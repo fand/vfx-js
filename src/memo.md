@@ -1,0 +1,12 @@
+- 登場人物
+  - VFXProvider
+  - VFXElement
+- VFXElementがやること
+  - マウント時にsceneを作成
+  - effect(シェーダー)をsceneに登録
+    - もしeffectが変更されたら登録し直し
+  - IntersectionObserverでisInViewportチェック
+  - Providerにデータをわたす
+    - scene
+    - isInViewport
+    - ref
