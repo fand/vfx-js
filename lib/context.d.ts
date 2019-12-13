@@ -1,4 +1,4 @@
-import { Dispatch } from 'react';
+import { Dispatch } from "react";
 export declare type VFXElementType = "img" | "span";
 export interface VFXElement {
     id: number;
@@ -6,7 +6,10 @@ export interface VFXElement {
     isInViewport: boolean;
     element: HTMLElement;
     scene: THREE.Scene;
-    material: THREE.Material;
+    camera: THREE.Camera;
+    uniforms: {
+        [name: string]: THREE.IUniform;
+    };
 }
 export interface VFXElementsState {
     elements: VFXElement[];
