@@ -1,8 +1,6 @@
-import { createContext, Dispatch } from 'react';
+import { createContext, Dispatch } from "react";
 
-export type VFXElementType =
-    | "img"
-    | "span";
+export type VFXElementType = "img" | "span";
 
 export interface VFXElement {
     id: number;
@@ -10,7 +8,8 @@ export interface VFXElement {
     isInViewport: boolean;
     element: HTMLElement;
     scene: THREE.Scene;
-    material: THREE.Material;
+    camera: THREE.Camera;
+    uniforms: { [name: string]: THREE.IUniform };
 }
 
 export interface VFXElementsState {
@@ -23,15 +22,21 @@ export interface VFXState {
 }
 
 export const initialState: VFXElementsState = {
-    elements: [],
+    elements: []
 };
 
 export type Action =
-    | { type: "ADD_ELEMENT", payload: VFXElement }
-    | { type: "REMOVE_ELEMENT", payload: { id: number } }
-    | { type: "TOGGLE_ELEMENT", payload: { id: number, isInViewport: boolean } };
+    | { type: "ADD_ELEMENT"; payload: VFXElement }
+    | { type: "REMOVE_ELEMENT"; payload: { id: number } }
+    | {
+          type: "TOGGLE_ELEMENT";
+          payload: { id: number; isInViewport: boolean };
+      };
 
-export function reducer(state: VFXElementsState, action: Action): VFXElementsState {
+export function reducer(
+    state: VFXElementsState,
+    action: Action
+): VFXElementsState {
     if (process.env.NODE_ENV !== "production") {
         console.log(">> action", action);
     }
@@ -40,14 +45,16 @@ export function reducer(state: VFXElementsState, action: Action): VFXElementsSta
         case "ADD_ELEMENT": {
             return {
                 ...state,
-                elements: state.elements.concat(action.payload),
+                elements: state.elements.concat(action.payload)
             };
         }
         case "REMOVE_ELEMENT": {
-            const newElements = state.elements.filter(e => e.id !== action.payload.id);
+            const newElements = state.elements.filter(
+                e => e.id !== action.payload.id
+            );
             return {
                 ...state,
-                elements: newElements,
+                elements: newElements
             };
         }
         case "TOGGLE_ELEMENT": {
@@ -60,7 +67,7 @@ export function reducer(state: VFXElementsState, action: Action): VFXElementsSta
 
             return {
                 ...state,
-                elements: newElements,
+                elements: newElements
             };
         }
         default: {
@@ -68,7 +75,6 @@ export function reducer(state: VFXElementsState, action: Action): VFXElementsSta
         }
     }
 }
-
 
 // eslint-disable-next-line
 export const VFXContext = createContext<VFXState>({} as any);
