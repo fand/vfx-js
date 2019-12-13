@@ -1,1 +1,1 @@
-export declare function textToImage(text: string, style: CSSStyleDeclaration): string;
+export declare function textToImage(text: string, rect: ClientRect | DOMRect, style: CSSStyleDeclaration): string;

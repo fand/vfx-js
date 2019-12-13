@@ -10,7 +10,8 @@ const canvasStyle = {
     left: 0,
     width: "100vw",
     height: "100vh",
-    zIndex: 9999
+    zIndex: 9999,
+    pointerEvents: "none"
 };
 
 export interface VFXProviderProps {

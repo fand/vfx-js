@@ -118,7 +118,7 @@ const VFXText: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = props => {
                 if (ref.current == null) {
                     return;
                 }
-                // ref.current.style.opacity = "0"; // hide original element
+                ref.current.style.opacity = "0"; // hide original element
                 const url = canvas.toDataURL();
                 const img = new Image();
                 const texture = new THREE.Texture(img);

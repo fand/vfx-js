@@ -1,5 +1,53 @@
+body {
+  background: #FA4669;
+}
+
+img {
+  max-width: 100%;
+}
+
 .App {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
   text-align: center;
+}
+.App-frame {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: 20px solid #FA4669;
+  z-index: 999999;
+  pointer-events: none;
+}
+.App-inner {
+  position: absolute;
+  margin: 20px;
+  width: calc(100% - 40px);
+  height: calc(100% - 40px);
+  /* pointer-events: none; */
+  background: #4425E3;
+  z-index: 99999;
+  overflow: scroll;
+}
+
+.App-hero {
+  width: calc(100vw - 40px);
+  height: calc(100vh - 40px);
+  pointer-events: none;
+  box-sizing: border-box;
+  font-size: 10vw;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+.App-hero-logo {
+  flex-grow: 0;
 }
 
 .App-logo {
