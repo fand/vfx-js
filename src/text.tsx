@@ -5,7 +5,7 @@ import { useIntersection } from "use-intersection";
 import { VFXContext, VFXElementType } from "./context";
 import { createElementId } from "./util";
 import { textToImage } from "./text-canvas";
-// import * as html2canvas from 'html2canvas';
+import * as html2canvas from "html2canvas";
 
 // function css(element: HTMLElement, property: string) {
 //     if (typeof window !== 'undefined') {
@@ -38,7 +38,7 @@ void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
     gl_FragColor = vec4(uv, sin(time) * .5 + .5, 1);
-    gl_FragColor *= smoothstep(0., 1., texture2D(src, uv).a);
+    gl_FragColor *= 1. - smoothstep(0., 1., texture2D(src, uv).r);
 }
 `;
 
@@ -55,7 +55,7 @@ const VFXText: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = props => {
         }
 
         // Override alpha
-        ref.current.style.opacity = "0";
+        // ref.current.style.opacity = "0";
 
         // Convert text to texture
         const refStyle = getStyle(ref.current)!;
@@ -109,6 +109,29 @@ const VFXText: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = props => {
         };
 
         dispatch({ type: "ADD_ELEMENT", payload: elem });
+
+        setTimeout(() => {
+            if (ref.current == null) {
+                return;
+            }
+            html2canvas(ref.current).then(canvas => {
+                if (ref.current == null) {
+                    return;
+                }
+                // ref.current.style.opacity = "0"; // hide original element
+                const url = canvas.toDataURL();
+                const img = new Image();
+                const texture = new THREE.Texture(img);
+                img.onload = () => {
+                    texture.needsUpdate = true;
+                };
+                img.src = url;
+                texture.minFilter = THREE.LinearFilter;
+                texture.magFilter = THREE.LinearFilter;
+                texture.format = THREE.RGBAFormat;
+                uniforms.src.value = texture;
+            });
+        }, Math.random() * 1000 + 1000);
 
         return () => {
             dispatch({ type: "REMOVE_ELEMENT", payload: { id: id.current } });
