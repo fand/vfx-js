@@ -22,7 +22,7 @@ void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
     gl_FragColor = vec4(uv, sin(time) * .5 + .5, 1);
-    gl_FragColor *= texture2D(src, uv).b;
+    gl_FragColor *= smoothstep(0., 1., texture2D(src, uv).a);
 }
 `;
 
@@ -38,10 +38,14 @@ const VFXImg: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = props => {
             return;
         }
 
+        // Override alpha
+        ref.current.style.opacity = "0";
+
+        // const texture = new THREE.TextureLoader().load(ref.current.src);
         const texture = new THREE.Texture(ref.current);
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
-        texture.format = THREE.RGBFormat;
+        texture.format = THREE.RGBAFormat;
         texture.needsUpdate = true;
 
         const uniforms = {

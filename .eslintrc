@@ -25,6 +25,7 @@
       },
     ],
     "@typescript-eslint/indent": ["warn", 4],
+    "react/prop-types": "off"
   },
   "settings": {
     "react": {
