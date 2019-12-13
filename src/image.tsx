@@ -4,27 +4,7 @@ import * as THREE from "three";
 import { useIntersection } from "use-intersection";
 import { VFXContext, VFXElementType } from "./context";
 import { createElementId } from "./util";
-
-const DEFAULT_VERTEX_SHADER = `
-precision mediump float;
-void main() {
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-
-const fs = `
-precision mediump float;
-uniform vec2 resolution;
-uniform vec2 offset;
-uniform float time;
-uniform sampler2D src;
-void main() {
-    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-
-    gl_FragColor = vec4(uv, sin(time) * .5 + .5, 1);
-    gl_FragColor *= smoothstep(0., 1., texture2D(src, uv).a);
-}
-`;
+import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
 
 const VFXImg: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = props => {
     const { dispatch } = useContext(VFXContext);
@@ -64,7 +44,7 @@ const VFXImg: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = props => {
         const geometry = new THREE.PlaneGeometry(2, 2);
         const material = new THREE.ShaderMaterial({
             vertexShader: DEFAULT_VERTEX_SHADER,
-            fragmentShader: fs,
+            fragmentShader: shaders.uvGradient,
             transparent: true,
             uniforms
         });

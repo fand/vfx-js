@@ -10,20 +10,20 @@ const App: React.FC = () => {
                 <VFX.VFXProvider>
                     <section className="App-hero">
                         <div className="App-hero-logo">
-                            <VFX.VFXText>REACT-VFX</VFX.VFXText>
+                            <VFX.VFXSpan>REACT-VFX</VFX.VFXSpan>
                         </div>
                     </section>
 
                     <VFX.VFXImg src="logo512.png" />
-                    <VFX.VFXText>Hello React-VFX!</VFX.VFXText>
+                    <VFX.VFXSpan>Hello React-VFX!</VFX.VFXSpan>
                     <VFX.VFXImg src="logo192.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <h1>
-                        <VFX.VFXText>Hello React-VFX!fooooooooo</VFX.VFXText>
+                        <VFX.VFXDiv>This is DIVVVVVVVVVVVVVVVVVVVv????</VFX.VFXDiv>
                     </h1>
                     <p>
-                        <VFX.VFXText>
+                        <VFX.VFXSpan>
                             Lorem ipsum dolor sit amet, consectetur adipiscing
                             elit. Donec molestie, ligula sit amet ullamcorper
                             scelerisque, urna tellus dictum lacus, quis
@@ -67,14 +67,14 @@ const App: React.FC = () => {
                             Nunc ut sem euismod, accumsan enim quis, ornare
                             felis. Nam in quam sed libero venenatis vestibulum
                             eu vitae lacus.
-                        </VFX.VFXText>
+                        </VFX.VFXSpan>
                     </p>
                     <VFX.VFXImg src="logo512.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <h2>
-                        <VFX.VFXText>Hello React-VFX!barrrrrrrrrrr</VFX.VFXText>
+                        <VFX.VFXSpan>Hello React-VFX!barrrrrrrrrrr</VFX.VFXSpan>
                     </h2>
                     <VFX.VFXImg src="logo512.png" />
                     <VFX.VFXImg src="logo192.png" />
@@ -82,12 +82,12 @@ const App: React.FC = () => {
                     <VFX.VFXImg src="logo192.png" />
                     <h3>
                         <i>
-                            <VFX.VFXText>BAzzzzzzzzzzzzzzzzzz</VFX.VFXText>
+                            <VFX.VFXSpan>BAzzzzzzzzzzzzzzzzzz</VFX.VFXSpan>
                         </i>
                     </h3>
                     <VFX.VFXImg src="logo512.png" />
                     <h1>
-                        <VFX.VFXText>Hello React-VFX!</VFX.VFXText>
+                        <VFX.VFXSpan>Hello React-VFX!</VFX.VFXSpan>
                     </h1>
                     <VFX.VFXImg src="logo512.png" />
                     <h1>yo</h1>
