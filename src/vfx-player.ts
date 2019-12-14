@@ -19,6 +19,7 @@ export default class VFXPlayer {
     isPlaying = false;
     pixelRatio = 2;
     elements: VFXElement[] = [];
+    io: IntersectionObserver;
 
     constructor(private canvas: HTMLCanvasElement) {
         this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
@@ -31,6 +32,8 @@ export default class VFXPlayer {
 
         this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
         this.camera.position.set(0, 0, 1);
+
+        this.io = new IntersectionObserver(this.updateIntersection);
     }
 
     resize = debounce(async () => {
@@ -42,22 +45,43 @@ export default class VFXPlayer {
             this.renderer.setSize(w, h);
             this.renderer.setPixelRatio(this.pixelRatio);
 
-            // Update html2canvas result
+            // Update html2canvas result.
+            // Render elements in viewport first, then render elements outside of the viewport.
             for (const e of this.elements) {
-                if (e.type === "img") {
-                    continue;
+                if (e.type !== "img" && e.isInViewport) {
+                    await this.rerender(e);
                 }
-
-                e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
-                const canvas = await html2canvas(e.element);
-                e.element.style.setProperty("opacity", "0");
-
-                const texture = new THREE.Texture(canvas);
-                texture.needsUpdate = true;
-                e.uniforms["src"].value = texture;
+            }
+            for (const e of this.elements) {
+                if (e.type !== "img" && !e.isInViewport) {
+                    await this.rerender(e);
+                }
             }
         }
     }, 50);
+
+    updateIntersection = async (ints: IntersectionObserverEntry[]) => {
+        // TODO: unroll nested loop using Map<HTMLElement,VFXElement> etc.
+        for (const int of ints) {
+            for (const e of this.elements) {
+                if (e.element === int.target) {
+                    e.isInViewport = int.isIntersecting;
+                }
+            }
+        }
+    };
+
+    async rerender(e: VFXElement) {
+        const srcTexture = e.uniforms["src"];
+
+        e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
+        const canvas = await html2canvas(e.element);
+        e.element.style.setProperty("opacity", "0");
+
+        const texture = new THREE.Texture(canvas);
+        texture.needsUpdate = true;
+        srcTexture.value = texture;
+    }
 
     public async addElement(element: HTMLElement): Promise<void> {
         let texture: THREE.Texture;
@@ -115,12 +139,14 @@ export default class VFXPlayer {
         };
 
         this.elements.push(elem);
+        this.io.observe(element);
     }
 
     public removeElement(element: HTMLElement) {
         const i = this.elements.findIndex(e => e.element === element);
         if (i !== -1) {
             this.elements.splice(i, 1);
+            this.io.unobserve(element);
         }
     }
 
