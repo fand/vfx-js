@@ -1,4 +1,4 @@
-import * as html2canvas from "html2canvas";
+import html2canvas from "html2canvas";
 import PQueue from "p-queue";
 import delay from "delay";
 
@@ -12,5 +12,7 @@ pq.add(() => delay(0));
 export default function elementToCanvas(
     element: HTMLElement
 ): Promise<HTMLCanvasElement> {
-    return pq.add(() => html2canvas(element, { backgroundColor: null }));
+    return pq.add(() =>
+        html2canvas(element, { backgroundColor: null, scale: 2 })
+    );
 }

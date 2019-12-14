@@ -1,8 +1,7 @@
 import * as React from "react";
-import { useReducer } from "react";
-import { Canvas } from "react-three-fiber";
-import { VFXContext, reducer, initialState } from "./context";
-import VFXCanvas from "./canvas";
+import { useState, useRef, useEffect } from "react";
+import { VFXContext } from "./context";
+import VFXPlayer from "./vfx-player";
 
 const canvasStyle = {
     position: "fixed",
@@ -19,15 +18,28 @@ export interface VFXProviderProps {
 }
 
 export const VFXProvider: React.FC<VFXProviderProps> = props => {
-    const [state, dispatch] = useReducer(reducer, initialState);
-    const value = { state, dispatch };
+    const [player, setPlayer] = useState<VFXPlayer | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    useEffect(() => {
+        if (canvasRef.current == null) {
+            return;
+        }
+
+        const player = new VFXPlayer(canvasRef.current);
+        setPlayer(player);
+
+        player.play();
+
+        return () => {
+            player.stop();
+        };
+    }, [canvasRef]);
 
     return (
         <>
-            <Canvas style={canvasStyle as any}>
-                <VFXCanvas elements={state.elements} />
-            </Canvas>
-            <VFXContext.Provider value={value}>
+            <canvas ref={canvasRef} style={canvasStyle as any} />
+            <VFXContext.Provider value={player}>
                 {props.children}
             </VFXContext.Provider>
         </>

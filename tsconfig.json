@@ -14,6 +14,7 @@
     "moduleResolution": "node",
     "jsx": "react",
     "skipLibCheck": true,
+    "esModuleInterop": true
   },
   "include": ["src"],
 }
