@@ -22,6 +22,8 @@ const App: React.FC = () => {
                     <h1>
                         <VFX.VFXDiv>This is DIVVVVVVVVVVVVVVVVVVVv????</VFX.VFXDiv>
                     </h1>
+                    <VFX.VFXVideo src="mind_blown_2.mp4" shader="rainbow" autoPlay loop/>
+                    <video src="mind_blown_2.mp4" autoPlay loop/>
                     <p>
                         <VFX.VFXSpan>
                             Lorem ipsum dolor sit amet, consectetur adipiscing

@@ -1,6 +1,9 @@
 /// <reference types="lodash" />
-import * as THREE from 'three';
-export declare type VFXElementType = "img" | "span";
+import * as THREE from "three";
+export interface VFXProps {
+    shader?: string;
+}
+export declare type VFXElementType = "img" | "span" | "video";
 export interface VFXElement {
     type: VFXElementType;
     isInViewport: boolean;
@@ -17,9 +20,12 @@ export default class VFXPlayer {
     isPlaying: boolean;
     pixelRatio: number;
     elements: VFXElement[];
+    io: IntersectionObserver;
     constructor(canvas: HTMLCanvasElement);
     resize: (() => Promise<void>) & import("lodash").Cancelable;
-    addElement(element: HTMLElement): Promise<void>;
+    updateIntersection: (ints: IntersectionObserverEntry[]) => Promise<void>;
+    rerender(e: VFXElement): Promise<void>;
+    addElement(element: HTMLElement, opts?: VFXProps): Promise<void>;
     removeElement(element: HTMLElement): void;
     updateElement(): void;
     play(): void;

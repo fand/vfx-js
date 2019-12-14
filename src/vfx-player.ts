@@ -3,7 +3,11 @@ import html2canvas from "./h2c-queued";
 import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
 import debounce from "lodash.debounce";
 
-export type VFXElementType = "img" | "span";
+export interface VFXProps {
+    shader?: string;
+}
+
+export type VFXElementType = "img" | "span" | "video";
 
 export interface VFXElement {
     type: VFXElementType;
@@ -83,13 +87,23 @@ export default class VFXPlayer {
         srcTexture.value = texture;
     }
 
-    public async addElement(element: HTMLElement): Promise<void> {
+    public async addElement(
+        element: HTMLElement,
+        opts: VFXProps = {}
+    ): Promise<void> {
+        // Init opts
+        const shaderName = opts.shader || "uvGradient";
+        const shader = (shaders as any)[shaderName] || shaders.uvGradient;
+
+        // Create values for element types
         let texture: THREE.Texture;
         let type: VFXElementType;
-
         if (element instanceof HTMLImageElement) {
             texture = new THREE.Texture(element);
             type = "img" as VFXElementType;
+        } else if (element instanceof HTMLVideoElement) {
+            texture = new THREE.VideoTexture(element);
+            type = "video" as VFXElementType;
         } else {
             const canvas = await html2canvas(element);
             texture = new THREE.Texture(canvas);
@@ -112,15 +126,14 @@ export default class VFXPlayer {
         };
 
         const scene = new THREE.Scene();
-
         const geometry = new THREE.PlaneGeometry(2, 2);
+
         const material = new THREE.ShaderMaterial({
             vertexShader: DEFAULT_VERTEX_SHADER,
-            fragmentShader: shaders.uvGradient,
+            fragmentShader: shader,
             transparent: true,
             uniforms
         });
-
         material.extensions = {
             derivatives: true,
             drawBuffers: true,
@@ -176,6 +189,10 @@ export default class VFXPlayer {
             e.uniforms["offset"].value.x = rect.left * this.pixelRatio;
             e.uniforms["offset"].value.y =
                 (window.innerHeight - rect.top - rect.height) * this.pixelRatio;
+
+            if (e.type === "video") {
+                e.uniforms["src"].value.needsUpdate = true;
+            }
 
             this.camera.lookAt(e.scene.position);
             this.renderer.setViewport(
