@@ -2,6 +2,7 @@ import * as THREE from "three";
 import html2canvas from "./h2c-queued";
 import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
 import debounce from "lodash.debounce";
+import GIFData from "./gif";
 
 export interface VFXProps {
     shader?: string;
@@ -15,7 +16,10 @@ export interface VFXElement {
     element: HTMLElement;
     scene: THREE.Scene;
     uniforms: { [name: string]: THREE.IUniform };
+    isGif: boolean;
 }
+
+const gifFor = new Map<HTMLElement, GIFData>();
 
 export default class VFXPlayer {
     renderer: THREE.WebGLRenderer;
@@ -95,12 +99,27 @@ export default class VFXPlayer {
         const shaderName = opts.shader || "uvGradient";
         const shader = (shaders as any)[shaderName] || shaders.uvGradient;
 
+        const rect = element.getBoundingClientRect();
+
         // Create values for element types
         let texture: THREE.Texture;
         let type: VFXElementType;
+        let isGif = false;
         if (element instanceof HTMLImageElement) {
-            texture = new THREE.Texture(element);
             type = "img" as VFXElementType;
+            isGif = !!element.src.match(/\.gif/i);
+
+            if (isGif) {
+                const gif = await GIFData.create(
+                    element.src,
+                    rect.width,
+                    rect.height
+                );
+                gifFor.set(element, gif);
+                texture = new THREE.Texture(gif.getCanvas());
+            } else {
+                texture = new THREE.Texture(element);
+            }
         } else if (element instanceof HTMLVideoElement) {
             texture = new THREE.VideoTexture(element);
             type = "video" as VFXElementType;
@@ -148,7 +167,8 @@ export default class VFXPlayer {
             type,
             scene,
             uniforms,
-            isInViewport: true // TODO: Fix
+            isInViewport: true, // TODO: Fix
+            isGif
         };
 
         this.elements.push(elem);
@@ -190,7 +210,12 @@ export default class VFXPlayer {
             e.uniforms["offset"].value.y =
                 (window.innerHeight - rect.top - rect.height) * this.pixelRatio;
 
-            if (e.type === "video") {
+            if (gifFor.has(e.element)) {
+                const gif = gifFor.get(e.element)!;
+                gif.update();
+            }
+
+            if (e.type === "video" || e.isGif) {
                 e.uniforms["src"].value.needsUpdate = true;
             }
 

@@ -56,7 +56,7 @@ export const shaders = {
         float x = (uv.x - uv.y) - time;
 
         vec4 img = texture2D(src, uv);
-        img.rgb = hueShift(img.rgb, x);
+        img.rgb *= hueShift(vec3(1,0,0), x);
 
         gl_FragColor = img;
     }

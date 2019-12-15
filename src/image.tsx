@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useRef, useContext } from "react";
+import { useRef, useContext, useCallback } from "react";
 import { VFXContext } from "./context";
 
 export interface VFXProps {
@@ -13,7 +13,7 @@ const VFXImg: React.FC<VFXImgProps> = props => {
     const ref = useRef<HTMLImageElement>(null);
 
     // Create scene
-    useEffect(() => {
+    const init = useCallback(() => {
         if (ref.current === null) {
             return;
         }
@@ -30,7 +30,7 @@ const VFXImg: React.FC<VFXImgProps> = props => {
         };
     }, [ref, player]);
 
-    return <img ref={ref} {...props} />;
+    return <img ref={ref} {...props} onLoad={init} />;
 };
 
 export default VFXImg;

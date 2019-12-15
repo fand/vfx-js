@@ -13,17 +13,36 @@ const App: React.FC = () => {
                             <VFX.VFXSpan>REACT-VFX</VFX.VFXSpan>
                         </div>
                     </section>
-
                     <VFX.VFXImg src="logo512.png" />
                     <VFX.VFXSpan>Hello React-VFX!</VFX.VFXSpan>
                     <VFX.VFXImg src="logo192.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <h1>
-                        <VFX.VFXDiv>This is DIVVVVVVVVVVVVVVVVVVVv????</VFX.VFXDiv>
+                        <VFX.VFXDiv>
+                            This is DIVVVVVVVVVVVVVVVVVVVv????
+                        </VFX.VFXDiv>
                     </h1>
-                    <VFX.VFXVideo src="mind_blown_2.mp4" shader="rainbow" autoPlay loop/>
-                    <video src="mind_blown_2.mp4" autoPlay loop/>
+                    <h1>GIF</h1>
+                    <VFX.VFXImg src="mind_blown.gif" shader="rainbow" />
+                    <img src="mind_blown.gif" />
+                    <br />
+                    <VFX.VFXImg src="octocat.gif" shader="rainbow" />
+                    <img src="octocat.gif" />
+                    <br />
+                    <VFX.VFXImg src="cat.gif" shader="rainbow" />
+                    <img src="cat.gif" />
+                    <br />
+                    <VFX.VFXImg src="doge.gif" shader="rainbow" />
+                    <img src="doge.gif" />
+                    <h1>VIDEO</h1>
+                    <VFX.VFXVideo
+                        src="mind_blown_2.mp4"
+                        shader="rainbow"
+                        autoPlay
+                        loop
+                    />
+                    <video src="mind_blown_2.mp4" autoPlay loop />
                     <p>
                         <VFX.VFXSpan>
                             Lorem ipsum dolor sit amet, consectetur adipiscing
