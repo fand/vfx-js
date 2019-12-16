@@ -25,16 +25,16 @@ const App: React.FC = () => {
                     </h1>
                     <h1>GIF</h1>
                     <VFX.VFXImg src="mind_blown.gif" shader="rainbow" />
-                    <img src="mind_blown.gif" />
+                    <img src="mind_blown.gif" alt="mind_blown original" />
                     <br />
                     <VFX.VFXImg src="octocat.gif" shader="rainbow" />
-                    <img src="octocat.gif" />
+                    <img src="octocat.gif" alt="octocat original" />
                     <br />
                     <VFX.VFXImg src="cat.gif" shader="rainbow" />
-                    <img src="cat.gif" />
+                    <img src="cat.gif" alt="cat original" />
                     <br />
                     <VFX.VFXImg src="doge.gif" shader="rainbow" />
-                    <img src="doge.gif" />
+                    <img src="doge.gif" alt="doge original" />
                     <h1>VIDEO</h1>
                     <VFX.VFXVideo
                         src="mind_blown_2.mp4"

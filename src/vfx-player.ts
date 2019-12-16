@@ -8,7 +8,7 @@ export interface VFXProps {
     shader?: string;
 }
 
-export type VFXElementType = "img" | "span" | "video";
+export type VFXElementType = "img" | "video" | "text";
 
 export interface VFXElement {
     type: VFXElementType;
@@ -27,7 +27,11 @@ export default class VFXPlayer {
     isPlaying = false;
     pixelRatio = 2;
     elements: VFXElement[] = [];
-    io: IntersectionObserver;
+
+    w = 0;
+    h = 0;
+    scrollX = 0;
+    scrollY = 0;
 
     constructor(private canvas: HTMLCanvasElement) {
         this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
@@ -35,13 +39,13 @@ export default class VFXPlayer {
 
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.resize);
+            window.addEventListener("scroll", this.scroll, { passive: true });
         }
         this.resize();
+        this.scroll();
 
         this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
         this.camera.position.set(0, 0, 1);
-
-        this.io = new IntersectionObserver(this.updateIntersection);
     }
 
     resize = debounce(async () => {
@@ -52,31 +56,27 @@ export default class VFXPlayer {
             this.canvas.height = h;
             this.renderer.setSize(w, h);
             this.renderer.setPixelRatio(this.pixelRatio);
+            this.w = w;
+            this.h = h;
 
             // Update html2canvas result.
             // Render elements in viewport first, then render elements outside of the viewport.
             for (const e of this.elements) {
-                if (e.type !== "img" && e.isInViewport) {
+                if (e.type === "text" && e.isInViewport) {
                     await this.rerender(e);
                 }
             }
             for (const e of this.elements) {
-                if (e.type !== "img" && !e.isInViewport) {
+                if (e.type === "text" && !e.isInViewport) {
                     await this.rerender(e);
                 }
             }
         }
     }, 50);
 
-    updateIntersection = async (ints: IntersectionObserverEntry[]) => {
-        // TODO: unroll nested loop using Map<HTMLElement,VFXElement> etc.
-        for (const int of ints) {
-            for (const e of this.elements) {
-                if (e.element === int.target) {
-                    e.isInViewport = int.isIntersecting;
-                }
-            }
-        }
+    scroll = () => {
+        this.scrollX = window.scrollX;
+        this.scrollY = window.scrollY;
     };
 
     async rerender(e: VFXElement) {
@@ -126,7 +126,7 @@ export default class VFXPlayer {
         } else {
             const canvas = await html2canvas(element);
             texture = new THREE.Texture(canvas);
-            type = "span" as VFXElementType;
+            type = "text" as VFXElementType;
         }
 
         texture.minFilter = THREE.LinearFilter;
@@ -172,14 +172,12 @@ export default class VFXPlayer {
         };
 
         this.elements.push(elem);
-        this.io.observe(element);
     }
 
     public removeElement(element: HTMLElement) {
         const i = this.elements.findIndex(e => e.element === element);
         if (i !== -1) {
             this.elements.splice(i, 1);
-            this.io.unobserve(element);
         }
     }
 
@@ -197,11 +195,25 @@ export default class VFXPlayer {
     }
 
     playLoop = () => {
+        const viewport = {
+            left: this.scrollX,
+            right: this.scrollX + this.w,
+            top: this.scrollY,
+            bottom: this.scrollY + this.h
+        };
+
         this.elements.forEach(e => {
+            const rect = e.element.getBoundingClientRect();
+
+            // Check intersection
+            e.isInViewport =
+                rect.left >= viewport.left ||
+                rect.right <= viewport.right ||
+                rect.top >= viewport.top ||
+                rect.bottom <= viewport.bottom;
             if (!e.isInViewport) {
                 return;
             }
-            const rect = e.element.getBoundingClientRect();
 
             e.uniforms["time"].value += 0.03; // TODO: use correct time
             e.uniforms["resolution"].value.x = rect.width * this.pixelRatio; // TODO: use correct width, height
