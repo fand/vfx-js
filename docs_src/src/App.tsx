@@ -19,9 +19,7 @@ const App: React.FC = () => {
                     <VFX.VFXImg src="logo192.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <h1>
-                        <VFX.VFXDiv>
-                            This is DIVVVVVVVVVVVVVVVVVVVv????
-                        </VFX.VFXDiv>
+                        <VFX.VFXDiv>This is DIV</VFX.VFXDiv>
                     </h1>
                     <h1>GIF</h1>
 
