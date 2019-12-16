@@ -10,7 +10,7 @@ const App: React.FC = () => {
                 <VFX.VFXProvider>
                     <section className="App-hero">
                         <div className="App-hero-logo">
-                            <VFX.VFXSpan>REACT-VFX</VFX.VFXSpan>
+                            <VFX.VFXImg src="REACT-VFX.png" shader="halftone" />
                         </div>
                     </section>
                     <VFX.VFXImg src="logo512.png" />
