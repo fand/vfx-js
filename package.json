@@ -1,65 +1,65 @@
 {
-  "name": "react-vfx",
-  "version": "0.1.0",
-  "description": "WebGL effects for React elements",
-  "main": "lib/index.js",
-  "scripts": {
-    "dev": "run-p watch:lib watch:docs",
-    "watch:lib": "tsc -w",
-    "watch:docs": "cd docs_src && npm start",
-    "build": "run-p build:lib build:docs",
-    "build:lib": "tsc -d",
-    "build:docs": "cd docs_src && npm run build && mv build ../docs",
-    "lint": "eslint src/**/*"
-  },
-  "keywords": [],
-  "author": "fand <fand.gmork@gmail.com> (https://gmork.in/)",
-  "license": "MIT",
-  "peerDependencies": {
-    "react": ">= 16.3.0",
-    "react-dom": ">= 16.3.0"
-  },
-  "dependencies": {
-    "delay": "^4.3.0",
-    "html2canvas": "^1.0.0-rc.5",
-    "lodash.debounce": "^4.0.8",
-    "p-queue": "^6.2.1",
-    "react-intersection-observer": "^8.25.2",
-    "react-three-fiber": "^3.0.0",
-    "three": "^0.111.0",
-    "typescript": "^3.7.3",
-    "use-intersection": "^0.2.0"
-  },
-  "devDependencies": {
-    "@types/delay": "^3.1.0",
-    "@types/html2canvas": "0.0.35",
-    "@types/lodash.debounce": "^4.0.6",
-    "@types/node": "^12.12.17",
-    "@types/p-queue": "^3.2.1",
-    "@types/react": "^16.9.16",
-    "@types/three": "^0.103.2",
-    "@typescript-eslint/eslint-plugin": "^2.11.0",
-    "@typescript-eslint/parser": "^2.11.0",
-    "eslint": "^6.7.2",
-    "eslint-config-prettier": "^6.7.0",
-    "eslint-plugin-prettier": "^3.1.1",
-    "eslint-plugin-react": "^7.17.0",
-    "husky": "^3.1.0",
-    "lint-staged": "^9.5.0",
-    "npm-run-all": "^4.1.5",
-    "prettier": "^1.19.1"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged",
-      "pre-publish": "npm run lint && npm run build:lib"
+    "name": "react-vfx",
+    "version": "0.1.0",
+    "description": "WebGL effects for React elements",
+    "main": "lib/index.js",
+    "scripts": {
+        "dev": "run-p watch:lib watch:docs",
+        "watch:lib": "tsc -w",
+        "watch:docs": "cd docs_src && npm start",
+        "build": "run-s build:lib build:docs",
+        "build:lib": "tsc -d",
+        "build:docs": "cd docs_src && npm run build && rm -rf ../docs && mv build ../docs",
+        "lint": "eslint src/**/*"
+    },
+    "keywords": [],
+    "author": "fand <fand.gmork@gmail.com> (https://gmork.in/)",
+    "license": "MIT",
+    "peerDependencies": {
+        "react": ">= 16.3.0",
+        "react-dom": ">= 16.3.0"
+    },
+    "dependencies": {
+        "delay": "^4.3.0",
+        "html2canvas": "^1.0.0-rc.5",
+        "lodash.debounce": "^4.0.8",
+        "p-queue": "^6.2.1",
+        "react-intersection-observer": "^8.25.2",
+        "react-three-fiber": "^3.0.0",
+        "three": "^0.111.0",
+        "typescript": "^3.7.3",
+        "use-intersection": "^0.2.0"
+    },
+    "devDependencies": {
+        "@types/delay": "^3.1.0",
+        "@types/html2canvas": "0.0.35",
+        "@types/lodash.debounce": "^4.0.6",
+        "@types/node": "^12.12.17",
+        "@types/p-queue": "^3.2.1",
+        "@types/react": "^16.9.16",
+        "@types/three": "^0.103.2",
+        "@typescript-eslint/eslint-plugin": "^2.11.0",
+        "@typescript-eslint/parser": "^2.11.0",
+        "eslint": "^6.7.2",
+        "eslint-config-prettier": "^6.7.0",
+        "eslint-plugin-prettier": "^3.1.1",
+        "eslint-plugin-react": "^7.17.0",
+        "husky": "^3.1.0",
+        "lint-staged": "^9.5.0",
+        "npm-run-all": "^4.1.5",
+        "prettier": "^1.19.1"
+    },
+    "husky": {
+        "hooks": {
+            "pre-commit": "lint-staged",
+            "pre-publish": "npm run lint && npm run build:lib"
+        }
+    },
+    "lint-staged": {
+        "src/*.{ts,tsx}": [
+            "eslint --fix",
+            "prettier --write",
+            "git add"
+        ]
     }
-  },
-  "lint-staged": {
-    "src/*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write",
-      "git add"
-    ]
-  }
 }

@@ -3,7 +3,7 @@ import * as THREE from "three";
 export interface VFXProps {
     shader?: string;
 }
-export declare type VFXElementType = "img" | "span" | "video";
+export declare type VFXElementType = "img" | "video" | "text";
 export interface VFXElement {
     type: VFXElementType;
     isInViewport: boolean;
@@ -21,10 +21,13 @@ export default class VFXPlayer {
     isPlaying: boolean;
     pixelRatio: number;
     elements: VFXElement[];
-    io: IntersectionObserver;
+    w: number;
+    h: number;
+    scrollX: number;
+    scrollY: number;
     constructor(canvas: HTMLCanvasElement);
     resize: (() => Promise<void>) & import("lodash").Cancelable;
-    updateIntersection: (ints: IntersectionObserverEntry[]) => Promise<void>;
+    scroll: () => void;
     rerender(e: VFXElement): Promise<void>;
     addElement(element: HTMLElement, opts?: VFXProps): Promise<void>;
     removeElement(element: HTMLElement): void;

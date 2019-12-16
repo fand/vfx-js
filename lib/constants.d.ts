@@ -2,4 +2,7 @@ export declare const DEFAULT_VERTEX_SHADER = "\nprecision mediump float;\nvoid m
 export declare const shaders: {
     uvGradient: string;
     rainbow: string;
+    glitch: string;
+    pixelate: string;
+    halftone: string;
 };
