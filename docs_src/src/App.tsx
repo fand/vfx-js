@@ -1,8 +1,22 @@
-import React from "react";
+import React, { useState } from "react";
+import { useDebounce } from "react-use";
 import "./App.css";
 import * as VFX from "react-vfx";
 
 const App: React.FC = () => {
+    const [text, setText] = useState("You can dynamically!!!!");
+    const [debouncedText, setDebouncedText] = useState(
+        "You can dynamically!!!!"
+    );
+
+    useDebounce(
+        () => {
+            setDebouncedText(text);
+        },
+        100,
+        [text]
+    );
+
     return (
         <div className="App">
             <div className="App-frame"></div>
@@ -10,19 +24,38 @@ const App: React.FC = () => {
                 <VFX.VFXProvider>
                     <section className="App-hero">
                         <div className="App-hero-logo">
-                            <VFX.VFXImg src="REACT-VFX.png" shader="halftone" />
+                            <VFX.VFXImg
+                                src="logo-mobile@2x.png"
+                                shader="rgbShift"
+                            />
                         </div>
                     </section>
-                    <VFX.VFXImg src="logo512.png" />
+                    <section className="Section2">
+                        <p>
+                            REACT-VFX is a React component library. It allows
+                            you to use WebGL power to stylize your React
+                            application.
+                        </p>
+                    </section>
+                    <section className="Secton3">
+                        <VFX.VFXSpan shader="rainbow">
+                            {debouncedText}
+                        </VFX.VFXSpan>
+                        <br />
+                        <input
+                            style={{ fontSize: 36 }}
+                            type="text"
+                            value={text}
+                            onChange={e => setText(e.target.value)}
+                        ></input>
+                    </section>
                     <VFX.VFXSpan>Hello React-VFX!</VFX.VFXSpan>
-                    <VFX.VFXImg src="logo192.png" />
-                    <VFX.VFXImg src="logo192.png" />
+                    <br />
                     <VFX.VFXImg src="logo192.png" />
                     <h1>
                         <VFX.VFXDiv>This is DIV</VFX.VFXDiv>
                     </h1>
                     <h1>GIF</h1>
-
                     <img src="mind_blown.gif" alt="mind_blown original" />
                     <img src="octocat.gif" alt="octocat original" />
                     <img src="cat.gif" alt="cat original" />
@@ -93,7 +126,7 @@ const App: React.FC = () => {
                     <VFX.VFXImg src="logo192.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <h2>
-                        <VFX.VFXSpan>Hello React-VFX!barrrrrrrrrrr</VFX.VFXSpan>
+                        <VFX.VFXSpan>Hello React-VFX!br</VFX.VFXSpan>
                     </h2>
                     <VFX.VFXImg src="logo512.png" />
                     <VFX.VFXImg src="logo192.png" />
@@ -101,7 +134,7 @@ const App: React.FC = () => {
                     <VFX.VFXImg src="logo192.png" />
                     <h3>
                         <i>
-                            <VFX.VFXSpan>BAzzzzzzzzzzzzzzzzzz</VFX.VFXSpan>
+                            <VFX.VFXSpan>BAzzzzz</VFX.VFXSpan>
                         </i>
                     </h3>
                     <VFX.VFXImg src="logo512.png" />

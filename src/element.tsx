@@ -2,11 +2,18 @@ import * as React from "react";
 import { useEffect, useRef, useContext } from "react";
 import { VFXContext } from "./context";
 
+// TODO: DRY
+export interface VFXProps {
+    shader?: string;
+}
+
+type VFXElementProps<T> = React.HTMLAttributes<T> & VFXProps;
+
 function VFXElementFactory<T extends HTMLElement>(
     type: keyof React.ReactHTML
-): React.FC<React.HTMLAttributes<T>> {
-    const VFXElement: React.FC<React.HTMLAttributes<T>> = (
-        props: React.HTMLAttributes<T>
+): React.FC<VFXElementProps<T>> {
+    const VFXElement: React.FC<VFXElementProps<T>> = (
+        props: VFXElementProps<T>
     ) => {
         const player = useContext(VFXContext);
         const ref = useRef<T>(null);
@@ -26,6 +33,15 @@ function VFXElementFactory<T extends HTMLElement>(
                 player?.removeElement(ref.current);
             };
         }, [ref, player]);
+
+        // Rerender if the content is updated
+        useEffect(() => {
+            if (ref.current === null) {
+                return;
+            }
+
+            player?.updateElement(ref.current);
+        }, [props.children]);
 
         return React.createElement(type, { ...props, ref });
     };

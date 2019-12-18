@@ -10,6 +10,7 @@
     "react": "^16.12.0",
     "react-dom": "^16.12.0",
     "react-scripts": "3.3.0",
+    "react-use": "^13.12.2",
     "react-vfx": "file:..",
     "typescript": "~3.7.2"
   },

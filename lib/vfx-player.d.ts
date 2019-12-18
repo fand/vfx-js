@@ -31,7 +31,7 @@ export default class VFXPlayer {
     rerender(e: VFXElement): Promise<void>;
     addElement(element: HTMLElement, opts?: VFXProps): Promise<void>;
     removeElement(element: HTMLElement): void;
-    updateElement(): void;
+    updateElement(element: HTMLElement): Promise<void>;
     play(): void;
     stop(): void;
     playLoop: () => void;

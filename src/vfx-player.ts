@@ -81,14 +81,17 @@ export default class VFXPlayer {
 
     async rerender(e: VFXElement) {
         const srcTexture = e.uniforms["src"];
+        try {
+            e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
+            const canvas = await html2canvas(e.element);
+            e.element.style.setProperty("opacity", "0");
 
-        e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
-        const canvas = await html2canvas(e.element);
-        e.element.style.setProperty("opacity", "0");
-
-        const texture = new THREE.Texture(canvas);
-        texture.needsUpdate = true;
-        srcTexture.value = texture;
+            const texture = new THREE.Texture(canvas);
+            texture.needsUpdate = true;
+            srcTexture.value = texture;
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     public async addElement(
@@ -174,23 +177,28 @@ export default class VFXPlayer {
         this.elements.push(elem);
     }
 
-    public removeElement(element: HTMLElement) {
+    public removeElement(element: HTMLElement): void {
         const i = this.elements.findIndex(e => e.element === element);
         if (i !== -1) {
             this.elements.splice(i, 1);
         }
     }
 
-    public updateElement() {
-        // TODO: implement
+    public updateElement(element: HTMLElement): Promise<void> {
+        const i = this.elements.findIndex(e => e.element === element);
+        if (i !== -1) {
+            return this.rerender(this.elements[i]);
+        }
+
+        return Promise.reject();
     }
 
-    public play() {
+    public play(): void {
         this.isPlaying = true;
         this.playLoop();
     }
 
-    public stop() {
+    public stop(): void {
         this.isPlaying = false;
     }
 
@@ -238,7 +246,9 @@ export default class VFXPlayer {
                 rect.width,
                 rect.height
             );
-            this.renderer.render(e.scene, this.camera);
+            try {
+                this.renderer.render(e.scene, this.camera);
+            } catch {}
         });
 
         if (this.isPlaying) {

@@ -123,6 +123,51 @@ export const shaders = {
         gl_FragColor = texture2D(src, uv);
     }
     `,
+    rgbShift: `
+    precision mediump float;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    uniform sampler2D src;
+
+    float random(vec2 st) {
+        return fract(sin(dot(st, vec2(948.,824.))) * 30284.);
+    }
+
+    void main (void) {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec2 uvr = uv, uvg = uv, uvb = uv;
+
+        if (fract(time * 0.3) > .9 || fract(time * 0.71) > .9) {
+            float t = floor(time * 7.);
+
+            float n = random(vec2(t, floor(uv.y * 3.7)));
+            if (n > .94) {
+                uvr.x = fract(uvr.x + random(vec2(t, 1.)) * .03);
+                uvg.x = fract(uvr.x + random(vec2(t, 2.)) * .03);
+                uvb.x = fract(uvr.x + random(vec2(t, 3.)) * .03);
+            }
+
+            float ny = random(vec2(t * 17. + floor(uv * 13.7)));
+            if (ny > .97) {
+                uvr.x = fract(uvr.x + random(vec2(t, 1.)) * .1);
+                uvg.x = fract(uvr.x + random(vec2(t, 2.)) * .1);
+                uvb.x = fract(uvr.x + random(vec2(t, 3.)) * .1);
+            }
+        }
+
+        vec4 cr = texture2D(src, uvr);
+        vec4 cg = texture2D(src, uvg);
+        vec4 cb = texture2D(src, uvb);
+
+        gl_FragColor = vec4(
+            cr.r,
+            cg.g,
+            cb.b,
+            step(.1, cr.a + cg.a + cb.a)
+        );
+    }
+    `,
     halftone: `
     // Halftone Effect by zoidberg
     // https://www.interactiveshaderformat.com/sketches/234

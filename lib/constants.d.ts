@@ -4,5 +4,6 @@ export declare const shaders: {
     rainbow: string;
     glitch: string;
     pixelate: string;
+    rgbShift: string;
     halftone: string;
 };
