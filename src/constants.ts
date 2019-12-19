@@ -53,7 +53,10 @@ export const shaders = {
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        float x = (uv.x - uv.y) - time;
+        vec2 uv2 = uv;
+        uv2.x *= resolution.x / resolution.y;
+
+        float x = (uv2.x - uv2.y) - time;
 
         vec4 img = texture2D(src, uv);
         img.rgb *= hueShift(vec3(1,0,0), x);
@@ -123,7 +126,7 @@ export const shaders = {
         gl_FragColor = texture2D(src, uv);
     }
     `,
-    rgbShift: `
+    rgbGlitch: `
     precision mediump float;
     uniform vec2 resolution;
     uniform vec2 offset;
@@ -142,14 +145,14 @@ export const shaders = {
             float t = floor(time * 7.);
 
             float n = random(vec2(t, floor(uv.y * 3.7)));
-            if (n > .94) {
+            if (n > .9) {
                 uvr.x = fract(uvr.x + random(vec2(t, 1.)) * .03);
                 uvg.x = fract(uvr.x + random(vec2(t, 2.)) * .03);
                 uvb.x = fract(uvr.x + random(vec2(t, 3.)) * .03);
             }
 
             float ny = random(vec2(t * 17. + floor(uv * 13.7)));
-            if (ny > .97) {
+            if (ny > .9) {
                 uvr.x = fract(uvr.x + random(vec2(t, 1.)) * .1);
                 uvg.x = fract(uvr.x + random(vec2(t, 2.)) * .1);
                 uvb.x = fract(uvr.x + random(vec2(t, 3.)) * .1);
@@ -159,6 +162,47 @@ export const shaders = {
         vec4 cr = texture2D(src, uvr);
         vec4 cg = texture2D(src, uvg);
         vec4 cb = texture2D(src, uvb);
+
+        gl_FragColor = vec4(
+            cr.r,
+            cg.g,
+            cb.b,
+            step(.1, cr.a + cg.a + cb.a)
+        );
+    }
+    `,
+    rgbShift: `
+    precision mediump float;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    uniform sampler2D src;
+
+    float nn(float y, float t) {
+        float n = (
+            sin(y * .07 + t * 8. + sin(y * .5 + t * 10.)) +
+            sin(y * .7 + t * 2. + sin(y * .3 + t * 8.)) * .7 +
+            sin(y * 1.1 + t * 2.8) * .4
+        );
+
+        n += sin(y * 124. + t * 100.7) * sin(y * 877. - t * 38.8) * .3;
+
+        return n;
+    }
+
+    void main (void) {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec2 uvr = uv, uvg = uv, uvb = uv;
+
+        if (abs(nn(uv.y, time)) > 1.) {
+            uvr.x += nn(uv.y, time) * .01;
+            uvg.x += nn(uv.y, time + 10.) * .01;
+            uvb.x += nn(uv.y, time + 20.) * .01;
+        }
+
+        vec4 cr = texture2D(src, fract(uvr));
+        vec4 cg = texture2D(src, fract(uvg));
+        vec4 cb = texture2D(src, fract(uvb));
 
         gl_FragColor = vec4(
             cr.r,
