@@ -3,6 +3,18 @@ import { useDebounce } from "react-use";
 import "./App.css";
 import * as VFX from "react-vfx";
 
+const blink = `
+    precision mediump float;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    uniform sampler2D src;
+    void main() {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        gl_FragColor = texture2D(src, uv) * (1. - sin(time * 10.));
+    }
+`;
+
 const App: React.FC = () => {
     const [text, setText] = useState("You can dynamically!!!!");
     const [debouncedText, setDebouncedText] = useState(
@@ -31,11 +43,11 @@ const App: React.FC = () => {
                         </div>
                     </section>
                     <section className="Section2">
-                        <p>
+                        <VFX.VFXP shader={blink}>
                             REACT-VFX is a React component library. It allows
                             you to use WebGL power to stylize your React
                             application.
-                        </p>
+                        </VFX.VFXP>
                     </section>
                     <section className="Secton3">
                         <VFX.VFXSpan shader="rainbow">

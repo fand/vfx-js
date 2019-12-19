@@ -100,7 +100,7 @@ export default class VFXPlayer {
     ): Promise<void> {
         // Init opts
         const shaderName = opts.shader || "uvGradient";
-        const shader = (shaders as any)[shaderName] || shaders.uvGradient;
+        const shader = (shaders as any)[shaderName] || shaderName;
 
         const rect = element.getBoundingClientRect();
 

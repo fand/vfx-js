@@ -24,7 +24,8 @@ function VFXElementFactory<T extends HTMLElement>(
                 return;
             }
 
-            player?.addElement(ref.current);
+            const shader = props.shader;
+            player?.addElement(ref.current, { shader });
 
             return () => {
                 if (ref.current === null) {
