@@ -33,6 +33,9 @@ export default class VFXPlayer {
     scrollX = 0;
     scrollY = 0;
 
+    mouseX = 0;
+    mouseY = 0;
+
     constructor(private canvas: HTMLCanvasElement) {
         this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
         this.renderer.autoClear = false;
@@ -40,12 +43,21 @@ export default class VFXPlayer {
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.resize);
             window.addEventListener("scroll", this.scroll, { passive: true });
+            window.addEventListener("mousemove", this.mousemove);
         }
         this.resize();
         this.scroll();
 
         this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
         this.camera.position.set(0, 0, 1);
+    }
+
+    destroy(): void {
+        if (typeof window !== "undefined") {
+            window.removeEventListener("resize", this.resize);
+            window.removeEventListener("scroll", this.scroll);
+            window.removeEventListener("mousemove", this.mousemove);
+        }
     }
 
     resize = debounce(async () => {
@@ -74,12 +86,22 @@ export default class VFXPlayer {
         }
     }, 50);
 
-    scroll = () => {
-        this.scrollX = window.scrollX;
-        this.scrollY = window.scrollY;
+    scroll = (): void => {
+        if (typeof window !== "undefined") {
+            this.scrollX = window.scrollX;
+            this.scrollY = window.scrollY;
+            console.log(this.scrollX, this.scrollY);
+        }
     };
 
-    async rerender(e: VFXElement) {
+    mousemove = (e: MouseEvent): void => {
+        if (typeof window !== "undefined") {
+            this.mouseX = e.clientX;
+            this.mouseY = window.innerHeight - e.clientY;
+        }
+    };
+
+    async rerender(e: VFXElement): Promise<void> {
         const srcTexture = e.uniforms["src"];
         try {
             e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
@@ -144,7 +166,8 @@ export default class VFXPlayer {
             src: { type: "t", value: texture },
             resolution: { type: "v2", value: new THREE.Vector2() },
             offset: { type: "v2", value: new THREE.Vector2() },
-            time: { type: "f", value: 0.0 }
+            time: { type: "f", value: 0.0 },
+            mouse: { type: "v2", value: new THREE.Vector2() }
         };
 
         const scene = new THREE.Scene();
@@ -229,6 +252,8 @@ export default class VFXPlayer {
             e.uniforms["offset"].value.x = rect.left * this.pixelRatio;
             e.uniforms["offset"].value.y =
                 (window.innerHeight - rect.top - rect.height) * this.pixelRatio;
+            e.uniforms["mouse"].value.x = this.mouseX * this.pixelRatio;
+            e.uniforms["mouse"].value.y = this.mouseY * this.pixelRatio;
 
             if (gifFor.has(e.element)) {
                 const gif = gifFor.get(e.element)!;

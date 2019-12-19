@@ -15,6 +15,21 @@ const blink = `
     }
 `;
 
+const mouse = `
+    precision mediump float;
+    uniform vec2 offset;
+    uniform vec2 mouse;
+    uniform float time;
+    uniform sampler2D src;
+
+    void main() {
+        float l = length(gl_FragCoord.xy - mouse);
+        float threshold = 100.;
+        float c = smoothstep(threshold + .01, threshold, l);
+        gl_FragColor = vec4(c);
+    }
+`;
+
 const App: React.FC = () => {
     const [text, setText] = useState("You can dynamically!!!!");
     const [debouncedText, setDebouncedText] = useState(
@@ -38,7 +53,7 @@ const App: React.FC = () => {
                         <div className="App-hero-logo">
                             <VFX.VFXImg
                                 src="logo-mobile@2x.png"
-                                shader="rgbShift"
+                                shader={mouse}
                             />
                         </div>
                     </section>
