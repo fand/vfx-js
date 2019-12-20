@@ -25,9 +25,13 @@ export default class VFXPlayer {
     h: number;
     scrollX: number;
     scrollY: number;
+    mouseX: number;
+    mouseY: number;
     constructor(canvas: HTMLCanvasElement);
+    destroy(): void;
     resize: (() => Promise<void>) & import("lodash").Cancelable;
     scroll: () => void;
+    mousemove: (e: MouseEvent) => void;
     rerender(e: VFXElement): Promise<void>;
     addElement(element: HTMLElement, opts?: VFXProps): Promise<void>;
     removeElement(element: HTMLElement): void;

@@ -43,20 +43,14 @@ video {
     margin: 10px;
     width: calc(100% - 20px);
     height: calc(100% - 20px);
-    /* pointer-events: none; */
     background: var(--bg);
     z-index: 99999;
     overflow: scroll;
 }
 
 .App-hero {
-    position: relative;
-    width: calc(100% - 20px);
-    height: calc(100% - 20px);
-    pointer-events: none;
-    box-sizing: border-box;
-    font-size: 10vw;
-    font-weight: bold;
+    width: 100%;
+    height: 100%;
     display: flex;
     justify-content: space-around;
     align-items: center;

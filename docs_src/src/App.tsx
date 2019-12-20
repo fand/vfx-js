@@ -53,7 +53,7 @@ const App: React.FC = () => {
                         <div className="App-hero-logo">
                             <VFX.VFXImg
                                 src="logo-mobile@2x.png"
-                                shader={mouse}
+                                shader={"rgbShift"}
                             />
                         </div>
                     </section>
@@ -99,8 +99,16 @@ const App: React.FC = () => {
                         shader="rainbow"
                         autoPlay
                         loop
+                        muted
+                        playsInline
                     />
-                    <video src="mind_blown_2.mp4" autoPlay loop />
+                    <video
+                        src="mind_blown_2.mp4"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                    />
                     <p>
                         <VFX.VFXSpan>
                             Lorem ipsum dolor sit amet, consectetur adipiscing
@@ -111,52 +119,9 @@ const App: React.FC = () => {
                             gravida magna convallis quis. Nam congue quam ipsum,
                             id efficitur velit ornare ut. In auctor leo quis
                             laoreet sagittis. Donec auctor tincidunt sagittis.
-                            Fusce sit amet cursus ante. Duis bibendum leo a sem
-                            auctor efficitur. Nunc euismod placerat nisl, vel
-                            malesuada risus consectetur a. Curabitur fringilla,
-                            justo ac porta volutpat, purus orci hendrerit
-                            tellus, in semper leo leo nec mauris. Donec commodo
-                            mi eu fringilla posuere. Mauris cursus lorem enim.
-                            Proin sit amet tellus scelerisque, lobortis justo
-                            quis, pharetra lectus. Phasellus vulputate, felis id
-                            dignissim sodales, diam nisi efficitur orci, eu
-                            venenatis odio neque eget dolor. Sed eleifend
-                            ultricies tortor a congue. Cras tincidunt ipsum
-                            risus. Integer eu lacus quam. Aenean non iaculis
-                            augue. In viverra eleifend mi, sit amet tempor ante
-                            elementum in. Pellentesque rhoncus mi id nunc
-                            pretium ultricies. Etiam vulputate convallis
-                            sollicitudin. Maecenas accumsan diam eget erat
-                            tincidunt tempus. Ut pellentesque scelerisque
-                            consequat. Nulla egestas dolor eu diam lobortis
-                            condimentum. Curabitur consequat velit nec porta
-                            venenatis. Donec rhoncus lacus urna, sit amet tempus
-                            ante gravida eget. Suspendisse pretium, risus
-                            efficitur finibus sollicitudin, eros turpis
-                            hendrerit massa, ut dapibus quam sem ac tellus.
-                            Nullam eget dolor ut diam viverra sodales ac quis
-                            velit. Vivamus in lorem nisl. Sed iaculis
-                            scelerisque pharetra. Integer imperdiet id neque sed
-                            dignissim. Donec dui odio, efficitur vitae pharetra
-                            a, ullamcorper vel nibh. Praesent urna nisi,
-                            sollicitudin a sapien et, feugiat ullamcorper ex.
-                            Fusce ultrices tristique dolor vel fermentum.
-                            Quisque a molestie libero, sit amet venenatis
-                            mauris. Maecenas congue nisl quis ornare posuere.
-                            Nunc ut sem euismod, accumsan enim quis, ornare
-                            felis. Nam in quam sed libero venenatis vestibulum
-                            eu vitae lacus.
                         </VFX.VFXSpan>
                     </p>
                     <VFX.VFXImg src="logo512.png" />
-                    <VFX.VFXImg src="logo192.png" />
-                    <VFX.VFXImg src="logo192.png" />
-                    <VFX.VFXImg src="logo192.png" />
-                    <h2>
-                        <VFX.VFXSpan>Hello React-VFX!br</VFX.VFXSpan>
-                    </h2>
-                    <VFX.VFXImg src="logo512.png" />
-                    <VFX.VFXImg src="logo192.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <VFX.VFXImg src="logo192.png" />
                     <h3>
