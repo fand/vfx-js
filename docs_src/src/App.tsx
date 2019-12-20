@@ -76,9 +76,11 @@ const App: React.FC = () => {
                             onChange={e => setText(e.target.value)}
                         ></input>
                     </section>
-                    <VFX.VFXSpan>Hello React-VFX!</VFX.VFXSpan>
+                    <VFX.VFXSpan shader="warpTransition">
+                        Transition effect
+                    </VFX.VFXSpan>
                     <br />
-                    <VFX.VFXImg src="logo192.png" />
+                    <VFX.VFXImg shader="warpTransition" src="logo512.png" />
                     <h1>
                         <VFX.VFXDiv>This is DIV</VFX.VFXDiv>
                     </h1>

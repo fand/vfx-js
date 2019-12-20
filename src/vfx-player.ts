@@ -16,6 +16,8 @@ export interface VFXElement {
     element: HTMLElement;
     scene: THREE.Scene;
     uniforms: { [name: string]: THREE.IUniform };
+    startTime: number;
+    enterTime: number;
     isGif: boolean;
 }
 
@@ -126,7 +128,20 @@ export default class VFXPlayer {
         const shaderName = opts.shader || "uvGradient";
         const shader = (shaders as any)[shaderName] || shaderName;
 
-        // const rect = element.getBoundingClientRect();
+        const rect = element.getBoundingClientRect();
+        const viewport = {
+            left: this.scrollX,
+            right: this.scrollX + this.w,
+            top: this.scrollY,
+            bottom: this.scrollY + this.h
+        };
+        const isInViewport =
+            rect.right >= viewport.left &&
+            rect.left <= viewport.right &&
+            rect.bottom >= viewport.top &&
+            rect.top <= viewport.bottom;
+
+        console.log(isInViewport, rect, viewport);
 
         // Create values for element types
         let texture: THREE.Texture;
@@ -165,6 +180,7 @@ export default class VFXPlayer {
             resolution: { type: "v2", value: new THREE.Vector2() },
             offset: { type: "v2", value: new THREE.Vector2() },
             time: { type: "f", value: 0.0 },
+            enterTime: { type: "f", value: -1.0 },
             mouse: { type: "v2", value: new THREE.Vector2() }
         };
 
@@ -186,12 +202,15 @@ export default class VFXPlayer {
 
         scene.add(new THREE.Mesh(geometry, material));
 
+        const now = Date.now() / 1000;
         const elem = {
             element,
             type,
             scene,
             uniforms,
-            isInViewport: true, // TODO: Fix
+            startTime: now,
+            enterTime: isInViewport ? now : -1,
+            isInViewport,
             isGif
         };
 
@@ -231,20 +250,28 @@ export default class VFXPlayer {
             bottom: this.scrollY + this.h
         };
 
+        const now = Date.now() / 1000;
+
         this.elements.forEach(e => {
             const rect = e.element.getBoundingClientRect();
 
             // Check intersection
-            e.isInViewport =
-                rect.left >= viewport.left ||
-                rect.right <= viewport.right ||
-                rect.top >= viewport.top ||
-                rect.bottom <= viewport.bottom;
+            const isInViewport =
+                rect.right >= viewport.left &&
+                rect.left <= viewport.right &&
+                rect.bottom >= viewport.top &&
+                rect.top <= viewport.bottom;
+            if (isInViewport && !e.isInViewport) {
+                e.enterTime = now;
+            }
+            e.isInViewport = isInViewport;
+
             if (!e.isInViewport) {
                 return;
             }
-
-            e.uniforms["time"].value += 0.03; // TODO: use correct time
+            e.uniforms["time"].value = now - e.startTime;
+            e.uniforms["enterTime"].value =
+                e.enterTime === -1 ? 0 : now - e.enterTime;
             e.uniforms["resolution"].value.x = rect.width * this.pixelRatio; // TODO: use correct width, height
             e.uniforms["resolution"].value.y = rect.height * this.pixelRatio;
             e.uniforms["offset"].value.x = rect.left * this.pixelRatio;
