@@ -41,6 +41,8 @@ export default class VFXPlayer {
         this.renderer.autoClear = false;
 
         if (typeof window !== "undefined") {
+            this.pixelRatio = window.devicePixelRatio;
+
             window.addEventListener("resize", this.resize);
             window.addEventListener("scroll", this.scroll, { passive: true });
             window.addEventListener("mousemove", this.mousemove);
@@ -124,7 +126,7 @@ export default class VFXPlayer {
         const shaderName = opts.shader || "uvGradient";
         const shader = (shaders as any)[shaderName] || shaderName;
 
-        const rect = element.getBoundingClientRect();
+        // const rect = element.getBoundingClientRect();
 
         // Create values for element types
         let texture: THREE.Texture;
@@ -135,11 +137,7 @@ export default class VFXPlayer {
             isGif = !!element.src.match(/\.gif/i);
 
             if (isGif) {
-                const gif = await GIFData.create(
-                    element.src,
-                    rect.width,
-                    rect.height
-                );
+                const gif = await GIFData.create(element.src, this.pixelRatio);
                 gifFor.set(element, gif);
                 texture = new THREE.Texture(gif.getCanvas());
             } else {
@@ -273,7 +271,9 @@ export default class VFXPlayer {
             );
             try {
                 this.renderer.render(e.scene, this.camera);
-            } catch {}
+            } catch (e) {
+                console.error(e);
+            }
         });
 
         if (this.isPlaying) {

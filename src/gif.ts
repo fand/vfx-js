@@ -11,27 +11,35 @@ export default class GIFData {
     index = 0;
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
+    pixelRatio: number;
     startTime: number; // msec
     playTime = 0;
 
-    static async create(
-        src: string,
-        width: number,
-        height: number
-    ): Promise<GIFData> {
-        const frames = await fetch(src)
+    static async create(src: string, pixelRatio: number): Promise<GIFData> {
+        const gif = await fetch(src)
             .then(resp => resp.arrayBuffer())
-            .then(buff => new GIF(buff))
-            .then(gif => gif.decompressFrames(true));
+            .then(buff => new GIF(buff));
 
-        return new GIFData(frames as any, width, height);
+        const frames = gif.decompressFrames(true);
+        const width = (gif.raw as any).lsd.width;
+        const height = (gif.raw as any).lsd.height;
+
+        return new GIFData(frames as any, width, height, pixelRatio);
     }
 
-    private constructor(frames: GIFFrame[], width: number, height: number) {
+    private constructor(
+        frames: GIFFrame[],
+        width: number,
+        height: number,
+        pixelRatio: number
+    ) {
         this.frames = frames;
         this.canvas = document.createElement("canvas");
         this.ctx = this.canvas.getContext("2d")!;
+        this.pixelRatio = pixelRatio;
 
+        // Override canvas size by image size
+        // Because canvas does not support scaling ImageData.
         this.canvas.width = width;
         this.canvas.height = height;
 
