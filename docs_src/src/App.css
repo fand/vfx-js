@@ -1,8 +1,9 @@
 :root {
-    --frame-color: #99ffee;
-    --bloom-color: #00ffee;
+    --frame-color: #99FFEE;
+    --bloom-color: #00FFFF;
     --bg: #222222;
     --text: #ffffff;
+    --frame-width: 5px;
 }
 
 body {
@@ -16,36 +17,28 @@ video {
     max-width: 100%;
 }
 
+section {
+    min-height: 100vh;
+}
+
 .App {
+    padding: var(--frame-width);
+    box-sizing: border-box;
+    text-align: center;
+    background: var(--bg);
+}
+
+.App-frame {
     position: fixed;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
     box-sizing: border-box;
-    text-align: center;
-}
-
-.App-frame {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    border: 10px solid var(--frame-color);
+    border: var(--frame-width) solid var(--frame-color);
     z-index: 999999;
     pointer-events: none;
-    box-shadow: 0px 0px 10px var(--bloom-color),
-        inset 0px 0px 10px var(--bloom-color);
-}
-
-.App-inner {
-    position: absolute;
-    margin: 10px;
-    width: calc(100% - 20px);
-    height: calc(100% - 20px);
-    background: var(--bg);
-    z-index: 99999;
-    overflow: scroll;
+    box-shadow: inset 0px 0px 10px var(--bloom-color);
 }
 
 .App-hero {

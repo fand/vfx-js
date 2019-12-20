@@ -12,6 +12,8 @@ export interface VFXElement {
     uniforms: {
         [name: string]: THREE.IUniform;
     };
+    startTime: number;
+    enterTime: number;
     isGif: boolean;
 }
 export default class VFXPlayer {
@@ -39,4 +41,5 @@ export default class VFXPlayer {
     play(): void;
     stop(): void;
     playLoop: () => void;
+    isRectInViewport(rect: DOMRect): boolean;
 }

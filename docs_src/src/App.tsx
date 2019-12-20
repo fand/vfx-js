@@ -45,55 +45,44 @@ const App: React.FC = () => {
     );
 
     return (
-        <div className="App">
-            <div className="App-frame"></div>
-            <div className="App-inner">
-                <VFX.VFXProvider>
-                    <section className="App-hero">
-                        <div className="App-hero-logo">
-                            <VFX.VFXImg
-                                src="logo-mobile@2x.png"
-                                shader={"rgbShift"}
-                            />
-                        </div>
-                    </section>
-                    <section className="Section2">
-                        <VFX.VFXP shader={blink}>
-                            REACT-VFX is a React component library. It allows
-                            you to use WebGL power to stylize your React
-                            application.
-                        </VFX.VFXP>
-                    </section>
-
-                    <section className="Secton3">
-                        <VFX.VFXSpan shader="rainbow">
-                            {debouncedText}
-                        </VFX.VFXSpan>
-                        <br />
-                        <input
-                            style={{ fontSize: 36 }}
-                            type="text"
-                            value={text}
-                            onChange={e => setText(e.target.value)}
-                        ></input>
-                    </section>
-
-                    <section className="Secton3">
-                        <h2>Transition Effects!</h2>
-                        <VFX.VFXImg shader="warpTransition" src="logo192.png" />
+        <VFX.VFXProvider>
+            <div className="App">
+                <div className="App-frame"></div>
+                <section className="App-hero">
+                    <div className="App-hero-logo">
                         <VFX.VFXImg
-                            shader="slitScanTransition"
-                            src="logo192.png"
+                            src="logo-mobile@2x.png"
+                            shader={"rgbShift"}
                         />
-                        <VFX.VFXImg
-                            shader="pixelateTransition"
-                            src="logo192.png"
-                        />
-                    </section>
-                    <h1>
-                        <VFX.VFXDiv>This is DIV</VFX.VFXDiv>
-                    </h1>
-                    <h1>GIF</h1>
+                    </div>
+                </section>
+                <section className="Section2">
+                    <VFX.VFXP shader={blink}>
+                        REACT-VFX is a React component library. It allows you to
+                        use WebGL power to stylize your React application.
+                    </VFX.VFXP>
+                </section>
+
+                <section className="Secton3">
+                    <VFX.VFXSpan shader="rainbow">{debouncedText}</VFX.VFXSpan>
+                    <br />
+                    <input
+                        style={{ fontSize: 36 }}
+                        type="text"
+                        value={text}
+                        onChange={e => setText(e.target.value)}
+                    ></input>
+                </section>
+
+                <section className="Secton3">
+                    <h2>Transition Effects!</h2>
+                    <VFX.VFXImg shader="warpTransition" src="logo192.png" />
+                    <VFX.VFXImg shader="slitScanTransition" src="logo192.png" />
+                    <VFX.VFXImg shader="pixelateTransition" src="logo192.png" />
+                </section>
+
+                <section className="Section-Gif">
+                    <h2>GIF</h2>
                     <img src="mind_blown.gif" alt="mind_blown original" />
                     <img src="octocat.gif" alt="octocat original" />
                     <img src="cat.gif" alt="cat original" />
@@ -103,8 +92,10 @@ const App: React.FC = () => {
                     <VFX.VFXImg src="octocat.gif" shader="glitch" />
                     <VFX.VFXImg src="cat.gif" shader="rainbow" />
                     <VFX.VFXImg src="doge.gif" shader="pixelate" />
-                    <br />
-                    <h1>VIDEO</h1>
+                </section>
+
+                <section className="Section-Video">
+                    <h2>VIDEO</h2>
                     <VFX.VFXVideo
                         src="mind_blown_2.mp4"
                         shader="rainbow"
@@ -120,35 +111,14 @@ const App: React.FC = () => {
                         muted
                         playsInline
                     />
-                    <p>
-                        <VFX.VFXSpan>
-                            Lorem ipsum dolor sit amet, consectetur adipiscing
-                            elit. Donec molestie, ligula sit amet ullamcorper
-                            scelerisque, urna tellus dictum lacus, quis
-                            ultricies nunc nibh in justo. Donec mattis rutrum
-                            gravida. Curabitur lobortis lectus tellus, eu
-                            gravida magna convallis quis. Nam congue quam ipsum,
-                            id efficitur velit ornare ut. In auctor leo quis
-                            laoreet sagittis. Donec auctor tincidunt sagittis.
-                        </VFX.VFXSpan>
-                    </p>
-                    <VFX.VFXImg src="logo512.png" />
-                    <VFX.VFXImg src="logo192.png" />
-                    <VFX.VFXImg src="logo192.png" />
-                    <h3>
-                        <i>
-                            <VFX.VFXSpan>BAzzzzz</VFX.VFXSpan>
-                        </i>
-                    </h3>
-                    <VFX.VFXImg src="logo512.png" />
-                    <h1>
-                        <VFX.VFXSpan>Hello React-VFX!</VFX.VFXSpan>
-                    </h1>
-                    <VFX.VFXImg src="logo512.png" />
-                    <h1>yo</h1>
-                </VFX.VFXProvider>
+                </section>
+                <section>
+                    <h2>Author</h2>
+                    <img />
+                    <a href="https://twitter.com/amagitakayosi">AMAGI</a>
+                </section>
             </div>
-        </div>
+        </VFX.VFXProvider>
     );
 };
 

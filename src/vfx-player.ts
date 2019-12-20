@@ -94,7 +94,6 @@ export default class VFXPlayer {
         if (typeof window !== "undefined") {
             this.scrollX = window.scrollX;
             this.scrollY = window.scrollY;
-            console.log(this.scrollX, this.scrollY);
         }
     };
 
@@ -129,19 +128,7 @@ export default class VFXPlayer {
         const shader = (shaders as any)[shaderName] || shaderName;
 
         const rect = element.getBoundingClientRect();
-        const viewport = {
-            left: this.scrollX,
-            right: this.scrollX + this.w,
-            top: this.scrollY,
-            bottom: this.scrollY + this.h
-        };
-        const isInViewport =
-            rect.right >= viewport.left &&
-            rect.left <= viewport.right &&
-            rect.bottom >= viewport.top &&
-            rect.top <= viewport.bottom;
-
-        console.log(isInViewport, rect, viewport);
+        const isInViewport = this.isRectInViewport(rect);
 
         // Create values for element types
         let texture: THREE.Texture;
@@ -242,25 +229,14 @@ export default class VFXPlayer {
         this.isPlaying = false;
     }
 
-    playLoop = () => {
-        const viewport = {
-            left: this.scrollX,
-            right: this.scrollX + this.w,
-            top: this.scrollY,
-            bottom: this.scrollY + this.h
-        };
-
+    playLoop = (): void => {
         const now = Date.now() / 1000;
 
         this.elements.forEach(e => {
             const rect = e.element.getBoundingClientRect();
 
             // Check intersection
-            const isInViewport =
-                rect.right >= viewport.left &&
-                rect.left <= viewport.right &&
-                rect.bottom >= viewport.top &&
-                rect.top <= viewport.bottom;
+            const isInViewport = this.isRectInViewport(rect);
             if (isInViewport && !e.isInViewport) {
                 e.enterTime = now;
             }
@@ -307,4 +283,14 @@ export default class VFXPlayer {
             requestAnimationFrame(this.playLoop);
         }
     };
+
+    isRectInViewport(rect: DOMRect): boolean {
+        // TODO: Consider custom root element
+        return (
+            rect.left <= this.w &&
+            rect.right >= 0 &&
+            rect.top <= this.h &&
+            rect.bottom >= 0
+        );
+    }
 }

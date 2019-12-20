@@ -13,9 +13,10 @@ export default class GIFData {
     index: number;
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
+    pixelRatio: number;
     startTime: number;
     playTime: number;
-    static create(src: string, width: number, height: number): Promise<GIFData>;
+    static create(src: string, pixelRatio: number): Promise<GIFData>;
     private constructor();
     getCanvas(): HTMLCanvasElement;
     update(): void;
