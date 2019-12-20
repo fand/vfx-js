@@ -64,6 +64,7 @@ const App: React.FC = () => {
                             application.
                         </VFX.VFXP>
                     </section>
+
                     <section className="Secton3">
                         <VFX.VFXSpan shader="rainbow">
                             {debouncedText}
@@ -76,11 +77,19 @@ const App: React.FC = () => {
                             onChange={e => setText(e.target.value)}
                         ></input>
                     </section>
-                    <VFX.VFXSpan shader="warpTransition">
-                        Transition effect
-                    </VFX.VFXSpan>
-                    <br />
-                    <VFX.VFXImg shader="warpTransition" src="logo512.png" />
+
+                    <section className="Secton3">
+                        <h2>Transition Effects!</h2>
+                        <VFX.VFXImg shader="warpTransition" src="logo192.png" />
+                        <VFX.VFXImg
+                            shader="slitScanTransition"
+                            src="logo192.png"
+                        />
+                        <VFX.VFXImg
+                            shader="pixelateTransition"
+                            src="logo192.png"
+                        />
+                    </section>
                     <h1>
                         <VFX.VFXDiv>This is DIV</VFX.VFXDiv>
                     </h1>
