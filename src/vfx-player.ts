@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import html2canvas from "./h2c-queued";
+import dom2canvas from "./dom-to-canvas";
 import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
 import debounce from "lodash.debounce";
 import GIFData from "./gif";
@@ -108,7 +108,11 @@ export default class VFXPlayer {
         const srcTexture = e.uniforms["src"];
         try {
             e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
-            const canvas = await html2canvas(e.element);
+            // const canvas = await html2canvas(e.element);
+            const canvas = await dom2canvas(e.element);
+            if (canvas.width === 0 || canvas.width === 0) {
+                throw "omg";
+            }
             e.element.style.setProperty("opacity", "0");
 
             const texture = new THREE.Texture(canvas);
@@ -149,7 +153,8 @@ export default class VFXPlayer {
             texture = new THREE.VideoTexture(element);
             type = "video" as VFXElementType;
         } else {
-            const canvas = await html2canvas(element);
+            // const canvas = await html2canvas(element);
+            const canvas = await dom2canvas(element);
             texture = new THREE.Texture(canvas);
             type = "text" as VFXElementType;
         }

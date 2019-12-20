@@ -57,14 +57,22 @@ const App: React.FC = () => {
                     </div>
                 </section>
                 <section className="Section2">
-                    <VFX.VFXP shader={blink}>
+                    <VFX.VFXP shader="rainbow">
+                        REACT-VFX is a React component library. It allows you to
+                        use WebGL power to stylize your React application.
+                        REACT-VFX is a React component library. It allows you to
+                        use WebGL power to stylize your React application.
                         REACT-VFX is a React component library. It allows you to
                         use WebGL power to stylize your React application.
                     </VFX.VFXP>
                 </section>
 
                 <section className="Secton3">
-                    <VFX.VFXSpan shader="rainbow">{debouncedText}</VFX.VFXSpan>
+                    <h2>
+                        <VFX.VFXSpan shader="rainbow">
+                            {debouncedText}
+                        </VFX.VFXSpan>
+                    </h2>
                     <br />
                     <input
                         style={{ fontSize: 36 }}
