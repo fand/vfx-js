@@ -1,4 +1,3 @@
-/// <reference types="lodash" />
 import * as THREE from "three";
 export interface VFXProps {
     shader?: string;
@@ -31,7 +30,7 @@ export default class VFXPlayer {
     mouseY: number;
     constructor(canvas: HTMLCanvasElement);
     destroy(): void;
-    resize: (() => Promise<void>) & import("lodash").Cancelable;
+    resize: () => Promise<void>;
     scroll: () => void;
     mousemove: (e: MouseEvent) => void;
     rerender(e: VFXElement): Promise<void>;

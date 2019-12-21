@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import dom2canvas from "./dom-to-canvas";
 import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
-import debounce from "lodash.debounce";
 import GIFData from "./gif";
 
 export interface VFXProps {
@@ -64,7 +63,7 @@ export default class VFXPlayer {
         }
     }
 
-    resize = debounce(async () => {
+    resize = async (): Promise<void> => {
         if (typeof window !== "undefined") {
             const w = window.innerWidth;
             const h = window.innerHeight;
@@ -88,7 +87,7 @@ export default class VFXPlayer {
                 }
             }
         }
-    }, 50);
+    };
 
     scroll = (): void => {
         if (typeof window !== "undefined") {
