@@ -7,9 +7,10 @@
         "dev": "run-p watch:lib watch:docs",
         "watch:lib": "tsc -w",
         "watch:docs": "cd docs_src && npm start",
-        "build": "run-s build:lib build:docs",
+        "build": "run-s clean build:lib build:docs",
         "build:lib": "tsc -d",
-        "build:docs": "cd docs_src && npm run build && rm -rf ../docs && mv build ../docs",
+        "build:docs": "cd docs_src && npm run build && mv build ../docs",
+        "clean": "rimraf lib docs",
         "lint": "eslint src/**/*"
     },
     "keywords": [],
@@ -20,14 +21,10 @@
         "react-dom": ">= 16.3.0"
     },
     "dependencies": {
-        "lodash.debounce": "^4.0.8",
-        "react-intersection-observer": "^8.25.2",
-        "react-three-fiber": "^3.0.0",
         "three": "^0.111.0",
         "typescript": "^3.7.3"
     },
     "devDependencies": {
-        "@types/lodash.debounce": "^4.0.6",
         "@types/node": "^12.12.17",
         "@types/react": "^16.9.16",
         "@types/three": "^0.103.2",
@@ -40,7 +37,8 @@
         "husky": "^3.1.0",
         "lint-staged": "^9.5.0",
         "npm-run-all": "^4.1.5",
-        "prettier": "^1.19.1"
+        "prettier": "^1.19.1",
+        "rimraf": "^3.0.0"
     },
     "husky": {
         "hooks": {
