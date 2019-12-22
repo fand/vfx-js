@@ -30,6 +30,7 @@ export default class VFXPlayer {
     mouseY: number;
     constructor(canvas: HTMLCanvasElement);
     destroy(): void;
+    updateCanvasSize(): void;
     resize: () => Promise<void>;
     scroll: () => void;
     mousemove: (e: MouseEvent) => void;

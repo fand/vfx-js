@@ -63,7 +63,7 @@ export default class VFXPlayer {
         }
     }
 
-    resize = async (): Promise<void> => {
+    updateCanvasSize(): void {
         if (typeof window !== "undefined") {
             const w = window.innerWidth;
             const h = window.innerHeight;
@@ -73,7 +73,11 @@ export default class VFXPlayer {
             this.renderer.setPixelRatio(this.pixelRatio);
             this.w = w;
             this.h = h;
+        }
+    }
 
+    resize = async (): Promise<void> => {
+        if (typeof window !== "undefined") {
             // Update html2canvas result.
             // Render elements in viewport first, then render elements outside of the viewport.
             for (const e of this.elements) {
@@ -235,6 +239,10 @@ export default class VFXPlayer {
 
     playLoop = (): void => {
         const now = Date.now() / 1000;
+
+        // This must done every frame because iOS Safari doesn't fire
+        // window resize event while the address bar is transforming.
+        this.updateCanvasSize();
 
         this.elements.forEach(e => {
             const rect = e.element.getBoundingClientRect();
