@@ -33,6 +33,7 @@ export const VFXProvider: React.FC<VFXProviderProps> = props => {
 
         return () => {
             player.stop();
+            player.destroy();
         };
     }, [canvasRef]);
 

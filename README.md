@@ -1,10 +1,9 @@
 <div align="center">
-  <h1><img alt="REACT-VFX" src="https://user-images.githubusercontent.com/1403842/71322537-d2386280-250b-11ea-81f5-d84b04d8aad6.png" width="100%"/></h1>
+  <h1><img alt="REACT-VFX" src="https://user-images.githubusercontent.com/1403842/71323457-c69e6900-2516-11ea-958c-b96b2121387b.png" width="100%"/></h1>
   <h2>WebGL effects for React elements!!</2>
   <br>
   <br>
 </div>
-
 
 ## Install
 
@@ -116,8 +115,8 @@ uniform sampler2D texture2;
 
 ## Future work
 
-- Passing custom uniforms
-- Passing custom textures
+-   Passing custom uniforms
+-   Passing custom textures
 
 ## Author
 
@@ -126,5 +125,3 @@ uniform sampler2D texture2;
 ## LICENSE
 
 MIT
-
-

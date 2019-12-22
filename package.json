@@ -3,6 +3,7 @@
     "version": "0.1.0",
     "description": "WebGL effects for React elements",
     "main": "lib/index.js",
+    "types": "lib/index.d.ts",
     "scripts": {
         "dev": "run-p watch:lib watch:docs",
         "watch:lib": "tsc -w",
@@ -11,7 +12,7 @@
         "build:lib": "tsc -d",
         "build:docs": "cd docs_src && npm run build && mv build ../docs",
         "clean": "rimraf lib docs",
-        "lint": "eslint src/**/*"
+        "lint": "eslint src/**/*.ts src/**/*.tsx"
     },
     "keywords": [],
     "author": "fand <fand.gmork@gmail.com> (https://gmork.in/)",

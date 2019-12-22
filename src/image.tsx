@@ -1,10 +1,7 @@
 import * as React from "react";
 import { useRef, useContext, useCallback } from "react";
 import { VFXContext } from "./context";
-
-export interface VFXProps {
-    shader?: string;
-}
+import { VFXProps } from "./types";
 
 export type VFXImgProps = React.ImgHTMLAttributes<HTMLImageElement> & VFXProps;
 

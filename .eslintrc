@@ -1,43 +1,44 @@
 {
-  "parser": "@typescript-eslint/parser",
-  "env": {
-    "es6": true,
-    "node": true,
-    "browser": true,
-  },
-  "extends": [
-    "eslint:recommended",
-    "plugin:@typescript-eslint/recommended",
-    "prettier",
-    "plugin:react/recommended",
-  ],
-  "plugins": ["@typescript-eslint"],
-  "parserOptions": {
-    "sourceType": "module",
-    "project": "./tsconfig.json",
-  },
-  "rules": {
-    "@typescript-eslint/explicit-function-return-type": [
-      "warn",
-      {
-        "allowExpressions": true,
-        "allowTypedFunctionExpressions": true,
-      },
+    "parser": "@typescript-eslint/parser",
+    "env": {
+        "es6": true,
+        "node": true,
+        "browser": true
+    },
+    "extends": [
+        "eslint:recommended",
+        "plugin:@typescript-eslint/recommended",
+        "prettier",
+        "plugin:react/recommended"
     ],
-    "@typescript-eslint/indent": ["warn", 4],
-    "react/prop-types": "off"
-  },
-  "settings": {
-    "react": {
-      "version": "detect",
+    "plugins": ["@typescript-eslint"],
+    "parserOptions": {
+        "sourceType": "module",
+        "project": "./tsconfig.json"
     },
-  },
-  "overrides": [
-    {
-      "files": ["*.js"],
-      "rules": {
-        "@typescript-eslint/no-var-requires": 0,
-      },
+    "rules": {
+        "@typescript-eslint/explicit-function-return-type": [
+            "warn",
+            {
+                "allowExpressions": true,
+                "allowTypedFunctionExpressions": true
+            }
+        ],
+        "@typescript-eslint/indent": ["warn", 4],
+        "react/prop-types": "off"
     },
-  ],
+    "settings": {
+        "react": {
+            "version": "detect"
+        }
+    },
+    "overrides": [
+        {
+            "files": ["*.js"],
+            "rules": {
+                "@typescript-eslint/no-var-requires": 0
+            }
+        }
+    ],
+    "ignorePatterns": ["src/gifuct-js"]
 }

@@ -2,23 +2,7 @@ import * as THREE from "three";
 import dom2canvas from "./dom-to-canvas";
 import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
 import GIFData from "./gif";
-
-export interface VFXProps {
-    shader?: string;
-}
-
-export type VFXElementType = "img" | "video" | "text";
-
-export interface VFXElement {
-    type: VFXElementType;
-    isInViewport: boolean;
-    element: HTMLElement;
-    scene: THREE.Scene;
-    uniforms: { [name: string]: THREE.IUniform };
-    startTime: number;
-    enterTime: number;
-    isGif: boolean;
-}
+import { VFXProps, VFXElement, VFXElementType } from "./types";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -38,14 +22,19 @@ export default class VFXPlayer {
     mouseY = 0;
 
     constructor(private canvas: HTMLCanvasElement) {
-        this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+        this.renderer = new THREE.WebGLRenderer({
+            canvas,
+            alpha: true
+        });
         this.renderer.autoClear = false;
 
         if (typeof window !== "undefined") {
             this.pixelRatio = window.devicePixelRatio;
 
             window.addEventListener("resize", this.resize);
-            window.addEventListener("scroll", this.scroll, { passive: true });
+            window.addEventListener("scroll", this.scroll, {
+                passive: true
+            });
             window.addEventListener("mousemove", this.mousemove);
         }
         this.resize();
@@ -63,7 +52,7 @@ export default class VFXPlayer {
         }
     }
 
-    updateCanvasSize(): void {
+    private updateCanvasSize(): void {
         if (typeof window !== "undefined") {
             const w = window.innerWidth;
             const h = window.innerHeight;
@@ -76,9 +65,9 @@ export default class VFXPlayer {
         }
     }
 
-    resize = async (): Promise<void> => {
+    private resize = async (): Promise<void> => {
         if (typeof window !== "undefined") {
-            // Update html2canvas result.
+            // Update dom2canvas result.
             // Render elements in viewport first, then render elements outside of the viewport.
             for (const e of this.elements) {
                 if (e.type === "text" && e.isInViewport) {
@@ -93,21 +82,21 @@ export default class VFXPlayer {
         }
     };
 
-    scroll = (): void => {
+    private scroll = (): void => {
         if (typeof window !== "undefined") {
             this.scrollX = window.scrollX;
             this.scrollY = window.scrollY;
         }
     };
 
-    mousemove = (e: MouseEvent): void => {
+    private mousemove = (e: MouseEvent): void => {
         if (typeof window !== "undefined") {
             this.mouseX = e.clientX;
             this.mouseY = window.innerHeight - e.clientY;
         }
     };
 
-    async rerender(e: VFXElement): Promise<void> {
+    private async rerender(e: VFXElement): Promise<void> {
         const srcTexture = e.uniforms["src"];
         try {
             e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
@@ -126,10 +115,7 @@ export default class VFXPlayer {
         }
     }
 
-    public async addElement(
-        element: HTMLElement,
-        opts: VFXProps = {}
-    ): Promise<void> {
+    async addElement(element: HTMLElement, opts: VFXProps = {}): Promise<void> {
         // Init opts
         const shaderName = opts.shader || "uvGradient";
         const shader = (shaders as any)[shaderName] || shaderName;
@@ -156,7 +142,6 @@ export default class VFXPlayer {
             texture = new THREE.VideoTexture(element);
             type = "video" as VFXElementType;
         } else {
-            // const canvas = await html2canvas(element);
             const canvas = await dom2canvas(element);
             texture = new THREE.Texture(canvas);
             type = "text" as VFXElementType;
@@ -172,7 +157,10 @@ export default class VFXPlayer {
 
         const uniforms = {
             src: { type: "t", value: texture },
-            resolution: { type: "v2", value: new THREE.Vector2() },
+            resolution: {
+                type: "v2",
+                value: new THREE.Vector2()
+            },
             offset: { type: "v2", value: new THREE.Vector2() },
             time: { type: "f", value: 0.0 },
             enterTime: { type: "f", value: -1.0 },
@@ -212,14 +200,14 @@ export default class VFXPlayer {
         this.elements.push(elem);
     }
 
-    public removeElement(element: HTMLElement): void {
+    removeElement(element: HTMLElement): void {
         const i = this.elements.findIndex(e => e.element === element);
         if (i !== -1) {
             this.elements.splice(i, 1);
         }
     }
 
-    public updateElement(element: HTMLElement): Promise<void> {
+    updateElement(element: HTMLElement): Promise<void> {
         const i = this.elements.findIndex(e => e.element === element);
         if (i !== -1) {
             return this.rerender(this.elements[i]);
@@ -228,16 +216,16 @@ export default class VFXPlayer {
         return Promise.reject();
     }
 
-    public play(): void {
+    play(): void {
         this.isPlaying = true;
         this.playLoop();
     }
 
-    public stop(): void {
+    stop(): void {
         this.isPlaying = false;
     }
 
-    playLoop = (): void => {
+    private playLoop = (): void => {
         const now = Date.now() / 1000;
 
         // This must done every frame because iOS Safari doesn't fire
@@ -257,6 +245,8 @@ export default class VFXPlayer {
             if (!e.isInViewport) {
                 return;
             }
+
+            // Update uniforms
             e.uniforms["time"].value = now - e.startTime;
             e.uniforms["enterTime"].value =
                 e.enterTime === -1 ? 0 : now - e.enterTime;
@@ -268,8 +258,9 @@ export default class VFXPlayer {
             e.uniforms["mouse"].value.x = this.mouseX * this.pixelRatio;
             e.uniforms["mouse"].value.y = this.mouseY * this.pixelRatio;
 
-            if (gifFor.has(e.element)) {
-                const gif = gifFor.get(e.element)!;
+            // Update GIF frame
+            const gif = gifFor.get(e.element);
+            if (gif !== undefined) {
                 gif.update();
             }
 
@@ -277,6 +268,7 @@ export default class VFXPlayer {
                 e.uniforms["src"].value.needsUpdate = true;
             }
 
+            // Render to viewport
             this.camera.lookAt(e.scene.position);
             this.renderer.setViewport(
                 rect.left,
@@ -296,7 +288,7 @@ export default class VFXPlayer {
         }
     };
 
-    isRectInViewport(rect: DOMRect): boolean {
+    private isRectInViewport(rect: DOMRect): boolean {
         // TODO: Consider custom root element
         return (
             rect.left <= this.w &&

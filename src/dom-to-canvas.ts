@@ -1,4 +1,5 @@
-const getWellFormedHtml = (html: string): string => {
+// Convert HTML string to valid XML.
+const convertHtmlToXml = (html: string): string => {
     const doc = document.implementation.createHTMLDocument("test");
 
     const range = doc.createRange();
@@ -18,14 +19,16 @@ const getWellFormedHtml = (html: string): string => {
     return wfHtml.replace(/<!DOCTYPE html>/, "");
 };
 
+// Clone DOM node.
 function cloneNode<T extends Node>(node: T): T {
     return node.cloneNode() as T;
 }
 
+// Render element content to canvas and return it.
+// ref.
 export default function getCanvasFromElement(
     element: HTMLElement
 ): Promise<HTMLCanvasElement> {
-    const style = window.getComputedStyle(element, "");
     const rect = element.getBoundingClientRect();
 
     const canvas = document.createElement("canvas");
@@ -35,16 +38,16 @@ export default function getCanvasFromElement(
     // Clone element with styles in text attribute
     // to apply styles in SVG
     const newElement = cloneNode(element);
-    const styleText = style.cssText;
+    const styleText = window.getComputedStyle(element, "").cssText;
     newElement.setAttribute("style", styleText);
     newElement.innerHTML = element.innerHTML;
 
     // Create SVG string
     const html = newElement.outerHTML;
-    const wellFormedHtml = getWellFormedHtml(html);
-    const data =
+    const xml = convertHtmlToXml(html);
+    const svg =
         `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">` +
-        `<foreignObject width="100%" height="100%">${wellFormedHtml}</foreignObject></svg>`;
+        `<foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
 
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -58,7 +61,6 @@ export default function getCanvasFromElement(
             resolve(canvas);
         };
 
-        img.src =
-            "data:image/svg+xml;charset=utf-8," + encodeURIComponent(data);
+        img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     });
 }

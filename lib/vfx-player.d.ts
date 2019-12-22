@@ -1,20 +1,5 @@
 import * as THREE from "three";
-export interface VFXProps {
-    shader?: string;
-}
-export declare type VFXElementType = "img" | "video" | "text";
-export interface VFXElement {
-    type: VFXElementType;
-    isInViewport: boolean;
-    element: HTMLElement;
-    scene: THREE.Scene;
-    uniforms: {
-        [name: string]: THREE.IUniform;
-    };
-    startTime: number;
-    enterTime: number;
-    isGif: boolean;
-}
+import { VFXProps, VFXElement } from "./types";
 export default class VFXPlayer {
     private canvas;
     renderer: THREE.WebGLRenderer;
@@ -30,16 +15,16 @@ export default class VFXPlayer {
     mouseY: number;
     constructor(canvas: HTMLCanvasElement);
     destroy(): void;
-    updateCanvasSize(): void;
-    resize: () => Promise<void>;
-    scroll: () => void;
-    mousemove: (e: MouseEvent) => void;
-    rerender(e: VFXElement): Promise<void>;
+    private updateCanvasSize;
+    private resize;
+    private scroll;
+    private mousemove;
+    private rerender;
     addElement(element: HTMLElement, opts?: VFXProps): Promise<void>;
     removeElement(element: HTMLElement): void;
     updateElement(element: HTMLElement): Promise<void>;
     play(): void;
     stop(): void;
-    playLoop: () => void;
-    isRectInViewport(rect: DOMRect): boolean;
+    private playLoop;
+    private isRectInViewport;
 }

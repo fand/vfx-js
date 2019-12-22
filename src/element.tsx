@@ -1,11 +1,7 @@
 import * as React from "react";
 import { useEffect, useRef, useContext } from "react";
 import { VFXContext } from "./context";
-
-// TODO: DRY
-export interface VFXProps {
-    shader?: string;
-}
+import { VFXProps } from "./types";
 
 type VFXElementProps<T> = React.HTMLAttributes<T> & VFXProps;
 
