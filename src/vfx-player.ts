@@ -228,6 +228,8 @@ export default class VFXPlayer {
     private playLoop = (): void => {
         const now = Date.now() / 1000;
 
+        this.renderer.clear();
+
         // This must done every frame because iOS Safari doesn't fire
         // window resize event while the address bar is transforming.
         this.updateCanvasSize();
