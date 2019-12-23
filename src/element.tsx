@@ -16,20 +16,18 @@ function VFXElementFactory<T extends HTMLElement>(
 
         // Create scene
         useEffect(() => {
-            if (ref.current === null) {
+            const element = ref.current;
+            if (element === null) {
                 return;
             }
 
             const shader = props.shader;
-            player?.addElement(ref.current, { shader });
+            player?.addElement(element, { shader });
 
             return () => {
-                if (ref.current === null) {
-                    return;
-                }
-                player?.removeElement(ref.current);
+                player?.removeElement(element);
             };
-        }, [ref, player]);
+        }, [ref, player, props.shader]);
 
         // Rerender if the content is updated
         useEffect(() => {
@@ -38,7 +36,7 @@ function VFXElementFactory<T extends HTMLElement>(
             }
 
             player?.updateElement(ref.current);
-        }, [props.children]);
+        }, [player, props.children]);
 
         return React.createElement(type, { ...props, ref });
     };

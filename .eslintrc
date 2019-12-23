@@ -11,7 +11,7 @@
         "prettier",
         "plugin:react/recommended"
     ],
-    "plugins": ["@typescript-eslint"],
+    "plugins": ["@typescript-eslint", "react-hooks"],
     "parserOptions": {
         "sourceType": "module",
         "project": "./tsconfig.json"
@@ -25,7 +25,9 @@
             }
         ],
         "@typescript-eslint/indent": ["warn", 4],
-        "react/prop-types": "off"
+        "react/prop-types": "off",
+        "react-hooks/rules-of-hooks": "error",
+        "react-hooks/exhaustive-deps": "warn"
     },
     "settings": {
         "react": {
