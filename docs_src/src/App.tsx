@@ -51,12 +51,11 @@ const App: React.FC = () => {
             <div className="App">
                 <div className="App-frame"></div>
                 <section className="App-hero">
-                    <div className="App-hero-logo">
-                        <VFX.VFXImg
-                            src="logo-mobile@2x.png"
-                            shader={"rgbShift"}
-                        />
-                    </div>
+                    <VFX.VFXImg
+                        className={`App-hero-logo`}
+                        src="logo-mobile@2x.png"
+                        shader={"rgbShift"}
+                    />
                 </section>
                 <section className="Section2">
                     <VFX.VFXP shader="rainbow">
@@ -68,7 +67,6 @@ const App: React.FC = () => {
                         use WebGL power to stylize your React application.
                     </VFX.VFXP>
                 </section>
-
                 <section className="Secton3">
                     <h2>
                         <VFX.VFXSpan shader="rainbow">
@@ -83,14 +81,12 @@ const App: React.FC = () => {
                         onChange={e => setText(e.target.value)}
                     ></input>
                 </section>
-
                 <section className="Secton3">
                     <h2>Transition Effects!</h2>
                     <VFX.VFXImg shader="warpTransition" src="logo192.png" />
                     <VFX.VFXImg shader="slitScanTransition" src="logo192.png" />
                     <VFX.VFXImg shader="pixelateTransition" src="logo192.png" />
                 </section>
-
                 <section className="Section-Gif">
                     <h2>GIF</h2>
                     <img src="mind_blown.gif" alt="mind_blown original" />
@@ -103,7 +99,6 @@ const App: React.FC = () => {
                     <VFX.VFXImg src="cat.gif" shader="rainbow" />
                     <VFX.VFXImg src="doge.gif" shader="pixelate" />
                 </section>
-
                 <section className="Section-Video">
                     <h2>VIDEO</h2>
                     <VFX.VFXVideo

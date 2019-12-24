@@ -9,8 +9,8 @@ const canvasStyle = {
     left: 0,
     width: "100vw",
     height: "100vh",
-    zIndex: 9999,
-    pointerEvents: "none"
+    "z-index": 9999,
+    "pointer-events": "none"
 };
 
 export interface VFXProviderProps {
@@ -19,11 +19,17 @@ export interface VFXProviderProps {
 
 export const VFXProvider: React.FC<VFXProviderProps> = props => {
     const [player, setPlayer] = useState<VFXPlayer | null>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
         if (canvasRef.current == null) {
-            return;
+            const canvas = document.createElement("canvas");
+            for (const [k, v] of Object.entries(canvasStyle)) {
+                canvas.style.setProperty(k, v.toString());
+            }
+            document.body.appendChild(canvas);
+
+            canvasRef.current = canvas;
         }
 
         const player = new VFXPlayer(canvasRef.current);
@@ -34,12 +40,13 @@ export const VFXProvider: React.FC<VFXProviderProps> = props => {
         return () => {
             player.stop();
             player.destroy();
+            canvasRef.current?.remove();
         };
     }, [canvasRef]);
 
     return (
         <>
-            <canvas ref={canvasRef} style={canvasStyle as any} />
+            {/* <canvas ref={canvasRef} style={canvasStyle as any} /> */}
             <VFXContext.Provider value={player}>
                 {props.children}
             </VFXContext.Provider>

@@ -29,7 +29,8 @@ export default class VFXPlayer {
         this.renderer.autoClear = false;
 
         if (typeof window !== "undefined") {
-            this.pixelRatio = window.devicePixelRatio;
+            // this.pixelRatio = window.devicePixelRatio;
+            this.pixelRatio = 1;
 
             window.addEventListener("resize", this.resize);
             window.addEventListener("scroll", this.scroll, {

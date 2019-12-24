@@ -1,13 +1,16 @@
 :root {
-    --frame-color: #99FFEE;
+    --frame-color: #00FFEE;
     --bloom-color: #00FFFF;
+    /* --frame-color: #FF0000;
+    --bloom-color: #FF0000; */
     --bg: #222222;
     --text: #ffffff;
-    --frame-width: 5px;
+    --frame-width: 1px;
 }
 
 body {
-    background: var(--frame-color);
+    /* background: var(--frame-color); */
+    background: black;
     color: var(--text);
     font-size: 36px;
 }
@@ -39,6 +42,7 @@ section {
     z-index: 999999;
     pointer-events: none;
     box-shadow: inset 0px 0px 10px var(--bloom-color);
+    /* border-radius: 30px; */
 }
 
 .App-hero {
@@ -51,12 +55,8 @@ section {
 
 .App-hero-logo {
     flex-grow: 0;
-    width: 100%;
-}
-
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+    width: 1600px;
+    max-width: 80%;
 }
 
 section {
@@ -70,9 +70,9 @@ input {
     max-width: calc(100% - 40px);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
+@media (max-width: 768px) {
+    .App-hero-logo {
+        max-width: 110%;
     }
 }
 
@@ -89,14 +89,4 @@ input {
 
 .App-link {
     color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
 }
