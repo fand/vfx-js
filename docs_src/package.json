@@ -10,8 +10,10 @@
     "react": "^16.12.0",
     "react-dom": "^16.12.0",
     "react-scripts": "3.3.0",
+    "react-three-fiber": "^3.0.17",
     "react-use": "^13.12.2",
     "react-vfx": "file:..",
+    "three": "^0.111.0",
     "typescript": "~3.7.2"
   },
   "scripts": {
@@ -34,5 +36,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@types/three": "^0.103.2"
   }
 }
