@@ -1,0 +1,26 @@
+.AuthorSection {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-size: 1em;
+}
+
+.AuthorSection .name {
+    margin: 10px;
+}
+
+.AuthorSection .icon {
+    width: 360px;
+    max-width: 40%;
+}
+
+.AuthorSection a {
+    font-size: 1em;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.AuthorSection a:visited {
+    color: white;
+}

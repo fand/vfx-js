@@ -4,6 +4,7 @@ import * as VFX from "react-vfx";
 import Bg from "./Bg";
 import Frame from "./dom/Frame";
 import InputSection from "./dom/InputSection";
+import AuthorSection from "./dom/AuthorSection";
 
 const blink = `
     precision mediump float;
@@ -92,11 +93,7 @@ const App: React.FC = () => {
                         playsInline
                     />
                 </section>
-                <section>
-                    <h2>Author</h2>
-                    <img />
-                    <a href="https://twitter.com/amagitakayosi">AMAGI</a>
-                </section>
+                <AuthorSection />
             </div>
         </VFX.VFXProvider>
     );
