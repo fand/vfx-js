@@ -1,5 +1,5 @@
 import * as React from "react";
 import { VFXProps } from "./types";
-declare type VFXElementProps<T> = React.HTMLAttributes<T> & VFXProps;
-declare function VFXElementFactory<T extends HTMLElement>(type: keyof React.ReactHTML): React.FC<VFXElementProps<T>>;
+declare type VFXElementProps<T extends keyof JSX.IntrinsicElements> = JSX.IntrinsicElements[T] & VFXProps;
+declare function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(type: T): React.FC<VFXElementProps<T>>;
 export default VFXElementFactory;

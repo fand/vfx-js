@@ -8,6 +8,6 @@ import vVideo from "./video";
 export const VFXVideo = vVideo;
 
 import vElementFactory from "./element";
-export const VFXSpan = vElementFactory<HTMLSpanElement>("span");
-export const VFXDiv = vElementFactory<HTMLDivElement>("div");
-export const VFXP = vElementFactory<HTMLParagraphElement>("p");
+export const VFXSpan = vElementFactory<"span">("span");
+export const VFXDiv = vElementFactory<"div">("div");
+export const VFXP = vElementFactory<"p">("p");

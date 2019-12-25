@@ -3,7 +3,7 @@ import { useRef, useContext, useCallback } from "react";
 import { VFXContext } from "./context";
 import { VFXProps } from "./types";
 
-export type VFXImgProps = React.ImgHTMLAttributes<HTMLImageElement> & VFXProps;
+export type VFXImgProps = JSX.IntrinsicElements["img"] & VFXProps;
 
 const VFXImg: React.FC<VFXImgProps> = props => {
     const player = useContext(VFXContext);
@@ -25,7 +25,7 @@ const VFXImg: React.FC<VFXImgProps> = props => {
 
             player?.removeElement(ref.current);
         };
-    }, [ref, player]);
+    }, [props.shader, player]);
 
     return <img ref={ref} {...props} onLoad={init} />;
 };

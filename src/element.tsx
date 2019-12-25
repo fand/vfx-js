@@ -3,16 +3,18 @@ import { useEffect, useRef, useContext } from "react";
 import { VFXContext } from "./context";
 import { VFXProps } from "./types";
 
-type VFXElementProps<T> = React.HTMLAttributes<T> & VFXProps;
+type VFXElementProps<
+    T extends keyof JSX.IntrinsicElements
+> = JSX.IntrinsicElements[T] & VFXProps;
 
-function VFXElementFactory<T extends HTMLElement>(
-    type: keyof React.ReactHTML
+function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
+    type: T
 ): React.FC<VFXElementProps<T>> {
     const VFXElement: React.FC<VFXElementProps<T>> = (
         props: VFXElementProps<T>
     ) => {
         const player = useContext(VFXContext);
-        const ref = useRef<T>(null);
+        const ref = useRef<HTMLElement>(null);
 
         // Create scene
         useEffect(() => {

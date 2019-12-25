@@ -3,8 +3,7 @@ import { useRef, useContext, useCallback } from "react";
 import { VFXContext } from "./context";
 import { VFXProps } from "./types";
 
-export type VFXVideoProps = React.VideoHTMLAttributes<HTMLVideoElement> &
-    VFXProps;
+export type VFXVideoProps = JSX.IntrinsicElements["video"] & VFXProps;
 
 const VFXVideo: React.FC<VFXVideoProps> = props => {
     const player = useContext(VFXContext);
@@ -26,7 +25,7 @@ const VFXVideo: React.FC<VFXVideoProps> = props => {
 
             player?.removeElement(ref.current);
         };
-    }, [ref, player]);
+    }, [props.shader, player]);
 
     return <video ref={ref} {...props} onLoadedData={onLoadedData} />;
 };
