@@ -3,7 +3,7 @@ import "./App.css";
 import * as VFX from "react-vfx";
 import Bg from "./Bg";
 import Frame from "./dom/Frame";
-import debounce from "lodash.debounce";
+import InputSection from "./dom/InputSection";
 
 const blink = `
     precision mediump float;
@@ -33,23 +33,6 @@ const mouse = `
 `;
 
 const App: React.FC = () => {
-    const [text, setText] = useState("You can dynamically!!!!");
-    const [debouncedText, setDebouncedText] = useState(
-        "You can dynamically!!!!"
-    );
-
-    const setDebounced = useCallback(
-        debounce((t: string) => setDebouncedText(t)),
-        []
-    );
-    const update = useCallback(
-        e => {
-            setText(e.target.value);
-            setDebounced(text);
-        },
-        [text]
-    );
-
     return (
         <VFX.VFXProvider pixelRatio={1}>
             <Bg />
@@ -72,20 +55,7 @@ const App: React.FC = () => {
                         use WebGL power to stylize your React application.
                     </VFX.VFXP>
                 </section>
-                <section className="Secton3">
-                    <h2>
-                        <VFX.VFXSpan shader="rainbow">
-                            {debouncedText}
-                        </VFX.VFXSpan>
-                    </h2>
-                    <br />
-                    <input
-                        style={{ fontSize: 36 }}
-                        type="text"
-                        value={text}
-                        onChange={update}
-                    ></input>
-                </section>
+                <InputSection />
                 <section className="Secton3">
                     <h2>Transition Effects!</h2>
                     <VFX.VFXImg shader="warpTransition" src="logo192.png" />

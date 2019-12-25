@@ -32,21 +32,29 @@ export default function getCanvasFromElement(
     const rect = element.getBoundingClientRect();
 
     const canvas = document.createElement("canvas");
-    canvas.width = rect.width + 1; // XXX
-    canvas.height = rect.height + 1;
+    canvas.width = Math.max(rect.width * 1.01, rect.width + 1); // XXX
+    canvas.height = Math.max(rect.height * 1.01, rect.height + 1);
 
     // Clone element with styles in text attribute
     // to apply styles in SVG
     const newElement = cloneNode(element);
-    const styleText = window.getComputedStyle(element, "").cssText;
+    const styles = window.getComputedStyle(element, "");
+    const styleText = styles.cssText;
     newElement.setAttribute("style", styleText);
+    newElement.style.setProperty("margin", "0");
     newElement.innerHTML = element.innerHTML;
 
+    // Wrap the element for text styling
+    const wrapper = document.createElement("div");
+    wrapper.style.setProperty("text-align", styles.textAlign);
+    wrapper.style.setProperty("vertical-align", styles.verticalAlign);
+    wrapper.appendChild(newElement);
+
     // Create SVG string
-    const html = newElement.outerHTML;
+    const html = wrapper.outerHTML;
     const xml = convertHtmlToXml(html);
     const svg =
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">` +
+        `<svg xmlns="http://www.w3.org/2000/svg">` +
         `<foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
 
     return new Promise((resolve, reject) => {
