@@ -1,15 +1,12 @@
 :root {
     --frame-color: #00ffee;
     --bloom-color: #00ffff;
-    /* --frame-color: #FF0000;
-    --bloom-color: #FF0000; */
     --bg: #222222;
     --text: #ffffff;
     --frame-width: 1px;
 }
 
 body {
-    /* background: var(--frame-color); */
     background: black;
     color: var(--text);
     font-size: 36px;
@@ -52,26 +49,11 @@ section {
 
 input {
     margin: 20px;
-    max-width: calc(100% - 40px);
+    max-width: 80%;
 }
 
 @media (max-width: 768px) {
     .App-hero-logo {
         max-width: 110%;
     }
-}
-
-.App-header {
-    background-color: #282c34;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
-}
-
-.App-link {
-    color: #61dafb;
 }

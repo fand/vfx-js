@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { useDebounce } from "react-use";
+import React, { useState, useCallback } from "react";
 import "./App.css";
 import * as VFX from "react-vfx";
 import Bg from "./Bg";
 import Frame from "./dom/Frame";
+import debounce from "lodash.debounce";
 
 const blink = `
     precision mediump float;
@@ -38,11 +38,15 @@ const App: React.FC = () => {
         "You can dynamically!!!!"
     );
 
-    useDebounce(
-        () => {
-            setDebouncedText(text);
+    const setDebounced = useCallback(
+        debounce((t: string) => setDebouncedText(t)),
+        []
+    );
+    const update = useCallback(
+        e => {
+            setText(e.target.value);
+            setDebounced(text);
         },
-        100,
         [text]
     );
 
@@ -79,7 +83,7 @@ const App: React.FC = () => {
                         style={{ fontSize: 36 }}
                         type="text"
                         value={text}
-                        onChange={e => setText(e.target.value)}
+                        onChange={update}
                     ></input>
                 </section>
                 <section className="Secton3">

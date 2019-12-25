@@ -100,7 +100,7 @@ export default class VFXPlayer {
         const srcTexture = e.uniforms["src"];
         try {
             e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
-            // const canvas = await html2canvas(e.element);
+
             const canvas = await dom2canvas(e.element);
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";

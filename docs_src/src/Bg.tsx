@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useCallback } from "react";
 import { Canvas, useFrame, useThree, useResource } from "react-three-fiber";
 import { useSpring } from "react-spring";
 import * as THREE from "three";
-import Triangle from "./Triangle";
-import Fragments from "./Fragments";
-import Effects from "./Effects";
+import Triangle from "./gl/Triangle";
+import Fragments from "./gl/Fragments";
+import Effects from "./gl/Effects";
 
 const canvasStyle = {
     position: "fixed",
