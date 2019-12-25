@@ -1,0 +1,13 @@
+.Frame {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    border: var(--frame-width) solid var(--frame-color);
+    z-index: 999999;
+    pointer-events: none;
+    box-shadow: inset 0px 0px 10px var(--bloom-color);
+    transition: all 1s;
+}

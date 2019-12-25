@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useCallback } from "react";
 import { Canvas, useFrame, useThree, useResource } from "react-three-fiber";
 import { useSpring } from "react-spring";
 import * as THREE from "three";
-import Asteroids from "./Asteroids";
 import Triangle from "./Triangle";
+import Fragments from "./Fragments";
 import Effects from "./Effects";
 
 const canvasStyle = {
@@ -43,18 +43,14 @@ function Bg() {
     }, []);
 
     useFrame(() => {
-        if (typeof window === "undefined" || typeof document === "undefined") {
-            return;
-        }
-
         const s = top.getValue();
         camera.rotation.set(-Math.PI * 0.1 - s * Math.PI * 0.4, 0, 0);
     });
 
     return (
         <>
-            <Asteroids count={1500} scroll={top} />
             <Triangle scroll={top} />
+            <Fragments count={1500} scroll={top} />
         </>
     );
 }

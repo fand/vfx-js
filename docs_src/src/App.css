@@ -1,6 +1,6 @@
 :root {
-    --frame-color: #00FFEE;
-    --bloom-color: #00FFFF;
+    --frame-color: #00ffee;
+    --bloom-color: #00ffff;
     /* --frame-color: #FF0000;
     --bloom-color: #FF0000; */
     --bg: #222222;
@@ -28,21 +28,6 @@ section {
     padding: var(--frame-width);
     box-sizing: border-box;
     text-align: center;
-    /* background: var(--bg); */
-}
-
-.App-frame {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    border: var(--frame-width) solid var(--frame-color);
-    z-index: 999999;
-    pointer-events: none;
-    box-shadow: inset 0px 0px 10px var(--bloom-color);
-    /* border-radius: 30px; */
 }
 
 .App-hero {

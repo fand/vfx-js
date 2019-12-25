@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDebounce } from "react-use";
 import "./App.css";
 import * as VFX from "react-vfx";
 import Bg from "./Bg";
+import Frame from "./dom/Frame";
 
 const blink = `
     precision mediump float;
@@ -49,7 +50,7 @@ const App: React.FC = () => {
         <VFX.VFXProvider pixelRatio={1}>
             <Bg />
             <div className="App">
-                <div className="App-frame"></div>
+                <Frame />
                 <section className="App-hero">
                     <VFX.VFXImg
                         className={`App-hero-logo`}
