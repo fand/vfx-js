@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { useFrame, useResource } from "react-three-fiber";
+import { OpaqueInterpolation } from "react-spring";
 
 function randomRange(min: number, max: number): number {
     const diff = max - min;
@@ -45,7 +46,12 @@ function Particle({ geometry, material }: any) {
     return <mesh ref={ref} material={material} geometry={geometry} />;
 }
 
-function Asteroids({ count }: { count: number }) {
+type FragmentsProps = {
+    count: number;
+    scroll: OpaqueInterpolation<number>;
+};
+
+function Asteroids({ count, scroll }: FragmentsProps) {
     const groupRef = useRef<THREE.Group>();
     const [geometryRef, geometry] = useResource();
     const [materialRef, material] = useResource();
@@ -58,10 +64,9 @@ function Asteroids({ count }: { count: number }) {
             return;
         }
 
-        const scroll = window.scrollY / document.body.scrollHeight;
-
-        groupRef.current.position.set(0, scroll * 100 - 50, 0);
-        groupRef.current.rotation.set(0, Date.now() / 8000 + scroll * 5, 0);
+        const s = scroll.getValue();
+        groupRef.current.position.set(0, s * 100 - 50, 0);
+        groupRef.current.rotation.set(0, Date.now() / 8000 + s * 5, 0);
     });
 
     return (
