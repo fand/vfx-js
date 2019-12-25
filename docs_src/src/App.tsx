@@ -46,7 +46,7 @@ const App: React.FC = () => {
     );
 
     return (
-        <VFX.VFXProvider>
+        <VFX.VFXProvider pixelRatio={1}>
             <Bg />
             <div className="App">
                 <div className="App-frame"></div>

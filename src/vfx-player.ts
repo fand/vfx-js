@@ -21,7 +21,7 @@ export default class VFXPlayer {
     mouseX = 0;
     mouseY = 0;
 
-    constructor(private canvas: HTMLCanvasElement) {
+    constructor(private canvas: HTMLCanvasElement, pixelRatio?: number) {
         this.renderer = new THREE.WebGLRenderer({
             canvas,
             alpha: true
@@ -29,8 +29,7 @@ export default class VFXPlayer {
         this.renderer.autoClear = false;
 
         if (typeof window !== "undefined") {
-            // this.pixelRatio = window.devicePixelRatio;
-            this.pixelRatio = 1;
+            this.pixelRatio = pixelRatio || window.devicePixelRatio;
 
             window.addEventListener("resize", this.resize);
             window.addEventListener("scroll", this.scroll, {

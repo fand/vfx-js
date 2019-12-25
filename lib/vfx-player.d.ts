@@ -13,7 +13,7 @@ export default class VFXPlayer {
     scrollY: number;
     mouseX: number;
     mouseY: number;
-    constructor(canvas: HTMLCanvasElement);
+    constructor(canvas: HTMLCanvasElement, pixelRatio?: number);
     destroy(): void;
     private updateCanvasSize;
     private resize;

@@ -15,6 +15,7 @@ const canvasStyle = {
 
 export interface VFXProviderProps {
     children?: any; // 😣 https://github.com/DefinitelyTyped/DefinitelyTyped/issues/27805
+    pixelRatio?: number;
 }
 
 export const VFXProvider: React.FC<VFXProviderProps> = props => {
@@ -32,7 +33,7 @@ export const VFXProvider: React.FC<VFXProviderProps> = props => {
             canvasRef.current = canvas;
         }
 
-        const player = new VFXPlayer(canvasRef.current);
+        const player = new VFXPlayer(canvasRef.current, props.pixelRatio);
         setPlayer(player);
 
         player.play();
@@ -42,7 +43,7 @@ export const VFXProvider: React.FC<VFXProviderProps> = props => {
             player.destroy();
             canvasRef.current?.remove();
         };
-    }, [canvasRef]);
+    }, [canvasRef, props.pixelRatio]);
 
     return (
         <>
