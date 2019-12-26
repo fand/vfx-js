@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./Frame.css";
 
-const colors = [
-    "#00FFEE",
-    "#FF9900",
-    "#00FF99",
-    "#0099FF",
-    "#9900FF",
-    "#FF0099"
-];
+const colors = ["#00FFEE", "#00FF99", "#0099FF", "#9900FF", "#FF0099"];
 
 type Props = {
     interval?: number;

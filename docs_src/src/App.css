@@ -4,6 +4,7 @@
     --bg: #222222;
     --text: #ffffff;
     --frame-width: 1px;
+    --vh: 1vh;
 }
 
 body {
@@ -19,6 +20,7 @@ video {
 
 section {
     min-height: 100vh;
+    min-height: calc(100vh - var(--vh-offset, 0px));
 }
 
 .App {

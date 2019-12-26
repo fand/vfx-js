@@ -16,7 +16,8 @@
     "react-use": "^13.12.2",
     "react-vfx": "file:..",
     "three": "^0.111.0",
-    "typescript": "~3.7.2"
+    "typescript": "~3.7.2",
+    "vh-check": "^2.0.5"
   },
   "scripts": {
     "start": "react-scripts start",
