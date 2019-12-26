@@ -3,6 +3,7 @@ import "./App.css";
 import * as VFX from "react-vfx";
 import Bg from "./Bg";
 import Frame from "./dom/Frame";
+import LogoSection from "./dom/LogoSection";
 import InputSection from "./dom/InputSection";
 import AuthorSection from "./dom/AuthorSection";
 
@@ -39,13 +40,7 @@ const App: React.FC = () => {
             <Bg />
             <div className="App">
                 <Frame />
-                <section className="App-hero">
-                    <VFX.VFXImg
-                        className={`App-hero-logo`}
-                        src="logo-mobile@2x.png"
-                        shader={"rgbShift"}
-                    />
-                </section>
+                <LogoSection />
                 <section className="Section2">
                     <VFX.VFXP shader="rainbow">
                         REACT-VFX is a React component library. It allows you to

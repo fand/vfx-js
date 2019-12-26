@@ -1,0 +1,19 @@
+.LogoSection {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.LogoSection .logo {
+    flex-grow: 0;
+    width: 1600px;
+    max-width: 80%;
+}
+
+@media (max-width: 768px) {
+    .LogoSection .logo {
+        max-width: 110%;
+    }
+}
