@@ -56,7 +56,7 @@ export const shaders = {
         vec2 uv2 = uv;
         uv2.x *= resolution.x / resolution.y;
 
-        float x = (uv2.x - uv2.y) - time;
+        float x = (uv2.x - uv2.y) - fract(time);
 
         vec4 img = texture2D(src, uv);
         img.rgb *= hueShift(vec3(1,0,0), x);
@@ -87,41 +87,47 @@ export const shaders = {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
         vec4 color = texture2D(src, uv);
 
-        // Seed value
-        float v = fract(sin(time * 2.) * 700.);
+        float t = mod(time, 3.14 * 10.);
 
-        if (abs(nn(uv.y, time)) < 1.2) {
+        // Seed value
+        float v = fract(sin(t * 2.) * 700.);
+
+        if (abs(nn(uv.y, t)) < 1.2) {
             v *= 0.01;
         }
 
         // Prepare for chromatic Abbreveation
         vec2 focus = vec2(0.5);
-        float d = v * 0.06;
-        vec2 ruv = focus + (uv - focus) * (1. - d);
-        vec2 guv = focus + (uv - focus) * (1. - 2. * d);
-        vec2 buv = focus + (uv - focus) * (1. - 3. * d);
+        float d = v * 0.6;
+        vec2 ruv = fract(focus + (uv - focus) * (1. - d));
+        vec2 guv = fract(focus + (uv - focus) * (1. - 2. * d));
+        vec2 buv = fract(focus + (uv - focus) * (1. - 3. * d));
 
         // Random Glitch
         if (v > 0.1) {
             // Randomize y
-            float y = floor(uv.y * 13. * sin(35. * time)) + 1.;
+            float y = floor(uv.y * 13. * sin(35. * t)) + 1.;
             if (sin(36. * y * v) > 0.9) {
                 ruv.x = fract(uv.x + sin(76. * y) * 0.1);
                 guv.x = fract(uv.x + sin(34. * y) * 0.1);
-                buv.x = fract(uv.x + sin(199. * y) * 0.1);
+                buv.x = fract(uv.x + sin(59. * y) * 0.1);
             }
 
             // RGB Shift
             v = pow(v * 1.5, 2.) * 0.15;
-            color.r = texture2D(src, vec2(uv.x + sin(time * 123.45) * v, uv.y)).r;
-            color.g = texture2D(src, vec2(uv.x + sin(time * 457.67) * v, uv.y)).g;
-            color.b = texture2D(src, vec2(uv.x + sin(time * 923.67) * v, uv.y)).b;
+            color.rgb *= 0.3;
+            color.r += texture2D(src, vec2(uv.x + sin(t * 123.45) * v, uv.y)).r;
+            color.g += texture2D(src, vec2(uv.x + sin(t * 157.67) * v, uv.y)).g;
+            color.b += texture2D(src, vec2(uv.x + sin(t * 143.67) * v, uv.y)).b;
         }
 
         // Compose Chromatic Abbreveation
-        color.r = color.r * 0.5 + color.r * texture2D(src, ruv).r;
-        color.g = color.g * 0.5 + color.g * texture2D(src, guv).g;
-        color.b = color.b * 0.5 + color.b * texture2D(src, buv).b;
+        if (abs(nn(uv.y, t)) > 1.1) {
+            color.r = color.r * 0.5 + color.r * texture2D(src, ruv).r;
+            color.g = color.g * 0.5 + color.g * texture2D(src, guv).g;
+            color.b = color.b * 0.5 + color.b * texture2D(src, buv).b;
+            color *= 2.;
+        }
 
         gl_FragColor = color;
         gl_FragColor.a = step(.1, length(color.rgb));
@@ -210,10 +216,12 @@ export const shaders = {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
         vec2 uvr = uv, uvg = uv, uvb = uv;
 
-        if (abs(nn(uv.y, time)) > 1.) {
-            uvr.x += nn(uv.y, time) * .01;
-            uvg.x += nn(uv.y, time + 10.) * .01;
-            uvb.x += nn(uv.y, time + 20.) * .01;
+        float t = mod(time, 30.);
+
+        if (abs(nn(uv.y, t)) > 1.) {
+            uvr.x += nn(uv.y, t) * .01;
+            uvg.x += nn(uv.y, t + 10.) * .01;
+            uvb.x += nn(uv.y, t + 20.) * .01;
         }
 
         vec4 cr = texture2D(src, fract(uvr));
