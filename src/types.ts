@@ -6,8 +6,10 @@ export type VFXElementType = "img" | "video" | "text";
 
 export interface VFXElement {
     type: VFXElementType;
-    isInViewport: boolean;
     element: HTMLElement;
+    isInViewport: boolean;
+    width: number;
+    height: number;
     scene: THREE.Scene;
     uniforms: { [name: string]: THREE.IUniform };
     startTime: number;

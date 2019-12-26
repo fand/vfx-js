@@ -71,12 +71,20 @@ export default class VFXPlayer {
             // Render elements in viewport first, then render elements outside of the viewport.
             for (const e of this.elements) {
                 if (e.type === "text" && e.isInViewport) {
-                    await this.rerender(e);
+                    const rect = e.element.getBoundingClientRect();
+                    if (rect.width !== e.width || rect.height !== e.height) {
+                        await this.rerender(e);
+                        e.width = rect.width;
+                        e.height = rect.height;
+                    }
                 }
             }
             for (const e of this.elements) {
-                if (e.type === "text" && !e.isInViewport) {
+                const rect = e.element.getBoundingClientRect();
+                if (rect.width !== e.width || rect.height !== e.height) {
                     await this.rerender(e);
+                    e.width = rect.width;
+                    e.height = rect.height;
                 }
             }
         }
@@ -187,13 +195,15 @@ export default class VFXPlayer {
 
         const now = Date.now() / 1000;
         const elem = {
-            element,
             type,
+            element,
+            isInViewport,
+            width: rect.width,
+            height: rect.height,
             scene,
             uniforms,
             startTime: now,
             enterTime: isInViewport ? now : -1,
-            isInViewport,
             isGif
         };
 
