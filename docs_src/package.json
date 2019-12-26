@@ -1,47 +1,47 @@
 {
-  "name": "react-vfx-docs",
-  "version": "0.1.0",
-  "private": true,
-  "homepage": "https://amagi.dev/react-vfx",
-  "dependencies": {
-    "@types/node": "^12.0.0",
-    "@types/react": "^16.9.0",
-    "@types/react-dom": "^16.9.0",
-    "lodash.debounce": "^4.0.8",
-    "react": "^16.12.0",
-    "react-dom": "^16.12.0",
-    "react-scripts": "3.3.0",
-    "react-spring": "^8.0.27",
-    "react-three-fiber": "^3.0.17",
-    "react-use": "^13.12.2",
-    "react-vfx": "file:..",
-    "three": "^0.111.0",
-    "typescript": "~3.7.2",
-    "vh-check": "^2.0.5"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": "react-app"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  },
-  "devDependencies": {
-    "@types/lodash.debounce": "^4.0.6",
-    "@types/three": "^0.103.2"
-  }
+    "name": "react-vfx-docs",
+    "version": "0.1.0",
+    "private": true,
+    "homepage": "https://amagi.dev/react-vfx",
+    "dependencies": {
+        "@types/node": "^12.0.0",
+        "@types/react": "^16.9.0",
+        "@types/react-dom": "^16.9.0",
+        "lodash.debounce": "^4.0.8",
+        "react": "^16.12.0",
+        "react-dom": "^16.12.0",
+        "react-scripts": "3.3.0",
+        "react-spring": "^8.0.27",
+        "react-three-fiber": "^3.0.17",
+        "react-use": "^13.12.2",
+        "react-vfx": "file:..",
+        "three": "^0.111.0",
+        "typescript": "~3.7.2",
+        "vh-check": "^2.0.5"
+    },
+    "scripts": {
+        "start": "react-scripts start",
+        "build": "REACT_APP_BUILD_TIMESTAMP=$(date +'%Y-%m-%dT%H:%M:%S%z') react-scripts build",
+        "test": "react-scripts test",
+        "eject": "react-scripts eject"
+    },
+    "eslintConfig": {
+        "extends": "react-app"
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    },
+    "devDependencies": {
+        "@types/lodash.debounce": "^4.0.6",
+        "@types/three": "^0.103.2"
+    }
 }
