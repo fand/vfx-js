@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useCallback } from "react";
-import { Canvas, useFrame, useThree, useResource } from "react-three-fiber";
+import React, { useEffect, useCallback } from "react";
+import { Canvas, useFrame, useThree } from "react-three-fiber";
 import { useSpring } from "react-spring";
+import { isMobile } from "is-mobile";
 import * as THREE from "three";
 import Triangle from "./gl/Triangle";
 import Fragments from "./gl/Fragments";
@@ -50,7 +51,7 @@ function Bg() {
     return (
         <>
             <Triangle scroll={top} />
-            <Fragments count={1500} scroll={top} />
+            <Fragments count={isMobile() ? 800 : 1500} scroll={top} />
         </>
     );
 }

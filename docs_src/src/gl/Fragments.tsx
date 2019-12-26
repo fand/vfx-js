@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { useFrame, useResource } from "react-three-fiber";
 import { OpaqueInterpolation } from "react-spring";
+import { isMobile } from "is-mobile";
 
 function randomRange(min: number, max: number): number {
     const diff = max - min;
@@ -26,15 +27,16 @@ function Particle({ geometry, material }: any) {
         d = 30;
     }
 
+    const size = isMobile() ? 18 : 12;
+
     useEffect(() => {
         if (ref.current === undefined) {
             return;
         }
 
-        const s = 12;
-        const sx = Math.random() * s;
-        const sy = Math.random() * s;
-        const sz = Math.random() * s;
+        const sx = Math.random() * size;
+        const sy = Math.random() * size;
+        const sz = Math.random() * size;
         ref.current.scale.set(sx, sy, sz);
 
         const a = Math.floor(sx * 900) * Math.PI * 0.5;

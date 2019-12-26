@@ -11,7 +11,7 @@
 }
 
 .AuthorSection .icon {
-    width: 360px;
+    width: 720px;
     max-width: 40%;
 }
 
@@ -24,4 +24,15 @@
 
 .AuthorSection a:visited {
     color: white;
+}
+
+@media (max-width: 768px) {
+    .AuthorSection .icon {
+        width: 320px;
+        max-width: 50%;
+    }
+
+    .AuthorSection .name {
+        font-size: 0.8em;
+    }
 }
