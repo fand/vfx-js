@@ -80,11 +80,13 @@ export default class VFXPlayer {
                 }
             }
             for (const e of this.elements) {
-                const rect = e.element.getBoundingClientRect();
-                if (rect.width !== e.width || rect.height !== e.height) {
-                    await this.rerender(e);
-                    e.width = rect.width;
-                    e.height = rect.height;
+                if (e.type === "text" && !e.isInViewport) {
+                    const rect = e.element.getBoundingClientRect();
+                    if (rect.width !== e.width || rect.height !== e.height) {
+                        await this.rerender(e);
+                        e.width = rect.width;
+                        e.height = rect.height;
+                    }
                 }
             }
         }
