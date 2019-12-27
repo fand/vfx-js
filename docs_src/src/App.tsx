@@ -156,10 +156,12 @@ const App: React.FC = () => {
                     </section>
                     <section>
                         <h3>⚡Animated GIFs are also supported!!⚡</h3>
-                        <VFX.VFXImg src="chill.gif" shader="rgbShift" />
-                        <VFX.VFXImg src="octocat.gif" shader="glitch" />
-                        <VFX.VFXImg src="cat.gif" shader="rainbow" />
-                        <VFX.VFXImg src="doge.gif" shader="pixelate" />
+                        <div className="GifContainer">
+                            <VFX.VFXImg src="chill.gif" shader="sinewave" />
+                            <VFX.VFXImg src="octocat.gif" shader="glitch" />
+                            <VFX.VFXImg src="cat.gif" shader="rainbow" />
+                            <VFX.VFXImg src="doge.gif" shader="pixelate" />
+                        </div>
                     </section>
                     <section>
                         <h3>Video</h3>

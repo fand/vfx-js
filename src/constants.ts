@@ -251,7 +251,7 @@ export const shaders = {
     uniform sampler2D src;
 
     // TODO: uniform
-    #define gridSize 15.0
+    #define gridSize 10.0
     #define dotSize 0.7
     #define smoothing 0.15
     #define speed 1.0
@@ -355,7 +355,7 @@ export const shaders = {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
         vec2 uvr = uv, uvg = uv, uvb = uv;
 
-        float amp = 10. / resolution.x;
+        float amp = 20. / resolution.x;
 
         uvr.x = fract(uv.x + sin(uv.y * 7. + time * 3.) * amp);
         uvg.x = fract(uv.x + sin(uv.y * 7. + time * 3. + .4) * amp);

@@ -1,5 +1,5 @@
 .LogoSection {
-    width: 100vw;
+    width: 100%;
     min-height: 100vh;
     min-height: calc(100vh - var(--vh-offset, 0px));
     margin-bottom: 0 !important;
