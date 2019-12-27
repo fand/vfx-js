@@ -1,19 +1,10 @@
-import React, { useRef, useEffect } from "react";
+import React from "react";
 import * as VFX from "react-vfx";
 import "./LogoSection.css";
 
 const LogoSection: React.FC = () => {
-    const ref = useRef<HTMLElement>(null);
-
-    // Shrink height on iOS
-    useEffect(() => {
-        if (ref.current != null && typeof window !== "undefined") {
-            ref.current.style.minHeight = window.innerHeight + "px";
-        }
-    }, []);
-
     return (
-        <section className="LogoSection" ref={ref}>
+        <section className="LogoSection">
             <VFX.VFXImg className="logo" src="logo.png" shader={"rgbShift"} />
         </section>
     );

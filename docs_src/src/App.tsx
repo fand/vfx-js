@@ -156,6 +156,7 @@ const App: React.FC = () => {
                     </section>
                     <section>
                         <h3>⚡Animated GIFs are also supported!!⚡</h3>
+                        <VFX.VFXImg src="chill.gif" shader="rgbShift" />
                         <VFX.VFXImg src="octocat.gif" shader="glitch" />
                         <VFX.VFXImg src="cat.gif" shader="rainbow" />
                         <VFX.VFXImg src="doge.gif" shader="pixelate" />
@@ -222,8 +223,11 @@ const App: React.FC = () => {
                         import { VFXSpan } from 'react-vfx';
 
                         const blink = \`
+                        precision mediump float;
+                        uniform vec2 resolution;
+                        uniform vec2 offset;
                         uniform float time;
-                        uniform float input;
+                        uniform sampler2D src;
 
                         void mainImage(vec2 uv, out vec4 color) {
                             gl_FragColor = texture2D(input, uv) * step(.5, fract(time));

@@ -9,6 +9,7 @@ export declare const shaders: {
     halftone: string;
     sinewave: string;
     shine: string;
+    blink: string;
     warpTransition: string;
     slitScanTransition: string;
     pixelateTransition: string;
