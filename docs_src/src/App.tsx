@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React from "react";
 import * as VFX from "react-vfx";
 import dedent from "dedent";
 import Bg from "./Bg";
@@ -39,21 +39,6 @@ void main() {
     // Fade alpha by enterTime
     gl_FragColor.a *= smoothstep(0.0, 3.0, enterTime);
 }
-`;
-
-const mouse = `
-    precision mediump float;
-    uniform vec2 offset;
-    uniform vec2 mouse;
-    uniform float time;
-    uniform sampler2D src;
-
-    void main() {
-        float l = length(gl_FragCoord.xy - mouse);
-        float threshold = 100.;
-        float c = smoothstep(threshold + .01, threshold, l);
-        gl_FragColor = vec4(c);
-    }
 `;
 
 const App: React.FC = () => {

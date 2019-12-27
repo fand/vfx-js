@@ -16,7 +16,7 @@ export default function Effects() {
     const { scene, gl, size, camera } = useThree();
 
     useEffect(() => {
-        if (composer.current == undefined) {
+        if (composer.current === undefined) {
             return;
         }
 

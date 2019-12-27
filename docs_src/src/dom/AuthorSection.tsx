@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React from "react";
 import * as VFX from "react-vfx";
 import "./AuthorSection.css";
 

@@ -22,7 +22,7 @@ function Bg() {
     scene.background = new THREE.Color(0x222222);
 
     const [{ scroll }, set] = useSpring(() => ({ scroll: 0 }));
-    const onScroll = useCallback(e => set({ scroll: window.scrollY }), []);
+    const onScroll = useCallback(e => set({ scroll: window.scrollY }), [set]);
 
     const top = scroll.interpolate(x => {
         if (typeof window === "undefined" || typeof document === "undefined") {
@@ -41,7 +41,7 @@ function Bg() {
         return () => {
             window.removeEventListener("scroll", onScroll);
         };
-    }, []);
+    }, [onScroll]);
 
     useFrame(() => {
         const s = top.getValue();

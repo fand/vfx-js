@@ -8,10 +8,6 @@ function randomRange(min: number, max: number): number {
     return Math.random() * diff + min;
 }
 
-function mix(x: number, y: number, t: number): number {
-    return x * (1 - t) + y * t;
-}
-
 function Particle({ geometry, material }: any) {
     let ref = useRef<THREE.Mesh>();
 
@@ -43,7 +39,7 @@ function Particle({ geometry, material }: any) {
         ref.current.rotation.set(a, a, a);
 
         ref.current.position.set(x, y, z);
-    }, []);
+    }, [size, x, y, z]);
 
     return <mesh ref={ref} material={material} geometry={geometry} />;
 }

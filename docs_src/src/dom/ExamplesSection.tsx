@@ -19,7 +19,15 @@ const ExamplesSection: React.FC = () => {
                 </div>
             </section>
             <section>
-                <h3>⚡Animated GIFs are also supported!!⚡</h3>
+                <h3>
+                    <span role="img" aria-label="zap">
+                        ⚡
+                    </span>
+                    Animated GIFs are also supported!!
+                    <span role="img" aria-label="zap">
+                        ⚡
+                    </span>
+                </h3>
                 <div className="ImgContainer">
                     <LazyLoad height={320}>
                         <VFX.VFXImg src="chill.gif" shader="sinewave" />

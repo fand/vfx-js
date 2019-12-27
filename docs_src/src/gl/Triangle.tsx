@@ -16,7 +16,7 @@ function Triangle({ scroll }: TriangleProps) {
 
     useFrame(() => {
         const r = ref.current;
-        if (r == undefined) {
+        if (r === undefined) {
             return;
         }
         r.rotation.y += 0.004;

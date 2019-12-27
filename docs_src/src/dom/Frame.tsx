@@ -23,7 +23,7 @@ const Frame: React.FC<Props> = (props: Props) => {
         return () => {
             clearInterval(id);
         };
-    }, []);
+    }, [interval]);
 
     return <div className="Frame" style={{ borderColor, boxShadow }}></div>;
 };
