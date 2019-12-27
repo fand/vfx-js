@@ -1,14 +1,15 @@
 import React, { useState, useCallback } from "react";
-import "./App.css";
 import * as VFX from "react-vfx";
+import dedent from "dedent";
 import Bg from "./Bg";
 import Frame from "./dom/Frame";
 import LogoSection from "./dom/LogoSection";
 import IntroSection from "./dom/IntroSection";
+import ExamplesSection from "./dom/ExamplesSection";
 import InputSection from "./dom/InputSection";
 import AuthorSection from "./dom/AuthorSection";
 import { Code, InlineCode } from "./dom/Code";
-import dedent from "dedent";
+import "./App.css";
 
 const blink = `
     precision mediump float;
@@ -45,6 +46,7 @@ const App: React.FC = () => {
                 <Frame />
                 <LogoSection />
                 <IntroSection />
+                <ExamplesSection />
                 <section>
                     <h2 id="install">Install</h2>
                     <code>npm i react-vfx</code>
@@ -125,9 +127,6 @@ const App: React.FC = () => {
                             }
                         `}
                     </Code>
-                </section>
-                <section>
-                    <h2 id="examples">Examples</h2>
                     <section>
                         <h3>Image</h3>
                         <p>
@@ -147,21 +146,6 @@ const App: React.FC = () => {
                                   shader="rainbow"/>
                             `}
                         </Code>
-                        <p>It renders like this 👇</p>
-                        <VFX.VFXImg
-                            src="react-logo.png"
-                            shader="rainbow"
-                            width="320px"
-                        />
-                    </section>
-                    <section>
-                        <h3>⚡Animated GIFs are also supported!!⚡</h3>
-                        <div className="GifContainer">
-                            <VFX.VFXImg src="chill.gif" shader="sinewave" />
-                            <VFX.VFXImg src="octocat.gif" shader="glitch" />
-                            <VFX.VFXImg src="cat.gif" shader="rainbow" />
-                            <VFX.VFXImg src="doge.gif" shader="pixelate" />
-                        </div>
                     </section>
                     <section>
                         <h3>Video</h3>
@@ -176,15 +160,6 @@ const App: React.FC = () => {
                                 <VFXVideo src="mind_blown.mp4" shader="halftone"/>
                             `}
                         </Code>
-                        <p>It renders like this 👇</p>
-                        <VFX.VFXVideo
-                            src="mind_blown.mp4"
-                            shader="halftone"
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                        />
                     </section>
                     <section>
                         <h3>Text</h3>
@@ -199,18 +174,11 @@ const App: React.FC = () => {
                                 <VFXSpan>Hello world!</VFXSpan>
                             `}
                         </Code>
-                        <p>It renders like this 👇</p>
-                        <VFX.VFXSpan
-                            style={{ fontSize: "48px", fontWeight: "bold" }}
-                        >
-                            Hello world!
-                        </VFX.VFXSpan>
                         <p>
                             <InlineCode>{"<VFXSpan>"}</InlineCode> automatically
                             re-renders when its content is updated.
                         </p>
                         <InputSection />
-
                         <p>
                             <i>
                                 NOTE: VFXSpan doesn't work with nested elements.
