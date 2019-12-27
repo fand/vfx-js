@@ -457,8 +457,8 @@ export const shaders = {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
         if (enterTime < 1.5) {
-            float t = enterTime / 1.5;
-            uv.y = uv.y < t ? uv.y : t;
+            float t = 1. - enterTime / 1.5;
+            uv.y = uv.y > t ? uv.y : t;
         }
 
         gl_FragColor = texture2D(src, uv);
