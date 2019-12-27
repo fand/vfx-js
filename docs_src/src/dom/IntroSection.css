@@ -1,0 +1,17 @@
+.IntroSection {
+    font-size: 7vw;
+    font-weight: bold;
+}
+
+.IntroSection img {
+    display: inline-block;
+    height: 1em;
+    transform: translateY(20%);
+}
+
+
+@media (max-width: 768px) {
+    .IntroSection {
+        font-size: 10vw;
+    }
+}

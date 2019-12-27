@@ -4,6 +4,7 @@ import * as VFX from "react-vfx";
 import Bg from "./Bg";
 import Frame from "./dom/Frame";
 import LogoSection from "./dom/LogoSection";
+import IntroSection from "./dom/IntroSection";
 import InputSection from "./dom/InputSection";
 import AuthorSection from "./dom/AuthorSection";
 
@@ -41,23 +42,8 @@ const App: React.FC = () => {
             <div className="App">
                 <Frame />
                 <LogoSection />
-                <section className="Section2">
-                    <VFX.VFXP shader="rainbow">
-                        REACT-VFX is a React component library. It allows you to
-                        use WebGL power to stylize your React application.
-                        REACT-VFX is a React component library. It allows you to
-                        use WebGL power to stylize your React application.
-                        REACT-VFX is a React component library. It allows you to
-                        use WebGL power to stylize your React application.
-                    </VFX.VFXP>
-                </section>
+                <IntroSection />
                 <InputSection />
-                <section className="Secton3">
-                    <h2>Transition Effects!</h2>
-                    <VFX.VFXImg shader="warpTransition" src="logo192.png" />
-                    <VFX.VFXImg shader="slitScanTransition" src="logo192.png" />
-                    <VFX.VFXImg shader="pixelateTransition" src="logo192.png" />
-                </section>
                 <section className="Section-Gif">
                     <h2>GIF</h2>
                     <img src="mind_blown.gif" alt="mind_blown original" />
@@ -87,6 +73,12 @@ const App: React.FC = () => {
                         muted
                         playsInline
                     />
+                </section>
+                <section className="Secton3">
+                    <h2>Transition Effects!</h2>
+                    <VFX.VFXImg shader="warpTransition" src="logo192.png" />
+                    <VFX.VFXImg shader="slitScanTransition" src="logo192.png" />
+                    <VFX.VFXImg shader="pixelateTransition" src="logo192.png" />
                 </section>
                 <AuthorSection />
             </div>

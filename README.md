@@ -120,7 +120,7 @@ uniform sampler2D texture2;
 
 ## Author
 
-[VJ AMAGI](https://twitter.com/amagitakayosi)
+[AMAGI](https://twitter.com/amagitakayosi)
 
 ## LICENSE
 

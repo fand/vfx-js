@@ -21,6 +21,10 @@ video {
 section {
     min-height: 100vh;
     min-height: calc(100vh - var(--vh-offset, 0px));
+    padding: 20px;
+    box-sizing: border-box;
+    overflow: hidden;
+    overflow-wrap: break-word;
 }
 
 .App {
@@ -29,13 +33,7 @@ section {
     text-align: center;
 }
 
-section {
-    max-width: 100%;
-    overflow: hidden;
-    overflow-wrap: break-word;
-}
-
-input {
+/* input {
     margin: 20px;
     max-width: 80%;
-}
+} */
