@@ -1,8 +1,8 @@
 import React, { useRef } from "react";
 import { useFrame } from "react-three-fiber";
-import { useWindowSize } from "react-use";
 import * as THREE from "three";
 import { OpaqueInterpolation } from "react-spring";
+import { isMobile } from "is-mobile";
 
 type TriangleProps = {
     scroll: OpaqueInterpolation<number>;
@@ -11,8 +11,7 @@ type TriangleProps = {
 function Triangle({ scroll }: TriangleProps) {
     const ref = useRef<THREE.Mesh>();
 
-    const { width } = useWindowSize();
-    const size = width < 768 ? 9 : 13;
+    const size = isMobile() ? 7 : 13;
 
     useFrame(() => {
         const r = ref.current;

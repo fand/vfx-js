@@ -11,8 +11,8 @@
 
 .LogoSection .logo {
     flex-grow: 0;
-    width: 1600px;
-    max-width: 80%;
+    width: 1280px;
+    max-width: 100%;
 }
 
 @media (max-width: 768px) {

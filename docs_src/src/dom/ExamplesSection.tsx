@@ -44,7 +44,7 @@ const ExamplesSection: React.FC = () => {
                 </div>
             </section>
             <section>
-                <h3>Videos works well!</h3>
+                <h3>Videos work well!</h3>
                 <LazyLoad height={320}>
                     <VFX.VFXVideo
                         src="mind_blown.mp4"
@@ -53,6 +53,15 @@ const ExamplesSection: React.FC = () => {
                         loop
                         muted
                         playsInline
+                    />
+                    {/* Dummy video element to help browser decoding video. I don't know why this works... */}
+                    <video
+                        src="mind_blown.mp4"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        style={{ width: "0.1px", height: "0.1px" }}
                     />
                 </LazyLoad>
             </section>
