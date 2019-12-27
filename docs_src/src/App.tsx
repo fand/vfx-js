@@ -12,15 +12,33 @@ import { Code, InlineCode } from "./dom/Code";
 import "./App.css";
 
 const blink = `
-    precision mediump float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform sampler2D src;
-    void main() {
-        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        gl_FragColor = texture2D(src, uv) * (1. - sin(time * 10.));
-    }
+uniform vec2 resolution; // Resolution of the element
+uniform vec2 offset;     // Position of the element in the screen
+uniform float time;      // Time passed since mount
+uniform sampler2D src;   // Input texture
+
+void main() {
+    // Get UV in the element
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+    gl_FragColor = texture2D(src, uv) * step(.5, fract(time));
+}
+`;
+
+const fadeIn = `
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform float enterTime; // Time since entering the viewport
+uniform sampler2D src;
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    gl_FragColor = texture2D(src, uv);
+
+    // Fade alpha by enterTime
+    gl_FragColor.a *= smoothstep(0.0, 3.0, enterTime);
+}
 `;
 
 const mouse = `
@@ -193,41 +211,75 @@ const App: React.FC = () => {
                         import { VFXSpan } from 'react-vfx';
 
                         const blink = \`
-                        precision mediump float;
-                        uniform vec2 resolution;
-                        uniform vec2 offset;
-                        uniform float time;
-                        uniform sampler2D src;
+                        uniform vec2 resolution; // Resolution of the element
+                        uniform vec2 offset;     // Position of the element in the screen
+                        uniform float time;      // Time passed since mount
+                        uniform sampler2D src;   // Input texture
 
-                        void mainImage(vec2 uv, out vec4 color) {
-                            gl_FragColor = texture2D(input, uv) * step(.5, fract(time));
+                        void main() {
+                            // Get UV in the element
+                            vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+                            gl_FragColor = texture2D(src, uv) * step(.5, fract(time));
                         }
                         \`;
 
                         export default = () => (
-                            <VFXSpan shader={blink}></VFXSpan>
+                            <VFXSpan shader={blink}>I'm blinking!</VFXSpan>
                         );
                     `}</Code>
+                    <p>This renders like this:</p>
+                    <VFX.VFXSpan
+                        shader={blink}
+                        style={{
+                            fontSize: "72px",
+                            fontWeight: "bold",
+                            fontStyle: "italic"
+                        }}
+                    >
+                        I'm blinking!
+                    </VFX.VFXSpan>
                     <section className="Secton3">
-                        <h3>Transition Effects</h3>
+                        <h3>Transition</h3>
                         <p>
                             REACT-VFX provides a uniform variable{" "}
                             <InlineCode>float enterTime;</InlineCode> to write
                             transition effects.{" "}
                         </p>
-                        <p>
-                            Here are the examples; scroll and see the
-                            transition!
-                        </p>
-                        <VFX.VFXImg shader="warpTransition" src="logo.png" />
-                        <VFX.VFXImg
-                            shader="slitScanTransition"
-                            src="logo.png"
-                        />
-                        <VFX.VFXImg
-                            shader="pixelateTransition"
-                            src="logo.png"
-                        />
+                        <Code>{dedent`
+                            import { VFXImg } from 'react-vfx';
+
+                            const fadeIn = \`
+                            uniform vec2 resolution;
+                            uniform vec2 offset;
+                            uniform float time;
+                            uniform float enterTime; // Time since entering the viewport
+                            uniform sampler2D src;
+
+                            void main() {
+                                vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+                                gl_FragColor = texture2D(src, uv);
+
+                                // Fade alpha by enterTime
+                                gl_FragColor.a *= smoothstep(0.0, 3.0, enterTime);
+                            }
+                            \`;
+
+                            export default = () => (
+                                <VFXSpan shader={fadeIn}>I'm fading!</VFXSpan>
+                            );
+                        `}</Code>
+                        <p>This renders like this:</p>
+                        <VFX.VFXSpan
+                            shader={fadeIn}
+                            style={{
+                                fontSize: "72px",
+                                fontWeight: "bold",
+                                fontStyle: "italic"
+                            }}
+                        >
+                            I'm fading!
+                        </VFX.VFXSpan>
                     </section>
                 </section>
                 <AuthorSection />

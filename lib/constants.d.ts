@@ -10,6 +10,7 @@ export declare const shaders: {
     sinewave: string;
     shine: string;
     blink: string;
+    spring: string;
     warpTransition: string;
     slitScanTransition: string;
     pixelateTransition: string;

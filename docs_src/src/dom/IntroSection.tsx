@@ -9,7 +9,7 @@ const IntroSection: React.FC = () => {
                 <VFX.VFXImg src="./logo-oneline.png" shader="rgbGlitch" /> is a{" "}
                 <VFX.VFXImg src="./react-logo-oneline.png" shader="rainbow" />{" "}
                 component library. It allows you to add{" "}
-                <VFX.VFXImg src="./webgl-logo.png" shader="blink" /> powered
+                <VFX.VFXImg src="./webgl-logo.png" shader="spring" /> powered
                 effects to your{" "}
                 <VFX.VFXImg src="./react-logo-oneline.png" shader="rainbow" />{" "}
                 application. You can easily add{" "}

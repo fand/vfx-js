@@ -71,15 +71,3 @@ p {
 code {
     font-size: 0.9em;
 }
-
-.GifContainer {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-}
-
-.GifContainer img {
-    /* width: 320px; */
-    height: 320px
-}
