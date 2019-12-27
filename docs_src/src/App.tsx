@@ -149,7 +149,7 @@ const App: React.FC = () => {
                         </Code>
                         <p>It renders like this 👇</p>
                         <VFX.VFXImg
-                            src="logo192.png"
+                            src="react-logo.png"
                             shader="rainbow"
                             width="320px"
                         />
@@ -176,7 +176,7 @@ const App: React.FC = () => {
                         </Code>
                         <p>It renders like this 👇</p>
                         <VFX.VFXVideo
-                            src="mind_blown_2.mp4"
+                            src="mind_blown.mp4"
                             shader="halftone"
                             autoPlay
                             loop
