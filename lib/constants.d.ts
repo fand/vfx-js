@@ -7,6 +7,8 @@ export declare const shaders: {
     rgbGlitch: string;
     rgbShift: string;
     halftone: string;
+    sinewave: string;
+    shine: string;
     warpTransition: string;
     slitScanTransition: string;
     pixelateTransition: string;

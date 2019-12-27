@@ -14,11 +14,7 @@ const LogoSection: React.FC = () => {
 
     return (
         <section className="LogoSection" ref={ref}>
-            <VFX.VFXImg
-                className="logo"
-                src="logo-mobile@2x.png"
-                shader={"rgbShift"}
-            />
+            <VFX.VFXImg className="logo" src="logo.png" shader={"rgbShift"} />
         </section>
     );
 };

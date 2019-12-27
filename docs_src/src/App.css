@@ -1,16 +1,13 @@
 :root {
-    --frame-color: #00ffee;
-    --bloom-color: #00ffff;
     --bg: #222222;
     --text: #ffffff;
-    --frame-width: 1px;
     --vh: 1vh;
 }
 
 body {
     background: black;
     color: var(--text);
-    font-size: 36px;
+    font-size: 32px;
 }
 
 img,
@@ -18,22 +15,59 @@ video {
     max-width: 100%;
 }
 
-section {
-    min-height: 100vh;
-    min-height: calc(100vh - var(--vh-offset, 0px));
-    padding: 20px;
+.App>section {
+    padding: 10px;
     box-sizing: border-box;
     overflow: hidden;
     overflow-wrap: break-word;
+    margin-bottom: 80px;
 }
 
 .App {
-    padding: var(--frame-width);
-    box-sizing: border-box;
     text-align: center;
 }
 
-/* input {
-    margin: 20px;
-    max-width: 80%;
-} */
+h2 {
+    font-size: 120px;
+    font-style: italic;
+}
+
+h2:before {
+    content: "# ";
+}
+
+h3 {
+    font-size: 72px;
+}
+
+@media (max-width: 768px) {
+    body {
+        font-size: 24px;
+    }
+
+    h2 {
+        font-size: 48px;
+    }
+
+    h3 {
+        font-size: 32px;
+    }
+}
+
+a,
+a:visited {
+    color: white;
+}
+
+p {
+    text-align: center;
+    padding: 0 0px;
+    line-height: 1.4em;
+    width: 960px;
+    max-width: calc(100% - 20px);
+    margin: 40px auto;
+}
+
+code {
+    font-size: 0.9em;
+}

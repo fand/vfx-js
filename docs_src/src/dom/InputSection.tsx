@@ -12,9 +12,9 @@ const InputSection: React.FC = () => {
 
     return (
         <section className="InputSection">
-            <h2>
+            <p style={{ fontSize: "48px", fontWeight: "bold" }}>
                 <VFX.VFXSpan shader="rainbow">{debouncedText}</VFX.VFXSpan>
-            </h2>
+            </p>
             <textarea
                 value={text}
                 onChange={e => setText(e.target.value)}

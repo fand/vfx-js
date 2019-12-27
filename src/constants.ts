@@ -340,6 +340,38 @@ export const shaders = {
         gl_FragColor = vec4(rgbAmounts[0], rgbAmounts[1], rgbAmounts[2], alpha);
     }
     `,
+    sinewave: `
+    precision mediump float;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    uniform sampler2D src;
+
+    void main (void) {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+        float amp = 10. / resolution.x;
+        uv.x = fract(uv.x + sin(uv.y * 7. + time * 3.) * amp);
+
+        gl_FragColor = texture2D(src, uv);
+    }
+    `,
+    shine: `
+    precision mediump float;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    uniform sampler2D src;
+
+    void main (void) {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+        float amp = 10. / resolution.x;
+        uv.x = fract(uv.x + sin(uv.y * 7. + time * 3.) * amp);
+
+        gl_FragColor = texture2D(src, uv);
+    }
+    `,
     warpTransition: `
     precision mediump float;
     uniform vec2 resolution;

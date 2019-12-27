@@ -5,7 +5,11 @@ import "./AuthorSection.css";
 const AuthorSection: React.FC = () => {
     return (
         <section className="AuthorSection">
-            <a href="https://twitter.com/amagitakayosi" target="_blank">
+            <a
+                href="https://twitter.com/amagitakayosi"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
                 <VFX.VFXImg
                     className="icon"
                     src="./amagi.png"

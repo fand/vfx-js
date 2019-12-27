@@ -1,6 +1,9 @@
 .LogoSection {
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    min-height: 100vh;
+    min-height: calc(100vh - var(--vh-offset, 0px));
+    margin-bottom: 0 !important;
+
     display: flex;
     justify-content: space-around;
     align-items: center;

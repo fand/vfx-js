@@ -1,6 +1,10 @@
 .IntroSection {
-    font-size: 7vw;
+    font-size: 144px;
     font-weight: bold;
+}
+
+.IntroSection p {
+    width: 100%;
 }
 
 .IntroSection img {
@@ -9,9 +13,9 @@
     transform: translateY(20%);
 }
 
-
 @media (max-width: 768px) {
     .IntroSection {
-        font-size: 10vw;
+        font-size: 56px;
+        line-height: 1.2em;
     }
 }
