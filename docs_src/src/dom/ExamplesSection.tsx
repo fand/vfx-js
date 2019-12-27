@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from "react";
+import React from "react";
+import LazyLoad from "react-lazyload";
 import * as VFX from "react-vfx";
-import "./ExampleSection.css";
+import "./ExamplesSection.css";
 
 const ExamplesSection: React.FC = () => {
     return (
@@ -9,29 +10,43 @@ const ExamplesSection: React.FC = () => {
             <section>
                 <h3>Add effects to your images!!</h3>
                 <div className="ImgContainer">
-                    <VFX.VFXImg src="react-logo.png" shader="rainbow" />
-                    <VFX.VFXImg src="david.png" shader="rgbShift" />
+                    <LazyLoad height={320}>
+                        <VFX.VFXImg src="react-logo.png" shader="rainbow" />
+                    </LazyLoad>
+                    <LazyLoad height={320}>
+                        <VFX.VFXImg src="david.png" shader="rgbShift" />
+                    </LazyLoad>
                 </div>
             </section>
             <section>
                 <h3>⚡Animated GIFs are also supported!!⚡</h3>
                 <div className="ImgContainer">
-                    <VFX.VFXImg src="chill.gif" shader="sinewave" />
-                    <VFX.VFXImg src="octocat.gif" shader="glitch" />
-                    <VFX.VFXImg src="cat.gif" shader="rainbow" />
-                    <VFX.VFXImg src="doge.gif" shader="pixelate" />
+                    <LazyLoad height={320}>
+                        <VFX.VFXImg src="chill.gif" shader="sinewave" />
+                    </LazyLoad>
+                    <LazyLoad height={320}>
+                        <VFX.VFXImg src="octocat.gif" shader="glitch" />
+                    </LazyLoad>
+                    <LazyLoad height={320}>
+                        <VFX.VFXImg src="cat.gif" shader="rainbow" />
+                    </LazyLoad>
+                    <LazyLoad height={320}>
+                        <VFX.VFXImg src="doge.gif" shader="pixelate" />
+                    </LazyLoad>
                 </div>
             </section>
             <section>
                 <h3>Videos works well!</h3>
-                <VFX.VFXVideo
-                    src="mind_blown.mp4"
-                    shader="halftone"
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                />
+                <LazyLoad height={320}>
+                    <VFX.VFXVideo
+                        src="mind_blown.mp4"
+                        shader="halftone"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                    />
+                </LazyLoad>
             </section>
             <section className="VFXSpanExample">
                 <VFX.VFXSpan shader="sinewave">

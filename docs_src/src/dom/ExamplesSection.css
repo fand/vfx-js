@@ -1,0 +1,30 @@
+.ExamplesSection > section {
+    margin: 40px 0;
+}
+
+.ImgContainer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+}
+
+.ImgContainer img {
+    height: 320px;
+    margin: 0 20px;
+}
+
+.ImgContainer video {
+    height: 320px;
+}
+
+.VFXSpanExample {
+    font-size: 96px;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .VFXSpanExample {
+        font-size: 64px;
+    }
+}
