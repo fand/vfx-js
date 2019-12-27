@@ -9,13 +9,13 @@ const IntroSection: React.FC = () => {
                 <VFX.VFXImg src="./logo-oneline.png" shader="rgbGlitch" /> is a{" "}
                 <VFX.VFXImg src="./react-logo-oneline.png" shader="rainbow" />{" "}
                 component library. It allows you to add{" "}
-                <VFX.VFXImg src="./webgl-logo.png" shader="rainbow" /> powered
+                <VFX.VFXImg src="./webgl-logo.png" shader="blink" /> powered
                 effects to your{" "}
                 <VFX.VFXImg src="./react-logo-oneline.png" shader="rainbow" />{" "}
                 application. You can easily add{" "}
                 <VFX.VFXDiv shader="glitch">glitched images, </VFX.VFXDiv>
                 <VFX.VFXDiv shader="sinewave">stylized videos</VFX.VFXDiv> and
-                <VFX.VFXDiv shader="rainbow"> shiny texts </VFX.VFXDiv>
+                <VFX.VFXDiv shader="shine"> shiny texts </VFX.VFXDiv>
                 to your website!!
             </p>
         </section>
