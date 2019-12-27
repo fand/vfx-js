@@ -1,59 +1,71 @@
 {
-    "name": "react-vfx",
-    "version": "0.1.0",
-    "description": "WebGL effects for React elements",
-    "main": "lib/index.js",
-    "types": "lib/index.d.ts",
-    "scripts": {
-        "dev": "run-p watch:lib watch:docs",
-        "watch:lib": "tsc -w",
-        "watch:docs": "cd docs_src && npm start",
-        "build": "run-s clean build:lib build:docs",
-        "build:lib": "tsc -d",
-        "build:docs": "cd docs_src && npm run build && mv build ../docs",
-        "clean": "rimraf lib docs",
-        "lint": "eslint src/**/*.ts src/**/*.tsx"
-    },
-    "keywords": [],
-    "author": "fand <fand.gmork@gmail.com> (https://gmork.in/)",
-    "license": "MIT",
-    "peerDependencies": {
-        "react": ">= 16.12.0",
-        "react-dom": ">= 16.12.0"
-    },
-    "dependencies": {
-        "three": "^0.111.0",
-        "typescript": "^3.7.3"
-    },
-    "devDependencies": {
-        "@types/node": "^12.12.17",
-        "@types/react": "^16.9.16",
-        "@types/three": "^0.103.2",
-        "@typescript-eslint/eslint-plugin": "^2.11.0",
-        "@typescript-eslint/parser": "^2.11.0",
-        "eslint": "^6.7.2",
-        "eslint-config-prettier": "^6.7.0",
-        "eslint-plugin-prettier": "^3.1.1",
-        "eslint-plugin-react": "^7.17.0",
-        "eslint-plugin-react-hooks": "^2.3.0",
-        "husky": "^3.1.0",
-        "lint-staged": "^9.5.0",
-        "npm-run-all": "^4.1.5",
-        "prettier": "^1.19.1",
-        "react-spring": "^8.0.27",
-        "rimraf": "^3.0.0"
-    },
-    "husky": {
-        "hooks": {
-            "pre-commit": "lint-staged",
-            "pre-publish": "npm run lint && npm run build:lib"
-        }
-    },
-    "lint-staged": {
-        "src/*.{ts,tsx}": [
-            "eslint --fix",
-            "prettier --write",
-            "git add"
-        ]
+  "name": "react-vfx",
+  "description": "WebGL effects for React elements",
+  "version": "0.1.0",
+  "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
+  "bugs": {
+    "url": "https://github.com/fand/react-vfx/issues"
+  },
+  "dependencies": {
+    "three": "^0.111.0"
+  },
+  "devDependencies": {
+    "@types/node": "^12.12.17",
+    "@types/react": "^16.9.16",
+    "@types/three": "^0.103.2",
+    "@typescript-eslint/eslint-plugin": "^2.11.0",
+    "@typescript-eslint/parser": "^2.11.0",
+    "eslint": "^6.7.2",
+    "eslint-config-prettier": "^6.7.0",
+    "eslint-plugin-prettier": "^3.1.1",
+    "eslint-plugin-react": "^7.17.0",
+    "eslint-plugin-react-hooks": "^2.3.0",
+    "husky": "^3.1.0",
+    "lint-staged": "^9.5.0",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^1.19.1",
+    "react-spring": "^8.0.27",
+    "rimraf": "^3.0.0",
+    "typescript": "^3.7.3"
+  },
+  "homepage": "https://amagi.dev/react-vfx",
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "pre-publish": "npm run lint && npm run build:lib"
     }
+  },
+  "keywords": [
+    "glsl",
+    "react",
+    "threejs",
+    "webgl"
+  ],
+  "license": "MIT",
+  "lint-staged": {
+    "src/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write",
+      "git add"
+    ]
+  },
+  "main": "lib/index.js",
+  "peerDependencies": {
+    "react": ">= 16.12.0",
+    "react-dom": ">= 16.12.0"
+  },
+  "repository": {
+    "url": "https://github.com/fand/react-vfx"
+  },
+  "scripts": {
+    "build": "run-s clean build:lib build:docs",
+    "build:docs": "cd docs_src && npm run build && mv build ../docs",
+    "build:lib": "tsc -d",
+    "clean": "rimraf lib docs",
+    "dev": "run-p watch:lib watch:docs",
+    "lint": "eslint src/**/*.ts src/**/*.tsx",
+    "watch:docs": "cd docs_src && npm start",
+    "watch:lib": "tsc -w"
+  },
+  "types": "lib/index.d.ts"
 }
