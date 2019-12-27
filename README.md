@@ -1,8 +1,8 @@
 <div align="center">
-  <h1><img alt="REACT-VFX" src="https://user-images.githubusercontent.com/1403842/71323457-c69e6900-2516-11ea-958c-b96b2121387b.png" width="100%"/></h1>
-  <h2>WebGL effects for React elements!!</2>
-  <br>
-  <br>
+  <img alt="REACT-VFX" src="https://user-images.githubusercontent.com/1403842/71323457-c69e6900-2516-11ea-958c-b96b2121387b.png" width="100%"/>
+  <h1>REACT-VFX: WebGL effects for React elements!!</h1>
+  <br/>
+  <br/>
 </div>
 
 ## Install
@@ -42,7 +42,7 @@ NOTE: `VFXSpan` doesn't work if the content includes child nodes.
 
 ```ts
 // OK
-<a href="http:s//example.com"><VFXSpan>Yo</VFXSpan></a>
+<a href="https://example.com"><VFXSpan>Yo</VFXSpan></a>
 
 // NG: link styles are not rendered correctly
 <VFXSpan><a href="http:s//example.com">Yo</a></VFXSpan>
@@ -54,11 +54,14 @@ NOTE: `VFXSpan` doesn't work if the content includes child nodes.
 import { VFXSpan } from 'react-vfx';
 
 const blink = `
+uniform vec2 resolution;
+uniform vec2 offset;
 uniform float time;
-uniform float input;
+uniform float src;
 
-void mainImage(vec2 uv, out vec4 color) {
-    gl_FragColor = texture2D(input, uv) * step(.5, fract(time));
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    gl_FragColor = texture2D(src, uv) * step(.5, fract(time));
 }
 `;
 
