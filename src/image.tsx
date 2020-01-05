@@ -5,7 +5,7 @@ import { VFXProps } from "./types";
 
 export type VFXImgProps = JSX.IntrinsicElements["img"] & VFXProps;
 
-const VFXImg: React.FC<VFXImgProps> = props => {
+export const VFXImg: React.FC<VFXImgProps> = props => {
     const player = useContext(VFXContext);
     const ref = useRef<HTMLImageElement>(null);
 
@@ -29,5 +29,3 @@ const VFXImg: React.FC<VFXImgProps> = props => {
 
     return <img ref={ref} {...props} onLoad={init} />;
 };
-
-export default VFXImg;

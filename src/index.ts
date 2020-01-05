@@ -1,11 +1,6 @@
-import vProvider from "./provider";
-export const VFXProvider = vProvider;
-
-import vImg from "./image";
-export const VFXImg = vImg;
-
-import vVideo from "./video";
-export const VFXVideo = vVideo;
+export { VFXProvider } from "./provider";
+export { VFXImg } from "./image";
+export { VFXVideo } from "./video";
 
 import vElementFactory from "./element";
 export const VFXSpan = vElementFactory<"span">("span");

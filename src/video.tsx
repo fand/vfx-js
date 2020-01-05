@@ -5,7 +5,7 @@ import { VFXProps } from "./types";
 
 export type VFXVideoProps = JSX.IntrinsicElements["video"] & VFXProps;
 
-const VFXVideo: React.FC<VFXVideoProps> = props => {
+export const VFXVideo: React.FC<VFXVideoProps> = props => {
     const player = useContext(VFXContext);
     const ref = useRef<HTMLVideoElement>(null);
 
@@ -29,5 +29,3 @@ const VFXVideo: React.FC<VFXVideoProps> = props => {
 
     return <video ref={ref} {...props} onLoadedData={onLoadedData} />;
 };
-
-export default VFXVideo;

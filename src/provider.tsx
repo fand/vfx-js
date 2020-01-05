@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { VFXContext } from "./context";
 import VFXPlayer from "./vfx-player";
 
@@ -19,40 +19,33 @@ export interface VFXProviderProps {
 }
 
 export const VFXProvider: React.FC<VFXProviderProps> = props => {
-    const [player, setPlayer] = useState<VFXPlayer | null>(null);
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const [_player, setPlayer] = useState<VFXPlayer | null>(null);
 
     useEffect(() => {
-        if (canvasRef.current == null) {
-            const canvas = document.createElement("canvas");
-            for (const [k, v] of Object.entries(canvasStyle)) {
-                canvas.style.setProperty(k, v.toString());
-            }
-            document.body.appendChild(canvas);
-
-            canvasRef.current = canvas;
+        // Create canvas
+        const canvas = document.createElement("canvas");
+        for (const [k, v] of Object.entries(canvasStyle)) {
+            canvas.style.setProperty(k, v.toString());
         }
+        document.body.appendChild(canvas);
 
-        const player = new VFXPlayer(canvasRef.current, props.pixelRatio);
+        // Setup player
+        const player = new VFXPlayer(canvas, props.pixelRatio);
         setPlayer(player);
-
         player.play();
 
         return () => {
             player.stop();
             player.destroy();
-            canvasRef.current?.remove();
+            canvas.remove();
         };
-    }, [canvasRef, props.pixelRatio]);
+    }, [props.pixelRatio]);
 
     return (
         <>
-            {/* <canvas ref={canvasRef} style={canvasStyle as any} /> */}
-            <VFXContext.Provider value={player}>
+            <VFXContext.Provider value={_player}>
                 {props.children}
             </VFXContext.Provider>
         </>
     );
 };
-
-export default VFXProvider;
