@@ -27,6 +27,7 @@ export default class VFXPlayer {
             alpha: true
         });
         this.renderer.autoClear = false;
+        this.renderer.setClearAlpha(0);
 
         if (typeof window !== "undefined") {
             this.pixelRatio = pixelRatio || window.devicePixelRatio;
