@@ -118,7 +118,9 @@ export default class VFXPlayer {
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
             }
-            e.element.style.setProperty("opacity", "0");
+
+            const opacity = e.type === "video" ? "0.0001" : "0"; // don't hide video element completely to prevent jank frames
+            e.element.style.setProperty("opacity", opacity);
 
             const texture = new THREE.Texture(canvas);
             texture.needsUpdate = true;
@@ -166,7 +168,8 @@ export default class VFXPlayer {
         texture.needsUpdate = true;
 
         // Hide original element
-        element.style.setProperty("opacity", "0");
+        const opacity = type === "video" ? "0.0001" : "0"; // don't hide video element completely to prevent jank frames
+        element.style.setProperty("opacity", opacity);
 
         const uniforms = {
             src: { type: "t", value: texture },

@@ -54,15 +54,6 @@ const ExamplesSection: React.FC = () => {
                         muted
                         playsInline
                     />
-                    {/* Dummy video element to help browser decoding video. I don't know why this works... */}
-                    <video
-                        src="mind_blown.mp4"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        style={{ width: "0.1px", height: "0.1px" }}
-                    />
                 </LazyLoad>
             </section>
             <section className="VFXSpanExample">
