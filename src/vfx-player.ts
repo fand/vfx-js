@@ -13,6 +13,8 @@ export default class VFXPlayer {
     pixelRatio = 2;
     elements: VFXElement[] = [];
 
+    textureLoader = new THREE.TextureLoader();
+
     w = 0;
     h = 0;
     scrollX = 0;
@@ -147,7 +149,7 @@ export default class VFXPlayer {
                 gifFor.set(element, gif);
                 texture = new THREE.Texture(gif.getCanvas());
             } else {
-                texture = new THREE.Texture(element);
+                texture = this.textureLoader.load(element.src);
             }
         } else if (element instanceof HTMLVideoElement) {
             texture = new THREE.VideoTexture(element);

@@ -1,14 +1,14 @@
 {
   "files": {
     "main.css": "/react-vfx/static/css/main.b22d7dc7.chunk.css",
-    "main.js": "/react-vfx/static/js/main.1472f26e.chunk.js",
-    "main.js.map": "/react-vfx/static/js/main.1472f26e.chunk.js.map",
+    "main.js": "/react-vfx/static/js/main.47a33d39.chunk.js",
+    "main.js.map": "/react-vfx/static/js/main.47a33d39.chunk.js.map",
     "runtime-main.js": "/react-vfx/static/js/runtime-main.73b26e45.js",
     "runtime-main.js.map": "/react-vfx/static/js/runtime-main.73b26e45.js.map",
     "static/js/2.bf7cab29.chunk.js": "/react-vfx/static/js/2.bf7cab29.chunk.js",
     "static/js/2.bf7cab29.chunk.js.map": "/react-vfx/static/js/2.bf7cab29.chunk.js.map",
     "index.html": "/react-vfx/index.html",
-    "precache-manifest.4ac1a5e4cff7e236461ba6db821f4d4e.js": "/react-vfx/precache-manifest.4ac1a5e4cff7e236461ba6db821f4d4e.js",
+    "precache-manifest.28a3d9f702281d34c68914c9e883355a.js": "/react-vfx/precache-manifest.28a3d9f702281d34c68914c9e883355a.js",
     "service-worker.js": "/react-vfx/service-worker.js",
     "static/css/main.b22d7dc7.chunk.css.map": "/react-vfx/static/css/main.b22d7dc7.chunk.css.map",
     "static/js/2.bf7cab29.chunk.js.LICENSE": "/react-vfx/static/js/2.bf7cab29.chunk.js.LICENSE"
@@ -17,6 +17,6 @@
     "static/js/runtime-main.73b26e45.js",
     "static/js/2.bf7cab29.chunk.js",
     "static/css/main.b22d7dc7.chunk.css",
-    "static/js/main.1472f26e.chunk.js"
+    "static/js/main.47a33d39.chunk.js"
   ]
 }
