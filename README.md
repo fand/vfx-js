@@ -45,7 +45,7 @@ NOTE: `VFXSpan` doesn't work if the content includes child nodes.
 <a href="https://example.com"><VFXSpan>Yo</VFXSpan></a>
 
 // NG: link styles are not rendered correctly
-<VFXSpan><a href="http:s//example.com">Yo</a></VFXSpan>
+<VFXSpan><a href="https://example.com">Yo</a></VFXSpan>
 ```
 
 ### Custom Shader
