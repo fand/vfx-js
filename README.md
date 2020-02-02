@@ -34,7 +34,7 @@ export default () => (
         <VFX.VFXVideo src="mind_blown.mp4"
             autoplay playsinline loop muted
             shader="halftone"/>
-    </VFX>
+    </VFX.VFXProvider>
 );
 ```
 
