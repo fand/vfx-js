@@ -57,7 +57,7 @@ const blink = `
 uniform vec2 resolution;
 uniform vec2 offset;
 uniform float time;
-uniform float src;
+uniform sampler2D src;
 
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
