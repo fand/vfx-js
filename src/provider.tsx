@@ -16,6 +16,7 @@ const canvasStyle = {
 export interface VFXProviderProps {
     children?: any; // 😣 https://github.com/DefinitelyTyped/DefinitelyTyped/issues/27805
     pixelRatio?: number;
+    zIndex?: number;
 }
 
 export const VFXProvider: React.FC<VFXProviderProps> = props => {
@@ -26,6 +27,9 @@ export const VFXProvider: React.FC<VFXProviderProps> = props => {
         const canvas = document.createElement("canvas");
         for (const [k, v] of Object.entries(canvasStyle)) {
             canvas.style.setProperty(k, v.toString());
+        }
+        if (props.zIndex !== undefined) {
+            canvas.style.setProperty("z-index", props.zIndex.toString());
         }
         document.body.appendChild(canvas);
 
@@ -39,7 +43,7 @@ export const VFXProvider: React.FC<VFXProviderProps> = props => {
             player.destroy();
             canvas.remove();
         };
-    }, [props.pixelRatio]);
+    }, [props.pixelRatio, props.zIndex]);
 
     return (
         <>
