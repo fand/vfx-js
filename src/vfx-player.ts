@@ -59,12 +59,15 @@ export default class VFXPlayer {
         if (typeof window !== "undefined") {
             const w = window.innerWidth;
             const h = window.innerHeight;
-            this.canvas.width = w;
-            this.canvas.height = h;
-            this.renderer.setSize(w, h);
-            this.renderer.setPixelRatio(this.pixelRatio);
-            this.w = w;
-            this.h = h;
+
+            if (w !== this.w || h !== this.h) {
+                this.canvas.width = w;
+                this.canvas.height = h;
+                this.renderer.setSize(w, h);
+                this.renderer.setPixelRatio(this.pixelRatio);
+                this.w = w;
+                this.h = h;
+            }
         }
     }
 
