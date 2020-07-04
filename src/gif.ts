@@ -20,7 +20,7 @@ export default class GIFData {
             .then(resp => resp.arrayBuffer())
             .then(buff => new GIF(buff));
 
-        const frames = gif.decompressFrames(true);
+        const frames = gif.decompressFrames(true, undefined, undefined);
         const width = (gif.raw as any).lsd.width;
         const height = (gif.raw as any).lsd.height;
 
