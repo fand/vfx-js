@@ -2,7 +2,7 @@ import * as THREE from "three";
 import dom2canvas from "./dom-to-canvas";
 import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
 import GIFData from "./gif";
-import { VFXProps, VFXElement, VFXElementType } from "./types";
+import { VFXProps, VFXElement, VFXElementType, VFXUniformValue } from "./types";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -174,18 +174,36 @@ export default class VFXPlayer {
         const opacity = type === "video" ? "0.0001" : "0"; // don't hide video element completely to prevent jank frames
         element.style.setProperty("opacity", opacity);
 
-        const uniforms = {
-            src: { type: "t", value: texture },
+        const uniforms: { [name: string]: THREE.IUniform } = {
+            src: { value: texture },
             resolution: {
-                type: "v2",
                 value: new THREE.Vector2()
             },
-            offset: { type: "v2", value: new THREE.Vector2() },
-            time: { type: "f", value: 0.0 },
-            enterTime: { type: "f", value: -1.0 },
-            leaveTime: { type: "f", value: -1.0 },
-            mouse: { type: "v2", value: new THREE.Vector2() }
+            offset: { value: new THREE.Vector2() },
+            time: { value: 0.0 },
+            enterTime: { value: -1.0 },
+            leaveTime: { value: -1.0 },
+            mouse: { value: new THREE.Vector2() }
         };
+
+        const uniformGenerators: {
+            [name: string]: () => VFXUniformValue;
+        } = {};
+
+        if (opts.uniforms !== undefined) {
+            const keys = Object.keys(opts.uniforms);
+            for (const key of keys) {
+                const value = opts.uniforms[key];
+                if (typeof value === "function") {
+                    uniforms[key] = {
+                        value: value()
+                    };
+                    uniformGenerators[key] = value;
+                } else {
+                    uniforms[key] = { value };
+                }
+            }
+        }
 
         const scene = new THREE.Scene();
         const geometry = new THREE.PlaneGeometry(2, 2);
@@ -214,6 +232,7 @@ export default class VFXPlayer {
             height: rect.height,
             scene,
             uniforms,
+            uniformGenerators,
             startTime: now,
             enterTime: isInViewport ? now : -1,
             leaveTime: Infinity,
@@ -289,6 +308,10 @@ export default class VFXPlayer {
                 (window.innerHeight - rect.top - rect.height) * this.pixelRatio;
             e.uniforms["mouse"].value.x = this.mouseX * this.pixelRatio;
             e.uniforms["mouse"].value.y = this.mouseY * this.pixelRatio;
+
+            for (const [key, gen] of Object.entries(e.uniformGenerators)) {
+                e.uniforms[key].value = gen();
+            }
 
             // Update GIF frame
             const gif = gifFor.get(e.element);

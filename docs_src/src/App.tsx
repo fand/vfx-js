@@ -41,6 +41,22 @@ void main() {
 }
 `;
 
+const scrollByScroll = `
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float scroll; // custom uniform passed as React props
+uniform sampler2D src;
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+    // scroll X by scroll
+    uv.x = fract(uv.x + scroll * 30.);
+
+    gl_FragColor = texture2D(src, uv);
+}
+`;
+
 const App: React.FC = () => {
     return (
         <VFX.VFXProvider pixelRatio={1}>
@@ -232,7 +248,7 @@ const App: React.FC = () => {
                             transition effects.{" "}
                         </p>
                         <Code>{dedent`
-                            import { VFXImg } from 'react-vfx';
+                            import { VFXSpan } from 'react-vfx';
 
                             const fadeIn = \`
                             uniform vec2 resolution;
@@ -264,6 +280,76 @@ const App: React.FC = () => {
                             }}
                         >
                             I'm fading!
+                        </VFX.VFXSpan>
+                    </section>
+                    <section className="Secton4">
+                        <h3>Custom Uniforms</h3>
+                        <p>
+                            REACT-VFX accepts custom uniform variables as
+                            `uniforms`. You can pass objects of parameters or
+                            functions:
+                        </p>
+                        <Code>
+                            {dedent`
+                            // dictionary of parameters or functions
+                            export type VFXUniforms = {
+                                [name: string]: VFXUniformValue | (() => VFXUniformValue);
+                            };
+
+                            // REACT-VFX currently supports float, vec2, vec3 and vec4.
+                            export type VFXUniformValue =
+                                | number // float
+                                | [number, number] // vec2
+                                | [number, number, number] // vec3
+                                | [number, number, number, number]; // vec4
+                        `}
+                        </Code>
+                        <p>
+                            If a parameter frequently changes over time (e.g.
+                            scroll position), consider passing it as a function
+                            than a native value to avoid performance problem.
+                        </p>
+                        <Code>{dedent`
+                            import { VFXSpan } from 'react-vfx';
+
+                            const scrollByScroll = \`
+                            uniform vec2 resolution;
+                            uniform vec2 offset;
+                            uniform float scroll; // custom uniform passed as props
+                            uniform sampler2D src;
+
+                            void main() {
+                                vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+                                // scroll X by scroll
+                                uv.x = fract(uv.x + scroll * 30.);
+
+                                gl_FragColor = texture2D(src, uv);
+                            }
+                            \`;
+
+                            export default = () => (
+                                <VFXSpan shader={scrollByScroll} uniforms={{
+                                    scroll: () => window.scrollY / (document.body.scrollHeight - window.innerHeight);
+                                }}>I'm blinking!</VFXSpan>
+                            );
+                        `}</Code>
+                        <p>This renders like this:</p>
+                        <VFX.VFXSpan
+                            shader={scrollByScroll}
+                            style={{
+                                fontSize: "72px",
+                                fontWeight: "bold",
+                                fontStyle: "italic"
+                            }}
+                            uniforms={{
+                                scroll: () =>
+                                    window.scrollY /
+                                    (document.body.scrollHeight -
+                                        window.innerHeight)
+                            }}
+                        >
+                            I'm scrolling!
                         </VFX.VFXSpan>
                     </section>
                 </section>

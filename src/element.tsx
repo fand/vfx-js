@@ -24,12 +24,14 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
             }
 
             const shader = props.shader;
-            player?.addElement(element, { shader });
+            const release = props.release;
+            const uniforms = props.uniforms;
+            player?.addElement(element, { shader, uniforms, release });
 
             return () => {
                 player?.removeElement(element);
             };
-        }, [ref, player, props.shader]);
+        }, [ref, player, props.shader, props.release, props.uniforms]);
 
         // Rerender if the content is updated
         useEffect(() => {
