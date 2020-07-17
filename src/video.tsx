@@ -16,7 +16,9 @@ export const VFXVideo: React.FC<VFXVideoProps> = props => {
         }
 
         const shader = props.shader;
-        player?.addElement(ref.current, { shader });
+        const release = props.release;
+        const uniforms = props.uniforms;
+        player?.addElement(ref.current, { shader, uniforms, release });
 
         return () => {
             if (ref.current === null) {
