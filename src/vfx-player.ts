@@ -183,6 +183,7 @@ export default class VFXPlayer {
             offset: { type: "v2", value: new THREE.Vector2() },
             time: { type: "f", value: 0.0 },
             enterTime: { type: "f", value: -1.0 },
+            leaveTime: { type: "f", value: -1.0 },
             mouse: { type: "v2", value: new THREE.Vector2() }
         };
 
@@ -215,6 +216,8 @@ export default class VFXPlayer {
             uniforms,
             startTime: now,
             enterTime: isInViewport ? now : -1,
+            leaveTime: Infinity,
+            release: opts.release ?? 0,
             isGif
         };
 
@@ -262,10 +265,14 @@ export default class VFXPlayer {
             const isInViewport = this.isRectInViewport(rect);
             if (isInViewport && !e.isInViewport) {
                 e.enterTime = now;
+                e.leaveTime = Infinity;
+            }
+            if (!isInViewport && e.isInViewport) {
+                e.leaveTime = now;
             }
             e.isInViewport = isInViewport;
 
-            if (!e.isInViewport) {
+            if (isInViewport && now - e.leaveTime > e.release) {
                 return;
             }
 
@@ -273,6 +280,8 @@ export default class VFXPlayer {
             e.uniforms["time"].value = now - e.startTime;
             e.uniforms["enterTime"].value =
                 e.enterTime === -1 ? 0 : now - e.enterTime;
+            e.uniforms["leaveTime"].value =
+                e.leaveTime === -1 ? 0 : now - e.leaveTime;
             e.uniforms["resolution"].value.x = rect.width * this.pixelRatio; // TODO: use correct width, height
             e.uniforms["resolution"].value.y = rect.height * this.pixelRatio;
             e.uniforms["offset"].value.x = rect.left * this.pixelRatio;
