@@ -70,7 +70,7 @@
         "dev": "run-p watch:lib watch:docs",
         "lint": "eslint src/**/*.ts src/**/*.tsx",
         "watch:docs": "cd docs_src && npm start",
-        "watch:lib": "tsc -w"
+        "watch:lib": "tsc -d -w"
     },
     "types": "lib/index.d.ts"
 }
