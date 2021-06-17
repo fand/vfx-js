@@ -13,9 +13,17 @@ const IntroSection: React.FC = () => {
                 effects to your{" "}
                 <VFX.VFXImg src="./react-logo-oneline.png" shader="rainbow" />{" "}
                 application. You can easily add{" "}
-                <VFX.VFXDiv shader="glitch">glitched images, </VFX.VFXDiv>
-                <VFX.VFXDiv shader="sinewave">stylized videos</VFX.VFXDiv> and
-                <VFX.VFXDiv shader="shine"> shiny texts </VFX.VFXDiv>
+                <VFX.VFXSpan style={{ display: "block" }} shader="glitch">
+                    glitched images,{" "}
+                </VFX.VFXSpan>
+                <VFX.VFXSpan style={{ display: "block" }} shader="sinewave">
+                    stylized videos
+                </VFX.VFXSpan>{" "}
+                and
+                <VFX.VFXSpan style={{ display: "block" }} shader="shine">
+                    {" "}
+                    shiny texts{" "}
+                </VFX.VFXSpan>
                 to your website!!
             </p>
         </section>
