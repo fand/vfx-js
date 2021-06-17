@@ -38,10 +38,14 @@ export default function getCanvasFromElement(
     // Clone element with styles in text attribute
     // to apply styles in SVG
     const newElement = cloneNode(element);
-    const styles = window.getComputedStyle(element, "");
-    const styleText = styles.cssText;
-    newElement.setAttribute("style", styleText);
-    newElement.style.setProperty("margin", "0");
+    const styles = window.getComputedStyle(element);
+    Array.from(styles).forEach(key => {
+        newElement.style.setProperty(
+            key,
+            styles.getPropertyValue(key),
+            styles.getPropertyPriority(key)
+        );
+    });
     newElement.innerHTML = element.innerHTML;
 
     // Wrap the element for text styling

@@ -256,7 +256,9 @@ export default class VFXPlayer {
             return this.rerender(this.elements[i]);
         }
 
-        return Promise.reject();
+        // Do nothing if the element is not found
+        // This happens when addElement is still processing
+        return Promise.resolve();
     }
 
     play(): void {
