@@ -25,7 +25,7 @@
         "eslint-plugin-prettier": "^3.4.0",
         "eslint-plugin-react": "^7.24.0",
         "eslint-plugin-react-hooks": "^4.2.0",
-        "husky": "^7.0.1",
+        "husky": "^7.0.0",
         "lint-staged": "^11.0.0",
         "npm-run-all": "^4.1.5",
         "prettier": "^2.3.2",
@@ -33,12 +33,6 @@
         "typescript": "^3.9.6"
     },
     "homepage": "https://amagi.dev/react-vfx",
-    "husky": {
-        "hooks": {
-            "pre-commit": "lint-staged",
-            "pre-publish": "run-s lint build:lib"
-        }
-    },
     "keywords": [
         "glsl",
         "react",
@@ -49,8 +43,7 @@
     "lint-staged": {
         "src/*.{ts,tsx}": [
             "eslint --fix",
-            "prettier --write",
-            "git add"
+            "prettier --write"
         ]
     },
     "main": "lib/index.js",
@@ -69,7 +62,8 @@
         "dev": "run-p watch:lib watch:docs",
         "lint": "eslint src/**/*.ts src/**/*.tsx",
         "watch:docs": "cd docs && yarn start",
-        "watch:lib": "tsc -d -w"
+        "watch:lib": "tsc -d -w",
+        "prepare": "husky install"
     },
     "types": "lib/index.d.ts"
 }
