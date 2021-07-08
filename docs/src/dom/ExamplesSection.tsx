@@ -21,7 +21,7 @@ const ExamplesSection: React.FC = () => {
                         />
                     </LazyLoad>
                     <LazyLoad height={320}>
-                        <VFX.VFXImg src="david.png" shader="rgbShift" />
+                        <VFX.VFXImg src={pub("david.png")} shader="rgbShift" />
                     </LazyLoad>
                 </div>
             </section>
