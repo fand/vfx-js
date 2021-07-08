@@ -3,6 +3,10 @@ import LazyLoad from "react-lazyload";
 import * as VFX from "react-vfx";
 import "./ExamplesSection.css";
 
+function pub(name: string): string {
+    return `${process.env.PUBLIC_URL}/${name}`;
+}
+
 const ExamplesSection: React.FC = () => {
     return (
         <section className="ExamplesSection">
@@ -11,7 +15,10 @@ const ExamplesSection: React.FC = () => {
                 <h3>Add effects to your images!!</h3>
                 <div className="ImgContainer">
                     <LazyLoad height={320}>
-                        <VFX.VFXImg src="react-logo.png" shader="rainbow" />
+                        <VFX.VFXImg
+                            src={pub("react-logo.png")}
+                            shader="rainbow"
+                        />
                     </LazyLoad>
                     <LazyLoad height={320}>
                         <VFX.VFXImg src="david.png" shader="rgbShift" />
@@ -30,16 +37,16 @@ const ExamplesSection: React.FC = () => {
                 </h3>
                 <div className="ImgContainer">
                     <LazyLoad height={320}>
-                        <VFX.VFXImg src="chill.gif" shader="sinewave" />
+                        <VFX.VFXImg src={pub("chill.gif")} shader="sinewave" />
                     </LazyLoad>
                     <LazyLoad height={320}>
-                        <VFX.VFXImg src="octocat.gif" shader="glitch" />
+                        <VFX.VFXImg src={pub("octocat.gif")} shader="glitch" />
                     </LazyLoad>
                     <LazyLoad height={320}>
-                        <VFX.VFXImg src="cat.gif" shader="rainbow" />
+                        <VFX.VFXImg src={pub("cat.gif")} shader="rainbow" />
                     </LazyLoad>
                     <LazyLoad height={320}>
-                        <VFX.VFXImg src="doge.gif" shader="pixelate" />
+                        <VFX.VFXImg src={pub("doge.gif")} shader="pixelate" />
                     </LazyLoad>
                 </div>
             </section>
@@ -47,7 +54,7 @@ const ExamplesSection: React.FC = () => {
                 <h3>Videos work well!</h3>
                 <LazyLoad height={320}>
                     <VFX.VFXVideo
-                        src="mind_blown.mp4"
+                        src={pub("mind_blown.mp4")}
                         shader="halftone"
                         autoPlay
                         loop
@@ -64,11 +71,11 @@ const ExamplesSection: React.FC = () => {
             </section>
             <section>
                 <h3>... and make Transition Effects!</h3>
-                <VFX.VFXImg shader="warpTransition" src="logo.png" />
+                <VFX.VFXImg shader="warpTransition" src={pub("logo.png")} />
                 <br />
-                <VFX.VFXImg shader="slitScanTransition" src="logo.png" />
+                <VFX.VFXImg shader="slitScanTransition" src={pub("logo.png")} />
                 <br />
-                <VFX.VFXImg shader="pixelateTransition" src="logo.png" />
+                <VFX.VFXImg shader="pixelateTransition" src={pub("logo.png")} />
                 <br />
             </section>
         </section>
