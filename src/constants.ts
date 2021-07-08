@@ -167,21 +167,21 @@ export const shaders = {
 
         float tt = mod(time, 17.);
 
-        if (fract(tt * 0.3) > .9 || fract(tt * 0.71) > .9) {
-            float t = floor(tt * 13.);
+        if (fract(tt * 0.73) > .8 || fract(tt * 0.91) > .8) {
+            float t = floor(tt * 11.);
 
-            float n = random(vec2(t, floor(uv.y * 3.7)));
+            float n = random(vec2(t, floor(uv.y * 17.7)));
             if (n > .7) {
-                uvr.x = fract(uvr.x + random(vec2(t, 1.)) * .03);
-                uvg.x = fract(uvr.x + random(vec2(t, 2.)) * .03);
-                uvb.x = fract(uvr.x + random(vec2(t, 3.)) * .03);
+                uvr.x += random(vec2(t, 1.)) * .1 - 0.05;
+                uvg.x += random(vec2(t, 2.)) * .1 - 0.05;
+                uvb.x += random(vec2(t, 3.)) * .1 - 0.05;
             }
 
-            float ny = random(vec2(t * 17. + floor(uv * 13.7)));
+            float ny = random(vec2(t * 17. + floor(uv * 19.7)));
             if (ny > .7) {
-                uvr.x = fract(uvr.x + random(vec2(t, 1.)) * .1);
-                uvg.x = fract(uvr.x + random(vec2(t, 2.)) * .1);
-                uvb.x = fract(uvr.x + random(vec2(t, 3.)) * .1);
+                uvr.x += random(vec2(t, 4.)) * .1 - 0.05;
+                uvg.x += random(vec2(t, 5.)) * .1 - 0.05;
+                uvb.x += random(vec2(t, 6.)) * .1 - 0.05;
             }
         }
 
@@ -484,5 +484,5 @@ export const shaders = {
 
         gl_FragColor = texture2D(src, uv);
     }
-    `
+    `,
 };
