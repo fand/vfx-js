@@ -4,6 +4,7 @@ export interface VFXProps {
     shader?: string;
     release?: number;
     uniforms?: VFXUniforms;
+    overflow?: boolean;
 }
 
 export type VFXUniforms = {
@@ -32,4 +33,5 @@ export interface VFXElement {
     leaveTime: number;
     release: number;
     isGif: boolean;
+    overflow: boolean;
 }

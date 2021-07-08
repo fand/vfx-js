@@ -16,6 +16,8 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
         const player = useContext(VFXContext);
         const ref = useRef<HTMLElement>(null);
 
+        const { shader, release, uniforms, overflow } = props;
+
         // Create scene
         useEffect(() => {
             const element = ref.current;
@@ -23,15 +25,17 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
                 return;
             }
 
-            const shader = props.shader;
-            const release = props.release;
-            const uniforms = props.uniforms;
-            player?.addElement(element, { shader, uniforms, release });
+            player?.addElement(element, {
+                shader,
+                release,
+                uniforms,
+                overflow
+            });
 
             return () => {
                 player?.removeElement(element);
             };
-        }, [ref, player, props.shader, props.release, props.uniforms]);
+        }, [ref, player, shader, release, uniforms, overflow]);
 
         // Rerender if the content is updated
         useEffect(() => {

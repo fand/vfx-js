@@ -26,7 +26,7 @@ export default class VFXPlayer {
     constructor(private canvas: HTMLCanvasElement, pixelRatio?: number) {
         this.renderer = new THREE.WebGLRenderer({
             canvas,
-            alpha: true
+            alpha: true,
         });
         this.renderer.autoClear = false;
         this.renderer.setClearAlpha(0);
@@ -36,7 +36,7 @@ export default class VFXPlayer {
 
             window.addEventListener("resize", this.resize);
             window.addEventListener("scroll", this.scroll, {
-                passive: true
+                passive: true,
             });
             window.addEventListener("mousemove", this.mousemove);
         }
@@ -177,13 +177,13 @@ export default class VFXPlayer {
         const uniforms: { [name: string]: THREE.IUniform } = {
             src: { value: texture },
             resolution: {
-                value: new THREE.Vector2()
+                value: new THREE.Vector2(),
             },
             offset: { value: new THREE.Vector2() },
             time: { value: 0.0 },
             enterTime: { value: -1.0 },
             leaveTime: { value: -1.0 },
-            mouse: { value: new THREE.Vector2() }
+            mouse: { value: new THREE.Vector2() },
         };
 
         const uniformGenerators: {
@@ -196,7 +196,7 @@ export default class VFXPlayer {
                 const value = opts.uniforms[key];
                 if (typeof value === "function") {
                     uniforms[key] = {
-                        value: value()
+                        value: value(),
                     };
                     uniformGenerators[key] = value;
                 } else {
@@ -212,13 +212,13 @@ export default class VFXPlayer {
             vertexShader: DEFAULT_VERTEX_SHADER,
             fragmentShader: shader,
             transparent: true,
-            uniforms
+            uniforms,
         });
         material.extensions = {
             derivatives: true,
             drawBuffers: true,
             fragDepth: true,
-            shaderTextureLOD: true
+            shaderTextureLOD: true,
         };
 
         scene.add(new THREE.Mesh(geometry, material));
@@ -237,21 +237,22 @@ export default class VFXPlayer {
             enterTime: isInViewport ? now : -1,
             leaveTime: Infinity,
             release: opts.release ?? 0,
-            isGif
+            isGif,
+            overflow: opts.overflow ?? false,
         };
 
         this.elements.push(elem);
     }
 
     removeElement(element: HTMLElement): void {
-        const i = this.elements.findIndex(e => e.element === element);
+        const i = this.elements.findIndex((e) => e.element === element);
         if (i !== -1) {
             this.elements.splice(i, 1);
         }
     }
 
     updateElement(element: HTMLElement): Promise<void> {
-        const i = this.elements.findIndex(e => e.element === element);
+        const i = this.elements.findIndex((e) => e.element === element);
         if (i !== -1) {
             return this.rerender(this.elements[i]);
         }
@@ -279,7 +280,7 @@ export default class VFXPlayer {
         // window resize event while the address bar is transforming.
         this.updateCanvasSize();
 
-        this.elements.forEach(e => {
+        for (const e of this.elements) {
             const rect = e.element.getBoundingClientRect();
 
             // Check intersection
@@ -325,20 +326,28 @@ export default class VFXPlayer {
                 e.uniforms["src"].value.needsUpdate = true;
             }
 
+            // Set viewport
+            if (e.overflow) {
+                this.renderer.setViewport(
+                    0, 0, window.innerWidth, window.innerHeight
+                );
+            } else {
+                this.renderer.setViewport(
+                    rect.left,
+                    window.innerHeight - (rect.top + rect.height),
+                    rect.width,
+                    rect.height
+                );
+            }
+
             // Render to viewport
             this.camera.lookAt(e.scene.position);
-            this.renderer.setViewport(
-                rect.left,
-                window.innerHeight - (rect.top + rect.height),
-                rect.width,
-                rect.height
-            );
             try {
                 this.renderer.render(e.scene, this.camera);
             } catch (e) {
                 console.error(e);
             }
-        });
+        }
 
         if (this.isPlaying) {
             requestAnimationFrame(this.playLoop);

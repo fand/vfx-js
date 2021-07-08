@@ -52,7 +52,6 @@ export const shaders = {
 
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-
         vec2 uv2 = uv;
         uv2.x *= resolution.x / resolution.y;
 
@@ -216,6 +215,14 @@ export const shaders = {
         return n;
     }
 
+    float step2(float t, vec2 uv) {
+        return step(t, uv.x) * step(t, uv.y);
+    }
+
+    float inside(vec2 uv) {
+        return step2(0., uv) * step2(0., 1. - uv);
+    }
+
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
         vec2 uvr = uv, uvg = uv, uvb = uv;
@@ -230,9 +237,9 @@ export const shaders = {
             uvb.x += nn(uv.y, t + 20.) * amp;
         }
 
-        vec4 cr = texture2D(src, fract(uvr));
-        vec4 cg = texture2D(src, fract(uvg));
-        vec4 cb = texture2D(src, fract(uvb));
+        vec4 cr = texture2D(src, uvr) * inside(uvr);
+        vec4 cg = texture2D(src, uvg) * inside(uvg);
+        vec4 cb = texture2D(src, uvb) * inside(uvb);
 
         gl_FragColor = vec4(
             cr.r,
@@ -353,8 +360,13 @@ export const shaders = {
     uniform float time;
     uniform sampler2D src;
 
+    float inside(in vec2 uv) {
+        return step(0., uv.x) * step(uv.x, 1.) * step(0., uv.y) * step(uv.y, 1.);
+    }
+
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
         vec2 uvr = uv, uvg = uv, uvb = uv;
 
         float amp = 20. / resolution.x;
@@ -363,9 +375,9 @@ export const shaders = {
         uvg.x += sin(uv.y * 7. + time * 3. + .4) * amp;
         uvb.x += sin(uv.y * 7. + time * 3. + .8) * amp;
 
-        vec4 cr = texture2D(src, uvr) * step(0., uvr.x) * step(uvr.x, 1.);
-        vec4 cg = texture2D(src, uvg) * step(0., uvg.x) * step(uvg.x, 1.);
-        vec4 cb = texture2D(src, uvb) * step(0., uvb.x) * step(uvb.x, 1.);
+        vec4 cr = texture2D(src, uvr) * inside(uvr);
+        vec4 cg = texture2D(src, uvg) * inside(uvg);
+        vec4 cb = texture2D(src, uvb) * inside(uvb);
 
         gl_FragColor = vec4(
             cr.r,

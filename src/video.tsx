@@ -9,16 +9,20 @@ export const VFXVideo: React.FC<VFXVideoProps> = props => {
     const player = useContext(VFXContext);
     const ref = useRef<HTMLVideoElement>(null);
 
+    const { shader, release, uniforms, overflow } = props;
+
     // Create scene
     const onLoadedData = useCallback(() => {
         if (ref.current === null) {
             return;
         }
 
-        const shader = props.shader;
-        const release = props.release;
-        const uniforms = props.uniforms;
-        player?.addElement(ref.current, { shader, uniforms, release });
+        player?.addElement(ref.current, {
+            shader,
+            release,
+            uniforms,
+            overflow
+        });
 
         return () => {
             if (ref.current === null) {
@@ -27,7 +31,7 @@ export const VFXVideo: React.FC<VFXVideoProps> = props => {
 
             player?.removeElement(ref.current);
         };
-    }, [props.shader, player]);
+    }, [player, shader, release, uniforms, overflow]);
 
     return <video ref={ref} {...props} onLoadedData={onLoadedData} />;
 };

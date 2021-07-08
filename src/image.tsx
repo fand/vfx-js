@@ -9,16 +9,20 @@ export const VFXImg: React.FC<VFXImgProps> = props => {
     const player = useContext(VFXContext);
     const ref = useRef<HTMLImageElement>(null);
 
+    const { shader, release, uniforms, overflow } = props;
+
     // Create scene
     const init = useCallback(() => {
         if (ref.current === null) {
             return;
         }
 
-        const shader = props.shader;
-        const release = props.release;
-        const uniforms = props.uniforms;
-        player?.addElement(ref.current, { shader, uniforms, release });
+        player?.addElement(ref.current, {
+            shader,
+            release,
+            uniforms,
+            overflow
+        });
 
         return () => {
             if (ref.current === null) {
@@ -27,7 +31,7 @@ export const VFXImg: React.FC<VFXImgProps> = props => {
 
             player?.removeElement(ref.current);
         };
-    }, [props.shader, player]);
+    }, [player, shader, release, uniforms, overflow]);
 
     return <img ref={ref} {...props} onLoad={init} />;
 };
