@@ -17,7 +17,7 @@ const canvasStyle = {
     pointerEvents: "none"
 };
 
-function Bg() {
+const Bg: React.VFC = () => {
     const { scene, camera } = useThree();
     scene.background = new THREE.Color(0x222222);
 
@@ -26,6 +26,9 @@ function Bg() {
 
     const top = scroll.interpolate(x => {
         if (typeof window === "undefined" || typeof document === "undefined") {
+            return 0;
+        }
+        if (typeof x !== "number") {
             return 0;
         }
         return x / (document.body.scrollHeight - window.innerHeight);
@@ -44,7 +47,7 @@ function Bg() {
     }, [onScroll]);
 
     useFrame(() => {
-        const s = top.getValue();
+        const s = top.get();
         camera.rotation.set(-Math.PI * 0.1 - s * Math.PI * 0.4, 0, 0);
     });
 
@@ -54,11 +57,13 @@ function Bg() {
             <Fragments count={isMobile() ? 800 : 1500} scroll={top} />
         </>
     );
-}
+};
 
-export default () => (
+const BG: React.VFC = () => (
     <Canvas style={canvasStyle as any}>
         <Effects />
         <Bg />
     </Canvas>
 );
+
+export default BG;

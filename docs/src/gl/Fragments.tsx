@@ -1,7 +1,8 @@
-import React, { useRef, useEffect } from "react";
-import { useFrame, useResource } from "react-three-fiber";
-import { OpaqueInterpolation } from "react-spring";
+import React, { useRef, useEffect, useState } from "react";
+import { useFrame } from "react-three-fiber";
+import { Interpolation } from "react-spring";
 import { isMobile } from "is-mobile";
+import { BufferGeometry, Material } from "three";
 
 function randomRange(min: number, max: number): number {
     const diff = max - min;
@@ -46,13 +47,13 @@ function Particle({ geometry, material }: any) {
 
 type FragmentsProps = {
     count: number;
-    scroll: OpaqueInterpolation<number>;
+    scroll: Interpolation<number>;
 };
 
 function Fragments({ count, scroll }: FragmentsProps) {
     const groupRef = useRef<THREE.Group>();
-    const [geometryRef, geometry] = useResource();
-    const [materialRef, material] = useResource();
+    const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
+    const [material, setMaterial] = useState<Material | null>(null);
 
     useFrame(() => {
         if (groupRef.current === undefined) {
@@ -62,17 +63,18 @@ function Fragments({ count, scroll }: FragmentsProps) {
             return;
         }
 
-        const s = scroll.getValue();
+        const s = scroll.get();
         groupRef.current.position.set(0, s * 100 - 50, 0);
         groupRef.current.rotation.set(0, Date.now() / 8000 + s * 5, 0);
     });
 
     return (
         <>
-            <boxBufferGeometry ref={geometryRef} args={[0.00001, 1, 1]} />
-            <meshDepthMaterial ref={materialRef} />
+            <boxBufferGeometry ref={setGeometry} args={[0.00001, 1, 1]} />
+            <meshDepthMaterial ref={setMaterial} />
             <group ref={groupRef}>
                 {geometry &&
+                    material &&
                     new Array(count)
                         .fill(0)
                         .map((_, index) => (

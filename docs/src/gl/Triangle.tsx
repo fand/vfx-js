@@ -1,11 +1,11 @@
 import React, { useRef } from "react";
 import { useFrame } from "react-three-fiber";
 import * as THREE from "three";
-import { OpaqueInterpolation } from "react-spring";
+import { Interpolation } from "react-spring";
 import { isMobile } from "is-mobile";
 
 type TriangleProps = {
-    scroll: OpaqueInterpolation<number>;
+    scroll: Interpolation<number>;
 };
 
 function Triangle({ scroll }: TriangleProps) {
@@ -21,7 +21,7 @@ function Triangle({ scroll }: TriangleProps) {
         r.rotation.y += 0.004;
         r.rotation.z += 0.01;
 
-        r.position.set(0, scroll.getValue() * 300 - 7, -15);
+        r.position.set(0, scroll.get() * 300 - 7, -15);
     });
 
     return (
