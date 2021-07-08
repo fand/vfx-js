@@ -21,7 +21,11 @@ const ExamplesSection: React.FC = () => {
                         />
                     </LazyLoad>
                     <LazyLoad height={320}>
-                        <VFX.VFXImg src={pub("david.png")} shader="rgbShift" />
+                        <VFX.VFXImg
+                            src={pub("david.png")}
+                            shader="rgbShift"
+                            overflow
+                        />
                     </LazyLoad>
                 </div>
             </section>
@@ -37,10 +41,18 @@ const ExamplesSection: React.FC = () => {
                 </h3>
                 <div className="ImgContainer">
                     <LazyLoad height={320}>
-                        <VFX.VFXImg src={pub("chill.gif")} shader="sinewave" />
+                        <VFX.VFXImg
+                            src={pub("chill.gif")}
+                            shader="sinewave"
+                            overflow
+                        />
                     </LazyLoad>
                     <LazyLoad height={320}>
-                        <VFX.VFXImg src={pub("octocat.gif")} shader="glitch" />
+                        <VFX.VFXImg
+                            src={pub("octocat.gif")}
+                            shader="glitch"
+                            overflow
+                        />
                     </LazyLoad>
                     <LazyLoad height={320}>
                         <VFX.VFXImg src={pub("cat.gif")} shader="rainbow" />
@@ -64,14 +76,18 @@ const ExamplesSection: React.FC = () => {
                 </LazyLoad>
             </section>
             <section className="VFXSpanExample">
-                <VFX.VFXSpan shader="sinewave">
+                <VFX.VFXSpan shader="sinewave" overflow>
                     You can also add effects to <br />
                     plain text!!!!!
                 </VFX.VFXSpan>
             </section>
             <section>
                 <h3>... and make Transition Effects!</h3>
-                <VFX.VFXImg shader="warpTransition" src={pub("logo.png")} />
+                <VFX.VFXImg
+                    shader="warpTransition"
+                    src={pub("logo.png")}
+                    overflow
+                />
                 <br />
                 <VFX.VFXImg shader="slitScanTransition" src={pub("logo.png")} />
                 <br />

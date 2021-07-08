@@ -348,6 +348,7 @@ const App: React.FC = () => {
                                     (document.body.scrollHeight -
                                         window.innerHeight)
                             }}
+                            overflow
                         >
                             I'm scrolling!
                         </VFX.VFXSpan>

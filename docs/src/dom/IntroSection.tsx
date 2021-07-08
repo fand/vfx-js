@@ -24,10 +24,18 @@ const IntroSection: React.FC = () => {
                     shader="rainbow"
                 />{" "}
                 application. You can easily add{" "}
-                <VFX.VFXSpan style={{ display: "block" }} shader="glitch">
+                <VFX.VFXSpan
+                    style={{ display: "block" }}
+                    shader="glitch"
+                    overflow
+                >
                     glitched images,{" "}
                 </VFX.VFXSpan>
-                <VFX.VFXSpan style={{ display: "block" }} shader="sinewave">
+                <VFX.VFXSpan
+                    style={{ display: "block" }}
+                    shader="sinewave"
+                    overflow
+                >
                     stylized videos
                 </VFX.VFXSpan>{" "}
                 and

@@ -18,6 +18,7 @@ const AuthorSection: React.FC = () => {
                     className="icon"
                     src={pub("amagi.png")}
                     shader="glitch"
+                    overflow
                 />
                 <h3 className="name">Made by AMAGI</h3>
             </a>
