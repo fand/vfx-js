@@ -27,11 +27,12 @@ function cloneNode<T extends Node>(node: T): T {
 // Render element content to canvas and return it.
 // ref.
 export default function getCanvasFromElement(
-    element: HTMLElement
+    element: HTMLElement,
+    oldCanvas?: HTMLCanvasElement
 ): Promise<HTMLCanvasElement> {
     const rect = element.getBoundingClientRect();
 
-    const canvas = document.createElement("canvas");
+    const canvas = oldCanvas ?? document.createElement("canvas");
     canvas.width = Math.max(rect.width * 1.01, rect.width + 1); // XXX
     canvas.height = Math.max(rect.height * 1.01, rect.height + 1);
 
@@ -39,7 +40,7 @@ export default function getCanvasFromElement(
     // to apply styles in SVG
     const newElement = cloneNode(element);
     const styles = window.getComputedStyle(element);
-    Array.from(styles).forEach(key => {
+    Array.from(styles).forEach((key) => {
         newElement.style.setProperty(
             key,
             styles.getPropertyValue(key),

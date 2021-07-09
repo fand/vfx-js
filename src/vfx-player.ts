@@ -113,21 +113,20 @@ export default class VFXPlayer {
     };
 
     private async rerender(e: VFXElement): Promise<void> {
-        const srcTexture = e.uniforms["src"];
         try {
             e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
 
-            const canvas = await dom2canvas(e.element);
+            const texture: THREE.CanvasTexture = e.uniforms["src"].value;
+            const canvas = texture.image;
+
+            await dom2canvas(e.element, canvas);
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
             }
 
-            const opacity = e.type === "video" ? "0.0001" : "0"; // don't hide video element completely to prevent jank frames
-            e.element.style.setProperty("opacity", opacity);
+            e.element.style.setProperty("opacity", "0");
 
-            const texture = new THREE.Texture(canvas);
             texture.needsUpdate = true;
-            srcTexture.value = texture;
         } catch (e) {
             console.error(e);
         }
@@ -161,7 +160,7 @@ export default class VFXPlayer {
             type = "video" as VFXElementType;
         } else {
             const canvas = await dom2canvas(element);
-            texture = new THREE.Texture(canvas);
+            texture = new THREE.CanvasTexture(canvas);
             type = "text" as VFXElementType;
         }
 
@@ -329,7 +328,10 @@ export default class VFXPlayer {
             // Set viewport
             if (e.overflow) {
                 this.renderer.setViewport(
-                    0, 0, window.innerWidth, window.innerHeight
+                    0,
+                    0,
+                    window.innerWidth,
+                    window.innerHeight
                 );
             } else {
                 this.renderer.setViewport(
