@@ -100,18 +100,18 @@ export const shaders = {
         // Prepare for chromatic Abbreveation
         vec2 focus = vec2(0.5);
         float d = v * 0.6;
-        vec2 ruv = fract(focus + (uv - focus) * (1. - d));
-        vec2 guv = fract(focus + (uv - focus) * (1. - 2. * d));
-        vec2 buv = fract(focus + (uv - focus) * (1. - 3. * d));
+        vec2 ruv = focus + (uv - focus) * (1. - d);
+        vec2 guv = focus + (uv - focus) * (1. - 2. * d);
+        vec2 buv = focus + (uv - focus) * (1. - 3. * d);
 
         // Random Glitch
         if (v > 0.1) {
             // Randomize y
             float y = floor(uv.y * 13. * sin(35. * t)) + 1.;
             if (sin(36. * y * v) > 0.9) {
-                ruv.x = fract(uv.x + sin(76. * y) * 0.1);
-                guv.x = fract(uv.x + sin(34. * y) * 0.1);
-                buv.x = fract(uv.x + sin(59. * y) * 0.1);
+                ruv.x = uv.x + sin(76. * y) * 0.1;
+                guv.x = uv.x + sin(34. * y) * 0.1;
+                buv.x = uv.x + sin(59. * y) * 0.1;
             }
 
             // RGB Shift
