@@ -3,9 +3,8 @@ import { useEffect, useRef, useContext } from "react";
 import { VFXContext } from "./context";
 import { VFXProps } from "./types";
 
-type VFXElementProps<
-    T extends keyof JSX.IntrinsicElements
-> = JSX.IntrinsicElements[T] & VFXProps;
+type VFXElementProps<T extends keyof JSX.IntrinsicElements> =
+    JSX.IntrinsicElements[T] & VFXProps;
 
 function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
     type: T
@@ -29,7 +28,7 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
                 shader,
                 release,
                 uniforms,
-                overflow
+                overflow,
             });
 
             return () => {
@@ -43,7 +42,7 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
                 return;
             }
 
-            player?.updateElement(ref.current);
+            player?.updateTextElement(ref.current);
         }, [player, props.children]);
 
         return React.createElement(type, { ...props, ref });

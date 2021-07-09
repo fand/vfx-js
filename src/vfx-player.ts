@@ -79,7 +79,7 @@ export default class VFXPlayer {
                 if (e.type === "text" && e.isInViewport) {
                     const rect = e.element.getBoundingClientRect();
                     if (rect.width !== e.width || rect.height !== e.height) {
-                        await this.rerender(e);
+                        await this.rerenderTextElement(e);
                         e.width = rect.width;
                         e.height = rect.height;
                     }
@@ -89,7 +89,7 @@ export default class VFXPlayer {
                 if (e.type === "text" && !e.isInViewport) {
                     const rect = e.element.getBoundingClientRect();
                     if (rect.width !== e.width || rect.height !== e.height) {
-                        await this.rerender(e);
+                        await this.rerenderTextElement(e);
                         e.width = rect.width;
                         e.height = rect.height;
                     }
@@ -112,7 +112,7 @@ export default class VFXPlayer {
         }
     };
 
-    private async rerender(e: VFXElement): Promise<void> {
+    private async rerenderTextElement(e: VFXElement): Promise<void> {
         try {
             e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
 
@@ -250,10 +250,10 @@ export default class VFXPlayer {
         }
     }
 
-    updateElement(element: HTMLElement): Promise<void> {
+    updateTextElement(element: HTMLElement): Promise<void> {
         const i = this.elements.findIndex((e) => e.element === element);
         if (i !== -1) {
-            return this.rerender(this.elements[i]);
+            return this.rerenderTextElement(this.elements[i]);
         }
 
         // Do nothing if the element is not found
