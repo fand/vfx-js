@@ -15,7 +15,7 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
         const player = useContext(VFXContext);
         const ref = useRef<HTMLElement>(null);
 
-        const { shader, release, uniforms, overflow } = props;
+        const { shader, release, uniforms, overflow, ...rawProps } = props;
 
         // Create scene
         useEffect(() => {
@@ -45,7 +45,7 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
             player?.updateTextElement(ref.current);
         }, [player, props.children]);
 
-        return React.createElement(type, { ...props, ref });
+        return React.createElement(type, { ...rawProps, ref });
     };
 
     return VFXElement;

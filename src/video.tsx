@@ -5,11 +5,11 @@ import { VFXProps } from "./types";
 
 export type VFXVideoProps = JSX.IntrinsicElements["video"] & VFXProps;
 
-export const VFXVideo: React.FC<VFXVideoProps> = props => {
+export const VFXVideo: React.FC<VFXVideoProps> = (props) => {
     const player = useContext(VFXContext);
     const ref = useRef<HTMLVideoElement>(null);
 
-    const { shader, release, uniforms, overflow } = props;
+    const { shader, release, uniforms, overflow, ...rawProps } = props;
 
     // Create scene
     const onLoadedData = useCallback(() => {
@@ -21,7 +21,7 @@ export const VFXVideo: React.FC<VFXVideoProps> = props => {
             shader,
             release,
             uniforms,
-            overflow
+            overflow,
         });
 
         return () => {
@@ -33,5 +33,5 @@ export const VFXVideo: React.FC<VFXVideoProps> = props => {
         };
     }, [player, shader, release, uniforms, overflow]);
 
-    return <video ref={ref} {...props} onLoadedData={onLoadedData} />;
+    return <video ref={ref} {...rawProps} onLoadedData={onLoadedData} />;
 };

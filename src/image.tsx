@@ -5,11 +5,11 @@ import { VFXProps } from "./types";
 
 export type VFXImgProps = JSX.IntrinsicElements["img"] & VFXProps;
 
-export const VFXImg: React.FC<VFXImgProps> = props => {
+export const VFXImg: React.FC<VFXImgProps> = (props) => {
     const player = useContext(VFXContext);
     const ref = useRef<HTMLImageElement>(null);
 
-    const { shader, release, uniforms, overflow } = props;
+    const { shader, release, uniforms, overflow, ...rawProps } = props;
 
     // Create scene
     const init = useCallback(() => {
@@ -21,7 +21,7 @@ export const VFXImg: React.FC<VFXImgProps> = props => {
             shader,
             release,
             uniforms,
-            overflow
+            overflow,
         });
 
         return () => {
@@ -33,5 +33,5 @@ export const VFXImg: React.FC<VFXImgProps> = props => {
         };
     }, [player, shader, release, uniforms, overflow]);
 
-    return <img ref={ref} {...props} onLoad={init} />;
+    return <img ref={ref} {...rawProps} onLoad={init} />;
 };
