@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import { extend, useThree, useFrame } from "react-three-fiber";
+import { extend, useThree, useFrame } from "@react-three/fiber";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass";
 import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader";
@@ -8,7 +8,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
 extend({
     EffectComposer,
     ShaderPass,
-    RenderPass
+    RenderPass,
 });
 
 export default function Effects() {
@@ -39,7 +39,7 @@ export default function Effects() {
                 args={[FXAAShader]}
                 material-uniforms-resolution-value={[
                     1 / size.width,
-                    1 / size.height
+                    1 / size.height,
                 ]}
                 renderToScreen
             />

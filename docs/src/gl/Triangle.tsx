@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
-import { useFrame } from "react-three-fiber";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { Interpolation } from "react-spring";
+import { Interpolation } from "@react-spring/web";
 import { isMobile } from "is-mobile";
 
 type TriangleProps = {

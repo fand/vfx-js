@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
-import { useFrame } from "react-three-fiber";
-import { Interpolation } from "react-spring";
+import { useFrame } from "@react-three/fiber";
+import { Interpolation } from "@react-spring/web";
 import { isMobile } from "is-mobile";
 import { BufferGeometry, Material } from "three";
 

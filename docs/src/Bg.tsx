@@ -1,6 +1,6 @@
 import React, { useEffect, useCallback } from "react";
-import { Canvas, useFrame, useThree } from "react-three-fiber";
-import { useSpring } from "react-spring";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useSpring } from "@react-spring/web";
 import { isMobile } from "is-mobile";
 import * as THREE from "three";
 import Triangle from "./gl/Triangle";
@@ -14,7 +14,7 @@ const canvasStyle = {
     width: "100vw",
     height: "100vh",
     zIndex: -1,
-    pointerEvents: "none"
+    pointerEvents: "none",
 };
 
 const Bg: React.VFC = () => {
@@ -22,9 +22,9 @@ const Bg: React.VFC = () => {
     scene.background = new THREE.Color(0x222222);
 
     const [{ scroll }, set] = useSpring(() => ({ scroll: 0 }));
-    const onScroll = useCallback(e => set({ scroll: window.scrollY }), [set]);
+    const onScroll = useCallback((e) => set({ scroll: window.scrollY }), [set]);
 
-    const top = scroll.interpolate(x => {
+    const top = scroll.to((x) => {
         if (typeof window === "undefined" || typeof document === "undefined") {
             return 0;
         }
