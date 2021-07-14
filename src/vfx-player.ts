@@ -71,9 +71,11 @@ export default class VFXPlayer {
 
         const arrays = {
             // full screen rectangle
-            position: [
-                -1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0,
-            ],
+            position: {
+                numComponents: 3,
+                data: [-1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0],
+            },
+            indices: { numComponents: 3, data: [0, 1, 2, 2, 1, 3] },
         };
 
         this.bufferInfo = twgl.createBufferInfoFromArrays(this.gl, arrays);
