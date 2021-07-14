@@ -26,7 +26,6 @@ export interface VFXElement {
     width: number;
     height: number;
     programInfo: twgl.ProgramInfo;
-    vao: twgl.VertexArrayInfo;
     uniforms: { [name: string]: VFXUniformValue | WebGLTexture };
     uniformGenerators: { [name: string]: () => VFXUniformValue };
     startTime: number;

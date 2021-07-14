@@ -77,7 +77,9 @@ export default class VFXPlayer {
             },
             indices: { numComponents: 3, data: [0, 1, 2, 2, 1, 3] },
         };
+
         this.bufferInfo = twgl.createBufferInfoFromArrays(this.gl, arrays);
+
         if (typeof window !== "undefined") {
             this.pixelRatio = pixelRatio || window.devicePixelRatio;
 
@@ -243,11 +245,6 @@ export default class VFXPlayer {
             DEFAULT_VERTEX_SHADER_TWGL,
             shader,
         ]);
-        const vao = twgl.createVertexArrayInfo(
-            this.gl,
-            programInfo,
-            this.bufferInfo
-        );
 
         const now = Date.now() / 1000;
         const elem = {
@@ -265,7 +262,6 @@ export default class VFXPlayer {
             isGif,
             overflow: opts.overflow ?? false,
             programInfo,
-            vao,
         };
 
         this.elements.push(elem);
@@ -383,9 +379,13 @@ export default class VFXPlayer {
 
             // Render to viewport
             this.gl.useProgram(e.programInfo.program);
-            // twgl.setBuffersAndAttributes(this.gl, e.programInfo, e.vao);
+            twgl.setBuffersAndAttributes(
+                this.gl,
+                e.programInfo,
+                this.bufferInfo
+            );
             twgl.setUniforms(e.programInfo, e.uniforms);
-            twgl.drawBufferInfo(this.gl, e.vao);
+            twgl.drawBufferInfo(this.gl, this.bufferInfo);
         }
 
         if (this.isPlaying) {
