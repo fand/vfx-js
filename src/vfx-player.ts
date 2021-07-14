@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import * as twgl from "twgl.js";
 import dom2canvas from "./dom-to-canvas";
 import { shaders, DEFAULT_VERTEX_SHADER_TWGL } from "./constants";

@@ -7,7 +7,6 @@
         "url": "https://github.com/fand/react-vfx/issues"
     },
     "dependencies": {
-        "three": "^0.130.1",
         "twgl.js": "^4.19.2"
     },
     "files": [
@@ -18,7 +17,6 @@
     "devDependencies": {
         "@types/node": "^16.0.1",
         "@types/react": "^17.0.14",
-        "@types/three": "^0.130.0",
         "@typescript-eslint/eslint-plugin": "^4.28.2",
         "@typescript-eslint/parser": "^4.28.2",
         "eslint": "^7.28.0",
@@ -37,8 +35,9 @@
     "keywords": [
         "glsl",
         "react",
-        "threejs",
-        "webgl"
+        "webgl",
+        "design",
+        "vfx"
     ],
     "license": "MIT",
     "lint-staged": {
