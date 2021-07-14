@@ -106,11 +106,8 @@ export default class VFXPlayer {
             const h = window.innerHeight;
 
             if (w !== this.w || h !== this.h) {
-                this.canvas.width = w;
-                this.canvas.height = h;
-                // this.gl.set
-                // this.renderer.setSize(w, h);
-                // this.renderer.setPixelRatio(this.pixelRatio);
+                this.canvas.width = w * this.pixelRatio;
+                this.canvas.height = h * this.pixelRatio;
                 this.w = w;
                 this.h = h;
             }
@@ -161,12 +158,19 @@ export default class VFXPlayer {
     private async rerenderTextElement(e: VFXElement): Promise<void> {
         try {
             e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
+
             const texture: WebGLTexture = e.uniforms["src"];
             const canvas = canvasFor.get(texture);
+            if (!canvas) {
+                throw "VFXElement not initialized correctly";
+            }
+
             await dom2canvas(e.element, canvas);
-            if (canvas?.offsetWidth === 0 || canvas?.offsetWidth === 0) {
+            if (canvas.width === 0 || canvas.height === 0) {
                 throw "omg";
             }
+
+            twgl.setTextureFromElement(this.gl, texture, canvas);
             e.element.style.setProperty("opacity", "0");
         } catch (e) {
             console.error(e);
@@ -265,7 +269,8 @@ export default class VFXPlayer {
     removeElement(element: HTMLElement): void {
         const i = this.elements.findIndex((e) => e.element === element);
         if (i !== -1) {
-            this.elements.splice(i, 1);
+            const [e] = this.elements.splice(i, 1);
+            canvasFor.delete(e.uniforms["src"]);
         }
     }
 
