@@ -7,7 +7,8 @@
         "url": "https://github.com/fand/react-vfx/issues"
     },
     "dependencies": {
-        "three": "^0.130.1"
+        "three": "^0.130.1",
+        "twgl.js": "^4.19.2"
     },
     "files": [
         "package.json",
