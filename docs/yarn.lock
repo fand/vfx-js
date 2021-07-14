@@ -9275,7 +9275,7 @@ react-use-measure@^2.0.4:
 "react-vfx@file:..":
   version "0.5.0"
   dependencies:
-    three "^0.130.1"
+    twgl.js "^4.19.2"
 
 react@^17.0.2:
   version "17.0.2"
@@ -10733,6 +10733,11 @@ tty-browserify@0.0.0:
   version "0.0.0"
   resolved "https://registry.yarnpkg.com/tty-browserify/-/tty-browserify-0.0.0.tgz#a157ba402da24e9bf957f9aa69d524eed42901a6"
   integrity sha1-oVe6QC2iTpv5V/mqadUk7tQpAaY=
+
+twgl.js@^4.19.2:
+  version "4.19.2"
+  resolved "https://registry.yarnpkg.com/twgl.js/-/twgl.js-4.19.2.tgz#d61c80e435676f1816ea9135f487c7842792a150"
+  integrity sha512-dK58dWDJyDyfJVTywpkb2cgqenFiMYqXXMQAp9AOO7Ed0zQ6K6HOjg9mjoWvk01sdSbd6O2Y6FG/M1SW25X+iQ==
 
 type-check@^0.4.0, type-check@~0.4.0:
   version "0.4.0"
