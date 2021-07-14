@@ -5,6 +5,14 @@ void main() {
 }
 `;
 
+export const DEFAULT_VERTEX_SHADER_TWGL = `
+precision mediump float;
+attribute vec4 position;
+void main() {
+    gl_Position = position;
+}
+`;
+
 export const shaders = {
     uvGradient: `
     precision mediump float;
@@ -454,7 +462,8 @@ export const shaders = {
             uv.x += sin(floor(uv.y * 300.)) * 3. * exp(t * -10.);
         }
 
-        gl_FragColor = texture2D(src, uv);
+        vec4 c = texture2D(src, uv);
+        gl_FragColor = c;
     }
     `,
     slitScanTransition: `

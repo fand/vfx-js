@@ -1,19 +1,60 @@
 import * as THREE from "three";
+import * as twgl from "twgl.js";
 import dom2canvas from "./dom-to-canvas";
-import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
+import { shaders, DEFAULT_VERTEX_SHADER_TWGL } from "./constants";
 import GIFData from "./gif";
 import { VFXProps, VFXElement, VFXElementType, VFXUniformValue } from "./types";
 
 const gifFor = new Map<HTMLElement, GIFData>();
+const canvasFor = new Map<WebGLTexture, HTMLCanvasElement>();
+
+function getWebGLContext(
+    canvas: HTMLCanvasElement
+): WebGL2RenderingContext | WebGLRenderingContext {
+    const gl2 = canvas.getContext("webgl2", { alpha: true, antialias: true });
+    if (gl2) {
+        gl2.getExtension("OES_standard_derivatives");
+        gl2.getExtension("WEBGL_draw_buffers");
+        gl2.getExtension("EXT_frag_depth");
+        gl2.getExtension("EXT_shader_texture_lod");
+        return gl2;
+    }
+
+    const gl1 = canvas.getContext("webgl", {
+        alpha: true,
+    });
+    if (gl1) {
+        gl1.getExtension("OES_standard_derivatives");
+        gl1.getExtension("WEBGL_draw_buffers");
+        gl1.getExtension("EXT_frag_depth");
+        gl1.getExtension("EXT_shader_texture_lod");
+        return gl1;
+    }
+
+    throw "Failed to initialize WebGL context";
+}
+
+function getTexture(
+    gl: WebGL2RenderingContext | WebGLRenderingContext,
+    src: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement
+): WebGLTexture {
+    return twgl.createTexture(gl, {
+        src: src,
+        min: gl.LINEAR,
+        mag: gl.LINEAR,
+        flipY: 1,
+        premultiplyAlpha: 1,
+        wrap: gl.CLAMP_TO_EDGE,
+    });
+}
 
 export default class VFXPlayer {
-    renderer: THREE.WebGLRenderer;
-    camera: THREE.Camera;
+    gl: WebGL2RenderingContext | WebGLRenderingContext;
+    bufferInfo: twgl.BufferInfo;
+
     isPlaying = false;
     pixelRatio = 2;
     elements: VFXElement[] = [];
-
-    textureLoader = new THREE.TextureLoader();
 
     w = 0;
     h = 0;
@@ -24,12 +65,19 @@ export default class VFXPlayer {
     mouseY = 0;
 
     constructor(private canvas: HTMLCanvasElement, pixelRatio?: number) {
-        this.renderer = new THREE.WebGLRenderer({
-            canvas,
-            alpha: true,
-        });
-        this.renderer.autoClear = false;
-        this.renderer.setClearAlpha(0);
+        this.gl = getWebGLContext(canvas);
+        this.gl.clearColor(0, 0, 0, 0);
+        this.gl.enable(this.gl.BLEND);
+        this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+
+        const arrays = {
+            // full screen rectangle
+            position: [
+                -1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0,
+            ],
+        };
+
+        this.bufferInfo = twgl.createBufferInfoFromArrays(this.gl, arrays);
 
         if (typeof window !== "undefined") {
             this.pixelRatio = pixelRatio || window.devicePixelRatio;
@@ -42,9 +90,6 @@ export default class VFXPlayer {
         }
         this.resize();
         this.scroll();
-
-        this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-        this.camera.position.set(0, 0, 1);
     }
 
     destroy(): void {
@@ -63,8 +108,9 @@ export default class VFXPlayer {
             if (w !== this.w || h !== this.h) {
                 this.canvas.width = w;
                 this.canvas.height = h;
-                this.renderer.setSize(w, h);
-                this.renderer.setPixelRatio(this.pixelRatio);
+                // this.gl.set
+                // this.renderer.setSize(w, h);
+                // this.renderer.setPixelRatio(this.pixelRatio);
                 this.w = w;
                 this.h = h;
             }
@@ -115,18 +161,13 @@ export default class VFXPlayer {
     private async rerenderTextElement(e: VFXElement): Promise<void> {
         try {
             e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
-
-            const texture: THREE.CanvasTexture = e.uniforms["src"].value;
-            const canvas = texture.image;
-
+            const texture: WebGLTexture = e.uniforms["src"];
+            const canvas = canvasFor.get(texture);
             await dom2canvas(e.element, canvas);
-            if (canvas.width === 0 || canvas.width === 0) {
+            if (canvas?.offsetWidth === 0 || canvas?.offsetWidth === 0) {
                 throw "omg";
             }
-
             e.element.style.setProperty("opacity", "0");
-
-            texture.needsUpdate = true;
         } catch (e) {
             console.error(e);
         }
@@ -141,7 +182,7 @@ export default class VFXPlayer {
         const isInViewport = this.isRectInViewport(rect);
 
         // Create values for element types
-        let texture: THREE.Texture;
+        let texture: WebGLTexture;
         let type: VFXElementType;
         let isGif = false;
         if (element instanceof HTMLImageElement) {
@@ -151,38 +192,32 @@ export default class VFXPlayer {
             if (isGif) {
                 const gif = await GIFData.create(element.src, this.pixelRatio);
                 gifFor.set(element, gif);
-                texture = new THREE.Texture(gif.getCanvas());
+                texture = getTexture(this.gl, gif.getCanvas());
             } else {
-                texture = this.textureLoader.load(element.src);
+                texture = getTexture(this.gl, element);
             }
         } else if (element instanceof HTMLVideoElement) {
-            texture = new THREE.VideoTexture(element);
+            texture = getTexture(this.gl, element);
             type = "video" as VFXElementType;
         } else {
             const canvas = await dom2canvas(element);
-            texture = new THREE.CanvasTexture(canvas);
+            texture = getTexture(this.gl, canvas);
+            canvasFor.set(texture, canvas);
             type = "text" as VFXElementType;
         }
-
-        texture.minFilter = THREE.LinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.format = THREE.RGBAFormat;
-        texture.needsUpdate = true;
 
         // Hide original element
         const opacity = type === "video" ? "0.0001" : "0"; // don't hide video element completely to prevent jank frames
         element.style.setProperty("opacity", opacity);
 
-        const uniforms: { [name: string]: THREE.IUniform } = {
-            src: { value: texture },
-            resolution: {
-                value: new THREE.Vector2(),
-            },
-            offset: { value: new THREE.Vector2() },
-            time: { value: 0.0 },
-            enterTime: { value: -1.0 },
-            leaveTime: { value: -1.0 },
-            mouse: { value: new THREE.Vector2() },
+        const uniforms: { [name: string]: VFXUniformValue | WebGLTexture } = {
+            src: texture,
+            resolution: [0, 0],
+            offset: [0, 0],
+            time: 0.0,
+            enterTime: -Infinity,
+            leaveTime: -Infinity,
+            mouse: [0, 0],
         };
 
         const uniformGenerators: {
@@ -194,33 +229,17 @@ export default class VFXPlayer {
             for (const key of keys) {
                 const value = opts.uniforms[key];
                 if (typeof value === "function") {
-                    uniforms[key] = {
-                        value: value(),
-                    };
-                    uniformGenerators[key] = value;
+                    (uniforms[key] = value()), (uniformGenerators[key] = value);
                 } else {
-                    uniforms[key] = { value };
+                    uniforms[key] = value;
                 }
             }
         }
 
-        const scene = new THREE.Scene();
-        const geometry = new THREE.PlaneGeometry(2, 2);
-
-        const material = new THREE.ShaderMaterial({
-            vertexShader: DEFAULT_VERTEX_SHADER,
-            fragmentShader: shader,
-            transparent: true,
-            uniforms,
-        });
-        material.extensions = {
-            derivatives: true,
-            drawBuffers: true,
-            fragDepth: true,
-            shaderTextureLOD: true,
-        };
-
-        scene.add(new THREE.Mesh(geometry, material));
+        const programInfo = twgl.createProgramInfo(this.gl, [
+            DEFAULT_VERTEX_SHADER_TWGL,
+            shader,
+        ]);
 
         const now = Date.now() / 1000;
         const elem = {
@@ -229,7 +248,6 @@ export default class VFXPlayer {
             isInViewport,
             width: rect.width,
             height: rect.height,
-            scene,
             uniforms,
             uniformGenerators,
             startTime: now,
@@ -238,6 +256,7 @@ export default class VFXPlayer {
             release: opts.release ?? 0,
             isGif,
             overflow: opts.overflow ?? false,
+            programInfo,
         };
 
         this.elements.push(elem);
@@ -273,7 +292,8 @@ export default class VFXPlayer {
     private playLoop = (): void => {
         const now = Date.now() / 1000;
 
-        this.renderer.clear();
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+        // this.renderer.clear();
 
         // This must done every frame because iOS Safari doesn't fire
         // window resize event while the address bar is transforming.
@@ -298,43 +318,52 @@ export default class VFXPlayer {
             }
 
             // Update uniforms
-            e.uniforms["time"].value = now - e.startTime;
-            e.uniforms["enterTime"].value =
+            e.uniforms["time"] = now - e.startTime;
+            e.uniforms["enterTime"] =
                 e.enterTime === -1 ? 0 : now - e.enterTime;
-            e.uniforms["leaveTime"].value =
+            e.uniforms["leaveTime"] =
                 e.leaveTime === -1 ? 0 : now - e.leaveTime;
-            e.uniforms["resolution"].value.x = rect.width * this.pixelRatio; // TODO: use correct width, height
-            e.uniforms["resolution"].value.y = rect.height * this.pixelRatio;
-            e.uniforms["offset"].value.x = rect.left * this.pixelRatio;
-            e.uniforms["offset"].value.y =
-                (window.innerHeight - rect.top - rect.height) * this.pixelRatio;
-            e.uniforms["mouse"].value.x = this.mouseX * this.pixelRatio;
-            e.uniforms["mouse"].value.y = this.mouseY * this.pixelRatio;
+            e.uniforms["resolution"] = [
+                rect.width * this.pixelRatio, // TODO: use correct width, height
+                rect.height * this.pixelRatio,
+            ];
+            e.uniforms["offset"] = [
+                rect.left * this.pixelRatio,
+                (window.innerHeight - rect.top - rect.height) * this.pixelRatio,
+            ];
+            e.uniforms["mouse"] = [
+                this.mouseX * this.pixelRatio,
+                this.mouseY * this.pixelRatio,
+            ];
 
             for (const [key, gen] of Object.entries(e.uniformGenerators)) {
-                e.uniforms[key].value = gen();
+                e.uniforms[key] = gen();
             }
 
             // Update GIF frame
             const gif = gifFor.get(e.element);
             if (gif !== undefined) {
                 gif.update();
+                twgl.setTextureFromElement(
+                    this.gl,
+                    e.uniforms["src"],
+                    gif.getCanvas()
+                );
             }
 
-            if (e.type === "video" || e.isGif) {
-                e.uniforms["src"].value.needsUpdate = true;
+            if (e.type === "video") {
+                twgl.setTextureFromElement(
+                    this.gl,
+                    e.uniforms["src"],
+                    e.element
+                );
             }
 
             // Set viewport
             if (e.overflow) {
-                this.renderer.setViewport(
-                    0,
-                    0,
-                    window.innerWidth,
-                    window.innerHeight
-                );
+                this.gl.viewport(0, 0, window.innerWidth, window.innerHeight);
             } else {
-                this.renderer.setViewport(
+                this.gl.viewport(
                     rect.left,
                     window.innerHeight - (rect.top + rect.height),
                     rect.width,
@@ -343,12 +372,14 @@ export default class VFXPlayer {
             }
 
             // Render to viewport
-            this.camera.lookAt(e.scene.position);
-            try {
-                this.renderer.render(e.scene, this.camera);
-            } catch (e) {
-                console.error(e);
-            }
+            this.gl.useProgram(e.programInfo.program);
+            twgl.setBuffersAndAttributes(
+                this.gl,
+                e.programInfo,
+                this.bufferInfo
+            );
+            twgl.setUniforms(e.programInfo, e.uniforms);
+            twgl.drawBufferInfo(this.gl, this.bufferInfo);
         }
 
         if (this.isPlaying) {

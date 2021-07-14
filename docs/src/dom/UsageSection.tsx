@@ -5,6 +5,7 @@ import dedent from "dedent";
 import { Code, InlineCode } from "./Code";
 
 const blink = `
+precision mediump float;
 uniform vec2 resolution; // Resolution of the element
 uniform vec2 offset;     // Position of the element in the screen
 uniform float time;      // Time passed since mount
@@ -19,6 +20,7 @@ void main() {
 `;
 
 const fadeIn = `
+precision mediump float;
 uniform vec2 resolution;
 uniform vec2 offset;
 uniform float time;
@@ -35,6 +37,7 @@ void main() {
 `;
 
 const scrollByScroll = `
+precision mediump float;
 uniform vec2 resolution;
 uniform vec2 offset;
 uniform float scroll; // custom uniform passed as React props
@@ -47,6 +50,7 @@ void main() {
     uv.x = fract(uv.x + scroll * 30.);
 
     gl_FragColor = texture2D(src, uv);
+    if (gl_FragColor.a == 0.) { discard; }
 }
 `;
 
@@ -219,7 +223,7 @@ const UsageSection: React.VFC = () => (
                 style={{
                     fontSize: "72px",
                     fontWeight: "bold",
-                    fontStyle: "italic"
+                    fontStyle: "italic",
                 }}
             >
                 I'm blinking!
@@ -260,7 +264,7 @@ const UsageSection: React.VFC = () => (
                     style={{
                         fontSize: "72px",
                         fontWeight: "bold",
-                        fontStyle: "italic"
+                        fontStyle: "italic",
                     }}
                 >
                     I'm fading!
@@ -323,12 +327,12 @@ const UsageSection: React.VFC = () => (
                     style={{
                         fontSize: "72px",
                         fontWeight: "bold",
-                        fontStyle: "italic"
+                        fontStyle: "italic",
                     }}
                     uniforms={{
                         scroll: () =>
                             window.scrollY /
-                            (document.body.scrollHeight - window.innerHeight)
+                            (document.body.scrollHeight - window.innerHeight),
                     }}
                     overflow
                 >

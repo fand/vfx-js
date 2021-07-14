@@ -31,11 +31,7 @@ const IntroSection: React.FC = () => {
                 >
                     glitched images,{" "}
                 </VFX.VFXSpan>
-                <VFX.VFXSpan
-                    style={{ display: "block" }}
-                    shader="sinewave"
-                    overflow
-                >
+                <VFX.VFXSpan style={{ display: "block" }} shader="sinewave">
                     stylized videos
                 </VFX.VFXSpan>{" "}
                 and

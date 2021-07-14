@@ -1,4 +1,4 @@
-import THREE from "three";
+import twgl from "twgl.js";
 
 export interface VFXProps {
     shader?: string;
@@ -25,8 +25,8 @@ export interface VFXElement {
     isInViewport: boolean;
     width: number;
     height: number;
-    scene: THREE.Scene;
-    uniforms: { [name: string]: THREE.IUniform };
+    programInfo: twgl.ProgramInfo;
+    uniforms: { [name: string]: VFXUniformValue | WebGLTexture };
     uniformGenerators: { [name: string]: () => VFXUniformValue };
     startTime: number;
     enterTime: number;
