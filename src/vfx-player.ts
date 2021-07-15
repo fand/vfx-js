@@ -2,14 +2,7 @@ import * as twgl from "twgl.js";
 import dom2canvas from "./dom-to-canvas";
 import { shaders, DEFAULT_VERTEX_SHADER_TWGL } from "./constants";
 import GIFData from "./gif";
-import {
-    VFXProps,
-    VFXElement,
-    VFXElementType,
-    VFXPropsUniformValue,
-    VFXUniform,
-    VFXUniformValue,
-} from "./types";
+import { VFXProps, VFXElement, VFXElementType, VFXUniformValue } from "./types";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 const canvasFor = new Map<WebGLTexture, HTMLCanvasElement>();
@@ -52,25 +45,6 @@ function getTexture(
         premultiplyAlpha: 1,
         wrap: gl.CLAMP_TO_EDGE,
     });
-}
-
-function isChanged(x: VFXUniformValue, y: VFXUniformValue): boolean {
-    if (typeof x !== typeof y) {
-        throw new Error(`Type mismatch: ${typeof x} and ${typeof y}`);
-    }
-
-    if (typeof x === "number" || !Array.isArray(x)) {
-        return x !== y;
-    } else {
-        if (!Array.isArray(y)) {
-            throw new Error(`Type mismatch: ${typeof x} and ${typeof y}`);
-        }
-        let isSame = true;
-        for (let i = 0; i < x.length; i++) {
-            isSame = isSame && x[i] === y[i];
-        }
-        return !isSame;
-    }
 }
 
 export default class VFXPlayer {
@@ -241,18 +215,18 @@ export default class VFXPlayer {
         const opacity = type === "video" ? "0.0001" : "0"; // don't hide video element completely to prevent jank frames
         element.style.setProperty("opacity", opacity);
 
-        const uniforms: { [name: string]: VFXUniform } = {
-            src: { value: texture, isChanged: true },
-            resolution: { value: [0, 0], isChanged: true },
-            offset: { value: [0, 0], isChanged: true },
-            time: { value: 0.0, isChanged: true },
-            enterTime: { value: -Infinity, isChanged: true },
-            leaveTime: { value: -Infinity, isChanged: true },
-            mouse: { value: [0, 0], isChanged: true },
+        const uniforms: { [name: string]: VFXUniformValue | WebGLTexture } = {
+            src: texture,
+            resolution: [0, 0],
+            offset: [0, 0],
+            time: 0.0,
+            enterTime: -Infinity,
+            leaveTime: -Infinity,
+            mouse: [0, 0],
         };
 
         const uniformGenerators: {
-            [name: string]: () => VFXPropsUniformValue;
+            [name: string]: () => VFXUniformValue;
         } = {};
 
         if (opts.uniforms !== undefined) {
@@ -260,13 +234,9 @@ export default class VFXPlayer {
             for (const key of keys) {
                 const value = opts.uniforms[key];
                 if (typeof value === "function") {
-                    uniforms[key] = {
-                        value: value(),
-                        isChanged: true,
-                    };
-                    uniformGenerators[key] = value;
+                    (uniforms[key] = value()), (uniformGenerators[key] = value);
                 } else {
-                    uniforms[key] = { value, isChanged: true };
+                    uniforms[key] = value;
                 }
             }
         }
@@ -353,58 +323,27 @@ export default class VFXPlayer {
                 return;
             }
 
-            this.gl.useProgram(e.programInfo.program);
-
             // Update uniforms
-            if (e.programInfo.uniformSetters["src"]) {
-                e.programInfo.uniformSetters["src"](e.uniforms.src.value);
-            }
-
-            const newUniforms: [string, VFXUniformValue][] = [
-                // ["src", e.uniforms.src.value],
-                ["time", now - e.startTime],
-                ["enterTime", e.enterTime === -1 ? 0 : now - e.enterTime],
-                ["leaveTime", e.leaveTime === -1 ? 0 : now - e.leaveTime],
-                [
-                    "resolution",
-                    [
-                        rect.width * this.pixelRatio, // TODO: use correct width, height
-                        rect.height * this.pixelRatio,
-                    ],
-                ],
-                [
-                    "offset",
-                    [
-                        rect.left * this.pixelRatio,
-                        (window.innerHeight - rect.top - rect.height) *
-                            this.pixelRatio,
-                    ],
-                ],
-                [
-                    "mouse",
-                    [
-                        this.mouseX * this.pixelRatio,
-                        this.mouseY * this.pixelRatio,
-                    ],
-                ],
+            e.uniforms["time"] = now - e.startTime;
+            e.uniforms["enterTime"] =
+                e.enterTime === -1 ? 0 : now - e.enterTime;
+            e.uniforms["leaveTime"] =
+                e.leaveTime === -1 ? 0 : now - e.leaveTime;
+            e.uniforms["resolution"] = [
+                rect.width * this.pixelRatio, // TODO: use correct width, height
+                rect.height * this.pixelRatio,
+            ];
+            e.uniforms["offset"] = [
+                rect.left * this.pixelRatio,
+                (window.innerHeight - rect.top - rect.height) * this.pixelRatio,
+            ];
+            e.uniforms["mouse"] = [
+                this.mouseX * this.pixelRatio,
+                this.mouseY * this.pixelRatio,
             ];
 
-            for (const [key, newValue] of newUniforms) {
-                if (isChanged(newValue, e.uniforms[key].value)) {
-                    e.uniforms[key].value = newValue;
-                    e.uniforms[key].isChanged = true;
-                }
-            }
-
-            for (const [key, uniform] of Object.entries(e.uniforms)) {
-                if (uniform.isChanged && e.programInfo.uniformSetters[key]) {
-                    e.programInfo.uniformSetters[key](uniform.value);
-                    uniform.isChanged = false;
-                }
-            }
-
             for (const [key, gen] of Object.entries(e.uniformGenerators)) {
-                e.programInfo.uniformSetters[key](gen());
+                e.uniforms[key] = gen();
             }
 
             // Update GIF frame
@@ -413,7 +352,7 @@ export default class VFXPlayer {
                 gif.update();
                 twgl.setTextureFromElement(
                     this.gl,
-                    e.uniforms["src"].value,
+                    e.uniforms["src"],
                     gif.getCanvas()
                 );
             }
@@ -421,7 +360,7 @@ export default class VFXPlayer {
             if (e.type === "video") {
                 twgl.setTextureFromElement(
                     this.gl,
-                    e.uniforms["src"].value,
+                    e.uniforms["src"],
                     e.element
                 );
             }
@@ -439,11 +378,13 @@ export default class VFXPlayer {
             }
 
             // Render to viewport
+            this.gl.useProgram(e.programInfo.program);
             twgl.setBuffersAndAttributes(
                 this.gl,
                 e.programInfo,
                 this.bufferInfo
             );
+            twgl.setUniforms(e.programInfo, e.uniforms);
             twgl.drawBufferInfo(this.gl, this.bufferInfo);
         }
 
