@@ -1,6 +1,5 @@
-import React, { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Interpolation } from "@react-spring/web";
 import { isMobile } from "is-mobile";
 import { BufferGeometry, Material } from "three";
 
@@ -47,7 +46,7 @@ function Particle({ geometry, material }: any) {
 
 type FragmentsProps = {
     count: number;
-    scroll: Interpolation<number>;
+    scroll: RefObject<number>;
 };
 
 function Fragments({ count, scroll }: FragmentsProps) {
@@ -63,7 +62,7 @@ function Fragments({ count, scroll }: FragmentsProps) {
             return;
         }
 
-        const s = scroll.get();
+        const s = scroll.current ?? 0;
         groupRef.current.position.set(0, s * 100 - 50, 0);
         groupRef.current.rotation.set(0, Date.now() / 8000 + s * 5, 0);
     });
