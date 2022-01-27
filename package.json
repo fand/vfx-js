@@ -7,7 +7,7 @@
         "url": "https://github.com/fand/react-vfx/issues"
     },
     "dependencies": {
-        "three": "^0.130.1"
+        "three": "^0.137.0"
     },
     "files": [
         "package.json",
