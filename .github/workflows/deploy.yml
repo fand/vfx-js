@@ -9,43 +9,23 @@ jobs:
     deploy:
         runs-on: ubuntu-18.04
         steps:
-            - uses: actions/checkout@v2
+            - uses: actions/checkout@v3
 
             - name: Setup Node
-              uses: actions/setup-node@v2
+              uses: actions/setup-node@v3
               with:
-                  node-version: "14"
+                  node-version: "16"
+                  cache: 'yarn'
+                  cache-dependency-path: '**/yarn.lock'
 
-            - name: Get yarn cache directory path
-              id: yarn-cache-dir-path
-              run: echo "::set-output name=dir::$(yarn cache dir)"
+            - name: Install dependencies
+              run: yarn install --frozen-lockfile
 
-            - uses: actions/cache@v2
-              with:
-                  path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-                  key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-yarn-
-
-            - name: Install dependencies for REACT-VFX
-              run: yarn
-
-            - name: Build REACT-VFX
-              run: yarn build:lib
-
-            - name: Install dependencies for docs
-              run: |
-                  cd docs
-                  yarn
-                  yarn add link:..
-
-            - name: Build docs
-              run: CI=false yarn build
-
-            - run: cd ..
+            - name: Build REACT-VFX and docs
+              run: yarn build
 
             - name: Deploy
               uses: peaceiris/actions-gh-pages@v3
               with:
                   github_token: ${{ secrets.GITHUB_TOKEN }}
-                  publish_dir: ./docs/build
+                  publish_dir: ./packages/docs/build

@@ -10,7 +10,7 @@ const canvasStyle = {
     width: "100vw",
     height: "100vh",
     "z-index": 9999,
-    "pointer-events": "none"
+    "pointer-events": "none",
 };
 
 export interface VFXProviderProps {
@@ -19,7 +19,7 @@ export interface VFXProviderProps {
     zIndex?: number;
 }
 
-export const VFXProvider: React.FC<VFXProviderProps> = props => {
+export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
     const [_player, setPlayer] = useState<VFXPlayer | null>(null);
 
     useEffect(() => {
