@@ -46,6 +46,9 @@ void main() {
     // scroll X by scroll
     uv.x = fract(uv.x + scroll * 30.);
 
+    // prevent vertical overflow
+    if (uv.y < 0. || uv.y > 1.) discard;
+
     gl_FragColor = texture2D(src, uv);
 }
 `;
@@ -219,7 +222,7 @@ const UsageSection: React.VFC = () => (
                 style={{
                     fontSize: "72px",
                     fontWeight: "bold",
-                    fontStyle: "italic"
+                    fontStyle: "italic",
                 }}
             >
                 I'm blinking!
@@ -260,7 +263,7 @@ const UsageSection: React.VFC = () => (
                     style={{
                         fontSize: "72px",
                         fontWeight: "bold",
-                        fontStyle: "italic"
+                        fontStyle: "italic",
                     }}
                 >
                     I'm fading!
@@ -307,6 +310,9 @@ const UsageSection: React.VFC = () => (
                 // scroll X by scroll
                 uv.x = fract(uv.x + scroll * 30.);
 
+                // prevent vertical overflow
+                if (uv.y < 0. || uv.y > 1.) discard;
+
                 gl_FragColor = texture2D(src, uv);
             }
             \`;
@@ -323,12 +329,12 @@ const UsageSection: React.VFC = () => (
                     style={{
                         fontSize: "72px",
                         fontWeight: "bold",
-                        fontStyle: "italic"
+                        fontStyle: "italic",
                     }}
                     uniforms={{
                         scroll: () =>
                             window.scrollY /
-                            (document.body.scrollHeight - window.innerHeight)
+                            (document.body.scrollHeight - window.innerHeight),
                     }}
                     overflow
                 >
