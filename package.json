@@ -2,7 +2,8 @@
   "name": "react-vfx-monorepo",
   "private": true,
   "workspaces": [
-    "packages/**"
+    "packages/react-vfx",
+    "packages/docs2"
   ],
   "scripts": {
     "build": "turbo run build",
