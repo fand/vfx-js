@@ -1,20 +1,20 @@
 {
   "files": {
     "main.css": "/react-vfx/static/css/main.39ec0459.chunk.css",
-    "main.js": "/react-vfx/static/js/main.c90c2a67.chunk.js",
-    "main.js.map": "/react-vfx/static/js/main.c90c2a67.chunk.js.map",
-    "runtime-main.js": "/react-vfx/static/js/runtime-main.2b7ae7f5.js",
-    "runtime-main.js.map": "/react-vfx/static/js/runtime-main.2b7ae7f5.js.map",
-    "static/js/2.84b159e8.chunk.js": "/react-vfx/static/js/2.84b159e8.chunk.js",
-    "static/js/2.84b159e8.chunk.js.map": "/react-vfx/static/js/2.84b159e8.chunk.js.map",
+    "main.js": "/react-vfx/static/js/main.3a9b3d7f.chunk.js",
+    "main.js.map": "/react-vfx/static/js/main.3a9b3d7f.chunk.js.map",
+    "runtime-main.js": "/react-vfx/static/js/runtime-main.39e25360.js",
+    "runtime-main.js.map": "/react-vfx/static/js/runtime-main.39e25360.js.map",
+    "static/js/2.e99f9c5b.chunk.js": "/react-vfx/static/js/2.e99f9c5b.chunk.js",
+    "static/js/2.e99f9c5b.chunk.js.map": "/react-vfx/static/js/2.e99f9c5b.chunk.js.map",
     "index.html": "/react-vfx/index.html",
     "static/css/main.39ec0459.chunk.css.map": "/react-vfx/static/css/main.39ec0459.chunk.css.map",
-    "static/js/2.84b159e8.chunk.js.LICENSE.txt": "/react-vfx/static/js/2.84b159e8.chunk.js.LICENSE.txt"
+    "static/js/2.e99f9c5b.chunk.js.LICENSE.txt": "/react-vfx/static/js/2.e99f9c5b.chunk.js.LICENSE.txt"
   },
   "entrypoints": [
-    "static/js/runtime-main.2b7ae7f5.js",
-    "static/js/2.84b159e8.chunk.js",
+    "static/js/runtime-main.39e25360.js",
+    "static/js/2.e99f9c5b.chunk.js",
     "static/css/main.39ec0459.chunk.css",
-    "static/js/main.c90c2a67.chunk.js"
+    "static/js/main.3a9b3d7f.chunk.js"
   ]
 }
