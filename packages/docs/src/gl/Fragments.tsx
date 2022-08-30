@@ -9,7 +9,7 @@ function randomRange(min: number, max: number): number {
 }
 
 function Particle({ geometry, material }: any) {
-    let ref = useRef<THREE.Mesh>();
+    const ref = useRef<THREE.Mesh>(null);
 
     let x = randomRange(-50, 50);
     let y = randomRange(-140, 100);
@@ -26,7 +26,7 @@ function Particle({ geometry, material }: any) {
     const size = isMobile() ? 18 : 12;
 
     useEffect(() => {
-        if (ref.current === undefined) {
+        if (ref.current === null) {
             return;
         }
 
@@ -50,12 +50,12 @@ type FragmentsProps = {
 };
 
 function Fragments({ count, scroll }: FragmentsProps) {
-    const groupRef = useRef<THREE.Group>();
+    const groupRef = useRef<THREE.Group>(null);
     const [geometry, setGeometry] = useState<BufferGeometry | null>(null);
     const [material, setMaterial] = useState<Material | null>(null);
 
     useFrame(() => {
-        if (groupRef.current === undefined) {
+        if (groupRef.current === null) {
             return;
         }
         if (typeof window === "undefined") {

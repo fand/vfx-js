@@ -8,13 +8,13 @@ type TriangleProps = {
 };
 
 function Triangle({ scroll }: TriangleProps) {
-    const ref = useRef<THREE.Mesh>();
+    const ref = useRef<THREE.Mesh>(null);
 
     const size = isMobile() ? 7 : 13;
 
     useFrame(() => {
         const r = ref.current;
-        if (r === undefined) {
+        if (r === null) {
             return;
         }
         r.rotation.y += 0.004;

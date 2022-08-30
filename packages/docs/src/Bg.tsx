@@ -27,25 +27,19 @@ const Bg: React.VFC = () => {
 
     const top = createRef() as MutableRefObject<number>;
 
-    const onScroll = useCallback(
-        (e) => {
-            const scroll = window.scrollY;
+    const onScroll = useCallback(() => {
+        const scroll = window.scrollY;
 
-            if (
-                typeof window === "undefined" ||
-                typeof document === "undefined"
-            ) {
-                return 0;
-            }
-            if (typeof scroll !== "number") {
-                return 0;
-            }
+        if (typeof window === "undefined" || typeof document === "undefined") {
+            return 0;
+        }
+        if (typeof scroll !== "number") {
+            return 0;
+        }
 
-            top.current =
-                scroll / (document.body.scrollHeight - window.innerHeight);
-        },
-        [top]
-    );
+        top.current =
+            scroll / (document.body.scrollHeight - window.innerHeight);
+    }, [top]);
 
     useEffect(() => {
         if (typeof window === "undefined" || typeof document === "undefined") {
