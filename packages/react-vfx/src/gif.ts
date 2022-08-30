@@ -17,8 +17,8 @@ export default class GIFData {
 
     static async create(src: string, pixelRatio: number): Promise<GIFData> {
         const gif = await fetch(src)
-            .then(resp => resp.arrayBuffer())
-            .then(buff => new GIF(buff));
+            .then((resp) => resp.arrayBuffer())
+            .then((buff) => new GIF(buff));
 
         const frames = gif.decompressFrames(true, undefined, undefined);
         const width = (gif.raw as any).lsd.width;

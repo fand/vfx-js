@@ -1,69 +1,29 @@
 {
-    "name": "react-vfx",
-    "description": "WebGL effects for React elements",
-    "version": "0.5.0",
-    "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
-    "bugs": {
-        "url": "https://github.com/fand/react-vfx/issues"
-    },
-    "dependencies": {
-        "three": "^0.130.1"
-    },
-    "files": [
-        "package.json",
-        "README.md",
-        "lib/"
-    ],
-    "devDependencies": {
-        "@types/node": "^16.0.1",
-        "@types/react": "^17.0.14",
-        "@types/three": "^0.130.0",
-        "@typescript-eslint/eslint-plugin": "^4.28.2",
-        "@typescript-eslint/parser": "^4.28.2",
-        "eslint": "^7.28.0",
-        "eslint-config-prettier": "^8.3.0",
-        "eslint-plugin-prettier": "^3.4.0",
-        "eslint-plugin-react": "^7.24.0",
-        "eslint-plugin-react-hooks": "^4.2.0",
-        "husky": "^7.0.0",
-        "lint-staged": "^11.0.0",
-        "npm-run-all": "^4.1.5",
-        "prettier": "^2.3.2",
-        "rimraf": "^3.0.2",
-        "typescript": "^4.3.5"
-    },
-    "homepage": "https://amagi.dev/react-vfx",
-    "keywords": [
-        "glsl",
-        "react",
-        "threejs",
-        "webgl"
-    ],
-    "license": "MIT",
-    "lint-staged": {
-        "src/*.{ts,tsx}": [
-            "eslint --fix",
-            "prettier --write"
-        ]
-    },
-    "main": "lib/index.js",
-    "peerDependencies": {
-        "react": ">= 16.12.0",
-        "react-dom": ">= 16.12.0"
-    },
-    "repository": {
-        "url": "https://github.com/fand/react-vfx"
-    },
-    "scripts": {
-        "build": "run-s clean build:lib build:docs",
-        "build:lib": "tsc -d",
-        "build:docs": "cd docs && yarn build",
-        "clean": "rimraf lib docs/build",
-        "dev": "run-p watch:lib watch:docs",
-        "lint": "eslint src/**/*.ts src/**/*.tsx",
-        "watch:docs": "cd docs && yarn start",
-        "watch:lib": "tsc -d -w",
-        "prepare": "husky install"
-    },
-    "types": "lib/index.d.ts"
+  "name": "react-vfx-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/**"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "clean": "turbo run clean",
+    "lint": "turbo run lint",
+    "prepare": "husky install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fand/react-vfx.git"
+  },
+  "keywords": [],
+  "author": "AMAGI <mail@amagi.dev> (https://amagi.dev/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/fand/react-vfx/issues"
+  },
+  "homepage": "https://github.com/fand/react-vfx#readme",
+  "devDependencies": {
+    "husky": "^8.0.1",
+    "turbo": "^1.4.3"
+  }
 }
