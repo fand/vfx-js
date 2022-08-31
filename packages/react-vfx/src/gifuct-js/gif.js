@@ -1,7 +1,7 @@
 // object used to represent array buffer data for a gif file
 
-const DataParser = require("./dataparser");
-const gifSchema = require("./schema");
+import DataParser from "./dataparser";
+import gifSchema from "./schema";
 
 function GIF(arrayBuffer) {
     // convert to byte array
@@ -23,7 +23,7 @@ function GIF(arrayBuffer) {
 // process a single gif image frames data, decompressing it using LZW
 // if buildPatch is true, the returned image will be a clamped 8 bit image patch
 // for use directly with a canvas.
-GIF.prototype.decompressFrame = function(index, buildPatch) {
+GIF.prototype.decompressFrame = function (index, buildPatch) {
     // make sure a valid frame is requested
     if (index >= this.raw.frames.length) {
         return null;
@@ -54,8 +54,8 @@ GIF.prototype.decompressFrame = function(index, buildPatch) {
                 top: frame.image.descriptor.top,
                 left: frame.image.descriptor.left,
                 width: frame.image.descriptor.width,
-                height: frame.image.descriptor.height
-            }
+                height: frame.image.descriptor.height,
+            },
         };
 
         // color table
@@ -212,7 +212,7 @@ GIF.prototype.decompressFrame = function(index, buildPatch) {
     function deinterlace(pixels, width) {
         var newPixels = new Array(pixels.length);
         var rows = pixels.length / width;
-        var cpRow = function(toRow, fromRow) {
+        var cpRow = function (toRow, fromRow) {
             var fromPixels = pixels.slice(
                 fromRow * width,
                 (fromRow + 1) * width
@@ -263,7 +263,7 @@ GIF.prototype.decompressFrame = function(index, buildPatch) {
 };
 
 // returns all frames decompressed
-GIF.prototype.decompressFrames = function(buildPatch, startFrame, endFrame) {
+GIF.prototype.decompressFrames = function (buildPatch, startFrame, endFrame) {
     if (startFrame === undefined) {
         startFrame = 0;
     }
@@ -282,4 +282,4 @@ GIF.prototype.decompressFrames = function(buildPatch, startFrame, endFrame) {
     return frames;
 };
 
-module.exports = GIF;
+export default GIF;

@@ -15,7 +15,7 @@ video {
     max-width: 100%;
 }
 
-.App>section {
+.App > section {
     padding: 10px;
     box-sizing: border-box;
     overflow: hidden;

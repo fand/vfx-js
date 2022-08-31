@@ -17,7 +17,7 @@ const InputSection: React.FC = () => {
             </p>
             <textarea
                 value={text}
-                onChange={e => setText(e.target.value)}
+                onChange={(e) => setText(e.target.value)}
             ></textarea>
             <button type="button" onClick={update}>
                 <VFX.VFXSpan shader="rainbow">FIRE</VFX.VFXSpan>

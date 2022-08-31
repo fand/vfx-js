@@ -6,7 +6,6 @@ import React, {
 } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { isMobile } from "is-mobile";
-import * as THREE from "three";
 import Triangle from "./gl/Triangle";
 import Fragments from "./gl/Fragments";
 import Effects from "./gl/Effects";
@@ -19,33 +18,27 @@ const canvasStyle = {
     height: "100vh",
     zIndex: -1,
     pointerEvents: "none",
+    background: "#222222",
 };
 
 const Bg: React.VFC = () => {
     const { scene, camera } = useThree();
-    scene.background = new THREE.Color(0x222222);
 
     const top = createRef() as MutableRefObject<number>;
 
-    const onScroll = useCallback(
-        (e) => {
-            const scroll = window.scrollY;
+    const onScroll = useCallback(() => {
+        const scroll = window.scrollY;
 
-            if (
-                typeof window === "undefined" ||
-                typeof document === "undefined"
-            ) {
-                return 0;
-            }
-            if (typeof scroll !== "number") {
-                return 0;
-            }
+        if (typeof window === "undefined" || typeof document === "undefined") {
+            return 0;
+        }
+        if (typeof scroll !== "number") {
+            return 0;
+        }
 
-            top.current =
-                scroll / (document.body.scrollHeight - window.innerHeight);
-        },
-        [top]
-    );
+        top.current =
+            scroll / (document.body.scrollHeight - window.innerHeight);
+    }, [top]);
 
     useEffect(() => {
         if (typeof window === "undefined" || typeof document === "undefined") {
