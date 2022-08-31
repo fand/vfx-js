@@ -1,9 +1,9 @@
 import React from "react";
-import * as VFX from "react-vfx";
+import VFX from "react-vfx";
 import "./AuthorSection.css";
 
 function pub(name: string): string {
-    return `${process.env.PUBLIC_URL}/${name}`;
+    return `${import.meta.env.BASE_URL}${name}`;
 }
 
 const AuthorSection: React.FC = () => {

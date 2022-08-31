@@ -1,5 +1,5 @@
 import React from "react";
-import * as VFX from "react-vfx";
+import VFX from "react-vfx";
 import Bg from "./Bg";
 import Frame from "./dom/Frame";
 import LogoSection from "./dom/LogoSection";

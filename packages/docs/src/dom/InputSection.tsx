@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import * as VFX from "react-vfx";
+import VFX from "react-vfx";
 import "./InputSection.css";
 
 const InputSection: React.FC = () => {
@@ -17,7 +17,7 @@ const InputSection: React.FC = () => {
             </p>
             <textarea
                 value={text}
-                onChange={e => setText(e.target.value)}
+                onChange={(e) => setText(e.target.value)}
             ></textarea>
             <button type="button" onClick={update}>
                 <VFX.VFXSpan shader="rainbow">FIRE</VFX.VFXSpan>
