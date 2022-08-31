@@ -56,7 +56,7 @@ const Bg: React.VFC = () => {
     return (
         <>
             <Triangle scroll={top} />
-            <Fragments count={isMobile() ? 800 : 1500} scroll={top} />
+            <Fragments count={isMobile() ? 1200 : 2500} scroll={top} />
         </>
     );
 };
