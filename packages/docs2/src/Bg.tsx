@@ -63,7 +63,7 @@ const Bg: React.VFC = () => {
 
 const BG: React.VFC = () => (
     <Canvas style={canvasStyle as any}>
-        {/* <Effects /> */}
+        <Effects />
         <Bg />
     </Canvas>
 );

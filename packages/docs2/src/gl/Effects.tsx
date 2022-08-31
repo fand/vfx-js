@@ -1,15 +1,10 @@
 import { useRef, useEffect } from "react";
 import { extend, useThree, useFrame } from "@react-three/fiber";
-import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer";
-import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass";
+// import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer";
+// import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass";
 import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader";
-import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
 
-extend({
-    EffectComposer,
-    ShaderPass,
-    RenderPass,
-});
+import { EffectComposer, SMAA } from "@react-three/postprocessing";
 
 export default function Effects() {
     const composer = useRef<EffectComposer>();
@@ -32,17 +27,22 @@ export default function Effects() {
     }, 2);
 
     return (
-        <effectComposer ref={composer} args={[gl]}>
-            <renderPass attachArray="passes" scene={scene} camera={camera} />
-            <shaderPass
-                attachArray="passes"
-                args={[FXAAShader]}
-                material-uniforms-resolution-value={[
-                    1 / size.width,
-                    1 / size.height,
-                ]}
-                renderToScreen
-            />
-        </effectComposer>
+        <EffectComposer multisampling={0}>
+            <SMAA />
+        </EffectComposer>
     );
+    // return (
+    //     // <effectComposer ref={composer} args={[gl]}>
+    //     //     <renderPass attachArray="passes" scene={scene} camera={camera} />
+    //     //     <shaderPass
+    //     //         attachArray="passes"
+    //     //         args={[FXAAShader]}
+    //     //         material-uniforms-resolution-value={[
+    //     //             1 / size.width,
+    //     //             1 / size.height,
+    //     //         ]}
+    //     //         renderToScreen
+    //     //     />
+    //     // </effectComposer>
+    // );
 }
