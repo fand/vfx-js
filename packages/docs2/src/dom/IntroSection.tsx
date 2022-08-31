@@ -3,7 +3,7 @@ import VFX from "react-vfx";
 import "./IntroSection.css";
 
 function pub(name: string): string {
-    return `${import.meta.env.BASE_URL}/${name}`;
+    return `${import.meta.env.BASE_URL}${name}`;
 }
 
 const IntroSection: React.FC = () => {
