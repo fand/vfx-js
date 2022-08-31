@@ -1,2 +1,2 @@
-const GIF = require("./gif");
-module.exports = GIF;
+import GIF from "./gif";
+export default GIF;

@@ -1,6 +1,6 @@
 import React from "react";
 import LazyLoad from "react-lazyload";
-import VFX from "react-vfx";
+import * as VFX from "react-vfx";
 import "./ExamplesSection.css";
 
 function pub(name: string): string {

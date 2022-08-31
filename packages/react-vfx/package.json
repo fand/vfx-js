@@ -46,7 +46,11 @@
       "prettier --write"
     ]
   },
-  "main": "lib/index.js",
+  "main": "./lib/cjs/index.js",
+  "exports": {
+    "require": "./lib/cjs/index.js",
+    "import": "./lib/esm/index.mjs"
+  },
   "peerDependencies": {
     "react": ">= 16.12.0",
     "react-dom": ">= 16.12.0"
@@ -55,11 +59,14 @@
     "url": "https://github.com/fand/react-vfx"
   },
   "scripts": {
-    "build": "run-s clean build:lib",
-    "build:lib": "tsc -d",
+    "build": "run-s clean build:cjs build:esm",
+    "build:cjs": "tsc -d",
+    "build:esm": "tsc -d -p tsconfig.esm.json",
     "clean": "rimraf lib",
-    "dev": "tsc -d -w",
+    "dev": "run-p watch:cjs watch:esm",
+    "watch:cjs": "tsc -d -w",
+    "watch:esm": "tsc -d -w -p tsconfig.esm.json",
     "lint": "eslint src/**/*.ts src/**/*.tsx"
   },
-  "types": "lib/index.d.ts"
+  "types": "lib/esm/index.d.ts"
 }

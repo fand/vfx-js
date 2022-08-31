@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import VFX from "react-vfx";
+import * as VFX from "react-vfx";
 import "./InputSection.css";
 
 const InputSection: React.FC = () => {

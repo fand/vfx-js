@@ -1,5 +1,5 @@
 import React from "react";
-import VFX from "react-vfx";
+import * as VFX from "react-vfx";
 import "./LogoSection.css";
 
 function pub(name: string): string {

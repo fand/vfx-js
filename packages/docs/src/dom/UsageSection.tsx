@@ -1,5 +1,5 @@
 import React from "react";
-import VFX from "react-vfx";
+import * as VFX from "react-vfx";
 import InputSection from "./InputSection";
 import dedent from "dedent";
 import { Code, InlineCode } from "./Code";
