@@ -1,0 +1,21 @@
+.IntroSection {
+    font-size: 144px;
+    font-weight: bold;
+}
+
+.IntroSection p {
+    width: 100%;
+}
+
+.IntroSection img {
+    display: inline-block;
+    height: 1em;
+    transform: translateY(20%);
+}
+
+@media (max-width: 768px) {
+    .IntroSection {
+        font-size: 56px;
+        line-height: 1.2em;
+    }
+}
