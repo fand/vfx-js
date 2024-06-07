@@ -1,6 +1,6 @@
 import { RefObject, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import * as THREE from "three";
+import { Mesh } from "three";
 import { isMobile } from "is-mobile";
 
 type TriangleProps = {
@@ -8,7 +8,7 @@ type TriangleProps = {
 };
 
 function Triangle({ scroll }: TriangleProps) {
-    const ref = useRef<THREE.Mesh>(null);
+    const ref = useRef<Mesh>(null);
 
     const size = isMobile() ? 7 : 13;
 
@@ -26,7 +26,7 @@ function Triangle({ scroll }: TriangleProps) {
 
     return (
         <mesh ref={ref}>
-            <torusBufferGeometry attach="geometry" args={[size, 1, 2, 3]} />
+            <torusGeometry attach="geometry" args={[size, 1, 2, 3]} />
             <meshNormalMaterial attach="material" />
         </mesh>
     );
