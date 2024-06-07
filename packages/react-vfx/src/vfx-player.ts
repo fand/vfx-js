@@ -23,7 +23,10 @@ export default class VFXPlayer {
     mouseX = 0;
     mouseY = 0;
 
-    constructor(private canvas: HTMLCanvasElement, pixelRatio?: number) {
+    constructor(
+        private canvas: HTMLCanvasElement,
+        pixelRatio?: number,
+    ) {
         this.renderer = new THREE.WebGLRenderer({
             canvas,
             alpha: true,
@@ -133,9 +136,7 @@ export default class VFXPlayer {
     }
 
     async addElement(element: HTMLElement, opts: VFXProps = {}): Promise<void> {
-        // Init opts
-        const shaderName = opts.shader || "uvGradient";
-        const shader = (shaders as any)[shaderName] || shaderName;
+        const shader = this.getShader(opts.shader || "uvGradient");
 
         const rect = element.getBoundingClientRect();
         const isInViewport = this.isRectInViewport(rect);
@@ -206,20 +207,12 @@ export default class VFXPlayer {
 
         const scene = new THREE.Scene();
         const geometry = new THREE.PlaneGeometry(2, 2);
-
         const material = new THREE.ShaderMaterial({
             vertexShader: DEFAULT_VERTEX_SHADER,
             fragmentShader: shader,
             transparent: true,
             uniforms,
         });
-        material.extensions = {
-            derivatives: true,
-            drawBuffers: true,
-            fragDepth: true,
-            shaderTextureLOD: true,
-        };
-
         scene.add(new THREE.Mesh(geometry, material));
 
         const now = Date.now() / 1000;
@@ -331,14 +324,14 @@ export default class VFXPlayer {
                     0,
                     0,
                     window.innerWidth,
-                    window.innerHeight
+                    window.innerHeight,
                 );
             } else {
                 this.renderer.setViewport(
                     rect.left,
                     window.innerHeight - (rect.top + rect.height),
                     rect.width,
-                    rect.height
+                    rect.height,
                 );
             }
 
@@ -364,5 +357,13 @@ export default class VFXPlayer {
             rect.top <= this.h &&
             rect.bottom >= 0
         );
+    }
+
+    private getShader(shaderNameOrCode: string): string {
+        if (shaderNameOrCode in shaders) {
+            return shaders[shaderNameOrCode as keyof typeof shaders];
+        } else {
+            return shaderNameOrCode; // Assume that the given string is a valid shader code
+        }
     }
 }
