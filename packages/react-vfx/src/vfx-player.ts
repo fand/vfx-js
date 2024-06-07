@@ -119,17 +119,20 @@ export default class VFXPlayer {
         try {
             e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
 
-            const texture: THREE.CanvasTexture = e.uniforms["src"].value;
-            const canvas = texture.image;
+            const oldTexture: THREE.CanvasTexture = e.uniforms["src"].value;
+            const canvas = oldTexture.image;
+
+            const texture = new THREE.CanvasTexture(canvas);
 
             await dom2canvas(e.element, canvas);
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
             }
 
-            e.element.style.setProperty("opacity", "0");
+            e.uniforms["src"].value = texture;
+            oldTexture.dispose();
 
-            texture.needsUpdate = true;
+            e.element.style.setProperty("opacity", "0");
         } catch (e) {
             console.error(e);
         }
