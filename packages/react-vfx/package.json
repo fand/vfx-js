@@ -66,7 +66,8 @@
     "dev": "run-p watch:cjs watch:esm",
     "watch:cjs": "tsc -d -w",
     "watch:esm": "tsc -d -w -p tsconfig.esm.json",
-    "lint": "eslint src/**/*.ts src/**/*.tsx"
+    "lint": "eslint src/**/*.ts src/**/*.tsx",
+    "lint-staged": "lint-staged"
   },
   "types": "lib/esm/index.d.ts"
 }

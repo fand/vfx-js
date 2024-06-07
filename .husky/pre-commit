@@ -1,4 +1,4 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
-yarn workspace react-vfx lint-staged
+npm --workspace=react-vfx run lint-staged
