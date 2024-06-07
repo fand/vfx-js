@@ -1,6 +1,7 @@
 {
   "name": "react-vfx-monorepo",
   "private": true,
+  "packageManager": "npm@9.8.1",
   "workspaces": [
     "packages/react-vfx",
     "packages/docs"
@@ -24,7 +25,7 @@
   },
   "homepage": "https://github.com/fand/react-vfx#readme",
   "devDependencies": {
-    "husky": "^8.0.1",
-    "turbo": "^1.4.3"
+    "husky": "^9.0.11",
+    "turbo": "^2.0.3"
   }
 }

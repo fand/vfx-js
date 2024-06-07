@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { isMobile } from "is-mobile";
-import { Object3D } from "three";
+import { Object3D, Group, InstancedMesh } from "three";
 
 function randomRange(min: number, max: number): number {
     const diff = max - min;
@@ -9,7 +9,7 @@ function randomRange(min: number, max: number): number {
 }
 
 function Particles({ count }: { count: number }) {
-    const ref = useRef<THREE.InstancedMesh>(null);
+    const ref = useRef<InstancedMesh>(null);
     const size = isMobile() ? 18 : 12;
 
     useEffect(() => {
@@ -52,7 +52,7 @@ function Particles({ count }: { count: number }) {
 
     return (
         <instancedMesh ref={ref} args={[undefined, undefined, count]}>
-            <boxBufferGeometry args={[0.00001, 1, 1]} />
+            <boxGeometry args={[0.00001, 1, 1]} />
             <meshDepthMaterial />
         </instancedMesh>
     );
@@ -64,7 +64,7 @@ type FragmentsProps = {
 };
 
 function Fragments({ count, scroll }: FragmentsProps) {
-    const groupRef = useRef<THREE.Group>(null);
+    const groupRef = useRef<Group>(null);
 
     useFrame(() => {
         if (groupRef.current === null) {
