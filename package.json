@@ -1,6 +1,7 @@
 {
   "name": "react-vfx-monorepo",
   "private": true,
+  "packageManager": "npm@9.8.1",
   "workspaces": [
     "packages/react-vfx",
     "packages/docs"
