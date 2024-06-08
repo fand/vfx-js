@@ -1,6 +1,7 @@
 import React from "react";
 import * as VFX from "react-vfx";
 import InputSection from "./InputSection";
+import DivSection from "./DivSection";
 import dedent from "dedent";
 import { Code, InlineCode } from "./Code";
 
@@ -187,6 +188,7 @@ const UsageSection: React.VFC = () => (
                     re-renders when its content is updated.
                 </p>
                 <InputSection />
+                <DivSection />
                 <p>
                     <i>NOTE: VFXSpan doesn't work with nested elements.</i>
                 </p>

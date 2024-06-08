@@ -6,3 +6,5 @@ import vElementFactory from "./element";
 export const VFXSpan = vElementFactory<"span">("span");
 export const VFXDiv = vElementFactory<"div">("div");
 export const VFXP = vElementFactory<"p">("p");
+
+export * from "./hooks";
