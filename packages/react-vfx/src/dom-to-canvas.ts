@@ -44,7 +44,6 @@ export default function getCanvasFromElement(
     // Clone element with styles in text attribute
     // to apply styles in SVG
     const newElement = cloneNode(element);
-    const styles = window.getComputedStyle(element);
     syncStylesOfTree(element, newElement);
 
     // Traverse and update input value
@@ -56,14 +55,8 @@ export default function getCanvasFromElement(
         }
     });
 
-    // Wrap the element for text styling
-    const wrapper = document.createElement("div");
-    wrapper.style.setProperty("text-align", styles.textAlign);
-    wrapper.style.setProperty("vertical-align", styles.verticalAlign);
-    wrapper.appendChild(newElement);
-
     // Create SVG string
-    const html = wrapper.outerHTML;
+    const html = newElement.outerHTML;
     const xml = convertHtmlToXml(html);
     const svg =
         `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">` +
