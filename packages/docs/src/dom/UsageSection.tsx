@@ -170,29 +170,8 @@ const UsageSection: React.VFC = () => (
             `}
                 </Code>
             </section>
-            <section>
-                <h3>Text</h3>
-                <p>
-                    Use <InlineCode>{"<VFXSpan>"}</InlineCode> instead of{" "}
-                    <InlineCode>{"<span>"}</InlineCode>.<br />
-                </p>
-                <Code>
-                    {dedent`
-                import { VFXSpan } from 'react-vfx';
-
-                <VFXSpan>Hello world!</VFXSpan>
-            `}
-                </Code>
-                <p>
-                    <InlineCode>{"<VFXSpan>"}</InlineCode> automatically
-                    re-renders when its content is updated.
-                </p>
-                <InputSection />
-                <DivSection />
-                <p>
-                    <i>NOTE: VFXSpan doesn't work with nested elements.</i>
-                </p>
-            </section>
+            <InputSection />
+            <DivSection />
         </section>
         <section>
             <h2 id="custom-shaders">Custom Shaders</h2>
