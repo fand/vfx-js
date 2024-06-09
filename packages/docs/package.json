@@ -20,6 +20,7 @@
     "react-dom": "^18.3.1",
     "react-lazyload": "^3.2.1",
     "react-syntax-highlighter": "^15.5.0",
+    "highlight.js": "11.9.0",
     "react-vfx": "*",
     "three": "^0.165.0",
     "vh-check": "^2.0.5"
