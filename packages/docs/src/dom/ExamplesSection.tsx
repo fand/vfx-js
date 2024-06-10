@@ -44,14 +44,14 @@ const ExamplesSection: React.FC = () => {
                         <VFX.VFXImg
                             src={pub("chill.gif")}
                             shader="sinewave"
-                            overflow
+                            overflow={30}
                         />
                     </LazyLoad>
                     <LazyLoad height={320}>
                         <VFX.VFXImg
                             src={pub("octocat.gif")}
                             shader="glitch"
-                            overflow
+                            overflow={[0, 100, 0, 100]}
                         />
                     </LazyLoad>
                     <LazyLoad height={320}>
@@ -86,7 +86,7 @@ const ExamplesSection: React.FC = () => {
                 <VFX.VFXImg
                     shader="warpTransition"
                     src={pub("logo.png")}
-                    overflow
+                    overflow={[0, 1000, 0, 1000]}
                 />
                 <br />
                 <VFX.VFXImg shader="slitScanTransition" src={pub("logo.png")} />
