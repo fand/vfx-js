@@ -9,12 +9,15 @@ const preStyle = {
     lineHeight: 1.5,
     textAlign: "left",
     overflowX: "auto",
+    backgroundColor: "rgba(0,0,0,0.8)",
 };
 
 const inlineStyle = {
     fontSize: "0.8em",
     margin: "4px",
     padding: "4px 8px",
+    color: "#EEEEEE",
+    backgroundColor: "rgba(0,0,0,0.8)",
 };
 
 export const Code = ({ children }: any) => (
@@ -36,17 +39,5 @@ export const Code = ({ children }: any) => (
 );
 
 export const InlineCode = ({ children }: any) => (
-    <Highlight language="jsx" theme={themes.oneDark} code={children}>
-        {({ style, tokens, getLineProps, getTokenProps }) => (
-            <code style={{ ...style, ...inlineStyle }}>
-                {tokens.map((line, i) => (
-                    <span key={i} {...getLineProps({ line })}>
-                        {line.map((token, key) => (
-                            <span key={key} {...getTokenProps({ token })} />
-                        ))}
-                    </span>
-                ))}
-            </code>
-        )}
-    </Highlight>
+    <code style={inlineStyle}>{children}</code>
 );
