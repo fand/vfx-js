@@ -1,7 +1,12 @@
 import THREE from "three";
+import { ShaderPreset } from "./constants";
 
 export interface VFXProps {
-    shader?: string;
+    /**
+     * Shader code or preset name.
+     */
+    shader?: ShaderPreset | (string & NonNullable<unknown>);
+
     release?: number;
     uniforms?: VFXUniforms;
 
