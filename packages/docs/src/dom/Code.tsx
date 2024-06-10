@@ -10,7 +10,7 @@ const preStyle = {
     textAlign: "left",
     overflowX: "auto",
     backgroundColor: "rgba(0,0,0,0.8)",
-};
+} as const;
 
 const inlineStyle = {
     fontSize: "0.8em",
@@ -18,7 +18,7 @@ const inlineStyle = {
     padding: "4px 8px",
     color: "#EEEEEE",
     backgroundColor: "rgba(0,0,0,0.8)",
-};
+} as const;
 
 export const Code = ({ children }: any) => (
     <div>
