@@ -286,17 +286,21 @@ export default class VFXPlayer {
 
             // Check intersection
             const isInViewport = this.isRectInViewport(rect);
+
+            // entering
             if (isInViewport && !e.isInViewport) {
                 e.enterTime = now;
                 e.leaveTime = Infinity;
             }
+
+            // leaving
             if (!isInViewport && e.isInViewport) {
                 e.leaveTime = now;
             }
             e.isInViewport = isInViewport;
 
-            if (isInViewport && now - e.leaveTime > e.release) {
-                return;
+            if (!isInViewport && now - e.leaveTime > e.release) {
+                continue;
             }
 
             // Update uniforms
@@ -317,12 +321,8 @@ export default class VFXPlayer {
                 e.uniforms[key].value = gen();
             }
 
-            // Update GIF frame
-            const gif = gifFor.get(e.element);
-            if (gif !== undefined) {
-                gif.update();
-            }
-
+            // Update GIF / video
+            gifFor.get(e.element)?.update();
             if (e.type === "video" || e.isGif) {
                 e.uniforms["src"].value.needsUpdate = true;
             }
