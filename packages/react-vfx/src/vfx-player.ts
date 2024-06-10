@@ -233,7 +233,7 @@ export default class VFXPlayer {
             leaveTime: Infinity,
             release: opts.release ?? 0,
             isGif,
-            overflow: opts.overflow ?? false,
+            overflow: sanitizeOverflow(opts.overflow),
         };
 
         this.elements.push(elem);
@@ -322,7 +322,7 @@ export default class VFXPlayer {
             }
 
             // Set viewport
-            if (e.overflow) {
+            if (e.overflow === "fullscreen") {
                 this.renderer.setViewport(
                     0,
                     0,
@@ -330,11 +330,12 @@ export default class VFXPlayer {
                     window.innerHeight,
                 );
             } else {
+                const [ot, or, ob, ol] = e.overflow;
                 this.renderer.setViewport(
-                    rect.left,
-                    window.innerHeight - (rect.top + rect.height),
-                    rect.width,
-                    rect.height,
+                    rect.left - ol,
+                    window.innerHeight - (rect.top + rect.height) - ob,
+                    rect.width + (ol + or),
+                    rect.height + (ot + ob),
                 );
             }
 
@@ -369,4 +370,19 @@ export default class VFXPlayer {
             return shaderNameOrCode; // Assume that the given string is a valid shader code
         }
     }
+}
+
+function sanitizeOverflow(
+    overflow: VFXProps["overflow"],
+): "fullscreen" | [number, number, number, number] {
+    if (overflow === true) {
+        return "fullscreen";
+    }
+    if (overflow === undefined) {
+        return [0, 0, 0, 0];
+    }
+    if (typeof overflow === "number") {
+        return [overflow, overflow, overflow, overflow];
+    }
+    return overflow;
 }

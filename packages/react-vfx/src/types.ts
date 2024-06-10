@@ -4,7 +4,7 @@ export interface VFXProps {
     shader?: string;
     release?: number;
     uniforms?: VFXUniforms;
-    overflow?: boolean;
+    overflow?: true | number | [number, number, number, number];
 }
 
 export type VFXUniforms = {
@@ -33,5 +33,5 @@ export interface VFXElement {
     leaveTime: number;
     release: number;
     isGif: boolean;
-    overflow: boolean;
+    overflow: "fullscreen" | [number, number, number, number];
 }
