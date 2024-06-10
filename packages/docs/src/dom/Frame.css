@@ -9,5 +9,5 @@
     z-index: 999999;
     pointer-events: none;
     box-shadow: inset 0px 0px 10px #00ffee;
-    transition: all 1s;
+    transition: border 1s;
 }
