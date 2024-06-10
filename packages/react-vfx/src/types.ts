@@ -4,7 +4,25 @@ export interface VFXProps {
     shader?: string;
     release?: number;
     uniforms?: VFXUniforms;
-    overflow?: true | number | [number, number, number, number];
+
+    /**
+     * Allow shader outputs to oveflow the original element area.
+     * If true, REACT-VFX will render the shader in fullscreen.
+     * If number is specified, REACT-VFX adds paddings with the given value.
+     *
+     * You can also specify the overflow size for each direction like CSS's `padding` property.
+     * If you pass an array, it will be parsed as the top, right, bottom and left overflow.
+     * For example, `<VFXImg overflow={[0, 100, 200, 0]} />` will render the image with
+     * 100px right padding and 200px bottom padding.
+     *
+     * If you pass an object like `<VFXImg overflow={{ top: 100 }} />`,
+     * REACT-VFX will add paddings only to the given direction (only to the `top` in this example).
+     */
+    overflow?:
+        | true
+        | number
+        | [top: number, right: number, bottom: number, left: number]
+        | { top?: number; right?: number; bottom?: number; left?: number };
 }
 
 export type VFXUniforms = {
@@ -33,5 +51,9 @@ export interface VFXElement {
     leaveTime: number;
     release: number;
     isGif: boolean;
-    overflow: "fullscreen" | [number, number, number, number];
+    overflow: VFXElementOverflow;
 }
+
+export type VFXElementOverflow =
+    | "fullscreen"
+    | [top: number, right: number, bottom: number, left: number];

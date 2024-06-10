@@ -2,7 +2,13 @@ import * as THREE from "three";
 import dom2canvas from "./dom-to-canvas";
 import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
 import GIFData from "./gif";
-import { VFXProps, VFXElement, VFXElementType, VFXUniformValue } from "./types";
+import {
+    VFXProps,
+    VFXElement,
+    VFXElementType,
+    VFXUniformValue,
+    VFXElementOverflow,
+} from "./types";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -372,9 +378,7 @@ export default class VFXPlayer {
     }
 }
 
-function sanitizeOverflow(
-    overflow: VFXProps["overflow"],
-): "fullscreen" | [number, number, number, number] {
+function sanitizeOverflow(overflow: VFXProps["overflow"]): VFXElementOverflow {
     if (overflow === true) {
         return "fullscreen";
     }
@@ -384,5 +388,13 @@ function sanitizeOverflow(
     if (typeof overflow === "number") {
         return [overflow, overflow, overflow, overflow];
     }
-    return overflow;
+    if (Array.isArray(overflow)) {
+        return overflow;
+    }
+    return [
+        overflow.top ?? 0,
+        overflow.right ?? 0,
+        overflow.bottom ?? 0,
+        overflow.left ?? 0,
+    ];
 }

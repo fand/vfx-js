@@ -336,7 +336,7 @@ const UsageSection: React.VFC = () => (
                             window.scrollY /
                             (document.body.scrollHeight - window.innerHeight),
                     }}
-                    overflow
+                    overflow={{ left: 1000, right: 1000 }}
                 >
                     I'm scrolling!
                 </VFX.VFXSpan>
