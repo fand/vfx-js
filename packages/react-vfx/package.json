@@ -69,7 +69,8 @@
     "watch:esm": "tsc -d -w -p tsconfig.esm.json",
     "lint": "eslint src/**/*.ts src/**/*.tsx",
     "lint-staged": "lint-staged",
-    "test": "vitest --dir src"
+    "test": "vitest --dir src --run",
+    "test:watch": "vitest --dir src"
   },
   "types": "lib/esm/index.d.ts"
 }
