@@ -2,7 +2,24 @@ import * as THREE from "three";
 import dom2canvas from "./dom-to-canvas";
 import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
 import GIFData from "./gif";
-import { VFXProps, VFXElement, VFXElementType, VFXUniformValue } from "./types";
+import {
+    VFXProps,
+    VFXElement,
+    VFXElementType,
+    VFXUniformValue,
+    VFXElementOverflow,
+} from "./types";
+
+/**
+ * top-left origin rect.
+ * Subset of DOMRect, which is returned by `HTMLElement.getBoundingClientRect()`.
+ */
+type Rect = {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+};
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -15,8 +32,13 @@ export default class VFXPlayer {
 
     textureLoader = new THREE.TextureLoader();
 
-    w = 0;
-    h = 0;
+    viewport: Rect = {
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+    };
+
     scrollX = 0;
     scrollY = 0;
 
@@ -63,15 +85,27 @@ export default class VFXPlayer {
             const w = window.innerWidth;
             const h = window.innerHeight;
 
-            if (w !== this.w || h !== this.h) {
+            if (w !== this.width() || h !== this.height()) {
                 this.canvas.width = w;
                 this.canvas.height = h;
                 this.renderer.setSize(w, h);
                 this.renderer.setPixelRatio(this.pixelRatio);
-                this.w = w;
-                this.h = h;
+                this.viewport = {
+                    top: 0,
+                    left: 0,
+                    right: w,
+                    bottom: h,
+                };
             }
         }
+    }
+
+    private width(): number {
+        return this.viewport.right - this.viewport.left;
+    }
+
+    private height(): number {
+        return this.viewport.bottom - this.viewport.top;
     }
 
     private resize = async (): Promise<void> => {
@@ -142,7 +176,8 @@ export default class VFXPlayer {
         const shader = this.getShader(opts.shader || "uvGradient");
 
         const rect = element.getBoundingClientRect();
-        const isInViewport = this.isRectInViewport(rect);
+        const overflow = sanitizeOverflow(opts.overflow);
+        const isInViewport = isRectInViewport(this.viewport, rect, overflow);
 
         // Create values for element types
         let texture: THREE.Texture;
@@ -230,10 +265,10 @@ export default class VFXPlayer {
             uniformGenerators,
             startTime: now,
             enterTime: isInViewport ? now : -1,
-            leaveTime: Infinity,
+            leaveTime: -Infinity,
             release: opts.release ?? 0,
             isGif,
-            overflow: opts.overflow ?? false,
+            overflow,
         };
 
         this.elements.push(elem);
@@ -279,18 +314,27 @@ export default class VFXPlayer {
             const rect = e.element.getBoundingClientRect();
 
             // Check intersection
-            const isInViewport = this.isRectInViewport(rect);
+            const isInViewport = isRectInViewport(
+                this.viewport,
+                rect,
+                e.overflow,
+            );
+
+            // entering
             if (isInViewport && !e.isInViewport) {
                 e.enterTime = now;
                 e.leaveTime = Infinity;
             }
+
+            // leaving
             if (!isInViewport && e.isInViewport) {
                 e.leaveTime = now;
             }
             e.isInViewport = isInViewport;
 
-            if (isInViewport && now - e.leaveTime > e.release) {
-                return;
+            // Quit if the element has left and the transition has ended
+            if (!isInViewport && now - e.leaveTime > e.release) {
+                continue;
             }
 
             // Update uniforms
@@ -311,18 +355,14 @@ export default class VFXPlayer {
                 e.uniforms[key].value = gen();
             }
 
-            // Update GIF frame
-            const gif = gifFor.get(e.element);
-            if (gif !== undefined) {
-                gif.update();
-            }
-
+            // Update GIF / video
+            gifFor.get(e.element)?.update();
             if (e.type === "video" || e.isGif) {
                 e.uniforms["src"].value.needsUpdate = true;
             }
 
             // Set viewport
-            if (e.overflow) {
+            if (e.overflow === "fullscreen") {
                 this.renderer.setViewport(
                     0,
                     0,
@@ -331,10 +371,12 @@ export default class VFXPlayer {
                 );
             } else {
                 this.renderer.setViewport(
-                    rect.left,
-                    window.innerHeight - (rect.top + rect.height),
-                    rect.width,
-                    rect.height,
+                    rect.left - e.overflow.left,
+                    window.innerHeight -
+                        (rect.top + rect.height) -
+                        e.overflow.bottom,
+                    rect.width + (e.overflow.left + e.overflow.right),
+                    rect.height + (e.overflow.top + e.overflow.bottom),
                 );
             }
 
@@ -352,16 +394,6 @@ export default class VFXPlayer {
         }
     };
 
-    private isRectInViewport(rect: DOMRect): boolean {
-        // TODO: Consider custom root element
-        return (
-            rect.left <= this.w &&
-            rect.right >= 0 &&
-            rect.top <= this.h &&
-            rect.bottom >= 0
-        );
-    }
-
     private getShader(shaderNameOrCode: string): string {
         if (shaderNameOrCode in shaders) {
             return shaders[shaderNameOrCode as keyof typeof shaders];
@@ -369,4 +401,55 @@ export default class VFXPlayer {
             return shaderNameOrCode; // Assume that the given string is a valid shader code
         }
     }
+}
+
+// TODO: Consider custom root element
+export function isRectInViewport(
+    viewport: Rect,
+    rect: Rect,
+    overflow: VFXElementOverflow,
+): boolean {
+    if (overflow === "fullscreen") {
+        return true;
+    }
+
+    return (
+        rect.left - overflow.left <= viewport.right &&
+        rect.right + overflow.right >= viewport.left &&
+        rect.top - overflow.top <= viewport.bottom &&
+        rect.bottom + overflow.bottom >= viewport.top
+    );
+}
+
+export function sanitizeOverflow(
+    overflow: VFXProps["overflow"],
+): VFXElementOverflow {
+    if (overflow === true) {
+        return "fullscreen";
+    }
+    if (overflow === undefined) {
+        return { top: 0, right: 0, bottom: 0, left: 0 };
+    }
+    if (typeof overflow === "number") {
+        return {
+            top: overflow,
+            right: overflow,
+            bottom: overflow,
+            left: overflow,
+        };
+    }
+    if (Array.isArray(overflow)) {
+        return {
+            top: overflow[0],
+            right: overflow[1],
+            bottom: overflow[2],
+            left: overflow[3],
+        };
+    }
+    return {
+        top: overflow.top ?? 0,
+        right: overflow.right ?? 0,
+        bottom: overflow.bottom ?? 0,
+        left: overflow.left ?? 0,
+    };
 }

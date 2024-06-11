@@ -8,9 +8,9 @@ type Props = {
 };
 
 const Frame: React.FC<Props> = (props: Props) => {
-    const [borderColor, setBorderColor] = useState("#00FFEE");
+    const [backgroundColor, setBorderColor] = useState("#00FFEE");
     const [boxShadow, setBoxShadow] = useState("inset 0 0 10px #00FFEE");
-    const interval = props.interval || 5000;
+    const interval = props.interval || 4000;
 
     useEffect(() => {
         let count = 0;
@@ -25,7 +25,26 @@ const Frame: React.FC<Props> = (props: Props) => {
         };
     }, [interval]);
 
-    return <div className="Frame" style={{ borderColor, boxShadow }}></div>;
+    return (
+        <>
+            <div
+                className="Frame top"
+                style={{ backgroundColor, boxShadow }}
+            ></div>
+            <div
+                className="Frame bottom"
+                style={{ backgroundColor, boxShadow }}
+            ></div>
+            <div
+                className="Frame left"
+                style={{ backgroundColor, boxShadow }}
+            ></div>
+            <div
+                className="Frame right"
+                style={{ backgroundColor, boxShadow }}
+            ></div>
+        </>
+    );
 };
 
 export default Frame;

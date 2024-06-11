@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
@@ -16,10 +16,10 @@
     "is-mobile": "^4.0.0",
     "lodash.debounce": "^4.0.8",
     "postprocessing": "^6.35.5",
+    "prism-react-renderer": "^2.3.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-lazyload": "^3.2.1",
-    "react-syntax-highlighter": "^15.5.0",
     "react-vfx": "*",
     "three": "^0.165.0",
     "vh-check": "^2.0.5"
@@ -33,7 +33,6 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@types/react-lazyload": "^3.2.3",
-    "@types/react-syntax-highlighter": "^15.5.13",
     "@types/three": "^0.165.0",
     "@vitejs/plugin-react": "^4.3.0",
     "rimraf": "^5.0.7",

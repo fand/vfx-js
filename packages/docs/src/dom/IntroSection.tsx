@@ -27,14 +27,14 @@ const IntroSection: React.FC = () => {
                 <VFX.VFXSpan
                     style={{ display: "block" }}
                     shader="glitch"
-                    overflow
+                    overflow={[0, 200, 0, 200]}
                 >
                     glitched images,{" "}
                 </VFX.VFXSpan>
                 <VFX.VFXSpan
                     style={{ display: "block" }}
                     shader="sinewave"
-                    overflow
+                    overflow={[0, 200, 0, 200]}
                 >
                     stylized videos
                 </VFX.VFXSpan>{" "}

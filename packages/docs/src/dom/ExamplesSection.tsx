@@ -24,7 +24,7 @@ const ExamplesSection: React.FC = () => {
                         <VFX.VFXImg
                             src={pub("david.png")}
                             shader="rgbShift"
-                            overflow
+                            overflow={[0, 100, 0, 100]}
                         />
                     </LazyLoad>
                 </div>
@@ -44,14 +44,14 @@ const ExamplesSection: React.FC = () => {
                         <VFX.VFXImg
                             src={pub("chill.gif")}
                             shader="sinewave"
-                            overflow
+                            overflow={30}
                         />
                     </LazyLoad>
                     <LazyLoad height={320}>
                         <VFX.VFXImg
                             src={pub("octocat.gif")}
                             shader="glitch"
-                            overflow
+                            overflow={[0, 100, 0, 100]}
                         />
                     </LazyLoad>
                     <LazyLoad height={320}>
@@ -76,7 +76,7 @@ const ExamplesSection: React.FC = () => {
                 </LazyLoad>
             </section>
             <section className="VFXSpanExample">
-                <VFX.VFXSpan shader="sinewave" overflow>
+                <VFX.VFXSpan shader="sinewave" overflow={100}>
                     You can also add effects to <br />
                     plain text!!!!!
                 </VFX.VFXSpan>
@@ -86,7 +86,7 @@ const ExamplesSection: React.FC = () => {
                 <VFX.VFXImg
                     shader="warpTransition"
                     src={pub("logo.png")}
-                    overflow
+                    overflow={[0, 1000, 0, 1000]}
                 />
                 <br />
                 <VFX.VFXImg shader="slitScanTransition" src={pub("logo.png")} />

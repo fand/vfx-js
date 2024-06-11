@@ -14,9 +14,3 @@
     width: 1280px;
     max-width: 100%;
 }
-
-@media (max-width: 768px) {
-    .LogoSection .logo {
-        max-width: 110%;
-    }
-}

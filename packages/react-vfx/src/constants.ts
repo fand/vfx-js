@@ -131,7 +131,7 @@ export const shaders = {
         }
 
         gl_FragColor = color;
-        gl_FragColor.a = step(.1, length(color.rgb));
+        gl_FragColor.a = smoothstep(0.0, 0.8, max(color.r, max(color.g, color.b)));
     }
     `,
     pixelate: `
@@ -364,9 +364,7 @@ export const shaders = {
         return step(0., uv.x) * step(uv.x, 1.) * step(0., uv.y) * step(uv.y, 1.);
     }
 
-    void main (void) {
-        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-
+    vec4 draw(vec2 uv) {
         vec2 uvr = uv, uvg = uv, uvb = uv;
 
         float amp = 20. / resolution.x;
@@ -379,12 +377,20 @@ export const shaders = {
         vec4 cg = texture2D(src, uvg) * inside(uvg);
         vec4 cb = texture2D(src, uvb) * inside(uvb);
 
-        gl_FragColor = vec4(
+        return vec4(
             cr.r,
             cg.g,
             cb.b,
             cr.a + cg.a + cb.a
         );
+    }
+
+    void main (void) {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+        // x blur
+        vec2 dx = vec2(2, 0) / resolution.x;
+        gl_FragColor = (draw(uv) * 2. + draw(uv + dx) + draw(uv - dx)) / 4.;
     }
     `,
     shine: `
@@ -497,4 +503,6 @@ export const shaders = {
         gl_FragColor = texture2D(src, uv);
     }
     `,
-};
+} as const;
+
+export type ShaderPreset = keyof typeof shaders;

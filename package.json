@@ -11,7 +11,8 @@
     "dev": "turbo run dev",
     "clean": "turbo run clean",
     "lint": "turbo run lint",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "test": "npm --workspace=react-vfx test"
   },
   "repository": {
     "type": "git",
