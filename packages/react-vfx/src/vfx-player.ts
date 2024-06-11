@@ -10,6 +10,17 @@ import {
     VFXElementOverflow,
 } from "./types";
 
+/**
+ * top-left origin rect.
+ * Subset of DOMRect, which is returned by `HTMLElement.getBoundingClientRect()`.
+ */
+type Rect = {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+};
+
 const gifFor = new Map<HTMLElement, GIFData>();
 
 export default class VFXPlayer {
@@ -21,8 +32,13 @@ export default class VFXPlayer {
 
     textureLoader = new THREE.TextureLoader();
 
-    w = 0;
-    h = 0;
+    viewport: Rect = {
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+    };
+
     scrollX = 0;
     scrollY = 0;
 
@@ -69,15 +85,27 @@ export default class VFXPlayer {
             const w = window.innerWidth;
             const h = window.innerHeight;
 
-            if (w !== this.w || h !== this.h) {
+            if (w !== this.width() || h !== this.height()) {
                 this.canvas.width = w;
                 this.canvas.height = h;
                 this.renderer.setSize(w, h);
                 this.renderer.setPixelRatio(this.pixelRatio);
-                this.w = w;
-                this.h = h;
+                this.viewport = {
+                    top: 0,
+                    left: 0,
+                    right: w,
+                    bottom: h,
+                };
             }
         }
+    }
+
+    private width(): number {
+        return this.viewport.right - this.viewport.left;
+    }
+
+    private height(): number {
+        return this.viewport.bottom - this.viewport.top;
     }
 
     private resize = async (): Promise<void> => {
@@ -149,7 +177,7 @@ export default class VFXPlayer {
 
         const rect = element.getBoundingClientRect();
         const overflow = sanitizeOverflow(opts.overflow);
-        const isInViewport = this.isRectInViewport(rect, overflow);
+        const isInViewport = isRectInViewport(this.viewport, rect, overflow);
 
         // Create values for element types
         let texture: THREE.Texture;
@@ -286,7 +314,11 @@ export default class VFXPlayer {
             const rect = e.element.getBoundingClientRect();
 
             // Check intersection
-            const isInViewport = this.isRectInViewport(rect, e.overflow);
+            const isInViewport = isRectInViewport(
+                this.viewport,
+                rect,
+                e.overflow,
+            );
 
             // entering
             if (isInViewport && !e.isInViewport) {
@@ -361,23 +393,6 @@ export default class VFXPlayer {
         }
     };
 
-    // TODO: Consider custom root element
-    private isRectInViewport(
-        rect: DOMRect,
-        overflow: VFXElementOverflow,
-    ): boolean {
-        if (overflow === "fullscreen") {
-            return true;
-        }
-
-        return (
-            rect.left - overflow.left <= this.w &&
-            rect.right + overflow.right >= 0 &&
-            rect.top - overflow.top <= this.h &&
-            rect.bottom + overflow.bottom >= 0
-        );
-    }
-
     private getShader(shaderNameOrCode: string): string {
         if (shaderNameOrCode in shaders) {
             return shaders[shaderNameOrCode as keyof typeof shaders];
@@ -385,6 +400,24 @@ export default class VFXPlayer {
             return shaderNameOrCode; // Assume that the given string is a valid shader code
         }
     }
+}
+
+// TODO: Consider custom root element
+export function isRectInViewport(
+    viewport: Rect,
+    rect: Rect,
+    overflow: VFXElementOverflow,
+): boolean {
+    if (overflow === "fullscreen") {
+        return true;
+    }
+
+    return (
+        rect.left - overflow.left <= viewport.right &&
+        rect.right + overflow.right >= viewport.left &&
+        rect.top - overflow.top <= viewport.bottom &&
+        rect.bottom + overflow.bottom >= viewport.top
+    );
 }
 
 export function sanitizeOverflow(
