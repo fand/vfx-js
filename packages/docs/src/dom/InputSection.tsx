@@ -6,15 +6,7 @@ import dedent from "dedent";
 import debounce from "lodash.debounce";
 
 const InputSection: React.FC = () => {
-    const [text, setText] = useState("Try editing text!");
-    const [debouncedText, setDebouncedText] = useState(text);
-
-    const update = useCallback(
-        debounce(() => {
-            setDebouncedText(text);
-        }),
-        [text],
-    );
+    const [text, setText] = useState("Edit me!!!");
 
     return (
         <section>
@@ -36,17 +28,22 @@ const InputSection: React.FC = () => {
             </p>
 
             <section className="InputSection">
-                <p style={{ fontSize: "48px", fontWeight: "bold" }}>
-                    <VFX.VFXSpan shader="rainbow">{debouncedText}</VFX.VFXSpan>
+                <p
+                    style={{
+                        fontSize: "48px",
+                        fontWeight: "bold",
+                    }}
+                >
+                    <VFX.VFXSpan shader="rainbow">
+                        {text === "" ? "Input something..." : text}
+                    </VFX.VFXSpan>
                 </p>
                 <input
                     type="text"
                     value={text}
+                    placeholder="Input something..."
                     onChange={(e) => setText(e.target.value)}
                 />
-                <button type="button" onClick={update}>
-                    Update!
-                </button>
             </section>
         </section>
     );
