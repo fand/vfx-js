@@ -151,22 +151,18 @@ export default class VFXPlayer {
 
     private async rerenderTextElement(e: VFXElement): Promise<void> {
         try {
-            e.element.style.setProperty("opacity", "1"); // TODO: Restore original opacity
-
             const oldTexture: THREE.CanvasTexture = e.uniforms["src"].value;
             const canvas = oldTexture.image;
 
             const texture = new THREE.CanvasTexture(canvas);
 
-            await dom2canvas(e.element, canvas);
+            await dom2canvas(e.element, e.originalOpacity, canvas);
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
             }
 
             e.uniforms["src"].value = texture;
             oldTexture.dispose();
-
-            e.element.style.setProperty("opacity", "0");
         } catch (e) {
             console.error(e);
         }
@@ -203,7 +199,7 @@ export default class VFXPlayer {
             texture = new THREE.VideoTexture(element);
             type = "video" as VFXElementType;
         } else {
-            const canvas = await dom2canvas(element);
+            const canvas = await dom2canvas(element, originalOpacity);
             texture = new THREE.CanvasTexture(canvas);
             type = "text" as VFXElementType;
         }
