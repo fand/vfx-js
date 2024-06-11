@@ -265,7 +265,7 @@ export default class VFXPlayer {
             uniformGenerators,
             startTime: now,
             enterTime: isInViewport ? now : -1,
-            leaveTime: Infinity,
+            leaveTime: -Infinity,
             release: opts.release ?? 0,
             isGif,
             overflow,
@@ -332,6 +332,7 @@ export default class VFXPlayer {
             }
             e.isInViewport = isInViewport;
 
+            // Quit if the element has left and the transition has ended
             if (!isInViewport && now - e.leaveTime > e.release) {
                 continue;
             }
