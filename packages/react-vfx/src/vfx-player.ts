@@ -148,7 +148,8 @@ export default class VFXPlayer {
         const shader = this.getShader(opts.shader || "uvGradient");
 
         const rect = element.getBoundingClientRect();
-        const isInViewport = this.isRectInViewport(rect);
+        const overflow = sanitizeOverflow(opts.overflow);
+        const isInViewport = this.isRectInViewport(rect, overflow);
 
         // Create values for element types
         let texture: THREE.Texture;
@@ -239,7 +240,7 @@ export default class VFXPlayer {
             leaveTime: Infinity,
             release: opts.release ?? 0,
             isGif,
-            overflow: sanitizeOverflow(opts.overflow),
+            overflow,
         };
 
         this.elements.push(elem);
@@ -285,7 +286,7 @@ export default class VFXPlayer {
             const rect = e.element.getBoundingClientRect();
 
             // Check intersection
-            const isInViewport = this.isRectInViewport(rect);
+            const isInViewport = this.isRectInViewport(rect, e.overflow);
 
             // entering
             if (isInViewport && !e.isInViewport) {
@@ -360,13 +361,20 @@ export default class VFXPlayer {
         }
     };
 
-    private isRectInViewport(rect: DOMRect): boolean {
-        // TODO: Consider custom root element
+    // TODO: Consider custom root element
+    private isRectInViewport(
+        rect: DOMRect,
+        overflow: VFXElementOverflow,
+    ): boolean {
+        if (overflow === "fullscreen") {
+            return true;
+        }
+
         return (
-            rect.left <= this.w &&
-            rect.right >= 0 &&
-            rect.top <= this.h &&
-            rect.bottom >= 0
+            rect.left - overflow.left <= this.w &&
+            rect.right + overflow.right >= 0 &&
+            rect.top - overflow.top <= this.h &&
+            rect.bottom + overflow.bottom >= 0
         );
     }
 
