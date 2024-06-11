@@ -336,12 +336,13 @@ export default class VFXPlayer {
                     window.innerHeight,
                 );
             } else {
-                const [ot, or, ob, ol] = e.overflow;
                 this.renderer.setViewport(
-                    rect.left - ol,
-                    window.innerHeight - (rect.top + rect.height) - ob,
-                    rect.width + (ol + or),
-                    rect.height + (ot + ob),
+                    rect.left - e.overflow.left,
+                    window.innerHeight -
+                        (rect.top + rect.height) -
+                        e.overflow.bottom,
+                    rect.width + (e.overflow.left + e.overflow.right),
+                    rect.height + (e.overflow.top + e.overflow.bottom),
                 );
             }
 
@@ -383,18 +384,28 @@ function sanitizeOverflow(overflow: VFXProps["overflow"]): VFXElementOverflow {
         return "fullscreen";
     }
     if (overflow === undefined) {
-        return [0, 0, 0, 0];
+        return { top: 0, right: 0, bottom: 0, left: 0 };
     }
     if (typeof overflow === "number") {
-        return [overflow, overflow, overflow, overflow];
+        return {
+            top: overflow,
+            right: overflow,
+            bottom: overflow,
+            left: overflow,
+        };
     }
     if (Array.isArray(overflow)) {
-        return overflow;
+        return {
+            top: overflow[0],
+            right: overflow[1],
+            bottom: overflow[2],
+            left: overflow[3],
+        };
     }
-    return [
-        overflow.top ?? 0,
-        overflow.right ?? 0,
-        overflow.bottom ?? 0,
-        overflow.left ?? 0,
-    ];
+    return {
+        top: overflow.top ?? 0,
+        right: overflow.right ?? 0,
+        bottom: overflow.bottom ?? 0,
+        left: overflow.left ?? 0,
+    };
 }
