@@ -179,6 +179,11 @@ export default class VFXPlayer {
         const overflow = sanitizeOverflow(opts.overflow);
         const isInViewport = isRectInViewport(this.viewport, rect, overflow);
 
+        const originalOpacity =
+            element.style.opacity === ""
+                ? 1
+                : parseFloat(element.style.opacity);
+
         // Create values for element types
         let texture: THREE.Texture;
         let type: VFXElementType;
@@ -269,6 +274,7 @@ export default class VFXPlayer {
             release: opts.release ?? 0,
             isGif,
             overflow,
+            originalOpacity,
         };
 
         this.elements.push(elem);

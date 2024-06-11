@@ -57,6 +57,7 @@ export interface VFXElement {
     release: number;
     isGif: boolean;
     overflow: VFXElementOverflow;
+    originalOpacity: number;
 }
 
 export type VFXElementOverflow =

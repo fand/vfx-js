@@ -27,6 +27,7 @@ function cloneNode<T extends Node>(node: T): T {
 // Render element content to canvas and return it.
 export default function getCanvasFromElement(
     element: HTMLElement,
+    originalOpacity: number,
     oldCanvas?: HTMLCanvasElement,
 ): Promise<HTMLCanvasElement> {
     const rect = element.getBoundingClientRect();
@@ -45,6 +46,7 @@ export default function getCanvasFromElement(
     // to apply styles in SVG
     const newElement = cloneNode(element);
     syncStylesOfTree(element, newElement);
+    newElement.style.setProperty("opacity", originalOpacity.toString());
 
     // Traverse and update input value
     traverseDOM(newElement, (el) => {
