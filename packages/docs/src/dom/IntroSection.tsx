@@ -34,7 +34,7 @@ const IntroSection: React.FC = () => {
                 <VFX.VFXSpan
                     style={{ display: "block" }}
                     shader="sinewave"
-                    overflow
+                    overflow={[0, 200, 0, 200]}
                 >
                     stylized videos
                 </VFX.VFXSpan>{" "}

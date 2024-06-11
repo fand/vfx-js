@@ -24,7 +24,7 @@ const ExamplesSection: React.FC = () => {
                         <VFX.VFXImg
                             src={pub("david.png")}
                             shader="rgbShift"
-                            overflow
+                            overflow={[0, 100, 0, 100]}
                         />
                     </LazyLoad>
                 </div>
@@ -76,7 +76,7 @@ const ExamplesSection: React.FC = () => {
                 </LazyLoad>
             </section>
             <section className="VFXSpanExample">
-                <VFX.VFXSpan shader="sinewave" overflow>
+                <VFX.VFXSpan shader="sinewave" overflow={100}>
                     You can also add effects to <br />
                     plain text!!!!!
                 </VFX.VFXSpan>
