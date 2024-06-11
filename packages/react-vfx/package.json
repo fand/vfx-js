@@ -30,7 +30,8 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^3.3.1",
     "rimraf": "^5.0.7",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
   },
   "homepage": "https://amagi.dev/react-vfx",
   "keywords": [
@@ -67,7 +68,8 @@
     "watch:cjs": "tsc -d -w",
     "watch:esm": "tsc -d -w -p tsconfig.esm.json",
     "lint": "eslint src/**/*.ts src/**/*.tsx",
-    "lint-staged": "lint-staged"
+    "lint-staged": "lint-staged",
+    "test": "vitest --dir src"
   },
   "types": "lib/esm/index.d.ts"
 }

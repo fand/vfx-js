@@ -387,7 +387,9 @@ export default class VFXPlayer {
     }
 }
 
-function sanitizeOverflow(overflow: VFXProps["overflow"]): VFXElementOverflow {
+export function sanitizeOverflow(
+    overflow: VFXProps["overflow"],
+): VFXElementOverflow {
     if (overflow === true) {
         return "fullscreen";
     }
