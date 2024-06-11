@@ -497,4 +497,6 @@ export const shaders = {
         gl_FragColor = texture2D(src, uv);
     }
     `,
-};
+} as const;
+
+export type ShaderPreset = keyof typeof shaders;

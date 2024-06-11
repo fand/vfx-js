@@ -12,7 +12,7 @@ const LogoSection: React.FC = () => {
             <VFX.VFXImg
                 className="logo"
                 src={pub("logo.png")}
-                shader={"rgbShift"}
+                shader="rgbShift"
             />
         </section>
     );
