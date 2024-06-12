@@ -5,11 +5,9 @@ import { InlineCode } from "./Code";
 
 const DivSection: React.FC = () => {
     const divRef = useRef<HTMLDivElement>(null);
-    const rerender = VFX.useVfx();
+    const { rerenderElement } = VFX.useVFX();
 
-    const onChange = () => {
-        divRef.current && rerender(divRef.current);
-    };
+    const onChange = () => rerenderElement(divRef.current);
 
     return (
         <section className="DivSection">
@@ -24,11 +22,7 @@ const DivSection: React.FC = () => {
                 <div className="DivSections">
                     <div className="DivSectionField">
                         <label htmlFor="DivTextArea">Textarea</label>
-                        <textarea
-                            id="DivTextArea"
-                            onChange={onChange}
-                            onResize={onChange}
-                        >
+                        <textarea id="DivTextArea" onChange={onChange}>
                             Hello
                         </textarea>
                     </div>
