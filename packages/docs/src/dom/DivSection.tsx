@@ -110,6 +110,7 @@ const DivSection: React.FC = () => {
             <VFX.VFXDiv
                 shader={shader}
                 ref={divRef}
+                overflow={100}
                 uniforms={{
                     dist: () => distRef.current,
                 }}
