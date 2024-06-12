@@ -149,23 +149,31 @@ export default class VFXPlayer {
         }
     };
 
+    private isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
+
     private async rerenderTextElement(e: VFXElement): Promise<void> {
+        if (this.isRenderingToCanvas.get(e.element)) {
+            return;
+        }
+        this.isRenderingToCanvas.set(e.element, true);
+
         try {
             const oldTexture: THREE.CanvasTexture = e.uniforms["src"].value;
             const canvas = oldTexture.image;
-
-            const texture = new THREE.CanvasTexture(canvas);
 
             await dom2canvas(e.element, e.originalOpacity, canvas);
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
             }
 
+            const texture = new THREE.CanvasTexture(canvas);
             e.uniforms["src"].value = texture;
             oldTexture.dispose();
         } catch (e) {
             console.error(e);
         }
+
+        this.isRenderingToCanvas.set(e.element, false);
     }
 
     async addElement(element: HTMLElement, opts: VFXProps = {}): Promise<void> {
