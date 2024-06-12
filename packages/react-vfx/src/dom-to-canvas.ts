@@ -62,8 +62,10 @@ export default function getCanvasFromElement(
             if (ctx === null) {
                 return reject();
             }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.scale(ratio, ratio);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
 
             resolve(canvas);
         };
