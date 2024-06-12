@@ -45,6 +45,8 @@ export default class VFXPlayer {
     mouseX = 0;
     mouseY = 0;
 
+    private isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
+
     constructor(
         private canvas: HTMLCanvasElement,
         pixelRatio?: number,
@@ -148,8 +150,6 @@ export default class VFXPlayer {
             this.mouseY = window.innerHeight - e.clientY;
         }
     };
-
-    private isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
     private async rerenderTextElement(e: VFXElement): Promise<void> {
         if (this.isRenderingToCanvas.get(e.element)) {
