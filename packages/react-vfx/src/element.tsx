@@ -43,19 +43,22 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
                 overflow,
             });
 
+            const mo = new MutationObserver(() => {
+                if (elementRef.current) {
+                    player?.updateTextElement(elementRef.current);
+                }
+            });
+            mo.observe(element, {
+                characterData: true,
+                attributes: true,
+                subtree: true,
+            });
+
             return () => {
                 player?.removeElement(element);
+                mo.disconnect();
             };
         }, [elementRef, player, shader, release, uniforms, overflow]);
-
-        // Rerender if the content is updated
-        useEffect(() => {
-            if (elementRef.current === undefined) {
-                return;
-            }
-
-            player?.updateTextElement(elementRef.current);
-        }, [player, props.children]);
 
         return React.createElement(type, { ...rawProps, ref });
     });
