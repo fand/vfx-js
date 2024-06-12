@@ -4481,6 +4481,7 @@ prismjs/prism.js:
 precision mediump float;
 uniform vec2 resolution;
 uniform vec2 offset;
+uniform vec2 mouse;
 uniform float time;
 uniform sampler2D src;
 uniform float dist;
@@ -4496,12 +4497,32 @@ float noise(float y, float t) {
     return n;
 }
 
+vec2 focus(vec2 uv, vec2 c, float z) {
+    return mix(
+        uv,
+        (uv - c) * 0.5 + c,
+        z
+    );
+}
+
 void main (void) {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+    vec2 uvr, uvg, uvb;
+
+    // mouse loupe
+    vec2 muv = (mouse - offset) / resolution;
+    vec2 d = uv - muv;
+    d.x *= resolution.x / resolution.y;
+    float zoom = exp(smoothstep(0., 1., length(d)) * -5.);
+
+    uvr = focus(uv, muv, zoom);
+    uvg = focus(uv, muv, zoom * 1.1);
+    uvb = focus(uv, muv, zoom * 1.2);
+
+    // Distort & Glitch
     float t = mod(time, 30.);
     float amp = (3. + dist * 30.) / resolution.x;
-
-    vec2 uvr = uv, uvg = uv, uvb = uv;
     if (abs(noise(uv.y, t)) > 1. || dist > 0.03) {
         uvr.x += noise(uv.y, t) * amp;
         uvg.x += noise(uv.y, t + 10.) * amp;
@@ -4519,7 +4540,7 @@ void main (void) {
         step(.1, cr.a + cg.a + cb.a)
     );
 }
-`,yV=()=>{const n=de.useRef(null),{rerenderElement:e}=MB(),t=de.useRef(0);de.useEffect(()=>{let r=!0;const s=()=>{t.current*=.8,r&&requestAnimationFrame(s)};return s(),()=>{r=!1}});const i=()=>{e(n.current),t.current=1};return V.jsxs("section",{className:"DivSection",children:[V.jsx("h3",{children:"Div (experimental)"}),V.jsxs("p",{children:["REACT-VFX also has ",V.jsx(Wn,{children:"VFXDiv"}),", which allow us to wrap any elements...",V.jsx("br",{}),"so you can make an interactive form with WebGL effects!!"]}),V.jsx(EB,{shader:vV,ref:n,uniforms:{dist:()=>t.current},children:V.jsxs("div",{className:"DivSections",children:[V.jsxs("div",{className:"DivSectionField",children:[V.jsx("label",{htmlFor:"DivInput",children:'Input (type="text")'}),V.jsx("input",{id:"DivInput",type:"text",defaultValue:"You can edit me!",onChange:i})]}),V.jsxs("div",{className:"DivSectionField",children:[V.jsx("label",{htmlFor:"DivInputRange",children:'Input (type="range")'}),V.jsx("input",{id:"DivInputRange",type:"range",min:"0",max:"100",defaultValue:"0",onChange:i})]}),V.jsxs("div",{className:"DivSectionField",children:[V.jsx("label",{htmlFor:"DivTextArea",children:"Textarea"}),V.jsx("textarea",{id:"DivTextArea",onChange:i,defaultValue:"You can even resize me!"})]})]})})]})},_V=`
+`,yV=()=>{const n=de.useRef(null),{rerenderElement:e}=MB(),t=de.useRef(0);de.useEffect(()=>{let s=!0;const o=()=>{t.current*=.8,s&&requestAnimationFrame(o)};return o(),()=>{s=!1}});const i=()=>{e(n.current),t.current=1},r=()=>{e(n.current)};return V.jsxs("section",{className:"DivSection",children:[V.jsx("h3",{children:"Div (experimental)"}),V.jsxs("p",{children:["REACT-VFX also has ",V.jsx(Wn,{children:"VFXDiv"}),", which allow us to wrap any elements...",V.jsx("br",{}),"so you can make an interactive form with WebGL effects!!"]}),V.jsx(EB,{shader:vV,ref:n,overflow:100,uniforms:{dist:()=>t.current},children:V.jsxs("div",{className:"DivSections",children:[V.jsxs("div",{className:"DivSectionField",children:[V.jsx("label",{htmlFor:"DivInput",children:'Input (type="text")'}),V.jsx("input",{id:"DivInput",type:"text",defaultValue:"You can edit me!",onChange:i})]}),V.jsxs("div",{className:"DivSectionField",children:[V.jsx("label",{htmlFor:"DivInputRange",children:'Input (type="range")'}),V.jsx("input",{id:"DivInputRange",type:"range",min:"0",max:"100",defaultValue:"0",onChange:r})]}),V.jsxs("div",{className:"DivSectionField",children:[V.jsx("label",{htmlFor:"DivTextArea",children:"Textarea"}),V.jsx("textarea",{id:"DivTextArea",onChange:i,defaultValue:"You can even resize me!"})]})]})})]})},_V=`
 uniform vec2 resolution; // Resolution of the element
 uniform vec2 offset;     // Position of the element in the screen
 uniform float time;      // Time passed since mount
