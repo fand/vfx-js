@@ -48,15 +48,6 @@ export default function getCanvasFromElement(
     syncStylesOfTree(element, newElement);
     newElement.style.setProperty("opacity", originalOpacity.toString());
 
-    // Traverse and update input value
-    traverseDOM(newElement, (el) => {
-        if (el.tagName === "INPUT") {
-            el.setAttribute("value", (el as HTMLInputElement).value);
-        } else if (el.tagName === "TEXTAREA") {
-            el.innerHTML = (el as HTMLTextAreaElement).value;
-        }
-    });
-
     // Create SVG string
     const html = newElement.outerHTML;
     const xml = convertHtmlToXml(html);
@@ -81,20 +72,8 @@ export default function getCanvasFromElement(
     });
 }
 
-function traverseDOM(
-    element: HTMLElement,
-    callback: (e: HTMLElement) => void,
-): void {
-    callback(element);
-
-    element.childNodes.forEach((child) => {
-        if (child.nodeType === Node.ELEMENT_NODE) {
-            traverseDOM(child as HTMLElement, callback);
-        }
-    });
-}
-
 function syncStylesOfTree(el1: HTMLElement, el2: HTMLElement): void {
+    // Sync CSS styles
     const styles = window.getComputedStyle(el1);
     Array.from(styles).forEach((key) => {
         el2.style.setProperty(
@@ -103,6 +82,13 @@ function syncStylesOfTree(el1: HTMLElement, el2: HTMLElement): void {
             styles.getPropertyPriority(key),
         );
     });
+
+    // Reflect input value to HTML attributes
+    if (el2.tagName === "INPUT") {
+        el2.setAttribute("value", (el2 as HTMLInputElement).value);
+    } else if (el2.tagName === "TEXTAREA") {
+        el2.innerHTML = (el2 as HTMLTextAreaElement).value;
+    }
 
     for (let i = 0; i < el1.children.length; i++) {
         const c1 = el1.children[i] as HTMLElement;
