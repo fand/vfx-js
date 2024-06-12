@@ -159,9 +159,13 @@ export default class VFXPlayer {
 
         try {
             const oldTexture: THREE.CanvasTexture = e.uniforms["src"].value;
-            const canvas = oldTexture.image;
+            const oldCanvas = oldTexture.image;
 
-            await dom2canvas(e.element, e.originalOpacity, canvas);
+            const canvas = await dom2canvas(
+                e.element,
+                e.originalOpacity,
+                oldCanvas,
+            );
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
             }

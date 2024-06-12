@@ -28,19 +28,18 @@ function cloneNode<T extends Node>(node: T): T {
 export default function getCanvasFromElement(
     element: HTMLElement,
     originalOpacity: number,
-    oldCanvas?: HTMLCanvasElement,
-): Promise<HTMLCanvasElement> {
+    oldCanvas?: OffscreenCanvas,
+): Promise<OffscreenCanvas> {
     const rect = element.getBoundingClientRect();
-    const width = Math.max(rect.width * 1.01, rect.width + 1); // XXX
-    const height = Math.max(rect.height * 1.01, rect.height + 1);
 
     const ratio = window.devicePixelRatio;
+    const width = rect.width * ratio;
+    const height = rect.height * ratio;
 
-    const canvas = oldCanvas || document.createElement("canvas");
-    canvas.width = width * ratio;
-    canvas.height = height * ratio;
-    canvas.style.width = width + "px";
-    canvas.style.height = height + "px";
+    const canvas =
+        oldCanvas && oldCanvas.width === width && oldCanvas.height === height
+            ? oldCanvas
+            : new OffscreenCanvas(width, height);
 
     // Clone element with styles in text attribute
     // to apply styles in SVG
@@ -52,19 +51,22 @@ export default function getCanvasFromElement(
     const html = newElement.outerHTML;
     const xml = convertHtmlToXml(html);
     const svg =
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">` +
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
         `<foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
 
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
-            const ctx = canvas.getContext("2d");
+            const ctx = canvas.getContext(
+                "2d",
+            ) as OffscreenCanvasRenderingContext2D | null;
             if (ctx === null) {
                 return reject();
             }
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.clearRect(0, 0, width, height);
             ctx.scale(ratio, ratio);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, width, height);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
 
             resolve(canvas);
