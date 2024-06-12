@@ -40,9 +40,6 @@ export default class VFXPlayer {
         bottom: 0,
     };
 
-    #scrollX = 0;
-    #scrollY = 0;
-
     #mouseX = 0;
     #mouseY = 0;
 
@@ -61,13 +58,9 @@ export default class VFXPlayer {
             this.#pixelRatio = pixelRatio || window.devicePixelRatio;
 
             window.addEventListener("resize", this.#resize);
-            window.addEventListener("scroll", this.#scroll, {
-                passive: true,
-            });
             window.addEventListener("mousemove", this.#mousemove);
         }
         this.#resize();
-        this.#scroll();
 
         this.#camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
         this.#camera.position.set(0, 0, 1);
@@ -76,7 +69,6 @@ export default class VFXPlayer {
     destroy(): void {
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", this.#resize);
-            window.removeEventListener("scroll", this.#scroll);
             window.removeEventListener("mousemove", this.#mousemove);
         }
     }
@@ -133,13 +125,6 @@ export default class VFXPlayer {
                     }
                 }
             }
-        }
-    };
-
-    #scroll = (): void => {
-        if (typeof window !== "undefined") {
-            this.#scrollX = window.scrollX;
-            this.#scrollY = window.scrollY;
         }
     };
 
