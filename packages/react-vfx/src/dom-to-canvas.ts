@@ -11,7 +11,7 @@ const convertHtmlToXml = (html: string): string => {
     doc.documentElement.appendChild(range.createContextualFragment(html));
     doc.documentElement.setAttribute(
         "xmlns",
-        doc.documentElement.namespaceURI!
+        doc.documentElement.namespaceURI!,
     );
 
     // Get well-formed markup
@@ -21,59 +21,82 @@ const convertHtmlToXml = (html: string): string => {
 
 // Clone DOM node.
 function cloneNode<T extends Node>(node: T): T {
-    return node.cloneNode() as T;
+    return node.cloneNode(true) as T;
 }
 
 // Render element content to canvas and return it.
-// ref.
 export default function getCanvasFromElement(
     element: HTMLElement,
-    oldCanvas?: HTMLCanvasElement
-): Promise<HTMLCanvasElement> {
+    originalOpacity: number,
+    oldCanvas?: OffscreenCanvas,
+): Promise<OffscreenCanvas> {
     const rect = element.getBoundingClientRect();
 
-    const canvas = oldCanvas ?? document.createElement("canvas");
-    canvas.width = Math.max(rect.width * 1.01, rect.width + 1); // XXX
-    canvas.height = Math.max(rect.height * 1.01, rect.height + 1);
+    const ratio = window.devicePixelRatio;
+    const width = rect.width * ratio;
+    const height = rect.height * ratio;
+
+    const canvas =
+        oldCanvas && oldCanvas.width === width && oldCanvas.height === height
+            ? oldCanvas
+            : new OffscreenCanvas(width, height);
 
     // Clone element with styles in text attribute
     // to apply styles in SVG
     const newElement = cloneNode(element);
-    const styles = window.getComputedStyle(element);
-    Array.from(styles).forEach((key) => {
-        newElement.style.setProperty(
-            key,
-            styles.getPropertyValue(key),
-            styles.getPropertyPriority(key)
-        );
-    });
-    newElement.innerHTML = element.innerHTML;
-
-    // Wrap the element for text styling
-    const wrapper = document.createElement("div");
-    wrapper.style.setProperty("text-align", styles.textAlign);
-    wrapper.style.setProperty("vertical-align", styles.verticalAlign);
-    wrapper.appendChild(newElement);
+    syncStylesOfTree(element, newElement);
+    newElement.style.setProperty("opacity", originalOpacity.toString());
 
     // Create SVG string
-    const html = wrapper.outerHTML;
+    const html = newElement.outerHTML;
     const xml = convertHtmlToXml(html);
     const svg =
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">` +
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
         `<foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
 
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
-            const ctx = canvas.getContext("2d");
+            const ctx = canvas.getContext(
+                "2d",
+            ) as OffscreenCanvasRenderingContext2D | null;
             if (ctx === null) {
                 return reject();
             }
 
-            ctx.drawImage(img, 0, 0);
+            ctx.clearRect(0, 0, width, height);
+            ctx.scale(ratio, ratio);
+            ctx.drawImage(img, 0, 0, width, height);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+
             resolve(canvas);
         };
 
         img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     });
+}
+
+function syncStylesOfTree(el1: HTMLElement, el2: HTMLElement): void {
+    // Sync CSS styles
+    const styles = window.getComputedStyle(el1);
+    Array.from(styles).forEach((key) => {
+        el2.style.setProperty(
+            key,
+            styles.getPropertyValue(key),
+            styles.getPropertyPriority(key),
+        );
+    });
+
+    // Reflect input value to HTML attributes
+    if (el2.tagName === "INPUT") {
+        el2.setAttribute("value", (el2 as HTMLInputElement).value);
+    } else if (el2.tagName === "TEXTAREA") {
+        el2.innerHTML = (el2 as HTMLTextAreaElement).value;
+    }
+
+    for (let i = 0; i < el1.children.length; i++) {
+        const c1 = el1.children[i] as HTMLElement;
+        const c2 = el2.children[i] as HTMLElement;
+        syncStylesOfTree(c1, c2);
+    }
 }
