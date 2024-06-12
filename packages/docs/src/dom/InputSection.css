@@ -18,10 +18,8 @@
 .InputSection button {
     display: block;
     font-size: 1em;
-    /* color: white; */
     font-weight: bold;
     border-radius: 10px;
-    /* padding: 2px; */
     margin: 40px auto;
     cursor: pointer;
 }
