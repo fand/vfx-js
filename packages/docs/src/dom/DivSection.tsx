@@ -7,6 +7,7 @@ const shader = `
 precision mediump float;
 uniform vec2 resolution;
 uniform vec2 offset;
+uniform vec2 mouse;
 uniform float time;
 uniform sampler2D src;
 uniform float dist;
@@ -22,12 +23,32 @@ float noise(float y, float t) {
     return n;
 }
 
+vec2 focus(vec2 uv, vec2 c, float z) {
+    return mix(
+        uv,
+        (uv - c) * 0.5 + c,
+        z
+    );
+}
+
 void main (void) {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+    vec2 uvr, uvg, uvb;
+
+    // mouse loupe
+    vec2 muv = (mouse - offset) / resolution;
+    vec2 d = uv - muv;
+    d.x *= resolution.x / resolution.y;
+    float zoom = exp(smoothstep(0., 1., length(d)) * -5.);
+
+    uvr = focus(uv, muv, zoom);
+    uvg = focus(uv, muv, zoom * 1.1);
+    uvb = focus(uv, muv, zoom * 1.2);
+
+    // Distort & Glitch
     float t = mod(time, 30.);
     float amp = (3. + dist * 30.) / resolution.x;
-
-    vec2 uvr = uv, uvg = uv, uvb = uv;
     if (abs(noise(uv.y, t)) > 1. || dist > 0.03) {
         uvr.x += noise(uv.y, t) * amp;
         uvg.x += noise(uv.y, t + 10.) * amp;
@@ -73,6 +94,10 @@ const DivSection: React.FC = () => {
         distRef.current = 1;
     };
 
+    const onChangeRange = () => {
+        rerenderElement(divRef.current);
+    };
+
     return (
         <section className="DivSection">
             <h3>Div (experimental)</h3>
@@ -110,7 +135,7 @@ const DivSection: React.FC = () => {
                             min="0"
                             max="100"
                             defaultValue="0"
-                            onChange={onChange}
+                            onChange={onChangeRange}
                         />
                     </div>
 
