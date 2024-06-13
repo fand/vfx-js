@@ -28,5 +28,8 @@
   "devDependencies": {
     "husky": "^9.0.11",
     "turbo": "^2.0.3"
+  },
+  "dependencies": {
+    "@changesets/cli": "^2.27.5"
   }
 }
