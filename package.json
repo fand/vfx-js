@@ -13,7 +13,8 @@
     "lint": "turbo run lint",
     "prepare": "husky install",
     "test": "npm --workspace=react-vfx test",
-    "release": "changeset && turbo run build lint test && changeset version && changeset publish"
+    "prepare-release": "changeset && turbo run build lint test && changeset version",
+    "release": "changeset publish"
   },
   "repository": {
     "type": "git",
