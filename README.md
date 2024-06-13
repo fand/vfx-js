@@ -8,22 +8,19 @@
 ## Install
 
 ```
-npm i -S react-vfx
+npm i react-vfx
 ```
 
 ## Usage
 
-REACT-VFX exports `VFXSpan`, `VFXImg` and `VFXVideo`.
-These components works just like `<span>`, `<img>` and `<video>` - accepts all properties they have, but they are rendered in WebGL world with shader effects!
+REACT-VFX exports `VFXImg`, `VFXVideo`, `VFXSpan` and `VFXDiv`.
+These components works just like `<img>`, `<video>`, `<span>` and `<div>` - accepts all properties they have, but they are rendered in WebGL world with shader effects!
 
 ```ts
 import * as VFX from 'react-vfx';
 
 export default () => (
     <VFX.VFXProvider>
-        {/* Render text as image, then apply the shader effect! */}
-        <VFX.VFXSpan shader="rainbow">Hi there!</VFX.VFXSpan>
-
         {/* Render image with shader */}
         <VFX.VFXImg src="cat.png" alt="image" shader="rgbShift"/>
 
@@ -34,6 +31,14 @@ export default () => (
         <VFX.VFXVideo src="mind_blown.mp4"
             autoplay playsinline loop muted
             shader="halftone"/>
+
+        {/* Render text as image, then apply the shader effect! */}
+        <VFX.VFXSpan shader="rainbow">Hi there!</VFX.VFXSpan>
+
+        {/* Or even inputs! */}
+        <VFX.VFXDiv shader="rainbow">
+            <input type="text" value="hello" />
+        </VFX.VFXDiv>
     </VFX.VFXProvider>
 );
 ```
