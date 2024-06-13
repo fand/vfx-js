@@ -14,7 +14,7 @@ const canvasStyle = {
 };
 
 export interface VFXProviderProps {
-    children?: any; // 😣 https://github.com/DefinitelyTyped/DefinitelyTyped/issues/27805
+    children?: React.ReactNode;
     pixelRatio?: number;
     zIndex?: number;
 }
