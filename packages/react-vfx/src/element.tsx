@@ -31,12 +31,12 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
 
         // Create scene
         useEffect(() => {
-            const element = elementRef.current;
-            if (element === undefined) {
+            if (!player || !elementRef.current) {
                 return;
             }
+            const element = elementRef.current;
 
-            player?.addElement(element, {
+            player.addElement(element, {
                 shader,
                 release,
                 uniforms,
@@ -55,8 +55,8 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
             });
 
             return () => {
-                player?.removeElement(element);
                 mo.disconnect();
+                player.removeElement(element);
             };
         }, [elementRef, player, shader, release, uniforms, overflow]);
 
