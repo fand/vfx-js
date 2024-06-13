@@ -12,7 +12,8 @@
     "clean": "turbo run clean",
     "lint": "turbo run lint",
     "prepare": "husky install",
-    "test": "npm --workspace=react-vfx test"
+    "test": "npm --workspace=react-vfx test",
+    "publish-packages": "turbo run build lint test && changeset version && changeset publish"
   },
   "repository": {
     "type": "git",
