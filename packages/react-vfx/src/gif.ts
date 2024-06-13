@@ -21,9 +21,10 @@ export default class GIFData {
             .then((buff) => new GIF(buff));
 
         const frames = gif.decompressFrames(true, undefined, undefined);
-        const width = (gif.raw as any).lsd.width;
-        const height = (gif.raw as any).lsd.height;
+        const width = (gif.raw as any).lsd.width; // eslint-disable-line  @typescript-eslint/no-explicit-any
+        const height = (gif.raw as any).lsd.height; // eslint-disable-line  @typescript-eslint/no-explicit-any
 
+        // eslint-disable-next-line  @typescript-eslint/no-explicit-any
         return new GIFData(frames as any, width, height, pixelRatio);
     }
 
@@ -31,7 +32,7 @@ export default class GIFData {
         frames: GIFFrame[],
         width: number,
         height: number,
-        pixelRatio: number
+        pixelRatio: number,
     ) {
         this.frames = frames;
         this.canvas = document.createElement("canvas");
@@ -64,7 +65,7 @@ export default class GIFData {
         const image = new ImageData(
             frame.patch,
             frame.dims.width,
-            frame.dims.height
+            frame.dims.height,
         );
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
