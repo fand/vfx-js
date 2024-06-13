@@ -12,7 +12,8 @@
     "clean": "turbo run clean",
     "lint": "turbo run lint",
     "prepare": "husky install",
-    "test": "npm --workspace=react-vfx test"
+    "test": "npm --workspace=react-vfx test",
+    "release": "changeset && turbo run build lint test && changeset version && changeset publish"
   },
   "repository": {
     "type": "git",
@@ -28,5 +29,8 @@
   "devDependencies": {
     "husky": "^9.0.11",
     "turbo": "^2.0.3"
+  },
+  "dependencies": {
+    "@changesets/cli": "^2.27.5"
   }
 }

@@ -70,7 +70,8 @@ describe("sanitizeOverflow", () => {
 });
 
 describe("isRectInViewport", () => {
-    const rect = (x: number, y: number, w: number, h: number) => {
+    type Rect = Parameters<typeof isRectInViewport>[0];
+    const rect = (x: number, y: number, w: number, h: number): Rect => {
         return {
             left: x,
             top: y,
@@ -79,7 +80,13 @@ describe("isRectInViewport", () => {
         };
     };
 
-    const pad = (t: number) => ({ left: t, right: t, top: t, bottom: t });
+    type Pad = Parameters<typeof isRectInViewport>[2];
+    const pad = (t: number): Pad => ({
+        left: t,
+        right: t,
+        top: t,
+        bottom: t,
+    });
 
     test("no overflow", () => {
         expect(
