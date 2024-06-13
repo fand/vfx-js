@@ -1,23 +1,25 @@
 import * as React from "react";
-import { useRef, useContext, useCallback } from "react";
+import { useRef, useContext, useState, useEffect } from "react";
 import { VFXContext } from "./context";
 import { VFXProps } from "./types";
 
 export type VFXVideoProps = JSX.IntrinsicElements["video"] & VFXProps;
 
 export const VFXVideo: React.FC<VFXVideoProps> = (props) => {
-    const player = useContext(VFXContext);
-    const ref = useRef<HTMLVideoElement>(null);
-
     const { shader, release, uniforms, overflow, ...rawProps } = props;
 
+    const player = useContext(VFXContext);
+    const ref = useRef<HTMLVideoElement>(null);
+    const [isLoaded, setIsLoaded] = useState(false);
+
     // Create scene
-    const onLoadedData = useCallback(() => {
-        if (ref.current === null) {
+    useEffect(() => {
+        if (!player || !ref.current || !isLoaded) {
             return;
         }
+        const element = ref.current;
 
-        player?.addElement(ref.current, {
+        player.addElement(element, {
             shader,
             release,
             uniforms,
@@ -25,13 +27,11 @@ export const VFXVideo: React.FC<VFXVideoProps> = (props) => {
         });
 
         return () => {
-            if (ref.current === null) {
-                return;
-            }
-
-            player?.removeElement(ref.current);
+            player.removeElement(element);
         };
-    }, [player, shader, release, uniforms, overflow]);
+    }, [player, shader, release, uniforms, overflow, isLoaded]);
 
-    return <video ref={ref} {...rawProps} onLoadedData={onLoadedData} />;
+    return (
+        <video ref={ref} {...rawProps} onLoadedData={() => setIsLoaded(true)} />
+    );
 };

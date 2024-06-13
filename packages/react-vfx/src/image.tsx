@@ -1,23 +1,25 @@
 import * as React from "react";
-import { useRef, useContext, useCallback } from "react";
+import { useRef, useContext, useEffect, useState } from "react";
 import { VFXContext } from "./context";
 import { VFXProps } from "./types";
 
 export type VFXImgProps = JSX.IntrinsicElements["img"] & VFXProps;
 
 export const VFXImg: React.FC<VFXImgProps> = (props) => {
-    const player = useContext(VFXContext);
-    const ref = useRef<HTMLImageElement>(null);
-
     const { shader, release, uniforms, overflow, ...rawProps } = props;
 
+    const player = useContext(VFXContext);
+    const ref = useRef<HTMLImageElement>(null);
+    const [isLoaded, setIsLoaded] = useState(false);
+
     // Create scene
-    const init = useCallback(() => {
-        if (ref.current === null) {
+    useEffect(() => {
+        if (!player || !ref.current || !isLoaded) {
             return;
         }
+        const element = ref.current;
 
-        player?.addElement(ref.current, {
+        player.addElement(element, {
             shader,
             release,
             uniforms,
@@ -25,13 +27,9 @@ export const VFXImg: React.FC<VFXImgProps> = (props) => {
         });
 
         return () => {
-            if (ref.current === null) {
-                return;
-            }
-
-            player?.removeElement(ref.current);
+            player.removeElement(element);
         };
-    }, [player, shader, release, uniforms, overflow]);
+    }, [player, shader, release, uniforms, overflow, isLoaded]);
 
-    return <img ref={ref} {...rawProps} onLoad={init} />;
+    return <img ref={ref} {...rawProps} onLoad={() => setIsLoaded(true)} />;
 };
