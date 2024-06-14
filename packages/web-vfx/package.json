@@ -1,0 +1,68 @@
+{
+  "name": "web-vfx",
+  "description": "Easy WebGL effects for HTML elements",
+  "version": "0.6.2",
+  "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
+  "bugs": {
+    "url": "https://github.com/fand/react-vfx/issues"
+  },
+  "dependencies": {
+    "three": "^0.165.0"
+  },
+  "files": [
+    "package.json",
+    "README.md",
+    "lib/"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "@types/three": "^0.165.0",
+    "@typescript-eslint/eslint-plugin": "^7.12.0",
+    "@typescript-eslint/parser": "^7.12.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.5",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.3.1",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  },
+  "homepage": "https://amagi.dev/react-vfx",
+  "keywords": [
+    "glsl",
+    "threejs",
+    "webgl"
+  ],
+  "license": "MIT",
+  "lint-staged": {
+    "src/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "main": "./lib/cjs/index.js",
+  "exports": {
+    "require": "./lib/cjs/index.js",
+    "import": "./lib/esm/index.mjs"
+  },
+  "repository": {
+    "url": "https://github.com/fand/react-vfx"
+  },
+  "scripts": {
+    "build": "run-s clean build:cjs build:esm",
+    "build:cjs": "tsc -d",
+    "build:esm": "tsc -d -p tsconfig.esm.json",
+    "clean": "rimraf lib",
+    "dev": "run-p watch:cjs watch:esm",
+    "watch:cjs": "tsc -d -w",
+    "watch:esm": "tsc -d -w -p tsconfig.esm.json",
+    "lint": "eslint src/**/*.ts src/**/*.tsx",
+    "lint-staged": "lint-staged",
+    "test": "vitest --dir src --run",
+    "test:watch": "vitest --dir src"
+  },
+  "types": "lib/esm/index.d.ts"
+}
