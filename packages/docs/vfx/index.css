@@ -14,3 +14,98 @@ code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
         monospace;
 }
+
+header {
+    position: fixed;
+    top: 32px;
+    right: 32px;
+    font-weight: bold;
+    font-size: 2rem;
+    z-index: 10010;
+    color: white;
+    cursor: pointer;
+}
+header a,
+header a:active {
+    color: white;
+}
+
+html,
+body {
+    height: 100%;
+    overflow: hidden;
+}
+
+.Parallax {
+    height: 100%;
+    perspective: 1px;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+.BlobWrapper {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    transform: translateZ(-2px) scale(2);
+    z-index: -1;
+}
+.Blob {
+    position: relative;
+    right: -40%;
+    width: 100%;
+}
+
+main {
+    position: relative;
+    transform-style: preserve-3d;
+}
+
+section {
+    margin: 0 32px;
+    font-size: 2rem;
+    box-sizing: border-box;
+}
+
+.TopSection {
+    height: 90vh;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.TopSection .Logo {
+    width: 100%;
+    max-width: 60vw;
+    max-height: 30vh;
+}
+.TopSection p {
+    font-size: 1.5rem;
+}
+
+.AuthorSection {
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    gap: 32px;
+}
+.AuthorSection img {
+    width: 200px;
+    height: 200px;
+}
+
+.Frame {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+
+    border: 8px solid #fff;
+    box-sizing: border-box;
+    opacity: 0.5;
+    z-index: 10000;
+    user-select: none;
+    pointer-events: none;
+}
