@@ -9,6 +9,10 @@ body {
     color: white;
     background-color: black;
     overflow-x: hidden;
+
+    /* BG pattern */
+    background: linear-gradient(-45deg, #000 49%, #333 50%, #000 51%);
+    background-size: 10px 10px;
 }
 
 code {
@@ -16,19 +20,38 @@ code {
         monospace;
 }
 
-header {
+.HeaderTop,
+.HeaderBottom {
     position: fixed;
     top: 32px;
     right: 32px;
+    padding: 0 4px;
     font-weight: bold;
     font-size: 2rem;
-    z-index: 10010;
-    color: white;
-    cursor: pointer;
 }
-header a,
-header a:active {
+.HeaderTop {
+    z-index: 10010;
+    cursor: pointer;
+    mix-blend-mode: exclusion;
+}
+.HeaderBottom {
+    z-index: 10009;
+    color: rgba(0, 0, 0, 0.3);
+}
+.HeaderTop:hover {
+    background: white;
+}
+.HeaderTop:hover + .HeaderBottom {
+    color: black;
+    background-color: rgba(0, 0, 0, 0.3);
+}
+.HeaderTop a,
+.HeaderTop a:active {
     color: white;
+    text-decoration: none;
+}
+.HeaderTop a:hover {
+    color: black;
 }
 
 section {
