@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "npm@9.8.1",
   "workspaces": [
-    "packages/web-vfx",
+    "packages/vfx-js",
     "packages/react-vfx",
     "packages/docs"
   ],

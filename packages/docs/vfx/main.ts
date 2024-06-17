@@ -1,4 +1,4 @@
-import { VFX } from "web-vfx";
+import { VFX } from "vfx-js";
 
 const shaders = {
     blob: `

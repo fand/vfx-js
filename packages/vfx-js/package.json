@@ -1,7 +1,7 @@
 {
-  "name": "web-vfx",
+  "name": "vfx-js",
   "description": "Easy WebGL effects for HTML elements",
-  "version": "0.6.2",
+  "version": "0.1.0",
   "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
   "bugs": {
     "url": "https://github.com/fand/react-vfx/issues"
@@ -30,7 +30,7 @@
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
   },
-  "homepage": "https://amagi.dev/react-vfx",
+  "homepage": "https://amagi.dev/vfx-js",
   "keywords": [
     "glsl",
     "threejs",

@@ -24,7 +24,7 @@
     "react-vfx": "*",
     "three": "^0.165.0",
     "vh-check": "^2.0.5",
-    "web-vfx": "*"
+    "vfx-js": "*"
   },
   "devDependencies": {
     "@originjs/vite-plugin-commonjs": "^1.0.3",
