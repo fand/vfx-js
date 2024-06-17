@@ -17,13 +17,14 @@
     "lodash.debounce": "^4.0.8",
     "postprocessing": "^6.35.5",
     "prism-react-renderer": "^2.3.1",
+    "prismjs": "^1.29.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-lazyload": "^3.2.1",
-    "web-vfx": "*",
     "react-vfx": "*",
     "three": "^0.165.0",
-    "vh-check": "^2.0.5"
+    "vh-check": "^2.0.5",
+    "web-vfx": "*"
   },
   "devDependencies": {
     "@originjs/vite-plugin-commonjs": "^1.0.3",

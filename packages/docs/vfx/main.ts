@@ -1,5 +1,4 @@
 import { VFX } from "web-vfx";
-import "./index.css";
 
 const shaders = {
     blob: `
@@ -75,48 +74,51 @@ const shaders = {
     }
 
     function loop() {
-        scroll = lerp(scroll, window.scrollY, 0.1);
-        bg.style.setProperty("transform", `translateY(-${scroll * 0.3}px)`);
+        scroll = lerp(scroll, window.scrollY, 0.03);
+        bg.style.setProperty("transform", `translateY(-${scroll * 0.1}px)`);
 
         requestAnimationFrame(loop);
     }
     loop();
 }
 
-const vfx = new VFX({ pixelRatio: window.devicePixelRatio });
+// Init VFX
+{
+    const vfx = new VFX({ pixelRatio: window.devicePixelRatio });
 
-for (const img of document.querySelectorAll("img")) {
-    const shader = img.getAttribute("data-shader");
-    if (shader) {
-        vfx.addImage(img, {
-            shader,
-            overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
+    for (const img of document.querySelectorAll("img")) {
+        const shader = img.getAttribute("data-shader");
+        if (shader) {
+            vfx.addImage(img, {
+                shader,
+                overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
+            });
+        }
+
+        const shaderId = img.getAttribute("data-shader-id");
+        if (shaderId) {
+            console.log(img, shaderId, shaders[shaderId]);
+            vfx.addImage(img, {
+                shader: shaders[shaderId],
+                overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
+            });
+        }
+    }
+
+    for (const video of document.querySelectorAll("video")) {
+        vfx.addVideo(video, {
+            shader: "sinewave",
+            overflow: 200,
         });
     }
 
-    const shaderId = img.getAttribute("data-shader-id");
-    if (shaderId) {
-        console.log(img, shaderId, shaders[shaderId]);
-        vfx.addImage(img, {
-            shader: shaders[shaderId],
-            overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
-        });
-    }
+    // for (const p of document.querySelectorAll("p")) {
+    //     vfx.addElement(p, {
+    //         shader: p.getAttribute("data-shader") ?? "glitch",
+    //         overflow: parseFloat(p.getAttribute("data-overflow") ?? "0"),
+    //     });
+    // }
 }
-
-for (const video of document.querySelectorAll("video")) {
-    vfx.addVideo(video, {
-        shader: "sinewave",
-        overflow: 200,
-    });
-}
-
-// for (const p of document.querySelectorAll("p")) {
-//     vfx.addElement(p, {
-//         shader: p.getAttribute("data-shader") ?? "glitch",
-//         overflow: parseFloat(p.getAttribute("data-overflow") ?? "0"),
-//     });
-// }
 
 window.addEventListener("load", () => {
     const maskTop = document.getElementById("MaskTop")!;

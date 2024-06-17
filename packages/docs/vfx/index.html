@@ -60,6 +60,8 @@
             href="favicion/favicon-180.png"
         />
         <link rel="icon" sizes="192x192" href="favicon/favicon-192.png" />
+
+        <link rel="stylesheet" href="./index.css" />
     </head>
 
     <body>
@@ -75,7 +77,7 @@
 
         <img
             id="BG"
-            src="../vfx-js-top-blob.png"
+            src="../vfx-js-blob.webp"
             alt="VFX-JS"
             data-shader-id="blob"
         />
@@ -107,6 +109,25 @@
             <img src="../octocat.gif" data-shader="glitch" />
 
             <video src="../mind_blown.mp4" autoplay loop muted></video>
+        </section>
+
+        <section class="UsageSection">
+            <h2>Usage</h2>
+
+            <p>Install via npm:</p>
+            <pre><code>
+npm i vfx-js
+            </code></pre>
+
+            <p>Then create <code>VFX</code> object in your script:</p>
+            <pre><code>
+import { VFX } from 'vfx-js';
+const vfx = new VFX();
+vfx.addImage(imgElement, { shader: "rgbShift" });
+            </code></pre>
+
+            <p>This will be rendered as below.</p>
+            <img src="../react-logo.png" data-shader="rgbShift" />
         </section>
 
         <section class="AuthorSection">

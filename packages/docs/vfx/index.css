@@ -8,7 +8,6 @@ body {
 
     color: white;
     background-color: black;
-
     overflow-x: hidden;
 }
 
@@ -32,36 +31,32 @@ header a:active {
     color: white;
 }
 
-#BG {
-    position: fixed;
-    margin-top: -20vh;
-    right: -40%;
-    top: 0;
-    height: 150vh;
-    z-index: -1;
-    transform-style: preserve-3d;
-}
-
 section {
-    margin: 0 32px;
-    font-size: 2rem;
+    width: 100%;
+    padding: 0 32px;
+    margin-bottom: 10vh;
     box-sizing: border-box;
+}
+section h2 {
+    font-size: 2rem;
+}
+section p {
+    font-size: 1.5rem;
+    line-height: 1.5;
 }
 
 .TopSection {
-    height: 90vh;
+    height: 100lvh;
 
     display: flex;
     flex-direction: column;
     justify-content: center;
+    align-items: start;
 }
 .TopSection .Logo {
     width: 100%;
     max-width: 60vw;
     max-height: 30vh;
-}
-.TopSection p {
-    font-size: 1.5rem;
 }
 
 .AuthorSection {
@@ -73,6 +68,16 @@ section {
 .AuthorSection img {
     width: 200px;
     height: 200px;
+}
+
+#BG {
+    position: fixed;
+    margin-top: -20vh;
+    right: -40%;
+    top: 0;
+    height: 150vh;
+    z-index: -1;
+    transform-style: preserve-3d;
 }
 
 #Frame {
@@ -110,6 +115,7 @@ section {
 
 #MaskBottom {
     z-index: 19999;
-    transition: opacity 1s 1.5s;
+    transition: opacity 1.5s 1.5s linear;
     background: #000;
+    pointer-events: none;
 }
