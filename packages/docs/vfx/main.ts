@@ -117,3 +117,13 @@ for (const video of document.querySelectorAll("video")) {
 //         overflow: parseFloat(p.getAttribute("data-overflow") ?? "0"),
 //     });
 // }
+
+window.addEventListener("load", () => {
+    const maskTop = document.getElementById("MaskTop")!;
+    maskTop.style.setProperty("height", "0");
+
+    const maskBottom = document.getElementById("MaskBottom")!;
+    maskBottom.style.setProperty("opacity", "0");
+
+    console.log("load");
+});

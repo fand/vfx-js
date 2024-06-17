@@ -8,6 +8,8 @@ body {
 
     color: white;
     background-color: black;
+
+    overflow-x: hidden;
 }
 
 code {
@@ -40,11 +42,6 @@ header a:active {
     transform-style: preserve-3d;
 }
 
-main {
-    position: relative;
-    transform-style: preserve-3d;
-}
-
 section {
     margin: 0 32px;
     font-size: 2rem;
@@ -58,7 +55,6 @@ section {
     flex-direction: column;
     justify-content: center;
 }
-
 .TopSection .Logo {
     width: 100%;
     max-width: 60vw;
@@ -79,7 +75,7 @@ section {
     height: 200px;
 }
 
-.Frame {
+#Frame {
     position: fixed;
     left: 0;
     top: 0;
@@ -88,9 +84,32 @@ section {
 
     border: 16px solid #999;
     box-sizing: border-box;
-    z-index: 10000;
+    z-index: 20000;
     user-select: none;
     pointer-events: none;
 
     mix-blend-mode: difference;
+}
+
+#MaskTop,
+#MaskBottom {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    user-select: none;
+    background: black;
+    transition: height 0.5s linear;
+}
+
+#MaskTop {
+    z-index: 20001;
+    transition: height 0.5s 0.5s;
+}
+
+#MaskBottom {
+    z-index: 19999;
+    transition: opacity 1s 1.5s;
+    background: #000;
 }
