@@ -1,5 +1,5 @@
 {
-  "name": "vfx-js",
+  "name": "@vfx-js/core",
   "description": "Easy WebGL effects for HTML elements",
   "version": "0.1.0",
   "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
