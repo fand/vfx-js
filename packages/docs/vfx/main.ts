@@ -65,33 +65,51 @@ const shaders = {
     `,
 };
 
-// const vfx = new VFX({ pixelRatio: window.devicePixelRatio });
+// Init BG
+{
+    const bg = document.getElementById("BG")!;
 
-// for (const img of document.querySelectorAll("img")) {
-//     const shader = img.getAttribute("data-shader");
-//     if (shader) {
-//         vfx.addImage(img, {
-//             shader,
-//             overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
-//         });
-//     }
+    let scroll = 0;
+    function lerp(a: number, b: number, t: number): number {
+        return a * (1 - t) + b * t;
+    }
 
-//     const shaderId = img.getAttribute("data-shader-id");
-//     if (shaderId) {
-//         console.log(img, shaderId, shaders[shaderId]);
-//         vfx.addImage(img, {
-//             shader: shaders[shaderId],
-//             overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
-//         });
-//     }
-// }
+    function loop() {
+        scroll = lerp(scroll, window.scrollY, 0.1);
+        bg.style.setProperty("transform", `translateY(-${scroll * 0.3}px)`);
 
-// for (const video of document.querySelectorAll("video")) {
-//     vfx.addVideo(video, {
-//         shader: "sinewave",
-//         overflow: 200,
-//     });
-// }
+        requestAnimationFrame(loop);
+    }
+    loop();
+}
+
+const vfx = new VFX({ pixelRatio: window.devicePixelRatio });
+
+for (const img of document.querySelectorAll("img")) {
+    const shader = img.getAttribute("data-shader");
+    if (shader) {
+        vfx.addImage(img, {
+            shader,
+            overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
+        });
+    }
+
+    const shaderId = img.getAttribute("data-shader-id");
+    if (shaderId) {
+        console.log(img, shaderId, shaders[shaderId]);
+        vfx.addImage(img, {
+            shader: shaders[shaderId],
+            overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
+        });
+    }
+}
+
+for (const video of document.querySelectorAll("video")) {
+    vfx.addVideo(video, {
+        shader: "sinewave",
+        overflow: 200,
+    });
+}
 
 // for (const p of document.querySelectorAll("p")) {
 //     vfx.addElement(p, {

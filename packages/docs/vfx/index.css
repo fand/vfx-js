@@ -30,30 +30,14 @@ header a:active {
     color: white;
 }
 
-html,
-body {
-    height: 100%;
-    overflow: hidden;
-}
-
-.Parallax {
-    height: 100%;
-    perspective: 1px;
-    overflow-x: hidden;
-    overflow-y: auto;
-}
-.BlobWrapper {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 100%;
-    transform: translateZ(-2px) scale(2);
-    z-index: -1;
-}
-.Blob {
-    position: relative;
+#BG {
+    position: fixed;
+    margin-top: -20vh;
     right: -40%;
-    width: 100%;
+    top: 0;
+    height: 150vh;
+    z-index: -1;
+    transform-style: preserve-3d;
 }
 
 main {
@@ -102,10 +86,11 @@ section {
     width: 100%;
     height: 100%;
 
-    border: 8px solid #fff;
+    border: 16px solid #999;
     box-sizing: border-box;
-    opacity: 0.5;
     z-index: 10000;
     user-select: none;
     pointer-events: none;
+
+    mix-blend-mode: difference;
 }
