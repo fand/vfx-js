@@ -13,7 +13,7 @@
     "clean": "turbo run clean",
     "lint": "turbo run lint",
     "prepare": "husky install",
-    "test": "npm --workspace=react-vfx test",
+    "test": "npm --workspace=@vfx-js/core test",
     "prepare-release": "changeset && turbo run build lint test && changeset version",
     "release": "changeset publish"
   },
