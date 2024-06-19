@@ -1,0 +1,34 @@
+{
+  "name": "docs-vfx-js",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "dedent": "^1.5.3",
+    "is-mobile": "^4.0.0",
+    "lodash.debounce": "^4.0.8",
+    "prismjs": "^1.29.0",
+    "vh-check": "^2.0.5",
+    "vfx-js": "*"
+  },
+  "devDependencies": {
+    "@originjs/vite-plugin-commonjs": "^1.0.3",
+    "@types/dedent": "^0.7.2",
+    "@types/is-mobile": "^2.1.4",
+    "@types/lodash.debounce": "^4.0.9",
+    "@types/node": "^20.14.2",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/react-lazyload": "^3.2.3",
+    "@types/three": "^0.165.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.13"
+  }
+}

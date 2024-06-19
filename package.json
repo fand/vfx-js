@@ -3,9 +3,7 @@
   "private": true,
   "packageManager": "npm@9.8.1",
   "workspaces": [
-    "packages/vfx-js",
-    "packages/react-vfx",
-    "packages/docs"
+    "packages/*"
   ],
   "scripts": {
     "build": "turbo run build",

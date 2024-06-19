@@ -1,0 +1,144 @@
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+        "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+        "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    color: white;
+    background-color: black;
+    overflow-x: hidden;
+
+    /* BG pattern */
+    background: linear-gradient(-45deg, #000 49%, #333 50%, #000 51%);
+    background-size: 10px 10px;
+}
+
+code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+        monospace;
+}
+
+.HeaderTop,
+.HeaderBottom {
+    position: fixed;
+    top: 32px;
+    right: 32px;
+    padding: 0 4px;
+    font-weight: bold;
+    font-size: 2rem;
+}
+.HeaderTop {
+    z-index: 10010;
+    cursor: pointer;
+    mix-blend-mode: exclusion;
+}
+.HeaderBottom {
+    z-index: 10009;
+    color: rgba(0, 0, 0, 0.3);
+}
+.HeaderTop:hover {
+    background: white;
+}
+.HeaderTop:hover + .HeaderBottom {
+    color: black;
+    background-color: rgba(0, 0, 0, 0.3);
+}
+.HeaderTop a,
+.HeaderTop a:active {
+    color: white;
+    text-decoration: none;
+}
+.HeaderTop a:hover {
+    color: black;
+}
+
+section {
+    width: 100%;
+    padding: 0 32px;
+    margin-bottom: 10vh;
+    box-sizing: border-box;
+}
+section h2 {
+    font-size: 2rem;
+}
+section p {
+    font-size: 1.5rem;
+    line-height: 1.5;
+}
+
+.TopSection {
+    height: 100lvh;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: start;
+}
+.TopSection .Logo {
+    width: 100%;
+    max-width: 60vw;
+    max-height: 30vh;
+}
+
+.AuthorSection {
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    gap: 32px;
+}
+.AuthorSection img {
+    width: 200px;
+    height: 200px;
+}
+
+#BG {
+    position: fixed;
+    margin-top: -20vh;
+    right: -40%;
+    top: 0;
+    height: 150vh;
+    z-index: -1;
+    transform-style: preserve-3d;
+}
+
+#Frame {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+
+    border: 16px solid #999;
+    box-sizing: border-box;
+    z-index: 20000;
+    user-select: none;
+    pointer-events: none;
+
+    mix-blend-mode: difference;
+}
+
+#MaskTop,
+#MaskBottom {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    user-select: none;
+    background: black;
+    transition: height 0.5s linear;
+}
+
+#MaskTop {
+    z-index: 20001;
+    transition: height 0.5s 0.5s;
+}
+
+#MaskBottom {
+    z-index: 19999;
+    transition: opacity 1.5s 1.5s linear;
+    background: #000;
+    pointer-events: none;
+}

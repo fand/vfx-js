@@ -23,8 +23,7 @@
     "react-lazyload": "^3.2.1",
     "react-vfx": "*",
     "three": "^0.165.0",
-    "vh-check": "^2.0.5",
-    "vfx-js": "*"
+    "vh-check": "^2.0.5"
   },
   "devDependencies": {
     "@originjs/vite-plugin-commonjs": "^1.0.3",
