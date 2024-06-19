@@ -2,6 +2,8 @@ name: Deploy to amagi.dev/vfx-js
 
 on:
     push:
+        branches:
+            - main
     workflow_dispatch:
 
 jobs:
