@@ -1,5 +1,5 @@
 import THREE from "three";
-import { ShaderPreset } from "vfx-js";
+import { ShaderPreset } from "@vfx-js/core";
 
 export interface VFXProps {
     /**
