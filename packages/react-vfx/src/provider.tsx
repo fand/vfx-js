@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { VFXContext } from "./context";
-import { VFX } from "vfx-js";
+import { VFX } from "@vfx-js/core";
 
 export interface VFXProviderProps {
     children?: React.ReactNode;
