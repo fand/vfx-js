@@ -8,18 +8,18 @@ export type VFXImgProps = JSX.IntrinsicElements["img"] & VFXProps;
 export const VFXImg: React.FC<VFXImgProps> = (props) => {
     const { shader, release, uniforms, overflow, ...rawProps } = props;
 
-    const player = useContext(VFXContext);
+    const vfx = useContext(VFXContext);
     const ref = useRef<HTMLImageElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
 
     // Create scene
     useEffect(() => {
-        if (!player || !ref.current || !isLoaded) {
+        if (!vfx || !ref.current || !isLoaded) {
             return;
         }
         const element = ref.current;
 
-        player.addElement(element, {
+        vfx.add(element, {
             shader,
             release,
             uniforms,
@@ -27,9 +27,9 @@ export const VFXImg: React.FC<VFXImgProps> = (props) => {
         });
 
         return () => {
-            player.removeElement(element);
+            vfx.remove(element);
         };
-    }, [player, shader, release, uniforms, overflow, isLoaded]);
+    }, [vfx, shader, release, uniforms, overflow, isLoaded]);
 
     return <img ref={ref} {...rawProps} onLoad={() => setIsLoaded(true)} />;
 };

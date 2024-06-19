@@ -15,7 +15,7 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
         props: VFXElementProps<T>,
         parentRef: React.ForwardedRef<HTMLElement>,
     ) {
-        const player = useContext(VFXContext);
+        const vfx = useContext(VFXContext);
 
         const elementRef = useRef<HTMLElement | undefined>();
         const ref = (e: HTMLElement): void => {
@@ -31,12 +31,12 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
 
         // Create scene
         useEffect(() => {
-            if (!player || !elementRef.current) {
+            if (!vfx || !elementRef.current) {
                 return;
             }
             const element = elementRef.current;
 
-            player.addElement(element, {
+            vfx.add(element, {
                 shader,
                 release,
                 uniforms,
@@ -45,7 +45,7 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
 
             const mo = new MutationObserver(() => {
                 if (elementRef.current) {
-                    player?.updateTextElement(elementRef.current);
+                    vfx?.update(elementRef.current);
                 }
             });
             mo.observe(element, {
@@ -56,9 +56,9 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
 
             return () => {
                 mo.disconnect();
-                player.removeElement(element);
+                vfx.remove(element);
             };
-        }, [elementRef, player, shader, release, uniforms, overflow]);
+        }, [elementRef, vfx, shader, release, uniforms, overflow]);
 
         return React.createElement(type, { ...rawProps, ref });
     });
