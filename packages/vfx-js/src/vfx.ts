@@ -33,6 +33,36 @@ export class VFX {
         this.#player.play();
     }
 
+    add(element: HTMLElement, opts: VFXProps): void {
+        if (element instanceof HTMLImageElement) {
+            this.#addImage(element, opts);
+        } else if (element instanceof HTMLVideoElement) {
+            this.#addVideo(element, opts);
+        } else {
+            this.#addText(element, opts);
+        }
+    }
+
+    remove(element: HTMLElement): void {
+        this.#player.removeElement(element);
+    }
+
+    update(element: HTMLElement): Promise<void> {
+        return this.#player.updateTextElement(element);
+    }
+
+    play(): void {
+        this.#player.play();
+    }
+
+    stop(): void {
+        this.#player.stop();
+    }
+
+    destroy(): void {
+        this.#player.destroy();
+    }
+
     #addImage(element: HTMLImageElement, opts: VFXProps): void {
         if (element.complete) {
             this.#player.addElement(element, opts);
@@ -55,15 +85,5 @@ export class VFX {
 
     #addText(element: HTMLElement, opts: VFXProps): void {
         this.#player.addElement(element, opts);
-    }
-
-    addElement(element: HTMLElement, opts: VFXProps): void {
-        if (element instanceof HTMLImageElement) {
-            this.#addImage(element, opts);
-        } else if (element instanceof HTMLVideoElement) {
-            this.#addVideo(element, opts);
-        } else {
-            this.#addText(element, opts);
-        }
     }
 }
