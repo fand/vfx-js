@@ -103,18 +103,6 @@
             </p>
         </section>
 
-        <section class="ExampleSection">
-            <h2>Examples</h2>
-            <img src="./react-logo.png" data-shader="rainbow" />
-            <img src="./david.png" data-shader="rgbShift" />
-            <img src="./cat.gif" data-shader="rainbow" />
-            <img src="./chill.gif" data-shader="sinewave" />
-            <img src="./doge.gif" data-shader="pixelate" />
-            <img src="./octocat.gif" data-shader="glitch" />
-
-            <video src="../mind_blown.mp4" autoplay loop muted></video>
-        </section>
-
         <section class="UsageSection">
             <h2>Usage</h2>
 
@@ -125,13 +113,25 @@ npm i vfx-js
 
             <p>Then create <code>VFX</code> object in your script:</p>
             <pre><code>
-import { VFX } from 'vfx-js';
+import { VFX } from '@vfx-js/core';
 const vfx = new VFX();
 vfx.addImage(imgElement, { shader: "rgbShift" });
             </code></pre>
 
             <p>This will be rendered as below.</p>
             <img src="./react-logo.png" data-shader="rgbShift" />
+        </section>
+
+        <section class="ExampleSection">
+            <h2>Examples</h2>
+            <img src="./react-logo.png" data-shader="rainbow" />
+            <img src="./david.png" data-shader="rgbShift" />
+            <img src="./cat.gif" data-shader="rainbow" />
+            <img src="./chill.gif" data-shader="sinewave" />
+            <img src="./doge.gif" data-shader="pixelate" />
+            <img src="./octocat.gif" data-shader="glitch" />
+
+            <video src="../mind_blown.mp4" autoplay loop muted></video>
         </section>
 
         <section class="AuthorSection">

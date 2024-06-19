@@ -1,3 +1,5 @@
+/*================ Global ================*/
+
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
@@ -19,6 +21,8 @@ code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
         monospace;
 }
+
+/*================ Header ================*/
 
 .HeaderTop,
 .HeaderBottom {
@@ -54,6 +58,8 @@ code {
     color: black;
 }
 
+/*================ Section ================*/
+
 section {
     width: 100%;
     padding: 0 32px;
@@ -61,12 +67,14 @@ section {
     box-sizing: border-box;
 }
 section h2 {
-    font-size: 2rem;
+    font-size: 3rem;
 }
 section p {
     font-size: 1.5rem;
     line-height: 1.5;
 }
+
+/*================ TopSection ================*/
 
 .TopSection {
     height: 100lvh;
@@ -82,16 +90,25 @@ section p {
     max-height: 30vh;
 }
 
+/*================ ExampleSection ================*/
+.ExampleSection img {
+    height: 300px;
+}
+
+/*================ AuthorSection ================*/
+
 .AuthorSection {
     display: flex;
     justify-content: start;
     align-items: center;
-    gap: 32px;
+    gap: 16px;
 }
 .AuthorSection img {
-    width: 200px;
-    height: 200px;
+    width: 5rem;
+    height: 5rem;
 }
+
+/*================ Fixed elements ================*/
 
 #BG {
     position: fixed;
