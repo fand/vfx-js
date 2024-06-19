@@ -1,4 +1,4 @@
-import { VFX } from "vfx-js";
+import { VFX } from "@vfx-js/core";
 
 const shaders: Record<string, string> = {
     blob: `
