@@ -33,7 +33,7 @@ export class VFX {
         this.#player.play();
     }
 
-    addImage(element: HTMLImageElement, opts: VFXProps): void {
+    #addImage(element: HTMLImageElement, opts: VFXProps): void {
         if (element.complete) {
             this.#player.addElement(element, opts);
         } else {
@@ -43,7 +43,7 @@ export class VFX {
         }
     }
 
-    addVideo(element: HTMLVideoElement, opts: VFXProps): void {
+    #addVideo(element: HTMLVideoElement, opts: VFXProps): void {
         if (element.readyState >= 4) {
             this.#player.addElement(element, opts);
         } else {
@@ -53,7 +53,17 @@ export class VFX {
         }
     }
 
-    addElement(element: HTMLElement, opts: VFXProps): void {
+    #addText(element: HTMLElement, opts: VFXProps): void {
         this.#player.addElement(element, opts);
+    }
+
+    addElement(element: HTMLElement, opts: VFXProps): void {
+        if (element instanceof HTMLImageElement) {
+            this.#addImage(element, opts);
+        } else if (element instanceof HTMLVideoElement) {
+            this.#addVideo(element, opts);
+        } else {
+            this.#addText(element, opts);
+        }
     }
 }

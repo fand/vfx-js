@@ -89,7 +89,7 @@ const shaders = {
     for (const img of document.querySelectorAll("img")) {
         const shader = img.getAttribute("data-shader");
         if (shader) {
-            vfx.addImage(img, {
+            vfx.addElement(img, {
                 shader,
                 overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
             });
@@ -98,7 +98,7 @@ const shaders = {
         const shaderId = img.getAttribute("data-shader-id");
         if (shaderId) {
             console.log(img, shaderId, shaders[shaderId]);
-            vfx.addImage(img, {
+            vfx.addElement(img, {
                 shader: shaders[shaderId],
                 overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
             });
@@ -106,7 +106,7 @@ const shaders = {
     }
 
     for (const video of document.querySelectorAll("video")) {
-        vfx.addVideo(video, {
+        vfx.addElement(video, {
             shader: "sinewave",
             overflow: 200,
         });

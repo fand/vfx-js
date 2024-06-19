@@ -1,1 +1,1 @@
-export * from "./web-vfx";
+export * from "./vfx";
