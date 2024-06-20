@@ -11,6 +11,7 @@ body {
     color: white;
     background-color: black;
     overflow-x: hidden;
+    overscroll-behavior: none;
 
     /* BG pattern */
     background: linear-gradient(-45deg, #000 49%, #333 50%, #000 51%);
