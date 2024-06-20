@@ -9,12 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vfx-js/core": "0.1.0",
     "dedent": "^1.5.3",
     "is-mobile": "^4.0.0",
     "lodash.debounce": "^4.0.8",
+    "prism-themes": "^1.9.0",
     "prismjs": "^1.29.0",
-    "vh-check": "^2.0.5",
-    "@vfx-js/core": "0.1.0"
+    "vh-check": "^2.0.5"
   },
   "devDependencies": {
     "@originjs/vite-plugin-commonjs": "^1.0.3",

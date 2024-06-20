@@ -18,6 +18,12 @@ body {
     background-size: 10px 10px;
 }
 
+pre {
+    display: inline-block;
+    color: white;
+    background: rgba(0, 0, 0, 0.8) !important;
+}
+
 code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
         monospace;

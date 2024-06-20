@@ -1,5 +1,11 @@
 import { VFX } from "@vfx-js/core";
 
+import Prism from "prismjs";
+import "prism-themes/themes/prism-nord.min.css";
+
+Prism.manual = true;
+Prism.highlightAll();
+
 const shaders: Record<string, string> = {
     blob: `
     precision mediump float;
@@ -84,7 +90,7 @@ const shaders: Record<string, string> = {
 
 // Init VFX
 {
-    const vfx = new VFX({ pixelRatio: window.devicePixelRatio });
+    const vfx = new VFX({ pixelRatio: window.devicePixelRatio, zIndex: -1 });
 
     for (const img of document.querySelectorAll("img")) {
         const shader = img.getAttribute("data-shader");
