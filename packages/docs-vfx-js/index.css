@@ -3,14 +3,17 @@
     --font-size: 1.5rem;
     --link-size: 2rem;
     --code-size: 1rem;
+    --inline-code-size: 1.2rem;
+    --flex-dir: row;
 }
 
 @media (max-width: 767px) {
     :root {
         --font-size: 1rem;
         --link-size: 1.2rem;
-        --code-size: 0.8rem;
+        --code-size: 0.84rem;
         --inline-code-size: 1rem;
+        --flex-dir: column;
     }
 }
 
@@ -144,28 +147,21 @@ section video {
 }
 
 /*================ ExampleSection ================*/
-.ExampleSection img {
-}
-
 .row {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 32px;
     margin-bottom: 64px;
+    flex-direction: var(--flex-dir);
 }
 .row .col {
-    flex: 1;
-    min-width: 375px;
+    flex: 1 0 0;
+    max-width: 100%;
 }
-.row .col img,
-.row .col video {
-    display: block;
+.row .col > img,
+.row .col > video {
     width: 100%;
-    /* height: auto; */
-    max-width: 50vh;
-    /* height: 200px;
-    max-height: 20vh; */
 }
 
 /*================ AuthorSection ================*/
