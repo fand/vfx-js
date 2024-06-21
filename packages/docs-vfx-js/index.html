@@ -113,8 +113,10 @@
             <pre><code class="language-javascript">
 import { VFX } from '@vfx-js/core';
 
+const img = document.querySelector('#img');
+
 const vfx = new VFX();
-vfx.add(imgElement, { shader: "rgbShift" });
+vfx.add(img, { shader: "rgbShift" });
             </code></pre>
 
             <p>This will be rendered as below.</p>
@@ -136,7 +138,7 @@ vfx.add(imgElement, { shader: "rgbShift" });
 &lt;img src="example.png" /&gt;
                     </code></pre>
                         <pre><code class="language-javascript">
-vfx.add(imgElement, { shader: "rgbShift" });
+vfx.add(img, { shader: "rgbShift" });
                     </code></pre>
                     </div>
                     <div class="col">
@@ -155,7 +157,7 @@ vfx.add(imgElement, { shader: "rgbShift" });
 &lt;img src="example.gif" /&gt;
                     </code></pre>
                         <pre><code class="language-javascript">
-vfx.add(gifElement, { shader: "rainbow" });
+vfx.add(gif, { shader: "rainbow" });
                     </code></pre>
                     </div>
                     <div class="col">
@@ -171,7 +173,7 @@ vfx.add(gifElement, { shader: "rainbow" });
                     </code></pre>
 
                         <pre><code class="language-javascript">
-vfx.add(videoElement, { shader: "halftone" });
+vfx.add(video, { shader: "halftone" });
                     </code></pre>
                     </div>
                     <div class="col">
@@ -192,7 +194,7 @@ vfx.add(videoElement, { shader: "halftone" });
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(imgElement, { shader: "rainbow" });
+vfx.add(el, { shader: "rainbow" });
                     </code></pre>
                     </div>
                     <div class="col">
@@ -205,7 +207,7 @@ vfx.add(imgElement, { shader: "rainbow" });
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(imgElement, { shader: "glitch" });
+vfx.add(el, { shader: "glitch" });
                         </code></pre>
                     </div>
                     <div class="col">
@@ -218,7 +220,7 @@ vfx.add(imgElement, { shader: "glitch" });
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(imgElement, { shader: "rgbShift" });
+vfx.add(el, { shader: "rgbShift" });
                         </code></pre>
                     </div>
                     <div class="col">
@@ -231,7 +233,7 @@ vfx.add(imgElement, { shader: "rgbShift" });
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(imgElement, { shader: "pixelate" });
+vfx.add(el, { shader: "pixelate" });
                         </code></pre>
                     </div>
                     <div class="col">
@@ -241,12 +243,18 @@ vfx.add(imgElement, { shader: "pixelate" });
                         />
                     </div>
                 </div>
+            </div>
 
+            <div>
                 <h3>Transitions</h3>
+                <p>
+                    VFX-JS presets for transition animation. These animation
+                    start when the element gets in the viewport.
+                </p>
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(imgElement, { shader: "slitScanTransition" });
+vfx.add(el, { shader: "slitScanTransition" });
                         </code></pre>
                     </div>
                     <div class="col">
@@ -259,13 +267,44 @@ vfx.add(imgElement, { shader: "slitScanTransition" });
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(imgElement, { shader: "warpTransition" });
+vfx.add(el, { shader: "warpTransition" });
                         </code></pre>
                     </div>
                     <div class="col">
                         <img
                             src="./vfx-js-logo-no-padding.svg"
                             data-shader="warpTransition"
+                        />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+vfx.add(el, { shader: "pixelateTransition" });
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            src="./vfx-js-logo-no-padding.svg"
+                            data-shader="pixelateTransition"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3>Custom Shaders</h3>
+                <p>You can write GLSL shader by yourself.</p>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+vfx.add(el, { shader: "slitScanTransition" });
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            src="./vfx-js-logo-no-padding.svg"
+                            data-shader="slitScanTransition"
                         />
                     </div>
                 </div>

@@ -5,6 +5,7 @@
 /*================ Global ================*/
 html {
     overflow-x: hidden;
+    overscroll-behavior: none;
 }
 
 body {
@@ -17,8 +18,6 @@ body {
     -moz-osx-font-smoothing: grayscale;
 
     color: white;
-
-    overscroll-behavior: none;
 
     /* Required to force body to have 100% width... */
     /* min-width: fit-content; */
