@@ -76,7 +76,6 @@ class App {
         zIndex: -1,
     });
 
-    // Init BG
     initBG() {
         const bg = document.getElementById("BG")!;
 
@@ -94,47 +93,22 @@ class App {
         loop();
     }
 
-    // Init VFX
     initVFX() {
-        for (const img of document.querySelectorAll("img")) {
-            const shader = img.getAttribute("data-shader");
-            if (shader) {
-                this.vfx.add(img, {
-                    shader,
-                    overflow: parseFloat(
-                        img.getAttribute("data-overflow") ?? "0",
-                    ),
-                });
-            }
+        const bg = document.getElementById("BG")!;
+        this.vfx.add(bg, { shader: shaders.blob });
 
-            const shaderId = img.getAttribute("data-shader-id");
-            if (shaderId) {
-                const shader = shaders[shaderId];
-                console.log(img, shaderId, shader);
-                this.vfx.add(img, {
-                    shader,
-                    overflow: parseFloat(
-                        img.getAttribute("data-overflow") ?? "0",
-                    ),
-                });
-            }
+        const logo = document.getElementById("Logo")!;
+        this.vfx.add(logo, { shader: "rgbShift", overflow: 100 });
+
+        for (const e of document.querySelectorAll(
+            "img[data-shader], video[data-shader]",
+        )) {
+            const shader = e.getAttribute("data-shader")!;
+            this.vfx.add(e as HTMLImageElement, {
+                shader,
+                overflow: parseFloat(e.getAttribute("data-overflow") ?? "0"),
+            });
         }
-
-        for (const video of document.querySelectorAll("video")) {
-            const shader = video.getAttribute("data-shader");
-            if (shader) {
-                this.vfx.add(video, {
-                    shader,
-                });
-            }
-        }
-
-        // for (const p of document.querySelectorAll("p")) {
-        //     vfx.addElement(p, {
-        //         shader: p.getAttribute("data-shader") ?? "glitch",
-        //         overflow: parseFloat(p.getAttribute("data-overflow") ?? "0"),
-        //     });
-        // }
     }
 
     hideMask() {
