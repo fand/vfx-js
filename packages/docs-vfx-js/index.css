@@ -118,7 +118,7 @@ section video {
     justify-content: center;
     align-items: start;
 }
-.TopSection .Logo {
+.TopSection #Logo {
     width: calc(max(50%, 600px));
     max-width: 80% !important;
 }

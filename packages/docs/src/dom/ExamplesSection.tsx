@@ -55,7 +55,15 @@ const ExamplesSection: React.FC = () => {
                         />
                     </LazyLoad>
                     <LazyLoad height={320}>
-                        <VFX.VFXImg src={pub("cat.gif")} shader="rainbow" />
+                        <VFX.VFXImg
+                            src={pub("cat.gif")}
+                            shader="duotone"
+                            uniforms={{
+                                color1: [1, 0.2, 0.2, 1],
+                                color2: [0.2, 0.2, 1, 1],
+                                speed: 1,
+                            }}
+                        />
                     </LazyLoad>
                     <LazyLoad height={320}>
                         <VFX.VFXImg src={pub("doge.gif")} shader="pixelate" />

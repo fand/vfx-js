@@ -444,6 +444,98 @@ export const shaders = {
         gl_FragColor = texture2D(src, uv);
     }
     `,
+    duotone: `
+    precision mediump float;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    uniform sampler2D src;
+    uniform vec4 color1;
+    uniform vec4 color2;
+    uniform float speed;
+
+    void main (void) {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec4 color = texture2D(src, uv);
+
+        float gray = dot(color.rgb, vec3(0.2, 0.7, 0.08));
+        float t = mod(gray * 2.0 + time * speed, 2.0);
+
+        if (t < 1.) {
+            gl_FragColor = mix(color1, color2, fract(t));
+        } else {
+            gl_FragColor = mix(color2, color1, fract(t));
+        }
+
+        gl_FragColor.a *= color.a;
+    }
+    `,
+    tritone: `
+    precision mediump float;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    uniform sampler2D src;
+    uniform vec4 color1;
+    uniform vec4 color2;
+    uniform vec4 color3;
+    uniform float speed;
+
+    void main (void) {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec4 color = texture2D(src, uv);
+
+        float gray = dot(color.rgb, vec3(0.2, 0.7, 0.08));
+        float t = mod(gray * 3.0 + time * speed, 3.0);
+
+        if (t < 1.) {
+            gl_FragColor = mix(color1, color2, fract(t));
+        } else if (t < 2.) {
+            gl_FragColor = mix(color2, color3, fract(t));
+        } else {
+            gl_FragColor = mix(color3, color1, fract(t));
+        }
+
+        gl_FragColor.a *= color.a;
+    }
+    `,
+    hueShift: `
+    precision mediump float;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    uniform sampler2D src;
+    uniform float shift;
+
+    vec3 hsv2rgb(vec3 c) {
+        vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+        vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+        return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+    }
+
+    vec3 rgb2hsv(vec3 c) {
+        vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+        vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+        vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+        float d = q.x - min(q.w, q.y);
+        float e = 1.0e-10;
+        return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+    }
+
+    vec3 hueShift(vec3 rgb, float t) {
+        vec3 hsv = rgb2hsv(rgb);
+        hsv.x = fract(hsv.x + t);
+        return hsv2rgb(hsv);
+    }
+
+    void main (void) {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec4 color = texture2D(src, uv);
+        color.rgb = hueShift(color.rgb, shift);
+        gl_FragColor = color;
+    }
+    `,
     warpTransition: `
     precision mediump float;
     uniform vec2 resolution;
