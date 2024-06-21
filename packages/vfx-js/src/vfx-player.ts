@@ -8,6 +8,7 @@ import {
     VFXElementType,
     VFXUniformValue,
     VFXElementOverflow,
+    VFXWrap,
 } from "./types";
 
 /**
@@ -155,6 +156,8 @@ export default class VFXPlayer {
             }
 
             const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = oldTexture.wrapS;
+            texture.wrapT = oldTexture.wrapT;
             e.uniforms["src"].value = texture;
             oldTexture.dispose();
         } catch (e) {
@@ -200,6 +203,9 @@ export default class VFXPlayer {
             type = "text" as VFXElementType;
         }
 
+        const [wrapS, wrapT] = parseWrap(opts.wrap);
+        texture.wrapS = wrapS;
+        texture.wrapT = wrapT;
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
         texture.format = THREE.RGBAFormat;
@@ -451,4 +457,29 @@ export function sanitizeOverflow(
         bottom: overflow.bottom ?? 0,
         left: overflow.left ?? 0,
     };
+}
+
+function parseWrapSingle(wrapOpt: VFXWrap): THREE.Wrapping {
+    if (wrapOpt === "repeat") {
+        return THREE.RepeatWrapping;
+    } else if (wrapOpt === "mirror") {
+        return THREE.MirroredRepeatWrapping;
+    } else {
+        return THREE.ClampToEdgeWrapping;
+    }
+}
+
+function parseWrap(
+    wrapOpt: VFXWrap | [VFXWrap, VFXWrap] | undefined,
+): [THREE.Wrapping, THREE.Wrapping] {
+    if (!wrapOpt) {
+        return [THREE.ClampToEdgeWrapping, THREE.ClampToEdgeWrapping];
+    }
+
+    if (Array.isArray(wrapOpt)) {
+        return [parseWrapSingle(wrapOpt[0]), parseWrapSingle(wrapOpt[1])];
+    } else {
+        const w = parseWrapSingle(wrapOpt);
+        return [w, w];
+    }
 }

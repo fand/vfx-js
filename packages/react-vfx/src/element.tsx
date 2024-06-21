@@ -27,7 +27,8 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
             }
         };
 
-        const { shader, release, uniforms, overflow, ...rawProps } = props;
+        const { shader, release, uniforms, overflow, wrap, ...rawProps } =
+            props;
 
         // Create scene
         useEffect(() => {
@@ -41,6 +42,7 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
                 release,
                 uniforms,
                 overflow,
+                wrap,
             });
 
             const mo = new MutationObserver(() => {

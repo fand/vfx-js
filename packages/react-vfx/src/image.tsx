@@ -6,7 +6,7 @@ import type { VFXProps } from "@vfx-js/core";
 export type VFXImgProps = JSX.IntrinsicElements["img"] & VFXProps;
 
 export const VFXImg: React.FC<VFXImgProps> = (props) => {
-    const { shader, release, uniforms, overflow, ...rawProps } = props;
+    const { shader, release, uniforms, overflow, wrap, ...rawProps } = props;
 
     const vfx = useContext(VFXContext);
     const ref = useRef<HTMLImageElement>(null);
@@ -24,6 +24,7 @@ export const VFXImg: React.FC<VFXImgProps> = (props) => {
             release,
             uniforms,
             overflow,
+            wrap,
         });
 
         return () => {

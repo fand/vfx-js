@@ -6,7 +6,7 @@ import type { VFXProps } from "@vfx-js/core";
 export type VFXVideoProps = JSX.IntrinsicElements["video"] & VFXProps;
 
 export const VFXVideo: React.FC<VFXVideoProps> = (props) => {
-    const { shader, release, uniforms, overflow, ...rawProps } = props;
+    const { shader, release, uniforms, overflow, wrap, ...rawProps } = props;
 
     const vfx = useContext(VFXContext);
     const ref = useRef<HTMLVideoElement>(null);
@@ -24,6 +24,7 @@ export const VFXVideo: React.FC<VFXVideoProps> = (props) => {
             release,
             uniforms,
             overflow,
+            wrap,
         });
 
         return () => {
