@@ -30,7 +30,7 @@ body {
 }
 
 pre {
-    display: inline-block;
+    /* display: inline-block; */
     color: white;
     background: rgba(0, 0, 0, 0.8) !important;
 }
@@ -39,7 +39,7 @@ code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
         monospace;
     display: inline-block;
-    background: rgba(0, 0, 0, 0.8) !important;
+    /* background: rgba(0, 0, 0, 0.8) !important; */
 }
 
 /*================ Header ================*/
@@ -82,9 +82,13 @@ code {
 
 /*================ Section ================*/
 
+body > section {
+    padding: 0 32px;
+}
+
 section {
     width: 100%;
-    padding: 0 32px;
+
     margin-bottom: 10vh;
     box-sizing: border-box;
     overflow-x: hidden;
@@ -92,7 +96,11 @@ section {
 section h2 {
     font-size: 3rem;
 }
+section h3 {
+    font-size: 2rem;
+}
 section p {
+    /* font-size: 1.5rem; */
     font-size: 1rem;
     line-height: 1.5;
 }
@@ -112,8 +120,12 @@ section video {
     align-items: start;
 }
 .TopSection .Logo {
-    width: calc(max(60%, 600px));
+    width: calc(max(50%, 600px));
     max-width: 80% !important;
+}
+.TopSection p {
+    /* font-size: 1.75rem; */
+    font-size: 1rem;
 }
 
 /*================ ExampleSection ================*/
@@ -125,16 +137,21 @@ section video {
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 32px;
+    margin-bottom: 64px;
 }
 .row .col {
     flex: 1;
     min-width: 375px;
 }
-.row .col img {
-    /* height: 300px; */
-    max-width: 80%;
+.row .col img,
+.row .col video {
+    display: block;
+    width: 100%;
+    /* height: auto; */
+    max-width: 50vh;
+    /* height: 200px;
+    max-height: 20vh; */
 }
-.
 
 /*================ AuthorSection ================*/
 

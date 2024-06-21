@@ -9,42 +9,42 @@
         <meta name="theme-color" content="#000000" />
         <meta
             name="description"
-            content="REACT-VFX is a React component library which allows you to add WebGL powered effects to you React aaplication."
+            content="VFX-JS is a JavaScript library to add WebGL powered effects to your website."
         />
         <link rel="apple-touch-icon" href="logo-with-bg.png" />
 
-        <meta property="og:url" content="https://amagi.dev/react-vfx/" />
+        <meta property="og:url" content="https://amagi.dev/vfx-js/" />
         <meta property="og:type" content="website" />
         <meta
             property="og:title"
-            content="REACT-VFX - WebGL effects for React! #REACTVFX"
+            content="VFX-JS - WebGL effects for your website #VFXJS"
         />
         <meta property="og:image" content="logo-with-bg.png" />
         <meta
             property="og:description"
-            content="REACT-VFX is a React component library which allows you to add WebGL powered effects to you React aaplication."
+            content="VFX-JS is a JavaScript library to add WebGL powered effects to your website."
         />
         <meta
             property="og:site_name"
-            content="REACT-VFX - WebGL effects for React! #REACTVFX"
+            content="VFX-JS - WebGL effects for your website #VFXJS"
         />
         <meta property="og:locale" content="en_US" />
 
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@amagitakayosi" />
         <meta name="twitter:creator" content="@amagitakayosi" />
-        <meta name="twitter:url" content="https://amagi.dev/react-vfx/" />
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/" />
         <meta
             name="twitter:title"
-            content="REACT-VFX - WebGL effects for React! #REACTVFX"
+            content="VFX-JS - WebGL effects for your website #VFXJS"
         />
         <meta
             name="twitter:description"
-            content="REACT-VFX is a React component library which allows you to add WebGL powered effects to you React aaplication."
+            content="VFX-JS is a JavaScript library to add WebGL powered effects to your website."
         />
         <meta
             name="twitter:image"
-            content="https://amagi.dev/react-vfx/logo-with-bg.png"
+            content="https://amagi.dev/vfx-js/logo-with-bg.png"
         />
 
         <link rel="icon" href="favicon/favicon.ico" />
@@ -112,52 +112,164 @@
             <p>Then create <code>VFX</code> object in your script:</p>
             <pre><code class="language-javascript">
 import { VFX } from '@vfx-js/core';
+
 const vfx = new VFX();
-vfx.addImage(imgElement, { shader: "rgbShift" });
+vfx.add(imgElement, { shader: "rgbShift" });
             </code></pre>
 
             <p>This will be rendered as below.</p>
-            <img src="./vfx-js-logo-no-padding.svg" data-shader="rgbShift" />
+            <img
+                src="./vfx-js-logo-no-padding.svg"
+                data-shader="rgbShift"
+                data-overflow="100"
+            />
         </section>
 
         <section class="ExampleSection">
             <h2>Examples</h2>
 
-            <h3><code>rainbow</code></h3>
-            <div class="row">
-                <div class="col">
-                    <p>Code:</p>
-                    <pre><code class="language-javascript">
-vfx.addImage(imgElement, { shader: "rainbow" });
-                        </code></pre>
+            <section>
+                <div class="row">
+                    <div class="col">
+                        <p>Image</p>
+                        <pre><code class="language-html">
+&lt;img src="example.png" /&gt;
+                    </code></pre>
+                        <pre><code class="language-javascript">
+vfx.add(imgElement, { shader: "rgbShift" });
+                    </code></pre>
+                    </div>
+                    <div class="col">
+                        <p>Output</p>
+                        <img
+                            src="./vfx-js-logo-no-padding.svg"
+                            data-shader="rgbShift"
+                        />
+                    </div>
                 </div>
-                <div class="col">
-                    <p>Output:</p>
-                    <img src="./cat.gif" data-shader="rainbow" />
+
+                <div class="row">
+                    <div class="col">
+                        <p>GIF</p>
+                        <pre><code class="language-html">
+&lt;img src="example.gif" /&gt;
+                    </code></pre>
+                        <pre><code class="language-javascript">
+vfx.add(gifElement, { shader: "rainbow" });
+                    </code></pre>
+                    </div>
+                    <div class="col">
+                        <p>Output</p>
+                        <img src="./nyancat.gif" data-shader="rainbow" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <p>Video</p>
+                        <pre><code class="language-html">
+&lt;video src="example.mp4" autoplay loop muted/&gt;
+                    </code></pre>
+
+                        <pre><code class="language-javascript">
+vfx.add(videoElement, { shader: "halftone" });
+                    </code></pre>
+                    </div>
+                    <div class="col">
+                        <p>Output:</p>
+                        <video
+                            src="../mind_blown.mp4"
+                            autoplay
+                            loop
+                            muted
+                            data-shader="halftone"
+                        />
+                    </div>
+                </div>
+            </section>
+
+            <div>
+                <h3>Presets</h3>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+vfx.add(imgElement, { shader: "rainbow" });
+                    </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            src="./vfx-js-logo-no-padding.svg"
+                            data-shader="rainbow"
+                        />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+vfx.add(imgElement, { shader: "glitch" });
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            src="./vfx-js-logo-no-padding.svg"
+                            data-shader="glitch"
+                        />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+vfx.add(imgElement, { shader: "rgbShift" });
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            src="./vfx-js-logo-no-padding.svg"
+                            data-shader="rgbShift"
+                        />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+vfx.add(imgElement, { shader: "pixelate" });
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            src="./vfx-js-logo-no-padding.svg"
+                            data-shader="pixelate"
+                        />
+                    </div>
+                </div>
+
+                <h3>Transitions</h3>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+vfx.add(imgElement, { shader: "slitScanTransition" });
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            src="./vfx-js-logo-no-padding.svg"
+                            data-shader="slitScanTransition"
+                        />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+vfx.add(imgElement, { shader: "warpTransition" });
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            src="./vfx-js-logo-no-padding.svg"
+                            data-shader="warpTransition"
+                        />
+                    </div>
                 </div>
             </div>
-
-            <h3><code>rgbShift</code></h3>
-            <div class="row">
-                <div class="col">
-                    <p>Code:</p>
-                    <pre><code class="language-javascript">
-vfx.addImage(imgElement, { shader: "rgbShift" });
-                        </code></pre>
-                </div>
-                <div class="col">
-                    <p>Output:</p>
-                    <img src="./david.png" data-shader="rgbShift" />
-                </div>
-            </div>
-
-            <img src="./vfx-js-logo-no-padding.svg" data-shader="rainbow" />
-
-            <img src="./chill.gif" data-shader="sinewave" />
-            <img src="./doge.gif" data-shader="pixelate" />
-            <img src="./octocat.gif" data-shader="glitch" />
-
-            <video src="../mind_blown.mp4" autoplay loop muted></video>
         </section>
 
         <section class="AuthorSection">

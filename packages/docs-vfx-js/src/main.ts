@@ -121,10 +121,12 @@ class App {
         }
 
         for (const video of document.querySelectorAll("video")) {
-            this.vfx.add(video, {
-                shader: "sinewave",
-                overflow: 200,
-            });
+            const shader = video.getAttribute("data-shader");
+            if (shader) {
+                this.vfx.add(video, {
+                    shader,
+                });
+            }
         }
 
         // for (const p of document.querySelectorAll("p")) {
