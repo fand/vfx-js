@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "target": "es2015",
+        "module": "CommonJS",
+        "lib": ["es2015", "dom"],
+        "sourceMap": true,
+        "outDir": "lib/cjs",
+        "removeComments": false,
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "moduleResolution": "node",
+        "jsx": "react",
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "allowJs": true
+    },
+    "include": ["src"]
+}

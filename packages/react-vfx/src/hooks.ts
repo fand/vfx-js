@@ -12,11 +12,11 @@ export type UseVFX = {
 };
 
 export function useVFX(): UseVFX {
-    const player = useContext(VFXContext);
+    const vfx = useContext(VFXContext);
 
     return {
         rerenderElement: (e: HTMLElement | null) => {
-            e && player?.updateTextElement(e);
+            e && vfx?.update(e);
         },
     };
 }

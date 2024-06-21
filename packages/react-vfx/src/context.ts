@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import VFXPlayer from "./vfx-player";
+import type { VFX } from "@vfx-js/core";
 
 // eslint-disable-next-line
-export const VFXContext = createContext<VFXPlayer | null>(null);
+export const VFXContext = createContext<VFX | null>(null);

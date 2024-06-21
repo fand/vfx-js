@@ -17,6 +17,7 @@
     "lodash.debounce": "^4.0.8",
     "postprocessing": "^6.35.5",
     "prism-react-renderer": "^2.3.1",
+    "prismjs": "^1.29.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-lazyload": "^3.2.1",

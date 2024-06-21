@@ -1,0 +1,37 @@
+name: Deploy to amagi.dev/vfx-js
+
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Setup Node
+              uses: actions/setup-node@v3
+              with:
+                  node-version: "20"
+                  cache: "npm"
+                  cache-dependency-path: "**/package-lock.json"
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build
+              run: npm run build
+
+            - name: Pushes to another repository
+              uses: cpina/github-action-push-to-another-repository@main
+              env:
+                  SSH_DEPLOY_KEY: ${{ secrets.VFX_JS_DEPLOY_KEY }}
+              with:
+                  source-directory: "packages/docs-vfx-js/dist"
+                  destination-github-username: "fand"
+                  destination-repository-name: "vfx-js"
+                  user-email: mail@amagi.dev
+                  target-branch: main
