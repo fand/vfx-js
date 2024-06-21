@@ -1,7 +1,15 @@
+:root {
+    --bgsize: 140lvh;
+}
+
 /*================ Global ================*/
+html {
+    overflow-x: hidden;
+}
 
 body {
     margin: 0;
+
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
         "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
         "Helvetica Neue", sans-serif;
@@ -9,13 +17,16 @@ body {
     -moz-osx-font-smoothing: grayscale;
 
     color: white;
-    background-color: black;
-    overflow-x: hidden;
+
     overscroll-behavior: none;
+
+    /* Required to force body to have 100% width... */
+    /* min-width: fit-content; */
 
     /* BG pattern */
     background: linear-gradient(-45deg, #000 49%, #333 50%, #000 51%);
     background-size: 10px 10px;
+    /* background: black; */
 }
 
 pre {
@@ -27,6 +38,8 @@ pre {
 code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
         monospace;
+    display: inline-block;
+    background: rgba(0, 0, 0, 0.8) !important;
 }
 
 /*================ Header ================*/
@@ -38,7 +51,9 @@ code {
     right: 32px;
     padding: 0 4px;
     font-weight: bold;
+
     font-size: 2rem;
+    /* font-size: 1rem; */
 }
 .HeaderTop {
     z-index: 10010;
@@ -72,35 +87,54 @@ section {
     padding: 0 32px;
     margin-bottom: 10vh;
     box-sizing: border-box;
+    overflow-x: hidden;
 }
 section h2 {
     font-size: 3rem;
 }
 section p {
-    font-size: 1.5rem;
+    font-size: 1rem;
     line-height: 1.5;
+}
+
+section img,
+section video {
+    max-width: 100%;
 }
 
 /*================ TopSection ================*/
 
 .TopSection {
-    height: 100lvh;
-
+    height: 100vh;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: start;
 }
 .TopSection .Logo {
-    width: 100%;
-    max-width: 60vw;
-    max-height: 30vh;
+    width: calc(max(60%, 600px));
+    max-width: 80% !important;
 }
 
 /*================ ExampleSection ================*/
 .ExampleSection img {
-    height: 300px;
 }
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 32px;
+}
+.row .col {
+    flex: 1;
+    min-width: 375px;
+}
+.row .col img {
+    /* height: 300px; */
+    max-width: 80%;
+}
+.
 
 /*================ AuthorSection ================*/
 
@@ -119,12 +153,14 @@ section p {
 
 #BG {
     position: fixed;
-    margin-top: -20vh;
-    right: -40%;
-    top: 0;
-    height: 150vh;
+    left: 75%;
+    top: 50%;
+    height: var(--bgsize);
+    width: var(--bgsize);
+    margin-left: calc(var(--bgsize) * -0.5);
+    margin-top: calc(var(--bgsize) * -0.5);
+    opacity: 0.3;
     z-index: -1;
-    transform-style: preserve-3d;
 }
 
 #Frame {
@@ -157,12 +193,12 @@ section p {
 
 #MaskTop {
     z-index: 20001;
-    transition: height 0.5s 0.5s;
+    /* transition: height 0.5s 0.5s; */
 }
 
 #MaskBottom {
     z-index: 19999;
-    transition: opacity 1.5s 1.5s linear;
+    /* transition: opacity 1.5s 1.5s linear; */
     background: #000;
     pointer-events: none;
 }

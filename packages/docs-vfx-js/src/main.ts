@@ -70,69 +70,83 @@ const shaders: Record<string, string> = {
     `,
 };
 
-// Init BG
-{
-    const bg = document.getElementById("BG")!;
+class App {
+    vfx = new VFX({
+        pixelRatio: window.devicePixelRatio,
+        zIndex: -1,
+    });
 
-    let scroll = 0;
-    function lerp(a: number, b: number, t: number): number {
-        return a * (1 - t) + b * t;
+    // Init BG
+    initBG() {
+        const bg = document.getElementById("BG")!;
+
+        let scroll = 0;
+        function lerp(a: number, b: number, t: number): number {
+            return a * (1 - t) + b * t;
+        }
+
+        function loop() {
+            scroll = lerp(scroll, window.scrollY, 0.03);
+            bg.style.setProperty("transform", `translateY(-${scroll * 0.1}px)`);
+
+            requestAnimationFrame(loop);
+        }
+        loop();
     }
 
-    function loop() {
-        scroll = lerp(scroll, window.scrollY, 0.03);
-        bg.style.setProperty("transform", `translateY(-${scroll * 0.1}px)`);
+    // Init VFX
+    initVFX() {
+        for (const img of document.querySelectorAll("img")) {
+            const shader = img.getAttribute("data-shader");
+            if (shader) {
+                this.vfx.add(img, {
+                    shader,
+                    overflow: parseFloat(
+                        img.getAttribute("data-overflow") ?? "0",
+                    ),
+                });
+            }
 
-        requestAnimationFrame(loop);
-    }
-    loop();
-}
+            const shaderId = img.getAttribute("data-shader-id");
+            if (shaderId) {
+                const shader = shaders[shaderId];
+                console.log(img, shaderId, shader);
+                this.vfx.add(img, {
+                    shader,
+                    overflow: parseFloat(
+                        img.getAttribute("data-overflow") ?? "0",
+                    ),
+                });
+            }
+        }
 
-// Init VFX
-{
-    const vfx = new VFX({ pixelRatio: window.devicePixelRatio, zIndex: -1 });
-
-    for (const img of document.querySelectorAll("img")) {
-        const shader = img.getAttribute("data-shader");
-        if (shader) {
-            vfx.add(img, {
-                shader,
-                overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
+        for (const video of document.querySelectorAll("video")) {
+            this.vfx.add(video, {
+                shader: "sinewave",
+                overflow: 200,
             });
         }
 
-        const shaderId = img.getAttribute("data-shader-id");
-        if (shaderId) {
-            const shader = shaders[shaderId];
-            console.log(img, shaderId, shader);
-            vfx.add(img, {
-                shader,
-                overflow: parseFloat(img.getAttribute("data-overflow") ?? "0"),
-            });
-        }
+        // for (const p of document.querySelectorAll("p")) {
+        //     vfx.addElement(p, {
+        //         shader: p.getAttribute("data-shader") ?? "glitch",
+        //         overflow: parseFloat(p.getAttribute("data-overflow") ?? "0"),
+        //     });
+        // }
     }
 
-    for (const video of document.querySelectorAll("video")) {
-        vfx.add(video, {
-            shader: "sinewave",
-            overflow: 200,
-        });
-    }
+    hideMask() {
+        const maskTop = document.getElementById("MaskTop")!;
+        maskTop.style.setProperty("height", "0");
 
-    // for (const p of document.querySelectorAll("p")) {
-    //     vfx.addElement(p, {
-    //         shader: p.getAttribute("data-shader") ?? "glitch",
-    //         overflow: parseFloat(p.getAttribute("data-overflow") ?? "0"),
-    //     });
-    // }
+        const maskBottom = document.getElementById("MaskBottom")!;
+        maskBottom.style.setProperty("opacity", "0");
+    }
 }
 
 window.addEventListener("load", () => {
-    const maskTop = document.getElementById("MaskTop")!;
-    maskTop.style.setProperty("height", "0");
-
-    const maskBottom = document.getElementById("MaskBottom")!;
-    maskBottom.style.setProperty("opacity", "0");
-
-    console.log("load");
+    const app = new App();
+    app.initBG();
+    app.initVFX();
+    app.hideMask();
 });
