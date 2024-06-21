@@ -104,9 +104,16 @@ class App {
             "img[data-shader], video[data-shader]",
         )) {
             const shader = e.getAttribute("data-shader")!;
+
+            const uniformsJSON = e.getAttribute("data-uniforms");
+            const uniforms = uniformsJSON
+                ? JSON.parse(uniformsJSON)
+                : undefined;
+
             this.vfx.add(e as HTMLImageElement, {
                 shader,
                 overflow: parseFloat(e.getAttribute("data-overflow") ?? "0"),
+                uniforms,
             });
         }
     }

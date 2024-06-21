@@ -87,7 +87,7 @@
             <p data-shader="rgbShift" data-overflow="100">
                 VFX-JS is a JavaScript library to add WebGL-powered effects to
                 your website. <br />You can easily attach it to normal
-                <code> &lt;img /&gt;</code>, <code>&lt;video&gt;</code> elements
+                <code> &lt;img&gt;</code>, <code>&lt;video&gt;</code> elements
                 etc.
             </p>
         </section>
@@ -219,16 +219,39 @@ vfx.add(el, { shader: "rgbShift" });
                         />
                     </div>
                 </div>
+            </div>
+
+            <div>
+                <h3>Parameters</h3>
+                <p>
+                    Some shaders take parameters (e.g. duotone). You can pass
+                    the params to the <code>uniforms</code> property.
+                </p>
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(el, { shader: "pixelate" });
+vfx.add(el, {
+    shader: "duotone",
+    uniforms: {
+        color1: [0, 0, 1, 1],
+        color2: [0, 1, 0, 1],
+        speed: 0.2
+    }
+});
                         </code></pre>
                     </div>
                     <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="pixelate"
+                        <video
+                            src="./jellyfish.mp4"
+                            autoplay
+                            loop
+                            muted
+                            data-shader="duotone"
+                            data-uniforms='{
+                                "color1": [0, 0, 1, 1],
+                                "color2": [0, 1, 0, 1],
+                                "speed": 0.5
+                            }'
                         />
                     </div>
                 </div>
@@ -287,6 +310,11 @@ vfx.add(el, { shader: "pixelateTransition" });
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
+const shader = `
+
+
+`;
+
 vfx.add(el, { shader: "slitScanTransition" });
                         </code></pre>
                     </div>

@@ -1,5 +1,17 @@
 :root {
     --bgsize: 140lvh;
+    --font-size: 1.5rem;
+    --link-size: 2rem;
+    --code-size: 1rem;
+}
+
+@media (max-width: 767px) {
+    :root {
+        --font-size: 1rem;
+        --link-size: 1.2rem;
+        --code-size: 0.8rem;
+        --inline-code-size: 1rem;
+    }
 }
 
 /*================ Global ================*/
@@ -19,28 +31,28 @@ body {
 
     color: white;
 
-    /* Required to force body to have 100% width... */
-    /* min-width: fit-content; */
-
     /* BG pattern */
     background: linear-gradient(-45deg, #000 49%, #333 50%, #000 51%);
     background-size: 10px 10px;
-    /* background: black; */
 }
 
 pre {
-    /* display: inline-block; */
     color: white;
     background: rgba(0, 0, 0, 0.8) !important;
+    border-radius: 2px !important;
+    font-size: var(--code-size);
+    font-family: monospace;
 }
-
 code {
-    font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
-        monospace;
     display: inline-block;
-    /* background: rgba(0, 0, 0, 0.8) !important; */
+    background: rgba(0, 0, 0, 0.8);
+    padding: 0 4px;
+    font-size: var(--inline-code-size);
 }
-
+pre > code {
+    background: none !important;
+    font-size: var(--code-size);
+}
 /*================ Header ================*/
 
 .HeaderTop,
@@ -50,9 +62,7 @@ code {
     right: 32px;
     padding: 0 4px;
     font-weight: bold;
-
-    font-size: 2rem;
-    /* font-size: 1rem; */
+    font-size: var(--link-size);
 }
 .HeaderTop {
     z-index: 10010;
@@ -99,8 +109,7 @@ section h3 {
     font-size: 2rem;
 }
 section p {
-    /* font-size: 1.5rem; */
-    font-size: 1rem;
+    font-size: var(--font-size);
     line-height: 1.5;
 }
 
@@ -124,7 +133,8 @@ section video {
 }
 .TopSection p {
     /* font-size: 1.75rem; */
-    font-size: 1rem;
+    /* font-size: 1rem; */
+    font-size: var(--font-size);
 }
 
 /*================ ExampleSection ================*/
