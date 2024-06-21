@@ -53,6 +53,12 @@ pre > code {
     background: none !important;
     font-size: var(--code-size);
 }
+
+/* Disable padding of logo */
+.logo-padded {
+    transform: translate(-20px, -20px);
+}
+
 /*================ Header ================*/
 
 .HeaderTop,

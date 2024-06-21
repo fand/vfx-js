@@ -82,7 +82,13 @@
         <img id="BG" src="./vfx-js-blob.webp" />
 
         <section class="TopSection">
-            <img id="Logo" src="./vfx-js-logo-no-padding.svg" alt="VFX-JS" />
+            <img
+                id="Logo"
+                class="logo-padded"
+                src="./vfx-js-logo-640w-20p.svg"
+                alt="VFX-JS"
+                class="logo-padded"
+            />
 
             <p data-shader="rgbShift" data-overflow="100">
                 VFX-JS is a JavaScript library to add WebGL-powered effects to
@@ -105,13 +111,14 @@ import { VFX } from '@vfx-js/core';
 const img = document.querySelector('#img');
 
 const vfx = new VFX();
-vfx.add(img, { shader: "rgbShift" });
+vfx.add(img, { shader: "glitch" });
             </code></pre>
 
             <p>This will be rendered as below.</p>
             <img
-                src="./vfx-js-logo-no-padding.svg"
-                data-shader="rgbShift"
+                src="./vfx-js-logo-640w-20p.svg"
+                class="logo-padded"
+                data-shader="glitch"
                 data-overflow="100"
             />
         </section>
