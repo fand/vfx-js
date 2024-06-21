@@ -33,7 +33,11 @@ export type VFXProps = {
         | number
         | [top: number, right: number, bottom: number, left: number]
         | { top?: number; right?: number; bottom?: number; left?: number };
+
+    wrap?: VFXWrap | [VFXWrap, VFXWrap];
 };
+
+export type VFXWrap = "clamp" | "repeat" | "mirror";
 
 export type VFXUniforms = {
     [name: string]: VFXUniformValue | (() => VFXUniformValue);
