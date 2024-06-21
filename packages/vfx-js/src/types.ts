@@ -1,7 +1,12 @@
 import THREE from "three";
 import { ShaderPreset } from "./constants";
 
-export interface VFXProps {
+export type VFXOpts = {
+    pixelRatio?: number;
+    zIndex?: number;
+};
+
+export type VFXProps = {
     /**
      * Shader code or preset name.
      */
@@ -28,7 +33,7 @@ export interface VFXProps {
         | number
         | [top: number, right: number, bottom: number, left: number]
         | { top?: number; right?: number; bottom?: number; left?: number };
-}
+};
 
 export type VFXUniforms = {
     [name: string]: VFXUniformValue | (() => VFXUniformValue);
@@ -42,7 +47,7 @@ export type VFXUniformValue =
 
 export type VFXElementType = "img" | "video" | "text";
 
-export interface VFXElement {
+export type VFXElement = {
     type: VFXElementType;
     element: HTMLElement;
     isInViewport: boolean;
@@ -58,7 +63,7 @@ export interface VFXElement {
     isGif: boolean;
     overflow: VFXElementOverflow;
     originalOpacity: number;
-}
+};
 
 export type VFXElementOverflow =
     | "fullscreen"

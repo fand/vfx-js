@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useRef, useContext, useState, useEffect } from "react";
 import { VFXContext } from "./context";
-import { VFXProps } from "./types";
+import type { VFXProps } from "@vfx-js/core";
 
 export type VFXVideoProps = JSX.IntrinsicElements["video"] & VFXProps;
 

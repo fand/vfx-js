@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useEffect, useRef, useContext } from "react";
 import { VFXContext } from "./context";
-import { VFXProps } from "./types";
+import type { VFXProps } from "@vfx-js/core";
 
 type VFXElementProps<T extends keyof JSX.IntrinsicElements> =
     JSX.IntrinsicElements[T] & VFXProps;

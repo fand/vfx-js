@@ -1,5 +1,5 @@
 import VFXPlayer from "./vfx-player";
-import { VFXProps } from "./types";
+import { VFXOpts, VFXProps } from "./types";
 
 const canvasStyle = {
     position: "fixed",
@@ -11,15 +11,10 @@ const canvasStyle = {
     "pointer-events": "none",
 };
 
-type VFXOptions = {
-    pixelRatio?: number;
-    zIndex?: number;
-};
-
 export class VFX {
     #player: VFXPlayer;
 
-    constructor(opts: VFXOptions = {}) {
+    constructor(opts: VFXOpts = {}) {
         const canvas = document.createElement("canvas");
         for (const [k, v] of Object.entries(canvasStyle)) {
             canvas.style.setProperty(k, v.toString());
