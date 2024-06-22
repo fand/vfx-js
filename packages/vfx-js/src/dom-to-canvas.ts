@@ -47,6 +47,9 @@ export default function getCanvasFromElement(
     syncStylesOfTree(element, newElement);
     newElement.style.setProperty("opacity", originalOpacity.toString());
 
+    // Remove margins of the root element
+    newElement.style.setProperty("margin", "0px");
+
     // Create SVG string
     const html = newElement.outerHTML;
     const xml = convertHtmlToXml(html);
