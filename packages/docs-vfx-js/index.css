@@ -6,7 +6,7 @@
     --inline-code-size: 1.2rem;
     --flex-dir: row;
 
-    --usage-img-size: calc(50% - 16px);
+    --column-size: calc(50% - 16px);
 
     --author-icon-size: 12rem;
     --author-icon-margin: 0;
@@ -22,7 +22,7 @@
         --inline-code-size: 1rem;
         --flex-dir: column;
 
-        --usage-img-size: 100%;
+        --column-size: 100%;
 
         --author-icon-size: 8rem;
         --author-icon-margin: -0.25rem;
@@ -158,7 +158,7 @@ section video {
 /*================ UsageSection ================*/
 
 .UsageSection img {
-    width: var(--usage-img-size);
+    width: var(--column-size);
 }
 
 /*================ ExampleSection ================*/
@@ -178,6 +178,24 @@ section video {
 .ExampleSection .row .col > img,
 .ExampleSection .row .col > video {
     width: 100%;
+}
+
+#div {
+    width: var(--column-size);
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+#div p {
+    margin: 0;
+}
+#div input,
+#div textarea {
+    display: block;
+    width: 100%;
+    font-size: 1.5rem;
 }
 
 /*================ AuthorSection ================*/

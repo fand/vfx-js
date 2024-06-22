@@ -182,6 +182,36 @@ vfx.add(video, { shader: "halftone" });
                         />
                     </div>
                 </div>
+
+                <div class="row">
+                    <div class="col">
+                        <p>Div</p>
+                        <pre><code class="language-html">
+&lt;div id="div"&gt;
+    &lt;p&gt;You can interact with these inputs.&lt;/p&gt;
+    &lt;input type="text" value="Edit me" /&gt;
+    &lt;input type="range" min="0" max="100" value="0" /&gt;
+    &lt;textarea&gt;Edit me&lt;/textarea&gt;
+&lt;/div&gt;
+                        </code></pre>
+
+                        <pre><code class="language-javascript">
+vfx.add(div, { shader: "rgbShift", overflow: 100 });
+
+input.addEventListener('input', () => vfx.update(div));
+
+                    </code></pre>
+                    </div>
+                    <div class="col">
+                        <p>Output:</p>
+                        <div id="div">
+                            <p>You can interact with these inputs.</p>
+                            <input type="text" value="Edit me" />
+                            <input type="range" min="0" max="100" value="0" />
+                            <textarea>Edit me</textarea>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <div>

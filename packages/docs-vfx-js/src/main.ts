@@ -177,9 +177,6 @@ class App {
         const bg = document.getElementById("BG")!;
         this.vfx.add(bg, { shader: shaders.blob });
 
-        // const logo = document.getElementById("Logo")!;
-        // this.vfx.add(logo, { shader: "rgbShift", overflow: 100 });
-
         for (const e of document.querySelectorAll("*[data-shader]")) {
             const shader = e.getAttribute("data-shader")!;
 
@@ -193,6 +190,15 @@ class App {
                 overflow: parseFloat(e.getAttribute("data-overflow") ?? "0"),
                 uniforms,
             });
+        }
+    }
+
+    initDiv() {
+        const div = document.getElementById("div")!;
+        this.vfx.add(div, { shader: "rgbShift", overflow: 100 });
+
+        for (const input of div.querySelectorAll("input,textarea")) {
+            input.addEventListener("input", () => this.vfx.update(div));
         }
     }
 
@@ -234,6 +240,7 @@ window.addEventListener("load", () => {
     const app = new App();
     app.initBG();
     app.initVFX();
+    app.initDiv();
     app.hideMask();
     setTimeout(() => {
         app.showLogo();
