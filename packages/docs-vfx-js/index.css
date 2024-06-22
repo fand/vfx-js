@@ -6,6 +6,8 @@
     --inline-code-size: 1.2rem;
     --flex-dir: row;
 
+    --usage-img-size: calc(50% - 16px);
+
     --author-icon-size: 12rem;
     --author-icon-margin: 0;
     --author-text-size: 3rem;
@@ -19,6 +21,8 @@
         --code-size: 0.84rem;
         --inline-code-size: 1rem;
         --flex-dir: column;
+
+        --usage-img-size: 100%;
 
         --author-icon-size: 8rem;
         --author-icon-margin: -0.25rem;
@@ -151,13 +155,20 @@ section video {
     font-size: var(--font-size);
 }
 
+/*================ UsageSection ================*/
+
+.UsageSection img {
+    width: var(--usage-img-size);
+}
+
 /*================ ExampleSection ================*/
+
 .ExampleSection .row {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 32px;
-    margin-bottom: 64px;
+    margin-bottom: 128px;
     flex-direction: var(--flex-dir);
 }
 .ExampleSection .row .col {
