@@ -142,12 +142,12 @@ section video {
     align-items: start;
 }
 .TopSection #Logo {
+    opacity: 0;
     width: calc(max(50%, 600px));
     max-width: 80% !important;
 }
 .TopSection p {
-    /* font-size: 1.75rem; */
-    /* font-size: 1rem; */
+    opacity: 0;
     font-size: var(--font-size);
 }
 
@@ -266,12 +266,12 @@ section video {
 
 #MaskTop {
     z-index: 20001;
-    /* transition: height 0.5s 0.5s; */
+    transition: height 0.5s 0.5s;
 }
 
 #MaskBottom {
     z-index: 19999;
-    /* transition: opacity 1.5s 1.5s linear; */
+    transition: opacity 1s 1.5s linear;
     background: #000;
     pointer-events: none;
 }
