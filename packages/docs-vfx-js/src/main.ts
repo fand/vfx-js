@@ -200,6 +200,12 @@ class App {
         for (const input of div.querySelectorAll("input,textarea")) {
             input.addEventListener("input", () => this.vfx.update(div));
         }
+
+        const textarea = div.querySelector("textarea")!;
+        const mo = new MutationObserver(() => this.vfx.update(div));
+        mo.observe(textarea, {
+            attributes: true,
+        });
     }
 
     hideMask() {

@@ -185,7 +185,7 @@ vfx.add(video, { shader: "halftone" });
 
                 <div class="row">
                     <div class="col">
-                        <p>Div</p>
+                        <p>Div (experimental)</p>
                         <pre><code class="language-html">
 &lt;div id="div"&gt;
     &lt;p&gt;You can interact with these inputs.&lt;/p&gt;
@@ -198,7 +198,12 @@ vfx.add(video, { shader: "halftone" });
                         <pre><code class="language-javascript">
 vfx.add(div, { shader: "rgbShift", overflow: 100 });
 
+// Update on input
 input.addEventListener('input', () => vfx.update(div));
+
+// Update on textarea resize
+const mo = new MutationObserver(() => vfx.update(div));
+mo.observe(textarea, { attributes: true });
 
                     </code></pre>
                     </div>

@@ -186,6 +186,7 @@ section video {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    overflow: hidden;
 }
 
 #div p {
@@ -196,6 +197,9 @@ section video {
     display: block;
     width: 100%;
     font-size: 1.5rem;
+}
+#div textarea {
+    resize: vertical;
 }
 
 /*================ AuthorSection ================*/
