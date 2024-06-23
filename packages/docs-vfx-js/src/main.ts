@@ -220,7 +220,7 @@ class App {
         const logo = document.getElementById("Logo")!;
         this.vfx.add(logo, {
             shader: shaders.logo,
-            overflow: [0, 1000, 0, 1000],
+            overflow: [0, 3000, 0, 100],
             uniforms: { delay: 0 },
         });
 
