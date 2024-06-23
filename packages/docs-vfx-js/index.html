@@ -105,7 +105,7 @@ import { VFX } from '@vfx-js/core';
 const img = document.querySelector('#img');
 
 const vfx = new VFX();
-vfx.add(img, { shader: "glitch" });
+vfx.add(img, { shader: "glitch", overflow: 100 });
             </code></pre>
             <p>This will be rendered as follows:</p>
             <img
@@ -237,19 +237,6 @@ vfx.add(el, { shader: "rainbow" });
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(el, { shader: "glitch" });
-                        </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="glitch"
-                        />
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col">
-                        <pre><code class="language-javascript">
 vfx.add(el, { shader: "rgbShift" });
                         </code></pre>
                     </div>
@@ -257,6 +244,25 @@ vfx.add(el, { shader: "rgbShift" });
                         <img
                             src="./vfx-js-logo-no-padding.svg"
                             data-shader="rgbShift"
+                        />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+// Some shaders require "overflow" property
+// so that they can render beyond the original area.
+//
+// In this example, the "glitch" shader can render
+// outside the original element up to 100px.
+vfx.add(el, { shader: "glitch", overflow: 100 });
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            src="./vfx-js-logo-no-padding.svg"
+                            data-shader="glitch"
+                            data-overflow="100"
                         />
                     </div>
                 </div>
