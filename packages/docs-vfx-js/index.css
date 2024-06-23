@@ -234,6 +234,11 @@ section video {
     margin-left: var(--author-icon-margin);
     margin-bottom: calc(var(--author-icon-margin) * 2);
 }
+.AuthorSection h2 {
+    margin: 0;
+    font-size: var(--author-text-size);
+    line-height: 1;
+}
 .AuthorSection .links {
     position: absolute;
     left: 0.1rem;
@@ -244,12 +249,7 @@ section video {
     align-items: start;
     gap: 16px;
 }
-.AuthorSection h2 {
-    margin: 0;
-    font-size: var(--author-text-size);
-    line-height: 1;
-}
-.AuthorSection .sns {
+.AuthorSection .link {
     width: var(--author-link-size);
     height: var(--author-link-size);
     filter: invert(1);
