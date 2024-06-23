@@ -12,6 +12,8 @@
     --author-icon-margin: 0;
     --author-text-size: 3rem;
     --author-link-size: 2rem;
+    --author-link-margin-top: 0.5rem;
+    --author-link-margin-bottom: 1rem;
 }
 
 @media (max-width: 767px) {
@@ -28,6 +30,8 @@
         --author-icon-margin: -0.25rem;
         --author-text-size: 2rem;
         --author-link-size: 1.5rem;
+        --author-link-margin-top: 0;
+        --author-link-margin-bottom: 0;
     }
 }
 
@@ -221,12 +225,9 @@ section video {
 .AuthorSection .column {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: end;
     align-items: center;
-}
-.AuthorSection .line {
-    height: 3rem;
-    position: relative;
+    gap: 16px;
 }
 .AuthorSection .icon {
     width: var(--author-icon-size);
@@ -240,14 +241,15 @@ section video {
     line-height: 1;
 }
 .AuthorSection .links {
-    position: absolute;
-    left: 0.1rem;
-    top: calc(var(--author-text-size) * 1.5);
     width: 100%;
+    height: 2rem;
     display: flex;
     justify-content: var(--author-align-items);
     align-items: start;
     gap: 16px;
+    margin-left: 0.1rem;
+    margin-top: var(--author-link-margin-top);
+    margin-bottom: var(--author-link-margin-bottom);
 }
 .AuthorSection .link {
     width: var(--author-link-size);
