@@ -1,4 +1,5 @@
 import { VFX } from "@vfx-js/core";
+import { inject as injectAnalytics } from "@vercel/analytics";
 
 import Prism from "prismjs";
 import "prism-themes/themes/prism-nord.min.css";
@@ -252,4 +253,6 @@ window.addEventListener("load", () => {
         app.showLogo();
         app.showProfile();
     }, 2000);
+
+    injectAnalytics();
 });
