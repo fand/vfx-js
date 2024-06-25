@@ -250,7 +250,7 @@ export const shaders = {
             cr.r,
             cg.g,
             cb.b,
-            step(.1, cr.a + cg.a + cb.a)
+            smoothstep(.0, 1., cr.a + cg.a + cb.a)
         );
     }
     `,
