@@ -148,6 +148,21 @@ const shaders: Record<string, string> = {
         gl_FragColor = img;
     }
     `,
+    custom: `
+precision mediump float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform sampler2D src;
+
+uniform float scroll;
+
+void main (void) {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    uv.x = fract(uv.x + scroll);
+    gl_FragColor = texture2D(src, uv);
+}
+    `,
 };
 
 class App {
@@ -208,6 +223,14 @@ class App {
         });
     }
 
+    initCustomShader() {
+        const e = document.getElementById("custom")!;
+        this.vfx.add(e, {
+            shader: shaders.custom,
+            uniforms: { scroll: () => window.scrollY / window.innerHeight },
+        });
+    }
+
     hideMask() {
         const maskTop = document.getElementById("MaskTop")!;
         maskTop.style.setProperty("height", "0");
@@ -247,6 +270,7 @@ window.addEventListener("load", () => {
     app.initBG();
     app.initVFX();
     app.initDiv();
+    app.initCustomShader();
     app.hideMask();
     setTimeout(() => {
         app.showLogo();

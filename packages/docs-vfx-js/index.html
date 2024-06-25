@@ -349,18 +349,35 @@ vfx.add(el, { shader: "pixelateTransition" });
                     <div class="col">
                         <pre><code class="language-javascript">
 const shader = `
+precision mediump float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform sampler2D src;
 
+uniform float scroll;
 
+void main (void) {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+    // Scroll X
+    uv.x = fract(uv.x + scroll);
+
+    gl_FragColor = texture2D(src, uv);
+}
 `;
 
-vfx.add(el, { shader: "slitScanTransition" });
+vfx.add(el, {
+    shader,
+    uniforms: {
+        // Uniform functions are evaluated every frame
+        scroll: () => window.scrollY / window.innerHeight,
+    }
+});
                         </code></pre>
                     </div>
                     <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="slitScanTransition"
-                        />
+                        <img id="custom" src="./vfx-js-logo-no-padding.svg" />
                     </div>
                 </div>
             </div>
