@@ -1,13 +1,13 @@
 {
   "name": "react-vfx",
   "description": "WebGL effects for React elements",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
   "bugs": {
     "url": "https://github.com/fand/react-vfx/issues"
   },
   "dependencies": {
-    "@vfx-js/core": "0.1.0"
+    "@vfx-js/core": "0.2.0"
   },
   "files": [
     "package.json",
