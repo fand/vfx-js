@@ -104,6 +104,46 @@ vfx.add(img, { shader: "glitch", overflow: 100 });
                 data-shader="glitch"
                 data-overflow="100"
             />
+
+            <p>
+                VFX-JS is also available on CDNs (
+                <a href="https://esm.sh/" target="_blank">esm.sh</a> or
+                <a
+                    href="https://www.jsdelivr.com/package/npm/@vfx-js/core"
+                    target="_blank"
+                    >jsDeliver</a
+                >). So you can use VFX-JS in CodePen etc:
+            </p>
+            <pre><code class="language-javascript">
+// Load VFX-JS from esm.sh
+import { VFX } from "https://esm.sh/@vfx-js/core";
+
+// or jsDeliver
+// import { VFX } from 'https://cdn.jsdelivr.net/npm/@vfx-js/core/+esm'
+
+// Then use VFX-JS
+const vfx = new VFX();
+vfx.addImage(img { shader: 'rgbShift' });
+            </code></pre>
+
+            <iframe
+                height="300"
+                style="width: 100%"
+                scrolling="no"
+                title="VFX-JS minimal example"
+                src="https://codepen.io/fand/embed/preview/ZENvdEM?default-tab=result"
+                frameborder="no"
+                loading="lazy"
+                allowtransparency="true"
+                allowfullscreen="true"
+            >
+                See the Pen
+                <a href="https://codepen.io/fand/pen/ZENvdEM">
+                    VFX-JS minimal example</a
+                >
+                by fand (<a href="https://codepen.io/fand">@fand</a>) on
+                <a href="https://codepen.io">CodePen</a>.
+            </iframe>
         </section>
 
         <section class="ExampleSection">
@@ -423,7 +463,7 @@ vfx.add(el, {
         </section>
 
         <div id="MaskBottom"></div>
-        <div id="Frame"></div>
+        <div id="Frame"><div id="FrameBottom"></div></div>
         <div id="MaskTop"></div>
 
         <script type="module" src="/src/main.ts"></script>

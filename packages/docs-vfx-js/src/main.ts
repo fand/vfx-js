@@ -33,14 +33,6 @@ const shaders: Record<string, string> = {
         return texture2D(tex, uv);
     }
 
-    float step2(float t, vec2 uv) {
-        return step(t, uv.x) * step(t, uv.y);
-    }
-
-    float inside(vec2 uv) {
-        return step2(0., uv) * step2(0., 1. - uv);
-    }
-
     vec4 glitch(vec2 uv) {
         vec2 uvr = uv, uvg = uv, uvb = uv;
         float t = mod(time, 30.);
@@ -50,9 +42,9 @@ const shaders: Record<string, string> = {
             uvg.x += nn(uv.y, t + 10.) * amp;
             uvb.x += nn(uv.y, t + 20.) * amp;
         }
-        vec4 cr = readTex(src, uvr) * inside(uvr);
-        vec4 cg = readTex(src, uvg) * inside(uvg);
-        vec4 cb = readTex(src, uvb) * inside(uvb);
+        vec4 cr = readTex(src, uvr);
+        vec4 cg = readTex(src, uvg);
+        vec4 cb = readTex(src, uvb);
 
         return vec4(
             cr.r,
@@ -63,11 +55,14 @@ const shaders: Record<string, string> = {
     }
     vec4 slitscan(vec2 uv) {
         float t = max(enterTime - delay, 0.) * speed;
+        if (t <= 0.0) {
+            return vec4(0);
+        }
 
         vec2 uvr = uv, uvg = uv, uvb = uv;
         uvr.x = min(uvr.x, t);
-        uvg.x = min(uvg.x, t - 0.2);
-        uvb.x = min(uvb.x, t - 0.4);
+        uvg.x = min(uvg.x, max(t - 0.2, 0.));
+        uvb.x = min(uvb.x, max(t - 0.4, 0.));
 
         vec4 cr = readTex(src, uvr);
         vec4 cg = readTex(src, uvg);
