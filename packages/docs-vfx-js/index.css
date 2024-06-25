@@ -140,6 +140,11 @@ section video {
     max-width: 100%;
 }
 
+a:active,
+a:visited {
+    color: white;
+}
+
 /*================ TopSection ================*/
 
 .TopSection {
