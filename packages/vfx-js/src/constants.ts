@@ -1,5 +1,5 @@
 export const DEFAULT_VERTEX_SHADER = `
-precision mediump float;
+precision highp float;
 void main() {
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
@@ -7,7 +7,7 @@ void main() {
 
 export const shaders = {
     uvGradient: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -22,7 +22,7 @@ export const shaders = {
     }
     `,
     rainbow: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -66,7 +66,7 @@ export const shaders = {
     }
     `,
     glitch: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -140,7 +140,7 @@ export const shaders = {
     }
     `,
     pixelate: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -155,7 +155,7 @@ export const shaders = {
     }
     `,
     rgbGlitch: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -202,7 +202,7 @@ export const shaders = {
     }
     `,
     rgbShift: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -258,7 +258,7 @@ export const shaders = {
     // Halftone Effect by zoidberg
     // https://www.interactiveshaderformat.com/sketches/234
 
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -359,7 +359,7 @@ export const shaders = {
     }
     `,
     sinewave: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -399,7 +399,7 @@ export const shaders = {
     }
     `,
     shine: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -420,7 +420,7 @@ export const shaders = {
     }
     `,
     blink: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -434,7 +434,7 @@ export const shaders = {
 
     `,
     spring: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -450,7 +450,7 @@ export const shaders = {
     }
     `,
     duotone: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -476,7 +476,7 @@ export const shaders = {
     }
     `,
     tritone: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -505,7 +505,7 @@ export const shaders = {
     }
     `,
     hueShift: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -542,7 +542,7 @@ export const shaders = {
     }
     `,
     warpTransition: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -561,7 +561,7 @@ export const shaders = {
     }
     `,
     slitScanTransition: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -580,7 +580,7 @@ export const shaders = {
     }
     `,
     pixelateTransition: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;

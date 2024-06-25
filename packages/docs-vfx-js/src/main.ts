@@ -8,7 +8,7 @@ Prism.highlightAll();
 
 const shaders: Record<string, string> = {
     logo: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -88,7 +88,7 @@ const shaders: Record<string, string> = {
     }
     `,
     blob: `
-    precision mediump float;
+    precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
@@ -149,7 +149,7 @@ const shaders: Record<string, string> = {
     }
     `,
     custom: `
-precision mediump float;
+precision highp float;
 uniform vec2 resolution;
 uniform vec2 offset;
 uniform float time;
