@@ -254,7 +254,6 @@ section video {
 .AuthorSection .link {
     width: var(--author-link-size);
     height: var(--author-link-size);
-    filter: invert(1);
 }
 
 /*================ Fixed elements ================*/
