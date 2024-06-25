@@ -38,7 +38,7 @@
   ],
   "license": "MIT",
   "lint-staged": {
-    "src/*.{ts,tsx}": [
+    "src/*.ts": [
       "eslint --fix",
       "prettier --write"
     ]
@@ -59,7 +59,7 @@
     "dev": "run-p watch:cjs watch:esm",
     "watch:cjs": "tsc -d -w",
     "watch:esm": "tsc -d -w -p tsconfig.esm.json",
-    "lint": "eslint src/**/*.ts src/**/*.tsx",
+    "lint": "eslint src/**/*.ts",
     "lint-staged": "lint-staged",
     "test": "vitest --dir src --run",
     "test:watch": "vitest --dir src"
