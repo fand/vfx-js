@@ -30,7 +30,7 @@ export const VFXImg: React.FC<VFXImgProps> = (props) => {
         return () => {
             vfx.remove(element);
         };
-    }, [vfx, shader, release, uniforms, overflow, isLoaded]);
+    }, [vfx, shader, release, uniforms, overflow, wrap, isLoaded]);
 
     return <img ref={ref} {...rawProps} onLoad={() => setIsLoaded(true)} />;
 };

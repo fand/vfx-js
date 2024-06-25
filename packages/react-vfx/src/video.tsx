@@ -30,7 +30,7 @@ export const VFXVideo: React.FC<VFXVideoProps> = (props) => {
         return () => {
             vfx.remove(element);
         };
-    }, [vfx, shader, release, uniforms, overflow, isLoaded]);
+    }, [vfx, shader, release, uniforms, overflow, wrap, isLoaded]);
 
     return (
         <video ref={ref} {...rawProps} onLoadedData={() => setIsLoaded(true)} />

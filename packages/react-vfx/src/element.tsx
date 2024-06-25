@@ -60,7 +60,7 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
                 mo.disconnect();
                 vfx.remove(element);
             };
-        }, [elementRef, vfx, shader, release, uniforms, overflow]);
+        }, [elementRef, vfx, shader, release, uniforms, overflow, wrap]);
 
         return React.createElement(type, { ...rawProps, ref });
     });
