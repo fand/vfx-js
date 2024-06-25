@@ -62,19 +62,27 @@ export class VFX {
         if (element.complete) {
             this.#player.addElement(element, opts);
         } else {
-            element.addEventListener("load", () => {
-                this.#player.addElement(element, opts);
-            });
+            element.addEventListener(
+                "load",
+                () => {
+                    this.#player.addElement(element, opts);
+                },
+                { once: true },
+            );
         }
     }
 
     #addVideo(element: HTMLVideoElement, opts: VFXProps): void {
-        if (element.readyState >= 4) {
+        if (element.readyState >= 3) {
             this.#player.addElement(element, opts);
         } else {
-            element.addEventListener("load", () => {
-                this.#player.addElement(element, opts);
-            });
+            element.addEventListener(
+                "canplay",
+                () => {
+                    this.#player.addElement(element, opts);
+                },
+                { once: true },
+            );
         }
     }
 
