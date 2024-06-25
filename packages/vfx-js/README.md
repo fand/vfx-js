@@ -1,6 +1,6 @@
 <div align="center">
-  <img alt="REACT-VFX" src="https://user-images.githubusercontent.com/1403842/71323457-c69e6900-2516-11ea-958c-b96b2121387b.png" width="100%"/>
-  <h1>REACT-VFX: WebGL effects for React elements!!</h1>
+  <img alt="VFX-JS" src="../docs-vfx-js/public/logo-oneline.png" width="100%"/>
+  <h1>VFX-JS: Visual Effects for Web</h1>
   <br/>
   <br/>
 </div>
@@ -8,7 +8,7 @@
 ## Install
 
 ```
-npm i react-vfx
+npm i @vfx-js/core
 ```
 
 ## Usage
