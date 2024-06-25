@@ -25,7 +25,7 @@ function cloneNode<T extends Node>(node: T): T {
 }
 
 // Render element content to canvas and return it.
-export default function getCanvasFromElement(
+export default async function getCanvasFromElement(
     element: HTMLElement,
     originalOpacity: number,
     oldCanvas?: OffscreenCanvas,
@@ -44,8 +44,11 @@ export default function getCanvasFromElement(
     // Clone element with styles in text attribute
     // to apply styles in SVG
     const newElement = cloneNode(element);
-    syncStylesOfTree(element, newElement);
+    await syncStylesOfTree(element, newElement);
     newElement.style.setProperty("opacity", originalOpacity.toString());
+
+    // Remove margins of the root element
+    newElement.style.setProperty("margin", "0px");
 
     // Create SVG string
     const html = newElement.outerHTML;
@@ -76,7 +79,10 @@ export default function getCanvasFromElement(
     });
 }
 
-function syncStylesOfTree(el1: HTMLElement, el2: HTMLElement): void {
+async function syncStylesOfTree(
+    el1: HTMLElement,
+    el2: HTMLElement,
+): Promise<void> {
     // Sync CSS styles
     const styles = window.getComputedStyle(el1);
     Array.from(styles).forEach((key) => {
@@ -92,11 +98,29 @@ function syncStylesOfTree(el1: HTMLElement, el2: HTMLElement): void {
         el2.setAttribute("value", (el2 as HTMLInputElement).value);
     } else if (el2.tagName === "TEXTAREA") {
         el2.innerHTML = (el2 as HTMLTextAreaElement).value;
+    } else if (el2.tagName === "IMG") {
+        // SVG forignObject does not accept external file,
+        // so we have to convert the src URL to Data URL
+        (el2 as HTMLImageElement).src = await toObjectUrl(
+            (el1 as HTMLImageElement).src,
+        );
     }
 
     for (let i = 0; i < el1.children.length; i++) {
         const c1 = el1.children[i] as HTMLElement;
         const c2 = el2.children[i] as HTMLElement;
-        syncStylesOfTree(c1, c2);
+        await syncStylesOfTree(c1, c2);
     }
+}
+
+// ref. https://stackoverflow.com/questions/44698967/
+async function toObjectUrl(url: string): Promise<string> {
+    const blob = await fetch(url).then((response) => response.blob());
+    return new Promise((callback) => {
+        const reader = new FileReader();
+        reader.onload = function () {
+            callback(this.result as string);
+        };
+        reader.readAsDataURL(blob);
+    });
 }

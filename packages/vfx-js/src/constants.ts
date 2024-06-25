@@ -84,9 +84,14 @@ export const shaders = {
         return n;
     }
 
+    vec4 readTex(sampler2D tex, vec2 uv) {
+        if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { return vec4(0); }
+        return texture2D(tex, uv);
+    }
+
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = texture2D(src, uv);
+        vec4 color = readTex(src, uv);
 
         float t = mod(time, 3.14 * 10.);
 
@@ -117,9 +122,9 @@ export const shaders = {
             // RGB Shift
             v = pow(v * 1.5, 2.) * 0.15;
             color.rgb *= 0.3;
-            color.r += texture2D(src, vec2(uv.x + sin(t * 123.45) * v, uv.y)).r;
-            color.g += texture2D(src, vec2(uv.x + sin(t * 157.67) * v, uv.y)).g;
-            color.b += texture2D(src, vec2(uv.x + sin(t * 143.67) * v, uv.y)).b;
+            color.r += readTex(src, vec2(uv.x + sin(t * 123.45) * v, uv.y)).r;
+            color.g += readTex(src, vec2(uv.x + sin(t * 157.67) * v, uv.y)).g;
+            color.b += readTex(src, vec2(uv.x + sin(t * 143.67) * v, uv.y)).b;
         }
 
         // Compose Chromatic Abbreveation
@@ -245,7 +250,7 @@ export const shaders = {
             cr.r,
             cg.g,
             cb.b,
-            step(.1, cr.a + cg.a + cb.a)
+            smoothstep(.0, 1., cr.a + cg.a + cb.a)
         );
     }
     `,

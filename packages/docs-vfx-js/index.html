@@ -4,29 +4,28 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-        <title>VFX-JS - WebGL effects for your website #VFXJS</title>
+        <title>VFX-JS - Visual Effects Framework for Web #VFXJS</title>
 
         <meta name="theme-color" content="#000000" />
         <meta
             name="description"
             content="VFX-JS is a JavaScript library to add WebGL powered effects to your website."
         />
-        <link rel="apple-touch-icon" href="logo-with-bg.png" />
 
         <meta property="og:url" content="https://amagi.dev/vfx-js/" />
         <meta property="og:type" content="website" />
         <meta
             property="og:title"
-            content="VFX-JS - WebGL effects for your website #VFXJS"
+            content="VFX-JS - Visual Effects Framework for Web #VFXJS"
         />
-        <meta property="og:image" content="logo-with-bg.png" />
+        <meta property="og:image" content="og_image.jpg" />
         <meta
             property="og:description"
             content="VFX-JS is a JavaScript library to add WebGL powered effects to your website."
         />
         <meta
             property="og:site_name"
-            content="VFX-JS - WebGL effects for your website #VFXJS"
+            content="VFX-JS - Visual Effects Framework for Web #VFXJS"
         />
         <meta property="og:locale" content="en_US" />
 
@@ -36,7 +35,7 @@
         <meta name="twitter:url" content="https://amagi.dev/vfx-js/" />
         <meta
             name="twitter:title"
-            content="VFX-JS - WebGL effects for your website #VFXJS"
+            content="VFX-JS - Visual Effects Framework for Web #VFXJS"
         />
         <meta
             name="twitter:description"
@@ -44,22 +43,14 @@
         />
         <meta
             name="twitter:image"
-            content="https://amagi.dev/vfx-js/logo-with-bg.png"
+            content="https://amagi.dev/vfx-js/og_image.jpg"
         />
 
-        <link rel="icon" href="favicon/favicon.ico" />
-        <link
-            rel="icon"
-            type="image/x-icon"
-            sizes="16x16 32x32"
-            href="favicon/favicon-36.png"
-        />
-        <link
-            rel="apple-touch-icon"
-            sizes="180x180"
-            href="favicion/favicon-180.png"
-        />
-        <link rel="icon" sizes="192x192" href="favicon/favicon-192.png" />
+        <!-- favicons -->
+        <link rel="icon" href="favicon/favicon.ico" sizes="32x32" />
+        <link rel="icon" href="favicon/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="favicon/favicon-180.png" />
+        <link rel="manifest" href="./manifest.webmanifest" />
 
         <link rel="stylesheet" href="./index.css" />
     </head>
@@ -84,10 +75,10 @@
         <section class="TopSection">
             <img id="Logo" src="./vfx-js-logo-no-padding.svg" alt="VFX-JS" />
 
-            <p data-shader="rgbShift" data-overflow="100">
+            <p id="LogoTagline">
                 VFX-JS is a JavaScript library to add WebGL-powered effects to
                 your website. <br />You can easily attach it to normal
-                <code> &lt;img /&gt;</code>, <code>&lt;video&gt;</code> elements
+                <code> &lt;img&gt;</code>, <code>&lt;video&gt;</code> elements
                 etc.
             </p>
         </section>
@@ -105,13 +96,12 @@ import { VFX } from '@vfx-js/core';
 const img = document.querySelector('#img');
 
 const vfx = new VFX();
-vfx.add(img, { shader: "rgbShift" });
+vfx.add(img, { shader: "glitch", overflow: 100 });
             </code></pre>
-
-            <p>This will be rendered as below.</p>
+            <p>This will be rendered as follows:</p>
             <img
                 src="./vfx-js-logo-no-padding.svg"
-                data-shader="rgbShift"
+                data-shader="glitch"
                 data-overflow="100"
             />
         </section>
@@ -151,7 +141,14 @@ vfx.add(gif, { shader: "rainbow" });
                     </div>
                     <div class="col">
                         <p>Output</p>
-                        <img src="./nyancat.gif" data-shader="rainbow" />
+                        <img
+                            src="./nyancat.gif"
+                            data-shader="rainbow"
+                            style="
+                                transform: scale(0.5) translateY(-25%);
+                                margin-bottom: -25%;
+                            "
+                        />
                     </div>
                 </div>
                 <div class="row">
@@ -176,6 +173,41 @@ vfx.add(video, { shader: "halftone" });
                         />
                     </div>
                 </div>
+
+                <div class="row">
+                    <div class="col">
+                        <p>Div (experimental)</p>
+                        <pre><code class="language-html">
+&lt;div id="div"&gt;
+    &lt;p&gt;You can interact with these inputs.&lt;/p&gt;
+    &lt;input type="text" value="Edit me" /&gt;
+    &lt;input type="range" min="0" max="100" value="0" /&gt;
+    &lt;textarea&gt;Edit me&lt;/textarea&gt;
+&lt;/div&gt;
+                        </code></pre>
+
+                        <pre><code class="language-javascript">
+vfx.add(div, { shader: "rgbShift", overflow: 100 });
+
+// Update on input
+input.addEventListener('input', () => vfx.update(div));
+
+// Update on textarea resize
+const mo = new MutationObserver(() => vfx.update(div));
+mo.observe(textarea, { attributes: true });
+
+                    </code></pre>
+                    </div>
+                    <div class="col">
+                        <p>Output:</p>
+                        <div id="div">
+                            <p>You can interact with these inputs.</p>
+                            <input type="text" value="Edit me" />
+                            <input type="range" min="0" max="100" value="0" />
+                            <textarea>Edit me</textarea>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <div>
@@ -196,19 +228,6 @@ vfx.add(el, { shader: "rainbow" });
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(el, { shader: "glitch" });
-                        </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="glitch"
-                        />
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col">
-                        <pre><code class="language-javascript">
 vfx.add(el, { shader: "rgbShift" });
                         </code></pre>
                     </div>
@@ -222,13 +241,55 @@ vfx.add(el, { shader: "rgbShift" });
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(el, { shader: "pixelate" });
+// Some shaders require "overflow" property
+// so that they can render beyond the original area.
+//
+// In this example, the "glitch" shader can render
+// outside the original element up to 100px.
+vfx.add(el, { shader: "glitch", overflow: 100 });
                         </code></pre>
                     </div>
                     <div class="col">
                         <img
                             src="./vfx-js-logo-no-padding.svg"
-                            data-shader="pixelate"
+                            data-shader="glitch"
+                            data-overflow="100"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3>Parameters</h3>
+                <p>
+                    Some shaders take parameters (e.g. duotone). You can pass
+                    the params to the <code>uniforms</code> property.
+                </p>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+vfx.add(el, {
+    shader: "duotone",
+    uniforms: {
+        color1: [0, 0, 1, 1],
+        color2: [0, 1, 0, 1],
+        speed: 0.2
+    }
+});
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <video
+                            src="./jellyfish.mp4"
+                            autoplay
+                            loop
+                            muted
+                            data-shader="duotone"
+                            data-uniforms='{
+                                "color1": [0, 0, 1, 1],
+                                "color2": [0, 1, 0, 1],
+                                "speed": 0.5
+                            }'
                         />
                     </div>
                 </div>
@@ -287,22 +348,78 @@ vfx.add(el, { shader: "pixelateTransition" });
                 <div class="row">
                     <div class="col">
                         <pre><code class="language-javascript">
-vfx.add(el, { shader: "slitScanTransition" });
+const shader = `
+precision mediump float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform sampler2D src;
+
+uniform float scroll;
+
+void main (void) {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+    // Scroll X
+    uv.x = fract(uv.x + scroll);
+
+    gl_FragColor = texture2D(src, uv);
+}
+`;
+
+vfx.add(el, {
+    shader,
+    uniforms: {
+        // Uniform functions are evaluated every frame
+        scroll: () => window.scrollY / window.innerHeight,
+    }
+});
                         </code></pre>
                     </div>
                     <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="slitScanTransition"
-                        />
+                        <img id="custom" src="./vfx-js-logo-no-padding.svg" />
                     </div>
                 </div>
             </div>
         </section>
 
         <section class="AuthorSection">
-            <img src="./amagi.png" />
-            <h2>Made by Amagi</h2>
+            <div id="profile" class="row">
+                <img class="icon" src="./amagi.png" />
+                <div class="column">
+                    <h2>Made by Amagi</h2>
+                    <div class="links">
+                        <a href="https://github.com/fand" target="_blank">
+                            <img
+                                class="link"
+                                src="./github.svg"
+                                alt="GitHub link"
+                            />
+                        </a>
+                        <a
+                            href="https://twitter.com/amagitakayosi"
+                            target="_blank"
+                        >
+                            <img
+                                class="link"
+                                src="./twitter.svg"
+                                alt="Twitter link"
+                            />
+                        </a>
+                        <a
+                            href="https://threads.net/amagitakayosi"
+                            target="_blank"
+                        >
+                            <img
+                                class="link"
+                                src="./threads.svg"
+                                alt="Threads link"
+                                style="margin-left: -8%"
+                            />
+                        </a>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <div id="MaskBottom"></div>
@@ -310,5 +427,13 @@ vfx.add(el, { shader: "slitScanTransition" });
         <div id="MaskTop"></div>
 
         <script type="module" src="/src/main.ts"></script>
+
+        <!-- Cloudflare Web Analytics -->
+        <script
+            defer
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon='{"token": "b9c39aae9c304f1cbfa1e7bb3e84f078"}'
+        ></script>
+        <!-- End Cloudflare Web Analytics -->
     </body>
 </html>

@@ -7,6 +7,86 @@ Prism.manual = true;
 Prism.highlightAll();
 
 const shaders: Record<string, string> = {
+    logo: `
+    precision mediump float;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    uniform float enterTime;
+    uniform sampler2D src;
+
+    uniform float delay;
+    #define speed 2.0
+
+    float nn(float y, float t) {
+        float n = (
+            sin(y * .07 + t * 8. + sin(y * .5 + t * 10.)) +
+            sin(y * .7 + t * 2. + sin(y * .3 + t * 8.)) * .7 +
+            sin(y * 1.1 + t * 2.8) * .4
+        );
+        n += sin(y * 124. + t * 100.7) * sin(y * 877. - t * 38.8) * .3;
+        return n;
+    }
+
+    vec4 readTex(sampler2D tex, vec2 uv) {
+        if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { return vec4(0); }
+        return texture2D(tex, uv);
+    }
+
+    float step2(float t, vec2 uv) {
+        return step(t, uv.x) * step(t, uv.y);
+    }
+
+    float inside(vec2 uv) {
+        return step2(0., uv) * step2(0., 1. - uv);
+    }
+
+    vec4 glitch(vec2 uv) {
+        vec2 uvr = uv, uvg = uv, uvb = uv;
+        float t = mod(time, 30.);
+        float amp = 10. / resolution.x;
+        if (abs(nn(uv.y, t)) > 1.) {
+            uvr.x += nn(uv.y, t) * amp;
+            uvg.x += nn(uv.y, t + 10.) * amp;
+            uvb.x += nn(uv.y, t + 20.) * amp;
+        }
+        vec4 cr = readTex(src, uvr) * inside(uvr);
+        vec4 cg = readTex(src, uvg) * inside(uvg);
+        vec4 cb = readTex(src, uvb) * inside(uvb);
+
+        return vec4(
+            cr.r,
+            cg.g,
+            cb.b,
+            smoothstep(.0, 1., cr.a + cg.a + cb.a)
+        );
+    }
+    vec4 slitscan(vec2 uv) {
+        float t = max(enterTime - delay, 0.) * speed;
+
+        vec2 uvr = uv, uvg = uv, uvb = uv;
+        uvr.x = min(uvr.x, t);
+        uvg.x = min(uvg.x, t - 0.2);
+        uvb.x = min(uvb.x, t - 0.4);
+
+        vec4 cr = readTex(src, uvr);
+        vec4 cg = readTex(src, uvg);
+        vec4 cb = readTex(src, uvb);
+
+        return vec4(
+            cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 1.
+        );
+    }
+
+    void main (void) {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        if (enterTime < 1.0) {
+            gl_FragColor = slitscan(uv);
+        } else {
+            gl_FragColor = glitch(uv);
+        }
+    }
+    `,
     blob: `
     precision mediump float;
     uniform vec2 resolution;
@@ -68,6 +148,21 @@ const shaders: Record<string, string> = {
         gl_FragColor = img;
     }
     `,
+    custom: `
+precision mediump float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform sampler2D src;
+
+uniform float scroll;
+
+void main (void) {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    uv.x = fract(uv.x + scroll);
+    gl_FragColor = texture2D(src, uv);
+}
+    `,
 };
 
 class App {
@@ -97,18 +192,43 @@ class App {
         const bg = document.getElementById("BG")!;
         this.vfx.add(bg, { shader: shaders.blob });
 
-        const logo = document.getElementById("Logo")!;
-        this.vfx.add(logo, { shader: "rgbShift", overflow: 100 });
-
-        for (const e of document.querySelectorAll(
-            "img[data-shader], video[data-shader]",
-        )) {
+        for (const e of document.querySelectorAll("*[data-shader]")) {
             const shader = e.getAttribute("data-shader")!;
+
+            const uniformsJSON = e.getAttribute("data-uniforms");
+            const uniforms = uniformsJSON
+                ? JSON.parse(uniformsJSON)
+                : undefined;
+
             this.vfx.add(e as HTMLImageElement, {
                 shader,
                 overflow: parseFloat(e.getAttribute("data-overflow") ?? "0"),
+                uniforms,
             });
         }
+    }
+
+    initDiv() {
+        const div = document.getElementById("div")!;
+        this.vfx.add(div, { shader: "rgbShift", overflow: 100 });
+
+        for (const input of div.querySelectorAll("input,textarea")) {
+            input.addEventListener("input", () => this.vfx.update(div));
+        }
+
+        const textarea = div.querySelector("textarea")!;
+        const mo = new MutationObserver(() => this.vfx.update(div));
+        mo.observe(textarea, {
+            attributes: true,
+        });
+    }
+
+    initCustomShader() {
+        const e = document.getElementById("custom")!;
+        this.vfx.add(e, {
+            shader: shaders.custom,
+            uniforms: { scroll: () => window.scrollY / window.innerHeight },
+        });
     }
 
     hideMask() {
@@ -118,11 +238,42 @@ class App {
         const maskBottom = document.getElementById("MaskBottom")!;
         maskBottom.style.setProperty("opacity", "0");
     }
+
+    showLogo() {
+        const logo = document.getElementById("Logo")!;
+        this.vfx.add(logo, {
+            shader: shaders.logo,
+            overflow: [0, 3000, 0, 100],
+            uniforms: { delay: 0 },
+        });
+
+        const tagline = document.getElementById("LogoTagline")!;
+        this.vfx.add(tagline, {
+            shader: shaders.logo,
+            overflow: [0, 1000, 0, 1000],
+            uniforms: { delay: 0.3 },
+        });
+    }
+
+    showProfile() {
+        const profile = document.getElementById("profile")!;
+        this.vfx.add(profile, {
+            shader: shaders.logo,
+            overflow: [0, 2000, 0, 1000],
+            uniforms: { delay: 0.5 },
+        });
+    }
 }
 
 window.addEventListener("load", () => {
     const app = new App();
     app.initBG();
     app.initVFX();
+    app.initDiv();
+    app.initCustomShader();
     app.hideMask();
+    setTimeout(() => {
+        app.showLogo();
+        app.showProfile();
+    }, 2000);
 });
