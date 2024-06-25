@@ -159,7 +159,7 @@ uniform float scroll;
 
 void main (void) {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    uv.x = fract(uv.x + scroll);
+    uv.x = fract(uv.x + scroll + time * 0.2);
     gl_FragColor = texture2D(src, uv);
 }
     `,
@@ -250,7 +250,7 @@ class App {
         const tagline = document.getElementById("LogoTagline")!;
         this.vfx.add(tagline, {
             shader: shaders.logo,
-            overflow: [0, 1000, 0, 1000],
+            overflow: [0, 3000, 0, 1000],
             uniforms: { delay: 0.3 },
         });
     }

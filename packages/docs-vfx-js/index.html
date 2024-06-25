@@ -361,7 +361,7 @@ void main (void) {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
     // Scroll X
-    uv.x = fract(uv.x + scroll);
+    uv.x = fract(uv.x + scroll + time * 0.2);
 
     gl_FragColor = texture2D(src, uv);
 }
