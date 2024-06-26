@@ -140,6 +140,7 @@ section video {
     max-width: 100%;
 }
 
+a,
 a:active,
 a:visited {
     color: white;
