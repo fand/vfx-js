@@ -12,6 +12,7 @@
     "lint": "turbo run lint",
     "prepare": "husky install",
     "test": "npm --workspace=@vfx-js/core test",
+    "typedoc": "typedoc --out docs packages/vfx-js/**/*.ts",
     "prepare-release": "changeset && turbo run build lint test && changeset version",
     "release": "changeset publish"
   },
@@ -28,7 +29,8 @@
   "homepage": "https://github.com/fand/react-vfx#readme",
   "devDependencies": {
     "husky": "^9.0.11",
-    "turbo": "^2.0.3"
+    "turbo": "^2.0.3",
+    "typedoc": "^0.26.2"
   },
   "dependencies": {
     "@changesets/cli": "^2.27.5"
