@@ -19,7 +19,9 @@
     },
     "highlightLanguages": ["javascript", "typescript", "tsx", "json", "jsonc"],
     "markdownItOptions": {
-        "html": true
+        "html": true,
+        "linkify": true,
+        "breaks": true
     },
     "excludeInternal": true,
     "readme": "docs/home.md",

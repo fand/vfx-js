@@ -56,6 +56,14 @@ body {
     --color-scheme: var(--dark-color-scheme) !important;
 }
 
+/* Fix line height */
+.tsd-typography {
+    line-height: 1.5 !important;
+}
+.tsd-signature {
+    line-height: 1.5 !important;
+}
+
 /* Hide right sidebar */
 .container-main {
     grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
@@ -106,4 +114,15 @@ body {
 }
 h1:not(.tsd-page-title h1) {
     margin-top: 0;
+}
+
+/* Make margins between params larger */
+li.tsd-parameter {
+    margin-bottom: 3rem;
+}
+li.tsd-parameter > h5 {
+    margin-bottom: 1rem 0;
+}
+.tsd-type-declaration > h4 {
+    margin: 2rem 0;
 }
