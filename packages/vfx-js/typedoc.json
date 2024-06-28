@@ -22,5 +22,7 @@
         "html": true
     },
     "excludeInternal": true,
-    "readme": "docs/home.md"
+    "readme": "docs/home.md",
+    "plugin": ["typedoc-plugin-missing-exports"],
+    "placeInternalsInOwningModule": true
 }

@@ -28,6 +28,7 @@
     "prettier": "^3.3.1",
     "rimraf": "^5.0.7",
     "typedoc": "^0.26.2",
+    "typedoc-plugin-missing-exports": "^3.0.0",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
   },
