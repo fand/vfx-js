@@ -1,18 +1,50 @@
 import THREE from "three";
 import { ShaderPreset } from "./constants";
 
+/**
+ * Options to initialize `VFX` class.
+ */
 export type VFXOpts = {
+    /**
+     * The pixelRatio of the WebGL rendering context.
+     *
+     * VFX-JS renders the output with `window.devicePixelRatio` by default.
+     * This means the resolution of the WebGL canvas gets larger in high-DPI display devices (e.g. iPhone).
+     *
+     * However, you might find VFX-JS not being rendered smoothly, especially in low-end devices.
+     * In such case, you can pass lower values to `pixelRatio` so VFX-JS can render in lower resolutions.
+     *
+     * For example, if `pixelRatio` is 0.5, VFX-JS renders in the half resolution of the native resolution.
+     */
     pixelRatio?: number;
+
+    /**
+     * `z-index` for the WebGL canvas.
+     * This is useful if you want to place the canvas behind other DOM element, or vice versa.
+     */
     zIndex?: number;
 };
 
+/**
+ * Properties for the element passed to `VFX.add()`.
+ */
 export type VFXProps = {
     /**
      * Shader code or preset name.
      */
     shader?: ShaderPreset | string;
 
+    /**
+     * The release time for transition shaders.
+     */
     release?: number;
+
+    /**
+     * Uniform values to be passed to the shader.
+     *
+     * You can
+     *
+     */
     uniforms?: VFXUniforms;
 
     /**
@@ -34,9 +66,22 @@ export type VFXProps = {
         | [top: number, right: number, bottom: number, left: number]
         | { top?: number; right?: number; bottom?: number; left?: number };
 
+    /**
+     * Texture wrapping mode.
+     *
+     * You can pass a single value to specify both horizontal and vertical wrapping at once,
+     * or you can provide a tuple to spefify different modes for horizontal / vertical wrapping.
+     *
+     * If not provided, VFX-JS will use "repeat" mode for both horizontal and vertical wrapping.
+     */
     wrap?: VFXWrap | [VFXWrap, VFXWrap];
 };
 
+/**
+ * Texture wrapping mode.
+ * This corresponds to `gl.CLAMP_TO_EDGE`, `gl.REPEAT` and `gl.MIRRORED_REPEAT` in WebGL API.
+ * ref. https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_textures_in_WebGL
+ */
 export type VFXWrap = "clamp" | "repeat" | "mirror";
 
 export type VFXUniforms = {
