@@ -1,4 +1,4 @@
-import VFXPlayer from "./vfx-player";
+import { VFXPlayer } from "./vfx-player";
 import { VFXOpts, VFXProps } from "./types";
 
 const canvasStyle = {

@@ -24,7 +24,7 @@ type Rect = {
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
-export default class VFXPlayer {
+export class VFXPlayer {
     #canvas: HTMLCanvasElement;
     #renderer: THREE.WebGLRenderer;
     #camera: THREE.Camera;
