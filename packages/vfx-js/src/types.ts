@@ -15,6 +15,8 @@ export type VFXOpts = {
      * In such case, you can pass lower values to `pixelRatio` so VFX-JS can render in lower resolutions.
      *
      * For example, if `pixelRatio` is 0.5, VFX-JS renders in the half resolution of the native resolution.
+     *
+     * ref. https://developer.mozilla.org/en-US/docs/Web/API/Window/devicePixelRatio
      */
     pixelRatio?: number;
 
@@ -31,19 +33,55 @@ export type VFXOpts = {
 export type VFXProps = {
     /**
      * Shader code or preset name.
+     *
+     * You can pass the preset name listed in [ShaderPreset](./ShaderPreset),
+     * then VFX-JS will use the corresponding shader preset.
+     *
+     * You can also write the shader by yourself, and pass the shader code here.
      */
     shader?: ShaderPreset | string;
 
     /**
-     * The release time for transition shaders.
+     * The release time for the element.
+     *
+     * Basically, VFX-JS starts rendering the element when the element entered the viewport,
+     * and it stops rendering after it got out of the viewport by scroll etc.
+     *
+     * Setting `release` will let VFX-JS to continue rendering the element after it goes out the viewport for the given duration.
+     * This is useful when the element has overflow and it has to be rendered after it left the viewport.
      */
     release?: number;
 
     /**
      * Uniform values to be passed to the shader.
+     * `uniforms` should be a map of the uniform variable name and the value.
      *
-     * You can
+     * ```js
+     * vfx.add(element, { shader, uniforms: {
+     *   myParam1: 1,
+     *   myParam2: [1.0, 2.0],
+     *   myColor:  [0, 0, 1, 1], // blue
+     * }});
+     * ```
      *
+     * Then these values are available inside GLSL shader.
+     *
+     * ```glsl
+     * uniform float myParam1;
+     * uniform vec2 myParam2;
+     * uniform vec4 myColor;
+     * ```
+     *
+     * You can also use a function to return the value every frame.
+     * This is useful to make a parameters that can change by time or user interactions.
+     *
+     * ```js
+     * vfx.add(element, { shader, uniforms: {
+     *   scroll: () => window.scrollY,
+     * }});
+     * ```
+     *
+     * Supported uniform types are defined as [`VFXUniformValue`](./VFXUniformValue).
      */
     uniforms?: VFXUniforms;
 
@@ -80,6 +118,7 @@ export type VFXProps = {
 /**
  * Texture wrapping mode.
  * This corresponds to `gl.CLAMP_TO_EDGE`, `gl.REPEAT` and `gl.MIRRORED_REPEAT` in WebGL API.
+ *
  * ref. https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_textures_in_WebGL
  * @notExported
  */
@@ -89,6 +128,10 @@ export type VFXUniforms = {
     [name: string]: VFXUniformValue | (() => VFXUniformValue);
 };
 
+/**
+ * Type for the values of uniform variables.
+ * Each of these corresponds to `float`, `vec2`, `vec3` and `vec4` in GLSL.
+ */
 export type VFXUniformValue =
     | number // float
     | [number, number] // vec2
