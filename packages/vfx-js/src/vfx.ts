@@ -11,6 +11,9 @@ const canvasStyle = {
     "pointer-events": "none",
 };
 
+/**
+ * The main interface of VFX-JS.
+ */
 export class VFX {
     #player: VFXPlayer;
 

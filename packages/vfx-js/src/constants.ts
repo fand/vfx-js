@@ -1,3 +1,6 @@
+/**
+ * @internal
+ */
 export const DEFAULT_VERTEX_SHADER = `
 precision highp float;
 void main() {
