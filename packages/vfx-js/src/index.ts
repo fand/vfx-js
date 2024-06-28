@@ -1,3 +1,8 @@
+/**
+ * General!!!
+ * @module VFX-JS
+ */
+
 export * from "./vfx";
 export * from "./constants";
 

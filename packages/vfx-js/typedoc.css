@@ -1,0 +1,46 @@
+html,
+body {
+    overflow-x: hidden;
+}
+
+/* Hide right sidebar */
+.container-main {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+    grid-template-areas: "sidebar content";
+}
+.page-menu {
+    display: none !important;
+}
+
+/* Fix header style */
+.container {
+    padding: 0 1rem !important;
+}
+.tsd-page-toolbar {
+    background: transparent;
+    border: none;
+    padding-top: 1rem;
+}
+#tsd-toolbar-links {
+    right: 1rem;
+}
+#tsd-toolbar-links a {
+    margin-left: 1rem !important;
+}
+.title {
+    color: transparent !important;
+}
+.title:after {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    content: "VFX-JS API docs";
+    color: white;
+    line-height: 1;
+}
+
+/* Align main section with the sidebar */
+.tsd-page-title > h2 {
+    margin-top: 0;
+}
