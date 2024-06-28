@@ -8,7 +8,35 @@ void main() {
 }
 `;
 
-export const shaders = {
+export type ShaderPreset =
+    | "uvGradient"
+    | "rainbow"
+    | "glitch"
+    | "rgbGlitch"
+    | "rgbShift"
+    | "shine"
+    | "blink"
+    | "spring"
+    | "duotone"
+    | "tritone"
+    | "hueShift"
+    | "sinewave"
+    | "pixelate"
+    | "halftone"
+    | "slitScanTransition"
+    | "warpTransition"
+    | "pixelateTransition";
+
+/**
+ * Shader code for presets.
+ * Shaders in `shader` can be looked up with keys in `ShaderPreset`.
+ *
+ * ```ts
+ * const shader = shaders["glitch"];
+ * console.log(shader);
+ * ```
+ */
+export const shaders: Record<ShaderPreset, string> = {
     uvGradient: `
     precision highp float;
     uniform vec2 resolution;
@@ -603,6 +631,4 @@ export const shaders = {
         gl_FragColor = texture2D(src, uv);
     }
     `,
-} as const;
-
-export type ShaderPreset = keyof typeof shaders;
+};

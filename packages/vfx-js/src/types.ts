@@ -10,7 +10,7 @@ export type VFXProps = {
     /**
      * Shader code or preset name.
      */
-    shader?: ShaderPreset | (string & NonNullable<unknown>);
+    shader?: ShaderPreset | string;
 
     release?: number;
     uniforms?: VFXUniforms;
