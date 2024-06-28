@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
 
@@ -8,4 +9,12 @@ export default defineConfig(() => ({
     },
     base: "",
     plugins: [viteCommonjs()],
+    build: {
+        rollupOptions: {
+            input: {
+                index: resolve(__dirname, "index.html"),
+                docs: resolve(__dirname, "docs/index.html"),
+            },
+        },
+    },
 }));

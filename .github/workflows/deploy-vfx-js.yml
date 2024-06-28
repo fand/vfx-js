@@ -25,6 +25,12 @@ jobs:
             - name: Build
               run: npm run build
 
+            - name: Sync TypeDoc
+              run: |
+                  cd packages/docs-vfx-js
+                  rm -rf dist/docs
+                  mv docs dist/docs
+
             - name: Pushes to another repository
               uses: cpina/github-action-push-to-another-repository@main
               env:

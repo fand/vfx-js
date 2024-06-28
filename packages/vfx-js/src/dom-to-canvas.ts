@@ -1,4 +1,7 @@
-// Convert HTML string to valid XML.
+/**
+ * Convert HTML string to valid XML.
+ * @internal
+ */
 const convertHtmlToXml = (html: string): string => {
     const doc = document.implementation.createHTMLDocument("test");
 
@@ -24,7 +27,10 @@ function cloneNode<T extends Node>(node: T): T {
     return node.cloneNode(true) as T;
 }
 
-// Render element content to canvas and return it.
+/**
+ * Render element content to canvas and return it.
+ * @internal
+ */
 export default async function getCanvasFromElement(
     element: HTMLElement,
     originalOpacity: number,

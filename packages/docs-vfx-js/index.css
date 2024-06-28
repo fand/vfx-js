@@ -86,6 +86,15 @@ pre > code {
     font-weight: bold;
     font-size: var(--link-size);
 }
+.HeaderTop.GitHub,
+.HeaderBottom.GitHub {
+    right: 32px;
+}
+.HeaderTop.API,
+.HeaderBottom.API {
+    right: calc(var(--link-size) * 4.2 + 32px);
+}
+
 .HeaderTop {
     z-index: 10010;
     cursor: pointer;

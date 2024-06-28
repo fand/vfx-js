@@ -14,6 +14,7 @@ import {
 /**
  * top-left origin rect.
  * Subset of DOMRect, which is returned by `HTMLElement.getBoundingClientRect()`.
+ * @internal
  */
 type Rect = {
     left: number;
@@ -24,7 +25,10 @@ type Rect = {
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
-export default class VFXPlayer {
+/**
+ * @internal
+ */
+export class VFXPlayer {
     #canvas: HTMLCanvasElement;
     #renderer: THREE.WebGLRenderer;
     #camera: THREE.Camera;

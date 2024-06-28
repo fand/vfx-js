@@ -27,6 +27,8 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^3.3.1",
     "rimraf": "^5.0.7",
+    "typedoc": "^0.26.2",
+    "typedoc-plugin-missing-exports": "^3.0.0",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
   },
@@ -62,7 +64,8 @@
     "lint": "eslint src/**/*.ts",
     "lint-staged": "lint-staged",
     "test": "vitest --dir src --run",
-    "test:watch": "vitest --dir src"
+    "test:watch": "vitest --dir src",
+    "typedoc": "typedoc --out ../docs-vfx-js/docs"
   },
   "types": "lib/esm/index.d.ts"
 }
