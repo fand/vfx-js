@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && rm -rf dist/docs && cp -a docs dist/docs",
     "preview": "vite preview"
   },
   "dependencies": {

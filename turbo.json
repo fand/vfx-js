@@ -3,7 +3,8 @@
     "tasks": {
         "build": {
             "dependsOn": [
-                "^build"
+                "^build",
+                "^typedoc"
             ],
             "outputs": [
                 "lib",
@@ -30,6 +31,7 @@
                 "lint"
             ],
             "outputs": []
-        }
+        },
+        "typedoc": {}
     }
 }
