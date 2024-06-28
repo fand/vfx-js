@@ -1,0 +1,22 @@
+{
+    "$schema": "https://typedoc.org/schema.json",
+    "name": "VFX-JS API",
+    "entryPoints": ["./src/index.ts"],
+    "sort": ["source-order"],
+    "categorizeByGroup": false,
+    "searchCategoryBoosts": {
+        "Component": 2,
+        "Model": 1.2
+    },
+    "searchGroupBoosts": {
+        "Classes": 1.5
+    },
+    "navigationLinks": {
+        "Home": "https://amagi.dev/vfx-js",
+        "GitHub": "https://github.com/fand/react-vfx"
+    },
+    "highlightLanguages": ["typescript", "tsx", "json", "jsonc", "yaml"],
+    "markdownItOptions": {
+        "html": true
+    }
+}

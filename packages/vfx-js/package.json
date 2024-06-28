@@ -64,7 +64,7 @@
     "lint-staged": "lint-staged",
     "test": "vitest --dir src --run",
     "test:watch": "vitest --dir src",
-    "typedoc": "typedoc --out ../docs-vfx-js/docs src/**/*.ts"
+    "typedoc": "typedoc --out ../docs-vfx-js/docs"
   },
   "types": "lib/esm/index.d.ts"
 }
