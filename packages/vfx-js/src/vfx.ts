@@ -17,6 +17,9 @@ const canvasStyle = {
 export class VFX {
     #player: VFXPlayer;
 
+    /**
+     * Creates VFX instance and start playing immediately.
+     */
     constructor(opts: VFXOpts = {}) {
         const canvas = document.createElement("canvas");
         for (const [k, v] of Object.entries(canvasStyle)) {
@@ -31,6 +34,9 @@ export class VFX {
         this.#player.play();
     }
 
+    /**
+     * Register an element to track the position and render visual effects in the area.
+     */
     add(element: HTMLElement, opts: VFXProps): void {
         if (element instanceof HTMLImageElement) {
             this.#addImage(element, opts);
@@ -41,22 +47,43 @@ export class VFX {
         }
     }
 
+    /**
+     * Remove the element from VFX and stop rendering the shader.
+     */
     remove(element: HTMLElement): void {
         this.#player.removeElement(element);
     }
 
+    /**
+     * Update the texture for the given element.
+     *
+     * If the element is an HTMLImageElemnt or HTMLVideoElement, VFX-JS does nothing.
+     * Otherwise, VFX-JS captures a new snapshot of the DOM tree under the elemnt and udpate the WebGL texture with it.
+     *
+     * This is useful to apply effects to eleents whose contents change dynamically (e.g. input, textare etc).
+     */
     update(element: HTMLElement): Promise<void> {
         return this.#player.updateTextElement(element);
     }
 
+    /**
+     * Start rendering VFX.
+     */
     play(): void {
         this.#player.play();
     }
 
+    /**
+     * Stop rendering VFX.
+     * You can restart rendering by calling `VFX.play()` later.
+     */
     stop(): void {
         this.#player.stop();
     }
 
+    /**
+     * Destroy VFX and stop rendering.
+     */
     destroy(): void {
         this.#player.destroy();
     }
