@@ -95,8 +95,14 @@ export type VFXUniformValue =
     | [number, number, number] // vec3
     | [number, number, number, number]; // vec4
 
+/**
+ * @internal
+ */
 export type VFXElementType = "img" | "video" | "text";
 
+/**
+ * @internal
+ */
 export type VFXElement = {
     type: VFXElementType;
     element: HTMLElement;
@@ -115,6 +121,9 @@ export type VFXElement = {
     originalOpacity: number;
 };
 
+/**
+ * @internal
+ */
 export type VFXElementOverflow =
     | "fullscreen"
     | { top: number; right: number; bottom: number; left: number };
