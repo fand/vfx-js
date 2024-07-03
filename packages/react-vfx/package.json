@@ -29,6 +29,7 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^3.3.1",
     "rimraf": "^5.0.7",
+    "tsconfig-to-dual-package": "^1.2.0",
     "typescript": "^5.4.5"
   },
   "homepage": "https://amagi.dev/react-vfx",
@@ -45,10 +46,17 @@
       "prettier --write"
     ]
   },
-  "main": "./lib/cjs/index.js",
+  "type": "module",
+  "main": "./lib/esm/index.js",
   "exports": {
-    "require": "./lib/cjs/index.js",
-    "import": "./lib/esm/index.mjs"
+    "require": {
+      "types": "./lib/cjs/index.d.ts",
+      "default": "./lib/cjs/index.js"
+    },
+    "import": {
+      "types": "./lib/esm/index.d.ts",
+      "default": "./lib/esm/index.js"
+    }
   },
   "peerDependencies": {
     "react": ">= 16.12.0",
@@ -58,9 +66,10 @@
     "url": "https://github.com/fand/react-vfx"
   },
   "scripts": {
-    "build": "run-s clean build:cjs build:esm",
+    "build": "run-s clean build:cjs build:esm build:dual",
     "build:cjs": "tsc -d",
     "build:esm": "tsc -d -p tsconfig.esm.json",
+    "build:dual": "tsconfig-to-dual-package",
     "clean": "rimraf lib",
     "dev": "run-p watch:cjs watch:esm",
     "watch:cjs": "tsc -d -w",
