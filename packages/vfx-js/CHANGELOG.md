@@ -1,5 +1,11 @@
 # react-vfx
 
+## 0.3.0
+
+### Minor Changes
+
+-   Migrate to ESM
+
 ## 0.2.0
 
 ### Minor Changes

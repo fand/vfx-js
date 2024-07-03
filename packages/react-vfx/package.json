@@ -1,7 +1,7 @@
 {
   "name": "react-vfx",
   "description": "WebGL effects for React elements",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "files": [
     "package.json",
     "README.md",
@@ -37,7 +37,7 @@
     "react-dom": ">= 16.12.0"
   },
   "dependencies": {
-    "@vfx-js/core": "0.2.0"
+    "@vfx-js/core": "0.3.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",

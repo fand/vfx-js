@@ -1,7 +1,7 @@
 {
   "name": "docs-vfx-js",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vfx-js/core": "0.2.0",
+    "@vfx-js/core": "0.3.0",
     "dedent": "^1.5.3",
     "is-mobile": "^4.0.0",
     "lodash.debounce": "^4.0.8",
