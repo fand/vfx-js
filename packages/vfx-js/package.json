@@ -2,19 +2,42 @@
   "name": "@vfx-js/core",
   "description": "Easy WebGL effects for HTML elements",
   "version": "0.2.0",
-  "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
-  "bugs": {
-    "url": "https://github.com/fand/react-vfx/issues"
-  },
-  "dependencies": {
-    "three": "^0.165.0"
-  },
   "files": [
     "package.json",
     "README.md",
     "lib/"
   ],
   "type": "module",
+  "main": "./lib/esm/index.js",
+  "types": "lib/esm/index.d.ts",
+  "exports": {
+    "require": {
+      "types": "./lib/cjs/index.d.ts",
+      "default": "./lib/cjs/index.js"
+    },
+    "import": {
+      "types": "./lib/esm/index.d.ts",
+      "default": "./lib/esm/index.js"
+    }
+  },
+  "scripts": {
+    "build": "run-s clean build:cjs build:esm build:dual",
+    "build:cjs": "tsc -d",
+    "build:esm": "tsc -d -p tsconfig.esm.json",
+    "build:dual": "tsconfig-to-dual-package",
+    "clean": "rimraf lib",
+    "dev": "run-p watch:cjs watch:esm",
+    "watch:cjs": "tsc -d -w",
+    "watch:esm": "tsc -d -w -p tsconfig.esm.json",
+    "lint": "eslint src/**/*.ts",
+    "lint-staged": "lint-staged",
+    "test": "vitest --dir src --run",
+    "test:watch": "vitest --dir src",
+    "typedoc": "typedoc --out ../docs-vfx-js/docs"
+  },
+  "dependencies": {
+    "three": "^0.165.0"
+  },
   "devDependencies": {
     "@types/node": "^20.14.2",
     "@types/three": "^0.165.0",
@@ -34,47 +57,24 @@
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
   },
-  "homepage": "https://amagi.dev/vfx-js",
-  "keywords": [
-    "glsl",
-    "threejs",
-    "webgl"
-  ],
-  "license": "MIT",
   "lint-staged": {
     "src/*.ts": [
       "eslint --fix",
       "prettier --write"
     ]
   },
-  "main": "./lib/esm/index.js",
-  "exports": {
-    "require": {
-      "types": "./lib/cjs/index.d.ts",
-      "default": "./lib/cjs/index.js"
-    },
-    "import": {
-      "types": "./lib/esm/index.d.ts",
-      "default": "./lib/esm/index.js"
-    }
-  },
+  "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
+  "homepage": "https://amagi.dev/vfx-js",
   "repository": {
     "url": "https://github.com/fand/react-vfx"
   },
-  "scripts": {
-    "build": "run-s clean build:cjs build:esm build:dual",
-    "build:cjs": "tsc -d",
-    "build:esm": "tsc -d -p tsconfig.esm.json",
-    "build:dual": "tsconfig-to-dual-package",
-    "clean": "rimraf lib",
-    "dev": "run-p watch:cjs watch:esm",
-    "watch:cjs": "tsc -d -w",
-    "watch:esm": "tsc -d -w -p tsconfig.esm.json",
-    "lint": "eslint src/**/*.ts",
-    "lint-staged": "lint-staged",
-    "test": "vitest --dir src --run",
-    "test:watch": "vitest --dir src",
-    "typedoc": "typedoc --out ../docs-vfx-js/docs"
+  "bugs": {
+    "url": "https://github.com/fand/react-vfx/issues"
   },
-  "types": "lib/esm/index.d.ts"
+  "keywords": [
+    "glsl",
+    "threejs",
+    "webgl"
+  ],
+  "license": "MIT"
 }
