@@ -6,7 +6,7 @@ import { VFXContext } from "./context.js";
 type VFXElementProps<T extends keyof JSX.IntrinsicElements> =
     JSX.IntrinsicElements[T] & VFXProps;
 
-function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
+export function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
     type: T,
 ): React.ForwardRefExoticComponent<
     React.PropsWithoutRef<VFXElementProps<T>> & React.RefAttributes<HTMLElement>
@@ -65,5 +65,3 @@ function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
         return React.createElement(type, { ...rawProps, ref });
     });
 }
-
-export default VFXElementFactory;
