@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { VFXContext } from "./context";
+import { VFXContext } from "./context.js";
 
 export type UseVFX = {
     /**
