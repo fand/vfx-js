@@ -2,18 +2,43 @@
   "name": "react-vfx",
   "description": "WebGL effects for React elements",
   "version": "0.7.0",
-  "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
-  "bugs": {
-    "url": "https://github.com/fand/react-vfx/issues"
-  },
-  "dependencies": {
-    "@vfx-js/core": "0.2.0"
-  },
   "files": [
     "package.json",
     "README.md",
     "lib/"
   ],
+  "type": "module",
+  "main": "./lib/esm/index.js",
+  "types": "lib/esm/index.d.ts",
+  "exports": {
+    "require": {
+      "types": "./lib/cjs/index.d.ts",
+      "default": "./lib/cjs/index.js"
+    },
+    "import": {
+      "types": "./lib/esm/index.d.ts",
+      "default": "./lib/esm/index.js"
+    }
+  },
+  "scripts": {
+    "build": "run-s clean build:cjs build:esm build:dual",
+    "build:cjs": "tsc -d",
+    "build:esm": "tsc -d -p tsconfig.esm.json",
+    "build:dual": "tsconfig-to-dual-package",
+    "clean": "rimraf lib",
+    "dev": "run-p watch:cjs watch:esm",
+    "watch:cjs": "tsc -d -w",
+    "watch:esm": "tsc -d -w -p tsconfig.esm.json",
+    "lint": "eslint src/**/*.ts src/**/*.tsx",
+    "lint-staged": "lint-staged"
+  },
+  "peerDependencies": {
+    "react": ">= 16.12.0",
+    "react-dom": ">= 16.12.0"
+  },
+  "dependencies": {
+    "@vfx-js/core": "0.2.0"
+  },
   "devDependencies": {
     "@types/node": "^20.14.2",
     "@types/react": "^18.3.3",
@@ -29,44 +54,28 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^3.3.1",
     "rimraf": "^5.0.7",
+    "tsconfig-to-dual-package": "^1.2.0",
     "typescript": "^5.4.5"
   },
-  "homepage": "https://amagi.dev/react-vfx",
-  "keywords": [
-    "glsl",
-    "react",
-    "threejs",
-    "webgl"
-  ],
-  "license": "MIT",
   "lint-staged": {
     "src/*.{ts,tsx}": [
       "eslint --fix",
       "prettier --write"
     ]
   },
-  "main": "./lib/cjs/index.js",
-  "exports": {
-    "require": "./lib/cjs/index.js",
-    "import": "./lib/esm/index.mjs"
-  },
-  "peerDependencies": {
-    "react": ">= 16.12.0",
-    "react-dom": ">= 16.12.0"
-  },
+  "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
+  "homepage": "https://amagi.dev/react-vfx",
   "repository": {
     "url": "https://github.com/fand/react-vfx"
   },
-  "scripts": {
-    "build": "run-s clean build:cjs build:esm",
-    "build:cjs": "tsc -d",
-    "build:esm": "tsc -d -p tsconfig.esm.json",
-    "clean": "rimraf lib",
-    "dev": "run-p watch:cjs watch:esm",
-    "watch:cjs": "tsc -d -w",
-    "watch:esm": "tsc -d -w -p tsconfig.esm.json",
-    "lint": "eslint src/**/*.ts src/**/*.tsx",
-    "lint-staged": "lint-staged"
+  "bugs": {
+    "url": "https://github.com/fand/react-vfx/issues"
   },
-  "types": "lib/esm/index.d.ts"
+  "keywords": [
+    "glsl",
+    "react",
+    "threejs",
+    "webgl"
+  ],
+  "license": "MIT"
 }

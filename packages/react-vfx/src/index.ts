@@ -1,1 +1,1 @@
-export * from "./react-vfx";
+export * from "./react-vfx.js";

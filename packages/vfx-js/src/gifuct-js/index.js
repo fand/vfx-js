@@ -1,2 +1,2 @@
-import GIF from "./gif";
+import GIF from "./gif.js";
 export default GIF;

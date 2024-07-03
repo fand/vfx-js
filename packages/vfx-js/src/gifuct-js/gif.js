@@ -1,7 +1,7 @@
 // object used to represent array buffer data for a gif file
 
-import DataParser from "./dataparser";
-import gifSchema from "./schema";
+import DataParser from "./dataparser.js";
+import gifSchema from "./schema.js";
 
 function GIF(arrayBuffer) {
     // convert to byte array
@@ -39,7 +39,7 @@ GIF.prototype.decompressFrame = function (index, buildPatch) {
         var pixels = lzw(
             frame.image.data.minCodeSize,
             frame.image.data.blocks,
-            totalPixels
+            totalPixels,
         );
 
         // deal with interlacing if necessary
@@ -215,11 +215,11 @@ GIF.prototype.decompressFrame = function (index, buildPatch) {
         var cpRow = function (toRow, fromRow) {
             var fromPixels = pixels.slice(
                 fromRow * width,
-                (fromRow + 1) * width
+                (fromRow + 1) * width,
             );
             newPixels.splice.apply(
                 newPixels,
-                [toRow * width, width].concat(fromPixels)
+                [toRow * width, width].concat(fromPixels),
             );
         };
 

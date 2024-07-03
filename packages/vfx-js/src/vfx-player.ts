@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import dom2canvas from "./dom-to-canvas";
-import { shaders, DEFAULT_VERTEX_SHADER } from "./constants";
-import GIFData from "./gif";
+import dom2canvas from "./dom-to-canvas.js";
+import { shaders, DEFAULT_VERTEX_SHADER } from "./constants.js";
+import GIFData from "./gif.js";
 import {
     VFXProps,
     VFXElement,

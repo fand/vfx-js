@@ -15,22 +15,22 @@
     "prepare-release": "changeset && turbo run build lint test && changeset version",
     "release": "changeset publish"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/fand/react-vfx.git"
+  "dependencies": {
+    "@changesets/cli": "^2.27.5"
   },
-  "keywords": [],
-  "author": "AMAGI <mail@amagi.dev> (https://amagi.dev/)",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/fand/react-vfx/issues"
-  },
-  "homepage": "https://github.com/fand/react-vfx#readme",
   "devDependencies": {
     "husky": "^9.0.11",
     "turbo": "^2.0.3"
   },
-  "dependencies": {
-    "@changesets/cli": "^2.27.5"
-  }
+  "author": "AMAGI <mail@amagi.dev> (https://amagi.dev/)",
+  "homepage": "https://github.com/fand/react-vfx#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fand/react-vfx.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fand/react-vfx/issues"
+  },
+  "keywords": [],
+  "license": "MIT"
 }

@@ -2,7 +2,7 @@
 // For js object convenience (re-use), the schema objects are approximately reverse ordered
 
 // common parsers available
-import Parsers from "./parsers";
+import Parsers from "./parsers.js";
 
 // a set of 0x00 terminated subblocks
 var subBlocks = {

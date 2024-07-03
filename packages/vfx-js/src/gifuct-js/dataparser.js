@@ -1,6 +1,6 @@
 // Primary data parsing object used to parse byte arrays
 
-import ByteStream from "./bytestream";
+import ByteStream from "./bytestream.js";
 
 function DataParser(data) {
     this.stream = new ByteStream(data);
@@ -73,7 +73,7 @@ DataParser.prototype.parseBits = function (details) {
         if (item.length) {
             // convert the bit set to value
             out[key] = bitsToNum(
-                bits.slice(item.index, item.index + item.length)
+                bits.slice(item.index, item.index + item.length),
             );
         } else {
             out[key] = bits[item.index];
