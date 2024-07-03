@@ -3,7 +3,7 @@
  * @module VFX-JS
  */
 
-export * from "./vfx";
-export * from "./constants";
+export * from "./vfx.js";
+export * from "./constants.js";
 
-export type { VFXOpts, VFXProps } from "./types";
+export type { VFXOpts, VFXProps } from "./types.js";

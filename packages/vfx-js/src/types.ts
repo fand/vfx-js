@@ -1,5 +1,5 @@
 import THREE from "three";
-import { ShaderPreset } from "./constants";
+import { ShaderPreset } from "./constants.js";
 
 /**
  * Options to initialize `VFX` class.

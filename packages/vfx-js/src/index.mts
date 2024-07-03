@@ -1,4 +1,4 @@
-export * from "./vfx";
-export * from "./constants";
+export * from "./vfx.js";
+export * from "./constants.js";
 
-export type * from "./types";
+export type * from "./types.js";

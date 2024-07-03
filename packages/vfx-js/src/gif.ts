@@ -1,4 +1,4 @@
-import GIF from "./gifuct-js";
+import GIF from "./gifuct-js/index.js";
 
 interface GIFFrame {
     patch: Uint8ClampedArray;
