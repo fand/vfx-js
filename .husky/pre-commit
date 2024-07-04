@@ -2,3 +2,4 @@
 . "$(dirname "$0")/_/husky.sh"
 
 npm --workspace=react-vfx run lint-staged
+npm --workspace=@vfx-js/core run lint-staged

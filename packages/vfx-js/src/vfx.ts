@@ -16,6 +16,7 @@ const canvasStyle = {
  */
 export class VFX {
     #player: VFXPlayer;
+    #canvas: HTMLCanvasElement;
 
     /**
      * Creates VFX instance and start playing immediately.
@@ -29,6 +30,7 @@ export class VFX {
             canvas.style.setProperty("z-index", opts.zIndex.toString());
         }
         document.body.appendChild(canvas);
+        this.#canvas = canvas;
 
         this.#player = new VFXPlayer(canvas);
         this.#player.play();
@@ -86,6 +88,7 @@ export class VFX {
      */
     destroy(): void {
         this.#player.destroy();
+        this.#canvas.remove();
     }
 
     #addImage(element: HTMLImageElement, opts: VFXProps): void {
