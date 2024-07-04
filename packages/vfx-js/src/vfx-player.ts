@@ -285,7 +285,10 @@ export class VFXPlayer {
     removeElement(element: HTMLElement): void {
         const i = this.#elements.findIndex((e) => e.element === element);
         if (i !== -1) {
-            this.#elements.splice(i, 1);
+            const e = this.#elements.splice(i, 1)[0] as VFXElement;
+
+            // Recover the original state
+            element.style.setProperty("opacity", e.originalOpacity.toString());
         }
     }
 
