@@ -32,7 +32,7 @@ export class VFXPlayer {
     #canvas: HTMLCanvasElement;
     #renderer: THREE.WebGLRenderer;
     #camera: THREE.Camera;
-    #isPlaying = false;
+    #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
     #elements: VFXElement[] = [];
 
@@ -300,13 +300,21 @@ export class VFXPlayer {
         return Promise.resolve();
     }
 
+    isPlaying(): boolean {
+        return this.#playRequest !== undefined;
+    }
+
     play(): void {
-        this.#isPlaying = true;
-        this.#playLoop();
+        if (!this.isPlaying()) {
+            this.#playRequest = requestAnimationFrame(this.#playLoop);
+        }
     }
 
     stop(): void {
-        this.#isPlaying = false;
+        if (this.#playRequest !== undefined) {
+            cancelAnimationFrame(this.#playRequest);
+            this.#playRequest = undefined;
+        }
     }
 
     #playLoop = (): void => {
@@ -398,8 +406,8 @@ export class VFXPlayer {
             }
         }
 
-        if (this.#isPlaying) {
-            requestAnimationFrame(this.#playLoop);
+        if (this.isPlaying()) {
+            this.#playRequest = requestAnimationFrame(this.#playLoop);
         }
     };
 
