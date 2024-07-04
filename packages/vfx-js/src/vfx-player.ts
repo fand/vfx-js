@@ -72,6 +72,7 @@ export class VFXPlayer {
     }
 
     destroy(): void {
+        this.stop();
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", this.#resize);
             window.removeEventListener("mousemove", this.#mousemove);
