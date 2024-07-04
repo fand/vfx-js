@@ -217,8 +217,14 @@ export class VFXPlayer {
         texture.needsUpdate = true;
 
         // Hide original element
-        const opacity = type === "video" ? "0.0001" : "0"; // don't hide video element completely to prevent jank frames
-        element.style.setProperty("opacity", opacity);
+        if (opts.overlay === true) {
+            /* Overlay mode. Do not hide the element */
+        } else if (typeof opts.overlay === "number") {
+            element.style.setProperty("opacity", opts.overlay.toString());
+        } else {
+            const opacity = type === "video" ? "0.0001" : "0"; // don't hide video element completely to prevent jank frames
+            element.style.setProperty("opacity", opacity.toString());
+        }
 
         const uniforms: { [name: string]: THREE.IUniform } = {
             src: { value: texture },

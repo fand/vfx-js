@@ -86,6 +86,20 @@ export type VFXProps = {
     uniforms?: VFXUniforms;
 
     /**
+     * The opacity for the original HTML element.
+     *
+     * By default, VFX-JS hides the original element by setting its opacity to 0.
+     * However, in some cases you might want not to hide the original element.
+     * `overlay` allows you to specify the opacity to be set explicitly.
+     *
+     * If you pass `true`, VFX-JS will preserve the original element's opacity.
+     *
+     * You can also specify the opacity by passing a number.
+     * For example, `overlay: 0.5` will set the opacity of the orignal element to 0.5.
+     */
+    overlay?: true | number;
+
+    /**
      * Allow shader outputs to oveflow the original element area.
      * If true, REACT-VFX will render the shader in fullscreen.
      * If number is specified, REACT-VFX adds paddings with the given value.
