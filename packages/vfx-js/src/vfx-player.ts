@@ -317,15 +317,8 @@ export class VFXPlayer {
         }
     }
 
-    #lastNow = 0;
-
     #playLoop = (): void => {
         const now = Date.now() / 1000;
-
-        // TMP: log estimated FPS
-        const fps = 1 / (now - this.#lastNow);
-        console.log(">> FPS:", fps.toFixed(5));
-        this.#lastNow = now;
 
         this.#renderer.clear();
 
