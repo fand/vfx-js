@@ -127,6 +127,12 @@ export type VFXProps = {
      * If not provided, VFX-JS will use "repeat" mode for both horizontal and vertical wrapping.
      */
     wrap?: VFXWrap | [VFXWrap, VFXWrap];
+
+    /**
+     * Z-index inside WebGL world.
+     * Default is `0`.
+     */
+    zIndex?: number;
 };
 
 /**
@@ -176,6 +182,7 @@ export type VFXElement = {
     isGif: boolean;
     overflow: VFXElementOverflow;
     originalOpacity: number;
+    zIndex: number;
 };
 
 /**
