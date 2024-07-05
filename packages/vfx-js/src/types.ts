@@ -42,7 +42,7 @@ export type VFXProps = {
     shader?: ShaderPreset | string;
 
     /**
-     * The release time for the element.
+     * The release time for the element. (Default: `0`)
      *
      * Basically, VFX-JS starts rendering the element when the element entered the viewport,
      * and it stops rendering after it got out of the viewport by scroll etc.
@@ -86,7 +86,7 @@ export type VFXProps = {
     uniforms?: VFXUniforms;
 
     /**
-     * The opacity for the original HTML element.
+     * The opacity for the original HTML element. (Default: `false`)
      *
      * By default, VFX-JS hides the original element by setting its opacity to 0.
      * However, in some cases you might want not to hide the original element.
@@ -100,7 +100,8 @@ export type VFXProps = {
     overlay?: true | number;
 
     /**
-     * Allow shader outputs to oveflow the original element area.
+     * Allow shader outputs to oveflow the original element area. (Default: `0`)
+     *
      * If true, REACT-VFX will render the shader in fullscreen.
      * If number is specified, REACT-VFX adds paddings with the given value.
      *
@@ -119,7 +120,7 @@ export type VFXProps = {
         | { top?: number; right?: number; bottom?: number; left?: number };
 
     /**
-     * Texture wrapping mode.
+     * Texture wrapping mode. (Default: `"repeat"`)
      *
      * You can pass a single value to specify both horizontal and vertical wrapping at once,
      * or you can provide a tuple to spefify different modes for horizontal / vertical wrapping.
@@ -129,8 +130,11 @@ export type VFXProps = {
     wrap?: VFXWrap | [VFXWrap, VFXWrap];
 
     /**
-     * Z-index inside WebGL world.
-     * Default is `0`.
+     * Z-index inside WebGL world. (Default: `0`)
+     *
+     * VFX-JS renders elements in ascending order by `zIndex`.
+     * For example, when we have elements with `zIndex: 1` and `zIndex: -1`, the second element is rendered first.
+     * When elements have the same `zIndex`, they are rendered in the order they were added.
      */
     zIndex?: number;
 };
