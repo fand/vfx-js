@@ -284,9 +284,14 @@ export class VFXPlayer {
             isGif,
             overflow,
             originalOpacity,
+            zIndex: opts.zIndex ?? 0,
         };
 
+        // Insert element and sort elements by z-index.
+        // Array.prototype.sort is stable sort, so the elements with same z
+        // will be rendered by the order they are added to VFX.
         this.#elements.push(elem);
+        this.#elements.sort((a, b) => a.zIndex - b.zIndex);
     }
 
     removeElement(element: HTMLElement): void {
