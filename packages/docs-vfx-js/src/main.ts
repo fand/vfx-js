@@ -6,6 +6,10 @@ import "prism-themes/themes/prism-nord.min.css";
 Prism.manual = true;
 Prism.highlightAll();
 
+function lerp(a: number, b: number, t: number) {
+    return a * (1 - t) + b * t;
+}
+
 const shaders: Record<string, string> = {
     logo: `
     precision highp float;
@@ -143,6 +147,21 @@ const shaders: Record<string, string> = {
         gl_FragColor = img;
     }
     `,
+    canvas: `
+precision highp float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform sampler2D src;
+
+void main (void) {
+    vec2 fc = gl_FragCoord.xy;
+    float res = sin(time) * 32. + 33.;
+    fc.y = floor(fc.y / res) * res;
+    vec2 uv = (fc - offset) / resolution;
+    gl_FragColor = texture2D(src, uv);
+}
+    `,
     custom: `
 precision highp float;
 uniform vec2 resolution;
@@ -218,6 +237,64 @@ class App {
         });
     }
 
+    initCanvas() {
+        const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+        const ctx = canvas.getContext("2d")!;
+        const { width, height } = canvas.getBoundingClientRect();
+        const ratio = window.devicePixelRatio ?? 1;
+        canvas.width = width * ratio;
+        canvas.height = height * ratio;
+        ctx.scale(ratio, ratio);
+
+        const ps = [[width / 2, height / 2]];
+        let mouse = [width / 2, height / 2];
+        let isMouseOn = false;
+        const startTime = Date.now();
+
+        canvas.addEventListener("mousemove", (e) => {
+            isMouseOn = true;
+            mouse = [e.offsetX, e.offsetY];
+        });
+        canvas.addEventListener("mouseleave", (e) => {
+            isMouseOn = false;
+        });
+
+        const drawMouseStalker = () => {
+            if (!isMouseOn) {
+                const t = Date.now() / 1000 - startTime;
+                const target = [
+                    width * 0.5 + Math.sin(t * 1.3) * width * 0.3,
+                    height * 0.5 + Math.sin(t * 1.7) * height * 0.3,
+                ];
+                mouse = [
+                    lerp(mouse[0], target[0], 0.1),
+                    lerp(mouse[1], target[1], 0.1),
+                ];
+            }
+            ps.push(mouse);
+            ps.splice(0, ps.length - 30);
+
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, width, height);
+
+            for (let i = 0; i < ps.length; i++) {
+                const [x, y] = ps[i];
+                const t = (i / ps.length) * 255;
+                ctx.fillStyle = `rgb(${255 - t}, 180, ${t})`;
+                ctx.beginPath();
+                ctx.arc(x, y, i + 20, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+
+            this.vfx.update(canvas);
+            requestAnimationFrame(drawMouseStalker);
+        };
+        drawMouseStalker();
+
+        this.vfx.add(canvas, { shader: "halftone" });
+    }
+
     initCustomShader() {
         const e = document.getElementById("custom")!;
         this.vfx.add(e, {
@@ -265,6 +342,7 @@ window.addEventListener("load", () => {
     app.initBG();
     app.initVFX();
     app.initDiv();
+    app.initCanvas();
     app.initCustomShader();
     app.hideMask();
     setTimeout(() => {
