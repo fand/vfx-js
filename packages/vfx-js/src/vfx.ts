@@ -66,8 +66,13 @@ export class VFX {
      *
      * This is useful to apply effects to eleents whose contents change dynamically (e.g. input, textare etc).
      */
-    update(element: HTMLElement): Promise<void> {
-        return this.#player.updateTextElement(element);
+    async update(element: HTMLElement): Promise<void> {
+        if (element instanceof HTMLCanvasElement) {
+            this.#player.updateCanvasElement(element);
+            return;
+        } else {
+            return this.#player.updateTextElement(element);
+        }
     }
 
     /**

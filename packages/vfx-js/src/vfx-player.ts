@@ -318,6 +318,13 @@ export class VFXPlayer {
         return Promise.resolve();
     }
 
+    updateCanvasElement(element: HTMLCanvasElement): void {
+        const e = this.#elements.find((e) => e.element === element);
+        if (e) {
+            e.uniforms["src"].value.needsUpdate = true;
+        }
+    }
+
     isPlaying(): boolean {
         return this.#playRequest !== undefined;
     }
