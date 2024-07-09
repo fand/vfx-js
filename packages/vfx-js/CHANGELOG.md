@@ -1,5 +1,11 @@
 # react-vfx
 
+## 0.4.0
+
+### Minor Changes
+
+-   Add canvas support etc
+
 ## 0.3.0
 
 ### Minor Changes

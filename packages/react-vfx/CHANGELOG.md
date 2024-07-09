@@ -1,5 +1,16 @@
 # react-vfx
 
+## 0.9.0
+
+### Minor Changes
+
+-   Add canvas support etc
+
+### Patch Changes
+
+-   Updated dependencies
+    -   @vfx-js/core@0.4.0
+
 ## 0.8.0
 
 ### Minor Changes
