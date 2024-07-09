@@ -53,7 +53,7 @@ jobs:
             - name: Pushes to another repository
               uses: cpina/github-action-push-to-another-repository@main
               env:
-                  SSH_DEPLOY_KEY: ${{ secrets.VFX_JS_DEPLOY_KEY }}
+                  SSH_DEPLOY_KEY: ${{ secrets.REACT_VFX_DEPLOY_KEY }}
               with:
                   source-directory: "packages/docs-react-vfx/dist"
                   destination-github-username: "fand"
