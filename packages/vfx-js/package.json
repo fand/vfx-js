@@ -33,7 +33,7 @@
     "lint-staged": "lint-staged",
     "test": "vitest --dir src --run",
     "test:watch": "vitest --dir src",
-    "typedoc": "typedoc --out ../docs-vfx-js/docs"
+    "typedoc": "typedoc --out ../docs/docs"
   },
   "dependencies": {
     "three": "^0.165.0"

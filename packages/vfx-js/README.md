@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="https://amagi.dev/vfx-js/" target="_blank"><img alt="VFX-JS" src="../docs-vfx-js/public/og_image.jpg" width="100%"/></a>
+  <a href="https://amagi.dev/vfx-js/" target="_blank"><img alt="VFX-JS" src="../docs/public/og_image.jpg" width="100%"/></a>
   <h1>VFX-JS: Visual Effects Framework for Web</h1>
   <br/>
   <br/>

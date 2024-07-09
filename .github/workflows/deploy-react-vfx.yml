@@ -1,4 +1,4 @@
-name: Deploy to amagi.dev/vfx-js
+name: Deploy to amagi.dev/react-vfx-docs
 
 on:
     push:
@@ -25,14 +25,13 @@ jobs:
             - name: Build
               run: npm run build
 
-            - name: Sync TypeDoc
-              run: |
-                  cd packages/docs
-                  rm -rf dist/docs
-                  mv docs dist/docs
-
-            - name: Deploy
-              uses: peaceiris/actions-gh-pages@v3
+            - name: Pushes to another repository
+              uses: cpina/github-action-push-to-another-repository@main
+              env:
+                  SSH_DEPLOY_KEY: ${{ secrets.REACT_VFX_DEPLOY_KEY }}
               with:
-                  github_token: ${{ secrets.GITHUB_TOKEN }}
-                  publish_dir: ./packages/docs/dist
+                  source-directory: "packages/docs-react-vfx/dist"
+                  destination-github-username: "fand"
+                  destination-repository-name: "react-vfx-docs"
+                  user-email: mail@amagi.dev
+                  target-branch: main

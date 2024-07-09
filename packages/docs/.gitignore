@@ -11,3 +11,6 @@ dist
 .vscode/*
 !.vscode/extensions.json
 .DS_Store
+
+# Typedoc outputs
+docs/*
