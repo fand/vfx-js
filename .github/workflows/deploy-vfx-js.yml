@@ -27,7 +27,7 @@ jobs:
 
             - name: Sync TypeDoc
               run: |
-                  cd packages/docs-vfx-js
+                  cd packages/docs
                   rm -rf dist/docs
                   mv docs dist/docs
 
@@ -36,7 +36,7 @@ jobs:
               env:
                   SSH_DEPLOY_KEY: ${{ secrets.VFX_JS_DEPLOY_KEY }}
               with:
-                  source-directory: "packages/docs-vfx-js/dist"
+                  source-directory: "packages/docs/dist"
                   destination-github-username: "fand"
                   destination-repository-name: "vfx-js"
                   user-email: mail@amagi.dev
