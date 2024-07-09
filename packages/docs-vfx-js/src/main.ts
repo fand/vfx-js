@@ -271,7 +271,24 @@ class App {
             isMouseOn = false;
         });
 
+        let isInside = false;
+        const io = new IntersectionObserver(
+            (changes) => {
+                for (const c of changes) {
+                    isInside = c.intersectionRatio > 0.1;
+                }
+            },
+            { threshold: [0, 1, 0.2, 0.8] },
+        );
+        io.observe(canvas);
+
         const drawMouseStalker = () => {
+            requestAnimationFrame(drawMouseStalker);
+
+            if (!isInside) {
+                return;
+            }
+
             if (!isMouseOn) {
                 const t = Date.now() / 1000 - startTime;
                 target = [
@@ -289,7 +306,7 @@ class App {
             ctx.fillRect(0, 0, width, height);
 
             ctx.fillStyle = "white";
-            ctx.font = "bold 120px sans-serif";
+            ctx.font = `bold ${width * 0.14}px sans-serif`;
             ctx.fillText("HOVER ME", width / 2, height / 2);
             ctx.textBaseline = "middle";
             ctx.textAlign = "center";
@@ -304,7 +321,6 @@ class App {
             }
 
             this.vfx.update(canvas);
-            requestAnimationFrame(drawMouseStalker);
         };
         drawMouseStalker();
 
