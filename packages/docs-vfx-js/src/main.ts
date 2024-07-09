@@ -154,12 +154,23 @@ uniform vec2 offset;
 uniform float time;
 uniform sampler2D src;
 
+#define ZOOM(uv, x) ((uv - .5) / x + .5)
+
 void main (void) {
-    vec2 fc = gl_FragCoord.xy;
-    float res = sin(time) * 32. + 33.;
-    fc.y = floor(fc.y / res) * res;
-    vec2 uv = (fc - offset) / resolution;
-    gl_FragColor = texture2D(src, uv);
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+    float r = sin(time) * 0.5 + 0.5;
+
+    float l = pow(length(uv - .5), 2.);
+    uv = (uv - .5) *  (1. - l * 0.3 * r) + .5;
+
+
+    float n = 0.02 + r * 0.03;
+    vec4 cr = texture2D(src, ZOOM(uv, 1.00));
+    vec4 cg = texture2D(src, ZOOM(uv, (1. + n)));
+    vec4 cb = texture2D(src, ZOOM(uv, (1. + n * 2.)));
+
+    gl_FragColor = vec4(cr.r, cg.g, cb.b, 1);
 }
     `,
     custom: `
@@ -246,14 +257,15 @@ class App {
         canvas.height = height * ratio;
         ctx.scale(ratio, ratio);
 
-        const ps = [[width / 2, height / 2]];
-        let mouse = [width / 2, height / 2];
+        let target = [width / 2, height / 2];
+        let p = target;
+        const ps = [p];
         let isMouseOn = false;
         const startTime = Date.now();
 
         canvas.addEventListener("mousemove", (e) => {
             isMouseOn = true;
-            mouse = [e.offsetX, e.offsetY];
+            target = [e.offsetX, e.offsetY];
         });
         canvas.addEventListener("mouseleave", (e) => {
             isMouseOn = false;
@@ -262,26 +274,30 @@ class App {
         const drawMouseStalker = () => {
             if (!isMouseOn) {
                 const t = Date.now() / 1000 - startTime;
-                const target = [
+                target = [
                     width * 0.5 + Math.sin(t * 1.3) * width * 0.3,
                     height * 0.5 + Math.sin(t * 1.7) * height * 0.3,
                 ];
-                mouse = [
-                    lerp(mouse[0], target[0], 0.1),
-                    lerp(mouse[1], target[1], 0.1),
-                ];
             }
-            ps.push(mouse);
+            p = [lerp(p[0], target[0], 0.1), lerp(p[1], target[1], 0.1)];
+
+            ps.push(p);
             ps.splice(0, ps.length - 30);
 
             ctx.clearRect(0, 0, width, height);
             ctx.fillStyle = "black";
             ctx.fillRect(0, 0, width, height);
 
+            ctx.fillStyle = "white";
+            ctx.font = "bold 120px sans-serif";
+            ctx.fillText("HOVER ME", width / 2, height / 2);
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+
             for (let i = 0; i < ps.length; i++) {
                 const [x, y] = ps[i];
                 const t = (i / ps.length) * 255;
-                ctx.fillStyle = `rgb(${255 - t}, 180, ${t})`;
+                ctx.fillStyle = `rgba(${255 - t}, 255, ${t}, ${(i / ps.length) * 0.5 + 0.5})`;
                 ctx.beginPath();
                 ctx.arc(x, y, i + 20, 0, 2 * Math.PI);
                 ctx.fill();
@@ -292,7 +308,7 @@ class App {
         };
         drawMouseStalker();
 
-        this.vfx.add(canvas, { shader: "halftone" });
+        this.vfx.add(canvas, { shader: shaders.canvas });
     }
 
     initCustomShader() {
