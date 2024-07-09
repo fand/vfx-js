@@ -44,6 +44,8 @@ export class VFX {
             this.#addImage(element, opts);
         } else if (element instanceof HTMLVideoElement) {
             this.#addVideo(element, opts);
+        } else if (element instanceof HTMLCanvasElement) {
+            this.#addCanvas(element, opts);
         } else {
             this.#addText(element, opts);
         }
@@ -64,8 +66,13 @@ export class VFX {
      *
      * This is useful to apply effects to eleents whose contents change dynamically (e.g. input, textare etc).
      */
-    update(element: HTMLElement): Promise<void> {
-        return this.#player.updateTextElement(element);
+    async update(element: HTMLElement): Promise<void> {
+        if (element instanceof HTMLCanvasElement) {
+            this.#player.updateCanvasElement(element);
+            return;
+        } else {
+            return this.#player.updateTextElement(element);
+        }
     }
 
     /**
@@ -117,6 +124,10 @@ export class VFX {
                 { once: true },
             );
         }
+    }
+
+    #addCanvas(element: HTMLCanvasElement, opts: VFXProps): void {
+        this.#player.addElement(element, opts);
     }
 
     #addText(element: HTMLElement, opts: VFXProps): void {

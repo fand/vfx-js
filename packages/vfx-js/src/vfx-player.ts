@@ -202,6 +202,9 @@ export class VFXPlayer {
         } else if (element instanceof HTMLVideoElement) {
             texture = new THREE.VideoTexture(element);
             type = "video" as VFXElementType;
+        } else if (element instanceof HTMLCanvasElement) {
+            texture = new THREE.CanvasTexture(element);
+            type = "canvas" as VFXElementType;
         } else {
             const canvas = await dom2canvas(element, originalOpacity);
             texture = new THREE.CanvasTexture(canvas);
@@ -313,6 +316,13 @@ export class VFXPlayer {
         // Do nothing if the element is not found
         // This happens when addElement is still processing
         return Promise.resolve();
+    }
+
+    updateCanvasElement(element: HTMLCanvasElement): void {
+        const e = this.#elements.find((e) => e.element === element);
+        if (e) {
+            e.uniforms["src"].value.needsUpdate = true;
+        }
     }
 
     isPlaying(): boolean {

@@ -6,6 +6,10 @@ import "prism-themes/themes/prism-nord.min.css";
 Prism.manual = true;
 Prism.highlightAll();
 
+function lerp(a: number, b: number, t: number) {
+    return a * (1 - t) + b * t;
+}
+
 const shaders: Record<string, string> = {
     logo: `
     precision highp float;
@@ -143,6 +147,32 @@ const shaders: Record<string, string> = {
         gl_FragColor = img;
     }
     `,
+    canvas: `
+precision highp float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform sampler2D src;
+
+#define ZOOM(uv, x) ((uv - .5) / x + .5)
+
+void main (void) {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+    float r = sin(time) * 0.5 + 0.5;
+
+    float l = pow(length(uv - .5), 2.);
+    uv = (uv - .5) *  (1. - l * 0.3 * r) + .5;
+
+
+    float n = 0.02 + r * 0.03;
+    vec4 cr = texture2D(src, ZOOM(uv, 1.00));
+    vec4 cg = texture2D(src, ZOOM(uv, (1. + n)));
+    vec4 cb = texture2D(src, ZOOM(uv, (1. + n * 2.)));
+
+    gl_FragColor = vec4(cr.r, cg.g, cb.b, 1);
+}
+    `,
     custom: `
 precision highp float;
 uniform vec2 resolution;
@@ -218,6 +248,85 @@ class App {
         });
     }
 
+    initCanvas() {
+        const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+        const ctx = canvas.getContext("2d")!;
+        const { width, height } = canvas.getBoundingClientRect();
+        const ratio = window.devicePixelRatio ?? 1;
+        canvas.width = width * ratio;
+        canvas.height = height * ratio;
+        ctx.scale(ratio, ratio);
+
+        let target = [width / 2, height / 2];
+        let p = target;
+        const ps = [p];
+        let isMouseOn = false;
+        const startTime = Date.now();
+
+        canvas.addEventListener("mousemove", (e) => {
+            isMouseOn = true;
+            target = [e.offsetX, e.offsetY];
+        });
+        canvas.addEventListener("mouseleave", (e) => {
+            isMouseOn = false;
+        });
+
+        let isInside = false;
+        const io = new IntersectionObserver(
+            (changes) => {
+                for (const c of changes) {
+                    isInside = c.intersectionRatio > 0.1;
+                }
+            },
+            { threshold: [0, 1, 0.2, 0.8] },
+        );
+        io.observe(canvas);
+
+        const drawMouseStalker = () => {
+            requestAnimationFrame(drawMouseStalker);
+
+            if (!isInside) {
+                return;
+            }
+
+            if (!isMouseOn) {
+                const t = Date.now() / 1000 - startTime;
+                target = [
+                    width * 0.5 + Math.sin(t * 1.3) * width * 0.3,
+                    height * 0.5 + Math.sin(t * 1.7) * height * 0.3,
+                ];
+            }
+            p = [lerp(p[0], target[0], 0.1), lerp(p[1], target[1], 0.1)];
+
+            ps.push(p);
+            ps.splice(0, ps.length - 30);
+
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.fillStyle = "white";
+            ctx.font = `bold ${width * 0.14}px sans-serif`;
+            ctx.fillText("HOVER ME", width / 2, height / 2);
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+
+            for (let i = 0; i < ps.length; i++) {
+                const [x, y] = ps[i];
+                const t = (i / ps.length) * 255;
+                ctx.fillStyle = `rgba(${255 - t}, 255, ${t}, ${(i / ps.length) * 0.5 + 0.5})`;
+                ctx.beginPath();
+                ctx.arc(x, y, i + 20, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+
+            this.vfx.update(canvas);
+        };
+        drawMouseStalker();
+
+        this.vfx.add(canvas, { shader: shaders.canvas });
+    }
+
     initCustomShader() {
         const e = document.getElementById("custom")!;
         this.vfx.add(e, {
@@ -265,6 +374,7 @@ window.addEventListener("load", () => {
     app.initBG();
     app.initVFX();
     app.initDiv();
+    app.initCanvas();
     app.initCustomShader();
     app.hideMask();
     setTimeout(() => {

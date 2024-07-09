@@ -256,6 +256,41 @@ mo.observe(textarea, { attributes: true });
                         </div>
                     </div>
                 </div>
+
+                <div class="row">
+                    <div class="col">
+                        <p>Canvas</p>
+                        <pre><code class="language-html">
+&lt;!--
+  VFX-JS also supports HTMLCanvasElement as the input.
+  You can draw 2D graphics and text in canvas,
+  then pass it to VFX-JS to add post effects.
+--&gt;
+&lt;canvas id="canvas"/&gt;
+                        </code></pre>
+
+                        <pre><code class="language-javascript">
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function drawCanvas() {
+    ...
+
+    // Update texture when the canvas has been updated
+    vfx.update(canvas);
+
+    requestAnimationFrame(drawCanvas);
+}
+drawCanvas();
+
+vfx.add(canvas, { shader });
+                    </code></pre>
+                    </div>
+                    <div class="col">
+                        <p>Output:</p>
+                        <canvas id="canvas" />
+                    </div>
+                </div>
             </section>
 
             <div>
