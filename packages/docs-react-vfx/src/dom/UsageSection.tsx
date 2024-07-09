@@ -63,7 +63,7 @@ const UsageSection: React.VFC = () => (
             <p>
                 See{" "}
                 <a
-                    href="https://github.com/fand/react-vfx"
+                    href="https://github.com/fand/vfx-js/tree/main/packages/react-vfx"
                     target="_blank"
                     rel="noopener noreferrer"
                 >

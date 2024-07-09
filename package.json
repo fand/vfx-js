@@ -1,5 +1,5 @@
 {
-  "name": "react-vfx-monorepo",
+  "name": "vfx-js-monorepo",
   "private": true,
   "packageManager": "npm@9.8.1",
   "workspaces": [
@@ -23,13 +23,13 @@
     "turbo": "^2.0.3"
   },
   "author": "AMAGI <mail@amagi.dev> (https://amagi.dev/)",
-  "homepage": "https://github.com/fand/react-vfx#readme",
+  "homepage": "https://github.com/fand/vfx-js#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fand/react-vfx.git"
+    "url": "git+https://github.com/fand/vfx-js.git"
   },
   "bugs": {
-    "url": "https://github.com/fand/react-vfx/issues"
+    "url": "https://github.com/fand/vfx-js/issues"
   },
   "keywords": [],
   "license": "MIT"
