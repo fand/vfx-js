@@ -1,9 +1,35 @@
-name: Deploy to amagi.dev/react-vfx
+name: Deploy to amagi.dev/react-vfx-docs
 
 on:
     push:
         branches:
             - main
+    workflow_dispatch:
+
+# jobs:
+#     deploy:
+#         runs-on: ubuntu-latest
+#         steps:
+#             - uses: actions/checkout@v3
+
+#             - name: Setup Node
+#               uses: actions/setup-node@v3
+#               with:
+#                   node-version: "20"
+#                   cache: "npm"
+#                   cache-dependency-path: "**/package-lock.json"
+
+#             - name: Install dependencies
+#               run: npm ci
+
+#             - name: Build REACT-VFX and docs
+#               run: npm run build
+
+#             - name: Deploy
+#               uses: peaceiris/actions-gh-pages@v3
+#               with:
+#                   github_token: ${{ secrets.GITHUB_TOKEN }}
+#                   publish_dir: ./packages/docs/dist
 
 jobs:
     deploy:
@@ -21,11 +47,16 @@ jobs:
             - name: Install dependencies
               run: npm ci
 
-            - name: Build REACT-VFX and docs
+            - name: Build
               run: npm run build
 
-            - name: Deploy
-              uses: peaceiris/actions-gh-pages@v3
+            - name: Pushes to another repository
+              uses: cpina/github-action-push-to-another-repository@main
+              env:
+                  SSH_DEPLOY_KEY: ${{ secrets.VFX_JS_DEPLOY_KEY }}
               with:
-                  github_token: ${{ secrets.GITHUB_TOKEN }}
-                  publish_dir: ./packages/docs/dist
+                  source-directory: "packages/docs/dist"
+                  destination-github-username: "fand"
+                  destination-repository-name: "react-vfx-docs"
+                  user-email: mail@amagi.dev
+                  target-branch: main
