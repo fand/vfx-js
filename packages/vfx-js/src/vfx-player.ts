@@ -202,6 +202,9 @@ export class VFXPlayer {
         } else if (element instanceof HTMLVideoElement) {
             texture = new THREE.VideoTexture(element);
             type = "video" as VFXElementType;
+        } else if (element instanceof HTMLCanvasElement) {
+            texture = new THREE.CanvasTexture(element);
+            type = "canvas" as VFXElementType;
         } else {
             const canvas = await dom2canvas(element, originalOpacity);
             texture = new THREE.CanvasTexture(canvas);

@@ -44,6 +44,8 @@ export class VFX {
             this.#addImage(element, opts);
         } else if (element instanceof HTMLVideoElement) {
             this.#addVideo(element, opts);
+        } else if (element instanceof HTMLCanvasElement) {
+            this.#addCanvas(element, opts);
         } else {
             this.#addText(element, opts);
         }
@@ -117,6 +119,10 @@ export class VFX {
                 { once: true },
             );
         }
+    }
+
+    #addCanvas(element: HTMLCanvasElement, opts: VFXProps): void {
+        this.#player.addElement(element, opts);
     }
 
     #addText(element: HTMLElement, opts: VFXProps): void {
