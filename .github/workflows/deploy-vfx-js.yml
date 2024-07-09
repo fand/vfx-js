@@ -31,13 +31,8 @@ jobs:
                   rm -rf dist/docs
                   mv docs dist/docs
 
-            - name: Pushes to another repository
-              uses: cpina/github-action-push-to-another-repository@main
-              env:
-                  SSH_DEPLOY_KEY: ${{ secrets.VFX_JS_DEPLOY_KEY }}
+            - name: Deploy
+              uses: peaceiris/actions-gh-pages@v3
               with:
-                  source-directory: "packages/docs/dist"
-                  destination-github-username: "fand"
-                  destination-repository-name: "vfx-js"
-                  user-email: mail@amagi.dev
-                  target-branch: main
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  publish_dir: ./packages/docs/dist
