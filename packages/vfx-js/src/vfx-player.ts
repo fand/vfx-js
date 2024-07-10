@@ -321,7 +321,12 @@ export class VFXPlayer {
     updateCanvasElement(element: HTMLCanvasElement): void {
         const e = this.#elements.find((e) => e.element === element);
         if (e) {
-            e.uniforms["src"].value.needsUpdate = true;
+            const oldTexture = e.uniforms["src"].value;
+            const texture = new THREE.CanvasTexture(element);
+            texture.wrapS = oldTexture.wrapS;
+            texture.wrapT = oldTexture.wrapT;
+            e.uniforms["src"].value = texture;
+            oldTexture.dispose();
         }
     }
 
