@@ -1,5 +1,12 @@
 # react-vfx
 
+## 0.9.1
+
+### Patch Changes
+
+-   Updated dependencies
+    -   @vfx-js/core@0.4.1
+
 ## 0.9.0
 
 ### Minor Changes

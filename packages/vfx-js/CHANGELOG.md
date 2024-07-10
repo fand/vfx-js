@@ -1,5 +1,11 @@
 # react-vfx
 
+## 0.4.1
+
+### Patch Changes
+
+-   Fix texture update bug on canvas resize
+
 ## 0.4.0
 
 ### Minor Changes
