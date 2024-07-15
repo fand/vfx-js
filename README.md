@@ -1,6 +1,7 @@
 <div align="center">
   <a href="https://amagi.dev/vfx-js/" target="_blank"><img alt="VFX-JS" src="packages/docs/public/og_image.jpg" width="100%"/></a>
   <h1>VFX-JS: Visual Effects Framework for Web</h1>
+  <a href="https://github.com/fand/vfx-js" target="_blank"><img src="https://img.shields.io/github/stars/fand/vfx-js" alt="Star on GitHub"></a>
   <br/>
   <br/>
 </div>
