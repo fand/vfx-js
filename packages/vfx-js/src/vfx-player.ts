@@ -10,18 +10,7 @@ import {
     VFXElementOverflow,
     VFXWrap,
 } from "./types";
-
-/**
- * top-left origin rect.
- * Subset of DOMRect, which is returned by `HTMLElement.getBoundingClientRect()`.
- * @internal
- */
-type Rect = {
-    left: number;
-    right: number;
-    top: number;
-    bottom: number;
-};
+import { createRect, Rect } from "./rect.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -477,28 +466,7 @@ export function sanitizeOverflow(
     if (overflow === undefined) {
         return { top: 0, right: 0, bottom: 0, left: 0 };
     }
-    if (typeof overflow === "number") {
-        return {
-            top: overflow,
-            right: overflow,
-            bottom: overflow,
-            left: overflow,
-        };
-    }
-    if (Array.isArray(overflow)) {
-        return {
-            top: overflow[0],
-            right: overflow[1],
-            bottom: overflow[2],
-            left: overflow[3],
-        };
-    }
-    return {
-        top: overflow.top ?? 0,
-        right: overflow.right ?? 0,
-        bottom: overflow.bottom ?? 0,
-        left: overflow.left ?? 0,
-    };
+    return createRect(overflow);
 }
 
 function parseWrapSingle(wrapOpt: VFXWrap): THREE.Wrapping {

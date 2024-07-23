@@ -1,5 +1,6 @@
 import THREE from "three";
 import { ShaderPreset } from "./constants.js";
+import { Rect, RectOpts } from "./rect.js";
 
 /**
  * Options to initialize `VFX` class.
@@ -113,11 +114,7 @@ export type VFXProps = {
      * If you pass an object like `<VFXImg overflow={{ top: 100 }} />`,
      * REACT-VFX will add paddings only to the given direction (only to the `top` in this example).
      */
-    overflow?:
-        | true
-        | number
-        | [top: number, right: number, bottom: number, left: number]
-        | { top?: number; right?: number; bottom?: number; left?: number };
+    overflow?: true | RectOpts;
 
     /**
      * Texture wrapping mode. (Default: `"repeat"`)
@@ -192,6 +189,4 @@ export type VFXElement = {
 /**
  * @internal
  */
-export type VFXElementOverflow =
-    | "fullscreen"
-    | { top: number; right: number; bottom: number; left: number };
+export type VFXElementOverflow = "fullscreen" | Rect;
