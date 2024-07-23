@@ -7,10 +7,9 @@ import {
     VFXElement,
     VFXElementType,
     VFXUniformValue,
-    VFXElementOverflow,
     VFXWrap,
 } from "./types";
-import { createRect, Rect } from "./rect.js";
+import { createRect, Rect, RECT_ZERO } from "./rect.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -165,8 +164,9 @@ export class VFXPlayer {
         const shader = this.#getShader(opts.shader || "uvGradient");
 
         const rect = element.getBoundingClientRect();
-        const overflow = sanitizeOverflow(opts.overflow);
-        const isInViewport = isRectInViewport(this.#viewport, rect, overflow);
+        const [isFullScreen, overflow] = sanitizeOverflow(opts.overflow);
+        const isInViewport =
+            isFullScreen || isRectInViewport(this.#viewport, rect, overflow);
 
         const originalOpacity =
             element.style.opacity === ""
@@ -274,6 +274,7 @@ export class VFXPlayer {
             leaveTime: -Infinity,
             release: opts.release ?? 0,
             isGif,
+            isFullScreen,
             overflow,
             originalOpacity,
             zIndex: opts.zIndex ?? 0,
@@ -349,11 +350,9 @@ export class VFXPlayer {
             const rect = e.element.getBoundingClientRect();
 
             // Check intersection
-            const isInViewport = isRectInViewport(
-                this.#viewport,
-                rect,
-                e.overflow,
-            );
+            const isInViewport =
+                e.isFullScreen ||
+                isRectInViewport(this.#viewport, rect, e.overflow);
 
             // entering
             if (isInViewport && !e.isInViewport) {
@@ -398,7 +397,7 @@ export class VFXPlayer {
             }
 
             // Set viewport
-            if (e.overflow === "fullscreen") {
+            if (e.isFullScreen) {
                 this.#renderer.setViewport(
                     0,
                     0,
@@ -443,12 +442,8 @@ export class VFXPlayer {
 export function isRectInViewport(
     viewport: Rect,
     rect: Rect,
-    overflow: VFXElementOverflow,
+    overflow: Rect,
 ): boolean {
-    if (overflow === "fullscreen") {
-        return true;
-    }
-
     return (
         rect.left - overflow.left <= viewport.right &&
         rect.right + overflow.right >= viewport.left &&
@@ -459,14 +454,14 @@ export function isRectInViewport(
 
 export function sanitizeOverflow(
     overflow: VFXProps["overflow"],
-): VFXElementOverflow {
+): [isFullScreen: boolean, Rect] {
     if (overflow === true) {
-        return "fullscreen";
+        return [true, RECT_ZERO];
     }
     if (overflow === undefined) {
-        return { top: 0, right: 0, bottom: 0, left: 0 };
+        return [false, RECT_ZERO];
     }
-    return createRect(overflow);
+    return [false, createRect(overflow)];
 }
 
 function parseWrapSingle(wrapOpt: VFXWrap): THREE.Wrapping {

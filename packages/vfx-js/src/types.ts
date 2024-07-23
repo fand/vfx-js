@@ -181,12 +181,8 @@ export type VFXElement = {
     leaveTime: number;
     release: number;
     isGif: boolean;
-    overflow: VFXElementOverflow;
+    isFullScreen: boolean;
+    overflow: Rect;
     originalOpacity: number;
     zIndex: number;
 };
-
-/**
- * @internal
- */
-export type VFXElementOverflow = "fullscreen" | Rect;
