@@ -8,8 +8,15 @@ import {
     VFXElementType,
     VFXUniformValue,
     VFXWrap,
+    VFXElementIntersection,
 } from "./types";
-import { createRect, growRect, Rect, RECT_ZERO } from "./rect.js";
+import {
+    createRect,
+    getIntersection,
+    growRect,
+    Rect,
+    RECT_ZERO,
+} from "./rect.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -165,8 +172,15 @@ export class VFXPlayer {
 
         const rect = element.getBoundingClientRect();
         const [isFullScreen, overflow] = sanitizeOverflow(opts.overflow);
+        const intersection = sanitizeIntersection(opts.intersection);
         const isInViewport =
-            isFullScreen || isRectInViewport(this.#viewport, rect, overflow);
+            isFullScreen ||
+            isRectInViewport(
+                this.#viewport,
+                rect,
+                overflow,
+                intersection.threshold,
+            );
 
         const originalOpacity =
             element.style.opacity === ""
@@ -276,6 +290,7 @@ export class VFXPlayer {
             isGif,
             isFullScreen,
             overflow,
+            intersection,
             originalOpacity,
             zIndex: opts.zIndex ?? 0,
         };
@@ -352,7 +367,12 @@ export class VFXPlayer {
             // Check intersection
             const isInViewport =
                 e.isFullScreen ||
-                isRectInViewport(this.#viewport, rect, e.overflow);
+                isRectInViewport(
+                    this.#viewport,
+                    rect,
+                    e.overflow,
+                    e.intersection.threshold,
+                );
 
             // entering
             if (isInViewport && !e.isInViewport) {
@@ -443,14 +463,10 @@ export function isRectInViewport(
     viewport: Rect,
     rect: Rect,
     overflow: Rect,
+    threshold: number,
 ): boolean {
     const rect2 = growRect(rect, overflow);
-    return (
-        rect2.left <= viewport.right &&
-        rect2.right >= viewport.left &&
-        rect2.top <= viewport.bottom &&
-        rect2.bottom >= viewport.top
-    );
+    return getIntersection(viewport, rect2) > threshold;
 }
 
 export function sanitizeOverflow(
@@ -463,6 +479,15 @@ export function sanitizeOverflow(
         return [false, RECT_ZERO];
     }
     return [false, createRect(overflow)];
+}
+
+export function sanitizeIntersection(
+    intersectionOpts: VFXProps["intersection"],
+): VFXElementIntersection {
+    const threshold = intersectionOpts?.threshold ?? 0;
+    return {
+        threshold,
+    };
 }
 
 function parseWrapSingle(wrapOpt: VFXWrap): THREE.Wrapping {

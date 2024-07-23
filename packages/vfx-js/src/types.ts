@@ -100,6 +100,10 @@ export type VFXProps = {
      */
     overlay?: true | number;
 
+    intersection?: {
+        threshold?: number;
+    };
+
     /**
      * Allow shader outputs to oveflow the original element area. (Default: `0`)
      *
@@ -183,6 +187,11 @@ export type VFXElement = {
     isGif: boolean;
     isFullScreen: boolean;
     overflow: Rect;
+    intersection: VFXElementIntersection;
     originalOpacity: number;
     zIndex: number;
+};
+
+export type VFXElementIntersection = {
+    threshold: number;
 };
