@@ -71,3 +71,23 @@ export function shrinkRect(a: Rect, b: Rect): Rect {
         left: a.left + b.left,
     };
 }
+
+function clamp(x: number, xmin: number, xmax: number): number {
+    return Math.min(Math.max(x, xmin), xmax);
+}
+
+/**
+ * Calculate the ratio of the intersection between two Rect objects.
+ * It returns a number between 0 and 1.
+ */
+export function getIntersection(container: Rect, target: Rect): number {
+    const targetL = clamp(target.left, container.left, container.right);
+    const targetR = clamp(target.right, container.left, container.right);
+    const w = (targetR - targetL) / (target.right - target.left);
+
+    const targetT = clamp(target.top, container.top, container.bottom);
+    const targetB = clamp(target.bottom, container.top, container.bottom);
+    const h = (targetB - targetT) / (target.bottom - target.top);
+
+    return w * h;
+}

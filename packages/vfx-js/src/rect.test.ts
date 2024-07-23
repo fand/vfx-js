@@ -1,5 +1,5 @@
 import { expect, describe, test } from "vitest";
-import { createRect, growRect, shrinkRect } from "./rect";
+import { createRect, getIntersection, growRect, shrinkRect } from "./rect";
 
 describe("createRect", () => {
     test("single number", () => {
@@ -95,5 +95,35 @@ describe("shrinkRect", () => {
             bottom: 201,
             left: 99,
         });
+    });
+});
+
+describe("getIntersection", () => {
+    test("no intersection", () => {
+        const a = createRect([0, 1, 1, 0]);
+        const b = createRect([0, 2, 1, 1]);
+        expect(getIntersection(a, b)).toBe(0);
+    });
+    test("full intersection", () => {
+        expect(
+            getIntersection(createRect([0, 1, 1, 0]), createRect([0, 1, 1, 0])),
+        ).toBe(1);
+        expect(
+            getIntersection(
+                createRect([0, 10, 10, 1]),
+                createRect([1, 2, 2, 1]),
+            ),
+        ).toBe(1);
+    });
+    test("partial intersection", () => {
+        expect(
+            getIntersection(createRect([0, 2, 1, 0]), createRect([0, 1, 1, 0])),
+        ).toBe(1); // target is fully covered by container
+        expect(
+            getIntersection(createRect([0, 1, 1, 0]), createRect([0, 2, 1, 0])),
+        ).toBe(0.5); // 50% of target is covered by container
+        expect(
+            getIntersection(createRect([1, 2, 2, 1]), createRect([0, 2, 2, 0])),
+        ).toBe(0.25); // 25%
     });
 });
