@@ -9,7 +9,7 @@ import {
     VFXUniformValue,
     VFXWrap,
 } from "./types";
-import { createRect, Rect, RECT_ZERO } from "./rect.js";
+import { createRect, growRect, Rect, RECT_ZERO } from "./rect.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -444,11 +444,12 @@ export function isRectInViewport(
     rect: Rect,
     overflow: Rect,
 ): boolean {
+    const rect2 = growRect(rect, overflow);
     return (
-        rect.left - overflow.left <= viewport.right &&
-        rect.right + overflow.right >= viewport.left &&
-        rect.top - overflow.top <= viewport.bottom &&
-        rect.bottom + overflow.bottom >= viewport.top
+        rect2.left <= viewport.right &&
+        rect2.right >= viewport.left &&
+        rect2.top <= viewport.bottom &&
+        rect2.bottom >= viewport.top
     );
 }
 
