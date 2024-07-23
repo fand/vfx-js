@@ -115,7 +115,7 @@ describe("isRectInViewport", () => {
 
     test("no overflow", () => {
         expect(
-            isRectInViewport(rect(0, 0, 1, 1), rect(0, 0, 1, 1), pad(0)),
+            isRectInViewport(rect(0, 0, 1, 1), rect(0, 0, 1, 1), pad(0), 0),
         ).toBe(true);
 
         // adjacent rects
@@ -124,6 +124,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(-1, 0, 1, 1), // left
                 pad(0),
+                0,
             ),
         ).toBe(true);
         expect(
@@ -131,6 +132,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(1, 0, 1, 1), // right
                 pad(0),
+                0,
             ),
         ).toBe(true);
         expect(
@@ -138,6 +140,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(0, -1, 1, 1), // top
                 pad(0),
+                0,
             ),
         ).toBe(true);
         expect(
@@ -145,6 +148,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(0, 1, 1, 1), // bottom
                 pad(0),
+                0,
             ),
         ).toBe(true);
 
@@ -154,6 +158,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(-2, 0, 1, 1), // 1px left
                 pad(0),
+                0,
             ),
         ).toBe(false);
         expect(
@@ -161,6 +166,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(2, 0, 1, 1), // 1px right
                 pad(0),
+                0,
             ),
         ).toBe(false);
         expect(
@@ -168,6 +174,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(0, -2, 1, 1), // 1px top
                 pad(0),
+                0,
             ),
         ).toBe(false);
         expect(
@@ -175,13 +182,14 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(0, 2, 1, 1), // 1px bottom
                 pad(0),
+                0,
             ),
         ).toBe(false);
     });
 
     test("with overflow", () => {
         expect(
-            isRectInViewport(rect(0, 0, 1, 1), rect(0, 0, 1, 1), pad(1)),
+            isRectInViewport(rect(0, 0, 1, 1), rect(0, 0, 1, 1), pad(1), 0),
         ).toBe(true);
 
         // adjacent rects
@@ -190,6 +198,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(-1, 0, 1, 1), // left
                 pad(1),
+                0,
             ),
         ).toBe(true);
         expect(
@@ -197,6 +206,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(1, 0, 1, 1), // right
                 pad(1),
+                0,
             ),
         ).toBe(true);
         expect(
@@ -204,6 +214,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(0, -1, 1, 1), // top
                 pad(1),
+                0,
             ),
         ).toBe(true);
         expect(
@@ -211,6 +222,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(0, 1, 1, 1), // bottom
                 pad(1),
+                0,
             ),
         ).toBe(true);
 
@@ -220,6 +232,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(-2, 0, 1, 1), // 1px left
                 pad(1),
+                0,
             ),
         ).toBe(true);
         expect(
@@ -227,6 +240,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(2, 0, 1, 1), // 1px right
                 pad(1),
+                0,
             ),
         ).toBe(true);
         expect(
@@ -234,6 +248,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(0, -2, 1, 1), // 1px top
                 pad(1),
+                0,
             ),
         ).toBe(true);
         expect(
@@ -241,6 +256,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(0, 2, 1, 1), // 1px bottom
                 pad(1),
+                0,
             ),
         ).toBe(true);
 
@@ -250,6 +266,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(-3, 0, 1, 1), // 2px left
                 pad(1),
+                0,
             ),
         ).toBe(false);
         expect(
@@ -257,6 +274,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(3, 0, 1, 1), // 2px right
                 pad(1),
+                0,
             ),
         ).toBe(false);
         expect(
@@ -264,6 +282,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(0, -3, 1, 1), // 2px top
                 pad(1),
+                0,
             ),
         ).toBe(false);
         expect(
@@ -271,6 +290,7 @@ describe("isRectInViewport", () => {
                 rect(0, 0, 1, 1),
                 rect(0, 3, 1, 1), // 2px bottom
                 pad(1),
+                0,
             ),
         ).toBe(false);
     });
