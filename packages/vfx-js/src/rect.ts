@@ -53,3 +53,21 @@ export function createRect(r: RectOpts): Rect {
         left: r.left ?? 0,
     };
 }
+
+export function growRect(a: Rect, b: Rect): Rect {
+    return {
+        top: a.top - b.top,
+        right: a.right + b.right,
+        bottom: a.bottom + b.bottom,
+        left: a.left - b.left,
+    };
+}
+
+export function shrinkRect(a: Rect, b: Rect): Rect {
+    return {
+        top: a.top + b.top,
+        right: a.right - b.right,
+        bottom: a.bottom - b.bottom,
+        left: a.left + b.left,
+    };
+}
