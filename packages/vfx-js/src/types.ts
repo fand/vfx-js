@@ -102,6 +102,7 @@ export type VFXProps = {
 
     intersection?: {
         threshold?: number;
+        rootMargin?: RectOpts;
     };
 
     /**
@@ -194,4 +195,5 @@ export type VFXElement = {
 
 export type VFXElementIntersection = {
     threshold: number;
+    rootMargin: Rect;
 };

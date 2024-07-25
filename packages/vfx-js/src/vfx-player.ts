@@ -173,14 +173,11 @@ export class VFXPlayer {
         const rect = element.getBoundingClientRect();
         const [isFullScreen, overflow] = sanitizeOverflow(opts.overflow);
         const intersection = sanitizeIntersection(opts.intersection);
+        const viewport = growRect(this.#viewport, intersection.rootMargin);
+
         const isInViewport =
             isFullScreen ||
-            isRectInViewport(
-                this.#viewport,
-                rect,
-                overflow,
-                intersection.threshold,
-            );
+            isRectInViewport(viewport, rect, overflow, intersection.threshold);
 
         const originalOpacity =
             element.style.opacity === ""
@@ -365,10 +362,14 @@ export class VFXPlayer {
             const rect = e.element.getBoundingClientRect();
 
             // Check intersection
+            const viewport = growRect(
+                this.#viewport,
+                e.intersection.rootMargin,
+            );
             const isInViewport =
                 e.isFullScreen ||
                 isRectInViewport(
-                    this.#viewport,
+                    viewport,
                     rect,
                     e.overflow,
                     e.intersection.threshold,
@@ -495,8 +496,10 @@ export function sanitizeIntersection(
     intersectionOpts: VFXProps["intersection"],
 ): VFXElementIntersection {
     const threshold = intersectionOpts?.threshold ?? 0;
+    const rootMargin = createRect(intersectionOpts?.rootMargin ?? 0);
     return {
         threshold,
+        rootMargin,
     };
 }
 
