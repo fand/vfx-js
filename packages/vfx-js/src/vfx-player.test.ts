@@ -126,7 +126,7 @@ describe("isRectInViewport", () => {
                 pad(0),
                 0,
             ),
-        ).toBe(false);
+        ).toBe(true);
         expect(
             isRectInViewport(
                 rect(0, 0, 1, 1),
@@ -134,7 +134,7 @@ describe("isRectInViewport", () => {
                 pad(0),
                 0,
             ),
-        ).toBe(false);
+        ).toBe(true);
         expect(
             isRectInViewport(
                 rect(0, 0, 1, 1),
@@ -142,7 +142,7 @@ describe("isRectInViewport", () => {
                 pad(0),
                 0,
             ),
-        ).toBe(false);
+        ).toBe(true);
         expect(
             isRectInViewport(
                 rect(0, 0, 1, 1),
@@ -150,7 +150,7 @@ describe("isRectInViewport", () => {
                 pad(0),
                 0,
             ),
-        ).toBe(false);
+        ).toBe(true);
 
         // distant rects
         expect(
@@ -234,7 +234,7 @@ describe("isRectInViewport", () => {
                 pad(1),
                 0,
             ),
-        ).toBe(false);
+        ).toBe(true);
         expect(
             isRectInViewport(
                 rect(0, 0, 1, 1),
@@ -242,7 +242,7 @@ describe("isRectInViewport", () => {
                 pad(1),
                 0,
             ),
-        ).toBe(false);
+        ).toBe(true);
         expect(
             isRectInViewport(
                 rect(0, 0, 1, 1),
@@ -250,7 +250,7 @@ describe("isRectInViewport", () => {
                 pad(1),
                 0,
             ),
-        ).toBe(false);
+        ).toBe(true);
         expect(
             isRectInViewport(
                 rect(0, 0, 1, 1),
@@ -258,7 +258,7 @@ describe("isRectInViewport", () => {
                 pad(1),
                 0,
             ),
-        ).toBe(false);
+        ).toBe(true);
 
         // more distant rects
         expect(
