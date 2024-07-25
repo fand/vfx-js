@@ -476,7 +476,7 @@ export function isRectInViewport(
             rect2.bottom >= viewport.top
         );
     } else {
-        return getIntersection(viewport, rect2) > threshold;
+        return getIntersection(viewport, rect2) >= threshold;
     }
 }
 
