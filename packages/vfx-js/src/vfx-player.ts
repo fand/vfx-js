@@ -466,7 +466,17 @@ export function isRectInViewport(
     threshold: number,
 ): boolean {
     const rect2 = growRect(rect, overflow);
-    return getIntersection(viewport, rect2) > threshold;
+    if (threshold === 0) {
+        // if threshold == 0, consider adjacent rects to be intersecting.
+        return (
+            rect2.left <= viewport.right &&
+            rect2.right >= viewport.left &&
+            rect2.top <= viewport.bottom &&
+            rect2.bottom >= viewport.top
+        );
+    } else {
+        return getIntersection(viewport, rect2) > threshold;
+    }
 }
 
 export function sanitizeOverflow(
