@@ -229,6 +229,11 @@ class App {
                 shader,
                 overflow: parseFloat(e.getAttribute("data-overflow") ?? "0"),
                 uniforms,
+                intersection: {
+                    threshold: parseFloat(
+                        e.getAttribute("data-threshold") ?? "0",
+                    ),
+                },
             });
         }
     }
