@@ -578,13 +578,23 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform float enterTime;
+    uniform float leaveTime;
     uniform sampler2D src;
+
+    #define DURATION 1.0
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        if (enterTime < 1.5) {
-            float t = enterTime / 1.5;
+        float t1 = enterTime / DURATION;
+        float t2 = leaveTime / DURATION;
+        float t = clamp(min(t1, 1. - t2), 0., 1.);
+
+        if (t == 0.) {
+            discard;
+        }
+
+        if (t < 1.) {
             uv.x += sin(floor(uv.y * 300.)) * 3. * exp(t * -10.);
         }
 
@@ -597,14 +607,30 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform float enterTime;
+    uniform float leaveTime;
     uniform sampler2D src;
+
+    #define DURATION 1.0
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        if (enterTime < 1.5) {
-            float t = 1. - enterTime / 1.5;
-            uv.y = uv.y > t ? uv.y : t;
+        float t1 = enterTime / DURATION;
+        float t2 = leaveTime / DURATION;
+
+        // Do not render before enter or after leave
+        if (t1 < 0. || 1. < t2) {
+            discard;
+        }
+
+        if (0. < t2) {
+            // Leaving
+            float t = 1. - t2;
+            uv.y = uv.y < t ? uv.y : t;
+        } else if (t1 < 1.) {
+            // Entering
+            float t = 1. - t1;
+            uv.y = uv.y < t ? t : uv.y;
         }
 
         gl_FragColor = texture2D(src, uv);
@@ -616,14 +642,21 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform float enterTime;
+    uniform float leaveTime;
     uniform sampler2D src;
+
+    #define DURATION 1.0
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        if (enterTime < 1.5) {
-            float t = enterTime / 1.5;
+        float t1 = enterTime / DURATION;
+        float t2 = leaveTime / DURATION;
+        float t = clamp(min(t1, 1. - t2), 0., 1.);
 
+        if (t == 0.) {
+            discard;
+        } else if (t < 1.) {
             float b = floor(t * 64.);
             uv = (floor(uv * b) + .5) / b;
         }
