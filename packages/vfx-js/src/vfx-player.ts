@@ -173,11 +173,21 @@ export class VFXPlayer {
         const rect = element.getBoundingClientRect();
         const [isFullScreen, overflow] = sanitizeOverflow(opts.overflow);
         const intersection = sanitizeIntersection(opts.intersection);
-        const viewport = growRect(this.#viewport, intersection.rootMargin);
-
         const isInViewport =
+            isFullScreen || isRectInViewport(this.#viewport, rect, overflow, 0);
+
+        const transitionArea = growRect(
+            this.#viewport,
+            intersection.rootMargin,
+        );
+        const isInTransitionArea =
             isFullScreen ||
-            isRectInViewport(viewport, rect, overflow, intersection.threshold);
+            isRectInViewport(
+                transitionArea,
+                rect,
+                overflow,
+                intersection.threshold,
+            );
 
         const originalOpacity =
             element.style.opacity === ""
@@ -275,15 +285,16 @@ export class VFXPlayer {
             type,
             element,
             isInViewport,
+            isInTransitionArea,
             width: rect.width,
             height: rect.height,
             scene,
             uniforms,
             uniformGenerators,
             startTime: now,
-            enterTime: isInViewport ? now : -1,
-            leaveTime: -Infinity,
-            release: opts.release ?? 0,
+            enterTime: isInViewport ? now : -Infinity,
+            leaveTime: isInViewport ? Infinity : -Infinity,
+            release: opts.release ?? Infinity,
             isGif,
             isFullScreen,
             overflow,
@@ -362,42 +373,44 @@ export class VFXPlayer {
             const rect = e.element.getBoundingClientRect();
 
             // Check intersection
-            const viewport = growRect(
+            const isInViewport =
+                e.isFullScreen ||
+                isRectInViewport(this.#viewport, rect, e.overflow, 0);
+
+            const transitionArea = growRect(
                 this.#viewport,
                 e.intersection.rootMargin,
             );
-            const isInViewport =
+            const isInTransitionArea =
                 e.isFullScreen ||
                 isRectInViewport(
-                    viewport,
+                    transitionArea,
                     rect,
                     e.overflow,
                     e.intersection.threshold,
                 );
 
-            // entering
-            if (isInViewport && !e.isInViewport) {
+            // Update transition timing
+            if (!e.isInTransitionArea && isInTransitionArea /* out -> in */) {
                 e.enterTime = now;
                 e.leaveTime = Infinity;
             }
-
-            // leaving
-            if (!isInViewport && e.isInViewport) {
+            if (e.isInTransitionArea && !isInTransitionArea /* in -> out */) {
                 e.leaveTime = now;
             }
+
             e.isInViewport = isInViewport;
+            e.isInTransitionArea = isInTransitionArea;
 
             // Quit if the element has left and the transition has ended
-            if (!isInViewport && now - e.leaveTime > e.release) {
+            if (!isInViewport || now - e.leaveTime > e.release) {
                 continue;
             }
 
             // Update uniforms
             e.uniforms["time"].value = now - e.startTime;
-            e.uniforms["enterTime"].value =
-                e.enterTime === -1 ? 0 : now - e.enterTime;
-            e.uniforms["leaveTime"].value =
-                e.leaveTime === -1 ? 0 : now - e.leaveTime;
+            e.uniforms["enterTime"].value = now - e.enterTime;
+            e.uniforms["leaveTime"].value = now - e.leaveTime;
             e.uniforms["resolution"].value.x = rect.width * this.#pixelRatio; // TODO: use correct width, height
             e.uniforms["resolution"].value.y = rect.height * this.#pixelRatio;
             e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;

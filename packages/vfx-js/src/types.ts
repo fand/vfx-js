@@ -176,6 +176,7 @@ export type VFXElement = {
     type: VFXElementType;
     element: HTMLElement;
     isInViewport: boolean;
+    isInTransitionArea: boolean;
     width: number;
     height: number;
     scene: THREE.Scene;
