@@ -174,22 +174,22 @@ export class VFXPlayer {
         const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
         const rectHitTest = growRect(rect, overflow);
 
-        const intersection = parseIntersectionOpts(opts.intersection);
+        const intersectionOpts = parseIntersectionOpts(opts.intersection);
         const isInViewport =
             isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
 
-        const transitionArea = growRect(
+        const logicalViewport = growRect(
             this.#viewport,
-            intersection.rootMargin,
+            intersectionOpts.rootMargin,
         );
-        const intersectionRatio = getIntersection(this.#viewport, rectHitTest);
-        const isInTransitionArea =
+        const intersection = getIntersection(this.#viewport, rectHitTest);
+        const isInLogicalViewport =
             isFullScreen ||
             checkIntersection(
-                transitionArea,
+                logicalViewport,
                 rectHitTest,
-                intersectionRatio,
-                intersection.threshold,
+                intersection,
+                intersectionOpts.threshold,
             );
 
         const originalOpacity =
@@ -288,7 +288,7 @@ export class VFXPlayer {
             type,
             element,
             isInViewport,
-            isInTransitionArea,
+            isInLogicalViewport,
             width: rect.width,
             height: rect.height,
             scene,
@@ -301,7 +301,7 @@ export class VFXPlayer {
             isGif,
             isFullScreen,
             overflow,
-            intersection,
+            intersection: intersectionOpts,
             originalOpacity,
             zIndex: opts.zIndex ?? 0,
         };
@@ -380,34 +380,31 @@ export class VFXPlayer {
             const isInViewport =
                 e.isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
 
-            const transitionArea = growRect(
+            const logicalViewport = growRect(
                 this.#viewport,
                 e.intersection.rootMargin,
             );
-            const intersectionRatio = getIntersection(
-                transitionArea,
-                rectHitTest,
-            );
-            const isInTransitionArea =
+            const intersection = getIntersection(logicalViewport, rectHitTest);
+            const isInLogicalViewport =
                 e.isFullScreen ||
                 checkIntersection(
-                    transitionArea,
+                    logicalViewport,
                     rectHitTest,
-                    intersectionRatio,
+                    intersection,
                     e.intersection.threshold,
                 );
 
             // Update transition timing
-            if (!e.isInTransitionArea && isInTransitionArea /* out -> in */) {
+            if (!e.isInLogicalViewport && isInLogicalViewport /* out -> in */) {
                 e.enterTime = now;
                 e.leaveTime = Infinity;
             }
-            if (e.isInTransitionArea && !isInTransitionArea /* in -> out */) {
+            if (e.isInLogicalViewport && !isInLogicalViewport /* in -> out */) {
                 e.leaveTime = now;
             }
 
             e.isInViewport = isInViewport;
-            e.isInTransitionArea = isInTransitionArea;
+            e.isInLogicalViewport = isInLogicalViewport;
 
             // Quit if the element has left and the transition has ended
             if (!isInViewport || now - e.leaveTime > e.release) {
