@@ -1,5 +1,6 @@
 import THREE from "three";
 import { ShaderPreset } from "./constants.js";
+import { Rect, RectOpts } from "./rect.js";
 
 /**
  * Options to initialize `VFX` class.
@@ -100,6 +101,18 @@ export type VFXProps = {
     overlay?: true | number;
 
     /**
+     * Options to control transition behaviour.
+     * These properties work similarly to the IntersectionObsrever options.
+     */
+    intersection?: {
+        /** Threshold for the element to be considered "entered" to the viewport. */
+        threshold?: number;
+
+        /** Margin of the viewport to be used in intersection calculcation. */
+        rootMargin?: RectOpts;
+    };
+
+    /**
      * Allow shader outputs to oveflow the original element area. (Default: `0`)
      *
      * If true, REACT-VFX will render the shader in fullscreen.
@@ -113,11 +126,7 @@ export type VFXProps = {
      * If you pass an object like `<VFXImg overflow={{ top: 100 }} />`,
      * REACT-VFX will add paddings only to the given direction (only to the `top` in this example).
      */
-    overflow?:
-        | true
-        | number
-        | [top: number, right: number, bottom: number, left: number]
-        | { top?: number; right?: number; bottom?: number; left?: number };
+    overflow?: true | RectOpts;
 
     /**
      * Texture wrapping mode. (Default: `"repeat"`)
@@ -174,6 +183,7 @@ export type VFXElement = {
     type: VFXElementType;
     element: HTMLElement;
     isInViewport: boolean;
+    isInLogicalViewport: boolean;
     width: number;
     height: number;
     scene: THREE.Scene;
@@ -184,14 +194,14 @@ export type VFXElement = {
     leaveTime: number;
     release: number;
     isGif: boolean;
-    overflow: VFXElementOverflow;
+    isFullScreen: boolean;
+    overflow: Rect;
+    intersection: VFXElementIntersection;
     originalOpacity: number;
     zIndex: number;
 };
 
-/**
- * @internal
- */
-export type VFXElementOverflow =
-    | "fullscreen"
-    | { top: number; right: number; bottom: number; left: number };
+export type VFXElementIntersection = {
+    threshold: number;
+    rootMargin: Rect;
+};

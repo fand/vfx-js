@@ -7,21 +7,16 @@ import {
     VFXElement,
     VFXElementType,
     VFXUniformValue,
-    VFXElementOverflow,
     VFXWrap,
+    VFXElementIntersection,
 } from "./types";
-
-/**
- * top-left origin rect.
- * Subset of DOMRect, which is returned by `HTMLElement.getBoundingClientRect()`.
- * @internal
- */
-type Rect = {
-    left: number;
-    right: number;
-    top: number;
-    bottom: number;
-};
+import {
+    createRect,
+    getIntersection,
+    growRect,
+    Rect,
+    RECT_ZERO,
+} from "./rect.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -176,8 +171,26 @@ export class VFXPlayer {
         const shader = this.#getShader(opts.shader || "uvGradient");
 
         const rect = element.getBoundingClientRect();
-        const overflow = sanitizeOverflow(opts.overflow);
-        const isInViewport = isRectInViewport(this.#viewport, rect, overflow);
+        const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
+        const rectHitTest = growRect(rect, overflow);
+
+        const intersectionOpts = parseIntersectionOpts(opts.intersection);
+        const isInViewport =
+            isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
+
+        const logicalViewport = growRect(
+            this.#viewport,
+            intersectionOpts.rootMargin,
+        );
+        const intersection = getIntersection(this.#viewport, rect);
+        const isInLogicalViewport =
+            isFullScreen ||
+            checkIntersection(
+                logicalViewport,
+                rect,
+                intersection,
+                intersectionOpts.threshold,
+            );
 
         const originalOpacity =
             element.style.opacity === ""
@@ -239,6 +252,7 @@ export class VFXPlayer {
             enterTime: { value: -1.0 },
             leaveTime: { value: -1.0 },
             mouse: { value: new THREE.Vector2() },
+            intersection: { value: intersection },
         };
 
         const uniformGenerators: {
@@ -275,17 +289,20 @@ export class VFXPlayer {
             type,
             element,
             isInViewport,
+            isInLogicalViewport,
             width: rect.width,
             height: rect.height,
             scene,
             uniforms,
             uniformGenerators,
             startTime: now,
-            enterTime: isInViewport ? now : -1,
-            leaveTime: -Infinity,
-            release: opts.release ?? 0,
+            enterTime: isInViewport ? now : -Infinity,
+            leaveTime: isInViewport ? Infinity : -Infinity,
+            release: opts.release ?? Infinity,
             isGif,
+            isFullScreen,
             overflow,
+            intersection: intersectionOpts,
             originalOpacity,
             zIndex: opts.zIndex ?? 0,
         };
@@ -358,37 +375,47 @@ export class VFXPlayer {
 
         for (const e of this.#elements) {
             const rect = e.element.getBoundingClientRect();
+            const rectHitTest = growRect(rect, e.overflow);
 
             // Check intersection
-            const isInViewport = isRectInViewport(
-                this.#viewport,
-                rect,
-                e.overflow,
-            );
+            const isInViewport =
+                e.isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
 
-            // entering
-            if (isInViewport && !e.isInViewport) {
+            const logicalViewport = growRect(
+                this.#viewport,
+                e.intersection.rootMargin,
+            );
+            const intersection = getIntersection(logicalViewport, rect);
+            const isInLogicalViewport =
+                e.isFullScreen ||
+                checkIntersection(
+                    logicalViewport,
+                    rect,
+                    intersection,
+                    e.intersection.threshold,
+                );
+
+            // Update transition timing
+            if (!e.isInLogicalViewport && isInLogicalViewport /* out -> in */) {
                 e.enterTime = now;
                 e.leaveTime = Infinity;
             }
-
-            // leaving
-            if (!isInViewport && e.isInViewport) {
+            if (e.isInLogicalViewport && !isInLogicalViewport /* in -> out */) {
                 e.leaveTime = now;
             }
+
             e.isInViewport = isInViewport;
+            e.isInLogicalViewport = isInLogicalViewport;
 
             // Quit if the element has left and the transition has ended
-            if (!isInViewport && now - e.leaveTime > e.release) {
+            if (!isInViewport || now - e.leaveTime > e.release) {
                 continue;
             }
 
             // Update uniforms
             e.uniforms["time"].value = now - e.startTime;
-            e.uniforms["enterTime"].value =
-                e.enterTime === -1 ? 0 : now - e.enterTime;
-            e.uniforms["leaveTime"].value =
-                e.leaveTime === -1 ? 0 : now - e.leaveTime;
+            e.uniforms["enterTime"].value = now - e.enterTime;
+            e.uniforms["leaveTime"].value = now - e.leaveTime;
             e.uniforms["resolution"].value.x = rect.width * this.#pixelRatio; // TODO: use correct width, height
             e.uniforms["resolution"].value.y = rect.height * this.#pixelRatio;
             e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
@@ -397,6 +424,7 @@ export class VFXPlayer {
                 this.#pixelRatio;
             e.uniforms["mouse"].value.x = this.#mouseX * this.#pixelRatio;
             e.uniforms["mouse"].value.y = this.#mouseY * this.#pixelRatio;
+            e.uniforms["intersection"].value = intersection;
 
             for (const [key, gen] of Object.entries(e.uniformGenerators)) {
                 e.uniforms[key].value = gen();
@@ -409,7 +437,7 @@ export class VFXPlayer {
             }
 
             // Set viewport
-            if (e.overflow === "fullscreen") {
+            if (e.isFullScreen) {
                 this.#renderer.setViewport(
                     0,
                     0,
@@ -450,54 +478,53 @@ export class VFXPlayer {
     }
 }
 
-// TODO: Consider custom root element
-export function isRectInViewport(
-    viewport: Rect,
-    rect: Rect,
-    overflow: VFXElementOverflow,
-): boolean {
-    if (overflow === "fullscreen") {
-        return true;
-    }
-
+/**
+ * Returns if the given rects intersect.
+ * It returns true when the rects are adjacent (= intersection ratio is 0).
+ */
+export function isRectInViewport(viewport: Rect, rect: Rect): boolean {
     return (
-        rect.left - overflow.left <= viewport.right &&
-        rect.right + overflow.right >= viewport.left &&
-        rect.top - overflow.top <= viewport.bottom &&
-        rect.bottom + overflow.bottom >= viewport.top
+        rect.left <= viewport.right &&
+        rect.right >= viewport.left &&
+        rect.top <= viewport.bottom &&
+        rect.bottom >= viewport.top
     );
 }
 
-export function sanitizeOverflow(
+export function checkIntersection(
+    viewport: Rect,
+    rect: Rect,
+    intersection: number,
+    threshold: number,
+): boolean {
+    if (threshold === 0) {
+        // if threshold === 0, consider adjacent rects to be intersecting.
+        return isRectInViewport(viewport, rect);
+    } else {
+        return intersection >= threshold;
+    }
+}
+
+export function parseOverflowOpts(
     overflow: VFXProps["overflow"],
-): VFXElementOverflow {
+): [isFullScreen: boolean, Rect] {
     if (overflow === true) {
-        return "fullscreen";
+        return [true, RECT_ZERO];
     }
     if (overflow === undefined) {
-        return { top: 0, right: 0, bottom: 0, left: 0 };
+        return [false, RECT_ZERO];
     }
-    if (typeof overflow === "number") {
-        return {
-            top: overflow,
-            right: overflow,
-            bottom: overflow,
-            left: overflow,
-        };
-    }
-    if (Array.isArray(overflow)) {
-        return {
-            top: overflow[0],
-            right: overflow[1],
-            bottom: overflow[2],
-            left: overflow[3],
-        };
-    }
+    return [false, createRect(overflow)];
+}
+
+export function parseIntersectionOpts(
+    intersectionOpts: VFXProps["intersection"],
+): VFXElementIntersection {
+    const threshold = intersectionOpts?.threshold ?? 0;
+    const rootMargin = createRect(intersectionOpts?.rootMargin ?? 0);
     return {
-        top: overflow.top ?? 0,
-        right: overflow.right ?? 0,
-        bottom: overflow.bottom ?? 0,
-        left: overflow.left ?? 0,
+        threshold,
+        rootMargin,
     };
 }
 
