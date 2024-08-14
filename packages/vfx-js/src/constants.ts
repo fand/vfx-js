@@ -25,7 +25,8 @@ export type ShaderPreset =
     | "halftone"
     | "slitScanTransition"
     | "warpTransition"
-    | "pixelateTransition";
+    | "pixelateTransition"
+    | "focusTransition";
 
 /**
  * Shader code for presets.
@@ -662,6 +663,25 @@ export const shaders: Record<ShaderPreset, string> = {
         }
 
         gl_FragColor = texture2D(src, uv);
+    }
+    `,
+    focusTransition: `
+    precision highp float;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    uniform float intersection;
+    uniform sampler2D src;
+
+    void main (void) {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        float t = smoothstep(0., 1., intersection);
+
+        gl_FragColor = mix(
+            texture2D(src, uv + vec2(1. - t, 0)),
+            texture2D(src, uv + vec2(-(1. - t), 0)),
+            0.5
+        ) * intersection;
     }
     `,
 };

@@ -252,6 +252,7 @@ export class VFXPlayer {
             enterTime: { value: -1.0 },
             leaveTime: { value: -1.0 },
             mouse: { value: new THREE.Vector2() },
+            intersection: { value: intersection },
         };
 
         const uniformGenerators: {
@@ -423,6 +424,7 @@ export class VFXPlayer {
                 this.#pixelRatio;
             e.uniforms["mouse"].value.x = this.#mouseX * this.#pixelRatio;
             e.uniforms["mouse"].value.y = this.#mouseY * this.#pixelRatio;
+            e.uniforms["intersection"].value = intersection;
 
             for (const [key, gen] of Object.entries(e.uniformGenerators)) {
                 e.uniforms[key].value = gen();
