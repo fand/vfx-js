@@ -172,9 +172,11 @@ export class VFXPlayer {
 
         const rect = element.getBoundingClientRect();
         const [isFullScreen, overflow] = sanitizeOverflow(opts.overflow);
+        const rectHitTest = growRect(rect, overflow);
+
         const intersection = sanitizeIntersection(opts.intersection);
         const isInViewport =
-            isFullScreen || isRectInViewport(this.#viewport, rect, overflow, 0);
+            isFullScreen || isRectInViewport(this.#viewport, rectHitTest, 0);
 
         const transitionArea = growRect(
             this.#viewport,
@@ -184,8 +186,7 @@ export class VFXPlayer {
             isFullScreen ||
             isRectInViewport(
                 transitionArea,
-                rect,
-                overflow,
+                rectHitTest,
                 intersection.threshold,
             );
 
@@ -371,11 +372,12 @@ export class VFXPlayer {
 
         for (const e of this.#elements) {
             const rect = e.element.getBoundingClientRect();
+            const rectHitTest = growRect(rect, e.overflow);
 
             // Check intersection
             const isInViewport =
                 e.isFullScreen ||
-                isRectInViewport(this.#viewport, rect, e.overflow, 0);
+                isRectInViewport(this.#viewport, rectHitTest, 0);
 
             const transitionArea = growRect(
                 this.#viewport,
@@ -385,8 +387,7 @@ export class VFXPlayer {
                 e.isFullScreen ||
                 isRectInViewport(
                     transitionArea,
-                    rect,
-                    e.overflow,
+                    rectHitTest,
                     e.intersection.threshold,
                 );
 
@@ -476,20 +477,18 @@ export class VFXPlayer {
 export function isRectInViewport(
     viewport: Rect,
     rect: Rect,
-    overflow: Rect,
     threshold: number,
 ): boolean {
-    const rect2 = growRect(rect, overflow);
     if (threshold === 0) {
         // if threshold == 0, consider adjacent rects to be intersecting.
         return (
-            rect2.left <= viewport.right &&
-            rect2.right >= viewport.left &&
-            rect2.top <= viewport.bottom &&
-            rect2.bottom >= viewport.top
+            rect.left <= viewport.right &&
+            rect.right >= viewport.left &&
+            rect.top <= viewport.bottom &&
+            rect.bottom >= viewport.top
         );
     } else {
-        return getIntersection(viewport, rect2) >= threshold;
+        return getIntersection(viewport, rect) >= threshold;
     }
 }
 
