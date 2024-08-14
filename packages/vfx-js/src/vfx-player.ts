@@ -176,17 +176,19 @@ export class VFXPlayer {
 
         const intersection = sanitizeIntersection(opts.intersection);
         const isInViewport =
-            isFullScreen || isRectInViewport(this.#viewport, rectHitTest, 0);
+            isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
 
         const transitionArea = growRect(
             this.#viewport,
             intersection.rootMargin,
         );
+        const intersectionRatio = getIntersection(this.#viewport, rectHitTest);
         const isInTransitionArea =
             isFullScreen ||
-            isRectInViewport(
+            checkIntersection(
                 transitionArea,
                 rectHitTest,
+                intersectionRatio,
                 intersection.threshold,
             );
 
@@ -376,18 +378,22 @@ export class VFXPlayer {
 
             // Check intersection
             const isInViewport =
-                e.isFullScreen ||
-                isRectInViewport(this.#viewport, rectHitTest, 0);
+                e.isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
 
             const transitionArea = growRect(
                 this.#viewport,
                 e.intersection.rootMargin,
             );
+            const intersectionRatio = getIntersection(
+                transitionArea,
+                rectHitTest,
+            );
             const isInTransitionArea =
                 e.isFullScreen ||
-                isRectInViewport(
+                checkIntersection(
                     transitionArea,
                     rectHitTest,
+                    intersectionRatio,
                     e.intersection.threshold,
                 );
 
@@ -473,22 +479,30 @@ export class VFXPlayer {
     }
 }
 
-// TODO: Consider custom root element
-export function isRectInViewport(
+/**
+ * Returns if the given rects intersect.
+ * It returns true when the rects are adjacent (= intersection ratio is 0).
+ */
+export function isRectInViewport(viewport: Rect, rect: Rect): boolean {
+    return (
+        rect.left <= viewport.right &&
+        rect.right >= viewport.left &&
+        rect.top <= viewport.bottom &&
+        rect.bottom >= viewport.top
+    );
+}
+
+export function checkIntersection(
     viewport: Rect,
     rect: Rect,
+    intersection: number,
     threshold: number,
 ): boolean {
     if (threshold === 0) {
-        // if threshold == 0, consider adjacent rects to be intersecting.
-        return (
-            rect.left <= viewport.right &&
-            rect.right >= viewport.left &&
-            rect.top <= viewport.bottom &&
-            rect.bottom >= viewport.top
-        );
+        // if threshold === 0, consider adjacent rects to be intersecting.
+        return isRectInViewport(viewport, rect);
     } else {
-        return getIntersection(viewport, rect) >= threshold;
+        return intersection >= threshold;
     }
 }
 
