@@ -1,14 +1,14 @@
 import { expect, describe, test } from "vitest";
-import { isRectInViewport, sanitizeOverflow } from "./vfx-player";
+import { isRectInViewport, parseOverflowOpts } from "./vfx-player";
 import { RECT_ZERO } from "./rect";
 
-describe("sanitizeOverflow", () => {
+describe("parseOverflowOpts", () => {
     test('true => "fullscreen"', () => {
-        expect(sanitizeOverflow(true)).toStrictEqual([true, RECT_ZERO]);
+        expect(parseOverflowOpts(true)).toStrictEqual([true, RECT_ZERO]);
     });
 
     test("undefined => 0", () => {
-        expect(sanitizeOverflow(undefined)).toStrictEqual([
+        expect(parseOverflowOpts(undefined)).toStrictEqual([
             false,
             {
                 top: 0,
@@ -20,7 +20,7 @@ describe("sanitizeOverflow", () => {
     });
 
     test("number", () => {
-        expect(sanitizeOverflow(100)).toStrictEqual([
+        expect(parseOverflowOpts(100)).toStrictEqual([
             false,
             {
                 top: 100,
@@ -32,7 +32,7 @@ describe("sanitizeOverflow", () => {
     });
 
     test("number array", () => {
-        expect(sanitizeOverflow([0, 100, 200, 300])).toStrictEqual([
+        expect(parseOverflowOpts([0, 100, 200, 300])).toStrictEqual([
             false,
             {
                 top: 0,
@@ -44,7 +44,7 @@ describe("sanitizeOverflow", () => {
     });
 
     test("object", () => {
-        expect(sanitizeOverflow({})).toStrictEqual([
+        expect(parseOverflowOpts({})).toStrictEqual([
             false,
             {
                 top: 0,
@@ -53,7 +53,7 @@ describe("sanitizeOverflow", () => {
                 left: 0,
             },
         ]);
-        expect(sanitizeOverflow({ top: 100 })).toStrictEqual([
+        expect(parseOverflowOpts({ top: 100 })).toStrictEqual([
             false,
             {
                 top: 100,
@@ -62,7 +62,7 @@ describe("sanitizeOverflow", () => {
                 left: 0,
             },
         ]);
-        expect(sanitizeOverflow({ left: 100 })).toStrictEqual([
+        expect(parseOverflowOpts({ left: 100 })).toStrictEqual([
             false,
             {
                 top: 0,
@@ -71,7 +71,7 @@ describe("sanitizeOverflow", () => {
                 left: 100,
             },
         ]);
-        expect(sanitizeOverflow({ top: 100, left: 200 })).toStrictEqual([
+        expect(parseOverflowOpts({ top: 100, left: 200 })).toStrictEqual([
             false,
             {
                 top: 100,
@@ -81,7 +81,7 @@ describe("sanitizeOverflow", () => {
             },
         ]);
         expect(
-            sanitizeOverflow({ top: 100, right: 200, bottom: 300, left: 400 }),
+            parseOverflowOpts({ top: 100, right: 200, bottom: 300, left: 400 }),
         ).toStrictEqual([
             false,
             {

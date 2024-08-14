@@ -171,10 +171,10 @@ export class VFXPlayer {
         const shader = this.#getShader(opts.shader || "uvGradient");
 
         const rect = element.getBoundingClientRect();
-        const [isFullScreen, overflow] = sanitizeOverflow(opts.overflow);
+        const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
         const rectHitTest = growRect(rect, overflow);
 
-        const intersection = sanitizeIntersection(opts.intersection);
+        const intersection = parseIntersectionOpts(opts.intersection);
         const isInViewport =
             isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
 
@@ -506,7 +506,7 @@ export function checkIntersection(
     }
 }
 
-export function sanitizeOverflow(
+export function parseOverflowOpts(
     overflow: VFXProps["overflow"],
 ): [isFullScreen: boolean, Rect] {
     if (overflow === true) {
@@ -518,7 +518,7 @@ export function sanitizeOverflow(
     return [false, createRect(overflow)];
 }
 
-export function sanitizeIntersection(
+export function parseIntersectionOpts(
     intersectionOpts: VFXProps["intersection"],
 ): VFXElementIntersection {
     const threshold = intersectionOpts?.threshold ?? 0;
