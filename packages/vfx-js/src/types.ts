@@ -100,8 +100,15 @@ export type VFXProps = {
      */
     overlay?: true | number;
 
+    /**
+     * Options to control transition behaviour.
+     * These properties work similarly to the IntersectionObsrever options.
+     */
     intersection?: {
+        /** Threshold for the element to be considered "entered" to the viewport. */
         threshold?: number;
+
+        /** Margin of the viewport to be used in intersection calculcation. */
         rootMargin?: RectOpts;
     };
 
