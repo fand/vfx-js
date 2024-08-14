@@ -182,12 +182,12 @@ export class VFXPlayer {
             this.#viewport,
             intersectionOpts.rootMargin,
         );
-        const intersection = getIntersection(this.#viewport, rectHitTest);
+        const intersection = getIntersection(this.#viewport, rect);
         const isInLogicalViewport =
             isFullScreen ||
             checkIntersection(
                 logicalViewport,
-                rectHitTest,
+                rect,
                 intersection,
                 intersectionOpts.threshold,
             );
@@ -385,12 +385,12 @@ export class VFXPlayer {
                 this.#viewport,
                 e.intersection.rootMargin,
             );
-            const intersection = getIntersection(logicalViewport, rectHitTest);
+            const intersection = getIntersection(logicalViewport, rect);
             const isInLogicalViewport =
                 e.isFullScreen ||
                 checkIntersection(
                     logicalViewport,
-                    rectHitTest,
+                    rect,
                     intersection,
                     e.intersection.threshold,
                 );
