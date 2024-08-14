@@ -17,6 +17,7 @@ const shaders: Record<string, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform float enterTime;
+    uniform float leaveTime;
     uniform sampler2D src;
 
     uniform float delay;
@@ -79,7 +80,10 @@ const shaders: Record<string, string> = {
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        if (enterTime < 1.0) {
+        if (leaveTime > 0.) {
+            float t = clamp(leaveTime - 0.5, 0., 1.);
+            gl_FragColor = glitch(uv) * (1. - t);
+        } else if (enterTime < 1.0) {
             gl_FragColor = slitscan(uv);
         } else {
             gl_FragColor = glitch(uv);
@@ -354,6 +358,9 @@ class App {
             shader: shaders.logo,
             overflow: [0, 3000, 0, 100],
             uniforms: { delay: 0 },
+            intersection: {
+                threshold: 1,
+            },
         });
 
         const tagline = document.getElementById("LogoTagline")!;
@@ -361,6 +368,9 @@ class App {
             shader: shaders.logo,
             overflow: [0, 3000, 0, 1000],
             uniforms: { delay: 0.3 },
+            intersection: {
+                threshold: 1,
+            },
         });
     }
 
@@ -368,8 +378,12 @@ class App {
         const profile = document.getElementById("profile")!;
         this.vfx.add(profile, {
             shader: shaders.logo,
-            overflow: [0, 2000, 0, 1000],
+            overflow: [0, 2000, 0, 2000],
             uniforms: { delay: 0.5 },
+            intersection: {
+                rootMargin: [-100, 0, -100, 0],
+                threshold: 1,
+            },
         });
     }
 }
