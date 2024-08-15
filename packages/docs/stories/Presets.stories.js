@@ -16,7 +16,6 @@ const render = (opts) => {
 
 export default {
     title: "Presets",
-    // tags: ["autodocs"],
     render,
     parameters: {
         layout: "fullscreen",
