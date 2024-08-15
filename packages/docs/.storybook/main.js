@@ -24,5 +24,6 @@ const config = {
         name: getAbsolutePath("@storybook/html-vite"),
         options: {},
     },
+    viteFinal: async (config) => ({ ...config, define: { "process.env": {} } }),
 };
 export default config;
