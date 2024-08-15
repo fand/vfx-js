@@ -1,5 +1,11 @@
 # react-vfx
 
+## 0.5.1
+
+### Patch Changes
+
+-   Fix intersection calculation on VFX.add()
+
 ## 0.5.0
 
 ### Minor Changes
