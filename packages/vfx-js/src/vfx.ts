@@ -32,7 +32,7 @@ export class VFX {
         document.body.appendChild(canvas);
         this.#canvas = canvas;
 
-        this.#player = new VFXPlayer(canvas);
+        this.#player = new VFXPlayer(canvas, opts.pixelRatio);
         this.#player.play();
     }
 
