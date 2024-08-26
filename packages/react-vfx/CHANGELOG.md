@@ -1,5 +1,13 @@
 # react-vfx
 
+## 0.10.2
+
+### Patch Changes
+
+-   Fix pixelRatio not working
+-   Updated dependencies
+    -   @vfx-js/core@0.5.2
+
 ## 0.10.1
 
 ### Patch Changes

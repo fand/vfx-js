@@ -1,5 +1,11 @@
 # react-vfx
 
+## 0.5.2
+
+### Patch Changes
+
+-   Fix pixelRatio not working
+
 ## 0.5.1
 
 ### Patch Changes
