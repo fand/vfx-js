@@ -44,13 +44,14 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        gl_FragColor = vec4(uv, sin(time) * .5 + .5, 1);
+        outColor = vec4(uv, sin(time) * .5 + .5, 1);
 
-        vec4 img = texture2D(src, uv);
-        gl_FragColor *= smoothstep(0., 1., img.a);
+        vec4 img = texture(src, uv);
+        outColor *= smoothstep(0., 1., img.a);
     }
     `,
     rainbow: `
@@ -59,6 +60,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     vec3 hsv2rgb(vec3 c) {
         vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -89,12 +91,12 @@ export const shaders: Record<ShaderPreset, string> = {
 
         float x = (uv2.x - uv2.y) - fract(time);
 
-        vec4 img = texture2D(src, uv);
+        vec4 img = texture(src, uv);
         float gray = length(img.rgb);
 
         img.rgb = vec3(hueShift(vec3(1,0,0), x) * gray);
 
-        gl_FragColor = img;
+        outColor = img;
     }
     `,
     glitch: `
@@ -103,6 +105,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     float nn(float y, float t) {
         float n = (
@@ -118,7 +121,7 @@ export const shaders: Record<ShaderPreset, string> = {
 
     vec4 readTex(sampler2D tex, vec2 uv) {
         if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { return vec4(0); }
-        return texture2D(tex, uv);
+        return texture(tex, uv);
     }
 
     void main (void) {
@@ -161,14 +164,14 @@ export const shaders: Record<ShaderPreset, string> = {
 
         // Compose Chromatic Abbreveation
         if (abs(nn(uv.y, t)) > 1.1) {
-            color.r = color.r * 0.5 + color.r * texture2D(src, ruv).r;
-            color.g = color.g * 0.5 + color.g * texture2D(src, guv).g;
-            color.b = color.b * 0.5 + color.b * texture2D(src, buv).b;
+            color.r = color.r * 0.5 + color.r * texture(src, ruv).r;
+            color.g = color.g * 0.5 + color.g * texture(src, guv).g;
+            color.b = color.b * 0.5 + color.b * texture(src, buv).b;
             color *= 2.;
         }
 
-        gl_FragColor = color;
-        gl_FragColor.a = smoothstep(0.0, 0.8, max(color.r, max(color.g, color.b)));
+        outColor = color;
+        outColor.a = smoothstep(0.0, 0.8, max(color.r, max(color.g, color.b)));
     }
     `,
     pixelate: `
@@ -177,13 +180,14 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
         float b = sin(time * 2.) * 32. + 48.;
         uv = floor(uv * b) / b;
-        gl_FragColor = texture2D(src, uv);
+        outColor = texture(src, uv);
     }
     `,
     rgbGlitch: `
@@ -192,6 +196,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     float random(vec2 st) {
         return fract(sin(dot(st, vec2(948.,824.))) * 30284.);
@@ -221,11 +226,11 @@ export const shaders: Record<ShaderPreset, string> = {
             }
         }
 
-        vec4 cr = texture2D(src, uvr);
-        vec4 cg = texture2D(src, uvg);
-        vec4 cb = texture2D(src, uvb);
+        vec4 cr = texture(src, uvr);
+        vec4 cg = texture(src, uvg);
+        vec4 cb = texture(src, uvb);
 
-        gl_FragColor = vec4(
+        outColor = vec4(
             cr.r,
             cg.g,
             cb.b,
@@ -239,6 +244,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     float nn(float y, float t) {
         float n = (
@@ -274,11 +280,11 @@ export const shaders: Record<ShaderPreset, string> = {
             uvb.x += nn(uv.y, t + 20.) * amp;
         }
 
-        vec4 cr = texture2D(src, uvr) * inside(uvr);
-        vec4 cg = texture2D(src, uvg) * inside(uvg);
-        vec4 cb = texture2D(src, uvb) * inside(uvb);
+        vec4 cr = texture(src, uvr) * inside(uvr);
+        vec4 cg = texture(src, uvg) * inside(uvg);
+        vec4 cb = texture(src, uvb) * inside(uvb);
 
-        gl_FragColor = vec4(
+        outColor = vec4(
             cr.r,
             cg.g,
             cb.b,
@@ -295,6 +301,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     // TODO: uniform
     #define gridSize 10.0
@@ -302,7 +309,7 @@ export const shaders: Record<ShaderPreset, string> = {
     #define smoothing 0.15
     #define speed 1.0
 
-    #define IMG_PIXEL(x, y) texture2D(x, (y - offset) / resolution);
+    #define IMG_PIXEL(x, y) texture(x, (y - offset) / resolution);
 
     vec4 gridRot = vec4(15.0, 45.0, 75.0, 0.0);
 
@@ -384,10 +391,10 @@ export const shaders: Record<ShaderPreset, string> = {
         }
 
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 original = texture2D(src, uv);
+        vec4 original = texture(src, uv);
         float alpha = step(.1, rgbAmounts[0] + rgbAmounts[1] + rgbAmounts[2] + original.a);
 
-        gl_FragColor = vec4(rgbAmounts[0], rgbAmounts[1], rgbAmounts[2], alpha);
+        outColor = vec4(rgbAmounts[0], rgbAmounts[1], rgbAmounts[2], alpha);
     }
     `,
     sinewave: `
@@ -396,6 +403,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     float inside(in vec2 uv) {
         return step(0., uv.x) * step(uv.x, 1.) * step(0., uv.y) * step(uv.y, 1.);
@@ -410,9 +418,9 @@ export const shaders: Record<ShaderPreset, string> = {
         uvg.x += sin(uv.y * 7. + time * 3. + .4) * amp;
         uvb.x += sin(uv.y * 7. + time * 3. + .8) * amp;
 
-        vec4 cr = texture2D(src, uvr) * inside(uvr);
-        vec4 cg = texture2D(src, uvg) * inside(uvg);
-        vec4 cb = texture2D(src, uvb) * inside(uvb);
+        vec4 cr = texture(src, uvr) * inside(uvr);
+        vec4 cg = texture(src, uvg) * inside(uvg);
+        vec4 cb = texture(src, uvb) * inside(uvb);
 
         return vec4(
             cr.r,
@@ -427,7 +435,7 @@ export const shaders: Record<ShaderPreset, string> = {
 
         // x blur
         vec2 dx = vec2(2, 0) / resolution.x;
-        gl_FragColor = (draw(uv) * 2. + draw(uv + dx) + draw(uv - dx)) / 4.;
+        outColor = (draw(uv) * 2. + draw(uv + dx) + draw(uv - dx)) / 4.;
     }
     `,
     shine: `
@@ -436,6 +444,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -443,12 +452,12 @@ export const shaders: Record<ShaderPreset, string> = {
         vec2 p = uv * 2. - 1.;
         float a = atan(p.y, p.x);
 
-        vec4 col = texture2D(src, uv);
+        vec4 col = texture(src, uv);
         float gray = length(col.rgb);
 
         float level = 1. + sin(a * 10. + time * 3.) * 0.2;
 
-        gl_FragColor = vec4(1, 1, .5, col.a) * level;
+        outColor = vec4(1, 1, .5, col.a) * level;
     }
     `,
     blink: `
@@ -457,11 +466,12 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        gl_FragColor = texture2D(src, uv) * (sin(time * 5.) * 0.2 + 0.8);
+        outColor = texture(src, uv) * (sin(time * 5.) * 0.2 + 0.8);
     }
 
     `,
@@ -471,6 +481,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -478,7 +489,7 @@ export const shaders: Record<ShaderPreset, string> = {
 
         if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { discard; }
 
-        gl_FragColor = texture2D(src, uv);
+        outColor = texture(src, uv);
     }
     `,
     duotone: `
@@ -490,21 +501,22 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec4 color1;
     uniform vec4 color2;
     uniform float speed;
+    out vec4 outColor;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = texture2D(src, uv);
+        vec4 color = texture(src, uv);
 
         float gray = dot(color.rgb, vec3(0.2, 0.7, 0.08));
         float t = mod(gray * 2.0 + time * speed, 2.0);
 
         if (t < 1.) {
-            gl_FragColor = mix(color1, color2, fract(t));
+            outColor = mix(color1, color2, fract(t));
         } else {
-            gl_FragColor = mix(color2, color1, fract(t));
+            outColor = mix(color2, color1, fract(t));
         }
 
-        gl_FragColor.a *= color.a;
+        outColor.a *= color.a;
     }
     `,
     tritone: `
@@ -520,20 +532,20 @@ export const shaders: Record<ShaderPreset, string> = {
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = texture2D(src, uv);
+        vec4 color = texture(src, uv);
 
         float gray = dot(color.rgb, vec3(0.2, 0.7, 0.08));
         float t = mod(gray * 3.0 + time * speed, 3.0);
 
         if (t < 1.) {
-            gl_FragColor = mix(color1, color2, fract(t));
+            outColor = mix(color1, color2, fract(t));
         } else if (t < 2.) {
-            gl_FragColor = mix(color2, color3, fract(t));
+            outColor = mix(color2, color3, fract(t));
         } else {
-            gl_FragColor = mix(color3, color1, fract(t));
+            outColor = mix(color3, color1, fract(t));
         }
 
-        gl_FragColor.a *= color.a;
+        outColor.a *= color.a;
     }
     `,
     hueShift: `
@@ -543,6 +555,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform float time;
     uniform sampler2D src;
     uniform float shift;
+    out vec4 outColor;
 
     vec3 hsv2rgb(vec3 c) {
         vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -568,9 +581,9 @@ export const shaders: Record<ShaderPreset, string> = {
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = texture2D(src, uv);
+        vec4 color = texture(src, uv);
         color.rgb = hueShift(color.rgb, shift);
-        gl_FragColor = color;
+        outColor = color;
     }
     `,
     warpTransition: `
@@ -581,6 +594,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform float enterTime;
     uniform float leaveTime;
     uniform sampler2D src;
+    out vec4 outColor;
 
     #define DURATION 1.0
 
@@ -599,7 +613,7 @@ export const shaders: Record<ShaderPreset, string> = {
             uv.x += sin(floor(uv.y * 300.)) * 3. * exp(t * -10.);
         }
 
-        gl_FragColor = texture2D(src, uv);
+        outColor = texture(src, uv);
     }
     `,
     slitScanTransition: `
@@ -610,6 +624,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform float enterTime;
     uniform float leaveTime;
     uniform sampler2D src;
+    out vec4 outColor;
 
     #define DURATION 1.0
 
@@ -634,7 +649,7 @@ export const shaders: Record<ShaderPreset, string> = {
             uv.y = uv.y < t ? t : uv.y;
         }
 
-        gl_FragColor = texture2D(src, uv);
+        outColor = texture(src, uv);
     }
     `,
     pixelateTransition: `
@@ -645,6 +660,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform float enterTime;
     uniform float leaveTime;
     uniform sampler2D src;
+    out vec4 outColor;
 
     #define DURATION 1.0
 
@@ -662,7 +678,7 @@ export const shaders: Record<ShaderPreset, string> = {
             uv = (floor(uv * b) + .5) / b;
         }
 
-        gl_FragColor = texture2D(src, uv);
+        outColor = texture(src, uv);
     }
     `,
     focusTransition: `
@@ -672,14 +688,15 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform float time;
     uniform float intersection;
     uniform sampler2D src;
+    out vec4 outColor;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
         float t = smoothstep(0., 1., intersection);
 
-        gl_FragColor = mix(
-            texture2D(src, uv + vec2(1. - t, 0)),
-            texture2D(src, uv + vec2(-(1. - t), 0)),
+        outColor = mix(
+            texture(src, uv + vec2(1. - t, 0)),
+            texture(src, uv + vec2(-(1. - t), 0)),
             0.5
         ) * intersection;
     }
