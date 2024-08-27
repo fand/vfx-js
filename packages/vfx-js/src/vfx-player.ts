@@ -281,7 +281,7 @@ export class VFXPlayer {
             fragmentShader: shader,
             transparent: true,
             uniforms,
-            glslVersion: "300 es",
+            glslVersion: opts.glslVersion ?? "300 es",
         });
         scene.add(new THREE.Mesh(geometry, material));
 
