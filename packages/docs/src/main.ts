@@ -23,6 +23,8 @@ const shaders: Record<string, string> = {
     uniform float delay;
     #define speed 2.0
 
+    out vec4 outColor;
+
     float nn(float y, float t) {
         float n = (
             sin(y * .07 + t * 8. + sin(y * .5 + t * 10.)) +
@@ -35,7 +37,7 @@ const shaders: Record<string, string> = {
 
     vec4 readTex(sampler2D tex, vec2 uv) {
         if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { return vec4(0); }
-        return texture2D(tex, uv);
+        return texture(tex, uv);
     }
 
     vec4 glitch(vec2 uv) {
@@ -82,11 +84,11 @@ const shaders: Record<string, string> = {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
         if (leaveTime > 0.) {
             float t = clamp(leaveTime - 0.5, 0., 1.);
-            gl_FragColor = glitch(uv) * (1. - t);
+            outColor = glitch(uv) * (1. - t);
         } else if (enterTime < 1.0) {
-            gl_FragColor = slitscan(uv);
+            outColor = slitscan(uv);
         } else {
-            gl_FragColor = glitch(uv);
+            outColor = glitch(uv);
         }
     }
     `,
@@ -96,6 +98,7 @@ const shaders: Record<string, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform sampler2D src;
+    out vec4 outColor;
 
     vec3 hsv2rgb(vec3 c) {
         vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -122,17 +125,17 @@ const shaders: Record<string, string> = {
     vec4 readTex(vec2 uv) {
         vec2 d = 3. / resolution.xy;
         vec4 c = vec4(0);
-        c += texture2D(src, uv + vec2(1, 0) * d);
-        c += texture2D(src, uv - vec2(1, 0) * d);
-        c += texture2D(src, uv + vec2(0, 1) * d);
-        c += texture2D(src, uv - vec2(0, 1) * d);
+        c += texture(src, uv + vec2(1, 0) * d);
+        c += texture(src, uv - vec2(1, 0) * d);
+        c += texture(src, uv + vec2(0, 1) * d);
+        c += texture(src, uv - vec2(0, 1) * d);
         return c / 4.;
     }
 
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        vec4 img = texture2D(src, uv);
+        vec4 img = texture(src, uv);
 
         float gray = dot(img.rgb, vec3(0.2, 0.7, 0.1));
 
@@ -148,7 +151,7 @@ const shaders: Record<string, string> = {
         img.rgb = hueShift(img.rgb, shift);
 
         img.a *= 0.5;
-        gl_FragColor = img;
+        outColor = img;
     }
     `,
     canvas: `
@@ -157,6 +160,7 @@ uniform vec2 resolution;
 uniform vec2 offset;
 uniform float time;
 uniform sampler2D src;
+out vec4 outColor;
 
 #define ZOOM(uv, x) ((uv - .5) / x + .5)
 
@@ -170,11 +174,11 @@ void main (void) {
 
 
     float n = 0.02 + r * 0.03;
-    vec4 cr = texture2D(src, ZOOM(uv, 1.00));
-    vec4 cg = texture2D(src, ZOOM(uv, (1. + n)));
-    vec4 cb = texture2D(src, ZOOM(uv, (1. + n * 2.)));
+    vec4 cr = texture(src, ZOOM(uv, 1.00));
+    vec4 cg = texture(src, ZOOM(uv, (1. + n)));
+    vec4 cb = texture(src, ZOOM(uv, (1. + n * 2.)));
 
-    gl_FragColor = vec4(cr.r, cg.g, cb.b, 1);
+    outColor = vec4(cr.r, cg.g, cb.b, 1);
 }
     `,
     custom: `
@@ -183,13 +187,13 @@ uniform vec2 resolution;
 uniform vec2 offset;
 uniform float time;
 uniform sampler2D src;
-
 uniform float scroll;
+out vec4 outColor;
 
 void main (void) {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     uv.x = fract(uv.x + scroll + time * 0.2);
-    gl_FragColor = texture2D(src, uv);
+    outColor = texture(src, uv);
 }
     `,
 };

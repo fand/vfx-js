@@ -11,6 +11,7 @@ uniform vec2 mouse;
 uniform float time;
 uniform sampler2D src;
 uniform float dist;
+out vec4 outColor;
 
 float noise(float y, float t) {
     float n = (
@@ -59,7 +60,7 @@ void main (void) {
     vec4 cg = texture2D(src, uvg);
     vec4 cb = texture2D(src, uvb);
 
-    gl_FragColor = vec4(
+    outColor = vec4(
         cr.r,
         cg.g,
         cb.b,

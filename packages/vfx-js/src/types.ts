@@ -146,6 +146,12 @@ export type VFXProps = {
      * When elements have the same `zIndex`, they are rendered in the order they were added.
      */
     zIndex?: number;
+
+    /**
+     * GLSL version of the given shader. (Default: `"300 es"`)
+     * If you want to use GLSL 100 (≒ WebGL 1) shader, pass `"100"` to this property.
+     */
+    glslVersion?: "100" | "300 es";
 };
 
 /**

@@ -451,8 +451,8 @@ uniform vec2 resolution;
 uniform vec2 offset;
 uniform float time;
 uniform sampler2D src;
-
 uniform float scroll;
+out vec4 outColor;
 
 void main (void) {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -460,7 +460,7 @@ void main (void) {
     // Scroll X
     uv.x = fract(uv.x + scroll + time * 0.2);
 
-    gl_FragColor = texture2D(src, uv);
+    outColor = texture2D(src, uv);
 }
 `;
 
