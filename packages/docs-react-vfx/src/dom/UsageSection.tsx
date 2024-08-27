@@ -10,12 +10,13 @@ uniform vec2 resolution; // Resolution of the element
 uniform vec2 offset;     // Position of the element in the screen
 uniform float time;      // Time passed since mount
 uniform sampler2D src;   // Input texture
+out vec4 outColor;
 
 void main() {
     // Get UV in the element
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-    gl_FragColor = texture2D(src, uv) * step(.5, fract(time));
+    outColor = texture2D(src, uv) * step(.5, fract(time));
 }
 `;
 
@@ -25,13 +26,14 @@ uniform vec2 offset;
 uniform float time;
 uniform float enterTime; // Time since entering the viewport
 uniform sampler2D src;
+out vec4 outColor;
 
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    gl_FragColor = texture2D(src, uv);
+    outColor = texture2D(src, uv);
 
     // Fade alpha by enterTime
-    gl_FragColor.a *= smoothstep(0.0, 3.0, enterTime);
+    outColor.a *= smoothstep(0.0, 3.0, enterTime);
 }
 `;
 
@@ -40,6 +42,7 @@ uniform vec2 resolution;
 uniform vec2 offset;
 uniform float scroll; // custom uniform passed as React props
 uniform sampler2D src;
+out vec4 outColor;
 
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -50,7 +53,7 @@ void main() {
     // prevent vertical overflow
     if (uv.y < 0. || uv.y > 1.) discard;
 
-    gl_FragColor = texture2D(src, uv);
+    outColor = texture2D(src, uv);
 }
 `;
 
@@ -184,12 +187,13 @@ const UsageSection: React.VFC = () => (
         uniform vec2 offset;     // Position of the element in the screen
         uniform float time;      // Time passed since mount
         uniform sampler2D src;   // Input texture
+        out vec4 outColor;
 
         void main() {
             // Get UV in the element
             vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-            gl_FragColor = texture2D(src, uv) * step(.5, fract(time));
+            outColor = texture2D(src, uv) * step(.5, fract(time));
         }
         \`;
 
@@ -224,13 +228,14 @@ const UsageSection: React.VFC = () => (
             uniform float time;
             uniform float enterTime; // Time since entering the viewport
             uniform sampler2D src;
+            out vec4 outColor;
 
             void main() {
                 vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                gl_FragColor = texture2D(src, uv);
+                outColor = texture2D(src, uv);
 
                 // Fade alpha by enterTime
-                gl_FragColor.a *= smoothstep(0.0, 3.0, enterTime);
+                outColor.a *= smoothstep(0.0, 3.0, enterTime);
             }
             \`;
 
@@ -284,6 +289,7 @@ const UsageSection: React.VFC = () => (
             uniform vec2 offset;
             uniform float scroll; // custom uniform passed as props
             uniform sampler2D src;
+            out vec4 outColor;
 
             void main() {
                 vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -294,7 +300,7 @@ const UsageSection: React.VFC = () => (
                 // prevent vertical overflow
                 if (uv.y < 0. || uv.y > 1.) discard;
 
-                gl_FragColor = texture2D(src, uv);
+                outColor = texture2D(src, uv);
             }
             \`;
 
