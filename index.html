@@ -52,7 +52,7 @@
         <link rel="apple-touch-icon" href="favicon/favicon-180.png" />
         <link rel="manifest" href="./assets/manifest-BmSZvifo.webmanifest" />
 
-      <script type="module" crossorigin src="./assets/index-CsNpsYCT.js"></script>
+      <script type="module" crossorigin src="./assets/index-DP6fjrcI.js"></script>
       <link rel="stylesheet" crossorigin href="./assets/index-CvEiNOSf.css">
     </head>
 
@@ -452,8 +452,8 @@ uniform vec2 resolution;
 uniform vec2 offset;
 uniform float time;
 uniform sampler2D src;
-
 uniform float scroll;
+out vec4 outColor;
 
 void main (void) {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -461,7 +461,7 @@ void main (void) {
     // Scroll X
     uv.x = fract(uv.x + scroll + time * 0.2);
 
-    gl_FragColor = texture2D(src, uv);
+    outColor = texture2D(src, uv);
 }
 `;
 
