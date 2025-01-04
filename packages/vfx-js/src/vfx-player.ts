@@ -169,6 +169,7 @@ export class VFXPlayer {
 
     async addElement(element: HTMLElement, opts: VFXProps = {}): Promise<void> {
         const shader = this.#getShader(opts.shader || "uvGradient");
+        const glslVersion = this.#getGLSLVersion(opts.glslVersion, shader);
 
         const rect = element.getBoundingClientRect();
         const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
@@ -281,7 +282,7 @@ export class VFXPlayer {
             fragmentShader: shader,
             transparent: true,
             uniforms,
-            glslVersion: opts.glslVersion ?? "300 es",
+            glslVersion,
         });
         scene.add(new THREE.Mesh(geometry, material));
 
@@ -476,6 +477,23 @@ export class VFXPlayer {
         } else {
             return shaderNameOrCode; // Assume that the given string is a valid shader code
         }
+    }
+
+    #getGLSLVersion(
+        opt: "100" | "300 es" | undefined,
+        shader: string,
+    ): "100" | "300 es" {
+        if (opt) {
+            return opt;
+        }
+        if (shader.includes("out vec4")) {
+            return "300 es";
+        }
+        if (shader.includes("gl_FragColor")) {
+            return "100";
+        }
+
+        throw `VFX-JS error: Cannot detect GLSL version of the shader.\n\nOriginal shader:\n${shader}`;
     }
 }
 
