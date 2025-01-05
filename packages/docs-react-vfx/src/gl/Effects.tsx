@@ -8,9 +8,12 @@ const FXAA = forwardRef(({}, ref) => {
 });
 
 export default function Effects() {
-    return (
-        <EffectComposer multisampling={0}>
-            <FXAA />
-        </EffectComposer>
-    );
+    // Effect doesn't work...
+    return null;
+
+    // return (
+    //     <EffectComposer multisampling={0}>
+    //         <FXAA />
+    //     </EffectComposer>
+    // );
 }

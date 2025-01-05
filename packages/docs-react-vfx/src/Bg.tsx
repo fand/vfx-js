@@ -4,6 +4,7 @@ import { isMobile } from "is-mobile";
 import Triangle from "./gl/Triangle";
 import Fragments from "./gl/Fragments";
 import Effects from "./gl/Effects";
+import { useSpringValue } from "@react-spring/web";
 
 const canvasStyle = {
     position: "fixed",
@@ -17,9 +18,10 @@ const canvasStyle = {
 };
 
 const Bg: React.FC = () => {
-    const { scene, camera } = useThree();
+    const { camera } = useThree();
+    camera.frustumCulled = false;
 
-    const top = useRef(0);
+    const top = useSpringValue(0);
 
     const onScroll = useCallback(() => {
         const scroll = window.scrollY;
@@ -31,8 +33,7 @@ const Bg: React.FC = () => {
             return 0;
         }
 
-        top.current =
-            scroll / (document.body.scrollHeight - window.innerHeight);
+        top.start(scroll / (document.body.scrollHeight - window.innerHeight));
     }, [top]);
 
     useEffect(() => {
@@ -44,7 +45,7 @@ const Bg: React.FC = () => {
     }, [onScroll]);
 
     useFrame(() => {
-        const s = top.current ?? 0;
+        const s = top.get() ?? 0;
         camera.rotation.set(-Math.PI * 0.1 - s * Math.PI * 0.4, 0, 0);
     });
 
