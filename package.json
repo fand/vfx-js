@@ -16,7 +16,7 @@
     "release": "changeset publish"
   },
   "dependencies": {
-    "@changesets/cli": "^2.27.5"
+    "@changesets/cli": "^2.27.11"
   },
   "devDependencies": {
     "husky": "^9.0.11",
