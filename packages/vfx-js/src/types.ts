@@ -1,6 +1,6 @@
-import THREE from "three";
-import { ShaderPreset } from "./constants.js";
-import { Rect, RectOpts } from "./rect.js";
+import type * as THREE from "three";
+import type { ShaderPreset } from "./constants.js";
+import type { Rect, RectOpts } from "./rect.js";
 
 /**
  * Options to initialize `VFX` class.
