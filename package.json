@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --ui tui",
     "clean": "turbo run clean",
     "lint": "turbo run lint",
     "prepare": "husky install",

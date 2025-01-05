@@ -13,7 +13,9 @@
             ]
         },
         "dev": {
-            "outputs": []
+            "outputs": [],
+            "persistent": true,
+            "cache": false
         },
         "clean": {
             "outputs": []
