@@ -52,7 +52,11 @@ function Particles({ count }: { count: number }) {
     }, []);
 
     return (
-        <instancedMesh ref={ref} args={[undefined, undefined, count]}>
+        <instancedMesh
+            ref={ref}
+            args={[undefined, undefined, count]}
+            frustumCulled={false}
+        >
             <boxGeometry args={[0.00001, 1, 1]} />
             <meshDepthMaterial />
         </instancedMesh>

@@ -19,7 +19,6 @@ const canvasStyle = {
 
 const Bg: React.FC = () => {
     const { camera } = useThree();
-    camera.frustumCulled = false;
 
     const top = useSpringValue(0);
 
