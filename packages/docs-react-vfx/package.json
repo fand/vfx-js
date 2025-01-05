@@ -9,14 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@react-spring/web": "^9.7.3",
+    "@react-spring/web": "^9.7.5",
     "@react-three/fiber": "^8.17.10",
     "@react-three/postprocessing": "^2.16.5",
     "dedent": "^1.5.3",
     "is-mobile": "^5.0.0",
     "lodash.debounce": "^4.0.8",
     "postprocessing": "^6.35.5",
-    "prism-react-renderer": "^2.3.1",
+    "prism-react-renderer": "^2.4.1",
     "prismjs": "^1.29.0",
     "react": "^18.3.1",
     "react-dom": "18.3.1",
@@ -36,7 +36,7 @@
     "@types/three": "^0.171.0",
     "@vitejs/plugin-react": "^4.3.4",
     "rimraf": "^6.0.1",
-    "typescript": "^5.4.5",
+    "typescript": "^5.7.2",
     "vite": "^6.0.7"
   }
 }

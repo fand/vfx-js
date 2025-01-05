@@ -20,7 +20,6 @@
   "devDependencies": {
     "@originjs/vite-plugin-commonjs": "^1.0.3",
     "@types/dedent": "^0.7.2",
-    "@types/is-mobile": "^2.1.4",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^22.10.5",
     "rimraf": "^6.0.1",
