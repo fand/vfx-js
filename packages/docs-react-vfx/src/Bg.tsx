@@ -1,9 +1,4 @@
-import React, {
-    useEffect,
-    useCallback,
-    createRef,
-    MutableRefObject,
-} from "react";
+import React, { useEffect, useCallback, createRef, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { isMobile } from "is-mobile";
 import Triangle from "./gl/Triangle";
@@ -21,10 +16,10 @@ const canvasStyle = {
     background: "#222222",
 };
 
-const Bg: React.VFC = () => {
+const Bg: React.FC = () => {
     const { scene, camera } = useThree();
 
-    const top = createRef() as MutableRefObject<number>;
+    const top = useRef(0);
 
     const onScroll = useCallback(() => {
         const scroll = window.scrollY;
@@ -61,7 +56,7 @@ const Bg: React.VFC = () => {
     );
 };
 
-const BG: React.VFC = () => (
+const BG: React.FC = () => (
     <Canvas style={canvasStyle as any}>
         <Effects />
         <Bg />

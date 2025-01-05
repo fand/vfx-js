@@ -3,10 +3,10 @@ import { useEffect, useRef, useContext } from "react";
 import type { VFXProps } from "@vfx-js/core";
 import { VFXContext } from "./context.js";
 
-type VFXElementProps<T extends keyof JSX.IntrinsicElements> =
-    JSX.IntrinsicElements[T] & VFXProps;
+type VFXElementProps<T extends keyof React.JSX.IntrinsicElements> =
+    React.JSX.IntrinsicElements[T] & VFXProps;
 
-export function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
+export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
     type: T,
 ): React.ForwardRefExoticComponent<
     React.PropsWithoutRef<VFXElementProps<T>> & React.RefAttributes<HTMLElement>
@@ -17,7 +17,7 @@ export function VFXElementFactory<T extends keyof JSX.IntrinsicElements>(
     ) {
         const vfx = useContext(VFXContext);
 
-        const elementRef = useRef<HTMLElement | undefined>();
+        const elementRef = useRef<HTMLElement>(undefined);
         const ref = (e: HTMLElement): void => {
             elementRef.current = e;
             if (parentRef instanceof Function) {

@@ -57,7 +57,7 @@ void main() {
 }
 `;
 
-const UsageSection: React.VFC = () => (
+const UsageSection: React.FC = () => (
     <>
         <section>
             <h2 id="install">Install</h2>
