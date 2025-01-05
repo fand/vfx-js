@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "husky": "^9.0.11",
-    "turbo": "^2.0.3"
+    "turbo": "^2.3.3"
   },
   "author": "AMAGI <mail@amagi.dev> (https://amagi.dev/)",
   "homepage": "https://github.com/fand/vfx-js#readme",
