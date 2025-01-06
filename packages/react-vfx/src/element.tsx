@@ -1,6 +1,6 @@
-import * as React from "react";
-import { useEffect, useRef, useContext } from "react";
 import type { VFXProps } from "@vfx-js/core";
+import * as React from "react";
+import { useContext, useEffect, useRef } from "react";
 import { VFXContext } from "./context.js";
 
 type VFXElementProps<T extends keyof React.JSX.IntrinsicElements> =
@@ -60,7 +60,7 @@ export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
                 mo.disconnect();
                 vfx.remove(element);
             };
-        }, [elementRef, vfx, shader, release, uniforms, overflow, wrap]);
+        }, [vfx, shader, release, uniforms, overflow, wrap]);
 
         return React.createElement(type, { ...rawProps, ref });
     });

@@ -1,5 +1,5 @@
+import type { VFXOpts, VFXProps } from "./types.js";
 import { VFXPlayer } from "./vfx-player.js";
-import { VFXOpts, VFXProps } from "./types.js";
 
 const canvasStyle = {
     position: "fixed",

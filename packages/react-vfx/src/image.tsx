@@ -1,6 +1,6 @@
-import * as React from "react";
-import { useRef, useContext, useEffect } from "react";
 import type { VFXProps } from "@vfx-js/core";
+import type * as React from "react";
+import { useContext, useEffect, useRef } from "react";
 import { VFXContext } from "./context.js";
 
 export type VFXImgProps = React.JSX.IntrinsicElements["img"] & VFXProps;
@@ -31,5 +31,6 @@ export const VFXImg: React.FC<VFXImgProps> = (props) => {
         };
     }, [vfx, shader, release, uniforms, overflow, wrap]);
 
+    // biome-ignore lint/a11y/useAltText: alt should be in rawProps
     return <img ref={ref} {...rawProps} />;
 };

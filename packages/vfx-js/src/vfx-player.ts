@@ -1,22 +1,22 @@
 import * as THREE from "three";
+import { DEFAULT_VERTEX_SHADER, shaders } from "./constants.js";
 import dom2canvas from "./dom-to-canvas.js";
-import { shaders, DEFAULT_VERTEX_SHADER } from "./constants.js";
 import GIFData from "./gif.js";
 import {
-    VFXProps,
-    VFXElement,
-    VFXElementType,
-    VFXUniformValue,
-    VFXWrap,
-    VFXElementIntersection,
-} from "./types";
-import {
+    RECT_ZERO,
+    type Rect,
     createRect,
     getIntersection,
     growRect,
-    Rect,
-    RECT_ZERO,
 } from "./rect.js";
+import type {
+    VFXElement,
+    VFXElementIntersection,
+    VFXElementType,
+    VFXProps,
+    VFXUniformValue,
+    VFXWrap,
+} from "./types";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -196,7 +196,7 @@ export class VFXPlayer {
         const originalOpacity =
             element.style.opacity === ""
                 ? 1
-                : parseFloat(element.style.opacity);
+                : Number.parseFloat(element.style.opacity);
 
         // Create values for element types
         let texture: THREE.Texture;
@@ -298,9 +298,11 @@ export class VFXPlayer {
             uniforms,
             uniformGenerators,
             startTime: now,
-            enterTime: isInLogicalViewport ? now : -Infinity,
-            leaveTime: isInLogicalViewport ? Infinity : -Infinity,
-            release: opts.release ?? Infinity,
+            enterTime: isInLogicalViewport ? now : Number.NEGATIVE_INFINITY,
+            leaveTime: isInLogicalViewport
+                ? Number.POSITIVE_INFINITY
+                : Number.NEGATIVE_INFINITY,
+            release: opts.release ?? Number.POSITIVE_INFINITY,
             isGif,
             isFullScreen,
             overflow,
@@ -400,7 +402,7 @@ export class VFXPlayer {
             // Update transition timing
             if (!e.isInLogicalViewport && isInLogicalViewport /* out -> in */) {
                 e.enterTime = now;
-                e.leaveTime = Infinity;
+                e.leaveTime = Number.POSITIVE_INFINITY;
             }
             if (e.isInLogicalViewport && !isInLogicalViewport /* in -> out */) {
                 e.leaveTime = now;

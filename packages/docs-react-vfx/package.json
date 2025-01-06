@@ -35,6 +35,7 @@
     "@types/react-lazyload": "^3.2.3",
     "@types/three": "^0.171.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "prop-types": "^15.8.1",
     "rimraf": "^6.0.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.7"

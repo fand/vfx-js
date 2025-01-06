@@ -1,0 +1,20 @@
+{
+    "$schema": "node_modules/@biomejs/biome/configuration_schema.json",
+    "linter": {
+        "ignore": [
+            "test"
+        ],
+        "rules": {
+            "complexity": {
+                "useLiteralKeys": "off"
+            },
+            "style": {
+                "noUselessElse": "off"
+            }
+        }
+    },
+    "formatter": {
+        "indentStyle": "space",
+        "indentWidth": 4
+    }
+}
