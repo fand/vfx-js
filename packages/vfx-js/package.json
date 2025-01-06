@@ -29,7 +29,7 @@
     "dev": "run-p watch:cjs watch:esm",
     "watch:cjs": "tsc -d -w",
     "watch:esm": "tsc -d -w -p tsconfig.esm.json",
-    "lint": "eslint src/**/*.ts",
+    "lint": "biome lint .",
     "lint-staged": "lint-staged",
     "test": "vitest --dir src --run",
     "test:watch": "vitest --dir src",
@@ -39,6 +39,7 @@
     "three": "^0.172.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@eslint/compat": "^1.2.4",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.17.0",
@@ -63,8 +64,7 @@
   },
   "lint-staged": {
     "src/*.ts": [
-      "eslint --fix",
-      "prettier --write"
+      "biome lint --fix"
     ]
   },
   "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",

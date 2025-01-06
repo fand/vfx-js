@@ -1,0 +1,25 @@
+{
+    "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+    "files": {
+        "include": [
+            "src/**/*.ts"
+        ],
+        "ignore": [
+            "src/gifuct-js"
+        ]
+    },
+    "linter": {
+        "ignore": [
+            "test"
+        ],
+        "rules": {
+            "complexity": {
+                "useLiteralKeys": "off"
+            }
+        }
+    },
+    "formatter": {
+        "indentStyle": "space",
+        "indentWidth": 4
+    }
+}
