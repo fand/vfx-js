@@ -29,7 +29,8 @@
     "dev": "run-p watch:cjs watch:esm",
     "watch:cjs": "tsc -d -w",
     "watch:esm": "tsc -d -w -p tsconfig.esm.json",
-    "lint": "biome lint .",
+    "lint": "biome check .",
+    "format": "biome check --write .",
     "lint-staged": "lint-staged",
     "test": "vitest --dir src --run",
     "test:watch": "vitest --dir src",
@@ -40,21 +41,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@eslint/compat": "^1.2.4",
-    "@eslint/eslintrc": "^3.2.0",
-    "@eslint/js": "^9.17.0",
     "@types/node": "^22.10.5",
     "@types/three": "^0.171.0",
-    "@typescript-eslint/eslint-plugin": "^8.19.0",
-    "@typescript-eslint/parser": "^8.19.0",
-    "eslint": "^9.17.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.2.1",
     "globals": "^15.14.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.3.0",
     "npm-run-all": "^4.1.5",
-    "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
     "tsconfig-to-dual-package": "^1.2.0",
     "typedoc": "^0.27.6",
@@ -64,7 +56,7 @@
   },
   "lint-staged": {
     "src/*.ts": [
-      "biome lint --fix"
+      "biome check --no-errors-on-unmatched --files-ignore-unknown=true"
     ]
   },
   "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
