@@ -3,7 +3,7 @@ import { useRef, useContext, useEffect } from "react";
 import type { VFXProps } from "@vfx-js/core";
 import { VFXContext } from "./context.js";
 
-export type VFXImgProps = JSX.IntrinsicElements["img"] & VFXProps;
+export type VFXImgProps = React.JSX.IntrinsicElements["img"] & VFXProps;
 
 export const VFXImg: React.FC<VFXImgProps> = (props) => {
     const { shader, release, uniforms, overflow, wrap, ...rawProps } = props;

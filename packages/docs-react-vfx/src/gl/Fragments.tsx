@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { isMobile } from "is-mobile";
 import { Object3D, Group, InstancedMesh } from "three";
+import { SpringValue } from "@react-spring/web";
 
 function randomRange(min: number, max: number): number {
     const diff = max - min;
@@ -51,7 +52,11 @@ function Particles({ count }: { count: number }) {
     }, []);
 
     return (
-        <instancedMesh ref={ref} args={[undefined, undefined, count]}>
+        <instancedMesh
+            ref={ref}
+            args={[undefined, undefined, count]}
+            frustumCulled={false}
+        >
             <boxGeometry args={[0.00001, 1, 1]} />
             <meshDepthMaterial />
         </instancedMesh>
@@ -60,7 +65,7 @@ function Particles({ count }: { count: number }) {
 
 type FragmentsProps = {
     count: number;
-    scroll: RefObject<number>;
+    scroll: SpringValue<number>;
 };
 
 function Fragments({ count, scroll }: FragmentsProps) {
@@ -74,7 +79,7 @@ function Fragments({ count, scroll }: FragmentsProps) {
             return;
         }
 
-        const s = scroll.current ?? 0;
+        const s = scroll.get();
         groupRef.current.position.set(0, s * 100 - 50, 0);
         groupRef.current.rotation.set(0, Date.now() / 8000 + s * 5, 0);
     });

@@ -1,14 +1,10 @@
-import React, {
-    useEffect,
-    useCallback,
-    createRef,
-    MutableRefObject,
-} from "react";
+import React, { useEffect, useCallback, createRef, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { isMobile } from "is-mobile";
 import Triangle from "./gl/Triangle";
 import Fragments from "./gl/Fragments";
 import Effects from "./gl/Effects";
+import { useSpringValue } from "@react-spring/web";
 
 const canvasStyle = {
     position: "fixed",
@@ -21,10 +17,10 @@ const canvasStyle = {
     background: "#222222",
 };
 
-const Bg: React.VFC = () => {
-    const { scene, camera } = useThree();
+const Bg: React.FC = () => {
+    const { camera } = useThree();
 
-    const top = createRef() as MutableRefObject<number>;
+    const top = useSpringValue(0);
 
     const onScroll = useCallback(() => {
         const scroll = window.scrollY;
@@ -36,8 +32,7 @@ const Bg: React.VFC = () => {
             return 0;
         }
 
-        top.current =
-            scroll / (document.body.scrollHeight - window.innerHeight);
+        top.start(scroll / (document.body.scrollHeight - window.innerHeight));
     }, [top]);
 
     useEffect(() => {
@@ -49,7 +44,7 @@ const Bg: React.VFC = () => {
     }, [onScroll]);
 
     useFrame(() => {
-        const s = top.current ?? 0;
+        const s = top.get() ?? 0;
         camera.rotation.set(-Math.PI * 0.1 - s * Math.PI * 0.4, 0, 0);
     });
 
@@ -61,7 +56,7 @@ const Bg: React.VFC = () => {
     );
 };
 
-const BG: React.VFC = () => (
+const BG: React.FC = () => (
     <Canvas style={canvasStyle as any}>
         <Effects />
         <Bg />

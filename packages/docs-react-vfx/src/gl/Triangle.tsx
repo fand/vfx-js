@@ -2,9 +2,10 @@ import { RefObject, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Mesh } from "three";
 import { isMobile } from "is-mobile";
+import { SpringValue } from "@react-spring/web";
 
 type TriangleProps = {
-    scroll: RefObject<number>;
+    scroll: SpringValue<number>;
 };
 
 function Triangle({ scroll }: TriangleProps) {
@@ -20,7 +21,7 @@ function Triangle({ scroll }: TriangleProps) {
         r.rotation.y += 0.004;
         r.rotation.z += 0.01;
 
-        const s = scroll.current ?? 0;
+        const s = scroll.get();
         r.position.set(0, s * 300 - 7, -15);
     });
 

@@ -1,8 +1,9 @@
-// declare module JSX {
-//     interface IntrinsicElements {
-//         instancedMesh: any;
-//         effectComposer: any;
-//         renderPass: any;
-//         shaderPass: any;
-//     }
-// }
+import { ThreeElements } from "@react-three/fiber";
+
+declare global {
+    namespace React {
+        namespace JSX {
+            interface IntrinsicElements extends ThreeElements {}
+        }
+    }
+}

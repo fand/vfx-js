@@ -89,7 +89,7 @@ const ExamplesSection: React.FC = () => {
                     plain text!!!!!
                 </VFX.VFXSpan>
             </section>
-            <section>
+            {/* <section>
                 <h3>... and make Transition Effects!</h3>
                 <VFX.VFXImg
                     shader="warpTransition"
@@ -101,7 +101,7 @@ const ExamplesSection: React.FC = () => {
                 <br />
                 <VFX.VFXImg shader="pixelateTransition" src={pub("logo.png")} />
                 <br />
-            </section>
+            </section> */}
         </section>
     );
 };
