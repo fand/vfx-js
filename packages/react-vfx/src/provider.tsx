@@ -22,7 +22,7 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
             vfx.stop();
             vfx.destroy();
         };
-    }, [props.pixelRatio, props.zIndex]);
+    }, [props.pixelRatio]); // TODO: add zIndex
 
     return (
         <>

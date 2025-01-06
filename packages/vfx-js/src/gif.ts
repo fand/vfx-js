@@ -21,10 +21,11 @@ export default class GIFData {
             .then((buff) => new GIF(buff));
 
         const frames = gif.decompressFrames(true, undefined, undefined);
-        const width = (gif.raw as any).lsd.width; // eslint-disable-line  @typescript-eslint/no-explicit-any
-        const height = (gif.raw as any).lsd.height; // eslint-disable-line  @typescript-eslint/no-explicit-any
 
-        // eslint-disable-next-line  @typescript-eslint/no-explicit-any
+        // biome-ignore lint/suspicious/noExplicitAny: raw data
+        const { width, height } = (gif.raw as any).lsd;
+
+        // biome-ignore lint/suspicious/noExplicitAny: frames
         return new GIFData(frames as any, width, height, pixelRatio);
     }
 
@@ -36,7 +37,10 @@ export default class GIFData {
     ) {
         this.frames = frames;
         this.canvas = document.createElement("canvas");
+
+        // biome-ignore lint/style/noNonNullAssertion: ctx
         this.ctx = this.canvas.getContext("2d")!;
+
         this.pixelRatio = pixelRatio;
 
         // Override canvas size by image size

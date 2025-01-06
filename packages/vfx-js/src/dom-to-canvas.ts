@@ -14,6 +14,7 @@ const convertHtmlToXml = (html: string): string => {
     doc.documentElement.appendChild(range.createContextualFragment(html));
     doc.documentElement.setAttribute(
         "xmlns",
+        // biome-ignore lint/style/noNonNullAssertion: ok
         doc.documentElement.namespaceURI!,
     );
 
@@ -91,13 +92,13 @@ async function syncStylesOfTree(
 ): Promise<void> {
     // Sync CSS styles
     const styles = window.getComputedStyle(el1);
-    Array.from(styles).forEach((key) => {
+    for (const key of Array.from(styles)) {
         el2.style.setProperty(
             key,
             styles.getPropertyValue(key),
             styles.getPropertyPriority(key),
         );
-    });
+    }
 
     // Reflect input value to HTML attributes
     if (el2.tagName === "INPUT") {

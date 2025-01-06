@@ -31,5 +31,6 @@ export const VFXImg: React.FC<VFXImgProps> = (props) => {
         };
     }, [vfx, shader, release, uniforms, overflow, wrap]);
 
+    // biome-ignore lint/a11y/useAltText: alt should be in rawProps
     return <img ref={ref} {...rawProps} />;
 };
