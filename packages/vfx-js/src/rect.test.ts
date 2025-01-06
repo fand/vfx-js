@@ -1,4 +1,4 @@
-import { expect, describe, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { createRect, getIntersection, growRect, shrinkRect } from "./rect";
 
 describe("createRect", () => {

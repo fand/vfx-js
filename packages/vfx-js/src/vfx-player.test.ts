@@ -1,6 +1,6 @@
-import { expect, describe, test } from "vitest";
-import { isRectInViewport, parseOverflowOpts } from "./vfx-player";
+import { describe, expect, test } from "vitest";
 import { RECT_ZERO } from "./rect";
+import { isRectInViewport, parseOverflowOpts } from "./vfx-player";
 
 describe("parseOverflowOpts", () => {
     test('true => "fullscreen"', () => {
