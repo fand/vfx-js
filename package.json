@@ -10,7 +10,7 @@
     "dev": "turbo run dev --ui tui",
     "clean": "turbo run clean",
     "lint": "turbo run lint",
-    "prepare": "husky install",
+    "prepare": "husky",
     "test": "npm --workspace=@vfx-js/core test",
     "prepare-release": "changeset && turbo run build lint test && changeset version",
     "release": "changeset publish"
