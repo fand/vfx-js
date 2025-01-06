@@ -16,7 +16,9 @@ export function useVFX(): UseVFX {
 
     return {
         rerenderElement: (e: HTMLElement | null) => {
-            e && vfx?.update(e);
+            if (e) {
+                vfx?.update(e);
+            }
         },
     };
 }
