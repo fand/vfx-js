@@ -1,5 +1,12 @@
 # docs-vfx-js
 
+## 0.0.8
+
+### Patch Changes
+
+-   Updated dependencies
+    -   @vfx-js/core@0.6.0
+
 ## 0.0.7
 
 ### Patch Changes

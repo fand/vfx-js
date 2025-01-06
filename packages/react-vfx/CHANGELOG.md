@@ -1,5 +1,16 @@
 # react-vfx
 
+## 0.11.0
+
+### Minor Changes
+
+-   Support WebGL2 shaders
+
+### Patch Changes
+
+-   Updated dependencies
+    -   @vfx-js/core@0.6.0
+
 ## 0.10.2
 
 ### Patch Changes
