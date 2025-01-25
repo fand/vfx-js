@@ -9,6 +9,24 @@ void main() {
 }
 `;
 
+/**
+ * @internal
+ */
+export const COPY_FRAGMENT_SHADER = `
+precision highp float;
+uniform vec2 offset;
+uniform vec2 resolution;
+uniform sampler2D src;
+out vec4 outColor;
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) {
+        discard;
+    }
+    outColor = texture(src, uv);
+}
+`;
+
 export type ShaderPreset =
     | "uvGradient"
     | "rainbow"

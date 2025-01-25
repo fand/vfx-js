@@ -1,5 +1,9 @@
 import * as THREE from "three";
-import { DEFAULT_VERTEX_SHADER, shaders } from "./constants.js";
+import {
+    COPY_FRAGMENT_SHADER,
+    DEFAULT_VERTEX_SHADER,
+    shaders,
+} from "./constants.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
 import {
@@ -30,6 +34,7 @@ export class VFXPlayer {
 
     #copyScene: THREE.Scene;
     #copyMesh: THREE.Mesh;
+    #copyUniforms: { [name: string]: THREE.IUniform };
 
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
@@ -71,12 +76,22 @@ export class VFXPlayer {
 
         // Setup copyScene
         this.#copyScene = new THREE.Scene();
+        this.#copyUniforms = {
+            src: { value: null },
+            offset: { value: new THREE.Vector2() },
+            resolution: { value: new THREE.Vector2() },
+        };
         this.#copyMesh = new THREE.Mesh(
             new THREE.PlaneGeometry(2, 2),
-            new THREE.MeshBasicMaterial({
+            new THREE.RawShaderMaterial({
+                vertexShader: DEFAULT_VERTEX_SHADER,
+                fragmentShader: COPY_FRAGMENT_SHADER,
+                uniforms: this.#copyUniforms,
+                glslVersion: "300 es",
                 transparent: true,
             }),
         );
+        this.#copyScene.add(this.#copyMesh);
     }
 
     destroy(): void {
@@ -267,6 +282,7 @@ export class VFXPlayer {
             leaveTime: { value: -1.0 },
             mouse: { value: new THREE.Vector2() },
             intersection: { value: intersection },
+            rectOuter: { value: new THREE.Vector4() },
         };
 
         const uniformGenerators: {
@@ -298,6 +314,7 @@ export class VFXPlayer {
                 this.#pixelRatio;
             const backbuffer0 = new THREE.WebGLRenderTarget(bw, bh);
             const backbuffer1 = new THREE.WebGLRenderTarget(bw, bh);
+
             return [backbuffer0, backbuffer1];
         })();
         uniforms["backbuffer"] = { value: backbuffer[0].texture };
@@ -439,8 +456,28 @@ export class VFXPlayer {
                 e.uniforms["src"].value.needsUpdate = true;
             }
 
+            // Update backbuffer
+            const bw =
+                (hit.rectWithOverflow.right - hit.rectWithOverflow.left) *
+                this.#pixelRatio;
+            const bh =
+                (hit.rectWithOverflow.bottom - hit.rectWithOverflow.top) *
+                this.#pixelRatio;
+            if (bw !== e.backbuffer[0].width || bh !== e.backbuffer[0].height) {
+                e.backbuffer[0].setSize(bw, bh);
+                e.backbuffer[1].setSize(bw, bh);
+            }
             e.uniforms["backbuffer"].value = e.backbuffer[0].texture;
             e.uniforms["backbuffer"].value.needsUpdate = true;
+            e.uniforms["rectOuter"].value.set(
+                hit.rectWithOverflow.left * this.#pixelRatio,
+                (window.innerHeight - hit.rectWithOverflow.bottom) *
+                    this.#pixelRatio,
+                (hit.rectWithOverflow.right - hit.rectWithOverflow.left) *
+                    this.#pixelRatio,
+                (hit.rectWithOverflow.bottom - hit.rectWithOverflow.top) *
+                    this.#pixelRatio,
+            );
 
             // Set viewport
             if (e.isFullScreen) {
@@ -455,32 +492,41 @@ export class VFXPlayer {
                 this.#render(e.scene, e.backbuffer[1]);
 
                 // Render to canvas
-                (this.#copyMesh.material as THREE.MeshBasicMaterial).map =
-                    e.backbuffer[1].texture;
-
-                this.#render(e.scene, null);
+                this.#copyUniforms["src"].value = e.backbuffer[1].texture;
+                this.#copyUniforms["resolution"] = e.uniforms["resolution"];
+                this.#copyUniforms["offset"] = e.uniforms["offset"];
+                this.#render(this.#copyScene, null);
             } else {
                 // Render to backbuffer
+                e.uniforms["offset"].value.x =
+                    e.overflow.left * this.#pixelRatio;
+                e.uniforms["offset"].value.y =
+                    e.overflow.bottom * this.#pixelRatio;
                 this.#renderer.setViewport(
-                    rect.left - e.overflow.left,
-                    window.innerHeight -
-                        (rect.top + rect.height) -
-                        e.overflow.bottom,
-                    rect.width + (e.overflow.left + e.overflow.right),
-                    rect.height + (e.overflow.top + e.overflow.bottom),
+                    0,
+                    0,
+                    e.backbuffer[1].width / this.#pixelRatio,
+                    e.backbuffer[1].height / this.#pixelRatio,
                 );
                 this.#render(e.scene, e.backbuffer[1]);
 
                 // Render to canvas
                 this.#renderer.setViewport(
-                    0,
-                    0,
-                    window.innerWidth,
-                    window.innerHeight,
+                    hit.rectWithOverflow.left,
+                    hit.rectWithOverflow.bottom,
+                    hit.rectWithOverflow.right - hit.rectWithOverflow.left,
+                    window.innerHeight -
+                        (hit.rectWithOverflow.bottom -
+                            hit.rectWithOverflow.top),
                 );
-                (this.#copyMesh.material as THREE.MeshBasicMaterial).map =
-                    e.backbuffer[1].texture;
-                this.#render(e.scene, null);
+                this.#copyUniforms["src"].value = e.backbuffer[1].texture;
+                this.#copyUniforms["resolution"] = e.uniforms["resolution"];
+                this.#copyUniforms["offset"].value.x =
+                    rect.left * this.#pixelRatio;
+                this.#copyUniforms["offset"].value.y =
+                    (window.innerHeight - rect.top - rect.height) *
+                    this.#pixelRatio;
+                this.#render(this.#copyScene, null);
             }
 
             e.backbuffer = [e.backbuffer[1], e.backbuffer[0]];
@@ -564,6 +610,10 @@ export class VFXPlayer {
 
     #render(scene: THREE.Scene, target: THREE.WebGLRenderTarget | null) {
         this.#renderer.setRenderTarget(target);
+        if (target !== null) {
+            this.#renderer.clear();
+        }
+
         try {
             this.#renderer.render(scene, this.#camera);
         } catch (e) {
