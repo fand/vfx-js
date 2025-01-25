@@ -429,7 +429,6 @@ export class VFXPlayer {
             }
 
             // Render to viewport
-            this.#camera.lookAt(e.scene.position);
             try {
                 this.#renderer.render(e.scene, this.#camera);
             } catch (e) {
