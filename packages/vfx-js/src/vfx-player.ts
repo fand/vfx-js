@@ -420,7 +420,7 @@ export class VFXPlayer {
             e.uniforms["time"].value = now - e.startTime;
             e.uniforms["enterTime"].value = now - e.enterTime;
             e.uniforms["leaveTime"].value = now - e.leaveTime;
-            e.uniforms["resolution"].value.x = rect.width * this.#pixelRatio; // TODO: use correct width, height
+            e.uniforms["resolution"].value.x = rect.width * this.#pixelRatio;
             e.uniforms["resolution"].value.y = rect.height * this.#pixelRatio;
             e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
             e.uniforms["offset"].value.y =
