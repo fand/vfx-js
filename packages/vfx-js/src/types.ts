@@ -206,6 +206,7 @@ export type VFXElement = {
     intersection: VFXElementIntersection;
     originalOpacity: number;
     zIndex: number;
+    backbuffer: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
 };
 
 export type VFXElementIntersection = {

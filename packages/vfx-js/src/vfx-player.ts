@@ -27,6 +27,10 @@ export class VFXPlayer {
     #canvas: HTMLCanvasElement;
     #renderer: THREE.WebGLRenderer;
     #camera: THREE.Camera;
+
+    #copyScene: THREE.Scene;
+    #copyMesh: THREE.Mesh;
+
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
     #elements: VFXElement[] = [];
@@ -64,6 +68,15 @@ export class VFXPlayer {
 
         this.#camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
         this.#camera.position.set(0, 0, 1);
+
+        // Setup copyScene
+        this.#copyScene = new THREE.Scene();
+        this.#copyMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(2, 2),
+            new THREE.MeshBasicMaterial({
+                transparent: true,
+            }),
+        );
     }
 
     destroy(): void {
@@ -173,11 +186,11 @@ export class VFXPlayer {
 
         const rect = element.getBoundingClientRect();
         const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
-        const rectPadded = growRect(rect, overflow);
+        const rectWithOverflow = growRect(rect, overflow);
 
         const intersectionOpts = parseIntersectionOpts(opts.intersection);
         const isInViewport =
-            isFullScreen || isRectInViewport(this.#viewport, rectPadded);
+            isFullScreen || isRectInViewport(this.#viewport, rectWithOverflow);
 
         const viewportPadded = growRect(
             this.#viewport,
@@ -275,6 +288,20 @@ export class VFXPlayer {
             }
         }
 
+        // Backbuffer
+        const backbuffer: VFXElement["backbuffer"] = (() => {
+            const bw =
+                (rectWithOverflow.right - rectWithOverflow.left) *
+                this.#pixelRatio;
+            const bh =
+                (rectWithOverflow.bottom - rectWithOverflow.top) *
+                this.#pixelRatio;
+            const backbuffer0 = new THREE.WebGLRenderTarget(bw, bh);
+            const backbuffer1 = new THREE.WebGLRenderTarget(bw, bh);
+            return [backbuffer0, backbuffer1];
+        })();
+        uniforms["backbuffer"] = { value: backbuffer[0].texture };
+
         const scene = new THREE.Scene();
         const geometry = new THREE.PlaneGeometry(2, 2);
         const material = new THREE.RawShaderMaterial({
@@ -311,6 +338,7 @@ export class VFXPlayer {
             intersection: intersectionOpts,
             originalOpacity,
             zIndex: opts.zIndex ?? 0,
+            backbuffer,
         };
 
         // Insert element and sort elements by z-index.
@@ -411,6 +439,9 @@ export class VFXPlayer {
                 e.uniforms["src"].value.needsUpdate = true;
             }
 
+            e.uniforms["backbuffer"].value = e.backbuffer[0].texture;
+            e.uniforms["backbuffer"].value.needsUpdate = true;
+
             // Set viewport
             if (e.isFullScreen) {
                 this.#renderer.setViewport(
@@ -419,7 +450,17 @@ export class VFXPlayer {
                     window.innerWidth,
                     window.innerHeight,
                 );
+
+                // Render to backbuffer
+                this.#render(e.scene, e.backbuffer[1]);
+
+                // Render to canvas
+                (this.#copyMesh.material as THREE.MeshBasicMaterial).map =
+                    e.backbuffer[1].texture;
+
+                this.#render(e.scene, null);
             } else {
+                // Render to backbuffer
                 this.#renderer.setViewport(
                     rect.left - e.overflow.left,
                     window.innerHeight -
@@ -428,14 +469,21 @@ export class VFXPlayer {
                     rect.width + (e.overflow.left + e.overflow.right),
                     rect.height + (e.overflow.top + e.overflow.bottom),
                 );
+                this.#render(e.scene, e.backbuffer[1]);
+
+                // Render to canvas
+                this.#renderer.setViewport(
+                    0,
+                    0,
+                    window.innerWidth,
+                    window.innerHeight,
+                );
+                (this.#copyMesh.material as THREE.MeshBasicMaterial).map =
+                    e.backbuffer[1].texture;
+                this.#render(e.scene, null);
             }
 
-            // Render to viewport
-            try {
-                this.#renderer.render(e.scene, this.#camera);
-            } catch (e) {
-                console.error(e);
-            }
+            e.backbuffer = [e.backbuffer[1], e.backbuffer[0]];
         }
 
         if (this.isPlaying()) {
@@ -512,6 +560,15 @@ export class VFXPlayer {
         }
 
         throw `VFX-JS error: Cannot detect GLSL version of the shader.\n\nOriginal shader:\n${shader}`;
+    }
+
+    #render(scene: THREE.Scene, target: THREE.WebGLRenderTarget | null) {
+        this.#renderer.setRenderTarget(target);
+        try {
+            this.#renderer.render(scene, this.#camera);
+        } catch (e) {
+            console.error(e);
+        }
     }
 }
 
