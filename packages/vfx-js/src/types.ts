@@ -193,6 +193,7 @@ export type VFXElement = {
     width: number;
     height: number;
     scene: THREE.Scene;
+    mesh: THREE.Mesh;
     uniforms: { [name: string]: THREE.IUniform };
     uniformGenerators: { [name: string]: () => VFXUniformValue };
     startTime: number;

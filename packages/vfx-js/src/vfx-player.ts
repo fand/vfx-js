@@ -284,7 +284,8 @@ export class VFXPlayer {
             uniforms,
             glslVersion,
         });
-        scene.add(new THREE.Mesh(geometry, material));
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
 
         const now = Date.now() / 1000;
         const elem = {
@@ -295,6 +296,7 @@ export class VFXPlayer {
             width: rect.width,
             height: rect.height,
             scene,
+            mesh,
             uniforms,
             uniformGenerators,
             startTime: now,
@@ -448,11 +450,12 @@ export class VFXPlayer {
         e: VFXElement,
         rect: Rect,
         now: number,
-    ): { isVisible: boolean; intersection: number } {
-        const rectGrown = growRect(rect, e.overflow);
+    ): { rectWithOverflow: Rect; isVisible: boolean; intersection: number } {
+        const rectWithOverflow = growRect(rect, e.overflow);
 
         const isInViewport =
-            e.isFullScreen || isRectInViewport(this.#viewport, rectGrown);
+            e.isFullScreen ||
+            isRectInViewport(this.#viewport, rectWithOverflow);
 
         const viewportPadded = growRect(
             this.#viewport,
@@ -483,7 +486,7 @@ export class VFXPlayer {
         // Quit if the element has left and the transition has ended
         const isVisible = isInViewport && now - e.leaveTime <= e.release;
 
-        return { isVisible, intersection };
+        return { isVisible, intersection, rectWithOverflow };
     }
 
     #getShader(shaderNameOrCode: string): string {
