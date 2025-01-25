@@ -173,13 +173,13 @@ export class VFXPlayer {
 
         const rect = element.getBoundingClientRect();
         const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
-        const rectHitTest = growRect(rect, overflow);
+        const rectPadded = growRect(rect, overflow);
 
         const intersectionOpts = parseIntersectionOpts(opts.intersection);
         const isInViewport =
-            isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
+            isFullScreen || isRectInViewport(this.#viewport, rectPadded);
 
-        const logicalViewport = growRect(
+        const viewportPadded = growRect(
             this.#viewport,
             intersectionOpts.rootMargin,
         );
@@ -187,7 +187,7 @@ export class VFXPlayer {
         const isInLogicalViewport =
             isFullScreen ||
             checkIntersection(
-                logicalViewport,
+                viewportPadded,
                 rect,
                 intersection,
                 intersectionOpts.threshold,
@@ -379,40 +379,9 @@ export class VFXPlayer {
 
         for (const e of this.#elements) {
             const rect = e.element.getBoundingClientRect();
-            const rectHitTest = growRect(rect, e.overflow);
+            const hit = this.#hitTest(e, rect, now);
 
-            // Check intersection
-            const isInViewport =
-                e.isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
-
-            const logicalViewport = growRect(
-                this.#viewport,
-                e.intersection.rootMargin,
-            );
-            const intersection = getIntersection(logicalViewport, rect);
-            const isInLogicalViewport =
-                e.isFullScreen ||
-                checkIntersection(
-                    logicalViewport,
-                    rect,
-                    intersection,
-                    e.intersection.threshold,
-                );
-
-            // Update transition timing
-            if (!e.isInLogicalViewport && isInLogicalViewport /* out -> in */) {
-                e.enterTime = now;
-                e.leaveTime = Number.POSITIVE_INFINITY;
-            }
-            if (e.isInLogicalViewport && !isInLogicalViewport /* in -> out */) {
-                e.leaveTime = now;
-            }
-
-            e.isInViewport = isInViewport;
-            e.isInLogicalViewport = isInLogicalViewport;
-
-            // Quit if the element has left and the transition has ended
-            if (!isInViewport || now - e.leaveTime > e.release) {
+            if (!hit.isVisible) {
                 continue;
             }
 
@@ -428,7 +397,7 @@ export class VFXPlayer {
                 this.#pixelRatio;
             e.uniforms["mouse"].value.x = this.#mouseX * this.#pixelRatio;
             e.uniforms["mouse"].value.y = this.#mouseY * this.#pixelRatio;
-            e.uniforms["intersection"].value = intersection;
+            e.uniforms["intersection"].value = hit.intersection;
 
             for (const [key, gen] of Object.entries(e.uniformGenerators)) {
                 e.uniforms[key].value = gen();
@@ -472,6 +441,51 @@ export class VFXPlayer {
             this.#playRequest = requestAnimationFrame(this.#playLoop);
         }
     };
+
+    /**
+     * Check element intersection with the viewport.
+     */
+    #hitTest(
+        e: VFXElement,
+        rect: Rect,
+        now: number,
+    ): { isVisible: boolean; intersection: number } {
+        const rectGrown = growRect(rect, e.overflow);
+
+        const isInViewport =
+            e.isFullScreen || isRectInViewport(this.#viewport, rectGrown);
+
+        const viewportPadded = growRect(
+            this.#viewport,
+            e.intersection.rootMargin,
+        );
+        const intersection = getIntersection(viewportPadded, rect);
+        const isInLogicalViewport =
+            e.isFullScreen ||
+            checkIntersection(
+                viewportPadded,
+                rect,
+                intersection,
+                e.intersection.threshold,
+            );
+
+        // Update transition timing
+        if (!e.isInLogicalViewport && isInLogicalViewport /* out -> in */) {
+            e.enterTime = now;
+            e.leaveTime = Number.POSITIVE_INFINITY;
+        }
+        if (e.isInLogicalViewport && !isInLogicalViewport /* in -> out */) {
+            e.leaveTime = now;
+        }
+
+        e.isInViewport = isInViewport;
+        e.isInLogicalViewport = isInLogicalViewport;
+
+        // Quit if the element has left and the transition has ended
+        const isVisible = isInViewport && now - e.leaveTime <= e.release;
+
+        return { isVisible, intersection };
+    }
 
     #getShader(shaderNameOrCode: string): string {
         if (shaderNameOrCode in shaders) {
