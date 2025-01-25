@@ -277,7 +277,7 @@ export class VFXPlayer {
 
         const scene = new THREE.Scene();
         const geometry = new THREE.PlaneGeometry(2, 2);
-        const material = new THREE.ShaderMaterial({
+        const material = new THREE.RawShaderMaterial({
             vertexShader: DEFAULT_VERTEX_SHADER,
             fragmentShader: shader,
             transparent: true,
