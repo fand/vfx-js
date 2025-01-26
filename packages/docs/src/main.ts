@@ -98,22 +98,22 @@ const shaders: Record<string, string> = {
     precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
+    uniform vec4 rectOuter; // x, y, w, h
     uniform float time;
     uniform sampler2D src;
     uniform sampler2D backbuffer;
     out vec4 outColor;
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec2 uvOuter = gl_FragCoord.xy / rectOuter.zw;
+
         vec2 p = uv * 2. - 1.;
         p.x *= resolution.x / resolution.y;
+        p += vec2(cos(time * 3.), sin(time * 3.)) * 0.4;
+        outColor = vec4(pow(.1 / length(p), 3.));
 
-        p += vec2(cos(time), sin(time)) * 0.3;
-
-        outColor = vec4(.2 / length(p));
-
-        outColor += texture(backbuffer, uv) * 0.1;
+        outColor += texture(backbuffer, uvOuter) * 0.96;
     }
-
     `,
     blob: `
     precision highp float;
@@ -126,17 +126,15 @@ const shaders: Record<string, string> = {
     out vec4 outColor;
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec2 uvOuter = gl_FragCoord.xy / rectOuter.zw;
+
         vec2 p = uv * 2. - 1.;
         p.x *= resolution.x / resolution.y;
-
-        p += vec2(cos(time * 3.), sin(time * 3.)) * 0.4;
+        p += vec2(cos(time * 2.), sin(time * 2.)) * 0.4;
         outColor = vec4(pow(.08 / length(p), 3.));
 
-        vec2 uvOuter = (gl_FragCoord.xy - rectOuter.xy) / rectOuter.wz;
-
-        outColor += texture(backbuffer, uvOuter) * 0.3;
+        outColor += texture(backbuffer, uvOuter) * 0.9;
     }
-
     `,
 
     // blob: `
@@ -269,7 +267,7 @@ class App {
 
     initVFX() {
         const bg = document.getElementById("BG")!;
-        this.vfx.add(bg, { shader: shaders.blob });
+        this.vfx.add(bg, { shader: shaders.blob, overflow: true });
 
         for (const e of document.querySelectorAll("*[data-shader]")) {
             const shader = e.getAttribute("data-shader")!;
@@ -403,24 +401,26 @@ class App {
     }
 
     showLogo() {
-        // const logo = document.getElementById("Logo")!;
-        // this.vfx.add(logo, {
-        //     shader: shaders.logo,
-        //     overflow: [0, 3000, 0, 100],
-        //     uniforms: { delay: 0 },
-        //     intersection: {
-        //         threshold: 1,
-        //     },
-        // });
-        // const tagline = document.getElementById("LogoTagline")!;
-        // this.vfx.add(tagline, {
-        //     shader: shaders.logo,
-        //     overflow: [0, 3000, 0, 1000],
-        //     uniforms: { delay: 0.3 },
-        //     intersection: {
-        //         threshold: 1,
-        //     },
-        // });
+        const logo = document.getElementById("Logo")!;
+        this.vfx.add(logo, {
+            shader: shaders.logo,
+            // overflow: [0, 3000, 0, 100],
+            overflow: true,
+            uniforms: { delay: 0 },
+            intersection: {
+                threshold: 1,
+            },
+        });
+        const tagline = document.getElementById("LogoTagline")!;
+        this.vfx.add(tagline, {
+            shader: shaders.logo,
+            // overflow: [0, 3000, 0, 1000],
+            overflow: true,
+            uniforms: { delay: 0.3 },
+            intersection: {
+                threshold: 1,
+            },
+        });
     }
 
     showProfile() {
