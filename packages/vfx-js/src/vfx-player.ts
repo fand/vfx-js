@@ -454,16 +454,6 @@ export class VFXPlayer {
 
             // Update backbuffer
             e.uniforms["backbuffer"].value = e.backbuffer[0].texture;
-            e.uniforms["backbuffer"].value.needsUpdate = true;
-            e.uniforms["rectOuter"].value.set(
-                hit.rectWithOverflow.left * this.#pixelRatio,
-                (window.innerHeight - hit.rectWithOverflow.bottom) *
-                    this.#pixelRatio,
-                (hit.rectWithOverflow.right - hit.rectWithOverflow.left) *
-                    this.#pixelRatio,
-                (hit.rectWithOverflow.bottom - hit.rectWithOverflow.top) *
-                    this.#pixelRatio,
-            );
 
             // Set viewport
             if (e.isFullScreen) {
@@ -533,6 +523,15 @@ export class VFXPlayer {
                     e.overflow.left * this.#pixelRatio;
                 e.uniforms["offset"].value.y =
                     e.overflow.bottom * this.#pixelRatio;
+                e.uniforms["rectOuter"].value.set(
+                    hit.rectWithOverflow.left * this.#pixelRatio,
+                    (window.innerHeight - hit.rectWithOverflow.bottom) *
+                        this.#pixelRatio,
+                    (hit.rectWithOverflow.right - hit.rectWithOverflow.left) *
+                        this.#pixelRatio,
+                    (hit.rectWithOverflow.bottom - hit.rectWithOverflow.top) *
+                        this.#pixelRatio,
+                );
                 this.#renderer.setViewport(
                     0,
                     0,
