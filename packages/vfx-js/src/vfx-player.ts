@@ -424,6 +424,9 @@ export class VFXPlayer {
         // window resize event while the address bar is transforming.
         this.#updateCanvasSize();
 
+        const viewportWidth = this.#viewport.right - this.#viewport.left;
+        const viewportHeight = this.#viewport.bottom - this.#viewport.top;
+
         for (const e of this.#elements) {
             const rect = e.element.getBoundingClientRect();
             const hit = this.#hitTest(e, rect, now);
@@ -458,8 +461,8 @@ export class VFXPlayer {
             // Set viewport
             if (e.isFullScreen) {
                 // Resize backbuffer
-                const bw = window.innerWidth * this.#pixelRatio;
-                const bh = window.innerHeight * this.#pixelRatio;
+                const bw = viewportWidth * this.#pixelRatio;
+                const bh = viewportHeight * this.#pixelRatio;
                 if (
                     bw !== e.backbuffer[0].width ||
                     bh !== e.backbuffer[0].height
@@ -471,36 +474,26 @@ export class VFXPlayer {
                 // Render to backbuffer
                 e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
                 e.uniforms["offset"].value.y =
-                    (window.innerHeight - rect.bottom) * this.#pixelRatio;
+                    (viewportHeight - rect.bottom) * this.#pixelRatio;
                 e.uniforms["rectOuter"].value.set(
                     0,
                     0,
-                    window.innerWidth * this.#pixelRatio,
-                    window.innerHeight * this.#pixelRatio,
+                    viewportWidth * this.#pixelRatio,
+                    viewportHeight * this.#pixelRatio,
                 );
-                this.#renderer.setViewport(
-                    0,
-                    0,
-                    window.innerWidth,
-                    window.innerHeight,
-                );
+                this.#renderer.setViewport(0, 0, viewportWidth, viewportHeight);
                 this.#render(e.scene, e.backbuffer[1]);
 
                 // Render to canvas
                 // TODO: use rectWithOffset as the viewport
                 this.#copyUniforms["src"].value = e.backbuffer[1].texture;
                 this.#copyUniforms["resolution"].value.x =
-                    window.innerWidth * this.#pixelRatio;
+                    viewportWidth * this.#pixelRatio;
                 this.#copyUniforms["resolution"].value.y =
-                    window.innerHeight * this.#pixelRatio;
+                    viewportHeight * this.#pixelRatio;
                 this.#copyUniforms["offset"].value.x = 0;
                 this.#copyUniforms["offset"].value.y = 0;
-                this.#renderer.setViewport(
-                    0,
-                    0,
-                    window.innerWidth,
-                    window.innerHeight,
-                );
+                this.#renderer.setViewport(0, 0, viewportWidth, viewportHeight);
                 this.#render(this.#copyScene, null);
             } else {
                 // Resize backbuffer
@@ -525,7 +518,7 @@ export class VFXPlayer {
                     e.overflow.bottom * this.#pixelRatio;
                 e.uniforms["rectOuter"].value.set(
                     hit.rectWithOverflow.left * this.#pixelRatio,
-                    (window.innerHeight - hit.rectWithOverflow.bottom) *
+                    (viewportHeight - hit.rectWithOverflow.bottom) *
                         this.#pixelRatio,
                     (hit.rectWithOverflow.right - hit.rectWithOverflow.left) *
                         this.#pixelRatio,
@@ -551,14 +544,14 @@ export class VFXPlayer {
                 this.#copyUniforms["offset"].value.x =
                     hit.rectWithOverflow.left * this.#pixelRatio;
                 this.#copyUniforms["offset"].value.y =
-                    (window.innerHeight - hit.rectWithOverflow.bottom) *
+                    (viewportHeight - hit.rectWithOverflow.bottom) *
                     this.#pixelRatio;
                 this.#renderer.setViewport(
                     // TODO: use rectWithOffset as the viewport
                     0,
                     0,
-                    window.innerWidth,
-                    window.innerHeight,
+                    viewportWidth,
+                    viewportHeight,
                 );
                 this.#render(this.#copyScene, null);
             }
