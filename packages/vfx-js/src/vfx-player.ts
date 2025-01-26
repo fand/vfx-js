@@ -438,10 +438,6 @@ export class VFXPlayer {
             e.uniforms["leaveTime"].value = now - e.leaveTime;
             e.uniforms["resolution"].value.x = rect.width * this.#pixelRatio;
             e.uniforms["resolution"].value.y = rect.height * this.#pixelRatio;
-            e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
-            e.uniforms["offset"].value.y =
-                (window.innerHeight - rect.top - rect.height) *
-                this.#pixelRatio;
             e.uniforms["mouse"].value.x = this.#mouseX * this.#pixelRatio;
             e.uniforms["mouse"].value.y = this.#mouseY * this.#pixelRatio;
             e.uniforms["intersection"].value = hit.intersection;
@@ -457,16 +453,6 @@ export class VFXPlayer {
             }
 
             // Update backbuffer
-            const bw =
-                (hit.rectWithOverflow.right - hit.rectWithOverflow.left) *
-                this.#pixelRatio;
-            const bh =
-                (hit.rectWithOverflow.bottom - hit.rectWithOverflow.top) *
-                this.#pixelRatio;
-            if (bw !== e.backbuffer[0].width || bh !== e.backbuffer[0].height) {
-                e.backbuffer[0].setSize(bw, bh);
-                e.backbuffer[1].setSize(bw, bh);
-            }
             e.uniforms["backbuffer"].value = e.backbuffer[0].texture;
             e.uniforms["backbuffer"].value.needsUpdate = true;
             e.uniforms["rectOuter"].value.set(
@@ -481,22 +467,67 @@ export class VFXPlayer {
 
             // Set viewport
             if (e.isFullScreen) {
+                // Resize backbuffer
+                const bw = window.innerWidth * this.#pixelRatio;
+                const bh = window.innerHeight * this.#pixelRatio;
+                if (
+                    bw !== e.backbuffer[0].width ||
+                    bh !== e.backbuffer[0].height
+                ) {
+                    e.backbuffer[0].setSize(bw, bh);
+                    e.backbuffer[1].setSize(bw, bh);
+                }
+
+                // Render to backbuffer
+                e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
+                e.uniforms["offset"].value.y =
+                    (window.innerHeight - rect.bottom) * this.#pixelRatio;
+                e.uniforms["rectOuter"].value.set(
+                    0,
+                    0,
+                    window.innerWidth * this.#pixelRatio,
+                    window.innerHeight * this.#pixelRatio,
+                );
                 this.#renderer.setViewport(
                     0,
                     0,
                     window.innerWidth,
                     window.innerHeight,
                 );
-
-                // Render to backbuffer
                 this.#render(e.scene, e.backbuffer[1]);
 
                 // Render to canvas
+                // TODO: use rectWithOffset as the viewport
                 this.#copyUniforms["src"].value = e.backbuffer[1].texture;
-                this.#copyUniforms["resolution"] = e.uniforms["resolution"];
-                this.#copyUniforms["offset"] = e.uniforms["offset"];
+                this.#copyUniforms["resolution"].value.x =
+                    window.innerWidth * this.#pixelRatio;
+                this.#copyUniforms["resolution"].value.y =
+                    window.innerHeight * this.#pixelRatio;
+                this.#copyUniforms["offset"].value.x = 0;
+                this.#copyUniforms["offset"].value.y = 0;
+                this.#renderer.setViewport(
+                    0,
+                    0,
+                    window.innerWidth,
+                    window.innerHeight,
+                );
                 this.#render(this.#copyScene, null);
             } else {
+                // Resize backbuffer
+                const bw =
+                    (hit.rectWithOverflow.right - hit.rectWithOverflow.left) *
+                    this.#pixelRatio;
+                const bh =
+                    (hit.rectWithOverflow.bottom - hit.rectWithOverflow.top) *
+                    this.#pixelRatio;
+                if (
+                    bw !== e.backbuffer[0].width ||
+                    bh !== e.backbuffer[0].height
+                ) {
+                    e.backbuffer[0].setSize(bw, bh);
+                    e.backbuffer[1].setSize(bw, bh);
+                }
+
                 // Render to backbuffer
                 e.uniforms["offset"].value.x =
                     e.overflow.left * this.#pixelRatio;
@@ -505,27 +536,31 @@ export class VFXPlayer {
                 this.#renderer.setViewport(
                     0,
                     0,
-                    e.backbuffer[1].width / this.#pixelRatio,
+                    e.backbuffer[1].width / this.#pixelRatio, // must use logical coordinate
                     e.backbuffer[1].height / this.#pixelRatio,
                 );
                 this.#render(e.scene, e.backbuffer[1]);
 
                 // Render to canvas
-                this.#renderer.setViewport(
-                    hit.rectWithOverflow.left,
-                    hit.rectWithOverflow.bottom,
-                    hit.rectWithOverflow.right - hit.rectWithOverflow.left,
-                    window.innerHeight -
-                        (hit.rectWithOverflow.bottom -
-                            hit.rectWithOverflow.top),
-                );
                 this.#copyUniforms["src"].value = e.backbuffer[1].texture;
-                this.#copyUniforms["resolution"] = e.uniforms["resolution"];
-                this.#copyUniforms["offset"].value.x =
-                    rect.left * this.#pixelRatio;
-                this.#copyUniforms["offset"].value.y =
-                    (window.innerHeight - rect.top - rect.height) *
+                this.#copyUniforms["resolution"].value.x =
+                    (hit.rectWithOverflow.right - hit.rectWithOverflow.left) *
                     this.#pixelRatio;
+                this.#copyUniforms["resolution"].value.y =
+                    (hit.rectWithOverflow.bottom - hit.rectWithOverflow.top) *
+                    this.#pixelRatio;
+                this.#copyUniforms["offset"].value.x =
+                    hit.rectWithOverflow.left * this.#pixelRatio;
+                this.#copyUniforms["offset"].value.y =
+                    (window.innerHeight - hit.rectWithOverflow.bottom) *
+                    this.#pixelRatio;
+                this.#renderer.setViewport(
+                    // TODO: use rectWithOffset as the viewport
+                    0,
+                    0,
+                    window.innerWidth,
+                    window.innerHeight,
+                );
                 this.#render(this.#copyScene, null);
             }
 
