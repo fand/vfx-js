@@ -1,4 +1,5 @@
 import type * as THREE from "three";
+import type { Backbuffer } from "./backbuffer.js";
 import type { ShaderPreset } from "./constants.js";
 import type { Rect, RectOpts } from "./rect.js";
 
@@ -206,7 +207,7 @@ export type VFXElement = {
     intersection: VFXElementIntersection;
     originalOpacity: number;
     zIndex: number;
-    backbuffer: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
+    backbuffer: Backbuffer;
 };
 
 export type VFXElementIntersection = {

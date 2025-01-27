@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Backbuffer } from "./backbuffer.js";
 import {
     COPY_FRAGMENT_SHADER,
     DEFAULT_VERTEX_SHADER,
@@ -312,12 +313,9 @@ export class VFXPlayer {
             const bh =
                 (rectWithOverflow.bottom - rectWithOverflow.top) *
                 this.#pixelRatio;
-            const backbuffer0 = new THREE.WebGLRenderTarget(bw, bh);
-            const backbuffer1 = new THREE.WebGLRenderTarget(bw, bh);
-
-            return [backbuffer0, backbuffer1];
+            return new Backbuffer(bw, bh);
         })();
-        uniforms["backbuffer"] = { value: backbuffer[0].texture };
+        uniforms["backbuffer"] = { value: backbuffer.texture };
 
         const scene = new THREE.Scene();
         const geometry = new THREE.PlaneGeometry(2, 2);
@@ -456,20 +454,14 @@ export class VFXPlayer {
             }
 
             // Update backbuffer
-            e.uniforms["backbuffer"].value = e.backbuffer[0].texture;
+            e.uniforms["backbuffer"].value = e.backbuffer.texture;
 
             // Set viewport
             if (e.isFullScreen) {
                 // Resize backbuffer
                 const bw = viewportWidth * this.#pixelRatio;
                 const bh = viewportHeight * this.#pixelRatio;
-                if (
-                    bw !== e.backbuffer[0].width ||
-                    bh !== e.backbuffer[0].height
-                ) {
-                    e.backbuffer[0].setSize(bw, bh);
-                    e.backbuffer[1].setSize(bw, bh);
-                }
+                e.backbuffer.resize(bw, bh);
 
                 // Render to backbuffer
                 e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
@@ -482,11 +474,12 @@ export class VFXPlayer {
                     viewportHeight * this.#pixelRatio,
                 );
                 this.#renderer.setViewport(0, 0, viewportWidth, viewportHeight);
-                this.#render(e.scene, e.backbuffer[1]);
+                this.#render(e.scene, e.backbuffer.target);
+                e.backbuffer.swap();
 
                 // Render to canvas
                 // TODO: use rectWithOffset as the viewport
-                this.#copyUniforms["src"].value = e.backbuffer[1].texture;
+                this.#copyUniforms["src"].value = e.backbuffer.texture;
                 this.#copyUniforms["resolution"].value.x =
                     viewportWidth * this.#pixelRatio;
                 this.#copyUniforms["resolution"].value.y =
@@ -503,13 +496,7 @@ export class VFXPlayer {
                 const bh =
                     (hit.rectWithOverflow.bottom - hit.rectWithOverflow.top) *
                     this.#pixelRatio;
-                if (
-                    bw !== e.backbuffer[0].width ||
-                    bh !== e.backbuffer[0].height
-                ) {
-                    e.backbuffer[0].setSize(bw, bh);
-                    e.backbuffer[1].setSize(bw, bh);
-                }
+                e.backbuffer.resize(bw, bh);
 
                 // Render to backbuffer
                 e.uniforms["offset"].value.x =
@@ -528,13 +515,14 @@ export class VFXPlayer {
                 this.#renderer.setViewport(
                     0,
                     0,
-                    e.backbuffer[1].width / this.#pixelRatio, // must use logical coordinate
-                    e.backbuffer[1].height / this.#pixelRatio,
+                    e.backbuffer.width / this.#pixelRatio, // must use logical coordinate
+                    e.backbuffer.height / this.#pixelRatio,
                 );
-                this.#render(e.scene, e.backbuffer[1]);
+                this.#render(e.scene, e.backbuffer.target);
+                e.backbuffer.swap();
 
                 // Render to canvas
-                this.#copyUniforms["src"].value = e.backbuffer[1].texture;
+                this.#copyUniforms["src"].value = e.backbuffer.texture;
                 this.#copyUniforms["resolution"].value.x =
                     (hit.rectWithOverflow.right - hit.rectWithOverflow.left) *
                     this.#pixelRatio;
@@ -555,8 +543,6 @@ export class VFXPlayer {
                 );
                 this.#render(this.#copyScene, null);
             }
-
-            e.backbuffer = [e.backbuffer[1], e.backbuffer[0]];
         }
 
         if (this.isPlaying()) {
