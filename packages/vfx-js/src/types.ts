@@ -153,6 +153,11 @@ export type VFXProps = {
      * If you want to use GLSL 100 (≒ WebGL 1) shader, pass `"100"` to this property.
      */
     glslVersion?: "100" | "300 es";
+
+    /**
+     * Whether the shader uses the backbuffer or not.
+     */
+    backbuffer?: boolean;
 };
 
 /**
@@ -207,7 +212,7 @@ export type VFXElement = {
     intersection: VFXElementIntersection;
     originalOpacity: number;
     zIndex: number;
-    backbuffer: Backbuffer;
+    backbuffer?: Backbuffer;
 };
 
 export type VFXElementIntersection = {
