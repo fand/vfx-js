@@ -1,10 +1,7 @@
 import * as THREE from "three";
 import { Backbuffer } from "./backbuffer.js";
-import {
-    COPY_FRAGMENT_SHADER,
-    DEFAULT_VERTEX_SHADER,
-    shaders,
-} from "./constants.js";
+import { DEFAULT_VERTEX_SHADER, shaders } from "./constants.js";
+import { CopyPass, rectToXywh } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
 import {
@@ -32,10 +29,7 @@ export class VFXPlayer {
     #canvas: HTMLCanvasElement;
     #renderer: THREE.WebGLRenderer;
     #camera: THREE.Camera;
-
-    #copyScene: THREE.Scene;
-    #copyMesh: THREE.Mesh;
-    #copyUniforms: { [name: string]: THREE.IUniform };
+    #copyPass: CopyPass;
 
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
@@ -76,23 +70,7 @@ export class VFXPlayer {
         this.#camera.position.set(0, 0, 1);
 
         // Setup copyScene
-        this.#copyScene = new THREE.Scene();
-        this.#copyUniforms = {
-            src: { value: null },
-            offset: { value: new THREE.Vector2() },
-            resolution: { value: new THREE.Vector2() },
-        };
-        this.#copyMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(2, 2),
-            new THREE.RawShaderMaterial({
-                vertexShader: DEFAULT_VERTEX_SHADER,
-                fragmentShader: COPY_FRAGMENT_SHADER,
-                uniforms: this.#copyUniforms,
-                glslVersion: "300 es",
-                transparent: true,
-            }),
-        );
-        this.#copyScene.add(this.#copyMesh);
+        this.#copyPass = new CopyPass();
     }
 
     destroy(): void {
@@ -487,20 +465,18 @@ export class VFXPlayer {
 
                     // Render to canvas
                     // TODO: use rectWithOverflow as the viewport
-                    this.#copyUniforms["src"].value = e.backbuffer.texture;
-                    this.#copyUniforms["resolution"].value.x =
-                        viewportWidth * this.#pixelRatio;
-                    this.#copyUniforms["resolution"].value.y =
-                        viewportHeight * this.#pixelRatio;
-                    this.#copyUniforms["offset"].value.x = 0;
-                    this.#copyUniforms["offset"].value.y = 0;
+                    this.#copyPass.setUniforms(
+                        e.backbuffer.texture,
+                        this.#pixelRatio,
+                        rectToXywh(this.#viewport, viewportHeight),
+                    );
                     this.#renderer.setViewport(
                         0,
                         0,
                         viewportWidth,
                         viewportHeight,
                     );
-                    this.#render(this.#copyScene, null);
+                    this.#render(this.#copyPass.scene, null);
                 } else {
                     // Resize backbuffer
                     const bw =
@@ -539,27 +515,17 @@ export class VFXPlayer {
                     e.backbuffer.swap();
 
                     // Render to canvas
-                    this.#copyUniforms["src"].value = e.backbuffer.texture;
-                    this.#copyUniforms["resolution"].value.x =
-                        (hit.rectWithOverflow.right -
-                            hit.rectWithOverflow.left) *
-                        this.#pixelRatio;
-                    this.#copyUniforms["resolution"].value.y =
-                        (hit.rectWithOverflow.bottom -
-                            hit.rectWithOverflow.top) *
-                        this.#pixelRatio;
-                    this.#copyUniforms["offset"].value.x =
-                        hit.rectWithOverflow.left * this.#pixelRatio;
-                    this.#copyUniforms["offset"].value.y =
-                        (viewportHeight - hit.rectWithOverflow.bottom) *
-                        this.#pixelRatio;
-                    this.#renderer.setViewport(
-                        hit.rectWithOverflow.left,
-                        viewportHeight - hit.rectWithOverflow.bottom,
-                        hit.rectWithOverflow.right - hit.rectWithOverflow.left,
-                        hit.rectWithOverflow.bottom - hit.rectWithOverflow.top,
+                    const xywh = rectToXywh(
+                        hit.rectWithOverflow,
+                        viewportHeight,
                     );
-                    this.#render(this.#copyScene, null);
+                    this.#copyPass.setUniforms(
+                        e.backbuffer.texture,
+                        this.#pixelRatio,
+                        xywh,
+                    );
+                    this.#renderer.setViewport(xywh.x, xywh.y, xywh.w, xywh.h);
+                    this.#render(this.#copyPass.scene, null);
                 }
             } else {
                 e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
