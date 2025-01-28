@@ -5,7 +5,6 @@ import "./preset.css";
 
 const render = (opts) => {
     const img = document.createElement("img");
-    console.log(opts.src);
     img.src = opts.src ?? Logo;
 
     const vfx = new VFX();
