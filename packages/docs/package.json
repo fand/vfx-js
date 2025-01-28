@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@vfx-js/core": "0.6.0",
@@ -18,11 +20,19 @@
     "vh-check": "^2.0.5"
   },
   "devDependencies": {
+    "@chromatic-com/storybook": "^3.2.4",
     "@originjs/vite-plugin-commonjs": "^1.0.3",
+    "@storybook/addon-essentials": "^8.5.2",
+    "@storybook/addon-interactions": "^8.5.2",
+    "@storybook/blocks": "^8.5.2",
+    "@storybook/html": "^8.5.2",
+    "@storybook/html-vite": "^8.5.2",
+    "@storybook/test": "^8.5.2",
     "@types/dedent": "^0.7.2",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^22.10.5",
     "rimraf": "^6.0.1",
+    "storybook": "^8.5.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.9"
   }
