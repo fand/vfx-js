@@ -13,6 +13,8 @@ dist
 .DS_Store
 
 # Typedoc outputs
-docs/*
+docs/
 
+# Storybook
 *storybook.log
+storybook/
