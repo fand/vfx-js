@@ -4,11 +4,13 @@
   "version": "0.0.8",
   "type": "module",
   "scripts": {
-    "dev": "vite --host",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build -o storybook"
+    "dev": "run-p dev:vite dev:storybook",
+    "dev:vite": "vite --host",
+    "dev:storybook": "storybook dev -p 6006",
+    "build": "run-s build-storybook build:vite",
+    "build:vite": "tsc && vite build",
+    "build-storybook": "storybook build -o storybook",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@vfx-js/core": "0.6.0",
@@ -33,6 +35,7 @@
     "@types/dedent": "^0.7.2",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^22.10.5",
+    "npm-run-all2": "^7.0.2",
     "rimraf": "^6.0.1",
     "storybook": "^8.5.2",
     "typescript": "^5.7.2",
