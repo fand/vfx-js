@@ -3,5 +3,3 @@ npm-debug.log*
 lib/
 .turbo
 .vscode/
-
-*storybook.log

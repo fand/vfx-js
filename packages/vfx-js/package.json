@@ -34,22 +34,13 @@
     "lint-staged": "lint-staged",
     "test": "vitest --dir src --run",
     "test:watch": "vitest --dir src",
-    "typedoc": "typedoc --out ../docs/docs --excludeExternals",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "typedoc": "typedoc --out ../docs/docs --excludeExternals"
   },
   "dependencies": {
     "three": "^0.172.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@chromatic-com/storybook": "^3.2.4",
-    "@storybook/addon-essentials": "^8.5.2",
-    "@storybook/addon-interactions": "^8.5.2",
-    "@storybook/blocks": "^8.5.2",
-    "@storybook/html": "^8.5.2",
-    "@storybook/html-vite": "^8.5.2",
-    "@storybook/test": "^8.5.2",
     "@types/node": "^22.10.5",
     "@types/three": "^0.171.0",
     "globals": "^15.14.0",
@@ -57,7 +48,6 @@
     "lint-staged": "^15.3.0",
     "npm-run-all": "^4.1.5",
     "rimraf": "^6.0.1",
-    "storybook": "^8.5.2",
     "tsconfig-to-dual-package": "^1.2.0",
     "typedoc": "^0.27.6",
     "typedoc-plugin-missing-exports": "^3.1.0",
