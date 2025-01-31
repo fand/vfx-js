@@ -15,6 +15,3 @@ dist
 # Typedoc outputs
 docs/
 
-# Storybook
-*storybook.log
-storybook/
