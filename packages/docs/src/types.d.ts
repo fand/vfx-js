@@ -1,6 +1,8 @@
 declare module "*.svg" {
-    export const img: string;
+    const img: string;
+    export default img;
 }
 declare module "*.webp" {
-    export const img: string;
+    const img: string;
+    export default img;
 }
