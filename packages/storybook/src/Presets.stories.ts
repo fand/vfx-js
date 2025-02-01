@@ -4,6 +4,7 @@ import Jellyfish from "./assets/jellyfish.webp";
 
 import type { Meta } from "@storybook/html";
 import "./preset.css";
+import { Timer } from "./TimeInput";
 
 interface PresetProps {
     src?: string;
@@ -15,14 +16,15 @@ interface PresetProps {
 }
 
 const render = (opts: PresetProps) => {
+    const ti = new Timer(opts.time ?? 0, [0, 10]);
+    document.body.append(ti.element);
+
     const img = document.createElement("img");
     img.src = opts.src ?? Logo;
+    img.className = "target";
 
     const props: VFXProps = { ...opts };
-    if (opts.time !== undefined) {
-        const time = opts.time;
-        props.uniforms = { ...opts.uniforms, time: () => time };
-    }
+    props.uniforms = { ...opts.uniforms, time: () => ti.time };
 
     const vfx = new VFX();
     vfx.add(img, props);
@@ -61,10 +63,10 @@ export const UvGradient = { args: { shader: "uvGradient" } };
 export const Glitch = { args: { shader: "glitch", overflow: 100, time: 2.5 } };
 export const RgbGlitch = { args: { shader: "rgbGlitch", time: 1.0 } };
 export const RgbShift = { args: { shader: "rgbShift", time: 2.0 } };
-export const Rainbow = { args: { shader: "rainbow" } };
-export const Shine = { args: { shader: "shine" } };
-export const Blink = { args: { shader: "blink" } };
-export const spring = { args: { shader: "spring" } };
+export const Rainbow = { args: { shader: "rainbow", time: 0.0 } };
+export const Shine = { args: { shader: "shine", time: 0.0 } };
+export const Blink = { args: { shader: "blink", time: 1.0 } };
+export const spring = { args: { shader: "spring", time: 1.0 } };
 export const duotone = {
     args: {
         src: Jellyfish,
@@ -86,7 +88,9 @@ export const Tritone = {
         },
     },
 };
-export const hueShift = { args: { src: Jellyfish, shader: "hueShift" } };
-export const sinewave = { args: { shader: "sinewave" } };
-export const pixelate = { args: { shader: "pixelate" } };
+export const hueShift = {
+    args: { src: Jellyfish, shader: "hueShift", time: 1.0 },
+};
+export const sinewave = { args: { shader: "sinewave", time: 1.0 } };
+export const pixelate = { args: { shader: "pixelate", time: 1.0 } };
 export const halftone = { args: { src: Jellyfish, shader: "halftone" } };

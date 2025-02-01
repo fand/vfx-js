@@ -14,3 +14,13 @@ img {
     max-width: 90%;
     max-height: 90%;
 }
+
+.time-input {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+}
+.time-input input[type="button"] {
+    cursor: pointer;
+    color: black;
+}
