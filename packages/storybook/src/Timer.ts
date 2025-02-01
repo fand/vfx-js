@@ -1,3 +1,5 @@
+import "./Timer.css";
+
 const RESOLUTION = 10;
 
 let INSTANCE: Timer | undefined;
@@ -6,6 +8,7 @@ export class Timer {
     #element: HTMLElement;
     #inputEl: HTMLInputElement;
     #buttonEl: HTMLInputElement;
+    #labelEl: HTMLSpanElement;
 
     #range: [number, number];
     #isPlaying = false;
@@ -25,25 +28,35 @@ export class Timer {
 
         // Setup elements
         this.#element = document.createElement("div");
-        this.#element.className = "time-input";
+        this.#element.className = "timer";
 
-        const buttonEl = document.createElement("input");
-        buttonEl.type = "button";
-        buttonEl.value = "PLAY";
-        buttonEl.addEventListener("click", this.togglePlay);
-        this.#element.appendChild(buttonEl);
-        this.#buttonEl = buttonEl;
+        this.#element.innerHTML = `
+            <div class="row">
+                <input class="btn" type="button" value="PLAY"/>
+                <input class="seek" type="range"
+                    min="${this.#range[0] * RESOLUTION}"
+                    max="${this.#range[1] * RESOLUTION}"
+                    value="${defaultValue * RESOLUTION}"/>
+            </div>
+            <div class="row">
+                <span class="label"></span>
+            </div>
+        `;
+        this.#buttonEl = this.#element.querySelector(
+            ".btn",
+        ) as HTMLInputElement;
+        this.#buttonEl.addEventListener("click", this.togglePlay);
 
-        const inputEl = document.createElement("input");
-        inputEl.type = "range";
-        inputEl.min = (this.#range[0] * RESOLUTION).toString();
-        inputEl.max = (this.#range[1] * RESOLUTION).toString();
-        inputEl.value = defaultValue.toString();
+        this.#inputEl = this.#element.querySelector(
+            ".seek",
+        ) as HTMLInputElement;
+        this.#inputEl.addEventListener("input", this.seek);
 
-        inputEl.addEventListener("input", this.seek);
-        inputEl.addEventListener("change", this.seek);
-        this.#element.appendChild(inputEl);
-        this.#inputEl = inputEl;
+        this.#labelEl = this.#element.querySelector(
+            ".label",
+        ) as HTMLInputElement;
+
+        this.#updateLabel();
     }
 
     get element() {
@@ -61,6 +74,7 @@ export class Timer {
             }
 
             this.#inputEl.value = (this.#time * RESOLUTION).toString();
+            this.#updateLabel();
 
             this.#lastNow = now;
         }
@@ -86,4 +100,8 @@ export class Timer {
         const v = Number.parseFloat(this.#inputEl.value) / RESOLUTION;
         this.#time = v;
     };
+
+    #updateLabel() {
+        this.#labelEl.innerText = `Time: ${this.#time.toFixed(1)} / ${this.#range[1]}`;
+    }
 }
