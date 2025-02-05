@@ -118,7 +118,7 @@ const UsageSection: React.FC = () => (
                 VFX Elements have <InlineCode>shader</InlineCode> property. etc.
                 All available shaders are listed{" "}
                 <a
-                    href="https://github.com/fand/react-vfx/tree/master/src/constants.ts"
+                    href="https://github.com/fand/vfx-js/tree/main/packages/vfx-js/src/constants.ts"
                     target="_blank"
                     rel="noopener noreferrer"
                 >
