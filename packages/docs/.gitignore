@@ -13,5 +13,7 @@ dist
 .DS_Store
 
 # Typedoc outputs
-docs/
+typedoc/
 
+# Storybook static build
+storybook/

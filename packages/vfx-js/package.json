@@ -21,7 +21,7 @@
     }
   },
   "scripts": {
-    "build": "run-s clean build:cjs build:esm build:dual",
+    "build": "run-s clean build:cjs build:esm build:dual typedoc",
     "build:cjs": "tsc -d",
     "build:esm": "tsc -d -p tsconfig.esm.json",
     "build:dual": "tsconfig-to-dual-package",
@@ -34,7 +34,7 @@
     "lint-staged": "lint-staged",
     "test": "vitest --dir src --run",
     "test:watch": "vitest --dir src",
-    "typedoc": "typedoc --out ../docs/docs --excludeExternals"
+    "typedoc": "typedoc --out docs-build --excludeExternals"
   },
   "dependencies": {
     "three": "^0.172.0"

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "storybook dev -p 6006",
     "build": "npm run build-storybook",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build -o docs-build"
   },
   "dependencies": {
     "@vfx-js/core": "0.6.0"
