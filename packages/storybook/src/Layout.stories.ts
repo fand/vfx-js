@@ -229,6 +229,55 @@ export const elementZIndexDefault321: StoryObj<ElementZIndexProps> = {
     },
 };
 
-// TODO: overlay
+export const overlay: StoryObj<null> = {
+    render: () => {
+        const shader = `
+        precision highp float;
+        uniform vec2 offset;
+        uniform vec2 resolution;
+        uniform sampler2D src;
+        uniform vec3 bg;
+        out vec4 outColor;
 
-// TODO: wrap
+        void main() {
+            vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+            uv = (uv - .5) * 0.9 + .5;
+            outColor = texture(src, uv) * 0.5;
+        }
+        `;
+
+        const img = document.createElement("img");
+        img.src = Logo;
+
+        const vfx = new VFX();
+        vfx.add(img, { shader, overlay: true });
+
+        return img;
+    },
+    args: null,
+};
+
+const wrapBase = (
+    wrap: VFXProps["wrap"], // clamp, repeat, mirror
+): StoryObj<{ wrap?: VFXProps["wrap"] }> => ({
+    render: ({ wrap }) => {
+        const img = document.createElement("img");
+        img.src = Logo;
+
+        const vfx = new VFX();
+        vfx.add(img, { shader, wrap, overflow: 200 });
+
+        return img;
+    },
+    args: { wrap },
+    argTypes: {
+        wrap: {
+            control: { type: "select" },
+            options: ["repeat", "clamp", "mirror"],
+        },
+    },
+});
+
+export const wrapRepeat = wrapBase("repeat");
+export const wrapClamp = wrapBase("clamp");
+export const wrapMirror = wrapBase("mirror");
