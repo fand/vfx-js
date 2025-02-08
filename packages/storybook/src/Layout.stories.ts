@@ -165,3 +165,70 @@ export const zIndexNegative: StoryObj<{ zIndex: number; fgZIndex: number }> = {
         fgZIndex: 0,
     },
 };
+
+type ElementZIndexProps = {
+    zIndex: [number, number, number];
+};
+
+const elementZIndexBase = ({ zIndex }: ElementZIndexProps) => {
+    const shader = `
+precision highp float;
+uniform vec2 offset;
+uniform vec2 resolution;
+uniform sampler2D src;
+uniform vec3 bg;
+out vec4 outColor;
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    outColor = texture(src, uv);
+    outColor += vec4(bg, 0.5);
+}
+    `;
+
+    const bg = [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+    ] as [number, number, number][];
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "elementZIndexWrapper";
+
+    const vfx = new VFX();
+
+    for (let i = 0; i < 3; i++) {
+        const img = document.createElement("img");
+        img.src = Logo;
+        wrapper.appendChild(img);
+
+        vfx.add(img, { shader, zIndex: zIndex[i], uniforms: { bg: bg[i] } });
+    }
+
+    return wrapper;
+};
+
+export const elementZIndexDefault: StoryObj<ElementZIndexProps> = {
+    render: elementZIndexBase,
+    args: {
+        zIndex: [0, 0, 0] as const,
+    },
+};
+
+export const elementZIndexDefault132: StoryObj<ElementZIndexProps> = {
+    render: elementZIndexBase,
+    args: {
+        zIndex: [1, 3, 2] as const,
+    },
+};
+
+export const elementZIndexDefault321: StoryObj<ElementZIndexProps> = {
+    render: elementZIndexBase,
+    args: {
+        zIndex: [3, 2, 1] as const,
+    },
+};
+
+// TODO: overlay
+
+// TODO: wrap

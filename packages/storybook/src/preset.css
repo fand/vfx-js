@@ -30,3 +30,21 @@ img {
     color: red;
     text-align: center;
 }
+
+.elementZIndexWrapper {
+    position: relative;
+}
+.elementZIndexWrapper img {
+    max-width: 100%;
+    max-height: 100%;
+}
+.elementZIndexWrapper img:nth-child(3n+1) {
+    position: absolute;
+    left: -50px;
+    top: -100px;
+}
+.elementZIndexWrapper img:nth-child(3n) {
+    position: absolute;
+    left: 50px;
+    top: 100px;
+}
