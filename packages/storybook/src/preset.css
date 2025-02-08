@@ -1,0 +1,50 @@
+html, body {
+    height: 100%;
+    margin: 0;
+}
+html { background: black; }
+body { background: rgba(0, 0, 0, 0.5); }
+
+#storybook-root {
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+img {
+    max-width: 90%;
+    max-height: 90%;
+}
+
+.wrapper img {
+    max-width: 100%;
+    max-height: 100%;
+}
+.wrapper .fg {
+    width: 100px;
+    height: 100px;
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: red;
+    text-align: center;
+}
+
+.elementZIndexWrapper {
+    position: relative;
+}
+.elementZIndexWrapper img {
+    max-width: 100%;
+    max-height: 100%;
+}
+.elementZIndexWrapper img:nth-child(3n+1) {
+    position: absolute;
+    left: -50px;
+    top: -100px;
+}
+.elementZIndexWrapper img:nth-child(3n) {
+    position: absolute;
+    left: 50px;
+    top: 100px;
+}

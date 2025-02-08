@@ -529,6 +529,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec4 color2;
     uniform vec4 color3;
     uniform float speed;
+    out vec4 outColor;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;

@@ -1,0 +1,27 @@
+.timer {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    background: #333;
+
+    display: flex;
+    gap: 8px;
+    flex-direction: column;
+    width: 320px;
+    padding: 8px;
+}
+.timer .row {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+}
+.timer .btn {
+    width: 60px;
+    cursor: pointer;
+}
+.timer .seek {
+    flex: 1;
+}
+.timer .label {
+    color: white;
+}
