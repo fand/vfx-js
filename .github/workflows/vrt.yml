@@ -51,16 +51,18 @@ jobs:
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           workingDir: packages/storybook # Specify Storybook directory in workspace
-      # Update check result based on Chromatic outcome
-      - name: Update Check Result
+      # Update check result and post comment
+      - name: Update Check Result and Comment
         if: always() # Run this step even if previous steps fail
         uses: actions/github-script@v7
         with:
           script: |-
             const { owner, repo } = context.repo;
             const conclusion = '${{ steps.chromatic.outcome }}' === 'success' ? 'success' : 'failure';
+            const buildUrl = '${{ steps.chromatic.outputs.buildUrl }}' || 'No build URL available';
+            const storybookUrl = '${{ steps.chromatic.outputs.storybookUrl }}' || 'No storybook URL available';
 
-            // Update check run with final result
+            // Update check run
             await github.rest.checks.create({
               owner,
               repo,
@@ -74,4 +76,27 @@ jobs:
                   ? 'Visual Regression Test passed successfully'
                   : 'Visual Regression Test failed - please check the results'
               }
+            });
+
+            // Create comment content with emojis and links
+            const commentBody = `## Visual Regression Test Results ${conclusion === 'success' ? '✅' : '❌'}
+
+            ${conclusion === 'success'
+              ? '🎉 All visual tests have passed!'
+              : '⚠️ Some visual changes were detected. Please review the changes.'}
+
+            🔍 **Test Results:**
+            - Build details: [View on Chromatic](${buildUrl})
+            - Storybook preview: [View Storybook](${storybookUrl})
+
+            ${conclusion !== 'success'
+              ? '\n⚡ To re-run the test, comment `/vrt` on this PR.'
+              : ''}`;
+
+            // Post comment to PR
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: context.issue.number,
+              body: commentBody
             });
