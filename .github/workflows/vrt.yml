@@ -3,30 +3,37 @@ on:
   issue_comment:
     types: [created]
 jobs:
-  chromatic:
+  vrt:
+    # Only run when a "/vrt" comment is posted on a PR
     if: ${{ github.event.issue.pull_request && github.event.comment.body == '/vrt' }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
       statuses: write
+      checks: write # Required for creating and updating check runs
     steps:
-      - name: Set pending status
+      # Create a required check to block merging until VRT passes
+      - name: Create Required Check
         uses: actions/github-script@v7
         with:
           script: |
             const { owner, repo } = context.repo;
-            await github.rest.repos.createCommitStatus({
+            // Create initial check run
+            const check = await github.rest.checks.create({
               owner,
               repo,
-              sha: context.sha,
-              state: 'pending',
-              context: 'VRT',
-              description: 'VRT is running'
+              name: 'VRT Status',
+              head_sha: context.sha,
+              status: 'in_progress',
+              output: {
+                title: 'VRT Required',
+                summary: 'Visual Regression Test is now required for this PR'
+              }
             });
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Required for Chromatic to access git history
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -35,26 +42,36 @@ jobs:
           cache-dependency-path: "**/package-lock.json"
       - name: Install dependencies
         run: npm ci
-      - name: Publish to Chromatic
+      - name: Build @vfx-js/core
+        run: npm --workspace @vfx-js/core run build
+      # Run Chromatic VRT
+      - name: Run Chromatic
         id: chromatic
         uses: chromaui/action@latest
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          workingDir: packages/storybook
-          buildScriptName: build-storybook
-      - name: Update status
-        if: always()
+          workingDir: packages/storybook # Specify Storybook directory in workspace
+      # Update check result based on Chromatic outcome
+      - name: Update Check Result
+        if: always() # Run this step even if previous steps fail
         uses: actions/github-script@v7
         with:
           script: |-
             const { owner, repo } = context.repo;
-            await github.rest.repos.createCommitStatus({
+            const conclusion = '${{ steps.chromatic.outcome }}' === 'success' ? 'success' : 'failure';
+
+            // Update check run with final result
+            await github.rest.checks.create({
               owner,
               repo,
-              sha: context.sha,
-              state: '${{ steps.chromatic.outcome }}' === 'success' ? 'success' : 'failure',
-              context: 'Chromatic',
-              description: '${{ steps.chromatic.outcome }}' === 'success'
-                ? 'VRT passed'
-                : 'VRT failed'
+              name: 'VRT Status',
+              head_sha: context.sha,
+              status: 'completed',
+              conclusion: conclusion,
+              output: {
+                title: conclusion === 'success' ? 'VRT Passed' : 'VRT Failed',
+                summary: conclusion === 'success'
+                  ? 'Visual Regression Test passed successfully'
+                  : 'Visual Regression Test failed - please check the results'
+              }
             });
