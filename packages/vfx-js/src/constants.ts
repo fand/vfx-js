@@ -47,7 +47,7 @@ export const shaders: Record<ShaderPreset, string> = {
     out vec4 outColor;
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        uv.x += 0.2;
+        uv.x += 0.1;
         outColor = vec4(uv, sin(time) * .5 + .5, 1);
 
         vec4 img = texture(src, uv);
