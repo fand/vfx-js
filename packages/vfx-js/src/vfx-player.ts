@@ -30,7 +30,6 @@ export class VFXPlayer {
     #renderer: THREE.WebGLRenderer;
     #camera: THREE.Camera;
     #copyPass: CopyPass;
-    #lastTarget: THREE.RenderTarget | null = null;
 
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
@@ -455,13 +454,12 @@ export class VFXPlayer {
                         viewportWidth * this.#pixelRatio,
                         viewportHeight * this.#pixelRatio,
                     );
-                    this.#renderer.setViewport(
+                    this.#render(e.scene, e.backbuffer.target, [
                         0,
                         0,
                         viewportWidth,
                         viewportHeight,
-                    );
-                    this.#render(e.scene, e.backbuffer.target);
+                    ]);
                     e.backbuffer.swap();
 
                     // Render to canvas
@@ -471,13 +469,12 @@ export class VFXPlayer {
                         this.#pixelRatio,
                         rectToXywh(this.#viewport, viewportHeight),
                     );
-                    this.#renderer.setViewport(
+                    this.#render(this.#copyPass.scene, null, [
                         0,
                         0,
                         viewportWidth,
                         viewportHeight,
-                    );
-                    this.#render(this.#copyPass.scene, null);
+                    ]);
                 } else {
                     // Resize backbuffer
                     const bw =
@@ -506,13 +503,12 @@ export class VFXPlayer {
                             hit.rectWithOverflow.top) *
                             this.#pixelRatio,
                     );
-                    this.#renderer.setViewport(
+                    this.#render(e.scene, e.backbuffer.target, [
                         0,
                         0,
                         e.backbuffer.width / this.#pixelRatio, // must use logical coordinate
                         e.backbuffer.height / this.#pixelRatio,
-                    );
-                    this.#render(e.scene, e.backbuffer.target);
+                    ]);
                     e.backbuffer.swap();
 
                     // Render to canvas
@@ -525,32 +521,32 @@ export class VFXPlayer {
                         this.#pixelRatio,
                         xywh,
                     );
-                    this.#renderer.setViewport(xywh.x, xywh.y, xywh.w, xywh.h);
-                    this.#render(this.#copyPass.scene, null);
+                    this.#render(this.#copyPass.scene, null, [
+                        xywh.x,
+                        xywh.y,
+                        xywh.w,
+                        xywh.h,
+                    ]);
                 }
             } else {
                 e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
                 e.uniforms["offset"].value.y =
                     (viewportHeight - rect.bottom) * this.#pixelRatio;
 
+                let viewport: [number, number, number, number] = [0, 0, 0, 0];
                 if (e.isFullScreen) {
-                    this.#renderer.setViewport(
-                        0,
-                        0,
-                        viewportWidth,
-                        viewportHeight,
-                    );
+                    viewport = [0, 0, viewportWidth, viewportHeight];
                 } else {
-                    this.#renderer.setViewport(
+                    viewport = [
                         hit.rectWithOverflow.left,
                         viewportHeight - hit.rectWithOverflow.bottom,
                         hit.rectWithOverflow.right - hit.rectWithOverflow.left,
                         hit.rectWithOverflow.bottom - hit.rectWithOverflow.top,
-                    );
+                    ];
                 }
 
                 // Render to canvas
-                this.#render(e.scene, null);
+                this.#render(e.scene, null, viewport);
             }
         }
 
@@ -630,14 +626,17 @@ export class VFXPlayer {
         throw `VFX-JS error: Cannot detect GLSL version of the shader.\n\nOriginal shader:\n${shader}`;
     }
 
-    #render(scene: THREE.Scene, target: THREE.WebGLRenderTarget | null) {
-        if (target !== this.#lastTarget) {
-            this.#lastTarget = target;
-            this.#renderer.setRenderTarget(target);
-            if (target !== null) {
-                this.#renderer.clear();
-            }
+    #render(
+        scene: THREE.Scene,
+        target: THREE.WebGLRenderTarget | null,
+        viewport: [number, number, number, number],
+    ) {
+        this.#renderer.setRenderTarget(target);
+        if (target !== null) {
+            this.#renderer.clear();
         }
+
+        this.#renderer.setViewport(...viewport);
 
         try {
             this.#renderer.render(scene, this.#camera);
