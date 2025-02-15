@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "npm-run-all -p build:typedoc build:storybook build:tsc -s build:docs",
+    "build": "npm-run-all -p build:typedoc build:storybook build:tsc -s build:docs build:typedoc-dist",
     "build:tsc": "tsc",
     "build:typedoc": "rm -rf typedoc && cp -a ../vfx-js/docs-build typedoc",
     "build:storybook": "rm -rf storybook && cp -a ../storybook/docs-build storybook",
     "build:docs": "vite build",
+    "build:typedoc-dist": "rm -rf dist/docs && cp -a typedoc dist/docs",
     "preview": "vite preview"
   },
   "dependencies": {
