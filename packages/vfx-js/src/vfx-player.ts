@@ -30,6 +30,7 @@ export class VFXPlayer {
     #renderer: THREE.WebGLRenderer;
     #camera: THREE.Camera;
     #copyPass: CopyPass;
+    #lastTarget: THREE.RenderTarget | null = null;
 
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
@@ -630,9 +631,12 @@ export class VFXPlayer {
     }
 
     #render(scene: THREE.Scene, target: THREE.WebGLRenderTarget | null) {
-        this.#renderer.setRenderTarget(target);
-        if (target !== null) {
-            this.#renderer.clear();
+        if (target !== this.#lastTarget) {
+            this.#lastTarget = target;
+            this.#renderer.setRenderTarget(target);
+            if (target !== null) {
+                this.#renderer.clear();
+            }
         }
 
         try {
