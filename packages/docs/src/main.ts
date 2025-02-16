@@ -11,193 +11,148 @@ function lerp(a: number, b: number, t: number) {
 }
 
 const shaders: Record<string, string> = {
-    // logo: `
-    // precision highp float;
-    // uniform vec2 resolution;
-    // uniform vec2 offset;
-    // uniform float time;
-    // uniform float enterTime;
-    // uniform float leaveTime;
-    // uniform sampler2D src;
-    // uniform sampler2D backbuffer;
-
-    // uniform float delay;
-    // #define speed 2.0
-
-    // out vec4 outColor;
-
-    // float nn(float y, float t) {
-    //     float n = (
-    //         sin(y * .07 + t * 8. + sin(y * .5 + t * 10.)) +
-    //         sin(y * .7 + t * 2. + sin(y * .3 + t * 8.)) * .7 +
-    //         sin(y * 1.1 + t * 2.8) * .4
-    //     );
-    //     n += sin(y * 124. + t * 100.7) * sin(y * 877. - t * 38.8) * .3;
-    //     return n;
-    // }
-
-    // vec4 readTex(sampler2D tex, vec2 uv) {
-    //     if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { return vec4(0); }
-    //     return texture(tex, uv);
-    // }
-
-    // vec4 glitch(vec2 uv) {
-    //     vec2 uvr = uv, uvg = uv, uvb = uv;
-    //     float t = mod(time, 30.);
-    //     float amp = 10. / resolution.x;
-    //     if (abs(nn(uv.y, t)) > 1.) {
-    //         uvr.x += nn(uv.y, t) * amp;
-    //         uvg.x += nn(uv.y, t + 10.) * amp;
-    //         uvb.x += nn(uv.y, t + 20.) * amp;
-    //     }
-    //     vec4 cr = readTex(src, uvr);
-    //     vec4 cg = readTex(src, uvg);
-    //     vec4 cb = readTex(src, uvb);
-
-    //     return vec4(
-    //         cr.r,
-    //         cg.g,
-    //         cb.b,
-    //         smoothstep(.0, 1., cr.a + cg.a + cb.a)
-    //     );
-    // }
-    // vec4 slitscan(vec2 uv) {
-    //     float t = max(enterTime - delay, 0.) * speed;
-    //     if (t <= 0.0) {
-    //         return vec4(0);
-    //     }
-
-    //     vec2 uvr = uv, uvg = uv, uvb = uv;
-    //     uvr.x = min(uvr.x, t);
-    //     uvg.x = min(uvg.x, max(t - 0.2, 0.));
-    //     uvb.x = min(uvb.x, max(t - 0.4, 0.));
-
-    //     vec4 cr = readTex(src, uvr);
-    //     vec4 cg = readTex(src, uvg);
-    //     vec4 cb = readTex(src, uvb);
-
-    //     return vec4(
-    //         cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 1.
-    //     );
-    // }
-
-    // void main (void) {
-    //     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    //     if (leaveTime > 0.) {
-    //         float t = clamp(leaveTime - 0.5, 0., 1.);
-    //         outColor = glitch(uv) * (1. - t);
-    //     } else if (enterTime < 1.0) {
-    //         outColor = slitscan(uv);
-    //     } else {
-    //         outColor = glitch(uv);
-    //     }
-    //     outColor += readTex(backbuffer, uv) * 0.03;
-    // }
-    // `,
     logo: `
     precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
-    uniform vec4 rectOuter; // x, y, w, h
     uniform float time;
+    uniform float enterTime;
+    uniform float leaveTime;
     uniform sampler2D src;
-    uniform sampler2D backbuffer;
+
+    uniform float delay;
+    #define speed 2.0
+
     out vec4 outColor;
-    void main() {
+
+    float nn(float y, float t) {
+        float n = (
+            sin(y * .07 + t * 8. + sin(y * .5 + t * 10.)) +
+            sin(y * .7 + t * 2. + sin(y * .3 + t * 8.)) * .7 +
+            sin(y * 1.1 + t * 2.8) * .4
+        );
+        n += sin(y * 124. + t * 100.7) * sin(y * 877. - t * 38.8) * .3;
+        return n;
+    }
+
+    vec4 readTex(sampler2D tex, vec2 uv) {
+        if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { return vec4(0); }
+        return texture(tex, uv);
+    }
+
+    vec4 glitch(vec2 uv) {
+        vec2 uvr = uv, uvg = uv, uvb = uv;
+        float t = mod(time, 30.);
+        float amp = 10. / resolution.x;
+        if (abs(nn(uv.y, t)) > 1.) {
+            uvr.x += nn(uv.y, t) * amp;
+            uvg.x += nn(uv.y, t + 10.) * amp;
+            uvb.x += nn(uv.y, t + 20.) * amp;
+        }
+        vec4 cr = readTex(src, uvr);
+        vec4 cg = readTex(src, uvg);
+        vec4 cb = readTex(src, uvb);
+
+        return vec4(
+            cr.r,
+            cg.g,
+            cb.b,
+            smoothstep(.0, 1., cr.a + cg.a + cb.a)
+        );
+    }
+    vec4 slitscan(vec2 uv) {
+        float t = max(enterTime - delay, 0.) * speed;
+        if (t <= 0.0) {
+            return vec4(0);
+        }
+
+        vec2 uvr = uv, uvg = uv, uvb = uv;
+        uvr.x = min(uvr.x, t);
+        uvg.x = min(uvg.x, max(t - 0.2, 0.));
+        uvb.x = min(uvb.x, max(t - 0.4, 0.));
+
+        vec4 cr = readTex(src, uvr);
+        vec4 cg = readTex(src, uvg);
+        vec4 cb = readTex(src, uvb);
+
+        return vec4(
+            cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 1.
+        );
+    }
+
+    void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec2 uvOuter = gl_FragCoord.xy / rectOuter.zw;
-
-        vec2 p = uv * 2. - 1.;
-        p.x *= resolution.x / resolution.y;
-        p += vec2(cos(time * 3.), sin(time * 3.)) * 0.4;
-        outColor = vec4(pow(.1 / length(p), 3.));
-
-        outColor += texture(backbuffer, uvOuter) * 0.96;
+        if (leaveTime > 0.) {
+            float t = clamp(leaveTime - 0.5, 0., 1.);
+            outColor = glitch(uv) * (1. - t);
+        } else if (enterTime < 1.0) {
+            outColor = slitscan(uv);
+        } else {
+            outColor = glitch(uv);
+        }
     }
     `,
     blob: `
     precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
-    uniform vec4 rectOuter; // x, y, w, h
     uniform float time;
     uniform sampler2D src;
-    uniform sampler2D backbuffer;
     out vec4 outColor;
+
+    vec3 hsv2rgb(vec3 c) {
+        vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+        vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+        return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+    }
+
+    vec3 rgb2hsv(vec3 c) {
+        vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+        vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+        vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+        float d = q.x - min(q.w, q.y);
+        float e = 1.0e-10;
+        return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+    }
+
+    vec3 hueShift(vec3 rgb, float t) {
+        vec3 hsv = rgb2hsv(rgb);
+        hsv.x = fract(hsv.x + t);
+        return hsv2rgb(hsv);
+    }
+
+    vec4 readTex(vec2 uv) {
+        vec2 d = 3. / resolution.xy;
+        vec4 c = vec4(0);
+        c += texture(src, uv + vec2(1, 0) * d);
+        c += texture(src, uv - vec2(1, 0) * d);
+        c += texture(src, uv + vec2(0, 1) * d);
+        c += texture(src, uv - vec2(0, 1) * d);
+        return c / 4.;
+    }
+
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec2 uvOuter = gl_FragCoord.xy / rectOuter.zw;
 
-        vec2 p = uv * 2. - 1.;
-        p.x *= resolution.x / resolution.y;
-        p += vec2(cos(time * 2.), sin(time * 2.)) * 0.4;
-        outColor = vec4(pow(.08 / length(p), 3.));
+        vec4 img = texture(src, uv);
 
-        outColor += texture(backbuffer, uvOuter) * 0.9;
+        float gray = dot(img.rgb, vec3(0.2, 0.7, 0.1));
+
+        vec2 d = (uv - .5) * vec2(resolution.x / resolution.y, 1);
+        float l = length(d);
+
+        // Colorize
+        img.rgb = mix(img.rgb, vec3(.8, .4, .4), sin(gray * 3. - time));
+
+        // Hue shift
+        float shift = fract(gray + l - time * 0.2);
+        img.rgb = hueShift(img.rgb, shift);
+
+        img.a *= 0.5;
+        outColor = img;
     }
     `,
-
-    // blob: `
-    // precision highp float;
-    // uniform vec2 resolution;
-    // uniform vec2 offset;
-    // uniform float time;
-    // uniform sampler2D src;
-    // out vec4 outColor;
-
-    // vec3 hsv2rgb(vec3 c) {
-    //     vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    //     vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    //     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-    // }
-
-    // vec3 rgb2hsv(vec3 c) {
-    //     vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-    //     vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
-    //     vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
-
-    //     float d = q.x - min(q.w, q.y);
-    //     float e = 1.0e-10;
-    //     return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
-    // }
-
-    // vec3 hueShift(vec3 rgb, float t) {
-    //     vec3 hsv = rgb2hsv(rgb);
-    //     hsv.x = fract(hsv.x + t);
-    //     return hsv2rgb(hsv);
-    // }
-
-    // vec4 readTex(vec2 uv) {
-    //     vec2 d = 3. / resolution.xy;
-    //     vec4 c = vec4(0);
-    //     c += texture(src, uv + vec2(1, 0) * d);
-    //     c += texture(src, uv - vec2(1, 0) * d);
-    //     c += texture(src, uv + vec2(0, 1) * d);
-    //     c += texture(src, uv - vec2(0, 1) * d);
-    //     return c / 4.;
-    // }
-
-    // void main() {
-    //     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-
-    //     vec4 img = texture(src, uv);
-
-    //     float gray = dot(img.rgb, vec3(0.2, 0.7, 0.1));
-
-    //     vec2 d = (uv - .5) * vec2(resolution.x / resolution.y, 1);
-    //     float l = length(d);
-
-    //     // Colorize
-    //     img.rgb = mix(img.rgb, vec3(.8, .4, .4), sin(gray * 3. - time));
-
-    //     // Hue shift
-    //     float shift = fract(gray + l - time * 0.2);
-    //     img.rgb = hueShift(img.rgb, shift);
-
-    //     img.a *= 0.5;
-    //     outColor = img;
-    // }
-    // `,
     canvas: `
 precision highp float;
 uniform vec2 resolution;
@@ -267,7 +222,7 @@ class App {
 
     initVFX() {
         const bg = document.getElementById("BG")!;
-        this.vfx.add(bg, { shader: shaders.blob, overflow: true });
+        this.vfx.add(bg, { shader: shaders.blob });
 
         for (const e of document.querySelectorAll("*[data-shader]")) {
             const shader = e.getAttribute("data-shader")!;
@@ -404,8 +359,7 @@ class App {
         const logo = document.getElementById("Logo")!;
         this.vfx.add(logo, {
             shader: shaders.logo,
-            // overflow: [0, 3000, 0, 100],
-            overflow: true,
+            overflow: [0, 3000, 0, 100],
             uniforms: { delay: 0 },
             intersection: {
                 threshold: 1,
@@ -414,8 +368,7 @@ class App {
         const tagline = document.getElementById("LogoTagline")!;
         this.vfx.add(tagline, {
             shader: shaders.logo,
-            // overflow: [0, 3000, 0, 1000],
-            overflow: true,
+            overflow: [0, 3000, 0, 1000],
             uniforms: { delay: 0.3 },
             intersection: {
                 threshold: 1,
