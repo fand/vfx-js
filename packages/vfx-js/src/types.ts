@@ -27,6 +27,14 @@ export type VFXOpts = {
      * This is useful if you want to place the canvas behind other DOM element, or vice versa.
      */
     zIndex?: number;
+
+    /**
+     * Whether VFX-JS should start playing animations automatically (Default: `true`).
+     *
+     * If false, you have to call `VFX.play()` manually to start animation,
+     * or render frames only when it's necessary by calling `VFX.render()`.
+     */
+    autoplay?: boolean;
 };
 
 /**

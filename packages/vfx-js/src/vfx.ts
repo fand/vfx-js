@@ -33,7 +33,10 @@ export class VFX {
         this.#canvas = canvas;
 
         this.#player = new VFXPlayer(canvas, opts.pixelRatio);
-        this.#player.play();
+
+        if (opts.autoplay !== false) {
+            this.#player.play();
+        }
     }
 
     /**
