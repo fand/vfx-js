@@ -394,7 +394,7 @@ export class VFXPlayer {
         }
     }
 
-    #playLoop = (): void => {
+    render(): void {
         const now = Date.now() / 1000;
 
         this.#renderer.clear();
@@ -549,8 +549,11 @@ export class VFXPlayer {
                 this.#render(e.scene, null, viewport);
             }
         }
+    }
 
+    #playLoop = (): void => {
         if (this.isPlaying()) {
+            this.render();
             this.#playRequest = requestAnimationFrame(this.#playLoop);
         }
     };

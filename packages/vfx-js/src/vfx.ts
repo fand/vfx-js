@@ -94,6 +94,14 @@ export class VFX {
     }
 
     /**
+     * Render the whole scene once, manually.
+     * This is useful when you want to control the rendering timings manually by combining with `autoplay: false`.
+     */
+    render(): void {
+        this.#player.render();
+    }
+
+    /**
      * Destroy VFX and stop rendering.
      */
     destroy(): void {
