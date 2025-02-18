@@ -281,3 +281,48 @@ const wrapBase = (
 export const wrapRepeat = wrapBase("repeat");
 export const wrapClamp = wrapBase("clamp");
 export const wrapMirror = wrapBase("mirror");
+
+const backbufferShader = `
+precision highp float;
+uniform vec2 offset;
+uniform vec2 resolution;
+uniform float time;
+uniform sampler2D backbuffer;
+out vec4 outColor;
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    vec2 p = uv * 2. - 1.;
+    p.x *= resolution.x / resolution.y;
+
+    outColor = vec4(
+        step(abs(length(p) - 0.5 - time * 0.1), .01)
+    );
+    outColor += texture(backbuffer, uv) * vec4(1, .5, .0, .9);
+}
+`;
+
+export const backbuffer: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Logo;
+        return img;
+    },
+    args: undefined,
+};
+backbuffer.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector('img')as HTMLImageElement;
+    await new Promise(o => img.onload = o);
+
+    let time = 0;
+
+    const vfx = new VFX({ autoplay: false });
+    vfx.add(img, { shader: backbufferShader, backbuffer: true, uniforms: { time: () => time } });
+    vfx.render();
+
+    time = 1;
+    vfx.render();
+
+    time = 2;
+    vfx.render();
+
+}
