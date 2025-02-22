@@ -31,8 +31,8 @@ export class CopyPass {
         this.#uniforms["src"].value = tex;
         this.#uniforms["resolution"].value.x = xywh.w * pixelRatio;
         this.#uniforms["resolution"].value.y = xywh.h * pixelRatio;
-        this.#uniforms["offset"].value.x = xywh.x;
-        this.#uniforms["offset"].value.y = xywh.y;
+        this.#uniforms["offset"].value.x = xywh.x * pixelRatio;
+        this.#uniforms["offset"].value.y = xywh.y * pixelRatio;
     }
 
     get scene(): THREE.Scene {
