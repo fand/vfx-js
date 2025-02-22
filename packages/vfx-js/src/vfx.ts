@@ -42,15 +42,15 @@ export class VFX {
     /**
      * Register an element to track the position and render visual effects in the area.
      */
-    add(element: HTMLElement, opts: VFXProps): void {
+    async add(element: HTMLElement, opts: VFXProps): Promise<void> {
         if (element instanceof HTMLImageElement) {
-            this.#addImage(element, opts);
+            await this.#addImage(element, opts);
         } else if (element instanceof HTMLVideoElement) {
-            this.#addVideo(element, opts);
+            await this.#addVideo(element, opts);
         } else if (element instanceof HTMLCanvasElement) {
-            this.#addCanvas(element, opts);
+            await this.#addCanvas(element, opts);
         } else {
-            this.#addText(element, opts);
+            await this.#addText(element, opts);
         }
     }
 
@@ -109,39 +109,45 @@ export class VFX {
         this.#canvas.remove();
     }
 
-    #addImage(element: HTMLImageElement, opts: VFXProps): void {
+    #addImage(element: HTMLImageElement, opts: VFXProps): Promise<void> {
         if (element.complete) {
-            this.#player.addElement(element, opts);
+            return this.#player.addElement(element, opts);
         } else {
-            element.addEventListener(
-                "load",
-                () => {
-                    this.#player.addElement(element, opts);
-                },
-                { once: true },
-            );
+            return new Promise<void>((resolve) => {
+                element.addEventListener(
+                    "load",
+                    () => {
+                        this.#player.addElement(element, opts);
+                        resolve();
+                    },
+                    { once: true },
+                );
+            });
         }
     }
 
-    #addVideo(element: HTMLVideoElement, opts: VFXProps): void {
+    #addVideo(element: HTMLVideoElement, opts: VFXProps): Promise<void> {
         if (element.readyState >= 3) {
-            this.#player.addElement(element, opts);
+            return this.#player.addElement(element, opts);
         } else {
-            element.addEventListener(
-                "canplay",
-                () => {
-                    this.#player.addElement(element, opts);
-                },
-                { once: true },
-            );
+            return new Promise<void>((resolve) => {
+                element.addEventListener(
+                    "canplay",
+                    () => {
+                        this.#player.addElement(element, opts);
+                        resolve();
+                    },
+                    { once: true },
+                );
+            });
         }
     }
 
-    #addCanvas(element: HTMLCanvasElement, opts: VFXProps): void {
-        this.#player.addElement(element, opts);
+    #addCanvas(element: HTMLCanvasElement, opts: VFXProps): Promise<void> {
+        return this.#player.addElement(element, opts);
     }
 
-    #addText(element: HTMLElement, opts: VFXProps): void {
-        this.#player.addElement(element, opts);
+    #addText(element: HTMLElement, opts: VFXProps): Promise<void> {
+        return this.#player.addElement(element, opts);
     }
 }

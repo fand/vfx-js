@@ -218,7 +218,7 @@ export class VFXPlayer {
                 gifFor.set(element, gif);
                 texture = new THREE.Texture(gif.getCanvas());
             } else {
-                texture = this.#textureLoader.load(element.src);
+                texture = await this.#textureLoader.loadAsync(element.src);
             }
         } else if (element instanceof HTMLVideoElement) {
             texture = new THREE.VideoTexture(element);
