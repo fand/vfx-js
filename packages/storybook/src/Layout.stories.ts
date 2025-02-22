@@ -310,13 +310,19 @@ export const backbuffer: StoryObj<undefined> = {
     args: undefined,
 };
 backbuffer.play = async ({ canvasElement }) => {
-    const img = canvasElement.querySelector('img')as HTMLImageElement;
-    await new Promise(o => img.onload = o);
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
 
     let time = 0;
 
     const vfx = new VFX({ autoplay: false });
-    vfx.add(img, { shader: backbufferShader, backbuffer: true, uniforms: { time: () => time } });
+    await vfx.add(img, {
+        shader: backbufferShader,
+        backbuffer: true,
+        uniforms: { time: () => time },
+    });
     vfx.render();
 
     time = 1;
@@ -324,5 +330,42 @@ backbuffer.play = async ({ canvasElement }) => {
 
     time = 2;
     vfx.render();
+};
 
-}
+export const backbufferCompatibility: StoryObj<undefined> = {
+    render: () => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "backbufferWrapper";
+
+        const img1 = document.createElement("img");
+        img1.id = "img1";
+        img1.src = Logo;
+        wrapper.appendChild(img1);
+
+        const img2 = document.createElement("img");
+        img2.id = "img2";
+        img2.src = Logo;
+        wrapper.appendChild(img2);
+
+        return wrapper;
+    },
+    args: undefined,
+};
+backbufferCompatibility.play = async ({ canvasElement }) => {
+    const img1 = canvasElement.querySelector("#img1") as HTMLImageElement;
+    const img2 = canvasElement.querySelector("#img2") as HTMLImageElement;
+    await Promise.all([
+        new Promise((o) => {
+            img1.onload = o;
+        }),
+        new Promise((o) => {
+            img2.onload = o;
+        }),
+    ]);
+
+    const vfx = new VFX({ autoplay: false });
+    await vfx.add(img1, { shader, backbuffer: false });
+    await vfx.add(img2, { shader, backbuffer: true });
+
+    vfx.render();
+};
