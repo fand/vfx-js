@@ -1,6 +1,7 @@
-import { VFX, type VFXProps, type shaders } from "@vfx-js/core";
+import type { VFXProps, shaders } from "@vfx-js/core";
 import type { Meta, StoryObj } from "@storybook/html";
 
+import { initVFX } from "./utils";
 import Logo from "./assets/logo-640w-20p.svg";
 import "./preset.css";
 
@@ -50,7 +51,7 @@ export const fullscreen: StoryObj<{ padding: number }> = {
         wrapper.style.padding = `${padding}px`;
         wrapper.appendChild(img);
 
-        const vfx = new VFX();
+        const vfx = initVFX();
         vfx.add(img, {
             shader,
             overflow: true,
@@ -72,7 +73,7 @@ export const overflowSingle: StoryObj<{ overflow: number }> = {
         wrapper.style.padding = `${overflow * 2}px`;
         wrapper.appendChild(img);
 
-        const vfx = new VFX();
+        const vfx = initVFX();
         vfx.add(img, {
             shader,
             overflow,
@@ -97,7 +98,7 @@ export const overflowArray: StoryObj<{
         wrapper.style.padding = `${o1}px ${o2}px ${o3}px ${o4}px`;
         wrapper.appendChild(img);
 
-        const vfx = new VFX();
+        const vfx = initVFX();
         vfx.add(img, {
             shader,
             overflow,
@@ -115,7 +116,7 @@ export const pixelRatio: StoryObj<{ pixelRatio: number }> = {
         const img = document.createElement("img");
         img.src = Logo;
 
-        const vfx = new VFX({ pixelRatio });
+        const vfx = initVFX({ pixelRatio });
         vfx.add(img, { shader });
 
         return img;
@@ -144,7 +145,7 @@ const zIndexBase = ({ zIndex, fgZIndex }: ZIndexProps) => {
     z0.style.zIndex = fgZIndex.toString();
     wrapper.appendChild(z0);
 
-    const vfx = new VFX({ zIndex });
+    const vfx = initVFX({ zIndex });
     vfx.add(img, { shader });
 
     return wrapper;
@@ -195,7 +196,7 @@ void main() {
     const wrapper = document.createElement("div");
     wrapper.className = "elementZIndexWrapper";
 
-    const vfx = new VFX();
+    const vfx = initVFX();
 
     for (let i = 0; i < 3; i++) {
         const img = document.createElement("img");
@@ -249,7 +250,7 @@ export const overlay: StoryObj<null> = {
         const img = document.createElement("img");
         img.src = Logo;
 
-        const vfx = new VFX();
+        const vfx = initVFX();
         vfx.add(img, { shader, overlay: true });
 
         return img;
@@ -264,7 +265,7 @@ const wrapBase = (
         const img = document.createElement("img");
         img.src = Logo;
 
-        const vfx = new VFX();
+        const vfx = initVFX();
         vfx.add(img, { shader, wrap, overflow: 200 });
 
         return img;
@@ -317,7 +318,7 @@ backbuffer.play = async ({ canvasElement }) => {
 
     let time = 0;
 
-    const vfx = new VFX({ autoplay: false });
+    const vfx = initVFX({ autoplay: false });
     await vfx.add(img, {
         shader: backbufferShader,
         backbuffer: true,
@@ -363,7 +364,7 @@ backbufferCompatibility.play = async ({ canvasElement }) => {
         }),
     ]);
 
-    const vfx = new VFX({ autoplay: false });
+    const vfx = initVFX({ autoplay: false });
     await vfx.add(img1, { shader, backbuffer: false });
     await vfx.add(img2, { shader, backbuffer: true });
 

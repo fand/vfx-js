@@ -57,6 +57,9 @@ export class Timer {
         ) as HTMLInputElement;
 
         this.#updateLabel();
+
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        (window as any).timer = this;
     }
 
     get element() {

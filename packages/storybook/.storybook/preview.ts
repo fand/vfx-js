@@ -12,3 +12,12 @@ const preview: Preview = {
 };
 
 export default preview;
+
+export const decorators = [
+    (story) => {
+        (window as any).vfx?.destroy();
+        (window as any).timer?.dispose();
+
+        return story();
+    },
+];
