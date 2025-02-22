@@ -22,6 +22,7 @@ export class CopyPass {
                 uniforms: this.#uniforms,
                 glslVersion: "300 es",
                 transparent: true,
+                premultipliedAlpha: true,
             }),
         );
         this.#scene.add(this.#mesh);
