@@ -535,8 +535,26 @@ export class VFXPlayer {
 
                 let viewport: [number, number, number, number] = [0, 0, 0, 0];
                 if (e.isFullScreen) {
+                    e.uniforms["rectOuter"].value.set(
+                        0,
+                        0,
+                        viewportWidth * this.#pixelRatio,
+                        viewportHeight * this.#pixelRatio,
+                    );
                     viewport = [0, 0, viewportWidth, viewportHeight];
                 } else {
+                    // TODO: mrege with setViewport?
+                    e.uniforms["rectOuter"].value.set(
+                        hit.rectWithOverflow.left * this.#pixelRatio,
+                        (viewportHeight - hit.rectWithOverflow.bottom) *
+                            this.#pixelRatio,
+                        (hit.rectWithOverflow.right -
+                            hit.rectWithOverflow.left) *
+                            this.#pixelRatio,
+                        (hit.rectWithOverflow.bottom -
+                            hit.rectWithOverflow.top) *
+                            this.#pixelRatio,
+                    );
                     viewport = [
                         hit.rectWithOverflow.left,
                         viewportHeight - hit.rectWithOverflow.bottom,
