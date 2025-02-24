@@ -13,6 +13,7 @@ export class CopyPass {
             src: { value: null },
             offset: { value: new THREE.Vector2() },
             resolution: { value: new THREE.Vector2() },
+            viewport: { value: new THREE.Vector4() },
         };
         this.#mesh = new THREE.Mesh(
             new THREE.PlaneGeometry(2, 2),

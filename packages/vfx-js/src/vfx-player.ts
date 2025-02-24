@@ -630,12 +630,14 @@ export class VFXPlayer {
         this.#renderer.setViewport(...viewport);
 
         // Set viewport uniform if passed and exists
-        uniforms["viewport"].value.set(
-            viewport[0] * this.#pixelRatio,
-            viewport[1] * this.#pixelRatio,
-            viewport[2] * this.#pixelRatio,
-            viewport[3] * this.#pixelRatio,
-        );
+        if (uniforms["viewport"]) {
+            uniforms["viewport"].value.set(
+                viewport[0] * this.#pixelRatio,
+                viewport[1] * this.#pixelRatio,
+                viewport[2] * this.#pixelRatio,
+                viewport[3] * this.#pixelRatio,
+            );
+        }
 
         try {
             this.#renderer.render(scene, this.#camera);
