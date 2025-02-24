@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { COPY_FRAGMENT_SHADER, DEFAULT_VERTEX_SHADER } from "./constants.js";
-import type { Rect } from "./rect.js";
+import type { XYWH } from "./xywh.js";
 
 export class CopyPass {
     #scene: THREE.Scene;
@@ -44,24 +44,4 @@ export class CopyPass {
     get scene(): THREE.Scene {
         return this.#scene;
     }
-}
-
-// TODO: move
-type XYWH = {
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-};
-
-/**
- * Convert a Rect (top-left origin) to WebGL screen-space offset (bottom-left origin)
- */
-export function rectToXywh(rect: Rect, containerHeight: number): XYWH {
-    return {
-        x: rect.left,
-        y: containerHeight - rect.bottom,
-        w: rect.right - rect.left,
-        h: rect.bottom - rect.top,
-    };
 }

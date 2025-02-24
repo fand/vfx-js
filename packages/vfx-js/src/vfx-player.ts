@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Backbuffer } from "./backbuffer.js";
 import { DEFAULT_VERTEX_SHADER, shaders } from "./constants.js";
-import { CopyPass, rectToXywh } from "./copy-pass.js";
+import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
 import {
@@ -19,6 +19,7 @@ import type {
     VFXUniformValue,
     VFXWrap,
 } from "./types";
+import { rectToXywh } from "./xywh.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
