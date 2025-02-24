@@ -28,6 +28,10 @@ export class CopyPass {
         this.#scene.add(this.#mesh);
     }
 
+    get uniforms() {
+        return this.#uniforms;
+    }
+
     setUniforms(tex: THREE.Texture, pixelRatio: number, xywh: XYWH) {
         this.#uniforms["src"].value = tex;
         this.#uniforms["resolution"].value.x = xywh.w * pixelRatio;

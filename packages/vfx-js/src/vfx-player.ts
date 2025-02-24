@@ -448,33 +448,26 @@ export class VFXPlayer {
                     e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
                     e.uniforms["offset"].value.y =
                         (viewportHeight - rect.bottom) * this.#pixelRatio;
-                    e.uniforms["rectOuter"].value.set(
-                        0,
-                        0,
-                        viewportWidth * this.#pixelRatio,
-                        viewportHeight * this.#pixelRatio,
+                    this.#render(
+                        e.scene,
+                        e.backbuffer.target,
+                        [0, 0, viewportWidth, viewportHeight],
+                        e.uniforms,
                     );
-                    this.#render(e.scene, e.backbuffer.target, [
-                        0,
-                        0,
-                        viewportWidth,
-                        viewportHeight,
-                    ]);
                     e.backbuffer.swap();
 
                     // Render to canvas
-                    // TODO: use rectWithOverflow as the viewport
                     this.#copyPass.setUniforms(
                         e.backbuffer.texture,
                         this.#pixelRatio,
                         rectToXywh(this.#viewport, viewportHeight),
                     );
-                    this.#render(this.#copyPass.scene, null, [
-                        0,
-                        0,
-                        viewportWidth,
-                        viewportHeight,
-                    ]);
+                    this.#render(
+                        this.#copyPass.scene,
+                        null,
+                        [0, 0, viewportWidth, viewportHeight],
+                        this.#copyPass.uniforms,
+                    );
                 } else {
                     // Resize backbuffer
                     const bw =
@@ -492,23 +485,17 @@ export class VFXPlayer {
                         e.overflow.left * this.#pixelRatio;
                     e.uniforms["offset"].value.y =
                         e.overflow.bottom * this.#pixelRatio;
-                    e.uniforms["rectOuter"].value.set(
-                        hit.rectWithOverflow.left * this.#pixelRatio,
-                        (viewportHeight - hit.rectWithOverflow.bottom) *
-                            this.#pixelRatio,
-                        (hit.rectWithOverflow.right -
-                            hit.rectWithOverflow.left) *
-                            this.#pixelRatio,
-                        (hit.rectWithOverflow.bottom -
-                            hit.rectWithOverflow.top) *
-                            this.#pixelRatio,
+                    this.#render(
+                        e.scene,
+                        e.backbuffer.target,
+                        [
+                            0,
+                            0,
+                            e.backbuffer.width / this.#pixelRatio, // must use logical coordinate
+                            e.backbuffer.height / this.#pixelRatio,
+                        ],
+                        e.uniforms,
                     );
-                    this.#render(e.scene, e.backbuffer.target, [
-                        0,
-                        0,
-                        e.backbuffer.width / this.#pixelRatio, // must use logical coordinate
-                        e.backbuffer.height / this.#pixelRatio,
-                    ]);
                     e.backbuffer.swap();
 
                     // Render to canvas
@@ -521,12 +508,12 @@ export class VFXPlayer {
                         this.#pixelRatio,
                         xywh,
                     );
-                    this.#render(this.#copyPass.scene, null, [
-                        xywh.x,
-                        xywh.y,
-                        xywh.w,
-                        xywh.h,
-                    ]);
+                    this.#render(
+                        this.#copyPass.scene,
+                        null,
+                        [xywh.x, xywh.y, xywh.w, xywh.h],
+                        this.#copyPass.uniforms,
+                    );
                 }
             } else {
                 e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
@@ -535,26 +522,8 @@ export class VFXPlayer {
 
                 let viewport: [number, number, number, number] = [0, 0, 0, 0];
                 if (e.isFullScreen) {
-                    e.uniforms["rectOuter"].value.set(
-                        0,
-                        0,
-                        viewportWidth * this.#pixelRatio,
-                        viewportHeight * this.#pixelRatio,
-                    );
                     viewport = [0, 0, viewportWidth, viewportHeight];
                 } else {
-                    // TODO: mrege with setViewport?
-                    e.uniforms["rectOuter"].value.set(
-                        hit.rectWithOverflow.left * this.#pixelRatio,
-                        (viewportHeight - hit.rectWithOverflow.bottom) *
-                            this.#pixelRatio,
-                        (hit.rectWithOverflow.right -
-                            hit.rectWithOverflow.left) *
-                            this.#pixelRatio,
-                        (hit.rectWithOverflow.bottom -
-                            hit.rectWithOverflow.top) *
-                            this.#pixelRatio,
-                    );
                     viewport = [
                         hit.rectWithOverflow.left,
                         viewportHeight - hit.rectWithOverflow.bottom,
@@ -564,7 +533,7 @@ export class VFXPlayer {
                 }
 
                 // Render to canvas
-                this.#render(e.scene, null, viewport);
+                this.#render(e.scene, null, viewport, e.uniforms);
             }
         }
     }
@@ -651,6 +620,7 @@ export class VFXPlayer {
         scene: THREE.Scene,
         target: THREE.WebGLRenderTarget | null,
         viewport: [number, number, number, number],
+        uniforms: { [key: string]: THREE.IUniform },
     ) {
         this.#renderer.setRenderTarget(target);
         if (target !== null) {
@@ -658,6 +628,14 @@ export class VFXPlayer {
         }
 
         this.#renderer.setViewport(...viewport);
+
+        // Set rectOuter uniform if passed and exists
+        uniforms["rectOuter"].value.set(
+            viewport[0] * this.#pixelRatio,
+            viewport[1] * this.#pixelRatio,
+            viewport[2] * this.#pixelRatio,
+            viewport[3] * this.#pixelRatio,
+        );
 
         try {
             this.#renderer.render(scene, this.#camera);
