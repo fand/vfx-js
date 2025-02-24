@@ -66,7 +66,7 @@ precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;
 uniform sampler2D src;
-uniform vec4 rectOuter;
+uniform vec4 viewport;
 uniform int id;
 out vec4 outColor;
 
@@ -79,10 +79,10 @@ void main() {
     outColor = texture(src, uv);
 
     // Show the UV coordinate
-    outColor += vec4(gl_FragCoord.xy / rectOuter.zw, 1, 0.5);
+    outColor += vec4(gl_FragCoord.xy / viewport.zw, 1, 0.5);
 
-    vec2 p = gl_FragCoord.xy / rectOuter.zw * 2. - 1.;
-    p.x *= rectOuter.z / rectOuter.w;
+    vec2 p = gl_FragCoord.xy / viewport.zw * 2. - 1.;
+    p.x *= viewport.z / viewport.w;
     outColor += smoothstep(.1, .0, abs(sin(length(p) * 30.))) * 0.1;
 }
 `;

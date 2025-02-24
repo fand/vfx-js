@@ -261,7 +261,7 @@ export class VFXPlayer {
             leaveTime: { value: -1.0 },
             mouse: { value: new THREE.Vector2() },
             intersection: { value: intersection },
-            rectOuter: { value: new THREE.Vector4() },
+            viewport: { value: new THREE.Vector4() },
         };
 
         const uniformGenerators: {
@@ -629,8 +629,8 @@ export class VFXPlayer {
 
         this.#renderer.setViewport(...viewport);
 
-        // Set rectOuter uniform if passed and exists
-        uniforms["rectOuter"].value.set(
+        // Set viewport uniform if passed and exists
+        uniforms["viewport"].value.set(
             viewport[0] * this.#pixelRatio,
             viewport[1] * this.#pixelRatio,
             viewport[2] * this.#pixelRatio,
