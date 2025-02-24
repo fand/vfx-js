@@ -1,5 +1,9 @@
 import * as THREE from "three";
 
+/**
+ * A class to manage initialization and double-buffring of the backbuffer.
+ * @internal
+ */
 export class Backbuffer {
     #width: number;
     #height: number;
@@ -30,6 +34,11 @@ export class Backbuffer {
         return this.#height;
     }
 
+    /**
+     * Resize textuers if necessary.
+     * @param width - physical width of the backbuffer
+     * @param height - physical height of the backbuffer
+     */
     resize(width: number, height: number) {
         if (width !== this.#width || height !== this.#height) {
             this.#width = width;
@@ -39,6 +48,10 @@ export class Backbuffer {
         }
     }
 
+    /**
+     * Swap double buffers for the backbuffer.
+     * This should always be called right after the rendering.
+     */
     swap() {
         this.#buffers = [this.#buffers[1], this.#buffers[0]];
     }
