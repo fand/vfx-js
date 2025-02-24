@@ -1,5 +1,7 @@
 import * as THREE from "three";
+import { Backbuffer } from "./backbuffer.js";
 import { DEFAULT_VERTEX_SHADER, shaders } from "./constants.js";
+import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
 import {
@@ -17,6 +19,7 @@ import type {
     VFXUniformValue,
     VFXWrap,
 } from "./types";
+import { rectToXywh } from "./xywh.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -27,6 +30,8 @@ export class VFXPlayer {
     #canvas: HTMLCanvasElement;
     #renderer: THREE.WebGLRenderer;
     #camera: THREE.Camera;
+    #copyPass: CopyPass;
+
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
     #elements: VFXElement[] = [];
@@ -64,6 +69,9 @@ export class VFXPlayer {
 
         this.#camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
         this.#camera.position.set(0, 0, 1);
+
+        // Setup copyScene
+        this.#copyPass = new CopyPass();
     }
 
     destroy(): void {
@@ -173,13 +181,13 @@ export class VFXPlayer {
 
         const rect = element.getBoundingClientRect();
         const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
-        const rectHitTest = growRect(rect, overflow);
+        const rectWithOverflow = growRect(rect, overflow);
 
         const intersectionOpts = parseIntersectionOpts(opts.intersection);
         const isInViewport =
-            isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
+            isFullScreen || isRectInViewport(this.#viewport, rectWithOverflow);
 
-        const logicalViewport = growRect(
+        const viewportPadded = growRect(
             this.#viewport,
             intersectionOpts.rootMargin,
         );
@@ -187,7 +195,7 @@ export class VFXPlayer {
         const isInLogicalViewport =
             isFullScreen ||
             checkIntersection(
-                logicalViewport,
+                viewportPadded,
                 rect,
                 intersection,
                 intersectionOpts.threshold,
@@ -211,7 +219,7 @@ export class VFXPlayer {
                 gifFor.set(element, gif);
                 texture = new THREE.Texture(gif.getCanvas());
             } else {
-                texture = this.#textureLoader.load(element.src);
+                texture = await this.#textureLoader.loadAsync(element.src);
             }
         } else if (element instanceof HTMLVideoElement) {
             texture = new THREE.VideoTexture(element);
@@ -254,6 +262,7 @@ export class VFXPlayer {
             leaveTime: { value: -1.0 },
             mouse: { value: new THREE.Vector2() },
             intersection: { value: intersection },
+            viewport: { value: new THREE.Vector4() },
         };
 
         const uniformGenerators: {
@@ -275,16 +284,32 @@ export class VFXPlayer {
             }
         }
 
+        // Backbuffer
+        let backbuffer: VFXElement["backbuffer"] = undefined;
+        if (opts.backbuffer) {
+            backbuffer = (() => {
+                const bw =
+                    (rectWithOverflow.right - rectWithOverflow.left) *
+                    this.#pixelRatio;
+                const bh =
+                    (rectWithOverflow.bottom - rectWithOverflow.top) *
+                    this.#pixelRatio;
+                return new Backbuffer(bw, bh);
+            })();
+            uniforms["backbuffer"] = { value: backbuffer.texture };
+        }
+
         const scene = new THREE.Scene();
         const geometry = new THREE.PlaneGeometry(2, 2);
-        const material = new THREE.ShaderMaterial({
+        const material = new THREE.RawShaderMaterial({
             vertexShader: DEFAULT_VERTEX_SHADER,
             fragmentShader: shader,
             transparent: true,
             uniforms,
             glslVersion,
         });
-        scene.add(new THREE.Mesh(geometry, material));
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
 
         const now = Date.now() / 1000;
         const elem = {
@@ -295,6 +320,7 @@ export class VFXPlayer {
             width: rect.width,
             height: rect.height,
             scene,
+            mesh,
             uniforms,
             uniformGenerators,
             startTime: now,
@@ -309,6 +335,7 @@ export class VFXPlayer {
             intersection: intersectionOpts,
             originalOpacity,
             zIndex: opts.zIndex ?? 0,
+            backbuffer,
         };
 
         // Insert element and sort elements by z-index.
@@ -368,7 +395,7 @@ export class VFXPlayer {
         }
     }
 
-    #playLoop = (): void => {
+    render(): void {
         const now = Date.now() / 1000;
 
         this.#renderer.clear();
@@ -377,42 +404,14 @@ export class VFXPlayer {
         // window resize event while the address bar is transforming.
         this.#updateCanvasSize();
 
+        const viewportWidth = this.#viewport.right - this.#viewport.left;
+        const viewportHeight = this.#viewport.bottom - this.#viewport.top;
+
         for (const e of this.#elements) {
             const rect = e.element.getBoundingClientRect();
-            const rectHitTest = growRect(rect, e.overflow);
+            const hit = this.#hitTest(e, rect, now);
 
-            // Check intersection
-            const isInViewport =
-                e.isFullScreen || isRectInViewport(this.#viewport, rectHitTest);
-
-            const logicalViewport = growRect(
-                this.#viewport,
-                e.intersection.rootMargin,
-            );
-            const intersection = getIntersection(logicalViewport, rect);
-            const isInLogicalViewport =
-                e.isFullScreen ||
-                checkIntersection(
-                    logicalViewport,
-                    rect,
-                    intersection,
-                    e.intersection.threshold,
-                );
-
-            // Update transition timing
-            if (!e.isInLogicalViewport && isInLogicalViewport /* out -> in */) {
-                e.enterTime = now;
-                e.leaveTime = Number.POSITIVE_INFINITY;
-            }
-            if (e.isInLogicalViewport && !isInLogicalViewport /* in -> out */) {
-                e.leaveTime = now;
-            }
-
-            e.isInViewport = isInViewport;
-            e.isInLogicalViewport = isInLogicalViewport;
-
-            // Quit if the element has left and the transition has ended
-            if (!isInViewport || now - e.leaveTime > e.release) {
+            if (!hit.isVisible) {
                 continue;
             }
 
@@ -420,15 +419,11 @@ export class VFXPlayer {
             e.uniforms["time"].value = now - e.startTime;
             e.uniforms["enterTime"].value = now - e.enterTime;
             e.uniforms["leaveTime"].value = now - e.leaveTime;
-            e.uniforms["resolution"].value.x = rect.width * this.#pixelRatio; // TODO: use correct width, height
+            e.uniforms["resolution"].value.x = rect.width * this.#pixelRatio;
             e.uniforms["resolution"].value.y = rect.height * this.#pixelRatio;
-            e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
-            e.uniforms["offset"].value.y =
-                (window.innerHeight - rect.top - rect.height) *
-                this.#pixelRatio;
             e.uniforms["mouse"].value.x = this.#mouseX * this.#pixelRatio;
             e.uniforms["mouse"].value.y = this.#mouseY * this.#pixelRatio;
-            e.uniforms["intersection"].value = intersection;
+            e.uniforms["intersection"].value = hit.intersection;
 
             for (const [key, gen] of Object.entries(e.uniformGenerators)) {
                 e.uniforms[key].value = gen();
@@ -440,38 +435,162 @@ export class VFXPlayer {
                 e.uniforms["src"].value.needsUpdate = true;
             }
 
-            // Set viewport
-            if (e.isFullScreen) {
-                this.#renderer.setViewport(
-                    0,
-                    0,
-                    window.innerWidth,
-                    window.innerHeight,
-                );
-            } else {
-                this.#renderer.setViewport(
-                    rect.left - e.overflow.left,
-                    window.innerHeight -
-                        (rect.top + rect.height) -
-                        e.overflow.bottom,
-                    rect.width + (e.overflow.left + e.overflow.right),
-                    rect.height + (e.overflow.top + e.overflow.bottom),
-                );
-            }
+            if (e.backbuffer) {
+                // Update backbuffer
+                e.uniforms["backbuffer"].value = e.backbuffer.texture;
+                // Set viewport
+                if (e.isFullScreen) {
+                    // Resize backbuffer
+                    const bw = viewportWidth * this.#pixelRatio;
+                    const bh = viewportHeight * this.#pixelRatio;
+                    e.backbuffer.resize(bw, bh);
 
-            // Render to viewport
-            this.#camera.lookAt(e.scene.position);
-            try {
-                this.#renderer.render(e.scene, this.#camera);
-            } catch (e) {
-                console.error(e);
+                    // Render to backbuffer
+                    e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
+                    e.uniforms["offset"].value.y =
+                        (viewportHeight - rect.bottom) * this.#pixelRatio;
+                    this.#render(
+                        e.scene,
+                        e.backbuffer.target,
+                        [0, 0, viewportWidth, viewportHeight],
+                        e.uniforms,
+                    );
+                    e.backbuffer.swap();
+
+                    // Render to canvas
+                    this.#copyPass.setUniforms(
+                        e.backbuffer.texture,
+                        this.#pixelRatio,
+                        rectToXywh(this.#viewport, viewportHeight),
+                    );
+                    this.#render(
+                        this.#copyPass.scene,
+                        null,
+                        [0, 0, viewportWidth, viewportHeight],
+                        this.#copyPass.uniforms,
+                    );
+                } else {
+                    // Resize backbuffer
+                    const bw =
+                        (hit.rectWithOverflow.right -
+                            hit.rectWithOverflow.left) *
+                        this.#pixelRatio;
+                    const bh =
+                        (hit.rectWithOverflow.bottom -
+                            hit.rectWithOverflow.top) *
+                        this.#pixelRatio;
+                    e.backbuffer.resize(bw, bh);
+
+                    // Render to backbuffer
+                    e.uniforms["offset"].value.x =
+                        e.overflow.left * this.#pixelRatio;
+                    e.uniforms["offset"].value.y =
+                        e.overflow.bottom * this.#pixelRatio;
+                    this.#render(
+                        e.scene,
+                        e.backbuffer.target,
+                        [
+                            0,
+                            0,
+                            e.backbuffer.width / this.#pixelRatio, // must use logical coordinate
+                            e.backbuffer.height / this.#pixelRatio,
+                        ],
+                        e.uniforms,
+                    );
+                    e.backbuffer.swap();
+
+                    // Render to canvas
+                    const xywh = rectToXywh(
+                        hit.rectWithOverflow,
+                        viewportHeight,
+                    );
+                    this.#copyPass.setUniforms(
+                        e.backbuffer.texture,
+                        this.#pixelRatio,
+                        xywh,
+                    );
+                    this.#render(
+                        this.#copyPass.scene,
+                        null,
+                        [xywh.x, xywh.y, xywh.w, xywh.h],
+                        this.#copyPass.uniforms,
+                    );
+                }
+            } else {
+                e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
+                e.uniforms["offset"].value.y =
+                    (viewportHeight - rect.bottom) * this.#pixelRatio;
+
+                let viewport: [number, number, number, number] = [0, 0, 0, 0];
+                if (e.isFullScreen) {
+                    viewport = [0, 0, viewportWidth, viewportHeight];
+                } else {
+                    viewport = [
+                        hit.rectWithOverflow.left,
+                        viewportHeight - hit.rectWithOverflow.bottom,
+                        hit.rectWithOverflow.right - hit.rectWithOverflow.left,
+                        hit.rectWithOverflow.bottom - hit.rectWithOverflow.top,
+                    ];
+                }
+
+                // Render to canvas
+                this.#render(e.scene, null, viewport, e.uniforms);
             }
         }
+    }
 
+    #playLoop = (): void => {
         if (this.isPlaying()) {
+            this.render();
             this.#playRequest = requestAnimationFrame(this.#playLoop);
         }
     };
+
+    /**
+     * Check element intersection with the viewport.
+     */
+    #hitTest(
+        e: VFXElement,
+        rect: Rect,
+        now: number,
+    ): { rectWithOverflow: Rect; isVisible: boolean; intersection: number } {
+        const rectWithOverflow = growRect(rect, e.overflow);
+
+        const isInViewport =
+            e.isFullScreen ||
+            isRectInViewport(this.#viewport, rectWithOverflow);
+
+        const viewportPadded = growRect(
+            this.#viewport,
+            e.intersection.rootMargin,
+        );
+        const intersection = getIntersection(viewportPadded, rect);
+        const isInLogicalViewport =
+            e.isFullScreen ||
+            checkIntersection(
+                viewportPadded,
+                rect,
+                intersection,
+                e.intersection.threshold,
+            );
+
+        // Update transition timing
+        if (!e.isInLogicalViewport && isInLogicalViewport /* out -> in */) {
+            e.enterTime = now;
+            e.leaveTime = Number.POSITIVE_INFINITY;
+        }
+        if (e.isInLogicalViewport && !isInLogicalViewport /* in -> out */) {
+            e.leaveTime = now;
+        }
+
+        e.isInViewport = isInViewport;
+        e.isInLogicalViewport = isInLogicalViewport;
+
+        // Quit if the element has left and the transition has ended
+        const isVisible = isInViewport && now - e.leaveTime <= e.release;
+
+        return { isVisible, intersection, rectWithOverflow };
+    }
 
     #getShader(shaderNameOrCode: string): string {
         if (shaderNameOrCode in shaders) {
@@ -496,6 +615,36 @@ export class VFXPlayer {
         }
 
         throw `VFX-JS error: Cannot detect GLSL version of the shader.\n\nOriginal shader:\n${shader}`;
+    }
+
+    #render(
+        scene: THREE.Scene,
+        target: THREE.WebGLRenderTarget | null,
+        viewport: [number, number, number, number],
+        uniforms: { [key: string]: THREE.IUniform },
+    ) {
+        this.#renderer.setRenderTarget(target);
+        if (target !== null) {
+            this.#renderer.clear();
+        }
+
+        this.#renderer.setViewport(...viewport);
+
+        // Set viewport uniform if passed and exists
+        if (uniforms["viewport"]) {
+            uniforms["viewport"].value.set(
+                viewport[0] * this.#pixelRatio,
+                viewport[1] * this.#pixelRatio,
+                viewport[2] * this.#pixelRatio,
+                viewport[3] * this.#pixelRatio,
+            );
+        }
+
+        try {
+            this.#renderer.render(scene, this.#camera);
+        } catch (e) {
+            console.error(e);
+        }
     }
 }
 

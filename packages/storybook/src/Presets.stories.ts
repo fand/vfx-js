@@ -1,7 +1,8 @@
-import { VFX, type VFXProps, type shaders } from "@vfx-js/core";
+import type { VFXProps, shaders } from "@vfx-js/core";
 import type { Meta } from "@storybook/html";
 import { Timer } from "./Timer";
 
+import { initVFX } from "./utils";
 import Logo from "./assets/logo-640w-20p.svg";
 import Jellyfish from "./assets/jellyfish.webp";
 import "./preset.css";
@@ -24,7 +25,7 @@ export default {
         const img = document.createElement("img");
         img.src = opts.src ?? Logo;
 
-        const vfx = new VFX();
+        const vfx = initVFX();
         vfx.add(img, {
             shader: opts.preset,
             overflow: opts.overflow,

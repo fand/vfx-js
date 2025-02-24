@@ -6,6 +6,10 @@ import "prism-themes/themes/prism-nord.min.css";
 Prism.manual = true;
 Prism.highlightAll();
 
+function $(selector: string, parent?: HTMLElement) {
+    return (parent ?? document).querySelector(selector) as HTMLElement;
+}
+
 function lerp(a: number, b: number, t: number) {
     return a * (1 - t) + b * t;
 }
@@ -142,7 +146,6 @@ const shaders: Record<string, string> = {
         vec2 d = (uv - .5) * vec2(resolution.x / resolution.y, 1);
         float l = length(d);
 
-
         // Colorize
         img.rgb = mix(img.rgb, vec3(.8, .4, .4), sin(gray * 3. - time));
 
@@ -205,7 +208,7 @@ class App {
     });
 
     initBG() {
-        const bg = document.getElementById("BG")!;
+        const bg = $("#BG");
 
         let scroll = 0;
         function lerp(a: number, b: number, t: number): number {
@@ -222,11 +225,11 @@ class App {
     }
 
     initVFX() {
-        const bg = document.getElementById("BG")!;
+        const bg = $("#BG");
         this.vfx.add(bg, { shader: shaders.blob });
 
         for (const e of document.querySelectorAll("*[data-shader]")) {
-            const shader = e.getAttribute("data-shader")!;
+            const shader = e.getAttribute("data-shader") as string;
 
             const uniformsJSON = e.getAttribute("data-uniforms");
             const uniforms = uniformsJSON
@@ -235,10 +238,12 @@ class App {
 
             this.vfx.add(e as HTMLImageElement, {
                 shader,
-                overflow: parseFloat(e.getAttribute("data-overflow") ?? "0"),
+                overflow: Number.parseFloat(
+                    e.getAttribute("data-overflow") ?? "0",
+                ),
                 uniforms,
                 intersection: {
-                    threshold: parseFloat(
+                    threshold: Number.parseFloat(
                         e.getAttribute("data-threshold") ?? "0",
                     ),
                 },
@@ -247,14 +252,14 @@ class App {
     }
 
     initDiv() {
-        const div = document.getElementById("div")!;
+        const div = $("#div");
         this.vfx.add(div, { shader: "rgbShift", overflow: 100 });
 
         for (const input of div.querySelectorAll("input,textarea")) {
             input.addEventListener("input", () => this.vfx.update(div));
         }
 
-        const textarea = div.querySelector("textarea")!;
+        const textarea = $("textarea", div);
         const mo = new MutationObserver(() => this.vfx.update(div));
         mo.observe(textarea, {
             attributes: true,
@@ -263,7 +268,11 @@ class App {
 
     initCanvas() {
         const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-        const ctx = canvas.getContext("2d")!;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+            throw "Failed to get the canvas context";
+        }
+
         const { width, height } = canvas.getBoundingClientRect();
         const ratio = window.devicePixelRatio ?? 1;
         canvas.width = width * ratio;
@@ -341,7 +350,7 @@ class App {
     }
 
     initCustomShader() {
-        const e = document.getElementById("custom")!;
+        const e = $("#custom");
         this.vfx.add(e, {
             shader: shaders.custom,
             uniforms: { scroll: () => window.scrollY / window.innerHeight },
@@ -349,15 +358,15 @@ class App {
     }
 
     hideMask() {
-        const maskTop = document.getElementById("MaskTop")!;
+        const maskTop = $("#MaskTop");
         maskTop.style.setProperty("height", "0");
 
-        const maskBottom = document.getElementById("MaskBottom")!;
+        const maskBottom = $("#MaskBottom");
         maskBottom.style.setProperty("opacity", "0");
     }
 
     showLogo() {
-        const logo = document.getElementById("Logo")!;
+        const logo = $("#Logo");
         this.vfx.add(logo, {
             shader: shaders.logo,
             overflow: [0, 3000, 0, 100],
@@ -366,8 +375,7 @@ class App {
                 threshold: 1,
             },
         });
-
-        const tagline = document.getElementById("LogoTagline")!;
+        const tagline = $("#LogoTagline");
         this.vfx.add(tagline, {
             shader: shaders.logo,
             overflow: [0, 3000, 0, 1000],
@@ -379,7 +387,7 @@ class App {
     }
 
     showProfile() {
-        const profile = document.getElementById("profile")!;
+        const profile = $("#profile");
         this.vfx.add(profile, {
             shader: shaders.logo,
             overflow: [0, 2000, 0, 2000],

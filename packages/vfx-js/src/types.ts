@@ -1,4 +1,5 @@
 import type * as THREE from "three";
+import type { Backbuffer } from "./backbuffer.js";
 import type { ShaderPreset } from "./constants.js";
 import type { Rect, RectOpts } from "./rect.js";
 
@@ -26,6 +27,14 @@ export type VFXOpts = {
      * This is useful if you want to place the canvas behind other DOM element, or vice versa.
      */
     zIndex?: number;
+
+    /**
+     * Whether VFX-JS should start playing animations automatically (Default: `true`).
+     *
+     * If false, you have to call `VFX.play()` manually to start animation,
+     * or render frames only when it's necessary by calling `VFX.render()`.
+     */
+    autoplay?: boolean;
 };
 
 /**
@@ -152,6 +161,11 @@ export type VFXProps = {
      * If you want to use GLSL 100 (≒ WebGL 1) shader, pass `"100"` to this property.
      */
     glslVersion?: "100" | "300 es";
+
+    /**
+     * Whether the shader uses the backbuffer or not.
+     */
+    backbuffer?: boolean;
 };
 
 /**
@@ -193,6 +207,7 @@ export type VFXElement = {
     width: number;
     height: number;
     scene: THREE.Scene;
+    mesh: THREE.Mesh;
     uniforms: { [name: string]: THREE.IUniform };
     uniformGenerators: { [name: string]: () => VFXUniformValue };
     startTime: number;
@@ -205,6 +220,7 @@ export type VFXElement = {
     intersection: VFXElementIntersection;
     originalOpacity: number;
     zIndex: number;
+    backbuffer?: Backbuffer;
 };
 
 export type VFXElementIntersection = {

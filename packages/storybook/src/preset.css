@@ -48,3 +48,10 @@ img {
     left: 50px;
     top: 100px;
 }
+
+
+.backbufferWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 100px;
+}

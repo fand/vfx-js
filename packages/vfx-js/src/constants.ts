@@ -3,8 +3,27 @@
  */
 export const DEFAULT_VERTEX_SHADER = `
 precision highp float;
+in vec3 position;
 void main() {
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_Position = vec4(position, 1.0);
+}
+`;
+
+/**
+ * @internal
+ */
+export const COPY_FRAGMENT_SHADER = `
+precision highp float;
+uniform vec2 offset;
+uniform vec2 resolution;
+uniform sampler2D src;
+out vec4 outColor;
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) {
+        discard;
+    }
+    outColor = texture(src, uv);
 }
 `;
 
