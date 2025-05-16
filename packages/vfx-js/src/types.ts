@@ -35,7 +35,44 @@ export type VFXOpts = {
      * or render frames only when it's necessary by calling `VFX.render()`.
      */
     autoplay?: boolean;
+
+    /**
+     * Option to control the dynamic scroll technique to reduce scroll jank (Default: `0.1`).
+     *
+     * If a number is given, VFX-JS will use the number as the padding ratio.
+     * For example, if 0.2 is given, VFX-JS will add 20% of padding to the canvas.
+     * (= the canvas height will be 140% of the window height)
+     *
+     * If you prefer not using the scroll jank technique, specify `false`.
+     */
+    scrollPadding?: number | false;
 };
+
+export type VFXOptsInner = {
+    pixelRatio: number;
+    zIndex: number | undefined;
+    autoplay: boolean;
+    fixedCanvas: boolean;
+    scrollPadding: number;
+};
+
+/**
+ * Parse VFXOpts and fill in the default values.
+ * @internal
+ */
+export function getVFXOpts(opts: VFXOpts): VFXOptsInner {
+    const defaultPixelRatio =
+        typeof window !== "undefined" ? window.devicePixelRatio : 1;
+
+    return {
+        pixelRatio: opts.pixelRatio ?? defaultPixelRatio,
+        zIndex: opts.zIndex ?? undefined,
+        autoplay: opts.autoplay ?? true,
+        fixedCanvas: opts.scrollPadding === false,
+        scrollPadding:
+            opts.scrollPadding === false ? 0 : (opts.scrollPadding ?? 0.1),
+    };
+}
 
 /**
  * Properties for the element passed to `VFX.add()`.
