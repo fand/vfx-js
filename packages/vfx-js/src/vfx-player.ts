@@ -83,23 +83,39 @@ export class VFXPlayer {
     }
 
     #updateCanvasSize(): void {
-        if (typeof window !== "undefined") {
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-
-            if (w !== this.#width() || h !== this.#height()) {
-                this.#canvas.width = w;
-                this.#canvas.height = h;
-                this.#renderer.setSize(w, h);
-                this.#renderer.setPixelRatio(this.#pixelRatio);
-                this.#viewport = {
-                    top: 0,
-                    left: 0,
-                    right: w,
-                    bottom: h,
-                };
-            }
+        if (typeof window === "undefined") {
+            return;
         }
+
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const scroll = window.scrollY;
+
+        // Clamp padding so that the canvas doesn't cause overflow
+        const maxPadding =
+            document.documentElement.scrollHeight - (scroll + height);
+        const padding = Math.min(height * 0.25, maxPadding);
+
+        const heightWithPadding = height + padding * 2;
+
+        if (width !== this.#width() || heightWithPadding !== this.#height()) {
+            this.#canvas.width = width;
+            this.#canvas.height = heightWithPadding;
+            this.#renderer.setSize(width, heightWithPadding);
+            this.#renderer.setPixelRatio(this.#pixelRatio);
+            this.#viewport = {
+                top: -padding,
+                left: 0,
+                right: width,
+                bottom: height,
+            };
+        }
+
+        // Sync scroll
+        this.#canvas.style.setProperty(
+            "transform",
+            `translate(0, ${scroll - padding}px)`,
+        );
     }
 
     #width(): number {

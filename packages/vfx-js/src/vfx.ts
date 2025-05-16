@@ -2,7 +2,7 @@ import type { VFXOpts, VFXProps } from "./types.js";
 import { VFXPlayer } from "./vfx-player.js";
 
 const canvasStyle = {
-    position: "fixed",
+    position: "absolute",
     top: 0,
     left: 0,
     width: "100vw",
