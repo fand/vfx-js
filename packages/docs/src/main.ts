@@ -207,7 +207,7 @@ class App {
         zIndex: -1,
     });
 
-    initBG() {
+    async initBG() {
         const bg = $("#BG");
 
         let scroll = 0;
@@ -222,38 +222,39 @@ class App {
             requestAnimationFrame(loop);
         }
         loop();
+
+        await this.vfx.add(bg, { shader: shaders.blob });
     }
 
-    initVFX() {
-        const bg = $("#BG");
-        this.vfx.add(bg, { shader: shaders.blob });
+    async initVFX() {
+        await Promise.all(
+            Array.from(document.querySelectorAll("*[data-shader]")).map((e) => {
+                const shader = e.getAttribute("data-shader") as string;
 
-        for (const e of document.querySelectorAll("*[data-shader]")) {
-            const shader = e.getAttribute("data-shader") as string;
+                const uniformsJSON = e.getAttribute("data-uniforms");
+                const uniforms = uniformsJSON
+                    ? JSON.parse(uniformsJSON)
+                    : undefined;
 
-            const uniformsJSON = e.getAttribute("data-uniforms");
-            const uniforms = uniformsJSON
-                ? JSON.parse(uniformsJSON)
-                : undefined;
-
-            this.vfx.add(e as HTMLImageElement, {
-                shader,
-                overflow: Number.parseFloat(
-                    e.getAttribute("data-overflow") ?? "0",
-                ),
-                uniforms,
-                intersection: {
-                    threshold: Number.parseFloat(
-                        e.getAttribute("data-threshold") ?? "0",
+                return this.vfx.add(e as HTMLImageElement, {
+                    shader,
+                    overflow: Number.parseFloat(
+                        e.getAttribute("data-overflow") ?? "0",
                     ),
-                },
-            });
-        }
+                    uniforms,
+                    intersection: {
+                        threshold: Number.parseFloat(
+                            e.getAttribute("data-threshold") ?? "0",
+                        ),
+                    },
+                });
+            }),
+        );
     }
 
-    initDiv() {
+    async initDiv() {
         const div = $("#div");
-        this.vfx.add(div, { shader: "rgbShift", overflow: 100 });
+        await this.vfx.add(div, { shader: "rgbShift", overflow: 100 });
 
         for (const input of div.querySelectorAll("input,textarea")) {
             input.addEventListener("input", () => this.vfx.update(div));
@@ -266,7 +267,7 @@ class App {
         });
     }
 
-    initCanvas() {
+    async initCanvas() {
         const canvas = document.getElementById("canvas") as HTMLCanvasElement;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
@@ -346,12 +347,12 @@ class App {
         };
         drawMouseStalker();
 
-        this.vfx.add(canvas, { shader: shaders.canvas });
+        await this.vfx.add(canvas, { shader: shaders.canvas });
     }
 
-    initCustomShader() {
+    async initCustomShader() {
         const e = $("#custom");
-        this.vfx.add(e, {
+        await this.vfx.add(e, {
             shader: shaders.custom,
             uniforms: { scroll: () => window.scrollY / window.innerHeight },
         });
@@ -365,30 +366,32 @@ class App {
         maskBottom.style.setProperty("opacity", "0");
     }
 
-    showLogo() {
+    async showLogo() {
         const logo = $("#Logo");
-        this.vfx.add(logo, {
-            shader: shaders.logo,
-            overflow: [0, 3000, 0, 100],
-            uniforms: { delay: 0 },
-            intersection: {
-                threshold: 1,
-            },
-        });
         const tagline = $("#LogoTagline");
-        this.vfx.add(tagline, {
-            shader: shaders.logo,
-            overflow: [0, 3000, 0, 1000],
-            uniforms: { delay: 0.3 },
-            intersection: {
-                threshold: 1,
-            },
-        });
+        return Promise.all([
+            this.vfx.add(logo, {
+                shader: shaders.logo,
+                overflow: [0, 3000, 0, 100],
+                uniforms: { delay: 0 },
+                intersection: {
+                    threshold: 1,
+                },
+            }),
+            this.vfx.add(tagline, {
+                shader: shaders.logo,
+                overflow: [0, 3000, 0, 1000],
+                uniforms: { delay: 0.3 },
+                intersection: {
+                    threshold: 1,
+                },
+            }),
+        ]);
     }
 
-    showProfile() {
+    async showProfile() {
         const profile = $("#profile");
-        this.vfx.add(profile, {
+        await this.vfx.add(profile, {
             shader: shaders.logo,
             overflow: [0, 2000, 0, 2000],
             uniforms: { delay: 0.5 },
@@ -400,13 +403,17 @@ class App {
     }
 }
 
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
     const app = new App();
-    app.initBG();
-    app.initVFX();
-    app.initDiv();
-    app.initCanvas();
-    app.initCustomShader();
+    await app.initBG();
+
+    await Promise.all([
+        await app.initVFX(),
+        app.initDiv(),
+        app.initCanvas(),
+        app.initCustomShader(),
+    ]);
+
     app.hideMask();
     setTimeout(() => {
         app.showLogo();
