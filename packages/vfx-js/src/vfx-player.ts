@@ -15,6 +15,7 @@ import type {
     VFXElement,
     VFXElementIntersection,
     VFXElementType,
+    VFXOptsInner,
     VFXProps,
     VFXUniformValue,
     VFXWrap,
@@ -27,6 +28,8 @@ const gifFor = new Map<HTMLElement, GIFData>();
  * @internal
  */
 export class VFXPlayer {
+    #opts: VFXOptsInner;
+
     #canvas: HTMLCanvasElement;
     #renderer: THREE.WebGLRenderer;
     #camera: THREE.Camera;
@@ -50,7 +53,9 @@ export class VFXPlayer {
 
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
-    constructor(canvas: HTMLCanvasElement, pixelRatio?: number) {
+    constructor(opts: VFXOptsInner, canvas: HTMLCanvasElement) {
+        this.#opts = opts;
+
         this.#canvas = canvas;
         this.#renderer = new THREE.WebGLRenderer({
             canvas,
@@ -58,10 +63,9 @@ export class VFXPlayer {
         });
         this.#renderer.autoClear = false;
         this.#renderer.setClearAlpha(0);
+        this.#pixelRatio = opts.pixelRatio;
 
         if (typeof window !== "undefined") {
-            this.#pixelRatio = pixelRatio || window.devicePixelRatio;
-
             window.addEventListener("resize", this.#resize);
             window.addEventListener("mousemove", this.#mousemove);
         }
@@ -83,22 +87,46 @@ export class VFXPlayer {
     }
 
     #updateCanvasSize(): void {
-        if (typeof window !== "undefined") {
-            const w = window.innerWidth;
-            const h = window.innerHeight;
+        if (typeof window === "undefined") {
+            return;
+        }
 
-            if (w !== this.#width() || h !== this.#height()) {
-                this.#canvas.width = w;
-                this.#canvas.height = h;
-                this.#renderer.setSize(w, h);
-                this.#renderer.setPixelRatio(this.#pixelRatio);
-                this.#viewport = {
-                    top: 0,
-                    left: 0,
-                    right: w,
-                    bottom: h,
-                };
-            }
+        const width =
+            this.#canvas.parentElement?.clientWidth ?? window.innerWidth; // consider scrollbar width
+        const height = window.innerHeight;
+        const scroll = window.scrollY;
+
+        let padding: number;
+        if (this.#opts.fixedCanvas) {
+            padding = 0;
+        } else {
+            // Clamp padding so that the canvas doesn't cause overflow
+            const maxPadding =
+                document.documentElement.scrollHeight - (scroll + height);
+            padding = Math.min(height * this.#opts.scrollPadding, maxPadding);
+        }
+
+        const heightWithPadding = height + padding * 2;
+
+        if (width !== this.#width() || heightWithPadding !== this.#height()) {
+            this.#canvas.width = width;
+            this.#canvas.height = heightWithPadding;
+            this.#renderer.setSize(width, heightWithPadding);
+            this.#renderer.setPixelRatio(this.#pixelRatio);
+            this.#viewport = {
+                top: -padding,
+                left: 0,
+                right: width,
+                bottom: height,
+            };
+        }
+
+        // Sync scroll
+        if (!this.#opts.fixedCanvas) {
+            this.#canvas.style.setProperty(
+                "transform",
+                `translate(0, ${scroll - padding}px)`,
+            );
         }
     }
 

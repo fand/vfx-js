@@ -1,15 +1,17 @@
-import type { VFXOpts, VFXProps } from "./types.js";
+import { type VFXOpts, type VFXProps, getVFXOpts } from "./types.js";
 import { VFXPlayer } from "./vfx-player.js";
 
-const canvasStyle = {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "100vw",
-    height: "100vh",
-    "z-index": 9999,
-    "pointer-events": "none",
-};
+function getCanvasStyle(fixed: boolean) {
+    return {
+        position: fixed ? "fixed" : "absolute",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        "z-index": 9999,
+        "pointer-events": "none",
+    };
+}
 
 /**
  * The main interface of VFX-JS.
@@ -21,8 +23,12 @@ export class VFX {
     /**
      * Creates VFX instance and start playing immediately.
      */
-    constructor(opts: VFXOpts = {}) {
+    constructor(options: VFXOpts = {}) {
+        const opts = getVFXOpts(options);
+
+        // Setup canvas
         const canvas = document.createElement("canvas");
+        const canvasStyle = getCanvasStyle(opts.fixedCanvas);
         for (const [k, v] of Object.entries(canvasStyle)) {
             canvas.style.setProperty(k, v.toString());
         }
@@ -32,9 +38,9 @@ export class VFX {
         document.body.appendChild(canvas);
         this.#canvas = canvas;
 
-        this.#player = new VFXPlayer(canvas, opts.pixelRatio);
+        this.#player = new VFXPlayer(opts, canvas);
 
-        if (opts.autoplay !== false) {
+        if (opts.autoplay) {
             this.#player.play();
         }
     }
