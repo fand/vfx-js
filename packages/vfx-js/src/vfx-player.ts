@@ -91,7 +91,8 @@ export class VFXPlayer {
             return;
         }
 
-        const width = window.innerWidth;
+        const width =
+            this.#canvas.parentElement?.clientWidth ?? window.innerWidth; // consider scrollbar width
         const height = window.innerHeight;
         const scroll = window.scrollY;
 
