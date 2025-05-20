@@ -14,7 +14,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vfx-js/core": "*",
+    "@vfx-js/core": "0.6.0",
     "@vfx-js/storybook": "0.0.8",
     "dedent": "^1.5.3",
     "is-mobile": "^5.0.0",
