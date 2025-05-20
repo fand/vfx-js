@@ -1,6 +1,6 @@
 import type { VFXProps } from "@vfx-js/core";
 import type * as React from "react";
-import { useContext, useEffect, useRef } from "react";
+import { useContext, useEffect, useState } from "react";
 import { VFXContext } from "./context.js";
 
 export type VFXImgProps = React.JSX.IntrinsicElements["img"] & VFXProps;
@@ -9,14 +9,13 @@ export const VFXImg: React.FC<VFXImgProps> = (props) => {
     const { shader, release, uniforms, overflow, wrap, ...rawProps } = props;
 
     const vfx = useContext(VFXContext);
-    const ref = useRef<HTMLImageElement>(null);
+    const [element, setElement] = useState<HTMLImageElement | null>(null);
 
     // Create scene
     useEffect(() => {
-        if (!vfx || !ref.current) {
+        if (!vfx || !element) {
             return;
         }
-        const element = ref.current;
 
         vfx.add(element, {
             shader,
@@ -29,8 +28,8 @@ export const VFXImg: React.FC<VFXImgProps> = (props) => {
         return () => {
             vfx.remove(element);
         };
-    }, [vfx, shader, release, uniforms, overflow, wrap]);
+    }, [element, vfx, shader, release, uniforms, overflow, wrap]);
 
     // biome-ignore lint/a11y/useAltText: alt should be in rawProps
-    return <img ref={ref} {...rawProps} />;
+    return <img ref={setElement} {...rawProps} />;
 };

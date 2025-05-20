@@ -1,6 +1,6 @@
 import type { VFXProps } from "@vfx-js/core";
 import * as React from "react";
-import { useContext, useEffect, useRef } from "react";
+import { useContext, useEffect, useState } from "react";
 import { VFXContext } from "./context.js";
 
 type VFXElementProps<T extends keyof React.JSX.IntrinsicElements> =
@@ -17,9 +17,9 @@ export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
     ) {
         const vfx = useContext(VFXContext);
 
-        const elementRef = useRef<HTMLElement>(undefined);
+        const [element, setElement] = useState<HTMLElement | null>(null);
         const ref = (e: HTMLElement): void => {
-            elementRef.current = e;
+            setElement(e);
             if (parentRef instanceof Function) {
                 parentRef(e);
             } else if (parentRef) {
@@ -32,10 +32,9 @@ export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
 
         // Create scene
         useEffect(() => {
-            if (!vfx || !elementRef.current) {
+            if (!vfx || !element) {
                 return;
             }
-            const element = elementRef.current;
 
             vfx.add(element, {
                 shader,
@@ -45,11 +44,7 @@ export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
                 wrap,
             });
 
-            const mo = new MutationObserver(() => {
-                if (elementRef.current) {
-                    vfx?.update(elementRef.current);
-                }
-            });
+            const mo = new MutationObserver(() => vfx.update(element));
             mo.observe(element, {
                 characterData: true,
                 attributes: true,
@@ -60,7 +55,7 @@ export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
                 mo.disconnect();
                 vfx.remove(element);
             };
-        }, [vfx, shader, release, uniforms, overflow, wrap]);
+        }, [element, vfx, shader, release, uniforms, overflow, wrap]);
 
         return React.createElement(type, { ...rawProps, ref });
     });
