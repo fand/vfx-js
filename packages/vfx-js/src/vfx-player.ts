@@ -47,6 +47,7 @@ export class VFXPlayer {
         top: 0,
         bottom: 0,
     };
+    #canvasSize = [0, 0];
 
     #mouseX = 0;
     #mouseY = 0;
@@ -108,7 +109,10 @@ export class VFXPlayer {
 
         const heightWithPadding = height + padding * 2;
 
-        if (width !== this.#width() || heightWithPadding !== this.#height()) {
+        if (
+            width !== this.#canvasSize[0] ||
+            heightWithPadding !== this.#canvasSize[1]
+        ) {
             this.#canvas.width = width;
             this.#canvas.height = heightWithPadding;
             this.#renderer.setSize(width, heightWithPadding);
@@ -117,8 +121,9 @@ export class VFXPlayer {
                 top: -padding,
                 left: 0,
                 right: width,
-                bottom: height + padding,
+                bottom: height,
             };
+            this.#canvasSize = [width, heightWithPadding];
         }
 
         // Sync scroll
@@ -128,14 +133,6 @@ export class VFXPlayer {
                 `translate(0, ${scroll - padding}px)`,
             );
         }
-    }
-
-    #width(): number {
-        return this.#viewport.right - this.#viewport.left;
-    }
-
-    #height(): number {
-        return this.#viewport.bottom - this.#viewport.top;
     }
 
     #resize = async (): Promise<void> => {
