@@ -1,0 +1,14 @@
+{
+  "mode": "pre",
+  "tag": "next",
+  "initialVersions": {
+    "docs": "0.0.8",
+    "docs-react-vfx": "0.0.0",
+    "react-vfx": "0.11.0",
+    "@vfx-js/storybook": "0.0.8",
+    "@vfx-js/core": "0.6.0"
+  },
+  "changesets": [
+    "odd-tomatoes-brush"
+  ]
+}

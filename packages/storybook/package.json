@@ -1,7 +1,7 @@
 {
   "name": "@vfx-js/storybook",
   "private": true,
-  "version": "0.0.8",
+  "version": "0.0.9-next.0",
   "type": "module",
   "scripts": {
     "dev": "storybook dev -p 6006 --no-open",
@@ -9,7 +9,7 @@
     "build-storybook": "storybook build -o docs-build"
   },
   "dependencies": {
-    "@vfx-js/core": "0.6.0"
+    "@vfx-js/core": "0.6.1-next.0"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^3.2.4",

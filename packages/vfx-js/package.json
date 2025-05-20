@@ -1,7 +1,7 @@
 {
   "name": "@vfx-js/core",
   "description": "Easy WebGL effects for HTML elements",
-  "version": "0.6.0",
+  "version": "0.6.1-next.0",
   "files": [
     "package.json",
     "README.md",
