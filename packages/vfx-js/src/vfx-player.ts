@@ -117,7 +117,7 @@ export class VFXPlayer {
                 top: -padding,
                 left: 0,
                 right: width,
-                bottom: height,
+                bottom: height + padding,
             };
         }
 
