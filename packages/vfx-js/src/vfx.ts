@@ -1,6 +1,15 @@
 import { type VFXOpts, type VFXProps, getVFXOpts } from "./types.js";
 import { VFXPlayer } from "./vfx-player.js";
 
+function checkEnvironment() {
+    if (typeof window === "undefined") {
+        throw "Cannot find 'window'. VFX-JS only runs on the browser.";
+    }
+    if (typeof document === "undefined") {
+        throw "Cannot find 'document'. VFX-JS only runs on the browser.";
+    }
+}
+
 function getCanvasStyle(fixed: boolean) {
     return {
         position: fixed ? "fixed" : "absolute",
@@ -24,6 +33,7 @@ export class VFX {
      * Creates VFX instance and start playing immediately.
      */
     constructor(options: VFXOpts = {}) {
+        checkEnvironment();
         const opts = getVFXOpts(options);
 
         // Setup canvas
