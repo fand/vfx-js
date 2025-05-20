@@ -56,9 +56,9 @@ void main (void) {
         uvb.x += noise(uv.y, t + 20.) * amp;
     }
 
-    vec4 cr = texture2D(src, uvr);
-    vec4 cg = texture2D(src, uvg);
-    vec4 cb = texture2D(src, uvb);
+    vec4 cr = texture(src, uvr);
+    vec4 cg = texture(src, uvg);
+    vec4 cb = texture(src, uvb);
 
     outColor = vec4(
         cr.r,

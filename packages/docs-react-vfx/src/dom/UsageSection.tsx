@@ -6,6 +6,7 @@ import dedent from "dedent";
 import { Code, InlineCode } from "./Code";
 
 const blink = `
+precision highp float;
 uniform vec2 resolution; // Resolution of the element
 uniform vec2 offset;     // Position of the element in the screen
 uniform float time;      // Time passed since mount
@@ -16,11 +17,12 @@ void main() {
     // Get UV in the element
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-    outColor = texture2D(src, uv) * step(.5, fract(time));
+    outColor = texture(src, uv) * step(.5, fract(time));
 }
 `;
 
 const fadeIn = `
+precision highp float;
 uniform vec2 resolution;
 uniform vec2 offset;
 uniform float time;
@@ -30,7 +32,7 @@ out vec4 outColor;
 
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    outColor = texture2D(src, uv);
+    outColor = texture(src, uv);
 
     // Fade alpha by enterTime
     outColor.a *= smoothstep(0.0, 3.0, enterTime);
@@ -38,6 +40,7 @@ void main() {
 `;
 
 const scrollByScroll = `
+precision highp float;
 uniform vec2 resolution;
 uniform vec2 offset;
 uniform float scroll; // custom uniform passed as React props
@@ -53,7 +56,7 @@ void main() {
     // prevent vertical overflow
     if (uv.y < 0. || uv.y > 1.) discard;
 
-    outColor = texture2D(src, uv);
+    outColor = texture(src, uv);
 }
 `;
 
@@ -193,7 +196,7 @@ const UsageSection: React.FC = () => (
             // Get UV in the element
             vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-            outColor = texture2D(src, uv) * step(.5, fract(time));
+            outColor = texture(src, uv) * step(.5, fract(time));
         }
         \`;
 
@@ -232,7 +235,7 @@ const UsageSection: React.FC = () => (
 
             void main() {
                 vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                outColor = texture2D(src, uv);
+                outColor = texture(src, uv);
 
                 // Fade alpha by enterTime
                 outColor.a *= smoothstep(0.0, 3.0, enterTime);
@@ -300,7 +303,7 @@ const UsageSection: React.FC = () => (
                 // prevent vertical overflow
                 if (uv.y < 0. || uv.y > 1.) discard;
 
-                outColor = texture2D(src, uv);
+                outColor = texture(src, uv);
             }
             \`;
 
