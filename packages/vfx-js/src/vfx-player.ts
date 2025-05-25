@@ -92,9 +92,9 @@ export class VFXPlayer {
             return;
         }
 
-        const width =
-            this.#canvas.parentElement?.clientWidth ?? window.innerWidth; // consider scrollbar width
-        const height = window.innerHeight;
+        const wrapper = this.#canvas.parentElement as HTMLElement;
+        const width = wrapper.clientWidth; // consider scrollbar width
+        const height = wrapper.clientHeight; // consider scrollbar width
         const scroll = window.scrollY;
 
         let padding: number;
@@ -102,8 +102,7 @@ export class VFXPlayer {
             padding = 0;
         } else {
             // Clamp padding so that the canvas doesn't cause overflow
-            const maxPadding =
-                document.documentElement.scrollHeight - (scroll + height);
+            const maxPadding = wrapper.scrollHeight - (scroll + height);
             padding = Math.min(height * this.#opts.scrollPadding, maxPadding);
         }
 
