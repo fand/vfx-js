@@ -52,7 +52,7 @@ export const longPageWithImageHorizontal: StoryObj = {
         // Place the image somewhere in the middle
         const img = document.createElement("img");
         img.src = Logo;
-        img.style.minWidth = "3000px";
+        // img.style.minWidth = "3000px";
 
         img.style.margin = "900px auto 0 auto";
 
@@ -62,12 +62,17 @@ export const longPageWithImageHorizontal: StoryObj = {
         const timer = new Timer(1.0, [0, 10]);
         container.appendChild(timer.element);
 
-        const vfx = initVFX();
+        const vfx = initVFX({ pixelRatio: 1 });
         vfx.add(img, {
             shader: "sinewave",
             uniforms: { time: () => timer.time },
+            // backbuffer: true,
+            // overflow: true,
+            overflow: 0,
         }).then(() => {
-            img.style.opacity = "0.4";
+            setTimeout(() => {
+                img.style.opacity = "0.4";
+            }, 100);
         });
 
         return container;
