@@ -49,6 +49,7 @@ export class VFXPlayer {
     };
     #canvasSize = [0, 0];
     #paddingX = 0;
+    #paddingY = 0;
 
     #mouseX = 0;
     #mouseY = 0;
@@ -133,6 +134,7 @@ export class VFXPlayer {
             };
             this.#canvasSize = [widthWithPadding, heightWithPadding];
             this.#paddingX = paddingX;
+            this.#paddingY = paddingY;
         }
 
         // Sync scroll
