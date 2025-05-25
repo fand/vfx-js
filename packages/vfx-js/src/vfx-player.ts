@@ -48,6 +48,7 @@ export class VFXPlayer {
         bottom: 0,
     };
     #canvasSize = [0, 0];
+    #paddingX = 0;
 
     #mouseX = 0;
     #mouseY = 0;
@@ -95,41 +96,50 @@ export class VFXPlayer {
         const wrapper = this.#canvas.parentElement as HTMLElement;
         const width = wrapper.clientWidth; // consider scrollbar width
         const height = wrapper.clientHeight; // consider scrollbar width
-        const scroll = window.scrollY;
 
-        let padding: number;
+        const scrollX = window.scrollX;
+        const scrollY = window.scrollY;
+
+        let paddingX: number;
+        let paddingY: number;
         if (this.#opts.fixedCanvas) {
-            padding = 0;
+            paddingY = 0;
+            paddingX = 0;
         } else {
             // Clamp padding so that the canvas doesn't cause overflow
-            const maxPadding = wrapper.scrollHeight - (scroll + height);
-            padding = Math.min(height * this.#opts.scrollPadding, maxPadding);
+            const maxPaddingX = wrapper.scrollWidth - (scrollX + width);
+            const maxPaddingY = wrapper.scrollHeight - (scrollY + height);
+
+            paddingX = Math.min(width * this.#opts.scrollPadding, maxPaddingX);
+            paddingY = Math.min(height * this.#opts.scrollPadding, maxPaddingY);
         }
 
-        const heightWithPadding = height + padding * 2;
+        const widthWithPadding = width + paddingX * 2;
+        const heightWithPadding = height + paddingY * 2;
 
         if (
-            width !== this.#canvasSize[0] ||
+            widthWithPadding !== this.#canvasSize[0] ||
             heightWithPadding !== this.#canvasSize[1]
         ) {
-            this.#canvas.width = width;
+            this.#canvas.width = widthWithPadding;
             this.#canvas.height = heightWithPadding;
-            this.#renderer.setSize(width, heightWithPadding);
+            this.#renderer.setSize(widthWithPadding, heightWithPadding);
             this.#renderer.setPixelRatio(this.#pixelRatio);
             this.#viewport = {
-                top: -padding,
-                left: 0,
+                top: -paddingY,
+                left: -paddingX,
                 right: width,
                 bottom: height,
             };
-            this.#canvasSize = [width, heightWithPadding];
+            this.#canvasSize = [widthWithPadding, heightWithPadding];
+            this.#paddingX = paddingX;
         }
 
         // Sync scroll
         if (!this.#opts.fixedCanvas) {
             this.#canvas.style.setProperty(
                 "transform",
-                `translate(0, ${scroll - padding}px)`,
+                `translate(${scrollX - paddingX}px, ${scrollY - paddingY}px)`,
             );
         }
     }
@@ -528,6 +538,7 @@ export class VFXPlayer {
                         hit.rectWithOverflow,
                         viewportHeight,
                     );
+                    xywh.x += this.#paddingX;
                     this.#copyPass.setUniforms(
                         e.backbuffer.texture,
                         this.#pixelRatio,
@@ -536,12 +547,14 @@ export class VFXPlayer {
                     this.#render(
                         this.#copyPass.scene,
                         null,
+                        // [xywh.x, xywh.y, xywh.w, xywh.h],
                         [xywh.x, xywh.y, xywh.w, xywh.h],
                         this.#copyPass.uniforms,
                     );
                 }
             } else {
-                e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
+                e.uniforms["offset"].value.x =
+                    (rect.left + this.#paddingX) * this.#pixelRatio;
                 e.uniforms["offset"].value.y =
                     (viewportHeight - rect.bottom) * this.#pixelRatio;
 
