@@ -129,8 +129,8 @@ export class VFXPlayer {
             this.#viewport = {
                 top: -paddingY,
                 left: -paddingX,
-                right: width,
-                bottom: height,
+                right: widthWithPadding,
+                bottom: heightWithPadding,
             };
             this.#canvasSize = [widthWithPadding, heightWithPadding];
             this.#paddingX = paddingX;
@@ -482,9 +482,12 @@ export class VFXPlayer {
                     e.backbuffer.resize(bw, bh);
 
                     // Render to backbuffer
-                    e.uniforms["offset"].value.x = rect.left * this.#pixelRatio;
+                    e.uniforms["offset"].value.x =
+                        (rect.left + this.#paddingX) * this.#pixelRatio;
                     e.uniforms["offset"].value.y =
-                        (viewportHeight - rect.bottom) * this.#pixelRatio;
+                        (viewportHeight - rect.bottom - this.#paddingY * 2) *
+                        this.#pixelRatio;
+
                     this.#render(
                         e.scene,
                         e.backbuffer.target,
@@ -494,10 +497,16 @@ export class VFXPlayer {
                     e.backbuffer.swap();
 
                     // Render to canvas
+                    const xywh = {
+                        x: 0,
+                        y: 0,
+                        w: viewportWidth,
+                        h: viewportHeight,
+                    };
                     this.#copyPass.setUniforms(
                         e.backbuffer.texture,
                         this.#pixelRatio,
-                        rectToXywh(this.#viewport, viewportHeight),
+                        xywh,
                     );
                     this.#render(
                         this.#copyPass.scene,
@@ -538,7 +547,7 @@ export class VFXPlayer {
                     // Render to canvas
                     const xywh = rectToXywh(
                         hit.rectWithOverflow,
-                        viewportHeight,
+                        viewportHeight - this.#paddingY * 2,
                     );
                     xywh.x += this.#paddingX;
                     this.#copyPass.setUniforms(
@@ -549,7 +558,6 @@ export class VFXPlayer {
                     this.#render(
                         this.#copyPass.scene,
                         null,
-                        // [xywh.x, xywh.y, xywh.w, xywh.h],
                         [xywh.x, xywh.y, xywh.w, xywh.h],
                         this.#copyPass.uniforms,
                     );
@@ -558,7 +566,8 @@ export class VFXPlayer {
                 e.uniforms["offset"].value.x =
                     (rect.left + this.#paddingX) * this.#pixelRatio;
                 e.uniforms["offset"].value.y =
-                    (viewportHeight - rect.bottom) * this.#pixelRatio;
+                    (viewportHeight - rect.bottom - this.#paddingY * 2) *
+                    this.#pixelRatio;
 
                 let viewport: [number, number, number, number] = [0, 0, 0, 0];
                 if (e.isFullScreen) {
@@ -566,7 +575,9 @@ export class VFXPlayer {
                 } else {
                     viewport = [
                         hit.rectWithOverflow.left,
-                        viewportHeight - hit.rectWithOverflow.bottom,
+                        viewportHeight -
+                            hit.rectWithOverflow.bottom -
+                            this.#paddingY * 2,
                         hit.rectWithOverflow.right - hit.rectWithOverflow.left,
                         hit.rectWithOverflow.bottom - hit.rectWithOverflow.top,
                     ];
