@@ -7,14 +7,19 @@ import * as THREE from "three";
 export class Backbuffer {
     #width: number;
     #height: number;
+    #pixelRatio: number;
     #buffers: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
 
-    constructor(width: number, height: number) {
+    constructor(width: number, height: number, pixelRatio: number) {
         this.#width = width;
         this.#height = height;
+        this.#pixelRatio = pixelRatio;
+
+        const pwidth = width * pixelRatio; // use physical size
+        const pheight = height * pixelRatio;
         this.#buffers = [
-            new THREE.WebGLRenderTarget(width, height),
-            new THREE.WebGLRenderTarget(width, height),
+            new THREE.WebGLRenderTarget(pwidth, pheight),
+            new THREE.WebGLRenderTarget(pwidth, pheight),
         ];
     }
 
@@ -26,27 +31,23 @@ export class Backbuffer {
         return this.#buffers[1];
     }
 
-    get width(): number {
-        return this.#width;
-    }
-
-    get height(): number {
-        return this.#height;
-    }
-
     /**
      * Resize textuers if necessary.
-     * @param width - physical width of the backbuffer
-     * @param height - physical height of the backbuffer
+     * @param width - logical width of the backbuffer
+     * @param height - logical height of the backbuffer
      */
-    resize(width_: number, height_: number, pixelRatio: number) {
-        const width = width_ * pixelRatio;
-        const height = height_ * pixelRatio;
+    resize(width: number, height: number) {
         if (width !== this.#width || height !== this.#height) {
             this.#width = width;
             this.#height = height;
-            this.#buffers[0].setSize(width, height);
-            this.#buffers[1].setSize(width, height);
+            this.#buffers[0].setSize(
+                width * this.#pixelRatio,
+                height * this.#pixelRatio,
+            );
+            this.#buffers[1].setSize(
+                width * this.#pixelRatio,
+                height * this.#pixelRatio,
+            );
         }
     }
 
@@ -56,5 +57,9 @@ export class Backbuffer {
      */
     swap() {
         this.#buffers = [this.#buffers[1], this.#buffers[0]];
+    }
+
+    getViewport(): [number, number, number, number] {
+        return [0, 0, this.#width, this.#height];
     }
 }
