@@ -487,12 +487,11 @@ export class VFXPlayer {
                     );
 
                     // Render to backbuffer
-                    e.uniforms["offset"].value.x =
-                        (rect.left + this.#paddingX) * this.#pixelRatio;
-                    e.uniforms["offset"].value.y =
-                        (viewportHeight - rect.bottom - this.#paddingY * 2) *
-                        this.#pixelRatio;
-
+                    this.#setOffset(
+                        e,
+                        rect.left + this.#paddingX,
+                        viewportHeight - rect.bottom - this.#paddingY * 2,
+                    );
                     this.#render(
                         e.scene,
                         e.backbuffer.target,
@@ -527,10 +526,7 @@ export class VFXPlayer {
                     );
 
                     // Render to backbuffer
-                    e.uniforms["offset"].value.x =
-                        e.overflow.left * this.#pixelRatio;
-                    e.uniforms["offset"].value.y =
-                        e.overflow.bottom * this.#pixelRatio;
+                    this.#setOffset(e, e.overflow.left, e.overflow.bottom);
                     this.#render(
                         e.scene,
                         e.backbuffer.target,
@@ -563,11 +559,11 @@ export class VFXPlayer {
                     );
                 }
             } else {
-                e.uniforms["offset"].value.x =
-                    (rect.left + this.#paddingX) * this.#pixelRatio;
-                e.uniforms["offset"].value.y =
-                    (viewportHeight - rect.bottom - this.#paddingY * 2) *
-                    this.#pixelRatio;
+                this.#setOffset(
+                    e,
+                    rect.left + this.#paddingX,
+                    viewportHeight - rect.bottom - this.#paddingY * 2,
+                );
 
                 let viewport: [number, number, number, number] = [0, 0, 0, 0];
                 if (e.isFullScreen) {
@@ -695,6 +691,15 @@ export class VFXPlayer {
         } catch (e) {
             console.error(e);
         }
+    }
+
+    /**
+     * Set uniforms["offset"] of the given element.
+     * XY must be the values from the bottom-left of the render target.
+     */
+    #setOffset(e: VFXElement, x: number, y: number) {
+        e.uniforms["offset"].value.x = x * this.#pixelRatio;
+        e.uniforms["offset"].value.y = y * this.#pixelRatio;
     }
 }
 
