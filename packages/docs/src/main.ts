@@ -206,6 +206,11 @@ class App {
         pixelRatio: window.devicePixelRatio,
         zIndex: -1,
     });
+    vfx2 = new VFX({
+        pixelRatio: 1,
+        zIndex: -2,
+        scrollPadding: false,
+    });
 
     async initBG() {
         const bg = $("#BG");
@@ -223,7 +228,7 @@ class App {
         }
         loop();
 
-        await this.vfx.add(bg, { shader: shaders.blob });
+        await this.vfx2.add(bg, { shader: shaders.blob });
     }
 
     async initVFX() {
