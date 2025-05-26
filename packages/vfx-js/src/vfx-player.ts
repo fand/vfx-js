@@ -4,6 +4,7 @@ import { DEFAULT_VERTEX_SHADER, shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
+import { rectToGLRect } from "./gl-rect.js";
 import {
     RECT_ZERO,
     type Rect,
@@ -20,7 +21,6 @@ import type {
     VFXUniformValue,
     VFXWrap,
 } from "./types";
-import { rectToXywh } from "./xywh.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -497,7 +497,7 @@ export class VFXPlayer {
                     e.backbuffer.swap();
 
                     // Render to canvas
-                    const xywh = {
+                    const glRect = {
                         x: 0,
                         y: 0,
                         w: viewportWidth,
@@ -506,7 +506,7 @@ export class VFXPlayer {
                     this.#copyPass.setUniforms(
                         e.backbuffer.texture,
                         this.#pixelRatio,
-                        xywh,
+                        glRect,
                     );
                     this.#render(
                         this.#copyPass.scene,
@@ -531,20 +531,20 @@ export class VFXPlayer {
                     e.backbuffer.swap();
 
                     // Render to canvas
-                    const xywh = rectToXywh(
+                    const glRect = rectToGLRect(
                         hit.rectWithOverflow,
                         viewportHeight - this.#paddingY * 2,
                     );
-                    xywh.x += this.#paddingX;
+                    glRect.x += this.#paddingX;
                     this.#copyPass.setUniforms(
                         e.backbuffer.texture,
                         this.#pixelRatio,
-                        xywh,
+                        glRect,
                     );
                     this.#render(
                         this.#copyPass.scene,
                         null,
-                        [xywh.x, xywh.y, xywh.w, xywh.h],
+                        [glRect.x, glRect.y, glRect.w, glRect.h],
                         this.#copyPass.uniforms,
                     );
                 }

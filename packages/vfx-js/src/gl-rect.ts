@@ -4,7 +4,7 @@ import type { Rect } from "./rect.js";
  * Layout of a rect in screen-space (bottom-left origin) that can be directly used in GLSL.
  * @internal
  */
-export type XYWH = {
+export type GLRect = {
     x: number;
     y: number;
     w: number;
@@ -12,10 +12,10 @@ export type XYWH = {
 };
 
 /**
- * Convert a Rect (top-left origin) to XYWH (bottom-left origin).
+ * Convert a Rect (top-left origin) to GLRect (bottom-left origin).
  * @internal
  */
-export function rectToXywh(rect: Rect, containerHeight: number): XYWH {
+export function rectToGLRect(rect: Rect, containerHeight: number): GLRect {
     return {
         x: rect.left,
         y: containerHeight - rect.bottom,
