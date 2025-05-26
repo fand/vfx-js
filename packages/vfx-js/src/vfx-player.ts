@@ -239,23 +239,6 @@ export class VFXPlayer {
         const rectWithOverflow = growRect(rect, overflow);
 
         const intersectionOpts = parseIntersectionOpts(opts.intersection);
-        const isInViewport =
-            isFullScreen ||
-            isRectInViewport(this.#viewportInner, rectWithOverflow);
-
-        const viewportWithMargin = growRect(
-            this.#viewportInner,
-            intersectionOpts.rootMargin,
-        );
-        const intersection = getIntersection(this.#viewportInner, rect);
-        const isInLogicalViewport =
-            isFullScreen ||
-            checkIntersection(
-                viewportWithMargin,
-                rect,
-                intersection,
-                intersectionOpts.threshold,
-            );
 
         const originalOpacity =
             element.style.opacity === ""
@@ -317,7 +300,7 @@ export class VFXPlayer {
             enterTime: { value: -1.0 },
             leaveTime: { value: -1.0 },
             mouse: { value: new THREE.Vector2() },
-            intersection: { value: intersection },
+            intersection: { value: 0.0 },
             viewport: { value: new THREE.Vector4() },
         };
 
@@ -371,8 +354,8 @@ export class VFXPlayer {
         const elem = {
             type,
             element,
-            isInViewport,
-            isInLogicalViewport,
+            isInViewport: false,
+            isInLogicalViewport: false,
             width: rect.width,
             height: rect.height,
             scene,
@@ -380,10 +363,8 @@ export class VFXPlayer {
             uniforms,
             uniformGenerators,
             startTime: now,
-            enterTime: isInLogicalViewport ? now : Number.NEGATIVE_INFINITY,
-            leaveTime: isInLogicalViewport
-                ? Number.POSITIVE_INFINITY
-                : Number.NEGATIVE_INFINITY,
+            enterTime: now,
+            leaveTime: Number.NEGATIVE_INFINITY,
             release: opts.release ?? Number.POSITIVE_INFINITY,
             isGif,
             isFullScreen,
@@ -393,6 +374,8 @@ export class VFXPlayer {
             zIndex: opts.zIndex ?? 0,
             backbuffer,
         };
+
+        this.#hitTest(elem, rect, now);
 
         // Insert element and sort elements by z-index.
         // Array.prototype.sort is stable sort, so the elements with same z
@@ -474,13 +457,10 @@ export class VFXPlayer {
 
             // Update uniforms
             e.uniforms["time"].value = now - e.startTime;
-            e.uniforms["enterTime"].value = now - e.enterTime;
-            e.uniforms["leaveTime"].value = now - e.leaveTime;
             e.uniforms["resolution"].value.x = rect.width * this.#pixelRatio;
             e.uniforms["resolution"].value.y = rect.height * this.#pixelRatio;
             e.uniforms["mouse"].value.x = this.#mouseX * this.#pixelRatio;
             e.uniforms["mouse"].value.y = this.#mouseY * this.#pixelRatio;
-            e.uniforms["intersection"].value = hit.intersection;
 
             for (const [key, gen] of Object.entries(e.uniformGenerators)) {
                 e.uniforms[key].value = gen();
@@ -633,6 +613,12 @@ export class VFXPlayer {
 
         // Quit if the element has left and the transition has ended
         const isVisible = isInViewport && now - e.leaveTime <= e.release;
+
+        if (isVisible) {
+            e.uniforms["intersection"].value = intersection;
+            e.uniforms["enterTime"].value = now - e.enterTime;
+            e.uniforms["leaveTime"].value = now - e.leaveTime;
+        }
 
         return { isVisible, intersection, rectWithOverflow };
     }
