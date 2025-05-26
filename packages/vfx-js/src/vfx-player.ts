@@ -6,11 +6,14 @@ import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import {
-    RECT_ZERO,
+    MARGIN_ZERO,
+    type Margin,
     type Rect,
+    createMargin,
     createRect,
     getIntersection,
     growRect,
+    toRect,
 } from "./rect.js";
 import type {
     VFXElement,
@@ -41,20 +44,10 @@ export class VFXPlayer {
 
     #textureLoader = new THREE.TextureLoader();
 
-    #viewport: Rect = {
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
-    };
+    #viewport: Rect = createRect(0);
 
     /** Actual viewport without padding */
-    #viewportInner: Rect = {
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
-    };
+    #viewportInner: Rect = createRect(0);
 
     #canvasSize = [0, 0];
     #paddingX = 0;
@@ -139,18 +132,18 @@ export class VFXPlayer {
             this.#canvas.height = heightWithPadding;
             this.#renderer.setSize(widthWithPadding, heightWithPadding);
             this.#renderer.setPixelRatio(this.#pixelRatio);
-            this.#viewport = {
+            this.#viewport = createRect({
                 top: -paddingY,
                 left: -paddingX,
                 right: widthWithPadding,
                 bottom: heightWithPadding,
-            };
-            this.#viewportInner = {
+            });
+            this.#viewportInner = createRect({
                 top: 0,
                 left: 0,
                 right: width,
                 bottom: height,
-            };
+            });
             this.#canvasSize = [widthWithPadding, heightWithPadding];
             this.#paddingX = paddingX;
             this.#paddingY = paddingY;
@@ -234,7 +227,8 @@ export class VFXPlayer {
         const shader = this.#getShader(opts.shader || "uvGradient");
         const glslVersion = this.#getGLSLVersion(opts.glslVersion, shader);
 
-        const rect = element.getBoundingClientRect();
+        const domRect = element.getBoundingClientRect();
+        const rect = toRect(domRect);
         const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
         const rectWithOverflow = growRect(rect, overflow);
 
@@ -356,8 +350,8 @@ export class VFXPlayer {
             element,
             isInViewport: false,
             isInLogicalViewport: false,
-            width: rect.width,
-            height: rect.height,
+            width: domRect.width,
+            height: domRect.height,
             scene,
             mesh,
             uniforms,
@@ -448,7 +442,8 @@ export class VFXPlayer {
         const viewportGlRect = getGLRect(0, 0, viewportWidth, viewportHeight);
 
         for (const e of this.#elements) {
-            const rect = e.element.getBoundingClientRect();
+            const domRect = e.element.getBoundingClientRect();
+            const rect = toRect(domRect);
             const hit = this.#hitTest(e, rect, now);
 
             if (!hit.isVisible) {
@@ -457,8 +452,9 @@ export class VFXPlayer {
 
             // Update uniforms
             e.uniforms["time"].value = now - e.startTime;
-            e.uniforms["resolution"].value.x = rect.width * this.#pixelRatio;
-            e.uniforms["resolution"].value.y = rect.height * this.#pixelRatio;
+            e.uniforms["resolution"].value.x = domRect.width * this.#pixelRatio;
+            e.uniforms["resolution"].value.y =
+                domRect.height * this.#pixelRatio;
             e.uniforms["mouse"].value.x = this.#mouseX * this.#pixelRatio;
             e.uniforms["mouse"].value.y = this.#mouseY * this.#pixelRatio;
 
@@ -717,21 +713,21 @@ export function checkIntersection(
 
 export function parseOverflowOpts(
     overflow: VFXProps["overflow"],
-): [isFullScreen: boolean, Rect] {
+): [isFullScreen: boolean, Margin] {
     if (overflow === true) {
-        return [true, RECT_ZERO];
+        return [true, MARGIN_ZERO];
     }
     if (overflow === undefined) {
-        return [false, RECT_ZERO];
+        return [false, MARGIN_ZERO];
     }
-    return [false, createRect(overflow)];
+    return [false, createMargin(overflow)];
 }
 
 export function parseIntersectionOpts(
     intersectionOpts: VFXProps["intersection"],
 ): VFXElementIntersection {
     const threshold = intersectionOpts?.threshold ?? 0;
-    const rootMargin = createRect(intersectionOpts?.rootMargin ?? 0);
+    const rootMargin = createMargin(intersectionOpts?.rootMargin ?? 0);
     return {
         threshold,
         rootMargin,

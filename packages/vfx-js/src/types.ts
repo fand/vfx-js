@@ -1,7 +1,7 @@
 import type * as THREE from "three";
 import type { Backbuffer } from "./backbuffer.js";
 import type { ShaderPreset } from "./constants.js";
-import type { Rect, RectOpts } from "./rect.js";
+import type { Margin, MarginOpts } from "./rect.js";
 
 /**
  * Options to initialize `VFX` class.
@@ -155,7 +155,7 @@ export type VFXProps = {
         threshold?: number;
 
         /** Margin of the viewport to be used in intersection calculcation. */
-        rootMargin?: RectOpts;
+        rootMargin?: MarginOpts;
     };
 
     /**
@@ -172,7 +172,7 @@ export type VFXProps = {
      * If you pass an object like `<VFXImg overflow={{ top: 100 }} />`,
      * REACT-VFX will add paddings only to the given direction (only to the `top` in this example).
      */
-    overflow?: true | RectOpts;
+    overflow?: true | MarginOpts;
 
     /**
      * Texture wrapping mode. (Default: `"repeat"`)
@@ -253,7 +253,7 @@ export type VFXElement = {
     release: number;
     isGif: boolean;
     isFullScreen: boolean;
-    overflow: Rect;
+    overflow: Margin;
     intersection: VFXElementIntersection;
     originalOpacity: number;
     zIndex: number;
@@ -262,5 +262,5 @@ export type VFXElement = {
 
 export type VFXElementIntersection = {
     threshold: number;
-    rootMargin: Rect;
+    rootMargin: Margin;
 };
