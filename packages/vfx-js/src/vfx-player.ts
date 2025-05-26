@@ -480,10 +480,11 @@ export class VFXPlayer {
                 e.uniforms["backbuffer"].value = e.backbuffer.texture;
                 // Set viewport
                 if (e.isFullScreen) {
-                    // Resize backbuffer
-                    const bw = viewportWidth * this.#pixelRatio;
-                    const bh = viewportHeight * this.#pixelRatio;
-                    e.backbuffer.resize(bw, bh);
+                    e.backbuffer.resize(
+                        viewportWidth,
+                        viewportHeight,
+                        this.#pixelRatio,
+                    );
 
                     // Render to backbuffer
                     e.uniforms["offset"].value.x =
@@ -519,16 +520,11 @@ export class VFXPlayer {
                         this.#copyPass.uniforms,
                     );
                 } else {
-                    // Resize backbuffer
-                    const bw =
-                        (hit.rectWithOverflow.right -
-                            hit.rectWithOverflow.left) *
-                        this.#pixelRatio;
-                    const bh =
-                        (hit.rectWithOverflow.bottom -
-                            hit.rectWithOverflow.top) *
-                        this.#pixelRatio;
-                    e.backbuffer.resize(bw, bh);
+                    e.backbuffer.resize(
+                        hit.rectWithOverflow.right - hit.rectWithOverflow.left,
+                        hit.rectWithOverflow.bottom - hit.rectWithOverflow.top,
+                        this.#pixelRatio,
+                    );
 
                     // Render to backbuffer
                     e.uniforms["offset"].value.x =

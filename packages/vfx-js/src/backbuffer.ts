@@ -39,7 +39,9 @@ export class Backbuffer {
      * @param width - physical width of the backbuffer
      * @param height - physical height of the backbuffer
      */
-    resize(width: number, height: number) {
+    resize(width_: number, height_: number, pixelRatio: number) {
+        const width = width_ * pixelRatio;
+        const height = height_ * pixelRatio;
         if (width !== this.#width || height !== this.#height) {
             this.#width = width;
             this.#height = height;
