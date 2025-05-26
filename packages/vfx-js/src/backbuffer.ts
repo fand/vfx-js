@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { type GLRect, getGLRect } from "./gl-rect";
 
 /**
  * A class to manage initialization and double-buffring of the backbuffer.
@@ -59,7 +60,7 @@ export class Backbuffer {
         this.#buffers = [this.#buffers[1], this.#buffers[0]];
     }
 
-    getViewport(): [number, number, number, number] {
-        return [0, 0, this.#width, this.#height];
+    getViewport(): GLRect {
+        return getGLRect(0, 0, this.#width, this.#height);
     }
 }

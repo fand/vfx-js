@@ -4,7 +4,7 @@ import { DEFAULT_VERTEX_SHADER, shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
-import { rectToGLRect } from "./gl-rect.js";
+import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import {
     RECT_ZERO,
     type Rect,
@@ -47,6 +47,15 @@ export class VFXPlayer {
         top: 0,
         bottom: 0,
     };
+
+    /** Actual viewport without padding */
+    #viewportInner: Rect = {
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+    };
+
     #canvasSize = [0, 0];
     #paddingX = 0;
     #paddingY = 0;
@@ -135,6 +144,12 @@ export class VFXPlayer {
                 left: -paddingX,
                 right: widthWithPadding,
                 bottom: heightWithPadding,
+            };
+            this.#viewportInner = {
+                top: 0,
+                left: 0,
+                right: width,
+                bottom: height,
             };
             this.#canvasSize = [widthWithPadding, heightWithPadding];
             this.#paddingX = paddingX;
@@ -446,6 +461,7 @@ export class VFXPlayer {
 
         const viewportWidth = this.#viewport.right - this.#viewport.left;
         const viewportHeight = this.#viewport.bottom - this.#viewport.top;
+        const viewportGlRect = getGLRect(0, 0, viewportWidth, viewportHeight);
 
         for (const e of this.#elements) {
             const rect = e.element.getBoundingClientRect();
@@ -478,7 +494,7 @@ export class VFXPlayer {
             if (e.backbuffer) {
                 // Update backbuffer
                 e.uniforms["backbuffer"].value = e.backbuffer.texture;
-                // Set viewport
+
                 if (e.isFullScreen) {
                     e.backbuffer.resize(viewportWidth, viewportHeight);
 
@@ -491,34 +507,31 @@ export class VFXPlayer {
                     this.#render(
                         e.scene,
                         e.backbuffer.target,
-                        [0, 0, viewportWidth, viewportHeight],
+                        viewportGlRect,
                         e.uniforms,
                     );
                     e.backbuffer.swap();
 
                     // Render to canvas
-                    const glRect = {
-                        x: 0,
-                        y: 0,
-                        w: viewportWidth,
-                        h: viewportHeight,
-                    };
                     this.#copyPass.setUniforms(
                         e.backbuffer.texture,
                         this.#pixelRatio,
-                        glRect,
+                        viewportGlRect,
                     );
                     this.#render(
                         this.#copyPass.scene,
                         null,
-                        [0, 0, viewportWidth, viewportHeight],
+                        viewportGlRect,
                         this.#copyPass.uniforms,
                     );
                 } else {
-                    e.backbuffer.resize(
-                        hit.rectWithOverflow.right - hit.rectWithOverflow.left,
-                        hit.rectWithOverflow.bottom - hit.rectWithOverflow.top,
+                    const glRect = rectToGLRect(
+                        hit.rectWithOverflow,
+                        viewportHeight - this.#paddingY * 2,
                     );
+                    glRect.x += this.#paddingX;
+
+                    e.backbuffer.resize(glRect.w, glRect.h);
 
                     // Render to backbuffer
                     this.#setOffset(e, e.overflow.left, e.overflow.bottom);
@@ -531,11 +544,6 @@ export class VFXPlayer {
                     e.backbuffer.swap();
 
                     // Render to canvas
-                    const glRect = rectToGLRect(
-                        hit.rectWithOverflow,
-                        viewportHeight - this.#paddingY * 2,
-                    );
-                    glRect.x += this.#paddingX;
                     this.#copyPass.setUniforms(
                         e.backbuffer.texture,
                         this.#pixelRatio,
@@ -544,7 +552,7 @@ export class VFXPlayer {
                     this.#render(
                         this.#copyPass.scene,
                         null,
-                        [glRect.x, glRect.y, glRect.w, glRect.h],
+                        glRect,
                         this.#copyPass.uniforms,
                     );
                 }
@@ -555,18 +563,18 @@ export class VFXPlayer {
                     viewportHeight - rect.bottom - this.#paddingY * 2,
                 );
 
-                let viewport: [number, number, number, number] = [0, 0, 0, 0];
+                let viewport: GLRect;
                 if (e.isFullScreen) {
-                    viewport = [0, 0, viewportWidth, viewportHeight];
+                    viewport = viewportGlRect;
                 } else {
-                    viewport = [
+                    viewport = getGLRect(
                         hit.rectWithOverflow.left,
                         viewportHeight -
                             hit.rectWithOverflow.bottom -
                             this.#paddingY * 2,
                         hit.rectWithOverflow.right - hit.rectWithOverflow.left,
                         hit.rectWithOverflow.bottom - hit.rectWithOverflow.top,
-                    ];
+                    );
                 }
 
                 // Render to canvas
@@ -594,17 +602,17 @@ export class VFXPlayer {
 
         const isInViewport =
             e.isFullScreen ||
-            isRectInViewport(this.#viewport, rectWithOverflow);
+            isRectInViewport(this.#viewportInner, rectWithOverflow);
 
-        const viewportPadded = growRect(
-            this.#viewport,
+        const viewportWithMargin = growRect(
+            this.#viewportInner,
             e.intersection.rootMargin,
         );
-        const intersection = getIntersection(viewportPadded, rect);
+        const intersection = getIntersection(viewportWithMargin, rect);
         const isInLogicalViewport =
             e.isFullScreen ||
             checkIntersection(
-                viewportPadded,
+                viewportWithMargin,
                 rect,
                 intersection,
                 e.intersection.threshold,
@@ -656,7 +664,7 @@ export class VFXPlayer {
     #render(
         scene: THREE.Scene,
         target: THREE.WebGLRenderTarget | null,
-        viewport: [number, number, number, number],
+        rect: GLRect,
         uniforms: { [key: string]: THREE.IUniform },
     ) {
         this.#renderer.setRenderTarget(target);
@@ -664,15 +672,15 @@ export class VFXPlayer {
             this.#renderer.clear();
         }
 
-        this.#renderer.setViewport(...viewport);
+        this.#renderer.setViewport(rect.x, rect.y, rect.w, rect.h);
 
         // Set viewport uniform if passed and exists
         if (uniforms["viewport"]) {
             uniforms["viewport"].value.set(
-                viewport[0] * this.#pixelRatio,
-                viewport[1] * this.#pixelRatio,
-                viewport[2] * this.#pixelRatio,
-                viewport[3] * this.#pixelRatio,
+                rect.x * this.#pixelRatio,
+                rect.y * this.#pixelRatio,
+                rect.w * this.#pixelRatio,
+                rect.h * this.#pixelRatio,
             );
         }
 

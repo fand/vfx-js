@@ -23,3 +23,10 @@ export function rectToGLRect(rect: Rect, containerHeight: number): GLRect {
         h: rect.bottom - rect.top,
     };
 }
+
+/**
+ * @internal
+ */
+export function getGLRect(x: number, y: number, w: number, h: number): GLRect {
+    return { x, y, w, h };
+}
