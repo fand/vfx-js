@@ -94,9 +94,13 @@ export class VFXPlayer {
             return;
         }
 
+        // Get the window size without scroll bar
         const wrapper = this.#canvas.parentElement as HTMLElement;
-        const width = wrapper.clientWidth; // consider scrollbar width
-        const height = wrapper.clientHeight; // consider scrollbar width
+        const ownerWindow = wrapper.ownerDocument.defaultView?.window ?? window;
+        const scrollBarWidth = wrapper.offsetWidth - wrapper.clientWidth;
+        const scrollBarHeight = wrapper.offsetHeight - wrapper.clientHeight;
+        const width = ownerWindow.innerWidth - scrollBarWidth;
+        const height = ownerWindow.innerHeight - scrollBarHeight;
 
         const scrollX = window.scrollX;
         const scrollY = window.scrollY;
