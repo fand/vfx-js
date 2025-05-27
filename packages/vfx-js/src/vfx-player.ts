@@ -506,7 +506,7 @@ export class VFXPlayer {
                         hit.rectWithOverflow,
                         viewportHeight - this.#paddingY * 2,
                     );
-                    glRect.x += this.#paddingX;
+                    glRect.x += this.#paddingX; // TODO!!!!
 
                     e.backbuffer.resize(glRect.w, glRect.h);
 
@@ -544,8 +544,9 @@ export class VFXPlayer {
                 if (e.isFullScreen) {
                     viewport = viewportGlRect;
                 } else {
+                    //
                     viewport = getGLRect(
-                        hit.rectWithOverflow.left,
+                        hit.rectWithOverflow.left + this.#paddingX,
                         viewportHeight -
                             hit.rectWithOverflow.bottom -
                             this.#paddingY * 2,
