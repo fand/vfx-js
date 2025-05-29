@@ -511,7 +511,11 @@ export class VFXPlayer {
                     e.backbuffer.resize(glRect.w, glRect.h);
 
                     // Render to backbuffer
-                    this.#setOffset(e, e.overflow.left, e.overflow.bottom);
+                    this.#setOffset(
+                        e,
+                        e.overflow.left,
+                        glRect.h - e.overflow.bottom,
+                    );
                     this.#render(
                         e.scene,
                         e.backbuffer.target,
