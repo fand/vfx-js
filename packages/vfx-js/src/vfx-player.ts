@@ -504,10 +504,10 @@ export class VFXPlayer {
                 } else {
                     const glRect = rectToGLRect(
                         hit.rectWithOverflow,
-                        viewportHeight - this.#paddingY * 2,
+                        viewportHeight,
+                        this.#paddingX,
+                        this.#paddingY,
                     );
-                    glRect.x += this.#paddingX; // TODO!!!!
-
                     e.backbuffer.resize(glRect.w, glRect.h);
 
                     // Render to backbuffer
@@ -544,14 +544,11 @@ export class VFXPlayer {
                 if (e.isFullScreen) {
                     viewport = viewportGlRect;
                 } else {
-                    //
-                    viewport = getGLRect(
-                        hit.rectWithOverflow.left + this.#paddingX,
-                        viewportHeight -
-                            hit.rectWithOverflow.bottom -
-                            this.#paddingY * 2,
-                        hit.rectWithOverflow.right - hit.rectWithOverflow.left,
-                        hit.rectWithOverflow.bottom - hit.rectWithOverflow.top,
+                    viewport = rectToGLRect(
+                        hit.rectWithOverflow,
+                        viewportHeight,
+                        this.#paddingX,
+                        this.#paddingY,
                     );
                 }
 

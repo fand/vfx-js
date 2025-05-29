@@ -15,10 +15,15 @@ export type GLRect = {
  * Convert a Rect (top-left origin) to GLRect (bottom-left origin).
  * @internal
  */
-export function rectToGLRect(rect: Rect, containerHeight: number): GLRect {
+export function rectToGLRect(
+    rect: Rect,
+    containerHeight: number,
+    paddingX: number,
+    paddingY: number,
+): GLRect {
     return {
-        x: rect.left,
-        y: containerHeight - rect.bottom,
+        x: rect.left + paddingX,
+        y: containerHeight - paddingY * 2 - rect.bottom,
         w: rect.right - rect.left,
         h: rect.bottom - rect.top,
     };
