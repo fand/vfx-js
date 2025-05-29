@@ -117,8 +117,8 @@ export class VFXPlayer {
             const maxPaddingX = wrapper.scrollWidth - (scrollX + width);
             const maxPaddingY = wrapper.scrollHeight - (scrollY + height);
 
-            paddingX = Math.min(width * this.#opts.scrollPadding, maxPaddingX);
-            paddingY = Math.min(height * this.#opts.scrollPadding, maxPaddingY);
+            paddingX = clamp(width * this.#opts.scrollPadding, 0, maxPaddingX);
+            paddingY = clamp(height * this.#opts.scrollPadding, 0, maxPaddingY);
         }
 
         const widthWithPadding = width + paddingX * 2;
@@ -755,4 +755,8 @@ function parseWrap(
         const w = parseWrapSingle(wrapOpt);
         return [w, w];
     }
+}
+
+function clamp(x: number, xmin: number, xmax: number): number {
+    return Math.max(xmin, Math.min(xmax, x));
 }
