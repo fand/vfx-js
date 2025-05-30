@@ -91,6 +91,24 @@ export class VFXPlayer {
         }
     }
 
+    #scrollBarSize: number | undefined;
+
+    #getScrollBarSize(): number {
+        if (this.#scrollBarSize === undefined) {
+            const div = document.createElement("div");
+            div.style.visibility = "hidden";
+            div.style.overflow = "scroll"; // Force scrollbar
+            div.style.position = "absolute";
+
+            document.body.appendChild(div);
+            const scrollbarSize = div.offsetWidth - div.clientWidth;
+            document.body.removeChild(div);
+
+            this.#scrollBarSize = scrollbarSize;
+        }
+        return this.#scrollBarSize;
+    }
+
     #updateCanvasSize(): void {
         if (typeof window === "undefined") {
             return;
@@ -98,9 +116,17 @@ export class VFXPlayer {
 
         // Get the window size without scroll bar
         const wrapper = this.#canvas.parentElement as HTMLElement;
+        const wrapperParent = wrapper.parentElement as HTMLElement;
+
         const ownerWindow = wrapper.ownerDocument.defaultView?.window ?? window;
-        const scrollBarWidth = wrapper.offsetWidth - wrapper.clientWidth;
-        const scrollBarHeight = wrapper.offsetHeight - wrapper.clientHeight;
+        const scrollBarWidth =
+            wrapperParent.scrollHeight > wrapperParent.clientHeight
+                ? this.#getScrollBarSize()
+                : 0;
+        const scrollBarHeight =
+            wrapperParent.scrollWidth > wrapperParent.clientWidth
+                ? this.#getScrollBarSize()
+                : 0;
         const width = ownerWindow.innerWidth - scrollBarWidth;
         const height = ownerWindow.innerHeight - scrollBarHeight;
 
