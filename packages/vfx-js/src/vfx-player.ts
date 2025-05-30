@@ -468,6 +468,19 @@ export class VFXPlayer {
                 e.uniforms["src"].value.needsUpdate = true;
             }
 
+            const glRect = rectToGLRect(
+                rect,
+                viewportHeight,
+                this.#paddingX,
+                this.#paddingY,
+            );
+            const glRectWithOverflow = rectToGLRect(
+                hit.rectWithOverflow,
+                viewportHeight,
+                this.#paddingX,
+                this.#paddingY,
+            );
+
             if (e.backbuffer) {
                 // Update backbuffer
                 e.uniforms["backbuffer"].value = e.backbuffer.texture;
@@ -476,11 +489,7 @@ export class VFXPlayer {
                     e.backbuffer.resize(viewportWidth, viewportHeight);
 
                     // Render to backbuffer
-                    this.#setOffset(
-                        e,
-                        rect.left + this.#paddingX,
-                        viewportHeight - rect.bottom - this.#paddingY * 2,
-                    );
+                    this.#setOffset(e, glRect.x, glRect.y);
                     this.#render(
                         e.scene,
                         e.backbuffer.target,
@@ -502,13 +511,10 @@ export class VFXPlayer {
                         this.#copyPass.uniforms,
                     );
                 } else {
-                    const glRect = rectToGLRect(
-                        hit.rectWithOverflow,
-                        viewportHeight,
-                        this.#paddingX,
-                        this.#paddingY,
+                    e.backbuffer.resize(
+                        glRectWithOverflow.w,
+                        glRectWithOverflow.h,
                     );
-                    e.backbuffer.resize(glRect.w, glRect.h);
 
                     // Render to backbuffer
                     this.#setOffset(e, e.overflow.left, e.overflow.bottom);
@@ -524,36 +530,24 @@ export class VFXPlayer {
                     this.#copyPass.setUniforms(
                         e.backbuffer.texture,
                         this.#pixelRatio,
-                        glRect,
+                        glRectWithOverflow,
                     );
                     this.#render(
                         this.#copyPass.scene,
                         null,
-                        glRect,
+                        glRectWithOverflow,
                         this.#copyPass.uniforms,
                     );
                 }
             } else {
-                this.#setOffset(
-                    e,
-                    rect.left + this.#paddingX,
-                    viewportHeight - rect.bottom - this.#paddingY * 2,
-                );
-
-                let viewport: GLRect;
-                if (e.isFullScreen) {
-                    viewport = viewportGlRect;
-                } else {
-                    viewport = rectToGLRect(
-                        hit.rectWithOverflow,
-                        viewportHeight,
-                        this.#paddingX,
-                        this.#paddingY,
-                    );
-                }
-
                 // Render to canvas
-                this.#render(e.scene, null, viewport, e.uniforms);
+                this.#setOffset(e, glRect.x, glRect.y);
+                this.#render(
+                    e.scene,
+                    null,
+                    e.isFullScreen ? viewportGlRect : glRectWithOverflow,
+                    e.uniforms,
+                );
             }
         }
     }
