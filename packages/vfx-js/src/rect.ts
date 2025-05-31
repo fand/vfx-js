@@ -1,35 +1,25 @@
 /**
- * top-left origin rect.
- * Subset of DOMRect, which is returned by `HTMLElement.getBoundingClientRect()`.
  * @internal
  */
-export type Rect = {
+type Tetra = {
     left: number;
     right: number;
     top: number;
     bottom: number;
 };
 
-export function rect(
+/** @internal */
+function tetra(
     top: number,
     right: number,
     bottom: number,
     left: number,
-): Rect {
+): Tetra {
     return { top, right, bottom, left };
 }
 
-export const RECT_ZERO: Rect = rect(0, 0, 0, 0);
-
-/**
- * Values to determine a rectangle area for margin, padding etc.
- */
-export type RectOpts =
-    | number
-    | [top: number, right: number, bottom: number, left: number]
-    | { top?: number; right?: number; bottom?: number; left?: number };
-
-export function createRect(r: RectOpts): Rect {
+/** @internal */
+function createTetra(r: MarginOpts): Tetra {
     if (typeof r === "number") {
         return {
             top: r,
@@ -54,22 +44,68 @@ export function createRect(r: RectOpts): Rect {
     };
 }
 
-export function growRect(a: Rect, b: Rect): Rect {
+/**
+ * top-left origin rect.
+ * Subset of DOMRect, which is returned by `HTMLElement.getBoundingClientRect()`.
+ * @internal
+ */
+export type Rect = Tetra & { readonly __brand: unique symbol };
+
+export const RECT_ZERO: Rect = tetra(0, 0, 0, 0) as Rect;
+
+/**
+ * @internal
+ */
+export type Margin = Tetra & { readonly __brand: unique symbol };
+
+/**
+ * Values for margin, padding, overflow etc.
+ */
+export type MarginOpts =
+    | number
+    | [top: number, right: number, bottom: number, left: number]
+    | { top?: number; right?: number; bottom?: number; left?: number };
+
+export function createMargin(r: MarginOpts): Margin {
+    return createTetra(r) as Margin;
+}
+
+export const MARGIN_ZERO: Margin = tetra(0, 0, 0, 0) as Margin;
+
+/**
+ * Values to determine a rectangle area for margin, padding etc.
+ */
+export type RectOpts = MarginOpts;
+
+export function createRect(r: RectOpts): Rect {
+    return createTetra(r) as Rect;
+}
+
+export function toRect(r: DOMRect): Rect {
+    return {
+        top: r.top,
+        right: r.right,
+        bottom: r.bottom,
+        left: r.left,
+    } as Rect;
+}
+
+export function growRect(a: Rect, b: Margin): Rect {
     return {
         top: a.top - b.top,
         right: a.right + b.right,
         bottom: a.bottom + b.bottom,
         left: a.left - b.left,
-    };
+    } as Rect;
 }
 
-export function shrinkRect(a: Rect, b: Rect): Rect {
+export function shrinkRect(a: Rect, b: Margin): Rect {
     return {
         top: a.top + b.top,
         right: a.right - b.right,
         bottom: a.bottom - b.bottom,
         left: a.left + b.left,
-    };
+    } as Rect;
 }
 
 function clamp(x: number, xmin: number, xmax: number): number {

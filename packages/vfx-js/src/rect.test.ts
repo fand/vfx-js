@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { createRect, getIntersection, growRect, shrinkRect } from "./rect";
+import {
+    createMargin,
+    createRect,
+    getIntersection,
+    growRect,
+    shrinkRect,
+} from "./rect";
 
 describe("createRect", () => {
     test("single number", () => {
@@ -34,13 +40,13 @@ describe("createRect", () => {
 
 describe("growRect", () => {
     test("positive values", () => {
-        const a = {
+        const a = createRect({
             top: 100,
             right: 200,
             bottom: 200,
             left: 100,
-        };
-        const b = createRect(1);
+        });
+        const b = createMargin(1);
         expect(growRect(a, b)).toStrictEqual({
             top: 99,
             right: 201,
@@ -49,13 +55,13 @@ describe("growRect", () => {
         });
     });
     test("negative values", () => {
-        const a = {
+        const a = createRect({
             top: 100,
             right: 200,
             bottom: 200,
             left: 100,
-        };
-        const b = createRect(-1);
+        });
+        const b = createMargin(-1);
         expect(growRect(a, b)).toStrictEqual({
             top: 101,
             right: 199,
@@ -67,13 +73,13 @@ describe("growRect", () => {
 
 describe("shrinkRect", () => {
     test("positive values", () => {
-        const a = {
+        const a = createRect({
             top: 100,
             right: 200,
             bottom: 200,
             left: 100,
-        };
-        const b = createRect(1);
+        });
+        const b = createMargin(1);
         expect(shrinkRect(a, b)).toStrictEqual({
             top: 101,
             right: 199,
@@ -82,13 +88,13 @@ describe("shrinkRect", () => {
         });
     });
     test("negative values", () => {
-        const a = {
+        const a = createRect({
             top: 100,
             right: 200,
             bottom: 200,
             left: 100,
-        };
-        const b = createRect(-1);
+        });
+        const b = createMargin(-1);
         expect(shrinkRect(a, b)).toStrictEqual({
             top: 99,
             right: 201,

@@ -8,6 +8,17 @@ const preview: Preview = {
                 date: /Date$/i,
             },
         },
+        viewport: {
+            viewports: {
+                small: {
+                    name: "small",
+                    styles: {
+                        width: "600px",
+                        height: "600px",
+                    },
+                },
+            },
+        },
     },
 };
 

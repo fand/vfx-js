@@ -102,7 +102,7 @@ describe("isRectInViewport", () => {
             top: y,
             right: x + w,
             bottom: y + h,
-        };
+        } as Rect;
     };
 
     test("no overflow", () => {
