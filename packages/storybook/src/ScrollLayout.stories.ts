@@ -64,6 +64,8 @@ const render = (opts = {}, scroll = [0, 0]): StoryObj => ({
     },
     parameters: {
         viewport: {
+            // XXX: This doesn't work on Chromatic...
+            // Thus we can't test the output after scroll properly, that's why I commented out some stories below.
             defaultViewport: "small",
         },
     },
