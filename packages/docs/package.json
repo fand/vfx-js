@@ -1,7 +1,7 @@
 {
   "name": "docs",
   "private": true,
-  "version": "0.0.8",
+  "version": "0.0.9",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -14,8 +14,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vfx-js/core": "0.6.0",
-    "@vfx-js/storybook": "0.0.8",
+    "@vfx-js/core": "0.7.0",
+    "@vfx-js/storybook": "0.0.9",
     "dedent": "^1.5.3",
     "is-mobile": "^5.0.0",
     "lodash.debounce": "^4.0.8",
