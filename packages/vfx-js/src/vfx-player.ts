@@ -143,8 +143,16 @@ export class VFXPlayer {
             const maxPaddingX = wrapper.scrollWidth - (scrollX + width);
             const maxPaddingY = wrapper.scrollHeight - (scrollY + height);
 
-            paddingX = clamp(width * this.#opts.scrollPadding, 0, maxPaddingX);
-            paddingY = clamp(height * this.#opts.scrollPadding, 0, maxPaddingY);
+            paddingX = clamp(
+                width * this.#opts.scrollPadding[0],
+                0,
+                maxPaddingX,
+            );
+            paddingY = clamp(
+                height * this.#opts.scrollPadding[1],
+                0,
+                maxPaddingY,
+            );
         }
 
         const widthWithPadding = width + paddingX * 2;
