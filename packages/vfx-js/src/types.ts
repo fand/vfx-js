@@ -41,11 +41,14 @@ export type VFXOpts = {
      *
      * If a number is given, VFX-JS will use the number as the padding ratio.
      * For example, if 0.2 is given, VFX-JS will add 20% of padding to the canvas.
-     * (= the canvas height will be 140% of the window height)
+     * (= the canvas width & height will be 140% of the window width & height)
+     *
+     * If `[number, number]` is given, VFX-JS will use the numbers as the horizontal & vertical padding ratio.
+     * For example, if `[0, 0.2]` is given, VFX-JS will only add the vertical padding with 20% height.
      *
      * If you prefer not using the scroll jank technique, specify `false`.
      */
-    scrollPadding?: number | false;
+    scrollPadding?: number | [number, number] | false;
 };
 
 export type VFXOptsInner = {
@@ -53,7 +56,7 @@ export type VFXOptsInner = {
     zIndex: number | undefined;
     autoplay: boolean;
     fixedCanvas: boolean;
-    scrollPadding: number;
+    scrollPadding: [number, number];
 };
 
 /**
@@ -64,13 +67,26 @@ export function getVFXOpts(opts: VFXOpts): VFXOptsInner {
     const defaultPixelRatio =
         typeof window !== "undefined" ? window.devicePixelRatio : 1;
 
+    let scrollPadding: [number, number];
+    if (opts.scrollPadding === undefined) {
+        scrollPadding = [0.1, 0.1];
+    } else if (opts.scrollPadding === false) {
+        scrollPadding = [0, 0];
+    } else if (Array.isArray(opts.scrollPadding)) {
+        scrollPadding = [
+            opts.scrollPadding[0] ?? 0.1,
+            opts.scrollPadding[1] ?? 0.1,
+        ];
+    } else {
+        scrollPadding = [opts.scrollPadding, opts.scrollPadding];
+    }
+
     return {
         pixelRatio: opts.pixelRatio ?? defaultPixelRatio,
         zIndex: opts.zIndex ?? undefined,
         autoplay: opts.autoplay ?? true,
         fixedCanvas: opts.scrollPadding === false,
-        scrollPadding:
-            opts.scrollPadding === false ? 0 : (opts.scrollPadding ?? 0.1),
+        scrollPadding,
     };
 }
 
