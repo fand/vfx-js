@@ -2,8 +2,9 @@ import type { VFXProps, shaders } from "@vfx-js/core";
 import type { Meta, StoryObj } from "@storybook/html";
 
 import { initVFX } from "./utils";
+import { Timer } from "./Timer";
 import Logo from "./assets/logo-640w-20p.svg";
-import LogoWithoutPadding from "./assets/logo-no-padding.svg";
+import Jellyfish from "./assets/jellyfish.webp";
 import "./preset.css";
 
 const shader = `
@@ -285,16 +286,27 @@ export const wrapClamp = wrapBase("clamp");
 export const wrapMirror = wrapBase("mirror");
 
 export const autoCrop = {
-    render: ({ autoCrop }: { autoCrop: boolean }) => {
+    render: ({ shader, autoCrop }: { shader: string; autoCrop: boolean }) => {
+        const timer = new Timer(0, [0, 10]);
+        document.body.append(timer.element);
+
         const img = document.createElement("img");
-        img.src = LogoWithoutPadding;
+        img.src = Jellyfish;
 
         const vfx = initVFX();
-        vfx.add(img, { autoCrop, overflow: 200 });
+        vfx.add(img, {
+            shader,
+            autoCrop,
+            overflow: 200,
+            uniforms: {
+                time: () => timer.time,
+            },
+        });
 
         return img;
     },
     args: {
+        shader: "rainbow",
         autoCrop: true,
     },
 };
