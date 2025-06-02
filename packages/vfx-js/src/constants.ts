@@ -47,6 +47,15 @@ export type ShaderPreset =
     | "pixelateTransition"
     | "focusTransition";
 
+const COMMON_HEADER = `precision highp float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform bool autoCrop;
+uniform sampler2D src;
+out vec4 outColor;
+`;
+
 const READ_TEX = `vec4 readTex(sampler2D tex, vec2 uv) {
     if (autoCrop && (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.)) {
         return vec4(0);
@@ -65,14 +74,7 @@ const READ_TEX = `vec4 readTex(sampler2D tex, vec2 uv) {
  */
 export const shaders: Record<ShaderPreset, string> = {
     uvGradient: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     void main() {
@@ -84,14 +86,7 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     rainbow: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     vec3 hsv2rgb(vec3 c) {
@@ -132,14 +127,7 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     glitch: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     float nn(float y, float t) {
@@ -205,14 +193,7 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     pixelate: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     void main (void) {
@@ -224,14 +205,7 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     rgbGlitch: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     float random(vec2 st) {
@@ -275,14 +249,7 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     rgbShift: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     float nn(float y, float t) {
@@ -331,14 +298,7 @@ export const shaders: Record<ShaderPreset, string> = {
     // Halftone Effect by zoidberg
     // https://www.interactiveshaderformat.com/sketches/234
 
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     // TODO: uniform
@@ -436,14 +396,7 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     sinewave: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     vec4 draw(vec2 uv) {
@@ -476,14 +429,7 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     shine: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     void main (void) {
@@ -501,14 +447,7 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     blink: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     void main (void) {
@@ -519,14 +458,7 @@ export const shaders: Record<ShaderPreset, string> = {
 
     `,
     spring: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
 
     void main (void) {
@@ -536,18 +468,12 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     duotone: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
+    ${COMMON_HEADER}
+    ${READ_TEX}
+
     uniform vec4 color1;
     uniform vec4 color2;
     uniform float speed;
-    out vec4 outColor;
-
-    ${READ_TEX}
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -566,19 +492,13 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     tritone: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
+    ${COMMON_HEADER}
+    ${READ_TEX}
+
     uniform vec4 color1;
     uniform vec4 color2;
     uniform vec4 color3;
     uniform float speed;
-    out vec4 outColor;
-
-    ${READ_TEX}
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -599,16 +519,10 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     hueShift: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    uniform float shift;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
+
+    uniform float shift;
 
     vec3 hsv2rgb(vec3 c) {
         vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -640,15 +554,9 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     warpTransition: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
+    ${COMMON_HEADER}
     uniform float enterTime;
     uniform float leaveTime;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
 
     ${READ_TEX}
 
@@ -673,17 +581,11 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     slitScanTransition: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
+    ${COMMON_HEADER}
+    ${READ_TEX}
+
     uniform float enterTime;
     uniform float leaveTime;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
-    ${READ_TEX}
 
     #define DURATION 1.0
 
@@ -712,17 +614,11 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     pixelateTransition: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
+    ${COMMON_HEADER}
+    ${READ_TEX}
+
     uniform float enterTime;
     uniform float leaveTime;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
-    ${READ_TEX}
 
     #define DURATION 1.0
 
@@ -744,16 +640,10 @@ export const shaders: Record<ShaderPreset, string> = {
     }
     `,
     focusTransition: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform float intersection;
-    uniform bool autoCrop;
-    uniform sampler2D src;
-    out vec4 outColor;
-
+    ${COMMON_HEADER}
     ${READ_TEX}
+
+    uniform float intersection;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
