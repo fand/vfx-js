@@ -219,6 +219,11 @@ export type VFXProps = {
      * Whether the shader uses the backbuffer or not.
      */
     backbuffer?: boolean;
+
+    /**
+     * auto
+     */
+    autoCrop?: boolean;
 };
 
 /**
@@ -274,6 +279,7 @@ export type VFXElement = {
     originalOpacity: number;
     zIndex: number;
     backbuffer?: Backbuffer;
+    autoCrop: boolean;
 };
 
 export type VFXElementIntersection = {

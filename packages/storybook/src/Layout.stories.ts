@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/html";
 
 import { initVFX } from "./utils";
 import Logo from "./assets/logo-640w-20p.svg";
+import LogoWithoutPadding from "./assets/logo-no-padding.svg";
 import "./preset.css";
 
 const shader = `
@@ -282,3 +283,18 @@ const wrapBase = (
 export const wrapRepeat = wrapBase("repeat");
 export const wrapClamp = wrapBase("clamp");
 export const wrapMirror = wrapBase("mirror");
+
+export const autoCrop = {
+    render: ({ autoCrop }: { autoCrop: boolean }) => {
+        const img = document.createElement("img");
+        img.src = LogoWithoutPadding;
+
+        const vfx = initVFX();
+        vfx.add(img, { autoCrop, overflow: 200 });
+
+        return img;
+    },
+    args: {
+        autoCrop: true,
+    },
+};

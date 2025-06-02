@@ -47,6 +47,10 @@ export type ShaderPreset =
     | "pixelateTransition"
     | "focusTransition";
 
+const AUTO_CROP = `
+if (autoCrop && uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { outColor = vec4(0); return; }
+`;
+
 /**
  * Shader code for presets.
  * Shaders in `shader` can be looked up with keys in `ShaderPreset`.
@@ -62,11 +66,13 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-
+        ${AUTO_CROP}
         outColor = vec4(uv, sin(time) * .5 + .5, 1);
 
         vec4 img = texture(src, uv);
