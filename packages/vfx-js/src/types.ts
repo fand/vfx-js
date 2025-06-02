@@ -219,6 +219,15 @@ export type VFXProps = {
      * Whether the shader uses the backbuffer or not.
      */
     backbuffer?: boolean;
+
+    /**
+     * Whether the input texture should be cropped to the element bounds. (Default: `true`)
+     * If `true`, The preset shaders will crop the input texture automatically.
+     *
+     * Note: if you use custom shaders, you have to implement the cropping manually.
+     * VFX-JS provides `uniform bool autoCrop;` to help this.
+     */
+    autoCrop?: boolean;
 };
 
 /**
@@ -274,6 +283,7 @@ export type VFXElement = {
     originalOpacity: number;
     zIndex: number;
     backbuffer?: Backbuffer;
+    autoCrop: boolean;
 };
 
 export type VFXElementIntersection = {

@@ -308,6 +308,8 @@ export class VFXPlayer {
         texture.format = THREE.RGBAFormat;
         texture.needsUpdate = true;
 
+        const autoCrop = opts.autoCrop ?? true;
+
         // Hide original element
         if (opts.overlay === true) {
             /* Overlay mode. Do not hide the element */
@@ -330,6 +332,7 @@ export class VFXPlayer {
             mouse: { value: new THREE.Vector2() },
             intersection: { value: 0.0 },
             viewport: { value: new THREE.Vector4() },
+            autoCrop: { value: autoCrop },
         };
 
         const uniformGenerators: {
@@ -401,6 +404,7 @@ export class VFXPlayer {
             originalOpacity,
             zIndex: opts.zIndex ?? 0,
             backbuffer,
+            autoCrop,
         };
 
         this.#hitTest(elem, rect, now);
