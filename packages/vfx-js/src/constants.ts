@@ -47,9 +47,12 @@ export type ShaderPreset =
     | "pixelateTransition"
     | "focusTransition";
 
-const AUTO_CROP = `
-if (autoCrop && uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { outColor = vec4(0); return; }
-`;
+const READ_TEX = `vec4 readTex(sampler2D tex, vec2 uv) {
+    if (autoCrop && (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.)) {
+        return vec4(0);
+    }
+    return texture(tex, uv);
+}`;
 
 /**
  * Shader code for presets.
@@ -70,12 +73,13 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform sampler2D src;
     out vec4 outColor;
 
+    ${READ_TEX}
+
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        ${AUTO_CROP}
         outColor = vec4(uv, sin(time) * .5 + .5, 1);
 
-        vec4 img = texture(src, uv);
+        vec4 img = readTex(src, uv);
         outColor *= smoothstep(0., 1., img.a);
     }
     `,
@@ -84,8 +88,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     vec3 hsv2rgb(vec3 c) {
         vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -116,7 +123,7 @@ export const shaders: Record<ShaderPreset, string> = {
 
         float x = (uv2.x - uv2.y) - fract(time);
 
-        vec4 img = texture(src, uv);
+        vec4 img = readTex(src, uv);
         float gray = length(img.rgb);
 
         img.rgb = vec3(hueShift(vec3(1,0,0), x) * gray);
@@ -129,8 +136,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     float nn(float y, float t) {
         float n = (
@@ -142,11 +152,6 @@ export const shaders: Record<ShaderPreset, string> = {
         n += sin(y * 124. + t * 100.7) * sin(y * 877. - t * 38.8) * .3;
 
         return n;
-    }
-
-    vec4 readTex(sampler2D tex, vec2 uv) {
-        if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { return vec4(0); }
-        return texture(tex, uv);
     }
 
     void main (void) {
@@ -204,15 +209,18 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
         float b = sin(time * 2.) * 32. + 48.;
         uv = floor(uv * b) / b;
-        outColor = texture(src, uv);
+        outColor = readTex(src, uv);
     }
     `,
     rgbGlitch: `
@@ -220,8 +228,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     float random(vec2 st) {
         return fract(sin(dot(st, vec2(948.,824.))) * 30284.);
@@ -251,9 +262,9 @@ export const shaders: Record<ShaderPreset, string> = {
             }
         }
 
-        vec4 cr = texture(src, uvr);
-        vec4 cg = texture(src, uvg);
-        vec4 cb = texture(src, uvb);
+        vec4 cr = readTex(src, uvr);
+        vec4 cg = readTex(src, uvg);
+        vec4 cb = readTex(src, uvb);
 
         outColor = vec4(
             cr.r,
@@ -268,8 +279,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     float nn(float y, float t) {
         float n = (
@@ -287,10 +301,6 @@ export const shaders: Record<ShaderPreset, string> = {
         return step(t, uv.x) * step(t, uv.y);
     }
 
-    float inside(vec2 uv) {
-        return step2(0., uv) * step2(0., 1. - uv);
-    }
-
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
         vec2 uvr = uv, uvg = uv, uvb = uv;
@@ -305,9 +315,9 @@ export const shaders: Record<ShaderPreset, string> = {
             uvb.x += nn(uv.y, t + 20.) * amp;
         }
 
-        vec4 cr = texture(src, uvr) * inside(uvr);
-        vec4 cg = texture(src, uvg) * inside(uvg);
-        vec4 cb = texture(src, uvb) * inside(uvb);
+        vec4 cr = readTex(src, uvr);
+        vec4 cg = readTex(src, uvg);
+        vec4 cb = readTex(src, uvb);
 
         outColor = vec4(
             cr.r,
@@ -325,8 +335,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     // TODO: uniform
     #define gridSize 10.0
@@ -334,7 +347,7 @@ export const shaders: Record<ShaderPreset, string> = {
     #define smoothing 0.15
     #define speed 1.0
 
-    #define IMG_PIXEL(x, y) texture(x, (y - offset) / resolution);
+    #define IMG_PIXEL(x, y) readTex(x, (y - offset) / resolution);
 
     vec4 gridRot = vec4(15.0, 45.0, 75.0, 0.0);
 
@@ -416,7 +429,7 @@ export const shaders: Record<ShaderPreset, string> = {
         }
 
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 original = texture(src, uv);
+        vec4 original = readTex(src, uv);
         float alpha = step(.1, rgbAmounts[0] + rgbAmounts[1] + rgbAmounts[2] + original.a);
 
         outColor = vec4(rgbAmounts[0], rgbAmounts[1], rgbAmounts[2], alpha);
@@ -427,12 +440,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
 
-    float inside(in vec2 uv) {
-        return step(0., uv.x) * step(uv.x, 1.) * step(0., uv.y) * step(uv.y, 1.);
-    }
+    ${READ_TEX}
 
     vec4 draw(vec2 uv) {
         vec2 uvr = uv, uvg = uv, uvb = uv;
@@ -443,9 +455,9 @@ export const shaders: Record<ShaderPreset, string> = {
         uvg.x += sin(uv.y * 7. + time * 3. + .4) * amp;
         uvb.x += sin(uv.y * 7. + time * 3. + .8) * amp;
 
-        vec4 cr = texture(src, uvr) * inside(uvr);
-        vec4 cg = texture(src, uvg) * inside(uvg);
-        vec4 cb = texture(src, uvb) * inside(uvb);
+        vec4 cr = readTex(src, uvr);
+        vec4 cg = readTex(src, uvg);
+        vec4 cb = readTex(src, uvb);
 
         return vec4(
             cr.r,
@@ -468,8 +480,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -477,7 +492,7 @@ export const shaders: Record<ShaderPreset, string> = {
         vec2 p = uv * 2. - 1.;
         float a = atan(p.y, p.x);
 
-        vec4 col = texture(src, uv);
+        vec4 col = readTex(src, uv);
         float gray = length(col.rgb);
 
         float level = 1. + sin(a * 10. + time * 3.) * 0.2;
@@ -490,13 +505,16 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        outColor = texture(src, uv) * (sin(time * 5.) * 0.2 + 0.8);
+        outColor = readTex(src, uv) * (sin(time * 5.) * 0.2 + 0.8);
     }
 
     `,
@@ -505,16 +523,16 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
         uv = (uv - .5) * (1.05 + sin(time * 5.) * 0.05) + .5;
-
-        if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { discard; }
-
-        outColor = texture(src, uv);
+        outColor = readTex(src, uv);
     }
     `,
     duotone: `
@@ -522,15 +540,18 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     uniform vec4 color1;
     uniform vec4 color2;
     uniform float speed;
     out vec4 outColor;
 
+    ${READ_TEX}
+
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = texture(src, uv);
+        vec4 color = readTex(src, uv);
 
         float gray = dot(color.rgb, vec3(0.2, 0.7, 0.08));
         float t = mod(gray * 2.0 + time * speed, 2.0);
@@ -549,6 +570,7 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     uniform vec4 color1;
     uniform vec4 color2;
@@ -556,9 +578,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform float speed;
     out vec4 outColor;
 
+    ${READ_TEX}
+
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = texture(src, uv);
+        vec4 color = readTex(src, uv);
 
         float gray = dot(color.rgb, vec3(0.2, 0.7, 0.08));
         float t = mod(gray * 3.0 + time * speed, 3.0);
@@ -579,9 +603,12 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform float time;
+    uniform bool autoCrop;
     uniform sampler2D src;
     uniform float shift;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     vec3 hsv2rgb(vec3 c) {
         vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -607,7 +634,7 @@ export const shaders: Record<ShaderPreset, string> = {
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = texture(src, uv);
+        vec4 color = readTex(src, uv);
         color.rgb = hueShift(color.rgb, shift);
         outColor = color;
     }
@@ -619,8 +646,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform float time;
     uniform float enterTime;
     uniform float leaveTime;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     #define DURATION 1.0
 
@@ -639,7 +669,7 @@ export const shaders: Record<ShaderPreset, string> = {
             uv.x += sin(floor(uv.y * 300.)) * 3. * exp(t * -10.);
         }
 
-        outColor = texture(src, uv);
+        outColor = readTex(src, uv);
     }
     `,
     slitScanTransition: `
@@ -649,8 +679,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform float time;
     uniform float enterTime;
     uniform float leaveTime;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     #define DURATION 1.0
 
@@ -675,7 +708,7 @@ export const shaders: Record<ShaderPreset, string> = {
             uv.y = uv.y < t ? t : uv.y;
         }
 
-        outColor = texture(src, uv);
+        outColor = readTex(src, uv);
     }
     `,
     pixelateTransition: `
@@ -685,8 +718,11 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform float time;
     uniform float enterTime;
     uniform float leaveTime;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     #define DURATION 1.0
 
@@ -704,7 +740,7 @@ export const shaders: Record<ShaderPreset, string> = {
             uv = (floor(uv * b) + .5) / b;
         }
 
-        outColor = texture(src, uv);
+        outColor = readTex(src, uv);
     }
     `,
     focusTransition: `
@@ -713,16 +749,19 @@ export const shaders: Record<ShaderPreset, string> = {
     uniform vec2 offset;
     uniform float time;
     uniform float intersection;
+    uniform bool autoCrop;
     uniform sampler2D src;
     out vec4 outColor;
+
+    ${READ_TEX}
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
         float t = smoothstep(0., 1., intersection);
 
         outColor = mix(
-            texture(src, uv + vec2(1. - t, 0)),
-            texture(src, uv + vec2(-(1. - t), 0)),
+            readTex(src, uv + vec2(1. - t, 0)),
+            readTex(src, uv + vec2(-(1. - t), 0)),
             0.5
         ) * intersection;
     }
