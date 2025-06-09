@@ -11,7 +11,8 @@
     "build:storybook": "rm -rf storybook && cp -a ../storybook/docs-build storybook",
     "build:docs": "vite build",
     "build:typedoc-dist": "rm -rf dist/docs && cp -a typedoc dist/docs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "clean": "rimraf dist storybook typedoc"
   },
   "dependencies": {
     "@vfx-js/core": "0.7.0",
