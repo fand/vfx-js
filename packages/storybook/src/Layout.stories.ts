@@ -1,5 +1,5 @@
 import type { VFXProps, shaders } from "@vfx-js/core";
-import type { Meta, StoryObj } from "@storybook/html";
+import type { Meta, StoryObj } from "@storybook/html-vite";
 
 import { initVFX } from "./utils";
 import { Timer } from "./Timer";

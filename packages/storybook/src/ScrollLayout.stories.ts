@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/html";
+import type { Meta, StoryObj } from "@storybook/html-vite";
 // import { allModes } from "../.storybook/modes";
 
 import { initVFX } from "./utils";
