@@ -398,7 +398,7 @@ class App {
         const profile = $("#profile");
         await this.vfx.add(profile, {
             shader: shaders.logo,
-            overflow: [0, 2000, 0, 2000],
+            overflow: [0, 3000, 0, 2000],
             uniforms: { delay: 0.5 },
             intersection: {
                 rootMargin: [-100, 0, -100, 0],
