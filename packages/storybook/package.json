@@ -16,7 +16,7 @@
     "@chromatic-com/storybook": "^4.0.0",
     "@storybook/addon-docs": "^9.0.6",
     "@storybook/html-vite": "^9.0.6",
-    "@types/node": "^22.10.5",
+    "@types/node": "^22.15.30",
     "storybook": "^9.0.6"
   },
   "overrides": {

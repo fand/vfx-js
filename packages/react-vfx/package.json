@@ -42,15 +42,15 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@types/node": "^22.10.5",
-    "@types/react": "^19.0.2",
-    "globals": "^15.14.0",
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.6",
+    "globals": "^16.2.0",
     "husky": "^9.1.7",
-    "lint-staged": "^15.3.0",
+    "lint-staged": "^16.1.0",
     "npm-run-all": "^4.1.5",
     "rimraf": "^6.0.1",
     "tsconfig-to-dual-package": "^1.2.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.8.3"
   },
   "lint-staged": {
     "src/*.{ts,tsx}": [

@@ -1,7 +1,7 @@
 {
   "name": "vfx-js-monorepo",
   "private": true,
-  "packageManager": "npm@11.0.0",
+  "packageManager": "npm@11.4.1",
   "workspaces": [
     "packages/*"
   ],
@@ -16,11 +16,11 @@
     "release": "changeset publish"
   },
   "dependencies": {
-    "@changesets/cli": "^2.27.11"
+    "@changesets/cli": "^2.29.4"
   },
   "devDependencies": {
     "husky": "^9.1.7",
-    "turbo": "^2.3.3"
+    "turbo": "^2.5.4"
   },
   "author": "AMAGI <mail@amagi.dev> (https://amagi.dev/)",
   "homepage": "https://github.com/fand/vfx-js#readme",
