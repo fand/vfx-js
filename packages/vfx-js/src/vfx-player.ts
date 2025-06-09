@@ -5,6 +5,7 @@ import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
+import { PostEffectPass } from "./post-effect-pass.js";
 import {
     MARGIN_ZERO,
     type Margin,
@@ -37,6 +38,10 @@ export class VFXPlayer {
     #renderer: THREE.WebGLRenderer;
     #camera: THREE.Camera;
     #copyPass: CopyPass;
+    #postEffectPass: PostEffectPass | undefined;
+    #postEffectTarget: THREE.WebGLRenderTarget | undefined;
+    #postEffectUniformGenerators: { [name: string]: () => VFXUniformValue } =
+        {};
 
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
@@ -81,6 +86,25 @@ export class VFXPlayer {
 
         // Setup copyScene
         this.#copyPass = new CopyPass();
+
+        // Setup post effect pass if specified
+        if (opts.postEffect) {
+            this.#postEffectPass = new PostEffectPass(
+                opts.postEffect.shader,
+                opts.postEffect.uniforms,
+            );
+
+            // Store uniform generators for custom uniforms
+            if (opts.postEffect.uniforms) {
+                for (const [key, value] of Object.entries(
+                    opts.postEffect.uniforms,
+                )) {
+                    if (typeof value === "function") {
+                        this.#postEffectUniformGenerators[key] = value;
+                    }
+                }
+            }
+        }
     }
 
     destroy(): void {
@@ -88,6 +112,11 @@ export class VFXPlayer {
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", this.#resize);
             window.removeEventListener("mousemove", this.#mousemove);
+        }
+
+        // Clean up post effect resources
+        if (this.#postEffectTarget) {
+            this.#postEffectTarget.dispose();
         }
     }
 
@@ -479,6 +508,12 @@ export class VFXPlayer {
         const viewportHeight = this.#viewport.bottom - this.#viewport.top;
         const viewportGlRect = getGLRect(0, 0, viewportWidth, viewportHeight);
 
+        // Setup post effect render target if needed
+        const shouldUsePostEffect = this.#postEffectPass !== undefined;
+        if (shouldUsePostEffect) {
+            this.#setupPostEffectTarget(viewportWidth, viewportHeight);
+        }
+
         for (const e of this.#elements) {
             const domRect = e.element.getBoundingClientRect();
             const rect = toRect(domRect);
@@ -544,7 +579,9 @@ export class VFXPlayer {
                     );
                     this.#render(
                         this.#copyPass.scene,
-                        null,
+                        shouldUsePostEffect
+                            ? this.#postEffectTarget || null
+                            : null,
                         viewportGlRect,
                         this.#copyPass.uniforms,
                     );
@@ -572,7 +609,9 @@ export class VFXPlayer {
                     );
                     this.#render(
                         this.#copyPass.scene,
-                        null,
+                        shouldUsePostEffect
+                            ? this.#postEffectTarget || null
+                            : null,
                         glRectWithOverflow,
                         this.#copyPass.uniforms,
                     );
@@ -582,11 +621,40 @@ export class VFXPlayer {
                 this.#setOffset(e, glRect.x, glRect.y);
                 this.#render(
                     e.scene,
-                    null,
+                    shouldUsePostEffect ? this.#postEffectTarget || null : null,
                     e.isFullScreen ? viewportGlRect : glRectWithOverflow,
                     e.uniforms,
                 );
             }
+        }
+
+        // Apply post effect if enabled
+        if (
+            shouldUsePostEffect &&
+            this.#postEffectPass &&
+            this.#postEffectTarget
+        ) {
+            this.#postEffectPass.setUniforms(
+                this.#postEffectTarget.texture,
+                this.#pixelRatio,
+                viewportGlRect,
+                now,
+                this.#mouseX,
+                this.#mouseY,
+            );
+
+            // Update custom uniforms
+            this.#postEffectPass.updateCustomUniforms(
+                this.#postEffectUniformGenerators,
+            );
+
+            // Render post effect to final canvas
+            this.#render(
+                this.#postEffectPass.scene,
+                null,
+                viewportGlRect,
+                this.#postEffectPass.uniforms,
+            );
         }
     }
 
@@ -711,6 +779,31 @@ export class VFXPlayer {
     #setOffset(e: VFXElement, x: number, y: number) {
         e.uniforms["offset"].value.x = x * this.#pixelRatio;
         e.uniforms["offset"].value.y = y * this.#pixelRatio;
+    }
+
+    #setupPostEffectTarget(width: number, height: number) {
+        const targetWidth = width * this.#pixelRatio;
+        const targetHeight = height * this.#pixelRatio;
+
+        if (
+            !this.#postEffectTarget ||
+            this.#postEffectTarget.width !== targetWidth ||
+            this.#postEffectTarget.height !== targetHeight
+        ) {
+            if (this.#postEffectTarget) {
+                this.#postEffectTarget.dispose();
+            }
+
+            this.#postEffectTarget = new THREE.WebGLRenderTarget(
+                targetWidth,
+                targetHeight,
+                {
+                    minFilter: THREE.LinearFilter,
+                    magFilter: THREE.LinearFilter,
+                    format: THREE.RGBAFormat,
+                },
+            );
+        }
     }
 }
 
