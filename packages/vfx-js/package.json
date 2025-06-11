@@ -56,7 +56,7 @@
   },
   "lint-staged": {
     "src/*.ts": [
-      "biome check --no-errors-on-unmatched --files-ignore-unknown=true"
+      "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
     ]
   },
   "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
