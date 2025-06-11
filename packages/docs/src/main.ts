@@ -199,12 +199,35 @@ void main (void) {
     outColor = texture(src, uv);
 }
     `,
+    post: `
+precision highp float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform vec2 mouse;
+uniform float time;
+uniform sampler2D src;
+out vec4 outColor;
+
+void main (void) {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    outColor = texture(src, uv);
+
+    vec2 d = gl_FragCoord.xy - mouse.xy;
+    outColor.rgb = mix(outColor.rgb, 1. - outColor.rgb, sin(length(d) / 100.0) * 0.1 + 0.1);
+}
+    `,
 };
 
 class App {
     vfx = new VFX({
         pixelRatio: window.devicePixelRatio,
         zIndex: -1,
+        postEffect: {
+            shader: shaders.post,
+            uniforms: {
+                scroll: () => window.scrollY / window.innerHeight,
+            },
+        },
     });
     vfx2 = new VFX({
         pixelRatio: 1,
