@@ -28,6 +28,7 @@ void main() {
 `;
 
 export type ShaderPreset =
+    | "none"
     | "uvGradient"
     | "rainbow"
     | "glitch"
@@ -73,6 +74,7 @@ const READ_TEX = `vec4 readTex(sampler2D tex, vec2 uv) {
  * ```
  */
 export const shaders: Record<ShaderPreset, string> = {
+    none: COPY_FRAGMENT_SHADER,
     uvGradient: `
     ${COMMON_HEADER}
     ${READ_TEX}
