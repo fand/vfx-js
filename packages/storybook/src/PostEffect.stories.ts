@@ -5,6 +5,7 @@ import { Timer } from "./Timer";
 import { initVFX } from "./utils";
 import Logo from "./assets/logo-640w-20p.svg";
 import Jellyfish from "./assets/jellyfish.webp";
+import Pigeon from "./assets/pigeon.webp";
 import "./preset.css";
 
 interface PostEffectProps {
@@ -28,7 +29,7 @@ export default {
         const vfx = initVFX({
             postEffect: opts.postEffect,
         });
-        
+
         vfx.add(img, {
             shader: opts.preset,
             overflow: opts.overflow,
@@ -46,7 +47,8 @@ const story = (props: PostEffectProps) => ({ args: props });
 
 // Simple invert post effect
 export const InvertColors = story({
-    preset: "uvGradient",
+    src: Pigeon,
+    preset: "rgbShift",
     postEffect: {
         shader: `
             precision highp float;
@@ -54,7 +56,7 @@ export const InvertColors = story({
             uniform vec2 resolution;
             uniform vec2 offset;
             out vec4 outColor;
-            
+
             void main() {
                 vec2 uv = (gl_FragCoord.xy - offset) / resolution;
                 vec4 color = texture(src, uv);
@@ -66,8 +68,8 @@ export const InvertColors = story({
 
 // Grayscale post effect
 export const Grayscale = story({
-    src: Jellyfish,
-    preset: "rainbow",
+    src: Pigeon,
+    preset: "sinewave",
     postEffect: {
         shader: `
             precision highp float;
@@ -75,7 +77,7 @@ export const Grayscale = story({
             uniform vec2 resolution;
             uniform vec2 offset;
             out vec4 outColor;
-            
+
             void main() {
                 vec2 uv = (gl_FragCoord.xy - offset) / resolution;
                 vec4 color = texture(src, uv);
@@ -88,8 +90,8 @@ export const Grayscale = story({
 
 // Sepia post effect with custom uniform
 export const Sepia = story({
-    src: Jellyfish,
-    preset: "shine",
+    src: Pigeon,
+    preset: "sinewave",
     defaultTime: 1.0,
     postEffect: {
         shader: `
@@ -99,17 +101,17 @@ export const Sepia = story({
             uniform vec2 offset;
             uniform float intensity;
             out vec4 outColor;
-            
+
             void main() {
                 vec2 uv = (gl_FragCoord.xy - offset) / resolution;
                 vec4 color = texture(src, uv);
-                
+
                 vec3 sepia = vec3(
                     dot(color.rgb, vec3(0.393, 0.769, 0.189)),
                     dot(color.rgb, vec3(0.349, 0.686, 0.168)),
                     dot(color.rgb, vec3(0.272, 0.534, 0.131))
                 );
-                
+
                 outColor = vec4(mix(color.rgb, sepia, intensity), color.a);
             }
         `,
@@ -121,8 +123,8 @@ export const Sepia = story({
 
 // Animated vignette post effect
 export const AnimatedVignette = story({
-    src: Jellyfish,
-    preset: "pixelate",
+    src: Pigeon,
+    preset: "sinewave",
     defaultTime: 1.0,
     postEffect: {
         shader: `
@@ -133,16 +135,16 @@ export const AnimatedVignette = story({
             uniform float time;
             uniform float vignetteStrength;
             out vec4 outColor;
-            
+
             void main() {
                 vec2 uv = (gl_FragCoord.xy - offset) / resolution;
                 vec4 color = texture(src, uv);
-                
+
                 vec2 center = vec2(0.5);
                 float dist = distance(uv, center);
                 float vignette = 1.0 - smoothstep(0.3, 1.0, dist * vignetteStrength);
                 vignette += sin(time * 2.0) * 0.1;
-                
+
                 outColor = vec4(color.rgb * vignette, color.a);
             }
         `,
@@ -154,8 +156,8 @@ export const AnimatedVignette = story({
 
 // Chromatic aberration post effect
 export const ChromaticAberration = story({
-    src: Jellyfish,
-    preset: "glitch",
+    src: Pigeon,
+    preset: "sinewave",
     overflow: 50,
     defaultTime: 2.5,
     postEffect: {
@@ -166,26 +168,59 @@ export const ChromaticAberration = story({
             uniform vec2 offset;
             uniform float aberrationStrength;
             out vec4 outColor;
-            
+
             void main() {
                 vec2 uv = (gl_FragCoord.xy - offset) / resolution;
                 vec2 center = vec2(0.5);
                 vec2 direction = normalize(uv - center);
                 float distance = length(uv - center);
-                
+
                 vec2 offsetR = direction * distance * aberrationStrength;
                 vec2 offsetB = direction * distance * aberrationStrength * -1.0;
-                
+
                 float r = texture(src, uv + offsetR).r;
                 float g = texture(src, uv).g;
                 float b = texture(src, uv + offsetB).b;
                 float a = texture(src, uv).a;
-                
+
                 outColor = vec4(r, g, b, a);
             }
         `,
         uniforms: {
             aberrationStrength: 0.01,
         },
+        backbuffer: true,
+    },
+});
+
+// Feedback effect using backbuffer
+export const FeedbackEffect = story({
+    src: Logo,
+    preset: "uvGradient",
+    defaultTime: 1.0,
+    postEffect: {
+        shader: `
+            precision highp float;
+            uniform sampler2D src;
+            uniform sampler2D backbuffer;
+            uniform vec2 resolution;
+            uniform vec2 offset;
+            uniform float time;
+            out vec4 outColor;
+
+            void main() {
+                vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+                vec4 current = texture(src, uv);
+
+                vec2 feedbackOffset = vec2(
+                    sin(uv.y * 31. + time * 1.0) + sin(uv.y * 17. + time * 0.7),
+                    cos(uv.x * 23. + time * 1.5) + cos(uv.x * 19. + time * 0.9)
+                ) * 0.001;
+                vec4 previous = texture(backbuffer, uv + feedbackOffset);
+
+                outColor = mix(current, previous * 0.99, 1. - current.a);
+            }
+        `,
+        backbuffer: true,
     },
 });
