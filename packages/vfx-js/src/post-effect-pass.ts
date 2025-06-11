@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Backbuffer } from "./backbuffer.js";
 import { DEFAULT_VERTEX_SHADER } from "./constants.js";
 import type { GLRect } from "./gl-rect.js";
 import type { VFXUniformValue, VFXUniforms } from "./types.js";
@@ -7,9 +8,16 @@ export class PostEffectPass {
     #scene: THREE.Scene;
     #mesh: THREE.Mesh;
     #uniforms: { [name: string]: THREE.IUniform };
+    #uniformGenerators: { [name: string]: () => VFXUniformValue };
+    #backbuffer?: Backbuffer;
 
-    constructor(fragmentShader: string, uniforms?: VFXUniforms) {
+    constructor(
+        fragmentShader: string,
+        uniforms?: VFXUniforms,
+        useBackbuffer?: boolean,
+    ) {
         this.#scene = new THREE.Scene();
+        this.#uniformGenerators = {};
         this.#uniforms = {
             src: { value: null },
             offset: { value: new THREE.Vector2() },
@@ -19,10 +27,16 @@ export class PostEffectPass {
             mouse: { value: new THREE.Vector2() },
         };
 
+        // Add backbuffer uniform if requested
+        if (useBackbuffer) {
+            this.#uniforms.backbuffer = { value: null };
+        }
+
         // Add custom uniforms if provided
         if (uniforms) {
             for (const [key, value] of Object.entries(uniforms)) {
                 if (typeof value === "function") {
+                    this.#uniformGenerators[key] = value;
                     this.#uniforms[key] = { value: value() };
                 } else {
                     this.#uniforms[key] = { value };
@@ -66,14 +80,43 @@ export class PostEffectPass {
         this.#uniforms["mouse"].value.y = mouseY * pixelRatio;
     }
 
-    updateCustomUniforms(uniformGenerators: {
+    updateCustomUniforms(uniformGenerators?: {
         [name: string]: () => VFXUniformValue;
     }) {
-        for (const [key, generator] of Object.entries(uniformGenerators)) {
+        // Update uniforms from constructor generators
+        for (const [key, generator] of Object.entries(
+            this.#uniformGenerators,
+        )) {
             if (this.#uniforms[key]) {
                 this.#uniforms[key].value = generator();
             }
         }
+
+        // Update uniforms from external generators (for compatibility)
+        if (uniformGenerators) {
+            for (const [key, generator] of Object.entries(uniformGenerators)) {
+                if (this.#uniforms[key]) {
+                    this.#uniforms[key].value = generator();
+                }
+            }
+        }
+    }
+
+    initializeBackbuffer(width: number, height: number, pixelRatio: number) {
+        if (this.#uniforms.backbuffer && !this.#backbuffer) {
+            this.#backbuffer = new Backbuffer(width, height, pixelRatio);
+            this.#uniforms.backbuffer.value = this.#backbuffer.texture;
+        }
+    }
+
+    resizeBackbuffer(width: number, height: number) {
+        if (this.#backbuffer) {
+            this.#backbuffer.resize(width, height);
+        }
+    }
+
+    get backbuffer() {
+        return this.#backbuffer;
     }
 
     get scene(): THREE.Scene {

@@ -314,6 +314,7 @@ export type VFXPostEffect = {
      * - `vec4 viewport`: Viewport information
      * - `float time`: Time in seconds since VFX started
      * - `vec2 mouse`: Mouse position in pixels
+     * - `sampler2D backbuffer`: Previous frame texture (if backbuffer is enabled)
      */
     shader: string;
 
@@ -322,4 +323,10 @@ export type VFXPostEffect = {
      * Works the same way as element uniforms.
      */
     uniforms?: VFXUniforms;
+
+    /**
+     * Whether the post effect should use a backbuffer for feedback effects.
+     * When enabled, the previous frame's output is available as `sampler2D backbuffer`.
+     */
+    backbuffer?: boolean;
 };

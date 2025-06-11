@@ -46,6 +46,7 @@ export class VFXPlayer {
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
     #elements: VFXElement[] = [];
+    #initTime = Date.now() / 1000.0;
 
     #textureLoader = new THREE.TextureLoader();
 
@@ -92,6 +93,7 @@ export class VFXPlayer {
             this.#postEffectPass = new PostEffectPass(
                 opts.postEffect.shader,
                 opts.postEffect.uniforms,
+                opts.postEffect.backbuffer,
             );
 
             // Store uniform generators for custom uniforms
@@ -638,7 +640,7 @@ export class VFXPlayer {
                 this.#postEffectTarget.texture,
                 this.#pixelRatio,
                 viewportGlRect,
-                now,
+                now - this.#initTime,
                 this.#mouseX,
                 this.#mouseY,
             );
@@ -648,13 +650,44 @@ export class VFXPlayer {
                 this.#postEffectUniformGenerators,
             );
 
-            // Render post effect to final canvas
-            this.#render(
-                this.#postEffectPass.scene,
-                null,
-                viewportGlRect,
-                this.#postEffectPass.uniforms,
-            );
+            // Handle backbuffer rendering
+            if (this.#postEffectPass.backbuffer) {
+                // Update backbuffer texture reference (previous frame)
+                this.#postEffectPass.uniforms.backbuffer.value =
+                    this.#postEffectPass.backbuffer.texture;
+
+                // Render post effect to backbuffer target
+                this.#render(
+                    this.#postEffectPass.scene,
+                    this.#postEffectPass.backbuffer.target,
+                    viewportGlRect,
+                    this.#postEffectPass.uniforms,
+                );
+
+                // Swap backbuffer immediately after rendering
+                this.#postEffectPass.backbuffer.swap();
+
+                // Copy from backbuffer to canvas
+                this.#copyPass.setUniforms(
+                    this.#postEffectPass.backbuffer.texture,
+                    this.#pixelRatio,
+                    viewportGlRect,
+                );
+                this.#render(
+                    this.#copyPass.scene,
+                    null,
+                    viewportGlRect,
+                    this.#copyPass.uniforms,
+                );
+            } else {
+                // Render post effect directly to canvas
+                this.#render(
+                    this.#postEffectPass.scene,
+                    null,
+                    viewportGlRect,
+                    this.#postEffectPass.uniforms,
+                );
+            }
         }
     }
 
@@ -803,6 +836,22 @@ export class VFXPlayer {
                     format: THREE.RGBAFormat,
                 },
             );
+        }
+
+        // Initialize/resize post effect backbuffer if needed
+        if (this.#postEffectPass) {
+            if (
+                this.#postEffectPass.uniforms.backbuffer &&
+                !this.#postEffectPass.backbuffer
+            ) {
+                this.#postEffectPass.initializeBackbuffer(
+                    width,
+                    height,
+                    this.#pixelRatio,
+                );
+            } else if (this.#postEffectPass.backbuffer) {
+                this.#postEffectPass.resizeBackbuffer(width, height);
+            }
         }
     }
 }
