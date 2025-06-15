@@ -514,6 +514,12 @@ export class VFXPlayer {
         const shouldUsePostEffect = this.#postEffectPass !== undefined;
         if (shouldUsePostEffect) {
             this.#setupPostEffectTarget(viewportWidth, viewportHeight);
+            // Clear the post effect target once at the beginning
+            if (this.#postEffectTarget) {
+                this.#renderer.setRenderTarget(this.#postEffectTarget);
+                this.#renderer.clear();
+                this.#renderer.setRenderTarget(null);
+            }
         }
 
         for (const e of this.#elements) {
@@ -782,7 +788,8 @@ export class VFXPlayer {
         uniforms: { [key: string]: THREE.IUniform },
     ) {
         this.#renderer.setRenderTarget(target);
-        if (target !== null) {
+        // Only clear if target is not the post effect target (which is cleared once at the beginning)
+        if (target !== null && target !== this.#postEffectTarget) {
             this.#renderer.clear();
         }
 
