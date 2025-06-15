@@ -224,3 +224,56 @@ export const FeedbackEffect = story({
         backbuffer: true,
     },
 });
+
+// Multiple VFXElements with post effect (test for render target clearing fix)
+export const MultipleElements = {
+    render: () => {
+        const timer = new Timer(0, [0, 10]);
+        document.body.append(timer.element);
+
+        const uniforms = {
+            time: () => timer.time,
+        };
+
+        const container = document.createElement("div");
+
+        // Create three images with different effects
+        const img1 = document.createElement("img");
+        img1.src = Logo;
+        img1.width = 300;
+
+        const img2 = img1.cloneNode() as HTMLImageElement;
+        const img3 = img1.cloneNode() as HTMLImageElement;
+
+        container.appendChild(img1);
+        container.appendChild(img2);
+        container.appendChild(img3);
+
+        const vfx = initVFX({
+            postEffect: {
+                shader: `
+                    precision highp float;
+                    uniform sampler2D src;
+                    uniform vec2 resolution;
+                    uniform vec2 offset;
+                    uniform float time;
+                    out vec4 outColor;
+
+                    void main() {
+                        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+                        outColor = texture(src, uv);
+                        outColor.rgb = 1. - outColor.rgb;
+                    }
+                `,
+                uniforms,
+            },
+        });
+
+        // Add different shader effects to each element
+        vfx.add(img1, { shader: "rgbShift", uniforms });
+        vfx.add(img2, { shader: "sinewave", uniforms });
+        vfx.add(img3, { shader: "uvGradient", uniforms });
+
+        return container;
+    },
+};
