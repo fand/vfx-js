@@ -26,7 +26,9 @@ export default preview;
 
 export const decorators = [
     (story) => {
+        // biome-ignore lint/suspicious/noExplicitAny: use global VFX
         (window as any).vfx?.destroy();
+        // biome-ignore lint/suspicious/noExplicitAny: use global Timer
         (window as any).timer?.dispose();
 
         return story();
