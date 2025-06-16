@@ -19,6 +19,17 @@ const config: StorybookConfig = {
         name: getAbsolutePath("@storybook/html-vite"),
         options: {},
     },
-    viteFinal: async (config) => ({ ...config, define: { "process.env": {} } }),
+    viteFinal: async (config) => ({
+        ...config,
+        define: { "process.env": {} },
+        resolve: {
+            ...config.resolve,
+            alias: {
+                ...config.resolve?.alias,
+                // During development, resolve @vfx-js/core to source files for hot reloading
+                "@vfx-js/core": join(__dirname, "../../vfx-js/src/index.ts"),
+            },
+        },
+    }),
 };
 export default config;
