@@ -304,7 +304,10 @@ export type VFXElementIntersection = {
  */
 export type VFXPostEffect = {
     /**
-     * Fragment shader code to be applied as a post effect.
+     * Fragment shader code or preset name to be applied as a post effect.
+     * You can pass a preset name from ShaderPreset (e.g., "invert", "grayscale", "sepia")
+     * or provide custom shader code.
+     *
      * The shader will receive the rendered canvas as a `sampler2D src` uniform.
      *
      * Standard uniforms available:
@@ -316,7 +319,7 @@ export type VFXPostEffect = {
      * - `vec2 mouse`: Mouse position in pixels
      * - `sampler2D backbuffer`: Previous frame texture (if backbuffer is enabled)
      */
-    shader: string;
+    shader: ShaderPreset | string;
 
     /**
      * Custom uniform values to be passed to the post effect shader.

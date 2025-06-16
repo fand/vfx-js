@@ -45,76 +45,31 @@ export default {
 
 const story = (props: PostEffectProps) => ({ args: props });
 
-// Simple invert post effect
+// Simple invert post effect using preset
 export const InvertColors = story({
     src: Pigeon,
     preset: "rgbShift",
     postEffect: {
-        shader: `
-            precision highp float;
-            uniform sampler2D src;
-            uniform vec2 resolution;
-            uniform vec2 offset;
-            out vec4 outColor;
-
-            void main() {
-                vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                vec4 color = texture(src, uv);
-                outColor = vec4(1.0 - color.rgb, color.a);
-            }
-        `,
+        shader: "invert",
     },
 });
 
-// Grayscale post effect
+// Grayscale post effect using preset
 export const Grayscale = story({
     src: Pigeon,
     preset: "sinewave",
     postEffect: {
-        shader: `
-            precision highp float;
-            uniform sampler2D src;
-            uniform vec2 resolution;
-            uniform vec2 offset;
-            out vec4 outColor;
-
-            void main() {
-                vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                vec4 color = texture(src, uv);
-                float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-                outColor = vec4(vec3(gray), color.a);
-            }
-        `,
+        shader: "grayscale",
     },
 });
 
-// Sepia post effect with custom uniform
+// Sepia post effect using preset with custom uniform
 export const Sepia = story({
     src: Pigeon,
     preset: "sinewave",
     defaultTime: 1.0,
     postEffect: {
-        shader: `
-            precision highp float;
-            uniform sampler2D src;
-            uniform vec2 resolution;
-            uniform vec2 offset;
-            uniform float intensity;
-            out vec4 outColor;
-
-            void main() {
-                vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                vec4 color = texture(src, uv);
-
-                vec3 sepia = vec3(
-                    dot(color.rgb, vec3(0.393, 0.769, 0.189)),
-                    dot(color.rgb, vec3(0.349, 0.686, 0.168)),
-                    dot(color.rgb, vec3(0.272, 0.534, 0.131))
-                );
-
-                outColor = vec4(mix(color.rgb, sepia, intensity), color.a);
-            }
-        `,
+        shader: "sepia",
         uniforms: {
             intensity: 0.8,
         },
@@ -154,42 +109,30 @@ export const AnimatedVignette = story({
     },
 });
 
-// Chromatic aberration post effect
+// Chromatic aberration post effect using preset
 export const ChromaticAberration = story({
     src: Pigeon,
     preset: "sinewave",
     overflow: 50,
     defaultTime: 2.5,
     postEffect: {
-        shader: `
-            precision highp float;
-            uniform sampler2D src;
-            uniform vec2 resolution;
-            uniform vec2 offset;
-            uniform float aberrationStrength;
-            out vec4 outColor;
-
-            void main() {
-                vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                vec2 center = vec2(0.5);
-                vec2 direction = normalize(uv - center);
-                float distance = length(uv - center);
-
-                vec2 offsetR = direction * distance * aberrationStrength;
-                vec2 offsetB = direction * distance * aberrationStrength * -1.0;
-
-                float r = texture(src, uv + offsetR).r;
-                float g = texture(src, uv).g;
-                float b = texture(src, uv + offsetB).b;
-                float a = texture(src, uv).a;
-
-                outColor = vec4(r, g, b, a);
-            }
-        `,
+        shader: "chromatic",
         uniforms: {
             aberrationStrength: 0.01,
         },
-        backbuffer: true,
+    },
+});
+
+// Vignette post effect using preset
+export const VignetteEffect = story({
+    src: Pigeon,
+    preset: "uvGradient",
+    postEffect: {
+        shader: "vignette",
+        uniforms: {
+            intensity: 2.0,
+            radius: 0.3,
+        },
     },
 });
 

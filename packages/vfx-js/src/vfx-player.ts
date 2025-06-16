@@ -90,8 +90,9 @@ export class VFXPlayer {
 
         // Setup post effect pass if specified
         if (opts.postEffect) {
+            const postEffectShader = this.#getShader(opts.postEffect.shader);
             this.#postEffectPass = new PostEffectPass(
-                opts.postEffect.shader,
+                postEffectShader,
                 opts.postEffect.uniforms,
                 opts.postEffect.backbuffer,
             );
