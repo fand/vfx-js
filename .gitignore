@@ -3,3 +3,4 @@ npm-debug.log*
 lib/
 .turbo
 .vscode/
+.claude/
