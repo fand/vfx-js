@@ -1,6 +1,10 @@
 import * as THREE from "three";
 import { Backbuffer } from "./backbuffer.js";
-import { DEFAULT_VERTEX_SHADER, shaders } from "./constants.js";
+import {
+    DEFAULT_VERTEX_SHADER,
+    DEFAULT_VERTEX_SHADER_100,
+    shaders,
+} from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
@@ -371,8 +375,12 @@ export class VFXPlayer {
 
         const scene = new THREE.Scene();
         const geometry = new THREE.PlaneGeometry(2, 2);
+        const vertexShader =
+            glslVersion === "100"
+                ? DEFAULT_VERTEX_SHADER_100
+                : DEFAULT_VERTEX_SHADER;
         const material = new THREE.RawShaderMaterial({
-            vertexShader: DEFAULT_VERTEX_SHADER,
+            vertexShader,
             fragmentShader: shader,
             transparent: true,
             uniforms,
