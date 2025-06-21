@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
 
 // https://vitejs.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => ({
     server: {
         port: 3001,
     },
@@ -18,6 +18,13 @@ export default defineConfig(() => ({
             },
         },
     },
+
+    // During development, resolve @vfx-js/core to source files for hot reloading
+    resolve: mode === "development" ? {
+        alias: {
+            "@vfx-js/core": resolve(__dirname, "../vfx-js/src/index.ts"),
+        },
+    } : undefined,
 
     define: { "process.env": {} },
 }));

@@ -49,6 +49,12 @@ export type VFXOpts = {
      * If you prefer not using the scroll jank technique, specify `false`.
      */
     scrollPadding?: number | [number, number] | false;
+
+    /**
+     * Post effect to be applied to the final output.
+     * You can specify a custom fragment shader to process the entire canvas output.
+     */
+    postEffect?: VFXPostEffect;
 };
 
 export type VFXOptsInner = {
@@ -57,6 +63,7 @@ export type VFXOptsInner = {
     autoplay: boolean;
     fixedCanvas: boolean;
     scrollPadding: [number, number];
+    postEffect: VFXPostEffect | undefined;
 };
 
 /**
@@ -87,6 +94,7 @@ export function getVFXOpts(opts: VFXOpts): VFXOptsInner {
         autoplay: opts.autoplay ?? true,
         fixedCanvas: opts.scrollPadding === false,
         scrollPadding,
+        postEffect: opts.postEffect,
     };
 }
 
@@ -289,4 +297,39 @@ export type VFXElement = {
 export type VFXElementIntersection = {
     threshold: number;
     rootMargin: Margin;
+};
+
+/**
+ * Configuration for post effects that are applied to the final canvas output.
+ */
+export type VFXPostEffect = {
+    /**
+     * Fragment shader code or preset name to be applied as a post effect.
+     * You can pass a preset name from ShaderPreset (e.g., "invert", "grayscale", "sepia")
+     * or provide custom shader code.
+     *
+     * The shader will receive the rendered canvas as a `sampler2D src` uniform.
+     *
+     * Standard uniforms available:
+     * - `sampler2D src`: The input texture (rendered canvas)
+     * - `vec2 resolution`: Canvas resolution in pixels
+     * - `vec2 offset`: Offset values
+     * - `vec4 viewport`: Viewport information
+     * - `float time`: Time in seconds since VFX started
+     * - `vec2 mouse`: Mouse position in pixels
+     * - `sampler2D backbuffer`: Previous frame texture (if backbuffer is enabled)
+     */
+    shader: ShaderPreset | string;
+
+    /**
+     * Custom uniform values to be passed to the post effect shader.
+     * Works the same way as element uniforms.
+     */
+    uniforms?: VFXUniforms;
+
+    /**
+     * Whether the post effect should use a backbuffer for feedback effects.
+     * When enabled, the previous frame's output is available as `sampler2D backbuffer`.
+     */
+    backbuffer?: boolean;
 };

@@ -39,6 +39,7 @@ void main() {
 `;
 
 export type ShaderPreset =
+    | "none"
     | "uvGradient"
     | "rainbow"
     | "glitch"
@@ -56,7 +57,11 @@ export type ShaderPreset =
     | "slitScanTransition"
     | "warpTransition"
     | "pixelateTransition"
-    | "focusTransition";
+    | "focusTransition"
+    | "invert"
+    | "grayscale"
+    | "vignette"
+    | "chromatic";
 
 const COMMON_HEADER = `precision highp float;
 uniform vec2 resolution;
@@ -84,6 +89,7 @@ const READ_TEX = `vec4 readTex(sampler2D tex, vec2 uv) {
  * ```
  */
 export const shaders: Record<ShaderPreset, string> = {
+    none: COPY_FRAGMENT_SHADER,
     uvGradient: `
     ${COMMON_HEADER}
     ${READ_TEX}
@@ -665,6 +671,68 @@ export const shaders: Record<ShaderPreset, string> = {
             readTex(src, uv + vec2(-(1. - t), 0)),
             0.5
         ) * intersection;
+    }
+    `,
+    invert: `
+    ${COMMON_HEADER}
+    ${READ_TEX}
+
+    void main() {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec4 color = readTex(src, uv);
+        outColor = vec4(1.0 - color.rgb, color.a);
+    }
+    `,
+    grayscale: `
+    ${COMMON_HEADER}
+    ${READ_TEX}
+
+    void main() {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec4 color = readTex(src, uv);
+        float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+        outColor = vec4(vec3(gray), color.a);
+    }
+    `,
+    vignette: `
+    ${COMMON_HEADER}
+    ${READ_TEX}
+
+    uniform float intensity;
+    uniform float radius;
+
+    void main() {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec4 color = readTex(src, uv);
+
+        vec2 center = vec2(0.5);
+        float dist = distance(uv, center);
+        float vignette = 1.0 - smoothstep(radius, 1.0, dist * intensity);
+
+        outColor = vec4(color.rgb * vignette, color.a);
+    }
+    `,
+    chromatic: `
+    ${COMMON_HEADER}
+    ${READ_TEX}
+
+    uniform float aberrationStrength;
+
+    void main() {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec2 center = vec2(0.5);
+        vec2 direction = normalize(uv - center);
+        float distance = length(uv - center);
+
+        vec2 offsetR = direction * distance * aberrationStrength;
+        vec2 offsetB = direction * distance * aberrationStrength * -1.0;
+
+        float r = readTex(src, uv + offsetR).r;
+        float g = readTex(src, uv).g;
+        float b = readTex(src, uv + offsetB).b;
+        float a = readTex(src, uv).a;
+
+        outColor = vec4(r, g, b, a);
     }
     `,
 };
