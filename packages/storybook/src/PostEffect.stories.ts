@@ -45,24 +45,6 @@ export default {
 
 const story = (props: PostEffectProps) => ({ args: props });
 
-// Simple invert post effect using preset
-export const InvertColors = story({
-    src: Pigeon,
-    preset: "rgbShift",
-    postEffect: {
-        shader: "invert",
-    },
-});
-
-// Grayscale post effect using preset
-export const Grayscale = story({
-    src: Pigeon,
-    preset: "sinewave",
-    postEffect: {
-        shader: "grayscale",
-    },
-});
-
 // Chromatic aberration post effect using preset
 export const ChromaticAberration = story({
     src: Pigeon,
@@ -151,21 +133,7 @@ export const MultipleElements = {
 
         const vfx = initVFX({
             postEffect: {
-                shader: `
-                    precision highp float;
-                    uniform sampler2D src;
-                    uniform vec2 resolution;
-                    uniform vec2 offset;
-                    uniform float time;
-                    out vec4 outColor;
-
-                    void main() {
-                        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                        outColor = texture(src, uv);
-                        outColor.rgb = 1. - outColor.rgb;
-                    }
-                `,
-                uniforms,
+                shader: "invert",
             },
         });
 
