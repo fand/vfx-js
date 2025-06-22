@@ -66,13 +66,15 @@ export const Grayscale = story({
 // Chromatic aberration post effect using preset
 export const ChromaticAberration = story({
     src: Pigeon,
-    preset: "sinewave",
+    preset: "none",
     overflow: 50,
     defaultTime: 2.5,
     postEffect: {
         shader: "chromatic",
         uniforms: {
-            aberrationStrength: 0.01,
+            intensity: 0.1,
+            radius: 0.0,
+            power: 1.0,
         },
     },
 });

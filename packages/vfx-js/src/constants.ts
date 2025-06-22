@@ -717,23 +717,34 @@ export const shaders: Record<ShaderPreset, string> = {
     ${COMMON_HEADER}
     ${READ_TEX}
 
-    uniform float aberrationStrength;
+    uniform float intensity;
+    uniform float radius;
+    uniform float power;
+
+
+    vec4 mirrorTex(sampler2D tex, vec2 uv) {
+        vec2 uv2 = 1. - abs(1. - mod(uv, 2.0));
+        return texture(tex, uv2);
+    }
 
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec2 center = vec2(0.5);
-        vec2 direction = normalize(uv - center);
-        float distance = length(uv - center);
 
-        vec2 offsetR = direction * distance * aberrationStrength;
-        vec2 offsetB = direction * distance * aberrationStrength * -1.0;
+        vec2 p = uv * 2.0 - 1.0;
+        p.x *= resolution.x / resolution.y;
 
-        float r = readTex(src, uv + offsetR).r;
-        float g = readTex(src, uv).g;
-        float b = readTex(src, uv + offsetB).b;
-        float a = readTex(src, uv).a;
+        float l = max(length(p) - radius, 0.);
+        float d = pow(l, power) * (intensity * 0.1);
 
-        outColor = vec4(r, g, b, a);
+        vec2 uvR = (uv - .5) * (1.0 - d * 1.) + 0.5;
+        vec2 uvG = (uv - .5) * (1.0 - d * 2.) + 0.5;
+        vec2 uvB = (uv - .5) * (1.0 - d * 3.) + 0.5;
+
+        vec4 cr = mirrorTex(src, uvR);
+        vec4 cg = mirrorTex(src, uvG);
+        vec4 cb = mirrorTex(src, uvB);
+
+        outColor = vec4(cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 3.0);
     }
     `,
 };
