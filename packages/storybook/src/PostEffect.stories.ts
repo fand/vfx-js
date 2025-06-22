@@ -80,12 +80,13 @@ export const ChromaticAberration = story({
 // Vignette post effect using preset
 export const VignetteEffect = story({
     src: Pigeon,
-    preset: "uvGradient",
+    preset: "none",
     postEffect: {
         shader: "vignette",
         uniforms: {
-            intensity: 2.0,
-            radius: 0.3,
+            intensity: 1.0,
+            radius: 1.0,
+            power: 1.0,
         },
     },
 });

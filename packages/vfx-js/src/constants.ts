@@ -700,16 +700,17 @@ export const shaders: Record<ShaderPreset, string> = {
 
     uniform float intensity;
     uniform float radius;
+    uniform float power;
 
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = readTex(src, uv);
+        outColor = readTex(src, uv);
 
-        vec2 center = vec2(0.5);
-        float dist = distance(uv, center);
-        float vignette = 1.0 - smoothstep(radius, 1.0, dist * intensity);
+        vec2 p = uv * 2.0 - 1.0;
+        p.x *= resolution.x / resolution.y;
 
-        outColor = vec4(color.rgb * vignette, color.a);
+        float l = max(length(p) - radius, 0.);
+        outColor *= 1. - pow(l, power) * intensity;
     }
     `,
     chromatic: `
