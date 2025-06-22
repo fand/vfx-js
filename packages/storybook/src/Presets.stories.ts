@@ -5,6 +5,7 @@ import { Timer } from "./Timer";
 import { initVFX } from "./utils";
 import Logo from "./assets/logo-640w-20p.svg";
 import Jellyfish from "./assets/jellyfish.webp";
+import Pigeon from "./assets/pigeon.webp";
 import "./preset.css";
 
 interface PresetProps {
@@ -82,3 +83,22 @@ export const hueShift = story({
 export const sinewave = story({ preset: "sinewave", defaultTime: 1.0 });
 export const pixelate = story({ preset: "pixelate", defaultTime: 1.0 });
 export const halftone = story({ src: Jellyfish, preset: "halftone" });
+export const Invert = story({ preset: "invert" });
+export const Grayscale = story({ preset: "grayscale" });
+export const Vignette = story({
+    preset: "vignette",
+    uniforms: {
+        intensity: 0.5,
+        radius: 1.0,
+        power: 2.0,
+    },
+});
+export const Chromatic = story({
+    src: Pigeon,
+    preset: "chromatic",
+    uniforms: {
+        intensity: 0.3,
+        radius: 0.0,
+        power: 2.0,
+    },
+});

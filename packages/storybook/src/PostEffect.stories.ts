@@ -4,8 +4,6 @@ import { Timer } from "./Timer";
 
 import { initVFX } from "./utils";
 import Logo from "./assets/logo-640w-20p.svg";
-import Jellyfish from "./assets/jellyfish.webp";
-import Pigeon from "./assets/pigeon.webp";
 import "./preset.css";
 
 interface PostEffectProps {
@@ -44,36 +42,6 @@ export default {
 } satisfies Meta<PostEffectProps>;
 
 const story = (props: PostEffectProps) => ({ args: props });
-
-// Chromatic aberration post effect using preset
-export const ChromaticAberration = story({
-    src: Pigeon,
-    preset: "none",
-    overflow: 50,
-    defaultTime: 2.5,
-    postEffect: {
-        shader: "chromatic",
-        uniforms: {
-            intensity: 0.1,
-            radius: 0.0,
-            power: 1.0,
-        },
-    },
-});
-
-// Vignette post effect using preset
-export const VignetteEffect = story({
-    src: Pigeon,
-    preset: "none",
-    postEffect: {
-        shader: "vignette",
-        uniforms: {
-            intensity: 1.0,
-            radius: 1.0,
-            power: 1.0,
-        },
-    },
-});
 
 // Feedback effect using backbuffer
 export const FeedbackEffect = story({

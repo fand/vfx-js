@@ -736,9 +736,9 @@ export const shaders: Record<ShaderPreset, string> = {
         float l = max(length(p) - radius, 0.);
         float d = pow(l, power) * (intensity * 0.1);
 
-        vec2 uvR = (uv - .5) * (1.0 - d * 1.) + 0.5;
-        vec2 uvG = (uv - .5) * (1.0 - d * 2.) + 0.5;
-        vec2 uvB = (uv - .5) * (1.0 - d * 3.) + 0.5;
+        vec2 uvR = (uv - .5) / (1.0 + d * 1.) + 0.5;
+        vec2 uvG = (uv - .5) / (1.0 + d * 2.) + 0.5;
+        vec2 uvB = (uv - .5) / (1.0 + d * 3.) + 0.5;
 
         vec4 cr = mirrorTex(src, uvR);
         vec4 cg = mirrorTex(src, uvG);
