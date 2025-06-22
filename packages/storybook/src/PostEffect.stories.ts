@@ -63,52 +63,6 @@ export const Grayscale = story({
     },
 });
 
-// Sepia post effect using preset with custom uniform
-export const Sepia = story({
-    src: Pigeon,
-    preset: "sinewave",
-    defaultTime: 1.0,
-    postEffect: {
-        shader: "sepia",
-        uniforms: {
-            intensity: 0.8,
-        },
-    },
-});
-
-// Animated vignette post effect
-export const AnimatedVignette = story({
-    src: Pigeon,
-    preset: "sinewave",
-    defaultTime: 1.0,
-    postEffect: {
-        shader: `
-            precision highp float;
-            uniform sampler2D src;
-            uniform vec2 resolution;
-            uniform vec2 offset;
-            uniform float time;
-            uniform float vignetteStrength;
-            out vec4 outColor;
-
-            void main() {
-                vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                vec4 color = texture(src, uv);
-
-                vec2 center = vec2(0.5);
-                float dist = distance(uv, center);
-                float vignette = 1.0 - smoothstep(0.3, 1.0, dist * vignetteStrength);
-                vignette += sin(time * 2.0) * 0.1;
-
-                outColor = vec4(color.rgb * vignette, color.a);
-            }
-        `,
-        uniforms: {
-            vignetteStrength: () => Math.sin(Date.now() / 1000) * 0.5 + 1.5,
-        },
-    },
-});
-
 // Chromatic aberration post effect using preset
 export const ChromaticAberration = story({
     src: Pigeon,
