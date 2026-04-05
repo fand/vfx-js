@@ -647,6 +647,11 @@ export class VFXPlayer {
                 this.#paddingY,
             );
 
+            // Update backbuffer uniform before any pass
+            if (e.backbuffer) {
+                e.passes[0].uniforms["backbuffer"].value = e.backbuffer.texture;
+            }
+
             // Render intermediate passes
             for (let i = 0; i < e.passes.length - 1; i++) {
                 const pass = e.passes[i];
