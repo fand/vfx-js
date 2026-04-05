@@ -652,6 +652,20 @@ export class VFXPlayer {
                 e.passes[0].uniforms["backbuffer"].value = e.backbuffer.texture;
             }
 
+            // Resize buffer targets if needed
+            if (e.bufferTargets.size > 0) {
+                const targetRect = e.isFullScreen
+                    ? viewportGlRect
+                    : glRectWithOverflow;
+                const tw = Math.max(1, targetRect.w * this.#pixelRatio);
+                const th = Math.max(1, targetRect.h * this.#pixelRatio);
+                for (const rt of e.bufferTargets.values()) {
+                    if (rt.width !== tw || rt.height !== th) {
+                        rt.setSize(tw, th);
+                    }
+                }
+            }
+
             // Render intermediate passes
             for (let i = 0; i < e.passes.length - 1; i++) {
                 const pass = e.passes[i];
