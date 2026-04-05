@@ -46,6 +46,7 @@ export class VFXPlayer {
     #camera: THREE.Camera;
     #copyPass: CopyPass;
     #postEffectPasses: PostEffectPass[] = [];
+    #postEffectPassTargets: (string | undefined)[] = [];
     #postEffectTarget: THREE.WebGLRenderTarget | undefined;
     #postEffectUniformGeneratorsList: {
         [name: string]: () => VFXUniformValue;
@@ -84,6 +85,7 @@ export class VFXPlayer {
         });
         this.#renderer.autoClear = false;
         this.#renderer.setClearAlpha(0);
+        this.#renderer.getContext().getExtension("OES_texture_float_linear");
         this.#pixelRatio = opts.pixelRatio;
 
         if (typeof window !== "undefined") {
@@ -886,63 +888,85 @@ export class VFXPlayer {
     }
 
     #initPostEffects(postEffects: (VFXPostEffect | VFXPass)[]) {
+        // Collect shader source and target names for each pass
+        const shaderSources: string[] = [];
+        const targetNames: (string | undefined)[] = [];
+
+        // First pass: assign auto target names for intermediate VFXPass items
         const passItems: VFXPass[] = [];
         for (const pe of postEffects) {
             if ("frag" in pe) {
                 passItems.push(pe);
             }
         }
-
-        // Assign auto target names for intermediate passes
         for (let i = 0; i < passItems.length - 1; i++) {
             if (!passItems[i].target) {
                 passItems[i] = { ...passItems[i], target: `postPass${i}` };
             }
         }
 
+        // Create PostEffectPass objects
         for (const pe of postEffects) {
-            if ("frag" in pe) {
-                // Create post effect pass from raw shader
-                const pass = new PostEffectPass(pe.frag, pe.uniforms, false);
-                this.#postEffectPasses.push(pass);
+            let frag: string;
+            let pass: PostEffectPass;
 
-                const generators: { [name: string]: () => VFXUniformValue } =
-                    {};
-                if (pe.uniforms) {
-                    for (const [key, value] of Object.entries(pe.uniforms)) {
-                        if (typeof value === "function") {
-                            generators[key] = value;
-                        }
-                    }
-                }
-                this.#postEffectUniformGeneratorsList.push(generators);
+            if ("frag" in pe) {
+                frag = pe.frag;
+                pass = new PostEffectPass(
+                    frag,
+                    pe.uniforms,
+                    pe.persistent ?? false,
+                    pe.format,
+                    pe.size,
+                );
+                targetNames.push(pe.target);
             } else {
-                // Create post effect pass from preset or shader code
-                const shader = this.#getShader(pe.shader);
-                const pass = new PostEffectPass(
-                    shader,
+                frag = this.#getShader(pe.shader);
+                pass = new PostEffectPass(
+                    frag,
                     pe.uniforms,
                     pe.backbuffer,
+                    pe.format,
                 );
-                this.#postEffectPasses.push(pass);
+                targetNames.push(undefined);
+            }
 
-                const generators: { [name: string]: () => VFXUniformValue } =
-                    {};
-                if (pe.uniforms) {
-                    for (const [key, value] of Object.entries(pe.uniforms)) {
-                        if (typeof value === "function") {
-                            generators[key] = value;
-                        }
+            this.#postEffectPasses.push(pass);
+            shaderSources.push(frag);
+
+            const generators: { [name: string]: () => VFXUniformValue } = {};
+            if (pe.uniforms) {
+                for (const [key, value] of Object.entries(pe.uniforms)) {
+                    if (typeof value === "function") {
+                        generators[key] = value;
                     }
                 }
-                this.#postEffectUniformGeneratorsList.push(generators);
             }
+            this.#postEffectUniformGeneratorsList.push(generators);
         }
+
+        this.#postEffectPassTargets = targetNames;
 
         // Register buffer target names (created lazily in #renderPostEffects)
         for (const p of passItems) {
             if (p.target) {
                 this.#postEffectBufferTargets.set(p.target, undefined);
+            }
+        }
+
+        // Auto-bind named buffer targets referenced in shaders
+        const allTargetNames = targetNames.filter(
+            (n): n is string => n !== undefined,
+        );
+        for (let i = 0; i < this.#postEffectPasses.length; i++) {
+            for (const name of allTargetNames) {
+                if (
+                    shaderSources[i].match(
+                        new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`),
+                    )
+                ) {
+                    this.#postEffectPasses[i].registerBufferUniform(name);
+                }
             }
         }
     }
@@ -952,20 +976,56 @@ export class VFXPlayer {
 
         let inputTexture = this.#postEffectTarget.texture;
 
+        // Track resolved target textures for auto-binding
+        const resolvedTargets = new Map<string, THREE.Texture>();
+
+        // Pre-register persistent backbuffer textures so that earlier passes
+        // can read from later passes' previous-frame output.
+        for (let i = 0; i < this.#postEffectPasses.length; i++) {
+            const pass = this.#postEffectPasses[i];
+            const targetName = this.#postEffectPassTargets[i];
+            if (targetName && pass.backbuffer) {
+                resolvedTargets.set(targetName, pass.backbuffer.texture);
+            }
+        }
+
         for (let i = 0; i < this.#postEffectPasses.length; i++) {
             const pass = this.#postEffectPasses[i];
             const isLastPass = i === this.#postEffectPasses.length - 1;
             const generators = this.#postEffectUniformGeneratorsList[i];
+            const targetName = this.#postEffectPassTargets[i];
 
-            pass.setUniforms(
-                inputTexture,
-                this.#pixelRatio,
-                viewportGlRect,
-                now - this.#initTime,
-                this.#mouseX,
-                this.#mouseY,
-            );
+            // For passes with custom size, set uniforms in target space
+            const targetDims = pass.getTargetDimensions();
+            if (targetDims) {
+                const [tw, th] = targetDims;
+                pass.uniforms.src.value = inputTexture;
+                pass.uniforms.resolution.value.set(tw, th);
+                pass.uniforms.offset.value.set(0, 0);
+                pass.uniforms.time.value = now - this.#initTime;
+                pass.uniforms.mouse.value.set(
+                    (this.#mouseX / viewportGlRect.w) * tw,
+                    (this.#mouseY / viewportGlRect.h) * th,
+                );
+            } else {
+                pass.setUniforms(
+                    inputTexture,
+                    this.#pixelRatio,
+                    viewportGlRect,
+                    now - this.#initTime,
+                    this.#mouseX,
+                    this.#mouseY,
+                );
+            }
+            pass.uniforms.passIndex.value = i;
             pass.updateCustomUniforms(generators);
+
+            // Update auto-bound buffer uniforms from previously resolved targets
+            for (const [name, tex] of resolvedTargets) {
+                if (pass.uniforms[name]) {
+                    pass.uniforms[name].value = tex;
+                }
+            }
 
             if (isLastPass) {
                 // Render to canvas
@@ -999,28 +1059,80 @@ export class VFXPlayer {
                         pass.uniforms,
                     );
                 }
+            } else if (pass.backbuffer) {
+                // Render intermediate pass with persistent backbuffer
+                pass.uniforms.backbuffer.value = pass.backbuffer.texture;
+
+                // Use custom size viewport if set
+                const bbRect = targetDims
+                    ? getGLRect(
+                          0,
+                          0,
+                          targetDims[0] / this.#pixelRatio,
+                          targetDims[1] / this.#pixelRatio,
+                      )
+                    : viewportGlRect;
+
+                this.#render(
+                    pass.scene,
+                    pass.backbuffer.target,
+                    bbRect,
+                    pass.uniforms,
+                );
+                pass.backbuffer.swap();
+
+                inputTexture = pass.backbuffer.texture;
+
+                // Register output for named buffer auto-binding
+                if (targetName) {
+                    resolvedTargets.set(targetName, pass.backbuffer.texture);
+                }
             } else {
                 // Render to intermediate buffer
-                const bufferName = `postEffect${i}`;
+                const bufferName = targetName ?? `postEffect${i}`;
                 let rt = this.#postEffectBufferTargets.get(bufferName);
-                if (!rt) {
-                    rt = new THREE.WebGLRenderTarget(
-                        viewportGlRect.w * this.#pixelRatio,
-                        viewportGlRect.h * this.#pixelRatio,
-                        {
-                            minFilter: THREE.LinearFilter,
-                            magFilter: THREE.LinearFilter,
-                            format: THREE.RGBAFormat,
-                        },
-                    );
+
+                // Use custom size or viewport size
+                const rtW = targetDims
+                    ? targetDims[0]
+                    : viewportGlRect.w * this.#pixelRatio;
+                const rtH = targetDims
+                    ? targetDims[1]
+                    : viewportGlRect.h * this.#pixelRatio;
+
+                if (!rt || rt.width !== rtW || rt.height !== rtH) {
+                    rt?.dispose();
+                    rt = new THREE.WebGLRenderTarget(rtW, rtH, {
+                        minFilter: THREE.LinearFilter,
+                        magFilter: THREE.LinearFilter,
+                        format: THREE.RGBAFormat,
+                        type:
+                            pass.format === "Float"
+                                ? THREE.FloatType
+                                : THREE.UnsignedByteType,
+                    });
                     this.#postEffectBufferTargets.set(bufferName, rt);
                 }
 
+                const renderRect = targetDims
+                    ? getGLRect(
+                          0,
+                          0,
+                          targetDims[0] / this.#pixelRatio,
+                          targetDims[1] / this.#pixelRatio,
+                      )
+                    : viewportGlRect;
+
                 this.#renderer.setRenderTarget(rt);
                 this.#renderer.clear();
-                this.#render(pass.scene, rt, viewportGlRect, pass.uniforms);
+                this.#render(pass.scene, rt, renderRect, pass.uniforms);
 
                 inputTexture = rt.texture;
+
+                // Register output for named buffer auto-binding
+                if (targetName) {
+                    resolvedTargets.set(targetName, rt.texture);
+                }
             }
         }
     }

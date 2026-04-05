@@ -10,6 +10,14 @@ import type { Margin, MarginOpts } from "./rect.js";
  * referenced as a `sampler2D` uniform in subsequent passes.
  * The last pass in the array renders to the screen.
  */
+/**
+ * Texture format for render targets.
+ * - `"RGBA"`: 8-bit per channel (default).
+ * - `"Float"`: 32-bit floating point per channel.
+ *   Use when storing non-visual data (e.g. velocity fields) or values outside [0, 1].
+ */
+export type VFXTextureFormat = "RGBA" | "Float";
+
 export type VFXPass = {
     /**
      * Vertex shader code.
@@ -29,6 +37,26 @@ export type VFXPass = {
      * If omitted on the last pass, renders to screen.
      */
     target?: string;
+
+    /**
+     * Whether this pass's render target should persist across frames.
+     * When enabled, the previous frame's output is available as `sampler2D backbuffer`.
+     */
+    persistent?: boolean;
+
+    /**
+     * Texture format for this pass's render target. (Default: `"RGBA"`)
+     */
+    format?: VFXTextureFormat;
+
+    /**
+     * Render target size in pixels `[width, height]`.
+     * When set, the backbuffer and intermediate buffer are created at this
+     * fixed size instead of the viewport resolution.
+     * Useful for fluid simulations where the velocity field runs at lower
+     * resolution (e.g. `[228, 128]`) than the display.
+     */
+    size?: [number, number];
 
     /**
      * Uniform values to be passed to this pass's shader.
@@ -385,4 +413,9 @@ export type VFXPostEffect = {
      * When enabled, the previous frame's output is available as `sampler2D backbuffer`.
      */
     backbuffer?: boolean;
+
+    /**
+     * Texture format for this effect's render target. (Default: `"RGBA"`)
+     */
+    format?: VFXTextureFormat;
 };
