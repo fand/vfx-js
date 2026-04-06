@@ -396,6 +396,7 @@ export class VFXPlayer {
 
         // Create buffer targets for intermediate passes
         const bufferTargets = new Map<string, THREE.WebGLRenderTarget>();
+        const passBackbuffers = new Map<string, Backbuffer>();
         for (let i = 0; i < inputPasses.length - 1; i++) {
             const targetName = inputPasses[i].target ?? `pass${i}`;
             inputPasses[i] = { ...inputPasses[i], target: targetName };
@@ -408,17 +409,38 @@ export class VFXPlayer {
                 ? passSize[1]
                 : (rectWithOverflow.bottom - rectWithOverflow.top) *
                   this.#pixelRatio;
-            bufferTargets.set(
-                targetName,
-                new THREE.WebGLRenderTarget(bw, bh, {
-                    minFilter: THREE.LinearFilter,
-                    magFilter: THREE.LinearFilter,
-                    format: THREE.RGBAFormat,
-                    type: inputPasses[i].float
-                        ? THREE.FloatType
-                        : THREE.UnsignedByteType,
-                }),
-            );
+
+            if (inputPasses[i].persistent) {
+                // Persistent passes use double-buffered Backbuffer
+                const pixelRatio = passSize ? 1 : this.#pixelRatio;
+                const logicalW = passSize
+                    ? passSize[0]
+                    : rectWithOverflow.right - rectWithOverflow.left;
+                const logicalH = passSize
+                    ? passSize[1]
+                    : rectWithOverflow.bottom - rectWithOverflow.top;
+                passBackbuffers.set(
+                    targetName,
+                    new Backbuffer(
+                        logicalW,
+                        logicalH,
+                        pixelRatio,
+                        inputPasses[i].float,
+                    ),
+                );
+            } else {
+                bufferTargets.set(
+                    targetName,
+                    new THREE.WebGLRenderTarget(bw, bh, {
+                        minFilter: THREE.LinearFilter,
+                        magFilter: THREE.LinearFilter,
+                        format: THREE.RGBAFormat,
+                        type: inputPasses[i].float
+                            ? THREE.FloatType
+                            : THREE.UnsignedByteType,
+                    }),
+                );
+            }
         }
 
         // Build passes
@@ -443,12 +465,21 @@ export class VFXPlayer {
 
             // Auto-bind buffer targets referenced in the shader
             // Skip binding the pass's own render target to avoid feedback loops
+            // (persistent passes can read their own buffer via backbuffer double-buffering)
             for (const [name, rt] of bufferTargets) {
                 if (name === p.target) continue;
                 if (
                     frag.match(new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`))
                 ) {
                     passUniforms[name] = { value: rt.texture };
+                }
+            }
+            for (const [name, bb] of passBackbuffers) {
+                if (
+                    frag.match(new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`))
+                ) {
+                    // Backbuffer read texture is always safe (double-buffered)
+                    passUniforms[name] = { value: bb.texture };
                 }
             }
 
@@ -488,6 +519,9 @@ export class VFXPlayer {
                 persistent: p.persistent,
                 float: p.float,
                 size: p.size,
+                backbuffer: p.target
+                    ? passBackbuffers.get(p.target)
+                    : undefined,
             });
         }
 
@@ -682,31 +716,113 @@ export class VFXPlayer {
                 }
             }
 
+            // Track resolved buffer textures for dynamic uniform updates
+            const resolvedTargets = new Map<string, THREE.Texture>();
+
+            // Pre-register persistent backbuffer textures
+            for (const pass of e.passes) {
+                if (pass.backbuffer && pass.target) {
+                    resolvedTargets.set(pass.target, pass.backbuffer.texture);
+                }
+            }
+
             // Render intermediate passes, chaining src between passes
             for (let i = 0; i < e.passes.length - 1; i++) {
                 const pass = e.passes[i];
-                const rt = e.bufferTargets.get(pass.target as string);
-                if (!rt) continue;
+                const defaultRect = e.isFullScreen
+                    ? viewportGlRect
+                    : glRectWithOverflow;
 
-                this.#setOffset(e, glRect.x, glRect.y);
-                this.#renderer.setRenderTarget(rt);
-                this.#renderer.clear();
-                this.#render(
-                    pass.scene,
-                    rt,
-                    e.isFullScreen ? viewportGlRect : glRectWithOverflow,
-                    pass.uniforms,
-                );
+                // Update auto-bound buffer uniforms from resolved targets
+                for (const [name, tex] of resolvedTargets) {
+                    if (pass.uniforms[name]) {
+                        pass.uniforms[name].value = tex;
+                    }
+                }
 
-                // Pipe output to next pass's src
-                const nextPass = e.passes[i + 1];
-                if (nextPass) {
-                    nextPass.uniforms["src"].value = rt.texture;
+                // Update dynamic uniforms
+                for (const [key, gen] of Object.entries(
+                    pass.uniformGenerators,
+                )) {
+                    if (pass.uniforms[key]) {
+                        pass.uniforms[key].value = gen();
+                    }
+                }
+
+                if (pass.backbuffer) {
+                    // Persistent pass: render to backbuffer, then swap
+                    const bbRect = pass.size
+                        ? getGLRect(0, 0, pass.size[0], pass.size[1])
+                        : defaultRect;
+
+                    this.#setOffset(e, glRect.x, glRect.y);
+                    this.#render(
+                        pass.scene,
+                        pass.backbuffer.target,
+                        bbRect,
+                        pass.uniforms,
+                    );
+                    pass.backbuffer.swap();
+
+                    // Update resolved target with swapped read texture
+                    if (pass.target) {
+                        resolvedTargets.set(
+                            pass.target,
+                            pass.backbuffer.texture,
+                        );
+                    }
+
+                    // Pipe output to next pass's src
+                    const nextPass = e.passes[i + 1];
+                    if (nextPass) {
+                        nextPass.uniforms["src"].value =
+                            pass.backbuffer.texture;
+                    }
+                } else {
+                    // Non-persistent pass: render to buffer target
+                    const rt = e.bufferTargets.get(pass.target as string);
+                    if (!rt) continue;
+
+                    const renderRect = pass.size
+                        ? getGLRect(0, 0, pass.size[0], pass.size[1])
+                        : defaultRect;
+
+                    this.#setOffset(e, glRect.x, glRect.y);
+                    this.#renderer.setRenderTarget(rt);
+                    this.#renderer.clear();
+                    this.#render(pass.scene, rt, renderRect, pass.uniforms);
+
+                    // Update resolved target
+                    if (pass.target) {
+                        resolvedTargets.set(pass.target, rt.texture);
+                    }
+
+                    // Pipe output to next pass's src
+                    const nextPass = e.passes[i + 1];
+                    if (nextPass) {
+                        nextPass.uniforms["src"].value = rt.texture;
+                    }
                 }
             }
 
             // Render final pass
             const finalPass = e.passes[e.passes.length - 1];
+
+            // Update resolved buffer uniforms for final pass
+            for (const [name, tex] of resolvedTargets) {
+                if (finalPass.uniforms[name]) {
+                    finalPass.uniforms[name].value = tex;
+                }
+            }
+            // Update dynamic uniforms for final pass
+            for (const [key, gen] of Object.entries(
+                finalPass.uniformGenerators,
+            )) {
+                if (finalPass.uniforms[key]) {
+                    finalPass.uniforms[key].value = gen();
+                }
+            }
+
             if (e.backbuffer) {
                 // Update backbuffer
                 finalPass.uniforms["backbuffer"].value = e.backbuffer.texture;
