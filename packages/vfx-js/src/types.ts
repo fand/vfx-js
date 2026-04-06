@@ -4,6 +4,68 @@ import type { ShaderPreset } from "./constants.js";
 import type { Margin, MarginOpts } from "./rect.js";
 
 /**
+ * A single render pass in a multipass shader pipeline.
+ *
+ * Each pass renders to a named buffer (specified by `target`), which can be
+ * referenced as a `sampler2D` uniform in subsequent passes.
+ * The last pass in the array renders to the screen.
+ */
+/**
+ * Texture format for render targets.
+ * - `"RGBA"`: 8-bit per channel (default).
+ * - `"Float"`: 32-bit floating point per channel.
+ *   Use when storing non-visual data (e.g. velocity fields) or values outside [0, 1].
+ */
+export type VFXTextureFormat = "RGBA" | "Float";
+
+export type VFXPass = {
+    /**
+     * Vertex shader code.
+     * If omitted, the default vertex shader is used.
+     */
+    vert?: string;
+
+    /** Fragment shader code. */
+    frag: string;
+
+    /**
+     * Name of the buffer to write this pass's output to.
+     * Later passes can reference it as `uniform sampler2D <target>;`.
+     *
+     * If specified, output is written to a named render target.
+     * If omitted on an intermediate pass, auto-assigned as `pass0`, `pass1`, etc.
+     * If omitted on the last pass, renders to screen.
+     */
+    target?: string;
+
+    /**
+     * Whether this pass's render target should persist across frames.
+     * When enabled, the previous frame's output is available as `sampler2D backbuffer`.
+     */
+    persistent?: boolean;
+
+    /**
+     * Texture format for this pass's render target. (Default: `"RGBA"`)
+     */
+    format?: VFXTextureFormat;
+
+    /**
+     * Render target size in pixels `[width, height]`.
+     * When set, the backbuffer and intermediate buffer are created at this
+     * fixed size instead of the viewport resolution.
+     * Useful for fluid simulations where the velocity field runs at lower
+     * resolution (e.g. `[228, 128]`) than the display.
+     */
+    size?: [number, number];
+
+    /**
+     * Uniform values to be passed to this pass's shader.
+     * Works the same way as element uniforms.
+     */
+    uniforms?: VFXUniforms;
+};
+
+/**
  * Options to initialize `VFX` class.
  */
 export type VFXOpts = {
@@ -53,8 +115,9 @@ export type VFXOpts = {
     /**
      * Post effect to be applied to the final output.
      * You can specify a custom fragment shader to process the entire canvas output.
+     * You can also pass `VFXPass[]` for a multipass post-effect chain.
      */
-    postEffect?: VFXPostEffect;
+    postEffect?: VFXPostEffect | VFXPass[];
 };
 
 export type VFXOptsInner = {
@@ -63,7 +126,7 @@ export type VFXOptsInner = {
     autoplay: boolean;
     fixedCanvas: boolean;
     scrollPadding: [number, number];
-    postEffect: VFXPostEffect | undefined;
+    postEffects: (VFXPostEffect | VFXPass)[];
 };
 
 /**
@@ -88,13 +151,22 @@ export function getVFXOpts(opts: VFXOpts): VFXOptsInner {
         scrollPadding = [opts.scrollPadding, opts.scrollPadding];
     }
 
+    let postEffects: (VFXPostEffect | VFXPass)[];
+    if (opts.postEffect === undefined) {
+        postEffects = [];
+    } else if (Array.isArray(opts.postEffect)) {
+        postEffects = opts.postEffect;
+    } else {
+        postEffects = [opts.postEffect];
+    }
+
     return {
         pixelRatio: opts.pixelRatio ?? defaultPixelRatio,
         zIndex: opts.zIndex ?? undefined,
         autoplay: opts.autoplay ?? true,
         fixedCanvas: opts.scrollPadding === false,
         scrollPadding,
-        postEffect: opts.postEffect,
+        postEffects,
     };
 }
 
@@ -110,7 +182,7 @@ export type VFXProps = {
      *
      * You can also write the shader by yourself, and pass the shader code here.
      */
-    shader?: ShaderPreset | string;
+    shader?: ShaderPreset | string | VFXPass[];
 
     /**
      * The release time for the element. (Default: `0`)
@@ -269,6 +341,17 @@ export type VFXElementType = "img" | "video" | "text" | "canvas";
 /**
  * @internal
  */
+export type VFXElementPass = {
+    scene: THREE.Scene;
+    mesh: THREE.Mesh;
+    uniforms: { [name: string]: THREE.IUniform };
+    uniformGenerators: { [name: string]: () => VFXUniformValue };
+    target?: string;
+};
+
+/**
+ * @internal
+ */
 export type VFXElement = {
     type: VFXElementType;
     element: HTMLElement;
@@ -276,10 +359,8 @@ export type VFXElement = {
     isInLogicalViewport: boolean;
     width: number;
     height: number;
-    scene: THREE.Scene;
-    mesh: THREE.Mesh;
-    uniforms: { [name: string]: THREE.IUniform };
-    uniformGenerators: { [name: string]: () => VFXUniformValue };
+    passes: VFXElementPass[];
+    bufferTargets: Map<string, THREE.WebGLRenderTarget>;
     startTime: number;
     enterTime: number;
     leaveTime: number;
@@ -332,4 +413,9 @@ export type VFXPostEffect = {
      * When enabled, the previous frame's output is available as `sampler2D backbuffer`.
      */
     backbuffer?: boolean;
+
+    /**
+     * Texture format for this effect's render target. (Default: `"RGBA"`)
+     */
+    format?: VFXTextureFormat;
 };

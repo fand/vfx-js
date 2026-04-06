@@ -1,3 +1,4 @@
+import type { VFXPass, VFXPostEffect } from "@vfx-js/core";
 import { VFX } from "@vfx-js/core";
 import type * as React from "react";
 import { useEffect, useState } from "react";
@@ -7,6 +8,7 @@ export interface VFXProviderProps {
     children?: React.ReactNode;
     pixelRatio?: number;
     zIndex?: number;
+    postEffect?: VFXPostEffect | VFXPass[];
 }
 
 export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
@@ -14,7 +16,10 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
 
     useEffect(() => {
         // Setup player
-        const vfx = new VFX({ pixelRatio: props.pixelRatio });
+        const vfx = new VFX({
+            pixelRatio: props.pixelRatio,
+            postEffect: props.postEffect,
+        });
         setVFX(vfx);
         vfx.play();
 
@@ -22,7 +27,7 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
             vfx.stop();
             vfx.destroy();
         };
-    }, [props.pixelRatio]); // TODO: add zIndex
+    }, [props.pixelRatio, props.postEffect]); // TODO: add zIndex
 
     return (
         <>
