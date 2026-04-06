@@ -375,6 +375,7 @@ export type VFXElement = {
     overflow: Margin;
     intersection: VFXElementIntersection;
     originalOpacity: number;
+    srcTexture: THREE.Texture;
     zIndex: number;
     backbuffer?: Backbuffer;
     autoCrop: boolean;

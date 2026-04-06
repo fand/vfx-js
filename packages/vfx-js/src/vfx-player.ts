@@ -279,6 +279,7 @@ export class VFXPlayer {
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             srcUniform.value = texture;
+            e.srcTexture = texture;
             oldTexture.dispose();
         } catch (e) {
             console.error(e);
@@ -544,6 +545,7 @@ export class VFXPlayer {
             overflow,
             intersection: intersectionOpts,
             originalOpacity,
+            srcTexture: texture,
             zIndex: opts.zIndex ?? 0,
             backbuffer,
             autoCrop,
@@ -604,6 +606,7 @@ export class VFXPlayer {
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             srcUniform.value = texture;
+            e.srcTexture = texture;
             oldTexture.dispose();
         }
     }
@@ -733,11 +736,20 @@ export class VFXPlayer {
             }
 
             // Render intermediate passes, chaining src between passes
+            // Use local inputTexture (like post-effects) to avoid corrupting
+            // the shared src uniform across frames.
+            let inputTexture: THREE.Texture = e.srcTexture;
+            const relMouseX = this.#mouseX - glRect.x;
+            const relMouseY = this.#mouseY - glRect.y;
+
             for (let i = 0; i < e.passes.length - 1; i++) {
                 const pass = e.passes[i];
                 const defaultRect = e.isFullScreen
                     ? viewportGlRect
                     : glRectWithOverflow;
+
+                // Set src from chain (not shared uniform mutation)
+                pass.uniforms["src"].value = inputTexture;
 
                 // Update auto-bound buffer uniforms from resolved targets
                 for (const [name, tex] of resolvedTargets) {
@@ -770,11 +782,9 @@ export class VFXPlayer {
                 pass.uniforms["resolution"].value.set(bufferW, bufferH);
                 pass.uniforms["offset"].value.set(0, 0);
                 pass.uniforms["mouse"].value.set(
-                    (this.#mouseX / defaultRect.w) * bufferW,
-                    (this.#mouseY / defaultRect.h) * bufferH,
+                    (relMouseX / defaultRect.w) * bufferW,
+                    (relMouseY / defaultRect.h) * bufferH,
                 );
-
-                let outputTexture: THREE.Texture;
 
                 if (pass.backbuffer) {
                     // Persistent pass: render to backbuffer, then swap
@@ -785,7 +795,7 @@ export class VFXPlayer {
                         pass.uniforms,
                     );
                     pass.backbuffer.swap();
-                    outputTexture = pass.backbuffer.texture;
+                    inputTexture = pass.backbuffer.texture;
                 } else {
                     // Non-persistent pass: render to buffer target
                     const rt = e.bufferTargets.get(pass.target as string);
@@ -794,23 +804,18 @@ export class VFXPlayer {
                     this.#renderer.setRenderTarget(rt);
                     this.#renderer.clear();
                     this.#render(pass.scene, rt, bufferRect, pass.uniforms);
-                    outputTexture = rt.texture;
+                    inputTexture = rt.texture;
                 }
 
                 // Update resolved target
                 if (pass.target) {
-                    resolvedTargets.set(pass.target, outputTexture);
-                }
-
-                // Pipe output to next pass's src
-                const nextPass = e.passes[i + 1];
-                if (nextPass) {
-                    nextPass.uniforms["src"].value = outputTexture;
+                    resolvedTargets.set(pass.target, inputTexture);
                 }
             }
 
-            // Render final pass — restore resolution/offset to element size
+            // Render final pass — restore element-space uniforms
             const finalPass = e.passes[e.passes.length - 1];
+            finalPass.uniforms["src"].value = inputTexture;
             finalPass.uniforms["resolution"].value.set(
                 domRect.width * this.#pixelRatio,
                 domRect.height * this.#pixelRatio,
