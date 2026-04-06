@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import { type GLRect, getGLRect } from "./gl-rect";
-import type { VFXTextureFormat } from "./types.js";
 
 /**
  * A class to manage initialization and double-buffring of the backbuffer.
@@ -12,26 +11,16 @@ export class Backbuffer {
     #pixelRatio: number;
     #buffers: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
 
-    constructor(
-        width: number,
-        height: number,
-        pixelRatio: number,
-        format?: VFXTextureFormat,
-    ) {
+    constructor(width: number, height: number, pixelRatio: number) {
         this.#width = width;
         this.#height = height;
         this.#pixelRatio = pixelRatio;
 
         const pwidth = width * pixelRatio; // use physical size
         const pheight = height * pixelRatio;
-        const opts = {
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            type: format === "Float" ? THREE.FloatType : THREE.UnsignedByteType,
-        };
         this.#buffers = [
-            new THREE.WebGLRenderTarget(pwidth, pheight, opts),
-            new THREE.WebGLRenderTarget(pwidth, pheight, opts),
+            new THREE.WebGLRenderTarget(pwidth, pheight),
+            new THREE.WebGLRenderTarget(pwidth, pheight),
         ];
     }
 

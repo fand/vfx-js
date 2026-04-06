@@ -2,11 +2,7 @@ import * as THREE from "three";
 import { Backbuffer } from "./backbuffer.js";
 import { DEFAULT_VERTEX_SHADER } from "./constants.js";
 import type { GLRect } from "./gl-rect.js";
-import type {
-    VFXTextureFormat,
-    VFXUniformValue,
-    VFXUniforms,
-} from "./types.js";
+import type { VFXUniformValue, VFXUniforms } from "./types.js";
 
 export class PostEffectPass {
     #scene: THREE.Scene;
@@ -14,18 +10,12 @@ export class PostEffectPass {
     #uniforms: { [name: string]: THREE.IUniform };
     #uniformGenerators: { [name: string]: () => VFXUniformValue };
     #backbuffer?: Backbuffer;
-    #format?: VFXTextureFormat;
-    #size?: [number, number];
 
     constructor(
         fragmentShader: string,
         uniforms?: VFXUniforms,
         useBackbuffer?: boolean,
-        format?: VFXTextureFormat,
-        size?: [number, number],
     ) {
-        this.#format = format;
-        this.#size = size;
         this.#scene = new THREE.Scene();
         this.#uniformGenerators = {};
         this.#uniforms = {
@@ -35,7 +25,6 @@ export class PostEffectPass {
             viewport: { value: new THREE.Vector4() },
             time: { value: 0.0 },
             mouse: { value: new THREE.Vector2() },
-            passIndex: { value: 0 },
         };
 
         // Add backbuffer uniform if requested
@@ -115,63 +104,19 @@ export class PostEffectPass {
 
     initializeBackbuffer(width: number, height: number, pixelRatio: number) {
         if (this.#uniforms.backbuffer && !this.#backbuffer) {
-            if (this.#size) {
-                this.#backbuffer = new Backbuffer(
-                    this.#size[0],
-                    this.#size[1],
-                    1,
-                    this.#format,
-                );
-            } else {
-                this.#backbuffer = new Backbuffer(
-                    width,
-                    height,
-                    pixelRatio,
-                    this.#format,
-                );
-            }
+            this.#backbuffer = new Backbuffer(width, height, pixelRatio);
             this.#uniforms.backbuffer.value = this.#backbuffer.texture;
         }
     }
 
     resizeBackbuffer(width: number, height: number) {
         if (this.#backbuffer) {
-            if (this.#size) {
-                // Fixed size: no resize needed
-            } else {
-                this.#backbuffer.resize(width, height);
-            }
-        }
-    }
-
-    /**
-     * Register a named buffer texture as a uniform (for auto-binding).
-     * The texture value will be updated each frame by the render loop.
-     */
-    registerBufferUniform(name: string) {
-        if (!this.#uniforms[name]) {
-            this.#uniforms[name] = { value: null };
+            this.#backbuffer.resize(width, height);
         }
     }
 
     get backbuffer() {
         return this.#backbuffer;
-    }
-
-    get format(): VFXTextureFormat | undefined {
-        return this.#format;
-    }
-
-    get size(): [number, number] | undefined {
-        return this.#size;
-    }
-
-    /**
-     * Get target dimensions for this pass.
-     * Returns undefined if no custom size is set (uses viewport resolution).
-     */
-    getTargetDimensions(): [number, number] | undefined {
-        return this.#size;
     }
 
     get scene(): THREE.Scene {

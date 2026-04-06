@@ -6,10 +6,4 @@
 export * from "./vfx.js";
 export * from "./constants.js";
 
-export type {
-    VFXOpts,
-    VFXProps,
-    VFXPostEffect,
-    VFXPass,
-    VFXTextureFormat,
-} from "./types.js";
+export type { VFXOpts, VFXProps, VFXPostEffect } from "./types.js";
