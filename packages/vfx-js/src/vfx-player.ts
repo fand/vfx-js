@@ -700,18 +700,24 @@ export class VFXPlayer {
             }
 
             // Resize buffer targets if needed (skip passes with custom size)
-            if (e.bufferTargets.size > 0) {
+            {
                 const targetRect = e.isFullScreen
                     ? viewportGlRect
                     : glRectWithOverflow;
                 const tw = Math.max(1, targetRect.w * this.#pixelRatio);
                 const th = Math.max(1, targetRect.h * this.#pixelRatio);
+                const logicalW = Math.max(1, targetRect.w);
+                const logicalH = Math.max(1, targetRect.h);
                 for (let i = 0; i < e.passes.length - 1; i++) {
                     const pass = e.passes[i];
                     if (pass.size) continue; // fixed size, no resize
-                    const rt = e.bufferTargets.get(pass.target as string);
-                    if (rt && (rt.width !== tw || rt.height !== th)) {
-                        rt.setSize(tw, th);
+                    if (pass.backbuffer) {
+                        pass.backbuffer.resize(logicalW, logicalH);
+                    } else {
+                        const rt = e.bufferTargets.get(pass.target as string);
+                        if (rt && (rt.width !== tw || rt.height !== th)) {
+                            rt.setSize(tw, th);
+                        }
                     }
                 }
             }
