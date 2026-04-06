@@ -755,83 +755,57 @@ export class VFXPlayer {
                     }
                 }
 
-                // Set resolution/offset/mouse for the pass's target space
-                if (pass.size) {
-                    pass.uniforms["resolution"].value.set(
-                        pass.size[0],
-                        pass.size[1],
-                    );
-                    pass.uniforms["offset"].value.set(0, 0);
-                    pass.uniforms["mouse"].value.set(
-                        (this.#mouseX / defaultRect.w) * pass.size[0],
-                        (this.#mouseY / defaultRect.h) * pass.size[1],
-                    );
-                } else {
-                    pass.uniforms["resolution"].value.set(
-                        defaultRect.w * this.#pixelRatio,
-                        defaultRect.h * this.#pixelRatio,
-                    );
-                    pass.uniforms["offset"].value.set(
-                        glRect.x * this.#pixelRatio,
-                        glRect.y * this.#pixelRatio,
-                    );
-                    pass.uniforms["mouse"].value.set(
-                        this.#mouseX * this.#pixelRatio,
-                        this.#mouseY * this.#pixelRatio,
-                    );
-                }
+                // Intermediate passes render to their own buffer,
+                // so offset is always 0 and resolution matches buffer size.
+                const bufferW = pass.size
+                    ? pass.size[0]
+                    : defaultRect.w * this.#pixelRatio;
+                const bufferH = pass.size
+                    ? pass.size[1]
+                    : defaultRect.h * this.#pixelRatio;
+                const bufferRect = pass.size
+                    ? getGLRect(0, 0, pass.size[0], pass.size[1])
+                    : getGLRect(0, 0, defaultRect.w, defaultRect.h);
+
+                pass.uniforms["resolution"].value.set(bufferW, bufferH);
+                pass.uniforms["offset"].value.set(0, 0);
+                pass.uniforms["mouse"].value.set(
+                    (this.#mouseX / defaultRect.w) * bufferW,
+                    (this.#mouseY / defaultRect.h) * bufferH,
+                );
+
+                let outputTexture: THREE.Texture;
 
                 if (pass.backbuffer) {
                     // Persistent pass: render to backbuffer, then swap
-                    const bbRect = pass.size
-                        ? getGLRect(0, 0, pass.size[0], pass.size[1])
-                        : defaultRect;
-
                     this.#render(
                         pass.scene,
                         pass.backbuffer.target,
-                        bbRect,
+                        bufferRect,
                         pass.uniforms,
                     );
                     pass.backbuffer.swap();
-
-                    // Update resolved target with swapped read texture
-                    if (pass.target) {
-                        resolvedTargets.set(
-                            pass.target,
-                            pass.backbuffer.texture,
-                        );
-                    }
-
-                    // Pipe output to next pass's src
-                    const nextPass = e.passes[i + 1];
-                    if (nextPass) {
-                        nextPass.uniforms["src"].value =
-                            pass.backbuffer.texture;
-                    }
+                    outputTexture = pass.backbuffer.texture;
                 } else {
                     // Non-persistent pass: render to buffer target
                     const rt = e.bufferTargets.get(pass.target as string);
                     if (!rt) continue;
 
-                    const renderRect = pass.size
-                        ? getGLRect(0, 0, pass.size[0], pass.size[1])
-                        : defaultRect;
-
                     this.#renderer.setRenderTarget(rt);
                     this.#renderer.clear();
-                    this.#render(pass.scene, rt, renderRect, pass.uniforms);
+                    this.#render(pass.scene, rt, bufferRect, pass.uniforms);
+                    outputTexture = rt.texture;
+                }
 
-                    // Update resolved target
-                    if (pass.target) {
-                        resolvedTargets.set(pass.target, rt.texture);
-                    }
+                // Update resolved target
+                if (pass.target) {
+                    resolvedTargets.set(pass.target, outputTexture);
+                }
 
-                    // Pipe output to next pass's src
-                    const nextPass = e.passes[i + 1];
-                    if (nextPass) {
-                        nextPass.uniforms["src"].value = rt.texture;
-                    }
+                // Pipe output to next pass's src
+                const nextPass = e.passes[i + 1];
+                if (nextPass) {
+                    nextPass.uniforms["src"].value = outputTexture;
                 }
             }
 
