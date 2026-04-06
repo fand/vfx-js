@@ -363,6 +363,50 @@ class App {
         });
     }
 
+    async initMultipass() {
+        const e = $("#multipass");
+        await this.vfx.add(e, {
+            shader: [
+                {
+                    frag: `
+                        precision highp float;
+                        uniform sampler2D src;
+                        uniform vec2 resolution;
+                        uniform vec2 offset;
+                        out vec4 outColor;
+                        void main() {
+                            vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+                            vec2 t = 4.0 / resolution;
+                            vec4 c = texture(src, uv) * 0.4;
+                            c += texture(src, uv + vec2(t.x, 0)) * 0.15;
+                            c += texture(src, uv - vec2(t.x, 0)) * 0.15;
+                            c += texture(src, uv + vec2(0, t.y)) * 0.15;
+                            c += texture(src, uv - vec2(0, t.y)) * 0.15;
+                            outColor = c;
+                        }
+                    `,
+                    target: "blur",
+                },
+                {
+                    frag: `
+                        precision highp float;
+                        uniform sampler2D src;
+                        uniform sampler2D blur;
+                        uniform vec2 resolution;
+                        uniform vec2 offset;
+                        out vec4 outColor;
+                        void main() {
+                            vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+                            vec4 c = texture(src, uv);
+                            vec4 b = texture(blur, uv);
+                            outColor = c + b * 0.6;
+                        }
+                    `,
+                },
+            ],
+        });
+    }
+
     hideMask() {
         const maskTop = $("#MaskTop");
         maskTop.style.setProperty("height", "0");
@@ -417,6 +461,7 @@ window.addEventListener("load", async () => {
         app.initDiv(),
         app.initCanvas(),
         app.initCustomShader(),
+        app.initMultipass(),
     ]);
 
     app.hideMask();
