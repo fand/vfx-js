@@ -436,7 +436,9 @@ export class VFXPlayer {
             } = {};
 
             // Auto-bind buffer targets referenced in the shader
+            // Skip binding the pass's own render target to avoid feedback loops
             for (const [name, rt] of bufferTargets) {
+                if (name === p.target) continue;
                 if (
                     frag.match(new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`))
                 ) {
@@ -668,7 +670,7 @@ export class VFXPlayer {
                 }
             }
 
-            // Render intermediate passes
+            // Render intermediate passes, chaining src between passes
             for (let i = 0; i < e.passes.length - 1; i++) {
                 const pass = e.passes[i];
                 const rt = e.bufferTargets.get(pass.target as string);
@@ -683,6 +685,12 @@ export class VFXPlayer {
                     e.isFullScreen ? viewportGlRect : glRectWithOverflow,
                     pass.uniforms,
                 );
+
+                // Pipe output to next pass's src
+                const nextPass = e.passes[i + 1];
+                if (nextPass) {
+                    nextPass.uniforms["src"].value = rt.texture;
+                }
             }
 
             // Render final pass
