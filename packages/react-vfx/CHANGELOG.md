@@ -1,5 +1,13 @@
 # react-vfx
 
+## 0.14.1
+
+### Patch Changes
+
+- fix cyclic texture reference in multipas shader
+- Updated dependencies
+  - @vfx-js/core@0.9.1
+
 ## 0.14.0
 
 ### Minor Changes
