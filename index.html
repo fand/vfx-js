@@ -52,7 +52,7 @@
         <link rel="apple-touch-icon" href="favicon/favicon-180.png" />
         <link rel="manifest" href="./assets/manifest-BmSZvifo.webmanifest" />
 
-      <script type="module" crossorigin src="./assets/index-BoCAsCuV.js"></script>
+      <script type="module" crossorigin src="./assets/index-B9gNEuvS.js"></script>
       <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-B5Qt9EMX.js">
       <link rel="stylesheet" crossorigin href="./assets/index-gSOs2VZc.css">
     </head>
@@ -477,6 +477,72 @@ vfx.add(el, {
                     </div>
                     <div class="col">
                         <img id="custom" src="./vfx-js-logo-no-padding.svg" />
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3>Multipass Shaders</h3>
+                <p>
+                    You can chain multiple shader passes by passing an array
+                    of <code>VFXPass</code> objects. Each pass writes to a
+                    named buffer that subsequent passes can read.
+                </p>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+// Pass 1: Blur the image into "blur" buffer
+const blurPass = {
+    frag: `
+        precision highp float;
+        uniform sampler2D src;
+        uniform vec2 resolution;
+        uniform vec2 offset;
+        out vec4 outColor;
+        void main() {
+            vec2 uv = (gl_FragCoord.xy - offset)
+                     / resolution;
+            vec2 t = 4.0 / resolution;
+            vec4 c = texture(src, uv) * 0.4;
+            c += texture(src, uv+vec2(t.x,0))*.15;
+            c += texture(src, uv-vec2(t.x,0))*.15;
+            c += texture(src, uv+vec2(0,t.y))*.15;
+            c += texture(src, uv-vec2(0,t.y))*.15;
+            outColor = c;
+        }
+    `,
+    target: "blur",
+};
+
+// Pass 2: Combine original + blurred for glow
+const glowPass = {
+    frag: `
+        precision highp float;
+        uniform sampler2D src;
+        uniform sampler2D blur;
+        uniform vec2 resolution;
+        uniform vec2 offset;
+        out vec4 outColor;
+        void main() {
+            vec2 uv = (gl_FragCoord.xy - offset)
+                     / resolution;
+            vec4 c = texture(src, uv);
+            vec4 b = texture(blur, uv);
+            outColor = c + b * 0.6;
+        }
+    `,
+};
+
+vfx.add(el, {
+    shader: [blurPass, glowPass],
+});
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            id="multipass"
+                            src="./vfx-js-logo-no-padding.svg"
+                        />
                     </div>
                 </div>
             </div>
