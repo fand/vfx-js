@@ -2,11 +2,7 @@ import * as THREE from "three";
 import { Backbuffer } from "./backbuffer.js";
 import { DEFAULT_VERTEX_SHADER } from "./constants.js";
 import type { GLRect } from "./gl-rect.js";
-import type {
-    VFXTextureFormat,
-    VFXUniformValue,
-    VFXUniforms,
-} from "./types.js";
+import type { VFXUniformValue, VFXUniforms } from "./types.js";
 
 export class PostEffectPass {
     #scene: THREE.Scene;
@@ -14,17 +10,19 @@ export class PostEffectPass {
     #uniforms: { [name: string]: THREE.IUniform };
     #uniformGenerators: { [name: string]: () => VFXUniformValue };
     #backbuffer?: Backbuffer;
-    #format?: VFXTextureFormat;
+    #persistent: boolean;
+    #float: boolean;
     #size?: [number, number];
 
     constructor(
         fragmentShader: string,
         uniforms?: VFXUniforms,
-        useBackbuffer?: boolean,
-        format?: VFXTextureFormat,
+        persistent?: boolean,
+        float?: boolean,
         size?: [number, number],
     ) {
-        this.#format = format;
+        this.#persistent = persistent ?? false;
+        this.#float = float ?? false;
         this.#size = size;
         this.#scene = new THREE.Scene();
         this.#uniformGenerators = {};
@@ -37,11 +35,6 @@ export class PostEffectPass {
             mouse: { value: new THREE.Vector2() },
             passIndex: { value: 0 },
         };
-
-        // Add backbuffer uniform if requested
-        if (useBackbuffer) {
-            this.#uniforms.backbuffer = { value: null };
-        }
 
         // Add custom uniforms if provided
         if (uniforms) {
@@ -114,23 +107,22 @@ export class PostEffectPass {
     }
 
     initializeBackbuffer(width: number, height: number, pixelRatio: number) {
-        if (this.#uniforms.backbuffer && !this.#backbuffer) {
+        if (this.#persistent && !this.#backbuffer) {
             if (this.#size) {
                 this.#backbuffer = new Backbuffer(
                     this.#size[0],
                     this.#size[1],
                     1,
-                    this.#format,
+                    this.#float,
                 );
             } else {
                 this.#backbuffer = new Backbuffer(
                     width,
                     height,
                     pixelRatio,
-                    this.#format,
+                    this.#float,
                 );
             }
-            this.#uniforms.backbuffer.value = this.#backbuffer.texture;
         }
     }
 
@@ -158,8 +150,12 @@ export class PostEffectPass {
         return this.#backbuffer;
     }
 
-    get format(): VFXTextureFormat | undefined {
-        return this.#format;
+    get persistent(): boolean {
+        return this.#persistent;
+    }
+
+    get float(): boolean {
+        return this.#float;
     }
 
     get size(): [number, number] | undefined {
