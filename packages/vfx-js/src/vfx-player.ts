@@ -901,7 +901,7 @@ export class VFXPlayer {
         }
         for (let i = 0; i < passItems.length - 1; i++) {
             if (!passItems[i].target) {
-                passItems[i] = { ...passItems[i], target: `postPass${i}` };
+                passItems[i] = { ...passItems[i], target: `pass${i}` };
             }
         }
 
@@ -916,7 +916,7 @@ export class VFXPlayer {
                     frag,
                     pe.uniforms,
                     pe.persistent ?? false,
-                    pe.format,
+                    pe.float ?? false,
                     pe.size,
                 );
                 targetNames.push(pe.target);
@@ -925,9 +925,13 @@ export class VFXPlayer {
                 pass = new PostEffectPass(
                     frag,
                     pe.uniforms,
-                    pe.backbuffer,
-                    pe.format,
+                    pe.persistent ?? false,
+                    pe.float ?? false,
                 );
+                // For legacy VFXPostEffect, register "backbuffer" uniform
+                if (pe.persistent) {
+                    pass.registerBufferUniform("backbuffer");
+                }
                 targetNames.push(undefined);
             }
 
@@ -1030,7 +1034,11 @@ export class VFXPlayer {
             if (isLastPass) {
                 // Render to canvas
                 if (pass.backbuffer) {
-                    pass.uniforms.backbuffer.value = pass.backbuffer.texture;
+                    // Legacy VFXPostEffect: set backbuffer uniform directly
+                    if (pass.uniforms.backbuffer) {
+                        pass.uniforms.backbuffer.value =
+                            pass.backbuffer.texture;
+                    }
 
                     this.#render(
                         pass.scene,
@@ -1061,7 +1069,10 @@ export class VFXPlayer {
                 }
             } else if (pass.backbuffer) {
                 // Render intermediate pass with persistent backbuffer
-                pass.uniforms.backbuffer.value = pass.backbuffer.texture;
+                // Legacy VFXPostEffect: set backbuffer uniform directly
+                if (pass.uniforms.backbuffer) {
+                    pass.uniforms.backbuffer.value = pass.backbuffer.texture;
+                }
 
                 // Use custom size viewport if set
                 const bbRect = targetDims
@@ -1106,10 +1117,9 @@ export class VFXPlayer {
                         minFilter: THREE.LinearFilter,
                         magFilter: THREE.LinearFilter,
                         format: THREE.RGBAFormat,
-                        type:
-                            pass.format === "Float"
-                                ? THREE.FloatType
-                                : THREE.UnsignedByteType,
+                        type: pass.float
+                            ? THREE.FloatType
+                            : THREE.UnsignedByteType,
                     });
                     this.#postEffectBufferTargets.set(bufferName, rt);
                 }
@@ -1163,7 +1173,7 @@ export class VFXPlayer {
 
         // Initialize/resize post effect backbuffers
         for (const pass of this.#postEffectPasses) {
-            if (pass.uniforms.backbuffer && !pass.backbuffer) {
+            if (pass.persistent && !pass.backbuffer) {
                 pass.initializeBackbuffer(width, height, this.#pixelRatio);
             } else if (pass.backbuffer) {
                 pass.resizeBackbuffer(width, height);
