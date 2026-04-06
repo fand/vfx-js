@@ -787,7 +787,6 @@ export class VFXPlayer {
                         ? getGLRect(0, 0, pass.size[0], pass.size[1])
                         : defaultRect;
 
-                    this.#setOffset(e, glRect.x, glRect.y);
                     this.#render(
                         pass.scene,
                         pass.backbuffer.target,
@@ -819,7 +818,6 @@ export class VFXPlayer {
                         ? getGLRect(0, 0, pass.size[0], pass.size[1])
                         : defaultRect;
 
-                    this.#setOffset(e, glRect.x, glRect.y);
                     this.#renderer.setRenderTarget(rt);
                     this.#renderer.clear();
                     this.#render(pass.scene, rt, renderRect, pass.uniforms);
@@ -842,6 +840,10 @@ export class VFXPlayer {
             finalPass.uniforms["resolution"].value.set(
                 domRect.width * this.#pixelRatio,
                 domRect.height * this.#pixelRatio,
+            );
+            finalPass.uniforms["offset"].value.set(
+                glRect.x * this.#pixelRatio,
+                glRect.y * this.#pixelRatio,
             );
             finalPass.uniforms["mouse"].value.set(
                 this.#mouseX * this.#pixelRatio,
