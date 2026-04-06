@@ -399,18 +399,24 @@ export class VFXPlayer {
         for (let i = 0; i < inputPasses.length - 1; i++) {
             const targetName = inputPasses[i].target ?? `pass${i}`;
             inputPasses[i] = { ...inputPasses[i], target: targetName };
-            const bw =
-                (rectWithOverflow.right - rectWithOverflow.left) *
-                this.#pixelRatio;
-            const bh =
-                (rectWithOverflow.bottom - rectWithOverflow.top) *
-                this.#pixelRatio;
+            const passSize = inputPasses[i].size;
+            const bw = passSize
+                ? passSize[0]
+                : (rectWithOverflow.right - rectWithOverflow.left) *
+                  this.#pixelRatio;
+            const bh = passSize
+                ? passSize[1]
+                : (rectWithOverflow.bottom - rectWithOverflow.top) *
+                  this.#pixelRatio;
             bufferTargets.set(
                 targetName,
                 new THREE.WebGLRenderTarget(bw, bh, {
                     minFilter: THREE.LinearFilter,
                     magFilter: THREE.LinearFilter,
                     format: THREE.RGBAFormat,
+                    type: inputPasses[i].float
+                        ? THREE.FloatType
+                        : THREE.UnsignedByteType,
                 }),
             );
         }
@@ -659,15 +665,18 @@ export class VFXPlayer {
                 e.passes[0].uniforms["backbuffer"].value = e.backbuffer.texture;
             }
 
-            // Resize buffer targets if needed
+            // Resize buffer targets if needed (skip passes with custom size)
             if (e.bufferTargets.size > 0) {
                 const targetRect = e.isFullScreen
                     ? viewportGlRect
                     : glRectWithOverflow;
                 const tw = Math.max(1, targetRect.w * this.#pixelRatio);
                 const th = Math.max(1, targetRect.h * this.#pixelRatio);
-                for (const rt of e.bufferTargets.values()) {
-                    if (rt.width !== tw || rt.height !== th) {
+                for (let i = 0; i < e.passes.length - 1; i++) {
+                    const pass = e.passes[i];
+                    if (pass.size) continue; // fixed size, no resize
+                    const rt = e.bufferTargets.get(pass.target as string);
+                    if (rt && (rt.width !== tw || rt.height !== th)) {
                         rt.setSize(tw, th);
                     }
                 }
