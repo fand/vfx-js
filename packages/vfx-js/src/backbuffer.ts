@@ -11,16 +11,26 @@ export class Backbuffer {
     #pixelRatio: number;
     #buffers: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
 
-    constructor(width: number, height: number, pixelRatio: number) {
+    constructor(
+        width: number,
+        height: number,
+        pixelRatio: number,
+        float?: boolean,
+    ) {
         this.#width = width;
         this.#height = height;
         this.#pixelRatio = pixelRatio;
 
         const pwidth = width * pixelRatio; // use physical size
         const pheight = height * pixelRatio;
+        const opts = {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+            type: float ? THREE.FloatType : THREE.UnsignedByteType,
+        };
         this.#buffers = [
-            new THREE.WebGLRenderTarget(pwidth, pheight),
-            new THREE.WebGLRenderTarget(pwidth, pheight),
+            new THREE.WebGLRenderTarget(pwidth, pheight, opts),
+            new THREE.WebGLRenderTarget(pwidth, pheight, opts),
         ];
     }
 

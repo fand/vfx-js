@@ -10,12 +10,20 @@ export class PostEffectPass {
     #uniforms: { [name: string]: THREE.IUniform };
     #uniformGenerators: { [name: string]: () => VFXUniformValue };
     #backbuffer?: Backbuffer;
+    #persistent: boolean;
+    #float: boolean;
+    #size?: [number, number];
 
     constructor(
         fragmentShader: string,
         uniforms?: VFXUniforms,
-        useBackbuffer?: boolean,
+        persistent?: boolean,
+        float?: boolean,
+        size?: [number, number],
     ) {
+        this.#persistent = persistent ?? false;
+        this.#float = float ?? false;
+        this.#size = size;
         this.#scene = new THREE.Scene();
         this.#uniformGenerators = {};
         this.#uniforms = {
@@ -25,12 +33,8 @@ export class PostEffectPass {
             viewport: { value: new THREE.Vector4() },
             time: { value: 0.0 },
             mouse: { value: new THREE.Vector2() },
+            passIndex: { value: 0 },
         };
-
-        // Add backbuffer uniform if requested
-        if (useBackbuffer) {
-            this.#uniforms.backbuffer = { value: null };
-        }
 
         // Add custom uniforms if provided
         if (uniforms) {
@@ -103,20 +107,67 @@ export class PostEffectPass {
     }
 
     initializeBackbuffer(width: number, height: number, pixelRatio: number) {
-        if (this.#uniforms.backbuffer && !this.#backbuffer) {
-            this.#backbuffer = new Backbuffer(width, height, pixelRatio);
-            this.#uniforms.backbuffer.value = this.#backbuffer.texture;
+        if (this.#persistent && !this.#backbuffer) {
+            if (this.#size) {
+                this.#backbuffer = new Backbuffer(
+                    this.#size[0],
+                    this.#size[1],
+                    1,
+                    this.#float,
+                );
+            } else {
+                this.#backbuffer = new Backbuffer(
+                    width,
+                    height,
+                    pixelRatio,
+                    this.#float,
+                );
+            }
         }
     }
 
     resizeBackbuffer(width: number, height: number) {
         if (this.#backbuffer) {
-            this.#backbuffer.resize(width, height);
+            if (this.#size) {
+                // Fixed size: no resize needed
+            } else {
+                this.#backbuffer.resize(width, height);
+            }
+        }
+    }
+
+    /**
+     * Register a named buffer texture as a uniform (for auto-binding).
+     * The texture value will be updated each frame by the render loop.
+     */
+    registerBufferUniform(name: string) {
+        if (!this.#uniforms[name]) {
+            this.#uniforms[name] = { value: null };
         }
     }
 
     get backbuffer() {
         return this.#backbuffer;
+    }
+
+    get persistent(): boolean {
+        return this.#persistent;
+    }
+
+    get float(): boolean {
+        return this.#float;
+    }
+
+    get size(): [number, number] | undefined {
+        return this.#size;
+    }
+
+    /**
+     * Get target dimensions for this pass.
+     * Returns undefined if no custom size is set (uses viewport resolution).
+     */
+    getTargetDimensions(): [number, number] | undefined {
+        return this.#size;
     }
 
     get scene(): THREE.Scene {
