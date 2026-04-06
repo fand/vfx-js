@@ -72,7 +72,7 @@ export const FeedbackEffect = story({
                 outColor = mix(current, previous * 0.99, 1. - current.a);
             }
         `,
-    backbuffer: true,
+    persistent: true,
   },
 });
 
