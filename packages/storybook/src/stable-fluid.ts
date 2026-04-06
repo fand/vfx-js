@@ -170,7 +170,7 @@ void main() {
 const advectDyeShader = `
 precision highp float;
 uniform sampler2D velocity;
-uniform sampler2D backbuffer;
+uniform sampler2D dye;
 uniform vec2 resolution;
 uniform vec2 offset;
 uniform float time;
@@ -196,9 +196,9 @@ void main() {
     vec2 vel = texture(velocity, uv).xy;
     vec2 velTexel = 1.0 / simSize;
     vec2 coord = uv - vel * velTexel * 0.016;
-    vec3 dye = texture(backbuffer, coord).rgb;
+    vec3 d = texture(dye, coord).rgb;
 
-    dye /= 1.0 + densityDissipation * 0.016;
+    d /= 1.0 + densityDissipation * 0.016;
 
     // Mouse dye splat (speed-dependent, random color)
     vec2 mouseUv = mouse / resolution;
@@ -207,9 +207,9 @@ void main() {
     float mSplat = exp(-dot(diff, diff) / dyeSplatRadius);
     float mSpeed = length(mouseDelta);
     vec3 mColor = hsv2rgb(vec3(fract(time * 0.06), 0.85, 1.0));
-    dye += mColor * mSplat * clamp(mSpeed * dyeSplatIntensity, 0.0, 3.0);
+    d += mColor * mSplat * clamp(mSpeed * dyeSplatIntensity, 0.0, 3.0);
 
-    outColor = vec4(max(dye, vec3(0.0)), 1.0);
+    outColor = vec4(max(d, vec3(0.0)), 1.0);
 }
 `;
 
@@ -257,7 +257,7 @@ function makePressurePasses(simSize: [number, number], iterations: number) {
     passes.push({
         frag: pressureInitShader,
         target: "p_a",
-        format: "Float",
+        float: true,
         size: simSize,
     });
     let lastTarget = "p_a";
@@ -266,7 +266,7 @@ function makePressurePasses(simSize: [number, number], iterations: number) {
         passes.push({
             frag: pressureShader,
             target: lastTarget,
-            format: "Float",
+            float: true,
             size: simSize,
         });
     }
@@ -298,13 +298,13 @@ export function buildFluidPasses(opts: FluidPassesOpts): VFXPass[] {
         {
             frag: curlShader,
             target: "curl",
-            format: "Float",
+            float: true,
             size: simSize,
         },
         {
             frag: vorticityShader,
             target: "vort_vel",
-            format: "Float",
+            float: true,
             size: simSize,
             uniforms: {
                 mouseDelta,
@@ -316,21 +316,21 @@ export function buildFluidPasses(opts: FluidPassesOpts): VFXPass[] {
         {
             frag: divergenceShader,
             target: "divergence",
-            format: "Float",
+            float: true,
             size: simSize,
         },
         ...pressure.passes,
         {
             frag: makeGradientShader(pressure.lastTarget),
             target: "proj_vel",
-            format: "Float",
+            float: true,
             size: simSize,
         },
         {
             frag: advectVelShader,
             target: "velocity",
             persistent: true,
-            format: "Float",
+            float: true,
             size: simSize,
             uniforms: {
                 velocityDissipation: opts.velocityDissipation,
@@ -340,7 +340,7 @@ export function buildFluidPasses(opts: FluidPassesOpts): VFXPass[] {
             frag: advectDyeShader,
             target: "dye",
             persistent: true,
-            format: "Float",
+            float: true,
             uniforms: {
                 mouseDelta,
                 time: opts.time,
