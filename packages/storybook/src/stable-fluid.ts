@@ -285,6 +285,7 @@ export interface FluidPassesOpts {
     dyeSplatIntensity: number;
     showDye: boolean;
     mouseDelta: () => [number, number];
+    time: () => number;
 }
 
 export function buildFluidPasses(opts: FluidPassesOpts): VFXPass[] {
@@ -342,6 +343,7 @@ export function buildFluidPasses(opts: FluidPassesOpts): VFXPass[] {
             format: "Float",
             uniforms: {
                 mouseDelta,
+                time: opts.time,
                 simSize,
                 densityDissipation: opts.densityDissipation,
                 dyeSplatRadius: opts.dyeSplatRadius,
@@ -350,7 +352,7 @@ export function buildFluidPasses(opts: FluidPassesOpts): VFXPass[] {
         },
         {
             frag: displayShader,
-            uniforms: { showDye: opts.showDye ? 1.0 : 0.0, simSize },
+            uniforms: { showDye: opts.showDye ? 1.0 : 0.0, time: opts.time, simSize },
         },
     ];
 }

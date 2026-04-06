@@ -128,45 +128,31 @@ export const StableFluid = {
     },
     showDye: { control: "boolean" },
   },
-  render: (args: FluidArgs) => {
-    let prevMouseX = -1;
-    let prevMouseY = -1;
-    let mouseDeltaX = 0;
-    let mouseDeltaY = 0;
+  render: () => {
+    const img = document.createElement("img");
+    img.src = Logo;
+    return img;
+  },
+  play: async ({
+    canvasElement,
+    args,
+  }: {
+    canvasElement: HTMLElement;
+    args: FluidArgs;
+  }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+      img.onload = o;
+    });
+
+    let time = 0;
+    let dX = 0;
+    let dY = 0;
     let lastMoveTime = 0;
-
-    const onMove = (x: number, y: number) => {
-      if (prevMouseX >= 0) {
-        mouseDeltaX = x - prevMouseX;
-        mouseDeltaY = y - prevMouseY;
-      }
-      prevMouseX = x;
-      prevMouseY = y;
-      lastMoveTime = performance.now();
-    };
-
-    window.addEventListener("mousemove", (e) => {
-      onMove(e.clientX, window.innerHeight - e.clientY);
-    });
-    window.addEventListener("touchstart", (e) => {
-      const t = e.touches[0];
-      prevMouseX = t.clientX;
-      prevMouseY = window.innerHeight - t.clientY;
-    });
-    window.addEventListener(
-      "touchmove",
-      (e) => {
-        e.preventDefault();
-        const t = e.touches[0];
-        onMove(t.clientX, window.innerHeight - t.clientY);
-      },
-      { passive: false }
-    );
-
     const mouseDelta = (): [number, number] => {
       const elapsed = performance.now() - lastMoveTime;
       const decay = Math.exp(-elapsed * 0.01);
-      return [mouseDeltaX * decay, mouseDeltaY * decay];
+      return [dX * decay, dY * decay];
     };
 
     const SIM = args.simResolution;
@@ -176,13 +162,12 @@ export const StableFluid = {
         ? [Math.round(SIM * aspect), SIM]
         : [SIM, Math.round(SIM / aspect)];
 
-    const img = document.createElement("img");
-    img.src = Logo;
-
     const vfx = initVFX({
+      autoplay: false,
       postEffect: buildFluidPasses({
         simSize,
         mouseDelta,
+        time: () => time,
         pressureIterations: args.pressureIterations,
         curlStrength: args.curlStrength,
         velocityDissipation: args.velocityDissipation,
@@ -195,9 +180,54 @@ export const StableFluid = {
       }),
     });
 
-    vfx.add(img, { shader: "uvGradient" });
+    await vfx.add(img, { shader: "uvGradient" });
 
-    return img;
+    // Simulate circular mouse motion
+    const cx = Math.round(window.innerWidth / 2);
+    const cy = Math.round(window.innerHeight / 2);
+    const frames = 100;
+
+    for (let i = 0; i < frames; i++) {
+      if (i < frames) {
+        const angle = (i / frames) * Math.PI * 2;
+        dX = Math.cos(angle) * 15;
+        dY = Math.sin(angle) * 15;
+        lastMoveTime = performance.now();
+        window.dispatchEvent(
+          new MouseEvent("mousemove", {
+            clientX: cx + Math.cos(angle) * 100,
+            clientY: cy - Math.sin(angle) * 100,
+          })
+        );
+      } else {
+        dX = 0;
+        dY = 0;
+      }
+      time = i * 0.016;
+      vfx.render();
+    }
+
+    // Click to start interactive mode with mouse tracking
+    canvasElement.addEventListener(
+      "click",
+      () => {
+        let prevX = -1;
+        let prevY = -1;
+        window.addEventListener("mousemove", (e) => {
+          const x = e.clientX;
+          const y = window.innerHeight - e.clientY;
+          if (prevX >= 0) {
+            dX = x - prevX;
+            dY = y - prevY;
+            lastMoveTime = performance.now();
+          }
+          prevX = x;
+          prevY = y;
+        });
+        vfx.play();
+      },
+      { once: true },
+    );
   },
   parameters: {
     layout: "fullscreen",
