@@ -1,5 +1,12 @@
 # @vfx-js/storybook
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies
+  - @vfx-js/core@0.9.0
+
 ## 0.0.10
 
 ### Patch Changes
