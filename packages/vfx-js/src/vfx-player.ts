@@ -755,6 +755,32 @@ export class VFXPlayer {
                     }
                 }
 
+                // Set resolution/offset/mouse for the pass's target space
+                if (pass.size) {
+                    pass.uniforms["resolution"].value.set(
+                        pass.size[0],
+                        pass.size[1],
+                    );
+                    pass.uniforms["offset"].value.set(0, 0);
+                    pass.uniforms["mouse"].value.set(
+                        (this.#mouseX / defaultRect.w) * pass.size[0],
+                        (this.#mouseY / defaultRect.h) * pass.size[1],
+                    );
+                } else {
+                    pass.uniforms["resolution"].value.set(
+                        defaultRect.w * this.#pixelRatio,
+                        defaultRect.h * this.#pixelRatio,
+                    );
+                    pass.uniforms["offset"].value.set(
+                        glRect.x * this.#pixelRatio,
+                        glRect.y * this.#pixelRatio,
+                    );
+                    pass.uniforms["mouse"].value.set(
+                        this.#mouseX * this.#pixelRatio,
+                        this.#mouseY * this.#pixelRatio,
+                    );
+                }
+
                 if (pass.backbuffer) {
                     // Persistent pass: render to backbuffer, then swap
                     const bbRect = pass.size
@@ -811,8 +837,16 @@ export class VFXPlayer {
                 }
             }
 
-            // Render final pass
+            // Render final pass — restore resolution/offset to element size
             const finalPass = e.passes[e.passes.length - 1];
+            finalPass.uniforms["resolution"].value.set(
+                domRect.width * this.#pixelRatio,
+                domRect.height * this.#pixelRatio,
+            );
+            finalPass.uniforms["mouse"].value.set(
+                this.#mouseX * this.#pixelRatio,
+                this.#mouseY * this.#pixelRatio,
+            );
 
             // Update resolved buffer uniforms for final pass
             for (const [name, tex] of resolvedTargets) {
