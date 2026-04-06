@@ -4,20 +4,17 @@ import type { ShaderPreset } from "./constants.js";
 import type { Margin, MarginOpts } from "./rect.js";
 
 /**
+ * @deprecated Use `float?: boolean` instead.
+ */
+export type VFXTextureFormat = "RGBA" | "Float";
+
+/**
  * A single render pass in a multipass shader pipeline.
  *
  * Each pass renders to a named buffer (specified by `target`), which can be
  * referenced as a `sampler2D` uniform in subsequent passes.
  * The last pass in the array renders to the screen.
  */
-/**
- * Texture format for render targets.
- * - `"RGBA"`: 8-bit per channel (default).
- * - `"Float"`: 32-bit floating point per channel.
- *   Use when storing non-visual data (e.g. velocity fields) or values outside [0, 1].
- */
-export type VFXTextureFormat = "RGBA" | "Float";
-
 export type VFXPass = {
     /**
      * Vertex shader code.
@@ -40,14 +37,18 @@ export type VFXPass = {
 
     /**
      * Whether this pass's render target should persist across frames.
-     * When enabled, the previous frame's output is available as `sampler2D backbuffer`.
+     * When enabled, the previous frame's output is available as
+     * `sampler2D <target>` (i.e. the target name doubles as the
+     * previous-frame texture, following the ISF convention).
      */
     persistent?: boolean;
 
     /**
-     * Texture format for this pass's render target. (Default: `"RGBA"`)
+     * Use 32-bit floating point render target. (Default: `false`)
+     * Enable when storing non-visual data (e.g. velocity fields) or
+     * values outside [0, 1].
      */
-    format?: VFXTextureFormat;
+    float?: boolean;
 
     /**
      * Render target size in pixels `[width, height]`.
@@ -398,7 +399,7 @@ export type VFXPostEffect = {
      * - `vec4 viewport`: Viewport information
      * - `float time`: Time in seconds since VFX started
      * - `vec2 mouse`: Mouse position in pixels
-     * - `sampler2D backbuffer`: Previous frame texture (if backbuffer is enabled)
+     * - `sampler2D backbuffer`: Previous frame texture (if persistent is enabled)
      */
     shader: ShaderPreset | string;
 
@@ -409,13 +410,13 @@ export type VFXPostEffect = {
     uniforms?: VFXUniforms;
 
     /**
-     * Whether the post effect should use a backbuffer for feedback effects.
+     * Whether the post effect should persist across frames.
      * When enabled, the previous frame's output is available as `sampler2D backbuffer`.
      */
-    backbuffer?: boolean;
+    persistent?: boolean;
 
     /**
-     * Texture format for this effect's render target. (Default: `"RGBA"`)
+     * Use 32-bit floating point render target. (Default: `false`)
      */
-    format?: VFXTextureFormat;
+    float?: boolean;
 };
