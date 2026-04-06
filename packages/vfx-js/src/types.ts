@@ -348,6 +348,10 @@ export type VFXElementPass = {
     uniforms: { [name: string]: THREE.IUniform };
     uniformGenerators: { [name: string]: () => VFXUniformValue };
     target?: string;
+    persistent?: boolean;
+    float?: boolean;
+    size?: [number, number];
+    backbuffer?: Backbuffer;
 };
 
 /**

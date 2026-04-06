@@ -479,6 +479,9 @@ export class VFXPlayer {
                     ...passUniformGenerators,
                 },
                 target: p.target,
+                persistent: p.persistent,
+                float: p.float,
+                size: p.size,
             });
         }
 
