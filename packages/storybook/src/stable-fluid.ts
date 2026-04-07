@@ -128,7 +128,7 @@ void main() {
 
 // Gradient subtraction from final pressure buffer
 function makeGradientShader(pressureBuffer: string) {
-    return `
+  return `
 precision highp float;
 uniform sampler2D vort_vel;
 uniform sampler2D ${pressureBuffer};
@@ -240,8 +240,8 @@ void main() {
         vec2 vel = texture(velocity, uv).xy;
         vec2 disp = vel / simSize;
 
-        vec2 cr = texture(canvas, uv - disp * 0.050).ra;
-        vec2 cg = texture(canvas, uv - disp * 0.045).ga;
+        vec2 cr = texture(canvas, uv - disp * 0.080).ra;
+        vec2 cg = texture(canvas, uv - disp * 0.060).ga;
         vec2 cb = texture(canvas, uv - disp * 0.040).ba;
         outColor = vec4(cr.x, cg.x, cb.x, (cr.y + cg.y + cb.y) / 3.);
 
@@ -253,106 +253,106 @@ void main() {
 
 // Build Jacobi pressure solver chain (alternates p_a / p_b)
 function makePressurePasses(simSize: [number, number], iterations: number) {
-    const passes: VFXPass[] = [];
+  const passes: VFXPass[] = [];
+  passes.push({
+    frag: pressureInitShader,
+    target: "p_a",
+    float: true,
+    size: simSize,
+  });
+  let lastTarget = "p_a";
+  for (let i = 0; i < iterations; i++) {
+    lastTarget = i % 2 === 0 ? "p_b" : "p_a";
     passes.push({
-        frag: pressureInitShader,
-        target: "p_a",
-        float: true,
-        size: simSize,
+      frag: pressureShader,
+      target: lastTarget,
+      float: true,
+      size: simSize,
     });
-    let lastTarget = "p_a";
-    for (let i = 0; i < iterations; i++) {
-        lastTarget = i % 2 === 0 ? "p_b" : "p_a";
-        passes.push({
-            frag: pressureShader,
-            target: lastTarget,
-            float: true,
-            size: simSize,
-        });
-    }
-    return { passes, lastTarget };
+  }
+  return { passes, lastTarget };
 }
 
 export interface FluidPassesOpts {
-    simSize: [number, number];
-    pressureIterations: number;
-    curlStrength: number;
-    velocityDissipation: number;
-    densityDissipation: number;
-    splatForce: number;
-    splatRadius: number;
-    dyeSplatRadius: number;
-    dyeSplatIntensity: number;
-    showDye: boolean;
-    mouseDelta: () => [number, number];
-    time: () => number;
+  simSize: [number, number];
+  pressureIterations: number;
+  curlStrength: number;
+  velocityDissipation: number;
+  densityDissipation: number;
+  splatForce: number;
+  splatRadius: number;
+  dyeSplatRadius: number;
+  dyeSplatIntensity: number;
+  showDye: boolean;
+  mouseDelta: () => [number, number];
+  time: () => number;
 }
 
 export function buildFluidPasses(opts: FluidPassesOpts): VFXPass[] {
-    const { simSize, mouseDelta } = opts;
-    const pressure = makePressurePasses(simSize, opts.pressureIterations);
+  const { simSize, mouseDelta } = opts;
+  const pressure = makePressurePasses(simSize, opts.pressureIterations);
 
-    return [
-        // Copy canvas to named buffer
-        { frag: copyShader, target: "canvas" },
-        {
-            frag: curlShader,
-            target: "curl",
-            float: true,
-            size: simSize,
-        },
-        {
-            frag: vorticityShader,
-            target: "vort_vel",
-            float: true,
-            size: simSize,
-            uniforms: {
-                mouseDelta,
-                curlStrength: opts.curlStrength,
-                splatForce: opts.splatForce,
-                splatRadius: opts.splatRadius,
-            },
-        },
-        {
-            frag: divergenceShader,
-            target: "divergence",
-            float: true,
-            size: simSize,
-        },
-        ...pressure.passes,
-        {
-            frag: makeGradientShader(pressure.lastTarget),
-            target: "proj_vel",
-            float: true,
-            size: simSize,
-        },
-        {
-            frag: advectVelShader,
-            target: "velocity",
-            persistent: true,
-            float: true,
-            size: simSize,
-            uniforms: {
-                velocityDissipation: opts.velocityDissipation,
-            },
-        },
-        {
-            frag: advectDyeShader,
-            target: "dye",
-            persistent: true,
-            float: true,
-            uniforms: {
-                mouseDelta,
-                time: opts.time,
-                simSize,
-                densityDissipation: opts.densityDissipation,
-                dyeSplatRadius: opts.dyeSplatRadius,
-                dyeSplatIntensity: opts.dyeSplatIntensity,
-            },
-        },
-        {
-            frag: displayShader,
-            uniforms: { showDye: opts.showDye ? 1.0 : 0.0, time: opts.time, simSize },
-        },
-    ];
+  return [
+    // Copy canvas to named buffer
+    { frag: copyShader, target: "canvas" },
+    {
+      frag: curlShader,
+      target: "curl",
+      float: true,
+      size: simSize,
+    },
+    {
+      frag: vorticityShader,
+      target: "vort_vel",
+      float: true,
+      size: simSize,
+      uniforms: {
+        mouseDelta,
+        curlStrength: opts.curlStrength,
+        splatForce: opts.splatForce,
+        splatRadius: opts.splatRadius,
+      },
+    },
+    {
+      frag: divergenceShader,
+      target: "divergence",
+      float: true,
+      size: simSize,
+    },
+    ...pressure.passes,
+    {
+      frag: makeGradientShader(pressure.lastTarget),
+      target: "proj_vel",
+      float: true,
+      size: simSize,
+    },
+    {
+      frag: advectVelShader,
+      target: "velocity",
+      persistent: true,
+      float: true,
+      size: simSize,
+      uniforms: {
+        velocityDissipation: opts.velocityDissipation,
+      },
+    },
+    {
+      frag: advectDyeShader,
+      target: "dye",
+      persistent: true,
+      float: true,
+      uniforms: {
+        mouseDelta,
+        time: opts.time,
+        simSize,
+        densityDissipation: opts.densityDissipation,
+        dyeSplatRadius: opts.dyeSplatRadius,
+        dyeSplatIntensity: opts.dyeSplatIntensity,
+      },
+    },
+    {
+      frag: displayShader,
+      uniforms: { showDye: opts.showDye ? 1.0 : 0.0, time: opts.time, simSize },
+    },
+  ];
 }

@@ -1,4 +1,5 @@
 import type { Meta } from "@storybook/html";
+import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { buildFluidPasses } from "./stable-fluid";
 import { initVFX } from "./utils";
@@ -198,7 +199,7 @@ export const StableFluidElement = {
     argTypes: fluidArgTypes,
     render: () => {
         const img = document.createElement("img");
-        img.src = Logo;
+        img.src = Jellyfish;
         return img;
     },
     play: async ({
