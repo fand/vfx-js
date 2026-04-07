@@ -1,5 +1,11 @@
 # react-vfx
 
+## 0.9.2
+
+### Patch Changes
+
+- Fix multipass options in element shaders
+
 ## 0.9.1
 
 ### Patch Changes

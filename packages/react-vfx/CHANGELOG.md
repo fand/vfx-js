@@ -1,5 +1,13 @@
 # react-vfx
 
+## 0.14.2
+
+### Patch Changes
+
+- Fix multipass options in element shaders
+- Updated dependencies
+  - @vfx-js/core@0.9.2
+
 ## 0.14.1
 
 ### Patch Changes
