@@ -739,8 +739,11 @@ export class VFXPlayer {
             // Use local inputTexture (like post-effects) to avoid corrupting
             // the shared src uniform across frames.
             let inputTexture: THREE.Texture = e.srcTexture;
-            const relMouseX = this.#mouseX - glRect.x;
-            const relMouseY = this.#mouseY - glRect.y;
+            // #mouseX/Y are in viewport-Y-up coords, but glRect is in
+            // canvas-Y-up coords (canvas extends paddingX/Y outside the
+            // viewport). Add padding to convert to the same space.
+            const relMouseX = this.#mouseX + this.#paddingX - glRect.x;
+            const relMouseY = this.#mouseY + this.#paddingY - glRect.y;
 
             for (let i = 0; i < e.passes.length - 1; i++) {
                 const pass = e.passes[i];
