@@ -1,0 +1,177 @@
+<script type="module" crossorigin src="./assets/test-xyuakOb0.js"></script>
+<link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-B5Qt9EMX.js">
+<link rel="modulepreload" crossorigin href="./assets/vfx-Ct8kENVT.js">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sandbox</title>
+
+<style>
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    color: #1a1a1a;
+  }
+
+  section {
+    display: flex;
+    align-items: center;
+    gap: 48px;
+    padding: 80px 64px;
+  }
+  section:nth-child(even) {
+    flex-direction: row-reverse;
+    background: #eef;
+  }
+  section:nth-child(odd) {
+    background: #1a1a1a;
+    color: #eef;
+  }
+  section:nth-child(even) .text p {
+    color: #888;
+  }
+  section:nth-child(odd) .text p {
+    color: #eef;
+  }
+
+  .head {
+    height: 70vh;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+
+    background: #1a1a1a;
+    color: #eef;
+  }
+  .head h1 {
+    font-size: 4rem;
+    margin-bottom: 8px;
+  }
+  .head p {
+    font-size: 2.2rem;
+    color: #888;
+  }
+
+  .text {
+    flex: 1;
+  }
+  .text h2 {
+    font-size: 2.4rem;
+    margin-bottom: 16px;
+  }
+  .text p {
+    font-size: 1.4rem;
+    line-height: 1.8;
+  }
+
+  .image {
+    flex: 1;
+  }
+  .image img {
+    width: 100%;
+    border-radius: 8px;
+    display: block;
+  }
+</style>
+
+<div id="app">
+  <div class="head">
+    <div>
+      <h1>Fluid Simulation with VFX-JS</h1>
+      <p>Mouse move to control waves.</p>
+    </div>
+  </div>
+  <section>
+    <div class="text">
+      <h2>Visual Effects for the Web</h2>
+      <p>
+        Add stunning glitch, blur, and distortion effects to any element on your
+        page. Built on WebGL, these shaders run at 60fps and integrate
+        seamlessly with your existing HTML. A simple API to make your website
+        feel alive.
+      </p>
+    </div>
+    <div class="image">
+      <img
+        src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop"
+        alt="Mountains"
+      />
+    </div>
+  </section>
+
+  <section>
+    <div class="text">
+      <h2>Pixels Are Just Light</h2>
+      <p>
+        Every image on your screen is a grid of colored light. We rearrange
+        those colors, shift them, blend them. What you see is not the original —
+        it never was. The browser renders what we tell it to render. You trust
+        it without thinking.
+      </p>
+    </div>
+    <div class="image">
+      <img
+        src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&h=600&fit=crop"
+        alt="City"
+      />
+    </div>
+  </section>
+
+  <section>
+    <div class="text">
+      <h2>The Screen Looks Back</h2>
+      <p>
+        You think you're reading this text, but the text is also reading you.
+        Your scroll position, your cursor, your hesitation — all of it is data.
+        The shader adjusts. The effect responds. At what point does the observer
+        become the observed?
+      </p>
+    </div>
+    <div class="image">
+      <img
+        src="https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=800&h=600&fit=crop"
+        alt="Ocean"
+      />
+    </div>
+  </section>
+
+  <section>
+    <div class="text">
+      <h2>This is not a Glitch</h2>
+      <p>
+        You noticed it, didn't you. The way the colors bled outside the div.
+        That wasn't a bug. The fragment shader knows where you looked. It
+        remembered. The DOM is a living document and it has been documenting
+        you. Scroll down. You have to scroll down.
+      </p>
+    </div>
+    <div class="image">
+      <img
+        src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=600&fit=crop"
+        alt="Coffee"
+      />
+    </div>
+  </section>
+
+  <section>
+    <div class="text">
+      <h2>This is just a Demo</h2>
+      <p>
+        the uniforms are leaking into the vertex array. i can see the texture
+        coordinates in my walls. every requestAnimationFrame brings it closer.
+        the canvas is not inside the browser anymore. the browser is inside the
+        canvas. you are inside the canvas. please do not resize the window.
+        please. it hears the resize event. it always hears the resize event.
+      </p>
+    </div>
+    <div class="image">
+      <img
+        src="https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&h=600&fit=crop"
+        alt="Forest"
+      />
+    </div>
+  </section>
+</div>
+
