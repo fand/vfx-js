@@ -1159,6 +1159,12 @@ export class VFXPlayer {
             const generators = this.#postEffectUniformGeneratorsList[i];
             const targetName = this.#postEffectPassTargets[i];
 
+            // #mouseX/Y are in viewport-Y-up coords, but the canvas extends
+            // paddingX/Y outside the viewport. Add padding to convert to the
+            // canvas-Y-up space that matches gl_FragCoord in render targets.
+            const mouseX = this.#mouseX + this.#paddingX;
+            const mouseY = this.#mouseY + this.#paddingY;
+
             // For passes with custom size, set uniforms in target space
             const targetDims = pass.getTargetDimensions();
             if (targetDims) {
@@ -1168,8 +1174,8 @@ export class VFXPlayer {
                 pass.uniforms.offset.value.set(0, 0);
                 pass.uniforms.time.value = now - this.#initTime;
                 pass.uniforms.mouse.value.set(
-                    (this.#mouseX / viewportGlRect.w) * tw,
-                    (this.#mouseY / viewportGlRect.h) * th,
+                    (mouseX / viewportGlRect.w) * tw,
+                    (mouseY / viewportGlRect.h) * th,
                 );
             } else {
                 pass.setUniforms(
@@ -1177,8 +1183,8 @@ export class VFXPlayer {
                     this.#pixelRatio,
                     viewportGlRect,
                     now - this.#initTime,
-                    this.#mouseX,
-                    this.#mouseY,
+                    mouseX,
+                    mouseY,
                 );
             }
             pass.uniforms.passIndex.value = i;
