@@ -45,8 +45,7 @@ export type VFXPass = {
 
     /**
      * Use 32-bit floating point render target. (Default: `false`)
-     * Enable when storing non-visual data (e.g. velocity fields) or
-     * values outside [0, 1].
+     * Enable when storing non-visual data or values outside [0, 1].
      */
     float?: boolean;
 
@@ -54,8 +53,6 @@ export type VFXPass = {
      * Render target size in pixels `[width, height]`.
      * When set, the backbuffer and intermediate buffer are created at this
      * fixed size instead of the viewport resolution.
-     * Useful for fluid simulations where the velocity field runs at lower
-     * resolution (e.g. `[228, 128]`) than the display.
      */
     size?: [number, number];
 
