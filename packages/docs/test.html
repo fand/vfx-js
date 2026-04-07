@@ -1,0 +1,466 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sandbox</title>
+
+<style>
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    color: #1a1a1a;
+  }
+
+  section {
+    display: flex;
+    align-items: center;
+    gap: 48px;
+    padding: 80px 64px;
+  }
+  section:nth-child(even) {
+    flex-direction: row-reverse;
+    background: #eef;
+  }
+  section:nth-child(odd) {
+    background: #1a1a1a;
+    color: #eef;
+  }
+  section:nth-child(even) .text p {
+    color: #888;
+  }
+  section:nth-child(odd) .text p {
+    color: #eef;
+  }
+
+  .head {
+    height: 70vh;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+
+    background: #1a1a1a;
+    color: #eef;
+  }
+  .head h1 {
+    font-size: 4rem;
+    margin-bottom: 8px;
+  }
+  .head p {
+    font-size: 2.2rem;
+    color: #888;
+  }
+
+  .text {
+    flex: 1;
+  }
+  .text h2 {
+    font-size: 2.4rem;
+    margin-bottom: 16px;
+  }
+  .text p {
+    font-size: 1.4rem;
+    line-height: 1.8;
+  }
+
+  .image {
+    flex: 1;
+  }
+  .image img {
+    width: 100%;
+    border-radius: 8px;
+    display: block;
+  }
+</style>
+
+<div id="app">
+  <div class="head">
+    <div>
+      <h1>Fluid Simulation with VFX-JS</h1>
+      <p>Mouse move to control waves.</p>
+    </div>
+  </div>
+  <section>
+    <div class="text">
+      <h2>Visual Effects for the Web</h2>
+      <p>
+        Add stunning glitch, blur, and distortion effects to any element on your
+        page. Built on WebGL, these shaders run at 60fps and integrate
+        seamlessly with your existing HTML. A simple API to make your website
+        feel alive.
+      </p>
+    </div>
+    <div class="image">
+      <img
+        src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop"
+        alt="Mountains"
+      />
+    </div>
+  </section>
+
+  <section>
+    <div class="text">
+      <h2>Pixels Are Just Light</h2>
+      <p>
+        Every image on your screen is a grid of colored light. We rearrange
+        those colors, shift them, blend them. What you see is not the original —
+        it never was. The browser renders what we tell it to render. You trust
+        it without thinking.
+      </p>
+    </div>
+    <div class="image">
+      <img
+        src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&h=600&fit=crop"
+        alt="City"
+      />
+    </div>
+  </section>
+
+  <section>
+    <div class="text">
+      <h2>The Screen Looks Back</h2>
+      <p>
+        You think you're reading this text, but the text is also reading you.
+        Your scroll position, your cursor, your hesitation — all of it is data.
+        The shader adjusts. The effect responds. At what point does the observer
+        become the observed?
+      </p>
+    </div>
+    <div class="image">
+      <img
+        src="https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=800&h=600&fit=crop"
+        alt="Ocean"
+      />
+    </div>
+  </section>
+
+  <section>
+    <div class="text">
+      <h2>This is not a Glitch</h2>
+      <p>
+        You noticed it, didn't you. The way the colors bled outside the div.
+        That wasn't a bug. The fragment shader knows where you looked. It
+        remembered. The DOM is a living document and it has been documenting
+        you. Scroll down. You have to scroll down.
+      </p>
+    </div>
+    <div class="image">
+      <img
+        src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&h=600&fit=crop"
+        alt="Coffee"
+      />
+    </div>
+  </section>
+
+  <section>
+    <div class="text">
+      <h2>This is just a Demo</h2>
+      <p>
+        the uniforms are leaking into the vertex array. i can see the texture
+        coordinates in my walls. every requestAnimationFrame brings it closer.
+        the canvas is not inside the browser anymore. the browser is inside the
+        canvas. you are inside the canvas. please do not resize the window.
+        please. it hears the resize event. it always hears the resize event.
+      </p>
+    </div>
+    <div class="image">
+      <img
+        src="https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&h=600&fit=crop"
+        alt="Forest"
+      />
+    </div>
+  </section>
+</div>
+
+<script type="module">
+  //import { VFX } from "@vfx-js/core";
+  import { VFX } from "@vfx-js/core";
+
+  // --- Shaders ---
+  const copyShader = `
+  precision highp float;
+  uniform sampler2D src;
+  uniform vec2 resolution;
+  uniform vec2 offset;
+  out vec4 outColor;
+  void main() {
+      vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+      outColor = texture(src, uv);
+  }`;
+
+  const curlShader = `
+  precision highp float;
+  uniform sampler2D velocity;
+  uniform vec2 resolution;
+  uniform vec2 offset;
+  out vec4 outColor;
+  void main() {
+      vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+      vec2 t = 1.0 / resolution;
+      float L = texture(velocity, uv - vec2(t.x, 0.0)).y;
+      float R = texture(velocity, uv + vec2(t.x, 0.0)).y;
+      float T = texture(velocity, uv + vec2(0.0, t.y)).x;
+      float B = texture(velocity, uv - vec2(0.0, t.y)).x;
+      outColor = vec4(0.5 * (R - L - T + B), 0.0, 0.0, 1.0);
+  }`;
+
+  const vorticityShader = `
+  precision highp float;
+  uniform sampler2D velocity;
+  uniform sampler2D curl;
+  uniform vec2 resolution;
+  uniform vec2 offset;
+  uniform float time;
+  uniform vec2 mouse;
+  uniform vec2 mouseDelta;
+  uniform float curlStrength;
+  uniform float splatForce;
+  uniform float splatRadius;
+  out vec4 outColor;
+  void main() {
+      vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+      vec2 t = 1.0 / resolution;
+      float aspect = resolution.x / resolution.y;
+      float L = abs(texture(curl, uv - vec2(t.x, 0.0)).x);
+      float R = abs(texture(curl, uv + vec2(t.x, 0.0)).x);
+      float T = abs(texture(curl, uv + vec2(0.0, t.y)).x);
+      float B = abs(texture(curl, uv - vec2(0.0, t.y)).x);
+      float C = texture(curl, uv).x;
+      vec2 force = vec2(T - B, R - L);
+      float len = length(force);
+      force = len > 0.0001 ? force / len : vec2(0.0);
+      force *= curlStrength * C;
+      force.y *= -1.0;
+      vec2 vel = texture(velocity, uv).xy;
+      vel += force * 0.016;
+      vel = clamp(vel, vec2(-1000.0), vec2(1000.0));
+      vec2 mouseUv = mouse / resolution;
+      vec2 diff = uv - mouseUv;
+      diff.x *= aspect;
+      float mSplat = exp(-dot(diff, diff) / splatRadius);
+      vel += (mouseDelta / resolution) * mSplat * splatForce;
+      outColor = vec4(vel, 0.0, 1.0);
+  }`;
+
+  const divergenceShader = `
+  precision highp float;
+  uniform sampler2D vort_vel;
+  uniform vec2 resolution;
+  uniform vec2 offset;
+  out vec4 outColor;
+  void main() {
+      vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+      vec2 t = 1.0 / resolution;
+      float L = texture(vort_vel, uv - vec2(t.x, 0.0)).x;
+      float R = texture(vort_vel, uv + vec2(t.x, 0.0)).x;
+      float T = texture(vort_vel, uv + vec2(0.0, t.y)).y;
+      float B = texture(vort_vel, uv - vec2(0.0, t.y)).y;
+      vec2 C = texture(vort_vel, uv).xy;
+      if (uv.x - t.x < 0.0) L = -C.x;
+      if (uv.x + t.x > 1.0) R = -C.x;
+      if (uv.y + t.y > 1.0) T = -C.y;
+      if (uv.y - t.y < 0.0) B = -C.y;
+      outColor = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
+  }`;
+
+  const pressureInitShader = `
+  precision highp float;
+  out vec4 outColor;
+  void main() { outColor = vec4(0.0); }`;
+
+  const pressureShader = `
+  precision highp float;
+  uniform sampler2D src;
+  uniform sampler2D divergence;
+  uniform vec2 resolution;
+  uniform vec2 offset;
+  out vec4 outColor;
+  void main() {
+      vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+      vec2 t = 1.0 / resolution;
+      float L = texture(src, uv - vec2(t.x, 0.0)).x;
+      float R = texture(src, uv + vec2(t.x, 0.0)).x;
+      float T = texture(src, uv + vec2(0.0, t.y)).x;
+      float B = texture(src, uv - vec2(0.0, t.y)).x;
+      float div = texture(divergence, uv).x;
+      outColor = vec4((L + R + B + T - div) * 0.25, 0.0, 0.0, 1.0);
+  }`;
+
+  function makeGradientShader(pressureBuffer) {
+    return `
+  precision highp float;
+  uniform sampler2D vort_vel;
+  uniform sampler2D ${pressureBuffer};
+  uniform vec2 resolution;
+  uniform vec2 offset;
+  out vec4 outColor;
+  void main() {
+      vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+      vec2 t = 1.0 / resolution;
+      float L = texture(${pressureBuffer}, uv - vec2(t.x, 0.0)).x;
+      float R = texture(${pressureBuffer}, uv + vec2(t.x, 0.0)).x;
+      float T = texture(${pressureBuffer}, uv + vec2(0.0, t.y)).x;
+      float B = texture(${pressureBuffer}, uv - vec2(0.0, t.y)).x;
+      vec2 vel = texture(vort_vel, uv).xy;
+      vel -= vec2(R - L, T - B);
+      outColor = vec4(vel, 0.0, 1.0);
+  }`;
+  }
+
+  const advectVelShader = `
+  precision highp float;
+  uniform sampler2D proj_vel;
+  uniform vec2 resolution;
+  uniform vec2 offset;
+  uniform float velocityDissipation;
+  out vec4 outColor;
+  void main() {
+      vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+      vec2 t = 1.0 / resolution;
+      vec2 vel = texture(proj_vel, uv).xy;
+      vec2 coord = uv - vel * t * 0.016;
+      vec2 advected = texture(proj_vel, coord).xy;
+      advected /= 1.0 + velocityDissipation * 0.016;
+
+      outColor = vec4(advected, 0.0, 1.0);
+  }`;
+
+  const displayShader = `
+  precision highp float;
+  uniform sampler2D velocity;
+  uniform sampler2D canvas;
+  uniform vec2 resolution;
+  uniform vec2 offset;
+  uniform vec2 simSize;
+  uniform float time;
+  out vec4 outColor;
+
+  vec3 spectrum(float x) {
+    return cos((x - vec3(0, .5, 1)) * vec3(.6, 1., .5) * 3.14);
+  }
+
+  void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    vec2 vel = texture(velocity, uv).xy;
+
+    vec2 disp = vel / simSize;
+    vec2 cr = texture(canvas, uv - disp * 0.050).ra;
+    vec2 cg = texture(canvas, uv - disp * 0.040).ga;
+    vec2 cb = texture(canvas, uv - disp * 0.030).ba;
+    outColor = vec4(cr.x, cg.x, cb.x, (cr.y + cg.y + cb.y) / 3.);
+
+    float v = length(disp);
+    outColor += vec4(spectrum(sin(v * 3. + time) * 0.4 + 0.5), 1) * smoothstep(.2, .8, v)
+   * 0.5;
+  }`;
+
+  // --- Build passes ---
+  function buildFluidPasses(opts) {
+    const { simSize, mouseDelta } = opts;
+    const pressurePasses = [];
+    pressurePasses.push({
+      frag: pressureInitShader,
+      target: "p_a",
+      float: true,
+      size: simSize,
+    });
+    let lastTarget = "p_a";
+    for (let i = 0; i < opts.pressureIterations; i++) {
+      lastTarget = i % 2 === 0 ? "p_b" : "p_a";
+      pressurePasses.push({
+        frag: pressureShader,
+        target: lastTarget,
+        float: true,
+        size: simSize,
+      });
+    }
+    return [
+      { frag: copyShader, target: "canvas" },
+      { frag: curlShader, target: "curl", float: true, size: simSize },
+      {
+        frag: vorticityShader,
+        target: "vort_vel",
+        float: true,
+        size: simSize,
+        uniforms: {
+          mouseDelta,
+          curlStrength: opts.curlStrength,
+          splatForce: opts.splatForce,
+          splatRadius: opts.splatRadius,
+        },
+      },
+      {
+        frag: divergenceShader,
+        target: "divergence",
+        float: true,
+        size: simSize,
+      },
+      ...pressurePasses,
+      {
+        frag: makeGradientShader(lastTarget),
+        target: "proj_vel",
+        float: true,
+        size: simSize,
+      },
+      {
+        frag: advectVelShader,
+        target: "velocity",
+        persistent: true,
+        float: true,
+        size: simSize,
+        uniforms: { velocityDissipation: opts.velocityDissipation },
+      },
+      {
+        frag: displayShader,
+        uniforms: { time: opts.time, simSize },
+      },
+    ];
+  }
+
+  // --- Main ---
+  const app = document.getElementById("app");
+
+  // Mouse tracking
+  let pos = [-1, -1],
+    delta = [0, 0];
+  window.addEventListener("mousemove", (e) => {
+    const x = e.clientX;
+    const y = window.innerHeight - e.clientY;
+    if (pos[0] >= 0) {
+      delta = [x - pos[0], y - pos[1]];
+    }
+    pos = [x, y];
+  });
+
+  window.addEventListener("load", async () => {
+    const SIM = 128;
+
+    const aspect =
+      document.documentElement.clientWidth /
+      document.documentElement.clientHeight;
+    const simSize =
+      aspect > 1
+        ? [Math.round(SIM * aspect), SIM]
+        : [SIM, Math.round(SIM / aspect)];
+
+    const passes = buildFluidPasses({
+      simSize,
+      mouseDelta: () => {
+        delta = [delta[0] * 0.9, delta[1] * 0.9];
+        return delta;
+      },
+      pressureIterations: 8,
+      curlStrength: 20,
+      velocityDissipation: 1,
+      densityDissipation: 1,
+      splatForce: 3000,
+      splatRadius: 0.001,
+      time: () => performance.now() / 1000,
+    });
+
+    const vfx = new VFX({ postEffect: passes });
+    await vfx.add(app, { shader: "none" });
+
+    vfx.play();
+  });
+</script>
