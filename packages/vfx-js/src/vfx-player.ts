@@ -279,6 +279,7 @@ export class VFXPlayer {
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             srcUniform.value = texture;
+            e.srcTexture = texture;
             oldTexture.dispose();
         } catch (e) {
             console.error(e);
@@ -396,23 +397,51 @@ export class VFXPlayer {
 
         // Create buffer targets for intermediate passes
         const bufferTargets = new Map<string, THREE.WebGLRenderTarget>();
+        const passBackbuffers = new Map<string, Backbuffer>();
         for (let i = 0; i < inputPasses.length - 1; i++) {
             const targetName = inputPasses[i].target ?? `pass${i}`;
             inputPasses[i] = { ...inputPasses[i], target: targetName };
-            const bw =
-                (rectWithOverflow.right - rectWithOverflow.left) *
-                this.#pixelRatio;
-            const bh =
-                (rectWithOverflow.bottom - rectWithOverflow.top) *
-                this.#pixelRatio;
-            bufferTargets.set(
-                targetName,
-                new THREE.WebGLRenderTarget(bw, bh, {
-                    minFilter: THREE.LinearFilter,
-                    magFilter: THREE.LinearFilter,
-                    format: THREE.RGBAFormat,
-                }),
-            );
+            const passSize = inputPasses[i].size;
+            const bw = passSize
+                ? passSize[0]
+                : (rectWithOverflow.right - rectWithOverflow.left) *
+                  this.#pixelRatio;
+            const bh = passSize
+                ? passSize[1]
+                : (rectWithOverflow.bottom - rectWithOverflow.top) *
+                  this.#pixelRatio;
+
+            if (inputPasses[i].persistent) {
+                // Persistent passes use double-buffered Backbuffer
+                const pixelRatio = passSize ? 1 : this.#pixelRatio;
+                const logicalW = passSize
+                    ? passSize[0]
+                    : rectWithOverflow.right - rectWithOverflow.left;
+                const logicalH = passSize
+                    ? passSize[1]
+                    : rectWithOverflow.bottom - rectWithOverflow.top;
+                passBackbuffers.set(
+                    targetName,
+                    new Backbuffer(
+                        logicalW,
+                        logicalH,
+                        pixelRatio,
+                        inputPasses[i].float,
+                    ),
+                );
+            } else {
+                bufferTargets.set(
+                    targetName,
+                    new THREE.WebGLRenderTarget(bw, bh, {
+                        minFilter: THREE.LinearFilter,
+                        magFilter: THREE.LinearFilter,
+                        format: THREE.RGBAFormat,
+                        type: inputPasses[i].float
+                            ? THREE.FloatType
+                            : THREE.UnsignedByteType,
+                    }),
+                );
+            }
         }
 
         // Build passes
@@ -437,12 +466,21 @@ export class VFXPlayer {
 
             // Auto-bind buffer targets referenced in the shader
             // Skip binding the pass's own render target to avoid feedback loops
+            // (persistent passes can read their own buffer via backbuffer double-buffering)
             for (const [name, rt] of bufferTargets) {
                 if (name === p.target) continue;
                 if (
                     frag.match(new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`))
                 ) {
                     passUniforms[name] = { value: rt.texture };
+                }
+            }
+            for (const [name, bb] of passBackbuffers) {
+                if (
+                    frag.match(new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`))
+                ) {
+                    // Backbuffer read texture is always safe (double-buffered)
+                    passUniforms[name] = { value: bb.texture };
                 }
             }
 
@@ -479,6 +517,12 @@ export class VFXPlayer {
                     ...passUniformGenerators,
                 },
                 target: p.target,
+                persistent: p.persistent,
+                float: p.float,
+                size: p.size,
+                backbuffer: p.target
+                    ? passBackbuffers.get(p.target)
+                    : undefined,
             });
         }
 
@@ -501,6 +545,7 @@ export class VFXPlayer {
             overflow,
             intersection: intersectionOpts,
             originalOpacity,
+            srcTexture: texture,
             zIndex: opts.zIndex ?? 0,
             backbuffer,
             autoCrop,
@@ -561,6 +606,7 @@ export class VFXPlayer {
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             srcUniform.value = texture;
+            e.srcTexture = texture;
             oldTexture.dispose();
         }
     }
@@ -656,45 +702,151 @@ export class VFXPlayer {
                 e.passes[0].uniforms["backbuffer"].value = e.backbuffer.texture;
             }
 
-            // Resize buffer targets if needed
-            if (e.bufferTargets.size > 0) {
+            // Resize buffer targets if needed (skip passes with custom size)
+            {
                 const targetRect = e.isFullScreen
                     ? viewportGlRect
                     : glRectWithOverflow;
                 const tw = Math.max(1, targetRect.w * this.#pixelRatio);
                 const th = Math.max(1, targetRect.h * this.#pixelRatio);
-                for (const rt of e.bufferTargets.values()) {
-                    if (rt.width !== tw || rt.height !== th) {
-                        rt.setSize(tw, th);
+                const logicalW = Math.max(1, targetRect.w);
+                const logicalH = Math.max(1, targetRect.h);
+                for (let i = 0; i < e.passes.length - 1; i++) {
+                    const pass = e.passes[i];
+                    if (pass.size) continue; // fixed size, no resize
+                    if (pass.backbuffer) {
+                        pass.backbuffer.resize(logicalW, logicalH);
+                    } else {
+                        const rt = e.bufferTargets.get(pass.target as string);
+                        if (rt && (rt.width !== tw || rt.height !== th)) {
+                            rt.setSize(tw, th);
+                        }
                     }
                 }
             }
 
-            // Render intermediate passes, chaining src between passes
-            for (let i = 0; i < e.passes.length - 1; i++) {
-                const pass = e.passes[i];
-                const rt = e.bufferTargets.get(pass.target as string);
-                if (!rt) continue;
+            // Track resolved buffer textures for dynamic uniform updates
+            const resolvedTargets = new Map<string, THREE.Texture>();
 
-                this.#setOffset(e, glRect.x, glRect.y);
-                this.#renderer.setRenderTarget(rt);
-                this.#renderer.clear();
-                this.#render(
-                    pass.scene,
-                    rt,
-                    e.isFullScreen ? viewportGlRect : glRectWithOverflow,
-                    pass.uniforms,
-                );
-
-                // Pipe output to next pass's src
-                const nextPass = e.passes[i + 1];
-                if (nextPass) {
-                    nextPass.uniforms["src"].value = rt.texture;
+            // Pre-register persistent backbuffer textures
+            for (const pass of e.passes) {
+                if (pass.backbuffer && pass.target) {
+                    resolvedTargets.set(pass.target, pass.backbuffer.texture);
                 }
             }
 
-            // Render final pass
+            // Render intermediate passes, chaining src between passes
+            // Use local inputTexture (like post-effects) to avoid corrupting
+            // the shared src uniform across frames.
+            let inputTexture: THREE.Texture = e.srcTexture;
+            // #mouseX/Y are in viewport-Y-up coords, but glRect is in
+            // canvas-Y-up coords (canvas extends paddingX/Y outside the
+            // viewport). Add padding to convert to the same space.
+            const relMouseX = this.#mouseX + this.#paddingX - glRect.x;
+            const relMouseY = this.#mouseY + this.#paddingY - glRect.y;
+
+            for (let i = 0; i < e.passes.length - 1; i++) {
+                const pass = e.passes[i];
+                const defaultRect = e.isFullScreen
+                    ? viewportGlRect
+                    : glRectWithOverflow;
+
+                // Set src from chain (not shared uniform mutation)
+                pass.uniforms["src"].value = inputTexture;
+
+                // Update auto-bound buffer uniforms from resolved targets
+                for (const [name, tex] of resolvedTargets) {
+                    if (pass.uniforms[name]) {
+                        pass.uniforms[name].value = tex;
+                    }
+                }
+
+                // Update dynamic uniforms
+                for (const [key, gen] of Object.entries(
+                    pass.uniformGenerators,
+                )) {
+                    if (pass.uniforms[key]) {
+                        pass.uniforms[key].value = gen();
+                    }
+                }
+
+                // Intermediate passes render to their own buffer,
+                // so offset is always 0 and resolution matches buffer size.
+                const bufferW = pass.size
+                    ? pass.size[0]
+                    : defaultRect.w * this.#pixelRatio;
+                const bufferH = pass.size
+                    ? pass.size[1]
+                    : defaultRect.h * this.#pixelRatio;
+                const bufferRect = pass.size
+                    ? getGLRect(0, 0, pass.size[0], pass.size[1])
+                    : getGLRect(0, 0, defaultRect.w, defaultRect.h);
+
+                pass.uniforms["resolution"].value.set(bufferW, bufferH);
+                pass.uniforms["offset"].value.set(0, 0);
+                pass.uniforms["mouse"].value.set(
+                    (relMouseX / defaultRect.w) * bufferW,
+                    (relMouseY / defaultRect.h) * bufferH,
+                );
+
+                if (pass.backbuffer) {
+                    // Persistent pass: render to backbuffer, then swap
+                    this.#render(
+                        pass.scene,
+                        pass.backbuffer.target,
+                        bufferRect,
+                        pass.uniforms,
+                    );
+                    pass.backbuffer.swap();
+                    inputTexture = pass.backbuffer.texture;
+                } else {
+                    // Non-persistent pass: render to buffer target
+                    const rt = e.bufferTargets.get(pass.target as string);
+                    if (!rt) continue;
+
+                    this.#renderer.setRenderTarget(rt);
+                    this.#renderer.clear();
+                    this.#render(pass.scene, rt, bufferRect, pass.uniforms);
+                    inputTexture = rt.texture;
+                }
+
+                // Update resolved target
+                if (pass.target) {
+                    resolvedTargets.set(pass.target, inputTexture);
+                }
+            }
+
+            // Render final pass — restore element-space uniforms
             const finalPass = e.passes[e.passes.length - 1];
+            finalPass.uniforms["src"].value = inputTexture;
+            finalPass.uniforms["resolution"].value.set(
+                domRect.width * this.#pixelRatio,
+                domRect.height * this.#pixelRatio,
+            );
+            finalPass.uniforms["offset"].value.set(
+                glRect.x * this.#pixelRatio,
+                glRect.y * this.#pixelRatio,
+            );
+            finalPass.uniforms["mouse"].value.set(
+                this.#mouseX * this.#pixelRatio,
+                this.#mouseY * this.#pixelRatio,
+            );
+
+            // Update resolved buffer uniforms for final pass
+            for (const [name, tex] of resolvedTargets) {
+                if (finalPass.uniforms[name]) {
+                    finalPass.uniforms[name].value = tex;
+                }
+            }
+            // Update dynamic uniforms for final pass
+            for (const [key, gen] of Object.entries(
+                finalPass.uniformGenerators,
+            )) {
+                if (finalPass.uniforms[key]) {
+                    finalPass.uniforms[key].value = gen();
+                }
+            }
+
             if (e.backbuffer) {
                 // Update backbuffer
                 finalPass.uniforms["backbuffer"].value = e.backbuffer.texture;
@@ -1007,6 +1159,12 @@ export class VFXPlayer {
             const generators = this.#postEffectUniformGeneratorsList[i];
             const targetName = this.#postEffectPassTargets[i];
 
+            // #mouseX/Y are in viewport-Y-up coords, but the canvas extends
+            // paddingX/Y outside the viewport. Add padding to convert to the
+            // canvas-Y-up space that matches gl_FragCoord in render targets.
+            const mouseX = this.#mouseX + this.#paddingX;
+            const mouseY = this.#mouseY + this.#paddingY;
+
             // For passes with custom size, set uniforms in target space
             const targetDims = pass.getTargetDimensions();
             if (targetDims) {
@@ -1016,8 +1174,8 @@ export class VFXPlayer {
                 pass.uniforms.offset.value.set(0, 0);
                 pass.uniforms.time.value = now - this.#initTime;
                 pass.uniforms.mouse.value.set(
-                    (this.#mouseX / viewportGlRect.w) * tw,
-                    (this.#mouseY / viewportGlRect.h) * th,
+                    (mouseX / viewportGlRect.w) * tw,
+                    (mouseY / viewportGlRect.h) * th,
                 );
             } else {
                 pass.setUniforms(
@@ -1025,8 +1183,8 @@ export class VFXPlayer {
                     this.#pixelRatio,
                     viewportGlRect,
                     now - this.#initTime,
-                    this.#mouseX,
-                    this.#mouseY,
+                    mouseX,
+                    mouseY,
                 );
             }
             pass.uniforms.passIndex.value = i;
