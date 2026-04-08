@@ -201,9 +201,17 @@
 ></div>
 
 <script type="module">
-  //import { VFX } from "@vfx-js/core";
   import { VFX } from "@vfx-js/core";
-  import Lenis from "https://esm.sh/lenis@1.1.20";
+
+  // iOS workaround - enable Lenis
+  const isIOS =
+    /iPad|iPhone/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (isIOS) {
+    import("https://esm.sh/lenis@1.1.20").then(({ default: Lenis }) => {
+      new Lenis({ autoRaf: true, syncTouch: true });
+    });
+  }
 
   // --- WebGL feature probe ---
   {
@@ -245,7 +253,13 @@
         gl.texImage2D(gl.TEXTURE_2D, 0, internal, 4, 4, 0, gl.RGBA, type, null);
         const fb = gl.createFramebuffer();
         gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        gl.framebufferTexture2D(
+          gl.FRAMEBUFFER,
+          gl.COLOR_ATTACHMENT0,
+          gl.TEXTURE_2D,
+          tex,
+          0
+        );
         const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
         if (status !== gl.FRAMEBUFFER_COMPLETE) {
           lines.push(`${label}: FBO FAIL 0x${status.toString(16)}`);
@@ -255,10 +269,16 @@
           return;
         }
         const vs = gl.createShader(gl.VERTEX_SHADER);
-        gl.shaderSource(vs, "#version 300 es\nin vec2 p; void main(){gl_Position=vec4(p,0.,1.);}");
+        gl.shaderSource(
+          vs,
+          "#version 300 es\nin vec2 p; void main(){gl_Position=vec4(p,0.,1.);}"
+        );
         gl.compileShader(vs);
         const fs = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(fs, "#version 300 es\nprecision highp float; out vec4 o;\nvoid main(){o=vec4(0.5,1.25,-2.5,1.0);}");
+        gl.shaderSource(
+          fs,
+          "#version 300 es\nprecision highp float; out vec4 o;\nvoid main(){o=vec4(0.5,1.25,-2.5,1.0);}"
+        );
         gl.compileShader(fs);
         const prog = gl.createProgram();
         gl.attachShader(prog, vs);
@@ -271,7 +291,11 @@
         gl.useProgram(prog);
         const buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+        gl.bufferData(
+          gl.ARRAY_BUFFER,
+          new Float32Array([-1, -1, 3, -1, -1, 3]),
+          gl.STATIC_DRAW
+        );
         const loc = gl.getAttribLocation(prog, "p");
         gl.enableVertexAttribArray(loc);
         gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
@@ -281,7 +305,11 @@
         const px = new Float32Array(4 * 4 * 4);
         try {
           gl.readPixels(0, 0, 4, 4, gl.RGBA, gl.FLOAT, px);
-          lines.push(`${label}: r=${px[0].toFixed(2)} g=${px[1].toFixed(2)} b=${px[2].toFixed(2)} a=${px[3].toFixed(2)}`);
+          lines.push(
+            `${label}: r=${px[0].toFixed(2)} g=${px[1].toFixed(
+              2
+            )} b=${px[2].toFixed(2)} a=${px[3].toFixed(2)}`
+          );
         } catch (e) {
           lines.push(`${label}: readPixels threw: ${e.message}`);
         }
@@ -299,16 +327,7 @@
       }
     }
     document.getElementById("probe").textContent = lines.join("\n");
-    console.log(lines.join("\n"));
   }
-
-  // Replace the device's native momentum scroll with Lenis. iOS Safari
-  // suppresses touch events while a native momentum scroll is in flight,
-  // which makes the fluid sim go unresponsive mid-swipe. `syncTouch: true`
-  // tells Lenis to take over touch scrolling too (Lenis 1.x defaults to
-  // letting native handle touch); with that on, scrolling is fully JS
-  // driven and touchmove keeps firing throughout.
-  const lenis = new Lenis({ autoRaf: true, syncTouch: true });
 
   // --- Shaders ---
   const copyShader = `
@@ -519,7 +538,6 @@
 
     vec4 c2 = vec4(spectrum(sin(v * 2.) * 0.4 + 0.6), 1);
     outColor += c2 * smoothstep(.2, .8, v) * 0.5;
-    //outColor = texture(velocity, uv);
   }`;
 
   // --- Build passes ---
@@ -601,7 +619,6 @@
       delta = [x - pos[0], y - pos[1]];
     }
     pos = [x, y];
-    console.log(delta);
   });
 
   window.addEventListener("load", async () => {
