@@ -186,6 +186,15 @@
 <script type="module">
   //import { VFX } from "@vfx-js/core";
   import { VFX } from "@vfx-js/core";
+  import Lenis from "https://esm.sh/lenis@1.1.20";
+
+  // Replace the device's native momentum scroll with Lenis. iOS Safari
+  // suppresses touch events while a native momentum scroll is in flight,
+  // which makes the fluid sim go unresponsive mid-swipe. `syncTouch: true`
+  // tells Lenis to take over touch scrolling too (Lenis 1.x defaults to
+  // letting native handle touch); with that on, scrolling is fully JS
+  // driven and touchmove keeps firing throughout.
+  const lenis = new Lenis({ autoRaf: true, syncTouch: true });
 
   // --- Shaders ---
   const copyShader = `

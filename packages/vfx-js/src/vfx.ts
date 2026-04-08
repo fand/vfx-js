@@ -15,8 +15,14 @@ function getCanvasStyle(fixed: boolean) {
         position: fixed ? "fixed" : "absolute",
         top: 0,
         left: 0,
-        width: "100vw",
-        height: "100vh",
+        // Width/height are set by VFXPlayer#updateCanvasSize using
+        // window.innerWidth/innerHeight. Avoid `100vw`/`100vh` here so the
+        // canvas can never accidentally widen the body — on iOS Safari with
+        // certain viewport conditions, `vw` resolves against the layout
+        // viewport, not the visual viewport, which can be larger than
+        // innerWidth and force horizontal overflow.
+        width: "0px",
+        height: "0px",
         "z-index": 9999,
         "pointer-events": "none",
     };
