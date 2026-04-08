@@ -160,13 +160,12 @@ export default async function getCanvasFromElement(
             const dataUrl = dataUrls[i];
             if (!dataUrl) return "";
             const orig = originalImgs[i];
+            const cs = window.getComputedStyle(orig);
             const r = orig.getBoundingClientRect();
             const x = r.left - rect.left;
             const y = r.top - rect.top;
 
-            const radii = parseUniformBorderRadius(
-                window.getComputedStyle(orig),
-            );
+            const radii = parseUniformBorderRadius(cs);
             let clipAttr = "";
             if (radii) {
                 const clipId = `vfx-img-clip-${i}`;
@@ -176,7 +175,8 @@ export default async function getCanvasFromElement(
                 clipAttr = ` clip-path="url(#${clipId})"`;
             }
 
-            return `<image href="${dataUrl}" x="${x}" y="${y}" width="${r.width}" height="${r.height}" preserveAspectRatio="none"${clipAttr} />`;
+            const par = imgObjectFitToPreserveAspectRatio(cs);
+            return `<image href="${dataUrl}" x="${x}" y="${y}" width="${r.width}" height="${r.height}" preserveAspectRatio="${par}"${clipAttr} />`;
         });
     }
 
@@ -278,6 +278,27 @@ function parseUniformBorderRadius(
     const ry = parts.length > 1 && Number.isFinite(parts[1]) ? parts[1] : rx;
     if (rx <= 0 && ry <= 0) return null;
     return { rx, ry };
+}
+
+/**
+ * Translate the CSS `object-fit` / `object-position` of an `<img>` to an SVG
+ * `preserveAspectRatio` attribute string. Used by the WebKit fallback path
+ * where an `<img>` is replaced by a native SVG `<image>` overlay; SVG's
+ * preserveAspectRatio covers the common cases (fill / contain / cover with
+ * any of the nine "Min/Mid/Max" alignment grid points).
+ *
+ * `none` and `scale-down` don't have a clean SVG equivalent (they require
+ * the image's natural size, which would also need width/height adjustments
+ * on the `<image>` element); they fall back to `fill`.
+ * @internal
+ */
+function imgObjectFitToPreserveAspectRatio(cs: CSSStyleDeclaration): string {
+    const fit = cs.objectFit || "fill";
+    if (fit !== "contain" && fit !== "cover") return "none";
+    const pos = (cs.objectPosition || "50% 50%").split(/\s+/);
+    const ax = pos[0] === "0%" ? "Min" : pos[0] === "100%" ? "Max" : "Mid";
+    const ay = pos[1] === "0%" ? "Min" : pos[1] === "100%" ? "Max" : "Mid";
+    return `x${ax}Y${ay} ${fit === "cover" ? "slice" : "meet"}`;
 }
 
 // ref. https://stackoverflow.com/questions/44698967/
