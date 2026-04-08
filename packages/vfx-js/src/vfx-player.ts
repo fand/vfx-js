@@ -93,9 +93,6 @@ export class VFXPlayer {
     #floatRTType: THREE.TextureDataType = THREE.HalfFloatType;
     #floatRTFilter: THREE.MagnificationTextureFilter = THREE.LinearFilter;
 
-    /** Diagnostic: human-readable summary of the resolved float RT config. */
-    floatRTDebug = "";
-
     /** Whether float RTs were configured with hardware LinearFilter. */
     get hasFloatLinearFilter(): boolean {
         return this.#floatRTFilter === THREE.LinearFilter;
@@ -130,25 +127,19 @@ export class VFXPlayer {
         if (colorBufferFloat && floatLinear) {
             this.#floatRTType = THREE.FloatType;
             this.#floatRTFilter = THREE.LinearFilter;
-            this.floatRTDebug = "FP32+Linear";
         } else if (colorBufferHalfFloat && halfFloatLinear) {
             this.#floatRTType = THREE.HalfFloatType;
             this.#floatRTFilter = THREE.LinearFilter;
-            this.floatRTDebug = "FP16+Linear";
         } else if (colorBufferFloat) {
             this.#floatRTType = THREE.FloatType;
             this.#floatRTFilter = THREE.NearestFilter;
-            this.floatRTDebug = "FP32+Nearest";
         } else if (colorBufferHalfFloat) {
             this.#floatRTType = THREE.HalfFloatType;
             this.#floatRTFilter = THREE.NearestFilter;
-            this.floatRTDebug = "FP16+Nearest";
         } else {
             this.#floatRTType = THREE.UnsignedByteType;
             this.#floatRTFilter = THREE.LinearFilter;
-            this.floatRTDebug = "Byte+Linear (no float)";
         }
-        this.floatRTDebug += ` (cbF=${colorBufferFloat} cbHF=${colorBufferHalfFloat} fL=${floatLinear} hfL=${halfFloatLinear})`;
         this.#maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
         this.#pixelRatio = opts.pixelRatio;
 

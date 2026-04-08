@@ -123,11 +123,6 @@ export class VFX {
         this.#player.render();
     }
 
-    /** @internal Diagnostic: resolved float render-target configuration. */
-    get floatRTDebug(): string {
-        return this.#player.floatRTDebug;
-    }
-
     /**
      * Whether float render targets use hardware linear filtering.
      *
