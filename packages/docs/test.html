@@ -71,6 +71,17 @@
     border-radius: 8px;
     display: block;
   }
+
+  @media (max-width: 768px) {
+    section {
+      flex-direction: column;
+      padding: 48px 24px;
+      gap: 24px;
+    }
+    section:nth-child(even) {
+      flex-direction: column;
+    }
+  }
 </style>
 
 <div id="app">
