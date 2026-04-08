@@ -498,10 +498,17 @@ export class VFXPlayer {
 
             const scene = new THREE.Scene();
             const geometry = new THREE.PlaneGeometry(2, 2);
+            // Passes that render to an intermediate buffer target must not
+            // blend: blending into a float render target requires the
+            // EXT_float_blend extension which iOS Safari does not provide.
+            const renderingToBuffer = p.target !== undefined;
             const material = new THREE.RawShaderMaterial({
                 vertexShader,
                 fragmentShader: frag,
-                transparent: true,
+                transparent: !renderingToBuffer,
+                blending: renderingToBuffer
+                    ? THREE.NoBlending
+                    : THREE.NormalBlending,
                 uniforms: passUniforms,
                 glslVersion,
             });
@@ -1078,6 +1085,7 @@ export class VFXPlayer {
                     pe.persistent ?? false,
                     pe.float ?? false,
                     pe.size,
+                    pe.target !== undefined,
                 );
                 targetNames.push(pe.target);
             } else {

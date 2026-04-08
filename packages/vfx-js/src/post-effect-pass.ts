@@ -20,6 +20,7 @@ export class PostEffectPass {
         persistent?: boolean,
         float?: boolean,
         size?: [number, number],
+        hasBufferTarget?: boolean,
     ) {
         this.#persistent = persistent ?? false;
         this.#float = float ?? false;
@@ -48,6 +49,12 @@ export class PostEffectPass {
             }
         }
 
+        // For passes that render to an intermediate buffer target, disable
+        // alpha blending. Blending into a float render target requires the
+        // EXT_float_blend extension which is unavailable on iOS Safari, and
+        // intermediate compute-style passes (e.g. fluid sim) want to write
+        // their output directly without blending against previous contents.
+        const renderingToBuffer = hasBufferTarget ?? false;
         this.#mesh = new THREE.Mesh(
             new THREE.PlaneGeometry(2, 2),
             new THREE.RawShaderMaterial({
@@ -55,7 +62,10 @@ export class PostEffectPass {
                 fragmentShader,
                 uniforms: this.#uniforms,
                 glslVersion: "300 es",
-                transparent: true,
+                transparent: !renderingToBuffer,
+                blending: renderingToBuffer
+                    ? THREE.NoBlending
+                    : THREE.NormalBlending,
                 premultipliedAlpha: true,
             }),
         );
