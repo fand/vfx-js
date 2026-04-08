@@ -96,6 +96,11 @@ export class VFXPlayer {
     /** Diagnostic: human-readable summary of the resolved float RT config. */
     floatRTDebug = "";
 
+    /** Whether float RTs were configured with hardware LinearFilter. */
+    get hasFloatLinearFilter(): boolean {
+        return this.#floatRTFilter === THREE.LinearFilter;
+    }
+
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
     constructor(opts: VFXOptsInner, canvas: HTMLCanvasElement) {

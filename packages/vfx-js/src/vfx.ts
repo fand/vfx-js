@@ -129,6 +129,22 @@ export class VFX {
     }
 
     /**
+     * Whether float render targets use hardware linear filtering.
+     *
+     * Returns false on devices that lack `OES_texture_float_linear` and
+     * `OES_texture_half_float_linear` (notably iOS Safari): on those, the
+     * library falls back to NearestFilter for float buffers, and any user
+     * shader that samples a float texture at non-aligned coordinates will
+     * see blocky output unless it implements manual bilinear filtering.
+     *
+     * Pass this through to your shaders (e.g. as a uniform) when you want
+     * to opt into manual bilinear filtering only on devices that need it.
+     */
+    get hasFloatLinearFilter(): boolean {
+        return this.#player.hasFloatLinearFilter;
+    }
+
+    /**
      * Destroy VFX and stop rendering.
      */
     destroy(): void {

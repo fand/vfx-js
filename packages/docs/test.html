@@ -441,6 +441,24 @@
   }`;
   }
 
+  // Manual bilinear sampling for devices that lack OES_texture_float_linear
+  // (iOS Safari). Activated by `useManualBilinear` uniform; the JS side
+  // sets it from `vfx.hasFloatLinearFilter`.
+  const bilinearGLSL = `
+  uniform float useManualBilinear;
+  vec4 sampleBilinear(sampler2D tex, vec2 uv, vec2 texSize) {
+      if (useManualBilinear < 0.5) return texture(tex, uv);
+      vec2 px = uv * texSize - 0.5;
+      vec2 fpx = fract(px);
+      vec2 base = (floor(px) + 0.5) / texSize;
+      vec2 step = 1.0 / texSize;
+      vec4 a = texture(tex, base);
+      vec4 b = texture(tex, base + vec2(step.x, 0.0));
+      vec4 c = texture(tex, base + vec2(0.0, step.y));
+      vec4 d = texture(tex, base + step);
+      return mix(mix(a, b, fpx.x), mix(c, d, fpx.x), fpx.y);
+  }`;
+
   const advectVelShader = `
   precision highp float;
   uniform sampler2D proj_vel;
@@ -448,12 +466,13 @@
   uniform vec2 offset;
   uniform float velocityDissipation;
   out vec4 outColor;
+  ${bilinearGLSL}
   void main() {
       vec2 uv = (gl_FragCoord.xy - offset) / resolution;
       vec2 t = 1.0 / resolution;
       vec2 vel = texture(proj_vel, uv).xy;
       vec2 coord = uv - vel * t * 0.016;
-      vec2 advected = texture(proj_vel, coord).xy;
+      vec2 advected = sampleBilinear(proj_vel, coord, resolution).xy;
       advected /= 1.0 + velocityDissipation * 0.016;
 
       outColor = vec4(advected, 0.0, 1.0);
@@ -468,6 +487,7 @@
   uniform vec2 simSize;
   uniform float time;
   out vec4 outColor;
+  ${bilinearGLSL}
 
   vec3 spectrum(float x) {
     return cos((x - vec3(0, .5, 1)) * vec3(.6, 1., .5) * 3.14);
@@ -475,7 +495,7 @@
 
   void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    vec2 vel = texture(velocity, uv).xy;
+    vec2 vel = sampleBilinear(velocity, uv, simSize).xy;
 
     vec2 disp = vel / simSize;
     float v = length(disp);
@@ -504,7 +524,7 @@
 
   // --- Build passes ---
   function buildFluidPasses(opts) {
-    const { simSize, mouseDelta } = opts;
+    const { simSize, mouseDelta, useManualBilinear } = opts;
     const pressurePasses = [];
     pressurePasses.push({
       frag: pressureInitShader,
@@ -556,11 +576,14 @@
         persistent: true,
         float: true,
         size: simSize,
-        uniforms: { velocityDissipation: opts.velocityDissipation },
+        uniforms: {
+          velocityDissipation: opts.velocityDissipation,
+          useManualBilinear,
+        },
       },
       {
         frag: displayShader,
-        uniforms: { time: opts.time, simSize },
+        uniforms: { time: opts.time, simSize, useManualBilinear },
       },
     ];
   }
@@ -592,12 +615,17 @@
         ? [Math.round(SIM * aspect), SIM]
         : [SIM, Math.round(SIM / aspect)];
 
+    // Forward-referenced VFX instance so the uniform generator below
+    // can read `hasFloatLinearFilter` lazily (the generator runs each
+    // frame, after construction).
+    let vfx;
     const passes = buildFluidPasses({
       simSize,
       mouseDelta: () => {
         delta = [delta[0] * 0.9, delta[1] * 0.9];
         return delta;
       },
+      useManualBilinear: () => (vfx && !vfx.hasFloatLinearFilter ? 1.0 : 0.0),
       pressureIterations: 8,
       curlStrength: 20,
       velocityDissipation: 1,
@@ -607,14 +635,13 @@
       time: () => performance.now() / 1000,
     });
 
-    const vfx = new VFX({ postEffect: passes });
+    vfx = new VFX({ postEffect: passes });
     await vfx.add(app, { shader: "none" });
 
     const probeEl = document.getElementById("probe");
     probeEl.textContent += `\nVFX: ${vfx.floatRTDebug}`;
+    probeEl.textContent += `\nuseManualBilinear: ${!vfx.hasFloatLinearFilter}`;
     console.log(vfx.floatRTDebug);
-    // const vfx = new VFX();
-    // await vfx.add(app, { shader: passes });
 
     vfx.play();
   });
