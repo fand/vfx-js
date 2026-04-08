@@ -456,13 +456,14 @@
   // Mouse tracking
   let pos = [-1, -1],
     delta = [0, 0];
-  window.addEventListener("mousemove", (e) => {
+  window.addEventListener("pointermove", (e) => {
     const x = e.clientX;
     const y = window.innerHeight - e.clientY;
     if (pos[0] >= 0) {
       delta = [x - pos[0], y - pos[1]];
     }
     pos = [x, y];
+    console.log(pos, delta);
   });
 
   window.addEventListener("load", async () => {
