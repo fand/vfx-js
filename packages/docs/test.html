@@ -460,6 +460,8 @@
 
     const vfx = new VFX({ postEffect: passes });
     await vfx.add(app, { shader: "none" });
+    // const vfx = new VFX();
+    // await vfx.add(app, { shader: passes });
 
     vfx.play();
   });
