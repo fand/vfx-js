@@ -94,6 +94,14 @@ export class VFXPlayer {
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.#resize);
             window.addEventListener("mousemove", this.#mousemove);
+            // iOS Safari does not synthesize mousemove from touchmove. Mirror
+            // touch movement as a synthetic mousemove on window so that
+            // VFX's internal mouse tracking and any user-installed mousemove
+            // listeners just work on touch devices. Use passive: true so
+            // native scrolling is preserved.
+            window.addEventListener("touchmove", this.#touchmove, {
+                passive: true,
+            });
         }
         this.#resize();
 
@@ -112,6 +120,7 @@ export class VFXPlayer {
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", this.#resize);
             window.removeEventListener("mousemove", this.#mousemove);
+            window.removeEventListener("touchmove", this.#touchmove);
         }
 
         // Clean up post effect resources
@@ -256,6 +265,21 @@ export class VFXPlayer {
             this.#mouseX = e.clientX;
             this.#mouseY = window.innerHeight - e.clientY;
         }
+    };
+
+    #touchmove = (e: TouchEvent): void => {
+        const t = e.touches[0];
+        if (!t) return;
+        // Re-dispatch as a synthetic mousemove on window. The existing
+        // #mousemove handler (and any user-installed mousemove listeners)
+        // will pick it up automatically.
+        window.dispatchEvent(
+            new MouseEvent("mousemove", {
+                clientX: t.clientX,
+                clientY: t.clientY,
+                bubbles: true,
+            }),
+        );
     };
 
     async #rerenderTextElement(e: VFXElement): Promise<void> {
