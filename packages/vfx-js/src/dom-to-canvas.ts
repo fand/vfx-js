@@ -36,17 +36,32 @@ export default async function getCanvasFromElement(
     element: HTMLElement,
     originalOpacity: number,
     oldCanvas?: OffscreenCanvas,
+    maxSize?: number,
 ): Promise<OffscreenCanvas> {
     const rect = element.getBoundingClientRect();
 
     const ratio = window.devicePixelRatio;
-    const width = rect.width * ratio;
-    const height = rect.height * ratio;
+
+    // Unclamped physical-pixel target size of the texture.
+    const fullW = rect.width * ratio;
+    const fullH = rect.height * ratio;
+
+    // Clamp to GL MAX_TEXTURE_SIZE so that the resulting CanvasTexture can
+    // actually be uploaded. iOS Safari (and some mobile GPUs) have lower
+    // limits than the document height of tall scrolling pages.
+    let clampScale = 1;
+    let canvasW = fullW;
+    let canvasH = fullH;
+    if (maxSize && (canvasW > maxSize || canvasH > maxSize)) {
+        clampScale = Math.min(maxSize / canvasW, maxSize / canvasH);
+        canvasW = Math.floor(canvasW * clampScale);
+        canvasH = Math.floor(canvasH * clampScale);
+    }
 
     const canvas =
-        oldCanvas && oldCanvas.width === width && oldCanvas.height === height
+        oldCanvas && oldCanvas.width === canvasW && oldCanvas.height === canvasH
             ? oldCanvas
-            : new OffscreenCanvas(width, height);
+            : new OffscreenCanvas(canvasW, canvasH);
 
     // Clone element with styles in text attribute
     // to apply styles in SVG
@@ -57,11 +72,17 @@ export default async function getCanvasFromElement(
     // Remove margins of the root element
     newElement.style.setProperty("margin", "0px");
 
-    // Create SVG string
+    // Create SVG string. The SVG is sized in unclamped physical pixels
+    // (rect × DPR), which is twice the CSS-pixel size of the content. The
+    // foreignObject is twice as wide/tall as the cloned DOM, so the content
+    // renders into the top-left (rect.width × rect.height) of the SVG and
+    // the rest is blank. This matches the long-standing behavior; see
+    // drawImage below for how the top-left region is then mapped to the
+    // canvas.
     const html = newElement.outerHTML;
     const xml = convertHtmlToXml(html);
     const svg =
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${fullW}" height="${fullH}">` +
         `<foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
 
     return new Promise((resolve, reject) => {
@@ -74,9 +95,18 @@ export default async function getCanvasFromElement(
                 return reject();
             }
 
-            ctx.clearRect(0, 0, width, height);
-            ctx.scale(ratio, ratio);
-            ctx.drawImage(img, 0, 0, width, height);
+            ctx.clearRect(0, 0, canvasW, canvasH);
+            // Combined scale: ratio (DPR upscale) × clampScale (size clamp).
+            // With ctx.scale + drawImage(... fullW, fullH), the user-space
+            // dest (0..fullW, 0..fullH) maps to physical pixels
+            // (0..fullW × drawScale, 0..fullH × drawScale). Because the
+            // canvas is exactly canvasW × canvasH = (fullW × clampScale) ×
+            // (fullH × clampScale), only the top-left rect.w × rect.h area
+            // of the source SVG (where the foreignObject content lives) is
+            // visible — and it ends up filling the canvas exactly.
+            const drawScale = ratio * clampScale;
+            ctx.scale(drawScale, drawScale);
+            ctx.drawImage(img, 0, 0, fullW, fullH);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
 
             resolve(canvas);

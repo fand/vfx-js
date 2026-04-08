@@ -56,6 +56,7 @@ export class VFXPlayer {
 
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
+    #maxTextureSize = 4096;
     #elements: VFXElement[] = [];
     #initTime = Date.now() / 1000.0;
 
@@ -85,7 +86,9 @@ export class VFXPlayer {
         });
         this.#renderer.autoClear = false;
         this.#renderer.setClearAlpha(0);
-        this.#renderer.getContext().getExtension("OES_texture_float_linear");
+        const gl = this.#renderer.getContext();
+        gl.getExtension("OES_texture_float_linear");
+        this.#maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
         this.#pixelRatio = opts.pixelRatio;
 
         if (typeof window !== "undefined") {
@@ -270,6 +273,7 @@ export class VFXPlayer {
                 e.element,
                 e.originalOpacity,
                 oldCanvas,
+                this.#maxTextureSize,
             );
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
@@ -326,7 +330,12 @@ export class VFXPlayer {
             texture = new THREE.CanvasTexture(element);
             type = "canvas" as VFXElementType;
         } else {
-            const canvas = await dom2canvas(element, originalOpacity);
+            const canvas = await dom2canvas(
+                element,
+                originalOpacity,
+                undefined,
+                this.#maxTextureSize,
+            );
             texture = new THREE.CanvasTexture(canvas);
             type = "text" as VFXElementType;
         }
