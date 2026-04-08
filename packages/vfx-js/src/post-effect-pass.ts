@@ -116,7 +116,13 @@ export class PostEffectPass {
         }
     }
 
-    initializeBackbuffer(width: number, height: number, pixelRatio: number) {
+    initializeBackbuffer(
+        width: number,
+        height: number,
+        pixelRatio: number,
+        floatType?: THREE.TextureDataType,
+        floatFilter?: THREE.MagnificationTextureFilter,
+    ) {
         if (this.#persistent && !this.#backbuffer) {
             if (this.#size) {
                 this.#backbuffer = new Backbuffer(
@@ -124,6 +130,8 @@ export class PostEffectPass {
                     this.#size[1],
                     1,
                     this.#float,
+                    floatType,
+                    floatFilter,
                 );
             } else {
                 this.#backbuffer = new Backbuffer(
@@ -131,6 +139,8 @@ export class PostEffectPass {
                     height,
                     pixelRatio,
                     this.#float,
+                    floatType,
+                    floatFilter,
                 );
             }
         }

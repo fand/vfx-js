@@ -16,6 +16,8 @@ export class Backbuffer {
         height: number,
         pixelRatio: number,
         float?: boolean,
+        floatType: THREE.TextureDataType = THREE.FloatType,
+        floatFilter: THREE.MagnificationTextureFilter = THREE.LinearFilter,
     ) {
         this.#width = width;
         this.#height = height;
@@ -23,10 +25,11 @@ export class Backbuffer {
 
         const pwidth = width * pixelRatio; // use physical size
         const pheight = height * pixelRatio;
+        const filter = float ? floatFilter : THREE.LinearFilter;
         const opts = {
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            type: float ? THREE.FloatType : THREE.UnsignedByteType,
+            minFilter: filter,
+            magFilter: filter,
+            type: float ? floatType : THREE.UnsignedByteType,
         };
         this.#buffers = [
             new THREE.WebGLRenderTarget(pwidth, pheight, opts),

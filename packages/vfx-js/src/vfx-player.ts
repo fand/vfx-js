@@ -74,6 +74,28 @@ export class VFXPlayer {
     #mouseX = 0;
     #mouseY = 0;
 
+    /**
+     * Texture data type and minification/magnification filter for float
+     * render targets. Resolved in the constructor from WebGL extension
+     * support so that we always pick the best combination the device
+     * actually supports:
+     *
+     *   - FP32 + Linear  : EXT_color_buffer_float + OES_texture_float_linear
+     *   - FP16 + Linear  : EXT_color_buffer_half_float + OES_texture_half_float_linear
+     *   - FP32 + Nearest : EXT_color_buffer_float only (no float linear filtering)
+     *   - FP16 + Nearest : EXT_color_buffer_half_float only
+     *
+     * iOS Safari is the motivating case for the Nearest fallback: it
+     * exposes EXT_color_buffer_(half_)float so float render targets *can*
+     * be created, but lacks OES_texture_(half_)float_linear, so sampling
+     * those targets with LinearFilter returns 0.
+     */
+    #floatRTType: THREE.TextureDataType = THREE.HalfFloatType;
+    #floatRTFilter: THREE.MagnificationTextureFilter = THREE.LinearFilter;
+
+    /** Diagnostic: human-readable summary of the resolved float RT config. */
+    floatRTDebug = "";
+
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
     constructor(opts: VFXOptsInner, canvas: HTMLCanvasElement) {
@@ -87,7 +109,41 @@ export class VFXPlayer {
         this.#renderer.autoClear = false;
         this.#renderer.setClearAlpha(0);
         const gl = this.#renderer.getContext();
-        gl.getExtension("OES_texture_float_linear");
+        const colorBufferFloat = !!gl.getExtension("EXT_color_buffer_float");
+        const colorBufferHalfFloat = !!gl.getExtension(
+            "EXT_color_buffer_half_float",
+        );
+        const floatLinear = !!gl.getExtension("OES_texture_float_linear");
+        const halfFloatLinear = !!gl.getExtension(
+            "OES_texture_half_float_linear",
+        );
+
+        // Pick the best available float render target configuration. iOS
+        // Safari exposes color_buffer_float but NOT *_linear, so we fall
+        // back to NearestFilter for float RTs on those devices to avoid
+        // sampling-returns-zero (= black output).
+        if (colorBufferFloat && floatLinear) {
+            this.#floatRTType = THREE.FloatType;
+            this.#floatRTFilter = THREE.LinearFilter;
+            this.floatRTDebug = "FP32+Linear";
+        } else if (colorBufferHalfFloat && halfFloatLinear) {
+            this.#floatRTType = THREE.HalfFloatType;
+            this.#floatRTFilter = THREE.LinearFilter;
+            this.floatRTDebug = "FP16+Linear";
+        } else if (colorBufferFloat) {
+            this.#floatRTType = THREE.FloatType;
+            this.#floatRTFilter = THREE.NearestFilter;
+            this.floatRTDebug = "FP32+Nearest";
+        } else if (colorBufferHalfFloat) {
+            this.#floatRTType = THREE.HalfFloatType;
+            this.#floatRTFilter = THREE.NearestFilter;
+            this.floatRTDebug = "FP16+Nearest";
+        } else {
+            this.#floatRTType = THREE.UnsignedByteType;
+            this.#floatRTFilter = THREE.LinearFilter;
+            this.floatRTDebug = "Byte+Linear (no float)";
+        }
+        this.floatRTDebug += ` (cbF=${colorBufferFloat} cbHF=${colorBufferHalfFloat} fL=${floatLinear} hfL=${halfFloatLinear})`;
         this.#maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
         this.#pixelRatio = opts.pixelRatio;
 
@@ -460,17 +516,23 @@ export class VFXPlayer {
                         logicalH,
                         pixelRatio,
                         inputPasses[i].float,
+                        this.#floatRTType,
+                        this.#floatRTFilter,
                     ),
                 );
             } else {
+                const isFloat = inputPasses[i].float;
+                const filter = isFloat
+                    ? this.#floatRTFilter
+                    : THREE.LinearFilter;
                 bufferTargets.set(
                     targetName,
                     new THREE.WebGLRenderTarget(bw, bh, {
-                        minFilter: THREE.LinearFilter,
-                        magFilter: THREE.LinearFilter,
+                        minFilter: filter,
+                        magFilter: filter,
                         format: THREE.RGBAFormat,
-                        type: inputPasses[i].float
-                            ? THREE.FloatType
+                        type: isFloat
+                            ? this.#floatRTType
                             : THREE.UnsignedByteType,
                     }),
                 );
@@ -1345,12 +1407,15 @@ export class VFXPlayer {
 
                 if (!rt || rt.width !== rtW || rt.height !== rtH) {
                     rt?.dispose();
+                    const filter = pass.float
+                        ? this.#floatRTFilter
+                        : THREE.LinearFilter;
                     rt = new THREE.WebGLRenderTarget(rtW, rtH, {
-                        minFilter: THREE.LinearFilter,
-                        magFilter: THREE.LinearFilter,
+                        minFilter: filter,
+                        magFilter: filter,
                         format: THREE.RGBAFormat,
                         type: pass.float
-                            ? THREE.FloatType
+                            ? this.#floatRTType
                             : THREE.UnsignedByteType,
                     });
                     this.#postEffectBufferTargets.set(bufferName, rt);
@@ -1406,7 +1471,13 @@ export class VFXPlayer {
         // Initialize/resize post effect backbuffers
         for (const pass of this.#postEffectPasses) {
             if (pass.persistent && !pass.backbuffer) {
-                pass.initializeBackbuffer(width, height, this.#pixelRatio);
+                pass.initializeBackbuffer(
+                    width,
+                    height,
+                    this.#pixelRatio,
+                    this.#floatRTType,
+                    this.#floatRTFilter,
+                );
             } else if (pass.backbuffer) {
                 pass.resizeBackbuffer(width, height);
             }

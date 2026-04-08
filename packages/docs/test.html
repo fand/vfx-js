@@ -183,10 +183,124 @@
   </section>
 </div>
 
+<div
+  id="probe"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+    background: rgba(255, 255, 0, 0.9);
+    color: #000;
+    font: 12px monospace;
+    padding: 6px;
+    max-width: 90vw;
+    white-space: pre-wrap;
+    pointer-events: none;
+  "
+></div>
+
 <script type="module">
   //import { VFX } from "@vfx-js/core";
   import { VFX } from "@vfx-js/core";
   import Lenis from "https://esm.sh/lenis@1.1.20";
+
+  // --- WebGL feature probe ---
+  {
+    const c = document.createElement("canvas");
+    const gl =
+      c.getContext("webgl2") ||
+      c.getContext("webgl") ||
+      c.getContext("experimental-webgl");
+    const lines = [];
+    if (!gl) {
+      lines.push("NO WebGL CONTEXT");
+    } else {
+      const isGL2 = !!c.getContext("webgl2");
+      lines.push(`GL: ${isGL2 ? "WebGL2" : "WebGL1"}`);
+      lines.push(`VENDOR: ${gl.getParameter(gl.VENDOR)}`);
+      const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+      if (dbg)
+        lines.push(`GPU: ${gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)}`);
+      const exts = [
+        "EXT_color_buffer_float",
+        "EXT_color_buffer_half_float",
+        "OES_texture_float_linear",
+        "OES_texture_half_float_linear",
+        "EXT_float_blend",
+      ];
+      for (const e of exts) lines.push(`${e}: ${!!gl.getExtension(e)}`);
+
+      // Render-and-readback: write a known color to a float FBO and read
+      // it back to verify writes actually land in the texture.
+      function testRT(label, internal, type) {
+        gl.getExtension("EXT_color_buffer_float");
+        gl.getExtension("EXT_color_buffer_half_float");
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, internal, 4, 4, 0, gl.RGBA, type, null);
+        const fb = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        if (status !== gl.FRAMEBUFFER_COMPLETE) {
+          lines.push(`${label}: FBO FAIL 0x${status.toString(16)}`);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          gl.deleteFramebuffer(fb);
+          gl.deleteTexture(tex);
+          return;
+        }
+        const vs = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vs, "#version 300 es\nin vec2 p; void main(){gl_Position=vec4(p,0.,1.);}");
+        gl.compileShader(vs);
+        const fs = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fs, "#version 300 es\nprecision highp float; out vec4 o;\nvoid main(){o=vec4(0.5,1.25,-2.5,1.0);}");
+        gl.compileShader(fs);
+        const prog = gl.createProgram();
+        gl.attachShader(prog, vs);
+        gl.attachShader(prog, fs);
+        gl.linkProgram(prog);
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+          lines.push(`${label}: link fail ${gl.getProgramInfoLog(prog)}`);
+          return;
+        }
+        gl.useProgram(prog);
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+        const loc = gl.getAttribLocation(prog, "p");
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+        gl.viewport(0, 0, 4, 4);
+        gl.disable(gl.BLEND);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        const px = new Float32Array(4 * 4 * 4);
+        try {
+          gl.readPixels(0, 0, 4, 4, gl.RGBA, gl.FLOAT, px);
+          lines.push(`${label}: r=${px[0].toFixed(2)} g=${px[1].toFixed(2)} b=${px[2].toFixed(2)} a=${px[3].toFixed(2)}`);
+        } catch (e) {
+          lines.push(`${label}: readPixels threw: ${e.message}`);
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.deleteFramebuffer(fb);
+        gl.deleteTexture(tex);
+        gl.deleteProgram(prog);
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+        gl.deleteBuffer(buf);
+      }
+      if (isGL2) {
+        testRT("RGBA32F write", gl.RGBA32F, gl.FLOAT);
+        testRT("RGBA16F write", gl.RGBA16F, gl.HALF_FLOAT);
+      }
+    }
+    document.getElementById("probe").textContent = lines.join("\n");
+    console.log(lines.join("\n"));
+  }
 
   // Replace the device's native momentum scroll with Lenis. iOS Safari
   // suppresses touch events while a native momentum scroll is in flight,
@@ -385,6 +499,7 @@
 
     vec4 c2 = vec4(spectrum(sin(v * 2.) * 0.4 + 0.6), 1);
     outColor += c2 * smoothstep(.2, .8, v) * 0.5;
+    //outColor = texture(velocity, uv);
   }`;
 
   // --- Build passes ---
@@ -463,7 +578,7 @@
       delta = [x - pos[0], y - pos[1]];
     }
     pos = [x, y];
-    console.log(pos, delta);
+    console.log(delta);
   });
 
   window.addEventListener("load", async () => {
@@ -494,6 +609,10 @@
 
     const vfx = new VFX({ postEffect: passes });
     await vfx.add(app, { shader: "none" });
+
+    const probeEl = document.getElementById("probe");
+    probeEl.textContent += `\nVFX: ${vfx.floatRTDebug}`;
+    console.log(vfx.floatRTDebug);
     // const vfx = new VFX();
     // await vfx.add(app, { shader: passes });
 
