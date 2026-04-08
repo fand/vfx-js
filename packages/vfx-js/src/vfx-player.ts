@@ -1059,9 +1059,34 @@ export class VFXPlayer {
             this.#renderer.clear();
         }
 
-        this.#renderer.setViewport(rect.x, rect.y, rect.w, rect.h);
+        // Clip the viewport rect to the bounds of the current render target.
+        // Mobile GPUs (Adreno, some Mali) use limited-precision fixed-point
+        // arithmetic in the rasterizer, and a viewport whose transformed
+        // vertices exceed ~16384 device pixels triggers visible clipping or
+        // wraparound on the visible portion of the framebuffer. Since
+        // gl_FragCoord is in window coordinates and the shader's uv
+        // calculation uses the offset/resolution uniforms (set from the
+        // un-clipped element rect), clipping the viewport rect here does
+        // not change the visible-pixel result — it only avoids feeding
+        // out-of-range geometry to the rasterizer.
+        const targetCssW = target
+            ? target.width / this.#pixelRatio
+            : this.#canvasSize[0];
+        const targetCssH = target
+            ? target.height / this.#pixelRatio
+            : this.#canvasSize[1];
+        const cx1 = Math.max(0, rect.x);
+        const cy1 = Math.max(0, rect.y);
+        const cx2 = Math.min(targetCssW, rect.x + rect.w);
+        const cy2 = Math.min(targetCssH, rect.y + rect.h);
+        const cw = cx2 - cx1;
+        const ch = cy2 - cy1;
+        if (cw <= 0 || ch <= 0) return; // nothing visible
+        this.#renderer.setViewport(cx1, cy1, cw, ch);
 
-        // Set viewport uniform if passed and exists
+        // Set viewport uniform if passed and exists. This stays as the
+        // un-clipped rect because user shaders use it to know the element's
+        // logical position in the render target.
         if (uniforms["viewport"]) {
             uniforms["viewport"].value.set(
                 rect.x * this.#pixelRatio,
