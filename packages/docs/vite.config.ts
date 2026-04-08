@@ -6,6 +6,8 @@ import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
 export default defineConfig(({ mode }) => ({
   server: {
     port: 3001,
+    host: true,
+    allowedHosts: [".ts.net"],
   },
   base: "",
   plugins: [viteCommonjs()],
