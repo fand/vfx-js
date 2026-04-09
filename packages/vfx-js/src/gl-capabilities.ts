@@ -1,13 +1,11 @@
 import * as THREE from "three";
 
 /**
- * Device-derived capabilities resolved from a WebGL2 context. Centralizes
- * the float render target type/filter selection and other GL limits so
- * call sites do not need to probe extensions themselves.
+ * Device-derived capabilities resolved from a WebGL2 context.
  *
- *   - FP32 + Linear : OES_texture_float_linear available (desktop, Android)
- *   - FP16 + Linear : no FP32 linear, but WebGL2 guarantees half-float
- *                      linear filtering as built-in (iOS Safari)
+ * Float RT data type is FP32 when OES_texture_float_linear is available
+ * (desktop, Android), FP16 otherwise (iOS Safari — WebGL2 guarantees
+ * half-float linear filtering as built-in).
  *
  * @internal
  */

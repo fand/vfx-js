@@ -2,12 +2,8 @@ import * as THREE from "three";
 import type { GLCapabilities } from "./gl-capabilities.js";
 
 /**
- * Create a `THREE.WebGLRenderTarget` configured according to the device's
- * GL capabilities. Use this everywhere instead of `new WebGLRenderTarget`
- * so that float type/filter selection lives in one place.
- *
- * For float RTs the type/filter come from `caps`, falling back to FP16 +
- * Nearest on devices (notably iOS Safari) that lack `*_texture_float_linear`.
+ * Create a `THREE.WebGLRenderTarget` with the correct float data type
+ * from `caps` (FP32 on desktop/Android, FP16 on iOS Safari).
  *
  * @internal
  */
@@ -28,13 +24,7 @@ export function createRenderTarget(
 
 /**
  * Create a `THREE.RawShaderMaterial` for a fullscreen pass.
- *
- * Centralizes the rule that passes writing to an intermediate buffer
- * target must disable blending: blending into a float render target
- * requires the `EXT_float_blend` extension which iOS Safari does not
- * provide, and intermediate compute-style passes (e.g. fluid sim) want
- * to write their output directly without blending against previous
- * contents.
+ * Disables blending when rendering to an intermediate buffer target.
  *
  * @internal
  */

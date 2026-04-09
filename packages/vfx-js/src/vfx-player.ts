@@ -75,7 +75,7 @@ export class VFXPlayer {
     #mouseX = 0;
     #mouseY = 0;
 
-    /** Device-derived GL capabilities (float RT type/filter, max tex size). */
+    /** Device-derived GL capabilities (float RT type, max tex size). */
     #caps!: GLCapabilities;
 
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
