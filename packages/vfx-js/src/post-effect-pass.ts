@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Backbuffer } from "./backbuffer.js";
 import { DEFAULT_VERTEX_SHADER } from "./constants.js";
+import type { GLCapabilities } from "./gl-capabilities.js";
 import type { GLRect } from "./gl-rect.js";
 import type { VFXUniformValue, VFXUniforms } from "./types.js";
 
@@ -120,8 +121,7 @@ export class PostEffectPass {
         width: number,
         height: number,
         pixelRatio: number,
-        floatType?: THREE.TextureDataType,
-        floatFilter?: THREE.MagnificationTextureFilter,
+        caps: GLCapabilities,
     ) {
         if (this.#persistent && !this.#backbuffer) {
             if (this.#size) {
@@ -130,8 +130,7 @@ export class PostEffectPass {
                     this.#size[1],
                     1,
                     this.#float,
-                    floatType,
-                    floatFilter,
+                    caps,
                 );
             } else {
                 this.#backbuffer = new Backbuffer(
@@ -139,8 +138,7 @@ export class PostEffectPass {
                     height,
                     pixelRatio,
                     this.#float,
-                    floatType,
-                    floatFilter,
+                    caps,
                 );
             }
         }

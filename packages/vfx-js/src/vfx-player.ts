@@ -8,6 +8,7 @@ import {
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
+import { GLCapabilities } from "./gl-capabilities.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import {
@@ -56,7 +57,6 @@ export class VFXPlayer {
 
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
-    #maxTextureSize = 4096;
     #elements: VFXElement[] = [];
     #initTime = Date.now() / 1000.0;
 
@@ -74,28 +74,12 @@ export class VFXPlayer {
     #mouseX = 0;
     #mouseY = 0;
 
-    /**
-     * Texture data type and minification/magnification filter for float
-     * render targets. Resolved in the constructor from WebGL extension
-     * support so that we always pick the best combination the device
-     * actually supports:
-     *
-     *   - FP32 + Linear  : EXT_color_buffer_float + OES_texture_float_linear
-     *   - FP16 + Linear  : EXT_color_buffer_half_float + OES_texture_half_float_linear
-     *   - FP32 + Nearest : EXT_color_buffer_float only (no float linear filtering)
-     *   - FP16 + Nearest : EXT_color_buffer_half_float only
-     *
-     * iOS Safari is the motivating case for the Nearest fallback: it
-     * exposes EXT_color_buffer_(half_)float so float render targets *can*
-     * be created, but lacks OES_texture_(half_)float_linear, so sampling
-     * those targets with LinearFilter returns 0.
-     */
-    #floatRTType: THREE.TextureDataType = THREE.HalfFloatType;
-    #floatRTFilter: THREE.MagnificationTextureFilter = THREE.LinearFilter;
+    /** Device-derived GL capabilities (float RT type/filter, max tex size). */
+    #caps!: GLCapabilities;
 
     /** Whether float RTs were configured with hardware LinearFilter. */
     get hasFloatLinearFilter(): boolean {
-        return this.#floatRTFilter === THREE.LinearFilter;
+        return this.#caps.hasFloatLinearFilter;
     }
 
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
@@ -110,37 +94,7 @@ export class VFXPlayer {
         });
         this.#renderer.autoClear = false;
         this.#renderer.setClearAlpha(0);
-        const gl = this.#renderer.getContext();
-        const colorBufferFloat = !!gl.getExtension("EXT_color_buffer_float");
-        const colorBufferHalfFloat = !!gl.getExtension(
-            "EXT_color_buffer_half_float",
-        );
-        const floatLinear = !!gl.getExtension("OES_texture_float_linear");
-        const halfFloatLinear = !!gl.getExtension(
-            "OES_texture_half_float_linear",
-        );
-
-        // Pick the best available float render target configuration. iOS
-        // Safari exposes color_buffer_float but NOT *_linear, so we fall
-        // back to NearestFilter for float RTs on those devices to avoid
-        // sampling-returns-zero (= black output).
-        if (colorBufferFloat && floatLinear) {
-            this.#floatRTType = THREE.FloatType;
-            this.#floatRTFilter = THREE.LinearFilter;
-        } else if (colorBufferHalfFloat && halfFloatLinear) {
-            this.#floatRTType = THREE.HalfFloatType;
-            this.#floatRTFilter = THREE.LinearFilter;
-        } else if (colorBufferFloat) {
-            this.#floatRTType = THREE.FloatType;
-            this.#floatRTFilter = THREE.NearestFilter;
-        } else if (colorBufferHalfFloat) {
-            this.#floatRTType = THREE.HalfFloatType;
-            this.#floatRTFilter = THREE.NearestFilter;
-        } else {
-            this.#floatRTType = THREE.UnsignedByteType;
-            this.#floatRTFilter = THREE.LinearFilter;
-        }
-        this.#maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        this.#caps = new GLCapabilities(this.#renderer.getContext());
         this.#pixelRatio = opts.pixelRatio;
 
         if (typeof window !== "undefined") {
@@ -325,7 +279,7 @@ export class VFXPlayer {
                 e.element,
                 e.originalOpacity,
                 oldCanvas,
-                this.#maxTextureSize,
+                this.#caps.maxTextureSize,
             );
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
@@ -386,7 +340,7 @@ export class VFXPlayer {
                 element,
                 originalOpacity,
                 undefined,
-                this.#maxTextureSize,
+                this.#caps.maxTextureSize,
             );
             texture = new THREE.CanvasTexture(canvas);
             type = "text" as VFXElementType;
@@ -451,7 +405,13 @@ export class VFXPlayer {
                 const bh =
                     (rectWithOverflow.bottom - rectWithOverflow.top) *
                     this.#pixelRatio;
-                return new Backbuffer(bw, bh, this.#pixelRatio);
+                return new Backbuffer(
+                    bw,
+                    bh,
+                    this.#pixelRatio,
+                    false,
+                    this.#caps,
+                );
             })();
             sharedUniforms["backbuffer"] = { value: backbuffer.texture };
         }
@@ -488,14 +448,13 @@ export class VFXPlayer {
                         logicalH,
                         pixelRatio,
                         inputPasses[i].float,
-                        this.#floatRTType,
-                        this.#floatRTFilter,
+                        this.#caps,
                     ),
                 );
             } else {
                 const isFloat = inputPasses[i].float;
                 const filter = isFloat
-                    ? this.#floatRTFilter
+                    ? this.#caps.floatRTFilter
                     : THREE.LinearFilter;
                 bufferTargets.set(
                     targetName,
@@ -504,7 +463,7 @@ export class VFXPlayer {
                         magFilter: filter,
                         format: THREE.RGBAFormat,
                         type: isFloat
-                            ? this.#floatRTType
+                            ? this.#caps.floatRTType
                             : THREE.UnsignedByteType,
                     }),
                 );
@@ -1380,14 +1339,14 @@ export class VFXPlayer {
                 if (!rt || rt.width !== rtW || rt.height !== rtH) {
                     rt?.dispose();
                     const filter = pass.float
-                        ? this.#floatRTFilter
+                        ? this.#caps.floatRTFilter
                         : THREE.LinearFilter;
                     rt = new THREE.WebGLRenderTarget(rtW, rtH, {
                         minFilter: filter,
                         magFilter: filter,
                         format: THREE.RGBAFormat,
                         type: pass.float
-                            ? this.#floatRTType
+                            ? this.#caps.floatRTType
                             : THREE.UnsignedByteType,
                     });
                     this.#postEffectBufferTargets.set(bufferName, rt);
@@ -1447,8 +1406,7 @@ export class VFXPlayer {
                     width,
                     height,
                     this.#pixelRatio,
-                    this.#floatRTType,
-                    this.#floatRTFilter,
+                    this.#caps,
                 );
             } else if (pass.backbuffer) {
                 pass.resizeBackbuffer(width, height);

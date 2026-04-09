@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { GLCapabilities } from "./gl-capabilities.js";
 import { type GLRect, getGLRect } from "./gl-rect";
 
 /**
@@ -15,9 +16,8 @@ export class Backbuffer {
         width: number,
         height: number,
         pixelRatio: number,
-        float?: boolean,
-        floatType: THREE.TextureDataType = THREE.FloatType,
-        floatFilter: THREE.MagnificationTextureFilter = THREE.LinearFilter,
+        float: boolean | undefined,
+        caps: GLCapabilities,
     ) {
         this.#width = width;
         this.#height = height;
@@ -25,11 +25,11 @@ export class Backbuffer {
 
         const pwidth = width * pixelRatio; // use physical size
         const pheight = height * pixelRatio;
-        const filter = float ? floatFilter : THREE.LinearFilter;
+        const filter = float ? caps.floatRTFilter : THREE.LinearFilter;
         const opts = {
             minFilter: filter,
             magFilter: filter,
-            type: float ? floatType : THREE.UnsignedByteType,
+            type: float ? caps.floatRTType : THREE.UnsignedByteType,
         };
         this.#buffers = [
             new THREE.WebGLRenderTarget(pwidth, pheight, opts),
