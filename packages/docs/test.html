@@ -183,14 +183,177 @@
   </section>
 </div>
 
+<div
+  id="probe"
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 999999;
+    background: rgba(0, 0, 0, 0.85);
+    color: #0f0;
+    font: 12px monospace;
+    padding: 8px;
+    max-width: 95vw;
+    white-space: pre-wrap;
+    pointer-events: none;
+  "
+></div>
+
+<script type="module">
+  // --- Float RT probe ---
+  {
+    const lines = [];
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl2");
+    if (!gl) {
+      lines.push("NO WebGL2");
+    } else {
+      const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+      if (dbg)
+        lines.push("GPU: " + gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL));
+
+      const exts = [
+        "EXT_color_buffer_float",
+        "EXT_color_buffer_half_float",
+        "OES_texture_float_linear",
+        "OES_texture_half_float_linear",
+        "EXT_float_blend",
+      ];
+      for (const e of exts) lines.push(`${e}: ${!!gl.getExtension(e)}`);
+
+      // Float16 encoding helper
+      function f32ToF16(val) {
+        const buf = new ArrayBuffer(4);
+        new Float32Array(buf)[0] = val;
+        const f = new Uint32Array(buf)[0];
+        const sign = (f >> 31) & 0x1;
+        let exp = (f >> 23) & 0xff;
+        let mant = f & 0x7fffff;
+        if (exp === 0) return sign << 15;
+        if (exp === 0xff) return (sign << 15) | 0x7c00 | (mant ? 0x200 : 0);
+        exp = exp - 127 + 15;
+        if (exp >= 31) return (sign << 15) | 0x7c00;
+        if (exp <= 0) {
+          if (exp < -10) return sign << 15;
+          mant = (mant | 0x800000) >> (1 - exp);
+          return (sign << 15) | (mant >> 13);
+        }
+        return (sign << 15) | (exp << 10) | (mant >> 13);
+      }
+
+      // Test: create a 2x1 texture with pixel0=(0,0,0,1), pixel1=(1,1,1,1),
+      // sample at the midpoint with LINEAR, read back via RGBA8 FBO.
+      // If linear works, mid-pixels ≈ 128. If nearest, 0 or 255.
+      function testLinearSample(label, internalFmt, type, data) {
+        gl.getExtension("EXT_color_buffer_float");
+        gl.getExtension("EXT_color_buffer_half_float");
+
+        // --- Source texture: 2x1 with LINEAR ---
+        const srcTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, srcTex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage2D(gl.TEXTURE_2D, 0, internalFmt, 2, 1, 0, gl.RGBA, type, data);
+        const texErr = gl.getError();
+        if (texErr !== gl.NO_ERROR) {
+          lines.push(`${label}: texImage2D GL error 0x${texErr.toString(16)}`);
+          gl.deleteTexture(srcTex);
+          return;
+        }
+
+        // --- Dest FBO: 4x1 RGBA8 ---
+        const readW = 4;
+        const dstTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, dstTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, readW, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        const fb = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, dstTex, 0);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+          lines.push(`${label}: FBO incomplete`);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          return;
+        }
+
+        // --- Shader: varying UV across quad ---
+        const vs = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vs, `#version 300 es
+in vec2 p;
+out vec2 v_uv;
+void main() { v_uv = p * 0.5 + 0.5; gl_Position = vec4(p, 0., 1.); }`);
+        gl.compileShader(vs);
+        const fs = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fs, `#version 300 es
+precision highp float;
+uniform sampler2D u_src;
+in vec2 v_uv;
+out vec4 o;
+void main() { o = texture(u_src, v_uv); }`);
+        gl.compileShader(fs);
+        const prog = gl.createProgram();
+        gl.attachShader(prog, vs);
+        gl.attachShader(prog, fs);
+        gl.linkProgram(prog);
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+          lines.push(`${label}: link fail`);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          return;
+        }
+        gl.useProgram(prog);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, srcTex);
+        gl.uniform1i(gl.getUniformLocation(prog, "u_src"), 0);
+
+        // Fullscreen quad (TRIANGLE_STRIP)
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+        const loc = gl.getAttribLocation(prog, "p");
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+        gl.viewport(0, 0, readW, 1);
+        gl.disable(gl.BLEND);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        // Readback
+        const px = new Uint8Array(readW * 4);
+        gl.readPixels(0, 0, readW, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        // Mid-pixels (index 1,2) should be interpolated if LINEAR works
+        const mid = Math.round((px[1 * 4] + px[2 * 4]) / 2);
+        const linear = mid > 30 && mid < 225;
+        const vals = Array.from({ length: readW }, (_, i) => px[i * 4]);
+        lines.push(`${label}: R=[${vals.join(",")}] mid=${mid} → ${linear ? "LINEAR OK" : "NO LINEAR"}`);
+
+        gl.deleteProgram(prog);
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+        gl.deleteBuffer(buf);
+        gl.deleteFramebuffer(fb);
+        gl.deleteTexture(srcTex);
+        gl.deleteTexture(dstTex);
+      }
+
+      const h0 = f32ToF16(0.0), h1 = f32ToF16(1.0);
+      testLinearSample("FP32+Linear", gl.RGBA32F, gl.FLOAT,
+        new Float32Array([0,0,0,1, 1,1,1,1]));
+      testLinearSample("FP16+Linear", gl.RGBA16F, gl.HALF_FLOAT,
+        new Uint16Array([h0,h0,h0,h1, h1,h1,h1,h1]));
+    }
+
+    document.getElementById("probe").textContent = lines.join("\n");
+    console.log(lines.join("\n"));
+  }
+</script>
+
 <script type="module">
   import { VFX } from "@vfx-js/core";
 
-  // iOS Safari suppresses pointer/touch events while native momentum
-  // scrolling is in flight, which makes the fluid sim freeze mid-swipe.
-  // Lenis with `syncTouch: true` replaces native touch scrolling with a
-  // JS-driven loop so events keep firing throughout. Other platforms
-  // don't have this problem, so the import is dynamic and fire-and-forget.
+  // iOS workaround
   const isIOS =
     /iPad|iPhone/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
