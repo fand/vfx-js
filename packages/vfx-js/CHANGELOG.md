@@ -1,5 +1,11 @@
 # react-vfx
 
+## 0.10.0
+
+### Minor Changes
+
+- Improve iOS support
+
 ## 0.9.2
 
 ### Patch Changes

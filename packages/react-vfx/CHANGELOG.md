@@ -1,5 +1,16 @@
 # react-vfx
 
+## 0.15.0
+
+### Minor Changes
+
+- Improve iOS support
+
+### Patch Changes
+
+- Updated dependencies
+  - @vfx-js/core@0.10.0
+
 ## 0.14.2
 
 ### Patch Changes
