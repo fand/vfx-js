@@ -12,10 +12,8 @@ import * as THREE from "three";
  * @internal
  */
 export class GLCapabilities {
-    /** Texture data type for float render targets. */
+    /** Texture data type for float render targets (FloatType or HalfFloatType). */
     readonly floatRTType: THREE.TextureDataType;
-    /** Min/mag filter for float render targets. */
-    readonly floatRTFilter: THREE.MagnificationTextureFilter;
     /** GL_MAX_TEXTURE_SIZE — max width/height of any texture upload. */
     readonly maxTextureSize: number;
 
@@ -24,18 +22,10 @@ export class GLCapabilities {
         gl.getExtension("EXT_color_buffer_half_float");
         const floatLinear = !!gl.getExtension("OES_texture_float_linear");
 
-        if (floatLinear) {
-            this.floatRTType = THREE.FloatType;
-            this.floatRTFilter = THREE.LinearFilter;
-        } else {
-            // WebGL2 guarantees half-float linear filtering as built-in
-            // (OES_texture_half_float_linear is core). iOS Safari lands
-            // here: it lacks OES_texture_float_linear but FP16+Linear
-            // works without the extension.
-            this.floatRTType = THREE.HalfFloatType;
-            this.floatRTFilter = THREE.LinearFilter;
-        }
-
+        // FP32 when hardware supports float linear filtering (desktop,
+        // Android), FP16 otherwise (iOS Safari — WebGL2 guarantees
+        // half-float linear filtering as built-in).
+        this.floatRTType = floatLinear ? THREE.FloatType : THREE.HalfFloatType;
         this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
     }
 }

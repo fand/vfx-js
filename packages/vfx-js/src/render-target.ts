@@ -18,10 +18,9 @@ export function createRenderTarget(
     opts: { float?: boolean } = {},
 ): THREE.WebGLRenderTarget {
     const float = opts.float ?? false;
-    const filter = float ? caps.floatRTFilter : THREE.LinearFilter;
     return new THREE.WebGLRenderTarget(width, height, {
-        minFilter: filter,
-        magFilter: filter,
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
         format: THREE.RGBAFormat,
         type: float ? caps.floatRTType : THREE.UnsignedByteType,
     });
