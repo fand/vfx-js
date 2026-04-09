@@ -20,6 +20,7 @@ import {
     growRect,
     toRect,
 } from "./rect.js";
+import { createPassMaterial, createRenderTarget } from "./render-target.js";
 import type {
     VFXElement,
     VFXElementIntersection,
@@ -73,6 +74,9 @@ export class VFXPlayer {
     #mouseX = 0;
     #mouseY = 0;
 
+    /** Float RT data type: FP32 if OES_texture_float_linear, else FP16. */
+    #floatRTType!: THREE.TextureDataType;
+
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
     constructor(opts: VFXOptsInner, canvas: HTMLCanvasElement) {
@@ -85,12 +89,17 @@ export class VFXPlayer {
         });
         this.#renderer.autoClear = false;
         this.#renderer.setClearAlpha(0);
-        this.#renderer.getContext().getExtension("OES_texture_float_linear");
+        const gl = this.#renderer.getContext() as WebGL2RenderingContext;
+        gl.getExtension("EXT_color_buffer_float");
+        gl.getExtension("EXT_color_buffer_half_float");
+        this.#floatRTType = gl.getExtension("OES_texture_float_linear")
+            ? THREE.FloatType
+            : THREE.HalfFloatType;
         this.#pixelRatio = opts.pixelRatio;
 
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.#resize);
-            window.addEventListener("mousemove", this.#mousemove);
+            window.addEventListener("pointermove", this.#pointermove);
         }
         this.#resize();
 
@@ -108,7 +117,7 @@ export class VFXPlayer {
         this.stop();
         if (typeof window !== "undefined") {
             window.removeEventListener("resize", this.#resize);
-            window.removeEventListener("mousemove", this.#mousemove);
+            window.removeEventListener("pointermove", this.#pointermove);
         }
 
         // Clean up post effect resources
@@ -248,7 +257,7 @@ export class VFXPlayer {
         }
     };
 
-    #mousemove = (e: MouseEvent): void => {
+    #pointermove = (e: PointerEvent): void => {
         if (typeof window !== "undefined") {
             this.#mouseX = e.clientX;
             this.#mouseY = window.innerHeight - e.clientY;
@@ -270,6 +279,7 @@ export class VFXPlayer {
                 e.element,
                 e.originalOpacity,
                 oldCanvas,
+                this.#renderer.capabilities.maxTextureSize,
             );
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
@@ -326,7 +336,12 @@ export class VFXPlayer {
             texture = new THREE.CanvasTexture(element);
             type = "canvas" as VFXElementType;
         } else {
-            const canvas = await dom2canvas(element, originalOpacity);
+            const canvas = await dom2canvas(
+                element,
+                originalOpacity,
+                undefined,
+                this.#renderer.capabilities.maxTextureSize,
+            );
             texture = new THREE.CanvasTexture(canvas);
             type = "text" as VFXElementType;
         }
@@ -390,7 +405,13 @@ export class VFXPlayer {
                 const bh =
                     (rectWithOverflow.bottom - rectWithOverflow.top) *
                     this.#pixelRatio;
-                return new Backbuffer(bw, bh, this.#pixelRatio);
+                return new Backbuffer(
+                    bw,
+                    bh,
+                    this.#pixelRatio,
+                    false,
+                    this.#floatRTType,
+                );
             })();
             sharedUniforms["backbuffer"] = { value: backbuffer.texture };
         }
@@ -427,18 +448,14 @@ export class VFXPlayer {
                         logicalH,
                         pixelRatio,
                         inputPasses[i].float,
+                        this.#floatRTType,
                     ),
                 );
             } else {
                 bufferTargets.set(
                     targetName,
-                    new THREE.WebGLRenderTarget(bw, bh, {
-                        minFilter: THREE.LinearFilter,
-                        magFilter: THREE.LinearFilter,
-                        format: THREE.RGBAFormat,
-                        type: inputPasses[i].float
-                            ? THREE.FloatType
-                            : THREE.UnsignedByteType,
+                    createRenderTarget(this.#floatRTType, bw, bh, {
+                        float: inputPasses[i].float,
                     }),
                 );
             }
@@ -498,12 +515,12 @@ export class VFXPlayer {
 
             const scene = new THREE.Scene();
             const geometry = new THREE.PlaneGeometry(2, 2);
-            const material = new THREE.RawShaderMaterial({
+            const material = createPassMaterial({
                 vertexShader,
                 fragmentShader: frag,
-                transparent: true,
                 uniforms: passUniforms,
                 glslVersion,
+                renderingToBuffer: p.target !== undefined,
             });
             const mesh = new THREE.Mesh(geometry, material);
             scene.add(mesh);
@@ -1019,9 +1036,24 @@ export class VFXPlayer {
             this.#renderer.clear();
         }
 
-        this.#renderer.setViewport(rect.x, rect.y, rect.w, rect.h);
+        // Clip viewport to render target bounds to avoid precision issues
+        // on mobile GPUs (Adreno, some Mali) with large offscreen rects.
+        const targetCssW = target
+            ? target.width / this.#pixelRatio
+            : this.#canvasSize[0];
+        const targetCssH = target
+            ? target.height / this.#pixelRatio
+            : this.#canvasSize[1];
+        const cx1 = Math.max(0, rect.x);
+        const cy1 = Math.max(0, rect.y);
+        const cx2 = Math.min(targetCssW, rect.x + rect.w);
+        const cy2 = Math.min(targetCssH, rect.y + rect.h);
+        const cw = cx2 - cx1;
+        const ch = cy2 - cy1;
+        if (cw <= 0 || ch <= 0) return; // nothing visible
+        this.#renderer.setViewport(cx1, cy1, cw, ch);
 
-        // Set viewport uniform if passed and exists
+        // Viewport uniform uses un-clipped rect for shader uv calculation.
         if (uniforms["viewport"]) {
             uniforms["viewport"].value.set(
                 rect.x * this.#pixelRatio,
@@ -1078,6 +1110,7 @@ export class VFXPlayer {
                     pe.persistent ?? false,
                     pe.float ?? false,
                     pe.size,
+                    pe.target !== undefined,
                 );
                 targetNames.push(pe.target);
             } else {
@@ -1279,13 +1312,8 @@ export class VFXPlayer {
 
                 if (!rt || rt.width !== rtW || rt.height !== rtH) {
                     rt?.dispose();
-                    rt = new THREE.WebGLRenderTarget(rtW, rtH, {
-                        minFilter: THREE.LinearFilter,
-                        magFilter: THREE.LinearFilter,
-                        format: THREE.RGBAFormat,
-                        type: pass.float
-                            ? THREE.FloatType
-                            : THREE.UnsignedByteType,
+                    rt = createRenderTarget(this.#floatRTType, rtW, rtH, {
+                        float: pass.float,
                     });
                     this.#postEffectBufferTargets.set(bufferName, rt);
                 }
@@ -1326,21 +1354,22 @@ export class VFXPlayer {
                 this.#postEffectTarget.dispose();
             }
 
-            this.#postEffectTarget = new THREE.WebGLRenderTarget(
+            this.#postEffectTarget = createRenderTarget(
+                this.#floatRTType,
                 targetWidth,
                 targetHeight,
-                {
-                    minFilter: THREE.LinearFilter,
-                    magFilter: THREE.LinearFilter,
-                    format: THREE.RGBAFormat,
-                },
             );
         }
 
         // Initialize/resize post effect backbuffers
         for (const pass of this.#postEffectPasses) {
             if (pass.persistent && !pass.backbuffer) {
-                pass.initializeBackbuffer(width, height, this.#pixelRatio);
+                pass.initializeBackbuffer(
+                    width,
+                    height,
+                    this.#pixelRatio,
+                    this.#floatRTType,
+                );
             } else if (pass.backbuffer) {
                 pass.resizeBackbuffer(width, height);
             }

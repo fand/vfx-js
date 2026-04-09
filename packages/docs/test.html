@@ -71,6 +71,17 @@
     border-radius: 8px;
     display: block;
   }
+
+  @media (max-width: 768px) {
+    section {
+      flex-direction: column;
+      padding: 48px 24px;
+      gap: 24px;
+    }
+    section:nth-child(even) {
+      flex-direction: column;
+    }
+  }
 </style>
 
 <div id="app">
@@ -173,8 +184,17 @@
 </div>
 
 <script type="module">
-  //import { VFX } from "@vfx-js/core";
   import { VFX } from "@vfx-js/core";
+
+  // iOS workaround
+  const isIOS =
+    /iPad|iPhone/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (isIOS) {
+    import("https://esm.sh/lenis@1.1.20").then(({ default: Lenis }) => {
+      new Lenis({ autoRaf: true, syncTouch: true });
+    });
+  }
 
   // --- Shaders ---
   const copyShader = `
@@ -334,7 +354,6 @@
   uniform vec2 simSize;
   uniform float time;
   out vec4 outColor;
-
   vec3 spectrum(float x) {
     return cos((x - vec3(0, .5, 1)) * vec3(.6, 1., .5) * 3.14);
   }
@@ -344,14 +363,27 @@
     vec2 vel = texture(velocity, uv).xy;
 
     vec2 disp = vel / simSize;
-    vec2 cr = texture(canvas, uv - disp * 0.050).ra;
-    vec2 cg = texture(canvas, uv - disp * 0.040).ga;
-    vec2 cb = texture(canvas, uv - disp * 0.030).ba;
-    outColor = vec4(cr.x, cg.x, cb.x, (cr.y + cg.y + cb.y) / 3.);
-
     float v = length(disp);
-    outColor += vec4(spectrum(sin(v * 3. + time) * 0.4 + 0.5), 1) * smoothstep(.2, .8, v)
-   * 0.5;
+
+    // dispersion
+    const int N = 8;
+    vec4 c = vec4(0.0);
+    vec3 wsum = vec3(0.0);
+    for (int i = 0; i < N; i++) {
+      float t = float(i) / float(N - 1);
+      vec3 w = max(vec3(0.0),
+      cos((t - vec3(0.0, 0.5, 1.0)) * 3.14159 * 0.5));
+      vec4 s = texture(canvas, uv - disp * 0.3 * (t + 0.3) * v);
+      c.rgb += s.rgb * w;
+      c.a   += s.a * (w.r + w.g + w.b) / 3.0;
+      wsum  += w;
+    }
+    c.rgb /= wsum;
+    c.a /= (wsum.r + wsum.g + wsum.b) / 3.0;
+    outColor = c;
+
+    vec4 c2 = vec4(spectrum(sin(v * 2.) * 0.4 + 0.6), 1);
+    outColor += c2 * smoothstep(.2, .8, v) * 0.5;
   }`;
 
   // --- Build passes ---
@@ -408,7 +440,9 @@
         persistent: true,
         float: true,
         size: simSize,
-        uniforms: { velocityDissipation: opts.velocityDissipation },
+        uniforms: {
+          velocityDissipation: opts.velocityDissipation,
+        },
       },
       {
         frag: displayShader,
@@ -423,7 +457,7 @@
   // Mouse tracking
   let pos = [-1, -1],
     delta = [0, 0];
-  window.addEventListener("mousemove", (e) => {
+  window.addEventListener("pointermove", (e) => {
     const x = e.clientX;
     const y = window.innerHeight - e.clientY;
     if (pos[0] >= 0) {

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { Backbuffer } from "./backbuffer.js";
 import { DEFAULT_VERTEX_SHADER } from "./constants.js";
 import type { GLRect } from "./gl-rect.js";
+import { createPassMaterial } from "./render-target.js";
 import type { VFXUniformValue, VFXUniforms } from "./types.js";
 
 export class PostEffectPass {
@@ -20,6 +21,7 @@ export class PostEffectPass {
         persistent?: boolean,
         float?: boolean,
         size?: [number, number],
+        hasBufferTarget?: boolean,
     ) {
         this.#persistent = persistent ?? false;
         this.#float = float ?? false;
@@ -50,12 +52,12 @@ export class PostEffectPass {
 
         this.#mesh = new THREE.Mesh(
             new THREE.PlaneGeometry(2, 2),
-            new THREE.RawShaderMaterial({
+            createPassMaterial({
                 vertexShader: DEFAULT_VERTEX_SHADER,
                 fragmentShader,
                 uniforms: this.#uniforms,
                 glslVersion: "300 es",
-                transparent: true,
+                renderingToBuffer: hasBufferTarget ?? false,
                 premultipliedAlpha: true,
             }),
         );
@@ -106,7 +108,12 @@ export class PostEffectPass {
         }
     }
 
-    initializeBackbuffer(width: number, height: number, pixelRatio: number) {
+    initializeBackbuffer(
+        width: number,
+        height: number,
+        pixelRatio: number,
+        floatRTType: THREE.TextureDataType,
+    ) {
         if (this.#persistent && !this.#backbuffer) {
             if (this.#size) {
                 this.#backbuffer = new Backbuffer(
@@ -114,6 +121,7 @@ export class PostEffectPass {
                     this.#size[1],
                     1,
                     this.#float,
+                    floatRTType,
                 );
             } else {
                 this.#backbuffer = new Backbuffer(
@@ -121,6 +129,7 @@ export class PostEffectPass {
                     height,
                     pixelRatio,
                     this.#float,
+                    floatRTType,
                 );
             }
         }

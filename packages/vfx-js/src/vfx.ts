@@ -15,8 +15,10 @@ function getCanvasStyle(fixed: boolean) {
         position: fixed ? "fixed" : "absolute",
         top: 0,
         left: 0,
-        width: "100vw",
-        height: "100vh",
+        // Sized by VFXPlayer#updateCanvasSize; avoid 100vw/100vh which
+        // can cause overflow on iOS Safari.
+        width: "0px",
+        height: "0px",
         "z-index": 9999,
         "pointer-events": "none",
     };
