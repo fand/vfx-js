@@ -23,11 +23,6 @@ const convertHtmlToXml = (html: string): string => {
     return wfHtml.replace(/<!DOCTYPE html>/, "");
 };
 
-// Clone DOM node.
-function cloneNode<T extends Node>(node: T): T {
-    return node.cloneNode(true) as T;
-}
-
 /**
  * Detect whether foreignObject renders `<img>`. WebKit blocks this,
  * so we fall back to native SVG `<image>` overlays. Cached.
@@ -94,69 +89,16 @@ export default async function getCanvasFromElement(
             : new OffscreenCanvas(canvasW, canvasH);
 
     // Clone element with styles in text attribute
-    // to apply styles in SVG
-    const newElement = cloneNode(element);
+    const newElement = element.cloneNode(true) as HTMLElement;
     await syncStylesOfTree(element, newElement);
     newElement.style.setProperty("opacity", originalOpacity.toString());
-
-    // Remove margins of the root element
     newElement.style.setProperty("margin", "0px");
 
-    // Pre-fetch all <img> as data URLs (used by both paths below).
-    const originalImgs = Array.from(
-        element.querySelectorAll("img"),
-    ) as HTMLImageElement[];
-    const clonedImgs = Array.from(
-        newElement.querySelectorAll("img"),
-    ) as HTMLImageElement[];
-    const dataUrls = await Promise.all(
-        originalImgs.map(async (img) => {
-            if (!img.complete || img.naturalWidth === 0) return null;
-            try {
-                return await toObjectUrl(img.src);
-            } catch {
-                return null;
-            }
-        }),
+    const { imageEls, clipPathDefs } = await prepareImages(
+        element,
+        newElement,
+        rect,
     );
-
-    // WebKit blocks <img> inside foreignObject; use SVG <image> overlay.
-    const useForeignObjectImg = await detectForeignObjectImgSupport();
-
-    let imageEls: string[] = [];
-    const clipPathDefs: string[] = [];
-    if (useForeignObjectImg) {
-        // Set cloned img src to pre-fetched data URL.
-        for (let i = 0; i < clonedImgs.length; i++) {
-            const dataUrl = dataUrls[i];
-            if (dataUrl) clonedImgs[i].src = dataUrl;
-        }
-    } else {
-        // WebKit: hide cloned imgs, overlay as SVG <image> elements.
-        imageEls = clonedImgs.map((cloned, i) => {
-            cloned.style.setProperty("visibility", "hidden");
-            const dataUrl = dataUrls[i];
-            if (!dataUrl) return "";
-            const orig = originalImgs[i];
-            const cs = window.getComputedStyle(orig);
-            const r = orig.getBoundingClientRect();
-            const x = r.left - rect.left;
-            const y = r.top - rect.top;
-
-            const radii = parseUniformBorderRadius(cs);
-            let clipAttr = "";
-            if (radii) {
-                const clipId = `vfx-img-clip-${i}`;
-                clipPathDefs.push(
-                    `<clipPath id="${clipId}"><rect x="${x}" y="${y}" width="${r.width}" height="${r.height}" rx="${radii.rx}" ry="${radii.ry}" /></clipPath>`,
-                );
-                clipAttr = ` clip-path="url(#${clipId})"`;
-            }
-
-            const par = imgObjectFitToPreserveAspectRatio(cs);
-            return `<image href="${dataUrl}" x="${x}" y="${y}" width="${r.width}" height="${r.height}" preserveAspectRatio="${par}"${clipAttr} />`;
-        });
-    }
 
     // Build SVG at full (unclamped) physical-pixel size.
     const html = newElement.outerHTML;
@@ -187,6 +129,71 @@ export default async function getCanvasFromElement(
 
         img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     });
+}
+
+/**
+ * Pre-fetch `<img>` data URLs and build SVG overlay fragments if needed.
+ * @internal
+ */
+async function prepareImages(
+    element: HTMLElement,
+    newElement: HTMLElement,
+    rect: DOMRect,
+): Promise<{ imageEls: string[]; clipPathDefs: string[] }> {
+    const originalImgs = Array.from(
+        element.querySelectorAll("img"),
+    ) as HTMLImageElement[];
+    const clonedImgs = Array.from(
+        newElement.querySelectorAll("img"),
+    ) as HTMLImageElement[];
+    const dataUrls = await Promise.all(
+        originalImgs.map(async (img) => {
+            if (!img.complete || img.naturalWidth === 0) return null;
+            try {
+                return await toObjectUrl(img.src);
+            } catch {
+                return null;
+            }
+        }),
+    );
+
+    const useForeignObjectImg = await detectForeignObjectImgSupport();
+
+    if (useForeignObjectImg) {
+        for (let i = 0; i < clonedImgs.length; i++) {
+            const dataUrl = dataUrls[i];
+            if (dataUrl) clonedImgs[i].src = dataUrl;
+        }
+        return { imageEls: [], clipPathDefs: [] };
+    }
+
+    // WebKit: hide cloned imgs, overlay as SVG <image> elements.
+    const clipPathDefs: string[] = [];
+    const imageEls = clonedImgs.map((cloned, i) => {
+        cloned.style.setProperty("visibility", "hidden");
+        const dataUrl = dataUrls[i];
+        if (!dataUrl) return "";
+        const orig = originalImgs[i];
+        const cs = window.getComputedStyle(orig);
+        const r = orig.getBoundingClientRect();
+        const x = r.left - rect.left;
+        const y = r.top - rect.top;
+
+        const radii = parseUniformBorderRadius(cs);
+        let clipAttr = "";
+        if (radii) {
+            const clipId = `vfx-img-clip-${i}`;
+            clipPathDefs.push(
+                `<clipPath id="${clipId}"><rect x="${x}" y="${y}" width="${r.width}" height="${r.height}" rx="${radii.rx}" ry="${radii.ry}" /></clipPath>`,
+            );
+            clipAttr = ` clip-path="url(#${clipId})"`;
+        }
+
+        const par = imgObjectFitToPreserveAspectRatio(cs);
+        return `<image href="${dataUrl}" x="${x}" y="${y}" width="${r.width}" height="${r.height}" preserveAspectRatio="${par}"${clipAttr} />`;
+    });
+
+    return { imageEls, clipPathDefs };
 }
 
 async function syncStylesOfTree(
