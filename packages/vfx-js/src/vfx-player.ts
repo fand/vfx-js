@@ -71,6 +71,10 @@ export class VFXPlayer {
     #paddingX = 0;
     #paddingY = 0;
 
+    /** Cached content scroll dimensions (excluding canvas) for overflow clamping (#137). */
+    #contentScrollWidth = 0;
+    #contentScrollHeight = 0;
+
     #mouseX = 0;
     #mouseY = 0;
 
@@ -129,6 +133,22 @@ export class VFXPlayer {
         }
     }
 
+    /**
+     * Measure the document's scroll area without the canvas contributing.
+     * Called on resize (not every frame) so the temporary 0x0 is never painted.
+     */
+    #measureContentScrollSize(): void {
+        const wrapper = this.#canvas.parentElement as HTMLElement;
+        const prevW = this.#canvas.style.width;
+        const prevH = this.#canvas.style.height;
+        this.#canvas.style.width = "0px";
+        this.#canvas.style.height = "0px";
+        this.#contentScrollWidth = wrapper.scrollWidth;
+        this.#contentScrollHeight = wrapper.scrollHeight;
+        this.#canvas.style.width = prevW;
+        this.#canvas.style.height = prevH;
+    }
+
     #scrollBarSize: number | undefined;
 
     #getScrollBarSize(): number {
@@ -177,9 +197,10 @@ export class VFXPlayer {
             paddingY = 0;
             paddingX = 0;
         } else {
-            // Clamp padding so that the canvas doesn't cause overflow
-            const maxPaddingX = wrapper.scrollWidth - (scrollX + width);
-            const maxPaddingY = wrapper.scrollHeight - (scrollY + height);
+            // Use cached content scroll size so the canvas itself
+            // does not inflate the measurement (#137).
+            const maxPaddingX = this.#contentScrollWidth - (scrollX + width);
+            const maxPaddingY = this.#contentScrollHeight - (scrollY + height);
 
             paddingX = clamp(
                 width * this.#opts.scrollPadding[0],
@@ -232,6 +253,8 @@ export class VFXPlayer {
 
     #resize = async (): Promise<void> => {
         if (typeof window !== "undefined") {
+            this.#measureContentScrollSize();
+
             // Update dom2canvas result.
             // Render elements in viewport first, then render elements outside of the viewport.
             for (const e of this.#elements) {
