@@ -21,6 +21,7 @@ import {
     growRect,
     toRect,
 } from "./rect.js";
+import { createPassMaterial, createRenderTarget } from "./render-target.js";
 import type {
     VFXElement,
     VFXElementIntersection,
@@ -452,19 +453,10 @@ export class VFXPlayer {
                     ),
                 );
             } else {
-                const isFloat = inputPasses[i].float;
-                const filter = isFloat
-                    ? this.#caps.floatRTFilter
-                    : THREE.LinearFilter;
                 bufferTargets.set(
                     targetName,
-                    new THREE.WebGLRenderTarget(bw, bh, {
-                        minFilter: filter,
-                        magFilter: filter,
-                        format: THREE.RGBAFormat,
-                        type: isFloat
-                            ? this.#caps.floatRTType
-                            : THREE.UnsignedByteType,
+                    createRenderTarget(this.#caps, bw, bh, {
+                        float: inputPasses[i].float,
                     }),
                 );
             }
@@ -524,19 +516,12 @@ export class VFXPlayer {
 
             const scene = new THREE.Scene();
             const geometry = new THREE.PlaneGeometry(2, 2);
-            // Passes that render to an intermediate buffer target must not
-            // blend: blending into a float render target requires the
-            // EXT_float_blend extension which iOS Safari does not provide.
-            const renderingToBuffer = p.target !== undefined;
-            const material = new THREE.RawShaderMaterial({
+            const material = createPassMaterial({
                 vertexShader,
                 fragmentShader: frag,
-                transparent: !renderingToBuffer,
-                blending: renderingToBuffer
-                    ? THREE.NoBlending
-                    : THREE.NormalBlending,
                 uniforms: passUniforms,
                 glslVersion,
+                renderingToBuffer: p.target !== undefined,
             });
             const mesh = new THREE.Mesh(geometry, material);
             scene.add(mesh);
@@ -1338,16 +1323,8 @@ export class VFXPlayer {
 
                 if (!rt || rt.width !== rtW || rt.height !== rtH) {
                     rt?.dispose();
-                    const filter = pass.float
-                        ? this.#caps.floatRTFilter
-                        : THREE.LinearFilter;
-                    rt = new THREE.WebGLRenderTarget(rtW, rtH, {
-                        minFilter: filter,
-                        magFilter: filter,
-                        format: THREE.RGBAFormat,
-                        type: pass.float
-                            ? this.#caps.floatRTType
-                            : THREE.UnsignedByteType,
+                    rt = createRenderTarget(this.#caps, rtW, rtH, {
+                        float: pass.float,
                     });
                     this.#postEffectBufferTargets.set(bufferName, rt);
                 }
@@ -1388,14 +1365,10 @@ export class VFXPlayer {
                 this.#postEffectTarget.dispose();
             }
 
-            this.#postEffectTarget = new THREE.WebGLRenderTarget(
+            this.#postEffectTarget = createRenderTarget(
+                this.#caps,
                 targetWidth,
                 targetHeight,
-                {
-                    minFilter: THREE.LinearFilter,
-                    magFilter: THREE.LinearFilter,
-                    format: THREE.RGBAFormat,
-                },
             );
         }
 

@@ -1,6 +1,7 @@
-import * as THREE from "three";
+import type * as THREE from "three";
 import type { GLCapabilities } from "./gl-capabilities.js";
 import { type GLRect, getGLRect } from "./gl-rect";
+import { createRenderTarget } from "./render-target.js";
 
 /**
  * A class to manage initialization and double-buffring of the backbuffer.
@@ -25,15 +26,9 @@ export class Backbuffer {
 
         const pwidth = width * pixelRatio; // use physical size
         const pheight = height * pixelRatio;
-        const filter = float ? caps.floatRTFilter : THREE.LinearFilter;
-        const opts = {
-            minFilter: filter,
-            magFilter: filter,
-            type: float ? caps.floatRTType : THREE.UnsignedByteType,
-        };
         this.#buffers = [
-            new THREE.WebGLRenderTarget(pwidth, pheight, opts),
-            new THREE.WebGLRenderTarget(pwidth, pheight, opts),
+            createRenderTarget(caps, pwidth, pheight, { float }),
+            createRenderTarget(caps, pwidth, pheight, { float }),
         ];
     }
 

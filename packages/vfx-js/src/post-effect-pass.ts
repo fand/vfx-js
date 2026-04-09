@@ -3,6 +3,7 @@ import { Backbuffer } from "./backbuffer.js";
 import { DEFAULT_VERTEX_SHADER } from "./constants.js";
 import type { GLCapabilities } from "./gl-capabilities.js";
 import type { GLRect } from "./gl-rect.js";
+import { createPassMaterial } from "./render-target.js";
 import type { VFXUniformValue, VFXUniforms } from "./types.js";
 
 export class PostEffectPass {
@@ -50,23 +51,14 @@ export class PostEffectPass {
             }
         }
 
-        // For passes that render to an intermediate buffer target, disable
-        // alpha blending. Blending into a float render target requires the
-        // EXT_float_blend extension which is unavailable on iOS Safari, and
-        // intermediate compute-style passes (e.g. fluid sim) want to write
-        // their output directly without blending against previous contents.
-        const renderingToBuffer = hasBufferTarget ?? false;
         this.#mesh = new THREE.Mesh(
             new THREE.PlaneGeometry(2, 2),
-            new THREE.RawShaderMaterial({
+            createPassMaterial({
                 vertexShader: DEFAULT_VERTEX_SHADER,
                 fragmentShader,
                 uniforms: this.#uniforms,
                 glslVersion: "300 es",
-                transparent: !renderingToBuffer,
-                blending: renderingToBuffer
-                    ? THREE.NoBlending
-                    : THREE.NormalBlending,
+                renderingToBuffer: hasBufferTarget ?? false,
                 premultipliedAlpha: true,
             }),
         );
