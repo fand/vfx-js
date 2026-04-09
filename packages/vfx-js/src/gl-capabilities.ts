@@ -10,13 +10,10 @@ import * as THREE from "three";
  *
  *   - FP32 + Linear  : EXT_color_buffer_float + OES_texture_float_linear
  *   - FP16 + Linear  : EXT_color_buffer_half_float + OES_texture_half_float_linear
- *   - FP32 + Nearest : EXT_color_buffer_float only (no float linear filtering)
- *   - FP16 + Nearest : EXT_color_buffer_half_float only
+ *   - FP32 + Nearest : everything else (iOS Safari fallback)
  *
- * iOS Safari is the motivating case for the Nearest fallback: it exposes
- * EXT_color_buffer_(half_)float so float render targets *can* be created,
- * but lacks OES_texture_(half_)float_linear, so sampling those targets
- * with LinearFilter returns 0.
+ * iOS Safari exposes EXT_color_buffer_float but not OES_texture_float_linear,
+ * so float RTs sampled with LinearFilter return 0 (= black).
  *
  * @internal
  */
@@ -49,15 +46,9 @@ export class GLCapabilities {
         } else if (colorBufferHalfFloat && halfFloatLinear) {
             this.floatRTType = THREE.HalfFloatType;
             this.floatRTFilter = THREE.LinearFilter;
-        } else if (colorBufferFloat) {
+        } else {
             this.floatRTType = THREE.FloatType;
             this.floatRTFilter = THREE.NearestFilter;
-        } else if (colorBufferHalfFloat) {
-            this.floatRTType = THREE.HalfFloatType;
-            this.floatRTFilter = THREE.NearestFilter;
-        } else {
-            this.floatRTType = THREE.UnsignedByteType;
-            this.floatRTFilter = THREE.LinearFilter;
         }
 
         this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
