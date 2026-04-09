@@ -1,0 +1,13 @@
+{
+    "formatter": {
+        "external": {
+            "command": "npx",
+            "arguments": [
+                "@biomejs/biome",
+                "format",
+                "--stdin-file-path",
+                "{buffer_path}"
+            ]
+        }
+    }
+}
