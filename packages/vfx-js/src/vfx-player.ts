@@ -8,7 +8,6 @@ import {
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
-import { GLCapabilities } from "./gl-capabilities.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import {
@@ -75,8 +74,8 @@ export class VFXPlayer {
     #mouseX = 0;
     #mouseY = 0;
 
-    /** Device-derived GL capabilities (float RT type, max tex size). */
-    #caps!: GLCapabilities;
+    /** Float RT data type: FP32 if OES_texture_float_linear, else FP16. */
+    #floatRTType!: THREE.TextureDataType;
 
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
@@ -90,9 +89,12 @@ export class VFXPlayer {
         });
         this.#renderer.autoClear = false;
         this.#renderer.setClearAlpha(0);
-        this.#caps = new GLCapabilities(
-            this.#renderer.getContext() as WebGL2RenderingContext,
-        );
+        const gl = this.#renderer.getContext() as WebGL2RenderingContext;
+        gl.getExtension("EXT_color_buffer_float");
+        gl.getExtension("EXT_color_buffer_half_float");
+        this.#floatRTType = gl.getExtension("OES_texture_float_linear")
+            ? THREE.FloatType
+            : THREE.HalfFloatType;
         this.#pixelRatio = opts.pixelRatio;
 
         if (typeof window !== "undefined") {
@@ -277,7 +279,7 @@ export class VFXPlayer {
                 e.element,
                 e.originalOpacity,
                 oldCanvas,
-                this.#caps.maxTextureSize,
+                this.#renderer.capabilities.maxTextureSize,
             );
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
@@ -338,7 +340,7 @@ export class VFXPlayer {
                 element,
                 originalOpacity,
                 undefined,
-                this.#caps.maxTextureSize,
+                this.#renderer.capabilities.maxTextureSize,
             );
             texture = new THREE.CanvasTexture(canvas);
             type = "text" as VFXElementType;
@@ -408,7 +410,7 @@ export class VFXPlayer {
                     bh,
                     this.#pixelRatio,
                     false,
-                    this.#caps,
+                    this.#floatRTType,
                 );
             })();
             sharedUniforms["backbuffer"] = { value: backbuffer.texture };
@@ -446,13 +448,13 @@ export class VFXPlayer {
                         logicalH,
                         pixelRatio,
                         inputPasses[i].float,
-                        this.#caps,
+                        this.#floatRTType,
                     ),
                 );
             } else {
                 bufferTargets.set(
                     targetName,
-                    createRenderTarget(this.#caps, bw, bh, {
+                    createRenderTarget(this.#floatRTType, bw, bh, {
                         float: inputPasses[i].float,
                     }),
                 );
@@ -1310,7 +1312,7 @@ export class VFXPlayer {
 
                 if (!rt || rt.width !== rtW || rt.height !== rtH) {
                     rt?.dispose();
-                    rt = createRenderTarget(this.#caps, rtW, rtH, {
+                    rt = createRenderTarget(this.#floatRTType, rtW, rtH, {
                         float: pass.float,
                     });
                     this.#postEffectBufferTargets.set(bufferName, rt);
@@ -1353,7 +1355,7 @@ export class VFXPlayer {
             }
 
             this.#postEffectTarget = createRenderTarget(
-                this.#caps,
+                this.#floatRTType,
                 targetWidth,
                 targetHeight,
             );
@@ -1366,7 +1368,7 @@ export class VFXPlayer {
                     width,
                     height,
                     this.#pixelRatio,
-                    this.#caps,
+                    this.#floatRTType,
                 );
             } else if (pass.backbuffer) {
                 pass.resizeBackbuffer(width, height);

@@ -1,9 +1,8 @@
 import * as THREE from "three";
-import type { GLCapabilities } from "./gl-capabilities.js";
 
 /** @internal */
 export function createRenderTarget(
-    caps: GLCapabilities,
+    floatRTType: THREE.TextureDataType,
     width: number,
     height: number,
     opts: { float?: boolean } = {},
@@ -13,7 +12,7 @@ export function createRenderTarget(
         minFilter: THREE.LinearFilter,
         magFilter: THREE.LinearFilter,
         format: THREE.RGBAFormat,
-        type: float ? caps.floatRTType : THREE.UnsignedByteType,
+        type: float ? floatRTType : THREE.UnsignedByteType,
     });
 }
 

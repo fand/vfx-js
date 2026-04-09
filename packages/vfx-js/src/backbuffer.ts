@@ -1,5 +1,4 @@
 import type * as THREE from "three";
-import type { GLCapabilities } from "./gl-capabilities.js";
 import { type GLRect, getGLRect } from "./gl-rect";
 import { createRenderTarget } from "./render-target.js";
 
@@ -18,7 +17,7 @@ export class Backbuffer {
         height: number,
         pixelRatio: number,
         float: boolean | undefined,
-        caps: GLCapabilities,
+        floatRTType: THREE.TextureDataType,
     ) {
         this.#width = width;
         this.#height = height;
@@ -27,8 +26,8 @@ export class Backbuffer {
         const pwidth = width * pixelRatio; // use physical size
         const pheight = height * pixelRatio;
         this.#buffers = [
-            createRenderTarget(caps, pwidth, pheight, { float }),
-            createRenderTarget(caps, pwidth, pheight, { float }),
+            createRenderTarget(floatRTType, pwidth, pheight, { float }),
+            createRenderTarget(floatRTType, pwidth, pheight, { float }),
         ];
     }
 
