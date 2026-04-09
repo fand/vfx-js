@@ -1,12 +1,7 @@
 import * as THREE from "three";
 import type { GLCapabilities } from "./gl-capabilities.js";
 
-/**
- * Create a `THREE.WebGLRenderTarget` with the correct float data type
- * from `caps` (FP32 on desktop/Android, FP16 on iOS Safari).
- *
- * @internal
- */
+/** @internal */
 export function createRenderTarget(
     caps: GLCapabilities,
     width: number,

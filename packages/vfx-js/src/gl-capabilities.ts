@@ -20,9 +20,6 @@ export class GLCapabilities {
         gl.getExtension("EXT_color_buffer_half_float");
         const floatLinear = !!gl.getExtension("OES_texture_float_linear");
 
-        // FP32 when hardware supports float linear filtering (desktop,
-        // Android), FP16 otherwise (iOS Safari — WebGL2 guarantees
-        // half-float linear filtering as built-in).
         this.floatRTType = floatLinear ? THREE.FloatType : THREE.HalfFloatType;
         this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
     }
