@@ -78,11 +78,6 @@ export class VFXPlayer {
     /** Device-derived GL capabilities (float RT type/filter, max tex size). */
     #caps!: GLCapabilities;
 
-    /** Whether float RTs were configured with hardware LinearFilter. */
-    get hasFloatLinearFilter(): boolean {
-        return this.#caps.hasFloatLinearFilter;
-    }
-
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
     constructor(opts: VFXOptsInner, canvas: HTMLCanvasElement) {
@@ -95,7 +90,9 @@ export class VFXPlayer {
         });
         this.#renderer.autoClear = false;
         this.#renderer.setClearAlpha(0);
-        this.#caps = new GLCapabilities(this.#renderer.getContext());
+        this.#caps = new GLCapabilities(
+            this.#renderer.getContext() as WebGL2RenderingContext,
+        );
         this.#pixelRatio = opts.pixelRatio;
 
         if (typeof window !== "undefined") {
