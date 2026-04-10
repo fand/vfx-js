@@ -72,6 +72,10 @@ async function inlineCrossOriginImages(root: Element): Promise<() => void> {
 const LAYOUT_FLOW_STYLES = [
     "display",
     "margin",
+    "margin-top",
+    "margin-right",
+    "margin-bottom",
+    "margin-left",
     "position",
     "top",
     "right",
@@ -83,12 +87,16 @@ const LAYOUT_FLOW_STYLES = [
     "flex-shrink",
     "flex-basis",
     "align-self",
-    "order",
-    "grid-column",
-    "grid-row",
-    "grid-area",
     "justify-self",
     "place-self",
+    "order",
+    "grid-column",
+    "grid-column-start",
+    "grid-column-end",
+    "grid-row",
+    "grid-row-start",
+    "grid-row-end",
+    "grid-area",
 ] as const;
 
 const resizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
