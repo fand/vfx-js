@@ -152,21 +152,18 @@ export class VFXPlayer {
             return;
         }
 
-        // Get the window size without scroll bar
+        // Get the viewport size excluding scrollbars.
+        // In quirks mode (BackCompat), body.clientWidth/Height return
+        // the viewport dimensions minus scrollbars.
+        // In standards mode, html.clientWidth/Height do the same.
         const wrapper = this.#canvas.parentElement as HTMLElement;
         const wrapperParent = wrapper.parentElement as HTMLElement;
-
-        const ownerWindow = wrapper.ownerDocument.defaultView?.window ?? window;
-        const scrollBarWidth =
-            wrapperParent.scrollHeight > wrapperParent.clientHeight
-                ? this.#getScrollBarSize()
-                : 0;
-        const scrollBarHeight =
-            wrapperParent.scrollWidth > wrapperParent.clientWidth
-                ? this.#getScrollBarSize()
-                : 0;
-        const width = ownerWindow.innerWidth - scrollBarWidth;
-        const height = ownerWindow.innerHeight - scrollBarHeight;
+        const viewportEl =
+            wrapper.ownerDocument.compatMode === "BackCompat"
+                ? wrapper
+                : wrapperParent;
+        const width = viewportEl.clientWidth;
+        const height = viewportEl.clientHeight;
 
         const scrollX = window.scrollX;
         const scrollY = window.scrollY;

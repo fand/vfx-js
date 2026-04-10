@@ -1,0 +1,36 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Scroll Overflow Test (#137)</title>
+
+<style>
+  /* No body margin reset - keep browser default (8px) */
+  .block {
+    width: 300px;
+    height: 400px;
+    margin: 20px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    font-family: sans-serif;
+  }
+  .block:nth-child(odd) { background: #4488ff; }
+  .block:nth-child(even) { background: #ff8844; }
+</style>
+
+<!-- Tall content to force vertical scrollbar -->
+<div class="block">Block 1</div>
+<div class="block">Block 2</div>
+<div class="block" id="target">Block 3 (VFX)</div>
+<div class="block">Block 4</div>
+<div class="block">Block 5</div>
+
+<script type="module">
+  import { VFX } from "@vfx-js/core";
+
+  const vfx = new VFX();
+  const target = document.getElementById("target");
+  await vfx.add(target, { shader: "uvGradient", overlay: true });
+  vfx.play();
+</script>
