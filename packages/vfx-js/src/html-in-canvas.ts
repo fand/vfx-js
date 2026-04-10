@@ -14,16 +14,13 @@ function isCrossOrigin(img: HTMLImageElement): boolean {
 }
 
 /**
- * Fetch image as data URL.
+ * Fetch image as blob URL. Much cheaper than data URL for large images
+ * since it's just a reference — no base64 encoding overhead.
  */
-async function toDataUrl(url: string): Promise<string> {
+async function toBlobUrl(url: string): Promise<string> {
     const res = await fetch(url);
     const blob = await res.blob();
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-    });
+    return URL.createObjectURL(blob);
 }
 
 /**
@@ -42,13 +39,15 @@ async function inlineCrossOriginImages(
     if (crossOriginImgs.length === 0) return () => {};
 
     const originals = new Map<HTMLImageElement, string>();
+    const blobUrls: string[] = [];
 
     await Promise.all(
         crossOriginImgs.map(async (img) => {
             try {
-                const dataUrl = await toDataUrl(img.src);
+                const blobUrl = await toBlobUrl(img.src);
                 originals.set(img, img.src);
-                img.src = dataUrl;
+                blobUrls.push(blobUrl);
+                img.src = blobUrl;
             } catch {
                 // CORS not allowed — skip silently
             }
@@ -58,6 +57,9 @@ async function inlineCrossOriginImages(
     return () => {
         for (const [img, src] of originals) {
             img.src = src;
+        }
+        for (const url of blobUrls) {
+            URL.revokeObjectURL(url);
         }
     };
 }
