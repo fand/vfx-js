@@ -66,10 +66,8 @@ export const AddHTMLWithImage: StoryObj = {
 };
 
 export const Fallback: StoryObj = {
+    parameters: { layout: "padded" },
     render: () => {
-        const root = document.getElementById("storybook-root")!;
-        root.style.height = "auto";
-        root.style.display = "block";
 
         const container = document.createElement("div");
         container.style.padding = "32px";
