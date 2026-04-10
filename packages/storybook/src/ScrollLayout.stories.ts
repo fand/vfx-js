@@ -10,6 +10,22 @@ export default {
     title: "Layout with Scroll",
 } satisfies Meta;
 
+function addPaddingDebug(container: HTMLElement) {
+    const debug = document.createElement("div");
+    debug.textContent = "padding: ...";
+    container.appendChild(debug);
+
+    const update = () => {
+        const canvas = document.querySelector("canvas");
+        if (!canvas) return;
+        const px = (canvas.width - window.innerWidth) / 2;
+        const py = (canvas.height - window.innerHeight) / 2;
+        debug.textContent = `padding: ${px.toFixed(0)}x${py.toFixed(0)}`;
+        requestAnimationFrame(update);
+    };
+    requestAnimationFrame(update);
+}
+
 const render = (opts = {}, scroll = [0, 0]): StoryObj => ({
     render: () => {
         const container = document.createElement("div");
@@ -49,6 +65,8 @@ const render = (opts = {}, scroll = [0, 0]): StoryObj => ({
         // Use Timer to mock time for VRT
         const timer = new Timer(1.0, [0, 10]);
         container.appendChild(timer.element);
+
+        addPaddingDebug(container);
 
         const vfx = initVFX({ pixelRatio: 1 });
         vfx.add(img, {
@@ -102,6 +120,8 @@ const renderWithWrapper = (opts = {}): StoryObj => ({
         const timer = new Timer(1.0, [0, 10]);
         wrapper.appendChild(timer.element);
 
+        addPaddingDebug(wrapper);
+
         const vfx = initVFX({ wrapper, pixelRatio: 1 });
         vfx.add(img, {
             shader: "sinewave",
@@ -110,21 +130,6 @@ const renderWithWrapper = (opts = {}): StoryObj => ({
             ...opts,
         });
         vfx.play();
-
-        // Debug overlay: show current scroll padding
-        const debug = document.createElement("div");
-        debug.style.cssText =
-            "position:fixed;top:8px;left:8px;background:rgba(0,0,0,0.7);color:#0f0;font:12px monospace;padding:4px 8px;z-index:9999;pointer-events:none";
-        wrapper.appendChild(debug);
-
-        const canvas = wrapper.querySelector("canvas")!;
-        const update = () => {
-            const px = (canvas.width - window.innerWidth) / 2;
-            const py = (canvas.height - window.innerHeight) / 2;
-            debug.textContent = `padding: ${px.toFixed(0)}x${py.toFixed(0)}`;
-            requestAnimationFrame(update);
-        };
-        requestAnimationFrame(update);
 
         return wrapper;
     },
