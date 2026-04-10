@@ -107,6 +107,18 @@ const renderWithWrapper = (opts = {}): StoryObj => ({
         wrapper.style.position = "relative";
         wrapper.style.overflow = "hidden";
 
+        const marker = document.createElement("div");
+        marker.style.position = "fixed";
+        marker.style.zIndex = "2";
+        marker.style.left = "0px";
+        marker.style.top = "0px";
+        marker.style.width = "100%";
+        marker.style.height = "100%";
+        marker.style.boxSizing = "border-box";
+        marker.style.border = "5px solid red";
+        marker.style.opacity = "0.5";
+        wrapper.appendChild(marker);
+
         // big blocks to cause scroll
         const block = document.createElement("div");
         block.style.width = "800px";
