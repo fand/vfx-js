@@ -68,9 +68,7 @@ export const AddHTMLWithImage: StoryObj = {
 export const Fallback: StoryObj = {
     parameters: { layout: "padded" },
     render: () => {
-
         const container = document.createElement("div");
-        container.style.padding = "32px";
         container.style.fontFamily = "sans-serif";
         container.style.color = "white";
 
