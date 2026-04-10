@@ -78,9 +78,7 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                 const ro = content
                     ? new ResizeObserver(() => {
                           const dpr = window.devicePixelRatio;
-                          canvas.width = Math.round(
-                              content.offsetWidth * dpr,
-                          );
+                          canvas.width = Math.round(content.offsetWidth * dpr);
                           canvas.height = Math.round(
                               content.offsetHeight * dpr,
                           );
@@ -126,11 +124,7 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                     className,
                     style,
                 },
-                React.createElement(
-                    "div",
-                    { ref: contentRef },
-                    children,
-                ),
+                React.createElement("div", { ref: contentRef }, children),
             );
         }
 

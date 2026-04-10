@@ -93,6 +93,12 @@ export class VFX {
             return this.add(element, opts);
         }
 
+        if (opts.overlay !== undefined) {
+            console.warn(
+                "addHTML does not support overlay mode (layoutsubtree hides children). Ignoring overlay option.",
+            );
+        }
+
         let wrapper = this.#wrapperCanvases.get(element);
         if (wrapper) {
             this.#player.removeElement(wrapper);
