@@ -214,6 +214,12 @@ export async function captureElement(
         throw new Error("Failed to get 2d context from layoutsubtree canvas");
     }
 
+    // Temporarily restore canvas visibility for drawElementImage.
+    // The wrapper canvas has opacity:0 (set by VFXPlayer to hide original element),
+    // but drawElementImage may include parent opacity in the paint record.
+    const prevOpacity = canvas.style.opacity;
+    canvas.style.setProperty("opacity", "1");
+
     // Ensure the browser has painted the element.
     // Pixel buffer is updated by ResizeObserver (setting canvas.width clears
     // the paint record, so it must happen before requestPaint, not here).
@@ -224,6 +230,9 @@ export async function captureElement(
     // so no DPR scaling is needed — the content fills the pixel buffer as-is.
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawElementImage(targetChild, 0, 0);
+
+    // Restore opacity
+    canvas.style.setProperty("opacity", prevOpacity);
 
     // Clamp to maxSize
     let w = canvas.width;
