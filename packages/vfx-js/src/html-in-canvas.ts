@@ -102,13 +102,16 @@ export function unwrapElement(
 
 /**
  * Wait for the browser to paint the layoutsubtree canvas children.
- * `requestPaint()` schedules a paint, then we wait one frame for it to complete.
+ * `requestPaint()` schedules a paint; rAF fires before paint, so we need
+ * a double-rAF to ensure the paint record is cached.
  */
 function waitForPaint(canvas: HTMLCanvasElement): Promise<void> {
     if (typeof (canvas as any).requestPaint === "function") {
         (canvas as any).requestPaint();
     }
-    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    return new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
 }
 
 /**
