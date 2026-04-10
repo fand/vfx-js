@@ -88,7 +88,7 @@ const renderWithWrapper = (opts = {}): StoryObj => ({
         // big blocks to cause scroll
         const block = document.createElement("div");
         block.style.width = "800px";
-        block.style.height = "150vh";
+        block.style.height = "400px";
         block.style.background = "#999";
 
         wrapper.appendChild(block.cloneNode());
