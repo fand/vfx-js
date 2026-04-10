@@ -18,7 +18,7 @@ export const AddHTML: StoryObj = {
         root.style.display = "block";
 
         const container = document.createElement("div");
-        container.style.padding = "32px";
+        container.style.padding = "128px";
         container.style.fontFamily = "sans-serif";
         container.style.color = "white";
 
@@ -53,7 +53,7 @@ export const AddHTMLWithImage: StoryObj = {
         root.style.display = "block";
 
         const container = document.createElement("div");
-        container.style.padding = "32px";
+        container.style.padding = "128px";
         container.style.fontFamily = "sans-serif";
         container.style.color = "white";
 
