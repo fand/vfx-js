@@ -1,5 +1,13 @@
 # docs-vfx-js
 
+## 0.0.15
+
+### Patch Changes
+
+- Updated dependencies
+  - @vfx-js/core@0.10.1
+  - @vfx-js/storybook@0.0.15
+
 ## 0.0.14
 
 ### Patch Changes

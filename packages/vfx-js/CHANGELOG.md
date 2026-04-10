@@ -1,5 +1,11 @@
 # react-vfx
 
+## 0.10.1
+
+### Patch Changes
+
+- Fix scroll overflow in Quirks mode
+
 ## 0.10.0
 
 ### Minor Changes
