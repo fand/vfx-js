@@ -9,6 +9,12 @@ export interface VFXProviderProps {
     pixelRatio?: number;
     zIndex?: number;
     postEffect?: VFXPostEffect | VFXPass[];
+    /**
+     * Wrapper element that the WebGL canvas will be appended to.
+     * The wrapper element should have `position: relative` and `overflow: hidden`.
+     * @see {@link @vfx-js/core!VFXOpts.wrapper} for details.
+     */
+    wrapper?: React.RefObject<HTMLElement | null>;
 }
 
 export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
@@ -19,6 +25,7 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
         const vfx = new VFX({
             pixelRatio: props.pixelRatio,
             postEffect: props.postEffect,
+            wrapper: props.wrapper?.current ?? undefined,
         });
         setVFX(vfx);
         vfx.play();
@@ -27,7 +34,7 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
             vfx.stop();
             vfx.destroy();
         };
-    }, [props.pixelRatio, props.postEffect]); // TODO: add zIndex
+    }, [props.pixelRatio, props.postEffect, props.wrapper]); // TODO: add zIndex
 
     return (
         <>

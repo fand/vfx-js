@@ -47,7 +47,7 @@ export class VFX {
         if (opts.zIndex !== undefined) {
             canvas.style.setProperty("z-index", opts.zIndex.toString());
         }
-        document.body.appendChild(canvas);
+        (opts.wrapper ?? document.body).appendChild(canvas);
         this.#canvas = canvas;
 
         this.#player = new VFXPlayer(opts, canvas);

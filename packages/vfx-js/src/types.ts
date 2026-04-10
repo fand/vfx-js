@@ -111,6 +111,22 @@ export type VFXOpts = {
     scrollPadding?: number | [number, number] | false;
 
     /**
+     * A wrapper element to append the WebGL canvas to instead of `document.body`.
+     * Prevents scroll overflow caused by the canvas extending beyond the page.
+     *
+     * The wrapper must have `position: relative` and `overflow: hidden`,
+     * and should be at the page origin (0, 0) containing all page content.
+     *
+     * @example
+     * ```html
+     * <div id="wrapper" style="position: relative; overflow: hidden;">
+     *   <!-- page content -->
+     * </div>
+     * ```
+     */
+    wrapper?: HTMLElement;
+
+    /**
      * Post effect to be applied to the final output.
      * You can specify a custom fragment shader to process the entire canvas output.
      * You can also pass `VFXPass[]` for a multipass post-effect chain.
@@ -124,6 +140,7 @@ export type VFXOptsInner = {
     autoplay: boolean;
     fixedCanvas: boolean;
     scrollPadding: [number, number];
+    wrapper: HTMLElement | undefined;
     postEffects: (VFXPostEffect | VFXPass)[];
 };
 
@@ -164,6 +181,7 @@ export function getVFXOpts(opts: VFXOpts): VFXOptsInner {
         autoplay: opts.autoplay ?? true,
         fixedCanvas: opts.scrollPadding === false,
         scrollPadding,
+        wrapper: opts.wrapper,
         postEffects,
     };
 }

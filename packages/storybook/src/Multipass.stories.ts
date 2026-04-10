@@ -126,7 +126,7 @@ function playFluidDemo(
         const angle = (i / frames) * Math.PI * 2;
         fluid.setDelta(Math.cos(angle) * 15, Math.sin(angle) * 15);
         window.dispatchEvent(
-            new MouseEvent("mousemove", {
+            new MouseEvent("pointermove", {
                 clientX: cx + Math.cos(angle) * 100,
                 clientY: cy - Math.sin(angle) * 100,
             }),
@@ -141,7 +141,7 @@ function playFluidDemo(
         () => {
             let prevX = -1;
             let prevY = -1;
-            window.addEventListener("mousemove", (e) => {
+            window.addEventListener("pointermove", (e) => {
                 const x = e.clientX;
                 const y = window.innerHeight - e.clientY;
                 if (prevX >= 0) {
