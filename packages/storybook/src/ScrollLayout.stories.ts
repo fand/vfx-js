@@ -58,7 +58,7 @@ const render = (opts = {}, scroll = [0, 0]): StoryObj => ({
         // Place the image somewhere in the middle
         const img = document.createElement("img");
         img.src = Logo;
-        img.style.width = "800px";
+        img.style.setProperty("width", "800px", "important");
         container.appendChild(img);
 
         container.appendChild(block.cloneNode());
@@ -115,6 +115,7 @@ const renderWithWrapper = (opts = {}): StoryObj => ({
 
         const img = document.createElement("img");
         img.src = Logo;
+        img.style.setProperty("width", "800px", "important");
         wrapper.appendChild(img);
 
         wrapper.appendChild(block.cloneNode());
