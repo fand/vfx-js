@@ -136,14 +136,12 @@ export async function wrapElement(element: HTMLElement): Promise<HTMLCanvasEleme
     const restore = await inlineCrossOriginImages(element);
     imageRestorers.set(canvas, restore);
 
-    // ResizeObserver: update CSS height + pixel buffer when child reflows.
+    // ResizeObserver: update CSS height when child reflows.
+    // Pixel buffer is synced in captureElement (together with opacity restore).
     const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
-            const { width, height } = entry.contentRect;
+            const { height } = entry.contentRect;
             canvas.style.setProperty("height", `${height}px`);
-            const d = window.devicePixelRatio;
-            canvas.width = Math.round(width * d);
-            canvas.height = Math.round(height * d);
         }
     });
     ro.observe(element);
@@ -216,13 +214,17 @@ export async function captureElement(
 
     // Temporarily restore canvas visibility for drawElementImage.
     // The wrapper canvas has opacity:0 (set by VFXPlayer to hide original element),
-    // but drawElementImage may include parent opacity in the paint record.
+    // but drawElementImage includes parent opacity in the paint record.
     const prevOpacity = canvas.style.opacity;
     canvas.style.setProperty("opacity", "1");
 
-    // Ensure the browser has painted the element.
-    // Pixel buffer is updated by ResizeObserver (setting canvas.width clears
-    // the paint record, so it must happen before requestPaint, not here).
+    // Sync pixel buffer to current child dimensions (may have changed on resize).
+    const childRect = (targetChild as HTMLElement).getBoundingClientRect();
+    const dpr = window.devicePixelRatio;
+    canvas.width = Math.round(childRect.width * dpr);
+    canvas.height = Math.round(childRect.height * dpr);
+
+    // Ensure the browser has painted the element
     await waitForPaint(canvas);
 
     // Draw the child element onto the layoutsubtree canvas.
