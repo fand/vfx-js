@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
+import { Timer } from "./Timer";
 import { initVFX } from "./utils";
 
 export default {
@@ -32,8 +33,14 @@ export const AddHTML: StoryObj = {
         `;
         container.appendChild(el);
 
+        const timer = new Timer(0, [0, 10]);
+        document.body.append(timer.element);
+
         const vfx = initVFX();
-        vfx.addHTML(el, { shader: "rainbow" });
+        vfx.addHTML(el, {
+            shader: "rainbow",
+            uniforms: { time: () => timer.time },
+        });
 
         return container;
     },
@@ -58,8 +65,14 @@ export const AddHTMLWithImage: StoryObj = {
         `;
         container.appendChild(el);
 
+        const timer = new Timer(0, [0, 10]);
+        document.body.append(timer.element);
+
         const vfx = initVFX();
-        vfx.addHTML(el, { shader: "rgbShift" });
+        vfx.addHTML(el, {
+            shader: "rainbow",
+            uniforms: { time: () => timer.time },
+        });
 
         return container;
     },
@@ -91,7 +104,14 @@ export const Fallback: StoryObj = {
     play: async ({ canvasElement }) => {
         await new Promise((r) => requestAnimationFrame(r));
         const el = canvasElement.querySelector("#fallback-target")!;
+
+        const timer = new Timer(0, [0, 10]);
+        document.body.append(timer.element);
+
         const vfx = initVFX();
-        await vfx.add(el as HTMLElement, { shader: "rainbow" });
+        await vfx.add(el as HTMLElement, {
+            shader: "rainbow",
+            uniforms: { time: () => timer.time },
+        });
     },
 };
