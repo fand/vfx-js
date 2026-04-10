@@ -235,12 +235,7 @@ export class VFXPlayer {
                 }
             }
 
-            // Re-capture hic elements on resize
-            for (const e of this.#elements) {
-                if (e.type === "hic") {
-                    this.updateHICElement(e.element as HTMLCanvasElement);
-                }
-            }
+
         }
     };
 
