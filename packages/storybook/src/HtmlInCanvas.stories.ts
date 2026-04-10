@@ -77,6 +77,7 @@ export const Fallback: StoryObj = {
         container.style.color = "white";
 
         const el = document.createElement("div");
+        el.id = "fallback-target";
         el.innerHTML = `
             <h2>html-in-canvas: fallback</h2>
             <p style="font-size:1.2rem; line-height:1.6; max-width:600px">
@@ -87,10 +88,12 @@ export const Fallback: StoryObj = {
         `;
         container.appendChild(el);
 
-        const vfx = initVFX();
-        // Always use dom-to-canvas fallback for this story
-        vfx.add(el, { shader: "rainbow" });
-
         return container;
+    },
+    // vfx.add needs the element in the DOM for getBoundingClientRect
+    play: async ({ canvasElement }) => {
+        const el = canvasElement.querySelector("#fallback-target")!;
+        const vfx = initVFX();
+        await vfx.add(el as HTMLElement, { shader: "rainbow" });
     },
 };
