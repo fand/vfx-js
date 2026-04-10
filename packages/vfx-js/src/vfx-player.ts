@@ -7,9 +7,9 @@ import {
 } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
-import { captureElement } from "./html-in-canvas.js";
 import GIFData from "./gif.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
+import { captureElement } from "./html-in-canvas.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import {
     MARGIN_ZERO,
@@ -238,9 +238,7 @@ export class VFXPlayer {
             // Re-capture hic elements on resize
             for (const e of this.#elements) {
                 if (e.type === "hic") {
-                    await this.updateHICElement(
-                        e.element as HTMLCanvasElement,
-                    );
+                    await this.updateHICElement(e.element as HTMLCanvasElement);
                     const rect = e.element.getBoundingClientRect();
                     e.width = rect.width;
                     e.height = rect.height;

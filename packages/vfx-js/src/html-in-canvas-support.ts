@@ -1,3 +1,5 @@
+/// <reference path="./html-in-canvas.d.ts" />
+
 let supported: boolean | undefined;
 
 export function supportsHtmlInCanvas(): boolean {
@@ -8,9 +10,7 @@ export function supportsHtmlInCanvas(): boolean {
     try {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-        supported =
-            ctx !== null &&
-            typeof (ctx as any).drawElementImage === "function";
+        supported = ctx !== null && typeof ctx.drawElementImage === "function";
     } catch {
         supported = false;
     }

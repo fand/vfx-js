@@ -28,9 +28,7 @@ async function toBlobUrl(url: string): Promise<string> {
  * Safe because `layoutsubtree` prevents visual rendering of children.
  * Returns a restore function.
  */
-async function inlineCrossOriginImages(
-    root: Element,
-): Promise<() => void> {
+async function inlineCrossOriginImages(root: Element): Promise<() => void> {
     const imgs = Array.from(root.querySelectorAll("img")) as HTMLImageElement[];
     const crossOriginImgs = imgs.filter(
         (img) => img.complete && img.naturalWidth > 0 && isCrossOrigin(img),
@@ -101,7 +99,9 @@ const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
  * Wrap an element in a `<canvas layoutsubtree>` for html-in-canvas capture.
  * The canvas takes over the element's position in the layout flow.
  */
-export async function wrapElement(element: HTMLElement): Promise<HTMLCanvasElement> {
+export async function wrapElement(
+    element: HTMLElement,
+): Promise<HTMLCanvasElement> {
     const rect = element.getBoundingClientRect();
 
     const canvas = document.createElement("canvas");
@@ -188,8 +188,8 @@ export function unwrapElement(
  * a double-rAF to ensure the paint record is cached.
  */
 function waitForPaint(canvas: HTMLCanvasElement): Promise<void> {
-    if (typeof (canvas as any).requestPaint === "function") {
-        (canvas as any).requestPaint();
+    if (typeof canvas.requestPaint === "function") {
+        canvas.requestPaint();
     }
     return new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
