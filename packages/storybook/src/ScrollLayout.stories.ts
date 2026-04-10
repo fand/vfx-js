@@ -29,12 +29,11 @@ function addPaddingDebug(container: HTMLElement) {
 
 const render = (opts = {}, scroll = [0, 0]): StoryObj => ({
     render: () => {
+        const root = document.getElementById("storybook-root")!;
+        root.style.height = "auto";
+        root.style.display = "block";
+
         const container = document.createElement("div");
-        container.style.position = "absolute";
-        container.style.left = "0";
-        container.style.top = "0";
-        container.style.display = "flex";
-        container.style.flexDirection = "column";
 
         const marker = document.createElement("div");
         marker.style.position = "fixed";
@@ -59,6 +58,7 @@ const render = (opts = {}, scroll = [0, 0]): StoryObj => ({
         // Place the image somewhere in the middle
         const img = document.createElement("img");
         img.src = Logo;
+        img.style.width = "800px";
         container.appendChild(img);
 
         container.appendChild(block.cloneNode());
@@ -82,6 +82,7 @@ const render = (opts = {}, scroll = [0, 0]): StoryObj => ({
         return container;
     },
     parameters: {
+        layout: "fullscreen",
         viewport: {
             // XXX: This doesn't work on Chromatic...
             // Thus we can't test the output after scroll properly, that's why I commented out some stories below.
