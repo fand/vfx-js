@@ -12,7 +12,8 @@ export default {
 
 function addPaddingDebug(container: HTMLElement) {
     const debug = document.createElement("div");
-    debug.textContent = "padding: ...";
+    debug.style.cssText =
+        "position:fixed;top:16px;left:360px;padding:8px;z-index:9999;pointer-events:none;background:#333;color:white";
     container.appendChild(debug);
 
     const update = () => {
