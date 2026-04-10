@@ -328,7 +328,7 @@ export class VFXPlayer {
                         "layoutsubtree canvas must have a child element",
                     );
                 }
-                const offscreen = captureElement(
+                const offscreen = await captureElement(
                     element,
                     target,
                     undefined,
@@ -633,7 +633,7 @@ export class VFXPlayer {
         }
     }
 
-    updateHICElement(canvas: HTMLCanvasElement): void {
+    async updateHICElement(canvas: HTMLCanvasElement): Promise<void> {
         const e = this.#elements.find((e) => e.element === canvas);
         if (!e || e.type !== "hic") return;
 
@@ -644,7 +644,7 @@ export class VFXPlayer {
         const oldTexture: THREE.CanvasTexture = srcUniform.value;
         const oldOffscreen: OffscreenCanvas = oldTexture.image;
 
-        const offscreen = captureElement(
+        const offscreen = await captureElement(
             canvas,
             target,
             oldOffscreen,

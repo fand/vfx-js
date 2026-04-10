@@ -101,19 +101,34 @@ export function unwrapElement(
 }
 
 /**
+ * Wait for the browser to paint the layoutsubtree canvas children.
+ * `requestPaint()` schedules a paint, then we wait one frame for it to complete.
+ */
+function waitForPaint(canvas: HTMLCanvasElement): Promise<void> {
+    if (typeof (canvas as any).requestPaint === "function") {
+        (canvas as any).requestPaint();
+    }
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+/**
  * Capture element content via drawElementImage → OffscreenCanvas.
+ * Waits for paint record before calling drawElementImage.
  * Reuses `oldOffscreen` when dimensions match.
  */
-export function captureElement(
+export async function captureElement(
     canvas: HTMLCanvasElement,
     targetChild: Element,
     oldOffscreen?: OffscreenCanvas,
     maxSize?: number,
-): OffscreenCanvas {
+): Promise<OffscreenCanvas> {
     const ctx = canvas.getContext("2d");
     if (!ctx) {
         throw new Error("Failed to get 2d context from layoutsubtree canvas");
     }
+
+    // Ensure the browser has painted the element
+    await waitForPaint(canvas);
 
     // Draw the child element onto the layoutsubtree canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
