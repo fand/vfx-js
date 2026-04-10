@@ -133,12 +133,11 @@ export async function captureElement(
     // Ensure the browser has painted the element
     await waitForPaint(canvas);
 
-    // Draw the child element onto the layoutsubtree canvas
+    // Draw the child element onto the layoutsubtree canvas.
+    // drawElementImage renders the display list at device pixel resolution,
+    // so no DPR scaling is needed — the content fills the pixel buffer as-is.
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const dpr = window.devicePixelRatio;
-    ctx.scale(dpr, dpr);
     ctx.drawElementImage(targetChild, 0, 0);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     // Clamp to maxSize
     let w = canvas.width;
