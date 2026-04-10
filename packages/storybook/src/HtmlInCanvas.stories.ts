@@ -90,8 +90,9 @@ export const Fallback: StoryObj = {
 
         return container;
     },
-    // vfx.add needs the element in the DOM for getBoundingClientRect
+    // vfx.add needs the element in the DOM with settled layout
     play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
         const el = canvasElement.querySelector("#fallback-target")!;
         const vfx = initVFX();
         await vfx.add(el as HTMLElement, { shader: "rainbow" });
