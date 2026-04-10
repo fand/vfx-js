@@ -152,21 +152,18 @@ export class VFXPlayer {
             return;
         }
 
-        // Get the window size without scroll bar
+        // Get the viewport size excluding scrollbars.
+        // In quirks mode (BackCompat), body.clientWidth/Height return
+        // the viewport dimensions minus scrollbars.
+        // In standards mode, html.clientWidth/Height do the same.
         const wrapper = this.#canvas.parentElement as HTMLElement;
         const wrapperParent = wrapper.parentElement as HTMLElement;
-
-        const ownerWindow = wrapper.ownerDocument.defaultView?.window ?? window;
-        const scrollBarWidth =
-            wrapperParent.scrollHeight > wrapperParent.clientHeight
-                ? this.#getScrollBarSize()
-                : 0;
-        const scrollBarHeight =
-            wrapperParent.scrollWidth > wrapperParent.clientWidth
-                ? this.#getScrollBarSize()
-                : 0;
-        const width = ownerWindow.innerWidth - scrollBarWidth;
-        const height = ownerWindow.innerHeight - scrollBarHeight;
+        const viewportEl =
+            wrapper.ownerDocument.compatMode === "BackCompat"
+                ? wrapper
+                : wrapperParent;
+        const width = viewportEl.clientWidth;
+        const height = viewportEl.clientHeight;
 
         const scrollX = window.scrollX;
         const scrollY = window.scrollY;
@@ -177,9 +174,19 @@ export class VFXPlayer {
             paddingY = 0;
             paddingX = 0;
         } else {
-            // Clamp padding so that the canvas doesn't cause overflow
-            const maxPaddingX = wrapper.scrollWidth - (scrollX + width);
-            const maxPaddingY = wrapper.scrollHeight - (scrollY + height);
+            // Temporarily remove the canvas from layout so it doesn't
+            // inflate wrapper.scrollWidth/Height in quirks mode (#137).
+            // display:none is needed because quirks mode may use the
+            // canvas width/height attributes for layout even when CSS
+            // dimensions are 0. This runs in a single synchronous block
+            // so the intermediate state is never painted.
+            this.#canvas.style.display = "none";
+            const contentScrollWidth = wrapper.scrollWidth;
+            const contentScrollHeight = wrapper.scrollHeight;
+            this.#canvas.style.display = "";
+
+            const maxPaddingX = contentScrollWidth - (scrollX + width);
+            const maxPaddingY = contentScrollHeight - (scrollY + height);
 
             paddingX = clamp(
                 width * this.#opts.scrollPadding[0],
