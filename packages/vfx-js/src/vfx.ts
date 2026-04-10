@@ -97,7 +97,7 @@ export class VFX {
         if (wrapper) {
             this.#player.removeElement(wrapper);
         } else {
-            wrapper = wrapElement(element);
+            wrapper = await wrapElement(element);
             this.#wrapperCanvases.set(element, wrapper);
         }
 

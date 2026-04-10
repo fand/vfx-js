@@ -47,7 +47,14 @@ async function inlineCrossOriginImages(
                 const blobUrl = await toBlobUrl(img.src);
                 originals.set(img, img.src);
                 blobUrls.push(blobUrl);
-                img.src = blobUrl;
+
+                // Wait for the image to reload with the blob URL
+                await new Promise<void>((resolve) => {
+                    img.addEventListener("load", () => resolve(), {
+                        once: true,
+                    });
+                    img.src = blobUrl;
+                });
             } catch {
                 // CORS not allowed — skip silently
             }
@@ -88,12 +95,13 @@ const LAYOUT_FLOW_STYLES = [
 
 const resizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
 const savedMargins = new WeakMap<HTMLElement, string>();
+const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
 
 /**
  * Wrap an element in a `<canvas layoutsubtree>` for html-in-canvas capture.
  * The canvas takes over the element's position in the layout flow.
  */
-export function wrapElement(element: HTMLElement): HTMLCanvasElement {
+export async function wrapElement(element: HTMLElement): Promise<HTMLCanvasElement> {
     const rect = element.getBoundingClientRect();
 
     const canvas = document.createElement("canvas");
@@ -123,6 +131,10 @@ export function wrapElement(element: HTMLElement): HTMLCanvasElement {
     canvas.appendChild(element);
     element.style.setProperty("margin", "0");
 
+    // Inline cross-origin images once (safe because layoutsubtree hides children)
+    const restore = await inlineCrossOriginImages(element);
+    imageRestorers.set(canvas, restore);
+
     // ResizeObserver to keep canvas size in sync
     const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
@@ -150,6 +162,13 @@ export function unwrapElement(
     if (ro) {
         ro.disconnect();
         resizeObservers.delete(canvas);
+    }
+
+    // Restore cross-origin image src and revoke blob URLs
+    const restoreImages = imageRestorers.get(canvas);
+    if (restoreImages) {
+        restoreImages();
+        imageRestorers.delete(canvas);
     }
 
     // Move element back before canvas, then remove canvas
@@ -194,10 +213,7 @@ export async function captureElement(
         throw new Error("Failed to get 2d context from layoutsubtree canvas");
     }
 
-    // Convert cross-origin images to data URLs so drawElementImage can render them
-    await inlineCrossOriginImages(targetChild);
-
-    // Ensure the browser has painted the element (after src changes)
+    // Ensure the browser has painted the element
     await waitForPaint(canvas);
 
     // Draw the child element onto the layoutsubtree canvas.
