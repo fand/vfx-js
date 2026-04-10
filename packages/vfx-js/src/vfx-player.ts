@@ -129,24 +129,6 @@ export class VFXPlayer {
         }
     }
 
-    #scrollBarSize: number | undefined;
-
-    #getScrollBarSize(): number {
-        if (this.#scrollBarSize === undefined) {
-            const div = document.createElement("div");
-            div.style.visibility = "hidden";
-            div.style.overflow = "scroll"; // Force scrollbar
-            div.style.position = "absolute";
-
-            document.body.appendChild(div);
-            const scrollbarSize = div.offsetWidth - div.clientWidth;
-            document.body.removeChild(div);
-
-            this.#scrollBarSize = scrollbarSize;
-        }
-        return this.#scrollBarSize;
-    }
-
     #updateCanvasSize(): void {
         if (typeof window === "undefined") {
             return;
