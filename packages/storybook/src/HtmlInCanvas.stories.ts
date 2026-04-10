@@ -74,6 +74,7 @@ export const Fallback: StoryObj = {
 
         const el = document.createElement("div");
         el.id = "fallback-target";
+        el.style.display = "flow-root";
         el.innerHTML = `
             <h2>html-in-canvas: fallback</h2>
             <p style="font-size:1.2rem; line-height:1.6; max-width:600px">
