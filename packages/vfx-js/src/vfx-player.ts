@@ -135,7 +135,7 @@ export class VFXPlayer {
         }
 
         // Get the viewport size excluding scrollbars.
-        // We need to choose the element for the HTML mode (quirks / standard).
+        // We need to choose the element based on the document mode (quirks / standard).
         const doc = this.#canvas.ownerDocument;
         const viewportEl =
             doc.compatMode === "BackCompat" ? doc.body : doc.documentElement;

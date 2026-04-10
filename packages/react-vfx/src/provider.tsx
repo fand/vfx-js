@@ -10,11 +10,8 @@ export interface VFXProviderProps {
     zIndex?: number;
     postEffect?: VFXPostEffect | VFXPass[];
     /**
-     * A ref to a wrapper element that the WebGL canvas will be appended to.
-     *
-     * The wrapper element should have `position: relative` and `overflow: hidden`
-     * CSS properties set.
-     *
+     * Wrapper element that the WebGL canvas will be appended to.
+     * The wrapper element should have `position: relative` and `overflow: hidden`.
      * @see {@link @vfx-js/core!VFXOpts.wrapper} for details.
      */
     wrapper?: React.RefObject<HTMLElement | null>;

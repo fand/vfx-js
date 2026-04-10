@@ -111,33 +111,17 @@ export type VFXOpts = {
     scrollPadding?: number | [number, number] | false;
 
     /**
-     * A wrapper element that the WebGL canvas will be appended to.
+     * A wrapper element to append the WebGL canvas to instead of `document.body`.
+     * Prevents scroll overflow caused by the canvas extending beyond the page.
      *
-     * By default, VFX-JS appends the canvas directly to `document.body`.
-     * This can cause scroll overflow when the canvas extends beyond the page content.
-     *
-     * By providing a wrapper element, VFX-JS appends the canvas to it instead.
-     * The wrapper element must have the following CSS properties:
-     * - `position: relative` — so the canvas is positioned relative to the wrapper.
-     *   This is also required for `overflow: hidden` to clip the absolute-positioned canvas.
-     * - `overflow: hidden` — to clip the canvas and prevent scroll overflow.
-     *
-     * The wrapper should be at the page origin (0, 0) and contain all page content.
-     *
-     * When a wrapper is provided, the scroll padding is not clamped at page edges,
-     * because `overflow: hidden` handles clipping automatically.
+     * The wrapper must have `position: relative` and `overflow: hidden`,
+     * and should be at the page origin (0, 0) containing all page content.
      *
      * @example
      * ```html
-     * <body>
-     *   <div id="wrapper" style="position: relative; overflow: hidden;">
-     *     <!-- page content -->
-     *   </div>
-     * </body>
-     * ```
-     * ```js
-     * const wrapper = document.getElementById("wrapper");
-     * const vfx = new VFX({ wrapper });
+     * <div id="wrapper" style="position: relative; overflow: hidden;">
+     *   <!-- page content -->
+     * </div>
      * ```
      */
     wrapper?: HTMLElement;
