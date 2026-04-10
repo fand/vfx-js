@@ -71,6 +71,65 @@ const render = (opts = {}, scroll = [0, 0]): StoryObj => ({
     },
 });
 
+const renderWithWrapper = (opts = {}): StoryObj => ({
+    render: () => {
+        // Append wrapper directly to body to match real usage (body > wrapper).
+        // Storybook manages #storybook-root, so we bypass it entirely.
+        const wrapper = document.createElement("div");
+        wrapper.style.position = "relative";
+        wrapper.style.overflow = "hidden";
+        document.body.appendChild(wrapper);
+        // biome-ignore lint/suspicious/noExplicitAny: cleanup in decorator
+        (window as any).vfxWrapper = wrapper;
+
+        const marker = document.createElement("div");
+        marker.style.position = "fixed";
+        marker.style.zIndex = "2";
+        marker.style.left = "0px";
+        marker.style.top = "0px";
+        marker.style.width = "100%";
+        marker.style.height = "100%";
+        marker.style.boxSizing = "border-box";
+        marker.style.border = "5px solid red";
+        marker.style.opacity = "0.5";
+        wrapper.appendChild(marker);
+
+        // big blocks to cause scroll
+        const block = document.createElement("div");
+        block.style.width = "800px";
+        block.style.height = "150vh";
+        block.style.background = "#999";
+
+        wrapper.appendChild(block.cloneNode());
+
+        const img = document.createElement("img");
+        img.src = Logo;
+        wrapper.appendChild(img);
+
+        wrapper.appendChild(block.cloneNode());
+
+        const timer = new Timer(1.0, [0, 10]);
+        wrapper.appendChild(timer.element);
+
+        const vfx = initVFX({ wrapper, pixelRatio: 1 });
+        vfx.add(img, {
+            shader: "sinewave",
+            uniforms: { time: () => timer.time },
+            overlay: true,
+            ...opts,
+        });
+        vfx.play();
+
+        return document.createElement("div");
+    },
+    parameters: {
+        layout: "fullscreen",
+        viewport: {
+            defaultViewport: "small",
+        },
+    },
+});
+
 const S = 1000;
 
 // Plain layout
@@ -95,3 +154,7 @@ const o3 = { overflow: true, backbuffer: true };
 export const FullscreenBackbuffer = render(o3);
 // export const FullscreenBackbufferScrollX = render(o3, [S, 0]);
 // export const FullscreenBackbufferScrollY = render(o3, [0, S]);
+
+// With wrapper
+export const Wrapper = renderWithWrapper();
+export const WrapperFullscreen = renderWithWrapper(o1);

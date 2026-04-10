@@ -31,6 +31,12 @@ export const decorators = [
         // biome-ignore lint/suspicious/noExplicitAny: use global Timer
         (window as any).timer?.dispose();
 
+        // Remove wrapper appended to body by wrapper stories
+        // biome-ignore lint/suspicious/noExplicitAny: cleanup global wrapper
+        (window as any).vfxWrapper?.remove();
+        // biome-ignore lint/suspicious/noExplicitAny: cleanup global wrapper
+        (window as any).vfxWrapper = null;
+
         return story();
     },
 ];
