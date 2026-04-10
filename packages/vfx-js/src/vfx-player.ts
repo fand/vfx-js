@@ -135,8 +135,11 @@ export class VFXPlayer {
         }
 
         // Get the viewport size excluding scrollbars.
-        // Use the document element directly so this works regardless of
-        // where the canvas is appended (body or a custom wrapper).
+        // In quirks mode (BackCompat), body.clientWidth/Height return
+        // the viewport dimensions minus scrollbars.
+        // In standards mode, documentElement.clientWidth/Height do the same.
+        // Use document directly so this works regardless of where the
+        // canvas is appended (body or a custom wrapper).
         const doc = this.#canvas.ownerDocument;
         const viewportEl =
             doc.compatMode === "BackCompat" ? doc.body : doc.documentElement;
