@@ -174,19 +174,9 @@ export class VFXPlayer {
             paddingY = 0;
             paddingX = 0;
         } else {
-            // Temporarily remove the canvas from layout so it doesn't
-            // inflate wrapper.scrollWidth/Height in quirks mode (#137).
-            // display:none is needed because quirks mode may use the
-            // canvas width/height attributes for layout even when CSS
-            // dimensions are 0. This runs in a single synchronous block
-            // so the intermediate state is never painted.
-            this.#canvas.style.display = "none";
-            const contentScrollWidth = wrapper.scrollWidth;
-            const contentScrollHeight = wrapper.scrollHeight;
-            this.#canvas.style.display = "";
-
-            const maxPaddingX = contentScrollWidth - (scrollX + width);
-            const maxPaddingY = contentScrollHeight - (scrollY + height);
+            // Clamp padding so that the canvas doesn't cause overflow
+            const maxPaddingX = wrapper.scrollWidth - (scrollX + width);
+            const maxPaddingY = wrapper.scrollHeight - (scrollY + height);
 
             paddingX = clamp(
                 width * this.#opts.scrollPadding[0],
