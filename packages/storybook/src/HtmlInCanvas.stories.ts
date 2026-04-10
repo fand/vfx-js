@@ -12,9 +12,14 @@ export default {
 
 export const AddHTML: StoryObj = {
     render: () => {
+        const root = document.getElementById("storybook-root")!;
+        root.style.height = "auto";
+        root.style.display = "block";
+
         const container = document.createElement("div");
         container.style.padding = "32px";
         container.style.fontFamily = "sans-serif";
+        container.style.color = "white";
 
         const el = document.createElement("div");
         el.innerHTML = `
@@ -36,9 +41,14 @@ export const AddHTML: StoryObj = {
 
 export const AddHTMLWithImage: StoryObj = {
     render: () => {
+        const root = document.getElementById("storybook-root")!;
+        root.style.height = "auto";
+        root.style.display = "block";
+
         const container = document.createElement("div");
         container.style.padding = "32px";
         container.style.fontFamily = "sans-serif";
+        container.style.color = "white";
 
         const el = document.createElement("div");
         el.innerHTML = `
@@ -57,9 +67,14 @@ export const AddHTMLWithImage: StoryObj = {
 
 export const Fallback: StoryObj = {
     render: () => {
+        const root = document.getElementById("storybook-root")!;
+        root.style.height = "auto";
+        root.style.display = "block";
+
         const container = document.createElement("div");
         container.style.padding = "32px";
         container.style.fontFamily = "sans-serif";
+        container.style.color = "white";
 
         const el = document.createElement("div");
         el.innerHTML = `
