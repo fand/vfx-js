@@ -136,12 +136,14 @@ export async function wrapElement(element: HTMLElement): Promise<HTMLCanvasEleme
     const restore = await inlineCrossOriginImages(element);
     imageRestorers.set(canvas, restore);
 
-    // ResizeObserver: only update CSS height (content reflow).
-    // Pixel buffer is updated in captureElement to avoid clearing canvas mid-frame.
+    // ResizeObserver: update CSS height + pixel buffer when child reflows.
     const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
-            const { height } = entry.contentRect;
+            const { width, height } = entry.contentRect;
             canvas.style.setProperty("height", `${height}px`);
+            const d = window.devicePixelRatio;
+            canvas.width = Math.round(width * d);
+            canvas.height = Math.round(height * d);
         }
     });
     ro.observe(element);
@@ -212,14 +214,9 @@ export async function captureElement(
         throw new Error("Failed to get 2d context from layoutsubtree canvas");
     }
 
-    // Sync pixel buffer to current child dimensions (may have changed due to resize).
-    // Done here (not in ResizeObserver) to avoid clearing the canvas mid-frame.
-    const childRect = (targetChild as HTMLElement).getBoundingClientRect();
-    const dpr = window.devicePixelRatio;
-    canvas.width = Math.round(childRect.width * dpr);
-    canvas.height = Math.round(childRect.height * dpr);
-
-    // Ensure the browser has painted the element
+    // Ensure the browser has painted the element.
+    // Pixel buffer is updated by ResizeObserver (setting canvas.width clears
+    // the paint record, so it must happen before requestPaint, not here).
     await waitForPaint(canvas);
 
     // Draw the child element onto the layoutsubtree canvas.

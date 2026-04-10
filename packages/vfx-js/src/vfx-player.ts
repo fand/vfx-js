@@ -236,9 +236,12 @@ export class VFXPlayer {
             }
 
             // Re-capture hic elements on resize.
-            // Pixel buffer update happens inside captureElement (no race with ResizeObserver).
+            // Force layout so ResizeObserver fires (updates pixel buffer)
+            // before captureElement's waitForPaint requests a new paint record.
             for (const e of this.#elements) {
                 if (e.type === "hic") {
+                    // Force layout → triggers ResizeObserver → updates pixel buffer
+                    e.element.getBoundingClientRect();
                     await this.updateHICElement(
                         e.element as HTMLCanvasElement,
                     );
