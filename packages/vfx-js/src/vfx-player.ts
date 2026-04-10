@@ -135,15 +135,11 @@ export class VFXPlayer {
         }
 
         // Get the viewport size excluding scrollbars.
-        // In quirks mode (BackCompat), body.clientWidth/Height return
-        // the viewport dimensions minus scrollbars.
-        // In standards mode, html.clientWidth/Height do the same.
-        const wrapper = this.#canvas.parentElement as HTMLElement;
-        const wrapperParent = wrapper.parentElement as HTMLElement;
+        // Use the document element directly so this works regardless of
+        // where the canvas is appended (body or a custom wrapper).
+        const doc = this.#canvas.ownerDocument;
         const viewportEl =
-            wrapper.ownerDocument.compatMode === "BackCompat"
-                ? wrapper
-                : wrapperParent;
+            doc.compatMode === "BackCompat" ? doc.body : doc.documentElement;
         const width = viewportEl.clientWidth;
         const height = viewportEl.clientHeight;
 
@@ -153,12 +149,17 @@ export class VFXPlayer {
         let paddingX: number;
         let paddingY: number;
         if (this.#opts.fixedCanvas) {
-            paddingY = 0;
             paddingX = 0;
+            paddingY = 0;
+        } else if (this.#opts.wrapper) {
+            // When a wrapper with overflow:hidden is used, no clamping needed.
+            // The wrapper clips the canvas, so full padding is safe.
+            paddingX = width * this.#opts.scrollPadding[0];
+            paddingY = height * this.#opts.scrollPadding[1];
         } else {
-            // Clamp padding so that the canvas doesn't cause overflow
-            const maxPaddingX = wrapper.scrollWidth - (scrollX + width);
-            const maxPaddingY = wrapper.scrollHeight - (scrollY + height);
+            // No wrapper: clamp padding so that the canvas doesn't cause overflow
+            const maxPaddingX = doc.body.scrollWidth - (scrollX + width);
+            const maxPaddingY = doc.body.scrollHeight - (scrollY + height);
 
             paddingX = clamp(
                 width * this.#opts.scrollPadding[0],

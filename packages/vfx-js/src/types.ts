@@ -111,6 +111,38 @@ export type VFXOpts = {
     scrollPadding?: number | [number, number] | false;
 
     /**
+     * A wrapper element that the WebGL canvas will be appended to.
+     *
+     * By default, VFX-JS appends the canvas directly to `document.body`.
+     * This can cause scroll overflow when the canvas extends beyond the page content.
+     *
+     * By providing a wrapper element, VFX-JS appends the canvas to it instead.
+     * The wrapper element must have the following CSS properties:
+     * - `position: relative` — so the canvas is positioned relative to the wrapper.
+     *   This is also required for `overflow: hidden` to clip the absolute-positioned canvas.
+     * - `overflow: hidden` — to clip the canvas and prevent scroll overflow.
+     *
+     * The wrapper should be at the page origin (0, 0) and contain all page content.
+     *
+     * When a wrapper is provided, the scroll padding is not clamped at page edges,
+     * because `overflow: hidden` handles clipping automatically.
+     *
+     * @example
+     * ```html
+     * <body>
+     *   <div id="wrapper" style="position: relative; overflow: hidden;">
+     *     <!-- page content -->
+     *   </div>
+     * </body>
+     * ```
+     * ```js
+     * const wrapper = document.getElementById("wrapper");
+     * const vfx = new VFX({ wrapper });
+     * ```
+     */
+    wrapper?: HTMLElement;
+
+    /**
      * Post effect to be applied to the final output.
      * You can specify a custom fragment shader to process the entire canvas output.
      * You can also pass `VFXPass[]` for a multipass post-effect chain.
@@ -124,6 +156,7 @@ export type VFXOptsInner = {
     autoplay: boolean;
     fixedCanvas: boolean;
     scrollPadding: [number, number];
+    wrapper: HTMLElement | undefined;
     postEffects: (VFXPostEffect | VFXPass)[];
 };
 
@@ -164,6 +197,7 @@ export function getVFXOpts(opts: VFXOpts): VFXOptsInner {
         autoplay: opts.autoplay ?? true,
         fixedCanvas: opts.scrollPadding === false,
         scrollPadding,
+        wrapper: opts.wrapper,
         postEffects,
     };
 }
