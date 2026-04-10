@@ -113,8 +113,9 @@ export async function wrapElement(element: HTMLElement): Promise<HTMLCanvasEleme
         canvas.style.setProperty(prop, cs.getPropertyValue(prop));
     }
 
-    // Set canvas CSS size to measured element size
-    canvas.style.setProperty("width", `${rect.width}px`);
+    // Width: responsive (fills parent like original block/flex/grid element)
+    // Height: measured value (updated by ResizeObserver when content reflows)
+    canvas.style.setProperty("width", "100%");
     canvas.style.setProperty("height", `${rect.height}px`);
     canvas.style.setProperty("box-sizing", "border-box");
 
@@ -135,14 +136,12 @@ export async function wrapElement(element: HTMLElement): Promise<HTMLCanvasEleme
     const restore = await inlineCrossOriginImages(element);
     imageRestorers.set(canvas, restore);
 
-    // ResizeObserver to keep canvas size in sync
+    // ResizeObserver: only update CSS height (content reflow).
+    // Pixel buffer is updated in captureElement to avoid clearing canvas mid-frame.
     const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
-            const { width, height } = entry.contentRect;
-            canvas.style.setProperty("width", `${width}px`);
+            const { height } = entry.contentRect;
             canvas.style.setProperty("height", `${height}px`);
-            canvas.width = Math.round(width * window.devicePixelRatio);
-            canvas.height = Math.round(height * window.devicePixelRatio);
         }
     });
     ro.observe(element);
@@ -212,6 +211,13 @@ export async function captureElement(
     if (!ctx) {
         throw new Error("Failed to get 2d context from layoutsubtree canvas");
     }
+
+    // Sync pixel buffer to current child dimensions (may have changed due to resize).
+    // Done here (not in ResizeObserver) to avoid clearing the canvas mid-frame.
+    const childRect = (targetChild as HTMLElement).getBoundingClientRect();
+    const dpr = window.devicePixelRatio;
+    canvas.width = Math.round(childRect.width * dpr);
+    canvas.height = Math.round(childRect.height * dpr);
 
     // Ensure the browser has painted the element
     await waitForPaint(canvas);

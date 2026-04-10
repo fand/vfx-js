@@ -235,7 +235,18 @@ export class VFXPlayer {
                 }
             }
 
-
+            // Re-capture hic elements on resize.
+            // Pixel buffer update happens inside captureElement (no race with ResizeObserver).
+            for (const e of this.#elements) {
+                if (e.type === "hic") {
+                    await this.updateHICElement(
+                        e.element as HTMLCanvasElement,
+                    );
+                    const rect = e.element.getBoundingClientRect();
+                    e.width = rect.width;
+                    e.height = rect.height;
+                }
+            }
         }
     };
 
