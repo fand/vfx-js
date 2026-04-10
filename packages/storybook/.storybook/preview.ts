@@ -31,11 +31,12 @@ export const decorators = [
         // biome-ignore lint/suspicious/noExplicitAny: use global Timer
         (window as any).timer?.dispose();
 
-        // Remove wrapper appended to body by wrapper stories
-        // biome-ignore lint/suspicious/noExplicitAny: cleanup global wrapper
-        (window as any).vfxWrapper?.remove();
-        // biome-ignore lint/suspicious/noExplicitAny: cleanup global wrapper
-        (window as any).vfxWrapper = null;
+        // Reset storybook-root styles (may be modified by wrapper stories)
+        const root = document.getElementById("storybook-root");
+        if (root) {
+            root.style.height = "";
+            root.style.display = "";
+        }
 
         return story();
     },

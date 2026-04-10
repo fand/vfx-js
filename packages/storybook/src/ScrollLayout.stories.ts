@@ -73,14 +73,17 @@ const render = (opts = {}, scroll = [0, 0]): StoryObj => ({
 
 const renderWithWrapper = (opts = {}): StoryObj => ({
     render: () => {
-        // Append wrapper directly to body to match real usage (body > wrapper).
-        // Storybook manages #storybook-root, so we bypass it entirely.
+        // Return the wrapper div directly. Canvas is appended inside it
+        // by the VFX constructor, so it survives Storybook's root clearing.
+        // Extra nesting (body > #storybook-root > wrapper) is unavoidable
+        // in Storybook but doesn't affect the test.
+        const root = document.getElementById("storybook-root")!;
+        root.style.height = "auto";
+        root.style.display = "block";
+
         const wrapper = document.createElement("div");
         wrapper.style.position = "relative";
         wrapper.style.overflow = "hidden";
-        document.body.appendChild(wrapper);
-        // biome-ignore lint/suspicious/noExplicitAny: cleanup in decorator
-        (window as any).vfxWrapper = wrapper;
 
         const marker = document.createElement("div");
         marker.style.position = "fixed";
@@ -120,7 +123,7 @@ const renderWithWrapper = (opts = {}): StoryObj => ({
         });
         vfx.play();
 
-        return document.createElement("div");
+        return wrapper;
     },
     parameters: {
         layout: "fullscreen",
