@@ -111,6 +111,21 @@ const renderWithWrapper = (opts = {}): StoryObj => ({
         });
         vfx.play();
 
+        // Debug overlay: show current scroll padding
+        const debug = document.createElement("div");
+        debug.style.cssText =
+            "position:fixed;top:8px;left:8px;background:rgba(0,0,0,0.7);color:#0f0;font:12px monospace;padding:4px 8px;z-index:9999;pointer-events:none";
+        wrapper.appendChild(debug);
+
+        const canvas = wrapper.querySelector("canvas")!;
+        const update = () => {
+            const px = (canvas.width - window.innerWidth) / 2;
+            const py = (canvas.height - window.innerHeight) / 2;
+            debug.textContent = `padding: ${px.toFixed(0)}x${py.toFixed(0)}`;
+            requestAnimationFrame(update);
+        };
+        requestAnimationFrame(update);
+
         return wrapper;
     },
     parameters: {
