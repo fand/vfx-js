@@ -1,0 +1,310 @@
+/// <reference path="./html-in-canvas.d.ts" />
+
+/**
+ * Check if an image is cross-origin.
+ */
+function isCrossOrigin(img: HTMLImageElement): boolean {
+    if (!img.src || img.src.startsWith("data:")) return false;
+    try {
+        const imgUrl = new URL(img.src, location.href);
+        return imgUrl.origin !== location.origin;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Fetch image as blob URL. Much cheaper than data URL for large images
+ * since it's just a reference — no base64 encoding overhead.
+ */
+async function toBlobUrl(url: string): Promise<string> {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+}
+
+/**
+ * Replace cross-origin `<img>` src with data URLs inside the subtree.
+ * Safe because `layoutsubtree` prevents visual rendering of children.
+ * Returns a restore function.
+ */
+async function inlineCrossOriginImages(root: Element): Promise<() => void> {
+    const imgs = Array.from(root.querySelectorAll("img")) as HTMLImageElement[];
+    const crossOriginImgs = imgs.filter(
+        (img) => img.complete && img.naturalWidth > 0 && isCrossOrigin(img),
+    );
+
+    if (crossOriginImgs.length === 0) return () => {};
+
+    const originals = new Map<HTMLImageElement, string>();
+    const blobUrls: string[] = [];
+
+    await Promise.all(
+        crossOriginImgs.map(async (img) => {
+            try {
+                const blobUrl = await toBlobUrl(img.src);
+                originals.set(img, img.src);
+                blobUrls.push(blobUrl);
+
+                // Wait for the image to reload with the blob URL
+                await new Promise<void>((resolve) => {
+                    img.addEventListener("load", () => resolve(), {
+                        once: true,
+                    });
+                    img.src = blobUrl;
+                });
+            } catch {
+                // CORS not allowed — skip silently
+            }
+        }),
+    );
+
+    return () => {
+        for (const [img, src] of originals) {
+            img.src = src;
+        }
+        for (const url of blobUrls) {
+            URL.revokeObjectURL(url);
+        }
+    };
+}
+
+const LAYOUT_FLOW_STYLES = [
+    "display",
+    "margin",
+    "margin-top",
+    "margin-right",
+    "margin-bottom",
+    "margin-left",
+    "position",
+    "top",
+    "right",
+    "bottom",
+    "left",
+    "float",
+    "flex",
+    "flex-grow",
+    "flex-shrink",
+    "flex-basis",
+    "align-self",
+    "justify-self",
+    "place-self",
+    "order",
+    "grid-column",
+    "grid-column-start",
+    "grid-column-end",
+    "grid-row",
+    "grid-row-start",
+    "grid-row-end",
+    "grid-area",
+] as const;
+
+const resizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
+const parentResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
+const savedMargins = new WeakMap<HTMLElement, string>();
+const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
+
+/**
+ * Wrap an element in a `<canvas layoutsubtree>` for html-in-canvas capture.
+ * The canvas takes over the element's position in the layout flow.
+ *
+ * `onReflow` is called when the wrapped subtree or its parent reflows, so
+ * the caller can re-capture the texture. It is invoked async via
+ * ResizeObserver, so it may fire before the wrapper is registered with the
+ * player (the player side must tolerate unknown canvases).
+ */
+export async function wrapElement(
+    element: HTMLElement,
+    onReflow?: (canvas: HTMLCanvasElement) => void,
+): Promise<HTMLCanvasElement> {
+    const rect = element.getBoundingClientRect();
+
+    const canvas = document.createElement("canvas");
+    canvas.setAttribute("layoutsubtree", "");
+
+    // Copy layout-flow styles from element to canvas
+    const cs = window.getComputedStyle(element);
+    for (const prop of LAYOUT_FLOW_STYLES) {
+        canvas.style.setProperty(prop, cs.getPropertyValue(prop));
+    }
+
+    // Fixed px from initial measurement so canvas CSS matches the element's
+    // border-box. This keeps canvas pixel density == dpr, so drawElementImage
+    // rasterizes the child at full device pixel resolution. Responsive
+    // behavior is handled separately by a parent ResizeObserver (later step).
+    canvas.style.setProperty("width", `${rect.width}px`);
+    canvas.style.setProperty("height", `${rect.height}px`);
+
+    // Set pixel buffer size
+    const dpr = window.devicePixelRatio;
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+
+    // Save original margin and reset
+    savedMargins.set(element, element.style.margin);
+
+    // Insert canvas in element's place, move element inside
+    element.parentNode?.insertBefore(canvas, element);
+    canvas.appendChild(element);
+    element.style.setProperty("margin", "0");
+
+    // Inline cross-origin images once (safe because layoutsubtree hides children)
+    const restore = await inlineCrossOriginImages(element);
+    imageRestorers.set(canvas, restore);
+
+    // Child ResizeObserver: update CSS height when the wrapped element
+    // reflows, then signal onReflow so the texture is re-captured.
+    // Use borderBoxSize (not contentRect) so the value matches the initial
+    // rect.height above (both are border-box). Otherwise the first RO fire
+    // shrinks canvas CSS height by padding+border, causing density blow-up
+    // in drawElementImage and clipping the child's bottom.
+    // Pixel buffer is synced in captureElement.
+    const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+            const borderH =
+                entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+            canvas.style.setProperty("height", `${borderH}px`);
+        }
+        onReflow?.(canvas);
+    });
+    ro.observe(element);
+    resizeObservers.set(canvas, ro);
+
+    // Parent ResizeObserver: track parent content width so the canvas (and
+    // thereby the wrapped block-auto child) flows with its container. Known
+    // limit: fixed-width children are forced to parent width — to be handled
+    // in a follow-up PR.
+    const parent = canvas.parentElement;
+    if (parent) {
+        const parentRO = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const newW = entry.contentRect.width;
+                canvas.style.setProperty("width", `${newW}px`);
+            }
+            onReflow?.(canvas);
+        });
+        parentRO.observe(parent);
+        parentResizeObservers.set(canvas, parentRO);
+    }
+
+    return canvas;
+}
+
+/**
+ * Unwrap: move element back out of the canvas wrapper and restore state.
+ */
+export function unwrapElement(
+    canvas: HTMLCanvasElement,
+    element: HTMLElement,
+): void {
+    const ro = resizeObservers.get(canvas);
+    if (ro) {
+        ro.disconnect();
+        resizeObservers.delete(canvas);
+    }
+
+    const parentRO = parentResizeObservers.get(canvas);
+    if (parentRO) {
+        parentRO.disconnect();
+        parentResizeObservers.delete(canvas);
+    }
+
+    // Restore cross-origin image src and revoke blob URLs
+    const restoreImages = imageRestorers.get(canvas);
+    if (restoreImages) {
+        restoreImages();
+        imageRestorers.delete(canvas);
+    }
+
+    // Move element back before canvas, then remove canvas
+    canvas.parentNode?.insertBefore(element, canvas);
+    canvas.remove();
+
+    // Restore original margin
+    const savedMargin = savedMargins.get(element);
+    if (savedMargin !== undefined) {
+        element.style.margin = savedMargin;
+        savedMargins.delete(element);
+    }
+}
+
+/**
+ * Wait for the browser to paint the layoutsubtree canvas children.
+ * `requestPaint()` schedules a paint; rAF fires before paint, so we need
+ * a double-rAF to ensure the paint record is cached.
+ */
+function waitForPaint(canvas: HTMLCanvasElement): Promise<void> {
+    if (typeof canvas.requestPaint === "function") {
+        canvas.requestPaint();
+    }
+    return new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+}
+
+/**
+ * Capture element content via drawElementImage → OffscreenCanvas.
+ * Waits for paint record before calling drawElementImage.
+ * Reuses `oldOffscreen` when dimensions match.
+ */
+export async function captureElement(
+    canvas: HTMLCanvasElement,
+    targetChild: Element,
+    oldOffscreen?: OffscreenCanvas,
+    maxSize?: number,
+): Promise<OffscreenCanvas> {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+        throw new Error("Failed to get 2d context from layoutsubtree canvas");
+    }
+
+    // Wait for paint BEFORE flipping opacity, to minimize the window where
+    // the wrapper canvas is visible. (VFXPlayer keeps it at opacity:0 to hide
+    // the original element.) drawElementImage includes parent opacity in the
+    // paint record, so we still need opacity:1 at draw time.
+    await waitForPaint(canvas);
+
+    // Temporarily restore canvas visibility for drawElementImage.
+    const prevOpacity = canvas.style.opacity;
+    canvas.style.setProperty("opacity", "1");
+
+    // Sync pixel buffer to current child dimensions (may have changed on
+    // resize). Setting canvas.width clears the buffer, so no clearRect needed.
+    const childRect = (targetChild as HTMLElement).getBoundingClientRect();
+    const dpr = window.devicePixelRatio;
+    canvas.width = Math.round(childRect.width * dpr);
+    canvas.height = Math.round(childRect.height * dpr);
+
+    // Draw the child element onto the layoutsubtree canvas.
+    // drawElementImage renders the display list at device pixel resolution,
+    // so no DPR scaling is needed — the content fills the pixel buffer as-is.
+    ctx.drawElementImage(targetChild, 0, 0);
+
+    // Restore opacity
+    canvas.style.setProperty("opacity", prevOpacity);
+
+    // Clamp to maxSize
+    let w = canvas.width;
+    let h = canvas.height;
+    if (maxSize && (w > maxSize || h > maxSize)) {
+        const scale = Math.min(maxSize / w, maxSize / h);
+        w = Math.floor(w * scale);
+        h = Math.floor(h * scale);
+    }
+
+    // Reuse or create OffscreenCanvas
+    const offscreen =
+        oldOffscreen && oldOffscreen.width === w && oldOffscreen.height === h
+            ? oldOffscreen
+            : new OffscreenCanvas(w, h);
+
+    const offCtx = offscreen.getContext("2d");
+    if (!offCtx) {
+        throw new Error("Failed to get 2d context from OffscreenCanvas");
+    }
+
+    offCtx.clearRect(0, 0, w, h);
+    offCtx.drawImage(canvas, 0, 0, w, h);
+
+    return offscreen;
+}

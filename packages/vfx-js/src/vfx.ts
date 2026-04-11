@@ -1,3 +1,5 @@
+import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
+import { unwrapElement, wrapElement } from "./html-in-canvas.js";
 import { type VFXOpts, type VFXProps, getVFXOpts } from "./types.js";
 import { VFXPlayer } from "./vfx-player.js";
 
@@ -30,6 +32,7 @@ function getCanvasStyle(fixed: boolean) {
 export class VFX {
     #player: VFXPlayer;
     #canvas: HTMLCanvasElement;
+    #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
 
     /**
      * Creates VFX instance and start playing immediately.
@@ -66,17 +69,64 @@ export class VFX {
         } else if (element instanceof HTMLVideoElement) {
             await this.#addVideo(element, opts);
         } else if (element instanceof HTMLCanvasElement) {
-            await this.#addCanvas(element, opts);
+            if (element.hasAttribute("layoutsubtree")) {
+                // layoutsubtree canvas (from <VFXCanvas>) → hic path
+                await this.#player.addElement(element, opts);
+            } else {
+                await this.#addCanvas(element, opts);
+            }
         } else {
             await this.#addText(element, opts);
         }
     }
 
     /**
+     * Register an element using html-in-canvas API.
+     * Wraps the element in a `<canvas layoutsubtree>` and captures via drawElementImage.
+     * Falls back to `add()` if html-in-canvas is not supported.
+     */
+    async addHTML(element: HTMLElement, opts: VFXProps): Promise<void> {
+        if (!supportsHtmlInCanvas()) {
+            console.warn(
+                "html-in-canvas not supported, falling back to dom-to-canvas",
+            );
+            return this.add(element, opts);
+        }
+
+        if (opts.overlay !== undefined) {
+            console.warn(
+                "addHTML does not support overlay mode (layoutsubtree hides children). Ignoring overlay option.",
+            );
+        }
+
+        let wrapper = this.#wrapperCanvases.get(element);
+        if (wrapper) {
+            this.#player.removeElement(wrapper);
+        } else {
+            // onReflow re-captures the texture on subtree or parent reflow.
+            // updateHICElement is a no-op until addElement below registers
+            // the wrapper, so early RO fires are harmless.
+            wrapper = await wrapElement(element, (c) => {
+                void this.#player.updateHICElement(c);
+            });
+            this.#wrapperCanvases.set(element, wrapper);
+        }
+
+        await this.#player.addElement(wrapper, opts);
+    }
+
+    /**
      * Remove the element from VFX and stop rendering the shader.
      */
     remove(element: HTMLElement): void {
-        this.#player.removeElement(element);
+        const wrapper = this.#wrapperCanvases.get(element);
+        if (wrapper) {
+            unwrapElement(wrapper, element);
+            this.#wrapperCanvases.delete(element);
+            this.#player.removeElement(wrapper);
+        } else {
+            this.#player.removeElement(element);
+        }
     }
 
     /**
@@ -88,7 +138,15 @@ export class VFX {
      * This is useful to apply effects to eleents whose contents change dynamically (e.g. input, textare etc).
      */
     async update(element: HTMLElement): Promise<void> {
+        const wrapper = this.#wrapperCanvases.get(element);
+        if (wrapper) {
+            return this.#player.updateHICElement(wrapper);
+        }
+
         if (element instanceof HTMLCanvasElement) {
+            if (element.hasAttribute("layoutsubtree")) {
+                return this.#player.updateHICElement(element);
+            }
             this.#player.updateCanvasElement(element);
             return;
         } else {
@@ -123,6 +181,11 @@ export class VFX {
      * Destroy VFX and stop rendering.
      */
     destroy(): void {
+        for (const [element, wrapper] of this.#wrapperCanvases) {
+            unwrapElement(wrapper, element);
+        }
+        this.#wrapperCanvases.clear();
+
         this.#player.destroy();
         this.#canvas.remove();
     }

@@ -9,6 +9,7 @@ import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
+import { captureElement } from "./html-in-canvas.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import {
     MARGIN_ZERO,
@@ -233,6 +234,16 @@ export class VFXPlayer {
                     }
                 }
             }
+
+            // Re-capture hic elements on resize
+            for (const e of this.#elements) {
+                if (e.type === "hic") {
+                    await this.updateHICElement(e.element as HTMLCanvasElement);
+                    const rect = e.element.getBoundingClientRect();
+                    e.width = rect.width;
+                    e.height = rect.height;
+                }
+            }
         }
     };
 
@@ -312,8 +323,26 @@ export class VFXPlayer {
             texture = new THREE.VideoTexture(element);
             type = "video" as VFXElementType;
         } else if (element instanceof HTMLCanvasElement) {
-            texture = new THREE.CanvasTexture(element);
-            type = "canvas" as VFXElementType;
+            if (element.hasAttribute("layoutsubtree")) {
+                // html-in-canvas: capture first child via drawElementImage
+                const target = element.firstElementChild;
+                if (!target) {
+                    throw new Error(
+                        "layoutsubtree canvas must have a child element",
+                    );
+                }
+                const offscreen = await captureElement(
+                    element,
+                    target,
+                    undefined,
+                    this.#renderer.capabilities.maxTextureSize,
+                );
+                texture = new THREE.CanvasTexture(offscreen);
+                type = "hic" as VFXElementType;
+            } else {
+                texture = new THREE.CanvasTexture(element);
+                type = "canvas" as VFXElementType;
+            }
         } else {
             const canvas = await dom2canvas(
                 element,
@@ -604,6 +633,36 @@ export class VFXPlayer {
             srcUniform.value = texture;
             e.srcTexture = texture;
             oldTexture.dispose();
+        }
+    }
+
+    async updateHICElement(canvas: HTMLCanvasElement): Promise<void> {
+        const e = this.#elements.find((e) => e.element === canvas);
+        if (!e || e.type !== "hic") return;
+
+        const target = canvas.firstElementChild;
+        if (!target) return;
+
+        const srcUniform = e.passes[0].uniforms["src"];
+        const oldTexture: THREE.CanvasTexture = srcUniform.value;
+        const oldOffscreen: OffscreenCanvas = oldTexture.image;
+
+        const offscreen = await captureElement(
+            canvas,
+            target,
+            oldOffscreen,
+            this.#renderer.capabilities.maxTextureSize,
+        );
+
+        if (offscreen !== oldOffscreen) {
+            const texture = new THREE.CanvasTexture(offscreen);
+            texture.wrapS = oldTexture.wrapS;
+            texture.wrapT = oldTexture.wrapT;
+            srcUniform.value = texture;
+            e.srcTexture = texture;
+            oldTexture.dispose();
+        } else {
+            oldTexture.needsUpdate = true;
         }
     }
 
