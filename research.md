@@ -1,10 +1,14 @@
 # html-in-canvas: サイズ計算の問題点
 
 `packages/vfx-js/src/html-in-canvas.ts` の `wrapElement` / `captureElement` と
-`packages/vfx-js/src/vfx-player.ts` の hic 経路を読み込んで検証した結果。
+`packages/vfx-js/src/vfx-player.ts` の hic 経路を読み込み、さらに実ブラウザ
+(Chromium + `chrome://flags/#canvas-draw-element`) で DOM/ピクセルバッファを
+直接検査して検証した結果。
 
-現状のストーリー (`HtmlInCanvas.stories.ts`) は全部 `<div>` (デフォルト幅100%
-のブロック) だから問題が顕在化していないだけで、実利用では複数の経路で破綻する。
+既存ストーリー (`AddHTML`, `AddHTMLWithImage`) は全部 `<div>` (デフォルト幅
+100% のブロック) だから問題が表面化しない。`HtmlInCanvas.stories.ts` に
+`BugFixedWidth` / `BugChildWithPadding` / `BugContentReflow` を追加してある
+ので、それぞれ該当問題を視覚的に再現できる。
 
 ---
 
@@ -28,22 +32,55 @@ canvas.style.setProperty("width", "100%");
 
 ---
 
-## 問題2: テクスチャと描画領域のサイズ不一致 (問題1の派生)
+## 問題2: `drawElementImage` の density と wrapper canvas の不一致 (問題1の派生)
 
-- `captureElement` のピクセルバッファ → **child** の `getBoundingClientRect`
-- `vfx-player` のWebGL配置とシェーダー `resolution` uniform → **wrapper canvas**
-  の rect (`vfx-player.ts:805` の `glRectWithOverflow`)
+問題1 で canvas の CSS width が child より広くなると、以下の連鎖が起こる:
 
-ブロック子要素が canvas いっぱいに広がる場合は両者が一致するので問題ない。
-しかし問題1で canvas が child より広くなると:
+- `captureElement` はピクセルバッファを `childRect × dpr` で設定 (例: 600×160)
+- その後 `ctx.drawElementImage(child, 0, 0)` を呼ぶ
+- **重要な発見**: `drawElementImage` は `devicePixelRatio` ではなく
+  **canvas 自身の pixel density (buffer / CSS size)** で子要素をラスタライズする
+
+### 実測値 (BugFixedWidth: child 300×80 CSS, canvas CSS 800×80, buffer 600×160)
+
+- canvas pixel density: `600/800 = 0.75` (水平), `160/80 = 2.0` (垂直)
+- child は `300 × 0.75 = 225px`, `80 × 2.0 = 160px` でラスタライズされる
+- texture の non-transparent bbox: **225 × 160** (buffer 600×160 の左上に収まる)
+- 右 375px 分は透明パディング
 
 ```
-canvas wrapper:  ████████████████████  800px (width:100%)
-inner child:     ██████                200px (width:200px)
-texture:         200×h (child rect 由来)
-shader area:     800×h (wrapper rect 由来)
-→ テクスチャが800pxに引き伸ばされて表示される
+pixel buffer (600×160):
+┌─────────────────────────────────┐
+│ child       │                   │
+│ (225×160)   │   transparent     │
+│             │                   │
+└─────────────────────────────────┘
+ ← 225 →     ← 375 (空) →
 ```
+
+### 視覚的に見える/見えない条件
+
+シェーダーが texture の alpha を見るかで結果が変わる:
+
+- **alpha 依存シェーダー** (`rainbow`, `uvGradient`, etc.) — 透明部分は出力も透明
+  になるので、画面上は「300px 幅のコンテンツが正しい位置に表示される」ように
+  見える。**偶然視覚的にキャンセルしてバグが隠れる**
+- **alpha 非依存シェーダー** (custom で `outColor = vec4(col, 1.)` 等) — 透明
+  パディング部分もシェーダー出力が描画されるので、**800px 幅の描画領域が
+  ハッキリ可視化される**
+
+### それでも実在する副作用
+
+視覚的にキャンセルしても、実害は残る:
+
+1. **DOM レイアウト破壊** — wrapper canvas は実際に 800×80 を占める。兄弟要素
+   の配置・scrollHeight・親の height などすべて影響を受ける
+2. **テクスチャ品質低下** — child は 0.75x 密度でラスタライズされる (300 CSS
+   pixel に対し 225 texture pixel)。dpr=2 なら本来 600 pixel あるべきところ。
+   **約 2.67× の解像度損失**。拡大するとボケる
+3. **ヒットテスト/マウスイベント** — wrapper canvas の 800×80 全域がイベント
+   ターゲットになる。視覚上 300px の箇所しか見えていないのにその外側でも
+   反応する (`pointer-events: none` が無ければ)
 
 ---
 
@@ -119,13 +156,26 @@ captureElement で再測定するから初回 add では救われるが、`addEl
 
 ## 推奨修正 (優先度順)
 
-1. **`width: 100%` をやめる** — `getBoundingClientRect()` の幅をそのまま
-   `${rect.width}px` で固定するか、`width` / `min-width` / `max-width` を
-   `LAYOUT_FLOW_STYLES` に追加して computed style からコピー
-2. **ResizeObserver で `borderBoxSize` を使う** — 初期測定と一致させる
+1. **`width: 100%` をやめる** — 最重要。`getBoundingClientRect()` の幅を
+   そのまま `${rect.width}px` で固定するか、`width` / `min-width` / `max-width`
+   を `LAYOUT_FLOW_STYLES` に追加して computed style からコピー。
+   これで問題1・2 (layout 破壊、drawElementImage density 低下、ヒットテスト
+   ズレ) が一度に解消する
+2. **ResizeObserver で `borderBoxSize` を使う** — 初期測定と一致させる (問題3)
 3. **wrapElement の RO 内でテクスチャ再キャプチャをトリガー** —
-   `vfx.update()` 相当を呼ぶ仕組み (コールバック注入か EventTarget)
-4. **DPR 変化リスナー追加** — `matchMedia` ベース
-5. **`box-sizing` 強制を削除** — `LAYOUT_FLOW_STYLES` に追加して元要素から継承
+   `vfx.update()` 相当を呼ぶ仕組み (コールバック注入か EventTarget)。問題4
+4. **DPR 変化リスナー追加** — `matchMedia('(resolution: 1dppx)')` ベース。問題5
+5. **`box-sizing` 強制を削除** — `LAYOUT_FLOW_STYLES` に追加して元要素から継承。問題6
 
-とくに `<VFXCanvas>` ではなく `vfx.addHTML()` を直接使うケースで(4)が顕在化する。
+とくに `<VFXCanvas>` ではなく `vfx.addHTML()` を直接使うケースで (3) が顕在化する。
+
+## ブラウザ検証メモ
+
+`drawElementImage` の仕様で重要なのは、child を `devicePixelRatio` ではなく
+**canvas 自身の pixel density** (pixel buffer / CSS size) でラスタライズする点。
+これを知らずに `canvas.width = childRect.width * dpr` と設定すると、canvas の
+CSS width が child より広い場合に density が dpr 未満になり、解像度が落ちる。
+
+修正案としては、pixel buffer の設定前に canvas CSS 幅を child 幅に一致
+させる (= width:100% を廃止) のが根本対処。それができない限り、buffer と
+CSS の比率を dpr に合わせる別のアプローチが必要になる。
