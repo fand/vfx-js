@@ -122,11 +122,21 @@ export const Fallback: StoryObj = {
 /**
  * BUG (issues 1, 2): `wrapElement` forces `width: 100%` on the wrapper canvas
  * regardless of the element's intrinsic/fixed width. The canvas overflows to
- * the full parent width, and the texture (sized to childRect) gets stretched
- * across the wider canvas via `resolution` uniform from wrapper rect.
+ * the full parent width, disrupting layout and extending the shader render
+ * area beyond the original element's bounds.
  *
- * Expected: rainbow area matches the 300px reference box.
- * Actual: rainbow area spans the full 800px parent.
+ * Note: `drawElementImage` rasterizes children at canvas-pixel-density
+ * (buffer/css), not at devicePixelRatio. When the canvas CSS width is
+ * stretched beyond the child width, the captured texture has transparent
+ * padding on the right. Texture-alpha-dependent shaders (rainbow, uvGradient)
+ * output transparent in that area, making the bug invisible by coincidence.
+ *
+ * This story uses a custom shader that ignores texture alpha and outputs a
+ * solid gradient over the full render area, exposing the wrapper canvas's
+ * actual size.
+ *
+ * Expected: gradient area matches the 300px reference box.
+ * Actual: gradient area spans the full 800px parent.
  */
 export const BugFixedWidth: StoryObj = {
     name: "Bug: width:100% override (issues 1, 2)",
@@ -140,30 +150,37 @@ export const BugFixedWidth: StoryObj = {
         container.style.fontFamily = "sans-serif";
         container.style.color = "white";
 
+        // 800px block parent. Intentionally NOT flex, to keep layout simple.
         const parent = document.createElement("div");
         parent.style.width = "800px";
         parent.style.border = "1px dashed #888";
         parent.style.padding = "16px";
-        parent.style.display = "flex";
-        parent.style.flexDirection = "column";
-        parent.style.gap = "32px";
         container.appendChild(parent);
 
-        // Reference box: 300px, no shader
+        // Common style for the 300×80 visual box. No padding / no border so
+        // ResizeObserver's contentRect == border-box and issue 3 does NOT
+        // shrink the canvas. This isolates issues 1/2.
+        const boxStyle = (el: HTMLElement) => {
+            el.style.width = "300px";
+            el.style.height = "80px";
+            el.style.background = "linear-gradient(90deg, #284, #28a)";
+            el.style.display = "flex";
+            el.style.alignItems = "center";
+            el.style.justifyContent = "center";
+            el.style.fontWeight = "bold";
+            el.style.marginBottom = "32px";
+        };
+
+        // Reference: 300×80 box, no shader
         const ref = document.createElement("div");
-        ref.style.width = "300px";
-        ref.style.border = "2px solid #f44";
-        ref.style.padding = "16px";
-        ref.innerHTML = "<strong>REFERENCE: 300px wide</strong>";
+        boxStyle(ref);
+        ref.textContent = "REFERENCE 300×80";
         parent.appendChild(ref);
 
-        // Target: 300px element with addHTML applied
+        // Target: identical 300×80 box with addHTML applied
         const target = document.createElement("div");
-        target.style.width = "300px";
-        target.style.border = "2px solid #f44";
-        target.style.padding = "16px";
-        target.innerHTML =
-            "<strong>WITH addHTML: should also be 300px</strong>";
+        boxStyle(target);
+        target.textContent = "WITH addHTML";
         parent.appendChild(target);
 
         const note = document.createElement("p");
@@ -171,15 +188,31 @@ export const BugFixedWidth: StoryObj = {
         note.style.fontSize = "0.9rem";
         note.style.marginTop = "16px";
         note.textContent =
-            "BUG: rainbow shader spans the full 800px parent instead of matching the 300px reference.";
+            "BUG: the colored gradient spans the full 800px parent instead of matching the 300px reference box above. The wrapper canvas is stretched to 100% width by wrapElement.";
         container.appendChild(note);
+
+        // Custom shader that renders a solid gradient, ignoring src alpha.
+        // This exposes the wrapper canvas's actual render area (800×80)
+        // regardless of where drawElementImage placed its content.
+        const customShader = `
+precision highp float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+out vec4 outColor;
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    vec3 col = 0.5 + 0.5 * cos(time + uv.xyx * 3.0 + vec3(0, 2, 4));
+    outColor = vec4(col, 0.85);
+}
+`;
 
         const timer = new Timer(0, [0, 10]);
         document.body.append(timer.element);
 
         const vfx = initVFX();
         vfx.addHTML(target, {
-            shader: "rainbow",
+            shader: customShader,
             uniforms: { time: () => timer.time },
         });
 
