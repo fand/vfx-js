@@ -146,11 +146,17 @@ export async function wrapElement(
     imageRestorers.set(canvas, restore);
 
     // ResizeObserver: update CSS height when child reflows.
-    // Pixel buffer is synced in captureElement (together with opacity restore).
+    // Use borderBoxSize (not contentRect) so the value matches the initial
+    // rect.height above (both are border-box). Otherwise the first RO fire
+    // shrinks canvas CSS height by padding+border, causing density blow-up
+    // in drawElementImage and clipping the child's bottom.
+    // Pixel buffer is synced in captureElement.
     const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
-            const { height } = entry.contentRect;
-            canvas.style.setProperty("height", `${height}px`);
+            const borderH =
+                entry.borderBoxSize?.[0]?.blockSize ??
+                entry.contentRect.height;
+            canvas.style.setProperty("height", `${borderH}px`);
         }
     });
     ro.observe(element);
