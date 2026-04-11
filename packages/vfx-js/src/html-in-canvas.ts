@@ -227,25 +227,26 @@ export async function captureElement(
         throw new Error("Failed to get 2d context from layoutsubtree canvas");
     }
 
+    // Wait for paint BEFORE flipping opacity, to minimize the window where
+    // the wrapper canvas is visible. (VFXPlayer keeps it at opacity:0 to hide
+    // the original element.) drawElementImage includes parent opacity in the
+    // paint record, so we still need opacity:1 at draw time.
+    await waitForPaint(canvas);
+
     // Temporarily restore canvas visibility for drawElementImage.
-    // The wrapper canvas has opacity:0 (set by VFXPlayer to hide original element),
-    // but drawElementImage includes parent opacity in the paint record.
     const prevOpacity = canvas.style.opacity;
     canvas.style.setProperty("opacity", "1");
 
-    // Sync pixel buffer to current child dimensions (may have changed on resize).
+    // Sync pixel buffer to current child dimensions (may have changed on
+    // resize). Setting canvas.width clears the buffer, so no clearRect needed.
     const childRect = (targetChild as HTMLElement).getBoundingClientRect();
     const dpr = window.devicePixelRatio;
     canvas.width = Math.round(childRect.width * dpr);
     canvas.height = Math.round(childRect.height * dpr);
 
-    // Ensure the browser has painted the element
-    await waitForPaint(canvas);
-
     // Draw the child element onto the layoutsubtree canvas.
     // drawElementImage renders the display list at device pixel resolution,
     // so no DPR scaling is needed — the content fills the pixel buffer as-is.
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawElementImage(targetChild, 0, 0);
 
     // Restore opacity
