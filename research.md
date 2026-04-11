@@ -154,6 +154,116 @@ captureElement で再測定するから初回 add では救われるが、`addEl
 
 ---
 
+---
+
+## コード精査で判明した追加事項
+
+### git history から読み取れる背景
+
+- commit `1e39f1d` (`fix: remove DPR scaling from drawElementImage`)
+  - 当時 `wrapElement` は `canvas.style.width = "${rect.width}px"` (固定px) だった
+  - → canvas CSS = child rect, buffer = rect × dpr
+  - → **density = dpr (ピッタリ)**
+  - この前提で `ctx.scale(dpr, dpr)` を外すのは正しかった
+- commit `261258c` (`fix: make canvas wrapper responsive to window resize`)
+  - `canvas.style.width = "100%"` に変更 (レスポンシブ化のため)
+  - しかし `captureElement` 側の `canvas.width = childRect.width * dpr` は
+    そのまま残った
+  - → density ≠ dpr になり、`1e39f1d` の前提が **silently 崩壊**
+
+commit メッセージの「drawElementImage renders display list at device pixel
+resolution」という仮説は厳密には誤り。正しくは「**canvas 自身の pixel
+density (buffer / CSS size) でレンダリング**」。同じ密度を dpr に保っている
+限り結果は同じに見えるので、当時のテストはすり抜けた。
+
+### 問題8: `waitForPaint` 中の空 buffer / opacity:1 リーク
+
+```ts
+// captureElement 226-242
+const prevOpacity = canvas.style.opacity;
+canvas.style.setProperty("opacity", "1");                // ← opacity 1
+
+const childRect = ...;
+canvas.width = Math.round(childRect.width * dpr);        // ← buffer リセット (中身も transform もクリア)
+canvas.height = Math.round(childRect.height * dpr);
+
+await waitForPaint(canvas);                              // ← 2 フレーム待つ
+
+ctx.clearRect(0, 0, canvas.width, canvas.height);        // ← 既に空なので無駄
+ctx.drawElementImage(targetChild, 0, 0);
+
+canvas.style.setProperty("opacity", prevOpacity);        // ← opacity 復帰
+```
+
+`waitForPaint` の 2 フレーム間、wrapper canvas は **opacity: 1** かつ
+**pixel buffer が空** (`canvas.width = N` 自体で中身と transform がクリア
+されるため)。`layoutsubtree` で子は paint されないので視覚的には多くの場合
+透明に見えるが、前フレームの WebGL 描画が残っていたり、親に背景があったり
+すると **一瞬の空白表示**が起こりうる。
+
+また 237 行目の `clearRect` は `canvas.width` 設定で既にクリア済みなので
+冗長。
+
+修正案: `drawElementImage` の直前に `opacity:1` を設定し、直後に戻す。
+buffer サイズ変更もそのタイミングに寄せる (paint 待機が終わった後)。
+
+### 問題9: `maxSize` クランプ時のバイリニア劣化 (低優先)
+
+```ts
+// captureElement 247-270
+if (maxSize && (w > maxSize || h > maxSize)) {
+    const scale = Math.min(maxSize / w, maxSize / h);
+    w = Math.floor(w * scale);
+    h = Math.floor(h * scale);
+}
+// ...
+offCtx.drawImage(canvas, 0, 0, w, h);
+```
+
+`drawImage` の 4引数形式は WebGL のテクスチャではなく 2D canvas の縮小を
+**バイリニア**で行う。巨大要素 (`maxTextureSize` 超過) の場合、高品質な
+縮小が必要なら `createImageBitmap` + `resizeQuality: "high"` の検討余地。
+
+通常サイズでは発火しないので優先度は低い。
+
+---
+
+## width:100% 起因バグの修正可能性
+
+`width: 100%` を外す修正で解消する問題:
+
+| 問題 | 解消するか | 理由 |
+|---|---|---|
+| 問題1 (width override) | ✅ 解消 | 直接の原因を除去 |
+| 問題2 (density 不整合) | ✅ 解消 | canvas CSS = rect になり density = dpr に戻る |
+| バグA (captureElement buffer) | ✅ 解消 | 同上 |
+| バグB (wrapElement 初期 buffer) | ✅ 解消 | 同上 |
+| DOM レイアウト破壊 | ✅ 解消 | wrapper canvas が元要素と同じサイズに収まる |
+| ヒットテスト/pointer events | ✅ 解消 | 同上 |
+| テクスチャ品質低下 | ✅ 解消 | density = dpr でフル解像度レンダリング |
+
+**ただし副作用として失うもの**: **responsive 動作** (`261258c` が解決しようと
+していた課題)。親幅が変わってもラッパーキャンバスは初期測定値に固定される。
+
+responsive を保ちつつ density バグも直すには、**parent 側の ResizeObserver で
+canvas CSS 幅を追従させる**追加機構が必要。
+
+### 推奨する修正戦略
+
+1. **短期**: `width: 100%` を `${rect.width}px` (または computed style の
+   `width` 値コピー) に戻す。density バグ・レイアウト破壊・ヒットテスト・
+   品質低下がまとめて解消する。responsive は一旦諦める
+2. **中期**: canvas の parent を `ResizeObserver` で監視し、parent の
+   contentRect に応じて canvas CSS 幅と buffer を同期更新するロジックを
+   追加。これで responsive も復活
+3. **並行**: 問題3 (borderBoxSize)・問題4 (reflow 再キャプチャ)・問題8
+   (opacity flash) は独立して修正可能
+
+問題5 (DPR 変化)・問題6 (box-sizing)・問題7 (flex wrap タイミング)・
+問題9 (maxSize 縮小品質) は低優先度。
+
+---
+
 ## 推奨修正 (優先度順)
 
 1. **`width: 100%` をやめる** — 最重要。`getBoundingClientRect()` の幅を
