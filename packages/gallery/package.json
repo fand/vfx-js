@@ -1,0 +1,28 @@
+{
+    "name": "@vfx-js/gallery",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite --host",
+        "build": "vite build",
+        "preview": "vite preview --host --port 3002 --strictPort",
+        "clean": "rimraf docs-build test-results playwright-report",
+        "test:visual": "playwright test",
+        "test:visual:update": "playwright test --update-snapshots",
+        "test:visual:install": "playwright install --with-deps chromium",
+        "lint": "biome check ."
+    },
+    "dependencies": {
+        "@vfx-js/core": "0.10.1"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^1.9.4",
+        "@playwright/test": "^1.49.0",
+        "@types/node": "^22.15.30",
+        "fast-glob": "^3.3.3",
+        "rimraf": "^6.0.1",
+        "typescript": "^5.8.3",
+        "vite": "^6.3.5"
+    }
+}

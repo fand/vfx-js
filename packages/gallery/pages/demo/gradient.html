@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Gradient demo</title>
+        <link rel="stylesheet" href="/preset.css" />
+        <style>
+            html,
+            body {
+                height: 100%;
+            }
+            body {
+                display: grid;
+                place-items: center;
+            }
+            #target {
+                width: 80vmin;
+                height: 80vmin;
+                background: #1a1a22;
+                border-radius: 16px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="target"></div>
+        <script type="module">
+            import { VFX } from "@vfx-js/core";
+
+            const shader = `
+                precision highp float;
+                uniform vec2 offset;
+                uniform vec2 resolution;
+                uniform float time;
+                out vec4 outColor;
+                void main() {
+                    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+                    vec3 col = vec3(uv.x, uv.y, 0.5 + 0.5 * sin(time));
+                    outColor = vec4(col, 1.0);
+                }
+            `;
+
+            const target = document.getElementById("target");
+            const vfx = new VFX();
+            await vfx.add(target, { shader });
+
+            window.__galleryReady = true;
+        </script>
+    </body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>VFX-JS Gallery</title>
+        <link rel="stylesheet" href="/preset.css" />
+        <style>
+            body {
+                max-width: 900px;
+                margin: 0 auto;
+                padding: 48px 24px 96px;
+                font-family:
+                    system-ui, -apple-system, "Segoe UI", sans-serif;
+                line-height: 1.6;
+                color: #e8e8ea;
+                background: #0b0b0d;
+            }
+            h1 {
+                font-size: 2.2rem;
+                margin: 0 0 8px;
+            }
+            .summary {
+                color: #8a8a92;
+                margin: 0 0 32px;
+            }
+            section {
+                margin: 32px 0;
+                padding: 20px 24px;
+                background: #16161a;
+                border: 1px solid #26262c;
+                border-radius: 10px;
+            }
+            section h2 {
+                margin: 0 0 12px;
+                font-size: 1.1rem;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: #a0a0a8;
+            }
+            section h2 .count {
+                color: #5a5a62;
+                font-size: 0.85em;
+                margin-left: 6px;
+            }
+            section[data-kind="test"] h2 { color: #7dd3fc; }
+            section[data-kind="tutorial"] h2 { color: #c4b5fd; }
+            section[data-kind="demo"] h2 { color: #fcd34d; }
+            ul { margin: 0; padding: 0; list-style: none; }
+            li {
+                padding: 6px 0;
+                border-bottom: 1px dashed #26262c;
+            }
+            li:last-child { border-bottom: none; }
+            a {
+                color: #e8e8ea;
+                text-decoration: none;
+                font-weight: 500;
+            }
+            a:hover { color: #7dd3fc; text-decoration: underline; }
+            code {
+                color: #6b6b73;
+                font-size: 0.85em;
+                margin-left: 8px;
+            }
+            .badge {
+                display: inline-block;
+                font-size: 0.7em;
+                padding: 1px 6px;
+                margin-left: 6px;
+                background: #1e3a5f;
+                color: #7dd3fc;
+                border-radius: 4px;
+                vertical-align: middle;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>VFX-JS Gallery</h1>
+        <p>
+            Visual regression targets, tutorials, and technical demos for
+            <code>@vfx-js/core</code>. Pages under
+            <code>pages/test/</code> are driven by Playwright.
+        </p>
+        <!-- GALLERY_INDEX -->
+    </body>
+</html>

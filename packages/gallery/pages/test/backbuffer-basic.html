@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Backbuffer basic</title>
+        <link rel="stylesheet" href="/preset.css" />
+        <style>
+            html,
+            body {
+                height: 100%;
+                background: #000;
+            }
+            body {
+                display: grid;
+                place-items: center;
+            }
+            #target {
+                width: 320px;
+                height: 320px;
+                background: linear-gradient(135deg, #1e3a5f 0%, #7dd3fc 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #fff;
+                font-size: 3rem;
+                font-weight: bold;
+                letter-spacing: 0.1em;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="target">VFX</div>
+        <script type="module">
+            import { VFX } from "@vfx-js/core";
+
+            const target = document.getElementById("target");
+
+            const shader = `
+                precision highp float;
+                uniform vec2 offset;
+                uniform vec2 resolution;
+                uniform float time;
+                uniform sampler2D src;
+                out vec4 outColor;
+                void main() {
+                    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+                    vec4 c = texture(src, uv);
+                    float s = 0.55 + 0.45 * sin(time * 3.0 + uv.x * 6.2832);
+                    outColor = vec4(c.rgb * s, c.a);
+                }
+            `;
+
+            let t = 0;
+            const vfx = new VFX({ autoplay: false });
+            await vfx.add(target, {
+                shader,
+                uniforms: { time: () => t },
+            });
+
+            // Advance a fixed number of frames for a deterministic snapshot.
+            for (let i = 0; i < 30; i++) {
+                t += 1 / 60;
+                vfx.render();
+            }
+
+            window.__galleryReady = true;
+        </script>
+    </body>
+</html>
