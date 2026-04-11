@@ -103,7 +103,12 @@ export class VFX {
         if (wrapper) {
             this.#player.removeElement(wrapper);
         } else {
-            wrapper = await wrapElement(element);
+            // onReflow re-captures the texture on subtree or parent reflow.
+            // updateHICElement is a no-op until addElement below registers
+            // the wrapper, so early RO fires are harmless.
+            wrapper = await wrapElement(element, (c) => {
+                void this.#player.updateHICElement(c);
+            });
             this.#wrapperCanvases.set(element, wrapper);
         }
 

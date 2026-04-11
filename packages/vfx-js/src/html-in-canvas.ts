@@ -100,15 +100,22 @@ const LAYOUT_FLOW_STYLES = [
 ] as const;
 
 const resizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
+const parentResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
 const savedMargins = new WeakMap<HTMLElement, string>();
 const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
 
 /**
  * Wrap an element in a `<canvas layoutsubtree>` for html-in-canvas capture.
  * The canvas takes over the element's position in the layout flow.
+ *
+ * `onReflow` is called when the wrapped subtree or its parent reflows, so
+ * the caller can re-capture the texture. It is invoked async via
+ * ResizeObserver, so it may fire before the wrapper is registered with the
+ * player (the player side must tolerate unknown canvases).
  */
 export async function wrapElement(
     element: HTMLElement,
+    onReflow?: (canvas: HTMLCanvasElement) => void,
 ): Promise<HTMLCanvasElement> {
     const rect = element.getBoundingClientRect();
 
@@ -145,7 +152,8 @@ export async function wrapElement(
     const restore = await inlineCrossOriginImages(element);
     imageRestorers.set(canvas, restore);
 
-    // ResizeObserver: update CSS height when child reflows.
+    // Child ResizeObserver: update CSS height when the wrapped element
+    // reflows, then signal onReflow so the texture is re-captured.
     // Use borderBoxSize (not contentRect) so the value matches the initial
     // rect.height above (both are border-box). Otherwise the first RO fire
     // shrinks canvas CSS height by padding+border, causing density blow-up
@@ -154,13 +162,30 @@ export async function wrapElement(
     const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
             const borderH =
-                entry.borderBoxSize?.[0]?.blockSize ??
-                entry.contentRect.height;
+                entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
             canvas.style.setProperty("height", `${borderH}px`);
         }
+        onReflow?.(canvas);
     });
     ro.observe(element);
     resizeObservers.set(canvas, ro);
+
+    // Parent ResizeObserver: track parent content width so the canvas (and
+    // thereby the wrapped block-auto child) flows with its container. Known
+    // limit: fixed-width children are forced to parent width — to be handled
+    // in a follow-up PR.
+    const parent = canvas.parentElement;
+    if (parent) {
+        const parentRO = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const newW = entry.contentRect.width;
+                canvas.style.setProperty("width", `${newW}px`);
+            }
+            onReflow?.(canvas);
+        });
+        parentRO.observe(parent);
+        parentResizeObservers.set(canvas, parentRO);
+    }
 
     return canvas;
 }
@@ -176,6 +201,12 @@ export function unwrapElement(
     if (ro) {
         ro.disconnect();
         resizeObservers.delete(canvas);
+    }
+
+    const parentRO = parentResizeObservers.get(canvas);
+    if (parentRO) {
+        parentRO.disconnect();
+        parentResizeObservers.delete(canvas);
     }
 
     // Restore cross-origin image src and revoke blob URLs
