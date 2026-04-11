@@ -221,15 +221,24 @@ void main() {
 };
 
 /**
- * BUG (issue 3): The ResizeObserver in `wrapElement` uses `entry.contentRect`
- * (content-box), but the initial canvas height is set from
- * `getBoundingClientRect()` (border-box). After the first RO fire, the canvas
- * CSS height shrinks by `padding + border` total, while the texture (sized
- * via childRect = border-box) keeps the larger size — content gets squashed
- * vertically.
+ * BUG (issue 3): `wrapElement`'s ResizeObserver uses `entry.contentRect`
+ * (content-box), but the initial canvas CSS height comes from
+ * `getBoundingClientRect()` (border-box). After the first RO fire, canvas
+ * CSS height shrinks by `padding + border` total.
  *
- * Expected: rainbow box height matches the reference box.
- * Actual: rainbow box is shorter by ~70px (30px padding * 2 + 5px border * 2).
+ * That alone would just compress the texture vertically. But there's a
+ * secondary amplification: by the time `captureElement`'s `waitForPaint`
+ * (double-rAF) resolves, the RO has already fired. The new canvas pixel
+ * density (vertical) is `buffer / new_css` instead of `dpr`, and
+ * `drawElementImage` rasterizes the child at this inflated density —
+ * which overflows the pixel buffer and **clips the bottom of the child**.
+ *
+ * Uses the same alpha-independent custom shader as BugFixedWidth so the
+ * canvas's actual render area is visible (alpha-dependent shaders like
+ * rainbow would hide the width mismatch from the coexisting issue 1/2).
+ *
+ * Expected: gradient box height matches the reference box.
+ * Actual: gradient box is shorter by ~70px (30px padding × 2 + 5px border × 2).
  */
 export const BugChildWithPadding: StoryObj = {
     name: "Bug: padding shrinks via contentRect (issue 3)",
@@ -243,26 +252,29 @@ export const BugChildWithPadding: StoryObj = {
         container.style.fontFamily = "sans-serif";
         container.style.color = "white";
 
+        // Common style: fixed width (avoids text-wrap variability),
+        // padding + border (to trigger content-box < border-box).
+        const boxStyle = (el: HTMLElement) => {
+            el.style.width = "400px";
+            el.style.padding = "30px";
+            el.style.border = "5px solid #f44";
+            el.style.background = "linear-gradient(180deg, #284, #28a)";
+            el.style.fontSize = "1.4rem";
+            el.style.lineHeight = "1.6";
+            el.style.fontWeight = "bold";
+            el.style.marginBottom = "32px";
+        };
+
         // Reference: identical padding/border, no shader
         const ref = document.createElement("div");
-        ref.style.padding = "30px";
-        ref.style.border = "5px solid #f44";
-        ref.style.fontSize = "1.4rem";
-        ref.style.lineHeight = "1.6";
-        ref.style.marginBottom = "32px";
-        ref.style.maxWidth = "600px";
-        ref.textContent = "REFERENCE — same padding/border, no shader";
+        boxStyle(ref);
+        ref.textContent = "REFERENCE (padding:30 border:5)";
         container.appendChild(ref);
 
-        // Target with addHTML
+        // Target with addHTML applied
         const target = document.createElement("div");
-        target.style.padding = "30px";
-        target.style.border = "5px solid #f44";
-        target.style.fontSize = "1.4rem";
-        target.style.lineHeight = "1.6";
-        target.style.maxWidth = "600px";
-        target.textContent =
-            "WITH addHTML — should be the same height as reference";
+        boxStyle(target);
+        target.textContent = "WITH addHTML (same size expected)";
         container.appendChild(target);
 
         const note = document.createElement("p");
@@ -270,15 +282,30 @@ export const BugChildWithPadding: StoryObj = {
         note.style.fontSize = "0.9rem";
         note.style.marginTop = "32px";
         note.textContent =
-            "BUG: ResizeObserver uses contentRect (content-box), so the canvas CSS height shrinks by padding+border total (~70px) after the first RO fire. Texture is compressed vertically.";
+            "BUG: the shader box is ~70px shorter than the reference (lost the padding+border zone). ResizeObserver fires with contentRect, shrinking canvas CSS height below the captured texture, and drawElementImage then clips the child's bottom on re-capture.";
         container.appendChild(note);
+
+        // Alpha-independent shader — exposes the canvas's actual render area
+        // regardless of texture transparency (same trick as BugFixedWidth).
+        const customShader = `
+precision highp float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+out vec4 outColor;
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    vec3 col = 0.5 + 0.5 * cos(time + uv.yxy * 3.0 + vec3(0, 2, 4));
+    outColor = vec4(col, 0.85);
+}
+`;
 
         const timer = new Timer(0, [0, 10]);
         document.body.append(timer.element);
 
         const vfx = initVFX();
         vfx.addHTML(target, {
-            shader: "rainbow",
+            shader: customShader,
             uniforms: { time: () => timer.time },
         });
 
