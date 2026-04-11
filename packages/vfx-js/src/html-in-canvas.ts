@@ -121,11 +121,12 @@ export async function wrapElement(
         canvas.style.setProperty(prop, cs.getPropertyValue(prop));
     }
 
-    // Width: responsive (fills parent like original block/flex/grid element)
-    // Height: measured value (updated by ResizeObserver when content reflows)
-    canvas.style.setProperty("width", "100%");
+    // Fixed px from initial measurement so canvas CSS matches the element's
+    // border-box. This keeps canvas pixel density == dpr, so drawElementImage
+    // rasterizes the child at full device pixel resolution. Responsive
+    // behavior is handled separately by a parent ResizeObserver (later step).
+    canvas.style.setProperty("width", `${rect.width}px`);
     canvas.style.setProperty("height", `${rect.height}px`);
-    canvas.style.setProperty("box-sizing", "border-box");
 
     // Set pixel buffer size
     const dpr = window.devicePixelRatio;
