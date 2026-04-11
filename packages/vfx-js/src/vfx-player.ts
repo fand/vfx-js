@@ -662,8 +662,13 @@ export class VFXPlayer {
             u["time"].value = now - e.startTime;
             u["resolution"].value.x = domRect.width * this.#pixelRatio;
             u["resolution"].value.y = domRect.height * this.#pixelRatio;
-            u["mouse"].value.x = this.#mouseX * this.#pixelRatio;
-            u["mouse"].value.y = this.#mouseY * this.#pixelRatio;
+            // #mouseX/Y are in viewport-Y-up coords, but gl_FragCoord in
+            // the canvas is in canvas-Y-up coords (canvas extends paddingX/Y
+            // outside the viewport). Add padding to convert.
+            u["mouse"].value.x =
+                (this.#mouseX + this.#paddingX) * this.#pixelRatio;
+            u["mouse"].value.y =
+                (this.#mouseY + this.#paddingY) * this.#pixelRatio;
 
             // Update uniform generators
             for (const pass of e.passes) {
@@ -824,8 +829,8 @@ export class VFXPlayer {
                 glRect.y * this.#pixelRatio,
             );
             finalPass.uniforms["mouse"].value.set(
-                this.#mouseX * this.#pixelRatio,
-                this.#mouseY * this.#pixelRatio,
+                (this.#mouseX + this.#paddingX) * this.#pixelRatio,
+                (this.#mouseY + this.#paddingY) * this.#pixelRatio,
             );
 
             // Update resolved buffer uniforms for final pass
