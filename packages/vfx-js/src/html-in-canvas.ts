@@ -69,13 +69,15 @@ async function inlineCrossOriginImages(root: Element): Promise<() => void> {
     };
 }
 
-const LAYOUT_FLOW_STYLES = [
-    "display",
+const MARGIN_PROPS = [
     "margin",
     "margin-top",
     "margin-right",
     "margin-bottom",
     "margin-left",
+] as const;
+
+const POSITION_FLOW_STYLES = [
     "position",
     "top",
     "right",
@@ -100,7 +102,6 @@ const LAYOUT_FLOW_STYLES = [
 ] as const;
 
 const resizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
-const parentResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
 const savedMargins = new WeakMap<HTMLElement, string>();
 const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
 
@@ -108,10 +109,13 @@ const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
  * Wrap an element in a `<canvas layoutsubtree>` for html-in-canvas capture.
  * The canvas takes over the element's position in the layout flow.
  *
- * `onReflow` is called when the wrapped subtree or its parent reflows, so
- * the caller can re-capture the texture. It is invoked async via
- * ResizeObserver, so it may fire before the wrapper is registered with the
- * player (the player side must tolerate unknown canvases).
+ * CSS identity (class + style attributes) is copied to the canvas so that
+ * CSS cascade resolves width/height/max-width/etc. naturally — responsive
+ * and fixed layouts both work without heuristics.
+ *
+ * A ResizeObserver on the canvas (`device-pixel-content-box`) keeps the
+ * pixel buffer in sync. `onReflow` fires on resize and, if available,
+ * on `canvas.onpaint` (child content changes).
  */
 export async function wrapElement(
     element: HTMLElement,
@@ -122,69 +126,94 @@ export async function wrapElement(
     const canvas = document.createElement("canvas");
     canvas.setAttribute("layoutsubtree", "");
 
-    // Copy layout-flow styles from element to canvas
-    const cs = window.getComputedStyle(element);
-    for (const prop of LAYOUT_FLOW_STYLES) {
+    // --- 1. Copy CSS identity ---
+    canvas.className = element.className;
+    const styleAttr = element.getAttribute("style");
+    if (styleAttr) {
+        canvas.setAttribute("style", styleAttr);
+    }
+
+    // --- 2. Canvas-specific overrides ---
+    const cs = getComputedStyle(element);
+
+    // Element-type defaults (div=block, span=inline) aren't in class rules
+    const display = cs.display === "inline" ? "block" : cs.display;
+    canvas.style.setProperty("display", display);
+
+    // Copy computed margins for element-type defaults (e.g. <p> margin-block)
+    for (const prop of MARGIN_PROPS) {
         canvas.style.setProperty(prop, cs.getPropertyValue(prop));
     }
 
-    // Fixed px from initial measurement so canvas CSS matches the element's
-    // border-box. This keeps canvas pixel density == dpr, so drawElementImage
-    // rasterizes the child at full device pixel resolution. Responsive
-    // behavior is handled separately by a parent ResizeObserver (later step).
-    canvas.style.setProperty("width", `${rect.width}px`);
-    canvas.style.setProperty("height", `${rect.height}px`);
+    // Replicate position/float/flex/grid placement
+    for (const prop of POSITION_FLOW_STYLES) {
+        canvas.style.setProperty(prop, cs.getPropertyValue(prop));
+    }
 
-    // Set pixel buffer size
+    // Strip padding/border — canvas content-box = element border-box
+    canvas.style.setProperty("padding", "0");
+    canvas.style.setProperty("border", "none");
+    canvas.style.setProperty("box-sizing", "content-box");
+
+    // --- 3. Padding/border compensation ---
+    // Can't add px to class-derived width expressions (%, auto), so when
+    // padding/border exists, fall back to measured rect (border-box).
+    const paddingH =
+        Number.parseFloat(cs.paddingLeft) + Number.parseFloat(cs.paddingRight);
+    const paddingV =
+        Number.parseFloat(cs.paddingTop) + Number.parseFloat(cs.paddingBottom);
+    const borderH =
+        Number.parseFloat(cs.borderLeftWidth) +
+        Number.parseFloat(cs.borderRightWidth);
+    const borderV =
+        Number.parseFloat(cs.borderTopWidth) +
+        Number.parseFloat(cs.borderBottomWidth);
+    if (paddingH + borderH > 0) {
+        canvas.style.setProperty("width", `${rect.width}px`);
+    }
+    if (paddingV + borderV > 0) {
+        canvas.style.setProperty("height", `${rect.height}px`);
+    }
+
+    // --- 4. Initial pixel buffer ---
     const dpr = window.devicePixelRatio;
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
 
-    // Save original margin and reset
+    // --- 5. DOM swap ---
     savedMargins.set(element, element.style.margin);
-
-    // Insert canvas in element's place, move element inside
     element.parentNode?.insertBefore(canvas, element);
     canvas.appendChild(element);
     element.style.setProperty("margin", "0");
 
-    // Inline cross-origin images once (safe because layoutsubtree hides children)
+    // --- 6. Cross-origin images ---
     const restore = await inlineCrossOriginImages(element);
     imageRestorers.set(canvas, restore);
 
-    // Child ResizeObserver: update CSS height when the wrapped element
-    // reflows, then signal onReflow so the texture is re-captured.
-    // Use borderBoxSize (not contentRect) so the value matches the initial
-    // rect.height above (both are border-box). Otherwise the first RO fire
-    // shrinks canvas CSS height by padding+border, causing density blow-up
-    // in drawElementImage and clipping the child's bottom.
-    // Pixel buffer is synced in captureElement.
+    // --- 7. RO on canvas (device-pixel-content-box) ---
     const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
-            const borderH =
-                entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
-            canvas.style.setProperty("height", `${borderH}px`);
+            const dpSize = entry.devicePixelContentBoxSize?.[0];
+            if (dpSize) {
+                canvas.width = dpSize.inlineSize;
+                canvas.height = dpSize.blockSize;
+            } else {
+                const box = entry.borderBoxSize?.[0];
+                if (box) {
+                    canvas.width = Math.round(box.inlineSize * dpr);
+                    canvas.height = Math.round(box.blockSize * dpr);
+                }
+            }
         }
         onReflow?.(canvas);
     });
-    ro.observe(element);
+    ro.observe(canvas, { box: "device-pixel-content-box" });
     resizeObservers.set(canvas, ro);
 
-    // Parent ResizeObserver: track parent content width so the canvas (and
-    // thereby the wrapped block-auto child) flows with its container. Known
-    // limit: fixed-width children are forced to parent width — to be handled
-    // in a follow-up PR.
-    const parent = canvas.parentElement;
-    if (parent) {
-        const parentRO = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                const newW = entry.contentRect.width;
-                canvas.style.setProperty("width", `${newW}px`);
-            }
-            onReflow?.(canvas);
-        });
-        parentRO.observe(parent);
-        parentResizeObservers.set(canvas, parentRO);
+    // --- 8. onpaint (if available) ---
+    if ("onpaint" in canvas) {
+        // biome-ignore lint/suspicious/noExplicitAny: onpaint is not yet in TS lib
+        (canvas as any).onpaint = () => onReflow?.(canvas);
     }
 
     return canvas;
@@ -201,12 +230,6 @@ export function unwrapElement(
     if (ro) {
         ro.disconnect();
         resizeObservers.delete(canvas);
-    }
-
-    const parentRO = parentResizeObservers.get(canvas);
-    if (parentRO) {
-        parentRO.disconnect();
-        parentResizeObservers.delete(canvas);
     }
 
     // Restore cross-origin image src and revoke blob URLs
@@ -268,19 +291,9 @@ export async function captureElement(
     const prevOpacity = canvas.style.opacity;
     canvas.style.setProperty("opacity", "1");
 
-    // Sync pixel buffer to current child dimensions (may have changed on
-    // resize). Setting canvas.width clears the buffer, so no clearRect needed.
-    const childRect = (targetChild as HTMLElement).getBoundingClientRect();
-    const dpr = window.devicePixelRatio;
-    canvas.width = Math.round(childRect.width * dpr);
-    canvas.height = Math.round(childRect.height * dpr);
-
-    // Draw the child element onto the layoutsubtree canvas.
-    // drawElementImage renders the display list at device pixel resolution,
-    // so no DPR scaling is needed — the content fills the pixel buffer as-is.
+    // Pixel buffer is managed by the RO in wrapElement — use as-is.
     ctx.drawElementImage(targetChild, 0, 0);
 
-    // Restore opacity
     canvas.style.setProperty("opacity", prevOpacity);
 
     // Clamp to maxSize
