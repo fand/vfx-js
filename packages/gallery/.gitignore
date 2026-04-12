@@ -1,0 +1,10 @@
+node_modules
+docs-build
+dist
+.turbo
+
+# Playwright
+test-results
+playwright-report
+blob-report
+.playwright

@@ -1,0 +1,123 @@
+name: VRT (Gallery)
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+    workflow_dispatch:
+        inputs:
+            update_snapshots:
+                description: "Regenerate baseline screenshots and commit them back to this branch"
+                type: boolean
+                default: false
+
+# Cancel in-progress runs for the same PR/branch so only the latest wins.
+concurrency:
+    group: vrt-${{ github.ref }}
+    cancel-in-progress: true
+
+# Default to read-only; the update-snapshots job elevates to write below.
+permissions:
+    contents: read
+
+jobs:
+    visual-regression:
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        # Needs write so that the update-snapshots dispatch can push the
+        # regenerated baselines back to the branch. Harmless for normal runs.
+        permissions:
+            contents: write
+        env:
+            UPDATE_SNAPSHOTS: ${{ github.event_name == 'workflow_dispatch' && inputs.update_snapshots }}
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Setup Node
+              uses: actions/setup-node@v3
+              with:
+                  node-version: "20"
+                  cache: "npm"
+                  cache-dependency-path: "**/package-lock.json"
+
+            - name: Install dependencies
+              run: npm ci
+
+            # Cache the Playwright browser binaries keyed on the lockfile so
+            # that browsers are only re-downloaded when @playwright/test is
+            # actually bumped. System libraries (`install-deps`) are cheap and
+            # run unconditionally.
+            - name: Cache Playwright browsers
+              id: pw-cache
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+            - name: Install Playwright browser (cache miss)
+              if: steps.pw-cache.outputs.cache-hit != 'true'
+              working-directory: packages/gallery
+              run: npx playwright install --with-deps chromium
+
+            - name: Install Playwright system deps (cache hit)
+              if: steps.pw-cache.outputs.cache-hit == 'true'
+              working-directory: packages/gallery
+              run: npx playwright install-deps chromium
+
+            # The gallery imports @vfx-js/core from node_modules during
+            # `vite build`, so core's lib/ must exist beforehand. The gallery
+            # itself is (re)built by Playwright's webServer in CI mode.
+            - name: Build @vfx-js/core
+              run: npm --workspace=@vfx-js/core run build
+
+            - name: Run visual regression
+              if: env.UPDATE_SNAPSHOTS != 'true'
+              run: npm --workspace=@vfx-js/gallery run test:visual
+              env:
+                  CI: "true"
+
+            - name: Regenerate baseline snapshots
+              if: env.UPDATE_SNAPSHOTS == 'true'
+              run: npm --workspace=@vfx-js/gallery run test:visual:update
+              env:
+                  CI: "true"
+
+            # If the dispatch asked for an update, commit anything that
+            # changed under __screenshots__ and push it back to the branch
+            # that triggered this run. `[skip ci]` avoids a recursion.
+            - name: Commit updated baselines
+              if: env.UPDATE_SNAPSHOTS == 'true'
+              run: |
+                  set -euo pipefail
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  if git diff --quiet -- packages/gallery/__screenshots__; then
+                      echo "Snapshots already up to date — nothing to commit."
+                      exit 0
+                  fi
+                  git add packages/gallery/__screenshots__
+                  git commit -m "test(gallery): update visual baselines [skip ci]"
+                  git push origin "HEAD:${GITHUB_REF_NAME}"
+
+            # Always upload the HTML report so reviewers can inspect
+            # timing / traces / screenshots even for passing runs.
+            - name: Upload Playwright HTML report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-report
+                  path: packages/gallery/playwright-report/
+                  retention-days: 14
+
+            # On failure, upload the per-test output directory which contains
+            # the expected / actual / diff PNGs. Download and commit the
+            # "actual" image to update a baseline, or re-run this workflow
+            # manually with `update_snapshots=true`.
+            - name: Upload failing test results
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: test-results
+                  path: packages/gallery/test-results/
+                  retention-days: 14

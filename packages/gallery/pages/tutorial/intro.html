@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Gallery intro</title>
+        <link rel="stylesheet" href="/preset.css" />
+        <style>
+            main {
+                max-width: 680px;
+                margin: 48px auto;
+                padding: 0 24px;
+                line-height: 1.7;
+            }
+            h1 {
+                font-size: 2.4rem;
+            }
+            h2 {
+                margin-top: 32px;
+                font-size: 1.3rem;
+                color: #7dd3fc;
+            }
+            p {
+                color: #c4c4cc;
+            }
+            code {
+                background: #16161a;
+                border: 1px solid #26262c;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 0.9em;
+            }
+            pre {
+                background: #16161a;
+                border: 1px solid #26262c;
+                padding: 16px;
+                border-radius: 8px;
+                overflow-x: auto;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <h1>VFX-JS Gallery</h1>
+            <p>
+                This gallery is a flat collection of standalone HTML pages
+                used for manual review and visual regression testing of
+                <code>@vfx-js/core</code>.
+            </p>
+
+            <h2>Layout</h2>
+            <p>
+                Pages live under <code>pages/&lt;kind&gt;/</code>. The
+                top-level directory determines how the page is treated:
+            </p>
+            <ul>
+                <li>
+                    <code>pages/test/</code> — visual regression targets;
+                    Playwright walks every HTML file here.
+                </li>
+                <li>
+                    <code>pages/tutorial/</code> — onboarding / how-to
+                    pages, not asserted.
+                </li>
+                <li>
+                    <code>pages/demo/</code> — technical demos, not
+                    asserted.
+                </li>
+            </ul>
+
+            <h2>Per-page scenarios</h2>
+            <p>
+                A page may have a sibling <code>*.scenario.ts</code> file
+                that describes how to drive it (viewport, interactions,
+                multiple shots, etc.):
+            </p>
+            <pre><code>// pages/test/foo.scenario.ts
+import { defineScenario } from "../../src/runner/scenario";
+
+export default defineScenario([
+    { title: "desktop", viewport: { width: 1280, height: 720 } },
+    { title: "mobile",  viewport: { width:  375, height: 667 } },
+]);</code></pre>
+            <p>
+                Pages without a scenario file fall back to a default
+                (1280x720, one viewport screenshot, waits for
+                <code>window.__galleryReady === true</code>).
+            </p>
+        </main>
+    </body>
+</html>

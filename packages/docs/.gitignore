@@ -17,3 +17,6 @@ typedoc/
 
 # Storybook static build
 storybook/
+
+# Gallery static build
+gallery/

@@ -1,0 +1,44 @@
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Quirks mode box-sizing</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 40px;
+                background: #0b0b0d;
+                color: #e8e8ea;
+                font-family: system-ui, sans-serif;
+            }
+            /*
+             * In quirks mode, width/height include padding+border (the old
+             * IE box model). A 300x200 box with 20px padding renders at
+             * exactly 300x200 instead of 340x240 as in standards mode.
+             */
+            .box {
+                width: 300px;
+                height: 200px;
+                padding: 20px;
+                border: 2px solid #7dd3fc;
+                background: #16161a;
+                margin-bottom: 16px;
+            }
+            .label {
+                font-size: 1.25rem;
+                color: #7dd3fc;
+            }
+        </style>
+    </head>
+    <body>
+        <p class="label">
+            <code>document.compatMode</code> =
+            <strong id="mode">?</strong>
+        </p>
+        <div class="box" id="a">300x200 + 20px padding</div>
+        <script>
+            document.getElementById("mode").textContent =
+                document.compatMode;
+            window.__galleryReady = true;
+        </script>
+    </body>
+</html>

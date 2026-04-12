@@ -1,0 +1,11 @@
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #0b0b0d;
+    color: #e8e8ea;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
