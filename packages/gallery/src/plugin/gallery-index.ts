@@ -4,106 +4,100 @@ import fg from "fast-glob";
 import type { Plugin } from "vite";
 
 /**
- * Vite plugin that auto-generates the gallery landing page by scanning
- * `pages/**\/*.html`, grouping by top-level directory (test / tutorial / demo),
- * and replacing a `<!-- GALLERY_INDEX -->` marker in the root `index.html`.
+ * Vite plugin that scans `pages/**\/*.html` and `public/__screenshots__/**`,
+ * then injects a JSON manifest into the gallery viewer's `index.html` via
+ * the `<!-- GALLERY_MANIFEST -->` marker.
  *
- * The marker is processed via `transformIndexHtml`, so the list stays fresh
- * on every dev-server request and every production build without a separate
- * codegen step. Adding a new page is just "drop an HTML file in pages/".
+ * The viewer (`src/viewer/main.ts`) reads the manifest from a
+ * `<script id="manifest-data" type="application/json">` element and renders
+ * the interactive grid client-side. Adding or removing a page / snapshot
+ * is always a pure file-system operation — no registry to update.
  */
-interface GalleryPage {
-    urlPath: string;
-    kind: string;
-    title: string;
-    hasScenario: boolean;
+
+interface Snapshot {
+    /** URL path, e.g. `/__screenshots__/chromium/test_backbuffer-basic__0__viewport.png`. */
+    url: string;
+    /** Base filename for display. */
+    filename: string;
+    /** Playwright project name parsed from the path, if discoverable. */
+    project: string | null;
 }
 
-function scan(root: string): GalleryPage[] {
-    const files = fg.sync("pages/**/*.html", { cwd: root }).sort();
-    return files.map((rel) => {
+interface GalleryPage {
+    /** e.g. `test/backbuffer-basic`. */
+    id: string;
+    /** URL path of the HTML file, e.g. `pages/test/backbuffer-basic.html`. */
+    urlPath: string;
+    /** Top-level bucket: test | tutorial | demo | ... */
+    kind: string;
+    /** Extracted <title>. */
+    title: string;
+    /** True if a sibling `*.scenario.ts` exists. */
+    hasScenario: boolean;
+    /** Baseline screenshots matched to this page, sorted by filename. */
+    snapshots: Snapshot[];
+}
+
+interface Manifest {
+    generatedAt: string;
+    pages: GalleryPage[];
+}
+
+/** Playwright encodes `id` into snapshot filenames by replacing `/` with `_`. */
+function safeId(id: string): string {
+    return id.replace(/\//g, "_");
+}
+
+function scan(root: string): Manifest {
+    const htmlFiles = fg.sync("pages/**/*.html", { cwd: root }).sort();
+    const snapshotFiles = fg
+        .sync("public/__screenshots__/**/*.png", { cwd: root })
+        .sort();
+
+    const pages: GalleryPage[] = htmlFiles.map((rel) => {
         const posix = rel.split(path.sep).join("/");
+        const id = posix.replace(/^pages\//, "").replace(/\.html$/, "");
         const parts = posix.split("/");
         const kind = parts[1] ?? "other";
         const abs = path.join(root, rel);
         const html = fs.readFileSync(abs, "utf8");
-        const m = /<title>([^<]*)<\/title>/i.exec(html);
-        const title = m?.[1]?.trim() || posix;
+        const match = /<title>([^<]*)<\/title>/i.exec(html);
+        const title = match?.[1]?.trim() || posix;
         const scenarioPath = abs.replace(/\.html$/, ".scenario.ts");
+        const prefix = `${safeId(id)}__`;
+        const snapshots: Snapshot[] = snapshotFiles
+            .filter((s) => path.basename(s).startsWith(prefix))
+            .map((s) => {
+                // strip "public/" → serve as absolute URL path
+                const urlPath = `/${s.split(path.sep).slice(1).join("/")}`;
+                const segments = s.split(path.sep);
+                // public/__screenshots__/<project>/<file>
+                const project = segments.length >= 4 ? segments[2] : null;
+                return {
+                    url: urlPath,
+                    filename: path.basename(s),
+                    project: project ?? null,
+                };
+            });
         return {
+            id,
             urlPath: posix,
             kind,
             title,
             hasScenario: fs.existsSync(scenarioPath),
+            snapshots,
         };
     });
-}
 
-function escapeHtml(s: string): string {
-    return s.replace(/[&<>"']/g, (c) => {
-        switch (c) {
-            case "&":
-                return "&amp;";
-            case "<":
-                return "&lt;";
-            case ">":
-                return "&gt;";
-            case '"':
-                return "&quot;";
-            default:
-                return "&#39;";
-        }
-    });
-}
-
-/** Stable ordering of the top-level kinds when rendering the index. */
-const KIND_ORDER = ["test", "tutorial", "demo"];
-
-function kindRank(kind: string): number {
-    const i = KIND_ORDER.indexOf(kind);
-    return i === -1 ? KIND_ORDER.length : i;
-}
-
-function renderIndex(pages: GalleryPage[]): string {
-    const groups = new Map<string, GalleryPage[]>();
-    for (const p of pages) {
-        const bucket = groups.get(p.kind) ?? [];
-        bucket.push(p);
-        groups.set(p.kind, bucket);
-    }
-    const kinds = [...groups.keys()].sort(
-        (a, b) => kindRank(a) - kindRank(b) || a.localeCompare(b),
-    );
-
-    const parts: string[] = [];
-    parts.push(`<p class="summary">${pages.length} pages</p>`);
-    for (const kind of kinds) {
-        const items = groups.get(kind) ?? [];
-        parts.push(
-            `<section data-kind="${escapeHtml(kind)}">`,
-            `<h2>${escapeHtml(kind)} <span class="count">${items.length}</span></h2>`,
-            "<ul>",
-        );
-        for (const p of items) {
-            const badge = p.hasScenario
-                ? ' <span class="badge" title="has scenario file">scenario</span>'
-                : "";
-            parts.push(
-                "<li>",
-                `<a href="/${escapeHtml(p.urlPath)}">${escapeHtml(p.title)}</a>`,
-                badge,
-                ` <code>${escapeHtml(p.urlPath)}</code>`,
-                "</li>",
-            );
-        }
-        parts.push("</ul></section>");
-    }
-    return parts.join("\n");
+    return {
+        generatedAt: new Date().toISOString(),
+        pages,
+    };
 }
 
 export function galleryIndex(): Plugin {
     let root = "";
-    const MARKER = "<!-- GALLERY_INDEX -->";
+    const MARKER = "<!-- GALLERY_MANIFEST -->";
 
     return {
         name: "vfx-js:gallery-index",
@@ -111,17 +105,24 @@ export function galleryIndex(): Plugin {
             root = config.root;
         },
         configureServer(server) {
-            // Watch the pages dir so that adding/removing HTML files triggers
-            // a full reload (re-scan happens in transformIndexHtml).
+            // Watch pages/ and the snapshot dir so that adding/removing
+            // files triggers a full reload (re-scan happens when the
+            // viewer re-requests index.html).
             const pagesDir = path.join(root, "pages");
+            const snapsDir = path.join(root, "public", "__screenshots__");
             server.watcher.add(pagesDir);
+            server.watcher.add(snapsDir);
             const handler = (file: string) => {
-                if (file.startsWith(pagesDir) && file.endsWith(".html")) {
+                if (
+                    (file.startsWith(pagesDir) && file.endsWith(".html")) ||
+                    (file.startsWith(snapsDir) && file.endsWith(".png"))
+                ) {
                     server.ws.send({ type: "full-reload", path: "*" });
                 }
             };
             server.watcher.on("add", handler);
             server.watcher.on("unlink", handler);
+            server.watcher.on("change", handler);
         },
         transformIndexHtml: {
             order: "pre",
@@ -129,8 +130,14 @@ export function galleryIndex(): Plugin {
                 const indexPath = path.join(root, "index.html");
                 if (!ctx.filename) return html;
                 if (path.resolve(ctx.filename) !== indexPath) return html;
-                const pages = scan(root);
-                return html.replace(MARKER, renderIndex(pages));
+                const manifest = scan(root);
+                // Escape `</script>` inside JSON so it can't break out of the
+                // surrounding <script> element.
+                const json = JSON.stringify(manifest).replace(
+                    /<\/script/gi,
+                    "<\\/script",
+                );
+                return html.replace(MARKER, json);
             },
         },
     };

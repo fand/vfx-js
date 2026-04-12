@@ -16,7 +16,12 @@ const isCI = !!process.env.CI;
 export default defineConfig({
     testDir: "./src/runner",
     testMatch: "**/*.spec.ts",
-    snapshotDir: "./__screenshots__",
+    // Snapshots live under `public/` so that Vite serves them at
+    // `/__screenshots__/...` in both dev and build. That lets the gallery
+    // viewer embed the baseline PNGs next to the live iframes.
+    snapshotDir: "./public/__screenshots__",
+    snapshotPathTemplate:
+        "{snapshotDir}/{projectName}/{arg}{ext}",
     outputDir: "./test-results",
 
     fullyParallel: true,

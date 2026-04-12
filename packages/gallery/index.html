@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
     <head>
         <meta charset="utf-8" />
@@ -6,82 +6,424 @@
         <title>VFX-JS Gallery</title>
         <link rel="stylesheet" href="/preset.css" />
         <style>
+            :root {
+                --bg: #0b0b0d;
+                --bg-soft: #16161a;
+                --bg-hover: #1d1d22;
+                --border: #26262c;
+                --text: #e8e8ea;
+                --text-soft: #a0a0a8;
+                --text-dim: #6b6b73;
+                --test: #7dd3fc;
+                --tutorial: #c4b5fd;
+                --demo: #fcd34d;
+                --other: #94a3b8;
+                --accent: #7dd3fc;
+            }
+            html,
             body {
-                max-width: 900px;
-                margin: 0 auto;
-                padding: 48px 24px 96px;
+                height: 100%;
+                background: var(--bg);
+                color: var(--text);
                 font-family:
                     system-ui, -apple-system, "Segoe UI", sans-serif;
-                line-height: 1.6;
-                color: #e8e8ea;
-                background: #0b0b0d;
             }
-            h1 {
-                font-size: 2.2rem;
-                margin: 0 0 8px;
+            body {
+                display: flex;
+                flex-direction: column;
             }
-            .summary {
-                color: #8a8a92;
-                margin: 0 0 32px;
+
+            .topbar {
+                display: flex;
+                gap: 16px;
+                align-items: center;
+                padding: 14px 24px;
+                background: var(--bg-soft);
+                border-bottom: 1px solid var(--border);
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                flex-wrap: wrap;
             }
-            section {
-                margin: 32px 0;
-                padding: 20px 24px;
-                background: #16161a;
-                border: 1px solid #26262c;
-                border-radius: 10px;
-            }
-            section h2 {
-                margin: 0 0 12px;
+            .topbar h1 {
+                margin: 0;
                 font-size: 1.1rem;
-                text-transform: uppercase;
-                letter-spacing: 0.08em;
-                color: #a0a0a8;
+                letter-spacing: 0.04em;
+                font-weight: 600;
             }
-            section h2 .count {
-                color: #5a5a62;
-                font-size: 0.85em;
+            .topbar h1 .sub {
+                color: var(--text-dim);
+                font-weight: 400;
                 margin-left: 6px;
             }
-            section[data-kind="test"] h2 { color: #7dd3fc; }
-            section[data-kind="tutorial"] h2 { color: #c4b5fd; }
-            section[data-kind="demo"] h2 { color: #fcd34d; }
-            ul { margin: 0; padding: 0; list-style: none; }
-            li {
-                padding: 6px 0;
-                border-bottom: 1px dashed #26262c;
+
+            #search {
+                flex: 1 1 200px;
+                max-width: 320px;
+                padding: 7px 12px;
+                background: var(--bg);
+                color: var(--text);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                font: inherit;
             }
-            li:last-child { border-bottom: none; }
-            a {
-                color: #e8e8ea;
-                text-decoration: none;
-                font-weight: 500;
+            #search:focus {
+                outline: none;
+                border-color: var(--accent);
             }
-            a:hover { color: #7dd3fc; text-decoration: underline; }
-            code {
-                color: #6b6b73;
+
+            #kind-filter {
+                display: flex;
+                gap: 6px;
+            }
+            .kind-tab {
+                background: var(--bg);
+                border: 1px solid var(--border);
+                color: var(--text-soft);
+                padding: 6px 12px;
+                border-radius: 6px;
+                font: inherit;
+                cursor: pointer;
+                text-transform: lowercase;
+            }
+            .kind-tab:hover {
+                background: var(--bg-hover);
+                color: var(--text);
+            }
+            .kind-tab.active {
+                background: var(--accent);
+                color: #0b0b0d;
+                border-color: var(--accent);
+                font-weight: 600;
+            }
+            .kind-tab .count {
+                display: inline-block;
+                margin-left: 4px;
+                font-size: 0.82em;
+                opacity: 0.7;
+            }
+
+            #count {
+                margin-left: auto;
+                color: var(--text-dim);
+                font-variant-numeric: tabular-nums;
+                font-size: 0.9em;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(
+                    auto-fill,
+                    minmax(280px, 1fr)
+                );
+                gap: 16px;
+                padding: 20px 24px 96px;
+            }
+
+            .card {
+                background: var(--bg-soft);
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                overflow: hidden;
+                cursor: pointer;
+                transition:
+                    border-color 0.12s,
+                    transform 0.12s;
+                display: flex;
+                flex-direction: column;
+            }
+            .card:hover,
+            .card:focus-visible {
+                border-color: var(--accent);
+                outline: none;
+            }
+
+            .thumb-wrap {
+                aspect-ratio: 16 / 10;
+                background: #000;
+                display: grid;
+                place-items: center;
+                overflow: hidden;
+            }
+            .thumb {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            }
+            .thumb.placeholder {
+                color: var(--text-dim);
                 font-size: 0.85em;
-                margin-left: 8px;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+            }
+
+            .card-meta {
+                padding: 12px 14px 14px;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            .card-title {
+                margin: 0;
+                font-size: 0.95rem;
+                font-weight: 600;
+                line-height: 1.3;
+                word-break: break-word;
+            }
+            .badges {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                margin-top: 2px;
             }
             .badge {
                 display: inline-block;
                 font-size: 0.7em;
-                padding: 1px 6px;
-                margin-left: 6px;
-                background: #1e3a5f;
-                color: #7dd3fc;
+                padding: 2px 7px;
+                background: var(--bg);
+                border: 1px solid var(--border);
+                color: var(--text-soft);
                 border-radius: 4px;
-                vertical-align: middle;
+                text-transform: lowercase;
+            }
+            .badge.kind-test {
+                border-color: var(--test);
+                color: var(--test);
+            }
+            .badge.kind-tutorial {
+                border-color: var(--tutorial);
+                color: var(--tutorial);
+            }
+            .badge.kind-demo {
+                border-color: var(--demo);
+                color: var(--demo);
+            }
+            .card-path {
+                color: var(--text-dim);
+                font-size: 0.78em;
+                word-break: break-all;
+            }
+
+            .empty {
+                grid-column: 1 / -1;
+                text-align: center;
+                padding: 64px 0;
+                color: var(--text-dim);
+            }
+
+            /* Modal */
+            .modal {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.82);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 24px;
+                z-index: 100;
+            }
+            .modal[hidden] {
+                display: none;
+            }
+            .modal-body {
+                background: var(--bg-soft);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                width: 100%;
+                max-width: 1400px;
+                max-height: 100%;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            .modal-head {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                padding: 12px 18px;
+                border-bottom: 1px solid var(--border);
+            }
+            .modal-head h2 {
+                margin: 0;
+                font-size: 1rem;
+                font-weight: 600;
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .modal-head a {
+                color: var(--accent);
+                text-decoration: none;
+                font-size: 0.85em;
+            }
+            .modal-head a:hover {
+                text-decoration: underline;
+            }
+            .modal-close {
+                background: none;
+                border: none;
+                color: var(--text-soft);
+                font-size: 1.5rem;
+                cursor: pointer;
+                line-height: 1;
+                padding: 0 4px;
+            }
+            .modal-close:hover {
+                color: var(--text);
+            }
+
+            .modal-tabs {
+                display: flex;
+                gap: 2px;
+                padding: 8px 18px 0;
+                border-bottom: 1px solid var(--border);
+            }
+            .modal-tab {
+                background: none;
+                border: none;
+                color: var(--text-soft);
+                padding: 8px 14px;
+                font: inherit;
+                cursor: pointer;
+                border-bottom: 2px solid transparent;
+                margin-bottom: -1px;
+            }
+            .modal-tab:hover {
+                color: var(--text);
+            }
+            .modal-tab.active {
+                color: var(--accent);
+                border-bottom-color: var(--accent);
+            }
+
+            .modal-content {
+                flex: 1;
+                min-height: 0;
+                overflow: auto;
+            }
+            .modal-pane {
+                height: 100%;
+                min-height: 480px;
+            }
+            .modal-pane[hidden] {
+                display: none;
+            }
+            #modal-frame {
+                width: 100%;
+                height: 100%;
+                min-height: 480px;
+                border: none;
+                background: #000;
+            }
+            .snap-strip {
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                padding: 16px;
+            }
+            .snap-strip figure {
+                margin: 0;
+                background: #000;
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                overflow: hidden;
+            }
+            .snap-strip img {
+                display: block;
+                width: 100%;
+                height: auto;
+            }
+            .snap-strip figcaption {
+                padding: 8px 12px;
+                font-size: 0.8em;
+                color: var(--text-dim);
+                border-top: 1px solid var(--border);
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            }
+            .no-snap {
+                padding: 32px;
+                text-align: center;
+                color: var(--text-dim);
             }
         </style>
     </head>
     <body>
-        <h1>VFX-JS Gallery</h1>
-        <p>
-            Visual regression targets, tutorials, and technical demos for
-            <code>@vfx-js/core</code>. Pages under
-            <code>pages/test/</code> are driven by Playwright.
-        </p>
-        <!-- GALLERY_INDEX -->
+        <header class="topbar">
+            <h1>
+                VFX-JS Gallery
+                <span class="sub">visual regression + demos</span>
+            </h1>
+            <input
+                id="search"
+                type="search"
+                placeholder="Filter by name or path…"
+                autocomplete="off"
+            />
+            <div id="kind-filter"></div>
+            <div id="count"></div>
+        </header>
+
+        <main id="grid" class="grid"></main>
+
+        <div id="modal" class="modal" hidden>
+            <div class="modal-body">
+                <header class="modal-head">
+                    <h2 id="modal-title"></h2>
+                    <a
+                        id="modal-link"
+                        target="_blank"
+                        rel="noopener"
+                        href="#"
+                        >open ↗</a
+                    >
+                    <button
+                        id="modal-close"
+                        class="modal-close"
+                        aria-label="Close"
+                    >
+                        ×
+                    </button>
+                </header>
+                <div id="modal-tabs" class="modal-tabs">
+                    <button class="modal-tab active" data-pane="live">
+                        live
+                    </button>
+                    <button class="modal-tab" data-pane="snaps">
+                        baselines <span id="modal-snap-count"></span>
+                    </button>
+                </div>
+                <div class="modal-content">
+                    <div
+                        id="modal-pane-live"
+                        class="modal-pane"
+                        data-pane="live"
+                    >
+                        <iframe
+                            id="modal-frame"
+                            src="about:blank"
+                            title="live page"
+                        ></iframe>
+                    </div>
+                    <div
+                        id="modal-pane-snaps"
+                        class="modal-pane"
+                        data-pane="snaps"
+                        hidden
+                    ></div>
+                </div>
+            </div>
+        </div>
+
+        <!--
+            The gallery-index Vite plugin replaces the marker below with the
+            serialized manifest. The viewer script reads it from this element.
+        -->
+        <script id="manifest-data" type="application/json">
+<!-- GALLERY_MANIFEST -->
+        </script>
+        <script type="module" src="/src/viewer/main.ts"></script>
     </body>
 </html>
