@@ -126,23 +126,12 @@ export const Fallback: StoryObj = {
     },
 };
 
-// ---------- Bug demonstration stories ----------
-
-/** BUG: wrapElement forces width:100% regardless of element's intrinsic width.
- *  Uses solidShader (ignores texture alpha) to expose actual canvas bounds. */
-export const BugFixedWidth: StoryObj = {
-    name: "Bug: width:100% override (issues 1, 2)",
+export const CanvasSizeFixed: StoryObj = {
     render: () => {
         fullscreenRoot();
         const container = document.createElement("div");
         container.style.cssText =
-            "padding:96px 64px 64px; font-family:sans-serif; color:white";
-
-        // 800px parent — intentionally not flex
-        const parent = document.createElement("div");
-        parent.style.cssText =
-            "width:800px; border:1px dashed #888; padding:16px";
-        container.appendChild(parent);
+            "margin: 96px 16px; font-family:sans-serif; color:white;";
 
         const boxCss =
             "width:300px; height:80px; background:linear-gradient(90deg,#284,#28a); display:flex; align-items:center; justify-content:center; font-weight:bold; margin-bottom:32px";
@@ -150,31 +139,28 @@ export const BugFixedWidth: StoryObj = {
         const ref = document.createElement("div");
         ref.style.cssText = boxCss;
         ref.textContent = "REFERENCE 300×80";
-        parent.appendChild(ref);
+        container.appendChild(ref);
 
         const target = document.createElement("div");
-        target.id = "bug-fixed-width-target";
+        target.id = "fixed-width-target";
         target.style.cssText = boxCss;
         target.textContent = "WITH addHTML";
-        parent.appendChild(target);
+        container.appendChild(target);
 
         return container;
     },
     play: async ({ canvasElement }) => {
         await new Promise((r) => requestAnimationFrame(r));
-        setupHIC(qs(canvasElement, "#bug-fixed-width-target"), solidShader);
+        setupHIC(qs(canvasElement, "#fixed-width-target"), solidShader);
     },
 };
 
-/** BUG: ResizeObserver uses contentRect (content-box) but initial canvas height
- *  comes from getBoundingClientRect (border-box). Canvas shrinks by padding+border. */
-export const BugChildWithPadding: StoryObj = {
-    name: "Bug: padding shrinks via contentRect (issue 3)",
+export const CanvasSizeWithPadding: StoryObj = {
     render: () => {
         fullscreenRoot();
         const container = document.createElement("div");
         container.style.cssText =
-            "padding:96px 64px 64px; font-family:sans-serif; color:white";
+            "margin: 96px 16px; font-family:sans-serif; color:white";
 
         const boxCss =
             "width:400px; padding:30px; border:5px solid #f44; background:linear-gradient(180deg,#284,#28a); font-size:1.4rem; line-height:1.6; font-weight:bold; margin-bottom:32px";
@@ -185,7 +171,7 @@ export const BugChildWithPadding: StoryObj = {
         container.appendChild(ref);
 
         const target = document.createElement("div");
-        target.id = "bug-padding-target";
+        target.id = "padding-target";
         target.style.cssText = boxCss;
         target.textContent = "WITH addHTML (same size expected)";
         container.appendChild(target);
@@ -195,22 +181,19 @@ export const BugChildWithPadding: StoryObj = {
     play: async ({ canvasElement }) => {
         await new Promise((r) => requestAnimationFrame(r));
         const shader = solidShader.replace("uv.xyx", "uv.yxy");
-        setupHIC(qs(canvasElement, "#bug-padding-target"), shader);
+        setupHIC(qs(canvasElement, "#padding-target"), shader);
     },
 };
 
-/** BUG: hic re-capture only fires on window.resize. DOM mutations (text, images)
- *  leave texture stale until manual vfx.update(). */
-export const BugContentReflow: StoryObj = {
-    name: "Bug: no auto re-capture on content change (issue 4)",
+export const CanvasSizeWithReflow: StoryObj = {
     render: () => {
         fullscreenRoot();
         const container = document.createElement("div");
         container.style.cssText =
-            "padding:96px 64px 64px; font-family:sans-serif; color:white";
+            "margin: 96px 16px; font-family:sans-serif; color:white";
 
         const target = document.createElement("div");
-        target.id = "bug-reflow-target";
+        target.id = "reflow-target";
         target.style.cssText =
             "font-size:1.4rem; line-height:1.6; padding:16px; border:2px solid #888; max-width:600px";
         target.textContent = "Initial text";
@@ -221,8 +204,8 @@ export const BugContentReflow: StoryObj = {
         container.appendChild(buttons);
 
         for (const [id, label] of [
-            ["bug-reflow-change", "Change DOM text"],
-            ["bug-reflow-update", "Manual vfx.update()"],
+            ["reflow-change", "Change DOM text"],
+            ["reflow-update", "Manual vfx.update()"],
         ] as const) {
             const btn = document.createElement("button");
             btn.id = id;
@@ -235,9 +218,9 @@ export const BugContentReflow: StoryObj = {
     },
     play: async ({ canvasElement }) => {
         await new Promise((r) => requestAnimationFrame(r));
-        const target = qs<HTMLElement>(canvasElement, "#bug-reflow-target");
-        const btnChange = qs<HTMLElement>(canvasElement, "#bug-reflow-change");
-        const btnUpdate = qs<HTMLElement>(canvasElement, "#bug-reflow-update");
+        const target = qs<HTMLElement>(canvasElement, "#reflow-target");
+        const btnChange = qs<HTMLElement>(canvasElement, "#reflow-change");
+        const btnUpdate = qs<HTMLElement>(canvasElement, "#reflow-update");
 
         const vfx = setupHIC(target);
 
