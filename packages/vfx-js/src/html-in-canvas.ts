@@ -114,9 +114,8 @@ const savedMargins = new WeakMap<HTMLElement, string>();
 const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
 
 /**
- * Set up onpaint handler + ResizeObserver on a layoutsubtree canvas.
- * drawElementImage is called inside onpaint (spec-compliant: uses "current
- * frame" snapshot). Returns the initial OffscreenCanvas from the first onpaint.
+ * Set up onpaint handler + ResizeObservers on a layoutsubtree canvas.
+ * Returns the initial OffscreenCanvas from the first onpaint.
  */
 export async function setupCapture(
     canvas: HTMLCanvasElement,
@@ -141,7 +140,6 @@ export async function setupCapture(
             return;
         }
 
-        // drawElementImage inside onpaint → "current frame" snapshot
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawElementImage(child, 0, 0);
 
@@ -163,8 +161,7 @@ export async function setupCapture(
         offCtx.clearRect(0, 0, w, h);
         offCtx.drawImage(canvas, 0, 0, w, h);
 
-        // Clear canvas so wrapper appears empty
-        // (VFXPlayer's WebGL canvas renders the shader version)
+        // Clear so VFXPlayer's WebGL canvas renders the shader version
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (resolveFirst) {
@@ -175,7 +172,7 @@ export async function setupCapture(
         onCapture(offscreen);
     };
 
-    // Canvas RO: pixel buffer sync + re-capture trigger
+    // Pixel buffer sync + re-capture on resize
     const canvasRO = new ResizeObserver((entries) => {
         for (const entry of entries) {
             const dpSize = entry.devicePixelContentBoxSize?.[0];
@@ -196,9 +193,7 @@ export async function setupCapture(
     canvasRO.observe(canvas, { box: "device-pixel-content-box" });
     canvasResizeObservers.set(canvas, canvasRO);
 
-    // Canvas is a replaced element — doesn't auto-fit height to children.
-    // Sync CSS height from the child so the canvas RO gets correct dimensions.
-    // Round + guard to prevent sub-pixel oscillation.
+    // Sync CSS height from child (canvas doesn't auto-fit to children).
     const child = canvas.firstElementChild as HTMLElement | null;
     let lastChildHeight = "";
     if (child) {
@@ -250,7 +245,7 @@ interface WrapResult {
  * NOT auto-fit height to children, even with `layoutsubtree`. A child RO
  * in `setupCapture` keeps the CSS height in sync with the child.
  *
- * Delegates onpaint + RO to `setupCapture`.
+ * Delegates onpaint + ROs to `setupCapture`.
  */
 export async function wrapElement(
     element: HTMLElement,
@@ -261,19 +256,18 @@ export async function wrapElement(
     const canvas = document.createElement("canvas");
     canvas.setAttribute("layoutsubtree", "");
 
-    // --- 1. Copy CSS identity ---
+    // Copy CSS identity
     canvas.className = element.className;
     const styleAttr = element.getAttribute("style");
     if (styleAttr) {
         canvas.setAttribute("style", styleAttr);
     }
 
-    // --- 2. Canvas-specific overrides (literal values, safe for detached) ---
     canvas.style.setProperty("padding", "0");
     canvas.style.setProperty("border", "none");
     canvas.style.setProperty("box-sizing", "content-box");
 
-    // --- 3. Computed-style overrides ---
+    // Computed-style overrides
     const cs = getComputedStyle(element);
 
     const display = cs.display === "inline" ? "block" : cs.display;
@@ -286,10 +280,8 @@ export async function wrapElement(
         canvas.style.setProperty(prop, cs.getPropertyValue(prop));
     }
 
-    // --- 4. Padding/border compensation ---
-    // Canvas has padding:0 border:none, so its content-box must equal the
-    // element's border-box. When the element has padding/border, override
-    // the copied width with the measured border-box value.
+    // Padding/border compensation:
+    // Canvas content-box must equal element's border-box.
     const pf = (v: string) => Number.parseFloat(v);
     const paddingH =
         pf(cs.paddingLeft) +
@@ -309,35 +301,30 @@ export async function wrapElement(
         canvas.style.setProperty("height", `${rect.height}px`);
     }
 
-    // Fallback: if no explicit CSS width was set (no inline, no class, no
-    // compensation), canvas would use its intrinsic size (canvas.width attr),
-    // creating a feedback loop with the RO. Set 100% to act as a block.
+    // Prevent intrinsic-size feedback loop with ResizeObserver.
     if (!canvas.style.width) {
         canvas.style.setProperty("width", "100%");
     }
-    // Canvas is a replaced element — without explicit height it derives
-    // height from the pixel-buffer aspect ratio, not from children.
-    // Always set initial CSS height from the element's measured height.
+    // Replaced element — height doesn't derive from children.
     if (!canvas.style.height) {
         canvas.style.setProperty("height", `${rect.height}px`);
     }
 
-    // --- 5. Pixel buffer (may be 0 — setupCapture's RO corrects) ---
+    // Pixel buffer (may be 0 — setupCapture's RO corrects)
     const dpr = window.devicePixelRatio;
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
 
-    // --- 6. DOM swap ---
+    // DOM swap
     savedMargins.set(element, element.style.margin);
     element.parentNode?.insertBefore(canvas, element);
     canvas.appendChild(element);
     element.style.setProperty("margin", "0");
 
-    // --- 7. Cross-origin images ---
+    // Cross-origin images
     const restore = await inlineCrossOriginImages(element);
     imageRestorers.set(canvas, restore);
 
-    // --- 8. onpaint + RO via setupCapture ---
     const initialCapture = await setupCapture(canvas, opts);
 
     return { canvas, initialCapture };
