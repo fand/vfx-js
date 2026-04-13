@@ -1,0 +1,512 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Liquid Glass Pro</title>
+
+<style>
+  :root {
+    --bg: #fbfbfd;
+    --bg-dark: #000;
+    --fg: #1d1d1f;
+    --fg-dark: #f5f5f7;
+    --muted: #6e6e73;
+    --link: #0066cc;
+  }
+
+  html,
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+      "SF Pro Text", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Nav */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(251, 251, 253, 0.8);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  nav ul {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin: 0;
+    padding: 0 24px;
+    list-style: none;
+    height: 44px;
+    align-items: center;
+    font-size: 0.82rem;
+    color: var(--fg);
+  }
+  nav ul li a {
+    color: inherit;
+    text-decoration: none;
+    opacity: 0.85;
+  }
+  nav ul li a:hover {
+    opacity: 1;
+  }
+
+  /* Hero */
+  .hero {
+    position: relative;
+    text-align: center;
+    padding: 0;
+    background: var(--bg);
+  }
+  .hero .stage {
+    width: 100%;
+    margin: 0;
+  }
+  .hero .stage img {
+    width: 100%;
+    display: block;
+  }
+  .hero .copy {
+    position: absolute;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+  .hero h1 {
+    font-size: 4.2rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    margin: 0 0 8px;
+  }
+  .hero h2 {
+    font-size: 1.7rem;
+    font-weight: 400;
+    margin: 0 0 18px;
+    color: var(--fg);
+  }
+  .hero .links {
+    font-size: 1.2rem;
+    color: var(--link);
+  }
+  .hero .links a {
+    color: inherit;
+    text-decoration: none;
+    margin: 0 12px;
+  }
+  .hero .links a:hover {
+    text-decoration: underline;
+  }
+
+  /* Tile grid */
+  .tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 12px;
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+  .tile {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+    background: #1a1a1a;
+    isolation: isolate;
+  }
+  .tile.full {
+    grid-column: 1 / -1;
+    aspect-ratio: 16 / 9;
+  }
+  .tile img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+  }
+  .tile .copy {
+    position: relative;
+    z-index: 1;
+    padding: 56px 24px 0;
+    text-align: center;
+  }
+  .tile .eyebrow {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 12px;
+    opacity: 0.85;
+  }
+  .tile h3 {
+    font-size: 3rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0 0 10px;
+  }
+  .tile p {
+    font-size: 1.25rem;
+    margin: 0 0 18px;
+    opacity: 0.92;
+  }
+  .tile .actions {
+    font-size: 1.05rem;
+  }
+  .tile .actions a {
+    color: var(--link);
+    text-decoration: none;
+    margin: 0 10px;
+  }
+  .tile .actions a:hover {
+    text-decoration: underline;
+  }
+  .tile.dark .copy {
+    color: var(--fg-dark);
+  }
+  .tile.dark .actions a {
+    color: #2997ff;
+  }
+  .tile.light .copy {
+    color: var(--fg);
+  }
+
+  /* Footer */
+  footer {
+    padding: 48px 24px 96px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.78rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin-top: 24px;
+  }
+</style>
+
+<div id="app">
+  <nav>
+    <ul>
+      <li><a href="#">GitHub</a></li>
+    </ul>
+  </nav>
+
+  <section class="hero">
+    <div class="stage">
+      <img
+        src="https://images.unsplash.com/photo-1512054502232-10a0a035d672?w=1600&h=900&fit=crop"
+        alt="xdLXPic3Wfk"
+      />
+    </div>
+    <div class="copy">
+      <h1>Liquid Glass Pro</h1>
+      <h2>A new way to look at the web.</h2>
+      <p class="links">
+        <a href="https://amagi.dev/vfx-js/" target="_blank">Learn more &gt;</a>
+      </p>
+    </div>
+  </section>
+
+  <section class="tiles">
+    <div class="tile dark full">
+      <img
+        src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&h=900&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">New</p>
+        <h3>Aurora Pro</h3>
+        <p>Built for the way light moves.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="tile light">
+      <img
+        src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1000&h=1250&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">iPhone</p>
+        <h3>Skyline</h3>
+        <p>Snap the city without lifting a finger.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+          <a href="#">Buy &gt;</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="tile dark">
+      <img
+        src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1000&h=1250&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">Mac</p>
+        <h3>Brewed In</h3>
+        <p>Espresso-grade silicon. All-day battery.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+          <a href="#">Buy &gt;</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="tile light">
+      <img
+        src="https://images.unsplash.com/photo-1448375240586-882707db888b?w=1000&h=1250&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">Watch</p>
+        <h3>Wander</h3>
+        <p>Track every step, even off the path.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+          <a href="#">Buy &gt;</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="tile dark">
+      <img
+        src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1000&h=1250&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">Vision</p>
+        <h3>Mirror Lake</h3>
+        <p>A window where your screen used to be.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+          <a href="#">Buy &gt;</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="tile light full">
+      <img
+        src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=1600&h=900&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">AirPods</p>
+        <h3>Open Sky</h3>
+        <p>Sound that floats above everything.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+          <a href="#">Buy &gt;</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer>vfx-js liquid glass post-effect demo</footer>
+</div>
+
+<script type="module">
+  import { VFX } from "@vfx-js/core";
+
+  const postEffectShader = `
+    precision highp float;
+    uniform sampler2D src;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform vec2 mouse;
+    uniform float time;
+    out vec4 outColor;
+
+    const float SPHERE_R = 0.1;
+    const float DISP = 0.015;
+
+    const int   DISP_STEPS = 32;
+    const float DISP_LO = 0.2;
+    const float DISP_HI = 1.0;
+
+    // Beer–Lambert absorption per channel (units: 1/world-distance).
+    // Higher = more absorbed → that channel transmits less light.
+    // R/G/B mismatch tints the glass; equal values give neutral darkening.
+    const vec3  ABSORB  = vec3(2.0, 1.2, 1.0);
+
+    mat2 rot(float t) {
+      float c = cos(t), s = sin(t);
+      return mat2(c, -s, s, c);
+    }
+
+    float sdSphere(vec3 p, float r) {
+      return length(p) - r;
+    }
+
+    float sdRing(vec3 p, vec2 r) {
+      float s = length(p.xy) - r.x;
+      return length(vec2(s, p.z)) - r.y;
+    }
+
+    float sdBox(vec3 p, vec3 b, float r){
+      vec3 q = abs(p) - b + r;
+      return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
+    }
+
+    float sdCappedCone(vec3 p, float h, float r1, float r2) {
+      vec2 q = vec2(length(p.xz), p.y);
+      vec2 k1 = vec2(r2, h);
+      vec2 k2 = vec2(r2 - r1, 2.0 * h);
+      vec2 ca = vec2(q.x - min(q.x, (q.y < 0.0) ? r1 : r2), abs(q.y) - h);
+      vec2 cb = q - k1 + k2 * clamp(dot(k1 - q, k2) / dot(k2, k2), 0.0, 1.0);
+      float s = (cb.x < 0.0 && ca.y < 0.0) ? -1.0 : 1.0;
+      return s * sqrt(min(dot(ca, ca), dot(cb, cb)));
+    }
+
+    float sdCup(vec3 p, float rBot, float rTop, float h, float thickness) {
+      float outer = sdCappedCone(p, h, rBot, rTop);
+      float inner = sdCappedCone(p - vec3(0.0, thickness, 0.0),
+                                 h, rBot - thickness, rTop - thickness);
+      return max(outer, -inner);
+    }
+
+    float map(vec3 p, vec3 c) {
+      p -= c;
+
+      // p.x += sin(p.y * 59. + time * 3.) * 0.0023;
+      // p.y += sin(p.x * 67. + time * 4.) * 0.0027;
+      // p.x += sin(p.y * 78. + time * 3.6) * 0.0013;
+      // p.y += sin(p.x * 17. + time * 4.5) * 0.0011;
+      // p.x += sin(p.y * 113. + time * 3.6) * 0.0003;
+      p.y += sin(p.z * 131. + time * 4.5) * 0.0007;
+      p.z += sin(p.x * 7. + p.y * 11. + time * 7.) * 0.002;
+
+      p.xy *= rot(time * 0.7);
+      p.xz *= rot(time * 0.9);
+      p.yz *= rot(0.4);
+
+      //return sdSphere(p, SPHERE_R);
+      //return sdRing(p, vec2(0.15, 0.04));
+      return sdBox(p, vec3(0.08), 0.01);
+      //return sdCup(p, 0.08, 0.12, 0.13, 0.005) - 0.001;
+    }
+
+    // 6-tap gradient normal.
+    vec3 calcNormal(vec3 p, vec3 c) {
+      vec2 e = vec2(0.001, 0.0);
+      return normalize(vec3(
+        map(p + e.xyy, c) - map(p - e.xyy, c),
+        map(p + e.yxy, c) - map(p - e.yxy, c),
+        map(p + e.yyx, c) - map(p - e.yyx, c)
+      ));
+    }
+
+    // x ∈ [0,1]: 0 = red, 1 = violet. Sums to ~white over a full sweep.
+    vec3 spectrum(float x) {
+      return clamp(vec3(
+        1.5 - abs(4.0 * x - 1.0),
+        1.5 - abs(4.0 * x - 2.0),
+        1.5 - abs(4.0 * x - 3.0)
+      ), 0.0, 1.0);
+    }
+
+    void main() {
+      vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+      float aspect = resolution.y / resolution.x;
+
+      vec2 p = (uv - 0.5) * vec2(1.0, aspect);
+      vec2 mp = (mouse / resolution - 0.5) * vec2(aspect, 1.0);
+
+      vec3  ro    = vec3(0.0, 0.0, -2.0);
+      float focal = 2.0;
+      vec3  rd    = normalize(vec3(p, focal));
+      vec3  c     = vec3(mp, 0.0);
+
+      const float SURF_EPS = 0.00003;
+      const float KICK     = 0.01;
+      const int   MAX_HITS = 4;
+
+      vec3 firstN = vec3(0.0);
+      vec3 lastN  = vec3(0.0);
+      int  hitCount = 0;
+      // Total in-glass distance (Σ over all entry→exit slabs).
+      float thickness = 0.0;
+      float tEntry    = 0.0;
+      float t = 0.0;
+      bool inside = false;
+      for (int i = 0; i < 80; i++) {
+        if (t > 10.0) break;
+
+        vec3 pos = ro + rd * t;
+        float d = map(pos, c);
+
+        // Distance to nearest surface, always positive regardless of side.
+        float step = inside ? -d : d;
+        if (step < SURF_EPS) {
+          vec3 n = calcNormal(pos, c);
+          if (hitCount == 0) firstN = n;
+          lastN = n;
+          // Sample t at every entry, accumulate (t - tEntry) at every exit.
+          if (!inside) {
+            tEntry = t;
+          } else {
+            thickness += t - tEntry;
+          }
+          hitCount++;
+          if (hitCount >= MAX_HITS) break;
+          inside = !inside;
+          t += KICK;
+        } else {
+          t += step;
+        }
+      }
+
+      if (hitCount > 0) {
+        vec2 baseDisp = -(firstN.xy + lastN.xy) * 0.5 * DISP;
+
+        // dispersion
+        vec3 acc  = vec3(0.0);
+        vec3 wsum = vec3(0.0);
+        for (int i = 0; i < DISP_STEPS; i++) {
+          float wl = float(i) / float(DISP_STEPS - 1);
+          float k  = mix(DISP_LO, DISP_HI, wl) * (1.1 + float(hitCount) * 0.2);
+          vec3 s   = texture(src, uv + baseDisp * k).rgb;
+          vec3 w   = spectrum(wl);
+          acc  += s * w;
+          wsum += w;
+        }
+        vec3 col = acc / wsum * 0.993;
+        col -= float(hitCount) * 0.03;
+
+        // Beer-Lambert: fraction of light that survives crossing thickness
+        // of glass = exp(-σ * d), per channel. Tints + darkens proportional
+        // to how much glass the ray actually traversed (Σ over all slabs).
+        col *= exp(-ABSORB * thickness);
+
+        // Fresnel
+        float fres = pow(1.0 - max(dot(firstN, -rd), 0.0), 5.0);
+        col *= 1. + fres * 0.7;
+
+        // Specular
+        vec3 ldir = normalize(vec3(0.6, 0.8, -0.4));
+        float spec = pow(max(dot(reflect(-ldir, firstN), -rd), 0.0), 100.0);
+        col += vec3(1.0) * spec * 20.;
+
+        vec3 ldir2 = normalize(vec3(-0.7, 0.3, -0.4));
+        spec = pow(max(dot(reflect(-ldir2, firstN), -rd), 0.0), 100.0);
+        col += vec3(1.0) * spec * 20.;
+
+        outColor = vec4(col, 1.0);
+      } else {
+        outColor = texture(src, uv);
+      }
+    }
+    `;
+
+  window.addEventListener("load", async () => {
+    const app = document.getElementById("app");
+    const vfx = new VFX({ postEffect: { shader: postEffectShader } });
+    await vfx.add(app, { shader: "none" });
+    vfx.play();
+  });
+</script>
