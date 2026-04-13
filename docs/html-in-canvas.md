@@ -83,6 +83,12 @@ if (supportsHtmlInCanvas()) { ... }
 
 Falls back to a `<div>` with dom-to-canvas when html-in-canvas is not supported.
 
+## Why not `texElementImage2D`?
+
+The WebGL-level `texElementImage2D` API can bind a DOM element directly as a GPU texture with zero intermediate copies. Three.js's `HTMLTexture` uses this approach. However, it requires the element to be a **child of the WebGL canvas itself** (`layoutsubtree` on the WebGL canvas). VFX-JS's architecture places a separate WebGL overlay canvas over the page, with elements remaining in normal document flow. Moving elements into the WebGL canvas would remove them from flow and make all non-VFX content invisible (since `layoutsubtree` suppresses child painting).
+
+The current approach uses per-element wrapper canvases with `drawElementImage` → OffscreenCanvas → `CanvasTexture`. This preserves document flow at the cost of a GPU→CPU→GPU round-trip per capture.
+
 ## Limitations
 
 - **Chrome Canary only** — requires `requestPaint`/`onpaint` APIs.
