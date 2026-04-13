@@ -9,7 +9,6 @@ import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
-import { captureElement } from "./html-in-canvas.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import {
     MARGIN_ZERO,
@@ -279,7 +278,11 @@ export class VFXPlayer {
         this.#isRenderingToCanvas.set(e.element, false);
     }
 
-    async addElement(element: HTMLElement, opts: VFXProps = {}): Promise<void> {
+    async addElement(
+        element: HTMLElement,
+        opts: VFXProps = {},
+        initialCapture?: OffscreenCanvas,
+    ): Promise<void> {
         // Normalize shader input to VFXPass array
         const inputPasses = this.#normalizePasses(opts);
 
@@ -314,21 +317,8 @@ export class VFXPlayer {
             texture = new THREE.VideoTexture(element);
             type = "video" as VFXElementType;
         } else if (element instanceof HTMLCanvasElement) {
-            if (element.hasAttribute("layoutsubtree")) {
-                // html-in-canvas: capture first child via drawElementImage
-                const target = element.firstElementChild;
-                if (!target) {
-                    throw new Error(
-                        "layoutsubtree canvas must have a child element",
-                    );
-                }
-                const offscreen = await captureElement(
-                    element,
-                    target,
-                    undefined,
-                    this.#renderer.capabilities.maxTextureSize,
-                );
-                texture = new THREE.CanvasTexture(offscreen);
+            if (element.hasAttribute("layoutsubtree") && initialCapture) {
+                texture = new THREE.CanvasTexture(initialCapture);
                 type = "hic" as VFXElementType;
             } else {
                 texture = new THREE.CanvasTexture(element);
@@ -356,7 +346,9 @@ export class VFXPlayer {
         const autoCrop = opts.autoCrop ?? true;
 
         // Hide original element
-        if (opts.overlay === true) {
+        if (type === "hic") {
+            /* onpaint clears the canvas — no need to hide */
+        } else if (opts.overlay === true) {
             /* Overlay mode. Do not hide the element */
         } else if (typeof opts.overlay === "number") {
             element.style.setProperty("opacity", opts.overlay.toString());
@@ -627,34 +619,30 @@ export class VFXPlayer {
         }
     }
 
-    async updateHICElement(canvas: HTMLCanvasElement): Promise<void> {
+    updateHICTexture(
+        canvas: HTMLCanvasElement,
+        offscreen: OffscreenCanvas,
+    ): void {
         const e = this.#elements.find((e) => e.element === canvas);
         if (!e || e.type !== "hic") return;
 
-        const target = canvas.firstElementChild;
-        if (!target) return;
-
         const srcUniform = e.passes[0].uniforms["src"];
         const oldTexture: THREE.CanvasTexture = srcUniform.value;
-        const oldOffscreen: OffscreenCanvas = oldTexture.image;
 
-        const offscreen = await captureElement(
-            canvas,
-            target,
-            oldOffscreen,
-            this.#renderer.capabilities.maxTextureSize,
-        );
-
-        if (offscreen !== oldOffscreen) {
+        if (oldTexture.image === offscreen) {
+            oldTexture.needsUpdate = true;
+        } else {
             const texture = new THREE.CanvasTexture(offscreen);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             srcUniform.value = texture;
             e.srcTexture = texture;
             oldTexture.dispose();
-        } else {
-            oldTexture.needsUpdate = true;
         }
+    }
+
+    get maxTextureSize(): number {
+        return this.#renderer.capabilities.maxTextureSize;
     }
 
     isPlaying(): boolean {

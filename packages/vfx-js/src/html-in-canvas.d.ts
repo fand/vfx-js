@@ -11,4 +11,5 @@ interface CanvasRenderingContext2D {
 
 interface HTMLCanvasElement {
     requestPaint(): void;
+    onpaint: (() => void) | null;
 }

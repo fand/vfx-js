@@ -104,17 +104,18 @@ export class VFX {
         let wrapper = this.#wrapperCanvases.get(element);
         if (wrapper) {
             this.#player.removeElement(wrapper);
-        } else {
-            // onReflow re-captures the texture on subtree or parent reflow.
-            // updateHICElement is a no-op until addElement below registers
-            // the wrapper, so early RO fires are harmless.
-            wrapper = await wrapElement(element, (c) => {
-                void this.#player.updateHICElement(c);
-            });
-            this.#wrapperCanvases.set(element, wrapper);
         }
 
-        await this.#player.addElement(wrapper, hicOpts);
+        const { canvas, initialCapture } = await wrapElement(element, {
+            onCapture: (offscreen) => {
+                this.#player.updateHICTexture(canvas, offscreen);
+            },
+            maxSize: this.#player.maxTextureSize,
+        });
+        wrapper = canvas;
+        this.#wrapperCanvases.set(element, wrapper);
+
+        await this.#player.addElement(wrapper, hicOpts, initialCapture);
     }
 
     /**
@@ -142,12 +143,16 @@ export class VFX {
     async update(element: HTMLElement): Promise<void> {
         const wrapper = this.#wrapperCanvases.get(element);
         if (wrapper) {
-            return this.#player.updateHICElement(wrapper);
+            wrapper.requestPaint();
+            return;
         }
 
         if (element instanceof HTMLCanvasElement) {
             if (element.hasAttribute("layoutsubtree")) {
-                return this.#player.updateHICElement(element);
+                // Direct layoutsubtree canvas (VFXCanvas path).
+                // Transition: will be removed when VFXCanvas uses setupCapture.
+                element.requestPaint();
+                return;
             }
             this.#player.updateCanvasElement(element);
             return;

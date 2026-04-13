@@ -101,25 +101,150 @@ const POSITION_FLOW_STYLES = [
     "grid-area",
 ] as const;
 
-const resizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
+export interface CaptureOpts {
+    onCapture: (offscreen: OffscreenCanvas) => void;
+    maxSize?: number;
+}
+
+const canvasResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
+const childResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
 const savedMargins = new WeakMap<HTMLElement, string>();
 const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
+
+/**
+ * Set up onpaint handler + ResizeObserver on a layoutsubtree canvas.
+ * drawElementImage is called inside onpaint (spec-compliant: uses "current
+ * frame" snapshot). Returns the initial OffscreenCanvas from the first onpaint.
+ */
+export async function setupCapture(
+    canvas: HTMLCanvasElement,
+    opts: CaptureOpts,
+): Promise<OffscreenCanvas> {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+        throw new Error("Failed to get 2d context from layoutsubtree canvas");
+    }
+
+    const { onCapture, maxSize } = opts;
+    let offscreen: OffscreenCanvas | null = null;
+
+    let resolveFirst: ((oc: OffscreenCanvas) => void) | null = null;
+    const firstCapture = new Promise<OffscreenCanvas>((resolve) => {
+        resolveFirst = resolve;
+    });
+
+    canvas.onpaint = () => {
+        const child = canvas.firstElementChild;
+        if (!child || canvas.width === 0 || canvas.height === 0) return;
+
+        // drawElementImage inside onpaint → "current frame" snapshot
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawElementImage(child, 0, 0);
+
+        // Copy to OffscreenCanvas (with maxSize clamp)
+        let w = canvas.width;
+        let h = canvas.height;
+        if (maxSize && (w > maxSize || h > maxSize)) {
+            const s = Math.min(maxSize / w, maxSize / h);
+            w = Math.floor(w * s);
+            h = Math.floor(h * s);
+        }
+        if (!offscreen || offscreen.width !== w || offscreen.height !== h) {
+            offscreen = new OffscreenCanvas(w, h);
+        }
+        const offCtx = offscreen.getContext("2d");
+        if (!offCtx) return;
+        offCtx.clearRect(0, 0, w, h);
+        offCtx.drawImage(canvas, 0, 0, w, h);
+
+        // Clear canvas so wrapper appears empty
+        // (VFXPlayer's WebGL canvas renders the shader version)
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (resolveFirst) {
+            resolveFirst(offscreen);
+            resolveFirst = null;
+            return; // initial capture is returned via promise, skip onCapture
+        }
+        onCapture(offscreen);
+    };
+
+    // Canvas RO: pixel buffer sync + re-capture trigger
+    const canvasRO = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+            const dpSize = entry.devicePixelContentBoxSize?.[0];
+            if (dpSize) {
+                canvas.width = dpSize.inlineSize;
+                canvas.height = dpSize.blockSize;
+            } else {
+                const box = entry.borderBoxSize?.[0];
+                if (box) {
+                    const dpr = window.devicePixelRatio;
+                    canvas.width = Math.round(box.inlineSize * dpr);
+                    canvas.height = Math.round(box.blockSize * dpr);
+                }
+            }
+        }
+        canvas.requestPaint();
+    });
+    canvasRO.observe(canvas, { box: "device-pixel-content-box" });
+    canvasResizeObservers.set(canvas, canvasRO);
+
+    // Child RO: canvas is a replaced element and doesn't auto-fit height
+    // to children. Sync CSS height from the child so the canvas RO gets
+    // the correct dimensions.
+    const child = canvas.firstElementChild as HTMLElement | null;
+    if (child) {
+        const childRO = new ResizeObserver((entries) => {
+            const box = entries[0].borderBoxSize?.[0];
+            if (box) {
+                canvas.style.setProperty("height", `${box.blockSize}px`);
+            }
+            // canvas RO will fire from the CSS height change → pixel buffer + requestPaint
+        });
+        childRO.observe(child);
+        childResizeObservers.set(canvas, childRO);
+    }
+
+    return firstCapture;
+}
+
+/**
+ * Tear down onpaint handler + ResizeObservers set up by setupCapture.
+ */
+export function teardownCapture(canvas: HTMLCanvasElement): void {
+    canvas.onpaint = null;
+    const canvasRO = canvasResizeObservers.get(canvas);
+    if (canvasRO) {
+        canvasRO.disconnect();
+        canvasResizeObservers.delete(canvas);
+    }
+    const childRO = childResizeObservers.get(canvas);
+    if (childRO) {
+        childRO.disconnect();
+        childResizeObservers.delete(canvas);
+    }
+}
+
+interface WrapResult {
+    canvas: HTMLCanvasElement;
+    initialCapture: OffscreenCanvas;
+}
 
 /**
  * Wrap an element in a `<canvas layoutsubtree>` for html-in-canvas capture.
  *
  * CSS identity (class + style) is copied to the canvas so width/height
- * resolve via normal CSS cascade. `layoutsubtree` makes height auto-fit
- * to child content, so no child RO is needed.
+ * resolve via normal CSS cascade. Canvas is a replaced element — it does
+ * NOT auto-fit height to children, even with `layoutsubtree`. A child RO
+ * in `setupCapture` keeps the CSS height in sync with the child.
  *
- * A ResizeObserver on the canvas (`device-pixel-content-box`) keeps the
- * pixel buffer in sync. `onReflow` fires on resize and, if available,
- * on `canvas.onpaint` (child content changes).
+ * Delegates onpaint + RO to `setupCapture`.
  */
 export async function wrapElement(
     element: HTMLElement,
-    onReflow?: (canvas: HTMLCanvasElement) => void,
-): Promise<HTMLCanvasElement> {
+    opts: CaptureOpts,
+): Promise<WrapResult> {
     const rect = element.getBoundingClientRect();
 
     const canvas = document.createElement("canvas");
@@ -179,8 +304,14 @@ export async function wrapElement(
     if (!canvas.style.width) {
         canvas.style.setProperty("width", "100%");
     }
+    // Canvas is a replaced element — without explicit height it derives
+    // height from the pixel-buffer aspect ratio, not from children.
+    // Always set initial CSS height from the element's measured height.
+    if (!canvas.style.height) {
+        canvas.style.setProperty("height", `${rect.height}px`);
+    }
 
-    // --- 5. Pixel buffer (may be 0 — canvas RO / captureElement corrects) ---
+    // --- 5. Pixel buffer (may be 0 — setupCapture's RO corrects) ---
     const dpr = window.devicePixelRatio;
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
@@ -195,33 +326,10 @@ export async function wrapElement(
     const restore = await inlineCrossOriginImages(element);
     imageRestorers.set(canvas, restore);
 
-    // --- 8. Canvas RO (device-pixel-content-box) for pixel buffer sync ---
-    const ro = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-            const dpSize = entry.devicePixelContentBoxSize?.[0];
-            if (dpSize) {
-                canvas.width = dpSize.inlineSize;
-                canvas.height = dpSize.blockSize;
-            } else {
-                const box = entry.borderBoxSize?.[0];
-                if (box) {
-                    canvas.width = Math.round(box.inlineSize * dpr);
-                    canvas.height = Math.round(box.blockSize * dpr);
-                }
-            }
-        }
-        onReflow?.(canvas);
-    });
-    ro.observe(canvas, { box: "device-pixel-content-box" });
-    resizeObservers.set(canvas, ro);
+    // --- 8. onpaint + RO via setupCapture ---
+    const initialCapture = await setupCapture(canvas, opts);
 
-    // --- 9. onpaint (if available) ---
-    if ("onpaint" in canvas) {
-        // biome-ignore lint/suspicious/noExplicitAny: onpaint is not yet in TS lib
-        (canvas as any).onpaint = () => onReflow?.(canvas);
-    }
-
-    return canvas;
+    return { canvas, initialCapture };
 }
 
 /**
@@ -231,11 +339,7 @@ export function unwrapElement(
     canvas: HTMLCanvasElement,
     element: HTMLElement,
 ): void {
-    const ro = resizeObservers.get(canvas);
-    if (ro) {
-        ro.disconnect();
-        resizeObservers.delete(canvas);
-    }
+    teardownCapture(canvas);
 
     // Restore cross-origin image src and revoke blob URLs
     const restoreImages = imageRestorers.get(canvas);
@@ -254,85 +358,4 @@ export function unwrapElement(
         element.style.margin = savedMargin;
         savedMargins.delete(element);
     }
-}
-
-/**
- * Wait for the browser to paint the layoutsubtree canvas children.
- * `requestPaint()` schedules a paint; rAF fires before paint, so we need
- * a double-rAF to ensure the paint record is cached.
- */
-function waitForPaint(canvas: HTMLCanvasElement): Promise<void> {
-    if (typeof canvas.requestPaint === "function") {
-        canvas.requestPaint();
-    }
-    return new Promise((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
-}
-
-/**
- * Capture element content via drawElementImage → OffscreenCanvas.
- * Waits for paint record before calling drawElementImage.
- * Reuses `oldOffscreen` when dimensions match.
- */
-export async function captureElement(
-    canvas: HTMLCanvasElement,
-    targetChild: Element,
-    oldOffscreen?: OffscreenCanvas,
-    maxSize?: number,
-): Promise<OffscreenCanvas> {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-        throw new Error("Failed to get 2d context from layoutsubtree canvas");
-    }
-
-    // Wait for paint BEFORE flipping opacity, to minimize the window where
-    // the wrapper canvas is visible. (VFXPlayer keeps it at opacity:0 to hide
-    // the original element.) drawElementImage includes parent opacity in the
-    // paint record, so we still need opacity:1 at draw time.
-    await waitForPaint(canvas);
-
-    // Temporarily restore canvas visibility for drawElementImage.
-    const prevOpacity = canvas.style.opacity;
-    canvas.style.setProperty("opacity", "1");
-
-    // RO manages the pixel buffer in steady state, but it may not have
-    // fired yet on the first captureElement call. Fall back to manual
-    // measurement when canvas dimensions are 0.
-    if (canvas.width === 0 || canvas.height === 0) {
-        const childRect = (targetChild as HTMLElement).getBoundingClientRect();
-        const dpr = window.devicePixelRatio;
-        canvas.width = Math.round(childRect.width * dpr);
-        canvas.height = Math.round(childRect.height * dpr);
-    }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawElementImage(targetChild, 0, 0);
-
-    canvas.style.setProperty("opacity", prevOpacity);
-
-    // Clamp to maxSize
-    let w = canvas.width;
-    let h = canvas.height;
-    if (maxSize && (w > maxSize || h > maxSize)) {
-        const scale = Math.min(maxSize / w, maxSize / h);
-        w = Math.floor(w * scale);
-        h = Math.floor(h * scale);
-    }
-
-    // Reuse or create OffscreenCanvas
-    const offscreen =
-        oldOffscreen && oldOffscreen.width === w && oldOffscreen.height === h
-            ? oldOffscreen
-            : new OffscreenCanvas(w, h);
-
-    const offCtx = offscreen.getContext("2d");
-    if (!offCtx) {
-        throw new Error("Failed to get 2d context from OffscreenCanvas");
-    }
-
-    offCtx.clearRect(0, 0, w, h);
-    offCtx.drawImage(canvas, 0, 0, w, h);
-
-    return offscreen;
 }
