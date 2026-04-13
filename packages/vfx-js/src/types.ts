@@ -352,7 +352,7 @@ export type VFXUniformValue =
 /**
  * @internal
  */
-export type VFXElementType = "img" | "video" | "text" | "canvas";
+export type VFXElementType = "img" | "video" | "text" | "canvas" | "hic";
 
 /**
  * @internal

@@ -18,7 +18,9 @@ function addPaddingDebug(container: HTMLElement) {
 
     const update = () => {
         const canvas = document.querySelector("canvas");
-        if (!canvas) return;
+        if (!canvas) {
+            return;
+        }
         const px = (canvas.width - window.innerWidth) / 2;
         const py = (canvas.height - window.innerHeight) / 2;
         debug.textContent = `padding: ${px.toFixed(0)}x${py.toFixed(0)}`;

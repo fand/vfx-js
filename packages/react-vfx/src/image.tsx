@@ -2,11 +2,12 @@ import type { VFXProps } from "@vfx-js/core";
 import type * as React from "react";
 import { useContext, useEffect, useState } from "react";
 import { VFXContext } from "./context.js";
+import { splitVFXProps } from "./split-props.js";
 
 export type VFXImgProps = React.JSX.IntrinsicElements["img"] & VFXProps;
 
 export const VFXImg: React.FC<VFXImgProps> = (props) => {
-    const { shader, release, uniforms, overflow, wrap, ...rawProps } = props;
+    const { vfxProps, domProps } = splitVFXProps(props);
 
     const vfx = useContext(VFXContext);
     const [element, setElement] = useState<HTMLImageElement | null>(null);
@@ -17,19 +18,13 @@ export const VFXImg: React.FC<VFXImgProps> = (props) => {
             return;
         }
 
-        vfx.add(element, {
-            shader,
-            release,
-            uniforms,
-            overflow,
-            wrap,
-        });
+        vfx.add(element, vfxProps);
 
         return () => {
             vfx.remove(element);
         };
-    }, [element, vfx, shader, release, uniforms, overflow, wrap]);
+    }, [element, vfx, vfxProps]);
 
-    // biome-ignore lint/a11y/useAltText: alt should be in rawProps
-    return <img ref={setElement} {...rawProps} />;
+    // biome-ignore lint/a11y/useAltText: alt should be in domProps
+    return <img ref={setElement} {...domProps} />;
 };

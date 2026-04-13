@@ -1,3 +1,5 @@
+import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
+import { unwrapElement, wrapElement } from "./html-in-canvas.js";
 import { type VFXOpts, type VFXProps, getVFXOpts } from "./types.js";
 import { VFXPlayer } from "./vfx-player.js";
 
@@ -30,6 +32,7 @@ function getCanvasStyle(fixed: boolean) {
 export class VFX {
     #player: VFXPlayer;
     #canvas: HTMLCanvasElement;
+    #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
 
     /**
      * Creates VFX instance and start playing immediately.
@@ -60,23 +63,91 @@ export class VFX {
     /**
      * Register an element to track the position and render visual effects in the area.
      */
-    async add(element: HTMLElement, opts: VFXProps): Promise<void> {
+    async add(
+        element: HTMLElement,
+        opts: VFXProps,
+        initialCapture?: OffscreenCanvas,
+    ): Promise<void> {
         if (element instanceof HTMLImageElement) {
             await this.#addImage(element, opts);
         } else if (element instanceof HTMLVideoElement) {
             await this.#addVideo(element, opts);
         } else if (element instanceof HTMLCanvasElement) {
-            await this.#addCanvas(element, opts);
+            if (element.hasAttribute("layoutsubtree") && initialCapture) {
+                await this.#player.addElement(element, opts, initialCapture);
+            } else {
+                await this.#addCanvas(element, opts);
+            }
         } else {
             await this.#addText(element, opts);
         }
     }
 
     /**
+     * Update the HIC texture for a layoutsubtree canvas.
+     * @internal Used by VFXCanvas (react-vfx).
+     */
+    updateHICTexture(
+        canvas: HTMLCanvasElement,
+        offscreen: OffscreenCanvas,
+    ): void {
+        this.#player.updateHICTexture(canvas, offscreen);
+    }
+
+    get maxTextureSize(): number {
+        return this.#player.maxTextureSize;
+    }
+
+    /**
+     * Register an element using html-in-canvas API.
+     * Wraps the element in a `<canvas layoutsubtree>` and captures via drawElementImage.
+     * Falls back to `add()` if html-in-canvas is not supported.
+     */
+    async addHTML(element: HTMLElement, opts: VFXProps): Promise<void> {
+        if (!supportsHtmlInCanvas()) {
+            console.warn(
+                "html-in-canvas not supported, falling back to dom-to-canvas",
+            );
+            return this.add(element, opts);
+        }
+
+        if (opts.overlay !== undefined) {
+            console.warn(
+                "addHTML does not support overlay mode (layoutsubtree hides children). Ignoring overlay option.",
+            );
+        }
+
+        const { overlay: _, ...hicOpts } = opts;
+
+        let wrapper = this.#wrapperCanvases.get(element);
+        if (wrapper) {
+            this.#player.removeElement(wrapper);
+        }
+
+        const { canvas, initialCapture } = await wrapElement(element, {
+            onCapture: (offscreen) => {
+                this.#player.updateHICTexture(canvas, offscreen);
+            },
+            maxSize: this.#player.maxTextureSize,
+        });
+        wrapper = canvas;
+        this.#wrapperCanvases.set(element, wrapper);
+
+        await this.#player.addElement(wrapper, hicOpts, initialCapture);
+    }
+
+    /**
      * Remove the element from VFX and stop rendering the shader.
      */
     remove(element: HTMLElement): void {
-        this.#player.removeElement(element);
+        const wrapper = this.#wrapperCanvases.get(element);
+        if (wrapper) {
+            unwrapElement(wrapper, element);
+            this.#wrapperCanvases.delete(element);
+            this.#player.removeElement(wrapper);
+        } else {
+            this.#player.removeElement(element);
+        }
     }
 
     /**
@@ -88,6 +159,12 @@ export class VFX {
      * This is useful to apply effects to eleents whose contents change dynamically (e.g. input, textare etc).
      */
     async update(element: HTMLElement): Promise<void> {
+        const wrapper = this.#wrapperCanvases.get(element);
+        if (wrapper) {
+            wrapper.requestPaint();
+            return;
+        }
+
         if (element instanceof HTMLCanvasElement) {
             this.#player.updateCanvasElement(element);
             return;
@@ -123,6 +200,11 @@ export class VFX {
      * Destroy VFX and stop rendering.
      */
     destroy(): void {
+        for (const [element, wrapper] of this.#wrapperCanvases) {
+            unwrapElement(wrapper, element);
+        }
+        this.#wrapperCanvases.clear();
+
         this.#player.destroy();
         this.#canvas.remove();
     }

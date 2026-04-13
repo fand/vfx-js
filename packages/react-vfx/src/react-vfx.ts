@@ -1,6 +1,7 @@
 export { VFXProvider } from "./provider.js";
 export { VFXImg } from "./image.js";
 export { VFXVideo } from "./video.js";
+export { VFXCanvas } from "./canvas.js";
 
 import { VFXElementFactory } from "./element.js";
 export const VFXSpan = VFXElementFactory<"span">("span");

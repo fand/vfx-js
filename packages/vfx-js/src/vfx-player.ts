@@ -277,7 +277,11 @@ export class VFXPlayer {
         this.#isRenderingToCanvas.set(e.element, false);
     }
 
-    async addElement(element: HTMLElement, opts: VFXProps = {}): Promise<void> {
+    async addElement(
+        element: HTMLElement,
+        opts: VFXProps = {},
+        initialCapture?: OffscreenCanvas,
+    ): Promise<void> {
         // Normalize shader input to VFXPass array
         const inputPasses = this.#normalizePasses(opts);
 
@@ -312,8 +316,13 @@ export class VFXPlayer {
             texture = new THREE.VideoTexture(element);
             type = "video" as VFXElementType;
         } else if (element instanceof HTMLCanvasElement) {
-            texture = new THREE.CanvasTexture(element);
-            type = "canvas" as VFXElementType;
+            if (element.hasAttribute("layoutsubtree") && initialCapture) {
+                texture = new THREE.CanvasTexture(initialCapture);
+                type = "hic" as VFXElementType;
+            } else {
+                texture = new THREE.CanvasTexture(element);
+                type = "canvas" as VFXElementType;
+            }
         } else {
             const canvas = await dom2canvas(
                 element,
@@ -336,7 +345,9 @@ export class VFXPlayer {
         const autoCrop = opts.autoCrop ?? true;
 
         // Hide original element
-        if (opts.overlay === true) {
+        if (type === "hic") {
+            /* onpaint clears the canvas — no need to hide */
+        } else if (opts.overlay === true) {
             /* Overlay mode. Do not hide the element */
         } else if (typeof opts.overlay === "number") {
             element.style.setProperty("opacity", opts.overlay.toString());
@@ -464,7 +475,9 @@ export class VFXPlayer {
             // Skip binding the pass's own render target to avoid feedback loops
             // (persistent passes can read their own buffer via backbuffer double-buffering)
             for (const [name, rt] of bufferTargets) {
-                if (name === p.target) continue;
+                if (name === p.target) {
+                    continue;
+                }
                 if (
                     frag.match(new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`))
                 ) {
@@ -607,6 +620,34 @@ export class VFXPlayer {
         }
     }
 
+    updateHICTexture(
+        canvas: HTMLCanvasElement,
+        offscreen: OffscreenCanvas,
+    ): void {
+        const e = this.#elements.find((e) => e.element === canvas);
+        if (!e || e.type !== "hic") {
+            return;
+        }
+
+        const srcUniform = e.passes[0].uniforms["src"];
+        const oldTexture: THREE.CanvasTexture = srcUniform.value;
+
+        if (oldTexture.image === offscreen) {
+            oldTexture.needsUpdate = true;
+        } else {
+            const texture = new THREE.CanvasTexture(offscreen);
+            texture.wrapS = oldTexture.wrapS;
+            texture.wrapT = oldTexture.wrapT;
+            srcUniform.value = texture;
+            e.srcTexture = texture;
+            oldTexture.dispose();
+        }
+    }
+
+    get maxTextureSize(): number {
+        return this.#renderer.capabilities.maxTextureSize;
+    }
+
     isPlaying(): boolean {
         return this.#playRequest !== undefined;
     }
@@ -714,7 +755,9 @@ export class VFXPlayer {
                 const logicalH = Math.max(1, targetRect.h);
                 for (let i = 0; i < e.passes.length - 1; i++) {
                     const pass = e.passes[i];
-                    if (pass.size) continue; // fixed size, no resize
+                    if (pass.size) {
+                        continue; // fixed size, no resize
+                    }
                     if (pass.backbuffer) {
                         pass.backbuffer.resize(logicalW, logicalH);
                     } else {
@@ -803,7 +846,9 @@ export class VFXPlayer {
                 } else {
                     // Non-persistent pass: render to buffer target
                     const rt = e.bufferTargets.get(pass.target as string);
-                    if (!rt) continue;
+                    if (!rt) {
+                        continue;
+                    }
 
                     this.#renderer.setRenderTarget(rt);
                     this.#renderer.clear();
@@ -1034,7 +1079,9 @@ export class VFXPlayer {
         const cy2 = Math.min(targetCssH, rect.y + rect.h);
         const cw = cx2 - cx1;
         const ch = cy2 - cy1;
-        if (cw <= 0 || ch <= 0) return; // nothing visible
+        if (cw <= 0 || ch <= 0) {
+            return; // nothing visible
+        }
         this.#renderer.setViewport(cx1, cy1, cw, ch);
 
         // Viewport uniform uses un-clipped rect for shader uv calculation.
@@ -1153,7 +1200,9 @@ export class VFXPlayer {
     }
 
     #renderPostEffects(viewportGlRect: GLRect, now: number) {
-        if (!this.#postEffectTarget) return;
+        if (!this.#postEffectTarget) {
+            return;
+        }
 
         let inputTexture = this.#postEffectTarget.texture;
 

@@ -2,11 +2,12 @@ import type { VFXProps } from "@vfx-js/core";
 import type * as React from "react";
 import { useContext, useEffect, useState } from "react";
 import { VFXContext } from "./context.js";
+import { splitVFXProps } from "./split-props.js";
 
 export type VFXVideoProps = React.JSX.IntrinsicElements["video"] & VFXProps;
 
 export const VFXVideo: React.FC<VFXVideoProps> = (props) => {
-    const { shader, release, uniforms, overflow, wrap, ...rawProps } = props;
+    const { vfxProps, domProps } = splitVFXProps(props);
 
     const vfx = useContext(VFXContext);
     const [element, setElement] = useState<HTMLVideoElement | null>(null);
@@ -17,18 +18,12 @@ export const VFXVideo: React.FC<VFXVideoProps> = (props) => {
             return;
         }
 
-        vfx.add(element, {
-            shader,
-            release,
-            uniforms,
-            overflow,
-            wrap,
-        });
+        vfx.add(element, vfxProps);
 
         return () => {
             vfx.remove(element);
         };
-    }, [element, vfx, shader, release, uniforms, overflow, wrap]);
+    }, [element, vfx, vfxProps]);
 
-    return <video ref={setElement} {...rawProps} />;
+    return <video ref={setElement} {...domProps} />;
 };

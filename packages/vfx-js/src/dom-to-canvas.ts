@@ -30,7 +30,9 @@ const convertHtmlToXml = (html: string): string => {
  */
 let foreignObjectImgSupport: Promise<boolean> | undefined;
 function detectForeignObjectImgSupport(): Promise<boolean> {
-    if (foreignObjectImgSupport) return foreignObjectImgSupport;
+    if (foreignObjectImgSupport) {
+        return foreignObjectImgSupport;
+    }
     foreignObjectImgSupport = new Promise<boolean>((resolve) => {
         // 1×1 red PNG data URL for the sniff test.
         const RED_1X1 =
@@ -41,7 +43,9 @@ function detectForeignObjectImgSupport(): Promise<boolean> {
             try {
                 const c = new OffscreenCanvas(1, 1);
                 const ctx = c.getContext("2d");
-                if (!ctx) return resolve(false);
+                if (!ctx) {
+                    return resolve(false);
+                }
                 ctx.drawImage(img, 0, 0);
                 // alpha > 0 → foreignObject did render the <img>
                 const alpha = ctx.getImageData(0, 0, 1, 1).data[3];
@@ -93,6 +97,7 @@ export default async function getCanvasFromElement(
     await syncStylesOfTree(element, newElement);
     newElement.style.setProperty("opacity", originalOpacity.toString());
     newElement.style.setProperty("margin", "0px");
+    zeroCollapsingMargins(newElement);
 
     const { imageEls, clipPathDefs } = await prepareImages(
         element,
@@ -148,7 +153,9 @@ async function prepareImages(
     ) as HTMLImageElement[];
     const dataUrls = await Promise.all(
         originalImgs.map(async (img) => {
-            if (!img.complete || img.naturalWidth === 0) return null;
+            if (!img.complete || img.naturalWidth === 0) {
+                return null;
+            }
             try {
                 return await toObjectUrl(img.src);
             } catch {
@@ -162,7 +169,9 @@ async function prepareImages(
     if (useForeignObjectImg) {
         for (let i = 0; i < clonedImgs.length; i++) {
             const dataUrl = dataUrls[i];
-            if (dataUrl) clonedImgs[i].src = dataUrl;
+            if (dataUrl) {
+                clonedImgs[i].src = dataUrl;
+            }
         }
         return { imageEls: [], clipPathDefs: [] };
     }
@@ -172,7 +181,9 @@ async function prepareImages(
     const imageEls = clonedImgs.map((cloned, i) => {
         cloned.style.setProperty("visibility", "hidden");
         const dataUrl = dataUrls[i];
-        if (!dataUrl) return "";
+        if (!dataUrl) {
+            return "";
+        }
         const orig = originalImgs[i];
         const cs = window.getComputedStyle(orig);
         const r = orig.getBoundingClientRect();
@@ -226,6 +237,67 @@ async function syncStylesOfTree(
 }
 
 /**
+ * In normal flow, a child's margin can collapse through its parent when the
+ * parent has no padding/border on that side. SVG foreignObject acts as a BFC
+ * boundary, so the collapsed margin can't escape — it becomes visible space
+ * inside the canvas instead. Zero those margins on the clone to match the
+ * original visual layout.
+ * @internal
+ */
+function zeroCollapsingMargins(root: HTMLElement): void {
+    // Top: walk first-child chain
+    let el: HTMLElement = root;
+    for (;;) {
+        const s = el.style;
+        if (
+            Number.parseFloat(s.paddingTop) > 0 ||
+            Number.parseFloat(s.borderTopWidth) > 0 ||
+            (s.getPropertyValue("overflow-x") &&
+                s.getPropertyValue("overflow-x") !== "visible") ||
+            (s.getPropertyValue("overflow-y") &&
+                s.getPropertyValue("overflow-y") !== "visible") ||
+            s.display === "flex" ||
+            s.display === "grid" ||
+            s.display === "flow-root" ||
+            s.display === "inline-block"
+        ) {
+            break;
+        }
+        const child = el.firstElementChild as HTMLElement | null;
+        if (!child) {
+            break;
+        }
+        child.style.setProperty("margin-top", "0px");
+        el = child;
+    }
+    // Bottom: walk last-child chain
+    el = root;
+    for (;;) {
+        const s = el.style;
+        if (
+            Number.parseFloat(s.paddingBottom) > 0 ||
+            Number.parseFloat(s.borderBottomWidth) > 0 ||
+            (s.getPropertyValue("overflow-x") &&
+                s.getPropertyValue("overflow-x") !== "visible") ||
+            (s.getPropertyValue("overflow-y") &&
+                s.getPropertyValue("overflow-y") !== "visible") ||
+            s.display === "flex" ||
+            s.display === "grid" ||
+            s.display === "flow-root" ||
+            s.display === "inline-block"
+        ) {
+            break;
+        }
+        const child = el.lastElementChild as HTMLElement | null;
+        if (!child) {
+            break;
+        }
+        child.style.setProperty("margin-bottom", "0px");
+        el = child;
+    }
+}
+
+/**
  * Return `{ rx, ry }` if all four border-radius corners are equal, else null.
  * @internal
  */
@@ -236,12 +308,18 @@ function parseUniformBorderRadius(
     const tr = cs.borderTopRightRadius;
     const bl = cs.borderBottomLeftRadius;
     const br = cs.borderBottomRightRadius;
-    if (tl !== tr || tl !== bl || tl !== br) return null;
+    if (tl !== tr || tl !== bl || tl !== br) {
+        return null;
+    }
     const parts = tl.split(/\s+/).map((s) => Number.parseFloat(s));
-    if (parts.length === 0 || !Number.isFinite(parts[0])) return null;
+    if (parts.length === 0 || !Number.isFinite(parts[0])) {
+        return null;
+    }
     const rx = parts[0];
     const ry = parts.length > 1 && Number.isFinite(parts[1]) ? parts[1] : rx;
-    if (rx <= 0 && ry <= 0) return null;
+    if (rx <= 0 && ry <= 0) {
+        return null;
+    }
     return { rx, ry };
 }
 
@@ -252,7 +330,9 @@ function parseUniformBorderRadius(
  */
 function imgObjectFitToPreserveAspectRatio(cs: CSSStyleDeclaration): string {
     const fit = cs.objectFit || "fill";
-    if (fit !== "contain" && fit !== "cover") return "none";
+    if (fit !== "contain" && fit !== "cover") {
+        return "none";
+    }
     const pos = (cs.objectPosition || "50% 50%").split(/\s+/);
     const ax = pos[0] === "0%" ? "Min" : pos[0] === "100%" ? "Max" : "Mid";
     const ay = pos[1] === "0%" ? "Min" : pos[1] === "100%" ? "Max" : "Mid";
