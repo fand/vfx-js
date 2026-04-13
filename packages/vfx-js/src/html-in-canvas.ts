@@ -133,7 +133,6 @@ export async function wrapElement(
     }
 
     // --- 2. Canvas-specific overrides (literal values, safe for detached) ---
-    canvas.style.setProperty("display", "block");
     canvas.style.setProperty("padding", "0");
     canvas.style.setProperty("border", "none");
     canvas.style.setProperty("box-sizing", "content-box");
