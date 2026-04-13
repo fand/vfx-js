@@ -7,6 +7,7 @@ import {
 import * as React from "react";
 import { useContext, useEffect, useRef } from "react";
 import { VFXContext } from "./context.js";
+import { splitVFXProps } from "./split-props.js";
 
 type VFXCanvasProps = React.PropsWithChildren<
     VFXProps & {
@@ -25,17 +26,10 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
         const canvasRef = useRef<HTMLCanvasElement>(null);
         const fallbackRef = useRef<HTMLDivElement>(null);
 
-        const {
-            shader,
-            release,
-            uniforms,
-            overflow,
-            wrap,
-            children,
-            className,
-            style,
-            ...rest
-        } = props;
+        const { vfxProps, domProps } = splitVFXProps(props);
+        const { children, ...restDomProps } = domProps as typeof domProps & {
+            children?: React.ReactNode;
+        };
 
         const isSupported = supportsHtmlInCanvas();
 
@@ -55,14 +49,6 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                 return;
             }
 
-            const vfxOpts: VFXProps = {
-                shader,
-                release,
-                uniforms,
-                overflow,
-                wrap,
-            };
-
             if (isSupported) {
                 const canvas = canvasRef.current;
                 if (!canvas) {
@@ -78,7 +64,7 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                     if (cancelled) {
                         return;
                     }
-                    vfx.add(canvas, vfxOpts, initialCapture);
+                    vfx.add(canvas, vfxProps, initialCapture);
                 });
 
                 return () => {
@@ -94,7 +80,7 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                 return;
             }
 
-            vfx.add(el, vfxOpts);
+            vfx.add(el, vfxProps);
 
             const mo = new MutationObserver(() => vfx.update(el));
             mo.observe(el, {
@@ -108,17 +94,15 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                 mo.disconnect();
                 vfx.remove(el);
             };
-        }, [vfx, shader, release, uniforms, overflow, wrap, isSupported]);
+        }, [vfx, vfxProps, isSupported]);
 
         if (isSupported) {
             return React.createElement(
                 "canvas",
                 {
-                    ...rest,
+                    ...restDomProps,
                     ref: canvasRef,
                     layoutsubtree: "",
-                    className,
-                    style,
                 },
                 React.createElement("div", null, children),
             );
@@ -126,7 +110,7 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
 
         return React.createElement(
             "div",
-            { ...rest, ref: fallbackRef, className, style },
+            { ...restDomProps, ref: fallbackRef },
             children,
         );
     },

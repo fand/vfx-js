@@ -2,6 +2,7 @@ import type { VFXProps } from "@vfx-js/core";
 import * as React from "react";
 import { useContext, useEffect, useState } from "react";
 import { VFXContext } from "./context.js";
+import { splitVFXProps } from "./split-props.js";
 
 type VFXElementProps<T extends keyof React.JSX.IntrinsicElements> =
     React.JSX.IntrinsicElements[T] & VFXProps;
@@ -27,8 +28,7 @@ export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
             }
         };
 
-        const { shader, release, uniforms, overflow, wrap, ...rawProps } =
-            props;
+        const { vfxProps, domProps } = splitVFXProps(props);
 
         // Create scene
         useEffect(() => {
@@ -36,13 +36,7 @@ export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
                 return;
             }
 
-            vfx.add(element, {
-                shader,
-                release,
-                uniforms,
-                overflow,
-                wrap,
-            });
+            vfx.add(element, vfxProps);
 
             const mo = new MutationObserver(() => vfx.update(element));
             mo.observe(element, {
@@ -55,8 +49,8 @@ export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
                 mo.disconnect();
                 vfx.remove(element);
             };
-        }, [element, vfx, shader, release, uniforms, overflow, wrap]);
+        }, [element, vfx, vfxProps]);
 
-        return React.createElement(type, { ...rawProps, ref });
+        return React.createElement(type, { ...domProps, ref });
     });
 }
