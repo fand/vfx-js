@@ -97,6 +97,7 @@ export default async function getCanvasFromElement(
     await syncStylesOfTree(element, newElement);
     newElement.style.setProperty("opacity", originalOpacity.toString());
     newElement.style.setProperty("margin", "0px");
+    zeroCollapsingMargins(newElement);
 
     const { imageEls, clipPathDefs } = await prepareImages(
         element,
@@ -232,6 +233,67 @@ async function syncStylesOfTree(
         const c1 = el1.children[i] as HTMLElement;
         const c2 = el2.children[i] as HTMLElement;
         await syncStylesOfTree(c1, c2);
+    }
+}
+
+/**
+ * In normal flow, a child's margin can collapse through its parent when the
+ * parent has no padding/border on that side. SVG foreignObject acts as a BFC
+ * boundary, so the collapsed margin can't escape — it becomes visible space
+ * inside the canvas instead. Zero those margins on the clone to match the
+ * original visual layout.
+ * @internal
+ */
+function zeroCollapsingMargins(root: HTMLElement): void {
+    // Top: walk first-child chain
+    let el: HTMLElement = root;
+    for (;;) {
+        const s = el.style;
+        if (
+            Number.parseFloat(s.paddingTop) > 0 ||
+            Number.parseFloat(s.borderTopWidth) > 0 ||
+            (s.getPropertyValue("overflow-x") &&
+                s.getPropertyValue("overflow-x") !== "visible") ||
+            (s.getPropertyValue("overflow-y") &&
+                s.getPropertyValue("overflow-y") !== "visible") ||
+            s.display === "flex" ||
+            s.display === "grid" ||
+            s.display === "flow-root" ||
+            s.display === "inline-block"
+        ) {
+            break;
+        }
+        const child = el.firstElementChild as HTMLElement | null;
+        if (!child) {
+            break;
+        }
+        child.style.setProperty("margin-top", "0px");
+        el = child;
+    }
+    // Bottom: walk last-child chain
+    el = root;
+    for (;;) {
+        const s = el.style;
+        if (
+            Number.parseFloat(s.paddingBottom) > 0 ||
+            Number.parseFloat(s.borderBottomWidth) > 0 ||
+            (s.getPropertyValue("overflow-x") &&
+                s.getPropertyValue("overflow-x") !== "visible") ||
+            (s.getPropertyValue("overflow-y") &&
+                s.getPropertyValue("overflow-y") !== "visible") ||
+            s.display === "flex" ||
+            s.display === "grid" ||
+            s.display === "flow-root" ||
+            s.display === "inline-block"
+        ) {
+            break;
+        }
+        const child = el.lastElementChild as HTMLElement | null;
+        if (!child) {
+            break;
+        }
+        child.style.setProperty("margin-bottom", "0px");
+        el = child;
     }
 }
 
