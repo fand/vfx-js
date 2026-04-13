@@ -292,6 +292,59 @@ if (type === "hic") {
    — Must not infinite-loop (canvas.width change should not re-trigger RO)
 4. **VFXCanvas (React) addHTML migration** — ref forwarding works correctly
 
+## Canvas sizing history
+
+Canvas is a replaced element — it does NOT auto-fit height to children,
+even with `layoutsubtree`. Each approach handled width/height differently.
+
+### Phase 1 (`04db6e5`)
+
+| | CSS width | CSS height | pixel buffer | RO |
+|---|---|---|---|---|
+| init | `${rect.width}px` | `${rect.height}px` | `rect * dpr` | child RO |
+| update | fixed | child RO → `contentRect.height` | `captureElement` measures child | child only |
+
+- Fixed px for both → accurate but loses responsive width.
+
+### Phase 2 (`a427e7d`)
+
+| | CSS width | CSS height | pixel buffer | RO |
+|---|---|---|---|---|
+| init | `${rect.width}px` | `${rect.height}px` | `rect * dpr` | child RO + parent RO |
+| update | parent RO → `contentRect.width` | child RO → `borderBoxSize.blockSize` | `captureElement` measures child | child + parent |
+
+- parent RO restores responsive width.
+- **Problem**: fixed-width children get stretched to parent width (parent RO overwrites unconditionally).
+
+### Pre-refactor (`128fff8` — class/style copy)
+
+| | CSS width | CSS height | pixel buffer | RO |
+|---|---|---|---|---|
+| init | class/style copy, `${rect.width}px` (padding), or `100%` (fallback) | class/style copy, `${rect.height}px` (padding), or **none** | `rect * dpr` | canvas RO |
+| update | CSS cascade | CSS cascade (no explicit height → **aspect-ratio from pixel buffer**) | canvas RO → `devicePixelContentBoxSize` | canvas only |
+
+- CSS identity copy delegates width to browser cascade → works for both fixed and responsive.
+- child/parent RO removed; canvas RO only.
+- **Problem**: elements without explicit height — canvas derives height from pixel-buffer aspect ratio, not child content → crop.
+
+### Current (onpaint + child RO)
+
+| | CSS width | CSS height | pixel buffer | RO |
+|---|---|---|---|---|
+| init | class/style copy, `${rect.width}px` (padding), or `100%` | class/style copy, `${rect.height}px` (padding), or `${rect.height}px` (fallback) | `rect * dpr` | canvas RO + child RO |
+| update | CSS cascade | child RO → `borderBoxSize.blockSize` | canvas RO → `devicePixelContentBoxSize` → `requestPaint` | canvas + child |
+
+Responsibility split:
+```
+width:        CSS cascade (class/style copy + 100% fallback)
+height:       child RO → canvas CSS height
+pixel buffer: canvas RO → devicePixelContentBoxSize
+capture:      canvas RO → requestPaint → onpaint → drawElementImage
+```
+
+Phase 2's problem was parent RO overwriting width. This child RO only
+touches height — width is fully managed by CSS cascade.
+
 ## Implementation order
 
 1. Add `onpaint` type to `html-in-canvas.d.ts`
