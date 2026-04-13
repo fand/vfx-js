@@ -27,8 +27,7 @@ async function toBlobUrl(url: string): Promise<string> {
 
 /**
  * Replace cross-origin `<img>` src with blob URLs inside the subtree.
- * Safe because `layoutsubtree` prevents visual rendering of children.
- * Returns a restore function.
+ * Returns a restore function that reverts src and revokes blob URLs.
  */
 async function inlineCrossOriginImages(root: Element): Promise<() => void> {
     const imgs = Array.from(root.querySelectorAll("img")) as HTMLImageElement[];
@@ -74,7 +73,6 @@ async function inlineCrossOriginImages(root: Element): Promise<() => void> {
 }
 
 const MARGIN_PROPS = [
-    "margin",
     "margin-top",
     "margin-right",
     "margin-bottom",
@@ -198,10 +196,8 @@ export async function setupCapture(
     canvasRO.observe(canvas, { box: "device-pixel-content-box" });
     canvasResizeObservers.set(canvas, canvasRO);
 
-    // Child RO: canvas is a replaced element and doesn't auto-fit height
-    // to children. Sync CSS height from the child so the canvas RO gets
-    // the correct dimensions.
-    // Canvas doesn't auto-fit height to children — sync from child.
+    // Canvas is a replaced element — doesn't auto-fit height to children.
+    // Sync CSS height from the child so the canvas RO gets correct dimensions.
     // Round + guard to prevent sub-pixel oscillation.
     const child = canvas.firstElementChild as HTMLElement | null;
     let lastChildHeight = "";
