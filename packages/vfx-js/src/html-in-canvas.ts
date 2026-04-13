@@ -4,7 +4,9 @@
  * Check if an image is cross-origin.
  */
 function isCrossOrigin(img: HTMLImageElement): boolean {
-    if (!img.src || img.src.startsWith("data:")) return false;
+    if (!img.src || img.src.startsWith("data:")) {
+        return false;
+    }
     try {
         const imgUrl = new URL(img.src, location.href);
         return imgUrl.origin !== location.origin;
@@ -34,7 +36,9 @@ async function inlineCrossOriginImages(root: Element): Promise<() => void> {
         (img) => img.complete && img.naturalWidth > 0 && isCrossOrigin(img),
     );
 
-    if (crossOriginImgs.length === 0) return () => {};
+    if (crossOriginImgs.length === 0) {
+        return () => {};
+    }
 
     const originals = new Map<HTMLImageElement, string>();
     const blobUrls: string[] = [];
@@ -135,7 +139,9 @@ export async function setupCapture(
 
     canvas.onpaint = () => {
         const child = canvas.firstElementChild;
-        if (!child || canvas.width === 0 || canvas.height === 0) return;
+        if (!child || canvas.width === 0 || canvas.height === 0) {
+            return;
+        }
 
         // drawElementImage inside onpaint → "current frame" snapshot
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -153,7 +159,9 @@ export async function setupCapture(
             offscreen = new OffscreenCanvas(w, h);
         }
         const offCtx = offscreen.getContext("2d");
-        if (!offCtx) return;
+        if (!offCtx) {
+            return;
+        }
         offCtx.clearRect(0, 0, w, h);
         offCtx.drawImage(canvas, 0, 0, w, h);
 
@@ -200,7 +208,9 @@ export async function setupCapture(
     if (child) {
         const childRO = new ResizeObserver((entries) => {
             const box = entries[0].borderBoxSize?.[0];
-            if (!box) return;
+            if (!box) {
+                return;
+            }
             const h = `${Math.round(box.blockSize)}px`;
             if (h !== lastChildHeight) {
                 lastChildHeight = h;

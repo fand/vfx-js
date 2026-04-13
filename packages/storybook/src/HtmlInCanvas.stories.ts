@@ -255,20 +255,28 @@ export const ReactVFXCanvas: StoryObj = {
         const root = createRoot(container);
         const h = React.createElement;
         root.render(
-            h(VFXProvider, null,
-                h(VFXCanvas, {
-                    shader: "rainbow",
-                    uniforms: { time: () => timer.time },
-                    style: { display: "block", width: "100%" },
-                },
+            h(
+                VFXProvider,
+                null,
+                h(
+                    VFXCanvas,
+                    {
+                        shader: "rainbow",
+                        uniforms: { time: () => timer.time },
+                        style: { display: "block", width: "100%" },
+                    },
                     h("h2", null, "VFXCanvas (react-vfx)"),
-                    h("p", {
-                        style: {
-                            fontSize: "1.2rem",
-                            lineHeight: 1.6,
-                            maxWidth: 600,
+                    h(
+                        "p",
+                        {
+                            style: {
+                                fontSize: "1.2rem",
+                                lineHeight: 1.6,
+                                maxWidth: 600,
+                            },
                         },
-                    }, "This element is rendered via the React VFXCanvas component using html-in-canvas."),
+                        "This element is rendered via the React VFXCanvas component using html-in-canvas.",
+                    ),
                 ),
             ),
         );

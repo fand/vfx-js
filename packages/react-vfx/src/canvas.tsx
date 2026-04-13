@@ -51,7 +51,9 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
 
         // VFX registration
         useEffect(() => {
-            if (!vfx) return;
+            if (!vfx) {
+                return;
+            }
 
             const vfxOpts: VFXProps = {
                 shader,
@@ -63,7 +65,9 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
 
             if (isSupported) {
                 const canvas = canvasRef.current;
-                if (!canvas) return;
+                if (!canvas) {
+                    return;
+                }
 
                 let cancelled = false;
                 setupCapture(canvas, {
@@ -71,7 +75,9 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                         vfx.updateHICTexture(canvas, offscreen),
                     maxSize: vfx.maxTextureSize,
                 }).then((initialCapture) => {
-                    if (cancelled) return;
+                    if (cancelled) {
+                        return;
+                    }
                     vfx.add(canvas, vfxOpts, initialCapture);
                 });
 
@@ -84,7 +90,9 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
 
             // Fallback: behave like VFXDiv
             const el = fallbackRef.current;
-            if (!el) return;
+            if (!el) {
+                return;
+            }
 
             vfx.add(el, vfxOpts);
 

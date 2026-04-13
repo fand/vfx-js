@@ -9,7 +9,8 @@
                 "useLiteralKeys": "off"
             },
             "style": {
-                "noUselessElse": "off"
+                "noUselessElse": "off",
+                "useBlockStatements": "error"
             }
         }
     },
