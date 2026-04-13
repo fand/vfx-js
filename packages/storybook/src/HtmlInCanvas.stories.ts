@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { VFXCanvas, VFXProvider } from "react-vfx";
 import { Timer } from "./Timer";
 import { initVFX } from "./utils";
 
@@ -232,5 +235,41 @@ export const CanvasSizeWithReflow: StoryObj = {
         btnUpdate.addEventListener("click", () => {
             vfx.update(target);
         });
+    },
+};
+
+export const ReactVFXCanvas: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "padding:96px 128px 128px; font-family:sans-serif; color:white";
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        const container = canvasElement.firstElementChild as HTMLElement;
+        const timer = new Timer(0, [0, 10]);
+        document.body.append(timer.element);
+
+        const root = createRoot(container);
+        const h = React.createElement;
+        root.render(
+            h(VFXProvider, null,
+                h(VFXCanvas, {
+                    shader: "rainbow",
+                    uniforms: { time: () => timer.time },
+                },
+                    h("h2", null, "VFXCanvas (react-vfx)"),
+                    h("p", {
+                        style: {
+                            fontSize: "1.2rem",
+                            lineHeight: 1.6,
+                            maxWidth: 600,
+                        },
+                    }, "This element is rendered via the React VFXCanvas component using html-in-canvas."),
+                ),
+            ),
+        );
     },
 };

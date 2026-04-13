@@ -26,8 +26,9 @@ const config: StorybookConfig = {
             ...config.resolve,
             alias: {
                 ...config.resolve?.alias,
-                // During development, resolve @vfx-js/core to source files for hot reloading
+                // During development, resolve to source files for hot reloading
                 "@vfx-js/core": join(__dirname, "../../vfx-js/src/index.ts"),
+                "react-vfx": join(__dirname, "../../react-vfx/src/react-vfx.ts"),
             },
         },
     }),
