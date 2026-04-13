@@ -107,11 +107,10 @@ const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
 
 /**
  * Wrap an element in a `<canvas layoutsubtree>` for html-in-canvas capture.
- * The canvas takes over the element's position in the layout flow.
  *
- * CSS identity (class + style attributes) is copied to the canvas so that
- * CSS cascade resolves width/height/max-width/etc. naturally — responsive
- * and fixed layouts both work without heuristics.
+ * CSS identity (class + style) is copied to the canvas so width/height
+ * resolve via normal CSS cascade. `layoutsubtree` makes height auto-fit
+ * to child content, so no child RO is needed.
  *
  * A ResizeObserver on the canvas (`device-pixel-content-box`) keeps the
  * pixel buffer in sync. `onReflow` fires on resize and, if available,
@@ -133,64 +132,108 @@ export async function wrapElement(
         canvas.setAttribute("style", styleAttr);
     }
 
-    // --- 2. Canvas-specific overrides ---
-    const cs = getComputedStyle(element);
-
-    // Element-type defaults (div=block, span=inline) aren't in class rules
-    const display = cs.display === "inline" ? "block" : cs.display;
-    canvas.style.setProperty("display", display);
-
-    // Copy computed margins for element-type defaults (e.g. <p> margin-block)
-    for (const prop of MARGIN_PROPS) {
-        canvas.style.setProperty(prop, cs.getPropertyValue(prop));
-    }
-
-    // Replicate position/float/flex/grid placement
-    for (const prop of POSITION_FLOW_STYLES) {
-        canvas.style.setProperty(prop, cs.getPropertyValue(prop));
-    }
-
-    // Strip padding/border — canvas content-box = element border-box
+    // --- 2. Canvas-specific overrides (literal values, safe for detached) ---
+    canvas.style.setProperty("display", "block");
     canvas.style.setProperty("padding", "0");
     canvas.style.setProperty("border", "none");
     canvas.style.setProperty("box-sizing", "content-box");
 
-    // --- 3. Padding/border compensation ---
-    // Can't add px to class-derived width expressions (%, auto), so when
-    // padding/border exists, fall back to measured rect (border-box).
-    const paddingH =
-        Number.parseFloat(cs.paddingLeft) + Number.parseFloat(cs.paddingRight);
-    const paddingV =
-        Number.parseFloat(cs.paddingTop) + Number.parseFloat(cs.paddingBottom);
-    const borderH =
-        Number.parseFloat(cs.borderLeftWidth) +
-        Number.parseFloat(cs.borderRightWidth);
-    const borderV =
-        Number.parseFloat(cs.borderTopWidth) +
-        Number.parseFloat(cs.borderBottomWidth);
-    if (paddingH + borderH > 0) {
-        canvas.style.setProperty("width", `${rect.width}px`);
-    }
-    if (paddingV + borderV > 0) {
-        canvas.style.setProperty("height", `${rect.height}px`);
+    // --- 3. Computed-style overrides (only when element is in the DOM) ---
+    // getComputedStyle on detached elements returns "" for all properties,
+    // which would clear the styles we just copied. Skip in that case.
+    if (element.isConnected) {
+        const cs = getComputedStyle(element);
+
+        const display = cs.display === "inline" ? "block" : cs.display;
+        canvas.style.setProperty("display", display);
+
+        for (const prop of MARGIN_PROPS) {
+            canvas.style.setProperty(prop, cs.getPropertyValue(prop));
+        }
+        for (const prop of POSITION_FLOW_STYLES) {
+            canvas.style.setProperty(prop, cs.getPropertyValue(prop));
+        }
     }
 
-    // --- 4. Initial pixel buffer ---
+    // --- 4. Padding/border compensation ---
+    // Canvas has padding:0 border:none, so its content-box must equal the
+    // element's border-box. When the element has padding/border, override
+    // the copied width with the measured border-box value.
+    const paddingH = element.isConnected
+        ? (() => {
+              const cs = getComputedStyle(element);
+              return (
+                  Number.parseFloat(cs.paddingLeft) +
+                  Number.parseFloat(cs.paddingRight) +
+                  Number.parseFloat(cs.borderLeftWidth) +
+                  Number.parseFloat(cs.borderRightWidth)
+              );
+          })()
+        : Number.parseFloat(element.style.paddingLeft || "0") +
+          Number.parseFloat(element.style.paddingRight || "0") +
+          Number.parseFloat(element.style.borderLeftWidth || "0") +
+          Number.parseFloat(element.style.borderRightWidth || "0");
+
+    const paddingV = element.isConnected
+        ? (() => {
+              const cs = getComputedStyle(element);
+              return (
+                  Number.parseFloat(cs.paddingTop) +
+                  Number.parseFloat(cs.paddingBottom) +
+                  Number.parseFloat(cs.borderTopWidth) +
+                  Number.parseFloat(cs.borderBottomWidth)
+              );
+          })()
+        : Number.parseFloat(element.style.paddingTop || "0") +
+          Number.parseFloat(element.style.paddingBottom || "0") +
+          Number.parseFloat(element.style.borderTopWidth || "0") +
+          Number.parseFloat(element.style.borderBottomWidth || "0");
+
+    if (paddingH > 0) {
+        if (rect.width > 0) {
+            canvas.style.setProperty("width", `${rect.width}px`);
+        } else {
+            // Detached: compute from inline width + padding + border
+            const inlineW = Number.parseFloat(element.style.width || "0");
+            if (inlineW > 0) {
+                canvas.style.setProperty("width", `${inlineW + paddingH}px`);
+            }
+        }
+    }
+    if (paddingV > 0) {
+        if (rect.height > 0) {
+            canvas.style.setProperty("height", `${rect.height}px`);
+        } else {
+            const inlineH = Number.parseFloat(element.style.height || "0");
+            if (inlineH > 0) {
+                canvas.style.setProperty("height", `${inlineH + paddingV}px`);
+            }
+        }
+    }
+
+    // Fallback: if no explicit CSS width was set (no inline, no class, no
+    // compensation), canvas would use its intrinsic size (canvas.width attr),
+    // creating a feedback loop with the RO. Set 100% to act as a block.
+    if (!canvas.style.width) {
+        canvas.style.setProperty("width", "100%");
+    }
+
+    // --- 5. Pixel buffer (may be 0 — canvas RO / captureElement corrects) ---
     const dpr = window.devicePixelRatio;
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
 
-    // --- 5. DOM swap ---
+    // --- 6. DOM swap ---
     savedMargins.set(element, element.style.margin);
     element.parentNode?.insertBefore(canvas, element);
     canvas.appendChild(element);
     element.style.setProperty("margin", "0");
 
-    // --- 6. Cross-origin images ---
+    // --- 7. Cross-origin images ---
     const restore = await inlineCrossOriginImages(element);
     imageRestorers.set(canvas, restore);
 
-    // --- 7. RO on canvas (device-pixel-content-box) ---
+    // --- 8. Canvas RO (device-pixel-content-box) for pixel buffer sync ---
     const ro = new ResizeObserver((entries) => {
         for (const entry of entries) {
             const dpSize = entry.devicePixelContentBoxSize?.[0];
@@ -210,7 +253,7 @@ export async function wrapElement(
     ro.observe(canvas, { box: "device-pixel-content-box" });
     resizeObservers.set(canvas, ro);
 
-    // --- 8. onpaint (if available) ---
+    // --- 9. onpaint (if available) ---
     if ("onpaint" in canvas) {
         // biome-ignore lint/suspicious/noExplicitAny: onpaint is not yet in TS lib
         (canvas as any).onpaint = () => onReflow?.(canvas);
@@ -291,7 +334,16 @@ export async function captureElement(
     const prevOpacity = canvas.style.opacity;
     canvas.style.setProperty("opacity", "1");
 
-    // Pixel buffer is managed by the RO in wrapElement — use as-is.
+    // RO manages the pixel buffer in steady state, but it may not have
+    // fired yet on the first captureElement call. Fall back to manual
+    // measurement when canvas dimensions are 0.
+    if (canvas.width === 0 || canvas.height === 0) {
+        const childRect = (targetChild as HTMLElement).getBoundingClientRect();
+        const dpr = window.devicePixelRatio;
+        canvas.width = Math.round(childRect.width * dpr);
+        canvas.height = Math.round(childRect.height * dpr);
+    }
+
     ctx.drawElementImage(targetChild, 0, 0);
 
     canvas.style.setProperty("opacity", prevOpacity);
