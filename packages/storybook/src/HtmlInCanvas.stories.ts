@@ -259,6 +259,7 @@ export const ReactVFXCanvas: StoryObj = {
                 h(VFXCanvas, {
                     shader: "rainbow",
                     uniforms: { time: () => timer.time },
+                    style: { display: "block", width: "100%" },
                 },
                     h("h2", null, "VFXCanvas (react-vfx)"),
                     h("p", {

@@ -193,14 +193,19 @@ export async function setupCapture(
     // Child RO: canvas is a replaced element and doesn't auto-fit height
     // to children. Sync CSS height from the child so the canvas RO gets
     // the correct dimensions.
+    // Canvas doesn't auto-fit height to children — sync from child.
+    // Round + guard to prevent sub-pixel oscillation.
     const child = canvas.firstElementChild as HTMLElement | null;
+    let lastChildHeight = "";
     if (child) {
         const childRO = new ResizeObserver((entries) => {
             const box = entries[0].borderBoxSize?.[0];
-            if (box) {
-                canvas.style.setProperty("height", `${box.blockSize}px`);
+            if (!box) return;
+            const h = `${Math.round(box.blockSize)}px`;
+            if (h !== lastChildHeight) {
+                lastChildHeight = h;
+                canvas.style.setProperty("height", h);
             }
-            // canvas RO will fire from the CSS height change → pixel buffer + requestPaint
         });
         childRO.observe(child);
         childResizeObservers.set(canvas, childRO);
