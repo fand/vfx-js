@@ -49,7 +49,7 @@ export const AddHTML: StoryObj = {
         fullscreenRoot();
         const container = document.createElement("div");
         container.style.cssText =
-            "padding:128px; font-family:sans-serif; color:white";
+            "padding:96px 128px 128px; font-family:sans-serif; color:white";
 
         const el = document.createElement("div");
         el.id = "add-html-target";
@@ -75,7 +75,7 @@ export const AddHTMLWithImage: StoryObj = {
         fullscreenRoot();
         const container = document.createElement("div");
         container.style.cssText =
-            "padding:128px; font-family:sans-serif; color:white";
+            "padding:96px 128px 128px; font-family:sans-serif; color:white";
 
         const el = document.createElement("div");
         el.id = "add-html-image-target";
@@ -97,7 +97,8 @@ export const Fallback: StoryObj = {
     parameters: { layout: "padded" },
     render: () => {
         const container = document.createElement("div");
-        container.style.cssText = "font-family:sans-serif; color:white";
+        container.style.cssText =
+            "padding-top:96px; font-family:sans-serif; color:white";
 
         const el = document.createElement("div");
         el.id = "fallback-target";
@@ -135,7 +136,7 @@ export const BugFixedWidth: StoryObj = {
         fullscreenRoot();
         const container = document.createElement("div");
         container.style.cssText =
-            "padding:64px; font-family:sans-serif; color:white";
+            "padding:96px 64px 64px; font-family:sans-serif; color:white";
 
         // 800px parent — intentionally not flex
         const parent = document.createElement("div");
@@ -173,7 +174,7 @@ export const BugChildWithPadding: StoryObj = {
         fullscreenRoot();
         const container = document.createElement("div");
         container.style.cssText =
-            "padding:64px; font-family:sans-serif; color:white";
+            "padding:96px 64px 64px; font-family:sans-serif; color:white";
 
         const boxCss =
             "width:400px; padding:30px; border:5px solid #f44; background:linear-gradient(180deg,#284,#28a); font-size:1.4rem; line-height:1.6; font-weight:bold; margin-bottom:32px";
@@ -206,7 +207,7 @@ export const BugContentReflow: StoryObj = {
         fullscreenRoot();
         const container = document.createElement("div");
         container.style.cssText =
-            "padding:64px; font-family:sans-serif; color:white";
+            "padding:96px 64px 64px; font-family:sans-serif; color:white";
 
         const target = document.createElement("div");
         target.id = "bug-reflow-target";
