@@ -1,5 +1,9 @@
 import type { VFXProps } from "@vfx-js/core";
-import { supportsHtmlInCanvas } from "@vfx-js/core";
+import {
+    setupCapture,
+    supportsHtmlInCanvas,
+    teardownCapture,
+} from "@vfx-js/core";
 import * as React from "react";
 import { useContext, useEffect, useRef } from "react";
 import { VFXContext } from "./context.js";
@@ -19,7 +23,6 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
     function VFXCanvas(props, parentRef) {
         const vfx = useContext(VFXContext);
         const canvasRef = useRef<HTMLCanvasElement>(null);
-        const contentRef = useRef<HTMLDivElement>(null);
         const fallbackRef = useRef<HTMLDivElement>(null);
 
         const {
@@ -62,56 +65,41 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                 const canvas = canvasRef.current;
                 if (!canvas) return;
 
-                vfx.add(canvas, vfxOpts);
-
-                // MutationObserver for content changes
-                const mo = new MutationObserver(() => vfx.update(canvas));
-                mo.observe(canvas, {
-                    characterData: true,
-                    attributes: true,
-                    childList: true,
-                    subtree: true,
+                let cancelled = false;
+                setupCapture(canvas, {
+                    onCapture: (offscreen) =>
+                        vfx.updateHICTexture(canvas, offscreen),
+                    maxSize: vfx.maxTextureSize,
+                }).then((initialCapture) => {
+                    if (cancelled) return;
+                    vfx.add(canvas, vfxOpts, initialCapture);
                 });
 
-                // ResizeObserver to update canvas pixel buffer
-                const content = contentRef.current;
-                const ro = content
-                    ? new ResizeObserver(() => {
-                          const dpr = window.devicePixelRatio;
-                          canvas.width = Math.round(content.offsetWidth * dpr);
-                          canvas.height = Math.round(
-                              content.offsetHeight * dpr,
-                          );
-                          vfx.update(canvas);
-                      })
-                    : null;
-                if (content) ro?.observe(content);
-
                 return () => {
-                    mo.disconnect();
-                    ro?.disconnect();
+                    cancelled = true;
+                    teardownCapture(canvas);
                     vfx.remove(canvas);
                 };
-            } else {
-                // Fallback: behave like VFXDiv
-                const el = fallbackRef.current;
-                if (!el) return;
-
-                vfx.add(el, vfxOpts);
-
-                const mo = new MutationObserver(() => vfx.update(el));
-                mo.observe(el, {
-                    characterData: true,
-                    attributes: true,
-                    childList: true,
-                    subtree: true,
-                });
-
-                return () => {
-                    mo.disconnect();
-                    vfx.remove(el);
-                };
             }
+
+            // Fallback: behave like VFXDiv
+            const el = fallbackRef.current;
+            if (!el) return;
+
+            vfx.add(el, vfxOpts);
+
+            const mo = new MutationObserver(() => vfx.update(el));
+            mo.observe(el, {
+                characterData: true,
+                attributes: true,
+                childList: true,
+                subtree: true,
+            });
+
+            return () => {
+                mo.disconnect();
+                vfx.remove(el);
+            };
         }, [vfx, shader, release, uniforms, overflow, wrap, isSupported]);
 
         if (isSupported) {
@@ -124,11 +112,10 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                     className,
                     style,
                 },
-                React.createElement("div", { ref: contentRef }, children),
+                React.createElement("div", null, children),
             );
         }
 
-        // Fallback: render as div
         return React.createElement(
             "div",
             { ...rest, ref: fallbackRef, className, style },

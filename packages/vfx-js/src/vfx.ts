@@ -63,21 +63,39 @@ export class VFX {
     /**
      * Register an element to track the position and render visual effects in the area.
      */
-    async add(element: HTMLElement, opts: VFXProps): Promise<void> {
+    async add(
+        element: HTMLElement,
+        opts: VFXProps,
+        initialCapture?: OffscreenCanvas,
+    ): Promise<void> {
         if (element instanceof HTMLImageElement) {
             await this.#addImage(element, opts);
         } else if (element instanceof HTMLVideoElement) {
             await this.#addVideo(element, opts);
         } else if (element instanceof HTMLCanvasElement) {
-            if (element.hasAttribute("layoutsubtree")) {
-                // layoutsubtree canvas (from <VFXCanvas>) → hic path
-                await this.#player.addElement(element, opts);
+            if (element.hasAttribute("layoutsubtree") && initialCapture) {
+                await this.#player.addElement(element, opts, initialCapture);
             } else {
                 await this.#addCanvas(element, opts);
             }
         } else {
             await this.#addText(element, opts);
         }
+    }
+
+    /**
+     * Update the HIC texture for a layoutsubtree canvas.
+     * @internal Used by VFXCanvas (react-vfx).
+     */
+    updateHICTexture(
+        canvas: HTMLCanvasElement,
+        offscreen: OffscreenCanvas,
+    ): void {
+        this.#player.updateHICTexture(canvas, offscreen);
+    }
+
+    get maxTextureSize(): number {
+        return this.#player.maxTextureSize;
     }
 
     /**
