@@ -138,21 +138,17 @@ export async function wrapElement(
     canvas.style.setProperty("border", "none");
     canvas.style.setProperty("box-sizing", "content-box");
 
-    // --- 3. Computed-style overrides + padding/border measurement ---
-    // getComputedStyle on detached elements returns "" for all properties,
-    // which would clear the styles we just copied. Skip in that case.
-    const cs = element.isConnected ? getComputedStyle(element) : null;
+    // --- 3. Computed-style overrides ---
+    const cs = getComputedStyle(element);
 
-    if (cs) {
-        const display = cs.display === "inline" ? "block" : cs.display;
-        canvas.style.setProperty("display", display);
+    const display = cs.display === "inline" ? "block" : cs.display;
+    canvas.style.setProperty("display", display);
 
-        for (const prop of MARGIN_PROPS) {
-            canvas.style.setProperty(prop, cs.getPropertyValue(prop));
-        }
-        for (const prop of POSITION_FLOW_STYLES) {
-            canvas.style.setProperty(prop, cs.getPropertyValue(prop));
-        }
+    for (const prop of MARGIN_PROPS) {
+        canvas.style.setProperty(prop, cs.getPropertyValue(prop));
+    }
+    for (const prop of POSITION_FLOW_STYLES) {
+        canvas.style.setProperty(prop, cs.getPropertyValue(prop));
     }
 
     // --- 4. Padding/border compensation ---
@@ -160,46 +156,22 @@ export async function wrapElement(
     // element's border-box. When the element has padding/border, override
     // the copied width with the measured border-box value.
     const pf = (v: string) => Number.parseFloat(v);
-    const paddingH = cs
-        ? pf(cs.paddingLeft) +
-          pf(cs.paddingRight) +
-          pf(cs.borderLeftWidth) +
-          pf(cs.borderRightWidth)
-        : pf(element.style.paddingLeft || "0") +
-          pf(element.style.paddingRight || "0") +
-          pf(element.style.borderLeftWidth || "0") +
-          pf(element.style.borderRightWidth || "0");
-
-    const paddingV = cs
-        ? pf(cs.paddingTop) +
-          pf(cs.paddingBottom) +
-          pf(cs.borderTopWidth) +
-          pf(cs.borderBottomWidth)
-        : pf(element.style.paddingTop || "0") +
-          pf(element.style.paddingBottom || "0") +
-          pf(element.style.borderTopWidth || "0") +
-          pf(element.style.borderBottomWidth || "0");
+    const paddingH =
+        pf(cs.paddingLeft) +
+        pf(cs.paddingRight) +
+        pf(cs.borderLeftWidth) +
+        pf(cs.borderRightWidth);
+    const paddingV =
+        pf(cs.paddingTop) +
+        pf(cs.paddingBottom) +
+        pf(cs.borderTopWidth) +
+        pf(cs.borderBottomWidth);
 
     if (paddingH > 0) {
-        if (rect.width > 0) {
-            canvas.style.setProperty("width", `${rect.width}px`);
-        } else {
-            // Detached: compute from inline width + padding + border
-            const inlineW = Number.parseFloat(element.style.width || "0");
-            if (inlineW > 0) {
-                canvas.style.setProperty("width", `${inlineW + paddingH}px`);
-            }
-        }
+        canvas.style.setProperty("width", `${rect.width}px`);
     }
     if (paddingV > 0) {
-        if (rect.height > 0) {
-            canvas.style.setProperty("height", `${rect.height}px`);
-        } else {
-            const inlineH = Number.parseFloat(element.style.height || "0");
-            if (inlineH > 0) {
-                canvas.style.setProperty("height", `${inlineH + paddingV}px`);
-            }
-        }
+        canvas.style.setProperty("height", `${rect.height}px`);
     }
 
     // Fallback: if no explicit CSS width was set (no inline, no class, no
