@@ -76,16 +76,6 @@ export const AddHTML: StoryObj = {
 export const AddHTMLWithImage: StoryObj = {
     render: () => {
         fullscreenRoot();
-
-        const style = document.createElement("style");
-        style.textContent = `
-            @keyframes slide {
-                0%, 100% { transform: translateX(0); }
-                50% { transform: translateX(200px); }
-            }
-        `;
-        document.head.appendChild(style);
-
         const container = document.createElement("div");
         container.style.cssText =
             "padding:96px 128px 128px; font-family:sans-serif; color:white";
@@ -93,9 +83,9 @@ export const AddHTMLWithImage: StoryObj = {
         const el = document.createElement("div");
         el.id = "add-html-image-target";
         el.innerHTML = `
-            <h2>html-in-canvas: with image (CSS animation)</h2>
+            <h2>html-in-canvas: with image</h2>
             <img src="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#4488ff"/><text x="100" y="110" text-anchor="middle" fill="white" font-size="24">SVG</text></svg>')}"
-                 style="display:block; width:200px; border-radius:8px; margin-top:16px; animation: slide 2s ease-in-out infinite" />
+                 style="display:block; width:200px; border-radius:8px; margin-top:16px" />
         `;
         container.appendChild(el);
         return container;
