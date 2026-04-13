@@ -138,12 +138,12 @@ export async function wrapElement(
     canvas.style.setProperty("border", "none");
     canvas.style.setProperty("box-sizing", "content-box");
 
-    // --- 3. Computed-style overrides (only when element is in the DOM) ---
+    // --- 3. Computed-style overrides + padding/border measurement ---
     // getComputedStyle on detached elements returns "" for all properties,
     // which would clear the styles we just copied. Skip in that case.
-    if (element.isConnected) {
-        const cs = getComputedStyle(element);
+    const cs = element.isConnected ? getComputedStyle(element) : null;
 
+    if (cs) {
         const display = cs.display === "inline" ? "block" : cs.display;
         canvas.style.setProperty("display", display);
 
@@ -159,35 +159,26 @@ export async function wrapElement(
     // Canvas has padding:0 border:none, so its content-box must equal the
     // element's border-box. When the element has padding/border, override
     // the copied width with the measured border-box value.
-    const paddingH = element.isConnected
-        ? (() => {
-              const cs = getComputedStyle(element);
-              return (
-                  Number.parseFloat(cs.paddingLeft) +
-                  Number.parseFloat(cs.paddingRight) +
-                  Number.parseFloat(cs.borderLeftWidth) +
-                  Number.parseFloat(cs.borderRightWidth)
-              );
-          })()
-        : Number.parseFloat(element.style.paddingLeft || "0") +
-          Number.parseFloat(element.style.paddingRight || "0") +
-          Number.parseFloat(element.style.borderLeftWidth || "0") +
-          Number.parseFloat(element.style.borderRightWidth || "0");
+    const pf = (v: string) => Number.parseFloat(v);
+    const paddingH = cs
+        ? pf(cs.paddingLeft) +
+          pf(cs.paddingRight) +
+          pf(cs.borderLeftWidth) +
+          pf(cs.borderRightWidth)
+        : pf(element.style.paddingLeft || "0") +
+          pf(element.style.paddingRight || "0") +
+          pf(element.style.borderLeftWidth || "0") +
+          pf(element.style.borderRightWidth || "0");
 
-    const paddingV = element.isConnected
-        ? (() => {
-              const cs = getComputedStyle(element);
-              return (
-                  Number.parseFloat(cs.paddingTop) +
-                  Number.parseFloat(cs.paddingBottom) +
-                  Number.parseFloat(cs.borderTopWidth) +
-                  Number.parseFloat(cs.borderBottomWidth)
-              );
-          })()
-        : Number.parseFloat(element.style.paddingTop || "0") +
-          Number.parseFloat(element.style.paddingBottom || "0") +
-          Number.parseFloat(element.style.borderTopWidth || "0") +
-          Number.parseFloat(element.style.borderBottomWidth || "0");
+    const paddingV = cs
+        ? pf(cs.paddingTop) +
+          pf(cs.paddingBottom) +
+          pf(cs.borderTopWidth) +
+          pf(cs.borderBottomWidth)
+        : pf(element.style.paddingTop || "0") +
+          pf(element.style.paddingBottom || "0") +
+          pf(element.style.borderTopWidth || "0") +
+          pf(element.style.borderBottomWidth || "0");
 
     if (paddingH > 0) {
         if (rect.width > 0) {
