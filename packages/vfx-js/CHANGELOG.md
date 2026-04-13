@@ -1,5 +1,11 @@
 # react-vfx
 
+## 0.11.0
+
+### Minor Changes
+
+- HTML-in-Canvas experimental support
+
 ## 0.10.1
 
 ### Patch Changes

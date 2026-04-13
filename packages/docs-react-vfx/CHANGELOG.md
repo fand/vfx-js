@@ -1,5 +1,12 @@
 # docs-react-vfx
 
+## 0.0.8
+
+### Patch Changes
+
+- Updated dependencies
+  - react-vfx@0.16.0
+
 ## 0.0.7
 
 ### Patch Changes

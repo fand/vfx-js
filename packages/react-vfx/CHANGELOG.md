@@ -1,5 +1,16 @@
 # react-vfx
 
+## 0.16.0
+
+### Minor Changes
+
+- HTML-in-Canvas experimental support
+
+### Patch Changes
+
+- Updated dependencies
+  - @vfx-js/core@0.11.0
+
 ## 0.15.1
 
 ### Patch Changes

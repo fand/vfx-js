@@ -1,7 +1,7 @@
 {
   "name": "docs-react-vfx",
   "private": true,
-  "version": "0.0.7",
+  "version": "0.0.8",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -22,7 +22,7 @@
     "react": "^19.1.0",
     "react-dom": "19.1.0",
     "react-lazyload": "^3.2.1",
-    "react-vfx": "0.15.1",
+    "react-vfx": "0.16.0",
     "three": "^0.177.0",
     "vh-check": "^2.0.5"
   },
