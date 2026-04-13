@@ -2,6 +2,10 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import { Timer } from "./Timer";
 import { initVFX } from "./utils";
 
+// biome-ignore lint/style/noNonNullAssertion: story helpers query known IDs
+const qs = <T extends Element>(el: Element, sel: string) =>
+    el.querySelector(sel)! as T;
+
 export default {
     title: "Html In Canvas",
     parameters: {
@@ -23,6 +27,7 @@ export const AddHTML: StoryObj = {
         container.style.color = "white";
 
         const el = document.createElement("div");
+        el.id = "add-html-target";
         el.innerHTML = `
             <h2>html-in-canvas: addHTML</h2>
             <p style="font-size:1.2rem; line-height:1.6; max-width:600px">
@@ -33,6 +38,12 @@ export const AddHTML: StoryObj = {
         `;
         container.appendChild(el);
 
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        const el = qs<HTMLElement>(canvasElement, "#add-html-target");
+
         const timer = new Timer(0, [0, 10]);
         document.body.append(timer.element);
 
@@ -41,8 +52,6 @@ export const AddHTML: StoryObj = {
             shader: "rainbow",
             uniforms: { time: () => timer.time },
         });
-
-        return container;
     },
 };
 
@@ -58,12 +67,19 @@ export const AddHTMLWithImage: StoryObj = {
         container.style.color = "white";
 
         const el = document.createElement("div");
+        el.id = "add-html-image-target";
         el.innerHTML = `
             <h2>html-in-canvas: with image</h2>
             <img src="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#4488ff"/><text x="100" y="110" text-anchor="middle" fill="white" font-size="24">SVG</text></svg>')}"
                  style="display:block; width:200px; border-radius:8px; margin-top:16px" />
         `;
         container.appendChild(el);
+
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        const el = qs<HTMLElement>(canvasElement, "#add-html-image-target");
 
         const timer = new Timer(0, [0, 10]);
         document.body.append(timer.element);
@@ -73,8 +89,6 @@ export const AddHTMLWithImage: StoryObj = {
             shader: "rainbow",
             uniforms: { time: () => timer.time },
         });
-
-        return container;
     },
 };
 
@@ -103,13 +117,13 @@ export const Fallback: StoryObj = {
     // vfx.add needs the element in the DOM with settled layout
     play: async ({ canvasElement }) => {
         await new Promise((r) => requestAnimationFrame(r));
-        const el = canvasElement.querySelector("#fallback-target")!;
+        const el = qs<HTMLElement>(canvasElement, "#fallback-target");
 
         const timer = new Timer(0, [0, 10]);
         document.body.append(timer.element);
 
         const vfx = initVFX();
-        await vfx.add(el as HTMLElement, {
+        await vfx.add(el, {
             shader: "rainbow",
             uniforms: { time: () => timer.time },
         });
@@ -179,6 +193,7 @@ export const BugFixedWidth: StoryObj = {
 
         // Target: identical 300×80 box with addHTML applied
         const target = document.createElement("div");
+        target.id = "bug-fixed-width-target";
         boxStyle(target);
         target.textContent = "WITH addHTML";
         parent.appendChild(target);
@@ -191,9 +206,15 @@ export const BugFixedWidth: StoryObj = {
             "BUG: the colored gradient spans the full 800px parent instead of matching the 300px reference box above. The wrapper canvas is stretched to 100% width by wrapElement.";
         container.appendChild(note);
 
-        // Custom shader that renders a solid gradient, ignoring src alpha.
-        // This exposes the wrapper canvas's actual render area (800×80)
-        // regardless of where drawElementImage placed its content.
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        const target = qs<HTMLElement>(
+            canvasElement,
+            "#bug-fixed-width-target",
+        );
+
         const customShader = `
 precision highp float;
 uniform vec2 resolution;
@@ -215,8 +236,6 @@ void main() {
             shader: customShader,
             uniforms: { time: () => timer.time },
         });
-
-        return container;
     },
 };
 
@@ -273,6 +292,7 @@ export const BugChildWithPadding: StoryObj = {
 
         // Target with addHTML applied
         const target = document.createElement("div");
+        target.id = "bug-padding-target";
         boxStyle(target);
         target.textContent = "WITH addHTML (same size expected)";
         container.appendChild(target);
@@ -285,8 +305,12 @@ export const BugChildWithPadding: StoryObj = {
             "BUG: the shader box is ~70px shorter than the reference (lost the padding+border zone). ResizeObserver fires with contentRect, shrinking canvas CSS height below the captured texture, and drawElementImage then clips the child's bottom on re-capture.";
         container.appendChild(note);
 
-        // Alpha-independent shader — exposes the canvas's actual render area
-        // regardless of texture transparency (same trick as BugFixedWidth).
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        const target = qs<HTMLElement>(canvasElement, "#bug-padding-target");
+
         const customShader = `
 precision highp float;
 uniform vec2 resolution;
@@ -308,8 +332,6 @@ void main() {
             shader: customShader,
             uniforms: { time: () => timer.time },
         });
-
-        return container;
     },
 };
 
@@ -337,6 +359,7 @@ export const BugContentReflow: StoryObj = {
         container.style.color = "white";
 
         const target = document.createElement("div");
+        target.id = "bug-reflow-target";
         target.style.fontSize = "1.4rem";
         target.style.lineHeight = "1.6";
         target.style.padding = "16px";
@@ -352,16 +375,13 @@ export const BugContentReflow: StoryObj = {
         container.appendChild(buttons);
 
         const btnChange = document.createElement("button");
+        btnChange.id = "bug-reflow-change";
         btnChange.textContent = "Change DOM text";
         btnChange.style.padding = "8px 16px";
-        let i = 0;
-        btnChange.addEventListener("click", () => {
-            i++;
-            target.textContent = `Updated text #${i} — longer content to force reflow`;
-        });
         buttons.appendChild(btnChange);
 
         const btnUpdate = document.createElement("button");
+        btnUpdate.id = "bug-reflow-update";
         btnUpdate.textContent = "Manual vfx.update()";
         btnUpdate.style.padding = "8px 16px";
         buttons.appendChild(btnUpdate);
@@ -374,6 +394,14 @@ export const BugContentReflow: StoryObj = {
             'BUG: clicking "Change DOM text" mutates the DOM, but the rainbow shader keeps showing the original text. Clicking "Manual vfx.update()" forces a re-capture.';
         container.appendChild(note);
 
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        const target = qs<HTMLElement>(canvasElement, "#bug-reflow-target");
+        const btnChange = qs<HTMLElement>(canvasElement, "#bug-reflow-change");
+        const btnUpdate = qs<HTMLElement>(canvasElement, "#bug-reflow-update");
+
         const timer = new Timer(0, [0, 10]);
         document.body.append(timer.element);
 
@@ -383,10 +411,13 @@ export const BugContentReflow: StoryObj = {
             uniforms: { time: () => timer.time },
         });
 
+        let i = 0;
+        btnChange.addEventListener("click", () => {
+            i++;
+            target.textContent = `Updated text #${i} — longer content to force reflow`;
+        });
         btnUpdate.addEventListener("click", () => {
             vfx.update(target);
         });
-
-        return container;
     },
 };
