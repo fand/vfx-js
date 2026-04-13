@@ -22,7 +22,32 @@ Side effects: removes `waitForPaint` (double-rAF hack) and the opacity dance.
 
 ## Design
 
-### New wrapElement signature
+### setupCapture — shared onpaint + RO logic
+
+Extracted from wrapElement so both `wrapElement` (for `addHTML`) and `VFXCanvas`
+(direct `<canvas layoutsubtree>`) can share the same capture path.
+
+```ts
+interface CaptureOpts {
+    onCapture: (offscreen: OffscreenCanvas) => void;
+    maxSize?: number;
+}
+
+/**
+ * Set up onpaint handler + ResizeObserver on an existing layoutsubtree canvas.
+ * Returns the initial OffscreenCanvas (awaits first onpaint).
+ */
+export async function setupCapture(
+    canvas: HTMLCanvasElement,
+    opts: CaptureOpts,
+): Promise<OffscreenCanvas>
+```
+
+- `onCapture`: called on every `onpaint` fire with the captured OffscreenCanvas.
+- `maxSize`: texture size cap (renderer.capabilities.maxTextureSize).
+- Returns: OffscreenCanvas from the first `onpaint`. Used by addElement for initial texture.
+
+### wrapElement — uses setupCapture internally
 
 ```ts
 interface WrapResult {
@@ -32,21 +57,18 @@ interface WrapResult {
 
 export async function wrapElement(
     element: HTMLElement,
-    opts: {
-        onCapture: (offscreen: OffscreenCanvas) => void;
-        maxSize?: number;
-    },
+    opts: CaptureOpts,
 ): Promise<WrapResult>
 ```
 
-- `onCapture`: called on every `onpaint` fire with the captured OffscreenCanvas.
-- `initialCapture`: OffscreenCanvas from the first `onpaint`. Used by addElement for initial texture.
-- `maxSize`: texture size cap (renderer.capabilities.maxTextureSize).
+wrapElement handles CSS identity copy, DOM swap, cross-origin images, then
+delegates onpaint + RO to `setupCapture`.
 
-### onpaint handler (inside wrapElement)
+### onpaint handler (inside setupCapture)
 
 ```ts
 let offscreen: OffscreenCanvas | null = null;
+const ctx = canvas.getContext("2d")!;
 
 canvas.onpaint = () => {
     const child = canvas.firstElementChild;
@@ -80,20 +102,9 @@ canvas.onpaint = () => {
 
 **Key**: final `clearRect` empties the canvas visually → opacity:0 no longer needed.
 
-### Waiting for initial capture
+### ResizeObserver (inside setupCapture)
 
-```ts
-const firstCapture = new Promise<OffscreenCanvas>(resolve => {
-    // resolved inside onpaint (via onCapture above)
-});
-
-// After DOM swap, requestPaint → onpaint fires → resolve
-canvas.requestPaint();
-const initialCapture = await firstCapture;
-return { canvas, initialCapture };
-```
-
-### ResizeObserver change
+Handles both pixel buffer sync and re-capture trigger.
 
 Current: RO updates canvas.width/height → `onReflow` callback → `updateHICElement` → `captureElement`
 
@@ -101,26 +112,53 @@ New: RO updates canvas.width/height → `canvas.requestPaint()` → onpaint fire
 ```ts
 const ro = new ResizeObserver((entries) => {
     for (const entry of entries) {
-        // update canvas.width/height (existing logic)
-        ...
+        const dpSize = entry.devicePixelContentBoxSize?.[0];
+        if (dpSize) {
+            canvas.width = dpSize.inlineSize;
+            canvas.height = dpSize.blockSize;
+        } else {
+            const box = entry.borderBoxSize?.[0];
+            if (box) {
+                const dpr = window.devicePixelRatio;
+                canvas.width = Math.round(box.inlineSize * dpr);
+                canvas.height = Math.round(box.blockSize * dpr);
+            }
+        }
     }
-    canvas.requestPaint();  // replaces onReflow
+    canvas.requestPaint();
 });
+ro.observe(canvas, { box: "device-pixel-content-box" });
+```
+
+### Waiting for initial capture
+
+```ts
+const firstCapture = new Promise<OffscreenCanvas>(resolve => {
+    // resolved inside onpaint (via onCapture above)
+});
+
+// requestPaint → onpaint fires → resolve
+canvas.requestPaint();
+return await firstCapture;
 ```
 
 ## File changes
 
 ### 1. `html-in-canvas.ts`
 
+- **Add**: `setupCapture(canvas, opts)` — onpaint handler + RO + initial capture await
+- **Add**: `teardownCapture(canvas)` — clears onpaint + disconnects RO
 - **Remove**: `waitForPaint()`, `captureElement()`
 - **Change**: `wrapElement` signature
-  - `onReflow` → `opts: { onCapture, maxSize }`
-  - Set up `onpaint` handler internally (design above)
+  - `onReflow` → `opts: CaptureOpts`
+  - Delegates onpaint + RO to `setupCapture` internally
   - Await first onpaint and return `{ canvas, initialCapture }`
-  - RO: `onReflow?.(canvas)` → `canvas.requestPaint()`
   - Remove step 9 (onpaint fallback) — now handled by the main onpaint handler
 - **Remove**: all opacity-related logic (onpaint's final clearRect makes it unnecessary)
-- `unwrapElement` unchanged
+- **Change**: `unwrapElement` — call `teardownCapture(canvas)` to clear onpaint + RO:
+  ```ts
+  teardownCapture(canvas);
+  ```
 
 ### 2. `html-in-canvas.d.ts`
 
@@ -157,7 +195,7 @@ interface HTMLCanvasElement {
 - **Change**: `addElement` hic branch — use `initialCapture` from wrapElement instead of calling `captureElement`
   - addElement can't access wrapElement's return (called from VFX.addHTML)
   - → Add optional `initialTexture` parameter to addElement. Use it for hic.
-- **Remove**: hic block in window resize handler (L238-246) — RO + onpaint handles this
+- ~~**Remove**: hic block in window resize handler~~ — already removed in d94ed8b
 
 ### 4. `vfx.ts`
 
@@ -172,10 +210,18 @@ interface HTMLCanvasElement {
   // pass initialCapture to addElement
   await this.#player.addElement(canvas, hicOpts, initialCapture);
   ```
-- **Change**: `update()` hic branch — `updateHICElement` → `canvas.requestPaint()`
+- **Change**: `update()` — two hic branches both need rewriting:
   ```ts
+  // Branch 1: addHTML wrapper path
   if (wrapper) {
       wrapper.requestPaint();
+      return;
+  }
+  // Branch 2: direct layoutsubtree canvas (VFXCanvas)
+  // After step 6 (VFXCanvas → addHTML), this becomes dead code and should be removed.
+  // During the transition (steps 4-5), keep it working via requestPaint:
+  if (element.hasAttribute("layoutsubtree")) {
+      (element as HTMLCanvasElement).requestPaint();
       return;
   }
   ```
@@ -183,19 +229,42 @@ interface HTMLCanvasElement {
 
 ### 5. `canvas.tsx` (VFXCanvas)
 
-VFXCanvas renders `<canvas layoutsubtree>` directly without using `wrapElement`.
-Two options:
+VFXCanvas renders `<canvas layoutsubtree ...rest>` directly. Users pass arbitrary
+HTML attributes (id, data-*, aria-*) via `...rest`, so the canvas element must
+remain under React's control.
 
-**A. Unify on addHTML** (recommended):
-- Render `<div ref={contentRef}>{children}</div>`
-- Call `vfx.addHTML(contentRef.current, opts)` in useEffect
-- Remove all custom RO/MO logic (wrapElement handles it)
+Using `addHTML` would replace the user's canvas with a wrapElement-generated one,
+losing `...rest` attributes. Instead, use `setupCapture` directly:
 
-**B. Set up onpaint independently**:
-- Keep current structure, add own onpaint handler
-- Duplicates wrapElement logic
+- **Keep**: `<canvas layoutsubtree ...rest>` rendering (preserves user attributes)
+- **Remove**: custom RO and MO (setupCapture's RO + onpaint cover both)
+- **Change**: useEffect calls `setupCapture(canvas, { onCapture, maxSize })` for
+  onpaint + RO setup, and `teardownCapture(canvas)` on cleanup
+- **Change**: `vfx.add(canvas)` for initial registration (addElement detects
+  layoutsubtree, uses initialCapture passed via optional param)
+  
+```tsx
+// Render (unchanged — ...rest stays on canvas)
+React.createElement("canvas", {
+    ...rest, ref: canvasRef, layoutsubtree: "", className, style,
+}, React.createElement("div", { ref: contentRef }, children));
 
-→ **Adopt A**. VFXCanvas simplifies significantly.
+// useEffect
+useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !vfx) return;
+    setupCapture(canvas, {
+        onCapture: (offscreen) => vfx.updateHICTexture(canvas, offscreen),
+        maxSize: ...,
+    }).then((initialCapture) => {
+        vfx.add(canvas, vfxOpts, initialCapture);
+    });
+    return () => {
+        teardownCapture(canvas);
+        vfx.remove(canvas);
+    };
+}, [...]);
+```
 
 ## Opacity handling
 
@@ -226,9 +295,10 @@ if (type === "hic") {
 ## Implementation order
 
 1. Add `onpaint` type to `html-in-canvas.d.ts`
-2. Refactor `html-in-canvas.ts` (remove waitForPaint/captureElement, add onpaint)
-3. Update `vfx-player.ts` (updateHICElement → updateHICTexture, resize handler cleanup)
+2. Refactor `html-in-canvas.ts` — add `setupCapture`/`teardownCapture`, remove `waitForPaint`/`captureElement`, update `wrapElement`/`unwrapElement`
+3. Update `vfx-player.ts` (updateHICElement → updateHICTexture, addElement initialCapture param)
 4. Update `vfx.ts` (rewrite addHTML/update)
 5. Verify in storybook
-6. Rewrite `canvas.tsx` to use addHTML
-7. Verify storybook + react-vfx
+6. Rewrite `canvas.tsx` — use `setupCapture`/`teardownCapture`, remove custom RO/MO
+7. Remove `update()` branch 2 (direct layoutsubtree path — now dead code)
+8. Verify storybook + react-vfx
