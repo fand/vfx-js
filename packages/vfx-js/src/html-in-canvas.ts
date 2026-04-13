@@ -307,6 +307,7 @@ export async function captureElement(
         canvas.height = Math.round(childRect.height * dpr);
     }
 
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawElementImage(targetChild, 0, 0);
 
     canvas.style.setProperty("opacity", prevOpacity);
