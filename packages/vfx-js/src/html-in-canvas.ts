@@ -24,7 +24,7 @@ async function toBlobUrl(url: string): Promise<string> {
 }
 
 /**
- * Replace cross-origin `<img>` src with data URLs inside the subtree.
+ * Replace cross-origin `<img>` src with blob URLs inside the subtree.
  * Safe because `layoutsubtree` prevents visual rendering of children.
  * Returns a restore function.
  */

@@ -99,6 +99,8 @@ export class VFX {
             );
         }
 
+        const { overlay: _, ...hicOpts } = opts;
+
         let wrapper = this.#wrapperCanvases.get(element);
         if (wrapper) {
             this.#player.removeElement(wrapper);
@@ -112,7 +114,7 @@ export class VFX {
             this.#wrapperCanvases.set(element, wrapper);
         }
 
-        await this.#player.addElement(wrapper, opts);
+        await this.#player.addElement(wrapper, hicOpts);
     }
 
     /**
