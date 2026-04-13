@@ -166,12 +166,6 @@ export class VFX {
         }
 
         if (element instanceof HTMLCanvasElement) {
-            if (element.hasAttribute("layoutsubtree")) {
-                // Direct layoutsubtree canvas (VFXCanvas path).
-                // Transition: will be removed when VFXCanvas uses setupCapture.
-                element.requestPaint();
-                return;
-            }
             this.#player.updateCanvasElement(element);
             return;
         } else {
