@@ -99,18 +99,12 @@ export default async function getCanvasFromElement(
     newElement.style.setProperty("margin", "0px");
     zeroCollapsingMargins(newElement);
 
-    const { imageEls, clipPathDefs } = await prepareImages(
-        element,
-        newElement,
-        rect,
-    );
-
     // Build SVG at full (unclamped) physical-pixel size.
     const html = newElement.outerHTML;
     const xml = convertHtmlToXml(html);
-    const defsBlock =
-        clipPathDefs.length > 0 ? `<defs>${clipPathDefs.join("")}</defs>` : "";
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${fullW}" height="${fullH}">${defsBlock}<foreignObject width="100%" height="100%">${xml}</foreignObject>${imageEls.join("")}</svg>`;
+    const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${fullW}" height="${fullH}">` +
+        `<foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
 
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -226,8 +220,15 @@ async function syncStylesOfTree(
         el2.setAttribute("value", (el2 as HTMLInputElement).value);
     } else if (el2.tagName === "TEXTAREA") {
         el2.innerHTML = (el2 as HTMLTextAreaElement).value;
+    } else if (el2.tagName === "IMG") {
+        try {
+            (el2 as HTMLImageElement).src = await toObjectUrl(
+                (el1 as HTMLImageElement).src,
+            );
+        } catch {
+            // Cross-origin fetch failed; keep original src
+        }
     }
-    // IMG elements are handled by getCanvasFromElement after cloning.
 
     for (let i = 0; i < el1.children.length; i++) {
         const c1 = el1.children[i] as HTMLElement;
