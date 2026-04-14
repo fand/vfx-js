@@ -390,7 +390,7 @@
       float aspect = resolution.y / resolution.x;
 
       vec2 p = (uv - 0.5) * vec2(1.0, aspect);
-      vec2 mp = ((mouse + lag) / resolution - 0.5) * vec2(aspect, 1.0);
+      vec2 mp = ((mouse + lag) / resolution - 0.5) * vec2(1.0, aspect);
 
       vec3 ro = vec3(0.0, 0.0, -2.0);
       float focal = 2.0;
@@ -580,7 +580,6 @@
           lag: () => {
             const dx = (p1.x - p0.x) * devicePixelRatio;
             const dy = (p1.y - p0.y) * devicePixelRatio;
-            console.log('lag', dx.toFixed(1), dy.toFixed(1));
             return [dx, dy];
           },
           bubbleData: () => {
