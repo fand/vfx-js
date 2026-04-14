@@ -300,7 +300,7 @@
     sphereR: 0.1,
     bubbleCount: 8,
     bubbleRadiusMin: 0.03,
-    bubbleRadiusMax: 0.06,  // min + range
+    bubbleRadiusMax: 0.06, // min + range
     bubbleSpeed: 0.6,
     mouseSmoothing: 0.05,
   };
@@ -318,19 +318,19 @@
     out vec4 outColor;
 
     const float SPHERE_R = ${PARAMS.sphereR.toFixed(4)};
-    const float DISP = 0.03;
 
-    const int   DISP_STEPS =12;
-    const float DISP_LO = 0.2;
+    const float DISP = 0.02;
+    const int   DISP_STEPS = 8;
+    const float DISP_LO = 0.0;
     const float DISP_HI = 1.0;
 
-    const float SCATTER = 0.012;
+    const float SCATTER = 0.03;
 
-    const int   N_BUBBLES = ${PARAMS.bubbleCount};
+    const int N_BUBBLES = ${PARAMS.bubbleCount};
     const float BUBBLE_SMOOTH = 0.025;
     uniform float bubbleData[${PARAMS.bubbleCount * 4}]; // N * (x, y, z, r)
 
-    const vec3  ABSORB  = vec3(2.0, 1.2, 1.0) * 3.;
+    const vec3 ABSORB = vec3(2.0, 1.2, 1.0) * 3.;
 
     float smin(float a, float b, float k) {
       float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
@@ -342,7 +342,6 @@
       p3 += dot(p3, p3.yzx + 33.33);
       return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;
     }
-
 
     mat2 rot(float t) {
       float c = cos(t), s = sin(t);
@@ -374,7 +373,6 @@
 
       q.xz *= rot(exp(-clickTime*3.0) * 8.);
 
-
       // Main object
       vec3 sp = q;
       sp.y += sin(sp.z * 29. + time * 4.5) * 0.01;
@@ -403,7 +401,6 @@
       return d * s;
     }
 
-    // 6-tap gradient normal.
     vec3 calcNormal(vec3 p, vec3 c) {
       vec2 e = vec2(0.001, 0.0);
       return normalize(vec3(
@@ -438,11 +435,8 @@
       float focal = 2.0;
       vec3 rd = normalize(vec3(p, focal));
 
+      // coord center
       vec3 c = vec3(mp, 0.0);
-
-      const float SURF_EPS = 0.00003;
-      const float KICK = 0.01;
-      const int MAX_HITS = 4;
 
       vec3 firstN = vec3(0.0);
       vec3 lastN = vec3(0.0);
@@ -461,7 +455,7 @@
 
         // Distance to nearest surface, always positive regardless of side.
         float step = inside ? -d : d;
-        if (step < SURF_EPS) {
+        if (step < 3e-4) {
           vec3 n = calcNormal(pos, c);
           if (hitCount == 0) firstN = n;
           lastN = n;
@@ -471,10 +465,12 @@
           } else {
             thickness += t - tEntry;
           }
+
           hitCount++;
-          if (hitCount >= MAX_HITS) break;
+          if (hitCount >= 4) { break; }
+
           inside = !inside;
-          t += KICK;
+          t += 0.01; // kick
         } else {
           t += step;
         }
@@ -483,20 +479,18 @@
       if (hitCount > 0) {
         vec2 baseDisp = -(firstN.xy + lastN.xy) * 0.5 * DISP;
 
-        // Angle between surface normal and view ray → scatter strength
         float NdotR = max(dot(firstN, -rd), 0.0);
         float scatter = pow((1.0 - NdotR), 2.0) * SCATTER;
 
         // dispersion + hash scatter
-        vec3 acc  = vec3(0.0);
+        vec3 acc = vec3(0.0);
         vec3 wsum = vec3(0.0);
         for (int i = 0; i < DISP_STEPS; i++) {
           float wl = float(i) / float(DISP_STEPS - 1);
-          float k  = mix(DISP_LO, DISP_HI, wl) * (1.3 + float(hitCount) * 0.2);
-          vec2 h   = hash22(uv * 1000.0 + float(i) * 7.13 + time) * scatter;
-          vec3 s   = getSrc(uv + baseDisp * k + h).rgb;
-          vec3 w   = spectrum(wl);
-          acc  += s * w;
+          float k = mix(DISP_LO, DISP_HI, wl) * (1.3 + float(hitCount) * 0.2);
+          vec2 h = hash22(uv * 1000.0 + float(i) * 7.13 + time) * scatter;
+          vec3 w = spectrum(wl);
+          acc += getSrc(uv + baseDisp * k + h).rgb * w;
           wsum += w;
         }
         vec3 col = acc / wsum * 0.99;
@@ -542,7 +536,8 @@
     const N = PARAMS.bubbleCount;
     const fract = (x) => x - Math.floor(x);
     const rot2d = (x, y, t) => {
-      const c = Math.cos(t), s = Math.sin(t);
+      const c = Math.cos(t),
+        s = Math.sin(t);
       return [x * c - y * s, x * s + y * c];
     };
 
@@ -594,7 +589,8 @@
         bz += Math.cos(time * 3.1 + i * 3.7) * 0.008 * life;
 
         // Offset from sphere center
-        const w = window.innerWidth, h = window.innerHeight;
+        const w = window.innerWidth,
+          h = window.innerHeight;
         bx += ((p2.x - p1.x) / w) * (h / w);
         by += (p2.y - p1.y) / h;
 
@@ -616,7 +612,10 @@
       postEffect: {
         shader: postEffectShader,
         uniforms: {
-          lag: () => [(p1.x - p0.x) * devicePixelRatio, (p1.y - p0.y) * devicePixelRatio],
+          lag: () => [
+            (p1.x - p0.x) * devicePixelRatio,
+            (p1.y - p0.y) * devicePixelRatio,
+          ],
           clickTime: () => performance.now() / 1000 - lastClickTime,
           clickCount: () => clickCount,
           bubbleData: () => bubbles,
