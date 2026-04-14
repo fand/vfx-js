@@ -1,5 +1,13 @@
 # react-vfx
 
+## 0.16.1
+
+### Patch Changes
+
+- Fix dom-to-canvas bugs
+- Updated dependencies
+  - @vfx-js/core@0.11.1
+
 ## 0.16.0
 
 ### Minor Changes

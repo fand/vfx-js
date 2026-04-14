@@ -1,5 +1,11 @@
 # react-vfx
 
+## 0.11.1
+
+### Patch Changes
+
+- Fix dom-to-canvas bugs
+
 ## 0.11.0
 
 ### Minor Changes
