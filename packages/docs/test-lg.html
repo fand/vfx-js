@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Liquid Glass Pro</title>
+
+<style>
+  :root {
+    --bg: #fbfbfd;
+    --fg: #1d1d1f;
+    --fg-dark: #f5f5f7;
+    --muted: #6e6e73;
+    --link: #0066cc;
+    --border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  html,
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+      "SF Pro Text", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Nav */
+  nav {
+    position: relative;
+    z-index: 10;
+    background: rgba(251, 251, 253, 0.8);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: var(--border);
+  }
+  nav ul {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin: 0;
+    padding: 0 24px;
+    list-style: none;
+    height: 44px;
+    align-items: center;
+    font-size: 0.82rem;
+  }
+  nav a {
+    color: inherit;
+    text-decoration: none;
+    opacity: 0.85;
+  }
+  nav a:hover {
+    opacity: 1;
+  }
+
+  /* Hero */
+  .hero {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: black;
+  }
+  .hero img,
+  .tile img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .hero img {
+    background: black;
+    opacity: 0.3;
+  }
+  .copy {
+    text-align: center;
+  }
+  .hero .copy {
+    position: absolute;
+    top: 30%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    color: #fff;
+  }
+  .hero h1 {
+    font-size: 4.2rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    margin: 0 0 8px;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  }
+  .hero h2 {
+    font-size: 1.7rem;
+    font-weight: 400;
+    margin: 0 0 18px;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
+  }
+  .actions a {
+    text-decoration: none;
+  }
+  .actions a:hover {
+    text-decoration: underline;
+  }
+  .hero .actions a {
+    color: #fff;
+    font-size: 1.2rem;
+    margin: 0 12px;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Tile grid */
+  .tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 12px;
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+  .tile {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+    background: #1a1a1a;
+    isolation: isolate;
+  }
+  .tile.full {
+    grid-column: 1 / -1;
+    aspect-ratio: 16 / 9;
+  }
+  .tile .copy {
+    position: relative;
+    z-index: 1;
+    padding: 56px 24px 0;
+    color: var(--fg-dark);
+  }
+  .tile .eyebrow {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 12px;
+    opacity: 0.85;
+  }
+  .tile h3 {
+    font-size: 3rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0 0 10px;
+  }
+  .tile p {
+    font-size: 1.25rem;
+    margin: 0 0 18px;
+    opacity: 0.92;
+  }
+  .tile .actions a {
+    color: var(--link);
+    font-size: 1.05rem;
+    margin: 0 10px;
+  }
+
+  /* Footer */
+  footer {
+    padding: 48px 24px 96px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.78rem;
+    border-top: var(--border);
+    margin-top: 24px;
+  }
+</style>
+
+<div id="app">
+  <nav>
+    <ul>
+      <li><a href="https://amagi.dev/vfx-js" target="_blank">VFX-JS</a></li>
+    </ul>
+  </nav>
+
+  <section class="hero">
+    <img
+      src="https://images.unsplash.com/photo-1512054502232-10a0a035d672?w=1600&h=900&fit=crop"
+      alt=""
+    />
+    <div class="copy">
+      <h1>Liquid Glass Pro</h1>
+      <h2>A new way to look at the web.</h2>
+      <p class="actions">
+        <a href="https://amagi.dev/vfx-js/" target="_blank">Learn more &gt;</a>
+      </p>
+    </div>
+  </section>
+
+  <section class="tiles">
+    <div class="tile dark full">
+      <img
+        src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&h=900&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">New</p>
+        <h3>Aurora Pro</h3>
+        <p>Built for the way light moves.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="tile light">
+      <img
+        src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1000&h=1250&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">iPhone</p>
+        <h3>Skyline</h3>
+        <p>Snap the city without lifting a finger.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+          <a href="#">Buy &gt;</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="tile dark">
+      <img
+        src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1000&h=1250&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">Mac</p>
+        <h3>Brewed In</h3>
+        <p>Espresso-grade silicon. All-day battery.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+          <a href="#">Buy &gt;</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="tile light">
+      <img
+        src="https://images.unsplash.com/photo-1448375240586-882707db888b?w=1000&h=1250&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">Watch</p>
+        <h3>Wander</h3>
+        <p>Track every step, even off the path.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+          <a href="#">Buy &gt;</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="tile dark">
+      <img
+        src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1000&h=1250&fit=crop"
+        alt=""
+      />
+      <div class="copy">
+        <p class="eyebrow">Vision</p>
+        <h3>Mirror Lake</h3>
+        <p>A window where your screen used to be.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+          <a href="#">Buy &gt;</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="tile light full">
+      <img
+        src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=1600&h=900&fit=crop"
+        alt=""
+        style="opacity: 0.5"
+      />
+      <div class="copy">
+        <p class="eyebrow">AirPods</p>
+        <h3>Open Sky</h3>
+        <p>Sound that floats above everything.</p>
+        <p class="actions">
+          <a href="#">Learn more &gt;</a>
+          <a href="#">Buy &gt;</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer>vfx-js liquid glass post-effect demo</footer>
+</div>
+
+<script type="module">
+  import { VFX } from "@vfx-js/core";
+
+  const PARAMS = {
+    sphereR: 0.1,
+    bubbleCount: 8,
+    bubbleRadiusMin: 0.03,
+    bubbleRadiusMax: 0.06, // min + range
+    bubbleSpeed: 0.6,
+    mouseSmoothing: 0.05,
+  };
+
+  const postEffectShader = `
+    precision highp float;
+    uniform sampler2D src;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform vec2 mouse;
+    uniform vec2 lag;
+    uniform float time;
+    uniform float clickTime;
+    uniform int clickCount;
+    out vec4 outColor;
+
+    const float SPHERE_R = ${PARAMS.sphereR.toFixed(4)};
+
+    const float DISP = 0.02;
+    const int   DISP_STEPS = 8;
+    const float DISP_LO = 0.0;
+    const float DISP_HI = 1.0;
+
+    const float SCATTER = 0.03;
+
+    const int N_BUBBLES = ${PARAMS.bubbleCount};
+    const float BUBBLE_SMOOTH = 0.025;
+    uniform float bubbleData[${PARAMS.bubbleCount * 4}]; // N * (x, y, z, r)
+
+    const vec3 ABSORB = vec3(2.0, 1.2, 1.0) * 3.;
+
+    float smin(float a, float b, float k) {
+      float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+      return mix(b, a, h) - k * h * (1.0 - h);
+    }
+
+    vec2 hash22(vec2 p) {
+      vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;
+    }
+
+    mat2 rot(float t) {
+      float c = cos(t), s = sin(t);
+      return mat2(c, -s, s, c);
+    }
+
+    float sdSphere(vec3 p, float r) {
+      return length(p) - r;
+    }
+
+    float sdBox(vec3 p, vec3 b, float r) {
+      vec3 q = abs(p) - b + r;
+      return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
+    }
+
+    float sdRing(vec3 p, vec2 r) {
+      float s = length(p.xy) - r.x;
+      return length(vec2(s, p.z)) - r.y;
+    }
+
+    float map(vec3 p, vec3 c) {
+      vec3 q = p - c;
+
+      // Click reaction
+      float tt = clickTime * 5.0;
+      float bounce = exp(-tt) * sin(tt) * 5. + (1. - exp(-tt));
+      float s = bounce * 0.5 + 0.5;
+      q /= s;
+
+      q.xz *= rot(exp(-clickTime*3.0) * 8.);
+
+      // Main object
+      vec3 sp = q;
+      sp.y += sin(sp.z * 29. + time * 4.5) * 0.01;
+      sp.z += sin(sp.x * 23. + sp.y * 11. + time * 7.) * 0.01;
+      sp.xy *= rot(time*1.3);
+      sp.xz *= rot(time*1.1);
+
+      float d ;
+      int objType = clickCount % 3;
+      if (objType == 0) {
+        d = sdSphere(sp, SPHERE_R);
+      } else if (objType == 1) {
+        d = sdBox(sp, vec3(SPHERE_R), 0.01);
+      } else {
+        d = sdRing(sp, vec2(SPHERE_R, 0.01));
+      }
+
+      // Bubbles (positions from JS uniform)
+      for (int i = 0; i < N_BUBBLES; i++) {
+        int b = i * 4;
+        vec3 bPos = vec3(bubbleData[b], bubbleData[b+1], bubbleData[b+2]);
+        float r = bubbleData[b+3];
+        d = smin(d, sdSphere(q - bPos, max(r, 0.001)), BUBBLE_SMOOTH);
+      }
+
+      return d * s;
+    }
+
+    vec3 calcNormal(vec3 p, vec3 c) {
+      vec2 e = vec2(0.001, 0.0);
+      return normalize(vec3(
+        map(p + e.xyy, c) - map(p - e.xyy, c),
+        map(p + e.yxy, c) - map(p - e.yxy, c),
+        map(p + e.yyx, c) - map(p - e.yyx, c)
+      ));
+    }
+
+    // x ∈ [0,1]: 0 = red, 1 = violet. Sums to ~white over a full sweep.
+    vec3 spectrum(float x) {
+      return clamp(vec3(
+        1.5 - abs(4.0 * x - 1.0),
+        1.5 - abs(4.0 * x - 2.0),
+        1.5 - abs(4.0 * x - 3.0)
+      ), 0.0, 1.0);
+    }
+
+    vec4 getSrc(vec2 uv) {
+      vec4 c = texture(src, uv);
+      return mix(vec4(1), c, c.a);
+    }
+
+    void main() {
+      vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+      float aspect = resolution.y / resolution.x;
+
+      vec2 p = (uv - 0.5) * vec2(1.0, aspect);
+      vec2 mp = ((mouse + lag) / resolution - 0.5) * vec2(1.0, aspect);
+
+      vec3 ro = vec3(0.0, 0.0, -2.0);
+      float focal = 2.0;
+      vec3 rd = normalize(vec3(p, focal));
+
+      // coord center
+      vec3 c = vec3(mp, 0.0);
+
+      vec3 firstN = vec3(0.0);
+      vec3 lastN = vec3(0.0);
+      int hitCount = 0;
+
+      // Total in-glass distance (Σ over all entry→exit slabs).
+      float thickness = 0.0;
+      float tEntry = 0.0;
+      float t = 0.0;
+      bool inside = false;
+      for (int i = 0; i < 50; i++) {
+        if (t > 10.0) break;
+
+        vec3 pos = ro + rd * t;
+        float d = map(pos, c);
+
+        // Distance to nearest surface, always positive regardless of side.
+        float step = inside ? -d : d;
+        if (step < 3e-4) {
+          vec3 n = calcNormal(pos, c);
+          if (hitCount == 0) firstN = n;
+          lastN = n;
+          // Sample t at every entry, accumulate (t - tEntry) at every exit.
+          if (!inside) {
+            tEntry = t;
+          } else {
+            thickness += t - tEntry;
+          }
+
+          hitCount++;
+          if (hitCount >= 4) { break; }
+
+          inside = !inside;
+          t += 0.01; // kick
+        } else {
+          t += step;
+        }
+      }
+
+      if (hitCount > 0) {
+        vec2 baseDisp = -(firstN.xy + lastN.xy) * 0.5 * DISP;
+
+        float NdotR = max(dot(firstN, -rd), 0.0);
+        float scatter = pow((1.0 - NdotR), 2.0) * SCATTER;
+
+        // dispersion + hash scatter
+        vec3 acc = vec3(0.0);
+        vec3 wsum = vec3(0.0);
+        for (int i = 0; i < DISP_STEPS; i++) {
+          float wl = float(i) / float(DISP_STEPS - 1);
+          float k = mix(DISP_LO, DISP_HI, wl) * (1.3 + float(hitCount) * 0.2);
+          vec2 h = hash22(uv * 1000.0 + float(i) * 7.13 + time) * scatter;
+          vec3 w = spectrum(wl);
+          acc += getSrc(uv + baseDisp * k + h).rgb * w;
+          wsum += w;
+        }
+        vec3 col = acc / wsum * 0.99;
+        col -= float(hitCount) * 0.05;
+
+        col += 0.1;
+
+        // Fresnel
+        float fres = pow(1.0 - NdotR, 5.0);
+        col *= 1. + fres;
+
+        // Absorb
+        float f2 = 1. - pow(NdotR, 3.0);
+        col *= mix(vec3(1), exp(-ABSORB * thickness), f2);
+        col *= 1. + f2;
+
+        // Lights
+        vec3 ld = normalize(vec3(0.5, 0.9, -0.3));
+        float spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 200.0);
+        col += spec * 30.;
+
+        ld = normalize(vec3(-0.9, 0.4, -0.3));
+        spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 300.0);
+        col += spec * 3.;
+
+        ld = normalize(vec3(-0.1, -0.9, -0.1));
+        spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 30.0);
+        col += spec * 0.5;
+
+        // Edge
+        col = min(col, 1.);
+        col = 1. - abs(col + fres * .5 - 1.);
+
+        outColor = vec4(col, 1.0);
+      } else {
+        outColor = getSrc(uv);
+      }
+    }
+    `;
+
+  window.addEventListener("load", async () => {
+    const app = document.getElementById("app");
+    const N = PARAMS.bubbleCount;
+    const fract = (x) => x - Math.floor(x);
+    const rot2d = (x, y, t) => {
+      const c = Math.cos(t),
+        s = Math.sin(t);
+      return [x * c - y * s, x * s + y * c];
+    };
+
+    const p0 = { x: 0, y: 0 };
+    const p1 = { x: 0, y: 0 };
+    const p2 = { x: 0, y: 0 };
+    window.addEventListener("pointermove", (e) => {
+      p0.x = e.clientX;
+      p0.y = window.innerHeight - e.clientY;
+    });
+
+    let lastClickTime = performance.now() / 1000;
+    let clickCount = 0;
+    window.addEventListener("pointerdown", () => {
+      lastClickTime = performance.now() / 1000;
+      clickCount++;
+    });
+
+    const bubbles = new Float32Array(N * 4);
+    const t0 = performance.now() / 1000;
+
+    function tick() {
+      const time = performance.now() / 1000 - t0;
+      const sm = PARAMS.mouseSmoothing;
+      p1.x += (p0.x - p1.x) * sm;
+      p1.y += (p0.y - p1.y) * sm;
+      p2.x += (p1.x - p2.x) * sm;
+      p2.y += (p1.y - p2.y) * sm;
+
+      for (let i = 0; i < N; i++) {
+        const life = fract(time * PARAMS.bubbleSpeed + i / N);
+
+        // Orbit
+        const orbitR = PARAMS.sphereR * (0.3 + life * 0.8);
+        const orbitAngle = time * (0.8 + fract(i * 0.618) * 0.7) + i * 1.256;
+
+        let bx = Math.cos(orbitAngle) * orbitR;
+        let by = 0;
+        let bz = Math.sin(orbitAngle) * orbitR;
+
+        // Tilt orbit
+        [bx, by] = rot2d(bx, by, i * 2.3);
+        [by, bz] = rot2d(by, bz, i * 1.8);
+
+        by += life * 0.1;
+
+        // Wobble
+        bx += Math.sin(time * 2.7 + i * 4.1) * 0.008 * life;
+        bz += Math.cos(time * 3.1 + i * 3.7) * 0.008 * life;
+
+        // Offset from sphere center
+        const w = window.innerWidth,
+          h = window.innerHeight;
+        bx += ((p2.x - p1.x) / w) * (h / w);
+        by += (p2.y - p1.y) / h;
+
+        // Bubble radius
+        const range = PARAMS.bubbleRadiusMax - PARAMS.bubbleRadiusMin;
+        const maxR = PARAMS.bubbleRadiusMin + range * fract(i * 0.618);
+
+        const j = i * 4;
+        bubbles[j] = bx;
+        bubbles[j + 1] = by;
+        bubbles[j + 2] = bz;
+        bubbles[j + 3] = maxR * Math.sin(life * Math.PI);
+      }
+      requestAnimationFrame(tick);
+    }
+    tick();
+
+    const vfx = new VFX({
+      postEffect: {
+        shader: postEffectShader,
+        uniforms: {
+          lag: () => [
+            (p1.x - p0.x) * devicePixelRatio,
+            (p1.y - p0.y) * devicePixelRatio,
+          ],
+          clickTime: () => performance.now() / 1000 - lastClickTime,
+          clickCount: () => clickCount,
+          bubbleData: () => bubbles,
+        },
+      },
+    });
+    await vfx.addHTML(app, { shader: "none" });
+    vfx.play();
+  });
+</script>

@@ -186,8 +186,8 @@ export class VFXPlayer {
             this.#viewport = createRect({
                 top: -paddingY,
                 left: -paddingX,
-                right: widthWithPadding,
-                bottom: heightWithPadding,
+                right: width + paddingX,
+                bottom: height + paddingY,
             });
             this.#viewportInner = createRect({
                 top: 0,

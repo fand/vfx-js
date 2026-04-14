@@ -111,6 +111,8 @@ export interface CaptureOpts {
 const canvasResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
 const childResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
 const savedMargins = new WeakMap<HTMLElement, string>();
+const savedWidths = new WeakMap<HTMLElement, string>();
+const savedBoxSizing = new WeakMap<HTMLElement, string>();
 const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
 
 /**
@@ -317,9 +319,17 @@ export async function wrapElement(
 
     // DOM swap
     savedMargins.set(element, element.style.margin);
+    savedWidths.set(element, element.style.width);
+    savedBoxSizing.set(element, element.style.boxSizing);
     element.parentNode?.insertBefore(canvas, element);
     canvas.appendChild(element);
     element.style.setProperty("margin", "0");
+
+    // layoutsubtree canvas doesn't establish a standard block formatting
+    // context — block children won't auto-fill the containing block width.
+    // Force 100% so the element matches the canvas's CSS dimensions.
+    element.style.setProperty("width", "100%");
+    element.style.setProperty("box-sizing", "border-box");
 
     // Cross-origin images
     const restore = await inlineCrossOriginImages(element);
@@ -350,10 +360,20 @@ export function unwrapElement(
     canvas.parentNode?.insertBefore(element, canvas);
     canvas.remove();
 
-    // Restore original margin
+    // Restore original styles
     const savedMargin = savedMargins.get(element);
     if (savedMargin !== undefined) {
         element.style.margin = savedMargin;
         savedMargins.delete(element);
+    }
+    const savedWidth = savedWidths.get(element);
+    if (savedWidth !== undefined) {
+        element.style.width = savedWidth;
+        savedWidths.delete(element);
+    }
+    const savedBS = savedBoxSizing.get(element);
+    if (savedBS !== undefined) {
+        element.style.boxSizing = savedBS;
+        savedBoxSizing.delete(element);
     }
 }
