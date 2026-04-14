@@ -95,15 +95,17 @@ export default async function getCanvasFromElement(
     // Clone element with styles in text attribute
     const newElement = element.cloneNode(true) as HTMLElement;
     await syncStylesOfTree(element, newElement);
+    restoreAutoMargins(element, newElement);
     newElement.style.setProperty("opacity", originalOpacity.toString());
     newElement.style.setProperty("margin", "0px");
     zeroCollapsingMargins(newElement);
 
-    // Build SVG at full (unclamped) physical-pixel size.
+    // Build SVG at CSS-pixel dimensions so foreignObject CSS layout matches
+    // the original viewport. drawImage will scale up to DPR canvas resolution.
     const html = newElement.outerHTML;
     const xml = convertHtmlToXml(html);
     const svg =
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${fullW}" height="${fullH}">` +
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}">` +
         `<foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
 
     return new Promise((resolve, reject) => {
@@ -117,11 +119,7 @@ export default async function getCanvasFromElement(
             }
 
             ctx.clearRect(0, 0, canvasW, canvasH);
-            // DPR × clampScale so the SVG content fills the clamped canvas.
-            const drawScale = ratio * clampScale;
-            ctx.scale(drawScale, drawScale);
-            ctx.drawImage(img, 0, 0, fullW, fullH);
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.drawImage(img, 0, 0, canvasW, canvasH);
 
             resolve(canvas);
         };
@@ -134,6 +132,8 @@ export default async function getCanvasFromElement(
  * Pre-fetch `<img>` data URLs and build SVG overlay fragments if needed.
  * @internal
  */
+// @ts-ignore: temporarily unused after revert in bd9f3e8
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function prepareImages(
     element: HTMLElement,
     newElement: HTMLElement,
@@ -208,6 +208,17 @@ async function syncStylesOfTree(
     // Sync CSS styles
     const styles = window.getComputedStyle(el1);
     for (const key of Array.from(styles)) {
+        // Skip CSS logical properties and -webkit- prefixed aliases.
+        // Physical counterparts (margin-left, width, etc.) already carry
+        // the correct resolved values; logical duplicates can override
+        // them with stale initial values (e.g. -webkit-margin-start: 0
+        // overriding margin-left: 558px).
+        if (
+            /(-inline-|-block-|^inline-|^block-)/.test(key) ||
+            /^-webkit-.*(start|end|before|after|logical)/.test(key)
+        ) {
+            continue;
+        }
         el2.style.setProperty(
             key,
             styles.getPropertyValue(key),
@@ -234,6 +245,43 @@ async function syncStylesOfTree(
         const c1 = el1.children[i] as HTMLElement;
         const c2 = el2.children[i] as HTMLElement;
         await syncStylesOfTree(c1, c2);
+    }
+}
+
+/**
+ * syncStylesOfTree resolves `margin: auto` to pixel values, but inside
+ * SVG foreignObject the layout context differs and those pixel values
+ * no longer center the element. Detect auto margins on the original
+ * element via CSS Typed OM and restore them as `auto` on the clone so
+ * the foreignObject renderer resolves them correctly.
+ * @internal
+ */
+function restoreAutoMargins(original: HTMLElement, clone: HTMLElement): void {
+    if (typeof original.computedStyleMap === "function") {
+        try {
+            const map = original.computedStyleMap();
+            for (const prop of [
+                "margin-top",
+                "margin-right",
+                "margin-bottom",
+                "margin-left",
+            ] as const) {
+                const val = map.get(prop);
+                if (val instanceof CSSKeywordValue && val.value === "auto") {
+                    clone.style.setProperty(prop, "auto");
+                }
+            }
+        } catch {
+            // computedStyleMap may throw for detached elements
+        }
+    }
+
+    for (let i = 0; i < original.children.length; i++) {
+        const c1 = original.children[i];
+        const c2 = clone.children[i];
+        if (c1 instanceof HTMLElement && c2 instanceof HTMLElement) {
+            restoreAutoMargins(c1, c2);
+        }
     }
 }
 
