@@ -6,11 +6,11 @@
 <style>
   :root {
     --bg: #fbfbfd;
-    --bg-dark: #000;
     --fg: #1d1d1f;
     --fg-dark: #f5f5f7;
     --muted: #6e6e73;
     --link: #0066cc;
+    --border: 1px solid rgba(0, 0, 0, 0.08);
   }
 
   html,
@@ -26,12 +26,11 @@
 
   /* Nav */
   nav {
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 10;
     background: rgba(251, 251, 253, 0.8);
     backdrop-filter: saturate(180%) blur(20px);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    border-bottom: var(--border);
   }
   nav ul {
     display: flex;
@@ -43,46 +42,71 @@
     height: 44px;
     align-items: center;
     font-size: 0.82rem;
-    color: var(--fg);
   }
-  nav ul li a {
+  nav a {
     color: inherit;
     text-decoration: none;
     opacity: 0.85;
   }
-  nav ul li a:hover {
+  nav a:hover {
     opacity: 1;
   }
 
   /* Hero */
   .hero {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: black;
+  }
+  .hero img,
+  .tile img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .hero img {
+    background: black;
+    opacity: 0.3;
+  }
+  .copy {
     text-align: center;
-    padding: 56px 24px 48px;
-    background: url("https://images.unsplash.com/photo-1512054502232-10a0a035d672?w=1600&h=900&fit=crop") center / cover no-repeat;
+  }
+  .hero .copy {
+    position: absolute;
+    top: 30%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    color: #fff;
   }
   .hero h1 {
     font-size: 4.2rem;
     font-weight: 600;
     letter-spacing: -0.025em;
     margin: 0 0 8px;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
   }
   .hero h2 {
     font-size: 1.7rem;
     font-weight: 400;
     margin: 0 0 18px;
-    color: var(--fg);
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
   }
-  .hero .links {
-    font-size: 1.2rem;
-    color: var(--link);
-  }
-  .hero .links a {
-    color: inherit;
+  .actions a {
     text-decoration: none;
-    margin: 0 12px;
   }
-  .hero .links a:hover {
+  .actions a:hover {
     text-decoration: underline;
+  }
+  .hero .actions a {
+    color: #fff;
+    font-size: 1.2rem;
+    margin: 0 12px;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
   }
 
   /* Tile grid */
@@ -106,19 +130,11 @@
     grid-column: 1 / -1;
     aspect-ratio: 16 / 9;
   }
-  .tile img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index: 0;
-  }
   .tile .copy {
     position: relative;
     z-index: 1;
     padding: 56px 24px 0;
-    text-align: center;
+    color: var(--fg-dark);
   }
   .tile .eyebrow {
     font-size: 0.85rem;
@@ -138,25 +154,10 @@
     margin: 0 0 18px;
     opacity: 0.92;
   }
-  .tile .actions {
-    font-size: 1.05rem;
-  }
   .tile .actions a {
     color: var(--link);
-    text-decoration: none;
+    font-size: 1.05rem;
     margin: 0 10px;
-  }
-  .tile .actions a:hover {
-    text-decoration: underline;
-  }
-  .tile.dark .copy {
-    color: var(--fg-dark);
-  }
-  .tile.dark .actions a {
-    color: #2997ff;
-  }
-  .tile.light .copy {
-    color: var(--fg);
   }
 
   /* Footer */
@@ -165,7 +166,7 @@
     text-align: center;
     color: var(--muted);
     font-size: 0.78rem;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    border-top: var(--border);
     margin-top: 24px;
   }
 </style>
@@ -173,17 +174,23 @@
 <div id="app">
   <nav>
     <ul>
-      <li><a href="#">GitHub</a></li>
+      <li><a href="https://amagi.dev/vfx-js" target="_blank">VFX-JS</a></li>
     </ul>
   </nav>
 
-  <!--<section class="hero">
-    <h1>Liquid Glass Pro</h1>
-    <h2>A new way to look at the web.</h2>
-    <p class="links">
-      <a href="https://amagi.dev/vfx-js/" target="_blank">Learn more &gt;</a>
-    </p>
-  </section>-->
+  <section class="hero">
+    <img
+      src="https://images.unsplash.com/photo-1512054502232-10a0a035d672?w=1600&h=900&fit=crop"
+      alt=""
+    />
+    <div class="copy">
+      <h1>Liquid Glass Pro</h1>
+      <h2>A new way to look at the web.</h2>
+      <p class="actions">
+        <a href="https://amagi.dev/vfx-js/" target="_blank">Learn more &gt;</a>
+      </p>
+    </div>
+  </section>
 
   <section class="tiles">
     <div class="tile dark full">
@@ -269,6 +276,7 @@
       <img
         src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=1600&h=900&fit=crop"
         alt=""
+        style="opacity: 0.5"
       />
       <div class="copy">
         <p class="eyebrow">AirPods</p>
@@ -288,6 +296,15 @@
 <script type="module">
   import { VFX } from "@vfx-js/core";
 
+  const PARAMS = {
+    sphereR: 0.1,
+    bubbleCount: 8,
+    bubbleRadiusMin: 0.03,
+    bubbleRadiusMax: 0.06,  // min + range
+    bubbleSpeed: 0.6,
+    mouseSmoothing: 0.05,
+  };
+
   const postEffectShader = `
     precision highp float;
     uniform sampler2D src;
@@ -296,25 +313,24 @@
     uniform vec2 mouse;
     uniform vec2 lag;
     uniform float time;
+    uniform float clickTime;
+    uniform int clickCount;
     out vec4 outColor;
 
-    const float SPHERE_R = 0.06;
-    const float DISP = 0.015;
+    const float SPHERE_R = ${PARAMS.sphereR.toFixed(4)};
+    const float DISP = 0.03;
 
-    const int   DISP_STEPS = 12;
+    const int   DISP_STEPS =12;
     const float DISP_LO = 0.2;
     const float DISP_HI = 1.0;
 
     const float SCATTER = 0.012;
 
-    const int   N_BUBBLES = 7;
+    const int   N_BUBBLES = ${PARAMS.bubbleCount};
     const float BUBBLE_SMOOTH = 0.025;
-    uniform float bubbleData[28]; // 7 * (x, y, z, r)
+    uniform float bubbleData[${PARAMS.bubbleCount * 4}]; // N * (x, y, z, r)
 
-    // Beer–Lambert absorption per channel (units: 1/world-distance).
-    // Higher = more absorbed → that channel transmits less light.
-    // R/G/B mismatch tints the glass; equal values give neutral darkening.
-    const vec3  ABSORB  = vec3(2.0, 1.2, 1.0) * 5.;
+    const vec3  ABSORB  = vec3(2.0, 1.2, 1.0) * 3.;
 
     float smin(float a, float b, float k) {
       float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
@@ -327,6 +343,7 @@
       return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;
     }
 
+
     mat2 rot(float t) {
       float c = cos(t), s = sin(t);
       return mat2(c, -s, s, c);
@@ -334,6 +351,11 @@
 
     float sdSphere(vec3 p, float r) {
       return length(p) - r;
+    }
+
+    float sdBox(vec3 p, vec3 b, float r) {
+      vec3 q = abs(p) - b + r;
+      return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
     }
 
     float sdRing(vec3 p, vec2 r) {
@@ -344,11 +366,31 @@
     float map(vec3 p, vec3 c) {
       vec3 q = p - c;
 
-      // Main sphere
+      // Click reaction
+      float tt = clickTime * 5.0;
+      float bounce = exp(-tt) * sin(tt) * 5. + (1. - exp(-tt));
+      float s = bounce * 0.5 + 0.5;
+      q /= s;
+
+      q.xz *= rot(exp(-clickTime*3.0) * 8.);
+
+
+      // Main object
       vec3 sp = q;
-      sp.y += sin(sp.z * 131. + time * 4.5) * 0.003;
-      sp.z += sin(sp.x * 7. + sp.y * 11. + time * 7.) * 0.002;
-      float d = sdSphere(sp, SPHERE_R);
+      sp.y += sin(sp.z * 29. + time * 4.5) * 0.01;
+      sp.z += sin(sp.x * 23. + sp.y * 11. + time * 7.) * 0.01;
+      sp.xy *= rot(time*1.3);
+      sp.xz *= rot(time*1.1);
+
+      float d ;
+      int objType = clickCount % 3;
+      if (objType == 0) {
+        d = sdSphere(sp, SPHERE_R);
+      } else if (objType == 1) {
+        d = sdBox(sp, vec3(SPHERE_R), 0.01);
+      } else {
+        d = sdRing(sp, vec2(SPHERE_R, 0.01));
+      }
 
       // Bubbles (positions from JS uniform)
       for (int i = 0; i < N_BUBBLES; i++) {
@@ -358,7 +400,7 @@
         d = smin(d, sdSphere(q - bPos, max(r, 0.001)), BUBBLE_SMOOTH);
       }
 
-      return d;
+      return d * s;
     }
 
     // 6-tap gradient normal.
@@ -399,16 +441,16 @@
       vec3 c = vec3(mp, 0.0);
 
       const float SURF_EPS = 0.00003;
-      const float KICK     = 0.01;
-      const int   MAX_HITS = 4;
+      const float KICK = 0.01;
+      const int MAX_HITS = 4;
 
       vec3 firstN = vec3(0.0);
-      vec3 lastN  = vec3(0.0);
-      int  hitCount = 0;
+      vec3 lastN = vec3(0.0);
+      int hitCount = 0;
 
       // Total in-glass distance (Σ over all entry→exit slabs).
       float thickness = 0.0;
-      float tEntry    = 0.0;
+      float tEntry = 0.0;
       float t = 0.0;
       bool inside = false;
       for (int i = 0; i < 50; i++) {
@@ -457,32 +499,31 @@
           acc  += s * w;
           wsum += w;
         }
-        vec3 col = acc / wsum * 0.993;
-        col -= float(hitCount) * 0.03;
+        vec3 col = acc / wsum * 0.99;
+        col -= float(hitCount) * 0.05;
 
-        // Beer-Lambert: fraction of light that survives crossing thickness
-        // of glass = exp(-σ * d), per channel. Tints + darkens proportional
-        // to how much glass the ray actually traversed (Σ over all slabs).
-        col *= exp(-ABSORB * thickness);
+        col += 0.1;
 
         // Fresnel
-        float fres = pow(1.0 - max(dot(firstN, -rd), 0.0), 5.0);
-        col *= 1. + fres * 1.0;
+        float fres = pow(1.0 - NdotR, 5.0);
+        col *= 1. + fres;
 
-        float f2 = pow(max(dot(firstN, -rd), 0.0), 3.0);
-        col *= 1. + f2 * 2.0;
+        // Absorb
+        float f2 = 1. - pow(NdotR, 3.0);
+        col *= mix(vec3(1), exp(-ABSORB * thickness), f2);
+        col *= 1. + f2;
 
-        // Specular
-        vec3 ldir = normalize(vec3(0.5, 0.9, -0.3));
-        float spec = pow(max(dot(reflect(-ldir, firstN), -rd), 0.0), 200.0);
+        // Lights
+        vec3 ld = normalize(vec3(0.5, 0.9, -0.3));
+        float spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 200.0);
         col += spec * 30.;
 
-        vec3 ldir2 = normalize(vec3(-0.9, 0.4, -0.3));
-        spec = pow(max(dot(reflect(-ldir2, firstN), -rd), 0.0), 300.0);
+        ld = normalize(vec3(-0.9, 0.4, -0.3));
+        spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 300.0);
         col += spec * 3.;
 
-        ldir2 = normalize(vec3(-0.1, -0.9, -0.1));
-        spec = pow(max(dot(reflect(-ldir2, firstN), -rd), 0.0), 30.0);
+        ld = normalize(vec3(-0.1, -0.9, -0.1));
+        spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 30.0);
         col += spec * 0.5;
 
         // Edge
@@ -498,77 +539,75 @@
 
   window.addEventListener("load", async () => {
     const app = document.getElementById("app");
-
-    // --- Bubble simulation ---
-    const N = 7;
-    const SPHERE_R = 0.05;
-    const BUBBLE_RISE = 0.1;
-    const BUBBLE_SPEED = 0.5;
-
+    const N = PARAMS.bubbleCount;
     const fract = (x) => x - Math.floor(x);
     const rot2d = (x, y, t) => {
       const c = Math.cos(t), s = Math.sin(t);
       return [x * c - y * s, x * s + y * c];
     };
 
-    // Mouse positions in raw pixel coords (same space as VFX mouse uniform)
     const p0 = { x: 0, y: 0 };
     const p1 = { x: 0, y: 0 };
     const p2 = { x: 0, y: 0 };
-    window.addEventListener("mousemove", (e) => {
+    window.addEventListener("pointermove", (e) => {
       p0.x = e.clientX;
-      p0.y = window.innerHeight - e.clientY; // GL coords (Y up), same as VFX-JS
+      p0.y = window.innerHeight - e.clientY;
     });
 
-    const bubblesArr = Array.from({ length: N }, () => ({ x: 0, y: 0, z: 0, w: 0 }));
+    let lastClickTime = performance.now() / 1000;
+    let clickCount = 0;
+    window.addEventListener("pointerdown", () => {
+      lastClickTime = performance.now() / 1000;
+      clickCount++;
+    });
+
+    const bubbles = new Float32Array(N * 4);
     const t0 = performance.now() / 1000;
 
     function tick() {
       const time = performance.now() / 1000 - t0;
-
-      // Lag p2 toward p1
-      p1.x += (p0.x - p1.x) * 0.1;
-      p1.y += (p0.y - p1.y) * 0.1;
-      p2.x += (p1.x - p2.x) * 0.1;
-      p2.y += (p1.y - p2.y) * 0.1;
+      const sm = PARAMS.mouseSmoothing;
+      p1.x += (p0.x - p1.x) * sm;
+      p1.y += (p0.y - p1.y) * sm;
+      p2.x += (p1.x - p2.x) * sm;
+      p2.y += (p1.y - p2.y) * sm;
 
       for (let i = 0; i < N; i++) {
-        const life = fract(time * BUBBLE_SPEED + i / N);
+        const life = fract(time * PARAMS.bubbleSpeed + i / N);
 
         // Orbit
-        const orbitR = SPHERE_R * (0.3 + life * 0.8);
-        const orbitSpeed = 0.8 + fract(i * 0.618) * 0.7;
-        const orbitAngle = time * orbitSpeed + i * 1.256;
+        const orbitR = PARAMS.sphereR * (0.3 + life * 0.8);
+        const orbitAngle = time * (0.8 + fract(i * 0.618) * 0.7) + i * 1.256;
+
         let bx = Math.cos(orbitAngle) * orbitR;
         let by = 0;
         let bz = Math.sin(orbitAngle) * orbitR;
 
-        // Tilt orbit plane per bubble
+        // Tilt orbit
         [bx, by] = rot2d(bx, by, i * 2.3);
         [by, bz] = rot2d(by, bz, i * 1.8);
 
-        by += life * BUBBLE_RISE;
+        by += life * 0.1;
 
         // Wobble
         bx += Math.sin(time * 2.7 + i * 4.1) * 0.008 * life;
         bz += Math.cos(time * 3.1 + i * 3.7) * 0.008 * life;
 
-        // Offset from sphere center to lagged mouse (p2 - p1) in shader space
+        // Offset from sphere center
         const w = window.innerWidth, h = window.innerHeight;
-        const a = h / w;
-        bx += ((p2.x - p1.x) / w) * a;
+        bx += ((p2.x - p1.x) / w) * (h / w);
         by += (p2.y - p1.y) / h;
 
-        // Radius: grow then shrink
-        const maxR = 0.02 + 0.01 * fract(i * 0.618);
-        const r = maxR * Math.sin(life * Math.PI);
+        // Bubble radius
+        const range = PARAMS.bubbleRadiusMax - PARAMS.bubbleRadiusMin;
+        const maxR = PARAMS.bubbleRadiusMin + range * fract(i * 0.618);
 
-        bubblesArr[i].x = bx;
-        bubblesArr[i].y = by;
-        bubblesArr[i].z = bz;
-        bubblesArr[i].w = r;
+        const j = i * 4;
+        bubbles[j] = bx;
+        bubbles[j + 1] = by;
+        bubbles[j + 2] = bz;
+        bubbles[j + 3] = maxR * Math.sin(life * Math.PI);
       }
-
       requestAnimationFrame(tick);
     }
     tick();
@@ -577,20 +616,14 @@
       postEffect: {
         shader: postEffectShader,
         uniforms: {
-          lag: () => {
-            const dx = (p1.x - p0.x) * devicePixelRatio;
-            const dy = (p1.y - p0.y) * devicePixelRatio;
-            return [dx, dy];
-          },
-          bubbleData: () => {
-            const arr = [];
-            for (const b of bubblesArr) arr.push(b.x, b.y, b.z, b.w);
-            return arr;
-          },
+          lag: () => [(p1.x - p0.x) * devicePixelRatio, (p1.y - p0.y) * devicePixelRatio],
+          clickTime: () => performance.now() / 1000 - lastClickTime,
+          clickCount: () => clickCount,
+          bubbleData: () => bubbles,
         },
       },
     });
-    await vfx.add(app, { shader: "none" });
+    await vfx.addHTML(app, { shader: "none" });
     vfx.play();
   });
 </script>
