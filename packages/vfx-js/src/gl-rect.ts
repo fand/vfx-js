@@ -23,7 +23,7 @@ export function rectToGLRect(
 ): GLRect {
     return {
         x: rect.left + paddingX,
-        y: containerHeight - paddingY * 2 - rect.bottom,
+        y: containerHeight - paddingY - rect.bottom,
         w: rect.right - rect.left,
         h: rect.bottom - rect.top,
     };
