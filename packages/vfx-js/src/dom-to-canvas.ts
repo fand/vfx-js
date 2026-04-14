@@ -24,43 +24,6 @@ const convertHtmlToXml = (html: string): string => {
 };
 
 /**
- * Detect whether foreignObject renders `<img>`. WebKit blocks this,
- * so we fall back to native SVG `<image>` overlays. Cached.
- * @internal
- */
-let foreignObjectImgSupport: Promise<boolean> | undefined;
-function detectForeignObjectImgSupport(): Promise<boolean> {
-    if (foreignObjectImgSupport) {
-        return foreignObjectImgSupport;
-    }
-    foreignObjectImgSupport = new Promise<boolean>((resolve) => {
-        // 1×1 red PNG data URL for the sniff test.
-        const RED_1X1 =
-            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Z3a4xUAAAAASUVORK5CYII=";
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><foreignObject width="100%" height="100%"><img xmlns="http://www.w3.org/1999/xhtml" src="${RED_1X1}" width="1" height="1" /></foreignObject></svg>`;
-        const img = new Image();
-        img.onload = () => {
-            try {
-                const c = new OffscreenCanvas(1, 1);
-                const ctx = c.getContext("2d");
-                if (!ctx) {
-                    return resolve(false);
-                }
-                ctx.drawImage(img, 0, 0);
-                // alpha > 0 → foreignObject did render the <img>
-                const alpha = ctx.getImageData(0, 0, 1, 1).data[3];
-                resolve(alpha > 0);
-            } catch {
-                resolve(false);
-            }
-        };
-        img.onerror = () => resolve(false);
-        img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-    });
-    return foreignObjectImgSupport;
-}
-
-/**
  * Render element content to canvas and return it.
  * @internal
  */
@@ -129,79 +92,6 @@ export default async function getCanvasFromElement(
 
         img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     });
-}
-
-/**
- * Pre-fetch `<img>` data URLs and build SVG overlay fragments if needed.
- * @internal
- */
-// @ts-ignore: temporarily unused after revert in bd9f3e8
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function prepareImages(
-    element: HTMLElement,
-    newElement: HTMLElement,
-    rect: DOMRect,
-): Promise<{ imageEls: string[]; clipPathDefs: string[] }> {
-    const originalImgs = Array.from(
-        element.querySelectorAll("img"),
-    ) as HTMLImageElement[];
-    const clonedImgs = Array.from(
-        newElement.querySelectorAll("img"),
-    ) as HTMLImageElement[];
-    const dataUrls = await Promise.all(
-        originalImgs.map(async (img) => {
-            if (!img.complete || img.naturalWidth === 0) {
-                return null;
-            }
-            try {
-                return await toObjectUrl(img.src);
-            } catch {
-                return null;
-            }
-        }),
-    );
-
-    const useForeignObjectImg = await detectForeignObjectImgSupport();
-
-    if (useForeignObjectImg) {
-        for (let i = 0; i < clonedImgs.length; i++) {
-            const dataUrl = dataUrls[i];
-            if (dataUrl) {
-                clonedImgs[i].src = dataUrl;
-            }
-        }
-        return { imageEls: [], clipPathDefs: [] };
-    }
-
-    // WebKit: hide cloned imgs, overlay as SVG <image> elements.
-    const clipPathDefs: string[] = [];
-    const imageEls = clonedImgs.map((cloned, i) => {
-        cloned.style.setProperty("visibility", "hidden");
-        const dataUrl = dataUrls[i];
-        if (!dataUrl) {
-            return "";
-        }
-        const orig = originalImgs[i];
-        const cs = window.getComputedStyle(orig);
-        const r = orig.getBoundingClientRect();
-        const x = r.left - rect.left;
-        const y = r.top - rect.top;
-
-        const radii = parseUniformBorderRadius(cs);
-        let clipAttr = "";
-        if (radii) {
-            const clipId = `vfx-img-clip-${i}`;
-            clipPathDefs.push(
-                `<clipPath id="${clipId}"><rect x="${x}" y="${y}" width="${r.width}" height="${r.height}" rx="${radii.rx}" ry="${radii.ry}" /></clipPath>`,
-            );
-            clipAttr = ` clip-path="url(#${clipId})"`;
-        }
-
-        const par = imgObjectFitToPreserveAspectRatio(cs);
-        return `<image href="${dataUrl}" x="${x}" y="${y}" width="${r.width}" height="${r.height}" preserveAspectRatio="${par}"${clipAttr} />`;
-    });
-
-    return { imageEls, clipPathDefs };
 }
 
 async function syncStylesOfTree(
@@ -346,48 +236,6 @@ function zeroCollapsingMargins(root: HTMLElement): void {
         child.style.setProperty("margin-bottom", "0px");
         el = child;
     }
-}
-
-/**
- * Return `{ rx, ry }` if all four border-radius corners are equal, else null.
- * @internal
- */
-function parseUniformBorderRadius(
-    cs: CSSStyleDeclaration,
-): { rx: number; ry: number } | null {
-    const tl = cs.borderTopLeftRadius;
-    const tr = cs.borderTopRightRadius;
-    const bl = cs.borderBottomLeftRadius;
-    const br = cs.borderBottomRightRadius;
-    if (tl !== tr || tl !== bl || tl !== br) {
-        return null;
-    }
-    const parts = tl.split(/\s+/).map((s) => Number.parseFloat(s));
-    if (parts.length === 0 || !Number.isFinite(parts[0])) {
-        return null;
-    }
-    const rx = parts[0];
-    const ry = parts.length > 1 && Number.isFinite(parts[1]) ? parts[1] : rx;
-    if (rx <= 0 && ry <= 0) {
-        return null;
-    }
-    return { rx, ry };
-}
-
-/**
- * Convert CSS object-fit/object-position to SVG preserveAspectRatio.
- * Only handles contain/cover; others fall back to fill.
- * @internal
- */
-function imgObjectFitToPreserveAspectRatio(cs: CSSStyleDeclaration): string {
-    const fit = cs.objectFit || "fill";
-    if (fit !== "contain" && fit !== "cover") {
-        return "none";
-    }
-    const pos = (cs.objectPosition || "50% 50%").split(/\s+/);
-    const ax = pos[0] === "0%" ? "Min" : pos[0] === "100%" ? "Max" : "Mid";
-    const ay = pos[1] === "0%" ? "Min" : pos[1] === "100%" ? "Max" : "Mid";
-    return `x${ax}Y${ay} ${fit === "cover" ? "slice" : "meet"}`;
 }
 
 // ref. https://stackoverflow.com/questions/44698967/
