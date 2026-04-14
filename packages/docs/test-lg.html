@@ -294,10 +294,11 @@
     uniform vec2 resolution;
     uniform vec2 offset;
     uniform vec2 mouse;
+    uniform vec2 mouse1;
     uniform float time;
     out vec4 outColor;
 
-    const float SPHERE_R = 0.05;
+    const float SPHERE_R = 0.06;
     const float DISP = 0.015;
 
     const int   DISP_STEPS = 12;
@@ -307,9 +308,8 @@
     const float SCATTER = 0.012;
 
     const int   N_BUBBLES = 7;
-    const float BUBBLE_RISE = 0.06;
-    const float BUBBLE_SPEED = 0.25;
     const float BUBBLE_SMOOTH = 0.025;
+    uniform float bubbleData[28]; // 7 * (x, y, z, r)
 
     // Beer–Lambert absorption per channel (units: 1/world-distance).
     // Higher = more absorbed → that channel transmits less light.
@@ -350,32 +350,11 @@
       sp.z += sin(sp.x * 7. + sp.y * 11. + time * 7.) * 0.002;
       float d = sdSphere(sp, SPHERE_R);
 
-      // Bubbles
+      // Bubbles (positions from JS uniform)
       for (int i = 0; i < N_BUBBLES; i++) {
-        float fi = float(i);
-        float life = fract(time * BUBBLE_SPEED + fi / float(N_BUBBLES));
-
-        // pos
-        float orbitR = SPHERE_R * (0.3 + life * 0.8);
-        float orbitSpeed = (0.8 + fract(fi * 0.618) * 0.7);
-        float orbitAngle = time * orbitSpeed + fi * 1.256;
-        vec3 bPos = vec3(cos(orbitAngle) * orbitR, 0.0, sin(orbitAngle) * orbitR);
-
-        // Tilt orbit plane
-        bPos.xy *= rot(fi * 2.3);
-        bPos.yz *= rot(fi * 1.8);
-
-        // Rise
-        bPos.y += life * BUBBLE_RISE;
-
-        // Wobble
-        bPos.x += sin(time * 2.7 + fi * 4.1) * 0.008 * life;
-        bPos.z += cos(time * 3.1 + fi * 3.7) * 0.008 * life;
-
-        // Grow from surface, shrink before disappearing
-        float maxR = mix(0.02, 0.03, fract(fi * 0.618));
-        float r = maxR * sin(life * 3.14159);
-
+        int b = i * 4;
+        vec3 bPos = vec3(bubbleData[b], bubbleData[b+1], bubbleData[b+2]);
+        float r = bubbleData[b+3];
         d = smin(d, sdSphere(q - bPos, max(r, 0.001)), BUBBLE_SMOOTH);
       }
 
@@ -412,11 +391,13 @@
 
       vec2 p = (uv - 0.5) * vec2(1.0, aspect);
       vec2 mp = (mouse / resolution - 0.5) * vec2(aspect, 1.0);
+      vec2 mp1 = (mouse1 / resolution - 0.5) * vec2(aspect, 1.0);
 
-      vec3  ro    = vec3(0.0, 0.0, -2.0);
+      vec3 ro = vec3(0.0, 0.0, -2.0);
       float focal = 2.0;
-      vec3  rd    = normalize(vec3(p, focal));
-      vec3  c     = vec3(mp, 0.0);
+      vec3 rd = normalize(vec3(p, focal));
+
+      vec3 c = vec3(mp, 0.0);
 
       const float SURF_EPS = 0.00003;
       const float KICK     = 0.01;
@@ -425,6 +406,7 @@
       vec3 firstN = vec3(0.0);
       vec3 lastN  = vec3(0.0);
       int  hitCount = 0;
+
       // Total in-glass distance (Σ over all entry→exit slabs).
       float thickness = 0.0;
       float tEntry    = 0.0;
@@ -486,7 +468,7 @@
 
         // Fresnel
         float fres = pow(1.0 - max(dot(firstN, -rd), 0.0), 5.0);
-        // col *= 1. + fres * 2.0;
+        col *= 1. + fres * 1.0;
 
         float f2 = pow(max(dot(firstN, -rd), 0.0), 1.0);
         col *= 1. + f2 * 0.7;
@@ -504,24 +486,108 @@
         spec = pow(max(dot(reflect(-ldir2, firstN), -rd), 0.0), 30.0);
         col += spec * 0.5;
 
-
+        // Edge
         col = min(col, 1.);
-        col = 1. - abs(col + fres * .3 - 1.);
+        col = 1. - abs(col + fres * .5 - 1.);
 
         outColor = vec4(col, 1.0);
       } else {
         outColor = getSrc(uv);
       }
-
-
     }
     `;
 
   window.addEventListener("load", async () => {
     const app = document.getElementById("app");
-    const vfx = new VFX({ postEffect: { shader: postEffectShader } });
+
+    // --- Bubble simulation ---
+    const N = 7;
+    const SPHERE_R = 0.05;
+    const BUBBLE_RISE = 0.1;
+    const BUBBLE_SPEED = 0.5;
+
+    const fract = (x) => x - Math.floor(x);
+    const rot2d = (x, y, t) => {
+      const c = Math.cos(t), s = Math.sin(t);
+      return [x * c - y * s, x * s + y * c];
+    };
+
+    // Mouse positions in raw pixel coords (same space as VFX mouse uniform)
+    const p0 = { x: 0, y: 0 };
+    const p1 = { x: 0, y: 0 };
+    const p2 = { x: 0, y: 0 };
+    window.addEventListener("mousemove", (e) => {
+      p0.x = e.clientX;
+      p0.y = window.innerHeight - e.clientY; // GL coords (Y up), same as VFX-JS
+    });
+
+    const bubblesArr = Array.from({ length: N }, () => ({ x: 0, y: 0, z: 0, w: 0 }));
+    const t0 = performance.now() / 1000;
+
+    function tick() {
+      const time = performance.now() / 1000 - t0;
+
+      // Lag p2 toward p1
+      p1.x += (p0.x - p1.x) * 0.1;
+      p1.y += (p0.y - p1.y) * 0.1;
+      p2.x += (p1.x - p2.x) * 0.1;
+      p2.y += (p1.y - p2.y) * 0.1;
+
+      for (let i = 0; i < N; i++) {
+        const life = fract(time * BUBBLE_SPEED + i / N);
+
+        // Orbit
+        const orbitR = SPHERE_R * (0.3 + life * 0.8);
+        const orbitSpeed = 0.8 + fract(i * 0.618) * 0.7;
+        const orbitAngle = time * orbitSpeed + i * 1.256;
+        let bx = Math.cos(orbitAngle) * orbitR;
+        let by = 0;
+        let bz = Math.sin(orbitAngle) * orbitR;
+
+        // Tilt orbit plane per bubble
+        [bx, by] = rot2d(bx, by, i * 2.3);
+        [by, bz] = rot2d(by, bz, i * 1.8);
+
+        by += life * BUBBLE_RISE;
+
+        // Wobble
+        bx += Math.sin(time * 2.7 + i * 4.1) * 0.008 * life;
+        bz += Math.cos(time * 3.1 + i * 3.7) * 0.008 * life;
+
+        // Offset from sphere center to lagged mouse (p2 - p1) in shader space
+        const w = window.innerWidth, h = window.innerHeight;
+        const a = h / w;
+        bx += ((p2.x - p1.x) / w) * a;
+        by += (p2.y - p1.y) / h;
+
+        // Radius: grow then shrink
+        const maxR = 0.02 + 0.01 * fract(i * 0.618);
+        const r = maxR * Math.sin(life * Math.PI);
+
+        bubblesArr[i].x = bx;
+        bubblesArr[i].y = by;
+        bubblesArr[i].z = bz;
+        bubblesArr[i].w = r;
+      }
+
+      requestAnimationFrame(tick);
+    }
+    tick();
+
+    const vfx = new VFX({
+      postEffect: {
+        shader: postEffectShader,
+        uniforms: {
+          mouse1: () => [p1.x * devicePixelRatio, p1.y * devicePixelRatio],
+          bubbleData: () => {
+            const arr = [];
+            for (const b of bubblesArr) arr.push(b.x, b.y, b.z, b.w);
+            return arr;
+          },
+        },
+      },
+    });
     await vfx.add(app, { shader: "none" });
     vfx.play();
-    // vfx.update(app);
   });
 </script>
