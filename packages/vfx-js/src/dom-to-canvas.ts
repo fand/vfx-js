@@ -100,12 +100,11 @@ export default async function getCanvasFromElement(
     newElement.style.setProperty("margin", "0px");
     zeroCollapsingMargins(newElement);
 
-    // Build SVG at CSS-pixel dimensions so foreignObject CSS layout matches
-    // the original viewport. drawImage will scale up to DPR canvas resolution.
+    // Build SVG at full (unclamped) physical-pixel size.
     const html = newElement.outerHTML;
     const xml = convertHtmlToXml(html);
     const svg =
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${rect.width}" height="${rect.height}">` +
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${fullW}" height="${fullH}">` +
         `<foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
 
     return new Promise((resolve, reject) => {
@@ -119,7 +118,11 @@ export default async function getCanvasFromElement(
             }
 
             ctx.clearRect(0, 0, canvasW, canvasH);
-            ctx.drawImage(img, 0, 0, canvasW, canvasH);
+            // DPR × clampScale so the SVG content fills the clamped canvas.
+            const drawScale = ratio * clampScale;
+            ctx.scale(drawScale, drawScale);
+            ctx.drawImage(img, 0, 0, fullW, fullH);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
 
             resolve(canvas);
         };
@@ -249,11 +252,10 @@ async function syncStylesOfTree(
 }
 
 /**
- * syncStylesOfTree resolves `margin: auto` to pixel values, but inside
- * SVG foreignObject the layout context differs and those pixel values
- * no longer center the element. Detect auto margins on the original
- * element via CSS Typed OM and restore them as `auto` on the clone so
- * the foreignObject renderer resolves them correctly.
+ * Restore `margin: auto` on the clone for elements that use auto margins
+ * for centering. syncStylesOfTree resolves auto to pixel values, but those
+ * values may be incorrect (e.g. 0px on initial load). Detecting via CSS
+ * Typed OM and restoring as `auto` lets the foreignObject resolve them.
  * @internal
  */
 function restoreAutoMargins(original: HTMLElement, clone: HTMLElement): void {
