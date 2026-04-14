@@ -2,6 +2,7 @@ import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 import { unwrapElement, wrapElement } from "./html-in-canvas.js";
 import { type VFXOpts, type VFXProps, getVFXOpts } from "./types.js";
 import { VFXPlayer } from "./vfx-player.js";
+import { isWebGLAvailable } from "./webgl-support.js";
 
 function checkEnvironment() {
     if (typeof window === "undefined") {
@@ -30,15 +31,26 @@ function getCanvasStyle(fixed: boolean) {
  * The main interface of VFX-JS.
  */
 export class VFX {
-    #player: VFXPlayer;
-    #canvas: HTMLCanvasElement;
+    #player: VFXPlayer | null = null;
+    #canvas: HTMLCanvasElement | null = null;
     #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
 
     /**
      * Creates VFX instance and start playing immediately.
+     *
+     * When WebGL is not available the instance stays inert — all methods
+     * become safe no-ops so the rest of the application keeps working.
      */
     constructor(options: VFXOpts = {}) {
         checkEnvironment();
+
+        if (!isWebGLAvailable()) {
+            console.warn(
+                "VFX-JS: WebGL is not available. Effects will be disabled.",
+            );
+            return;
+        }
+
         const opts = getVFXOpts(options);
 
         // Setup canvas
@@ -68,6 +80,10 @@ export class VFX {
         opts: VFXProps,
         initialCapture?: OffscreenCanvas,
     ): Promise<void> {
+        if (!this.#player) {
+            return;
+        }
+
         if (element instanceof HTMLImageElement) {
             await this.#addImage(element, opts);
         } else if (element instanceof HTMLVideoElement) {
@@ -91,11 +107,11 @@ export class VFX {
         canvas: HTMLCanvasElement,
         offscreen: OffscreenCanvas,
     ): void {
-        this.#player.updateHICTexture(canvas, offscreen);
+        this.#player?.updateHICTexture(canvas, offscreen);
     }
 
     get maxTextureSize(): number {
-        return this.#player.maxTextureSize;
+        return this.#player?.maxTextureSize ?? 0;
     }
 
     /**
@@ -104,6 +120,10 @@ export class VFX {
      * Falls back to `add()` if html-in-canvas is not supported.
      */
     async addHTML(element: HTMLElement, opts: VFXProps): Promise<void> {
+        if (!this.#player) {
+            return;
+        }
+
         if (!supportsHtmlInCanvas()) {
             console.warn(
                 "html-in-canvas not supported, falling back to dom-to-canvas",
@@ -119,27 +139,33 @@ export class VFX {
 
         const { overlay: _, ...hicOpts } = opts;
 
+        const player = this.#player;
+
         let wrapper = this.#wrapperCanvases.get(element);
         if (wrapper) {
-            this.#player.removeElement(wrapper);
+            player.removeElement(wrapper);
         }
 
         const { canvas, initialCapture } = await wrapElement(element, {
             onCapture: (offscreen) => {
-                this.#player.updateHICTexture(canvas, offscreen);
+                player.updateHICTexture(canvas, offscreen);
             },
-            maxSize: this.#player.maxTextureSize,
+            maxSize: player.maxTextureSize,
         });
         wrapper = canvas;
         this.#wrapperCanvases.set(element, wrapper);
 
-        await this.#player.addElement(wrapper, hicOpts, initialCapture);
+        await player.addElement(wrapper, hicOpts, initialCapture);
     }
 
     /**
      * Remove the element from VFX and stop rendering the shader.
      */
     remove(element: HTMLElement): void {
+        if (!this.#player) {
+            return;
+        }
+
         const wrapper = this.#wrapperCanvases.get(element);
         if (wrapper) {
             unwrapElement(wrapper, element);
@@ -159,6 +185,10 @@ export class VFX {
      * This is useful to apply effects to eleents whose contents change dynamically (e.g. input, textare etc).
      */
     async update(element: HTMLElement): Promise<void> {
+        if (!this.#player) {
+            return;
+        }
+
         const wrapper = this.#wrapperCanvases.get(element);
         if (wrapper) {
             wrapper.requestPaint();
@@ -177,7 +207,7 @@ export class VFX {
      * Start rendering VFX.
      */
     play(): void {
-        this.#player.play();
+        this.#player?.play();
     }
 
     /**
@@ -185,7 +215,7 @@ export class VFX {
      * You can restart rendering by calling `VFX.play()` later.
      */
     stop(): void {
-        this.#player.stop();
+        this.#player?.stop();
     }
 
     /**
@@ -193,7 +223,7 @@ export class VFX {
      * This is useful when you want to control the rendering timings manually by combining with `autoplay: false`.
      */
     render(): void {
-        this.#player.render();
+        this.#player?.render();
     }
 
     /**
@@ -205,19 +235,24 @@ export class VFX {
         }
         this.#wrapperCanvases.clear();
 
-        this.#player.destroy();
-        this.#canvas.remove();
+        this.#player?.destroy();
+        this.#canvas?.remove();
     }
 
     #addImage(element: HTMLImageElement, opts: VFXProps): Promise<void> {
+        if (!this.#player) {
+            return Promise.resolve();
+        }
+
         if (element.complete) {
             return this.#player.addElement(element, opts);
         } else {
+            const player = this.#player;
             return new Promise<void>((resolve) => {
                 element.addEventListener(
                     "load",
                     () => {
-                        this.#player.addElement(element, opts);
+                        player.addElement(element, opts);
                         resolve();
                     },
                     { once: true },
@@ -227,14 +262,19 @@ export class VFX {
     }
 
     #addVideo(element: HTMLVideoElement, opts: VFXProps): Promise<void> {
+        if (!this.#player) {
+            return Promise.resolve();
+        }
+
         if (element.readyState >= 3) {
             return this.#player.addElement(element, opts);
         } else {
+            const player = this.#player;
             return new Promise<void>((resolve) => {
                 element.addEventListener(
                     "canplay",
                     () => {
-                        this.#player.addElement(element, opts);
+                        player.addElement(element, opts);
                         resolve();
                     },
                     { once: true },
@@ -244,10 +284,16 @@ export class VFX {
     }
 
     #addCanvas(element: HTMLCanvasElement, opts: VFXProps): Promise<void> {
+        if (!this.#player) {
+            return Promise.resolve();
+        }
         return this.#player.addElement(element, opts);
     }
 
     #addText(element: HTMLElement, opts: VFXProps): Promise<void> {
+        if (!this.#player) {
+            return Promise.resolve();
+        }
         return this.#player.addElement(element, opts);
     }
 }
