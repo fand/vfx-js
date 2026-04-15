@@ -648,6 +648,14 @@ export class VFXPlayer {
         return this.#renderer.capabilities.maxTextureSize;
     }
 
+    forceContextLoss(): void {
+        this.#renderer.forceContextLoss();
+    }
+
+    forceContextRestore(): void {
+        this.#renderer.forceContextRestore();
+    }
+
     isPlaying(): boolean {
         return this.#playRequest !== undefined;
     }

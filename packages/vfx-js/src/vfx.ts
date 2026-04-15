@@ -115,6 +115,22 @@ export class VFX {
     }
 
     /**
+     * Simulate a WebGL context loss via the `WEBGL_lose_context` extension.
+     * Useful for testing how your application handles GPU context loss.
+     */
+    forceContextLoss(): void {
+        this.#player?.forceContextLoss();
+    }
+
+    /**
+     * Simulate a WebGL context restore via the `WEBGL_lose_context` extension.
+     * Useful for testing recovery after a forced context loss.
+     */
+    forceContextRestore(): void {
+        this.#player?.forceContextRestore();
+    }
+
+    /**
      * Register an element using html-in-canvas API.
      * Wraps the element in a `<canvas layoutsubtree>` and captures via drawElementImage.
      * Falls back to `add()` if html-in-canvas is not supported.
