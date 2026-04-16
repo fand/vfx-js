@@ -21,12 +21,18 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
     const [vfx, setVFX] = useState<VFX | null>(null);
 
     useEffect(() => {
-        // Setup player
-        const vfx = new VFX({
-            pixelRatio: props.pixelRatio,
-            postEffect: props.postEffect,
-            wrapper: props.wrapper?.current ?? undefined,
-        });
+        let vfx: VFX;
+        try {
+            vfx = new VFX({
+                pixelRatio: props.pixelRatio,
+                postEffect: props.postEffect,
+                wrapper: props.wrapper?.current ?? undefined,
+            });
+        } catch {
+            // WebGL unavailable — render children without effects
+            return;
+        }
+
         setVFX(vfx);
         vfx.play();
 

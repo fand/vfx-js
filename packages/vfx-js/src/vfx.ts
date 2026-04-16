@@ -2,6 +2,7 @@ import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 import { unwrapElement, wrapElement } from "./html-in-canvas.js";
 import { type VFXOpts, type VFXProps, getVFXOpts } from "./types.js";
 import { VFXPlayer } from "./vfx-player.js";
+import { isWebGLAvailable } from "./webgl-support.js";
 
 function checkEnvironment() {
     if (typeof window === "undefined") {
@@ -35,10 +36,29 @@ export class VFX {
     #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
 
     /**
+     * Create a VFX instance if WebGL is available, or return `null`.
+     */
+    static init(options?: VFXOpts): VFX | null {
+        try {
+            return new VFX(options);
+        } catch {
+            return null;
+        }
+    }
+
+    /**
      * Creates VFX instance and start playing immediately.
+     * @throws When WebGL is not available in the current environment.
      */
     constructor(options: VFXOpts = {}) {
         checkEnvironment();
+
+        if (!isWebGLAvailable()) {
+            throw new Error(
+                "[VFX-JS] WebGL is not available in this environment.",
+            );
+        }
+
         const opts = getVFXOpts(options);
 
         // Setup canvas
