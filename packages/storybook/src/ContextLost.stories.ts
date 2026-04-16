@@ -6,7 +6,9 @@ import { initVFX } from "./utils";
 import Logo from "./assets/logo-640w-20p.svg";
 import "./preset.css";
 
-function getVFXContext(): WEBGL_lose_context | null {
+/** Must be called while the context is still active; the extension
+ *  reference stays valid even after context loss. */
+function getVFXLoseContextExt(): WEBGL_lose_context | null {
     const canvas = document.querySelector(
         'canvas[style*="pointer-events"]',
     ) as HTMLCanvasElement | null;
@@ -73,7 +75,8 @@ export const ContextLostAndRestore: StoryObj = {
         const loseBtn = canvasElement.querySelectorAll("button")[0];
         const restoreBtn = canvasElement.querySelectorAll("button")[1];
 
-        const ext = getVFXContext();
+        // Grab once while the context is alive — getExtension returns null after loss
+        const ext = getVFXLoseContextExt();
 
         loseBtn.addEventListener("click", () => {
             ext?.loseContext();
@@ -89,18 +92,25 @@ export const ContextLostAndRestore: StoryObj = {
 
 function ContextLostReactApp() {
     const statusRef = useRef<HTMLSpanElement>(null);
+    const extRef = useRef<WEBGL_lose_context | null>(null);
 
-    const handleLose = useCallback(() => {
-        const ext = getVFXContext();
-        ext?.loseContext();
-        if (statusRef.current) {
-            statusRef.current.textContent = "Status: context lost";
+    // Grab extension once after first render (context is alive)
+    const initExt = useCallback(() => {
+        if (!extRef.current) {
+            extRef.current = getVFXLoseContextExt();
         }
     }, []);
 
+    const handleLose = useCallback(() => {
+        initExt();
+        extRef.current?.loseContext();
+        if (statusRef.current) {
+            statusRef.current.textContent = "Status: context lost";
+        }
+    }, [initExt]);
+
     const handleRestore = useCallback(() => {
-        const ext = getVFXContext();
-        ext?.restoreContext();
+        extRef.current?.restoreContext();
         if (statusRef.current) {
             statusRef.current.textContent = "Status: context restored";
         }
