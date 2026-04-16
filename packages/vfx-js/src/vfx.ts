@@ -36,6 +36,17 @@ export class VFX {
     #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
 
     /**
+     * Create a VFX instance if WebGL is available, or return `null`.
+     */
+    static init(options?: VFXOpts): VFX | null {
+        try {
+            return new VFX(options);
+        } catch {
+            return null;
+        }
+    }
+
+    /**
      * Creates VFX instance and start playing immediately.
      * @throws When WebGL is not available in the current environment.
      */
