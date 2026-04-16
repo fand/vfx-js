@@ -30,23 +30,20 @@ export const ContextLostAndRestore: StoryObj = {
         wrapper.style.gap = "20px";
         wrapper.style.padding = "20px";
 
-        // Controls overlay — must sit above the VFX canvas (z-index 9999)
-        const controls = document.createElement("div");
-        controls.style.position = "fixed";
-        controls.style.top = "12px";
-        controls.style.left = "12px";
-        controls.style.zIndex = "10000";
-        controls.style.display = "flex";
-        controls.style.alignItems = "center";
-        controls.style.gap = "12px";
-        wrapper.appendChild(controls);
-
-        const status = document.createElement("span");
+        // Status display
+        const status = document.createElement("div");
+        status.dataset.role = "status";
         status.style.color = "white";
         status.style.fontFamily = "monospace";
         status.style.fontSize = "14px";
         status.textContent = "Status: rendering";
-        controls.appendChild(status);
+        wrapper.appendChild(status);
+
+        // Buttons
+        const controls = document.createElement("div");
+        controls.style.display = "flex";
+        controls.style.gap = "12px";
+        wrapper.appendChild(controls);
 
         const btnStyle = (btn: HTMLButtonElement) => {
             btn.style.padding = "8px 16px";
@@ -68,7 +65,6 @@ export const ContextLostAndRestore: StoryObj = {
         restoreBtn.textContent = "Force Context Restore";
         restoreBtn.style.background = "#3a3";
         btnStyle(restoreBtn);
-        restoreBtn.disabled = true;
         controls.appendChild(restoreBtn);
 
         // Image
@@ -79,7 +75,6 @@ export const ContextLostAndRestore: StoryObj = {
         // Init VFX
         initVFX();
 
-        // Use play() callback so VFX canvas is already in the DOM
         return wrapper;
     },
     play: async ({ canvasElement }) => {
@@ -96,7 +91,9 @@ export const ContextLostAndRestore: StoryObj = {
         const vfx = (window as any).vfx;
         await vfx.add(img, { shader: "rainbow" });
 
-        const status = canvasElement.querySelector("div") as HTMLDivElement;
+        const status = canvasElement.querySelector(
+            '[data-role="status"]',
+        ) as HTMLDivElement;
         const loseBtn = canvasElement.querySelectorAll("button")[0];
         const restoreBtn = canvasElement.querySelectorAll("button")[1];
 
@@ -105,17 +102,11 @@ export const ContextLostAndRestore: StoryObj = {
         loseBtn.addEventListener("click", () => {
             ext?.loseContext();
             status.textContent = "Status: context lost";
-            // status.style.color = "#f88";
-            // loseBtn.disabled = true;
-            // restoreBtn.disabled = false;
         });
 
         restoreBtn.addEventListener("click", () => {
             ext?.restoreContext();
             status.textContent = "Status: context restored";
-            // status.style.color = "#8f8";
-            // loseBtn.disabled = false;
-            // restoreBtn.disabled = true;
         });
     },
 };
