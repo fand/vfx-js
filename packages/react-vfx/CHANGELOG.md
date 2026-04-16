@@ -1,5 +1,16 @@
 # react-vfx
 
+## 0.17.0
+
+### Minor Changes
+
+- Improve WebGL error handling
+
+### Patch Changes
+
+- Updated dependencies
+  - @vfx-js/core@0.12.0
+
 ## 0.16.1
 
 ### Patch Changes
