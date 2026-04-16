@@ -30,19 +30,23 @@ export const ContextLostAndRestore: StoryObj = {
         wrapper.style.gap = "20px";
         wrapper.style.padding = "20px";
 
-        // Status display
-        const status = document.createElement("div");
+        // Controls overlay — must sit above the VFX canvas (z-index 9999)
+        const controls = document.createElement("div");
+        controls.style.position = "fixed";
+        controls.style.top = "12px";
+        controls.style.left = "12px";
+        controls.style.zIndex = "10000";
+        controls.style.display = "flex";
+        controls.style.alignItems = "center";
+        controls.style.gap = "12px";
+        wrapper.appendChild(controls);
+
+        const status = document.createElement("span");
         status.style.color = "white";
         status.style.fontFamily = "monospace";
         status.style.fontSize = "14px";
         status.textContent = "Status: rendering";
-        wrapper.appendChild(status);
-
-        // Buttons
-        const controls = document.createElement("div");
-        controls.style.display = "flex";
-        controls.style.gap = "12px";
-        wrapper.appendChild(controls);
+        controls.appendChild(status);
 
         const btnStyle = (btn: HTMLButtonElement) => {
             btn.style.padding = "8px 16px";
@@ -96,22 +100,22 @@ export const ContextLostAndRestore: StoryObj = {
         const loseBtn = canvasElement.querySelectorAll("button")[0];
         const restoreBtn = canvasElement.querySelectorAll("button")[1];
 
+        const ext = getVFXContext();
+
         loseBtn.addEventListener("click", () => {
-            const ext = getVFXContext();
             ext?.loseContext();
             status.textContent = "Status: context lost";
-            status.style.color = "#f88";
-            loseBtn.disabled = true;
-            restoreBtn.disabled = false;
+            // status.style.color = "#f88";
+            // loseBtn.disabled = true;
+            // restoreBtn.disabled = false;
         });
 
         restoreBtn.addEventListener("click", () => {
-            const ext = getVFXContext();
             ext?.restoreContext();
             status.textContent = "Status: context restored";
-            status.style.color = "#8f8";
-            loseBtn.disabled = false;
-            restoreBtn.disabled = true;
+            // status.style.color = "#8f8";
+            // loseBtn.disabled = false;
+            // restoreBtn.disabled = true;
         });
     },
 };
