@@ -37,9 +37,7 @@ export class VFX {
 
     /**
      * Creates VFX instance and start playing immediately.
-     *
      * @throws When WebGL is not available in the current environment.
-     * Use {@link isWebGLAvailable} to check before constructing.
      */
     constructor(options: VFXOpts = {}) {
         checkEnvironment();
