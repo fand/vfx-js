@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
+import React, { useCallback, useRef } from "react";
+import { createRoot } from "react-dom/client";
+import { VFXImg, VFXProvider } from "react-vfx";
 import { initVFX } from "./utils";
 import Logo from "./assets/logo-640w-20p.svg";
 import "./preset.css";
@@ -81,5 +84,56 @@ export const ContextLostAndRestore: StoryObj = {
             ext?.restoreContext();
             status.textContent = "Status: context restored";
         });
+    },
+};
+
+function ContextLostReactApp() {
+    const statusRef = useRef<HTMLSpanElement>(null);
+
+    const handleLose = useCallback(() => {
+        const ext = getVFXContext();
+        ext?.loseContext();
+        if (statusRef.current) {
+            statusRef.current.textContent = "Status: context lost";
+        }
+    }, []);
+
+    const handleRestore = useCallback(() => {
+        const ext = getVFXContext();
+        ext?.restoreContext();
+        if (statusRef.current) {
+            statusRef.current.textContent = "Status: context restored";
+        }
+    }, []);
+
+    const h = React.createElement;
+    return h(
+        VFXProvider,
+        null,
+        h(
+            "div",
+            null,
+            h(
+                "div",
+                { style: { display: "flex", gap: "10px" } },
+                h("span", { ref: statusRef, style: { color: "white" } }, "Status: rendering"),
+                h("button", { onClick: handleLose }, "Force Context Lost"),
+                h("button", { onClick: handleRestore }, "Force Context Restore"),
+            ),
+            h(VFXImg, { src: Logo, shader: "rainbow" }),
+        ),
+    );
+}
+
+export const ContextLostAndRestoreReact: StoryObj = {
+    render: () => {
+        const container = document.createElement("div");
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        const container = canvasElement.firstElementChild as HTMLElement;
+        const root = createRoot(container);
+        root.render(React.createElement(ContextLostReactApp));
     },
 };
