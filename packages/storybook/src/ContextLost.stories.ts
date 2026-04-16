@@ -3,6 +3,17 @@ import { initVFX } from "./utils";
 import Logo from "./assets/logo-640w-20p.svg";
 import "./preset.css";
 
+function getVFXContext(): WEBGL_lose_context | null {
+    const canvas = document.querySelector(
+        'canvas[style*="pointer-events"]',
+    ) as HTMLCanvasElement | null;
+    if (!canvas) {
+        return null;
+    }
+    const gl = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+    return gl?.getExtension("WEBGL_lose_context") ?? null;
+}
+
 export default {
     title: "Context Lost",
     parameters: {
@@ -62,12 +73,32 @@ export const ContextLostAndRestore: StoryObj = {
         wrapper.appendChild(img);
 
         // Init VFX
-        const vfx = initVFX();
-        vfx.add(img, { shader: "rainbow" });
+        initVFX();
 
-        // Button handlers
+        // Use play() callback so VFX canvas is already in the DOM
+        return wrapper;
+    },
+    play: async ({ canvasElement }) => {
+        const img = canvasElement.querySelector("img") as HTMLImageElement;
+        await new Promise((r) => {
+            if (img.complete) {
+                r(undefined);
+            } else {
+                img.onload = r;
+            }
+        });
+
+        // biome-ignore lint/suspicious/noExplicitAny: access global vfx
+        const vfx = (window as any).vfx;
+        await vfx.add(img, { shader: "rainbow" });
+
+        const status = canvasElement.querySelector("div") as HTMLDivElement;
+        const loseBtn = canvasElement.querySelectorAll("button")[0];
+        const restoreBtn = canvasElement.querySelectorAll("button")[1];
+
         loseBtn.addEventListener("click", () => {
-            vfx.forceContextLoss();
+            const ext = getVFXContext();
+            ext?.loseContext();
             status.textContent = "Status: context lost";
             status.style.color = "#f88";
             loseBtn.disabled = true;
@@ -75,13 +106,12 @@ export const ContextLostAndRestore: StoryObj = {
         });
 
         restoreBtn.addEventListener("click", () => {
-            vfx.forceContextRestore();
+            const ext = getVFXContext();
+            ext?.restoreContext();
             status.textContent = "Status: context restored";
             status.style.color = "#8f8";
             loseBtn.disabled = false;
             restoreBtn.disabled = true;
         });
-
-        return wrapper;
     },
 };
