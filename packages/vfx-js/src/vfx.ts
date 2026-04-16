@@ -55,7 +55,7 @@ export class VFX {
 
         if (!isWebGLAvailable()) {
             throw new Error(
-                "VFX-JS: WebGL is not available. Use isWebGLAvailable() to check before creating a VFX instance.",
+                "[VFX-JS] WebGL is not available in this environment.",
             );
         }
 
