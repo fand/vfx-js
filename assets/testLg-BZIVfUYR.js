@@ -1,4 +1,4 @@
-import"./modulepreload-polyfill-B5Qt9EMX.js";import{V as B}from"./vfx-Bk5ysT1u.js";const c={sphereR:.1,bubbleCount:8,bubbleRadiusMin:.03,bubbleRadiusMax:.06,bubbleSpeed:.6,mouseSmoothing:.05},N=`
+import"./modulepreload-polyfill-B5Qt9EMX.js";import{V as B}from"./vfx-BXXu5G5R.js";const c={sphereR:.1,bubbleCount:8,bubbleRadiusMin:.03,bubbleRadiusMax:.06,bubbleSpeed:.6,mouseSmoothing:.05},N=`
     precision highp float;
     uniform sampler2D src;
     uniform vec2 resolution;
