@@ -41,7 +41,11 @@ export class Program {
     constructor(gl: WebGL2RenderingContext, vertSrc: string, fragSrc: string) {
         this.gl = gl;
         const vs = compileShader(gl, gl.VERTEX_SHADER, ensureVersion(vertSrc));
-        const fs = compileShader(gl, gl.FRAGMENT_SHADER, ensureVersion(fragSrc));
+        const fs = compileShader(
+            gl,
+            gl.FRAGMENT_SHADER,
+            ensureVersion(fragSrc),
+        );
 
         const program = gl.createProgram();
         if (!program) {
@@ -67,13 +71,20 @@ export class Program {
         gl.deleteShader(fs);
         this.program = program;
 
-        const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number;
+        const count = gl.getProgramParameter(
+            program,
+            gl.ACTIVE_UNIFORMS,
+        ) as number;
         for (let i = 0; i < count; i++) {
             const info = gl.getActiveUniform(program, i);
-            if (!info) continue;
+            if (!info) {
+                continue;
+            }
             const name = info.name.replace(/\[0\]$/, "");
             const location = gl.getUniformLocation(program, info.name);
-            if (!location) continue;
+            if (!location) {
+                continue;
+            }
             this.#uniforms.set(name, {
                 location,
                 type: info.type,
@@ -96,9 +107,13 @@ export class Program {
         let textureUnit = 0;
         for (const [name, info] of this.#uniforms) {
             const entry = uniforms[name];
-            if (!entry) continue;
+            if (!entry) {
+                continue;
+            }
             const value = entry.value;
-            if (value === null || value === undefined) continue;
+            if (value === null || value === undefined) {
+                continue;
+            }
 
             if (isSamplerType(info.type)) {
                 if (value instanceof Texture) {
@@ -108,7 +123,9 @@ export class Program {
                 }
                 continue;
             }
-            if (value instanceof Texture) continue;
+            if (value instanceof Texture) {
+                continue;
+            }
             uploadScalarUniform(gl, info, value);
         }
     }

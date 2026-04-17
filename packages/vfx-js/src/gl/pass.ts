@@ -56,15 +56,21 @@ export function renderPass(
     canvasH: number,
     pixelRatio: number,
 ): void {
-    const targetCssW = target ? target.width / pixelRatio : canvasW / pixelRatio;
-    const targetCssH = target ? target.height / pixelRatio : canvasH / pixelRatio;
+    const targetCssW = target
+        ? target.width / pixelRatio
+        : canvasW / pixelRatio;
+    const targetCssH = target
+        ? target.height / pixelRatio
+        : canvasH / pixelRatio;
     const cx1 = Math.max(0, viewport.x);
     const cy1 = Math.max(0, viewport.y);
     const cx2 = Math.min(targetCssW, viewport.x + viewport.w);
     const cy2 = Math.min(targetCssH, viewport.y + viewport.h);
     const cw = cx2 - cx1;
     const ch = cy2 - cy1;
-    if (cw <= 0 || ch <= 0) return;
+    if (cw <= 0 || ch <= 0) {
+        return;
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.fbo : null);
     gl.viewport(

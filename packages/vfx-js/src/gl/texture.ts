@@ -94,8 +94,16 @@ export class Texture {
 
     #applyParams(): void {
         const gl = this.gl;
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapEnum(gl, this.wrapS));
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapEnum(gl, this.wrapT));
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_WRAP_S,
+            wrapEnum(gl, this.wrapS),
+        );
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_WRAP_T,
+            wrapEnum(gl, this.wrapT),
+        );
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     }
@@ -106,8 +114,12 @@ export class Texture {
 }
 
 function wrapEnum(gl: WebGL2RenderingContext, w: TextureWrap): number {
-    if (w === "repeat") return gl.REPEAT;
-    if (w === "mirror") return gl.MIRRORED_REPEAT;
+    if (w === "repeat") {
+        return gl.REPEAT;
+    }
+    if (w === "mirror") {
+        return gl.MIRRORED_REPEAT;
+    }
     return gl.CLAMP_TO_EDGE;
 }
 

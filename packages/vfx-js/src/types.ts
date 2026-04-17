@@ -1,6 +1,9 @@
-import type * as THREE from "three";
 import type { Backbuffer } from "./backbuffer.js";
 import type { ShaderPreset } from "./constants.js";
+import type { Framebuffer } from "./gl/framebuffer.js";
+import type { Pass } from "./gl/pass.js";
+import type { Uniforms } from "./gl/program.js";
+import type { Texture } from "./gl/texture.js";
 import type { Margin, MarginOpts } from "./rect.js";
 
 /**
@@ -306,12 +309,6 @@ export type VFXProps = {
     zIndex?: number;
 
     /**
-     * GLSL version of the given shader. (Default: `"300 es"`)
-     * If you want to use GLSL 100 (≒ WebGL 1) shader, pass `"100"` to this property.
-     */
-    glslVersion?: "100" | "300 es";
-
-    /**
      * Whether the shader uses the backbuffer or not.
      */
     backbuffer?: boolean;
@@ -358,9 +355,8 @@ export type VFXElementType = "img" | "video" | "text" | "canvas" | "hic";
  * @internal
  */
 export type VFXElementPass = {
-    scene: THREE.Scene;
-    mesh: THREE.Mesh;
-    uniforms: { [name: string]: THREE.IUniform };
+    pass: Pass;
+    uniforms: Uniforms;
     uniformGenerators: { [name: string]: () => VFXUniformValue };
     target?: string;
     persistent?: boolean;
@@ -380,7 +376,7 @@ export type VFXElement = {
     width: number;
     height: number;
     passes: VFXElementPass[];
-    bufferTargets: Map<string, THREE.WebGLRenderTarget>;
+    bufferTargets: Map<string, Framebuffer>;
     startTime: number;
     enterTime: number;
     leaveTime: number;
@@ -390,7 +386,7 @@ export type VFXElement = {
     overflow: Margin;
     intersection: VFXElementIntersection;
     originalOpacity: number;
-    srcTexture: THREE.Texture;
+    srcTexture: Texture;
     zIndex: number;
     backbuffer?: Backbuffer;
     autoCrop: boolean;
