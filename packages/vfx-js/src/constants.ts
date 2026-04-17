@@ -324,21 +324,16 @@ export const shaders: Record<ShaderPreset, string> = {
 
     const vec3 gridRot = vec3(15.0, 45.0, 75.0);
 
-    // The fragment's own cell plus the 8 surrounding cells. Diagonals matter
-    // when dotSize pushes dotRadius past gridSize/sqrt(2).
     const vec2 cellOffsets[9] = vec2[9](
-        vec2(0.0, 0.0),
-        vec2(-1.0, 0.0), vec2(1.0, 0.0), vec2(0.0, -1.0), vec2(0.0, 1.0),
-        vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0), vec2(1.0, 1.0)
+        vec2(0),
+        vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2(0, 1),
+        vec2(-1, -1), vec2(1, -1), vec2(-1, 1), vec2(1)
     );
 
     void main() {
         vec2 fragCoord = gl_FragCoord.xy - offset;
         vec3 rgbAmounts = vec3(0.0);
 
-        // a halftone is an overlapping series of grids of dots, one per channel,
-        // each rotated by a different angle. the size of each dot encodes the
-        // channel value; the shape stays a regular circle.
         for (int i = 0; i < 3; ++i) {
             float rotRad = radians(gridRot[i]);
             float c = cos(rotRad);
@@ -351,16 +346,18 @@ export const shaders: Record<ShaderPreset, string> = {
             vec2 gridFragLoc = cTrans * fragCoord;
             vec2 gridOriginLoc = floor(gridFragLoc / gridSize);
 
-            // Check the fragment's own cell and all 8 neighbors so overlap from
-            // large dots (dotSize > ~0.7) is handled on every axis.
+            // Check the fragment's cell and 8 neighbors
+            float maxDotRadius = gridSize * dotSize;
             for (int j = 0; j < 9; ++j) {
                 vec2 cell = gridOriginLoc + cellOffsets[j];
                 vec2 gridDotLoc = cell * gridSize + vec2(gridSize / 2.0);
                 vec2 renderDotLoc = ccTrans * gridDotLoc;
 
-                float imageChannelAmount = readTex(src, renderDotLoc / resolution)[i];
-                float dotRadius = imageChannelAmount * (gridSize * dotSize);
                 float fragDistanceToDotCenter = distance(fragCoord, renderDotLoc);
+                if (fragDistanceToDotCenter > maxDotRadius) { continue; }
+
+                float imageChannelAmount = readTex(src, renderDotLoc / resolution)[i];
+                float dotRadius = imageChannelAmount * maxDotRadius;
                 if (fragDistanceToDotCenter < dotRadius) {
                     rgbAmounts[i] += smoothstep(dotRadius, dotRadius - dotRadius * smoothing, fragDistanceToDotCenter);
                 }
