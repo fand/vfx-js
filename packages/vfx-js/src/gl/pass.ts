@@ -56,12 +56,8 @@ export function renderPass(
     canvasH: number,
     pixelRatio: number,
 ): void {
-    const targetCssW = target
-        ? target.width / pixelRatio
-        : canvasW / pixelRatio;
-    const targetCssH = target
-        ? target.height / pixelRatio
-        : canvasH / pixelRatio;
+    const targetCssW = target ? target.width / pixelRatio : canvasW;
+    const targetCssH = target ? target.height / pixelRatio : canvasH;
     const cx1 = Math.max(0, viewport.x);
     const cy1 = Math.max(0, viewport.y);
     const cx2 = Math.min(targetCssW, viewport.x + viewport.w);
