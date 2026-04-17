@@ -9,7 +9,6 @@ const VFX_PROP_KEYS: readonly (keyof VFXProps)[] = [
     "overflow",
     "wrap",
     "zIndex",
-    "glslVersion",
     "backbuffer",
     "autoCrop",
 ] as const;
