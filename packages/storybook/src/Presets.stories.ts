@@ -82,7 +82,15 @@ export const hueShift = story({
 });
 export const sinewave = story({ preset: "sinewave", defaultTime: 1.0 });
 export const pixelate = story({ preset: "pixelate", defaultTime: 1.0 });
-export const halftone = story({ src: Jellyfish, preset: "halftone" });
+export const halftone = story({
+    src: Jellyfish,
+    preset: "halftone",
+    uniforms: {
+        gridSize: 10.0,
+        dotSize: 0.7,
+        smoothing: 0.15,
+    },
+});
 export const Invert = story({ preset: "invert" });
 export const Grayscale = story({ preset: "grayscale" });
 export const Vignette = story({

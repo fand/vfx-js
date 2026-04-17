@@ -318,98 +318,60 @@ export const shaders: Record<ShaderPreset, string> = {
     ${COMMON_HEADER}
     ${READ_TEX}
 
-    // TODO: uniform
-    #define gridSize 10.0
-    #define dotSize 0.7
-    #define smoothing 0.15
-    #define speed 1.0
+    uniform float gridSize;
+    uniform float dotSize;
+    uniform float smoothing;
 
-    #define IMG_PIXEL(x, y) readTex(x, (y - offset) / resolution);
+    const vec3 gridRot = vec3(15.0, 45.0, 75.0);
 
-    vec4 gridRot = vec4(15.0, 45.0, 75.0, 0.0);
-
-    // during calculation we find the closest dot to a frag, determine its size, and then determine the size of the four dots above/below/right/left of it. this array of offsets move "one left", "one up", "one right", and "one down"...
-    vec2 originOffsets[4];
+    // The fragment's own cell plus the 8 surrounding cells. Diagonals matter
+    // when dotSize pushes dotRadius past gridSize/sqrt(2).
+    const vec2 cellOffsets[9] = vec2[9](
+        vec2(0.0, 0.0),
+        vec2(-1.0, 0.0), vec2(1.0, 0.0), vec2(0.0, -1.0), vec2(0.0, 1.0),
+        vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0), vec2(1.0, 1.0)
+    );
 
     void main() {
         vec2 fragCoord = gl_FragCoord.xy - offset;
-
-        // a halftone is an overlapping series of grids of dots
-        // each grid of dots is rotated by a different amount
-        // the size of the dots determines the colors. the shape of the dot should never change (always be a dot with regular edges)
-        originOffsets[0] = vec2(-1.0, 0.0);
-        originOffsets[1] = vec2(0.0, 1.0);
-        originOffsets[2] = vec2(1.0, 0.0);
-        originOffsets[3] = vec2(0.0, -1.0);
-
         vec3 rgbAmounts = vec3(0.0);
 
-        // for each of the channels (i) of RGB...
-        for (float i=0.0; i<3.0; ++i) {
-            // figure out the rotation of the grid in radians
-            float rotRad = radians(gridRot[int(i)]);
+        // a halftone is an overlapping series of grids of dots, one per channel,
+        // each rotated by a different angle. the size of each dot encodes the
+        // channel value; the shape stays a regular circle.
+        for (int i = 0; i < 3; ++i) {
+            float rotRad = radians(gridRot[i]);
+            float c = cos(rotRad);
+            float s = sin(rotRad);
 
-            // the grids are rotated counter-clockwise- to find the nearest dot, take the fragment pixel loc,
-            // rotate it clockwise, and split by the grid to find the center of the dot. then rotate this
-            // coord counter-clockwise to yield the location of the center of the dot in pixel coords local to the render space
-            mat2 ccTrans = mat2(vec2(cos(rotRad), sin(rotRad)), vec2(-1.0*sin(rotRad), cos(rotRad)));
-            mat2 cTrans = mat2(vec2(cos(rotRad), -1.0*sin(rotRad)), vec2(sin(rotRad), cos(rotRad)));
+            // cTrans rotates screen -> grid space; ccTrans is its inverse
+            mat2 ccTrans = mat2(c, s, -s, c);
+            mat2 cTrans = mat2(c, -s, s, c);
 
-            // find the location of the frag in the grid (prior to rotating it)
-            vec2 gridFragLoc = cTrans * fragCoord.xy;
+            vec2 gridFragLoc = cTrans * fragCoord;
+            vec2 gridOriginLoc = floor(gridFragLoc / gridSize);
 
-            // find the center of the dot closest to the frag- there's no "round" in GLSL 1.2, so do a "floor" to find the dot to the bottom-left of the frag, then figure out if the frag would be in the top and right halves of that square to find the closest dot to the frag
-            vec2 gridOriginLoc = vec2(floor(gridFragLoc.x/gridSize), floor(gridFragLoc.y/gridSize));
+            // Check the fragment's own cell and all 8 neighbors so overlap from
+            // large dots (dotSize > ~0.7) is handled on every axis.
+            for (int j = 0; j < 9; ++j) {
+                vec2 cell = gridOriginLoc + cellOffsets[j];
+                vec2 gridDotLoc = cell * gridSize + vec2(gridSize / 2.0);
+                vec2 renderDotLoc = ccTrans * gridDotLoc;
 
-            vec2 tmpGridCoords = gridFragLoc/vec2(gridSize);
-            bool fragAtTopOfGrid = ((tmpGridCoords.y-floor(tmpGridCoords.y)) > (gridSize/2.0)) ? true : false;
-            bool fragAtRightOfGrid = ((tmpGridCoords.x-floor(tmpGridCoords.x)) > (gridSize/2.0)) ? true : false;
-            if (fragAtTopOfGrid)
-                gridOriginLoc.y = gridOriginLoc.y + 1.0;
-            if (fragAtRightOfGrid)
-                gridOriginLoc.x = gridOriginLoc.x + 1.0;
-
-            // ...at this point, "gridOriginLoc" contains the grid coords of the nearest dot to the fragment being rendered
-            // convert the location of the center of the dot from grid coords to pixel coords
-            vec2 gridDotLoc = vec2(gridOriginLoc.x*gridSize, gridOriginLoc.y*gridSize) + vec2(gridSize/2.0);
-
-            // rotate the pixel coords of the center of the dot so they become relative to the rendering space
-            vec2 renderDotLoc = ccTrans * gridDotLoc;
-
-            // get the color of the pixel of the input image under this dot (the color will ultimately determine the size of the dot)
-            vec4 renderDotImageColorRGB = IMG_PIXEL(src, renderDotLoc + offset);
-
-            // the amount of this channel is taken from the same channel of the color of the pixel of the input image under this halftone dot
-            float imageChannelAmount = renderDotImageColorRGB[int(i)];
-
-            // the size of the dot is determined by the value of the channel
-            float dotRadius = imageChannelAmount * (gridSize * dotSize);
-            float fragDistanceToDotCenter = distance(fragCoord.xy, renderDotLoc);
-            if (fragDistanceToDotCenter < dotRadius) {
-                rgbAmounts[int(i)] += smoothstep(dotRadius, dotRadius-(dotRadius*smoothing), fragDistanceToDotCenter);
-            }
-
-            // calcluate the size of the dots abov/below/to the left/right to see if they're overlapping
-            for (float j=0.0; j<4.0; ++j) {
-                gridDotLoc = vec2((gridOriginLoc.x+originOffsets[int(j)].x)*gridSize, (gridOriginLoc.y+originOffsets[int(j)].y)*gridSize) + vec2(gridSize/2.0);
-
-                renderDotLoc = ccTrans * gridDotLoc;
-                renderDotImageColorRGB = IMG_PIXEL(src, renderDotLoc + offset);
-
-                imageChannelAmount = renderDotImageColorRGB[int(i)];
-                dotRadius = imageChannelAmount * (gridSize*1.50/2.0);
-                fragDistanceToDotCenter = distance(fragCoord.xy, renderDotLoc);
+                float imageChannelAmount = readTex(src, renderDotLoc / resolution)[i];
+                float dotRadius = imageChannelAmount * (gridSize * dotSize);
+                float fragDistanceToDotCenter = distance(fragCoord, renderDotLoc);
                 if (fragDistanceToDotCenter < dotRadius) {
-                    rgbAmounts[int(i)] += smoothstep(dotRadius, dotRadius-(dotRadius*smoothing), fragDistanceToDotCenter);
+                    rgbAmounts[i] += smoothstep(dotRadius, dotRadius - dotRadius * smoothing, fragDistanceToDotCenter);
                 }
             }
         }
 
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
         vec4 original = readTex(src, uv);
-        float alpha = step(.1, rgbAmounts[0] + rgbAmounts[1] + rgbAmounts[2] + original.a);
+        float alpha = clamp(rgbAmounts.r + rgbAmounts.g + rgbAmounts.b + original.a, 0.0, 1.0);
 
-        outColor = vec4(rgbAmounts[0], rgbAmounts[1], rgbAmounts[2], alpha);
+        outColor = vec4(rgbAmounts, alpha);
     }
     `,
     sinewave: `
