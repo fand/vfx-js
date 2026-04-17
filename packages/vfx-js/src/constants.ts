@@ -334,6 +334,10 @@ export const shaders: Record<ShaderPreset, string> = {
         vec2 fragCoord = gl_FragCoord.xy - offset;
         vec3 rgbAmounts = vec3(0.0);
 
+        // Axis neighbors only reach when dotSize >= 0.5,
+        // diagonals only when dotSize >= 1/sqrt(2) ~= 0.7071
+        int cellCount = dotSize < 0.5 ? 1 : (dotSize < 0.7071068 ? 5 : 9);
+
         for (int i = 0; i < 3; ++i) {
             float rotRad = radians(gridRot[i]);
             float c = cos(rotRad);
@@ -349,6 +353,8 @@ export const shaders: Record<ShaderPreset, string> = {
             // Check the fragment's cell and 8 neighbors
             float maxDotRadius = gridSize * dotSize;
             for (int j = 0; j < 9; ++j) {
+                if (j >= cellCount) { break; }
+
                 vec2 cell = gridOriginLoc + cellOffsets[j];
                 vec2 gridDotLoc = cell * gridSize + vec2(gridSize / 2.0);
                 vec2 renderDotLoc = ccTrans * gridDotLoc;
