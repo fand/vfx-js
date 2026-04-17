@@ -1,3 +1,5 @@
+import type { GLContext, Restorable } from "./context.js";
+
 /**
  * Texture wrapper over a WebGL2 `TEXTURE_2D`.
  *
@@ -5,6 +7,10 @@
  * by VFX-JS: Y-flipped unpack, non-premultiplied alpha, linear filter,
  * and RGBA format. Use {@link needsUpdate} to re-upload from a live
  * canvas/video source on the next bind.
+ *
+ * Self-registers with {@link GLContext} unless `autoRegister: false` is
+ * passed — opt out when the Texture is owned by a {@link Framebuffer}
+ * (its storage is managed by the FBO's own `restore()`).
  * @internal
  */
 export type TextureWrap = "clamp" | "repeat" | "mirror";
@@ -18,27 +24,51 @@ export type TextureSource =
     | ImageBitmap;
 
 /** @internal */
-export class Texture {
+export type TextureOpts = {
+    /** Default true. Pass false for FBO attachment textures. */
+    autoRegister?: boolean;
+};
+
+/** @internal */
+export class Texture implements Restorable {
     gl: WebGL2RenderingContext;
-    texture: WebGLTexture;
+    texture!: WebGLTexture;
     wrapS: TextureWrap = "clamp";
     wrapT: TextureWrap = "clamp";
     needsUpdate = true;
     /** Source image/canvas/video; exposed for identity comparison. */
     source: TextureSource | null = null;
 
+    #ctx: GLContext;
     #uploaded = false;
+    #registered: boolean;
 
-    constructor(gl: WebGL2RenderingContext, source?: TextureSource) {
-        this.gl = gl;
-        const tex = gl.createTexture();
+    constructor(ctx: GLContext, source?: TextureSource, opts?: TextureOpts) {
+        this.#ctx = ctx;
+        this.gl = ctx.gl;
+        this.#create();
+        if (source) {
+            this.source = source;
+        }
+        this.#registered = opts?.autoRegister !== false;
+        if (this.#registered) {
+            ctx.addResource(this);
+        }
+    }
+
+    #create(): void {
+        const tex = this.gl.createTexture();
         if (!tex) {
             throw new Error("[VFX-JS] Failed to create texture");
         }
         this.texture = tex;
-        if (source) {
-            this.source = source;
-        }
+    }
+
+    restore(): void {
+        // Old handle is invalid; create a fresh one and flag for re-upload.
+        this.#create();
+        this.#uploaded = false;
+        this.needsUpdate = true;
     }
 
     bind(unit: number): void {
@@ -109,6 +139,9 @@ export class Texture {
     }
 
     dispose(): void {
+        if (this.#registered) {
+            this.#ctx.removeResource(this);
+        }
         this.gl.deleteTexture(this.texture);
     }
 }

@@ -1,4 +1,5 @@
 import { type GLRect, getGLRect } from "./gl-rect.js";
+import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
 import type { Texture } from "./gl/texture.js";
 
@@ -15,12 +16,11 @@ export class Backbuffer {
     #buffers: [Framebuffer, Framebuffer];
 
     constructor(
-        gl: WebGL2RenderingContext,
+        ctx: GLContext,
         width: number,
         height: number,
         pixelRatio: number,
         float: boolean | undefined,
-        floatLinearFilter: boolean,
     ) {
         this.#width = width;
         this.#height = height;
@@ -29,8 +29,8 @@ export class Backbuffer {
         const pwidth = width * pixelRatio;
         const pheight = height * pixelRatio;
         this.#buffers = [
-            new Framebuffer(gl, pwidth, pheight, { float, floatLinearFilter }),
-            new Framebuffer(gl, pwidth, pheight, { float, floatLinearFilter }),
+            new Framebuffer(ctx, pwidth, pheight, { float }),
+            new Framebuffer(ctx, pwidth, pheight, { float }),
         ];
     }
 

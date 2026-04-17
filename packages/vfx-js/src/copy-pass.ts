@@ -1,5 +1,6 @@
 import { COPY_FRAGMENT_SHADER, DEFAULT_VERTEX_SHADER } from "./constants.js";
 import type { GLRect } from "./gl-rect.js";
+import type { GLContext } from "./gl/context.js";
 import { Pass } from "./gl/pass.js";
 import type { Uniforms } from "./gl/program.js";
 import type { Texture } from "./gl/texture.js";
@@ -15,7 +16,7 @@ export class CopyPass {
     pass: Pass;
     uniforms: Uniforms;
 
-    constructor(gl: WebGL2RenderingContext) {
+    constructor(ctx: GLContext) {
         this.uniforms = {
             src: { value: null },
             offset: { value: new Vec2() },
@@ -23,7 +24,7 @@ export class CopyPass {
             viewport: { value: new Vec4() },
         };
         this.pass = new Pass(
-            gl,
+            ctx,
             DEFAULT_VERTEX_SHADER,
             COPY_FRAGMENT_SHADER,
             this.uniforms,

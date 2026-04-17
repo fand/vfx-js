@@ -1,3 +1,4 @@
+import type { GLContext, Restorable } from "./context.js";
 import { Texture } from "./texture.js";
 import { Vec2, Vec4 } from "./vec.js";
 
@@ -31,20 +32,39 @@ type ActiveUniform = {
  *
  * Shader source is automatically prefixed with `#version 300 es` when
  * no `#version` directive is present.
+ *
+ * Self-registers with {@link GLContext} so the program is recompiled
+ * after a `webglcontextrestored` event.
  * @internal
  */
-export class Program {
+export class Program implements Restorable {
     gl: WebGL2RenderingContext;
-    program: WebGLProgram;
+    program!: WebGLProgram;
+    #ctx: GLContext;
+    #vertSrc: string;
+    #fragSrc: string;
     #uniforms = new Map<string, ActiveUniform>();
 
-    constructor(gl: WebGL2RenderingContext, vertSrc: string, fragSrc: string) {
-        this.gl = gl;
-        const vs = compileShader(gl, gl.VERTEX_SHADER, ensureVersion(vertSrc));
+    constructor(ctx: GLContext, vertSrc: string, fragSrc: string) {
+        this.#ctx = ctx;
+        this.gl = ctx.gl;
+        this.#vertSrc = vertSrc;
+        this.#fragSrc = fragSrc;
+        this.#compile();
+        ctx.addResource(this);
+    }
+
+    #compile(): void {
+        const gl = this.gl;
+        const vs = compileShader(
+            gl,
+            gl.VERTEX_SHADER,
+            ensureVersion(this.#vertSrc),
+        );
         const fs = compileShader(
             gl,
             gl.FRAGMENT_SHADER,
-            ensureVersion(fragSrc),
+            ensureVersion(this.#fragSrc),
         );
 
         const program = gl.createProgram();
@@ -71,6 +91,7 @@ export class Program {
         gl.deleteShader(fs);
         this.program = program;
 
+        this.#uniforms.clear();
         const count = gl.getProgramParameter(
             program,
             gl.ACTIVE_UNIFORMS,
@@ -91,6 +112,11 @@ export class Program {
                 size: info.size,
             });
         }
+    }
+
+    restore(): void {
+        // The old handle is dead after context loss; recompile from source.
+        this.#compile();
     }
 
     use(): void {
@@ -131,6 +157,7 @@ export class Program {
     }
 
     dispose(): void {
+        this.#ctx.removeResource(this);
         this.gl.deleteProgram(this.program);
     }
 }

@@ -1,3 +1,4 @@
+import type { GLContext } from "./context.js";
 import type { Framebuffer } from "./framebuffer.js";
 import { Program, type Uniforms } from "./program.js";
 import type { Quad } from "./quad.js";
@@ -22,14 +23,14 @@ export class Pass {
     blend: BlendMode;
 
     constructor(
-        gl: WebGL2RenderingContext,
+        ctx: GLContext,
         vertSrc: string,
         fragSrc: string,
         uniforms: Uniforms,
         blend: BlendMode,
     ) {
-        this.gl = gl;
-        this.program = new Program(gl, vertSrc, fragSrc);
+        this.gl = ctx.gl;
+        this.program = new Program(ctx, vertSrc, fragSrc);
         this.uniforms = uniforms;
         this.blend = blend;
     }

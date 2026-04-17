@@ -1,6 +1,7 @@
 import { Backbuffer } from "./backbuffer.js";
 import { DEFAULT_VERTEX_SHADER } from "./constants.js";
 import type { GLRect } from "./gl-rect.js";
+import type { GLContext } from "./gl/context.js";
 import type { Pass } from "./gl/pass.js";
 import type { Uniforms } from "./gl/program.js";
 import type { Texture } from "./gl/texture.js";
@@ -23,7 +24,7 @@ export class PostEffectPass {
     #size?: [number, number];
 
     constructor(
-        gl: WebGL2RenderingContext,
+        ctx: GLContext,
         fragmentShader: string,
         uniforms?: VFXUniforms,
         persistent?: boolean,
@@ -56,7 +57,7 @@ export class PostEffectPass {
             }
         }
 
-        this.pass = createPassMaterial(gl, {
+        this.pass = createPassMaterial(ctx, {
             vertexShader: DEFAULT_VERTEX_SHADER,
             fragmentShader,
             uniforms: this.#uniforms,
@@ -113,30 +114,27 @@ export class PostEffectPass {
     }
 
     initializeBackbuffer(
-        gl: WebGL2RenderingContext,
+        ctx: GLContext,
         width: number,
         height: number,
         pixelRatio: number,
-        floatLinearFilter: boolean,
     ): void {
         if (this.#persistent && !this.#backbuffer) {
             if (this.#size) {
                 this.#backbuffer = new Backbuffer(
-                    gl,
+                    ctx,
                     this.#size[0],
                     this.#size[1],
                     1,
                     this.#float,
-                    floatLinearFilter,
                 );
             } else {
                 this.#backbuffer = new Backbuffer(
-                    gl,
+                    ctx,
                     width,
                     height,
                     pixelRatio,
                     this.#float,
-                    floatLinearFilter,
                 );
             }
         }

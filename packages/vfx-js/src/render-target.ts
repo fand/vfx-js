@@ -1,4 +1,5 @@
 import { DEFAULT_VERTEX_SHADER } from "./constants.js";
+import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
 import { type BlendMode, Pass } from "./gl/pass.js";
 import type { Uniforms } from "./gl/program.js";
@@ -8,16 +9,12 @@ import type { Uniforms } from "./gl/program.js";
  * @internal
  */
 export function createRenderTarget(
-    gl: WebGL2RenderingContext,
-    floatLinearFilter: boolean,
+    ctx: GLContext,
     width: number,
     height: number,
     opts: { float?: boolean } = {},
 ): Framebuffer {
-    return new Framebuffer(gl, width, height, {
-        float: opts.float ?? false,
-        floatLinearFilter,
-    });
+    return new Framebuffer(ctx, width, height, { float: opts.float ?? false });
 }
 
 /**
@@ -29,7 +26,7 @@ export function createRenderTarget(
  * @internal
  */
 export function createPassMaterial(
-    gl: WebGL2RenderingContext,
+    ctx: GLContext,
     opts: {
         vertexShader?: string;
         fragmentShader: string;
@@ -50,7 +47,7 @@ export function createPassMaterial(
     }
     const vertexShader = opts.vertexShader ?? DEFAULT_VERTEX_SHADER;
     return new Pass(
-        gl,
+        ctx,
         vertexShader,
         opts.fragmentShader,
         opts.uniforms,

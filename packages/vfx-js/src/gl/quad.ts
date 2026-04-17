@@ -1,17 +1,30 @@
+import type { GLContext, Restorable } from "./context.js";
+
 /**
  * Fullscreen quad. Builds a single VAO with a position buffer that
  * covers NDC (-1..1). Attribute name "position" is bound to location 0
  * on every shader program (see {@link Program}) so this VAO can be
  * shared across all passes.
+ *
+ * Self-registers with {@link GLContext} so the VAO/buffer are rebuilt
+ * after a context loss.
  * @internal
  */
-export class Quad {
+export class Quad implements Restorable {
     gl: WebGL2RenderingContext;
-    vao: WebGLVertexArrayObject;
-    #buffer: WebGLBuffer;
+    vao!: WebGLVertexArrayObject;
+    #ctx: GLContext;
+    #buffer!: WebGLBuffer;
 
-    constructor(gl: WebGL2RenderingContext) {
-        this.gl = gl;
+    constructor(ctx: GLContext) {
+        this.#ctx = ctx;
+        this.gl = ctx.gl;
+        this.#allocate();
+        ctx.addResource(this);
+    }
+
+    #allocate(): void {
+        const gl = this.gl;
         const vao = gl.createVertexArray();
         const buffer = gl.createBuffer();
         if (!vao || !buffer) {
@@ -20,7 +33,6 @@ export class Quad {
         this.vao = vao;
         this.#buffer = buffer;
 
-        // Two triangles covering NDC.
         const verts = new Float32Array([
             -1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0,
         ]);
@@ -33,6 +45,10 @@ export class Quad {
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
+    restore(): void {
+        this.#allocate();
+    }
+
     draw(): void {
         const gl = this.gl;
         gl.bindVertexArray(this.vao);
@@ -40,6 +56,7 @@ export class Quad {
     }
 
     dispose(): void {
+        this.#ctx.removeResource(this);
         this.gl.deleteVertexArray(this.vao);
         this.gl.deleteBuffer(this.#buffer);
     }

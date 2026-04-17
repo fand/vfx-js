@@ -85,7 +85,7 @@ export class VFXPlayer {
         this.#gl.clearColor(0, 0, 0, 0);
         this.#pixelRatio = opts.pixelRatio;
 
-        this.#quad = new Quad(this.#gl);
+        this.#quad = new Quad(this.#ctx);
 
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.#resize);
@@ -93,8 +93,15 @@ export class VFXPlayer {
         }
         this.#resize();
 
-        this.#copyPass = new CopyPass(this.#gl);
+        this.#copyPass = new CopyPass(this.#ctx);
         this.#initPostEffects(opts.postEffects);
+
+        // Clear state that depends on frame-by-frame GPU output so the
+        // scene re-renders cleanly after a context restore (persistent
+        // backbuffers come back as black, then accumulate again).
+        this.#ctx.onContextRestored(() => {
+            this.#gl.clearColor(0, 0, 0, 0);
+        });
     }
 
     destroy(): void {
@@ -256,7 +263,7 @@ export class VFXPlayer {
                 throw "omg";
             }
 
-            const texture = new Texture(this.#gl, canvas);
+            const texture = new Texture(this.#ctx, canvas);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.needsUpdate = true;
@@ -301,20 +308,20 @@ export class VFXPlayer {
             if (isGif) {
                 const gif = await GIFData.create(element.src, this.#pixelRatio);
                 gifFor.set(element, gif);
-                texture = new Texture(this.#gl, gif.getCanvas());
+                texture = new Texture(this.#ctx, gif.getCanvas());
             } else {
                 const img = await loadImage(element.src);
-                texture = new Texture(this.#gl, img);
+                texture = new Texture(this.#ctx, img);
             }
         } else if (element instanceof HTMLVideoElement) {
-            texture = new Texture(this.#gl, element);
+            texture = new Texture(this.#ctx, element);
             type = "video" as VFXElementType;
         } else if (element instanceof HTMLCanvasElement) {
             if (element.hasAttribute("layoutsubtree") && initialCapture) {
-                texture = new Texture(this.#gl, initialCapture);
+                texture = new Texture(this.#ctx, initialCapture);
                 type = "hic" as VFXElementType;
             } else {
-                texture = new Texture(this.#gl, element);
+                texture = new Texture(this.#ctx, element);
                 type = "canvas" as VFXElementType;
             }
         } else {
@@ -324,7 +331,7 @@ export class VFXPlayer {
                 undefined,
                 this.maxTextureSize,
             );
-            texture = new Texture(this.#gl, canvas);
+            texture = new Texture(this.#ctx, canvas);
             type = "text" as VFXElementType;
         }
 
@@ -387,12 +394,11 @@ export class VFXPlayer {
                     (rectWithOverflow.bottom - rectWithOverflow.top) *
                     this.#pixelRatio;
                 return new Backbuffer(
-                    this.#gl,
+                    this.#ctx,
                     bw,
                     bh,
                     this.#pixelRatio,
                     false,
-                    this.#ctx.floatLinearFilter,
                 );
             })();
             sharedUniforms["backbuffer"] = { value: backbuffer.texture };
@@ -426,24 +432,19 @@ export class VFXPlayer {
                 passBackbuffers.set(
                     targetName,
                     new Backbuffer(
-                        this.#gl,
+                        this.#ctx,
                         logicalW,
                         logicalH,
                         pixelRatio,
                         inputPasses[i].float,
-                        this.#ctx.floatLinearFilter,
                     ),
                 );
             } else {
                 bufferTargets.set(
                     targetName,
-                    createRenderTarget(
-                        this.#gl,
-                        this.#ctx.floatLinearFilter,
-                        bw,
-                        bh,
-                        { float: inputPasses[i].float },
-                    ),
+                    createRenderTarget(this.#ctx, bw, bh, {
+                        float: inputPasses[i].float,
+                    }),
                 );
             }
         }
@@ -495,7 +496,7 @@ export class VFXPlayer {
                 }
             }
 
-            const pass = createPassMaterial(this.#gl, {
+            const pass = createPassMaterial(this.#ctx, {
                 vertexShader,
                 fragmentShader: frag,
                 uniforms: passUniforms,
@@ -600,7 +601,7 @@ export class VFXPlayer {
         if (e) {
             const srcUniform = e.passes[0].uniforms["src"];
             const oldTexture = srcUniform.value as Texture;
-            const texture = new Texture(this.#gl, element);
+            const texture = new Texture(this.#ctx, element);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.needsUpdate = true;
@@ -625,7 +626,7 @@ export class VFXPlayer {
         if (oldTexture.source === offscreen) {
             oldTexture.needsUpdate = true;
         } else {
-            const texture = new Texture(this.#gl, offscreen);
+            const texture = new Texture(this.#ctx, offscreen);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.needsUpdate = true;
@@ -1128,7 +1129,7 @@ export class VFXPlayer {
             if ("frag" in pe) {
                 frag = pe.frag;
                 pass = new PostEffectPass(
-                    this.#gl,
+                    this.#ctx,
                     frag,
                     pe.uniforms,
                     pe.persistent ?? false,
@@ -1140,7 +1141,7 @@ export class VFXPlayer {
             } else {
                 frag = this.#getShader(pe.shader);
                 pass = new PostEffectPass(
-                    this.#gl,
+                    this.#ctx,
                     frag,
                     pe.uniforms,
                     pe.persistent ?? false,
@@ -1329,13 +1330,9 @@ export class VFXPlayer {
 
                 if (!rt || rt.width !== rtW || rt.height !== rtH) {
                     rt?.dispose();
-                    rt = createRenderTarget(
-                        this.#gl,
-                        this.#ctx.floatLinearFilter,
-                        rtW,
-                        rtH,
-                        { float: pass.float },
-                    );
+                    rt = createRenderTarget(this.#ctx, rtW, rtH, {
+                        float: pass.float,
+                    });
                     this.#postEffectBufferTargets.set(bufferName, rt);
                 }
 
@@ -1370,8 +1367,7 @@ export class VFXPlayer {
         ) {
             this.#postEffectTarget?.dispose();
             this.#postEffectTarget = createRenderTarget(
-                this.#gl,
-                this.#ctx.floatLinearFilter,
+                this.#ctx,
                 targetWidth,
                 targetHeight,
             );
@@ -1381,11 +1377,10 @@ export class VFXPlayer {
         for (const pass of this.#postEffectPasses) {
             if (pass.persistent && !pass.backbuffer) {
                 pass.initializeBackbuffer(
-                    this.#gl,
+                    this.#ctx,
                     width,
                     height,
                     this.#pixelRatio,
-                    this.#ctx.floatLinearFilter,
                 );
             } else if (pass.backbuffer) {
                 pass.resizeBackbuffer(width, height);
