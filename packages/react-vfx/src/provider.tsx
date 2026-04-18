@@ -15,10 +15,17 @@ export interface VFXProviderProps {
      * @see {@link @vfx-js/core!VFXOpts.wrapper} for details.
      */
     wrapper?: React.RefObject<HTMLElement | null>;
+    /**
+     * Whether to start the render loop automatically (default `true`).
+     * Set to `false` to drive rendering manually via the VFX instance
+     * exposed through {@link VFXContext}.
+     */
+    autoplay?: boolean;
 }
 
 export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
     const [vfx, setVFX] = useState<VFX | null>(null);
+    const autoplay = props.autoplay ?? true;
 
     useEffect(() => {
         let vfx: VFX;
@@ -27,6 +34,7 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
                 pixelRatio: props.pixelRatio,
                 postEffect: props.postEffect,
                 wrapper: props.wrapper?.current ?? undefined,
+                autoplay,
             });
         } catch {
             // WebGL unavailable — render children without effects
@@ -34,13 +42,12 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
         }
 
         setVFX(vfx);
-        vfx.play();
 
         return () => {
             vfx.stop();
             vfx.destroy();
         };
-    }, [props.pixelRatio, props.postEffect, props.wrapper]); // TODO: add zIndex
+    }, [props.pixelRatio, props.postEffect, props.wrapper, autoplay]); // TODO: add zIndex
 
     return (
         <>
