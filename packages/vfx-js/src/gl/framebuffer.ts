@@ -65,6 +65,12 @@ export class Framebuffer implements Restorable {
 
     #allocate(): void {
         const gl = this.gl;
+        // Delete the previous FBO before creating a new one. Safe on the
+        // restore() path: deleteFramebuffer on a handle from a lost
+        // context is a no-op per the WebGL spec.
+        if (this.fbo) {
+            gl.deleteFramebuffer(this.fbo);
+        }
         const fbo = gl.createFramebuffer();
         if (!fbo) {
             throw new Error("[VFX-JS] Failed to create framebuffer");
