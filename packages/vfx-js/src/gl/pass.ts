@@ -1,6 +1,6 @@
 import type { GLContext } from "./context.js";
 import type { Framebuffer } from "./framebuffer.js";
-import { Program, type Uniforms } from "./program.js";
+import { type GlslVersion, Program, type Uniforms } from "./program.js";
 import type { Quad } from "./quad.js";
 
 /**
@@ -28,9 +28,10 @@ export class Pass {
         fragSrc: string,
         uniforms: Uniforms,
         blend: BlendMode,
+        glslVersion?: GlslVersion,
     ) {
         this.gl = ctx.gl;
-        this.program = new Program(ctx, vertSrc, fragSrc);
+        this.program = new Program(ctx, vertSrc, fragSrc, glslVersion);
         this.uniforms = uniforms;
         this.blend = blend;
     }

@@ -1,9 +1,8 @@
 import { Backbuffer } from "./backbuffer.js";
-import { DEFAULT_VERTEX_SHADER } from "./constants.js";
 import type { GLRect } from "./gl-rect.js";
 import type { GLContext } from "./gl/context.js";
 import type { Pass } from "./gl/pass.js";
-import type { Uniforms } from "./gl/program.js";
+import type { GlslVersion, Uniforms } from "./gl/program.js";
 import type { Texture } from "./gl/texture.js";
 import { Vec2, Vec4 } from "./gl/vec.js";
 import { createPassMaterial } from "./render-target.js";
@@ -31,6 +30,7 @@ export class PostEffectPass {
         float?: boolean,
         size?: [number, number],
         hasBufferTarget?: boolean,
+        glslVersion?: GlslVersion,
     ) {
         this.#persistent = persistent ?? false;
         this.#float = float ?? false;
@@ -58,11 +58,11 @@ export class PostEffectPass {
         }
 
         this.pass = createPassMaterial(ctx, {
-            vertexShader: DEFAULT_VERTEX_SHADER,
             fragmentShader,
             uniforms: this.#uniforms,
             renderingToBuffer: hasBufferTarget ?? false,
             premultipliedAlpha: true,
+            glslVersion,
         });
     }
 

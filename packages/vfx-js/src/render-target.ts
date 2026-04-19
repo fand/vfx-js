@@ -1,8 +1,15 @@
-import { DEFAULT_VERTEX_SHADER } from "./constants.js";
+import {
+    DEFAULT_VERTEX_SHADER,
+    DEFAULT_VERTEX_SHADER_100,
+} from "./constants.js";
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
 import { type BlendMode, Pass } from "./gl/pass.js";
-import type { Uniforms } from "./gl/program.js";
+import {
+    type GlslVersion,
+    type Uniforms,
+    detectGlslVersion,
+} from "./gl/program.js";
 
 /**
  * Create a framebuffer matching the options passed to element/post-effect passes.
@@ -34,6 +41,7 @@ export function createPassMaterial(
         /** True when this pass renders into an intermediate RT. */
         renderingToBuffer?: boolean;
         premultipliedAlpha?: boolean;
+        glslVersion?: GlslVersion;
     },
 ): Pass {
     const renderingToBuffer = opts.renderingToBuffer ?? false;
@@ -45,12 +53,19 @@ export function createPassMaterial(
     } else {
         blend = "normal";
     }
-    const vertexShader = opts.vertexShader ?? DEFAULT_VERTEX_SHADER;
+    const glslVersion =
+        opts.glslVersion ?? detectGlslVersion(opts.fragmentShader);
+    const vertexShader =
+        opts.vertexShader ??
+        (glslVersion === "100"
+            ? DEFAULT_VERTEX_SHADER_100
+            : DEFAULT_VERTEX_SHADER);
     return new Pass(
         ctx,
         vertexShader,
         opts.fragmentShader,
         opts.uniforms,
         blend,
+        glslVersion,
     );
 }

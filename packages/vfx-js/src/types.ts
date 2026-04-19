@@ -2,9 +2,11 @@ import type { Backbuffer } from "./backbuffer.js";
 import type { ShaderPreset } from "./constants.js";
 import type { Framebuffer } from "./gl/framebuffer.js";
 import type { Pass } from "./gl/pass.js";
-import type { Uniforms } from "./gl/program.js";
+import type { GlslVersion, Uniforms } from "./gl/program.js";
 import type { Texture } from "./gl/texture.js";
 import type { Margin, MarginOpts } from "./rect.js";
+
+export type { GlslVersion } from "./gl/program.js";
 
 /**
  * @deprecated Use `float?: boolean` instead.
@@ -64,6 +66,9 @@ export type VFXPass = {
      * Works the same way as element uniforms.
      */
     uniforms?: VFXUniforms;
+
+    /** See {@link GlslVersion}. */
+    glslVersion?: GlslVersion;
 };
 
 /**
@@ -321,6 +326,9 @@ export type VFXProps = {
      * VFX-JS provides `uniform bool autoCrop;` to help this.
      */
     autoCrop?: boolean;
+
+    /** See {@link GlslVersion}. */
+    glslVersion?: GlslVersion;
 };
 
 /**
@@ -435,4 +443,7 @@ export type VFXPostEffect = {
      * Use 32-bit floating point render target. (Default: `false`)
      */
     float?: boolean;
+
+    /** See {@link GlslVersion}. */
+    glslVersion?: GlslVersion;
 };

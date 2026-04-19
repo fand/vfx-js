@@ -1,5 +1,5 @@
 import { Backbuffer } from "./backbuffer.js";
-import { DEFAULT_VERTEX_SHADER, shaders } from "./constants.js";
+import { shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
@@ -454,7 +454,6 @@ export class VFXPlayer {
         for (let i = 0; i < inputPasses.length; i++) {
             const p = inputPasses[i];
             const frag = p.frag;
-            const vertexShader = p.vert ? p.vert : DEFAULT_VERTEX_SHADER;
 
             // Create per-pass uniforms
             const passUniforms: Uniforms = { ...sharedUniforms };
@@ -497,10 +496,11 @@ export class VFXPlayer {
             }
 
             const pass = createPassMaterial(this.#ctx, {
-                vertexShader,
+                vertexShader: p.vert,
                 fragmentShader: frag,
                 uniforms: passUniforms,
                 renderingToBuffer: p.target !== undefined,
+                glslVersion: p.glslVersion,
             });
 
             passes.push({
@@ -556,13 +556,18 @@ export class VFXPlayer {
 
     /**
      * Normalize shader input to a VFXPass array.
+     * Per-pass `glslVersion` wins; otherwise `opts.glslVersion` is inherited.
      */
     #normalizePasses(opts: VFXProps): VFXPass[] {
+        const inherit = (p: VFXPass): VFXPass =>
+            p.glslVersion === undefined && opts.glslVersion !== undefined
+                ? { ...p, glslVersion: opts.glslVersion }
+                : p;
         if (Array.isArray(opts.shader)) {
-            return opts.shader;
+            return opts.shader.map(inherit);
         }
         const shaderCode = this.#getShader(opts.shader || "uvGradient");
-        return [{ frag: shaderCode }];
+        return [inherit({ frag: shaderCode })];
     }
 
     removeElement(element: HTMLElement): void {
@@ -1136,6 +1141,7 @@ export class VFXPlayer {
                     pe.float ?? false,
                     pe.size,
                     pe.target !== undefined,
+                    pe.glslVersion,
                 );
                 targetNames.push(pe.target);
             } else {
@@ -1146,6 +1152,9 @@ export class VFXPlayer {
                     pe.uniforms,
                     pe.persistent ?? false,
                     pe.float ?? false,
+                    undefined,
+                    false,
+                    pe.glslVersion,
                 );
                 if (pe.persistent) {
                     pass.registerBufferUniform("backbuffer");

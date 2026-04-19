@@ -19,6 +19,28 @@ export type Uniform = { value: UniformValue | null };
 /** @internal */
 export type Uniforms = { [name: string]: Uniform };
 
+/**
+ * GLSL ES version of a shader. When omitted on a VFX prop, it is
+ * auto-detected from the fragment shader via {@link detectGlslVersion}:
+ * GLSL 100 markers (`gl_FragColor`, `texture2D`, `varying`, `attribute`)
+ * pick `"100"`, otherwise `"300 es"`.
+ */
+export type GlslVersion = "100" | "300 es";
+
+/** @see {@link GlslVersion} */
+export function detectGlslVersion(src: string): GlslVersion {
+    if (/#version\s+300\s+es\b/.test(src)) {
+        return "300 es";
+    }
+    if (/#version\s+100\b/.test(src)) {
+        return "100";
+    }
+    if (/\bgl_FragColor\b|\btexture2D\b|\bvarying\b|\battribute\b/.test(src)) {
+        return "100";
+    }
+    return "300 es";
+}
+
 type ActiveUniform = {
     location: WebGLUniformLocation;
     type: number;
@@ -30,8 +52,8 @@ type ActiveUniform = {
  * link, attribute binding (attribute "position" → location 0), and
  * uniform upload.
  *
- * Shader source is automatically prefixed with `#version 300 es` when
- * no `#version` directive is present.
+ * GLSL version: `glslVersion` if given, else auto-detected from the
+ * fragment shader via {@link detectGlslVersion}.
  *
  * Self-registers with {@link GLContext} so the program is recompiled
  * after a `webglcontextrestored` event.
@@ -43,13 +65,20 @@ export class Program implements Restorable {
     #ctx: GLContext;
     #vertSrc: string;
     #fragSrc: string;
+    #glslVersion: GlslVersion;
     #uniforms = new Map<string, ActiveUniform>();
 
-    constructor(ctx: GLContext, vertSrc: string, fragSrc: string) {
+    constructor(
+        ctx: GLContext,
+        vertSrc: string,
+        fragSrc: string,
+        glslVersion?: GlslVersion,
+    ) {
         this.#ctx = ctx;
         this.gl = ctx.gl;
         this.#vertSrc = vertSrc;
         this.#fragSrc = fragSrc;
+        this.#glslVersion = glslVersion ?? detectGlslVersion(fragSrc);
         this.#compile();
         ctx.addResource(this);
     }
@@ -59,12 +88,12 @@ export class Program implements Restorable {
         const vs = compileShader(
             gl,
             gl.VERTEX_SHADER,
-            ensureVersion(this.#vertSrc),
+            ensureVersion(this.#vertSrc, this.#glslVersion),
         );
         const fs = compileShader(
             gl,
             gl.FRAGMENT_SHADER,
-            ensureVersion(this.#fragSrc),
+            ensureVersion(this.#fragSrc, this.#glslVersion),
         );
 
         const program = gl.createProgram();
@@ -181,9 +210,13 @@ function compileShader(
     return sh;
 }
 
-function ensureVersion(src: string): string {
+function ensureVersion(src: string, version: GlslVersion): string {
     const trimmed = src.replace(/^\s+/, "");
     if (trimmed.startsWith("#version")) {
+        return src;
+    }
+    if (version === "100") {
+        // WebGL2 default is GLSL ES 1.00 when no directive is present.
         return src;
     }
     return `#version 300 es\n${src}`;

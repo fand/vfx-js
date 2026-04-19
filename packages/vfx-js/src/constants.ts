@@ -10,6 +10,19 @@ void main() {
 `;
 
 /**
+ * GLSL ES 1.00 variant of the default vertex shader. Used when the paired
+ * fragment shader is GLSL 100 so vertex/fragment versions match at link time.
+ * @internal
+ */
+export const DEFAULT_VERTEX_SHADER_100 = `
+precision highp float;
+attribute vec3 position;
+void main() {
+    gl_Position = vec4(position, 1.0);
+}
+`;
+
+/**
  * @internal
  */
 export const COPY_FRAGMENT_SHADER = `
