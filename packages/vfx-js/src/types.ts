@@ -357,7 +357,8 @@ export type VFXUniformValue =
     | [number, number, number, number] // vec4
     | number[]
     | Float32Array
-    | Int32Array;
+    | Int32Array
+    | Uint32Array;
 
 /**
  * @internal

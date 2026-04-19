@@ -14,7 +14,8 @@ export type UniformValue =
     | [number, number, number, number]
     | number[]
     | Float32Array
-    | Int32Array;
+    | Int32Array
+    | Uint32Array;
 
 /** @internal */
 export type Uniform = { value: UniformValue | null };
@@ -235,24 +236,32 @@ function isSamplerType(type: number): boolean {
     );
 }
 
-function uploadScalarUniform(
+/** Track unsupported uniform types we've already warned about to avoid log spam. */
+const warnedUnsupportedTypes = new Set<number>();
+
+/** @internal — exported for testability; not part of the public API. */
+export function uploadScalarUniform(
     gl: WebGL2RenderingContext,
     info: ActiveUniform,
     value: Exclude<UniformValue, Texture>,
 ): void {
     const loc = info.location;
     const isArray = info.size > 1;
+    const fv = value as Float32Array | number[];
+    const iv = value as Int32Array | number[];
+    const uv = value as Uint32Array | number[];
+
     switch (info.type) {
         case gl.FLOAT:
             if (isArray) {
-                gl.uniform1fv(loc, value as Float32Array | number[]);
+                gl.uniform1fv(loc, fv);
             } else {
                 gl.uniform1f(loc, value as number);
             }
             return;
         case gl.FLOAT_VEC2:
             if (isArray) {
-                gl.uniform2fv(loc, value as Float32Array | number[]);
+                gl.uniform2fv(loc, fv);
             } else if (value instanceof Vec2) {
                 gl.uniform2f(loc, value.x, value.y);
             } else {
@@ -262,7 +271,7 @@ function uploadScalarUniform(
             return;
         case gl.FLOAT_VEC3:
             if (isArray) {
-                gl.uniform3fv(loc, value as Float32Array | number[]);
+                gl.uniform3fv(loc, fv);
             } else {
                 const v = value as [number, number, number];
                 gl.uniform3f(loc, v[0], v[1], v[2]);
@@ -270,7 +279,7 @@ function uploadScalarUniform(
             return;
         case gl.FLOAT_VEC4:
             if (isArray) {
-                gl.uniform4fv(loc, value as Float32Array | number[]);
+                gl.uniform4fv(loc, fv);
             } else if (value instanceof Vec4) {
                 gl.uniform4f(loc, value.x, value.y, value.z, value.w);
             } else {
@@ -280,20 +289,119 @@ function uploadScalarUniform(
             return;
         case gl.INT:
             if (isArray) {
-                gl.uniform1iv(loc, value as Int32Array | number[]);
+                gl.uniform1iv(loc, iv);
             } else {
                 gl.uniform1i(loc, value as number);
             }
             return;
+        case gl.INT_VEC2:
+            if (isArray) {
+                gl.uniform2iv(loc, iv);
+            } else {
+                const v = value as [number, number];
+                gl.uniform2i(loc, v[0], v[1]);
+            }
+            return;
+        case gl.INT_VEC3:
+            if (isArray) {
+                gl.uniform3iv(loc, iv);
+            } else {
+                const v = value as [number, number, number];
+                gl.uniform3i(loc, v[0], v[1], v[2]);
+            }
+            return;
+        case gl.INT_VEC4:
+            if (isArray) {
+                gl.uniform4iv(loc, iv);
+            } else {
+                const v = value as [number, number, number, number];
+                gl.uniform4i(loc, v[0], v[1], v[2], v[3]);
+            }
+            return;
         case gl.BOOL:
             if (isArray) {
-                gl.uniform1iv(loc, value as Int32Array | number[]);
+                gl.uniform1iv(loc, iv);
             } else {
                 gl.uniform1i(loc, value ? 1 : 0);
             }
             return;
+        case gl.BOOL_VEC2:
+            if (isArray) {
+                gl.uniform2iv(loc, iv);
+            } else {
+                const v = value as [number, number];
+                gl.uniform2i(loc, v[0] ? 1 : 0, v[1] ? 1 : 0);
+            }
+            return;
+        case gl.BOOL_VEC3:
+            if (isArray) {
+                gl.uniform3iv(loc, iv);
+            } else {
+                const v = value as [number, number, number];
+                gl.uniform3i(loc, v[0] ? 1 : 0, v[1] ? 1 : 0, v[2] ? 1 : 0);
+            }
+            return;
+        case gl.BOOL_VEC4:
+            if (isArray) {
+                gl.uniform4iv(loc, iv);
+            } else {
+                const v = value as [number, number, number, number];
+                gl.uniform4i(
+                    loc,
+                    v[0] ? 1 : 0,
+                    v[1] ? 1 : 0,
+                    v[2] ? 1 : 0,
+                    v[3] ? 1 : 0,
+                );
+            }
+            return;
+        case gl.FLOAT_MAT2:
+            gl.uniformMatrix2fv(loc, false, fv);
+            return;
+        case gl.FLOAT_MAT3:
+            gl.uniformMatrix3fv(loc, false, fv);
+            return;
+        case gl.FLOAT_MAT4:
+            gl.uniformMatrix4fv(loc, false, fv);
+            return;
+        case gl.UNSIGNED_INT:
+            if (isArray) {
+                gl.uniform1uiv(loc, uv);
+            } else {
+                gl.uniform1ui(loc, value as number);
+            }
+            return;
+        case gl.UNSIGNED_INT_VEC2:
+            if (isArray) {
+                gl.uniform2uiv(loc, uv);
+            } else {
+                const v = value as [number, number];
+                gl.uniform2ui(loc, v[0], v[1]);
+            }
+            return;
+        case gl.UNSIGNED_INT_VEC3:
+            if (isArray) {
+                gl.uniform3uiv(loc, uv);
+            } else {
+                const v = value as [number, number, number];
+                gl.uniform3ui(loc, v[0], v[1], v[2]);
+            }
+            return;
+        case gl.UNSIGNED_INT_VEC4:
+            if (isArray) {
+                gl.uniform4uiv(loc, uv);
+            } else {
+                const v = value as [number, number, number, number];
+                gl.uniform4ui(loc, v[0], v[1], v[2], v[3]);
+            }
+            return;
         default:
-            // Unsupported uniform type; skip silently.
+            if (!warnedUnsupportedTypes.has(info.type)) {
+                warnedUnsupportedTypes.add(info.type);
+                console.warn(
+                    `[VFX-JS] Unsupported uniform type 0x${info.type.toString(16)}; skipping upload.`,
+                );
+            }
             return;
     }
 }
