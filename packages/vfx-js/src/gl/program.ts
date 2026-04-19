@@ -11,7 +11,10 @@ export type UniformValue =
     | Texture
     | [number, number]
     | [number, number, number]
-    | [number, number, number, number];
+    | [number, number, number, number]
+    | number[]
+    | Float32Array
+    | Int32Array;
 
 /** @internal */
 export type Uniform = { value: UniformValue | null };
@@ -238,25 +241,37 @@ function uploadScalarUniform(
     value: Exclude<UniformValue, Texture>,
 ): void {
     const loc = info.location;
+    const isArray = info.size > 1;
     switch (info.type) {
         case gl.FLOAT:
-            gl.uniform1f(loc, value as number);
+            if (isArray) {
+                gl.uniform1fv(loc, value as Float32Array | number[]);
+            } else {
+                gl.uniform1f(loc, value as number);
+            }
             return;
         case gl.FLOAT_VEC2:
-            if (value instanceof Vec2) {
+            if (isArray) {
+                gl.uniform2fv(loc, value as Float32Array | number[]);
+            } else if (value instanceof Vec2) {
                 gl.uniform2f(loc, value.x, value.y);
             } else {
                 const v = value as [number, number];
                 gl.uniform2f(loc, v[0], v[1]);
             }
             return;
-        case gl.FLOAT_VEC3: {
-            const v = value as [number, number, number];
-            gl.uniform3f(loc, v[0], v[1], v[2]);
+        case gl.FLOAT_VEC3:
+            if (isArray) {
+                gl.uniform3fv(loc, value as Float32Array | number[]);
+            } else {
+                const v = value as [number, number, number];
+                gl.uniform3f(loc, v[0], v[1], v[2]);
+            }
             return;
-        }
         case gl.FLOAT_VEC4:
-            if (value instanceof Vec4) {
+            if (isArray) {
+                gl.uniform4fv(loc, value as Float32Array | number[]);
+            } else if (value instanceof Vec4) {
                 gl.uniform4f(loc, value.x, value.y, value.z, value.w);
             } else {
                 const v = value as [number, number, number, number];
@@ -264,10 +279,18 @@ function uploadScalarUniform(
             }
             return;
         case gl.INT:
-            gl.uniform1i(loc, value as number);
+            if (isArray) {
+                gl.uniform1iv(loc, value as Int32Array | number[]);
+            } else {
+                gl.uniform1i(loc, value as number);
+            }
             return;
         case gl.BOOL:
-            gl.uniform1i(loc, value ? 1 : 0);
+            if (isArray) {
+                gl.uniform1iv(loc, value as Int32Array | number[]);
+            } else {
+                gl.uniform1i(loc, value ? 1 : 0);
+            }
             return;
         default:
             // Unsupported uniform type; skip silently.

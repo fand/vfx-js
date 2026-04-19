@@ -346,13 +346,18 @@ export type VFXUniforms = {
 
 /**
  * Type for the values of uniform variables.
- * Each of these corresponds to `float`, `vec2`, `vec3` and `vec4` in GLSL.
+ * Scalars/tuples map to GLSL `float`/`vec2`/`vec3`/`vec4`. Flat numeric
+ * arrays (e.g. `Float32Array`) map to array uniforms — a `Float32Array`
+ * of length `N*4` feeds `uniform vec4 foo[N]` (or `uniform float foo[N*4]`).
  */
 export type VFXUniformValue =
     | number // float
     | [number, number] // vec2
     | [number, number, number] // vec3
-    | [number, number, number, number]; // vec4
+    | [number, number, number, number] // vec4
+    | number[]
+    | Float32Array
+    | Int32Array;
 
 /**
  * @internal
