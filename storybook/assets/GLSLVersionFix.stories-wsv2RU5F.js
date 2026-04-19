@@ -1,4 +1,4 @@
-import{V as E}from"./vfx-CaMVhH5E.js";import{J as y}from"./jellyfish-qrbjulKw.js";const L={title:"Tests/GLSL Version Auto Detection",parameters:{layout:"fullscreen"}},p=`
+import{V as E}from"./vfx-wGJBmbdk.js";import{J as y}from"./jellyfish-qrbjulKw.js";const L={title:"Tests/GLSL Version Auto Detection",parameters:{layout:"fullscreen"}},p=`
 precision highp float;
 uniform vec2 resolution;
 uniform vec2 offset;

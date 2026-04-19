@@ -1,4 +1,4 @@
-import{i as u}from"./utils-C00prF83.js";import{L as n}from"./preset-B_9u5Dmn.js";import"./vfx-CaMVhH5E.js";const _={title:"Backbuffer",parameters:{layout:"fullscreen"}},d=`
+import{i as u}from"./utils-BUgq-vrJ.js";import{L as n}from"./preset-B_9u5Dmn.js";import"./vfx-wGJBmbdk.js";const _={title:"Backbuffer",parameters:{layout:"fullscreen"}},d=`
 precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;

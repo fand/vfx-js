@@ -1,4 +1,4 @@
-import{L as f}from"./preset-B_9u5Dmn.js";import{i as h}from"./utils-C00prF83.js";import"./vfx-CaMVhH5E.js";const P={title:"Mouse Position"},x=`
+import{L as f}from"./preset-B_9u5Dmn.js";import{i as h}from"./utils-BUgq-vrJ.js";import"./vfx-wGJBmbdk.js";const P={title:"Mouse Position"},x=`
 precision highp float;
 uniform vec2 mouse;
 uniform sampler2D src;
