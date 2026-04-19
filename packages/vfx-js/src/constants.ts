@@ -10,6 +10,8 @@ void main() {
 `;
 
 /**
+ * GLSL ES 1.00 variant of the default vertex shader. Used when the paired
+ * fragment shader is GLSL 100 so vertex/fragment versions match at link time.
  * @internal
  */
 export const DEFAULT_VERTEX_SHADER_100 = `

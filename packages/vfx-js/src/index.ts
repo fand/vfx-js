@@ -9,4 +9,10 @@ export { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 export { setupCapture, teardownCapture } from "./html-in-canvas.js";
 export type { CaptureOpts } from "./html-in-canvas.js";
 
-export type { VFXOpts, VFXProps, VFXPostEffect, VFXPass } from "./types.js";
+export type {
+    GlslVersion,
+    VFXOpts,
+    VFXPass,
+    VFXPostEffect,
+    VFXProps,
+} from "./types.js";

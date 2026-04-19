@@ -1,14 +1,16 @@
-import * as THREE from "three";
 import { Backbuffer } from "./backbuffer.js";
-import {
-    DEFAULT_VERTEX_SHADER,
-    DEFAULT_VERTEX_SHADER_100,
-    shaders,
-} from "./constants.js";
+import { shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
+import { GLContext } from "./gl/context.js";
+import type { Framebuffer } from "./gl/framebuffer.js";
+import { type Pass, renderPass } from "./gl/pass.js";
+import type { Uniform, Uniforms } from "./gl/program.js";
+import { Quad } from "./gl/quad.js";
+import { Texture, type TextureWrap, loadImage } from "./gl/texture.js";
+import { Vec2, Vec4 } from "./gl/vec.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import {
     MARGIN_ZERO,
@@ -32,7 +34,7 @@ import type {
     VFXProps,
     VFXUniformValue,
     VFXWrap,
-} from "./types";
+} from "./types.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -43,24 +45,22 @@ export class VFXPlayer {
     #opts: VFXOptsInner;
 
     #canvas: HTMLCanvasElement;
-    #renderer: THREE.WebGLRenderer;
-    #camera: THREE.Camera;
+    #ctx: GLContext;
+    #gl: WebGL2RenderingContext;
+    #quad: Quad;
     #copyPass: CopyPass;
     #postEffectPasses: PostEffectPass[] = [];
     #postEffectPassTargets: (string | undefined)[] = [];
-    #postEffectTarget: THREE.WebGLRenderTarget | undefined;
+    #postEffectTarget: Framebuffer | undefined;
     #postEffectUniformGeneratorsList: {
         [name: string]: () => VFXUniformValue;
     }[] = [];
-    #postEffectBufferTargets: Map<string, THREE.WebGLRenderTarget | undefined> =
-        new Map();
+    #postEffectBufferTargets: Map<string, Framebuffer | undefined> = new Map();
 
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
     #elements: VFXElement[] = [];
     #initTime = Date.now() / 1000.0;
-
-    #textureLoader = new THREE.TextureLoader();
 
     #viewport: Rect = createRect(0);
 
@@ -74,28 +74,18 @@ export class VFXPlayer {
     #mouseX = 0;
     #mouseY = 0;
 
-    /** Float RT data type: FP32 if OES_texture_float_linear, else FP16. */
-    #floatRTType!: THREE.TextureDataType;
-
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
     constructor(opts: VFXOptsInner, canvas: HTMLCanvasElement) {
         this.#opts = opts;
 
         this.#canvas = canvas;
-        this.#renderer = new THREE.WebGLRenderer({
-            canvas,
-            alpha: true,
-        });
-        this.#renderer.autoClear = false;
-        this.#renderer.setClearAlpha(0);
-        const gl = this.#renderer.getContext() as WebGL2RenderingContext;
-        gl.getExtension("EXT_color_buffer_float");
-        gl.getExtension("EXT_color_buffer_half_float");
-        this.#floatRTType = gl.getExtension("OES_texture_float_linear")
-            ? THREE.FloatType
-            : THREE.HalfFloatType;
+        this.#ctx = new GLContext(canvas);
+        this.#gl = this.#ctx.gl;
+        this.#gl.clearColor(0, 0, 0, 0);
         this.#pixelRatio = opts.pixelRatio;
+
+        this.#quad = new Quad(this.#ctx);
 
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.#resize);
@@ -103,14 +93,15 @@ export class VFXPlayer {
         }
         this.#resize();
 
-        this.#camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-        this.#camera.position.set(0, 0, 1);
-
-        // Setup copyScene
-        this.#copyPass = new CopyPass();
-
-        // Setup post effect passes
+        this.#copyPass = new CopyPass(this.#ctx);
         this.#initPostEffects(opts.postEffects);
+
+        // Clear state that depends on frame-by-frame GPU output so the
+        // scene re-renders cleanly after a context restore (persistent
+        // backbuffers come back as black, then accumulate again).
+        this.#ctx.onContextRestored(() => {
+            this.#gl.clearColor(0, 0, 0, 0);
+        });
     }
 
     destroy(): void {
@@ -120,13 +111,15 @@ export class VFXPlayer {
             window.removeEventListener("pointermove", this.#pointermove);
         }
 
-        // Clean up post effect resources
-        if (this.#postEffectTarget) {
-            this.#postEffectTarget.dispose();
-        }
+        this.#postEffectTarget?.dispose();
         for (const rt of this.#postEffectBufferTargets.values()) {
             rt?.dispose();
         }
+        for (const pass of this.#postEffectPasses) {
+            pass.dispose();
+        }
+        this.#copyPass.dispose();
+        this.#quad.dispose();
     }
 
     #updateCanvasSize(): void {
@@ -179,10 +172,13 @@ export class VFXPlayer {
             widthWithPadding !== this.#canvasSize[0] ||
             heightWithPadding !== this.#canvasSize[1]
         ) {
-            this.#canvas.width = widthWithPadding;
-            this.#canvas.height = heightWithPadding;
-            this.#renderer.setSize(widthWithPadding, heightWithPadding);
-            this.#renderer.setPixelRatio(this.#pixelRatio);
+            this.#canvas.style.width = `${widthWithPadding}px`;
+            this.#canvas.style.height = `${heightWithPadding}px`;
+            this.#ctx.setSize(
+                widthWithPadding,
+                heightWithPadding,
+                this.#pixelRatio,
+            );
             this.#viewport = createRect({
                 top: -paddingY,
                 left: -paddingX,
@@ -251,22 +247,26 @@ export class VFXPlayer {
 
         try {
             const srcUniform = e.passes[0].uniforms["src"];
-            const oldTexture: THREE.CanvasTexture = srcUniform.value;
-            const oldCanvas = oldTexture.image;
+            const oldTexture = srcUniform.value as Texture;
+            const oldCanvas =
+                oldTexture.source instanceof OffscreenCanvas
+                    ? oldTexture.source
+                    : undefined;
 
             const canvas = await dom2canvas(
                 e.element,
                 e.originalOpacity,
                 oldCanvas,
-                this.#renderer.capabilities.maxTextureSize,
+                this.maxTextureSize,
             );
             if (canvas.width === 0 || canvas.width === 0) {
                 throw "omg";
             }
 
-            const texture = new THREE.CanvasTexture(canvas);
+            const texture = new Texture(this.#ctx, canvas);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
+            texture.needsUpdate = true;
             srcUniform.value = texture;
             e.srcTexture = texture;
             oldTexture.dispose();
@@ -298,7 +298,7 @@ export class VFXPlayer {
                 : Number.parseFloat(element.style.opacity);
 
         // Create values for element types
-        let texture: THREE.Texture;
+        let texture: Texture;
         let type: VFXElementType;
         let isGif = false;
         if (element instanceof HTMLImageElement) {
@@ -308,19 +308,20 @@ export class VFXPlayer {
             if (isGif) {
                 const gif = await GIFData.create(element.src, this.#pixelRatio);
                 gifFor.set(element, gif);
-                texture = new THREE.Texture(gif.getCanvas());
+                texture = new Texture(this.#ctx, gif.getCanvas());
             } else {
-                texture = await this.#textureLoader.loadAsync(element.src);
+                const img = await loadImage(element.src);
+                texture = new Texture(this.#ctx, img);
             }
         } else if (element instanceof HTMLVideoElement) {
-            texture = new THREE.VideoTexture(element);
+            texture = new Texture(this.#ctx, element);
             type = "video" as VFXElementType;
         } else if (element instanceof HTMLCanvasElement) {
             if (element.hasAttribute("layoutsubtree") && initialCapture) {
-                texture = new THREE.CanvasTexture(initialCapture);
+                texture = new Texture(this.#ctx, initialCapture);
                 type = "hic" as VFXElementType;
             } else {
-                texture = new THREE.CanvasTexture(element);
+                texture = new Texture(this.#ctx, element);
                 type = "canvas" as VFXElementType;
             }
         } else {
@@ -328,18 +329,15 @@ export class VFXPlayer {
                 element,
                 originalOpacity,
                 undefined,
-                this.#renderer.capabilities.maxTextureSize,
+                this.maxTextureSize,
             );
-            texture = new THREE.CanvasTexture(canvas);
+            texture = new Texture(this.#ctx, canvas);
             type = "text" as VFXElementType;
         }
 
         const [wrapS, wrapT] = parseWrap(opts.wrap);
         texture.wrapS = wrapS;
         texture.wrapT = wrapT;
-        texture.minFilter = THREE.LinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.format = THREE.RGBAFormat;
         texture.needsUpdate = true;
 
         const autoCrop = opts.autoCrop ?? true;
@@ -357,16 +355,16 @@ export class VFXPlayer {
         }
 
         // Create shared uniforms
-        const sharedUniforms: { [name: string]: THREE.IUniform } = {
+        const sharedUniforms: Uniforms = {
             src: { value: texture },
-            resolution: { value: new THREE.Vector2() },
-            offset: { value: new THREE.Vector2() },
+            resolution: { value: new Vec2() },
+            offset: { value: new Vec2() },
             time: { value: 0.0 },
             enterTime: { value: -1.0 },
             leaveTime: { value: -1.0 },
-            mouse: { value: new THREE.Vector2() },
+            mouse: { value: new Vec2() },
             intersection: { value: 0.0 },
-            viewport: { value: new THREE.Vector4() },
+            viewport: { value: new Vec4() },
             autoCrop: { value: autoCrop },
         };
 
@@ -396,18 +394,18 @@ export class VFXPlayer {
                     (rectWithOverflow.bottom - rectWithOverflow.top) *
                     this.#pixelRatio;
                 return new Backbuffer(
+                    this.#ctx,
                     bw,
                     bh,
                     this.#pixelRatio,
                     false,
-                    this.#floatRTType,
                 );
             })();
             sharedUniforms["backbuffer"] = { value: backbuffer.texture };
         }
 
         // Create buffer targets for intermediate passes
-        const bufferTargets = new Map<string, THREE.WebGLRenderTarget>();
+        const bufferTargets = new Map<string, Framebuffer>();
         const passBackbuffers = new Map<string, Backbuffer>();
         for (let i = 0; i < inputPasses.length - 1; i++) {
             const targetName = inputPasses[i].target ?? `pass${i}`;
@@ -434,17 +432,17 @@ export class VFXPlayer {
                 passBackbuffers.set(
                     targetName,
                     new Backbuffer(
+                        this.#ctx,
                         logicalW,
                         logicalH,
                         pixelRatio,
                         inputPasses[i].float,
-                        this.#floatRTType,
                     ),
                 );
             } else {
                 bufferTargets.set(
                     targetName,
-                    createRenderTarget(this.#floatRTType, bw, bh, {
+                    createRenderTarget(this.#ctx, bw, bh, {
                         float: inputPasses[i].float,
                     }),
                 );
@@ -456,17 +454,9 @@ export class VFXPlayer {
         for (let i = 0; i < inputPasses.length; i++) {
             const p = inputPasses[i];
             const frag = p.frag;
-            const glslVersion = this.#getGLSLVersion(opts.glslVersion, frag);
-            const vertexShader = p.vert
-                ? p.vert
-                : glslVersion === "100"
-                  ? DEFAULT_VERTEX_SHADER_100
-                  : DEFAULT_VERTEX_SHADER;
 
             // Create per-pass uniforms
-            const passUniforms: { [name: string]: THREE.IUniform } = {
-                ...sharedUniforms,
-            };
+            const passUniforms: Uniforms = { ...sharedUniforms };
             const passUniformGenerators: {
                 [name: string]: () => VFXUniformValue;
             } = {};
@@ -505,21 +495,16 @@ export class VFXPlayer {
                 }
             }
 
-            const scene = new THREE.Scene();
-            const geometry = new THREE.PlaneGeometry(2, 2);
-            const material = createPassMaterial({
-                vertexShader,
+            const pass = createPassMaterial(this.#ctx, {
+                vertexShader: p.vert,
                 fragmentShader: frag,
                 uniforms: passUniforms,
-                glslVersion,
                 renderingToBuffer: p.target !== undefined,
+                glslVersion: p.glslVersion,
             });
-            const mesh = new THREE.Mesh(geometry, material);
-            scene.add(mesh);
 
             passes.push({
-                scene,
-                mesh,
+                pass,
                 uniforms: passUniforms,
                 uniformGenerators: {
                     ...sharedUniformGenerators,
@@ -571,13 +556,18 @@ export class VFXPlayer {
 
     /**
      * Normalize shader input to a VFXPass array.
+     * Per-pass `glslVersion` wins; otherwise `opts.glslVersion` is inherited.
      */
     #normalizePasses(opts: VFXProps): VFXPass[] {
+        const inherit = (p: VFXPass): VFXPass =>
+            p.glslVersion === undefined && opts.glslVersion !== undefined
+                ? { ...p, glslVersion: opts.glslVersion }
+                : p;
         if (Array.isArray(opts.shader)) {
-            return opts.shader;
+            return opts.shader.map(inherit);
         }
         const shaderCode = this.#getShader(opts.shader || "uvGradient");
-        return [{ frag: shaderCode }];
+        return [inherit({ frag: shaderCode })];
     }
 
     removeElement(element: HTMLElement): void {
@@ -585,10 +575,15 @@ export class VFXPlayer {
         if (i !== -1) {
             const e = this.#elements.splice(i, 1)[0] as VFXElement;
 
-            // Dispose buffer targets
             for (const rt of e.bufferTargets.values()) {
                 rt.dispose();
             }
+            for (const p of e.passes) {
+                p.pass.dispose();
+                p.backbuffer?.dispose();
+            }
+            e.backbuffer?.dispose();
+            e.srcTexture.dispose();
 
             // Recover the original state
             element.style.setProperty("opacity", e.originalOpacity.toString());
@@ -610,10 +605,11 @@ export class VFXPlayer {
         const e = this.#elements.find((e) => e.element === element);
         if (e) {
             const srcUniform = e.passes[0].uniforms["src"];
-            const oldTexture = srcUniform.value;
-            const texture = new THREE.CanvasTexture(element);
+            const oldTexture = srcUniform.value as Texture;
+            const texture = new Texture(this.#ctx, element);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
+            texture.needsUpdate = true;
             srcUniform.value = texture;
             e.srcTexture = texture;
             oldTexture.dispose();
@@ -630,14 +626,15 @@ export class VFXPlayer {
         }
 
         const srcUniform = e.passes[0].uniforms["src"];
-        const oldTexture: THREE.CanvasTexture = srcUniform.value;
+        const oldTexture = srcUniform.value as Texture;
 
-        if (oldTexture.image === offscreen) {
+        if (oldTexture.source === offscreen) {
             oldTexture.needsUpdate = true;
         } else {
-            const texture = new THREE.CanvasTexture(offscreen);
+            const texture = new Texture(this.#ctx, offscreen);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
+            texture.needsUpdate = true;
             srcUniform.value = texture;
             e.srcTexture = texture;
             oldTexture.dispose();
@@ -645,7 +642,7 @@ export class VFXPlayer {
     }
 
     get maxTextureSize(): number {
-        return this.#renderer.capabilities.maxTextureSize;
+        return this.#ctx.maxTextureSize;
     }
 
     isPlaying(): boolean {
@@ -667,12 +664,16 @@ export class VFXPlayer {
 
     render(): void {
         const now = Date.now() / 1000;
-
-        this.#renderer.clear();
+        const gl = this.#gl;
 
         // This must done every frame because iOS Safari doesn't fire
         // window resize event while the address bar is transforming.
         this.#updateCanvasSize();
+
+        // Clear the main canvas.
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, this.#canvas.width, this.#canvas.height);
+        gl.clear(gl.COLOR_BUFFER_BIT);
 
         const viewportWidth = this.#viewport.right - this.#viewport.left;
         const viewportHeight = this.#viewport.bottom - this.#viewport.top;
@@ -683,9 +684,9 @@ export class VFXPlayer {
         if (shouldUsePostEffect) {
             this.#setupPostEffectTarget(viewportWidth, viewportHeight);
             if (this.#postEffectTarget) {
-                this.#renderer.setRenderTarget(this.#postEffectTarget);
-                this.#renderer.clear();
-                this.#renderer.setRenderTarget(null);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this.#postEffectTarget.fbo);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             }
         }
 
@@ -701,15 +702,17 @@ export class VFXPlayer {
             // Update uniforms
             const u = e.passes[0].uniforms;
             u["time"].value = now - e.startTime;
-            u["resolution"].value.x = domRect.width * this.#pixelRatio;
-            u["resolution"].value.y = domRect.height * this.#pixelRatio;
+            (u["resolution"].value as Vec2).set(
+                domRect.width * this.#pixelRatio,
+                domRect.height * this.#pixelRatio,
+            );
             // #mouseX/Y are in viewport-Y-up coords, but gl_FragCoord in
             // the canvas is in canvas-Y-up coords (canvas extends paddingX/Y
             // outside the viewport). Add padding to convert.
-            u["mouse"].value.x =
-                (this.#mouseX + this.#paddingX) * this.#pixelRatio;
-            u["mouse"].value.y =
-                (this.#mouseY + this.#paddingY) * this.#pixelRatio;
+            (u["mouse"].value as Vec2).set(
+                (this.#mouseX + this.#paddingX) * this.#pixelRatio,
+                (this.#mouseY + this.#paddingY) * this.#pixelRatio,
+            );
 
             // Update uniform generators
             for (const pass of e.passes) {
@@ -723,7 +726,7 @@ export class VFXPlayer {
             // Update GIF / video
             gifFor.get(e.element)?.update();
             if (e.type === "video" || e.isGif) {
-                u["src"].value.needsUpdate = true;
+                (u["src"].value as Texture).needsUpdate = true;
             }
 
             const glRect = rectToGLRect(
@@ -770,7 +773,7 @@ export class VFXPlayer {
             }
 
             // Track resolved buffer textures for dynamic uniform updates
-            const resolvedTargets = new Map<string, THREE.Texture>();
+            const resolvedTargets = new Map<string, Texture>();
 
             // Pre-register persistent backbuffer textures
             for (const pass of e.passes) {
@@ -782,7 +785,7 @@ export class VFXPlayer {
             // Render intermediate passes, chaining src between passes
             // Use local inputTexture (like post-effects) to avoid corrupting
             // the shared src uniform across frames.
-            let inputTexture: THREE.Texture = e.srcTexture;
+            let inputTexture: Texture = e.srcTexture;
             // #mouseX/Y are in viewport-Y-up coords, but glRect is in
             // canvas-Y-up coords (canvas extends paddingX/Y outside the
             // viewport). Add padding to convert to the same space.
@@ -826,9 +829,12 @@ export class VFXPlayer {
                     ? getGLRect(0, 0, pass.size[0], pass.size[1])
                     : getGLRect(0, 0, defaultRect.w, defaultRect.h);
 
-                pass.uniforms["resolution"].value.set(bufferW, bufferH);
-                pass.uniforms["offset"].value.set(0, 0);
-                pass.uniforms["mouse"].value.set(
+                (pass.uniforms["resolution"].value as Vec2).set(
+                    bufferW,
+                    bufferH,
+                );
+                (pass.uniforms["offset"].value as Vec2).set(0, 0);
+                (pass.uniforms["mouse"].value as Vec2).set(
                     (relMouseX / defaultRect.w) * bufferW,
                     (relMouseY / defaultRect.h) * bufferH,
                 );
@@ -836,23 +842,26 @@ export class VFXPlayer {
                 if (pass.backbuffer) {
                     // Persistent pass: render to backbuffer, then swap
                     this.#render(
-                        pass.scene,
+                        pass.pass,
                         pass.backbuffer.target,
                         bufferRect,
                         pass.uniforms,
+                        true,
                     );
                     pass.backbuffer.swap();
                     inputTexture = pass.backbuffer.texture;
                 } else {
-                    // Non-persistent pass: render to buffer target
                     const rt = e.bufferTargets.get(pass.target as string);
                     if (!rt) {
                         continue;
                     }
-
-                    this.#renderer.setRenderTarget(rt);
-                    this.#renderer.clear();
-                    this.#render(pass.scene, rt, bufferRect, pass.uniforms);
+                    this.#render(
+                        pass.pass,
+                        rt,
+                        bufferRect,
+                        pass.uniforms,
+                        true,
+                    );
                     inputTexture = rt.texture;
                 }
 
@@ -865,15 +874,15 @@ export class VFXPlayer {
             // Render final pass — restore element-space uniforms
             const finalPass = e.passes[e.passes.length - 1];
             finalPass.uniforms["src"].value = inputTexture;
-            finalPass.uniforms["resolution"].value.set(
+            (finalPass.uniforms["resolution"].value as Vec2).set(
                 domRect.width * this.#pixelRatio,
                 domRect.height * this.#pixelRatio,
             );
-            finalPass.uniforms["offset"].value.set(
+            (finalPass.uniforms["offset"].value as Vec2).set(
                 glRect.x * this.#pixelRatio,
                 glRect.y * this.#pixelRatio,
             );
-            finalPass.uniforms["mouse"].value.set(
+            (finalPass.uniforms["mouse"].value as Vec2).set(
                 (this.#mouseX + this.#paddingX) * this.#pixelRatio,
                 (this.#mouseY + this.#paddingY) * this.#pixelRatio,
             );
@@ -902,10 +911,11 @@ export class VFXPlayer {
 
                     this.#setOffset(e, glRect.x, glRect.y);
                     this.#render(
-                        finalPass.scene,
+                        finalPass.pass,
                         e.backbuffer.target,
                         viewportGlRect,
                         finalPass.uniforms,
+                        true,
                     );
                     e.backbuffer.swap();
 
@@ -915,12 +925,13 @@ export class VFXPlayer {
                         viewportGlRect,
                     );
                     this.#render(
-                        this.#copyPass.scene,
+                        this.#copyPass.pass,
                         shouldUsePostEffect
                             ? this.#postEffectTarget || null
                             : null,
                         viewportGlRect,
                         this.#copyPass.uniforms,
+                        false,
                     );
                 } else {
                     e.backbuffer.resize(
@@ -930,10 +941,11 @@ export class VFXPlayer {
 
                     this.#setOffset(e, e.overflow.left, e.overflow.bottom);
                     this.#render(
-                        finalPass.scene,
+                        finalPass.pass,
                         e.backbuffer.target,
                         e.backbuffer.getViewport(),
                         finalPass.uniforms,
+                        true,
                     );
                     e.backbuffer.swap();
 
@@ -943,21 +955,23 @@ export class VFXPlayer {
                         glRectWithOverflow,
                     );
                     this.#render(
-                        this.#copyPass.scene,
+                        this.#copyPass.pass,
                         shouldUsePostEffect
                             ? this.#postEffectTarget || null
                             : null,
                         glRectWithOverflow,
                         this.#copyPass.uniforms,
+                        false,
                     );
                 }
             } else {
                 this.#setOffset(e, glRect.x, glRect.y);
                 this.#render(
-                    finalPass.scene,
+                    finalPass.pass,
                     shouldUsePostEffect ? this.#postEffectTarget || null : null,
                     e.isFullScreen ? viewportGlRect : glRectWithOverflow,
                     finalPass.uniforms,
+                    false,
                 );
             }
         }
@@ -1032,61 +1046,35 @@ export class VFXPlayer {
         if (shaderNameOrCode in shaders) {
             return shaders[shaderNameOrCode as keyof typeof shaders];
         } else {
-            return shaderNameOrCode; // Assume that the given string is a valid shader code
+            return shaderNameOrCode;
         }
-    }
-
-    #getGLSLVersion(
-        opt: "100" | "300 es" | undefined,
-        shader: string,
-    ): "100" | "300 es" {
-        if (opt) {
-            return opt;
-        }
-        if (shader.includes("out vec4")) {
-            return "300 es";
-        }
-        if (shader.includes("gl_FragColor")) {
-            return "100";
-        }
-
-        throw `VFX-JS error: Cannot detect GLSL version of the shader.\n\nOriginal shader:\n${shader}`;
     }
 
     #render(
-        scene: THREE.Scene,
-        target: THREE.WebGLRenderTarget | null,
+        pass: Pass,
+        target: Framebuffer | null,
         rect: GLRect,
-        uniforms: { [key: string]: THREE.IUniform },
+        uniforms: Uniforms,
+        clearTarget: boolean,
     ) {
-        this.#renderer.setRenderTarget(target);
-        // Only clear if target is not the post effect target (which is cleared once at the beginning)
-        if (target !== null && target !== this.#postEffectTarget) {
-            this.#renderer.clear();
-        }
+        const gl = this.#gl;
 
-        // Clip viewport to render target bounds to avoid precision issues
-        // on mobile GPUs (Adreno, some Mali) with large offscreen rects.
-        const targetCssW = target
-            ? target.width / this.#pixelRatio
-            : this.#canvasSize[0];
-        const targetCssH = target
-            ? target.height / this.#pixelRatio
-            : this.#canvasSize[1];
-        const cx1 = Math.max(0, rect.x);
-        const cy1 = Math.max(0, rect.y);
-        const cx2 = Math.min(targetCssW, rect.x + rect.w);
-        const cy2 = Math.min(targetCssH, rect.y + rect.h);
-        const cw = cx2 - cx1;
-        const ch = cy2 - cy1;
-        if (cw <= 0 || ch <= 0) {
-            return; // nothing visible
+        // Clear intermediate targets, but never touch the post-effect target
+        // here (it's cleared once per frame at the top of `render`).
+        if (
+            clearTarget &&
+            target !== null &&
+            target !== this.#postEffectTarget
+        ) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+            gl.viewport(0, 0, target.width, target.height);
+            gl.clear(gl.COLOR_BUFFER_BIT);
         }
-        this.#renderer.setViewport(cx1, cy1, cw, ch);
 
         // Viewport uniform uses un-clipped rect for shader uv calculation.
-        if (uniforms["viewport"]) {
-            uniforms["viewport"].value.set(
+        const vp = uniforms["viewport"];
+        if (vp && vp.value instanceof Vec4) {
+            vp.value.set(
                 rect.x * this.#pixelRatio,
                 rect.y * this.#pixelRatio,
                 rect.w * this.#pixelRatio,
@@ -1095,7 +1083,16 @@ export class VFXPlayer {
         }
 
         try {
-            this.#renderer.render(scene, this.#camera);
+            renderPass(
+                gl,
+                this.#quad,
+                pass,
+                target,
+                rect,
+                this.#canvasSize[0],
+                this.#canvasSize[1],
+                this.#pixelRatio,
+            );
         } catch (e) {
             console.error(e);
         }
@@ -1106,8 +1103,9 @@ export class VFXPlayer {
      * XY must be the values from the bottom-left of the render target.
      */
     #setOffset(e: VFXElement, x: number, y: number) {
-        e.passes[0].uniforms["offset"].value.x = x * this.#pixelRatio;
-        e.passes[0].uniforms["offset"].value.y = y * this.#pixelRatio;
+        const offset = e.passes[0].uniforms["offset"].value as Vec2;
+        offset.x = x * this.#pixelRatio;
+        offset.y = y * this.#pixelRatio;
     }
 
     #initPostEffects(postEffects: (VFXPostEffect | VFXPass)[]) {
@@ -1136,23 +1134,28 @@ export class VFXPlayer {
             if ("frag" in pe) {
                 frag = pe.frag;
                 pass = new PostEffectPass(
+                    this.#ctx,
                     frag,
                     pe.uniforms,
                     pe.persistent ?? false,
                     pe.float ?? false,
                     pe.size,
                     pe.target !== undefined,
+                    pe.glslVersion,
                 );
                 targetNames.push(pe.target);
             } else {
                 frag = this.#getShader(pe.shader);
                 pass = new PostEffectPass(
+                    this.#ctx,
                     frag,
                     pe.uniforms,
                     pe.persistent ?? false,
                     pe.float ?? false,
+                    undefined,
+                    false,
+                    pe.glslVersion,
                 );
-                // For legacy VFXPostEffect, register "backbuffer" uniform
                 if (pe.persistent) {
                     pass.registerBufferUniform("backbuffer");
                 }
@@ -1175,7 +1178,6 @@ export class VFXPlayer {
 
         this.#postEffectPassTargets = targetNames;
 
-        // Register buffer target names (created lazily in #renderPostEffects)
         for (const p of passItems) {
             if (p.target) {
                 this.#postEffectBufferTargets.set(p.target, undefined);
@@ -1204,10 +1206,9 @@ export class VFXPlayer {
             return;
         }
 
-        let inputTexture = this.#postEffectTarget.texture;
+        let inputTexture: Texture = this.#postEffectTarget.texture;
 
-        // Track resolved target textures for auto-binding
-        const resolvedTargets = new Map<string, THREE.Texture>();
+        const resolvedTargets = new Map<string, Texture>();
 
         // Pre-register persistent backbuffer textures so that earlier passes
         // can read from later passes' previous-frame output.
@@ -1225,21 +1226,17 @@ export class VFXPlayer {
             const generators = this.#postEffectUniformGeneratorsList[i];
             const targetName = this.#postEffectPassTargets[i];
 
-            // #mouseX/Y are in viewport-Y-up coords, but the canvas extends
-            // paddingX/Y outside the viewport. Add padding to convert to the
-            // canvas-Y-up space that matches gl_FragCoord in render targets.
             const mouseX = this.#mouseX + this.#paddingX;
             const mouseY = this.#mouseY + this.#paddingY;
 
-            // For passes with custom size, set uniforms in target space
             const targetDims = pass.getTargetDimensions();
             if (targetDims) {
                 const [tw, th] = targetDims;
                 pass.uniforms.src.value = inputTexture;
-                pass.uniforms.resolution.value.set(tw, th);
-                pass.uniforms.offset.value.set(0, 0);
+                (pass.uniforms.resolution.value as Vec2).set(tw, th);
+                (pass.uniforms.offset.value as Vec2).set(0, 0);
                 pass.uniforms.time.value = now - this.#initTime;
-                pass.uniforms.mouse.value.set(
+                (pass.uniforms.mouse.value as Vec2).set(
                     (mouseX / viewportGlRect.w) * tw,
                     (mouseY / viewportGlRect.h) * th,
                 );
@@ -1258,25 +1255,25 @@ export class VFXPlayer {
 
             // Update auto-bound buffer uniforms from previously resolved targets
             for (const [name, tex] of resolvedTargets) {
-                if (pass.uniforms[name]) {
-                    pass.uniforms[name].value = tex;
+                const u: Uniform | undefined = pass.uniforms[name];
+                if (u) {
+                    u.value = tex;
                 }
             }
 
             if (isLastPass) {
-                // Render to canvas
                 if (pass.backbuffer) {
-                    // Legacy VFXPostEffect: set backbuffer uniform directly
                     if (pass.uniforms.backbuffer) {
                         pass.uniforms.backbuffer.value =
                             pass.backbuffer.texture;
                     }
 
                     this.#render(
-                        pass.scene,
+                        pass.pass,
                         pass.backbuffer.target,
                         viewportGlRect,
                         pass.uniforms,
+                        true,
                     );
                     pass.backbuffer.swap();
 
@@ -1286,27 +1283,26 @@ export class VFXPlayer {
                         viewportGlRect,
                     );
                     this.#render(
-                        this.#copyPass.scene,
+                        this.#copyPass.pass,
                         null,
                         viewportGlRect,
                         this.#copyPass.uniforms,
+                        false,
                     );
                 } else {
                     this.#render(
-                        pass.scene,
+                        pass.pass,
                         null,
                         viewportGlRect,
                         pass.uniforms,
+                        false,
                     );
                 }
             } else if (pass.backbuffer) {
-                // Render intermediate pass with persistent backbuffer
-                // Legacy VFXPostEffect: set backbuffer uniform directly
                 if (pass.uniforms.backbuffer) {
                     pass.uniforms.backbuffer.value = pass.backbuffer.texture;
                 }
 
-                // Use custom size viewport if set
                 const bbRect = targetDims
                     ? getGLRect(
                           0,
@@ -1317,25 +1313,23 @@ export class VFXPlayer {
                     : viewportGlRect;
 
                 this.#render(
-                    pass.scene,
+                    pass.pass,
                     pass.backbuffer.target,
                     bbRect,
                     pass.uniforms,
+                    true,
                 );
                 pass.backbuffer.swap();
 
                 inputTexture = pass.backbuffer.texture;
 
-                // Register output for named buffer auto-binding
                 if (targetName) {
                     resolvedTargets.set(targetName, pass.backbuffer.texture);
                 }
             } else {
-                // Render to intermediate buffer
                 const bufferName = targetName ?? `postEffect${i}`;
                 let rt = this.#postEffectBufferTargets.get(bufferName);
 
-                // Use custom size or viewport size
                 const rtW = targetDims
                     ? targetDims[0]
                     : viewportGlRect.w * this.#pixelRatio;
@@ -1345,7 +1339,7 @@ export class VFXPlayer {
 
                 if (!rt || rt.width !== rtW || rt.height !== rtH) {
                     rt?.dispose();
-                    rt = createRenderTarget(this.#floatRTType, rtW, rtH, {
+                    rt = createRenderTarget(this.#ctx, rtW, rtH, {
                         float: pass.float,
                     });
                     this.#postEffectBufferTargets.set(bufferName, rt);
@@ -1360,13 +1354,10 @@ export class VFXPlayer {
                       )
                     : viewportGlRect;
 
-                this.#renderer.setRenderTarget(rt);
-                this.#renderer.clear();
-                this.#render(pass.scene, rt, renderRect, pass.uniforms);
+                this.#render(pass.pass, rt, renderRect, pass.uniforms, true);
 
                 inputTexture = rt.texture;
 
-                // Register output for named buffer auto-binding
                 if (targetName) {
                     resolvedTargets.set(targetName, rt.texture);
                 }
@@ -1383,12 +1374,9 @@ export class VFXPlayer {
             this.#postEffectTarget.width !== targetWidth ||
             this.#postEffectTarget.height !== targetHeight
         ) {
-            if (this.#postEffectTarget) {
-                this.#postEffectTarget.dispose();
-            }
-
+            this.#postEffectTarget?.dispose();
             this.#postEffectTarget = createRenderTarget(
-                this.#floatRTType,
+                this.#ctx,
                 targetWidth,
                 targetHeight,
             );
@@ -1398,10 +1386,10 @@ export class VFXPlayer {
         for (const pass of this.#postEffectPasses) {
             if (pass.persistent && !pass.backbuffer) {
                 pass.initializeBackbuffer(
+                    this.#ctx,
                     width,
                     height,
                     this.#pixelRatio,
-                    this.#floatRTType,
                 );
             } else if (pass.backbuffer) {
                 pass.resizeBackbuffer(width, height);
@@ -1460,29 +1448,28 @@ export function parseIntersectionOpts(
     };
 }
 
-function parseWrapSingle(wrapOpt: VFXWrap): THREE.Wrapping {
+function parseWrapSingle(wrapOpt: VFXWrap): TextureWrap {
     if (wrapOpt === "repeat") {
-        return THREE.RepeatWrapping;
-    } else if (wrapOpt === "mirror") {
-        return THREE.MirroredRepeatWrapping;
-    } else {
-        return THREE.ClampToEdgeWrapping;
+        return "repeat";
     }
+    if (wrapOpt === "mirror") {
+        return "mirror";
+    }
+    return "clamp";
 }
 
 function parseWrap(
     wrapOpt: VFXWrap | [VFXWrap, VFXWrap] | undefined,
-): [THREE.Wrapping, THREE.Wrapping] {
+): [TextureWrap, TextureWrap] {
     if (!wrapOpt) {
-        return [THREE.ClampToEdgeWrapping, THREE.ClampToEdgeWrapping];
+        return ["clamp", "clamp"];
     }
 
     if (Array.isArray(wrapOpt)) {
         return [parseWrapSingle(wrapOpt[0]), parseWrapSingle(wrapOpt[1])];
-    } else {
-        const w = parseWrapSingle(wrapOpt);
-        return [w, w];
     }
+    const w = parseWrapSingle(wrapOpt);
+    return [w, w];
 }
 
 function clamp(x: number, xmin: number, xmax: number): number {

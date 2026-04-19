@@ -9,9 +9,9 @@ const VFX_PROP_KEYS: readonly (keyof VFXProps)[] = [
     "overflow",
     "wrap",
     "zIndex",
-    "glslVersion",
     "backbuffer",
     "autoCrop",
+    "glslVersion",
 ] as const;
 
 export function splitVFXProps<T extends VFXProps>(

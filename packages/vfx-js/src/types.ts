@@ -1,7 +1,12 @@
-import type * as THREE from "three";
 import type { Backbuffer } from "./backbuffer.js";
 import type { ShaderPreset } from "./constants.js";
+import type { Framebuffer } from "./gl/framebuffer.js";
+import type { Pass } from "./gl/pass.js";
+import type { GlslVersion, Uniforms } from "./gl/program.js";
+import type { Texture } from "./gl/texture.js";
 import type { Margin, MarginOpts } from "./rect.js";
+
+export type { GlslVersion } from "./gl/program.js";
 
 /**
  * @deprecated Use `float?: boolean` instead.
@@ -61,6 +66,9 @@ export type VFXPass = {
      * Works the same way as element uniforms.
      */
     uniforms?: VFXUniforms;
+
+    /** See {@link GlslVersion}. */
+    glslVersion?: GlslVersion;
 };
 
 /**
@@ -306,12 +314,6 @@ export type VFXProps = {
     zIndex?: number;
 
     /**
-     * GLSL version of the given shader. (Default: `"300 es"`)
-     * If you want to use GLSL 100 (≒ WebGL 1) shader, pass `"100"` to this property.
-     */
-    glslVersion?: "100" | "300 es";
-
-    /**
      * Whether the shader uses the backbuffer or not.
      */
     backbuffer?: boolean;
@@ -324,6 +326,9 @@ export type VFXProps = {
      * VFX-JS provides `uniform bool autoCrop;` to help this.
      */
     autoCrop?: boolean;
+
+    /** See {@link GlslVersion}. */
+    glslVersion?: GlslVersion;
 };
 
 /**
@@ -341,13 +346,19 @@ export type VFXUniforms = {
 
 /**
  * Type for the values of uniform variables.
- * Each of these corresponds to `float`, `vec2`, `vec3` and `vec4` in GLSL.
+ * Scalars/tuples map to GLSL `float`/`vec2`/`vec3`/`vec4`. Flat numeric
+ * arrays (e.g. `Float32Array`) map to array uniforms — a `Float32Array`
+ * of length `N*4` feeds `uniform vec4 foo[N]` (or `uniform float foo[N*4]`).
  */
 export type VFXUniformValue =
     | number // float
     | [number, number] // vec2
     | [number, number, number] // vec3
-    | [number, number, number, number]; // vec4
+    | [number, number, number, number] // vec4
+    | number[]
+    | Float32Array
+    | Int32Array
+    | Uint32Array;
 
 /**
  * @internal
@@ -358,9 +369,8 @@ export type VFXElementType = "img" | "video" | "text" | "canvas" | "hic";
  * @internal
  */
 export type VFXElementPass = {
-    scene: THREE.Scene;
-    mesh: THREE.Mesh;
-    uniforms: { [name: string]: THREE.IUniform };
+    pass: Pass;
+    uniforms: Uniforms;
     uniformGenerators: { [name: string]: () => VFXUniformValue };
     target?: string;
     persistent?: boolean;
@@ -380,7 +390,7 @@ export type VFXElement = {
     width: number;
     height: number;
     passes: VFXElementPass[];
-    bufferTargets: Map<string, THREE.WebGLRenderTarget>;
+    bufferTargets: Map<string, Framebuffer>;
     startTime: number;
     enterTime: number;
     leaveTime: number;
@@ -390,7 +400,7 @@ export type VFXElement = {
     overflow: Margin;
     intersection: VFXElementIntersection;
     originalOpacity: number;
-    srcTexture: THREE.Texture;
+    srcTexture: Texture;
     zIndex: number;
     backbuffer?: Backbuffer;
     autoCrop: boolean;
@@ -439,4 +449,7 @@ export type VFXPostEffect = {
      * Use 32-bit floating point render target. (Default: `false`)
      */
     float?: boolean;
+
+    /** See {@link GlslVersion}. */
+    glslVersion?: GlslVersion;
 };

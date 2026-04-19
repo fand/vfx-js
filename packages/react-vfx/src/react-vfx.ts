@@ -1,4 +1,5 @@
 export { VFXProvider } from "./provider.js";
+export { VFXContext } from "./context.js";
 export { VFXImg } from "./image.js";
 export { VFXVideo } from "./video.js";
 export { VFXCanvas } from "./canvas.js";

@@ -1,44 +1,71 @@
-import * as THREE from "three";
+import {
+    DEFAULT_VERTEX_SHADER,
+    DEFAULT_VERTEX_SHADER_100,
+} from "./constants.js";
+import type { GLContext } from "./gl/context.js";
+import { Framebuffer } from "./gl/framebuffer.js";
+import { type BlendMode, Pass } from "./gl/pass.js";
+import {
+    type GlslVersion,
+    type Uniforms,
+    detectGlslVersion,
+} from "./gl/program.js";
 
-/** @internal */
+/**
+ * Create a framebuffer matching the options passed to element/post-effect passes.
+ * @internal
+ */
 export function createRenderTarget(
-    floatRTType: THREE.TextureDataType,
+    ctx: GLContext,
     width: number,
     height: number,
     opts: { float?: boolean } = {},
-): THREE.WebGLRenderTarget {
-    const float = opts.float ?? false;
-    return new THREE.WebGLRenderTarget(width, height, {
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.LinearFilter,
-        format: THREE.RGBAFormat,
-        type: float ? floatRTType : THREE.UnsignedByteType,
-    });
+): Framebuffer {
+    return new Framebuffer(ctx, width, height, { float: opts.float ?? false });
 }
 
 /**
- * Create a `THREE.RawShaderMaterial` for a fullscreen pass.
- * Disables blending when rendering to an intermediate buffer target.
- *
+ * Create a {@link Pass} for a fullscreen render. Maps the old
+ * `createPassMaterial` behaviour:
+ *   - Rendering to an intermediate buffer → NoBlending.
+ *   - Rendering to the screen with `premultipliedAlpha` → premultiplied blend.
+ *   - Otherwise (element passes) → non-premultiplied normal blend.
  * @internal
  */
-export function createPassMaterial(opts: {
-    vertexShader: string;
-    fragmentShader: string;
-    uniforms: { [name: string]: THREE.IUniform };
-    glslVersion?: THREE.GLSLVersion;
-    /** True when this material renders into an intermediate RT. */
-    renderingToBuffer?: boolean;
-    premultipliedAlpha?: boolean;
-}): THREE.RawShaderMaterial {
+export function createPassMaterial(
+    ctx: GLContext,
+    opts: {
+        vertexShader?: string;
+        fragmentShader: string;
+        uniforms: Uniforms;
+        /** True when this pass renders into an intermediate RT. */
+        renderingToBuffer?: boolean;
+        premultipliedAlpha?: boolean;
+        glslVersion?: GlslVersion;
+    },
+): Pass {
     const renderingToBuffer = opts.renderingToBuffer ?? false;
-    return new THREE.RawShaderMaterial({
-        vertexShader: opts.vertexShader,
-        fragmentShader: opts.fragmentShader,
-        uniforms: opts.uniforms,
-        glslVersion: opts.glslVersion,
-        transparent: !renderingToBuffer,
-        blending: renderingToBuffer ? THREE.NoBlending : THREE.NormalBlending,
-        premultipliedAlpha: opts.premultipliedAlpha,
-    });
+    let blend: BlendMode;
+    if (renderingToBuffer) {
+        blend = "none";
+    } else if (opts.premultipliedAlpha) {
+        blend = "premultiplied";
+    } else {
+        blend = "normal";
+    }
+    const glslVersion =
+        opts.glslVersion ?? detectGlslVersion(opts.fragmentShader);
+    const vertexShader =
+        opts.vertexShader ??
+        (glslVersion === "100"
+            ? DEFAULT_VERTEX_SHADER_100
+            : DEFAULT_VERTEX_SHADER);
+    return new Pass(
+        ctx,
+        vertexShader,
+        opts.fragmentShader,
+        opts.uniforms,
+        blend,
+        glslVersion,
+    );
 }
