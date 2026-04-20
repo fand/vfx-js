@@ -65,6 +65,7 @@ export class Framebuffer implements Restorable {
 
     #allocate(): void {
         const gl = this.gl;
+        const oldFbo = this.fbo;
         const fbo = gl.createFramebuffer();
         if (!fbo) {
             throw new Error("[VFX-JS] Failed to create framebuffer");
@@ -120,5 +121,11 @@ export class Framebuffer implements Restorable {
         // Keep the Texture wrapper's source null: the storage is managed
         // here, not by a DOM source.
         this.texture.source = null;
+
+        // Delete after assigning the new FBO so this.fbo is never stale.
+        // On restore() the old handle is dead; deleteFramebuffer is a no-op.
+        if (oldFbo) {
+            gl.deleteFramebuffer(oldFbo);
+        }
     }
 }

@@ -19,6 +19,10 @@ export type VFXTextureFormat = "RGBA" | "Float";
  * Each pass renders to a named buffer (specified by `target`), which can be
  * referenced as a `sampler2D` uniform in subsequent passes.
  * The last pass in the array renders to the screen.
+ *
+ * Note: auto-bind matches only `uniform sampler2D <name>;` declarations —
+ * `isampler2D` / `usampler2D` are not recognised, and integer render
+ * targets are not currently supported.
  */
 export type VFXPass = {
     /**
@@ -413,6 +417,10 @@ export type VFXElementIntersection = {
 
 /**
  * Configuration for post effects that are applied to the final canvas output.
+ *
+ * Note: auto-bind matches only `uniform sampler2D <name>;` declarations —
+ * `isampler2D` / `usampler2D` are not recognised, and integer render
+ * targets are not currently supported.
  */
 export type VFXPostEffect = {
     /**
