@@ -6,9 +6,9 @@ import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
 import { type BlendMode, Pass } from "./gl/pass.js";
 import {
+    detectGlslVersion,
     type GlslVersion,
     type Uniforms,
-    detectGlslVersion,
 } from "./gl/program.js";
 
 /**

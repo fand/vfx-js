@@ -1,6 +1,6 @@
-import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 import { unwrapElement, wrapElement } from "./html-in-canvas.js";
-import { type VFXOpts, type VFXProps, getVFXOpts } from "./types.js";
+import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
+import { getVFXOpts, type VFXOpts, type VFXProps } from "./types.js";
 import { VFXPlayer } from "./vfx-player.js";
 import { isWebGLAvailable } from "./webgl-support.js";
 

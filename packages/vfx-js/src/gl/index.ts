@@ -1,11 +1,11 @@
-export { GLContext } from "./context.js";
 export type { Restorable } from "./context.js";
+export { GLContext } from "./context.js";
 export { Framebuffer } from "./framebuffer.js";
-export { Pass, renderPass, applyBlend } from "./pass.js";
 export type { BlendMode } from "./pass.js";
+export { applyBlend, Pass, renderPass } from "./pass.js";
+export type { Uniform, Uniforms, UniformValue } from "./program.js";
 export { Program } from "./program.js";
-export type { Uniform, UniformValue, Uniforms } from "./program.js";
 export { Quad } from "./quad.js";
-export { Texture, loadImage } from "./texture.js";
 export type { TextureSource, TextureWrap } from "./texture.js";
+export { loadImage, Texture } from "./texture.js";
 export { Vec2, Vec4 } from "./vec.js";

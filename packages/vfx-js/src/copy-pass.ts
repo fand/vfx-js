@@ -1,10 +1,10 @@
 import { COPY_FRAGMENT_SHADER, DEFAULT_VERTEX_SHADER } from "./constants.js";
-import type { GLRect } from "./gl-rect.js";
 import type { GLContext } from "./gl/context.js";
 import { Pass } from "./gl/pass.js";
 import type { Uniforms } from "./gl/program.js";
 import type { Texture } from "./gl/texture.js";
 import { Vec2, Vec4 } from "./gl/vec.js";
+import type { GLRect } from "./gl-rect.js";
 
 /**
  * Copies a source texture to the current framebuffer with premultiplied

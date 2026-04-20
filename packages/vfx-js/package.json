@@ -37,7 +37,7 @@
     "typedoc": "typedoc --out docs-build --excludeExternals"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "2.4.11",
     "@types/node": "^22.15.30",
     "globals": "^16.2.0",
     "husky": "^9.1.7",

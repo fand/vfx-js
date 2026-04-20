@@ -3,12 +3,10 @@
  * @module VFX-JS
  */
 
-export * from "./vfx.js";
 export * from "./constants.js";
-export { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
-export { setupCapture, teardownCapture } from "./html-in-canvas.js";
 export type { CaptureOpts } from "./html-in-canvas.js";
-
+export { setupCapture, teardownCapture } from "./html-in-canvas.js";
+export { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 export type {
     GlslVersion,
     VFXOpts,
@@ -16,3 +14,4 @@ export type {
     VFXPostEffect,
     VFXProps,
 } from "./types.js";
+export * from "./vfx.js";

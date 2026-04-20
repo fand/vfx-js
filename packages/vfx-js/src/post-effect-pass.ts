@@ -1,12 +1,12 @@
 import { Backbuffer } from "./backbuffer.js";
-import type { GLRect } from "./gl-rect.js";
 import type { GLContext } from "./gl/context.js";
 import type { Pass } from "./gl/pass.js";
 import type { GlslVersion, Uniforms } from "./gl/program.js";
 import type { Texture } from "./gl/texture.js";
 import { Vec2, Vec4 } from "./gl/vec.js";
+import type { GLRect } from "./gl-rect.js";
 import { createPassMaterial } from "./render-target.js";
-import type { VFXUniformValue, VFXUniforms } from "./types.js";
+import type { VFXUniforms, VFXUniformValue } from "./types.js";
 
 /**
  * A single post-effect pass. Owns its shader program, uniforms, and

@@ -3,23 +3,23 @@ import { shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import GIFData from "./gif.js";
-import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import { GLContext } from "./gl/context.js";
 import type { Framebuffer } from "./gl/framebuffer.js";
 import { type Pass, renderPass } from "./gl/pass.js";
 import type { Uniform, Uniforms } from "./gl/program.js";
 import { Quad } from "./gl/quad.js";
-import { Texture, type TextureWrap, loadImage } from "./gl/texture.js";
+import { loadImage, Texture, type TextureWrap } from "./gl/texture.js";
 import { Vec2, Vec4 } from "./gl/vec.js";
+import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import {
-    MARGIN_ZERO,
-    type Margin,
-    type Rect,
     createMargin,
     createRect,
     getIntersection,
     growRect,
+    MARGIN_ZERO,
+    type Margin,
+    type Rect,
     toRect,
 } from "./rect.js";
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
@@ -384,7 +384,7 @@ export class VFXPlayer {
         }
 
         // Backbuffer
-        let backbuffer: VFXElement["backbuffer"] = undefined;
+        let backbuffer: VFXElement["backbuffer"];
         if (opts.backbuffer) {
             backbuffer = (() => {
                 const bw =

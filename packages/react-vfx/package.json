@@ -41,7 +41,7 @@
     "@vfx-js/core": "0.13.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "2.4.11",
     "@types/node": "^22.15.30",
     "@types/react": "^19.1.6",
     "globals": "^16.2.0",
