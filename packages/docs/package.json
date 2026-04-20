@@ -1,7 +1,7 @@
 {
   "name": "docs",
   "private": true,
-  "version": "0.0.18",
+  "version": "0.0.19",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -16,8 +16,8 @@
     "clean": "rimraf dist storybook typedoc"
   },
   "dependencies": {
-    "@vfx-js/core": "0.12.0",
-    "@vfx-js/storybook": "0.0.18",
+    "@vfx-js/core": "0.13.0",
+    "@vfx-js/storybook": "0.0.19",
     "dedent": "^1.6.0",
     "is-mobile": "^5.0.0",
     "lodash.debounce": "^4.0.8",

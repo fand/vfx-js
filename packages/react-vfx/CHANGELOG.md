@@ -1,5 +1,16 @@
 # react-vfx
 
+## 0.18.0
+
+### Minor Changes
+
+- Remove Three.js dependency
+
+### Patch Changes
+
+- Updated dependencies
+  - @vfx-js/core@0.13.0
+
 ## 0.17.0
 
 ### Minor Changes
