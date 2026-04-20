@@ -31,7 +31,9 @@ function makeMockGl() {
         FLOAT: 0x1406,
         HALF_FLOAT: 0x140b,
 
-        createFramebuffer: vi.fn(() => ({ _fbo: ++fboSeq })),
+        createFramebuffer: vi.fn<() => { _fbo: number } | null>(() => ({
+            _fbo: ++fboSeq,
+        })),
         deleteFramebuffer: vi.fn(),
         createTexture: vi.fn(() => ({ _tex: ++texSeq })),
         deleteTexture: vi.fn(),
@@ -99,5 +101,36 @@ describe("Framebuffer", () => {
         const current = fb.fbo;
         fb.dispose();
         expect(gl.deleteFramebuffer).toHaveBeenCalledWith(current);
+    });
+
+    it("keeps the old FBO live if createFramebuffer fails mid-setSize", () => {
+        const { gl } = makeMockGl();
+        const fb = new Framebuffer(makeCtx(gl), 10, 10);
+        const oldFbo = fb.fbo;
+        gl.createFramebuffer.mockReturnValueOnce(null);
+
+        expect(() => fb.setSize(20, 20)).toThrow();
+        expect(gl.deleteFramebuffer).not.toHaveBeenCalled();
+        expect(fb.fbo).toBe(oldFbo);
+    });
+
+    it("deletes old FBO only after the new one is created and assigned", () => {
+        const { gl, calls } = makeMockGl();
+        const fb = new Framebuffer(makeCtx(gl), 10, 10);
+        const oldFbo = fb.fbo;
+        const order: string[] = [];
+        gl.createFramebuffer.mockImplementationOnce(() => {
+            order.push("create");
+            return { _fbo: 999 };
+        });
+        gl.deleteFramebuffer.mockImplementationOnce(() => {
+            order.push("delete");
+        });
+
+        fb.setSize(20, 20);
+
+        expect(order).toEqual(["create", "delete"]);
+        expect(calls.some(([n]) => n === "framebufferTexture2D")).toBe(true);
+        expect(gl.deleteFramebuffer).toHaveBeenCalledWith(oldFbo);
     });
 });
