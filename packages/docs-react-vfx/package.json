@@ -27,7 +27,6 @@
     "vh-check": "^2.0.5"
   },
   "devDependencies": {
-    "@originjs/vite-plugin-commonjs": "^1.0.3",
     "@types/dedent": "^0.7.2",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^22.15.30",
