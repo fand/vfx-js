@@ -1,4 +1,4 @@
-import{i as a}from"./utils-BUgq-vrJ.js";import{T as fe}from"./Timer-D64dUIku.js";import{L as s}from"./preset-B_9u5Dmn.js";import{J as ve}from"./jellyfish-qrbjulKw.js";import"./vfx-wGJBmbdk.js";const m=`
+import{i as a}from"./utils-CoLwPjcP.js";import{T as fe}from"./Timer-D64dUIku.js";import{L as s}from"./preset-B_9u5Dmn.js";import{J as ve}from"./jellyfish-qrbjulKw.js";import"./vfx-toqadiTe.js";const m=`
 precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;

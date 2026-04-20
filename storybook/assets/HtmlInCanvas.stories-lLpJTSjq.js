@@ -1,4 +1,4 @@
-import{c as N,R as _}from"./jsx-runtime-Dsq5Daep.js";import{a as $,b as O}from"./react-vfx-Du5BiHC6.js";import{T as g}from"./Timer-D64dUIku.js";import{i as W}from"./utils-BUgq-vrJ.js";import"./vfx-wGJBmbdk.js";const s=(e,t)=>e.querySelector(t);function d(e,t="rainbow"){const n=new g(0,[0,10]);document.body.append(n.element);const a=W();return a.addHTML(e,{shader:t,uniforms:{time:()=>n.time}}),a}const X=`
+import{c as N,R as _}from"./jsx-runtime-Dsq5Daep.js";import{a as $,b as O}from"./react-vfx-D0DSqgfE.js";import{T as g}from"./Timer-D64dUIku.js";import{i as W}from"./utils-CoLwPjcP.js";import"./vfx-toqadiTe.js";const s=(e,t)=>e.querySelector(t);function d(e,t="rainbow"){const n=new g(0,[0,10]);document.body.append(n.element);const a=W();return a.addHTML(e,{shader:t,uniforms:{time:()=>n.time}}),a}const X=`
 precision highp float;
 uniform vec2 resolution;
 uniform vec2 offset;

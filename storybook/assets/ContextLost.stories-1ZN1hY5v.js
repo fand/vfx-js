@@ -1,4 +1,4 @@
-import{r as u,j as P,c as D,R as C}from"./jsx-runtime-Dsq5Daep.js";import{s as T,V as S,a as q}from"./react-vfx-Du5BiHC6.js";import{L as w}from"./preset-B_9u5Dmn.js";import{i as M}from"./utils-BUgq-vrJ.js";import"./vfx-wGJBmbdk.js";const b=t=>{const{vfxProps:e,domProps:a}=T(t),n=u.useContext(S),[r,i]=u.useState(null);return u.useEffect(()=>{if(!(!n||!r))return n.add(r,e),()=>{n.remove(r)}},[r,n,e]),P.jsx("img",{ref:i,...a})},F=`
+import{r as u,j as P,c as D,R as C}from"./jsx-runtime-Dsq5Daep.js";import{s as T,V as S,a as q}from"./react-vfx-D0DSqgfE.js";import{L as w}from"./preset-B_9u5Dmn.js";import{i as M}from"./utils-CoLwPjcP.js";import"./vfx-toqadiTe.js";const b=t=>{const{vfxProps:e,domProps:a}=T(t),n=u.useContext(S),[r,i]=u.useState(null);return u.useEffect(()=>{if(!(!n||!r))return n.add(r,e),()=>{n.remove(r)}},[r,n,e]),P.jsx("img",{ref:i,...a})},F=`
 precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;
