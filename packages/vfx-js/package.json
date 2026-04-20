@@ -45,9 +45,9 @@
     "npm-run-all2": "^8.0.4",
     "rimraf": "^6.0.1",
     "tsconfig-to-dual-package": "^1.2.0",
-    "typedoc": "^0.27.6",
-    "typedoc-plugin-missing-exports": "^3.1.0",
-    "typescript": "^5.8.3",
+    "typedoc": "0.28.19",
+    "typedoc-plugin-missing-exports": "4.1.3",
+    "typescript": "6.0.2",
     "vitest": "^3.2.3"
   },
   "lint-staged": {

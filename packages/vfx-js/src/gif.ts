@@ -67,7 +67,7 @@ export default class GIFData {
         const frame = this.frames[this.index % this.frames.length];
 
         const image = new ImageData(
-            frame.patch,
+            frame.patch as Uint8ClampedArray<ArrayBuffer>,
             frame.dims.width,
             frame.dims.height,
         );
