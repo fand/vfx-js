@@ -23,7 +23,7 @@
     "react-dom": "19.1.0",
     "react-intersection-observer": "^10.0.3",
     "react-vfx": "0.18.0",
-    "three": "^0.177.0",
+    "three": "0.183.2",
     "vh-check": "^2.0.5"
   },
   "devDependencies": {
@@ -32,7 +32,7 @@
     "@types/node": "^22.15.30",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
-    "@types/three": "^0.177.0",
+    "@types/three": "0.183.1",
     "@vitejs/plugin-react": "^4.5.1",
     "prop-types": "^15.8.1",
     "rimraf": "^6.0.1",
