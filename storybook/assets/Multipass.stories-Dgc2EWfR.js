@@ -1,4 +1,4 @@
-import{J as R}from"./jellyfish-qrbjulKw.js";import{L as T}from"./preset-B_9u5Dmn.js";import{i as S}from"./utils-CoLwPjcP.js";import"./vfx-toqadiTe.js";const _=`
+import{J as T}from"./jellyfish-qrbjulKw.js";import{L as R}from"./preset-B_9u5Dmn.js";import{i as S}from"./utils-CoLwPjcP.js";import"./vfx-toqadiTe.js";const _=`
 precision highp float;
 uniform sampler2D src;
 uniform vec2 resolution;
@@ -68,7 +68,7 @@ void main() {
 
     outColor = vec4(vel, 0.0, 1.0);
 }
-`,M=`
+`,L=`
 precision highp float;
 uniform sampler2D vort_vel;
 uniform vec2 resolution;
@@ -89,7 +89,7 @@ void main() {
     if (uv.y - t.y < 0.0) B = -C.y;
     outColor = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
 }
-`,L=`
+`,M=`
 precision highp float;
 out vec4 outColor;
 void main() { outColor = vec4(0.0); }
@@ -224,7 +224,7 @@ void main() {
         outColor += vec4(spectrum(sin(v * 3. + time) * 0.4 + 0.5), 1) * smoothstep(.2, .8, v) * 0.2;
     }
 }
-`;function H(e,t){const o=[];o.push({frag:L,target:"p_a",float:!0,size:e});let r="p_a";for(let i=0;i<t;i++)r=i%2===0?"p_b":"p_a",o.push({frag:I,target:r,float:!0,size:e});return{passes:o,lastTarget:r}}function V(e){const{simSize:t,mouseDelta:o}=e,r=H(t,e.pressureIterations);return[{frag:_,target:"canvas"},{frag:E,target:"curl",float:!0,size:t},{frag:b,target:"vort_vel",float:!0,size:t,uniforms:{mouseDelta:o,curlStrength:e.curlStrength,splatForce:e.splatForce,splatRadius:e.splatRadius}},{frag:M,target:"divergence",float:!0,size:t},...r.passes,{frag:z(r.lastTarget),target:"proj_vel",float:!0,size:t},{frag:P,target:"velocity",persistent:!0,float:!0,size:t,uniforms:{velocityDissipation:e.velocityDissipation}},{frag:A,target:"dye",persistent:!0,float:!0,uniforms:{mouseDelta:o,time:e.time,simSize:t,densityDissipation:e.densityDissipation,dyeSplatRadius:e.dyeSplatRadius,dyeSplatIntensity:e.dyeSplatIntensity}},{frag:B,uniforms:{showDye:e.showDye?1:0,time:e.time,simSize:t}}]}const D={simResolution:{control:{type:"range",min:32,max:512,step:32}},pressureIterations:{control:{type:"range",min:1,max:40,step:1}},curlStrength:{control:{type:"range",min:0,max:100,step:1}},velocityDissipation:{control:{type:"range",min:0,max:5,step:.05}},densityDissipation:{control:{type:"range",min:0,max:5,step:.05}},splatForce:{control:{type:"range",min:100,max:2e4,step:100}},splatRadius:{control:{type:"range",min:1e-4,max:.01,step:1e-4}},dyeSplatRadius:{control:{type:"range",min:1e-4,max:.01,step:1e-4}},dyeSplatIntensity:{control:{type:"range",min:.001,max:.03,step:.001}},showDye:{control:"boolean"}},w={simResolution:128,pressureIterations:1,curlStrength:13,velocityDissipation:.6,densityDissipation:.65,splatForce:6e3,splatRadius:.002,dyeSplatRadius:.001,dyeSplatIntensity:.005,showDye:!1},j={title:"Multipass",parameters:{layout:"fullscreen"}};function C(e){let t=0,o=0,r=0,i=0;const a=()=>{const l=performance.now()-i,u=Math.exp(-l*.01);return[o*u,r*u]},n=e.simResolution,s=window.innerWidth/window.innerHeight,c=s>1?[Math.round(n*s),n]:[n,Math.round(n/s)];return{passes:V({simSize:c,mouseDelta:a,time:()=>t,pressureIterations:e.pressureIterations,curlStrength:e.curlStrength,velocityDissipation:e.velocityDissipation,densityDissipation:e.densityDissipation,splatForce:e.splatForce,splatRadius:e.splatRadius,dyeSplatRadius:e.dyeSplatRadius,dyeSplatIntensity:e.dyeSplatIntensity,showDye:e.showDye}),getTime:()=>t,setTime:l=>{t=l},setDelta:(l,u)=>{o=l,r=u,i=performance.now()}}}function F(e,t,o){const r=Math.round(window.innerWidth/2),i=Math.round(window.innerHeight/2),a=100;for(let n=0;n<a;n++){const s=n/a*Math.PI*2;o.setDelta(Math.cos(s)*15,Math.sin(s)*15),window.dispatchEvent(new MouseEvent("pointermove",{clientX:r+Math.cos(s)*100,clientY:i-Math.sin(s)*100})),o.setTime(n*.016),t.render()}e.addEventListener("click",()=>{let n=-1,s=-1;window.addEventListener("pointermove",c=>{const m=c.clientX,l=window.innerHeight-c.clientY;n>=0&&o.setDelta(m-n,l-s),n=m,s=l}),t.play()},{once:!0})}const v={args:{...w},argTypes:D,render:()=>{const e=document.createElement("img");return e.src=T,e},play:async({canvasElement:e,args:t})=>{const o=e.querySelector("img");await new Promise(a=>{o.onload=a});const r=C(t),i=S({autoplay:!1,postEffect:r.passes});await i.add(o,{shader:"uvGradient"}),F(e,i,r)},parameters:{layout:"fullscreen"}},f={args:{...w},argTypes:D,render:()=>{const e=document.createElement("img");return e.src=R,e},play:async({canvasElement:e,args:t})=>{const o=e.querySelector("img");await new Promise(a=>{o.onload=a});const r=C(t),i=S({autoplay:!1});await i.add(o,{shader:r.passes}),F(e,i,r)},parameters:{layout:"fullscreen"}};var d,p,y;v.parameters={...v.parameters,docs:{...(d=v.parameters)==null?void 0:d.docs,source:{originalSource:`{
+`;function H(e,t){const o=[];o.push({frag:M,target:"p_a",float:!0,size:e});let r="p_a";for(let i=0;i<t;i++)r=i%2===0?"p_b":"p_a",o.push({frag:I,target:r,float:!0,size:e});return{passes:o,lastTarget:r}}function V(e){const{simSize:t,mouseDelta:o}=e,r=H(t,e.pressureIterations);return[{frag:_,target:"canvas"},{frag:E,target:"curl",float:!0,size:t},{frag:b,target:"vort_vel",float:!0,size:t,uniforms:{mouseDelta:o,curlStrength:e.curlStrength,splatForce:e.splatForce,splatRadius:e.splatRadius}},{frag:L,target:"divergence",float:!0,size:t},...r.passes,{frag:z(r.lastTarget),target:"proj_vel",float:!0,size:t},{frag:P,target:"velocity",persistent:!0,float:!0,size:t,uniforms:{velocityDissipation:e.velocityDissipation}},{frag:A,target:"dye",persistent:!0,float:!0,uniforms:{mouseDelta:o,time:e.time,simSize:t,densityDissipation:e.densityDissipation,dyeSplatRadius:e.dyeSplatRadius,dyeSplatIntensity:e.dyeSplatIntensity}},{frag:B,uniforms:{showDye:e.showDye?1:0,time:e.time,simSize:t}}]}const D={simResolution:{control:{type:"range",min:32,max:512,step:32}},pressureIterations:{control:{type:"range",min:1,max:40,step:1}},curlStrength:{control:{type:"range",min:0,max:100,step:1}},velocityDissipation:{control:{type:"range",min:0,max:5,step:.05}},densityDissipation:{control:{type:"range",min:0,max:5,step:.05}},splatForce:{control:{type:"range",min:100,max:2e4,step:100}},splatRadius:{control:{type:"range",min:1e-4,max:.01,step:1e-4}},dyeSplatRadius:{control:{type:"range",min:1e-4,max:.01,step:1e-4}},dyeSplatIntensity:{control:{type:"range",min:.001,max:.03,step:.001}},showDye:{control:"boolean"}},w={simResolution:128,pressureIterations:1,curlStrength:13,velocityDissipation:.6,densityDissipation:.65,splatForce:6e3,splatRadius:.002,dyeSplatRadius:.001,dyeSplatIntensity:.005,showDye:!1},j={title:"Multipass",parameters:{layout:"fullscreen"}};function C(e){let t=0,o=0,r=0;const i=()=>[o,r],s=e.simResolution,n=window.innerWidth/window.innerHeight,a=n>1?[Math.round(s*n),s]:[s,Math.round(s/n)];return{passes:V({simSize:a,mouseDelta:i,time:()=>t,pressureIterations:e.pressureIterations,curlStrength:e.curlStrength,velocityDissipation:e.velocityDissipation,densityDissipation:e.densityDissipation,splatForce:e.splatForce,splatRadius:e.splatRadius,dyeSplatRadius:e.dyeSplatRadius,dyeSplatIntensity:e.dyeSplatIntensity,showDye:e.showDye}),getTime:()=>t,setTime:l=>{t=l},setDelta:(l,c)=>{o=l,r=c}}}function F(e,t,o){const r=Math.round(window.innerWidth/2),i=Math.round(window.innerHeight/2),s=100;for(let n=0;n<s;n++){const a=n/s*Math.PI*2;o.setDelta(Math.cos(a)*15,Math.sin(a)*15),window.dispatchEvent(new MouseEvent("pointermove",{clientX:r+Math.cos(a)*100,clientY:i-Math.sin(a)*100})),o.setTime(n*.016),t.render()}e.addEventListener("click",()=>{let n=-1,a=-1,m;window.addEventListener("pointermove",l=>{const c=l.clientX,f=window.innerHeight-l.clientY;n>=0&&o.setDelta(c-n,f-a),n=c,a=f,clearTimeout(m),m=window.setTimeout(()=>o.setDelta(0,0),50)}),t.play()},{once:!0})}const u={args:{...w},argTypes:D,render:()=>{const e=document.createElement("img");return e.src=R,e},play:async({canvasElement:e,args:t})=>{const o=e.querySelector("img");await new Promise(s=>{o.onload=s});const r=C(t),i=S({autoplay:!1,postEffect:r.passes});await i.add(o,{shader:"uvGradient"}),F(e,i,r)},parameters:{layout:"fullscreen"}},v={args:{...w},argTypes:D,render:()=>{const e=document.createElement("img");return e.src=T,e},play:async({canvasElement:e,args:t})=>{const o=e.querySelector("img");await new Promise(s=>{o.onload=s});const r=C(t),i=S({autoplay:!1});await i.add(o,{shader:r.passes}),F(e,i,r)},parameters:{layout:"fullscreen"}};var d,p,y;u.parameters={...u.parameters,docs:{...(d=u.parameters)==null?void 0:d.docs,source:{originalSource:`{
   args: {
     ...defaultFluidArgs
   },
@@ -258,7 +258,7 @@ void main() {
   parameters: {
     layout: "fullscreen"
   }
-}`,...(y=(p=v.parameters)==null?void 0:p.docs)==null?void 0:y.source}}};var x,g,h;f.parameters={...f.parameters,docs:{...(x=f.parameters)==null?void 0:x.docs,source:{originalSource:`{
+}`,...(y=(p=u.parameters)==null?void 0:p.docs)==null?void 0:y.source}}};var x,g,h;v.parameters={...v.parameters,docs:{...(x=v.parameters)==null?void 0:x.docs,source:{originalSource:`{
   args: {
     ...defaultFluidArgs
   },
@@ -291,4 +291,4 @@ void main() {
   parameters: {
     layout: "fullscreen"
   }
-}`,...(h=(g=f.parameters)==null?void 0:g.docs)==null?void 0:h.source}}};const q=["StableFluidPostEffect","StableFluidElement"];export{f as StableFluidElement,v as StableFluidPostEffect,q as __namedExportsOrder,j as default};
+}`,...(h=(g=v.parameters)==null?void 0:g.docs)==null?void 0:h.source}}};const q=["StableFluidPostEffect","StableFluidElement"];export{v as StableFluidElement,u as StableFluidPostEffect,q as __namedExportsOrder,j as default};

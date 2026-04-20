@@ -1,4 +1,4 @@
-import{r as u,j as P,c as D,R as C}from"./jsx-runtime-Dsq5Daep.js";import{s as T,V as S,a as q}from"./react-vfx-D0DSqgfE.js";import{L as w}from"./preset-B_9u5Dmn.js";import{i as M}from"./utils-CoLwPjcP.js";import"./vfx-toqadiTe.js";const b=t=>{const{vfxProps:e,domProps:a}=T(t),n=u.useContext(S),[r,i]=u.useState(null);return u.useEffect(()=>{if(!(!n||!r))return n.add(r,e),()=>{n.remove(r)}},[r,n,e]),P.jsx("img",{ref:i,...a})},F=`
+import{r as l,j as M,c as X,R as b}from"./jsx-runtime-Dsq5Daep.js";import{s as T,V as A,a as _}from"./react-vfx-D0DSqgfE.js";import{L as C}from"./preset-B_9u5Dmn.js";import{i as H}from"./utils-CoLwPjcP.js";import"./vfx-toqadiTe.js";const y=t=>{const{vfxProps:e,domProps:o}=T(t),n=l.useContext(A),[s,c]=l.useState(null);return l.useEffect(()=>{if(!(!n||!s))return n.add(s,e),()=>{n.remove(s)}},[s,n,e]),M.jsx("img",{ref:c,...o})},D=`
 precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;
@@ -14,7 +14,7 @@ void main() {
     outColor = vec4(step(length(d), .15));
     outColor += texture(backbuffer, uv) * vec4(.95);
 }
-`,E=30;function A(){const t=document.querySelector('canvas[style*="pointer-events"]');if(!t)return null;const e=t.getContext("webgl2")??t.getContext("webgl");return(e==null?void 0:e.getExtension("WEBGL_lose_context"))??null}const G={title:"Context Lost",parameters:{layout:"fullscreen"}},f={render:()=>{const t=document.createElement("div"),e=document.createElement("div");e.style.display="flex",e.style.gap="10px",t.appendChild(e);const a=document.createElement("span");a.id="status",a.style.color="white",a.textContent="Status: rendering",e.append(a);const n=document.createElement("button");n.textContent="Draw",e.appendChild(n);const r=document.createElement("button");r.textContent="Force Context Lost",e.appendChild(r);const i=document.createElement("button");i.textContent="Force Context Restore",e.appendChild(i);const c=document.createElement("div");c.style.display="flex",c.style.flexDirection="column",c.style.gap="20px",t.appendChild(c);const d=document.createElement("img");d.src=w,c.appendChild(d);const o=document.createElement("img");return o.src=w,c.appendChild(o),M({autoplay:!1}),t},play:async({canvasElement:t})=>{const[e,a]=[...t.querySelectorAll("img")];await Promise.all([e,a].map(p=>new Promise(m=>{p.complete?m(void 0):p.onload=m})));const n=window.vfx;let r=0;await n.add(e,{shader:"rainbow"}),await n.add(a,{shader:F,backbuffer:!0,uniforms:{time:()=>r}});const i=t.querySelector("#status"),c=t.querySelectorAll("button"),d=c[0],o=c[1],s=c[2],l=A();d.addEventListener("click",()=>{n.render(),r+=.1}),o.addEventListener("click",()=>{l==null||l.loseContext(),i.textContent="Status: context lost"}),s.addEventListener("click",()=>{l==null||l.restoreContext(),i.textContent="Status: context restored",r=0});const v=p=>{for(let m=0;m<p;m++)d.click()},h=p=>new Promise(m=>setTimeout(m,p));v(E),await h(50),o.click(),await h(100),s.click(),await h(100),v(E)}};function V(){const t=u.useContext(S),e=u.useRef(null),a=u.useRef(null),n=u.useRef(0),r=u.useCallback(()=>{a.current||(a.current=A())},[]),i=u.useCallback(()=>{t&&(t.render(),n.current+=.1)},[t]),c=u.useCallback(()=>{var s;r(),(s=a.current)==null||s.loseContext(),e.current&&(e.current.textContent="Status: context lost")},[r]),d=u.useCallback(()=>{var s;(s=a.current)==null||s.restoreContext(),e.current&&(e.current.textContent="Status: context restored"),n.current=0},[]),o=C.createElement;return o("div",null,o("div",{style:{display:"flex",gap:"10px"}},o("span",{ref:e,style:{color:"white"}},"Status: rendering"),o("button",{onClick:i},"Draw"),o("button",{onClick:c},"Force Context Lost"),o("button",{onClick:d},"Force Context Restore")),o("div",{style:{display:"flex",flexDirection:"column",gap:"20px"}},o(b,{src:w,shader:"rainbow"}),o(b,{src:w,shader:F,backbuffer:!0,uniforms:{time:()=>n.current}})))}function _(){const t=C.createElement;return t(q,{autoplay:!1},t(V,null))}const x={render:()=>document.createElement("div"),play:async({canvasElement:t})=>{await new Promise(s=>requestAnimationFrame(s));const e=t.firstElementChild;D.createRoot(e).render(C.createElement(_)),await new Promise(s=>setTimeout(s,500));const n=t.querySelectorAll("button"),r=n[0],i=n[1],c=n[2],d=s=>{for(let l=0;l<s;l++)r.click()},o=s=>new Promise(l=>setTimeout(l,s));d(E),await o(50),i.click(),await o(100),c.click(),await o(100),d(E)}};var g,y,B;f.parameters={...f.parameters,docs:{...(g=f.parameters)==null?void 0:g.docs,source:{originalSource:`{
+`,E=30;function q(){const t=h();if(!t)return null;const e=t.getContext("webgl2")??t.getContext("webgl");return(e==null?void 0:e.getExtension("WEBGL_lose_context"))??null}function h(){return document.querySelector('canvas[style*="pointer-events"]')}function g(t,e){return new Promise(o=>{if(!t){o();return}t.addEventListener(e,()=>requestAnimationFrame(()=>o()),{once:!0})})}const J={title:"Context Lost",parameters:{layout:"fullscreen"}},w={render:()=>{const t=document.createElement("div"),e=document.createElement("div");e.style.display="flex",e.style.gap="10px",t.appendChild(e);const o=document.createElement("span");o.id="status",o.style.color="white",o.textContent="Status: rendering",e.append(o);const n=document.createElement("button");n.textContent="Draw",e.appendChild(n);const s=document.createElement("button");s.textContent="Force Context Lost",e.appendChild(s);const c=document.createElement("button");c.textContent="Force Context Restore",e.appendChild(c);const a=document.createElement("div");a.style.display="flex",a.style.flexDirection="column",a.style.gap="20px",t.appendChild(a);const i=document.createElement("img");i.src=C,a.appendChild(i);const r=document.createElement("img");return r.src=C,a.appendChild(r),H({autoplay:!1}),t},play:async({canvasElement:t})=>{const[e,o]=[...t.querySelectorAll("img")];await Promise.all([e,o].map(x=>new Promise(f=>{x.complete?f(void 0):x.onload=f})));const n=window.vfx;let s=0;await n.add(e,{shader:"rainbow",uniforms:{time:()=>s}}),await n.add(o,{shader:D,backbuffer:!0,uniforms:{time:()=>s}});const c=t.querySelector("#status"),a=t.querySelectorAll("button"),i=a[0],r=a[1],u=a[2],d=q();i.addEventListener("click",()=>{n.render(),s+=.1}),r.addEventListener("click",()=>{d==null||d.loseContext(),c.textContent="Status: context lost"}),u.addEventListener("click",()=>{d==null||d.restoreContext(),c.textContent="Status: context restored",s=0});const m=x=>{for(let f=0;f<x;f++)i.click()},p=h();m(E);const P=g(p,"webglcontextlost");r.click(),await P;const V=g(p,"webglcontextrestored");u.click(),await V,m(E)}};function N(){const t=l.useContext(A),e=l.useRef(null),o=l.useRef(null),n=l.useRef(0),s=l.useCallback(()=>{o.current||(o.current=q())},[]),c=l.useCallback(()=>{t&&(t.render(),n.current+=.1)},[t]),a=l.useCallback(()=>{var u;s(),(u=o.current)==null||u.loseContext(),e.current&&(e.current.textContent="Status: context lost")},[s]),i=l.useCallback(()=>{var u;(u=o.current)==null||u.restoreContext(),e.current&&(e.current.textContent="Status: context restored"),n.current=0},[]),r=b.createElement;return r("div",null,r("div",{style:{display:"flex",gap:"10px"}},r("span",{ref:e,style:{color:"white"}},"Status: rendering"),r("button",{onClick:c},"Draw"),r("button",{onClick:a},"Force Context Lost"),r("button",{onClick:i},"Force Context Restore")),r("div",{style:{display:"flex",flexDirection:"column",gap:"20px"}},r(y,{src:C,shader:"rainbow",uniforms:{time:()=>n.current}}),r(y,{src:C,shader:D,backbuffer:!0,uniforms:{time:()=>n.current}})))}function j(){const t=b.createElement;return t(_,{autoplay:!1},t(N,null))}const v={render:()=>document.createElement("div"),play:async({canvasElement:t})=>{await new Promise(m=>requestAnimationFrame(m));const e=t.firstElementChild;X.createRoot(e).render(b.createElement(j)),await new Promise(m=>setTimeout(m,500));const n=t.querySelectorAll("button"),s=n[0],c=n[1],a=n[2],i=m=>{for(let p=0;p<m;p++)s.click()},r=h();i(E);const u=g(r,"webglcontextlost");c.click(),await u;const d=g(r,"webglcontextrestored");a.click(),await d,i(E)}};var B,R,k;w.parameters={...w.parameters,docs:{...(B=w.parameters)==null?void 0:B.docs,source:{originalSource:`{
   render: () => {
     const wrapper = document.createElement("div");
     const controls = document.createElement("div");
@@ -72,7 +72,10 @@ void main() {
     // Frame counter drives the backbuffer shader's time.
     let time = 0;
     await vfx.add(img1, {
-      shader: "rainbow"
+      shader: "rainbow",
+      uniforms: {
+        time: () => time
+      }
     });
     await vfx.add(img2, {
       shader: backbufferShader,
@@ -112,26 +115,22 @@ void main() {
     // below (draw N → lose → restore → draw N) exercises the full
     // context-recovery path; if resources don't rebuild correctly,
     // the final state will differ pixel-wise from a clean render.
-    //
-    // webglcontextlost / webglcontextrestored are dispatched
-    // asynchronously. Firing them back-to-back in the same tick
-    // confuses Chrome's context-loss heuristics and can kill the
-    // tab, so we yield to the event loop between steps.
     const drawBatch = (n: number): void => {
       for (let i = 0; i < n; i++) {
         drawBtn.click();
       }
     };
-    const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms));
+    const canvas = getVFXCanvas();
     drawBatch(RENDER_FRAMES);
-    await sleep(50);
+    const lost = waitForCanvasEvent(canvas, "webglcontextlost");
     loseBtn.click();
-    await sleep(100);
+    await lost;
+    const restored = waitForCanvasEvent(canvas, "webglcontextrestored");
     restoreBtn.click();
-    await sleep(100);
+    await restored;
     drawBatch(RENDER_FRAMES);
   }
-}`,...(B=(y=f.parameters)==null?void 0:y.docs)==null?void 0:B.source}}};var R,k,L;x.parameters={...x.parameters,docs:{...(R=x.parameters)==null?void 0:R.docs,source:{originalSource:`{
+}`,...(k=(R=w.parameters)==null?void 0:R.docs)==null?void 0:k.source}}};var F,L,S;v.parameters={...v.parameters,docs:{...(F=v.parameters)==null?void 0:F.docs,source:{originalSource:`{
   render: () => {
     const container = document.createElement("div");
     return container;
@@ -156,13 +155,14 @@ void main() {
         drawBtn.click();
       }
     };
-    const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms));
+    const canvas = getVFXCanvas();
     drawBatch(RENDER_FRAMES);
-    await sleep(50);
+    const lost = waitForCanvasEvent(canvas, "webglcontextlost");
     loseBtn.click();
-    await sleep(100);
+    await lost;
+    const restored = waitForCanvasEvent(canvas, "webglcontextrestored");
     restoreBtn.click();
-    await sleep(100);
+    await restored;
     drawBatch(RENDER_FRAMES);
   }
-}`,...(L=(k=x.parameters)==null?void 0:k.docs)==null?void 0:L.source}}};const O=["ContextLostAndRestore","ContextLostAndRestoreReact"];export{f as ContextLostAndRestore,x as ContextLostAndRestoreReact,O as __namedExportsOrder,G as default};
+}`,...(S=(L=v.parameters)==null?void 0:L.docs)==null?void 0:S.source}}};const K=["ContextLostAndRestore","ContextLostAndRestoreReact"];export{w as ContextLostAndRestore,v as ContextLostAndRestoreReact,K as __namedExportsOrder,J as default};
