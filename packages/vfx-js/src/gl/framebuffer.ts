@@ -122,11 +122,8 @@ export class Framebuffer implements Restorable {
         // here, not by a DOM source.
         this.texture.source = null;
 
-        // Delete the old FBO only after the new one is fully constructed
-        // and assigned so this.fbo always points to a valid handle. If
-        // createFramebuffer above had failed, the old handle is still
-        // live and the caller can retry. On restore() the old handle is
-        // already dead; deleteFramebuffer is a no-op per the WebGL spec.
+        // Delete after assigning the new FBO so this.fbo is never stale.
+        // On restore() the old handle is dead; deleteFramebuffer is a no-op.
         if (oldFbo) {
             gl.deleteFramebuffer(oldFbo);
         }
