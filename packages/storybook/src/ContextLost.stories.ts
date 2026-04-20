@@ -33,14 +33,38 @@ const RENDER_FRAMES = 30;
 /** Must be called while the context is still active; the extension
  *  reference stays valid even after context loss. */
 function getVFXLoseContextExt(): WEBGL_lose_context | null {
-    const canvas = document.querySelector(
-        'canvas[style*="pointer-events"]',
-    ) as HTMLCanvasElement | null;
+    const canvas = getVFXCanvas();
     if (!canvas) {
         return null;
     }
     const gl = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
     return gl?.getExtension("WEBGL_lose_context") ?? null;
+}
+
+function getVFXCanvas(): HTMLCanvasElement | null {
+    return document.querySelector(
+        'canvas[style*="pointer-events"]',
+    ) as HTMLCanvasElement | null;
+}
+
+/** Resolves on the next dispatch of `type` on `target`, then yields a
+ *  frame so VFX's own listener can run its recovery logic before we
+ *  continue. */
+function waitForCanvasEvent(
+    target: EventTarget | null,
+    type: string,
+): Promise<void> {
+    return new Promise((resolve) => {
+        if (!target) {
+            resolve();
+            return;
+        }
+        target.addEventListener(
+            type,
+            () => requestAnimationFrame(() => resolve()),
+            { once: true },
+        );
+    });
 }
 
 export default {
@@ -120,7 +144,10 @@ export const ContextLostAndRestore: StoryObj = {
         // Frame counter drives the backbuffer shader's time.
         let time = 0;
 
-        await vfx.add(img1, { shader: "rainbow" });
+        await vfx.add(img1, {
+            shader: "rainbow",
+            uniforms: { time: () => time },
+        });
         await vfx.add(img2, {
             shader: backbufferShader,
             backbuffer: true,
@@ -161,25 +188,20 @@ export const ContextLostAndRestore: StoryObj = {
         // below (draw N → lose → restore → draw N) exercises the full
         // context-recovery path; if resources don't rebuild correctly,
         // the final state will differ pixel-wise from a clean render.
-        //
-        // webglcontextlost / webglcontextrestored are dispatched
-        // asynchronously. Firing them back-to-back in the same tick
-        // confuses Chrome's context-loss heuristics and can kill the
-        // tab, so we yield to the event loop between steps.
         const drawBatch = (n: number): void => {
             for (let i = 0; i < n; i++) {
                 drawBtn.click();
             }
         };
-        const sleep = (ms: number): Promise<void> =>
-            new Promise((r) => setTimeout(r, ms));
 
+        const canvas = getVFXCanvas();
         drawBatch(RENDER_FRAMES);
-        await sleep(50);
+        const lost = waitForCanvasEvent(canvas, "webglcontextlost");
         loseBtn.click();
-        await sleep(100);
+        await lost;
+        const restored = waitForCanvasEvent(canvas, "webglcontextrestored");
         restoreBtn.click();
-        await sleep(100);
+        await restored;
         drawBatch(RENDER_FRAMES);
     },
 };
@@ -250,7 +272,11 @@ function ContextLostReactControls() {
                     gap: "20px",
                 },
             },
-            h(VFXImg, { src: Logo, shader: "rainbow" }),
+            h(VFXImg, {
+                src: Logo,
+                shader: "rainbow",
+                uniforms: { time: () => timeRef.current },
+            }),
             h(VFXImg, {
                 src: Logo,
                 shader: backbufferShader,
@@ -295,15 +321,15 @@ export const ContextLostAndRestoreReact: StoryObj = {
                 drawBtn.click();
             }
         };
-        const sleep = (ms: number): Promise<void> =>
-            new Promise((r) => setTimeout(r, ms));
 
+        const canvas = getVFXCanvas();
         drawBatch(RENDER_FRAMES);
-        await sleep(50);
+        const lost = waitForCanvasEvent(canvas, "webglcontextlost");
         loseBtn.click();
-        await sleep(100);
+        await lost;
+        const restored = waitForCanvasEvent(canvas, "webglcontextrestored");
         restoreBtn.click();
-        await sleep(100);
+        await restored;
         drawBatch(RENDER_FRAMES);
     },
 };

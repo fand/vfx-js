@@ -41,39 +41,71 @@ export default {
     },
 } satisfies Meta<PostEffectProps>;
 
-const story = (props: PostEffectProps) => ({ args: props });
+const feedbackShader = `
+    precision highp float;
+    uniform sampler2D src;
+    uniform sampler2D backbuffer;
+    uniform vec2 resolution;
+    uniform vec2 offset;
+    uniform float time;
+    out vec4 outColor;
 
-// Feedback effect using backbuffer
-export const FeedbackEffect = story({
-    src: Logo,
-    preset: "uvGradient",
-    defaultTime: 1.0,
-    postEffect: {
-        shader: `
-            precision highp float;
-            uniform sampler2D src;
-            uniform sampler2D backbuffer;
-            uniform vec2 resolution;
-            uniform vec2 offset;
-            uniform float time;
-            out vec4 outColor;
+    void main() {
+        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+        vec4 current = texture(src, uv);
 
-            void main() {
-                vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                vec4 current = texture(src, uv);
+        vec2 feedbackOffset = vec2(
+            sin(uv.y * 31. + time * 1.0) + sin(uv.y * 17. + time * 0.7),
+            cos(uv.x * 23. + time * 1.5) + cos(uv.x * 19. + time * 0.9)
+        ) * 0.001;
+        vec4 previous = texture(backbuffer, uv + feedbackOffset);
 
-                vec2 feedbackOffset = vec2(
-                    sin(uv.y * 31. + time * 1.0) + sin(uv.y * 17. + time * 0.7),
-                    cos(uv.x * 23. + time * 1.5) + cos(uv.x * 19. + time * 0.9)
-                ) * 0.001;
-                vec4 previous = texture(backbuffer, uv + feedbackOffset);
+        outColor = mix(current, previous * 0.99, 1. - current.a);
+    }
+`;
 
-                outColor = mix(current, previous * 0.99, 1. - current.a);
-            }
-        `,
-        persistent: true,
+// Feedback effect using backbuffer. The `persistent: true` backbuffer
+// accumulates across frames, so autoplay would make the captured frame
+// count non-deterministic. Render a fixed number of frames manually.
+export const FeedbackEffect = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Logo;
+        return img;
     },
-});
+    play: async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+        const img = canvasElement.querySelector("img") as HTMLImageElement;
+        if (!img.complete) {
+            await new Promise((r) => {
+                img.onload = r;
+            });
+        }
+
+        let time = 1.0;
+        const vfx = initVFX({
+            autoplay: false,
+            // Override the default wall-clock time so the feedback shader's
+            // sin/cos offset is deterministic across runs.
+            postEffect: {
+                shader: feedbackShader,
+                persistent: true,
+                uniforms: { time: () => time },
+            },
+        });
+        await vfx.add(img, {
+            shader: "uvGradient",
+            uniforms: { time: () => time },
+        });
+
+        for (let i = 0; i < 60; i++) {
+            time = 1.0 + i * 0.016;
+            vfx.render();
+        }
+    },
+    parameters: {
+        layout: "fullscreen",
+    },
+};
 
 // Multiple VFXElements with post effect (test for render target clearing fix)
 export const MultipleElements = {

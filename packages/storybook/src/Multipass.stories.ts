@@ -69,12 +69,9 @@ function buildFluidOpts(args: FluidArgs) {
     let time = 0;
     let dX = 0;
     let dY = 0;
-    let lastMoveTime = 0;
-    const mouseDelta = (): [number, number] => {
-        const elapsed = performance.now() - lastMoveTime;
-        const decay = Math.exp(-elapsed * 0.01);
-        return [dX * decay, dY * decay];
-    };
+    // Deterministic: setDelta is called right before each render, so the
+    // shader reads the value that was just set. No wall-clock decay.
+    const mouseDelta = (): [number, number] => [dX, dY];
 
     const SIM = args.simResolution;
     const aspect = window.innerWidth / window.innerHeight;
@@ -107,7 +104,6 @@ function buildFluidOpts(args: FluidArgs) {
         setDelta: (x: number, y: number) => {
             dX = x;
             dY = y;
-            lastMoveTime = performance.now();
         },
     };
 }
@@ -141,6 +137,7 @@ function playFluidDemo(
         () => {
             let prevX = -1;
             let prevY = -1;
+            let idleTimer: number | undefined;
             window.addEventListener("pointermove", (e) => {
                 const x = e.clientX;
                 const y = window.innerHeight - e.clientY;
@@ -149,6 +146,10 @@ function playFluidDemo(
                 }
                 prevX = x;
                 prevY = y;
+                // Zero the delta after a short idle so the fluid stops
+                // being pushed when the mouse holds still.
+                clearTimeout(idleTimer);
+                idleTimer = window.setTimeout(() => fluid.setDelta(0, 0), 50);
             });
             vfx.play();
         },

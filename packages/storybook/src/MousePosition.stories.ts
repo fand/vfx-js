@@ -74,7 +74,13 @@ const render = (scrollable: boolean, pos: [number, number]): StoryObj => ({
 
         return container;
     },
-    play: async () => {
+    play: async ({ canvasElement }) => {
+        const img = canvasElement.querySelector("img") as HTMLImageElement;
+        if (img && !img.complete) {
+            await new Promise((r) => {
+                img.onload = r;
+            });
+        }
         window.dispatchEvent(
             new PointerEvent("pointermove", {
                 clientX: pos[0],
@@ -84,6 +90,12 @@ const render = (scrollable: boolean, pos: [number, number]): StoryObj => ({
                 bubbles: true,
             }),
         );
+        // The shader has no `time` uniform, so once the auto-render picks
+        // up the new `mouse` uniform the output is stable. Two rAFs is
+        // enough for the uniform update to land on the canvas before
+        // Chromatic captures.
+        await new Promise((r) => requestAnimationFrame(r));
+        await new Promise((r) => requestAnimationFrame(r));
     },
     parameters: {
         layout: "fullscreen",
