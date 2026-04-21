@@ -1,0 +1,1 @@
+.timer{background:#333;flex-direction:column;gap:8px;width:320px;padding:8px;display:flex;position:fixed;top:16px;left:16px}.timer .row{gap:8px;width:100%;display:flex}.timer .btn{cursor:pointer;width:60px}.timer .seek{flex:1}.timer .label{color:#fff}
