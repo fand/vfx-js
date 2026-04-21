@@ -39,7 +39,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.11",
     "@types/node": "^22.15.30",
-    "globals": "^16.2.0",
+    "globals": "17.5.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.0",
     "npm-run-all2": "^8.0.4",
