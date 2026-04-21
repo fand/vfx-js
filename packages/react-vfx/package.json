@@ -44,8 +44,6 @@
     "@biomejs/biome": "2.4.11",
     "@types/node": "24.12.2",
     "@types/react": "^19.1.6",
-    "globals": "17.5.0",
-    "husky": "^9.1.7",
     "lint-staged": "^16.1.0",
     "npm-run-all2": "^8.0.4",
     "rimraf": "^6.0.1",

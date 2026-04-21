@@ -18,23 +18,19 @@
     "lodash.debounce": "^4.0.8",
     "postprocessing": "^6.37.4",
     "prism-react-renderer": "^2.4.1",
-    "prismjs": "^1.30.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-intersection-observer": "^10.0.3",
     "react-vfx": "0.18.0",
-    "three": "0.183.2",
-    "vh-check": "^2.0.5"
+    "three": "0.183.2"
   },
   "devDependencies": {
-    "@types/dedent": "^0.7.2",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "24.12.2",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
     "@types/three": "0.183.1",
     "@vitejs/plugin-react": "6.0.1",
-    "prop-types": "^15.8.1",
     "rimraf": "^6.0.1",
     "typescript": "6.0.2",
     "vite": "8.0.8"

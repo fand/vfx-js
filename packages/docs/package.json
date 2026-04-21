@@ -18,16 +18,10 @@
   "dependencies": {
     "@vfx-js/core": "0.13.0",
     "@vfx-js/storybook": "0.0.19",
-    "dedent": "^1.6.0",
-    "is-mobile": "^5.0.0",
-    "lodash.debounce": "^4.0.8",
     "prism-themes": "^1.9.0",
-    "prismjs": "^1.30.0",
-    "vh-check": "^2.0.5"
+    "prismjs": "^1.30.0"
   },
   "devDependencies": {
-    "@types/dedent": "^0.7.2",
-    "@types/lodash.debounce": "^4.0.9",
     "@types/node": "24.12.2",
     "npm-run-all2": "^8.0.4",
     "rimraf": "^6.0.1",
