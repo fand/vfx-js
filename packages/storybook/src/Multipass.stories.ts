@@ -1,4 +1,4 @@
-import type { Meta } from "@storybook/html";
+import type { Meta } from "@storybook/html-vite";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { buildFluidPasses } from "./stable-fluid";
