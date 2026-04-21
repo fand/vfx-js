@@ -28,7 +28,7 @@
   "devDependencies": {
     "@types/dedent": "^0.7.2",
     "@types/lodash.debounce": "^4.0.9",
-    "@types/node": "^22.15.30",
+    "@types/node": "24.12.2",
     "npm-run-all2": "^8.0.4",
     "rimraf": "^6.0.1",
     "typescript": "6.0.2",

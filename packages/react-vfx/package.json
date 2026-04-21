@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.11",
-    "@types/node": "^22.15.30",
+    "@types/node": "24.12.2",
     "@types/react": "^19.1.6",
     "globals": "17.5.0",
     "husky": "^9.1.7",
