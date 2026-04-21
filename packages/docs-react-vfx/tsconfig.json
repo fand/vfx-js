@@ -8,7 +8,7 @@
         "strict": true,
         "forceConsistentCasingInFileNames": true,
         "module": "ESNext",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "noEmit": true,
         "jsx": "react"
     },

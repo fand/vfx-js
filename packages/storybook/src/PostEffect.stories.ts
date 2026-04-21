@@ -1,4 +1,4 @@
-import type { Meta } from "@storybook/html";
+import type { Meta } from "@storybook/html-vite";
 import type { VFXPostEffect, VFXProps } from "@vfx-js/core";
 import { Timer } from "./Timer";
 

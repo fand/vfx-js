@@ -50,10 +50,6 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
     }, [props.pixelRatio, props.postEffect, props.wrapper, autoplay]); // TODO: add zIndex
 
     return (
-        <>
-            <VFXContext.Provider value={vfx}>
-                {props.children}
-            </VFXContext.Provider>
-        </>
+        <VFXContext.Provider value={vfx}>{props.children}</VFXContext.Provider>
     );
 };

@@ -1,7 +1,7 @@
-import { type GLRect, getGLRect } from "./gl-rect.js";
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
 import type { Texture } from "./gl/texture.js";
+import { type GLRect, getGLRect } from "./gl-rect.js";
 
 /**
  * Double-buffered render target. Pass 0 is read, pass 1 is written;
