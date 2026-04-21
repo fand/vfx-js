@@ -1,11 +1,12 @@
 import type { StorybookConfig } from "@storybook/html-vite";
 
+import { createRequire } from "node:module";
 import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-/**
- * This function is used to resolve the absolute path of a package.
- * It is needed in projects that use Yarn PnP or are set up within a monorepo.
- */
+const require = createRequire(import.meta.url);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 function getAbsolutePath(value: string): any {
     return dirname(require.resolve(join(value, "package.json")));
 }
