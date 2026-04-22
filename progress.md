@@ -46,6 +46,16 @@ Track per-task completion here. Format per entry:
 - date: 2026-04-22
 - notes: EffectChain orchestrates the per-element pipeline. renderingIndices is computed once at construction (typeof render === "function"). run(input) reflects state into hosts, resolves intermediates (reallocate only on size/float delta), calls update phase (array order), then render phase (renderingIndices order). Each intermediate exposes two handles — an EffectRenderTarget for the producing effect's `ctx.output` and an EffectTexture for the next stage's `ctx.src` — so the public type contract that `ctx.src: EffectTexture` is preserved. Initialization is sequential with `await`; on throw the chain disposes prior effects in reverse order, disposes the failing host (to release any RTs its own init allocated), and rethrows. update/render throws warn once per effect index; render failures fall back to passthrough copy so the output doesn't disappear. finalTarget handle cached + regenerated only when the underlying Framebuffer instance changes.
 
+## 5-1: effect-host.test.ts
+- commit: b8f24f0
+- date: 2026-04-22
+- notes: 27 tests. vi.mock replaces Backbuffer / Framebuffer / Texture / Program / Pass / EffectGeometryCache with recording classes so the host's orchestration can be unit-tested without WebGL. DOM class stubs are installed on globalThis because vitest's default env is node (HTMLVideoElement et al. undefined otherwise, causing the autoUpdate default detection to fall through). Covers wrapTexture autoUpdate defaults (video/canvas→true, image→false) + override; WebGLTexture opts.size requirement + externalHandle + autoRegister:false; wrap/filter flow-through (single + tuple); createRenderTarget persistent vs non-persistent dispatch; explicit-size vs auto-resize (pr=1 vs host.pr semantics); Backbuffer wrap/filter ctor forwarding; auto-resize via setFrameDims; program cache collapse + vert-diff rebuild; ctx.draw phase gating (update warns once; init silent); onContextRestored unsub auto-called on dispose; dispose cleanup + idempotent. Intentionally NOT covered (documented in commit body): GL-integration paths (persistent RT flip, perInstance/LINE_STRIP dispatch, ctx.gl.* resilience, context-lost restore, uvInnerRect upload) — would need headless WebGL; storybook demo covers these end-to-end.
+
+## 5-2: effect-chain.test.ts
+- commit: 06857b4
+- date: 2026-04-22
+- notes: 26 orchestration tests. vi.mock replaces EffectHost + Framebuffer with stubs so chain logic can be unit-tested. Covers renderingIndices collection; M=0 identity copy + isVisible gate; M=3 intermediate alloc + src/output swap + per-intermediate clear; render-less middle skipped; outputSize explicit size / float / last-effect-ignored / overflow non-cumulative; outputSize reallocation only on size/float delta; post-effect context mirror; initAll sequential+await; init throw → prior effects' dispose in reverse (failing effect's own NOT called); update/render throw paths (warn once, passthrough fallback for render); dispose reverse order + idempotent. Side-fix in effect-chain.ts: initAll error path now disposes prior hosts after their effect.dispose (was leaking host-owned GL resources from prior effects' successful inits). Matches the main dispose() path's ordering.
+
 ## 4-5: vfx.ts pass effect through
 - commit: — (no code change)
 - date: 2026-04-22
