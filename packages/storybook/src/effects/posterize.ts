@@ -15,7 +15,8 @@ void main() {
         c = texture(src, uvInner);
     }
     // Quantize each channel to N = levels discrete steps.
-    vec3 q = floor(c.rgb * levels) / (levels - 1.0);
+    // Output bands: 0, 1/N, 2/N, ..., (N-1)/N. Values stay in [0,1).
+    vec3 q = floor(c.rgb * levels) / levels;
     outColor = vec4(q, c.a);
 }
 `;

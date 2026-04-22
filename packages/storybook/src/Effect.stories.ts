@@ -37,8 +37,7 @@ bloom.play = async ({ canvasElement }) => {
         effect: createBloomEffect({
             threshold: 0.6,
             intensity: 1.3,
-            radius: 2,
-            iterations: 4,
+            iterations: 8,
         }),
         overflow: 80,
     });
@@ -55,8 +54,8 @@ export const posterizeAndBloom: StoryObj<undefined> = {
         const img = document.createElement("img");
         img.src = Jellyfish;
         img.style.display = "block";
-        img.style.margin = "40px auto";
-        img.style.width = "480px";
+        img.style.margin = "60px auto";
+        img.style.width = "min(900px, 80vw)";
         return img;
     },
     args: undefined,
@@ -72,13 +71,12 @@ posterizeAndBloom.play = async ({ canvasElement }) => {
         effect: [
             createPosterizeEffect({ levels: 4 }),
             createBloomEffect({
-                threshold: 0.5,
+                threshold: 0.4,
                 softness: 0.05,
                 intensity: 2.5,
-                radius: 3,
-                iterations: 6,
+                iterations: 12,
             }),
         ],
-        overflow: 120,
+        overflow: 160,
     });
 };

@@ -32,7 +32,10 @@ precision highp float;
 in vec2 uv;
 out vec4 outColor;
 uniform sampler2D src;
-uniform vec2 direction;
+// Single-texel step along the blur axis: [1/width, 0] for H or
+// [0, 1/height] for V. Taps are always 1 texel apart to avoid sparse-
+// sampling grid aliasing — use more iterations to widen the spread.
+uniform vec2 texelStep;
 
 // 9-tap gaussian (σ ≈ 2), precomputed weights.
 const float W0 = 0.2270270270;
@@ -43,14 +46,14 @@ const float W4 = 0.0162162162;
 
 void main() {
     vec4 result = texture(src, uv) * W0;
-    result += texture(src, uv + direction * 1.0) * W1;
-    result += texture(src, uv - direction * 1.0) * W1;
-    result += texture(src, uv + direction * 2.0) * W2;
-    result += texture(src, uv - direction * 2.0) * W2;
-    result += texture(src, uv + direction * 3.0) * W3;
-    result += texture(src, uv - direction * 3.0) * W3;
-    result += texture(src, uv + direction * 4.0) * W4;
-    result += texture(src, uv - direction * 4.0) * W4;
+    result += texture(src, uv + texelStep * 1.0) * W1;
+    result += texture(src, uv - texelStep * 1.0) * W1;
+    result += texture(src, uv + texelStep * 2.0) * W2;
+    result += texture(src, uv - texelStep * 2.0) * W2;
+    result += texture(src, uv + texelStep * 3.0) * W3;
+    result += texture(src, uv - texelStep * 3.0) * W3;
+    result += texture(src, uv + texelStep * 4.0) * W4;
+    result += texture(src, uv - texelStep * 4.0) * W4;
     outColor = result;
 }
 `;
@@ -87,11 +90,10 @@ export type BloomOptions = {
     /** Additive gain applied to the blurred bright pass. Default 1.2. */
     intensity?: number;
     /**
-     * Blur radius in pixels per tap. Larger = wider glow, more cost.
-     * Actual spread ≈ radius × iterations × 4 px. Default 2.
+     * Number of H+V separable-blur passes. Each iteration adds
+     * ~4 texels of spread; cumulative spread ≈ 2×sqrt(iterations)×σ
+     * (σ=2). Default 6 — ~20-texel effective radius.
      */
-    radius?: number;
-    /** Number of H+V separable-blur passes. Default 3. */
     iterations?: number;
 };
 
@@ -108,8 +110,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
     const threshold = opts.threshold ?? 0.7;
     const softness = opts.softness ?? 0.1;
     const intensity = opts.intensity ?? 1.2;
-    const radius = opts.radius ?? 2;
-    const iterations = opts.iterations ?? 3;
+    const iterations = opts.iterations ?? 6;
 
     let bright: EffectRenderTarget | null = null;
     let pingA: EffectRenderTarget | null = null;
@@ -133,17 +134,19 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
 
             // 2. Separable blur, ping-pong between pingA / pingB. The
             //    first H pass seeds pingA from `bright`; subsequent
-            //    passes alternate read/write.
+            //    passes alternate read/write. Always step 1 texel per
+            //    tap so the 9-tap kernel stays contiguous (no sparse-
+            //    sample grid aliasing).
             let read: EffectRenderTarget = bright;
             let write: EffectRenderTarget = pingA;
             for (let pass = 0; pass < iterations * 2; pass++) {
-                const dir: [number, number] =
+                const step: [number, number] =
                     pass % 2 === 0
-                        ? [radius / bright.width, 0]
-                        : [0, radius / bright.height];
+                        ? [1 / bright.width, 0]
+                        : [0, 1 / bright.height];
                 ctx.draw({
                     frag: FRAG_BLUR,
-                    uniforms: { src: read, direction: dir },
+                    uniforms: { src: read, texelStep: step },
                     target: write,
                 });
                 read = write;
