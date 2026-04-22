@@ -30,6 +30,13 @@ export type TextureSource =
 export type TextureOpts = {
     /** Default true. Pass false for FBO attachment textures. */
     autoRegister?: boolean;
+    /**
+     * Externally-owned raw WebGL texture handle. When provided, the
+     * Texture wrapper skips creation / upload / deletion — the caller
+     * retains lifetime ownership. Used by
+     * {@link EffectContext.wrapTexture} for WebGLTexture sources.
+     */
+    externalHandle?: WebGLTexture;
 };
 
 /** @internal */
@@ -47,15 +54,24 @@ export class Texture implements Restorable {
     #ctx: GLContext;
     #uploaded = false;
     #registered: boolean;
+    #external: boolean;
 
     constructor(ctx: GLContext, source?: TextureSource, opts?: TextureOpts) {
         this.#ctx = ctx;
         this.gl = ctx.gl;
-        this.#create();
+        this.#external = opts?.externalHandle !== undefined;
+        if (this.#external) {
+            // Caller owns the handle; skip create/upload/restore/delete.
+            this.texture = opts!.externalHandle!;
+            this.#uploaded = true;
+            this.needsUpdate = false;
+        } else {
+            this.#create();
+        }
         if (source) {
             this.source = source;
         }
-        this.#registered = opts?.autoRegister !== false;
+        this.#registered = opts?.autoRegister !== false && !this.#external;
         if (this.#registered) {
             ctx.addResource(this);
         }
@@ -70,6 +86,12 @@ export class Texture implements Restorable {
     }
 
     restore(): void {
+        // External handles are dead after context loss; caller rebuilds
+        // them via their onContextRestored subscription and hands a new
+        // Texture back. No-op here.
+        if (this.#external) {
+            return;
+        }
         // Old handle is invalid; create a fresh one and flag for re-upload.
         this.#create();
         this.#uploaded = false;
@@ -155,7 +177,9 @@ export class Texture implements Restorable {
         if (this.#registered) {
             this.#ctx.removeResource(this);
         }
-        this.gl.deleteTexture(this.texture);
+        if (!this.#external) {
+            this.gl.deleteTexture(this.texture);
+        }
     }
 }
 
