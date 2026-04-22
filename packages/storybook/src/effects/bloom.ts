@@ -8,17 +8,19 @@ import type {
 const FRAG_THRESHOLD = `#version 300 es
 precision highp float;
 in vec2 uvInner;
+in vec2 uvInnerDst;
 out vec4 outColor;
 uniform sampler2D src;
 uniform float threshold;
 uniform float softness;
 
 void main() {
-    // Only sample within the element interior; overflow pad contributes
-    // nothing to the bright extraction.
+    // uvInner is the src-sampling UV pointing into src's inner region.
+    // uvInnerDst is the destination-space 0..1 over the element proper;
+    // outside [0, 1] means pad — contribute nothing to the bright pass.
     vec4 c = vec4(0.0);
-    if (uvInner.x >= 0.0 && uvInner.x <= 1.0 &&
-        uvInner.y >= 0.0 && uvInner.y <= 1.0) {
+    if (uvInnerDst.x >= 0.0 && uvInnerDst.x <= 1.0 &&
+        uvInnerDst.y >= 0.0 && uvInnerDst.y <= 1.0) {
         c = texture(src, uvInner);
     }
     float lum = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
@@ -62,6 +64,7 @@ const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvInner;
+in vec2 uvInnerDst;
 out vec4 outColor;
 uniform sampler2D src;
 uniform sampler2D bloom;
@@ -70,8 +73,8 @@ uniform float intensity;
 void main() {
     vec4 baseColor = vec4(0.0);
     bool inside =
-        uvInner.x >= 0.0 && uvInner.x <= 1.0 &&
-        uvInner.y >= 0.0 && uvInner.y <= 1.0;
+        uvInnerDst.x >= 0.0 && uvInnerDst.x <= 1.0 &&
+        uvInnerDst.y >= 0.0 && uvInnerDst.y <= 1.0;
     if (inside) {
         baseColor = texture(src, uvInner);
     }
@@ -95,6 +98,13 @@ export type BloomOptions = {
      * (σ=2). Default 6 — ~20-texel effective radius.
      */
     iterations?: number;
+    /**
+     * Extra pad around the element (physical px) for the glow to spread
+     * into. `"fullscreen"` reaches the viewport edges on all sides.
+     * Omit → no pad grown by bloom itself; compose with a prior
+     * padding effect to get room for the glow.
+     */
+    pad?: number | "fullscreen";
 };
 
 /**
@@ -111,12 +121,13 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
     const softness = opts.softness ?? 0.1;
     const intensity = opts.intensity ?? 1.2;
     const iterations = opts.iterations ?? 6;
+    const pad = opts.pad;
 
     let bright: EffectRenderTarget | null = null;
     let pingA: EffectRenderTarget | null = null;
     let pingB: EffectRenderTarget | null = null;
 
-    return {
+    const effect: Effect = {
         init(ctx: EffectContext) {
             bright = ctx.createRenderTarget();
             pingA = ctx.createRenderTarget();
@@ -166,4 +177,15 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             pingB = null;
         },
     };
+
+    if (pad !== undefined) {
+        effect.outputSize = (dims) => {
+            if (pad === "fullscreen") {
+                return { padAdd: dims.fullscreenPad };
+            }
+            return { padAdd: pad };
+        };
+    }
+
+    return effect;
 }
