@@ -2,6 +2,8 @@ import { Backbuffer } from "./backbuffer.js";
 import { shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
+import { EffectChain } from "./effect-chain.js";
+import { makeEffectTexture } from "./effect-host.js";
 import GIFData from "./gif.js";
 import { GLContext } from "./gl/context.js";
 import type { Framebuffer } from "./gl/framebuffer.js";
@@ -24,6 +26,9 @@ import {
 } from "./rect.js";
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
 import type {
+    Effect,
+    EffectUniformValue,
+    EffectVFXProps,
     VFXElement,
     VFXElementIntersection,
     VFXElementPass,
@@ -246,8 +251,7 @@ export class VFXPlayer {
         this.#isRenderingToCanvas.set(e.element, true);
 
         try {
-            const srcUniform = e.passes[0].uniforms["src"];
-            const oldTexture = srcUniform.value as Texture;
+            const oldTexture = e.srcTexture;
             const oldCanvas =
                 oldTexture.source instanceof OffscreenCanvas
                     ? oldTexture.source
@@ -267,7 +271,13 @@ export class VFXPlayer {
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.needsUpdate = true;
-            srcUniform.value = texture;
+            // Effect-path uses a resolver-form EffectTexture that reads
+            // `e.srcTexture` each frame, so updating the field alone is
+            // enough. Shader path also needs the pass-0 src uniform
+            // rewritten.
+            if (!e.chain && e.passes.length > 0) {
+                e.passes[0].uniforms["src"].value = texture;
+            }
             e.srcTexture = texture;
             oldTexture.dispose();
         } catch (e) {
@@ -282,6 +292,11 @@ export class VFXPlayer {
         opts: VFXProps = {},
         initialCapture?: OffscreenCanvas,
     ): Promise<void> {
+        // Effect path: mutually exclusive with `shader`. See plan.md.
+        if (opts.effect !== undefined) {
+            return this.#addEffectElement(element, opts, initialCapture);
+        }
+
         // Normalize shader input to VFXPass array
         const inputPasses = this.#normalizePasses(opts);
 
@@ -554,6 +569,177 @@ export class VFXPlayer {
         this.#elements.sort((a, b) => a.zIndex - b.zIndex);
     }
 
+    async #addEffectElement(
+        element: HTMLElement,
+        opts: VFXProps,
+        initialCapture?: OffscreenCanvas,
+    ): Promise<void> {
+        const rawEffect = opts.effect!;
+
+        if (opts.shader !== undefined) {
+            console.warn(
+                "[VFX-JS] Both `shader` and `effect` specified; `effect` takes precedence.",
+            );
+        }
+
+        const effects: readonly Effect[] = Array.isArray(rawEffect)
+            ? [...rawEffect]
+            : [rawEffect];
+        if (effects.length === 0) {
+            console.warn(
+                "[VFX-JS] Empty `effect` array; rendering identity capture → final target.",
+            );
+        }
+
+        // Shared prelude (mirrors shader-path addElement).
+        const domRect = element.getBoundingClientRect();
+        const rect = toRect(domRect);
+        const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
+        const intersectionOpts = parseIntersectionOpts(opts.intersection);
+
+        const originalOpacity =
+            element.style.opacity === ""
+                ? 1
+                : Number.parseFloat(element.style.opacity);
+
+        let texture: Texture;
+        let type: VFXElementType;
+        let isGif = false;
+        if (element instanceof HTMLImageElement) {
+            type = "img" as VFXElementType;
+            isGif = !!element.src.match(/\.gif/i);
+
+            if (isGif) {
+                const gif = await GIFData.create(element.src, this.#pixelRatio);
+                gifFor.set(element, gif);
+                texture = new Texture(this.#ctx, gif.getCanvas());
+            } else {
+                const img = await loadImage(element.src);
+                texture = new Texture(this.#ctx, img);
+            }
+        } else if (element instanceof HTMLVideoElement) {
+            texture = new Texture(this.#ctx, element);
+            type = "video" as VFXElementType;
+        } else if (element instanceof HTMLCanvasElement) {
+            if (element.hasAttribute("layoutsubtree") && initialCapture) {
+                texture = new Texture(this.#ctx, initialCapture);
+                type = "hic" as VFXElementType;
+            } else {
+                texture = new Texture(this.#ctx, element);
+                type = "canvas" as VFXElementType;
+            }
+        } else {
+            const canvas = await dom2canvas(
+                element,
+                originalOpacity,
+                undefined,
+                this.maxTextureSize,
+            );
+            texture = new Texture(this.#ctx, canvas);
+            type = "text" as VFXElementType;
+        }
+
+        const [wrapS, wrapT] = parseWrap(opts.wrap);
+        texture.wrapS = wrapS;
+        texture.wrapT = wrapT;
+        texture.needsUpdate = true;
+
+        const autoCrop = opts.autoCrop ?? true;
+
+        if (type === "hic") {
+            /* onpaint clears the canvas */
+        } else if (opts.overlay === true) {
+            /* overlay mode */
+        } else if (typeof opts.overlay === "number") {
+            element.style.setProperty("opacity", opts.overlay.toString());
+        } else {
+            const opacity = type === "video" ? "0.0001" : "0";
+            element.style.setProperty("opacity", opacity.toString());
+        }
+
+        // Effect-path specifics.
+        const now = Date.now() / 1000;
+        const elem: VFXElement = {
+            type,
+            element,
+            isInViewport: false,
+            isInLogicalViewport: false,
+            width: domRect.width,
+            height: domRect.height,
+            passes: [],
+            bufferTargets: new Map(),
+            startTime: now,
+            enterTime: now,
+            leaveTime: Number.NEGATIVE_INFINITY,
+            release: opts.release ?? Number.POSITIVE_INFINITY,
+            isGif,
+            isFullScreen,
+            overflow,
+            intersection: intersectionOpts,
+            originalOpacity,
+            srcTexture: texture,
+            zIndex: opts.zIndex ?? 0,
+            backbuffer: undefined,
+            autoCrop,
+            effectLastRenderTime: now,
+        };
+
+        // Resolver-form EffectTexture — closure over `elem.srcTexture`
+        // transparently follows text-element re-renders.
+        const captureHandle = makeEffectTexture(
+            () => elem.srcTexture,
+            () => readTextureSourceDim(elem.srcTexture, "w"),
+            () => readTextureSourceDim(elem.srcTexture, "h"),
+        );
+
+        // Split user uniforms into static + generators.
+        const staticUniforms: Record<string, EffectUniformValue> = {};
+        const gens: Record<string, () => EffectUniformValue> = {};
+        if (opts.uniforms) {
+            for (const [k, v] of Object.entries(opts.uniforms)) {
+                if (typeof v === "function") {
+                    gens[k] = v as () => EffectUniformValue;
+                    staticUniforms[k] = v() as EffectUniformValue;
+                } else {
+                    staticUniforms[k] = v as EffectUniformValue;
+                }
+            }
+        }
+        elem.effectUniformGenerators = gens;
+        elem.effectStaticUniforms = staticUniforms;
+
+        const vfxProps: EffectVFXProps = {
+            autoCrop,
+            glslVersion: opts.glslVersion ?? "300 es",
+        };
+        const chain = new EffectChain(
+            this.#ctx,
+            this.#quad,
+            this.#pixelRatio,
+            effects,
+            vfxProps,
+            captureHandle,
+            false,
+        );
+        try {
+            await chain.initAll();
+        } catch (err) {
+            // Chain has already disposed prior effects + failing host.
+            // Release the source texture and restore opacity.
+            texture.dispose();
+            element.style.setProperty(
+                "opacity",
+                originalOpacity.toString(),
+            );
+            throw err;
+        }
+        elem.chain = chain;
+
+        this.#hitTest(elem, rect, now);
+        this.#elements.push(elem);
+        this.#elements.sort((a, b) => a.zIndex - b.zIndex);
+    }
+
     /**
      * Normalize shader input to a VFXPass array.
      * Per-pass `glslVersion` wins; otherwise `opts.glslVersion` is inherited.
@@ -575,14 +761,20 @@ export class VFXPlayer {
         if (i !== -1) {
             const e = this.#elements.splice(i, 1)[0] as VFXElement;
 
-            for (const rt of e.bufferTargets.values()) {
-                rt.dispose();
+            if (e.chain) {
+                // Effect path: chain disposes its effects + hosts +
+                // intermediates. Source texture + opacity are ours.
+                e.chain.dispose();
+            } else {
+                for (const rt of e.bufferTargets.values()) {
+                    rt.dispose();
+                }
+                for (const p of e.passes) {
+                    p.pass.dispose();
+                    p.backbuffer?.dispose();
+                }
+                e.backbuffer?.dispose();
             }
-            for (const p of e.passes) {
-                p.pass.dispose();
-                p.backbuffer?.dispose();
-            }
-            e.backbuffer?.dispose();
             e.srcTexture.dispose();
 
             // Recover the original state
@@ -604,13 +796,14 @@ export class VFXPlayer {
     updateCanvasElement(element: HTMLCanvasElement): void {
         const e = this.#elements.find((e) => e.element === element);
         if (e) {
-            const srcUniform = e.passes[0].uniforms["src"];
-            const oldTexture = srcUniform.value as Texture;
+            const oldTexture = e.srcTexture;
             const texture = new Texture(this.#ctx, element);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.needsUpdate = true;
-            srcUniform.value = texture;
+            if (!e.chain && e.passes.length > 0) {
+                e.passes[0].uniforms["src"].value = texture;
+            }
             e.srcTexture = texture;
             oldTexture.dispose();
         }
@@ -625,8 +818,7 @@ export class VFXPlayer {
             return;
         }
 
-        const srcUniform = e.passes[0].uniforms["src"];
-        const oldTexture = srcUniform.value as Texture;
+        const oldTexture = e.srcTexture;
 
         if (oldTexture.source === offscreen) {
             oldTexture.needsUpdate = true;
@@ -635,7 +827,9 @@ export class VFXPlayer {
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.needsUpdate = true;
-            srcUniform.value = texture;
+            if (!e.chain && e.passes.length > 0) {
+                e.passes[0].uniforms["src"].value = texture;
+            }
             e.srcTexture = texture;
             oldTexture.dispose();
         }
@@ -696,6 +890,12 @@ export class VFXPlayer {
             const hit = this.#hitTest(e, rect, now);
 
             if (!hit.isVisible) {
+                continue;
+            }
+
+            // Effect-path elements are handled via EffectChain in the next
+            // commit; skip the shader-path machinery for now.
+            if (e.chain) {
                 continue;
             }
 
@@ -1032,7 +1232,7 @@ export class VFXPlayer {
         // Quit if the element has left and the transition has ended
         const isVisible = isInViewport && now - e.leaveTime <= e.release;
 
-        if (isVisible) {
+        if (isVisible && !e.chain && e.passes.length > 0) {
             const u = e.passes[0].uniforms;
             u["intersection"].value = intersection;
             u["enterTime"].value = now - e.enterTime;
@@ -1451,6 +1651,32 @@ export function parseIntersectionOpts(
         threshold,
         rootMargin,
     };
+}
+
+/**
+ * Inspect a Texture's source and return its native width/height.
+ * Used by `ctx.src` for effect-path elements. Returns 0 if the source
+ * is not yet ready (e.g. HTMLImageElement pre-load).
+ */
+function readTextureSourceDim(tex: Texture, axis: "w" | "h"): number {
+    const src = tex.source;
+    if (!src) {
+        return 0;
+    }
+    if (
+        typeof HTMLImageElement !== "undefined" &&
+        src instanceof HTMLImageElement
+    ) {
+        return axis === "w" ? src.naturalWidth : src.naturalHeight;
+    }
+    if (
+        typeof HTMLVideoElement !== "undefined" &&
+        src instanceof HTMLVideoElement
+    ) {
+        return axis === "w" ? src.videoWidth : src.videoHeight;
+    }
+    const wc = src as { width: number; height: number };
+    return axis === "w" ? wc.width : wc.height;
 }
 
 function parseWrapSingle(wrapOpt: VFXWrap): TextureWrap {

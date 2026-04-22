@@ -1,5 +1,6 @@
 import type { Backbuffer } from "./backbuffer.js";
 import type { ShaderPreset } from "./constants.js";
+import type { EffectChain } from "./effect-chain.js";
 import type { Framebuffer } from "./gl/framebuffer.js";
 import type { Pass } from "./gl/pass.js";
 import type { GlslVersion, Uniforms } from "./gl/program.js";
@@ -424,6 +425,14 @@ export type VFXElement = {
     zIndex: number;
     backbuffer?: Backbuffer;
     autoCrop: boolean;
+    /** Present only for effect-path elements. */
+    chain?: EffectChain;
+    /** Per-frame evaluated generators for effect-path uniforms. */
+    effectUniformGenerators?: Record<string, () => EffectUniformValue>;
+    /** Static effect-path uniforms (merged with generator results). */
+    effectStaticUniforms?: Record<string, EffectUniformValue>;
+    /** Wall-clock seconds of the previous render. Used for ctx.deltaTime. */
+    effectLastRenderTime?: number;
 };
 
 export type VFXElementIntersection = {
