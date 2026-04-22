@@ -62,6 +62,17 @@ export class VFXPlayer {
     }[] = [];
     #postEffectBufferTargets: Map<string, Framebuffer | undefined> = new Map();
 
+    // Effect-path post-effect state (mutually exclusive with the shader
+    // post-effect passes above).
+    #postEffectChain: EffectChain | null = null;
+    #postEffectChainReady = false;
+    #postEffectChainStaticUniforms: Record<string, EffectUniformValue> = {};
+    #postEffectChainGenerators: Record<
+        string,
+        () => EffectUniformValue
+    > = {};
+    #postEffectChainLastTime = 0;
+
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
     #elements: VFXElement[] = [];
@@ -122,6 +133,11 @@ export class VFXPlayer {
         }
         for (const pass of this.#postEffectPasses) {
             pass.dispose();
+        }
+        if (this.#postEffectChain) {
+            this.#postEffectChain.dispose();
+            this.#postEffectChain = null;
+            this.#postEffectChainReady = false;
         }
         this.#copyPass.dispose();
         this.#quad.dispose();
@@ -873,8 +889,12 @@ export class VFXPlayer {
         const viewportHeight = this.#viewport.bottom - this.#viewport.top;
         const viewportGlRect = getGLRect(0, 0, viewportWidth, viewportHeight);
 
-        // Setup post effect render target if needed
-        const shouldUsePostEffect = this.#postEffectPasses.length > 0;
+        // Setup post effect render target if needed. Chain-based
+        // post-effect is only enabled once its async `init` resolves;
+        // until then render directly to canvas (no blank frames).
+        const shouldUsePostEffect =
+            this.#postEffectPasses.length > 0 ||
+            (this.#postEffectChain !== null && this.#postEffectChainReady);
         if (shouldUsePostEffect) {
             this.#setupPostEffectTarget(viewportWidth, viewportHeight);
             if (this.#postEffectTarget) {
@@ -1177,7 +1197,11 @@ export class VFXPlayer {
 
         // Apply post effects
         if (shouldUsePostEffect && this.#postEffectTarget) {
-            this.#renderPostEffects(viewportGlRect, now);
+            if (this.#postEffectChain && this.#postEffectChainReady) {
+                this.#runPostEffectChain(viewportGlRect, now);
+            } else {
+                this.#renderPostEffects(viewportGlRect, now);
+            }
         }
     }
 
@@ -1429,6 +1453,17 @@ export class VFXPlayer {
     }
 
     #initPostEffects(postEffects: (VFXPostEffect | VFXPass)[]) {
+        // Effect-path post-effect: a single-slot VFXPostEffect whose
+        // `effect` field is set. See plan.md task 4-4.
+        if (
+            postEffects.length === 1 &&
+            !("frag" in postEffects[0]) &&
+            (postEffects[0] as VFXPostEffect).effect !== undefined
+        ) {
+            this.#initPostEffectChain(postEffects[0] as VFXPostEffect);
+            return;
+        }
+
         // Collect shader source and target names for each pass
         const shaderSources: string[] = [];
         const targetNames: (string | undefined)[] = [];
@@ -1524,6 +1559,144 @@ export class VFXPlayer {
                 }
             }
         }
+    }
+
+    /**
+     * Build the Effect-path post-effect chain (single slot). See plan.md
+     * task 4-4. Init is kicked off synchronously but its Promise is
+     * fire-and-forget: until it resolves, `shouldUsePostEffect` remains
+     * false and the scene renders directly to canvas (no blank frame).
+     */
+    #initPostEffectChain(pe: VFXPostEffect): void {
+        if (pe.shader !== undefined) {
+            console.warn(
+                "[VFX-JS] Both `shader` and `effect` specified on post-effect; `effect` takes precedence.",
+            );
+        }
+        const rawEffect = pe.effect!;
+        const effects: readonly Effect[] = Array.isArray(rawEffect)
+            ? [...rawEffect]
+            : [rawEffect];
+        if (effects.length === 0) {
+            console.warn(
+                "[VFX-JS] Empty post-effect `effect` array; identity chain.",
+            );
+        }
+
+        // Capture resolver: always the current #postEffectTarget texture
+        // (regenerated on viewport resize via #setupPostEffectTarget).
+        const captureHandle = makeEffectTexture(
+            () => this.#postEffectTarget!.texture,
+            () => this.#postEffectTarget?.width ?? 0,
+            () => this.#postEffectTarget?.height ?? 0,
+        );
+        const vfxProps: EffectVFXProps = {
+            autoCrop: true,
+            glslVersion: pe.glslVersion ?? "300 es",
+        };
+        const chain = new EffectChain(
+            this.#ctx,
+            this.#quad,
+            this.#pixelRatio,
+            effects,
+            vfxProps,
+            captureHandle,
+            true,
+        );
+
+        if (pe.uniforms) {
+            for (const [k, v] of Object.entries(pe.uniforms)) {
+                if (typeof v === "function") {
+                    this.#postEffectChainGenerators[k] =
+                        v as () => EffectUniformValue;
+                    this.#postEffectChainStaticUniforms[k] =
+                        v() as EffectUniformValue;
+                } else {
+                    this.#postEffectChainStaticUniforms[k] =
+                        v as EffectUniformValue;
+                }
+            }
+        }
+
+        this.#postEffectChain = chain;
+        this.#postEffectChainLastTime = Date.now() / 1000;
+
+        chain
+            .initAll()
+            .then(() => {
+                // Guard against destroy() between init kickoff and
+                // resolution.
+                if (this.#postEffectChain === chain) {
+                    this.#postEffectChainReady = true;
+                }
+            })
+            .catch((err) => {
+                console.error(
+                    "[VFX-JS] Post-effect init failed; post-effect disabled:",
+                    err,
+                );
+                if (this.#postEffectChain === chain) {
+                    this.#postEffectChain.dispose();
+                    this.#postEffectChain = null;
+                    this.#postEffectChainReady = false;
+                }
+            });
+    }
+
+    #runPostEffectChain(viewportGlRect: GLRect, now: number): void {
+        const chain = this.#postEffectChain;
+        if (!chain) {
+            return;
+        }
+
+        const pr = this.#pixelRatio;
+        const resolvedUniforms: Record<string, EffectUniformValue> = {
+            ...this.#postEffectChainStaticUniforms,
+        };
+        for (const [k, gen] of Object.entries(this.#postEffectChainGenerators)) {
+            resolvedUniforms[k] = gen();
+        }
+
+        const viewportWidth = this.#viewport.right - this.#viewport.left;
+        const viewportHeight = this.#viewport.bottom - this.#viewport.top;
+        const prev = this.#postEffectChainLastTime;
+        const deltaTime = now - prev;
+        this.#postEffectChainLastTime = now;
+
+        // For post-effects `element*` mirrors `viewport*`; overflow is 0.
+        const viewportLogical: [number, number] = [viewportWidth, viewportHeight];
+        const viewportPhys: [number, number] = [
+            viewportWidth * pr,
+            viewportHeight * pr,
+        ];
+
+        chain.run({
+            time: now - this.#initTime,
+            deltaTime,
+            mouse: [this.#mouseX * pr, this.#mouseY * pr],
+            mouseViewport: [this.#mouseX * pr, this.#mouseY * pr],
+            intersection: 1,
+            enterTime: 0,
+            leaveTime: 0,
+            resolvedUniforms,
+            canvasPhysW: this.#canvas.width,
+            canvasPhysH: this.#canvas.height,
+            elementLogical: viewportLogical,
+            elementPhys: viewportPhys,
+            elementInnerLogical: viewportLogical,
+            elementInnerPhys: viewportPhys,
+            viewportLogical,
+            viewportPhys,
+            overflow: { top: 0, right: 0, bottom: 0, left: 0 },
+            finalViewport: {
+                x: viewportGlRect.x * pr,
+                y: viewportGlRect.y * pr,
+                w: viewportGlRect.w * pr,
+                h: viewportGlRect.h * pr,
+            },
+            finalTarget: null,
+            isVisible: true,
+        });
     }
 
     #renderPostEffects(viewportGlRect: GLRect, now: number) {
