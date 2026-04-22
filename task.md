@@ -159,7 +159,7 @@ was destination-space (0..1 over dst inner), making
 `texture(src, uvInner)` wrong at stage k≥1 where src is a buffer-sized
 intermediate rather than an inner-only capture. Redesign per the
 updated plan.md "Pad model" section: pad tracked by chain as delta
-accumulation (`padAdd`), `uvInner` becomes the src-sampling UV, new
+accumulation (`pad`), `uvInner` becomes the src-sampling UV, new
 `uvInnerDst` varying handles the "am I inside?" gate, `srcInnerRect`
 auto-uniform drives the sampling math.
 
@@ -172,8 +172,8 @@ type and `dims` fields (documented breaking changes).
 
 - [ ] **8-1**: Update `Effect.outputSize` signature in `packages/vfx-js/src/types.ts`
   - `dims`: remove `overflow`, add `fullscreenPad: { top, right, bottom, left }` (Margin, physical px)
-  - return: add `{ padAdd: MarginOpts; float?: boolean }` variant alongside existing `[w, h]` / `{ size, float }`
-  - JSDoc: describe `padAdd` (delta, monotonic, normalized via `createMargin`), `fullscreenPad` helper, clamp semantics
+  - return: add `{ pad: MarginOpts; float?: boolean }` variant alongside existing `[w, h]` / `{ size, float }`
+  - JSDoc: describe `pad` (delta, monotonic, normalized via `createMargin`), `fullscreenPad` helper, clamp semantics
   - `VFXProps.overflow` JSDoc: note that it's shader-path only and is ignored by the effect path (dev warn when both present)
   - Acceptance: `npx tsc --noEmit` clean. No runtime change yet.
 
@@ -185,9 +185,9 @@ type and `dims` fields (documented breaking changes).
   - `#resolveIntermediates`:
     - Stage 0 src pad = `{0,0,0,0}` (capture has no pad)
     - Call `effect.outputSize(dims)`; normalize return to `{ pad: Margin, bufferSize: [w,h], float: bool }`:
-      - `{ padAdd }` → `dst_pad = src_pad + createMargin(padAdd)` per side; `bufferSize = elementPixel + pad sums`
+      - `{ pad }` → `dst_pad = src_pad + createMargin(pad)` per side; `bufferSize = elementPixel + pad sums`
       - `{ size }` / `[w, h]` → `bufferSize = size`; distribute `buffer - elementPixel` to each side proportionally to `src_pad` ratios (equal split when src pad is zero everywhere)
-      - Omitted → `padAdd = 0`
+      - Omitted → `pad = 0`
     - Monotonic clamp: `dst_pad[side] = max(dst_pad[side], src_pad[side])`; emit dev warn once per (chain, effect) on violation
     - Buffer < elementPixel on any axis → dev warn + clamp to elementPixel
     - Reallocate `Framebuffer` only when `{bufferSize, float, pad}` differs
@@ -230,8 +230,8 @@ type and `dims` fields (documented breaking changes).
   - Sampling: `texture(src, uvInner)` stays the same in the source code (semantics now correct across chain stages)
   - Add `pad?: number | "fullscreen"` option to `BloomOptions`
   - Implement `outputSize(dims)`:
-    - `pad: "fullscreen"` → `{ padAdd: dims.fullscreenPad }`
-    - numeric → `{ padAdd: pad }` (uniform margin)
+    - `pad: "fullscreen"` → `{ pad: dims.fullscreenPad }`
+    - numeric → `{ pad: pad }` (uniform margin)
     - omitted → no outputSize method (effect grows no pad)
   - Acceptance: storybook `bloom` story still renders with pad controlled by the bloom option rather than VFXProps.overflow
 
@@ -254,10 +254,10 @@ type and `dims` fields (documented breaking changes).
 
 - [ ] **8-8**: Update `packages/vfx-js/src/effect-chain.test.ts` and `effect-host.test.ts`
   - effect-chain.test.ts (add):
-    - `{padAdd: 10}` at stage 0 with capture → dst pad = 10; intermediate buffer = elementPixel + 20 per axis
-    - Stacked padAdd: `[a({padAdd: 10}), b({padAdd: 10})]` → stage 1 src pad = 10, stage 1 dst pad = 20
-    - Asymmetric padAdd: `{top: 0, right: 50, bottom: 0, left: 50}` produces asymmetric buffer; srcInnerRect reflects physical layout
-    - Monotonic clamp: effect returning `{padAdd: -5}` → dev warn + clamped to 0 (dst pad unchanged)
+    - `{pad: 10}` at stage 0 with capture → dst pad = 10; intermediate buffer = elementPixel + 20 per axis
+    - Stacked pad: `[a({pad: 10}), b({pad: 10})]` → stage 1 src pad = 10, stage 1 dst pad = 20
+    - Asymmetric pad: `{top: 0, right: 50, bottom: 0, left: 50}` produces asymmetric buffer; srcInnerRect reflects physical layout
+    - Monotonic clamp: effect returning `{pad: -5}` → dev warn + clamped to 0 (dst pad unchanged)
     - `{size: [w, h]}` with w < elementPixel[0] → dev warn + clamped to elementPixel
     - `dims.fullscreenPad` matches `max(0, viewport_edge_distance × pr - src_pad)` per side
     - `dims.fullscreenPad` for post-effect chain is always `{0,0,0,0}`
@@ -265,7 +265,7 @@ type and `dims` fields (documented breaking changes).
     - `uvInnerRect` matches the CURRENT dst buffer's inner sub-rect (NOT the src's)
   - effect-chain.test.ts (remove / update):
     - Any test asserting old "overflow × pr" stage 0 size — update to assert capture-based default (stage 0 src pad = 0)
-    - The "overflow not added cumulatively" test — replace with the new "padAdd accumulates" test
+    - The "overflow not added cumulatively" test — replace with the new "pad accumulates" test
   - effect-host.test.ts (add):
     - `srcInnerRect` uniform is auto-uploaded with the right vec4 value
     - `uvInnerRect` uniform is auto-uploaded with the right vec4 value

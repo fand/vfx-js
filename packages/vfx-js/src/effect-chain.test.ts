@@ -425,9 +425,9 @@ describe("EffectChain: outputSize", () => {
         expect(fbs[0].disposed).toBe(true); // old FB disposed
     });
 
-    it("{ padAdd: N } at stage 0 → dst pad = N, buffer = elementPixel + 2N per axis", () => {
+    it("{ pad: N } at stage 0 → dst pad = N, buffer = elementPixel + 2N per axis", () => {
         const effects: Effect[] = [
-            { render: () => {}, outputSize: () => ({ padAdd: 10 }) },
+            { render: () => {}, outputSize: () => ({ pad: 10 }) },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
@@ -444,10 +444,10 @@ describe("EffectChain: outputSize", () => {
         });
     });
 
-    it("stacked padAdd accumulates: [a({padAdd:10}), b({padAdd:10})] → stage 1 dst pad = 20", () => {
+    it("stacked pad accumulates: [a({pad:10}), b({pad:10})] → stage 1 dst pad = 20", () => {
         const effects: Effect[] = [
-            { render: () => {}, outputSize: () => ({ padAdd: 10 }) },
-            { render: () => {}, outputSize: () => ({ padAdd: 10 }) },
+            { render: () => {}, outputSize: () => ({ pad: 10 }) },
+            { render: () => {}, outputSize: () => ({ pad: 10 }) },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
@@ -460,15 +460,15 @@ describe("EffectChain: outputSize", () => {
         expect(fbs[1].width).toBe(140); // stage 1 intermediate
     });
 
-    it("asymmetric padAdd produces asymmetric buffer; srcInnerRect reflects layout", () => {
+    it("asymmetric pad produces asymmetric buffer; srcInnerRect reflects layout", () => {
         const effects: Effect[] = [
             {
                 render: () => {},
                 outputSize: () => ({
-                    padAdd: { top: 0, right: 50, bottom: 0, left: 50 },
+                    pad: { top: 0, right: 50, bottom: 0, left: 50 },
                 }),
             },
-            { render: () => {}, outputSize: vi.fn().mockReturnValue({ padAdd: 0 }) },
+            { render: () => {}, outputSize: vi.fn().mockReturnValue({ pad: 0 }) },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
@@ -485,13 +485,13 @@ describe("EffectChain: outputSize", () => {
         expect(s1.srcInnerRect[3]).toBeCloseTo(1);
     });
 
-    it("monotonic clamp: negative padAdd component dev-warns and clamps to 0", () => {
+    it("monotonic clamp: negative pad component dev-warns and clamps to 0", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
         const effects: Effect[] = [
             {
                 render: () => {},
                 outputSize: () => ({
-                    padAdd: { top: -5, right: 0, bottom: 0, left: 0 },
+                    pad: { top: -5, right: 0, bottom: 0, left: 0 },
                 }),
             },
             { render: () => {} },
@@ -504,7 +504,7 @@ describe("EffectChain: outputSize", () => {
     });
 
     it("dims.fullscreenPad equals max(0, viewport-edge distance - srcPad) per side", () => {
-        const probe = vi.fn().mockReturnValue({ padAdd: 0 });
+        const probe = vi.fn().mockReturnValue({ pad: 0 });
         const effects: Effect[] = [
             { render: () => {}, outputSize: probe },
             { render: () => {} },
@@ -531,7 +531,7 @@ describe("EffectChain: outputSize", () => {
 
     it("srcInnerRect at stage 0 is (0, 0, 1, 1); uvInnerRect reflects current dst pad", () => {
         const effects: Effect[] = [
-            { render: () => {}, outputSize: () => ({ padAdd: 10 }) },
+            { render: () => {}, outputSize: () => ({ pad: 10 }) },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
@@ -549,10 +549,10 @@ describe("EffectChain: outputSize", () => {
 
     it("stage k+1 sees dims.input == stage k's dst buffer size", () => {
         const stage2Probe = vi.fn().mockImplementation(() => {
-            return { padAdd: 0 };
+            return { pad: 0 };
         });
         const effects: Effect[] = [
-            { render: () => {}, outputSize: () => ({ padAdd: 20 }) },
+            { render: () => {}, outputSize: () => ({ pad: 20 }) },
             { render: () => {}, outputSize: stage2Probe },
             { render: () => {} },
         ];

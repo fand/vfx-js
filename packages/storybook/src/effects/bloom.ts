@@ -181,9 +181,9 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
     if (pad !== undefined) {
         effect.outputSize = (dims) => {
             if (pad === "fullscreen") {
-                return { padAdd: dims.fullscreenPad };
+                return { pad: dims.fullscreenPad };
             }
-            return { padAdd: pad };
+            return { pad };
         };
     }
 

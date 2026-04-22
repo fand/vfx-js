@@ -15,20 +15,20 @@ This change adds an Effect abstraction that satisfies the following:
 
 ### Pad model (tl;dr)
 
-The Effect path manages pad (the margin around the element's inner rect) entirely via effects. There is **no element-level pad option** (`VFXProps.overflow` is shader-path only). Each effect declares how much it wants to widen the pad through its `outputSize({padAdd})` return. The chain tracks accumulated pad internally and never exposes it to effects.
+The Effect path manages pad (the margin around the element's inner rect) entirely via effects. There is **no element-level pad option** (`VFXProps.overflow` is shader-path only). Each effect declares how much it wants to widen the pad through its `outputSize({pad})` return. The chain tracks accumulated pad internally and never exposes it to effects.
 
 ```
 stage 0 src = capture       (inner-only texture, pad = 0)
-stage 0 dst pad = 0 + padAdd_0
+stage 0 dst pad = 0 + pad_0
 stage 1 src pad = stage 0 dst pad
-stage 1 dst pad = src_pad + padAdd_1
+stage 1 dst pad = src_pad + pad_1
 ...
 dst pad >= src pad per side   (monotonic non-decreasing)
 ```
 
 Shader authors sample src content with the auto-injected `uvInner` varying, which is an **src-sampling UV pointing into src's inner region** (valid whether src is capture or a prior intermediate). For "am I inside the element?" gating, use `uvInnerDst` (0..1 over the current dst buffer's inner region; outside [0,1] means overflow pad). Both computed in the default vertex shader from two auto-uniforms `uvInnerRect` (dst) and `srcInnerRect` (src).
 
-To reach viewport edges, an effect returns `{padAdd: dims.fullscreenPad}`. The chain pre-computes `fullscreenPad` as the per-side delta needed to hit the viewport from the current src pad.
+To reach viewport edges, an effect returns `{pad: dims.fullscreenPad}`. The chain pre-computes `fullscreenPad` as the per-side delta needed to hit the viewport from the current src pad.
 
 ### Public types (add to packages/vfx-js/src/types.ts)
 
@@ -317,10 +317,10 @@ export interface Effect {
     // ignored).
     //
     // Return forms (in priority order):
-    //   `{ padAdd: MarginOpts; float?: boolean }`
+    //   `{ pad: MarginOpts; float?: boolean }`
     //     Grow each side's pad by the given amount (physical px).
-    //     `padAdd: 10` is shorthand for `{top:10, right:10, bottom:10, left:10}`.
-    //     The dst buffer size becomes `elementPixel + (src pad + padAdd)`
+    //     `pad: 10` is shorthand for `{top:10, right:10, bottom:10, left:10}`.
+    //     The dst buffer size becomes `elementPixel + (src pad + pad)`
     //     on each axis. Use `dims.fullscreenPad` to reach viewport edges.
     //   `{ size: [w, h]; float?: boolean }` / `readonly [w, h]`
     //     Explicit absolute buffer size (physical px). The inner region's
@@ -339,9 +339,9 @@ export interface Effect {
     //
     // Pad tracking is entirely internal to the chain. Effects never
     // observe the chain's accumulated pad directly — they only declare
-    // deltas via `padAdd`, or absolute buffer sizes via `size`/`[w,h]`.
+    // deltas via `pad`, or absolute buffer sizes via `size`/`[w,h]`.
     // For "reach viewport edges" the chain provides `dims.fullscreenPad`
-    // which is the exact `padAdd` needed from src's current pad to hit
+    // which is the exact `pad` needed from src's current pad to hit
     // the viewport boundaries (>= 0 per side, 0 if already at or beyond).
     outputSize?(dims: {
         readonly input: readonly [number, number];       // src buffer size
@@ -363,7 +363,7 @@ export interface Effect {
         | readonly [number, number]
         | { readonly size: readonly [number, number]; readonly float?: boolean }
         | {
-              readonly padAdd:
+              readonly pad:
                   | number
                   | readonly [number, number, number, number]
                   | {
@@ -438,14 +438,14 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             pingB = ctx.createRenderTarget();
         },
         // Grow the dst buffer so the glow has room to spread beyond the
-        // element. `padAdd` is the delta added on top of src's pad —
+        // element. `pad` is the delta added on top of src's pad —
         // chain accumulates without the effect author knowing the src
         // pad explicitly.
         outputSize(dims) {
             if (pad === "fullscreen") {
-                return { padAdd: dims.fullscreenPad };
+                return { pad: dims.fullscreenPad };
             }
-            return { padAdd: pad };
+            return { pad: pad };
         },
         render(ctx) {
             if (!bright || !pingA || !pingB) return;
@@ -477,16 +477,16 @@ Composition:
 // Single effect
 vfx.add(el, { effect: grayscale() });
 
-// Pipeline — array order = pass order. Each effect's padAdd accumulates.
+// Pipeline — array order = pass order. Each effect's pad accumulates.
 vfx.add(el, { effect: [
-    posterize({ levels: 4 }),             // padAdd 0 (default)
-    bloom({ pad: 80 }),                   // padAdd 80 → final buffer = element + 80px pad
+    posterize({ levels: 4 }),             // pad 0 (default)
+    bloom({ pad: 80 }),                   // pad 80 → final buffer = element + 80px pad
 ]});
 
 // Multiple pad-growing effects compose
 vfx.add(el, { effect: [
-    dilate({ pad: 10 }),                  // padAdd 10 → stage 1 src pad = 10
-    shadow({ pad: 10 }),                  // padAdd 10 → stage 2 src pad = 20
+    dilate({ pad: 10 }),                  // pad 10 → stage 1 src pad = 10
+    shadow({ pad: 10 }),                  // pad 10 → stage 2 src pad = 20
 ]});
 
 // Fullscreen pad (effect's own parameter, computed from dims.fullscreenPad)
@@ -532,7 +532,7 @@ ctx.draw({
 - **Each intermediate buffer is `elementPixel + pad_total`** on each axis, where `pad_total.x = pad.left + pad.right` and `pad_total.y = pad.top + pad.bottom`.
 - **Inner is positioned** at `(pad.left, pad.bottom)` within the buffer (GL bottom-left origin).
 - **Pad monotonically non-decreasing**: `dst_pad[side] >= src_pad[side]` per side. Dev warn + clamp if an `outputSize` return would shrink pad on any side.
-- **`padAdd` is always a delta** applied on top of src's pad; chain does the addition internally. Effects never observe the absolute accumulated pad.
+- **`pad` is always a delta** applied on top of src's pad; chain does the addition internally. Effects never observe the absolute accumulated pad.
 
 **Chain initial state** (stage 0 src):
 - Element effects: src = element capture texture. Capture is inner-only (no pad), so stage 0 src pad = 0.
@@ -542,9 +542,9 @@ ctx.draw({
 - If M = 0, no intermediates are needed.
 - If M ≥ 1, allocate M - 1 intermediates.
 - For each rendering effect, resolve the output pad + buffer size from its `outputSize(dims)` return:
-  - `{ padAdd }`: `dst_pad = src_pad + padAdd` per side, then `buffer = elementPixel + pad_total`. `padAdd` normalized via `createMargin(MarginOpts)`.
+  - `{ pad }`: `dst_pad = src_pad + pad` per side, then `buffer = elementPixel + pad_total`. `pad` normalized via `createMargin(MarginOpts)`.
   - `{ size }` / `[w, h]`: buffer size explicit. Imply pad as `(buffer - elementPixel)` total on each axis, distributed to each side proportionally to `src_pad` ratios (falls back to equal split when src has no pad).
-  - Omitted: `padAdd = 0` → `buffer = src buffer size`.
+  - Omitted: `pad = 0` → `buffer = src buffer size`.
   - `float: true` requests an RGBA16F/32F attachment (matching `Framebuffer`'s existing negotiation via `OES_texture_float_linear`).
 - Pooled: the RT handle is kept alive across frames; only reallocated when the resolved `{ buffer_w, buffer_h, pad, float }` differs from the previous frame's.
 - Every frame, before a rendering effect writes to its intermediate, the chain `gl.clear`s it (`COLOR_BUFFER_BIT`, clear color `0, 0, 0, 0`). Matches the shader-path per-pass clear in `vfx-player.ts:1062-1072`.
@@ -554,13 +554,13 @@ ctx.draw({
 - For stage k≥1 src (intermediate k-1): `(pad.left / buffer_w, pad.bottom / buffer_h, elementPixel_w / buffer_w, elementPixel_h / buffer_h)` — physical layout of the inner sub-rect within the intermediate.
 
 **`fullscreenPad` computation** (per stage, passed as `dims.fullscreenPad` to `outputSize`):
-- For element effects: `fullscreenPad[side] = max(0, viewport_edge_distance[side] × pixelRatio - src_pad[side])` per side, where `viewport_edge_distance` is the physical-px distance from the element's edge to the viewport edge on that side. An effect returning `{ padAdd: dims.fullscreenPad }` ends up with `dst_pad = viewport_edge_distance × pixelRatio` (clamped non-negative).
+- For element effects: `fullscreenPad[side] = max(0, viewport_edge_distance[side] × pixelRatio - src_pad[side])` per side, where `viewport_edge_distance` is the physical-px distance from the element's edge to the viewport edge on that side. An effect returning `{ pad: dims.fullscreenPad }` ends up with `dst_pad = viewport_edge_distance × pixelRatio` (clamped non-negative).
 - For post effects: always `{ top: 0, right: 0, bottom: 0, left: 0 }` (src already spans the viewport).
 
 **Per-frame execution order** (only runs when the element is visible, i.e. `isVisible === true`. Off-viewport / post-release elements skip the chain entirely — both update and render are suppressed, matching the existing shader path):
 
 1. **uniform resolve**: evaluate function-valued entries in `VFXProps.uniforms` and write the results into each host's `ctx.uniforms`
-2. **outputSize resolve**: walk `renderingIndices` in order, call each effect's `outputSize?.(dims)`, apply padAdd to src pad to get dst pad, compute buffer size, and reallocate the corresponding intermediate RT only when buffer size / pad / float differ from the previous frame. Update each host's `srcInnerRect` and `uvInnerRect` uniforms for this frame.
+2. **outputSize resolve**: walk `renderingIndices` in order, call each effect's `outputSize?.(dims)`, apply pad to src pad to get dst pad, compute buffer size, and reallocate the corresponding intermediate RT only when buffer size / pad / float differ from the previous frame. Update each host's `srcInnerRect` and `uvInnerRect` uniforms for this frame.
 3. **update phase**: call `update?.(ctx)` on every effect in array order (ctx.src / ctx.output may carry over from the previous frame — update is state-update only). `ctx.draw()` is a no-op when called here (silently ignored, dev warning once per host)
 4. **render phase**: walk `renderingIndices` in order. For the k-th rendering effect (original-array index i):
    - `ctx.src` = (k = 0) ? element capture's `EffectTexture` : the `EffectTexture` resolver pointing at `intermediates[k-1]`'s current read texture
@@ -704,12 +704,12 @@ ctx.draw({
      - with N=3 and three rendering effects, 2 intermediates are allocated and src/output are swapped per pass
      - when an intermediate effect has no `render`, that slot is skipped and the previous effect's output becomes the src of the next rendering effect (one fewer intermediate)
      - when every effect lacks render, the M=0 special case copies capture → finalTarget once
-     - **`outputSize({padAdd: N})` grows each side's pad by N**: buffer = elementPixel + (src_pad + padAdd) sums. Stage 0 src pad = 0 so dst pad = padAdd; stage k inherits accumulated pad
-     - **Stacked `padAdd`**: `[effectA({padAdd: 10}), effectB({padAdd: 10})]` → final buffer's pad = 20 per side
-     - **`outputSize({padAdd: …})` with asymmetric per-side values** (e.g. `{top: 0, right: 50, bottom: 0, left: 50}`) produces an asymmetric buffer and `srcInnerRect` matches the physical layout
+     - **`outputSize({pad: N})` grows each side's pad by N**: buffer = elementPixel + (src_pad + pad) sums. Stage 0 src pad = 0 so dst pad = pad; stage k inherits accumulated pad
+     - **Stacked `pad`**: `[effectA({pad: 10}), effectB({pad: 10})]` → final buffer's pad = 20 per side
+     - **`outputSize({pad: …})` with asymmetric per-side values** (e.g. `{top: 0, right: 50, bottom: 0, left: 50}`) produces an asymmetric buffer and `srcInnerRect` matches the physical layout
      - `outputSize({size: [w, h]})` distributes extra pad proportionally to src's pad ratios; buffer < elementPixel on any axis → dev warn + clamp
-     - `outputSize` returning `{padAdd: M}` with M < 0 on any side → dev warn + clamp to 0 (pad monotonic non-decreasing)
-     - `dims.fullscreenPad` equals the padAdd needed to extend src to viewport edges per side (non-negative); effect returning `{padAdd: dims.fullscreenPad}` reaches viewport
+     - `outputSize` returning `{pad: M}` with M < 0 on any side → dev warn + clamp to 0 (pad monotonic non-decreasing)
+     - `dims.fullscreenPad` equals the pad needed to extend src to viewport edges per side (non-negative); effect returning `{pad: dims.fullscreenPad}` reaches viewport
      - `dims.fullscreenPad` for post effects is always `{top:0, right:0, bottom:0, left:0}`
      - LAST rendering effect's `outputSize` return value is ignored (final target is fixed)
      - **`srcInnerRect` uniform**: at stage 0 `(0, 0, 1, 1)` for capture; at stage k≥1 matches `pad.left/w, pad.bottom/h, elementPixel_w/w, elementPixel_h/h` of the previous intermediate
@@ -720,13 +720,13 @@ ctx.draw({
      - `update()` that calls `ctx.draw()` produces no GL side effect (draw call is silently ignored)
      - when `init` returns a Promise, it is awaited sequentially (a later effect's init never runs before an earlier one finishes)
      - when `init` throws, prior effects in the chain have their `dispose` called in reverse order — the failing effect's own `dispose` is NOT called — and the element is NOT inserted into `#elements`
-     - `outputSize` returning `{ padAdd, float: true }` / `{ size, float: true }` allocates an RGBA16F/RGBA32F intermediate; toggling `float` across frames reallocates
+     - `outputSize` returning `{ pad, float: true }` / `{ size, float: true }` allocates an RGBA16F/RGBA32F intermediate; toggling `float` across frames reallocates
      - when a middle `render` throws, a `console.warn` is emitted once and the failed effect's slot is replaced by a passthrough copy (input → output) so the next effect reads a valid texture; subsequent frames continue to call the effect
      - when the last `render` throws, a passthrough copy is emitted into the final target so the element still renders the previous effect's output (does NOT disappear)
      - when the element is off-viewport (`isVisible === false`), neither `update` nor `render` is called
      - `dispose` is called in reverse array order
    - run: `npm --workspace=@vfx-js/core run test`
-3. **Integration demo**: add `packages/storybook/src/Effect.stories.ts` and implement a bloom effect (deterministic, VRT-friendly) and a `[posterize, bloom]` chain story. Write effect modules assuming `@vfx-js/core` is a devDep and only `import type` is used; verify in a browser via `npm --workspace=storybook run dev`. The chain story exercises M=2 intermediate allocation, `padAdd` accumulation, and `srcInnerRect` propagation between stages.
+3. **Integration demo**: add `packages/storybook/src/Effect.stories.ts` and implement a bloom effect (deterministic, VRT-friendly) and a `[posterize, bloom]` chain story. Write effect modules assuming `@vfx-js/core` is a devDep and only `import type` is used; verify in a browser via `npm --workspace=storybook run dev`. The chain story exercises M=2 intermediate allocation, `pad` accumulation, and `srcInnerRect` propagation between stages.
 4. **zero-runtime-dep check**: within the storybook story, only `import type { Effect } ...`, and grep the build output to verify no runtime imports of `@vfx-js/core` are included
 5. **Existing tests**: `npm test` and `npm run lint` both pass
 

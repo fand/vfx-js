@@ -105,11 +105,11 @@ type IntermediateEntry = {
  * - Each rendering stage tracks `(srcPad, srcBufferSize, dstPad, dstBufferSize)`
  *   in physical pixels per side. Stage 0's src pad is always `{0,0,0,0}`
  *   (capture is inner-only).
- * - Each effect's `outputSize(dims)` returns either `padAdd` (delta added
- *   to src pad), explicit `size` (absolute buffer size with pad derived),
+ * - Each effect's `outputSize(dims)` returns either `pad` (delta added to
+ *   src pad), explicit `size` (absolute buffer size with pad derived),
  *   or a bare `[w, h]` tuple. Returns are clamped non-monotonic (dst pad
  *   must be >= src pad per side).
- * - `dims.fullscreenPad` is the per-side padAdd needed to reach the
+ * - `dims.fullscreenPad` is the per-side `pad` delta needed to reach the
  *   viewport edges from the current src pad (non-negative, 0 if already
  *   past the edge). Zero for post-effect chains.
  * - The last rendering effect's `outputSize` return is ignored — its dst
@@ -504,7 +504,7 @@ export class EffectChain {
         let dstBufferSize: [number, number];
         let float = false;
 
-        if (Array.isArray(ret) || !("padAdd" in (ret as object))) {
+        if (Array.isArray(ret) || !("pad" in (ret as object))) {
             // Explicit-size variant: `[w, h]` or `{ size, float? }`.
             const rawSize: readonly [number, number] = Array.isArray(ret)
                 ? [ret[0], ret[1]]
@@ -530,10 +530,10 @@ export class EffectChain {
             ];
             dstPad = distributePad(dstBufferSize, elementPixel, srcPad);
         } else {
-            // padAdd variant.
-            const obj = ret as { padAdd: MarginOpts; float?: boolean };
+            // pad variant (delta added to src pad).
+            const obj = ret as { pad: MarginOpts; float?: boolean };
             float = obj.float ?? false;
-            const delta = createMargin(obj.padAdd);
+            const delta = createMargin(obj.pad);
             dstPad = createMargin({
                 top: srcPad.top + delta.top,
                 right: srcPad.right + delta.right,

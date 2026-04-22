@@ -298,7 +298,7 @@ export type VFXProps = {
      * REACT-VFX will add paddings only to the given direction (only to the `top` in this example).
      *
      * SHADER PATH ONLY. Ignored by the effect path — effects control pad via
-     * each effect's own `outputSize` return (padAdd / fullscreenPad). Setting
+     * each effect's own `outputSize` return (pad / fullscreenPad). Setting
      * both `overflow` and `effect` emits a dev warning.
      */
     overflow?: true | MarginOpts;
@@ -878,10 +878,10 @@ export interface Effect {
      *
      * Return forms:
      *
-     *   `{ padAdd: MarginOpts; float?: boolean }`
+     *   `{ pad: MarginOpts; float?: boolean }`
      *     Grow each side's pad by the given amount (physical px).
-     *     `padAdd: 10` is shorthand for all sides. The dst buffer size
-     *     becomes `elementPixel + (src pad + padAdd)` on each axis. Use
+     *     `pad: 10` is shorthand for all sides. The dst buffer size
+     *     becomes `elementPixel + (src pad + pad)` on each axis. Use
      *     `dims.fullscreenPad` to reach viewport edges.
      *
      *   `{ size: [w, h]; float?: boolean }` / `readonly [w, h]`
@@ -901,9 +901,9 @@ export interface Effect {
      * `viewport` / `viewportPixel`; `fullscreenPad` is always zero.
      *
      * Pad tracking is entirely internal to the chain. Effects never
-     * observe the accumulated pad — they declare deltas via `padAdd`, or
+     * observe the accumulated pad — they declare deltas via `pad`, or
      * absolute buffer sizes. For "reach viewport edges" the chain provides
-     * `dims.fullscreenPad` — the exact `padAdd` needed from src's current
+     * `dims.fullscreenPad` — the exact `pad` needed from src's current
      * pad to hit the viewport (>= 0 per side).
      */
     outputSize?(dims: {
@@ -931,7 +931,7 @@ export interface Effect {
               readonly float?: boolean;
           }
         | {
-              readonly padAdd: MarginOpts;
+              readonly pad: MarginOpts;
               readonly float?: boolean;
           };
 }

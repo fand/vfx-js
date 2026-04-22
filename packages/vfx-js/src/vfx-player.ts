@@ -600,7 +600,7 @@ export class VFXPlayer {
 
         if (opts.overflow !== undefined) {
             console.warn(
-                "[VFX-JS] `overflow` is shader-path only and is ignored by the effect path. Use each effect's own `outputSize` / `padAdd` / `dims.fullscreenPad` to control pad.",
+                "[VFX-JS] `overflow` is shader-path only and is ignored by the effect path. Use each effect's own `outputSize` / `pad` / `dims.fullscreenPad` to control pad.",
             );
         }
 
