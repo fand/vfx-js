@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 
+import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { createBloomEffect } from "./effects/bloom";
+import { createPosterizeEffect } from "./effects/posterize";
 import "./preset.css";
 import { initVFX } from "./utils";
 
@@ -43,20 +45,23 @@ bloom.play = async ({ canvasElement }) => {
 };
 
 /**
- * Array form confirms the chain accepts `readonly Effect[]` — a
- * length-1 array behaves identically to the single form.
+ * Chain: posterize → bloom. Exercises EffectChain with M=2 (one
+ * intermediate RT allocated between the two rendering effects) and
+ * verifies that src/output swap correctly. Still deterministic for
+ * VRT.
  */
-export const bloomAsArray: StoryObj<undefined> = {
+export const posterizeAndBloom: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
-        img.src = Logo;
+        img.src = Jellyfish;
         img.style.display = "block";
         img.style.margin = "40px auto";
+        img.style.width = "480px";
         return img;
     },
     args: undefined,
 };
-bloomAsArray.play = async ({ canvasElement }) => {
+posterizeAndBloom.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
     await new Promise((o) => {
         img.onload = o;
@@ -65,13 +70,15 @@ bloomAsArray.play = async ({ canvasElement }) => {
     const vfx = initVFX();
     await vfx.add(img, {
         effect: [
+            createPosterizeEffect({ levels: 4 }),
             createBloomEffect({
-                threshold: 0.6,
-                intensity: 1.3,
-                radius: 2,
-                iterations: 4,
+                threshold: 0.5,
+                softness: 0.05,
+                intensity: 2.5,
+                radius: 3,
+                iterations: 6,
             }),
         ],
-        overflow: 80,
+        overflow: 120,
     });
 };
