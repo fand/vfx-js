@@ -13,6 +13,23 @@ This change adds an Effect abstraction that satisfies the following:
 
 ## Design
 
+### Pad model (tl;dr)
+
+The Effect path manages pad (the margin around the element's inner rect) entirely via effects. There is **no element-level pad option** (`VFXProps.overflow` is shader-path only). Each effect declares how much it wants to widen the pad through its `outputSize({padAdd})` return. The chain tracks accumulated pad internally and never exposes it to effects.
+
+```
+stage 0 src = capture       (inner-only texture, pad = 0)
+stage 0 dst pad = 0 + padAdd_0
+stage 1 src pad = stage 0 dst pad
+stage 1 dst pad = src_pad + padAdd_1
+...
+dst pad >= src pad per side   (monotonic non-decreasing)
+```
+
+Shader authors sample src content with the auto-injected `uvInner` varying, which is an **src-sampling UV pointing into src's inner region** (valid whether src is capture or a prior intermediate). For "am I inside the element?" gating, use `uvInnerDst` (0..1 over the current dst buffer's inner region; outside [0,1] means overflow pad). Both computed in the default vertex shader from two auto-uniforms `uvInnerRect` (dst) and `srcInnerRect` (src).
+
+To reach viewport edges, an effect returns `{padAdd: dims.fullscreenPad}`. The chain pre-computes `fullscreenPad` as the per-side delta needed to hit the viewport from the current src pad.
+
 ### Public types (add to packages/vfx-js/src/types.ts)
 
 **The public API exposes only branded types and a raw WebGL2 escape hatch (`ctx.gl`).** No rendering-library types leak through, which keeps effect packages framework-agnostic and future-proof for a WebGPU backend.
@@ -140,7 +157,7 @@ export type EffectGeometry = {
 };
 
 // Opaque handle for the effect's "target region" quad:
-//   element effect → element rect + overflow padding
+//   element effect → current dst buffer (elementPixel + per-stage pad)
 //   post effect    → viewport + scrollPadding
 // Users cannot construct or extend it; treat it as an injected default.
 export type EffectQuad = { readonly __brand: "EffectQuad" };
@@ -157,9 +174,10 @@ export type EffectDrawOpts = {
 };
 
 // A read-only snapshot of the VFXProps keys that are still meaningful
-// when `effect` is used. The keys that affect the orchestrator
-// (overflow/type/intersection/release/overlay/zIndex/wrap) are applied
-// outside the Effect and NOT surfaced here.
+// when `effect` is used. Keys that affect the orchestrator
+// (type/intersection/release/overlay/zIndex/wrap) are applied outside
+// the Effect and NOT surfaced here. `VFXProps.overflow` is shader-path
+// only and is ignored by the effect path (pad is effect-declared).
 export type EffectVFXProps = {
     readonly autoCrop: boolean;     // default: true
     readonly glslVersion: "100" | "300 es"; // default: "300 es"
@@ -194,20 +212,38 @@ export type EffectContext = {
     // Snapshot of VFXProps fields that survive the effect boundary.
     readonly vfxProps: EffectVFXProps;
     // Canonical fullscreen NDC (-1..1) quad. Draws through it use the
-    // target's viewport rect (element rect + overflow for element effects,
-    // viewport + scrollPadding for post effects), so vertex shaders operate
-    // in NDC space that maps 1:1 to the target region. For pixel-space or
-    // custom-topology draws, supply an `EffectGeometry` instead.
+    // dst buffer rect (stage k's intermediate or final target), with the
+    // chain setting `gl.viewport` to cover that buffer. For pixel-space
+    // or custom-topology draws, supply an `EffectGeometry` instead.
     //
-    // Convenience varying — available in the fragment shader when draws
-    // go through `ctx.quad`:
-    //   `in vec2 uvInner;` — 0..1 covers the INNER region (element rect
-    //   proper for element effects; viewport proper for post effects).
-    //   Negative components or values >1 mean the fragment is in the
-    //   overflow / scrollPadding pad. Auto-injected by the default vertex
-    //   shader; only active when the user does NOT supply a custom `vert`
-    //   (custom vertex shaders must compute their own mapping). For post
-    //   effects overflow is zero, so `uvInner` equals the standard 0..1 UV.
+    // Convenience varyings auto-injected by the default vertex shader
+    // (only active when the user does NOT supply a custom `vert`; custom
+    // vertex shaders must compute their own mapping):
+    //
+    //   `in vec2 uv;`
+    //     0..1 over the full dst buffer (inner + pad).
+    //
+    //   `in vec2 uvInner;`
+    //     Sampling UV pointing into `ctx.src`'s INNER region (the
+    //     element-content area within src). Always usable as
+    //     `texture(src, uvInner)` to fetch element content regardless
+    //     of whether src is the capture (inner-only texture) or a
+    //     prior stage's intermediate (buffer with pad). Computed as
+    //     `srcInnerRect.xy + uvInnerDst * srcInnerRect.zw`.
+    //
+    //   `in vec2 uvInnerDst;`
+    //     0..1 over the CURRENT dst buffer's inner region (the element
+    //     area in the buffer we are rendering into). Values outside
+    //     [0, 1] mean the fragment is in the pad (overflow / bloom
+    //     spread zone). Use for "am I inside the element?" gating.
+    //
+    // Auto-uploaded uniforms (for custom vertex shaders or advanced use):
+    //   `uniform vec4 uvInnerRect;` — dst inner sub-rect in buffer UV
+    //                                 (xy = origin, zw = size).
+    //   `uniform vec4 srcInnerRect;` — src inner sub-rect in src texture
+    //                                   UV. `(0,0,1,1)` for capture;
+    //                                   `(pad/w, pad/h, inner/w, inner/h)`
+    //                                   for intermediate inputs.
     readonly quad: EffectQuad;
     createRenderTarget(opts?: EffectRenderTargetOpts): EffectRenderTarget;
     // Wrap an externally-produced texture so it can be passed in uniforms.
@@ -266,52 +302,78 @@ export interface Effect {
     // (telemetry, external state coordination, debug hooks).
     render?(ctx: EffectContext): void;
     dispose?(): void;
-    // Declares the output dimensions (and optional float flag) this effect
-    // writes into ctx.output. Called every frame. The chain compares the
-    // return value with the current intermediate and only reallocates the
-    // RT when `size` OR `float` differs (cheap path is a no-op equality
-    // check).
+    // Declares how this effect extends its output buffer relative to
+    // src. Called every frame. The chain compares the resolved output
+    // dimensions with the current intermediate and only reallocates
+    // the RT when size or float differs (cheap equality check).
     //
-    // If omitted, the default is the input size, non-float (i.e. ctx.src's
-    // size at that slot, RGBA8). Only meaningful when render is present AND
-    // the effect is not the last rendering effect in the chain (the last
-    // effect's output is the fixed final target, so its outputSize return
-    // value is ignored).
+    // If omitted, the effect writes to a buffer of the same size as
+    // its src (no pad added). This is the right choice for simple
+    // filters that don't grow content (grayscale, invert, posterize).
     //
-    // `input` reflects the previous stage's output (or, for the first
-    // rendering effect, element rect + overflow × pixelRatio). Overflow
-    // is applied once at stage 1 and carried forward — it is NOT added
-    // at every stage. Effects that want cumulative extra padding must
-    // compute it explicitly from `dims.overflow` in their return value.
+    // Only meaningful when `render` is present AND the effect is not
+    // the last rendering effect in the chain (the last effect's output
+    // is the fixed final target, so its outputSize return value is
+    // ignored).
     //
-    // Return forms:
-    //   `[w, h]`                       → non-float RGBA8 of that size
-    //   `{ size: [w, h], float?: bool }` → float true requests RGBA16F/32F
+    // Return forms (in priority order):
+    //   `{ padAdd: MarginOpts; float?: boolean }`
+    //     Grow each side's pad by the given amount (physical px).
+    //     `padAdd: 10` is shorthand for `{top:10, right:10, bottom:10, left:10}`.
+    //     The dst buffer size becomes `elementPixel + (src pad + padAdd)`
+    //     on each axis. Use `dims.fullscreenPad` to reach viewport edges.
+    //   `{ size: [w, h]; float?: boolean }` / `readonly [w, h]`
+    //     Explicit absolute buffer size (physical px). The inner region's
+    //     pixel size stays at `elementPixel`; extra pixels are distributed
+    //     to each side of the pad proportionally to src's pad ratios
+    //     (falls back to equal split when src has no pad). Buffer smaller
+    //     than `elementPixel` on any axis triggers a dev warn + clamp.
     //
     // Units:
-    //   input / elementPixel / viewportPixel / overflow / return value → physical pixels
-    //   element / viewport                                             → logical pixels (CSS px)
+    //   input / elementPixel / viewportPixel / fullscreenPad / return value → physical px
+    //   element / viewport                                                   → logical px
     //   pixelRatio → element × pixelRatio === elementPixel
     //
     // Post-effect context: `element` / `elementPixel` mirror
-    // `viewport` / `viewportPixel`. `overflow` is always zero.
+    // `viewport` / `viewportPixel`.
+    //
+    // Pad tracking is entirely internal to the chain. Effects never
+    // observe the chain's accumulated pad directly — they only declare
+    // deltas via `padAdd`, or absolute buffer sizes via `size`/`[w,h]`.
+    // For "reach viewport edges" the chain provides `dims.fullscreenPad`
+    // which is the exact `padAdd` needed from src's current pad to hit
+    // the viewport boundaries (>= 0 per side, 0 if already at or beyond).
     outputSize?(dims: {
-        readonly input: readonly [number, number];
-        readonly element: readonly [number, number];
-        readonly elementPixel: readonly [number, number];
+        readonly input: readonly [number, number];       // src buffer size
+        readonly element: readonly [number, number];      // inner, logical px
+        readonly elementPixel: readonly [number, number]; // inner, physical px
         readonly viewport: readonly [number, number];
         readonly viewportPixel: readonly [number, number];
-        // Margin padding around the element (physical px). Zero for post-effects.
-        readonly overflow: {
+        readonly pixelRatio: number;
+        // Pad (physical px) needed to extend from src to viewport edges.
+        // Non-negative per side; 0 means src already covers that edge.
+        // For post-effects, always 0 (src already spans the viewport).
+        readonly fullscreenPad: {
             readonly top: number;
             readonly right: number;
             readonly bottom: number;
             readonly left: number;
         };
-        readonly pixelRatio: number;
     }):
         | readonly [number, number]
-        | { readonly size: readonly [number, number]; readonly float?: boolean };
+        | { readonly size: readonly [number, number]; readonly float?: boolean }
+        | {
+              readonly padAdd:
+                  | number
+                  | readonly [number, number, number, number]
+                  | {
+                        readonly top?: number;
+                        readonly right?: number;
+                        readonly bottom?: number;
+                        readonly left?: number;
+                    };
+              readonly float?: boolean;
+          };
 }
 ```
 
@@ -327,7 +389,8 @@ Add `effect?: Effect | readonly Effect[];` to `VFXPostEffect` as well (same shap
 | `uniforms` | piped into `ctx.uniforms` (function-valued entries evaluated per frame, before `update`) |
 | `backbuffer` | ignored for effects (NOT piped into `ctx.vfxProps`); use `ctx.createRenderTarget({ persistent: true })` for equivalent double-buffered behavior |
 | `autoCrop` / `glslVersion` | piped into `ctx.vfxProps` as a read-only snapshot |
-| `overflow` / `intersection` / `release` / `overlay` / `zIndex` / `wrap` | handled by the orchestrator as today (unchanged) |
+| `overflow` | **shader-path only**. Ignored by the effect path — effect authors control pad via each effect's own `outputSize` / constructor parameter. Emits a dev warning if set alongside `effect`. |
+| `intersection` / `release` / `overlay` / `zIndex` / `wrap` | handled by the orchestrator as today (unchanged) |
 
 ### Public exports (packages/vfx-js/src/index.ts)
 
@@ -347,33 +410,60 @@ Existing `VFXOpts / VFXProps / VFXPostEffect / VFXPass` remain unchanged.
 ### User-side usage example
 
 ```ts
-// effect-my-effect/package.json
+// effect-my-bloom/package.json
 //   "devDependencies": { "@vfx-js/core": "^0.12.0" }
-// effect-my-effect/src/index.ts
+// effect-my-bloom/src/index.ts
 import type { Effect, EffectRenderTarget } from "@vfx-js/core"; // erased at compile
 
-const FRAG = `...`;
+const FRAG_THRESHOLD = `...`;
+const FRAG_BLUR = `...`;
+const FRAG_COMPOSITE = `...`;
 
-export function createTrailEffect(): Effect {
-    let feedback: EffectRenderTarget | null = null;
+export type BloomOptions = {
+    /** pad around the element in physical px, or "fullscreen". Default 0. */
+    pad?: number | "fullscreen";
+    iterations?: number;
+};
+
+export function createBloomEffect(opts: BloomOptions = {}): Effect {
+    const { pad = 0, iterations = 6 } = opts;
+    let bright: EffectRenderTarget | null = null;
+    let pingA: EffectRenderTarget | null = null;
+    let pingB: EffectRenderTarget | null = null;
+
     return {
         init(ctx) {
-            feedback = ctx.createRenderTarget({ persistent: true });
+            bright = ctx.createRenderTarget();
+            pingA = ctx.createRenderTarget();
+            pingB = ctx.createRenderTarget();
+        },
+        // Grow the dst buffer so the glow has room to spread beyond the
+        // element. `padAdd` is the delta added on top of src's pad —
+        // chain accumulates without the effect author knowing the src
+        // pad explicitly.
+        outputSize(dims) {
+            if (pad === "fullscreen") {
+                return { padAdd: dims.fullscreenPad };
+            }
+            return { padAdd: pad };
         },
         render(ctx) {
-            // geometry omitted → ctx.quad (element rect + overflow or
-            // viewport + scrollPadding depending on effect type).
-            // persistent=true: `feedback` as a uniform reads the previous
-            // frame; after this draw the handle swaps internally so the
-            // next read shows what we just wrote.
+            if (!bright || !pingA || !pingB) return;
+            // 1. Extract bright pixels. `texture(src, uvInner)` works
+            //    whether ctx.src is capture (inner-only) or a prior
+            //    stage's intermediate (buffer with pad) — uvInner is the
+            //    src-sampling UV into src's inner region.
             ctx.draw({
-                frag: FRAG,
-                uniforms: { src: ctx.src, prev: feedback!, time: ctx.time },
-                target: feedback,
+                frag: FRAG_THRESHOLD,
+                uniforms: { src: ctx.src, threshold: 0.6 },
+                target: bright,
             });
+            // 2. Separable blur ping-pong (omitted).
+            //    ...
+            // 3. Composite src + bloom into final target.
             ctx.draw({
-                frag: `/* copy */`,
-                uniforms: { src: feedback! },
+                frag: FRAG_COMPOSITE,
+                uniforms: { src: ctx.src, bloom: pingB, intensity: 1.3 },
                 target: ctx.output,
             });
         },
@@ -387,14 +477,26 @@ Composition:
 // Single effect
 vfx.add(el, { effect: grayscale() });
 
-// Pipeline — array order = pass order
-vfx.add(el, { effect: [grayscale(), bloom({ threshold: 0.8 })] });
+// Pipeline — array order = pass order. Each effect's padAdd accumulates.
+vfx.add(el, { effect: [
+    posterize({ levels: 4 }),             // padAdd 0 (default)
+    bloom({ pad: 80 }),                   // padAdd 80 → final buffer = element + 80px pad
+]});
+
+// Multiple pad-growing effects compose
+vfx.add(el, { effect: [
+    dilate({ pad: 10 }),                  // padAdd 10 → stage 1 src pad = 10
+    shadow({ pad: 10 }),                  // padAdd 10 → stage 2 src pad = 20
+]});
+
+// Fullscreen pad (effect's own parameter, computed from dims.fullscreenPad)
+vfx.add(el, { effect: bloom({ pad: "fullscreen" }) });
 
 // Mixed: render-having effects form passes; render-less effects are transparent
 vfx.add(el, { effect: [
     grayscale(),         // pass 0: capture → intermediate
     telemetry(),         // no render → skipped; grayscale output flows directly to bloom
-    bloom({ ... }),      // pass 1: reads grayscale output, writes final target
+    bloom({ pad: 80 }),  // pass 1: reads grayscale output, writes final target
 ]});
 ```
 
@@ -424,21 +526,41 @@ ctx.draw({
 
 **Extracting rendering effects**: walk the array and collect the indices of effects that have a `render` method into `renderingIndices`. Let M = `renderingIndices.length`.
 
+**Pad tracking invariants** (core of the composition model):
+
+- **Inner physical size is constant across the chain** = `elementPixel` (element × pixelRatio) for element effects, `viewportPixel` for post effects.
+- **Each intermediate buffer is `elementPixel + pad_total`** on each axis, where `pad_total.x = pad.left + pad.right` and `pad_total.y = pad.top + pad.bottom`.
+- **Inner is positioned** at `(pad.left, pad.bottom)` within the buffer (GL bottom-left origin).
+- **Pad monotonically non-decreasing**: `dst_pad[side] >= src_pad[side]` per side. Dev warn + clamp if an `outputSize` return would shrink pad on any side.
+- **`padAdd` is always a delta** applied on top of src's pad; chain does the addition internally. Effects never observe the absolute accumulated pad.
+
+**Chain initial state** (stage 0 src):
+- Element effects: src = element capture texture. Capture is inner-only (no pad), so stage 0 src pad = 0.
+- Post effects: src = viewport capture (a buffer that already spans the viewport); src pad = 0 (viewport is treated as the inner region).
+
 **Intermediate RT allocation** (resolved every frame at the top of `chain.run`):
-- If M = 0, no intermediates are needed
-- If M ≥ 1, allocate M - 1 intermediates
-- Each intermediate's size and format = the corresponding effect's `outputSize(dims)` return value (same size as input, non-float, if unspecified). Returning `{ size, float }` requests a float intermediate (RGBA16F or RGBA32F depending on `OES_texture_float_linear`, matching `Framebuffer`'s existing negotiation)
-- `input` dims propagation (**overflow is applied once at stage 1 and carried forward**, not added cumulatively):
-  - First rendering effect in the chain: `input` = **(element rect + overflow) × pixelRatio** for element effects; viewport+scrollPadding × pixelRatio for post effects
-  - Subsequent effects: `input` = the previous rendering effect's resolved output size (whatever its `outputSize` returned, including the overflow pad that stage 1 baked in)
-  - Effects wanting an additional padding per stage (e.g. cumulative blur-spread) compute it explicitly in their `outputSize`: `(dims) => [dims.input[0] + 2 * dims.overflow.left, ...]`
-- Pooled: the RT handle is kept alive across frames; only reallocated when the resolved `{ size, float }` differs from the previous frame's. First frame allocates fresh; subsequent frames are a cheap equality check when both size and float are stable
-- Every frame, before a rendering effect writes to its intermediate, the chain `gl.clear`s it (`COLOR_BUFFER_BIT`, clear color `0, 0, 0, 0`). Matches the shader-path per-pass clear in `vfx-player.ts:1062-1072`
+- If M = 0, no intermediates are needed.
+- If M ≥ 1, allocate M - 1 intermediates.
+- For each rendering effect, resolve the output pad + buffer size from its `outputSize(dims)` return:
+  - `{ padAdd }`: `dst_pad = src_pad + padAdd` per side, then `buffer = elementPixel + pad_total`. `padAdd` normalized via `createMargin(MarginOpts)`.
+  - `{ size }` / `[w, h]`: buffer size explicit. Imply pad as `(buffer - elementPixel)` total on each axis, distributed to each side proportionally to `src_pad` ratios (falls back to equal split when src has no pad).
+  - Omitted: `padAdd = 0` → `buffer = src buffer size`.
+  - `float: true` requests an RGBA16F/32F attachment (matching `Framebuffer`'s existing negotiation via `OES_texture_float_linear`).
+- Pooled: the RT handle is kept alive across frames; only reallocated when the resolved `{ buffer_w, buffer_h, pad, float }` differs from the previous frame's.
+- Every frame, before a rendering effect writes to its intermediate, the chain `gl.clear`s it (`COLOR_BUFFER_BIT`, clear color `0, 0, 0, 0`). Matches the shader-path per-pass clear in `vfx-player.ts:1062-1072`.
+
+**`srcInnerRect` computation** (per stage, for the next stage's shader):
+- For stage 0 src (capture): `(0, 0, 1, 1)` — capture is inner-only, 0..1 UV covers the inner.
+- For stage k≥1 src (intermediate k-1): `(pad.left / buffer_w, pad.bottom / buffer_h, elementPixel_w / buffer_w, elementPixel_h / buffer_h)` — physical layout of the inner sub-rect within the intermediate.
+
+**`fullscreenPad` computation** (per stage, passed as `dims.fullscreenPad` to `outputSize`):
+- For element effects: `fullscreenPad[side] = max(0, viewport_edge_distance[side] × pixelRatio - src_pad[side])` per side, where `viewport_edge_distance` is the physical-px distance from the element's edge to the viewport edge on that side. An effect returning `{ padAdd: dims.fullscreenPad }` ends up with `dst_pad = viewport_edge_distance × pixelRatio` (clamped non-negative).
+- For post effects: always `{ top: 0, right: 0, bottom: 0, left: 0 }` (src already spans the viewport).
 
 **Per-frame execution order** (only runs when the element is visible, i.e. `isVisible === true`. Off-viewport / post-release elements skip the chain entirely — both update and render are suppressed, matching the existing shader path):
 
 1. **uniform resolve**: evaluate function-valued entries in `VFXProps.uniforms` and write the results into each host's `ctx.uniforms`
-2. **outputSize resolve**: walk `renderingIndices` in order, call each effect's `outputSize?.(dims)` (or default to input size), and reallocate the corresponding intermediate RT only when the size differs from the current one
+2. **outputSize resolve**: walk `renderingIndices` in order, call each effect's `outputSize?.(dims)`, apply padAdd to src pad to get dst pad, compute buffer size, and reallocate the corresponding intermediate RT only when buffer size / pad / float differ from the previous frame. Update each host's `srcInnerRect` and `uvInnerRect` uniforms for this frame.
 3. **update phase**: call `update?.(ctx)` on every effect in array order (ctx.src / ctx.output may carry over from the previous frame — update is state-update only). `ctx.draw()` is a no-op when called here (silently ignored, dev warning once per host)
 4. **render phase**: walk `renderingIndices` in order. For the k-th rendering effect (original-array index i):
    - `ctx.src` = (k = 0) ? element capture's `EffectTexture` : the `EffectTexture` resolver pointing at `intermediates[k-1]`'s current read texture
@@ -496,7 +618,7 @@ ctx.draw({
      - Holds references to the shared `GLContext` (`this.#ctx`), the shared `Quad` (`this.#quad`), and the `#pixelRatio`
      - Caches compiled programs in a `Map<string, Program>` keyed by `frag + "\x00" + vert`. `Program` self-registers with the `GLContext`, so context loss recovery is automatic
      - Holds a `WeakMap<EffectGeometry, Map<Program, { vao, vbos, ibo, restorable }>>` to lazily compile + cache geometry POJOs per (geometry, program) pair. The program dimension is required because `gl.getAttribLocation` results are program-specific; caching a VAO against just the geometry would break on a second program with different attribute name → location assignments. Each entry implements the `Restorable` protocol and is registered on `GLContext` (same lifecycle treatment as `Quad` / `Program` / `Framebuffer` / `Texture`)
-     - `ctx.quad` is an `EffectQuad` opaque token that always resolves to the shared `this.#quad` (NDC -1..1 fullscreen). The viewport rect (element rect + overflow for element effects, viewport + scrollPadding for post effects) is set by the host before the draw, so the NDC quad maps 1:1 to the target region. No per-effect VAO is needed for this path. Effects wanting pixel-space or custom-topology vertices supply an `EffectGeometry` instead
+     - `ctx.quad` is an `EffectQuad` opaque token that always resolves to the shared `this.#quad` (NDC -1..1 fullscreen). The viewport rect (current stage's dst buffer — `elementPixel + per-stage pad` for element effects, `viewport + scrollPadding` for post effects) is set by the host before the draw, so the NDC quad maps 1:1 to the target region. No per-effect VAO is needed for this path. Effects wanting pixel-space or custom-topology vertices supply an `EffectGeometry` instead
      - `createRenderTarget(opts)` allocates a `Framebuffer` or a `Backbuffer` (for `persistent: true`, reusing `packages/vfx-js/src/backbuffer.ts`) and returns a branded handle that wraps it, applying the `wrap` / `filter` options to the underlying texture (for `Backbuffer`, applied to both internal `Framebuffer`s). Both classes already self-register with `GLContext` for context-loss recovery
        - **`Backbuffer` + `size` handling**: `Backbuffer`'s constructor takes `(width, height, pixelRatio, float)` and multiplies internally (see `backbuffer.ts:29-34`), and `resize(w, h)` also takes logical-px. But `EffectRenderTargetOpts.size` is **physical pixels**. The host normalizes:
          - `opts.size` specified (fixed size, no auto-resize): instantiate `Backbuffer` with `pixelRatio=1` and pass `size[0]` / `size[1]` directly
@@ -515,11 +637,11 @@ ctx.draw({
    - Insert the element into `#elements`; `#hitTest` works the same as before
 3. In the loop in `render()` (L668-969), if an element is the effect type, instead of the existing passes rendering:
    - Skip the chain entirely when `!hit.isVisible` (same gate as the shader path), so both update and render are suppressed for off-viewport / post-release elements
-   - Reflect the per-frame chain state into each host's ctx (EffectChain does this in bulk): `time`, `deltaTime`, `pixelRatio`, `resolution`, `mouse` (element-local bottom-left physical px), `mouseViewport` (viewport-local bottom-left physical px), `intersection`, `enterTime`, `leaveTime`, and the resolved `ctx.uniforms`
+   - Reflect the per-frame chain state into each host's ctx (EffectChain does this in bulk): `time`, `deltaTime`, `pixelRatio`, `resolution`, `mouse` (element-local bottom-left physical px), `mouseViewport` (viewport-local bottom-left physical px), `intersection`, `enterTime`, `leaveTime`, and the resolved `ctx.uniforms`. Also update each host's auto-uniform slots `uvInnerRect` (dst inner sub-rect) and `srcInnerRect` (src inner sub-rect) for the current stage
    - Call `chain.run(elementCapture, finalTarget)`
    - `finalTarget` branches on whether post-effects are present:
      - With post-effects: wrap `#postEffectTarget` in an `EffectRenderTarget` handle and pass it. **Handle cached at the host level** and regenerated only when the underlying `Framebuffer` instance changes (`#setupPostEffectTarget` reallocates on viewport resize). This keeps `ctx.output` reference-stable across frames so effects can compare identity for "output changed" checks
-     - Without post-effects: `null` (→ draw directly to canvas), with the chain setting the viewport via `gl.viewport` matching the element rect
+     - Without post-effects: `null` (→ draw directly to canvas), with the chain setting the viewport via `gl.viewport` to the last effect's dst buffer rect on the canvas (`elementPixel + accumulated pad`, positioned at the element's canvas-space origin minus pad)
 4. `chain.resolveIntermediates(...)` is called once per frame at the top of `chain.run` — no separate element/viewport resize hook is needed (the per-frame outputSize call naturally tracks size changes; RTs are only reallocated when the size differs)
 5. `removeElement`: call `chain.dispose()` only (it handles effect.dispose and host.dispose internally in bulk)
 6. For `VFXPostEffect.effect`, do the same wiring at the post-effect slot: one `EffectChain` whose first input is the viewport capture, final output is `null` (canvas). The branch lives alongside the existing `#renderPostEffects` path (L1202-1375). When a single post-effect slot has `effect` set, its `shader` field is ignored (dev warning if both present)
@@ -528,8 +650,17 @@ ctx.draw({
 
 - **Self-contained draws**: every `ctx.draw()` call performs a full binding sequence (program → framebuffer → viewport → blend → VAO → uniform upload) before dispatching the draw, so no state leaks from one draw to the next, and any raw `ctx.gl.*` mutations an effect author makes between draws are harmless. No explicit reset API is exposed.
 - **Program cache**: `Map<string, Program>` keyed by `frag + "\x00" + vert` (source-identical draws reuse the compiled program). `Program` already handles active-uniform introspection (the existing `ActiveUniform` table in `gl/program.ts`) and GLSL version auto-detection via `detectGlslVersion`; the host just passes `vfxProps.glslVersion` when provided
-- **Quad fast path**: when `geometry` is `ctx.quad` AND the effect is drawing against the default target region (element rect + overflow, or viewport + scrollPadding), dispatch through `renderPass(gl, this.#quad, pass, target, viewport, ...)` — the same path the shader-based effect pipeline already uses. The NDC -1..1 mapping plus the `viewport` clip rectangle match the existing coordinate convention, so no per-host quad VAO is allocated
-- **`uvInner` varying**: the default vertex shader (used when `EffectDrawOpts.vert` is omitted) emits a `vec2 uvInner` varying where 0..1 spans the inner region (element rect proper for element effects; viewport proper for post effects). Computed from NDC position and `uniform vec4 uvInnerRect` (xy=innerOrigin, zw=innerSize in buffer-pixel units), both auto-uploaded by the host from the current stage's `overflow` pad. Custom `vert` users must compute `uvInner` themselves if they want it — `uvInnerRect` is still auto-uploaded so the data is available. Post effects receive `overflow=0`, so `uvInner === (gl_FragCoord.xy / resolution)`
+- **Quad fast path**: when `geometry` is `ctx.quad` AND the effect is drawing against the default target region (current stage's dst buffer, or viewport + scrollPadding for post effects), dispatch through `renderPass(gl, this.#quad, pass, target, viewport, ...)` — the same path the shader-based effect pipeline already uses. The NDC -1..1 mapping plus the `viewport` clip rectangle match the existing coordinate convention, so no per-host quad VAO is allocated
+- **`uvInner` / `uvInnerDst` varyings**: the default vertex shader (used when `EffectDrawOpts.vert` is omitted) emits three varyings:
+  - `uv` — 0..1 over the full dst buffer (inner + pad).
+  - `uvInnerDst` — `(bufferUV - uvInnerRect.xy) / uvInnerRect.zw`. 0..1 over the current dst buffer's inner region. Used for "am I in the element proper?" gating.
+  - `uvInner` — `srcInnerRect.xy + uvInnerDst * srcInnerRect.zw`. The src-sampling UV pointing into src's inner region. `texture(src, uvInner)` fetches element content regardless of src's physical layout.
+
+  Two auto-uploaded uniforms drive this:
+  - `uniform vec4 uvInnerRect;` — dst inner sub-rect in buffer UV (xy = origin, zw = size). For element effects stage k, `(pad.left / buffer_w, pad.bottom / buffer_h, elementPixel_w / buffer_w, elementPixel_h / buffer_h)`. For post effects (no pad), `(0, 0, 1, 1)`.
+  - `uniform vec4 srcInnerRect;` — src inner sub-rect in src texture UV. `(0, 0, 1, 1)` for stage 0's capture (capture is inner-only). For stage k≥1, matches the previous intermediate's `uvInnerRect`.
+
+  Custom `vert` users must compute `uvInner` / `uvInnerDst` themselves if they want them; the two `*Rect` uniforms are still auto-uploaded so the data is available.
 - **Custom geometry**: `EffectGeometry` POJO → compiled to a VAO via the `WeakMap<EffectGeometry, Map<Program, VaoEntry>>` cache. Attribute descriptors → `gl.bufferData` + `gl.vertexAttribPointer` (+ `gl.vertexAttribDivisor(loc, 1)` for `perInstance: true`), `indices` → `gl.bufferData(ELEMENT_ARRAY_BUFFER, ...)`, and `mode` maps to the GL primitive (`TRIANGLES` / `LINES` / `LINE_STRIP` / `POINTS`). Each entry implements `Restorable` so a context-lost recovery rebuilds it. Reusing the same POJO reference with the same program is a cache hit; a new reference or a different program rebuilds
 - **Uniform dispatch**: reuse `Program`'s existing active-uniform table. `EffectUniformValue` → internal `UniformValue` (see `gl/program.ts:6-19`) is a 1:1 map: `number`, `boolean`, tuples, `number[]`, typed arrays (`Float32Array` / `Int32Array` / `Uint32Array`) pass straight through; `EffectTexture` and `EffectRenderTarget` both resolve (at bind time) to the internal `Texture` instance — for persistent RTs this resolves to the current read texture of the underlying `Backbuffer`. The backend assigns a texture unit, calls `Texture.bind(unit)`, and uploads `uniform1i(loc, unit)`
 - **Scalar / tuple type dispatch**: driven entirely by the shader's active uniform type (already handled by `uploadScalarUniform` in `gl/program.ts:243-407`). `[1, 2]` against `uniform vec2` uses `uniform2f`; the same tuple against `uniform ivec2` uses `uniform2i`; `number` against `uniform bool` uses `uniform1i(loc, v ? 1 : 0)`. Effect authors don't need separate tag types
@@ -573,21 +704,29 @@ ctx.draw({
      - with N=3 and three rendering effects, 2 intermediates are allocated and src/output are swapped per pass
      - when an intermediate effect has no `render`, that slot is skipped and the previous effect's output becomes the src of the next rendering effect (one fewer intermediate)
      - when every effect lacks render, the M=0 special case copies capture → finalTarget once
-     - specifying `outputSize` allocates the corresponding intermediate at the specified physical-pixel size; the LAST rendering effect's `outputSize` return value is ignored (final target is fixed)
-     - `outputSize` receives logical and physical pixel dims for element/viewport and physical-pixel `input` / return value
-     - on element resize, intermediate sizes are recomputed and reallocated (reused when size is unchanged)
+     - **`outputSize({padAdd: N})` grows each side's pad by N**: buffer = elementPixel + (src_pad + padAdd) sums. Stage 0 src pad = 0 so dst pad = padAdd; stage k inherits accumulated pad
+     - **Stacked `padAdd`**: `[effectA({padAdd: 10}), effectB({padAdd: 10})]` → final buffer's pad = 20 per side
+     - **`outputSize({padAdd: …})` with asymmetric per-side values** (e.g. `{top: 0, right: 50, bottom: 0, left: 50}`) produces an asymmetric buffer and `srcInnerRect` matches the physical layout
+     - `outputSize({size: [w, h]})` distributes extra pad proportionally to src's pad ratios; buffer < elementPixel on any axis → dev warn + clamp
+     - `outputSize` returning `{padAdd: M}` with M < 0 on any side → dev warn + clamp to 0 (pad monotonic non-decreasing)
+     - `dims.fullscreenPad` equals the padAdd needed to extend src to viewport edges per side (non-negative); effect returning `{padAdd: dims.fullscreenPad}` reaches viewport
+     - `dims.fullscreenPad` for post effects is always `{top:0, right:0, bottom:0, left:0}`
+     - LAST rendering effect's `outputSize` return value is ignored (final target is fixed)
+     - **`srcInnerRect` uniform**: at stage 0 `(0, 0, 1, 1)` for capture; at stage k≥1 matches `pad.left/w, pad.bottom/h, elementPixel_w/w, elementPixel_h/h` of the previous intermediate
+     - **`uvInnerRect` uniform**: per stage matches `pad.left/w, pad.bottom/h, elementPixel_w/w, elementPixel_h/h` of the CURRENT dst buffer
+     - on element resize, intermediate sizes are recomputed and reallocated (reused when size / pad / float are unchanged)
      - `ctx.uniforms` reflects VFXProps.uniforms including function-valued entries (re-evaluated per frame, before update)
      - `ctx.mouse` and `ctx.mouseViewport` both use bottom-left origin and physical pixels; `mouse` is element-local and `mouseViewport` is viewport-local
      - `update()` that calls `ctx.draw()` produces no GL side effect (draw call is silently ignored)
      - when `init` returns a Promise, it is awaited sequentially (a later effect's init never runs before an earlier one finishes)
      - when `init` throws, prior effects in the chain have their `dispose` called in reverse order — the failing effect's own `dispose` is NOT called — and the element is NOT inserted into `#elements`
-     - `outputSize` returning `{ size, float: true }` allocates an RGBA16F/RGBA32F intermediate; toggling `float` across frames reallocates
+     - `outputSize` returning `{ padAdd, float: true }` / `{ size, float: true }` allocates an RGBA16F/RGBA32F intermediate; toggling `float` across frames reallocates
      - when a middle `render` throws, a `console.warn` is emitted once and the failed effect's slot is replaced by a passthrough copy (input → output) so the next effect reads a valid texture; subsequent frames continue to call the effect
      - when the last `render` throws, a passthrough copy is emitted into the final target so the element still renders the previous effect's output (does NOT disappear)
      - when the element is off-viewport (`isVisible === false`), neither `update` nor `render` is called
      - `dispose` is called in reverse array order
    - run: `npm --workspace=@vfx-js/core run test`
-3. **Integration demo**: add `packages/storybook/src/Effect.stories.ts` and implement a simple trail effect. Write it assuming `@vfx-js/core` is a devDep and only `import type` is used; verify in a browser via `npm --workspace=storybook run dev`
+3. **Integration demo**: add `packages/storybook/src/Effect.stories.ts` and implement a bloom effect (deterministic, VRT-friendly) and a `[posterize, bloom]` chain story. Write effect modules assuming `@vfx-js/core` is a devDep and only `import type` is used; verify in a browser via `npm --workspace=storybook run dev`. The chain story exercises M=2 intermediate allocation, `padAdd` accumulation, and `srcInnerRect` propagation between stages.
 4. **zero-runtime-dep check**: within the storybook story, only `import type { Effect } ...`, and grep the build output to verify no runtime imports of `@vfx-js/core` are included
 5. **Existing tests**: `npm test` and `npm run lint` both pass
 
