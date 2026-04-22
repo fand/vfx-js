@@ -519,17 +519,28 @@ function callOutputSize(
             : input.elementInnerPhys,
         viewport: input.viewportLogical,
         viewportPixel: input.viewportPhys,
-        overflow: isPostEffect
-            ? { top: 0, right: 0, bottom: 0, left: 0 }
-            : input.overflow,
+        // 8-2 will compute the real fullscreenPad (viewport-edge distance
+        // per side minus src pad). Until then, zero stub keeps the types
+        // aligned with the new `dims` shape.
+        fullscreenPad: { top: 0, right: 0, bottom: 0, left: 0 },
         pixelRatio: input.viewportPhys[0] / input.viewportLogical[0] || 1,
     };
     const ret = effect.outputSize(dims);
     if (Array.isArray(ret)) {
         return { size: [ret[0], ret[1]], float: false };
     }
-    const o = ret as { size: readonly [number, number]; float?: boolean };
-    return { size: [o.size[0], o.size[1]], float: o.float ?? false };
+    const obj = ret as
+        | { size: readonly [number, number]; float?: boolean }
+        | { padAdd: unknown; float?: boolean };
+    if ("padAdd" in obj) {
+        // padAdd variant: real handling lands in 8-2. For now, fall back
+        // to input size so behaviour is unchanged.
+        return {
+            size: [inputSize[0], inputSize[1]],
+            float: obj.float ?? false,
+        };
+    }
+    return { size: [obj.size[0], obj.size[1]], float: obj.float ?? false };
 }
 
 // Silence unused-import warnings; resolveRt is exported for chain tests.

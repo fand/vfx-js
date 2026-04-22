@@ -296,6 +296,10 @@ export type VFXProps = {
      *
      * If you pass an object like `<VFXImg overflow={{ top: 100 }} />`,
      * REACT-VFX will add paddings only to the given direction (only to the `top` in this example).
+     *
+     * SHADER PATH ONLY. Ignored by the effect path — effects control pad via
+     * each effect's own `outputSize` return (padAdd / fullscreenPad). Setting
+     * both `overflow` and `effect` emits a dev warning.
      */
     overflow?: true | MarginOpts;
 
@@ -732,12 +736,29 @@ export type EffectContext = {
      * target's viewport rect, so vertex shaders operate in NDC space
      * that maps 1:1 to the target region.
      *
-     * Convenience varying (default vertex shader only, omit `vert`):
-     *   `in vec2 uvInner;` — 0..1 spans the INNER region (element rect
-     *   proper for element effects; viewport proper for post effects).
-     *   Negative components or values > 1 indicate the overflow /
-     *   scrollPadding pad. Custom vertex shaders must compute their own
-     *   mapping.
+     * Convenience varyings (default vertex shader only, omit `vert`):
+     *
+     *   `in vec2 uv;`
+     *     0..1 over the full dst buffer (inner + pad).
+     *
+     *   `in vec2 uvInner;`
+     *     Sampling UV pointing into `ctx.src`'s INNER region. Always usable
+     *     as `texture(src, uvInner)` to fetch element content regardless of
+     *     whether src is the capture (inner-only) or a prior stage's
+     *     intermediate (buffer with pad). Computed as
+     *     `srcInnerRect.xy + uvInnerDst * srcInnerRect.zw`.
+     *
+     *   `in vec2 uvInnerDst;`
+     *     0..1 over the CURRENT dst buffer's inner region. Values outside
+     *     `[0, 1]` mean the fragment is in the pad. Use for "am I inside
+     *     the element?" gating.
+     *
+     * Auto-uploaded uniforms (for custom vertex shaders or advanced use):
+     *   `uniform vec4 uvInnerRect;`  — dst inner sub-rect in buffer UV
+     *                                  (xy = origin, zw = size).
+     *   `uniform vec4 srcInnerRect;` — src inner sub-rect in src texture UV.
+     *                                  `(0,0,1,1)` for capture; with pad
+     *                                  for intermediate inputs.
      */
     readonly quad: EffectQuad;
 
@@ -843,21 +864,47 @@ export interface Effect {
     dispose?(): void;
 
     /**
-     * Declares the output dimensions (and optional float flag) this
-     * effect writes into `ctx.output`. Called every frame; the chain
-     * only reallocates the intermediate RT when `size` OR `float`
-     * differs.
+     * Declares how this effect extends its output buffer relative to src.
+     * Called every frame; the chain reallocates the intermediate RT only
+     * when resolved `{ size, float, pad }` differs from the previous frame.
      *
-     * Units: `input` / `elementPixel` / `viewportPixel` / `overflow` /
-     * return value are physical pixels; `element` / `viewport` are
-     * logical pixels (CSS px).
+     * Omitted → the effect writes to a buffer of the same size as its src
+     * (no pad added). Right choice for simple filters that don't grow
+     * content (grayscale, invert, posterize).
      *
-     * Overflow is applied once at stage 1 and carried forward; it is
-     * NOT added cumulatively. Effects that want cumulative extra padding
-     * must compute it explicitly from `dims.overflow`.
+     * Only meaningful when `render` is present AND the effect is not the
+     * last rendering effect in the chain (the last effect's output is the
+     * fixed final target, so its return value is ignored).
+     *
+     * Return forms:
+     *
+     *   `{ padAdd: MarginOpts; float?: boolean }`
+     *     Grow each side's pad by the given amount (physical px).
+     *     `padAdd: 10` is shorthand for all sides. The dst buffer size
+     *     becomes `elementPixel + (src pad + padAdd)` on each axis. Use
+     *     `dims.fullscreenPad` to reach viewport edges.
+     *
+     *   `{ size: [w, h]; float?: boolean }` / `readonly [w, h]`
+     *     Explicit absolute buffer size (physical px). Extra pixels
+     *     (`buffer - elementPixel`) are distributed to each side of the
+     *     pad proportionally to src's pad ratios (equal split when src
+     *     has no pad). Buffer smaller than `elementPixel` on any axis
+     *     triggers a dev warn + clamp.
+     *
+     * Units:
+     *   input / elementPixel / viewportPixel / fullscreenPad / return →
+     *     physical px
+     *   element / viewport → logical px
+     *   pixelRatio: element × pixelRatio === elementPixel
      *
      * Post-effect context: `element` / `elementPixel` mirror
-     * `viewport` / `viewportPixel`. `overflow` is always zero.
+     * `viewport` / `viewportPixel`; `fullscreenPad` is always zero.
+     *
+     * Pad tracking is entirely internal to the chain. Effects never
+     * observe the accumulated pad — they declare deltas via `padAdd`, or
+     * absolute buffer sizes. For "reach viewport edges" the chain provides
+     * `dims.fullscreenPad` — the exact `padAdd` needed from src's current
+     * pad to hit the viewport (>= 0 per side).
      */
     outputSize?(dims: {
         readonly input: readonly [number, number];
@@ -865,18 +912,26 @@ export interface Effect {
         readonly elementPixel: readonly [number, number];
         readonly viewport: readonly [number, number];
         readonly viewportPixel: readonly [number, number];
-        /** Margin padding around the element, physical px. */
-        readonly overflow: {
+        readonly pixelRatio: number;
+        /**
+         * Physical-px pad delta needed to extend src to viewport edges,
+         * per side. Non-negative; 0 means src already spans that edge.
+         * Always zero for post-effects (src already spans the viewport).
+         */
+        readonly fullscreenPad: {
             readonly top: number;
             readonly right: number;
             readonly bottom: number;
             readonly left: number;
         };
-        readonly pixelRatio: number;
     }):
         | readonly [number, number]
         | {
               readonly size: readonly [number, number];
+              readonly float?: boolean;
+          }
+        | {
+              readonly padAdd: MarginOpts;
               readonly float?: boolean;
           };
 }
