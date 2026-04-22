@@ -38,8 +38,8 @@ bloom.play = async ({ canvasElement }) => {
             threshold: 0.6,
             intensity: 1.3,
             iterations: 8,
+            pad: 80,
         }),
-        overflow: 80,
     });
 };
 
@@ -72,8 +72,8 @@ posterizeAndBloom.play = async ({ canvasElement }) => {
                 softness: 0.05,
                 intensity: 2.5,
                 iterations: 12,
+                pad: 160,
             }),
         ],
-        overflow: 160,
     });
 };
