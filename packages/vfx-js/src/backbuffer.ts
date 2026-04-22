@@ -1,6 +1,6 @@
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
-import type { Texture } from "./gl/texture.js";
+import type { Texture, TextureFilter, TextureWrap } from "./gl/texture.js";
 import { type GLRect, getGLRect } from "./gl-rect.js";
 
 /**
@@ -21,6 +21,10 @@ export class Backbuffer {
         height: number,
         pixelRatio: number,
         float: boolean | undefined,
+        opts: {
+            wrap?: TextureWrap | readonly [TextureWrap, TextureWrap];
+            filter?: TextureFilter;
+        } = {},
     ) {
         this.#width = width;
         this.#height = height;
@@ -28,9 +32,10 @@ export class Backbuffer {
 
         const pwidth = width * pixelRatio;
         const pheight = height * pixelRatio;
+        const fbOpts = { float, wrap: opts.wrap, filter: opts.filter };
         this.#buffers = [
-            new Framebuffer(ctx, pwidth, pheight, { float }),
-            new Framebuffer(ctx, pwidth, pheight, { float }),
+            new Framebuffer(ctx, pwidth, pheight, fbOpts),
+            new Framebuffer(ctx, pwidth, pheight, fbOpts),
         ];
     }
 
