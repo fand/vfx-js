@@ -46,6 +46,11 @@ Track per-task completion here. Format per entry:
 - date: 2026-04-22
 - notes: EffectChain orchestrates the per-element pipeline. renderingIndices is computed once at construction (typeof render === "function"). run(input) reflects state into hosts, resolves intermediates (reallocate only on size/float delta), calls update phase (array order), then render phase (renderingIndices order). Each intermediate exposes two handles — an EffectRenderTarget for the producing effect's `ctx.output` and an EffectTexture for the next stage's `ctx.src` — so the public type contract that `ctx.src: EffectTexture` is preserved. Initialization is sequential with `await`; on throw the chain disposes prior effects in reverse order, disposes the failing host (to release any RTs its own init allocated), and rethrows. update/render throws warn once per effect index; render failures fall back to passthrough copy so the output doesn't disappear. finalTarget handle cached + regenerated only when the underlying Framebuffer instance changes.
 
+## 4-4: VFXPostEffect.effect
+- commit: c147888
+- date: 2026-04-22
+- notes: Detect single-slot VFXPostEffect.effect in #initPostEffects and route into a dedicated EffectChain whose capture is a resolver over #postEffectTarget.texture. initAll is awaited via a detached Promise (chain identity guards against destroy/re-init races); shouldUsePostEffect is gated on `chainReady` so while init is pending the scene renders directly to canvas instead of a blank frame. #runPostEffectChain synthesizes post-effect-flavored ChainFrameInput (element* === viewport*, overflow zero, mouse === mouseViewport, time = now − #initTime). Multi-slot mixed cases aren't reachable via the public typing (VFXOpts.postEffect is VFXPostEffect | VFXPass[]; VFXPass has no .effect field), so the branch handles only `postEffects.length === 1 && !("frag" in ...) && .effect`. destroy() disposes the chain and clears the flag.
+
 ## 4-3: removeElement Effect branch
 - commit: 13bde85 (bundled with 4-1)
 - date: 2026-04-22
