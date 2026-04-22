@@ -16,6 +16,9 @@ import type { GLContext, Restorable } from "./context.js";
 export type TextureWrap = "clamp" | "repeat" | "mirror";
 
 /** @internal */
+export type TextureFilter = "nearest" | "linear";
+
+/** @internal */
 export type TextureSource =
     | HTMLImageElement
     | HTMLVideoElement
@@ -35,6 +38,8 @@ export class Texture implements Restorable {
     texture!: WebGLTexture;
     wrapS: TextureWrap = "clamp";
     wrapT: TextureWrap = "clamp";
+    minFilter: TextureFilter = "linear";
+    magFilter: TextureFilter = "linear";
     needsUpdate = true;
     /** Source image/canvas/video; exposed for identity comparison. */
     source: TextureSource | null = null;
@@ -134,8 +139,16 @@ export class Texture implements Restorable {
             gl.TEXTURE_WRAP_T,
             wrapEnum(gl, this.wrapT),
         );
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_MIN_FILTER,
+            filterEnum(gl, this.minFilter),
+        );
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_MAG_FILTER,
+            filterEnum(gl, this.magFilter),
+        );
     }
 
     dispose(): void {
@@ -154,6 +167,10 @@ function wrapEnum(gl: WebGL2RenderingContext, w: TextureWrap): number {
         return gl.MIRRORED_REPEAT;
     }
     return gl.CLAMP_TO_EDGE;
+}
+
+function filterEnum(gl: WebGL2RenderingContext, f: TextureFilter): number {
+    return f === "nearest" ? gl.NEAREST : gl.LINEAR;
 }
 
 /** Load an image from URL with CORS enabled. @internal */

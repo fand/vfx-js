@@ -6,6 +6,6 @@ export { applyBlend, Pass, renderPass } from "./pass.js";
 export type { Uniform, Uniforms, UniformValue } from "./program.js";
 export { Program } from "./program.js";
 export { Quad } from "./quad.js";
-export type { TextureSource, TextureWrap } from "./texture.js";
+export type { TextureFilter, TextureSource, TextureWrap } from "./texture.js";
 export { loadImage, Texture } from "./texture.js";
 export { Vec2, Vec4 } from "./vec.js";
