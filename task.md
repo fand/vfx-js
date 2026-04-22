@@ -149,3 +149,132 @@ Rules:
 - [ ] **7-1: Build check** — `npm --workspace=@vfx-js/core run build` produces dual ESM/CJS; new types appear in `lib/esm/index.d.ts`
 - [ ] **7-2: Zero-runtime-dep check** — grep `packages/storybook` build output; no runtime imports of `@vfx-js/core`
 - [ ] **7-3: Existing tests/lint** — `npm test && npm run lint` pass
+
+---
+
+## Phase 8: Pad model refactor
+
+Refactor in response to the [posterize, bloom] chain bug: `uvInner`
+was destination-space (0..1 over dst inner), making
+`texture(src, uvInner)` wrong at stage k≥1 where src is a buffer-sized
+intermediate rather than an inner-only capture. Redesign per the
+updated plan.md "Pad model" section: pad tracked by chain as delta
+accumulation (`padAdd`), `uvInner` becomes the src-sampling UV, new
+`uvInnerDst` varying handles the "am I inside?" gate, `srcInnerRect`
+auto-uniform drives the sampling math.
+
+Phase 4 already landed the old model in vfx-player.ts / effect-chain.ts
+/ effect-host.ts. Phase 8 replaces those internals without touching
+the public Effect interface shape except for the `outputSize` return
+type and `dims` fields (documented breaking changes).
+
+### 8-1: types.ts — `outputSize` signature + dims reshape
+
+- [ ] **8-1**: Update `Effect.outputSize` signature in `packages/vfx-js/src/types.ts`
+  - `dims`: remove `overflow`, add `fullscreenPad: { top, right, bottom, left }` (Margin, physical px)
+  - return: add `{ padAdd: MarginOpts; float?: boolean }` variant alongside existing `[w, h]` / `{ size, float }`
+  - JSDoc: describe `padAdd` (delta, monotonic, normalized via `createMargin`), `fullscreenPad` helper, clamp semantics
+  - `VFXProps.overflow` JSDoc: note that it's shader-path only and is ignored by the effect path (dev warn when both present)
+  - Acceptance: `npx tsc --noEmit` clean. No runtime change yet.
+
+### 8-2: effect-chain.ts — pad tracking + srcInnerRect + fullscreenPad
+
+- [ ] **8-2**: Rewrite chain pad propagation in `packages/vfx-js/src/effect-chain.ts`
+  - `ChainFrameInput`: remove `overflow` fields piped into dims (keep the data if the player still passes it — map internally); add `viewportRectOnCanvasPx` (or whatever lets chain compute element's viewport-edge distance per side)
+  - `IntermediateEntry`: add `pad: Margin` (physical px per side)
+  - `#resolveIntermediates`:
+    - Stage 0 src pad = `{0,0,0,0}` (capture has no pad)
+    - Call `effect.outputSize(dims)`; normalize return to `{ pad: Margin, bufferSize: [w,h], float: bool }`:
+      - `{ padAdd }` → `dst_pad = src_pad + createMargin(padAdd)` per side; `bufferSize = elementPixel + pad sums`
+      - `{ size }` / `[w, h]` → `bufferSize = size`; distribute `buffer - elementPixel` to each side proportionally to `src_pad` ratios (equal split when src pad is zero everywhere)
+      - Omitted → `padAdd = 0`
+    - Monotonic clamp: `dst_pad[side] = max(dst_pad[side], src_pad[side])`; emit dev warn once per (chain, effect) on violation
+    - Buffer < elementPixel on any axis → dev warn + clamp to elementPixel
+    - Reallocate `Framebuffer` only when `{bufferSize, float, pad}` differs
+  - Compute `srcInnerRect` per stage:
+    - stage 0 (for the first rendering effect's src): `(0, 0, 1, 1)` — capture is inner-only
+    - stage k≥1: `(prev.pad.left / prev.bufferSize[0], prev.pad.bottom / prev.bufferSize[1], elementPixel[0] / prev.bufferSize[0], elementPixel[1] / prev.bufferSize[1])`
+  - Compute `fullscreenPad` per stage for the `dims` input: `max(0, viewport_edge_distance[side] × pr - src_pad[side])` per side (post-effects: always zero)
+  - Compute `uvInnerRect` per stage (dst): `(pad.left / bufferW, pad.bottom / bufferH, elementPixel[0] / bufferW, elementPixel[1] / bufferH)`
+  - Pass `srcInnerRect` and `uvInnerRect` to each host's `setFrameDims`
+  - `callOutputSize`: build dims with `fullscreenPad` (not `overflow`), adapt return-value normalization to new variants
+  - Acceptance: `npm --workspace=@vfx-js/core run test` — all existing chain tests pass after adjustments
+
+### 8-3: effect-host.ts — default vert + srcInnerRect uniform + uvInnerDst
+
+- [ ] **8-3**: Update `packages/vfx-js/src/effect-host.ts`
+  - `HostFrameDims`: replace the old `uvInnerRect` field (if any) with two fields, `uvInnerRect: [x,y,w,h]` (dst) and `srcInnerRect: [x,y,w,h]` (src); both buffer/texture UV (0..1 each component)
+  - `#buildUniforms`: auto-inject BOTH `uvInnerRect` and `srcInnerRect` as `vec4`
+  - Default vertex shader (300 es + 100): emit three varyings: `uv`, `uvInnerDst`, `uvInner`. Compute:
+    ```
+    uv = bufferUV;
+    uvInnerDst = (bufferUV - uvInnerRect.xy) / uvInnerRect.zw;
+    uvInner = srcInnerRect.xy + uvInnerDst * srcInnerRect.zw;
+    ```
+  - passthrough shaders: keep `uv`-based sampling (OK since passthrough writes across the full dst buffer with src having the same layout — callers of `passthroughCopy` must pass src sized to match the dst viewport)
+  - Acceptance: host-level draws with the new defaults produce the same output when src/dst layouts match (equivalent to old behavior for uniform overflow); new behavior correct when src is capture (inner-only) and dst has pad
+
+### 8-4: vfx-player.ts — remove overflow piping, pass viewport-edge info
+
+- [ ] **8-4**: Update `#renderEffectElement` and `#addEffectElement` in `packages/vfx-js/src/vfx-player.ts`
+  - Stop treating `e.overflow × pr` as the chain's initial pad (chain's stage 0 src pad = 0)
+  - Emit dev warning in `#addEffectElement` when both `opts.overflow` and `opts.effect` are set (effect path ignores overflow)
+  - `ChainFrameInput` passes the element's viewport-edge distances (or enough data for chain to compute `fullscreenPad` per stage — likely needs the element's rect on viewport in physical px)
+  - Update post-effect chain wiring similarly (fullscreenPad=0 for post effects)
+  - Acceptance: storybook smoke test: bloom / posterizeAndBloom stories render (even if not yet visually correct — pending 8-5/8-6 shader updates)
+
+### 8-5: storybook/effects/bloom.ts — new API usage
+
+- [ ] **8-5**: Update `packages/storybook/src/effects/bloom.ts`
+  - Shader change: replace `uvInner in [0,1]` gate with `uvInnerDst in [0,1]` in threshold and composite passes (the gate is destination-space)
+  - Sampling: `texture(src, uvInner)` stays the same in the source code (semantics now correct across chain stages)
+  - Add `pad?: number | "fullscreen"` option to `BloomOptions`
+  - Implement `outputSize(dims)`:
+    - `pad: "fullscreen"` → `{ padAdd: dims.fullscreenPad }`
+    - numeric → `{ padAdd: pad }` (uniform margin)
+    - omitted → no outputSize method (effect grows no pad)
+  - Acceptance: storybook `bloom` story still renders with pad controlled by the bloom option rather than VFXProps.overflow
+
+### 8-6: storybook/effects/posterize.ts — new API usage
+
+- [ ] **8-6**: Update `packages/storybook/src/effects/posterize.ts`
+  - Shader change: replace `uvInner in [0,1]` gate with `uvInnerDst in [0,1]` (for skipping overflow pad)
+  - No `outputSize` needed (posterize doesn't grow pad)
+  - Acceptance: standalone `posterize` story (if added) renders the posterized element on a transparent pad
+
+### 8-7: Effect.stories.ts — drop overflow, tune effect params
+
+- [ ] **8-7**: Update `packages/storybook/src/Effect.stories.ts`
+  - `bloom` story: remove `overflow: 80`; pass `pad: 80` (or similar) to `createBloomEffect` instead
+  - `posterizeAndBloom` story: remove `overflow: 160`; pass `pad: 160` (or `pad: "fullscreen"`) to bloom
+  - Optionally add a third story that demonstrates `[dilate(10), shadow(10)]` or a fullscreen example
+  - Acceptance: storybook renders all effect stories correctly (visual check); DevTools shows `uvInnerDst` / `uvInner` / `srcInnerRect` present when a draw is captured
+
+### 8-8: Tests — pad accumulation + srcInnerRect + fullscreenPad
+
+- [ ] **8-8**: Update `packages/vfx-js/src/effect-chain.test.ts` and `effect-host.test.ts`
+  - effect-chain.test.ts (add):
+    - `{padAdd: 10}` at stage 0 with capture → dst pad = 10; intermediate buffer = elementPixel + 20 per axis
+    - Stacked padAdd: `[a({padAdd: 10}), b({padAdd: 10})]` → stage 1 src pad = 10, stage 1 dst pad = 20
+    - Asymmetric padAdd: `{top: 0, right: 50, bottom: 0, left: 50}` produces asymmetric buffer; srcInnerRect reflects physical layout
+    - Monotonic clamp: effect returning `{padAdd: -5}` → dev warn + clamped to 0 (dst pad unchanged)
+    - `{size: [w, h]}` with w < elementPixel[0] → dev warn + clamped to elementPixel
+    - `dims.fullscreenPad` matches `max(0, viewport_edge_distance × pr - src_pad)` per side
+    - `dims.fullscreenPad` for post-effect chain is always `{0,0,0,0}`
+    - `srcInnerRect` at stage 0 is `(0,0,1,1)`; at stage k≥1 matches previous intermediate's pad/buffer ratios
+    - `uvInnerRect` matches the CURRENT dst buffer's inner sub-rect (NOT the src's)
+  - effect-chain.test.ts (remove / update):
+    - Any test asserting old "overflow × pr" stage 0 size — update to assert capture-based default (stage 0 src pad = 0)
+    - The "overflow not added cumulatively" test — replace with the new "padAdd accumulates" test
+  - effect-host.test.ts (add):
+    - `srcInnerRect` uniform is auto-uploaded with the right vec4 value
+    - `uvInnerRect` uniform is auto-uploaded with the right vec4 value
+    - Default vert emits three varyings (`uv`, `uvInnerDst`, `uvInner`); smoke-test via a shader that reads them
+  - Acceptance: `npm --workspace=@vfx-js/core run test` — all passing
+
+### 8-9: progress.md + commit housekeeping
+
+- [ ] **8-9**: Update `progress.md` as Phase 8 tasks land
+  - One entry per 8-N commit, per existing format
+  - Flag breaking changes in the Notes: `Effect.outputSize` signature changed; `dims.overflow` → `dims.fullscreenPad`; default vert varyings changed
+  - Note: no public API change to `VFXProps` itself (overflow stays as-is for shader path; no `VFXProps.pad` added)
