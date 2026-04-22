@@ -97,3 +97,43 @@ Track per-task completion here. Format per entry:
 - commit: 13bde85
 - date: 2026-04-22
 - notes: addElement detects opts.effect and dispatches to #addEffectElement, which replays the shader path's texture/opacity prelude then builds an EffectChain. Shader+effect mutex emits dev warning (effect wins); empty array emits dev warning (identity chain). captureHandle is a resolver-form EffectTexture closing over elem.srcTexture so text re-render swaps propagate automatically. User uniforms split into static + generators. initAll is sequential + awaited; on failure the chain self-cleans priors + failing host, addElement releases srcTexture, restores opacity, and rejects. VFXElement gains optional chain/effectUniformGenerators/effectStaticUniforms/effectLastRenderTime fields (passes:[], bufferTargets:new Map() for effect elements). #hitTest now guards the shader-uniform writes (isVisible && !e.chain). #rerenderTextElement / updateCanvasElement / updateHICTexture rewritten to pull `oldTexture` from `e.srcTexture` and only touch `passes[0].uniforms["src"]` on the shader path. render() loop's effect branch is a placeholder `continue` (real chain.run in 4-2). removeElement routes chain elements to `chain.dispose()` (effects + hosts + intermediates); srcTexture.dispose + opacity restore stay in the shared tail.
+
+## 8-1: types.ts — outputSize signature + dims reshape
+- commit: 4baf478
+- date: 2026-04-22
+- notes: Added `{ padAdd: MarginOpts; float? }` return variant. `dims` drops `overflow`, adds `fullscreenPad: { top,right,bottom,left }` (physical px, non-negative). JSDoc updated for `VFXProps.overflow` (shader-path only; warn when both present) and `EffectContext.quad` (uv / uvInner / uvInnerDst varyings + uvInnerRect / srcInnerRect auto-uniforms). effect-chain.ts got scaffolding (fullscreenPad:0 stub + padAdd passthrough) to keep tsc clean — real pad tracking lands in 8-2. **Breaking change**: the `overflow` field on the `dims` object passed to `outputSize` is removed.
+
+## 8-2: effect-chain.ts — pad tracking + srcInnerRect + fullscreenPad
+- commit: 1d821b0
+- date: 2026-04-22
+- notes: Per-stage StageLayout tracks `{srcPad, srcBufferSize, dstPad, dstBufferSize, srcInnerRect, uvInnerRect, float, outputViewport}` (all physical px). outputSize dispatch: padAdd adds per-side delta, explicit size distributes excess proportionally to src pad ratios (equal split when zero), tuple [w,h] treated as size. Monotonic clamp (dst pad >= src pad per side) + buffer >= elementPixel clamp, both warn once per (chain, effect). fullscreenPad = max(0, viewport-edge distance × pr − srcPad) per side; zero for post-effect chains. Last rendering effect's outputSize return is ignored (its src pad sets the canvas draw viewport). ChainFrameInput swaps `finalViewport` / `overflow` / `elementInner*` for `elementRectOnCanvasPx` + `viewportRectOnCanvasPx`. HostFrameDims: `canvasViewport*` → `outputViewport`; adds `srcInnerRect`. effect-host.ts `#doDraw` routes implicit-output writes (null / omitted / target===ctx.output) through `outputViewport` instead of hardcoded full-RT dims — fixes a 4-4-era bug where the element-chain's last effect wrote to the full postEffectTarget FBO instead of the element's canvas sub-region. Two old tests skipped with TODO-8-8 (buffer < elementPixel semantics changed from "shrink allowed" to "clamp up"). **Breaking change**: `Effect.outputSize` can no longer request a buffer smaller than `elementPixel`; plugins that did so get clamped with a dev warning.
+
+## 8-3: effect-host.ts — default vert + srcInnerRect + uvInnerDst
+- commit: 71ec9a8
+- date: 2026-04-22
+- notes: Default vertex shader (300 es + 100) emits three varyings: `uv` (0..1 over full dst buffer), `uvInnerDst` = `(bufferUV − uvInnerRect.xy) / uvInnerRect.zw` (0..1 over element proper, with pad mapping outside [0,1]), `uvInner` = `srcInnerRect.xy + uvInnerDst * srcInnerRect.zw` (src-sampling UV, valid for capture and padded intermediates alike). `#buildUniforms` auto-injects both vec4 uniforms; `Program.uploadUniforms` silently ignores uniforms the shader doesn't declare, so custom shaders that only use `uv` or only `uvInner` keep working. Passthrough shaders still use `uv` (simple same-layout copy). **Breaking change**: shader authors gating on `uvInner ∈ [0,1]` must switch to `uvInnerDst ∈ [0,1]` — `uvInner` is now a sampling UV, not an inside-check.
+
+## 8-4: vfx-player.ts — overflow dev warn on effect path
+- commit: be0cfce
+- date: 2026-04-22
+- notes: `#addEffectElement` emits a dev warn when `opts.overflow` is set alongside `opts.effect` (overflow is shader-path only; effect path uses each effect's own `outputSize` / `padAdd` / `dims.fullscreenPad`). The chain-internal pad reshape already landed in 8-2 — this closes the loop with the user-facing signal.
+
+## 8-5: storybook/effects/bloom.ts — new API usage
+- commit: 2fd4da5
+- date: 2026-04-22
+- notes: `BloomOptions.pad: number | "fullscreen"` controls glow spread room. `outputSize` conditionally attached (omitted when `pad` is not supplied, keeping bloom pad-neutral). Shaders gate on `uvInnerDst ∈ [0,1]`; `texture(src, uvInner)` stays correct across chain stages.
+
+## 8-6: storybook/effects/posterize.ts — new API usage
+- commit: f014fc9
+- date: 2026-04-22
+- notes: Gate switched to `uvInnerDst ∈ [0,1]`. No `outputSize` — posterize doesn't grow pad.
+
+## 8-7: Effect.stories.ts — drop overflow
+- commit: 458194f
+- date: 2026-04-22
+- notes: `bloom` story: `pad: 80`. `posterizeAndBloom`: bloom tail `pad: 160`. VFXProps.overflow removed from both.
+
+## 8-8: tests — pad accumulation + srcInnerRect + fullscreenPad + auto-uniforms
+- commit: 56f254f
+- date: 2026-04-22
+- notes: effect-chain.test.ts: revived the two 8-2 skips with pad-model-correct semantics; added padAdd stacking, asymmetric padAdd, monotonic clamp (negative component → warn + clamp), fullscreenPad formula verification, stage-0 srcInnerRect/uvInnerRect assertions, buffer < elementPixel clamp-up + warn. effect-host.test.ts: auto-upload of `uvInnerRect` and `srcInnerRect` vec4s, and default vert grep for the 3 varyings + 2 uniforms. Side-fix in effect-chain.ts: detect the clamp condition on the raw user-supplied size before `distributePad` rewrites it (the 8-2 warn was masked because `distributePad` already clamps excess to 0). 119 tests pass (was 108+2 skipped).
