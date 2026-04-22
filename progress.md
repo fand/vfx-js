@@ -46,6 +46,11 @@ Track per-task completion here. Format per entry:
 - date: 2026-04-22
 - notes: EffectChain orchestrates the per-element pipeline. renderingIndices is computed once at construction (typeof render === "function"). run(input) reflects state into hosts, resolves intermediates (reallocate only on size/float delta), calls update phase (array order), then render phase (renderingIndices order). Each intermediate exposes two handles — an EffectRenderTarget for the producing effect's `ctx.output` and an EffectTexture for the next stage's `ctx.src` — so the public type contract that `ctx.src: EffectTexture` is preserved. Initialization is sequential with `await`; on throw the chain disposes prior effects in reverse order, disposes the failing host (to release any RTs its own init allocated), and rethrows. update/render throws warn once per effect index; render failures fall back to passthrough copy so the output doesn't disappear. finalTarget handle cached + regenerated only when the underlying Framebuffer instance changes.
 
+## 4-2: render() Effect branch
+- commit: 7506dff
+- date: 2026-04-22
+- notes: #renderEffectElement assembles ChainFrameInput and dispatches chain.run per frame. Gif/video srcTexture.needsUpdate=true mirrors shader path. Uniforms = static ⊕ generator results per frame. mouse/mouseViewport split (element-local vs viewport-local, both bottom-left physical px). element vs elementInner distinguishes rect+overflow vs rect proper; overflow × pixelRatio; finalViewport = (isFullScreen ? viewport : rect+overflow) × pr. finalTarget = #postEffectTarget when post effects exist, else null (canvas). First frame deltaTime=0 (lastRenderTime initialized to elem.startTime at addElement). Chain already gates on !isVisible internally but caller already `continue`s first for parity with shader path.
+
 ## 4-1: addElement Effect branch
 - commit: 13bde85
 - date: 2026-04-22
