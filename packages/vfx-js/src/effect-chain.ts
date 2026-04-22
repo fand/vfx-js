@@ -158,14 +158,17 @@ export class EffectChain {
                     `[VFX-JS] effect[${i}].init() failed:`,
                     err,
                 );
-                // Dispose prior effects (reverse order). Failing effect's
-                // own dispose is NOT called.
+                // Dispose prior effects (reverse order): user's dispose
+                // first, then their host to release any GL resources
+                // allocated via ctx.createRenderTarget / wrapTexture.
+                // Same ordering as the main dispose() path. The failing
+                // effect's own `dispose` is NOT called (init did not
+                // complete), but its host IS disposed because init may
+                // have allocated RTs / textures before the throw.
                 for (let j = i - 1; j >= 0; j--) {
                     this.#safeDispose(j);
+                    this.#hosts[j].dispose();
                 }
-                // Host for the failing effect still needs to release its
-                // GL resources — its init may have allocated RTs / textures
-                // before the throw.
                 this.#hosts[i].dispose();
                 throw err;
             }
