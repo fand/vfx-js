@@ -504,82 +504,71 @@ export class EffectChain {
         let dstBufferSize: [number, number];
         let float = false;
 
-        if (Array.isArray(ret)) {
-            dstBufferSize = [ret[0], ret[1]];
-            dstPad = distributePad(
-                dstBufferSize,
-                elementPixel,
-                srcPad,
-            );
-        } else {
-            const obj = ret as
-                | { size: readonly [number, number]; float?: boolean }
-                | { padAdd: MarginOpts; float?: boolean };
-            float = obj.float ?? false;
-            if ("padAdd" in obj) {
-                const delta = createMargin(obj.padAdd);
-                dstPad = createMargin({
-                    top: srcPad.top + delta.top,
-                    right: srcPad.right + delta.right,
-                    bottom: srcPad.bottom + delta.bottom,
-                    left: srcPad.left + delta.left,
-                });
-                dstBufferSize = [
-                    elementPixel[0] + dstPad.left + dstPad.right,
-                    elementPixel[1] + dstPad.top + dstPad.bottom,
-                ];
-            } else {
-                dstBufferSize = [obj.size[0], obj.size[1]];
-                dstPad = distributePad(
-                    dstBufferSize,
-                    elementPixel,
-                    srcPad,
-                );
+        if (Array.isArray(ret) || !("padAdd" in (ret as object))) {
+            // Explicit-size variant: `[w, h]` or `{ size, float? }`.
+            const rawSize: readonly [number, number] = Array.isArray(ret)
+                ? [ret[0], ret[1]]
+                : (ret as { size: readonly [number, number] }).size;
+            if (!Array.isArray(ret)) {
+                float =
+                    (ret as { float?: boolean }).float ?? false;
             }
+            if (
+                rawSize[0] < elementPixel[0] ||
+                rawSize[1] < elementPixel[1]
+            ) {
+                if (!this.#warnedClampBuffer.has(effectIndex)) {
+                    this.#warnedClampBuffer.add(effectIndex);
+                    console.warn(
+                        `[VFX-JS] effect[${effectIndex}].outputSize(): buffer smaller than elementPixel; clamped.`,
+                    );
+                }
+            }
+            dstBufferSize = [
+                Math.max(rawSize[0], elementPixel[0]),
+                Math.max(rawSize[1], elementPixel[1]),
+            ];
+            dstPad = distributePad(dstBufferSize, elementPixel, srcPad);
+        } else {
+            // padAdd variant.
+            const obj = ret as { padAdd: MarginOpts; float?: boolean };
+            float = obj.float ?? false;
+            const delta = createMargin(obj.padAdd);
+            dstPad = createMargin({
+                top: srcPad.top + delta.top,
+                right: srcPad.right + delta.right,
+                bottom: srcPad.bottom + delta.bottom,
+                left: srcPad.left + delta.left,
+            });
+            dstBufferSize = [
+                elementPixel[0] + dstPad.left + dstPad.right,
+                elementPixel[1] + dstPad.top + dstPad.bottom,
+            ];
         }
 
         // Monotonic clamp: dst pad >= src pad per side.
-        let violated = false;
         const clampedPad = createMargin({
             top: Math.max(dstPad.top, srcPad.top),
             right: Math.max(dstPad.right, srcPad.right),
             bottom: Math.max(dstPad.bottom, srcPad.bottom),
             left: Math.max(dstPad.left, srcPad.left),
         });
-        if (
+        const violated =
             clampedPad.top !== dstPad.top ||
             clampedPad.right !== dstPad.right ||
             clampedPad.bottom !== dstPad.bottom ||
-            clampedPad.left !== dstPad.left
-        ) {
-            violated = true;
-        }
+            clampedPad.left !== dstPad.left;
         if (violated && !this.#warnedMonotonic.has(effectIndex)) {
             this.#warnedMonotonic.add(effectIndex);
             console.warn(
                 `[VFX-JS] effect[${effectIndex}].outputSize(): pad non-monotonic (dst < src); clamped.`,
             );
         }
-        dstPad = clampedPad;
-        dstBufferSize = [
-            elementPixel[0] + dstPad.left + dstPad.right,
-            elementPixel[1] + dstPad.top + dstPad.bottom,
-        ];
-
-        // Buffer >= elementPixel on each axis (sanity).
-        if (
-            dstBufferSize[0] < elementPixel[0] ||
-            dstBufferSize[1] < elementPixel[1]
-        ) {
-            if (!this.#warnedClampBuffer.has(effectIndex)) {
-                this.#warnedClampBuffer.add(effectIndex);
-                console.warn(
-                    `[VFX-JS] effect[${effectIndex}].outputSize(): buffer smaller than elementPixel; clamped.`,
-                );
-            }
+        if (violated) {
+            dstPad = clampedPad;
             dstBufferSize = [
-                Math.max(dstBufferSize[0], elementPixel[0]),
-                Math.max(dstBufferSize[1], elementPixel[1]),
+                elementPixel[0] + dstPad.left + dstPad.right,
+                elementPixel[1] + dstPad.top + dstPad.bottom,
             ];
         }
 

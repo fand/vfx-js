@@ -349,8 +349,21 @@ describe("EffectChain: render-less middle", () => {
 // ---------------------------------------------------------------------------
 
 describe("EffectChain: outputSize", () => {
-    it.skip("allocates intermediates at the specified physical-px size", () => {
-        // TODO 8-8: rewrite for pad model (buffer < elementPixel clamps up).
+    it("allocates intermediates at the specified physical-px size (>= elementPixel)", () => {
+        const outputSize = vi.fn().mockReturnValue([256, 300]);
+        const effects: Effect[] = [
+            { render: () => {}, outputSize },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [200, 200] }));
+        expect(fbs).toHaveLength(1);
+        expect(fbs[0].width).toBe(256);
+        expect(fbs[0].height).toBe(300);
+    });
+
+    it("clamps up when buffer < elementPixel on any axis + warns once", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
         const outputSize = vi.fn().mockReturnValue([256, 128]);
         const effects: Effect[] = [
             { render: () => {}, outputSize },
@@ -360,7 +373,10 @@ describe("EffectChain: outputSize", () => {
         chain.run(makeInput({ elementPhys: [200, 200] }));
         expect(fbs).toHaveLength(1);
         expect(fbs[0].width).toBe(256);
-        expect(fbs[0].height).toBe(128);
+        // 128 < 200 → clamp to elementPixel (200).
+        expect(fbs[0].height).toBe(200);
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
     });
 
     it("last rendering effect's outputSize is ignored (final target fixed)", () => {
@@ -409,28 +425,143 @@ describe("EffectChain: outputSize", () => {
         expect(fbs[0].disposed).toBe(true); // old FB disposed
     });
 
-    it.skip("receives overflow; stage-2+ default input == previous output (no cumulative overflow)", () => {
-        // TODO 8-8: replace with padAdd accumulation test. Current test
-        // uses raw [50, 50] tuples which the new pad model clamps up to
-        // elementPixel.
-        const stage1 = vi.fn().mockImplementation(() => [50, 50]);
-        const stage2Probe = vi.fn().mockImplementation((dims) => {
-            return dims.input;
-        });
+    it("{ padAdd: N } at stage 0 → dst pad = N, buffer = elementPixel + 2N per axis", () => {
         const effects: Effect[] = [
-            { render: () => {}, outputSize: stage1 },
-            { render: () => {}, outputSize: stage2Probe },
+            { render: () => {}, outputSize: () => ({ padAdd: 10 }) },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        expect(fbs).toHaveLength(1);
+        expect(fbs[0].width).toBe(120);
+        expect(fbs[0].height).toBe(120);
+        const stage0 = chain.stages[0];
+        expect(stage0.dstPad).toMatchObject({
+            top: 10,
+            right: 10,
+            bottom: 10,
+            left: 10,
+        });
+    });
+
+    it("stacked padAdd accumulates: [a({padAdd:10}), b({padAdd:10})] → stage 1 dst pad = 20", () => {
+        const effects: Effect[] = [
+            { render: () => {}, outputSize: () => ({ padAdd: 10 }) },
+            { render: () => {}, outputSize: () => ({ padAdd: 10 }) },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        const [s0, s1] = chain.stages;
+        expect(s0.dstPad.left).toBe(10);
+        expect(s1.srcPad.left).toBe(10);
+        expect(s1.dstPad.left).toBe(20);
+        expect(fbs[0].width).toBe(120); // stage 0 intermediate
+        expect(fbs[1].width).toBe(140); // stage 1 intermediate
+    });
+
+    it("asymmetric padAdd produces asymmetric buffer; srcInnerRect reflects layout", () => {
+        const effects: Effect[] = [
+            {
+                render: () => {},
+                outputSize: () => ({
+                    padAdd: { top: 0, right: 50, bottom: 0, left: 50 },
+                }),
+            },
+            { render: () => {}, outputSize: vi.fn().mockReturnValue({ padAdd: 0 }) },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        // Stage 0 intermediate: 200×100 (100 + 50 + 50, 100 + 0 + 0).
+        expect(fbs[0].width).toBe(200);
+        expect(fbs[0].height).toBe(100);
+        const s1 = chain.stages[1];
+        // Stage 1's src is stage 0's intermediate. srcInnerRect places
+        // the inner at (50/200, 0/100) with size (100/200, 100/100).
+        expect(s1.srcInnerRect[0]).toBeCloseTo(0.25);
+        expect(s1.srcInnerRect[1]).toBeCloseTo(0);
+        expect(s1.srcInnerRect[2]).toBeCloseTo(0.5);
+        expect(s1.srcInnerRect[3]).toBeCloseTo(1);
+    });
+
+    it("monotonic clamp: negative padAdd component dev-warns and clamps to 0", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const effects: Effect[] = [
+            {
+                render: () => {},
+                outputSize: () => ({
+                    padAdd: { top: -5, right: 0, bottom: 0, left: 0 },
+                }),
+            },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        expect(chain.stages[0].dstPad.top).toBe(0); // clamped
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
+    });
+
+    it("dims.fullscreenPad equals max(0, viewport-edge distance - srcPad) per side", () => {
+        const probe = vi.fn().mockReturnValue({ padAdd: 0 });
+        const effects: Effect[] = [
+            { render: () => {}, outputSize: probe },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
         chain.run(
             makeInput({
                 elementPhys: [100, 100],
+                viewportPhys: [400, 400],
+                elementRectOnCanvasPx: { x: 150, y: 150, w: 100, h: 100 },
+                viewportRectOnCanvasPx: { x: 0, y: 0, w: 400, h: 400 },
             }),
         );
+        const dims = probe.mock.calls[0][0];
+        // Element origin (150, 150), extent (250, 250). Viewport (0, 0)–(400, 400).
+        // Edges: left=150, right=150, bottom=150, top=150. srcPad=0.
+        expect(dims.fullscreenPad).toEqual({
+            top: 150,
+            right: 150,
+            bottom: 150,
+            left: 150,
+        });
+    });
+
+    it("srcInnerRect at stage 0 is (0, 0, 1, 1); uvInnerRect reflects current dst pad", () => {
+        const effects: Effect[] = [
+            { render: () => {}, outputSize: () => ({ padAdd: 10 }) },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        const [s0] = chain.stages;
+        // Stage 0 src = capture (inner-only).
+        expect(s0.srcInnerRect).toEqual([0, 0, 1, 1]);
+        // Stage 0 dst buffer = 120×120 with inner at (10, 10) size 100×100.
+        // Ratios: (10/120, 10/120, 100/120, 100/120).
+        expect(s0.uvInnerRect[0]).toBeCloseTo(10 / 120);
+        expect(s0.uvInnerRect[1]).toBeCloseTo(10 / 120);
+        expect(s0.uvInnerRect[2]).toBeCloseTo(100 / 120);
+        expect(s0.uvInnerRect[3]).toBeCloseTo(100 / 120);
+    });
+
+    it("stage k+1 sees dims.input == stage k's dst buffer size", () => {
+        const stage2Probe = vi.fn().mockImplementation(() => {
+            return { padAdd: 0 };
+        });
+        const effects: Effect[] = [
+            { render: () => {}, outputSize: () => ({ padAdd: 20 }) },
+            { render: () => {}, outputSize: stage2Probe },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
         expect(stage2Probe).toHaveBeenCalled();
-        const args = stage2Probe.mock.calls[0][0];
-        expect(args.input).toEqual([50, 50]);
+        // Stage 0 dst: 100 + 20*2 = 140 per axis. Stage 1 sees this as
+        // dims.input.
+        expect(stage2Probe.mock.calls[0][0].input).toEqual([140, 140]);
     });
 
     it("post-effect context: element* mirrors viewport* and fullscreenPad is zero", () => {

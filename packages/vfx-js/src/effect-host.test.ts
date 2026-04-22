@@ -671,6 +671,39 @@ describe("EffectHost.draw", () => {
         expect(warn).not.toHaveBeenCalled();
         warn.mockRestore();
     });
+
+    it("auto-uploads uvInnerRect and srcInnerRect as vec4 uniforms", () => {
+        const { host } = makeHost();
+        host.setFrameDims({
+            outputPhysW: 100,
+            outputPhysH: 100,
+            canvasPhysW: 200,
+            canvasPhysH: 200,
+            outputViewport: { x: 0, y: 0, w: 100, h: 100 },
+            elementPhysW: 100,
+            elementPhysH: 100,
+            uvInnerRect: [0.1, 0.2, 0.3, 0.4],
+            srcInnerRect: [0.5, 0.6, 0.7, 0.8],
+        });
+        host.setPhase("render");
+        host.ctx.draw({ frag: FRAG });
+        expect(programs).toHaveLength(1);
+        const uploads = programs[0].uploads[0];
+        expect(uploads["uvInnerRect"].value).toEqual([0.1, 0.2, 0.3, 0.4]);
+        expect(uploads["srcInnerRect"].value).toEqual([0.5, 0.6, 0.7, 0.8]);
+    });
+
+    it("default vertex shader emits uv / uvInnerDst / uvInner varyings", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        host.ctx.draw({ frag: FRAG });
+        const vert = programs[0].vert;
+        expect(vert).toMatch(/\bout vec2 uv\b/);
+        expect(vert).toMatch(/\bout vec2 uvInnerDst\b/);
+        expect(vert).toMatch(/\bout vec2 uvInner\b/);
+        expect(vert).toMatch(/uniform vec4 uvInnerRect\b/);
+        expect(vert).toMatch(/uniform vec4 srcInnerRect\b/);
+    });
 });
 
 // ---------------------------------------------------------------------------
