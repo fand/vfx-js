@@ -46,6 +46,11 @@ Track per-task completion here. Format per entry:
 - date: 2026-04-22
 - notes: EffectChain orchestrates the per-element pipeline. renderingIndices is computed once at construction (typeof render === "function"). run(input) reflects state into hosts, resolves intermediates (reallocate only on size/float delta), calls update phase (array order), then render phase (renderingIndices order). Each intermediate exposes two handles — an EffectRenderTarget for the producing effect's `ctx.output` and an EffectTexture for the next stage's `ctx.src` — so the public type contract that `ctx.src: EffectTexture` is preserved. Initialization is sequential with `await`; on throw the chain disposes prior effects in reverse order, disposes the failing host (to release any RTs its own init allocated), and rethrows. update/render throws warn once per effect index; render failures fall back to passthrough copy so the output doesn't disappear. finalTarget handle cached + regenerated only when the underlying Framebuffer instance changes.
 
+## 4-3: removeElement Effect branch
+- commit: 13bde85 (bundled with 4-1)
+- date: 2026-04-22
+- notes: Already implemented in 4-1's addElement wiring commit (plan's "one task per commit, unless explicitly depends"): removeElement branches on `e.chain` and calls `chain.dispose()` (effects + hosts + intermediate RTs) in place of the shader-path bufferTargets/passes/backbuffer dispose loop; srcTexture.dispose + opacity restore stay in the shared tail. No additional changes for 4-3.
+
 ## 4-2: render() Effect branch
 - commit: 7506dff
 - date: 2026-04-22
