@@ -53,9 +53,6 @@ export const posterizeAndBloom: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
         img.src = Jellyfish;
-        img.style.display = "block";
-        img.style.margin = "60px auto";
-        img.style.width = "min(900px, 80vw)";
         return img;
     },
     args: undefined,
