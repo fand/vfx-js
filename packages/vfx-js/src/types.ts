@@ -333,6 +333,22 @@ export type VFXProps = {
 
     /** See {@link GlslVersion}. */
     glslVersion?: GlslVersion;
+
+    /**
+     * Effect (or pipeline of effects) applied to this element.
+     *
+     * Mutually exclusive with `shader`. When both are specified, `effect`
+     * takes precedence and a dev warning is emitted.
+     *
+     * A single Effect is normalized internally to a length-1 array. An empty
+     * array emits a dev warning and copies the element capture directly to
+     * the final target (identity chain).
+     *
+     * Effect instances are stateful: do NOT reuse the same Effect object
+     * across multiple elements. Use a factory that returns a new Effect
+     * per call.
+     */
+    effect?: Effect | readonly Effect[];
 };
 
 /**
@@ -438,8 +454,12 @@ export type VFXPostEffect = {
      * - `float time`: Time in seconds since VFX started
      * - `vec2 mouse`: Mouse position in pixels
      * - `sampler2D backbuffer`: Previous frame texture (if persistent is enabled)
+     *
+     * Optional: mutually exclusive with `effect`. One of `shader` or `effect`
+     * must be specified. If both are present, `effect` takes precedence and
+     * a dev warning is emitted.
      */
-    shader: ShaderPreset | string;
+    shader?: ShaderPreset | string;
 
     /**
      * Custom uniform values to be passed to the post effect shader.
@@ -460,4 +480,394 @@ export type VFXPostEffect = {
 
     /** See {@link GlslVersion}. */
     glslVersion?: GlslVersion;
+
+    /**
+     * Effect (or pipeline of effects) to apply in this post-effect slot.
+     *
+     * When set, the slot runs the Effect pipeline against the viewport
+     * capture instead of the shader-based post-effect pass. Mutually
+     * exclusive with `shader` — if both are specified, `effect` takes
+     * precedence and a dev warning is emitted.
+     */
+    effect?: Effect | readonly Effect[];
 };
+
+// ---------------------------------------------------------------------------
+// Effect API (public)
+// ---------------------------------------------------------------------------
+
+/**
+ * Handle for a GPU texture exposed to effects.
+ *
+ * Always pass this (not an extracted inner reference) as a uniform; the
+ * backend resolves to the current internal Texture at bind time. The
+ * resolver form lets `ctx.src` transparently follow a text-element
+ * re-render (which swaps the underlying texture).
+ *
+ * `width` / `height` are physical pixels of the source's native size.
+ * They may read as 0 before the source is ready (e.g. HTMLImageElement
+ * pre-load, HTMLVideoElement pre-play).
+ */
+export type EffectTexture = {
+    readonly width: number;
+    readonly height: number;
+    readonly __brand: "EffectTexture";
+};
+
+/**
+ * Render target handle.
+ *
+ * Do NOT retain the underlying texture reference separately — for
+ * persistent (double-buffered) RTs the read texture rotates across
+ * draws. Always pass the RT itself as a uniform value; the backend
+ * resolves the current read texture at bind time.
+ */
+export type EffectRenderTarget = {
+    readonly width: number;
+    readonly height: number;
+    readonly __brand: "EffectRenderTarget";
+};
+
+/**
+ * Source types accepted by {@link EffectContext.wrapTexture}.
+ * Mirrors the internal Texture source list plus a raw WebGLTexture
+ * escape hatch for callers that uploaded via `ctx.gl` themselves.
+ */
+export type EffectTextureSource =
+    | WebGLTexture
+    | HTMLImageElement
+    | HTMLCanvasElement
+    | HTMLVideoElement
+    | ImageBitmap
+    | OffscreenCanvas;
+
+export type EffectTextureWrap = "clamp" | "repeat" | "mirror";
+export type EffectTextureFilter = "nearest" | "linear";
+
+/**
+ * Uniform value type.
+ *
+ * Dispatch is driven by the shader's active uniform type (inspected via
+ * `gl.getActiveUniform`), not the JS type alone. For example `[1, 2]`
+ * against `uniform ivec2 foo` uploads via `gl.uniform2i(loc, 1, 2)`.
+ * `number[]` / typed arrays are polymorphic: length 9 → mat3, length 16
+ * → mat4, otherwise array uniform matching the shader's declared type.
+ * Length mismatches emit a dev warning and skip the upload.
+ */
+export type EffectUniformValue =
+    | number
+    | boolean
+    | [number, number]
+    | [number, number, number]
+    | [number, number, number, number]
+    | number[]
+    | Float32Array
+    | Int32Array
+    | Uint32Array
+    | EffectTexture
+    | EffectRenderTarget;
+
+export type EffectUniforms = { [name: string]: EffectUniformValue };
+
+export type EffectRenderTargetOpts = {
+    /**
+     * Size in physical pixels.
+     *
+     * Omit → match element size × pixelRatio and auto-resize on element
+     * resize. Specify a tuple (physical px) → fixed size, no auto-resize.
+     */
+    size?: readonly [number, number];
+
+    /** Use 16F/32F render target. (Default: `false`) */
+    float?: boolean;
+
+    /**
+     * Double-buffered across frames. (Default: `false`)
+     *
+     * Pass the RT itself as a uniform to read the previous frame's write;
+     * after a draw to it the handle swaps internally.
+     */
+    persistent?: boolean;
+
+    /** Default: `"clamp"`. Tuple form specifies `[wrapS, wrapT]`. */
+    wrap?: EffectTextureWrap | readonly [EffectTextureWrap, EffectTextureWrap];
+
+    /** Default: `"linear"`. */
+    filter?: EffectTextureFilter;
+};
+
+export type EffectAttributeTypedArray =
+    | Float32Array
+    | Uint8Array
+    | Uint16Array
+    | Uint32Array
+    | Int8Array
+    | Int16Array
+    | Int32Array;
+
+export type EffectAttributeDescriptor =
+    | EffectAttributeTypedArray
+    | {
+          data: EffectAttributeTypedArray;
+          itemSize: 1 | 2 | 3 | 4;
+          normalized?: boolean;
+          /** ANGLE_instanced_arrays / WebGPU `stepMode: "instance"`. */
+          perInstance?: boolean;
+          /**
+           * Optional explicit vertex attribute location. GLSL: honored
+           * via `gl.bindAttribLocation` before link. WGSL (future): must
+           * match `@location(N)` in the user shader. Omit for GLSL;
+           * specify when writing raw WGSL.
+           */
+          location?: number;
+      };
+
+/**
+ * Geometry POJO. Maps 1:1 to a raw-WebGL VAO today and WebGPU
+ * `GPUVertexBufferLayout` + `primitive.topology` tomorrow. Attribute
+ * names (not shaderLocation numbers) are the user contract; backend
+ * resolves to locations during program link.
+ */
+export type EffectGeometry = {
+    /** Default: `"triangles"`. */
+    mode?: "triangles" | "lines" | "lineStrip" | "points";
+    /** `"position"` is conventional. */
+    attributes: Record<string, EffectAttributeDescriptor>;
+    indices?: Uint16Array | Uint32Array;
+    instanceCount?: number;
+    drawRange?: { start?: number; count?: number };
+};
+
+/**
+ * Opaque handle for the effect's "target region" fullscreen quad.
+ *
+ * - element effect → element rect + overflow padding
+ * - post effect    → viewport + scrollPadding
+ *
+ * Users cannot construct or extend it; treat it as an injected default.
+ */
+export type EffectQuad = { readonly __brand: "EffectQuad" };
+
+export type EffectDrawOpts = {
+    frag: string;
+    vert?: string;
+    /** Default: `ctx.quad`. */
+    geometry?: EffectQuad | EffectGeometry;
+    uniforms?: EffectUniforms;
+    /**
+     * `null` / omitted → use `ctx.output` (which may itself be null → canvas).
+     * Passing `ctx.output` explicitly and passing `null` are equivalent.
+     */
+    target?: EffectRenderTarget | null;
+};
+
+/**
+ * Read-only snapshot of VFXProps fields that survive the effect boundary.
+ *
+ * Orchestrator-level fields (overflow/intersection/release/overlay/zIndex/
+ * wrap/type) are applied outside the Effect and NOT surfaced here.
+ * `backbuffer` is intentionally omitted — use
+ * `ctx.createRenderTarget({ persistent: true })` instead.
+ */
+export type EffectVFXProps = {
+    /** Default: `true`. */
+    readonly autoCrop: boolean;
+    /** Default: `"300 es"`. */
+    readonly glslVersion: "100" | "300 es";
+};
+
+/**
+ * Context passed to each Effect lifecycle hook.
+ *
+ * The orchestrator mutates fields (src / output / time / mouse / ...) in
+ * place between frames; effect authors should read values through the
+ * ctx reference and not cache across frames.
+ */
+export type EffectContext = {
+    readonly time: number;
+    readonly deltaTime: number;
+    readonly pixelRatio: number;
+    /** Canvas resolution, physical px. */
+    readonly resolution: readonly [number, number];
+    /**
+     * Element-local bottom-left origin, physical px. Bottom-left matches
+     * GLSL `gl_FragCoord` convention.
+     *
+     * NOTE: diverges from the shader path's `mouse` uniform (canvas-space
+     * and pass-dependent). Effect authors migrating a shader should
+     * account for the new origin/space.
+     */
+    readonly mouse: readonly [number, number];
+    /**
+     * Viewport-local bottom-left origin, physical px. Same value across
+     * all passes (no padding/buffer-space scaling).
+     */
+    readonly mouseViewport: readonly [number, number];
+    readonly intersection: number;
+    readonly enterTime: number;
+    readonly leaveTime: number;
+    /** Element capture texture (read-only input for the first stage). */
+    readonly src: EffectTexture;
+    /** Final target; `null` → canvas. */
+    readonly output: EffectRenderTarget | null;
+    /**
+     * User-supplied uniforms from `VFXProps.uniforms`, resolved every
+     * frame (function-valued entries are evaluated before `update`).
+     * vfx-js's built-in uniforms (time/mouse/resolution/...) are NOT
+     * included here — they are exposed as top-level ctx fields.
+     */
+    readonly uniforms: Readonly<Record<string, EffectUniformValue>>;
+    readonly vfxProps: EffectVFXProps;
+    /**
+     * Canonical fullscreen NDC (-1..1) quad. Draws through it use the
+     * target's viewport rect, so vertex shaders operate in NDC space
+     * that maps 1:1 to the target region.
+     *
+     * Convenience varying (default vertex shader only, omit `vert`):
+     *   `in vec2 uvInner;` — 0..1 spans the INNER region (element rect
+     *   proper for element effects; viewport proper for post effects).
+     *   Negative components or values > 1 indicate the overflow /
+     *   scrollPadding pad. Custom vertex shaders must compute their own
+     *   mapping.
+     */
+    readonly quad: EffectQuad;
+
+    /** Allocate a render target. */
+    createRenderTarget(opts?: EffectRenderTargetOpts): EffectRenderTarget;
+
+    /**
+     * Wrap an externally-produced texture for use as a uniform.
+     *
+     * - `WebGLTexture` source requires `opts.size` (no JS-side
+     *   introspection). Not registered for context-loss recovery:
+     *   caller must re-allocate + re-wrap in `onContextRestored(cb)`.
+     * - DOM sources carry their own dimensions and ARE registered for
+     *   automatic restore.
+     *
+     * `autoUpdate` default:
+     *   `HTMLVideoElement` / `HTMLCanvasElement` / `OffscreenCanvas` → true
+     *   `HTMLImageElement` / `ImageBitmap` / `WebGLTexture`         → false
+     *
+     * No caching: calling `wrapTexture` twice with the same source
+     * allocates two independent GPU textures. Hoist the call into
+     * `init()` and reuse the handle across frames.
+     */
+    wrapTexture(
+        source: EffectTextureSource,
+        opts?: {
+            size?: readonly [number, number];
+            autoUpdate?: boolean;
+            wrap?:
+                | EffectTextureWrap
+                | readonly [EffectTextureWrap, EffectTextureWrap];
+            filter?: EffectTextureFilter;
+        },
+    ): EffectTexture;
+
+    /**
+     * Dispatch a draw.
+     *
+     * Every call performs a full binding sequence (program → framebuffer
+     * → viewport → blend → VAO → uniforms) before dispatch, so no state
+     * leaks from one draw to the next. Raw `ctx.gl.*` state mutations
+     * between draws are harmless.
+     *
+     * Called from `update()` it is a no-op (silently ignored, dev warning
+     * once per host).
+     */
+    draw(opts: EffectDrawOpts): void;
+
+    /**
+     * Raw escape hatch: the live WebGL2 context VFX-JS renders into.
+     *
+     * Use for custom GL operations (DataTexture upload, extensions, MRT,
+     * etc). Resources allocated via `ctx.gl` are the caller's
+     * responsibility — release them in `dispose()` and re-allocate them
+     * in `onContextRestored(cb)`.
+     */
+    readonly gl: WebGL2RenderingContext;
+
+    /**
+     * Subscribe to `webglcontextrestored`.
+     *
+     * Resources created via the high-level API (createRenderTarget /
+     * wrapTexture / ctx.draw with EffectGeometry) are restored
+     * automatically. Raw `ctx.gl`-allocated resources are the caller's
+     * responsibility to rebuild.
+     *
+     * Returns an unsubscribe function; automatically unsubscribed on
+     * dispose.
+     */
+    onContextRestored(cb: () => void): () => void;
+};
+
+/**
+ * Effect lifecycle interface.
+ *
+ * All hooks are optional:
+ * - `init` runs once at registration, sequentially in array order.
+ * - `update` runs every frame (state-update only; `ctx.draw` is a no-op).
+ * - `render` runs every frame; omitting it makes the effect TRANSPARENT
+ *   in the chain (no pass allocated, previous rendering effect's output
+ *   flows directly to the next).
+ * - `outputSize` declares the dimensions this effect writes into
+ *   `ctx.output`. Default: input size, non-float. The LAST rendering
+ *   effect's return value is ignored (its output is the fixed final
+ *   target).
+ * - `dispose` runs on element removal, reverse array order.
+ */
+export interface Effect {
+    init?(ctx: EffectContext): void | Promise<void>;
+
+    /**
+     * State-update phase. `ctx.src` / `ctx.output` may point to stale /
+     * previous-frame handles here, so `ctx.draw()` MUST NOT be called.
+     * If called, the orchestrator silently ignores it.
+     */
+    update?(ctx: EffectContext): void;
+
+    /**
+     * Render phase. Omit to make this effect transparent in the chain.
+     */
+    render?(ctx: EffectContext): void;
+
+    dispose?(): void;
+
+    /**
+     * Declares the output dimensions (and optional float flag) this
+     * effect writes into `ctx.output`. Called every frame; the chain
+     * only reallocates the intermediate RT when `size` OR `float`
+     * differs.
+     *
+     * Units: `input` / `elementPixel` / `viewportPixel` / `overflow` /
+     * return value are physical pixels; `element` / `viewport` are
+     * logical pixels (CSS px).
+     *
+     * Overflow is applied once at stage 1 and carried forward; it is
+     * NOT added cumulatively. Effects that want cumulative extra padding
+     * must compute it explicitly from `dims.overflow`.
+     *
+     * Post-effect context: `element` / `elementPixel` mirror
+     * `viewport` / `viewportPixel`. `overflow` is always zero.
+     */
+    outputSize?(dims: {
+        readonly input: readonly [number, number];
+        readonly element: readonly [number, number];
+        readonly elementPixel: readonly [number, number];
+        readonly viewport: readonly [number, number];
+        readonly viewportPixel: readonly [number, number];
+        /** Margin padding around the element, physical px. */
+        readonly overflow: {
+            readonly top: number;
+            readonly right: number;
+            readonly bottom: number;
+            readonly left: number;
+        };
+        readonly pixelRatio: number;
+    }):
+        | readonly [number, number]
+        | {
+              readonly size: readonly [number, number];
+              readonly float?: boolean;
+          };
+}
