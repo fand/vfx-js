@@ -46,6 +46,11 @@ Track per-task completion here. Format per entry:
 - date: 2026-04-22
 - notes: EffectChain orchestrates the per-element pipeline. renderingIndices is computed once at construction (typeof render === "function"). run(input) reflects state into hosts, resolves intermediates (reallocate only on size/float delta), calls update phase (array order), then render phase (renderingIndices order). Each intermediate exposes two handles — an EffectRenderTarget for the producing effect's `ctx.output` and an EffectTexture for the next stage's `ctx.src` — so the public type contract that `ctx.src: EffectTexture` is preserved. Initialization is sequential with `await`; on throw the chain disposes prior effects in reverse order, disposes the failing host (to release any RTs its own init allocated), and rethrows. update/render throws warn once per effect index; render failures fall back to passthrough copy so the output doesn't disappear. finalTarget handle cached + regenerated only when the underlying Framebuffer instance changes.
 
+## 4-5: vfx.ts pass effect through
+- commit: — (no code change)
+- date: 2026-04-22
+- notes: Verified: VFX.add delegates to #addImage / #addVideo / #addCanvas / #addText, each of which calls `this.#player.addElement(element, opts)` with the untouched opts object. VFX.addHTML destructures `overlay` out (hic flow has its own hiding) but splats everything else into hicOpts, including `effect`. No modifications required — opts.effect flows through unchanged.
+
 ## 4-4: VFXPostEffect.effect
 - commit: c147888
 - date: 2026-04-22
