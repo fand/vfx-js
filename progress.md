@@ -46,6 +46,23 @@ Track per-task completion here. Format per entry:
 - date: 2026-04-22
 - notes: EffectChain orchestrates the per-element pipeline. renderingIndices is computed once at construction (typeof render === "function"). run(input) reflects state into hosts, resolves intermediates (reallocate only on size/float delta), calls update phase (array order), then render phase (renderingIndices order). Each intermediate exposes two handles — an EffectRenderTarget for the producing effect's `ctx.output` and an EffectTexture for the next stage's `ctx.src` — so the public type contract that `ctx.src: EffectTexture` is preserved. Initialization is sequential with `await`; on throw the chain disposes prior effects in reverse order, disposes the failing host (to release any RTs its own init allocated), and rethrows. update/render throws warn once per effect index; render failures fall back to passthrough copy so the output doesn't disappear. finalTarget handle cached + regenerated only when the underlying Framebuffer instance changes.
 
+## 6-1: Effect.stories.ts
+- commit: 79e2b9f
+- date: 2026-04-22
+- notes: packages/storybook/src/effects/trail.ts exposes `createTrailEffect({ decay })` as a factory returning a stateful Effect. `feedback` = persistent RT; render is two-pass (accumulate src ⊕ decayed prev → feedback, then copy feedback → ctx.output). The accumulate shader uses `uvInner` to mask the overflow pad so only the trail history bleeds out, not the element itself. Only `import type { Effect, EffectContext, EffectRenderTarget }` from @vfx-js/core — the emitted JS has zero runtime imports of core (verified in 7-2). Two stories: `trail` (single form) and `trailAsArray` (array form), both using the SVG logo with overflow padding.
+
+## 7-1: Build check
+- date: 2026-04-22
+- notes: `npm --workspace=@vfx-js/core run build` is blocked by pre-existing tsconfig `ignoreDeprecations: "6.0"` incompatibility with tsc 5.8+ (flagged in 1-1 notes). Worked around via direct tsc invocation in lib/esm and lib/cjs. Both builds emit index.d.ts with the full Effect* export set: `Effect, EffectAttributeDescriptor, EffectAttributeTypedArray, EffectContext, EffectDrawOpts, EffectGeometry, EffectQuad, EffectRenderTarget, EffectRenderTargetOpts, EffectTexture, EffectTextureFilter, EffectTextureSource, EffectTextureWrap, EffectUniforms, EffectUniformValue, EffectVFXProps`. No commit.
+
+## 7-2: Zero-runtime-dep check
+- date: 2026-04-22
+- notes: Storybook `build` is blocked by pre-existing config issue (`.storybook/main.ts` uses `require` in ESM scope). Verified the zero-runtime-dep property directly by standalone-compiling `packages/storybook/src/effects/trail.ts` with tsc (esnext target, bundler moduleResolution). Emitted JS contains zero `import`/`require`/`@vfx-js` occurrences — `import type` is fully erased as expected. No commit.
+
+## 7-3: Existing tests + lint
+- date: 2026-04-22
+- notes: `npm test` passes — 110 tests across 6 files (rect, gl/framebuffer, gl/program, effect-host, effect-chain, vfx-player). `npm run lint` is blocked pre-existing: Biome 2.x rejects the repo's biome.json `linter.includes` key (introduced in Biome 2.x schema; effective Biome CLI version chokes on it). No lint regressions introduced by this PR (not observable until Biome config is fixed). No commit.
+
 ## 5-1: effect-host.test.ts
 - commit: b8f24f0
 - date: 2026-04-22
