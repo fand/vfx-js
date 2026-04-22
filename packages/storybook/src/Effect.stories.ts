@@ -3,7 +3,9 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { createBloomEffect } from "./effects/bloom";
-import { createPosterizeEffect } from "./effects/posterize";
+import { createPixelateEffect } from "./effects/pixelate";
+import { createRgbMixEffect } from "./effects/rgb-mix";
+import { createScanlineEffect } from "./effects/scanline";
 import "./preset.css";
 import { initVFX } from "./utils";
 
@@ -12,10 +14,6 @@ export default {
     parameters: { layout: "fullscreen" },
 } satisfies Meta<undefined>;
 
-/**
- * Single effect: bloom. Deterministic (no frame-to-frame feedback),
- * making it VRT-friendly — static input ⇒ static output.
- */
 export const bloom: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
@@ -43,13 +41,7 @@ bloom.play = async ({ canvasElement }) => {
     });
 };
 
-/**
- * Chain: posterize → bloom. Exercises EffectChain with M=2 (one
- * intermediate RT allocated between the two rendering effects) and
- * verifies that src/output swap correctly. Still deterministic for
- * VRT.
- */
-export const posterizeAndBloom: StoryObj<undefined> = {
+export const crtBloom: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
         img.src = Jellyfish;
@@ -57,7 +49,7 @@ export const posterizeAndBloom: StoryObj<undefined> = {
     },
     args: undefined,
 };
-posterizeAndBloom.play = async ({ canvasElement }) => {
+crtBloom.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
     await new Promise((o) => {
         img.onload = o;
@@ -66,12 +58,14 @@ posterizeAndBloom.play = async ({ canvasElement }) => {
     const vfx = initVFX();
     await vfx.add(img, {
         effect: [
-            createPosterizeEffect({ levels: 4 }),
+            createPixelateEffect({ size: 10 }),
+            createScanlineEffect({ spacing: 5 }),
+            createRgbMixEffect({ gains: [0, 2, 2] }),
             createBloomEffect({
-                threshold: 0.4,
-                softness: 0.05,
-                intensity: 2.5,
-                iterations: 12,
+                threshold: 0.2,
+                softness: 0.4,
+                intensity: 5.0,
+                iterations: 300,
                 pad: 160,
             }),
         ],
