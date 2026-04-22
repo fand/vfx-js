@@ -148,23 +148,32 @@ export type HostFrameDims = {
     /** Canvas physical-px size for `resolution`. */
     canvasPhysW: number;
     canvasPhysH: number;
-    /** Physical-px rect on the canvas when ctx.output === null. */
-    canvasViewportX: number;
-    canvasViewportY: number;
-    canvasViewportW: number;
-    canvasViewportH: number;
+    /**
+     * Physical-px viewport used when the draw's target is the stage's
+     * assigned `ctx.output` (or `null` / omitted). For intermediate
+     * stages this is `(0, 0, bufferW, bufferH)`; for the last stage it
+     * is the canvas-space element rect (bottom-left origin). User-
+     * allocated RTs keep their full-dim viewport regardless.
+     */
+    outputViewport: { x: number; y: number; w: number; h: number };
     /**
      * Current element physical size (used by auto-resize RTs). Equal to
-     * the element rect + overflow in physical px for element effects, or
-     * the viewport + scrollPadding for post effects.
+     * the element rect in physical px (inner, no overflow) for element
+     * effects, or the viewport for post effects.
      */
     elementPhysW: number;
     elementPhysH: number;
     /**
-     * `uvInnerRect` uniform value: inner origin + inner size in
+     * `uvInnerRect` uniform value (dst): inner origin + inner size in
      * buffer-fraction units (0..1). See plan.md "`uvInner` varying".
      */
     uvInnerRect: [number, number, number, number];
+    /**
+     * `srcInnerRect` uniform value (src): sampling origin + size in src
+     * texture UV. Drives `uvInner = srcInnerRect.xy + uvInnerDst *
+     * srcInnerRect.zw` in the default vertex shader.
+     */
+    srcInnerRect: [number, number, number, number];
 };
 
 type Phase = "init" | "update" | "render" | "disposed";
@@ -239,13 +248,11 @@ export class EffectHost {
             outputPhysH: 1,
             canvasPhysW: 1,
             canvasPhysH: 1,
-            canvasViewportX: 0,
-            canvasViewportY: 0,
-            canvasViewportW: 1,
-            canvasViewportH: 1,
+            outputViewport: { x: 0, y: 0, w: 1, h: 1 },
             elementPhysW: 1,
             elementPhysH: 1,
             uvInnerRect: [0, 0, 1, 1],
+            srcInnerRect: [0, 0, 1, 1],
         };
         this.#ctxBacking = {
             time: 0,
@@ -325,16 +332,8 @@ export class EffectHost {
         const prevOutput = this.#ctxBacking.output;
         this.#ctxBacking.output = target;
         try {
-            const prevCanvasVp = {
-                x: this.#dims.canvasViewportX,
-                y: this.#dims.canvasViewportY,
-                w: this.#dims.canvasViewportW,
-                h: this.#dims.canvasViewportH,
-            };
-            this.#dims.canvasViewportX = viewport.x;
-            this.#dims.canvasViewportY = viewport.y;
-            this.#dims.canvasViewportW = viewport.w;
-            this.#dims.canvasViewportH = viewport.h;
+            const prevVp = this.#dims.outputViewport;
+            this.#dims.outputViewport = { ...viewport };
             const glslVersion = this.#ctxBacking.vfxProps.glslVersion;
             const frag =
                 glslVersion === "100"
@@ -345,10 +344,7 @@ export class EffectHost {
                 uniforms: { src },
                 target,
             });
-            this.#dims.canvasViewportX = prevCanvasVp.x;
-            this.#dims.canvasViewportY = prevCanvasVp.y;
-            this.#dims.canvasViewportW = prevCanvasVp.w;
-            this.#dims.canvasViewportH = prevCanvasVp.h;
+            this.#dims.outputViewport = prevVp;
         } finally {
             this.#ctxBacking.output = prevOutput;
             this.#phase = prevPhase;
@@ -663,10 +659,15 @@ export class EffectHost {
             this.#programs.set(key, program);
         }
 
+        const ctxOutput = this.#ctxBacking.output;
         const rawTarget =
             opts.target === undefined || opts.target === null
-                ? this.#ctxBacking.output
+                ? ctxOutput
                 : opts.target;
+        // Writes to the stage's assigned output (explicit ctx.output, null,
+        // or omitted) honor the chain-computed outputViewport. Writes to a
+        // user-allocated RT get full-RT dims.
+        const isStageOutput = rawTarget === null || rawTarget === ctxOutput;
 
         let fbo: WebGLFramebuffer | null;
         let vpX: number;
@@ -676,17 +677,24 @@ export class EffectHost {
         let swap: (() => void) | undefined;
         if (rawTarget === null) {
             fbo = null;
-            vpX = this.#dims.canvasViewportX;
-            vpY = this.#dims.canvasViewportY;
-            vpW = this.#dims.canvasViewportW;
-            vpH = this.#dims.canvasViewportH;
+            vpX = this.#dims.outputViewport.x;
+            vpY = this.#dims.outputViewport.y;
+            vpW = this.#dims.outputViewport.w;
+            vpH = this.#dims.outputViewport.h;
         } else {
             const resolver = resolveRt(rawTarget);
             fbo = resolver.getWriteFbo().fbo;
-            vpX = 0;
-            vpY = 0;
-            vpW = rawTarget.width;
-            vpH = rawTarget.height;
+            if (isStageOutput) {
+                vpX = this.#dims.outputViewport.x;
+                vpY = this.#dims.outputViewport.y;
+                vpW = this.#dims.outputViewport.w;
+                vpH = this.#dims.outputViewport.h;
+            } else {
+                vpX = 0;
+                vpY = 0;
+                vpW = rawTarget.width;
+                vpH = rawTarget.height;
+            }
             swap = resolver.swap;
         }
 

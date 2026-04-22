@@ -7,6 +7,7 @@ import {
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
 import type { Quad } from "./gl/quad.js";
+import { createMargin, type Margin, type MarginOpts } from "./rect.js";
 import type {
     Effect,
     EffectRenderTarget,
@@ -15,12 +16,14 @@ import type {
     EffectVFXProps,
 } from "./types.js";
 
-export type ChainOverflow = {
+export type ChainMargin = {
     readonly top: number;
     readonly right: number;
     readonly bottom: number;
     readonly left: number;
 };
+
+const ZERO_MARGIN: ChainMargin = { top: 0, right: 0, bottom: 0, left: 0 };
 
 export type ChainFrameInput = {
     time: number;
@@ -35,31 +38,53 @@ export type ChainFrameInput = {
     canvasPhysW: number;
     canvasPhysH: number;
 
-    /** Element rect + overflow, logical px. For post effects, mirrors viewport. */
+    /** Element rect (inner, no overflow), logical px. Mirrors viewport for post effects. */
     elementLogical: readonly [number, number];
-    /** Element rect + overflow, physical px. For post effects, mirrors viewport. */
+    /** Element rect (inner, no overflow), physical px. Mirrors viewport for post effects. */
     elementPhys: readonly [number, number];
-    /** Element rect proper (no overflow), logical px. */
-    elementInnerLogical: readonly [number, number];
-    /** Element rect proper (no overflow), physical px. */
-    elementInnerPhys: readonly [number, number];
     viewportLogical: readonly [number, number];
     viewportPhys: readonly [number, number];
-    /** Physical-px margin around the element. Zero for post effects. */
-    overflow: ChainOverflow;
-
-    /** Canvas physical-px rect the final stage must draw into. */
-    finalViewport: {
-        x: number;
-        y: number;
-        w: number;
-        h: number;
-    };
+    /**
+     * Element's inner rect on canvas, bottom-left origin, physical px.
+     * Used by the chain to compute the final-stage draw viewport after
+     * pad accumulation. For post-effect chains this equals
+     * `viewportRectOnCanvasPx`.
+     */
+    elementRectOnCanvasPx: { x: number; y: number; w: number; h: number };
+    /**
+     * Viewport inner rect on canvas, bottom-left origin, physical px.
+     * Used with `elementRectOnCanvasPx` to derive the per-side viewport
+     * edge distance → `dims.fullscreenPad`.
+     */
+    viewportRectOnCanvasPx: { x: number; y: number; w: number; h: number };
 
     /** null → canvas; otherwise the already-allocated final FBO. */
     finalTarget: Framebuffer | null;
 
     isVisible: boolean;
+};
+
+type StageLayout = {
+    /** Src pad entering this stage (physical px per side). */
+    srcPad: Margin;
+    /** Src buffer size (physical px): elementPixel + srcPad sums. */
+    srcBufferSize: [number, number];
+    /** Dst pad produced by this stage (physical px per side). */
+    dstPad: Margin;
+    /** Dst buffer size (physical px): elementPixel + dstPad sums. */
+    dstBufferSize: [number, number];
+    /** Whether the dst buffer is float. */
+    float: boolean;
+    /** Src inner sub-rect in src texture UV (xy = origin, zw = size). */
+    srcInnerRect: [number, number, number, number];
+    /** Dst inner sub-rect in buffer UV (xy = origin, zw = size). */
+    uvInnerRect: [number, number, number, number];
+    /**
+     * Physical-px viewport on the canvas / final FBO for this stage's
+     * draw. Only meaningful for the last rendering stage; intermediate
+     * stages use `(0, 0, dstBufferSize[0], dstBufferSize[1])`.
+     */
+    outputViewport: { x: number; y: number; w: number; h: number };
 };
 
 type IntermediateEntry = {
@@ -69,28 +94,37 @@ type IntermediateEntry = {
     /** Read handle (passed as `ctx.src` to the next stage). */
     texHandle: EffectTexture;
     float: boolean;
+    pad: Margin;
+    bufferSize: [number, number];
 };
 
 /**
  * Pipeline orchestrator for a single element's Effect chain.
  *
- * - Walks `renderingIndices` (indices of effects with a `render`) and
- *   allocates M-1 intermediate RTs between them.
- * - Resolves each intermediate's size + float from its owning effect's
- *   `outputSize?(dims)` every frame; reallocates only on size / float
- *   delta.
- * - Runs uniform-resolve → outputSize-resolve → update → render each
- *   frame (only when `isVisible`).
- * - M=0 identity copy: when no effect has a `render`, copies capture →
- *   finalTarget once via the first host's passthrough pass.
- * - Error handling: `init` throws → reverse-dispose prior effects, bubble
- *   rejection. `update`/`render` throws → `console.warn` once per
- *   (chain, effect), `render` failures are replaced by a passthrough copy
- *   so the output doesn't disappear.
- * - `dispose()` runs in reverse array order (effect `dispose` + host
- *   `dispose` + intermediate FBO `dispose`).
+ * Pad model (see plan.md "Pad model"):
+ * - Each rendering stage tracks `(srcPad, srcBufferSize, dstPad, dstBufferSize)`
+ *   in physical pixels per side. Stage 0's src pad is always `{0,0,0,0}`
+ *   (capture is inner-only).
+ * - Each effect's `outputSize(dims)` returns either `padAdd` (delta added
+ *   to src pad), explicit `size` (absolute buffer size with pad derived),
+ *   or a bare `[w, h]` tuple. Returns are clamped non-monotonic (dst pad
+ *   must be >= src pad per side).
+ * - `dims.fullscreenPad` is the per-side padAdd needed to reach the
+ *   viewport edges from the current src pad (non-negative, 0 if already
+ *   past the edge). Zero for post-effect chains.
+ * - The last rendering effect's `outputSize` return is ignored — its dst
+ *   is the fixed final target. Its src pad determines the canvas-space
+ *   draw viewport.
+ * - `srcInnerRect` / `uvInnerRect` are derived per stage and uploaded as
+ *   uniforms so the default vertex shader can emit `uvInner` (src-sampling
+ *   UV) and `uvInnerDst` (dst-space 0..1 over element).
  *
- * See plan.md "Composition protocol" for the full spec.
+ * Error handling:
+ * - `init` throws → reverse-dispose prior effects, bubble rejection.
+ * - `update`/`render` throw → `console.warn` once per (chain, effect),
+ *   render failures fall back to a passthrough copy so the output doesn't
+ *   disappear.
+ *
  * @internal
  */
 export class EffectChain {
@@ -99,13 +133,16 @@ export class EffectChain {
     #hosts: EffectHost[];
     #renderingIndices: number[];
     #intermediates: (IntermediateEntry | null)[] = [];
+    #stages: StageLayout[] = [];
     #capture: EffectTexture;
     #finalFallbackHandle: EffectRenderTarget | null = null;
     #finalFallbackFb: Framebuffer | null = null;
     #warnedUpdate = new Set<number>();
     #warnedRender = new Set<number>();
+    #warnedMonotonic = new Set<number>();
+    #warnedClampBuffer = new Set<number>();
     #disposed = false;
-    /** Post-effect context (element/overflow mirror viewport; overflow=0). */
+    /** Post-effect context (element mirrors viewport; fullscreenPad=0). */
     #isPostEffect: boolean;
 
     constructor(
@@ -139,6 +176,11 @@ export class EffectChain {
         return this.#renderingIndices;
     }
 
+    /** Test-only accessor for per-stage layout data. @internal */
+    get stages(): readonly StageLayout[] {
+        return this.#stages;
+    }
+
     /**
      * Sequentially run each effect's `init`. On throw, dispose prior
      * effects in reverse order (the failing effect's own `dispose` is
@@ -158,13 +200,6 @@ export class EffectChain {
                     `[VFX-JS] effect[${i}].init() failed:`,
                     err,
                 );
-                // Dispose prior effects (reverse order): user's dispose
-                // first, then their host to release any GL resources
-                // allocated via ctx.createRenderTarget / wrapTexture.
-                // Same ordering as the main dispose() path. The failing
-                // effect's own `dispose` is NOT called (init did not
-                // complete), but its host IS disposed because init may
-                // have allocated RTs / textures before the throw.
                 for (let j = i - 1; j >= 0; j--) {
                     this.#safeDispose(j);
                     this.#hosts[j].dispose();
@@ -201,17 +236,13 @@ export class EffectChain {
             });
         }
 
-        // 2. Resolve intermediate sizes via outputSize(), reallocate
-        //    when size or float differs.
-        this.#resolveIntermediates(input);
+        // 2. Resolve per-stage pad / buffers / srcInnerRect / uvInnerRect.
+        //    Allocates / reuses intermediate RTs.
+        this.#resolveStages(input);
 
-        // 3. Apply per-host frame dims (canvas + element + uvInnerRect).
-        //    Must come AFTER #resolveIntermediates so auto-tracking RTs
-        //    see the current size.
+        // 3. Apply per-host frame dims.
         for (let k = 0; k < this.#hosts.length; k++) {
-            this.#hosts[k].setFrameDims(
-                this.#hostFrameDims(k, input),
-            );
+            this.#hosts[k].setFrameDims(this.#hostFrameDims(k, input));
         }
 
         // 4. Update phase (array order). ctx.draw() is a no-op here.
@@ -236,24 +267,12 @@ export class EffectChain {
         // 5. M = 0 identity copy special case.
         if (M === 0) {
             const srcHandle = this.#capture;
+            const canvasVp = this.#postEffectTargetViewport(input);
             if (input.finalTarget === null) {
-                this.#hosts[0]?.passthroughCopy(
-                    srcHandle,
-                    null,
-                    input.finalViewport,
-                );
+                this.#hosts[0]?.passthroughCopy(srcHandle, null, canvasVp);
             } else {
                 const target = this.#getFinalHandle(input.finalTarget);
-                this.#hosts[0]?.passthroughCopy(
-                    srcHandle,
-                    target,
-                    {
-                        x: 0,
-                        y: 0,
-                        w: input.finalTarget.width,
-                        h: input.finalTarget.height,
-                    },
-                );
+                this.#hosts[0]?.passthroughCopy(srcHandle, target, canvasVp);
             }
             return;
         }
@@ -265,14 +284,12 @@ export class EffectChain {
             host.setPhase("render");
             host.tickAutoUpdates();
 
-            // src: capture for k=0, else previous intermediate's read.
             const srcHandle =
                 k === 0
                     ? this.#capture
                     : this.#intermediates[k - 1]!.texHandle;
             host.setSrc(srcHandle);
 
-            // output: final target for k=M-1, else intermediate[k]'s write.
             let outputHandle: EffectRenderTarget | null;
             if (k === M - 1) {
                 outputHandle =
@@ -281,7 +298,6 @@ export class EffectChain {
                         : this.#getFinalHandle(input.finalTarget);
             } else {
                 outputHandle = this.#intermediates[k]!.rtHandle;
-                // Clear intermediate to (0,0,0,0) before write.
                 host.clearRt(outputHandle);
             }
             host.setOutput(outputHandle);
@@ -297,13 +313,11 @@ export class EffectChain {
                         err,
                     );
                 }
-                // Passthrough src → output so the chain keeps flowing.
+                const vp = this.#stages[k].outputViewport;
                 if (outputHandle === null) {
-                    host.passthroughCopy(
-                        srcHandle,
-                        null,
-                        input.finalViewport,
-                    );
+                    host.passthroughCopy(srcHandle, null, vp);
+                } else if (k === M - 1) {
+                    host.passthroughCopy(srcHandle, outputHandle, vp);
                 } else {
                     host.passthroughCopy(
                         srcHandle,
@@ -327,7 +341,6 @@ export class EffectChain {
             return;
         }
         this.#disposed = true;
-        // Reverse array order: effect.dispose then host.dispose.
         for (let i = this.#effects.length - 1; i >= 0; i--) {
             this.#safeDispose(i);
             this.#hosts[i].dispose();
@@ -336,6 +349,7 @@ export class EffectChain {
             im?.fb.dispose();
         }
         this.#intermediates = [];
+        this.#stages = [];
         if (this.#finalFallbackFb) {
             this.#finalFallbackFb.dispose();
             this.#finalFallbackFb = null;
@@ -354,55 +368,301 @@ export class EffectChain {
         }
     }
 
-    #resolveIntermediates(input: ChainFrameInput): void {
+    /**
+     * Compute per-stage layout (pad, buffer size, srcInnerRect, uvInnerRect,
+     * outputViewport) for every rendering stage. Allocates / reuses
+     * intermediate RTs.
+     */
+    #resolveStages(input: ChainFrameInput): void {
         const M = this.#renderingIndices.length;
-        if (M <= 1) {
+        this.#stages = new Array(M);
+        if (M === 0) {
             return;
         }
-        let stageInput: readonly [number, number] = [
+        const elementPixel: [number, number] = [
             input.elementPhys[0],
             input.elementPhys[1],
         ];
-        for (let k = 0; k < M - 1; k++) {
+        let srcPad: Margin = createMargin(0);
+        let srcBufferSize: [number, number] = [
+            elementPixel[0],
+            elementPixel[1],
+        ];
+        for (let k = 0; k < M; k++) {
             const i = this.#renderingIndices[k];
             const effect = this.#effects[i];
-            const { size, float } = callOutputSize(
-                effect,
-                stageInput,
-                input,
-                this.#isPostEffect,
-            );
-            const current = this.#intermediates[k];
-            if (
-                current === null ||
-                current.fb.width !== size[0] ||
-                current.fb.height !== size[1] ||
-                current.float !== float
-            ) {
-                if (current) {
-                    current.fb.dispose();
-                }
-                const fb = new Framebuffer(
-                    this.#glCtx,
-                    size[0],
-                    size[1],
-                    { float },
+            const isLast = k === M - 1;
+
+            // Compute fullscreenPad from src pad for the dims input.
+            const fullscreenPad = this.#fullscreenPadFor(input, srcPad);
+
+            let dstPad: Margin;
+            let dstBufferSize: [number, number];
+            let float: boolean;
+
+            if (isLast) {
+                // Last effect's outputSize return is ignored — dst is the
+                // fixed final target. Carry src pad forward for uniforms /
+                // canvas viewport.
+                dstPad = srcPad;
+                dstBufferSize = srcBufferSize;
+                float = false;
+            } else {
+                const resolved = this.#callOutputSize(
+                    effect,
+                    i,
+                    srcPad,
+                    srcBufferSize,
+                    elementPixel,
+                    fullscreenPad,
+                    input,
                 );
-                const rtHandle = makeEffectRenderTargetFromFb(fb);
-                const texHandle = makeEffectTexture(
-                    () => fb.texture,
-                    () => fb.width,
-                    () => fb.height,
-                );
-                this.#intermediates[k] = {
-                    fb,
-                    rtHandle,
-                    texHandle,
-                    float,
+                dstPad = resolved.pad;
+                dstBufferSize = resolved.bufferSize;
+                float = resolved.float;
+            }
+
+            const srcInnerRect = rectForPad(srcPad, srcBufferSize, elementPixel);
+            const uvInnerRect = rectForPad(dstPad, dstBufferSize, elementPixel);
+
+            // Stage outputViewport: where the draw lands on its dst buffer.
+            let outputViewport: { x: number; y: number; w: number; h: number };
+            if (isLast) {
+                // Draw onto canvas / final FBO at the element's canvas rect
+                // grown by src pad. For post-effect chains, srcPad = 0 and
+                // the rect equals viewportRectOnCanvasPx.
+                outputViewport = {
+                    x: input.elementRectOnCanvasPx.x - srcPad.left,
+                    y: input.elementRectOnCanvasPx.y - srcPad.bottom,
+                    w: dstBufferSize[0],
+                    h: dstBufferSize[1],
+                };
+            } else {
+                outputViewport = {
+                    x: 0,
+                    y: 0,
+                    w: dstBufferSize[0],
+                    h: dstBufferSize[1],
                 };
             }
-            stageInput = size;
+
+            this.#stages[k] = {
+                srcPad,
+                srcBufferSize,
+                dstPad,
+                dstBufferSize,
+                float,
+                srcInnerRect,
+                uvInnerRect,
+                outputViewport,
+            };
+
+            if (!isLast) {
+                this.#ensureIntermediate(k, dstBufferSize, dstPad, float);
+            }
+
+            srcPad = dstPad;
+            srcBufferSize = dstBufferSize;
         }
+    }
+
+    #callOutputSize(
+        effect: Effect,
+        effectIndex: number,
+        srcPad: Margin,
+        srcBufferSize: [number, number],
+        elementPixel: [number, number],
+        fullscreenPad: ChainMargin,
+        input: ChainFrameInput,
+    ): { pad: Margin; bufferSize: [number, number]; float: boolean } {
+        if (!effect.outputSize) {
+            // Default: no pad added. dst pad = src pad, dst buffer = src buffer.
+            return {
+                pad: srcPad,
+                bufferSize: srcBufferSize,
+                float: false,
+            };
+        }
+        const pixelRatio =
+            input.viewportPhys[0] / input.viewportLogical[0] || 1;
+        const dims = {
+            input: srcBufferSize as readonly [number, number],
+            element: this.#isPostEffect
+                ? input.viewportLogical
+                : input.elementLogical,
+            elementPixel: this.#isPostEffect
+                ? input.viewportPhys
+                : input.elementPhys,
+            viewport: input.viewportLogical,
+            viewportPixel: input.viewportPhys,
+            pixelRatio,
+            fullscreenPad,
+        };
+        const ret = effect.outputSize(dims);
+
+        let dstPad: Margin;
+        let dstBufferSize: [number, number];
+        let float = false;
+
+        if (Array.isArray(ret)) {
+            dstBufferSize = [ret[0], ret[1]];
+            dstPad = distributePad(
+                dstBufferSize,
+                elementPixel,
+                srcPad,
+            );
+        } else {
+            const obj = ret as
+                | { size: readonly [number, number]; float?: boolean }
+                | { padAdd: MarginOpts; float?: boolean };
+            float = obj.float ?? false;
+            if ("padAdd" in obj) {
+                const delta = createMargin(obj.padAdd);
+                dstPad = createMargin({
+                    top: srcPad.top + delta.top,
+                    right: srcPad.right + delta.right,
+                    bottom: srcPad.bottom + delta.bottom,
+                    left: srcPad.left + delta.left,
+                });
+                dstBufferSize = [
+                    elementPixel[0] + dstPad.left + dstPad.right,
+                    elementPixel[1] + dstPad.top + dstPad.bottom,
+                ];
+            } else {
+                dstBufferSize = [obj.size[0], obj.size[1]];
+                dstPad = distributePad(
+                    dstBufferSize,
+                    elementPixel,
+                    srcPad,
+                );
+            }
+        }
+
+        // Monotonic clamp: dst pad >= src pad per side.
+        let violated = false;
+        const clampedPad = createMargin({
+            top: Math.max(dstPad.top, srcPad.top),
+            right: Math.max(dstPad.right, srcPad.right),
+            bottom: Math.max(dstPad.bottom, srcPad.bottom),
+            left: Math.max(dstPad.left, srcPad.left),
+        });
+        if (
+            clampedPad.top !== dstPad.top ||
+            clampedPad.right !== dstPad.right ||
+            clampedPad.bottom !== dstPad.bottom ||
+            clampedPad.left !== dstPad.left
+        ) {
+            violated = true;
+        }
+        if (violated && !this.#warnedMonotonic.has(effectIndex)) {
+            this.#warnedMonotonic.add(effectIndex);
+            console.warn(
+                `[VFX-JS] effect[${effectIndex}].outputSize(): pad non-monotonic (dst < src); clamped.`,
+            );
+        }
+        dstPad = clampedPad;
+        dstBufferSize = [
+            elementPixel[0] + dstPad.left + dstPad.right,
+            elementPixel[1] + dstPad.top + dstPad.bottom,
+        ];
+
+        // Buffer >= elementPixel on each axis (sanity).
+        if (
+            dstBufferSize[0] < elementPixel[0] ||
+            dstBufferSize[1] < elementPixel[1]
+        ) {
+            if (!this.#warnedClampBuffer.has(effectIndex)) {
+                this.#warnedClampBuffer.add(effectIndex);
+                console.warn(
+                    `[VFX-JS] effect[${effectIndex}].outputSize(): buffer smaller than elementPixel; clamped.`,
+                );
+            }
+            dstBufferSize = [
+                Math.max(dstBufferSize[0], elementPixel[0]),
+                Math.max(dstBufferSize[1], elementPixel[1]),
+            ];
+        }
+
+        return { pad: dstPad, bufferSize: dstBufferSize, float };
+    }
+
+    #ensureIntermediate(
+        k: number,
+        bufferSize: [number, number],
+        pad: Margin,
+        float: boolean,
+    ): void {
+        const current = this.#intermediates[k];
+        if (
+            current !== null &&
+            current.fb.width === bufferSize[0] &&
+            current.fb.height === bufferSize[1] &&
+            current.float === float
+        ) {
+            // Size / float unchanged — reuse. Pad is diagnostic only.
+            current.pad = pad;
+            return;
+        }
+        if (current) {
+            current.fb.dispose();
+        }
+        const fb = new Framebuffer(
+            this.#glCtx,
+            bufferSize[0],
+            bufferSize[1],
+            { float },
+        );
+        const rtHandle = makeEffectRenderTargetFromFb(fb);
+        const texHandle = makeEffectTexture(
+            () => fb.texture,
+            () => fb.width,
+            () => fb.height,
+        );
+        this.#intermediates[k] = {
+            fb,
+            rtHandle,
+            texHandle,
+            float,
+            pad,
+            bufferSize,
+        };
+    }
+
+    #fullscreenPadFor(
+        input: ChainFrameInput,
+        srcPad: Margin,
+    ): ChainMargin {
+        if (this.#isPostEffect) {
+            return ZERO_MARGIN;
+        }
+        const el = input.elementRectOnCanvasPx;
+        const vp = input.viewportRectOnCanvasPx;
+        const distLeft = Math.max(0, el.x - vp.x);
+        const distRight = Math.max(0, vp.x + vp.w - (el.x + el.w));
+        const distBottom = Math.max(0, el.y - vp.y);
+        const distTop = Math.max(0, vp.y + vp.h - (el.y + el.h));
+        return {
+            top: Math.max(0, distTop - srcPad.top),
+            right: Math.max(0, distRight - srcPad.right),
+            bottom: Math.max(0, distBottom - srcPad.bottom),
+            left: Math.max(0, distLeft - srcPad.left),
+        };
+    }
+
+    /** Canvas-space viewport used by the M=0 passthrough copy. */
+    #postEffectTargetViewport(input: ChainFrameInput): {
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+    } {
+        // M=0: src = capture (no pad). Copy fills element's inner rect.
+        return {
+            x: input.elementRectOnCanvasPx.x,
+            y: input.elementRectOnCanvasPx.y,
+            w: input.elementRectOnCanvasPx.w,
+            h: input.elementRectOnCanvasPx.h,
+        };
     }
 
     #hostFrameDims(
@@ -413,78 +673,49 @@ export class EffectChain {
         outputPhysH: number;
         canvasPhysW: number;
         canvasPhysH: number;
-        canvasViewportX: number;
-        canvasViewportY: number;
-        canvasViewportW: number;
-        canvasViewportH: number;
+        outputViewport: { x: number; y: number; w: number; h: number };
         elementPhysW: number;
         elementPhysH: number;
         uvInnerRect: [number, number, number, number];
+        srcInnerRect: [number, number, number, number];
     } {
-        const M = this.#renderingIndices.length;
-        // Find whether host k is a rendering effect and its position.
         const renderPos = this.#renderingIndices.indexOf(k);
         let outputW: number;
         let outputH: number;
+        let outputViewport: { x: number; y: number; w: number; h: number };
+        let uvInnerRect: [number, number, number, number];
+        let srcInnerRect: [number, number, number, number];
+
         if (renderPos < 0) {
-            // Not a rendering effect; use element phys as a placeholder.
+            // Not a rendering effect; placeholders.
             outputW = input.elementPhys[0];
             outputH = input.elementPhys[1];
-        } else if (renderPos === M - 1) {
-            outputW =
-                input.finalTarget === null
-                    ? input.finalViewport.w
-                    : input.finalTarget.width;
-            outputH =
-                input.finalTarget === null
-                    ? input.finalViewport.h
-                    : input.finalTarget.height;
+            outputViewport = { x: 0, y: 0, w: outputW, h: outputH };
+            uvInnerRect = [0, 0, 1, 1];
+            srcInnerRect = [0, 0, 1, 1];
         } else {
-            const im = this.#intermediates[renderPos]!;
-            outputW = im.fb.width;
-            outputH = im.fb.height;
+            const stage = this.#stages[renderPos];
+            outputW = stage.dstBufferSize[0];
+            outputH = stage.dstBufferSize[1];
+            outputViewport = stage.outputViewport;
+            uvInnerRect = stage.uvInnerRect;
+            srcInnerRect = stage.srcInnerRect;
         }
-
-        // uvInnerRect: inner region / buffer size. The inner region is
-        // the element rect proper; the buffer is the element rect +
-        // overflow. For post effects overflow is zero → uvInnerRect is
-        // [0, 0, 1, 1].
-        const bufW = input.elementPhys[0];
-        const bufH = input.elementPhys[1];
-        const innerW = input.elementInnerPhys[0];
-        const innerH = input.elementInnerPhys[1];
-        const innerOriginX =
-            bufW > 0 ? input.overflow.left / bufW : 0;
-        const innerOriginY =
-            bufH > 0 ? input.overflow.bottom / bufH : 0;
-        const innerSizeX = bufW > 0 ? innerW / bufW : 1;
-        const innerSizeY = bufH > 0 ? innerH / bufH : 1;
 
         return {
             outputPhysW: outputW,
             outputPhysH: outputH,
             canvasPhysW: input.canvasPhysW,
             canvasPhysH: input.canvasPhysH,
-            canvasViewportX: input.finalViewport.x,
-            canvasViewportY: input.finalViewport.y,
-            canvasViewportW: input.finalViewport.w,
-            canvasViewportH: input.finalViewport.h,
+            outputViewport,
             elementPhysW: input.elementPhys[0],
             elementPhysH: input.elementPhys[1],
-            uvInnerRect: [
-                innerOriginX,
-                innerOriginY,
-                innerSizeX,
-                innerSizeY,
-            ],
+            uvInnerRect,
+            srcInnerRect,
         };
     }
 
     #getFinalHandle(fb: Framebuffer): EffectRenderTarget {
-        // Cached at the chain level and regenerated only when the
-        // underlying Framebuffer instance changes (viewport resize
-        // reallocates it). Keeps ctx.output reference-stable across
-        // frames.
         if (
             this.#finalFallbackFb !== fb ||
             this.#finalFallbackHandle === null
@@ -500,47 +731,60 @@ export class EffectChain {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function callOutputSize(
-    effect: Effect,
-    inputSize: readonly [number, number],
-    input: ChainFrameInput,
-    isPostEffect: boolean,
-): { size: [number, number]; float: boolean } {
-    if (!effect.outputSize) {
-        return { size: [inputSize[0], inputSize[1]], float: false };
+/**
+ * Derive a per-side pad from an absolute dst buffer size. The excess
+ * `(buffer - elementPixel)` is distributed across sides proportionally
+ * to src pad ratios; equal split when src pad is zero everywhere.
+ */
+function distributePad(
+    bufferSize: readonly [number, number],
+    elementPixel: readonly [number, number],
+    srcPad: Margin,
+): Margin {
+    const excessX = Math.max(0, bufferSize[0] - elementPixel[0]);
+    const excessY = Math.max(0, bufferSize[1] - elementPixel[1]);
+    const totalH = srcPad.left + srcPad.right;
+    const totalV = srcPad.top + srcPad.bottom;
+    let left: number;
+    let right: number;
+    let top: number;
+    let bottom: number;
+    if (totalH > 0) {
+        left = (excessX * srcPad.left) / totalH;
+        right = excessX - left;
+    } else {
+        left = excessX / 2;
+        right = excessX - left;
     }
-    const dims = {
-        input: inputSize,
-        element: isPostEffect
-            ? input.viewportLogical
-            : input.elementInnerLogical,
-        elementPixel: isPostEffect
-            ? input.viewportPhys
-            : input.elementInnerPhys,
-        viewport: input.viewportLogical,
-        viewportPixel: input.viewportPhys,
-        // 8-2 will compute the real fullscreenPad (viewport-edge distance
-        // per side minus src pad). Until then, zero stub keeps the types
-        // aligned with the new `dims` shape.
-        fullscreenPad: { top: 0, right: 0, bottom: 0, left: 0 },
-        pixelRatio: input.viewportPhys[0] / input.viewportLogical[0] || 1,
-    };
-    const ret = effect.outputSize(dims);
-    if (Array.isArray(ret)) {
-        return { size: [ret[0], ret[1]], float: false };
+    if (totalV > 0) {
+        bottom = (excessY * srcPad.bottom) / totalV;
+        top = excessY - bottom;
+    } else {
+        bottom = excessY / 2;
+        top = excessY - bottom;
     }
-    const obj = ret as
-        | { size: readonly [number, number]; float?: boolean }
-        | { padAdd: unknown; float?: boolean };
-    if ("padAdd" in obj) {
-        // padAdd variant: real handling lands in 8-2. For now, fall back
-        // to input size so behaviour is unchanged.
-        return {
-            size: [inputSize[0], inputSize[1]],
-            float: obj.float ?? false,
-        };
+    return createMargin({ top, right, bottom, left });
+}
+
+/**
+ * Inner sub-rect (origin + size) in buffer UV for a buffer sized
+ * `elementPixel + pad sums` with the inner region positioned at
+ * `(pad.left, pad.bottom)` (GL bottom-left origin).
+ */
+function rectForPad(
+    pad: Margin,
+    bufferSize: readonly [number, number],
+    elementPixel: readonly [number, number],
+): [number, number, number, number] {
+    if (bufferSize[0] <= 0 || bufferSize[1] <= 0) {
+        return [0, 0, 1, 1];
     }
-    return { size: [obj.size[0], obj.size[1]], float: obj.float ?? false };
+    return [
+        pad.left / bufferSize[0],
+        pad.bottom / bufferSize[1],
+        elementPixel[0] / bufferSize[0],
+        elementPixel[1] / bufferSize[1],
+    ];
 }
 
 // Silence unused-import warnings; resolveRt is exported for chain tests.

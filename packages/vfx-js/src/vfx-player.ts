@@ -1260,16 +1260,6 @@ export class VFXPlayer {
             this.#paddingX,
             this.#paddingY,
         );
-        const glRectWithOverflow = rectToGLRect(
-            hit.rectWithOverflow,
-            viewportHeight,
-            this.#paddingX,
-            this.#paddingY,
-        );
-        const finalCanvasRect = e.isFullScreen
-            ? viewportGlRect
-            : glRectWithOverflow;
-
         // Mouse coordinates (bottom-left origin, physical px).
         //   mouse: element-local
         //   mouseViewport: viewport-local
@@ -1281,10 +1271,6 @@ export class VFXPlayer {
 
         const elementInnerLogicalW = rect.right - rect.left;
         const elementInnerLogicalH = rect.bottom - rect.top;
-        const elementLogicalW =
-            hit.rectWithOverflow.right - hit.rectWithOverflow.left;
-        const elementLogicalH =
-            hit.rectWithOverflow.bottom - hit.rectWithOverflow.top;
 
         const prevT = e.effectLastRenderTime ?? now;
         const deltaTime = now - prevT;
@@ -1307,26 +1293,24 @@ export class VFXPlayer {
             resolvedUniforms,
             canvasPhysW: this.#canvas.width,
             canvasPhysH: this.#canvas.height,
-            elementLogical: [elementLogicalW, elementLogicalH],
-            elementPhys: [elementLogicalW * pr, elementLogicalH * pr],
-            elementInnerLogical: [elementInnerLogicalW, elementInnerLogicalH],
-            elementInnerPhys: [
+            elementLogical: [elementInnerLogicalW, elementInnerLogicalH],
+            elementPhys: [
                 elementInnerLogicalW * pr,
                 elementInnerLogicalH * pr,
             ],
             viewportLogical: [viewportWidth, viewportHeight],
             viewportPhys: [viewportWidth * pr, viewportHeight * pr],
-            overflow: {
-                top: e.overflow.top * pr,
-                right: e.overflow.right * pr,
-                bottom: e.overflow.bottom * pr,
-                left: e.overflow.left * pr,
+            elementRectOnCanvasPx: {
+                x: glRect.x * pr,
+                y: glRect.y * pr,
+                w: glRect.w * pr,
+                h: glRect.h * pr,
             },
-            finalViewport: {
-                x: finalCanvasRect.x * pr,
-                y: finalCanvasRect.y * pr,
-                w: finalCanvasRect.w * pr,
-                h: finalCanvasRect.h * pr,
+            viewportRectOnCanvasPx: {
+                x: viewportGlRect.x * pr,
+                y: viewportGlRect.y * pr,
+                w: viewportGlRect.w * pr,
+                h: viewportGlRect.h * pr,
             },
             finalTarget,
             isVisible: hit.isVisible,
@@ -1670,6 +1654,13 @@ export class VFXPlayer {
             viewportHeight * pr,
         ];
 
+        const viewportOnCanvas = {
+            x: viewportGlRect.x * pr,
+            y: viewportGlRect.y * pr,
+            w: viewportGlRect.w * pr,
+            h: viewportGlRect.h * pr,
+        };
+
         chain.run({
             time: now - this.#initTime,
             deltaTime,
@@ -1683,17 +1674,10 @@ export class VFXPlayer {
             canvasPhysH: this.#canvas.height,
             elementLogical: viewportLogical,
             elementPhys: viewportPhys,
-            elementInnerLogical: viewportLogical,
-            elementInnerPhys: viewportPhys,
             viewportLogical,
             viewportPhys,
-            overflow: { top: 0, right: 0, bottom: 0, left: 0 },
-            finalViewport: {
-                x: viewportGlRect.x * pr,
-                y: viewportGlRect.y * pr,
-                w: viewportGlRect.w * pr,
-                h: viewportGlRect.h * pr,
-            },
+            elementRectOnCanvasPx: viewportOnCanvas,
+            viewportRectOnCanvasPx: viewportOnCanvas,
             finalTarget: null,
             isVisible: true,
         });

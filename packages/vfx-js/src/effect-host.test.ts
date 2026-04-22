@@ -353,13 +353,11 @@ function makeHost() {
         outputPhysH: 100,
         canvasPhysW: 200,
         canvasPhysH: 200,
-        canvasViewportX: 0,
-        canvasViewportY: 0,
-        canvasViewportW: 100,
-        canvasViewportH: 100,
+        outputViewport: { x: 0, y: 0, w: 100, h: 100 },
         elementPhysW: 100,
         elementPhysH: 100,
         uvInnerRect: [0, 0, 1, 1],
+        srcInnerRect: [0, 0, 1, 1],
     });
     return { host, gl, glCtx };
 }
@@ -587,13 +585,11 @@ describe("EffectHost.createRenderTarget", () => {
             outputPhysH: 200,
             canvasPhysW: 200,
             canvasPhysH: 200,
-            canvasViewportX: 0,
-            canvasViewportY: 0,
-            canvasViewportW: 200,
-            canvasViewportH: 200,
+            outputViewport: { x: 0, y: 0, w: 200, h: 200 },
             elementPhysW: 200,
             elementPhysH: 200,
             uvInnerRect: [0, 0, 1, 1],
+            srcInnerRect: [0, 0, 1, 1],
         });
         expect(framebuffers[0].width).toBe(200);
     });
@@ -606,13 +602,11 @@ describe("EffectHost.createRenderTarget", () => {
             outputPhysH: 200,
             canvasPhysW: 200,
             canvasPhysH: 200,
-            canvasViewportX: 0,
-            canvasViewportY: 0,
-            canvasViewportW: 200,
-            canvasViewportH: 200,
+            outputViewport: { x: 0, y: 0, w: 200, h: 200 },
             elementPhysW: 200,
             elementPhysH: 200,
             uvInnerRect: [0, 0, 1, 1],
+            srcInnerRect: [0, 0, 1, 1],
         });
         // Fixed: still 50×50.
         expect(framebuffers[0].width).toBe(50);
