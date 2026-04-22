@@ -893,9 +893,8 @@ export class VFXPlayer {
                 continue;
             }
 
-            // Effect-path elements are handled via EffectChain in the next
-            // commit; skip the shader-path machinery for now.
             if (e.chain) {
+                this.#renderEffectElement(e, rect, hit, now, viewportGlRect);
                 continue;
             }
 
@@ -1188,6 +1187,127 @@ export class VFXPlayer {
             this.#playRequest = requestAnimationFrame(this.#playLoop);
         }
     };
+
+    /**
+     * Effect-path render. Assembles the ChainFrameInput for one visible
+     * element and dispatches to its EffectChain.
+     *
+     * Hit-test is already done by the caller; `hit.isVisible === true`
+     * here.
+     */
+    #renderEffectElement(
+        e: VFXElement,
+        rect: Rect,
+        hit: { rectWithOverflow: Rect; isVisible: boolean; intersection: number },
+        now: number,
+        viewportGlRect: GLRect,
+    ): void {
+        const chain = e.chain;
+        if (!chain) {
+            return;
+        }
+
+        const pr = this.#pixelRatio;
+
+        // Video / GIF per-frame re-upload (mirror shader path).
+        gifFor.get(e.element)?.update();
+        if (e.type === "video" || e.isGif) {
+            e.srcTexture.needsUpdate = true;
+        }
+
+        // Resolve per-frame uniforms: static baseline + generator results.
+        const resolvedUniforms: Record<string, EffectUniformValue> = {
+            ...(e.effectStaticUniforms ?? {}),
+        };
+        if (e.effectUniformGenerators) {
+            for (const [k, gen] of Object.entries(
+                e.effectUniformGenerators,
+            )) {
+                resolvedUniforms[k] = gen() as EffectUniformValue;
+            }
+        }
+
+        const viewportWidth = this.#viewport.right - this.#viewport.left;
+        const viewportHeight = this.#viewport.bottom - this.#viewport.top;
+
+        const glRect = rectToGLRect(
+            rect,
+            viewportHeight,
+            this.#paddingX,
+            this.#paddingY,
+        );
+        const glRectWithOverflow = rectToGLRect(
+            hit.rectWithOverflow,
+            viewportHeight,
+            this.#paddingX,
+            this.#paddingY,
+        );
+        const finalCanvasRect = e.isFullScreen
+            ? viewportGlRect
+            : glRectWithOverflow;
+
+        // Mouse coordinates (bottom-left origin, physical px).
+        //   mouse: element-local
+        //   mouseViewport: viewport-local
+        // `#mouseX/Y` are viewport-local logical px; adding padding maps
+        // into canvas-local coords, subtracting glRect.x/y maps into
+        // element-local coords.
+        const relMouseX = this.#mouseX + this.#paddingX - glRect.x;
+        const relMouseY = this.#mouseY + this.#paddingY - glRect.y;
+
+        const elementInnerLogicalW = rect.right - rect.left;
+        const elementInnerLogicalH = rect.bottom - rect.top;
+        const elementLogicalW =
+            hit.rectWithOverflow.right - hit.rectWithOverflow.left;
+        const elementLogicalH =
+            hit.rectWithOverflow.bottom - hit.rectWithOverflow.top;
+
+        const prevT = e.effectLastRenderTime ?? now;
+        const deltaTime = now - prevT;
+        e.effectLastRenderTime = now;
+
+        const shouldUsePostEffect = this.#postEffectPasses.length > 0;
+        const finalTarget =
+            shouldUsePostEffect && this.#postEffectTarget
+                ? this.#postEffectTarget
+                : null;
+
+        chain.run({
+            time: now - e.startTime,
+            deltaTime,
+            mouse: [relMouseX * pr, relMouseY * pr],
+            mouseViewport: [this.#mouseX * pr, this.#mouseY * pr],
+            intersection: hit.intersection,
+            enterTime: now - e.enterTime,
+            leaveTime: now - e.leaveTime,
+            resolvedUniforms,
+            canvasPhysW: this.#canvas.width,
+            canvasPhysH: this.#canvas.height,
+            elementLogical: [elementLogicalW, elementLogicalH],
+            elementPhys: [elementLogicalW * pr, elementLogicalH * pr],
+            elementInnerLogical: [elementInnerLogicalW, elementInnerLogicalH],
+            elementInnerPhys: [
+                elementInnerLogicalW * pr,
+                elementInnerLogicalH * pr,
+            ],
+            viewportLogical: [viewportWidth, viewportHeight],
+            viewportPhys: [viewportWidth * pr, viewportHeight * pr],
+            overflow: {
+                top: e.overflow.top * pr,
+                right: e.overflow.right * pr,
+                bottom: e.overflow.bottom * pr,
+                left: e.overflow.left * pr,
+            },
+            finalViewport: {
+                x: finalCanvasRect.x * pr,
+                y: finalCanvasRect.y * pr,
+                w: finalCanvasRect.w * pr,
+                h: finalCanvasRect.h * pr,
+            },
+            finalTarget,
+            isVisible: hit.isVisible,
+        });
+    }
 
     /**
      * Check element intersection with the viewport.
