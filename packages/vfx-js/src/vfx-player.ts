@@ -1145,6 +1145,11 @@ export class VFXPlayer {
                 );
                 targetNames.push(pe.target);
             } else {
+                if (pe.shader === undefined) {
+                    throw new Error(
+                        "VFXPostEffect requires `shader` (the `effect` path is not implemented yet).",
+                    );
+                }
                 frag = this.#getShader(pe.shader);
                 pass = new PostEffectPass(
                     this.#ctx,
