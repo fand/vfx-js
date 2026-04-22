@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 
 import Logo from "./assets/logo-640w-20p.svg";
-import { createTrailEffect } from "./effects/trail";
+import { createBloomEffect } from "./effects/bloom";
 import "./preset.css";
 import { initVFX } from "./utils";
 
@@ -11,10 +11,10 @@ export default {
 } satisfies Meta<undefined>;
 
 /**
- * Single effect: a stateful trail that accumulates the element's pixels
- * into a persistent render target and blits the result to the output.
+ * Single effect: bloom. Deterministic (no frame-to-frame feedback),
+ * making it VRT-friendly — static input ⇒ static output.
  */
-export const trail: StoryObj<undefined> = {
+export const bloom: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
         img.src = Logo;
@@ -24,26 +24,29 @@ export const trail: StoryObj<undefined> = {
     },
     args: undefined,
 };
-trail.play = async ({ canvasElement }) => {
+bloom.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
     await new Promise((o) => {
         img.onload = o;
     });
 
     const vfx = initVFX();
-    // Factory call: fresh Effect instance per element.
     await vfx.add(img, {
-        effect: createTrailEffect({ decay: 0.94 }),
+        effect: createBloomEffect({
+            threshold: 0.6,
+            intensity: 1.3,
+            radius: 2,
+            iterations: 4,
+        }),
         overflow: 80,
     });
 };
 
 /**
- * Pipeline: pass an array of effects. With one render-having effect in
- * the chain this is equivalent to the single form, but confirms the
- * array acceptance path.
+ * Array form confirms the chain accepts `readonly Effect[]` — a
+ * length-1 array behaves identically to the single form.
  */
-export const trailAsArray: StoryObj<undefined> = {
+export const bloomAsArray: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
         img.src = Logo;
@@ -53,7 +56,7 @@ export const trailAsArray: StoryObj<undefined> = {
     },
     args: undefined,
 };
-trailAsArray.play = async ({ canvasElement }) => {
+bloomAsArray.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
     await new Promise((o) => {
         img.onload = o;
@@ -61,7 +64,14 @@ trailAsArray.play = async ({ canvasElement }) => {
 
     const vfx = initVFX();
     await vfx.add(img, {
-        effect: [createTrailEffect({ decay: 0.9 })],
-        overflow: 60,
+        effect: [
+            createBloomEffect({
+                threshold: 0.6,
+                intensity: 1.3,
+                radius: 2,
+                iterations: 4,
+            }),
+        ],
+        overflow: 80,
     });
 };
