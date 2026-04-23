@@ -62,8 +62,8 @@ crtBloom.play = async ({ canvasElement }) => {
             createRgbMixEffect({ gains: [0, 2, 2] }),
             createBloomEffect({
                 threshold: 0.2,
-                intensity: 10.0,
-                radius: 100,
+                intensity: 1000.0,
+                radius: 50,
                 pad: 100,
             }),
         ],

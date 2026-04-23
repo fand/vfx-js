@@ -163,10 +163,6 @@ export type BloomOptions = {
     pad?: number | "fullscreen";
 };
 
-// Filter radius for tent upsample (source-texel units). Kept internal;
-// 1.0 matches COD AW defaults and is rarely worth tuning.
-const TENT_FILTER_RADIUS = 1.0;
-
 export function createBloomEffect(opts: BloomOptions = {}): Effect {
     const threshold = opts.threshold ?? 0.7;
     const softness = opts.softness ?? 0.1;
@@ -177,6 +173,9 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
     let bright: EffectRenderTarget | null = null;
     const mipsDown: EffectRenderTarget[] = [];
     const mipsUp: EffectRenderTarget[] = [];
+    // Fractional tent-filter radius (source-texel units). Combined with
+    // integer mip depth it linearises reach vs `radius` across 2^L jumps.
+    let tentRadius = 1.0;
     let allocated = false;
 
     function allocateMips(ctx: EffectContext, baseW: number, baseH: number) {
@@ -184,12 +183,17 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             return;
         }
         // radius is CSS px; convert to physical to drive mip depth.
-        // Effective reach ≈ 2^L physical px; `floor` keeps reach ≤ radius.
-        const physRadius = Math.max(1, radius * ctx.pixelRatio);
+        // Empirical reach ≈ 2 × 2^(L+1) × tentRadius physical px (the
+        // 13-tap downsample chain contributes as much spread as the
+        // tent-upsample chain, effectively doubling the model reach).
+        // Pick L so tentRadius ∈ [1, 2) gives continuous interpolation
+        // and total reach == physRadius.
+        const physRadius = Math.max(4, radius * ctx.pixelRatio);
         const maxMipLevels = Math.min(
-            Math.max(Math.floor(Math.log2(physRadius)), 1),
+            Math.max(Math.floor(Math.log2(physRadius)) - 2, 1),
             8,
         );
+        tentRadius = physRadius / 2 ** (maxMipLevels + 2);
         let w = Math.max(1, Math.floor(baseW / 2));
         let h = Math.max(1, Math.floor(baseH / 2));
         for (let i = 0; i < maxMipLevels; i++) {
@@ -267,8 +271,8 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                         srcSmall: small,
                         srcLarge: mipsDown[i],
                         texelSize: [
-                            (1 / small.width) * TENT_FILTER_RADIUS,
-                            (1 / small.height) * TENT_FILTER_RADIUS,
+                            (1 / small.width) * tentRadius,
+                            (1 / small.height) * tentRadius,
                         ],
                     },
                     target: mipsUp[i],
@@ -282,8 +286,8 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                     src: ctx.src,
                     bloom: bloomTex,
                     texelSize: [
-                        (1 / bloomTex.width) * TENT_FILTER_RADIUS,
-                        (1 / bloomTex.height) * TENT_FILTER_RADIUS,
+                        (1 / bloomTex.width) * tentRadius,
+                        (1 / bloomTex.height) * tentRadius,
                     ],
                     intensity,
                 },
