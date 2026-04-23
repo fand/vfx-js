@@ -159,14 +159,21 @@ void main() {
     vec3 lin = baseLin + max(b.rgb, vec3(0.0)) * intensity;
     vec3 rgb = pow(lin, vec3(1.0 / 2.2));
 
-    // Dither just before 8-bit quantisation — bands form at the pow,
-    // so noise has to land after it. ±0.5 LSB at dither=1, with
-    // independent noise per channel to avoid tinted bands.
-    vec3 n = vec3(
+    // TPDF dither just before 8-bit quantisation. Two IGN samples
+    // summed give a triangular PDF in [-1, 1], which decorrelates the
+    // quantisation error from the signal (uniform dither doesn't).
+    // Independent per channel to avoid tinted bands.
+    vec3 n1 = vec3(
         ign(gl_FragCoord.xy),
         ign(gl_FragCoord.xy + 17.0),
         ign(gl_FragCoord.xy + 41.0)
-    ) - 0.5;
+    );
+    vec3 n2 = vec3(
+        ign(gl_FragCoord.xy + 113.0),
+        ign(gl_FragCoord.xy + 131.0),
+        ign(gl_FragCoord.xy + 149.0)
+    );
+    vec3 n = n1 + n2 - 1.0;
     rgb += n * dither / 255.0;
 
     float a = min(1.0, max(baseColor.a, b.a * intensity));
