@@ -160,9 +160,14 @@ void main() {
     vec3 rgb = pow(lin, vec3(1.0 / 2.2));
 
     // Dither just before 8-bit quantisation — bands form at the pow,
-    // so noise has to land after it.
-    float n = ign(gl_FragCoord.xy) - 0.5;
-    rgb += vec3(n * dither / 255.0) * 0.1;
+    // so noise has to land after it. ±0.5 LSB at dither=1, with
+    // independent noise per channel to avoid tinted bands.
+    vec3 n = vec3(
+        ign(gl_FragCoord.xy),
+        ign(gl_FragCoord.xy + 17.0),
+        ign(gl_FragCoord.xy + 41.0)
+    ) - 0.5;
+    rgb += n * dither / 255.0;
 
     float a = min(1.0, max(baseColor.a, b.a * intensity));
     outColor = vec4(rgb, a);
