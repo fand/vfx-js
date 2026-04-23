@@ -6,6 +6,10 @@
 // dominated by the pyramid (≈ output × 4/3 total), not N full-res passes.
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 
+// Threshold + sRGB→linear decode. Bloom math runs in linear space so
+// downsample averages reflect light intensity (not perceptual levels)
+// and Rec.709 luma coefficients apply correctly. `pow(2.2)` is the
+// standard fast approximation of the sRGB EOTF.
 const FRAG_THRESHOLD = `#version 300 es
 precision highp float;
 in vec2 uvInner;
@@ -16,14 +20,15 @@ uniform float threshold;
 uniform float softness;
 
 void main() {
-    vec4 c = vec4(0.0);
+    vec3 lin = vec3(0.0);
     if (uvInnerDst.x >= 0.0 && uvInnerDst.x <= 1.0 &&
         uvInnerDst.y >= 0.0 && uvInnerDst.y <= 1.0) {
-        c = texture(src, uvInner);
+        vec3 srgb = texture(src, uvInner).rgb;
+        lin = pow(srgb, vec3(2.2));
     }
-    float lum = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float lum = dot(lin, vec3(0.2126, 0.7152, 0.0722));
     float f = smoothstep(threshold, threshold + softness, lum);
-    outColor = vec4(c.rgb * f, f);
+    outColor = vec4(lin * f, f);
 }
 `;
 
@@ -106,7 +111,10 @@ void main() {
 }
 `;
 
-// Composite: tent-upsample bloom from half-res → full-res and add to src.
+// Composite: tent-upsample bloom from half-res → full-res, decode the
+// sRGB src to linear, add the linear halo, then re-encode once. Doing
+// the single pow at the end means dither can be injected right before
+// 8-bit quantisation — where banding actually forms.
 const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -117,6 +125,14 @@ uniform sampler2D src;
 uniform sampler2D bloom;
 uniform vec2 texelSize;
 uniform float intensity;
+uniform float dither;
+
+// Interleaved gradient noise (Jimenez 2014). Cheap, high-quality,
+// spatially decorrelated — perfect for breaking 8-bit quantisation
+// bands in the gamma-encoded bloom halo.
+float ign(vec2 p) {
+    return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+}
 
 void main() {
     vec2 t = texelSize;
@@ -137,7 +153,17 @@ void main() {
         uvInnerDst.y >= 0.0 && uvInnerDst.y <= 1.0) {
         baseColor = texture(src, uvInner);
     }
-    vec3 rgb = baseColor.rgb + b.rgb * intensity;
+
+    // Linear composite: decode base, add linear bloom, single pow out.
+    vec3 baseLin = pow(baseColor.rgb, vec3(2.2));
+    vec3 lin = baseLin + max(b.rgb, vec3(0.0)) * intensity;
+    vec3 rgb = pow(lin, vec3(1.0 / 2.2));
+
+    // Dither just before 8-bit quantisation — bands form at the pow,
+    // so noise has to land after it.
+    float n = ign(gl_FragCoord.xy) - 0.5;
+    rgb += vec3(n * dither / 255.0) * 0.1;
+
     float a = min(1.0, max(baseColor.a, b.a * intensity));
     outColor = vec4(rgb, a);
 }
@@ -164,6 +190,14 @@ export type BloomOptions = {
      * sides. Default 50.
      */
     pad?: number | "fullscreen";
+    /**
+     * Dither amount 0..1 (default 0). Non-zero injects ±0.5-LSB
+     * interleaved-gradient noise at composite time to mask residual
+     * 8-bit banding from the linear→sRGB re-encode. 1 is typically
+     * invisible but enough to dissolve bands; raise for aggressive
+     * smoothing.
+     */
+    dither?: number;
 };
 
 // Map user scatter 0..1 → tent filter factor. Mirrors Unity HDRP's
@@ -178,6 +212,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
     const softness = opts.softness ?? 0.1;
     const intensity = opts.intensity ?? 1.2;
     const tentFilter = scatterFilter(opts.scatter ?? 0.7);
+    const dither = Math.max(0, opts.dither ?? 0);
     const pad = opts.pad ?? 50;
 
     let bright: EffectRenderTarget | null = null;
@@ -194,7 +229,9 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
         let w = Math.max(1, Math.floor(baseW / 2));
         let h = Math.max(1, Math.floor(baseH / 2));
         for (let i = 0; i < 8; i++) {
-            mipsDown.push(ctx.createRenderTarget({ size: [w, h] }));
+            mipsDown.push(
+                ctx.createRenderTarget({ size: [w, h], float: true }),
+            );
             const nw = Math.max(1, Math.floor(w / 2));
             const nh = Math.max(1, Math.floor(h / 2));
             if (nw < 4 || nh < 4) {
@@ -207,6 +244,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             mipsUp.push(
                 ctx.createRenderTarget({
                     size: [mipsDown[i].width, mipsDown[i].height],
+                    float: true,
                 }),
             );
         }
@@ -216,7 +254,9 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
     const effect: Effect = {
         init(ctx) {
             // Full-output, auto-resize — threshold needs inner-rect gating.
-            bright = ctx.createRenderTarget();
+            // Float storage so linear-space bloom values keep precision in
+            // the dark end across the downsample chain (8-bit would band).
+            bright = ctx.createRenderTarget({ float: true });
         },
         render(ctx) {
             if (!bright) {
@@ -298,6 +338,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                         (tentFilter * 2) / baseH,
                     ],
                     intensity,
+                    dither,
                 },
                 target: ctx.output,
             });

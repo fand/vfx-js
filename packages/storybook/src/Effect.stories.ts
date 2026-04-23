@@ -60,13 +60,14 @@ crtBloom.play = async ({ canvasElement }) => {
         effect: [
             createPixelateEffect({ size: 5 }),
             createScanlineEffect({ spacing: 5 }),
-            // createRgbMixEffect({ gains: [0, 2, 2] }),
+            // createRgbMixEffect({ gains: [0.5, 1, 1] }),
             createBloomEffect({
-                threshold: 0.2,
-                softness: 1,
-                intensity: 3.0,
-                scatter: 0.9,
-                pad: 100,
+                threshold: 0.01,
+                softness: 0.2,
+                intensity: 2.0,
+                scatter: 1.0,
+                dither: 0.0,
+                pad: "fullscreen",
             }),
         ],
     });
