@@ -139,6 +139,12 @@ void main() {
 // forms. Gaussian (vs tent) gives a round falloff with no step
 // response, so concentric rings from the pyramid's reconstruction no
 // longer show up on the visible pass.
+//
+// Output is *premultiplied*: the runtime blends with (ONE, 1-SRC_ALPHA)
+// when writing to screen, so the low-intensity halo in the pad area
+// (where sRGB-encoded `rgb` is still visibly bright due to pow(1/2.2)'s
+// infinite slope at 0) correctly fades via its alpha instead of painting
+// a visible ring.
 const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -150,6 +156,7 @@ uniform sampler2D bloom;
 uniform vec2 texelSize;
 uniform float intensity;
 uniform float dither;
+uniform float edgeFade;
 
 // Interleaved gradient noise (Jimenez 2014). Cheap, high-quality,
 // spatially decorrelated — perfect for breaking 8-bit quantisation
@@ -175,16 +182,19 @@ void main() {
     b += texture(bloom, uv + vec2( t.x,  t.y)) * 25.0;
     b *= (1.0 / 256.0);
 
-    vec4 baseColor = vec4(0.0);
-    if (uvInnerDst.x >= 0.0 && uvInnerDst.x <= 1.0 &&
-        uvInnerDst.y >= 0.0 && uvInnerDst.y <= 1.0) {
-        baseColor = texture(src, uvInner);
-    }
+    // Same soft edge-fade as threshold so base and bloom share a
+    // coverage footprint — base alpha tapers into the pad instead of
+    // stepping from 1 to 0.
+    vec4 baseColor = texture(src, clamp(uvInner, 0.0, 1.0));
+    vec2 outside = max(vec2(0.0), max(-uvInnerDst, uvInnerDst - 1.0));
+    float outDist = max(outside.x, outside.y);
+    float baseMask = 1.0 - smoothstep(0.0, edgeFade, outDist);
+    baseColor.a *= baseMask;
 
     // Linear composite: decode base, add linear bloom, single pow out.
     vec3 baseLin = pow(baseColor.rgb, vec3(2.2));
     vec3 lin = baseLin + max(b.rgb, vec3(0.0)) * intensity;
-    vec3 rgb = pow(lin, vec3(1.0 / 2.2));
+    vec3 rgb = pow(max(lin, vec3(0.0)), vec3(1.0 / 2.2));
 
     // TPDF dither just before 8-bit quantisation. Two IGN samples
     // summed give a triangular PDF in [-1, 1], which decorrelates the
@@ -203,8 +213,11 @@ void main() {
     vec3 n = n1 + n2 - 1.0;
     rgb += n * dither / 255.0;
 
-    float a = min(1.0, max(baseColor.a, b.a * intensity));
-    outColor = vec4(rgb, a);
+    // Premultiply with the union coverage of base and bloom. At pad
+    // edges both feed zero so rgb × a → 0 and the halo dissolves
+    // instead of leaving a gamma-boosted floor behind.
+    float a = clamp(max(baseColor.a, b.a * intensity), 0.0, 1.0);
+    outColor = vec4(rgb * a, a);
 }
 `;
 
@@ -409,6 +422,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                     ],
                     intensity: effectiveIntensity,
                     dither,
+                    edgeFade,
                 },
                 target: ctx.output,
             });
