@@ -85,10 +85,11 @@ void main() {
 }
 `;
 
-// 3×3 tent upsample of `srcSmall` blended with `srcLarge` (same-size)
-// via Unity HDRP / COD:AW scatter: 0 → pick only this level's coarse
-// downsample (tight halo, high-detail); 1 → pick only the recursive
-// upsample from deeper mips (wide halo, low-detail); mix in between.
+// 3×3 tent upsample — COD:AW additive pyramid. Each level contributes
+// `mipsDown[i] * weightLarge + tent(deeper) * weightSmall`; weights are
+// driven from JS so scatter maps to halo radius linearly.
+// (Unity HDRP's `mix(down, tent, scatter)` is geometric in radius —
+// replaced here with a per-level linear gate.)
 const FRAG_UPSAMPLE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -96,7 +97,8 @@ out vec4 outColor;
 uniform sampler2D srcSmall;
 uniform sampler2D srcLarge;
 uniform vec2 texelSize;
-uniform float scatter;
+uniform float weightLarge;
+uniform float weightSmall;
 
 void main() {
     vec2 t = texelSize;
@@ -111,7 +113,7 @@ void main() {
     sum += texture(srcSmall, uv + vec2( 0.0,  t.y)) * 2.0;
     sum += texture(srcSmall, uv + vec2( t.x,  t.y)) * 1.0;
     sum *= (1.0 / 16.0);
-    outColor = mix(texture(srcLarge, uv), sum, scatter);
+    outColor = texture(srcLarge, uv) * weightLarge + sum * weightSmall;
 }
 `;
 
@@ -199,13 +201,13 @@ export type BloomOptions = {
     /** Additive gain on the bloom. Default 1.2. */
     intensity?: number;
     /**
-     * How wide / diffuse the bloom looks. 0..1 (default 0.7). Unity
-     * HDRP / COD:AW "Scatter" convention — at each pyramid level,
-     * `mix(thisLevelDown, upsample(deeperMip), scatter)`. 0 collapses
-     * the halo to the tightest single-level blur; 1 reconstructs it
-     * purely from deep mips (widest, softest). Also scales the tent
-     * filter width so endpoints don't alias. Maximum reach is still
-     * bounded by pyramid depth (set by the element + pad buffer).
+     * Halo radius, 0..1 (default 0.7). Maps linearly to src-px reach:
+     * scatter=0 uses only the shallowest downsample (≈ 2 src-px halo),
+     * scatter=1 activates the full pyramid (≈ 2^(depth−1) src-px).
+     * Internally the scatter value is log2-warped to a fractional
+     * pyramid depth so that the visible halo radius grows linearly
+     * with the knob. Intensity is normalised by active depth, so
+     * brightness is roughly scatter-independent.
      */
     scatter?: number;
     /**
@@ -224,19 +226,17 @@ export type BloomOptions = {
     dither?: number;
 };
 
-// Map user scatter 0..1 → tent filter factor. Mirrors Unity HDRP's
-// `Lerp(0.05, 0.95, scatter)` to keep tent offsets inside 1 texel and
-// avoid sparse-sample aliasing at the endpoints.
-function scatterFilter(scatter: number): number {
-    return 0.05 + 0.9 * Math.min(Math.max(scatter, 0), 1);
-}
+// Tent offset in mip-texel units. 0.5 here combined with the
+// base-anchored offset (`levelScale / base`) produces a 1-texel tent
+// on srcSmall — the classic HDRP reconstruction kernel, fixed now
+// that scatter no longer dials the filter width.
+const TENT_FILTER = 0.5;
 
 export function createBloomEffect(opts: BloomOptions = {}): Effect {
     const threshold = opts.threshold ?? 0.7;
     const softness = opts.softness ?? 0.1;
     const intensity = opts.intensity ?? 1.2;
     const scatter = Math.min(Math.max(opts.scatter ?? 0.7, 0), 1);
-    const tentFilter = scatterFilter(scatter);
     const dither = Math.max(0, opts.dither ?? 0);
     const pad = opts.pad ?? 50;
 
@@ -326,37 +326,53 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                 });
             }
 
-            // Upsample-blend: write into mipsUp[i] at mipsDown[i]'s size.
-            //   mipsUp[n-2] = mix(mipsDown[n-2], tent(mipsDown[n-1]), scatter)
-            //   mipsUp[i]   = mix(mipsDown[i],   tent(mipsUp[i+1]),   scatter)
+            // Additive pyramid upsample with per-level weights.
+            //   upsample[D-1] = mipsDown[D-1] × w[D-1]
+            //   upsample[i]   = mipsDown[i]   × w[i] + tent(upsample[i+1])
+            // weight[i] = clamp(activeDepth − i, 0, 1) where activeDepth is
+            // 1 + log2(radiusPx) with radiusPx linear in scatter. This makes
+            // the halo radius linear in scatter while keeping the pyramid
+            // cascade itself COD-faithful (pure additive, no nested mix).
             //
             // Tent offsets use the *ideal* (non-floored) texel size
             //   idealTexelUV = 2^smallLevel / base
             // where smallLevel = i + 2. Anchoring to the base dimensions
-            // cancels the cumulative floor error from the halving chain,
-            // so reach stays calibrated to `tentFilter × 2^smallLevel`
-            // source-px regardless of the actual mip dims.
+            // cancels the cumulative floor error from the halving chain.
             const baseW = bright.width;
             const baseH = bright.height;
+            const maxRadius = 2 ** Math.max(0, n - 1);
+            const radiusPx = 1 + scatter * (maxRadius - 1);
+            const activeDepth = 1 + Math.log2(radiusPx);
+            const weightFor = (i: number) =>
+                Math.min(1, Math.max(0, activeDepth - i));
             for (let i = n - 2; i >= 0; i--) {
                 const small = i === n - 2 ? mipsDown[n - 1] : mipsUp[i + 1];
                 const levelScale = 2 ** (i + 2);
+                // Bottom mip is raw downsample — its weight is applied here.
+                // Intermediate upsamples already carry per-level weights
+                // baked in from previous iterations, so pass-through = 1.
+                const wSmall = i === n - 2 ? weightFor(n - 1) : 1.0;
                 ctx.draw({
                     frag: FRAG_UPSAMPLE,
                     uniforms: {
                         srcSmall: small,
                         srcLarge: mipsDown[i],
                         texelSize: [
-                            (tentFilter * levelScale) / baseW,
-                            (tentFilter * levelScale) / baseH,
+                            (TENT_FILTER * levelScale) / baseW,
+                            (TENT_FILTER * levelScale) / baseH,
                         ],
-                        scatter,
+                        weightLarge: weightFor(i),
+                        weightSmall: wSmall,
                     },
                     target: mipsUp[i],
                 });
             }
 
             const bloomTex = n >= 2 ? mipsUp[0] : mipsDown[0];
+            // Normalise by active depth so bloom amplitude stays roughly
+            // constant across scatter — fully-additive pyramid sums N
+            // levels, so raw amplitude scales with level count otherwise.
+            const effectiveIntensity = intensity / Math.max(1, activeDepth);
             // bloomTex is always at level 1 (half of base).
             ctx.draw({
                 frag: FRAG_COMPOSITE,
@@ -364,10 +380,10 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                     src: ctx.src,
                     bloom: bloomTex,
                     texelSize: [
-                        (tentFilter * 2) / baseW,
-                        (tentFilter * 2) / baseH,
+                        (TENT_FILTER * 2) / baseW,
+                        (TENT_FILTER * 2) / baseH,
                     ],
-                    intensity,
+                    intensity: effectiveIntensity,
                     dither,
                 },
                 target: ctx.output,
