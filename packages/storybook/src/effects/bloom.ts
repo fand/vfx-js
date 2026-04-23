@@ -85,7 +85,10 @@ void main() {
 }
 `;
 
-// 3×3 tent upsample of `srcSmall` added to `srcLarge` (same-size).
+// 3×3 tent upsample of `srcSmall` blended with `srcLarge` (same-size)
+// via Unity HDRP / COD:AW scatter: 0 → pick only this level's coarse
+// downsample (tight halo, high-detail); 1 → pick only the recursive
+// upsample from deeper mips (wide halo, low-detail); mix in between.
 const FRAG_UPSAMPLE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -93,6 +96,7 @@ out vec4 outColor;
 uniform sampler2D srcSmall;
 uniform sampler2D srcLarge;
 uniform vec2 texelSize;
+uniform float scatter;
 
 void main() {
     vec2 t = texelSize;
@@ -107,7 +111,7 @@ void main() {
     sum += texture(srcSmall, uv + vec2( 0.0,  t.y)) * 2.0;
     sum += texture(srcSmall, uv + vec2( t.x,  t.y)) * 1.0;
     sum *= (1.0 / 16.0);
-    outColor = texture(srcLarge, uv) + sum;
+    outColor = mix(texture(srcLarge, uv), sum, scatter);
 }
 `;
 
@@ -195,11 +199,13 @@ export type BloomOptions = {
     /** Additive gain on the bloom. Default 1.2. */
     intensity?: number;
     /**
-     * How diffuse the bloom looks. 0..1 (default 0.7). Follows the
-     * Unity HDRP / COD:AW "Scatter" convention — 0 is focused/tight,
-     * 1 is a wide soft halo. Not a pixel radius: total extent is
-     * dominated by the mip pyramid depth (auto-fit to the element +
-     * pad buffer), which is effectively full-frame.
+     * How wide / diffuse the bloom looks. 0..1 (default 0.7). Unity
+     * HDRP / COD:AW "Scatter" convention — at each pyramid level,
+     * `mix(thisLevelDown, upsample(deeperMip), scatter)`. 0 collapses
+     * the halo to the tightest single-level blur; 1 reconstructs it
+     * purely from deep mips (widest, softest). Also scales the tent
+     * filter width so endpoints don't alias. Maximum reach is still
+     * bounded by pyramid depth (set by the element + pad buffer).
      */
     scatter?: number;
     /**
@@ -229,7 +235,8 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
     const threshold = opts.threshold ?? 0.7;
     const softness = opts.softness ?? 0.1;
     const intensity = opts.intensity ?? 1.2;
-    const tentFilter = scatterFilter(opts.scatter ?? 0.7);
+    const scatter = Math.min(Math.max(opts.scatter ?? 0.7, 0), 1);
+    const tentFilter = scatterFilter(scatter);
     const dither = Math.max(0, opts.dither ?? 0);
     const pad = opts.pad ?? 50;
 
@@ -319,9 +326,9 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                 });
             }
 
-            // Upsample-add: write into mipsUp[i] at mipsDown[i]'s size.
-            //   mipsUp[n-2] = tent(mipsDown[n-1]) + mipsDown[n-2]
-            //   mipsUp[i]   = tent(mipsUp[i+1])   + mipsDown[i]  (i=n-3..0)
+            // Upsample-blend: write into mipsUp[i] at mipsDown[i]'s size.
+            //   mipsUp[n-2] = mix(mipsDown[n-2], tent(mipsDown[n-1]), scatter)
+            //   mipsUp[i]   = mix(mipsDown[i],   tent(mipsUp[i+1]),   scatter)
             //
             // Tent offsets use the *ideal* (non-floored) texel size
             //   idealTexelUV = 2^smallLevel / base
@@ -343,6 +350,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                             (tentFilter * levelScale) / baseW,
                             (tentFilter * levelScale) / baseH,
                         ],
+                        scatter,
                     },
                     target: mipsUp[i],
                 });
