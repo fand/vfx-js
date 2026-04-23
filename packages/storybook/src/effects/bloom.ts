@@ -151,26 +151,28 @@ export type BloomOptions = {
     /** Additive gain on the bloom. Default 1.2. */
     intensity?: number;
     /**
-     * Mip pyramid depth (1..8). Larger = wider glow.
-     * Auto-capped when a level would shrink below 4 px. Default 5.
+     * Glow reach in CSS (logical) px. Larger = wider, softer halo.
+     * Drives the internal mip depth. Default 50.
      */
-    mipLevels?: number;
-    /** Tent upsample radius in source-texel units (1..4 typical). Default 1. */
-    filterRadius?: number;
+    radius?: number;
     /**
-     * Extra pad around the element (physical px) for the glow to spread
-     * into. `"fullscreen"` reaches the viewport edges on all sides.
+     * Extra pad around the element in CSS (logical) px so the glow has
+     * room to spread. `"fullscreen"` reaches the viewport edges on all
+     * sides. Default: same as `radius`.
      */
     pad?: number | "fullscreen";
 };
+
+// Filter radius for tent upsample (source-texel units). Kept internal;
+// 1.0 matches COD AW defaults and is rarely worth tuning.
+const TENT_FILTER_RADIUS = 1.0;
 
 export function createBloomEffect(opts: BloomOptions = {}): Effect {
     const threshold = opts.threshold ?? 0.7;
     const softness = opts.softness ?? 0.1;
     const intensity = opts.intensity ?? 1.2;
-    const filterRadius = opts.filterRadius ?? 1.0;
-    const maxMipLevels = Math.min(Math.max(opts.mipLevels ?? 5, 1), 8);
-    const pad = opts.pad;
+    const radius = Math.max(1, opts.radius ?? 50);
+    const pad = opts.pad ?? radius;
 
     let bright: EffectRenderTarget | null = null;
     const mipsDown: EffectRenderTarget[] = [];
@@ -181,6 +183,13 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
         if (allocated) {
             return;
         }
+        // radius is CSS px; convert to physical to drive mip depth.
+        // Effective reach ≈ 2^L physical px; `floor` keeps reach ≤ radius.
+        const physRadius = Math.max(1, radius * ctx.pixelRatio);
+        const maxMipLevels = Math.min(
+            Math.max(Math.floor(Math.log2(physRadius)), 1),
+            8,
+        );
         let w = Math.max(1, Math.floor(baseW / 2));
         let h = Math.max(1, Math.floor(baseH / 2));
         for (let i = 0; i < maxMipLevels; i++) {
@@ -258,8 +267,8 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                         srcSmall: small,
                         srcLarge: mipsDown[i],
                         texelSize: [
-                            (1 / small.width) * filterRadius,
-                            (1 / small.height) * filterRadius,
+                            (1 / small.width) * TENT_FILTER_RADIUS,
+                            (1 / small.height) * TENT_FILTER_RADIUS,
                         ],
                     },
                     target: mipsUp[i],
@@ -273,8 +282,8 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                     src: ctx.src,
                     bloom: bloomTex,
                     texelSize: [
-                        (1 / bloomTex.width) * filterRadius,
-                        (1 / bloomTex.height) * filterRadius,
+                        (1 / bloomTex.width) * TENT_FILTER_RADIUS,
+                        (1 / bloomTex.height) * TENT_FILTER_RADIUS,
                     ],
                     intensity,
                 },
@@ -289,14 +298,12 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
         },
     };
 
-    if (pad !== undefined) {
-        effect.outputSize = (dims) => {
-            if (pad === "fullscreen") {
-                return { pad: dims.fullscreenPad };
-            }
-            return { pad };
-        };
-    }
+    effect.outputSize = (dims) => {
+        if (pad === "fullscreen") {
+            return { pad: dims.fullscreenPad };
+        }
+        return { pad: pad * dims.pixelRatio };
+    };
 
     return effect;
 }
