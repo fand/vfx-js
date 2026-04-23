@@ -193,7 +193,6 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             Math.max(Math.floor(Math.log2(physRadius)) - 2, 1),
             8,
         );
-        tentRadius = physRadius / 2 ** (maxMipLevels + 2);
         let w = Math.max(1, Math.floor(baseW / 2));
         let h = Math.max(1, Math.floor(baseH / 2));
         for (let i = 0; i < maxMipLevels; i++) {
@@ -206,6 +205,9 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             w = nw;
             h = nh;
         }
+        // Calibrate against the ACTUAL allocated depth — the pyramid
+        // can truncate early if a level would fall below the 4-px floor.
+        tentRadius = physRadius / 2 ** (mipsDown.length + 2);
         for (let i = 0; i < mipsDown.length - 1; i++) {
             mipsUp.push(
                 ctx.createRenderTarget({
@@ -263,16 +265,26 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             // Upsample-add: write into mipsUp[i] at mipsDown[i]'s size.
             //   mipsUp[n-2] = tent(mipsDown[n-1]) + mipsDown[n-2]
             //   mipsUp[i]   = tent(mipsUp[i+1])   + mipsDown[i]  (i=n-3..0)
+            //
+            // Tent offsets use the *ideal* (non-floored) texel size
+            //   idealTexelUV = 2^smallLevel / base
+            // where smallLevel = i + 2. Anchoring to the base dimensions
+            // cancels the cumulative floor error from the halving chain,
+            // so reach stays calibrated to `tentRadius × 2^smallLevel`
+            // source-px regardless of the actual mip dims.
+            const baseW = bright.width;
+            const baseH = bright.height;
             for (let i = n - 2; i >= 0; i--) {
                 const small = i === n - 2 ? mipsDown[n - 1] : mipsUp[i + 1];
+                const levelScale = 2 ** (i + 2);
                 ctx.draw({
                     frag: FRAG_UPSAMPLE,
                     uniforms: {
                         srcSmall: small,
                         srcLarge: mipsDown[i],
                         texelSize: [
-                            (1 / small.width) * tentRadius,
-                            (1 / small.height) * tentRadius,
+                            (tentRadius * levelScale) / baseW,
+                            (tentRadius * levelScale) / baseH,
                         ],
                     },
                     target: mipsUp[i],
@@ -280,14 +292,15 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             }
 
             const bloomTex = n >= 2 ? mipsUp[0] : mipsDown[0];
+            // bloomTex is always at level 1 (half of base).
             ctx.draw({
                 frag: FRAG_COMPOSITE,
                 uniforms: {
                     src: ctx.src,
                     bloom: bloomTex,
                     texelSize: [
-                        (1 / bloomTex.width) * tentRadius,
-                        (1 / bloomTex.height) * tentRadius,
+                        (tentRadius * 2) / baseW,
+                        (tentRadius * 2) / baseH,
                     ],
                     intensity,
                 },

@@ -64,7 +64,7 @@ crtBloom.play = async ({ canvasElement }) => {
                 threshold: 0.2,
                 intensity: 1000.0,
                 radius: 50,
-                pad: 100,
+                // pad: 100,
             }),
         ],
     });
