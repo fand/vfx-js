@@ -242,8 +242,12 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
         if (allocated) {
             return;
         }
-        // Auto-depth: halve until a further level would drop below 4 px
-        // on either axis. Cap at 8 levels.
+        // Auto-depth: halve until both axes hit 1 px, capped at 8
+        // levels. Going past the 13-tap stencil's "nice" size (4 px)
+        // is intentional — the deepest mips become degenerate box
+        // averages over the whole buffer, which is exactly what
+        // contributes the wide low-frequency halo tail that smears
+        // the 8-bit cutoff across enough pixels for dither to dissolve.
         let w = Math.max(1, Math.floor(baseW / 2));
         let h = Math.max(1, Math.floor(baseH / 2));
         for (let i = 0; i < 8; i++) {
@@ -252,7 +256,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             );
             const nw = Math.max(1, Math.floor(w / 2));
             const nh = Math.max(1, Math.floor(h / 2));
-            if (nw < 4 || nh < 4) {
+            if (nw === w && nh === h) {
                 break;
             }
             w = nw;
