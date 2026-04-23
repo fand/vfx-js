@@ -112,13 +112,12 @@ void main() {
 `;
 
 // Composite: 5×5 binomial-gaussian upsample of bloom from half-res →
-// full-res, sRGB-encode the halo, then add linearly to the (already
-// sRGB) src. intensity scales the halo perceptually — slider is linear
-// and the sub-LSB tail clips sooner, so low-intensity halos don't
-// leave a visible cliff against black from 8-bit quantisation.
-// Gaussian (vs tent) gives a round falloff with no step response, so
-// concentric rings from the pyramid's reconstruction no longer show
-// up on the visible pass.
+// full-res, decode the sRGB src to linear, add the linear halo, then
+// re-encode once. Doing the single pow at the end means dither can be
+// injected right before 8-bit quantisation — where banding actually
+// forms. Gaussian (vs tent) gives a round falloff with no step
+// response, so concentric rings from the pyramid's reconstruction no
+// longer show up on the visible pass.
 const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -161,11 +160,10 @@ void main() {
         baseColor = texture(src, uvInner);
     }
 
-    // sRGB composite: encode halo to sRGB, scale by intensity, add to
-    // the (already sRGB) base. Keeps the intensity slider linear and
-    // shortens the sub-LSB halo tail at low intensity.
-    vec3 bloomSrgb = pow(max(b.rgb, vec3(0.0)), vec3(1.0 / 2.2));
-    vec3 rgb = baseColor.rgb + bloomSrgb * intensity;
+    // Linear composite: decode base, add linear bloom, single pow out.
+    vec3 baseLin = pow(baseColor.rgb, vec3(2.2));
+    vec3 lin = baseLin + max(b.rgb, vec3(0.0)) * intensity;
+    vec3 rgb = pow(lin, vec3(1.0 / 2.2));
 
     // TPDF dither just before 8-bit quantisation. Two IGN samples
     // summed give a triangular PDF in [-1, 1], which decorrelates the
