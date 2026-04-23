@@ -67,10 +67,7 @@ export class VFXPlayer {
     #postEffectChain: EffectChain | null = null;
     #postEffectChainReady = false;
     #postEffectChainStaticUniforms: Record<string, EffectUniformValue> = {};
-    #postEffectChainGenerators: Record<
-        string,
-        () => EffectUniformValue
-    > = {};
+    #postEffectChainGenerators: Record<string, () => EffectUniformValue> = {};
     #postEffectChainLastTime = 0;
 
     #playRequest: number | undefined = undefined;
@@ -310,7 +307,12 @@ export class VFXPlayer {
     ): Promise<void> {
         // Effect path: mutually exclusive with `shader`. See plan.md.
         if (opts.effect !== undefined) {
-            return this.#addEffectElement(element, opts, initialCapture);
+            return this.#addEffectElement(
+                element,
+                opts,
+                opts.effect,
+                initialCapture,
+            );
         }
 
         // Normalize shader input to VFXPass array
@@ -588,10 +590,9 @@ export class VFXPlayer {
     async #addEffectElement(
         element: HTMLElement,
         opts: VFXProps,
+        rawEffect: Effect | readonly Effect[],
         initialCapture?: OffscreenCanvas,
     ): Promise<void> {
-        const rawEffect = opts.effect!;
-
         if (opts.shader !== undefined) {
             console.warn(
                 "[VFX-JS] Both `shader` and `effect` specified; `effect` takes precedence.",
@@ -749,10 +750,7 @@ export class VFXPlayer {
             // Chain has already disposed prior effects + failing host.
             // Release the source texture and restore opacity.
             texture.dispose();
-            element.style.setProperty(
-                "opacity",
-                originalOpacity.toString(),
-            );
+            element.style.setProperty("opacity", originalOpacity.toString());
             throw err;
         }
         elem.chain = chain;
@@ -1228,7 +1226,11 @@ export class VFXPlayer {
     #renderEffectElement(
         e: VFXElement,
         rect: Rect,
-        hit: { rectWithOverflow: Rect; isVisible: boolean; intersection: number },
+        hit: {
+            rectWithOverflow: Rect;
+            isVisible: boolean;
+            intersection: number;
+        },
         now: number,
         viewportGlRect: GLRect,
     ): void {
@@ -1250,9 +1252,7 @@ export class VFXPlayer {
             ...(e.effectStaticUniforms ?? {}),
         };
         if (e.effectUniformGenerators) {
-            for (const [k, gen] of Object.entries(
-                e.effectUniformGenerators,
-            )) {
+            for (const [k, gen] of Object.entries(e.effectUniformGenerators)) {
                 resolvedUniforms[k] = gen() as EffectUniformValue;
             }
         }
@@ -1300,10 +1300,7 @@ export class VFXPlayer {
             canvasPhysW: this.#canvas.width,
             canvasPhysH: this.#canvas.height,
             elementLogical: [elementInnerLogicalW, elementInnerLogicalH],
-            elementPhys: [
-                elementInnerLogicalW * pr,
-                elementInnerLogicalH * pr,
-            ],
+            elementPhys: [elementInnerLogicalW * pr, elementInnerLogicalH * pr],
             viewportLogical: [viewportWidth, viewportHeight],
             viewportPhys: [viewportWidth * pr, viewportHeight * pr],
             elementRectOnCanvasPx: {
@@ -1445,12 +1442,12 @@ export class VFXPlayer {
     #initPostEffects(postEffects: (VFXPostEffect | VFXPass)[]) {
         // Effect-path post-effect: a single-slot VFXPostEffect whose
         // `effect` field is set. See plan.md task 4-4.
-        if (
-            postEffects.length === 1 &&
-            !("frag" in postEffects[0]) &&
-            (postEffects[0] as VFXPostEffect).effect !== undefined
-        ) {
-            this.#initPostEffectChain(postEffects[0] as VFXPostEffect);
+        const pe =
+            postEffects.length === 1 && !("frag" in postEffects[0])
+                ? (postEffects[0] as VFXPostEffect)
+                : null;
+        if (pe && pe.effect !== undefined) {
+            this.#initPostEffectChain(pe, pe.effect);
             return;
         }
 
@@ -1557,13 +1554,15 @@ export class VFXPlayer {
      * fire-and-forget: until it resolves, `shouldUsePostEffect` remains
      * false and the scene renders directly to canvas (no blank frame).
      */
-    #initPostEffectChain(pe: VFXPostEffect): void {
+    #initPostEffectChain(
+        pe: VFXPostEffect,
+        rawEffect: Effect | readonly Effect[],
+    ): void {
         if (pe.shader !== undefined) {
             console.warn(
                 "[VFX-JS] Both `shader` and `effect` specified on post-effect; `effect` takes precedence.",
             );
         }
-        const rawEffect = pe.effect!;
         const effects: readonly Effect[] = Array.isArray(rawEffect)
             ? [...rawEffect]
             : [rawEffect];
@@ -1576,7 +1575,15 @@ export class VFXPlayer {
         // Capture resolver: always the current #postEffectTarget texture
         // (regenerated on viewport resize via #setupPostEffectTarget).
         const captureHandle = makeEffectTexture(
-            () => this.#postEffectTarget!.texture,
+            () => {
+                const target = this.#postEffectTarget;
+                if (!target) {
+                    throw new Error(
+                        "[VFX-JS] post-effect chain active without target",
+                    );
+                }
+                return target.texture;
+            },
             () => this.#postEffectTarget?.width ?? 0,
             () => this.#postEffectTarget?.height ?? 0,
         );
@@ -1643,7 +1650,9 @@ export class VFXPlayer {
         const resolvedUniforms: Record<string, EffectUniformValue> = {
             ...this.#postEffectChainStaticUniforms,
         };
-        for (const [k, gen] of Object.entries(this.#postEffectChainGenerators)) {
+        for (const [k, gen] of Object.entries(
+            this.#postEffectChainGenerators,
+        )) {
             resolvedUniforms[k] = gen();
         }
 
@@ -1654,7 +1663,10 @@ export class VFXPlayer {
         this.#postEffectChainLastTime = now;
 
         // For post-effects `element*` mirrors `viewport*`; overflow is 0.
-        const viewportLogical: [number, number] = [viewportWidth, viewportHeight];
+        const viewportLogical: [number, number] = [
+            viewportWidth,
+            viewportHeight,
+        ];
         const viewportPhys: [number, number] = [
             viewportWidth * pr,
             viewportHeight * pr,

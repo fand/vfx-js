@@ -196,10 +196,7 @@ export class EffectChain {
                     await e.init(host.ctx);
                 }
             } catch (err) {
-                console.error(
-                    `[VFX-JS] effect[${i}].init() failed:`,
-                    err,
-                );
+                console.error(`[VFX-JS] effect[${i}].init() failed:`, err);
                 for (let j = i - 1; j >= 0; j--) {
                     this.#safeDispose(j);
                     this.#hosts[j].dispose();
@@ -248,7 +245,9 @@ export class EffectChain {
         // 4. Update phase (array order). ctx.draw() is a no-op here.
         for (let i = 0; i < this.#effects.length; i++) {
             const e = this.#effects[i];
-            if (!e.update) continue;
+            if (!e.update) {
+                continue;
+            }
             const host = this.#hosts[i];
             host.setPhase("update");
             try {
@@ -278,16 +277,30 @@ export class EffectChain {
         }
 
         // 6. Render phase: walk renderingIndices.
+        const requireIntermediate = (idx: number): IntermediateEntry => {
+            const entry = this.#intermediates[idx];
+            if (!entry) {
+                throw new Error(
+                    `[VFX-JS] intermediate[${idx}] missing during render`,
+                );
+            }
+            return entry;
+        };
         for (let k = 0; k < M; k++) {
             const i = this.#renderingIndices[k];
             const host = this.#hosts[i];
+            const effect = this.#effects[i];
+            const render = effect.render;
+            if (!render) {
+                // renderingIndices filters on render presence — unreachable
+                // unless the Effect mutated its own shape post-construction.
+                continue;
+            }
             host.setPhase("render");
             host.tickAutoUpdates();
 
             const srcHandle =
-                k === 0
-                    ? this.#capture
-                    : this.#intermediates[k - 1]!.texHandle;
+                k === 0 ? this.#capture : requireIntermediate(k - 1).texHandle;
             host.setSrc(srcHandle);
 
             let outputHandle: EffectRenderTarget | null;
@@ -297,14 +310,13 @@ export class EffectChain {
                         ? null
                         : this.#getFinalHandle(input.finalTarget);
             } else {
-                outputHandle = this.#intermediates[k]!.rtHandle;
+                outputHandle = requireIntermediate(k).rtHandle;
                 host.clearRt(outputHandle);
             }
             host.setOutput(outputHandle);
 
-            const effect = this.#effects[i];
             try {
-                effect.render!(host.ctx);
+                render(host.ctx);
             } catch (err) {
                 if (!this.#warnedRender.has(i)) {
                     this.#warnedRender.add(i);
@@ -319,16 +331,12 @@ export class EffectChain {
                 } else if (k === M - 1) {
                     host.passthroughCopy(srcHandle, outputHandle, vp);
                 } else {
-                    host.passthroughCopy(
-                        srcHandle,
-                        outputHandle,
-                        {
-                            x: 0,
-                            y: 0,
-                            w: outputHandle.width,
-                            h: outputHandle.height,
-                        },
-                    );
+                    host.passthroughCopy(srcHandle, outputHandle, {
+                        x: 0,
+                        y: 0,
+                        w: outputHandle.width,
+                        h: outputHandle.height,
+                    });
                 }
             }
 
@@ -360,7 +368,9 @@ export class EffectChain {
 
     #safeDispose(i: number): void {
         const e = this.#effects[i];
-        if (!e.dispose) return;
+        if (!e.dispose) {
+            return;
+        }
         try {
             e.dispose();
         } catch (err) {
@@ -422,7 +432,11 @@ export class EffectChain {
                 float = resolved.float;
             }
 
-            const srcInnerRect = rectForPad(srcPad, srcBufferSize, elementPixel);
+            const srcInnerRect = rectForPad(
+                srcPad,
+                srcBufferSize,
+                elementPixel,
+            );
             const uvInnerRect = rectForPad(dstPad, dstBufferSize, elementPixel);
 
             // Stage outputViewport: where the draw lands on its dst buffer.
@@ -510,13 +524,9 @@ export class EffectChain {
                 ? [ret[0], ret[1]]
                 : (ret as { size: readonly [number, number] }).size;
             if (!Array.isArray(ret)) {
-                float =
-                    (ret as { float?: boolean }).float ?? false;
+                float = (ret as { float?: boolean }).float ?? false;
             }
-            if (
-                rawSize[0] < elementPixel[0] ||
-                rawSize[1] < elementPixel[1]
-            ) {
+            if (rawSize[0] < elementPixel[0] || rawSize[1] < elementPixel[1]) {
                 if (!this.#warnedClampBuffer.has(effectIndex)) {
                     this.#warnedClampBuffer.add(effectIndex);
                     console.warn(
@@ -595,12 +605,9 @@ export class EffectChain {
         if (current) {
             current.fb.dispose();
         }
-        const fb = new Framebuffer(
-            this.#glCtx,
-            bufferSize[0],
-            bufferSize[1],
-            { float },
-        );
+        const fb = new Framebuffer(this.#glCtx, bufferSize[0], bufferSize[1], {
+            float,
+        });
         const rtHandle = makeEffectRenderTargetFromFb(fb);
         const texHandle = makeEffectTexture(
             () => fb.texture,
@@ -617,10 +624,7 @@ export class EffectChain {
         };
     }
 
-    #fullscreenPadFor(
-        input: ChainFrameInput,
-        srcPad: Margin,
-    ): ChainMargin {
+    #fullscreenPadFor(input: ChainFrameInput, srcPad: Margin): ChainMargin {
         if (this.#isPostEffect) {
             return ZERO_MARGIN;
         }

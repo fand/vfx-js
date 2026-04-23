@@ -119,12 +119,10 @@ export class Framebuffer implements Restorable {
             type,
             null,
         );
-        const minF = this.texture.minFilter === "nearest"
-            ? gl.NEAREST
-            : gl.LINEAR;
-        const magF = this.texture.magFilter === "nearest"
-            ? gl.NEAREST
-            : gl.LINEAR;
+        const minF =
+            this.texture.minFilter === "nearest" ? gl.NEAREST : gl.LINEAR;
+        const magF =
+            this.texture.magFilter === "nearest" ? gl.NEAREST : gl.LINEAR;
         const wrapS = wrapEnum(gl, this.texture.wrapS);
         const wrapT = wrapEnum(gl, this.texture.wrapT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minF);

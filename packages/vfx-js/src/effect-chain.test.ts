@@ -143,7 +143,7 @@ vi.mock("./gl/framebuffer.js", () => {
 });
 
 // Imports MUST come after vi.mock calls.
-import { EffectChain, type ChainFrameInput } from "./effect-chain.js";
+import { type ChainFrameInput, EffectChain } from "./effect-chain.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -290,15 +290,15 @@ describe("EffectChain: M=3 intermediates + swap", () => {
         void capture;
 
         // Stage 1: src = intermediate[0] (tex handle), output = intermediate[1]
-        expect(
-            (log[1].src as { __brand: string })?.__brand,
-        ).toBe("EffectTexture");
+        expect((log[1].src as { __brand: string })?.__brand).toBe(
+            "EffectTexture",
+        );
         expect((log[1].output as { _fb: unknown })._fb).toBe(fbs[1]);
 
         // Stage 2: src = intermediate[1] (tex handle), output = null (canvas)
-        expect(
-            (log[2].src as { __brand: string })?.__brand,
-        ).toBe("EffectTexture");
+        expect((log[2].src as { __brand: string })?.__brand).toBe(
+            "EffectTexture",
+        );
         expect(log[2].output).toBe(null);
     });
 
@@ -313,15 +313,15 @@ describe("EffectChain: M=3 intermediates + swap", () => {
 
         // hosts 0 and 1 each clearRt (their outputs are intermediates).
         // host 2's output is the final target (null) — no clearRt.
-        expect(
-            hosts[0]._calls.filter((c) => c[0] === "clearRt"),
-        ).toHaveLength(1);
-        expect(
-            hosts[1]._calls.filter((c) => c[0] === "clearRt"),
-        ).toHaveLength(1);
-        expect(
-            hosts[2]._calls.filter((c) => c[0] === "clearRt"),
-        ).toHaveLength(0);
+        expect(hosts[0]._calls.filter((c) => c[0] === "clearRt")).toHaveLength(
+            1,
+        );
+        expect(hosts[1]._calls.filter((c) => c[0] === "clearRt")).toHaveLength(
+            1,
+        );
+        expect(hosts[2]._calls.filter((c) => c[0] === "clearRt")).toHaveLength(
+            0,
+        );
     });
 });
 
@@ -408,7 +408,8 @@ describe("EffectChain: outputSize", () => {
     });
 
     it("reallocates only on size/float delta", () => {
-        const size = vi.fn()
+        const size = vi
+            .fn()
             .mockReturnValueOnce([100, 100])
             .mockReturnValueOnce([100, 100]) // same → reuse
             .mockReturnValueOnce([200, 200]); // changed → reallocate
@@ -468,7 +469,10 @@ describe("EffectChain: outputSize", () => {
                     pad: { top: 0, right: 50, bottom: 0, left: 50 },
                 }),
             },
-            { render: () => {}, outputSize: vi.fn().mockReturnValue({ pad: 0 }) },
+            {
+                render: () => {},
+                outputSize: vi.fn().mockReturnValue({ pad: 0 }),
+            },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
@@ -783,9 +787,7 @@ describe("EffectChain: error handling", () => {
             (c) => c[0] === "passthroughCopy",
         );
         expect(passes).toHaveLength(1);
-        expect(
-            (passes[0][1] as { target: unknown }).target,
-        ).toBe(null);
+        expect((passes[0][1] as { target: unknown }).target).toBe(null);
         warn.mockRestore();
     });
 });
@@ -821,10 +823,10 @@ describe("EffectChain: frame state", () => {
         chain.run(makeInput({ resolvedUniforms: uniforms }));
         for (const h of hosts) {
             const call = h._calls.find((c) => c[0] === "setFrameState");
-            expect(call).toBeDefined();
-            expect(
-                (call![1] as { uniforms: unknown }).uniforms,
-            ).toBe(uniforms);
+            if (!call) {
+                throw new Error("setFrameState not called");
+            }
+            expect((call[1] as { uniforms: unknown }).uniforms).toBe(uniforms);
         }
     });
 
@@ -836,7 +838,10 @@ describe("EffectChain: frame state", () => {
                 mouseViewport: [50, 75],
             }),
         );
-        const call = hosts[0]._calls.find((c) => c[0] === "setFrameState")!;
+        const call = hosts[0]._calls.find((c) => c[0] === "setFrameState");
+        if (!call) {
+            throw new Error("setFrameState not called");
+        }
         const state = call[1] as { mouse: unknown; mouseViewport: unknown };
         expect(state.mouse).toEqual([100, 200]);
         expect(state.mouseViewport).toEqual([50, 75]);

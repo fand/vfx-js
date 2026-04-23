@@ -272,7 +272,6 @@ vi.mock("./effect-geometry.js", async () => {
                     this.quadDrawCount += 1;
                 },
             };
-            constructor(_ctx: unknown, _q: unknown) {}
             resolve() {
                 this.customResolveCount += 1;
                 return {
@@ -643,8 +642,14 @@ describe("EffectHost.draw", () => {
     it("different vert with same frag → new Program", () => {
         const { host } = makeHost();
         host.setPhase("render");
-        host.ctx.draw({ frag: FRAG, vert: "void main(){gl_Position=vec4(0);}" });
-        host.ctx.draw({ frag: FRAG, vert: "void main(){gl_Position=vec4(1);}" });
+        host.ctx.draw({
+            frag: FRAG,
+            vert: "void main(){gl_Position=vec4(0);}",
+        });
+        host.ctx.draw({
+            frag: FRAG,
+            vert: "void main(){gl_Position=vec4(1);}",
+        });
         expect(programs).toHaveLength(2);
     });
 
@@ -790,8 +795,6 @@ describe("EffectHost.dispose", () => {
         host.dispose();
         // Second dispose must not somehow "un-dispose" or re-enter
         // cleanup logic in a way that mutates counts.
-        expect(programs.filter((p) => p.disposed).length).toBe(
-            disposedCount,
-        );
+        expect(programs.filter((p) => p.disposed).length).toBe(disposedCount);
     });
 });

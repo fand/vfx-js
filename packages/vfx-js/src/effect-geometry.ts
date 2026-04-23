@@ -38,7 +38,10 @@ type NormalizedAttribute = {
     location: number | undefined;
 };
 
-function modeEnum(gl: WebGL2RenderingContext, mode: string | undefined): number {
+function modeEnum(
+    gl: WebGL2RenderingContext,
+    mode: string | undefined,
+): number {
     switch (mode) {
         case "lines":
             return gl.LINES;
@@ -55,13 +58,27 @@ function attribTypeEnum(
     gl: WebGL2RenderingContext,
     data: EffectAttributeTypedArray,
 ): number {
-    if (data instanceof Float32Array) return gl.FLOAT;
-    if (data instanceof Uint8Array) return gl.UNSIGNED_BYTE;
-    if (data instanceof Uint16Array) return gl.UNSIGNED_SHORT;
-    if (data instanceof Uint32Array) return gl.UNSIGNED_INT;
-    if (data instanceof Int8Array) return gl.BYTE;
-    if (data instanceof Int16Array) return gl.SHORT;
-    if (data instanceof Int32Array) return gl.INT;
+    if (data instanceof Float32Array) {
+        return gl.FLOAT;
+    }
+    if (data instanceof Uint8Array) {
+        return gl.UNSIGNED_BYTE;
+    }
+    if (data instanceof Uint16Array) {
+        return gl.UNSIGNED_SHORT;
+    }
+    if (data instanceof Uint32Array) {
+        return gl.UNSIGNED_INT;
+    }
+    if (data instanceof Int8Array) {
+        return gl.BYTE;
+    }
+    if (data instanceof Int16Array) {
+        return gl.SHORT;
+    }
+    if (data instanceof Int32Array) {
+        return gl.INT;
+    }
     throw new Error("[VFX-JS] Unsupported attribute typed array");
 }
 
@@ -82,7 +99,10 @@ function normalizeAttribute(
             location: undefined,
         };
     }
-    const d = desc as Exclude<EffectAttributeDescriptor, EffectAttributeTypedArray>;
+    const d = desc as Exclude<
+        EffectAttributeDescriptor,
+        EffectAttributeTypedArray
+    >;
     return {
         name,
         data: d.data,
@@ -185,28 +205,26 @@ export class CompiledGeometry implements Restorable {
                 gl.vertexAttribDivisor(loc, 1);
             }
             if (name === "position" && vertexCountFromPosition === null) {
-                vertexCountFromPosition =
-                    attr.data.length / attr.itemSize;
+                vertexCountFromPosition = attr.data.length / attr.itemSize;
             }
         }
 
-        if (this.#geo.indices) {
+        let indexCount = 0;
+        const indices = this.#geo.indices;
+        if (indices) {
             const ibo = gl.createBuffer();
             if (!ibo) {
                 throw new Error("[VFX-JS] Failed to create IBO");
             }
             this.#ibo = ibo;
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-            gl.bufferData(
-                gl.ELEMENT_ARRAY_BUFFER,
-                this.#geo.indices,
-                gl.STATIC_DRAW,
-            );
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
             this.hasIndices = true;
             this.indexType =
-                this.#geo.indices instanceof Uint32Array
+                indices instanceof Uint32Array
                     ? gl.UNSIGNED_INT
                     : gl.UNSIGNED_SHORT;
+            indexCount = indices.length;
         } else {
             this.hasIndices = false;
         }
@@ -219,7 +237,7 @@ export class CompiledGeometry implements Restorable {
 
         // Compute drawCount / drawStart.
         const totalCount = this.hasIndices
-            ? this.#geo.indices!.length
+            ? indexCount
             : (vertexCountFromPosition ?? 0);
         const range = this.#geo.drawRange;
         this.drawStart = range?.start ?? 0;

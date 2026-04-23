@@ -1,9 +1,5 @@
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
-import type {
-    Effect,
-    EffectContext,
-    EffectRenderTarget,
-} from "@vfx-js/core";
+import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 
 const FRAG_THRESHOLD = `#version 300 es
 precision highp float;
@@ -134,7 +130,9 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             pingB = ctx.createRenderTarget();
         },
         render(ctx: EffectContext) {
-            if (!bright || !pingA || !pingB) return;
+            if (!bright || !pingA || !pingB) {
+                return;
+            }
 
             // 1. Extract bright pixels.
             ctx.draw({

@@ -59,10 +59,11 @@ export class Texture implements Restorable {
     constructor(ctx: GLContext, source?: TextureSource, opts?: TextureOpts) {
         this.#ctx = ctx;
         this.gl = ctx.gl;
-        this.#external = opts?.externalHandle !== undefined;
-        if (this.#external) {
+        const external = opts?.externalHandle;
+        this.#external = external !== undefined;
+        if (external !== undefined) {
             // Caller owns the handle; skip create/upload/restore/delete.
-            this.texture = opts!.externalHandle!;
+            this.texture = external;
             this.#uploaded = true;
             this.needsUpdate = false;
         } else {

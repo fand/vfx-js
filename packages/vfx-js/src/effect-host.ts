@@ -1,7 +1,7 @@
 import { Backbuffer } from "./backbuffer.js";
 import {
-    EffectGeometryCache,
     EFFECT_QUAD_TOKEN,
+    EffectGeometryCache,
     isEffectQuad,
 } from "./effect-geometry.js";
 import type { GLContext } from "./gl/context.js";
@@ -22,8 +22,8 @@ import type {
     EffectTextureFilter,
     EffectTextureSource,
     EffectTextureWrap,
-    EffectUniformValue,
     EffectUniforms,
+    EffectUniformValue,
     EffectVFXProps,
 } from "./types.js";
 
@@ -448,12 +448,8 @@ export class EffectHost {
         const wrap = normalizeWrap(opts?.wrap);
         const filter = opts?.filter;
         const explicitSize = opts?.size;
-        const sizeW = explicitSize
-            ? explicitSize[0]
-            : this.#dims.elementPhysW;
-        const sizeH = explicitSize
-            ? explicitSize[1]
-            : this.#dims.elementPhysH;
+        const sizeW = explicitSize ? explicitSize[0] : this.#dims.elementPhysW;
+        const sizeH = explicitSize ? explicitSize[1] : this.#dims.elementPhysH;
 
         let resolver: RenderTargetResolver;
         let getW: () => number;
@@ -813,9 +809,10 @@ function isWebGLTextureHandle(
     if (
         globalWebGLTexture &&
         typeof globalWebGLTexture === "function" &&
-        source instanceof (globalWebGLTexture as unknown as {
-            new (): WebGLTexture;
-        })
+        source instanceof
+            (globalWebGLTexture as unknown as {
+                new (): WebGLTexture;
+            })
     ) {
         return true;
     }
@@ -903,8 +900,7 @@ export function makeEffectRenderTargetFromFb(
     return handle;
 }
 
-// Re-export resolvers for the chain's internal use.
-export { resolveRt, resolveTexture, RESOLVE_RT, RESOLVE_TEXTURE };
-
 /** Effect-host-owned type tag re-export for convenience. @internal */
 export type { Effect };
+// Re-export resolvers for the chain's internal use.
+export { RESOLVE_RT, RESOLVE_TEXTURE, resolveRt, resolveTexture };
