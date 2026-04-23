@@ -111,10 +111,13 @@ void main() {
 }
 `;
 
-// Composite: tent-upsample bloom from half-res → full-res, decode the
-// sRGB src to linear, add the linear halo, then re-encode once. Doing
-// the single pow at the end means dither can be injected right before
-// 8-bit quantisation — where banding actually forms.
+// Composite: 5×5 binomial-gaussian upsample of bloom from half-res →
+// full-res, decode the sRGB src to linear, add the linear halo, then
+// re-encode once. Doing the single pow at the end means dither can be
+// injected right before 8-bit quantisation — where banding actually
+// forms. Gaussian (vs tent) gives a round falloff with no step
+// response, so concentric rings from the pyramid's reconstruction no
+// longer show up on the visible pass.
 const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -135,18 +138,21 @@ float ign(vec2 p) {
 }
 
 void main() {
-    vec2 t = texelSize;
+    // 5×5 binomial gaussian ([1,4,6,4,1]/16 outer-producted) via 9
+    // bilinear taps at ±1.2 source texels. Each bilinear fetch
+    // integrates a tap-pair perfectly, so result ≡ 25-tap convolution.
+    vec2 t = texelSize * 1.2;
     vec4 b = vec4(0.0);
-    b += texture(bloom, uv + vec2(-t.x, -t.y)) * 1.0;
-    b += texture(bloom, uv + vec2( 0.0, -t.y)) * 2.0;
-    b += texture(bloom, uv + vec2( t.x, -t.y)) * 1.0;
-    b += texture(bloom, uv + vec2(-t.x,  0.0)) * 2.0;
-    b += texture(bloom, uv                  ) * 4.0;
-    b += texture(bloom, uv + vec2( t.x,  0.0)) * 2.0;
-    b += texture(bloom, uv + vec2(-t.x,  t.y)) * 1.0;
-    b += texture(bloom, uv + vec2( 0.0,  t.y)) * 2.0;
-    b += texture(bloom, uv + vec2( t.x,  t.y)) * 1.0;
-    b *= (1.0 / 16.0);
+    b += texture(bloom, uv + vec2(-t.x, -t.y)) * 25.0;
+    b += texture(bloom, uv + vec2( 0.0, -t.y)) * 30.0;
+    b += texture(bloom, uv + vec2( t.x, -t.y)) * 25.0;
+    b += texture(bloom, uv + vec2(-t.x,  0.0)) * 30.0;
+    b += texture(bloom, uv                  ) * 36.0;
+    b += texture(bloom, uv + vec2( t.x,  0.0)) * 30.0;
+    b += texture(bloom, uv + vec2(-t.x,  t.y)) * 25.0;
+    b += texture(bloom, uv + vec2( 0.0,  t.y)) * 30.0;
+    b += texture(bloom, uv + vec2( t.x,  t.y)) * 25.0;
+    b *= (1.0 / 256.0);
 
     vec4 baseColor = vec4(0.0);
     if (uvInnerDst.x >= 0.0 && uvInnerDst.x <= 1.0 &&
