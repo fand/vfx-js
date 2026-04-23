@@ -10,6 +10,13 @@ import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 // downsample averages reflect light intensity (not perceptual levels)
 // and Rec.709 luma coefficients apply correctly. `pow(2.2)` is the
 // standard fast approximation of the sRGB EOTF.
+//
+// The inner-rect boundary is *smoothly* masked (was a hard cutoff):
+// the pyramid would otherwise capture a bright↔0 step at the pad edge,
+// which reappears as a visible ring after gamma-encoded composite.
+// Fading `f` (and the lin*f it premultiplies) across `edgeFade` uv
+// units past the inner rect gives the cascade a continuous input and
+// kills the ring at the source.
 const FRAG_THRESHOLD = `#version 300 es
 precision highp float;
 in vec2 uvInner;
@@ -18,16 +25,24 @@ out vec4 outColor;
 uniform sampler2D src;
 uniform float threshold;
 uniform float softness;
+uniform float edgeFade;
 
 void main() {
-    vec3 lin = vec3(0.0);
-    if (uvInnerDst.x >= 0.0 && uvInnerDst.x <= 1.0 &&
-        uvInnerDst.y >= 0.0 && uvInnerDst.y <= 1.0) {
-        vec3 srgb = texture(src, uvInner).rgb;
-        lin = pow(srgb, vec3(2.2));
-    }
+    // Clamp sampling — the mask zeroes anything far outside anyway, but
+    // using the edge color across the narrow fade band avoids feeding
+    // the pyramid whatever the src's outside-of-range policy returns.
+    vec3 srgb = texture(src, clamp(uvInner, 0.0, 1.0)).rgb;
+    vec3 lin = pow(srgb, vec3(2.2));
     float lum = dot(lin, vec3(0.2126, 0.7152, 0.0722));
     float f = smoothstep(threshold, threshold + softness, lum);
+
+    // Chebyshev distance outside the inner rect in uvInnerDst units;
+    // 0 inside, positive in the pad region.
+    vec2 outside = max(vec2(0.0), max(-uvInnerDst, uvInnerDst - 1.0));
+    float outDist = max(outside.x, outside.y);
+    float mask = 1.0 - smoothstep(0.0, edgeFade, outDist);
+    f *= mask;
+
     outColor = vec4(lin * f, f);
 }
 `;
@@ -224,6 +239,14 @@ export type BloomOptions = {
      * smoothing.
      */
     dither?: number;
+    /**
+     * Width (in uvInnerDst units, 0..1 spans the element) over which
+     * the threshold input fades to zero past the element boundary.
+     * Default 0.02 (~2 % of element dim). Too small re-introduces
+     * the pad-edge ring; too large trims bright content near the
+     * element's own edge.
+     */
+    edgeFade?: number;
 };
 
 // Tent offset in mip-texel units. 0.5 here combined with the
@@ -238,6 +261,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
     const intensity = opts.intensity ?? 1.2;
     const scatter = Math.min(Math.max(opts.scatter ?? 0.7, 0), 1);
     const dither = Math.max(0, opts.dither ?? 0);
+    const edgeFade = Math.max(1e-6, opts.edgeFade ?? 0.02);
     const pad = opts.pad ?? 50;
 
     let bright: EffectRenderTarget | null = null;
@@ -299,7 +323,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
 
             ctx.draw({
                 frag: FRAG_THRESHOLD,
-                uniforms: { src: ctx.src, threshold, softness },
+                uniforms: { src: ctx.src, threshold, softness, edgeFade },
                 target: bright,
             });
 
