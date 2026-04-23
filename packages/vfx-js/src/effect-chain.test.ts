@@ -379,19 +379,35 @@ describe("EffectChain: outputSize", () => {
         warn.mockRestore();
     });
 
-    it("last rendering effect's outputSize is ignored (final target fixed)", () => {
-        const middle = vi.fn().mockReturnValue([300, 300]);
-        const last = vi.fn().mockReturnValue([999, 999]);
+    it("last rendering effect's outputSize is honored for dstPad / viewport but allocates no intermediate", () => {
+        const middle = vi.fn().mockReturnValue({ pad: 5 });
+        const last = vi.fn().mockReturnValue({ pad: 7 });
         const effects: Effect[] = [
             { render: () => {}, outputSize: middle },
             { render: () => {}, outputSize: last },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
-        // Only one intermediate (for middle); last's outputSize never
-        // affects allocation.
+        chain.run(
+            makeInput({
+                elementPhys: [100, 100],
+                elementRectOnCanvasPx: { x: 50, y: 60, w: 100, h: 100 },
+            }),
+        );
+        // Middle stage allocates 1 intermediate; last allocates none.
         expect(fbs).toHaveLength(1);
-        expect(fbs[0].width).toBe(300);
+        expect(last).toHaveBeenCalled();
+        // Last stage's dstPad accumulates: middle(5) + last(7) = 12.
+        const sLast = chain.stages[1];
+        expect(sLast.dstPad.left).toBe(12);
+        expect(sLast.dstBufferSize).toEqual([124, 124]);
+        // Output viewport on canvas grows by dstPad on the negative side
+        // (origin shifts) and dstBufferSize on the positive side.
+        expect(sLast.outputViewport).toEqual({
+            x: 50 - 12,
+            y: 60 - 12,
+            w: 124,
+            h: 124,
+        });
     });
 
     it("allocates float intermediate when outputSize returns { float: true }", () => {
@@ -590,6 +606,115 @@ describe("EffectChain: outputSize", () => {
             right: 0,
             bottom: 0,
             left: 0,
+        });
+    });
+
+    it("single-effect pad grows the canvas-space draw viewport", () => {
+        const effects: Effect[] = [
+            { render: () => {}, outputSize: () => ({ pad: 10 }) },
+        ];
+        const chain = makeChain(effects);
+        chain.run(
+            makeInput({
+                elementPhys: [100, 100],
+                elementRectOnCanvasPx: { x: 30, y: 40, w: 100, h: 100 },
+            }),
+        );
+        // No intermediate (last stage = only stage).
+        expect(fbs).toHaveLength(0);
+        const s0 = chain.stages[0];
+        expect(s0.dstPad).toMatchObject({
+            top: 10,
+            right: 10,
+            bottom: 10,
+            left: 10,
+        });
+        expect(s0.outputViewport).toEqual({
+            x: 30 - 10,
+            y: 40 - 10,
+            w: 120,
+            h: 120,
+        });
+    });
+
+    it("single-effect fullscreen pad reaches viewport edges", () => {
+        const effects: Effect[] = [
+            {
+                render: () => {},
+                outputSize: (dims) => ({ pad: dims.fullscreenPad }),
+            },
+        ];
+        const chain = makeChain(effects);
+        chain.run(
+            makeInput({
+                elementPhys: [100, 100],
+                viewportPhys: [400, 400],
+                elementRectOnCanvasPx: { x: 150, y: 150, w: 100, h: 100 },
+                viewportRectOnCanvasPx: { x: 0, y: 0, w: 400, h: 400 },
+            }),
+        );
+        const s0 = chain.stages[0];
+        // fullscreenPad = 150 per side → dst buffer 400x400, viewport (0,0,400,400).
+        expect(s0.dstBufferSize).toEqual([400, 400]);
+        expect(s0.outputViewport).toEqual({ x: 0, y: 0, w: 400, h: 400 });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Empty effects: M=0 passthrough via dedicated host
+// ---------------------------------------------------------------------------
+
+describe("EffectChain: empty effects", () => {
+    it("constructs a dedicated passthrough host (separate from #hosts)", () => {
+        // Construction allocates 1 host even though `effects` is empty.
+        makeChain([]);
+        expect(hosts).toHaveLength(1);
+    });
+
+    it("M=0 passthrough renders capture → finalTarget on run()", () => {
+        const chain = makeChain([]);
+        chain.run(makeInput({ finalTarget: null }));
+        const passthroughCalls = hosts[0]._calls.filter(
+            (c) => c[0] === "passthroughCopy",
+        );
+        expect(passthroughCalls).toHaveLength(1);
+    });
+
+    it("dispose() releases the passthrough host", () => {
+        const chain = makeChain([]);
+        chain.dispose();
+        expect(hosts[0]._calls.some((c) => c[0] === "dispose")).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// hitTestPadPhys: visibility margin for the host
+// ---------------------------------------------------------------------------
+
+describe("EffectChain: hitTestPadPhys", () => {
+    it("starts at zero before any frame", () => {
+        const chain = makeChain([{ render: () => {} }]);
+        expect(chain.hitTestPadPhys).toMatchObject({
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+        });
+    });
+
+    it("reflects last stage's dstPad after run()", () => {
+        const effects: Effect[] = [
+            { render: () => {}, outputSize: () => ({ pad: 8 }) },
+            { render: () => {}, outputSize: () => ({ pad: 4 }) },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        // Pad accumulates monotonically: 8 → 12.
+        expect(chain.hitTestPadPhys).toMatchObject({
+            top: 12,
+            right: 12,
+            bottom: 12,
+            left: 12,
         });
     });
 });

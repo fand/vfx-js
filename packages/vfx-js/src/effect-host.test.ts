@@ -593,6 +593,26 @@ describe("EffectHost.createRenderTarget", () => {
         expect(framebuffers[0].width).toBe(200);
     });
 
+    it("auto-size follows outputPhysW/H (= dst buffer = inner + pad), not elementPhysW/H", () => {
+        const { host } = makeHost();
+        // dst buffer (120x110) > inner element (100x100) — pad in play.
+        host.setFrameDims({
+            outputPhysW: 120,
+            outputPhysH: 110,
+            canvasPhysW: 200,
+            canvasPhysH: 200,
+            outputViewport: { x: 0, y: 0, w: 120, h: 110 },
+            elementPhysW: 100,
+            elementPhysH: 100,
+            uvInnerRect: [0, 0, 1, 1],
+            srcInnerRect: [0, 0, 1, 1],
+        });
+        host.ctx.createRenderTarget();
+        // Sized to outputPhys, not elementPhys.
+        expect(framebuffers[0].width).toBe(120);
+        expect(framebuffers[0].height).toBe(110);
+    });
+
     it("fixed-size RT does NOT auto-resize", () => {
         const { host } = makeHost();
         host.ctx.createRenderTarget({ size: [50, 50] });

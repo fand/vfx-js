@@ -66,6 +66,12 @@ export class VFXPlayer {
     // post-effect passes above).
     #postEffectChain: EffectChain | null = null;
     #postEffectChainReady = false;
+    /**
+     * Tracks Effect instances currently attached (element chain or
+     * postEffect chain). Used to reject reuse — Effects are stateful
+     * (own RTs, dims) and cannot safely be shared across hosts.
+     */
+    #registeredEffects: WeakSet<Effect> = new WeakSet();
     #postEffectChainStaticUniforms: Record<string, EffectUniformValue> = {};
     #postEffectChainGenerators: Record<string, () => EffectUniformValue> = {};
     #postEffectChainLastTime = 0;
@@ -608,11 +614,7 @@ export class VFXPlayer {
         const effects: readonly Effect[] = Array.isArray(rawEffect)
             ? [...rawEffect]
             : [rawEffect];
-        if (effects.length === 0) {
-            console.warn(
-                "[VFX-JS] Empty `effect` array; rendering identity capture → final target.",
-            );
-        }
+        this.#assertEffectsNotReused(effects);
 
         // Shared prelude (mirrors shader-path addElement).
         const domRect = element.getBoundingClientRect();
@@ -749,6 +751,7 @@ export class VFXPlayer {
         } catch (err) {
             // Chain has already disposed prior effects + failing host.
             // Release the source texture and restore opacity.
+            this.#releaseEffects(effects);
             texture.dispose();
             element.style.setProperty("opacity", originalOpacity.toString());
             throw err;
@@ -784,6 +787,7 @@ export class VFXPlayer {
             if (e.chain) {
                 // Effect path: chain disposes its effects + hosts +
                 // intermediates. Source texture + opacity are ours.
+                this.#releaseEffects(e.chain.effects);
                 e.chain.dispose();
             } else {
                 for (const rt of e.bufferTargets.values()) {
@@ -896,9 +900,7 @@ export class VFXPlayer {
         // Setup post effect render target if needed. Chain-based
         // post-effect is only enabled once its async `init` resolves;
         // until then render directly to canvas (no blank frames).
-        const shouldUsePostEffect =
-            this.#postEffectPasses.length > 0 ||
-            (this.#postEffectChain !== null && this.#postEffectChainReady);
+        const shouldUsePostEffect = this.#shouldUsePostEffect();
         if (shouldUsePostEffect) {
             this.#setupPostEffectTarget(viewportWidth, viewportHeight);
             if (this.#postEffectTarget) {
@@ -1282,7 +1284,7 @@ export class VFXPlayer {
         const deltaTime = now - prevT;
         e.effectLastRenderTime = now;
 
-        const shouldUsePostEffect = this.#postEffectPasses.length > 0;
+        const shouldUsePostEffect = this.#shouldUsePostEffect();
         const finalTarget =
             shouldUsePostEffect && this.#postEffectTarget
                 ? this.#postEffectTarget
@@ -1320,6 +1322,50 @@ export class VFXPlayer {
         });
     }
 
+    #shouldUsePostEffect(): boolean {
+        return (
+            this.#postEffectPasses.length > 0 ||
+            (this.#postEffectChain !== null && this.#postEffectChainReady)
+        );
+    }
+
+    /**
+     * Throws if any of the given Effect instances is already attached to
+     * another element/postEffect on this player. Effects own per-host
+     * GPU resources and dims, so reuse silently corrupts state.
+     * Successful assertions register the instances; callers must release
+     * via #releaseEffects on dispose.
+     */
+    #assertEffectsNotReused(effects: readonly Effect[]): void {
+        for (const e of effects) {
+            if (this.#registeredEffects.has(e)) {
+                throw new Error(
+                    "[VFX-JS] Effect instance already attached. Construct a new instance per `vfx.add()` / `postEffect`.",
+                );
+            }
+        }
+        for (const e of effects) {
+            this.#registeredEffects.add(e);
+        }
+    }
+
+    #releaseEffects(effects: readonly Effect[]): void {
+        for (const e of effects) {
+            this.#registeredEffects.delete(e);
+        }
+    }
+
+    #chainMarginLogical(chain: EffectChain): Margin {
+        const padPhys = chain.hitTestPadPhys;
+        const pr = this.#pixelRatio;
+        return createMargin({
+            top: padPhys.top / pr,
+            right: padPhys.right / pr,
+            bottom: padPhys.bottom / pr,
+            left: padPhys.left / pr,
+        });
+    }
+
     /**
      * Check element intersection with the viewport.
      */
@@ -1328,7 +1374,13 @@ export class VFXPlayer {
         rect: Rect,
         now: number,
     ): { rectWithOverflow: Rect; isVisible: boolean; intersection: number } {
-        const rectWithOverflow = growRect(rect, e.overflow);
+        // Effect path uses chain's max dst pad (physical px → logical
+        // for growRect) instead of `e.overflow`, which is shader-only.
+        // Lags the actual chain pad by one frame on entry; acceptable.
+        const visibilityMargin = e.chain
+            ? this.#chainMarginLogical(e.chain)
+            : e.overflow;
+        const rectWithOverflow = growRect(rect, visibilityMargin);
 
         const isInViewport =
             e.isFullScreen ||
@@ -1566,11 +1618,7 @@ export class VFXPlayer {
         const effects: readonly Effect[] = Array.isArray(rawEffect)
             ? [...rawEffect]
             : [rawEffect];
-        if (effects.length === 0) {
-            console.warn(
-                "[VFX-JS] Empty post-effect `effect` array; identity chain.",
-            );
-        }
+        this.#assertEffectsNotReused(effects);
 
         // Capture resolver: always the current #postEffectTarget texture
         // (regenerated on viewport resize via #setupPostEffectTarget).
@@ -1633,6 +1681,7 @@ export class VFXPlayer {
                     err,
                 );
                 if (this.#postEffectChain === chain) {
+                    this.#releaseEffects(this.#postEffectChain.effects);
                     this.#postEffectChain.dispose();
                     this.#postEffectChain = null;
                     this.#postEffectChainReady = false;

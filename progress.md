@@ -137,3 +137,27 @@ Track per-task completion here. Format per entry:
 - commit: 56f254f
 - date: 2026-04-22
 - notes: effect-chain.test.ts: revived the two 8-2 skips with pad-model-correct semantics; added padAdd stacking, asymmetric padAdd, monotonic clamp (negative component → warn + clamp), fullscreenPad formula verification, stage-0 srcInnerRect/uvInnerRect assertions, buffer < elementPixel clamp-up + warn. effect-host.test.ts: auto-upload of `uvInnerRect` and `srcInnerRect` vec4s, and default vert grep for the 3 varyings + 2 uniforms. Side-fix in effect-chain.ts: detect the clamp condition on the raw user-supplied size before `distributePad` rewrites it (the 8-2 warn was masked because `distributePad` already clamps excess to 0). 119 tests pass (was 108+2 skipped).
+
+## 9-1: post-effect 判定漏れ (Codex P1-1)
+- date: 2026-04-23
+- notes: `#renderEffectElement`'s local `shouldUsePostEffect` only checked `#postEffectPasses.length > 0`, so element-effect chains bypassed the chain-based post-effect when both were active (post-effect chain processed an empty target → blank canvas / dropped post-fx). Extracted the shared check into `#shouldUsePostEffect()` and replaced both call sites (top of `render` and `#renderEffectElement`).
+
+## 9-2: Effect インスタンス再利用検出 (Gemini #1)
+- date: 2026-04-23
+- notes: VFXPlayer now owns `#registeredEffects: WeakSet<Effect>`. `#assertEffectsNotReused` checks-then-registers at `#addEffectElement` and `#initPostEffectChain` entry; throws on dup. `#releaseEffects` reverses on `removeElement`, on chain `initAll` rejection (element path), and on postEffect chain init failure. Player `destroy()` doesn't release — WeakSet dies with the player. Added `EffectChain.effects` getter so the player can release without storing the array twice. Factory-pattern usage (`createBloomEffect()` per add) is unaffected; the throw fires only on actual reuse.
+
+## 9-3: last-stage outputSize 尊重 + auto-size dst-buffer 化 (Codex P1-2 / Q1)
+- date: 2026-04-23
+- notes: Old `#resolveStages` skipped `#callOutputSize` for `isLast`, hard-wiring `dstPad = srcPad`. Effect: a single bloom (`pad: 80`) couldn't grow the canvas-space draw viewport — glow was clipped to the element rect. Now `outputSize` is honored at every stage; for the last stage no intermediate FB is allocated, but `outputViewport` widens to `elementRectOnCanvasPx ± dstPad` and `outputPhysW/H` reflects the requested dst buffer. `float` is forced false on the last stage (final target's format is fixed). Companion change in `effect-host.ts`: `createRenderTarget()` default size and the `setFrameDims` auto-resize loop now follow `dims.outputPhysW/H` (= dst buffer = inner + dstPad) instead of `dims.elementPhysW/H` — without this, internal RTs (`bright`/`pingA`/`pingB` in bloom etc.) stayed at inner size and blur couldn't spread into the pad region. Same fix incidentally repairs intermediate-stage bloom (e.g. `[bloom(pad), grayscale]`) which had the same latent bug. Monotonic clamp (dst pad ≥ src pad per side) preserved for last stage too.
+
+## 9-4: 空 effect: [] passthrough サポート (Codex P2-1)
+- date: 2026-04-23
+- notes: User-driven dynamic add/remove may legitimately leave the effect array empty for a frame. Old behavior: warn + silent no-op (`#hosts[0]?.passthroughCopy(...)` returns undefined when `hosts.length === 0`), and the element opacity is forced to 0 → element vanishes. Now `EffectChain` constructor allocates a dedicated `#emptyPassthroughHost` when `effects.length === 0`; the M=0 branch falls back to it (`#hosts[0] ?? #emptyPassthroughHost`). The host gets `dispose()` in `chain.dispose()`. `#addEffectElement`'s warn for empty arrays removed (now valid usage).
+
+## 9-5: visibility に chain pad を反映 (Codex P2-2)
+- date: 2026-04-23
+- notes: `#hitTest` previously grew the visibility rect by `e.overflow`, which is shader-path only (effect path warns and ignores it). Effects that draw outside the inner rect (glow / trail) had their chain stop the moment the inner rect crossed the viewport edge, even when the glow was still on-screen. Added `EffectChain.hitTestPadPhys: Margin` getter backed by `#lastMaxDstPad` (cached from the final stage's `dstPad` at the end of `#resolveStages`; pad is monotonic-non-decreasing, so the last stage holds the per-side max). VFXPlayer's `#hitTest` now grows by `#chainMarginLogical(chain)` (physical → logical via `pixelRatio`) when `e.chain` exists. One-frame lag on entry (initial pad = 0) is acceptable — pad is typically static or `fullscreenPad`-driven (geometric, settles immediately). `e.intersection.rootMargin` left untouched (user-controlled, distinct semantics).
+
+## 9-6: tests for 9-1〜9-5
+- date: 2026-04-23
+- notes: effect-chain.test.ts: rewrote the 8-2 era "last outputSize ignored" test to assert the new honor-at-last semantics (dstPad accumulates, no intermediate FB, outputViewport shifts). New tests: single-effect pad grows the viewport; single-effect `fullscreenPad` reaches viewport edges; empty-effects chain constructs a passthrough host and runs passthroughCopy on `run()`; passthrough host disposed via `chain.dispose()`; `hitTestPadPhys` starts at zero and reflects last stage's dstPad. effect-host.test.ts: new test asserts auto-size follows `outputPhysW/H` (inner=100, dst=120×110 → FB=120×110), distinct from `elementPhysW/H`. 119 → 127 tests. Lint + storybook build also pass. Player-level reuse-throw not unit-tested (would need real WebGL); logic is small and exercised at the API boundary.

@@ -112,9 +112,12 @@ type IntermediateEntry = {
  * - `dims.fullscreenPad` is the per-side `pad` delta needed to reach the
  *   viewport edges from the current src pad (non-negative, 0 if already
  *   past the edge). Zero for post-effect chains.
- * - The last rendering effect's `outputSize` return is ignored — its dst
- *   is the fixed final target. Its src pad determines the canvas-space
- *   draw viewport.
+ * - The last rendering effect's `outputSize` is honored too, but no
+ *   intermediate buffer is allocated — the dst remains the fixed final
+ *   target, and `dstPad` only widens the canvas-space draw viewport
+ *   (the host still receives `outputPhysW/H = dstBufferSize` so
+ *   internal RTs auto-size to include pad). The `float` request is
+ *   ignored on the last stage.
  * - `srcInnerRect` / `uvInnerRect` are derived per stage and uploaded as
  *   uniforms so the default vertex shader can emit `uvInner` (src-sampling
  *   UV) and `uvInnerDst` (dst-space 0..1 over element).
@@ -144,6 +147,24 @@ export class EffectChain {
     #disposed = false;
     /** Post-effect context (element mirrors viewport; fullscreenPad=0). */
     #isPostEffect: boolean;
+    /**
+     * Maximum dst pad observed across all rendering stages on the most
+     * recent successful `#resolveStages`. Used by the host (`#hitTest`)
+     * to grow the visibility rect so glow / trail extending past the
+     * element rect doesn't cause the chain to stop while the padded
+     * region is still on-screen. Lags by one frame (initial entry uses
+     * 0); acceptable since pad is typically static or `fullscreenPad`,
+     * which is geometric and updates immediately on the next frame.
+     */
+    #lastMaxDstPad: Margin = createMargin(0);
+    /**
+     * Dedicated host used for the M=0 passthrough copy when `effects`
+     * is empty (no per-effect host exists). Owned by the chain so user-
+     * driven `vfx.add(el, { effect: [] })` works as a transparent
+     * blit of the captured source — supports dynamic add/remove without
+     * a special-case "no chain" branch.
+     */
+    #emptyPassthroughHost: EffectHost | null = null;
 
     constructor(
         glCtx: GLContext,
@@ -161,11 +182,24 @@ export class EffectChain {
         this.#hosts = effects.map(
             () => new EffectHost(glCtx, quad, pixelRatio, capture, vfxProps),
         );
+        if (effects.length === 0) {
+            this.#emptyPassthroughHost = new EffectHost(
+                glCtx,
+                quad,
+                pixelRatio,
+                capture,
+                vfxProps,
+            );
+        }
         this.#renderingIndices = effects
             .map((e, i) => (typeof e.render === "function" ? i : -1))
             .filter((i) => i >= 0);
         const M = this.#renderingIndices.length;
         this.#intermediates = new Array(Math.max(0, M - 1)).fill(null);
+    }
+
+    get effects(): readonly Effect[] {
+        return this.#effects;
     }
 
     get hosts(): readonly EffectHost[] {
@@ -179,6 +213,18 @@ export class EffectChain {
     /** Test-only accessor for per-stage layout data. @internal */
     get stages(): readonly StageLayout[] {
         return this.#stages;
+    }
+
+    /**
+     * Per-side pad in **physical px** to grow the visibility hit-test
+     * rect by, so glow / trail extending past the element rect keeps
+     * the chain running while the padded region is on-screen. Reflects
+     * the most recent rendered frame; empty / first-frame chains
+     * return zero margins. Caller divides by `pixelRatio` to convert
+     * to logical px before passing to `growRect`.
+     */
+    get hitTestPadPhys(): Margin {
+        return this.#lastMaxDstPad;
     }
 
     /**
@@ -264,14 +310,21 @@ export class EffectChain {
         }
 
         // 5. M = 0 identity copy special case.
+        //    `host` is `#hosts[0]` when effects has non-rendering entries,
+        //    or the dedicated `#emptyPassthroughHost` when effects is
+        //    empty.
         if (M === 0) {
+            const host = this.#hosts[0] ?? this.#emptyPassthroughHost;
+            if (!host) {
+                return;
+            }
             const srcHandle = this.#capture;
             const canvasVp = this.#postEffectTargetViewport(input);
             if (input.finalTarget === null) {
-                this.#hosts[0]?.passthroughCopy(srcHandle, null, canvasVp);
+                host.passthroughCopy(srcHandle, null, canvasVp);
             } else {
                 const target = this.#getFinalHandle(input.finalTarget);
-                this.#hosts[0]?.passthroughCopy(srcHandle, target, canvasVp);
+                host.passthroughCopy(srcHandle, target, canvasVp);
             }
             return;
         }
@@ -353,6 +406,10 @@ export class EffectChain {
             this.#safeDispose(i);
             this.#hosts[i].dispose();
         }
+        if (this.#emptyPassthroughHost) {
+            this.#emptyPassthroughHost.dispose();
+            this.#emptyPassthroughHost = null;
+        }
         for (const im of this.#intermediates) {
             im?.fb.dispose();
         }
@@ -406,31 +463,24 @@ export class EffectChain {
             // Compute fullscreenPad from src pad for the dims input.
             const fullscreenPad = this.#fullscreenPadFor(input, srcPad);
 
-            let dstPad: Margin;
-            let dstBufferSize: [number, number];
-            let float: boolean;
-
-            if (isLast) {
-                // Last effect's outputSize return is ignored — dst is the
-                // fixed final target. Carry src pad forward for uniforms /
-                // canvas viewport.
-                dstPad = srcPad;
-                dstBufferSize = srcBufferSize;
-                float = false;
-            } else {
-                const resolved = this.#callOutputSize(
-                    effect,
-                    i,
-                    srcPad,
-                    srcBufferSize,
-                    elementPixel,
-                    fullscreenPad,
-                    input,
-                );
-                dstPad = resolved.pad;
-                dstBufferSize = resolved.bufferSize;
-                float = resolved.float;
-            }
+            // outputSize is honored at every stage. For the last stage,
+            // `dstBufferSize` becomes the canvas-space draw extent
+            // (no intermediate buffer is allocated — see below); the dst
+            // is still the fixed final target. The `float` request is
+            // ignored on the last stage because the final target's
+            // pixel format is fixed.
+            const resolved = this.#callOutputSize(
+                effect,
+                i,
+                srcPad,
+                srcBufferSize,
+                elementPixel,
+                fullscreenPad,
+                input,
+            );
+            const dstPad: Margin = resolved.pad;
+            const dstBufferSize: [number, number] = resolved.bufferSize;
+            const float: boolean = isLast ? false : resolved.float;
 
             const srcInnerRect = rectForPad(
                 srcPad,
@@ -443,11 +493,12 @@ export class EffectChain {
             let outputViewport: { x: number; y: number; w: number; h: number };
             if (isLast) {
                 // Draw onto canvas / final FBO at the element's canvas rect
-                // grown by src pad. For post-effect chains, srcPad = 0 and
-                // the rect equals viewportRectOnCanvasPx.
+                // grown by `dstPad` (the effect's requested pad, monotonic-
+                // clamped against srcPad). For post-effect chains, both pads
+                // are 0 so the rect equals viewportRectOnCanvasPx.
                 outputViewport = {
-                    x: input.elementRectOnCanvasPx.x - srcPad.left,
-                    y: input.elementRectOnCanvasPx.y - srcPad.bottom,
+                    x: input.elementRectOnCanvasPx.x - dstPad.left,
+                    y: input.elementRectOnCanvasPx.y - dstPad.bottom,
                     w: dstBufferSize[0],
                     h: dstBufferSize[1],
                 };
@@ -478,6 +529,11 @@ export class EffectChain {
             srcPad = dstPad;
             srcBufferSize = dstBufferSize;
         }
+
+        // Cache the max dst pad (per side) across all stages for the
+        // host's hit-test rect grow. Pad is monotonic-non-decreasing,
+        // so the last stage's dstPad is the max.
+        this.#lastMaxDstPad = this.#stages[M - 1].dstPad;
     }
 
     #callOutputSize(

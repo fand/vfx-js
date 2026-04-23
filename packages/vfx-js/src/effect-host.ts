@@ -172,9 +172,10 @@ export type HostFrameDims = {
      */
     outputViewport: { x: number; y: number; w: number; h: number };
     /**
-     * Current element physical size (used by auto-resize RTs). Equal to
-     * the element rect in physical px (inner, no overflow) for element
-     * effects, or the viewport for post effects.
+     * Current element physical size (inner, no pad). Provided for
+     * effects that need the inner extent — auto-resize RTs use
+     * `outputPhysW/H` (= dst buffer = inner + dstPad) instead so they
+     * include this stage's pad region.
      */
     elementPhysW: number;
     elementPhysH: number;
@@ -296,9 +297,12 @@ export class EffectHost {
     setFrameDims(dims: HostFrameDims): void {
         this.#dims = dims;
         this.#ctxBacking.resolution = [dims.canvasPhysW, dims.canvasPhysH];
-        // Auto-resize managed RTs whose size tracks the element.
+        // Auto-resize managed RTs whose size tracks this stage's dst
+        // buffer (= element + dstPad). Sizing to dst buffer instead of
+        // inner element ensures effects can write into the pad region
+        // without manual sizing.
         for (const rt of this.#autoResizeRTs) {
-            rt.resolver.resize?.(dims.elementPhysW, dims.elementPhysH);
+            rt.resolver.resize?.(dims.outputPhysW, dims.outputPhysH);
         }
     }
 
@@ -448,8 +452,8 @@ export class EffectHost {
         const wrap = normalizeWrap(opts?.wrap);
         const filter = opts?.filter;
         const explicitSize = opts?.size;
-        const sizeW = explicitSize ? explicitSize[0] : this.#dims.elementPhysW;
-        const sizeH = explicitSize ? explicitSize[1] : this.#dims.elementPhysH;
+        const sizeW = explicitSize ? explicitSize[0] : this.#dims.outputPhysW;
+        const sizeH = explicitSize ? explicitSize[1] : this.#dims.outputPhysH;
 
         let resolver: RenderTargetResolver;
         let getW: () => number;
