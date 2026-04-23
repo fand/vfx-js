@@ -151,51 +151,49 @@ export type BloomOptions = {
     /** Additive gain on the bloom. Default 1.2. */
     intensity?: number;
     /**
-     * Glow reach in CSS (logical) px. Larger = wider, softer halo.
-     * Drives the internal mip depth. Default 50.
+     * How diffuse the bloom looks. 0..1 (default 0.7). Follows the
+     * Unity HDRP / COD:AW "Scatter" convention — 0 is focused/tight,
+     * 1 is a wide soft halo. Not a pixel radius: total extent is
+     * dominated by the mip pyramid depth (auto-fit to the element +
+     * pad buffer), which is effectively full-frame.
      */
-    radius?: number;
+    scatter?: number;
     /**
      * Extra pad around the element in CSS (logical) px so the glow has
      * room to spread. `"fullscreen"` reaches the viewport edges on all
-     * sides. Default: same as `radius`.
+     * sides. Default 50.
      */
     pad?: number | "fullscreen";
 };
+
+// Map user scatter 0..1 → tent filter factor. Mirrors Unity HDRP's
+// `Lerp(0.05, 0.95, scatter)` to keep tent offsets inside 1 texel and
+// avoid sparse-sample aliasing at the endpoints.
+function scatterFilter(scatter: number): number {
+    return 0.05 + 0.9 * Math.min(Math.max(scatter, 0), 1);
+}
 
 export function createBloomEffect(opts: BloomOptions = {}): Effect {
     const threshold = opts.threshold ?? 0.7;
     const softness = opts.softness ?? 0.1;
     const intensity = opts.intensity ?? 1.2;
-    const radius = Math.max(1, opts.radius ?? 50);
-    const pad = opts.pad ?? radius;
+    const tentFilter = scatterFilter(opts.scatter ?? 0.7);
+    const pad = opts.pad ?? 50;
 
     let bright: EffectRenderTarget | null = null;
     const mipsDown: EffectRenderTarget[] = [];
     const mipsUp: EffectRenderTarget[] = [];
-    // Fractional tent-filter radius (source-texel units). Combined with
-    // integer mip depth it linearises reach vs `radius` across 2^L jumps.
-    let tentRadius = 1.0;
     let allocated = false;
 
     function allocateMips(ctx: EffectContext, baseW: number, baseH: number) {
         if (allocated) {
             return;
         }
-        // radius is CSS px; convert to physical to drive mip depth.
-        // Empirical reach ≈ 2 × 2^(L+1) × tentRadius physical px (the
-        // 13-tap downsample chain contributes as much spread as the
-        // tent-upsample chain, effectively doubling the model reach).
-        // Pick L so tentRadius ∈ [1, 2) gives continuous interpolation
-        // and total reach == physRadius.
-        const physRadius = Math.max(4, radius * ctx.pixelRatio);
-        const maxMipLevels = Math.min(
-            Math.max(Math.floor(Math.log2(physRadius)) - 2, 1),
-            8,
-        );
+        // Auto-depth: halve until a further level would drop below 4 px
+        // on either axis. Cap at 8 levels.
         let w = Math.max(1, Math.floor(baseW / 2));
         let h = Math.max(1, Math.floor(baseH / 2));
-        for (let i = 0; i < maxMipLevels; i++) {
+        for (let i = 0; i < 8; i++) {
             mipsDown.push(ctx.createRenderTarget({ size: [w, h] }));
             const nw = Math.max(1, Math.floor(w / 2));
             const nh = Math.max(1, Math.floor(h / 2));
@@ -205,9 +203,6 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             w = nw;
             h = nh;
         }
-        // Calibrate against the ACTUAL allocated depth — the pyramid
-        // can truncate early if a level would fall below the 4-px floor.
-        tentRadius = physRadius / 2 ** (mipsDown.length + 2);
         for (let i = 0; i < mipsDown.length - 1; i++) {
             mipsUp.push(
                 ctx.createRenderTarget({
@@ -270,7 +265,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             //   idealTexelUV = 2^smallLevel / base
             // where smallLevel = i + 2. Anchoring to the base dimensions
             // cancels the cumulative floor error from the halving chain,
-            // so reach stays calibrated to `tentRadius × 2^smallLevel`
+            // so reach stays calibrated to `tentFilter × 2^smallLevel`
             // source-px regardless of the actual mip dims.
             const baseW = bright.width;
             const baseH = bright.height;
@@ -283,8 +278,8 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                         srcSmall: small,
                         srcLarge: mipsDown[i],
                         texelSize: [
-                            (tentRadius * levelScale) / baseW,
-                            (tentRadius * levelScale) / baseH,
+                            (tentFilter * levelScale) / baseW,
+                            (tentFilter * levelScale) / baseH,
                         ],
                     },
                     target: mipsUp[i],
@@ -299,8 +294,8 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
                     src: ctx.src,
                     bloom: bloomTex,
                     texelSize: [
-                        (tentRadius * 2) / baseW,
-                        (tentRadius * 2) / baseH,
+                        (tentFilter * 2) / baseW,
+                        (tentFilter * 2) / baseH,
                     ],
                     intensity,
                 },

@@ -35,7 +35,8 @@ bloom.play = async ({ canvasElement }) => {
         effect: createBloomEffect({
             threshold: 0.6,
             intensity: 1.3,
-            radius: 80,
+            scatter: 0.7,
+            pad: 80,
         }),
     });
 };
@@ -59,12 +60,13 @@ crtBloom.play = async ({ canvasElement }) => {
         effect: [
             createPixelateEffect({ size: 5 }),
             createScanlineEffect({ spacing: 5 }),
-            createRgbMixEffect({ gains: [0, 2, 2] }),
+            // createRgbMixEffect({ gains: [0, 2, 2] }),
             createBloomEffect({
                 threshold: 0.2,
-                intensity: 1000.0,
-                radius: 50,
-                // pad: 100,
+                softness: 1,
+                intensity: 3.0,
+                scatter: 0.9,
+                pad: 100,
             }),
         ],
     });
