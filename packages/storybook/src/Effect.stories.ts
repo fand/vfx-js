@@ -34,9 +34,10 @@ bloom.play = async ({ canvasElement }) => {
     await vfx.add(img, {
         effect: createBloomEffect({
             threshold: 0.6,
-            intensity: 1.3,
+            intensity: 0.3,
             scatter: 0.7,
-            pad: 80,
+            pad: "fullscreen",
+            dither: 1.0,
         }),
     });
 };
