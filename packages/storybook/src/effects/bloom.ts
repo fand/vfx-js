@@ -229,13 +229,16 @@ export type BloomOptions = {
     /** Additive gain on the bloom. Default 1.2. */
     intensity?: number;
     /**
-     * Halo radius, 0..1 (default 0.7). Maps linearly to src-px reach:
-     * scatter=0 uses only the shallowest downsample (≈ 2 src-px halo),
-     * scatter=1 activates the full pyramid (≈ 2^(depth−1) src-px).
-     * Internally the scatter value is log2-warped to a fractional
-     * pyramid depth so that the visible halo radius grows linearly
-     * with the knob. Intensity is normalised by active depth, so
-     * brightness is roughly scatter-independent.
+     * Halo spread, 0..1 (default 0.7). Each step of `1/(depth−1)`
+     * activates one more pyramid level, so the knob is linear in
+     * *octaves* of reach: scatter=0 collapses to the shallowest
+     * downsample (≈ 2 src-px halo), scatter=1 engages all levels
+     * (≈ 2^(depth−1) src-px). Radius grows exponentially with the
+     * knob, but that feels linear to the eye — a px-linear mapping
+     * bunches all visible change into scatter<0.2 because the
+     * outermost level dominates visible reach. Intensity is
+     * normalised by active depth, so brightness stays roughly
+     * scatter-independent.
      */
     scatter?: number;
     /**
@@ -366,10 +369,12 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             // Additive pyramid upsample with per-level weights.
             //   upsample[D-1] = mipsDown[D-1] × w[D-1]
             //   upsample[i]   = mipsDown[i]   × w[i] + tent(upsample[i+1])
-            // weight[i] = clamp(activeDepth − i, 0, 1) where activeDepth is
-            // 1 + log2(radiusPx) with radiusPx linear in scatter. This makes
-            // the halo radius linear in scatter while keeping the pyramid
-            // cascade itself COD-faithful (pure additive, no nested mix).
+            // weight[i] = clamp(activeDepth − i, 0, 1). activeDepth is
+            // linear in scatter (each step of 1/(n−1) activates one more
+            // level), giving ~even perceptual change across the knob.
+            // A radius-linear (log2) mapping bunches all visible motion
+            // into scatter < 0.2 because halo reach is dominated by the
+            // outermost level — octave-linear is what "feels" linear.
             //
             // Tent offsets use the *ideal* (non-floored) texel size
             //   idealTexelUV = 2^smallLevel / base
@@ -377,9 +382,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             // cancels the cumulative floor error from the halving chain.
             const baseW = bright.width;
             const baseH = bright.height;
-            const maxRadius = 2 ** Math.max(0, n - 1);
-            const radiusPx = 1 + scatter * (maxRadius - 1);
-            const activeDepth = 1 + Math.log2(radiusPx);
+            const activeDepth = 1 + scatter * Math.max(0, n - 1);
             const weightFor = (i: number) =>
                 Math.min(1, Math.max(0, activeDepth - i));
             for (let i = n - 2; i >= 0; i--) {
