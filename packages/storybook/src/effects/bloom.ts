@@ -28,10 +28,14 @@ uniform float softness;
 uniform float edgeFade;
 
 void main() {
-    // Clamp sampling — the mask zeroes anything far outside anyway, but
-    // using the edge color across the narrow fade band avoids feeding
-    // the pyramid whatever the src's outside-of-range policy returns.
-    vec3 srgb = texture(src, clamp(uvInner, 0.0, 1.0)).rgb;
+    // Hard-gate sampling to uvInner in [0,1]: a bare clamp would smear
+    // src's edge pixels into the pad (visible as a stretched image
+    // when edgeFade x pad reaches past the src buffer). The clamp on
+    // texture() keeps the sampler happy; srcMask zeroes what lies
+    // outside the actual src content.
+    vec2 insideSrc = step(vec2(0.0), uvInner) * step(uvInner, vec2(1.0));
+    float srcMask = insideSrc.x * insideSrc.y;
+    vec3 srgb = texture(src, clamp(uvInner, 0.0, 1.0)).rgb * srcMask;
     vec3 lin = pow(srgb, vec3(2.2));
     float lum = dot(lin, vec3(0.2126, 0.7152, 0.0722));
     float f = smoothstep(threshold, threshold + softness, lum);
@@ -184,8 +188,13 @@ void main() {
 
     // Same soft edge-fade as threshold so base and bloom share a
     // coverage footprint — base alpha tapers into the pad instead of
-    // stepping from 1 to 0.
-    vec4 baseColor = texture(src, clamp(uvInner, 0.0, 1.0));
+    // stepping from 1 to 0. The hard srcMask (same shape as the
+    // threshold pass) kills anything outside src's valid [0,1] so
+    // bloom pad extending past the src buffer doesn't repeat edge
+    // pixels.
+    vec2 insideSrc = step(vec2(0.0), uvInner) * step(uvInner, vec2(1.0));
+    float srcMask = insideSrc.x * insideSrc.y;
+    vec4 baseColor = texture(src, clamp(uvInner, 0.0, 1.0)) * srcMask;
     vec2 outside = max(vec2(0.0), max(-uvInnerDst, uvInnerDst - 1.0));
     float outDist = max(outside.x, outside.y);
     float baseMask = 1.0 - smoothstep(0.0, edgeFade, outDist);
