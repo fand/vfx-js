@@ -74,13 +74,13 @@ uniform float delay;
 uniform float width;
 
 #define W width
-#define LAYERS layers
+#define LAYERS 3.
 
 vec4 readTex(vec2 uv) {
   if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) {
     return vec4(0);
   }
-  return texture(src, uv);
+  return texture2D(src, uv);
 }
 
 float hash(vec2 p) {
