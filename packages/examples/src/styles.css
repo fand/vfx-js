@@ -77,16 +77,6 @@ body {
         background-position: 200% 0;
     }
 }
-.vf-sublabel {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: #777;
-    margin-top: 12px;
-}
-.vf-mdrawer-head .vf-sublabel {
-    margin-top: 0;
-}
 .vf-filters {
     display: flex;
     flex-wrap: wrap;
@@ -340,11 +330,14 @@ body {
     overflow: hidden;
 }
 .vf-mtop {
+    position: relative;
+    z-index: 20;
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0 16px;
     border-bottom: 1px solid #232323;
+    background: #111;
 }
 .vf-mlogo {
     font-weight: 700;
@@ -392,7 +385,7 @@ body {
 }
 .vf-mdrawer {
     position: absolute;
-    inset: 0;
+    inset: 56px 0 0 0;
     background: #111;
     transform: translateY(-100%);
     transition: transform 0.5s cubic-bezier(0.77, 0, 0.18, 1);
@@ -402,15 +395,6 @@ body {
 }
 .vf-mdrawer.open {
     transform: translateY(0);
-}
-.vf-mdrawer-head {
-    box-sizing: border-box;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    height: 56px;
-    padding: 0 16px;
-    border-bottom: 1px solid #232323;
 }
 .vf-mdrawer .vf-filters {
     padding: 12px 16px;

@@ -57,7 +57,7 @@ const FilterBar = ({
 
 export const VFinal = ({ works, mobile = false }: Props) => {
     const [activeId, setActiveId] = useState(works[0].id);
-    const [mobileOpen, setMobileOpen] = useState(false);
+    const [mobileOpen, setMobileOpen] = useState(mobile);
     const [activeTags, setActiveTags] = useState<string[]>([]);
 
     const allTags = useMemo(() => {
@@ -131,16 +131,6 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                         </div>
                     </div>
                     <div className={`vf-mdrawer ${mobileOpen ? "open" : ""}`}>
-                        <div className="vf-mdrawer-head">
-                            <div className="vf-sublabel">EXAMPLES / INDEX</div>
-                            <button
-                                type="button"
-                                className="vf-mmenu"
-                                onClick={() => setMobileOpen(false)}
-                            >
-                                CLOSE
-                            </button>
-                        </div>
                         <FilterBar
                             allTags={allTags}
                             activeTags={activeTags}
