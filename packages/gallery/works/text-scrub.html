@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Text Scrub</title>
+
+<style>
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    background: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    touch-action: none;
+  }
+  h2 {
+    color: white;
+    font-size: 10vw;
+    line-height: 1;
+    margin: 0;
+    padding-right: 32px;
+  }
+</style>
+
+<h2>Hello world!</h2>
+
+<script type="module">
+  // Reproduction of Daniel Kuntz's work.
+  // https://x.com/dankuntz/status/1813283813881225625
+  import { VFX } from "@vfx-js/core";
+
+  const shader = `
+precision highp float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform sampler2D src;
+
+uniform vec4 mouse2;
+
+#define mouse (mouse2.xy)
+#define move (mouse2.zw * vec2(resolution.y/resolution.x, 1.))
+
+vec4 tex(vec2 uv) {
+  float y = floor(uv.y);
+  float ys = sin(y+0.7);
+  uv.x += ys + time * 0.05 * ys;
+  return texture2D(src, fract(uv) * 0.98 + 0.01);
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / resolution;
+  float dist = 0.;
+
+  for (int i = 0; i < 8; i++) {
+    float fi = float(i);
+    vec2 md = mouse.xy - move * resolution * fi * .2;
+    float r = 250. + fi * 80.;
+    dist += pow(smoothstep(r, 0., length(md - gl_FragCoord.xy)), 2.) * (1. - fi * 0.1);
+  }
+
+  vec2 mv = move * dist;
+  vec2 uvr, uvg, uvb;
+  vec4 cr, cg, cb;
+
+  for (float i = 0.; i < 8.; i++) {
+    float ii = 1. + i / 8. * 0.2;
+    uvr = uv - mv * ii * 1.;
+    uvg = uv - mv * ii * 1.4;
+    uvb = uv - mv * ii * 1.8;
+    cr += tex(uvr);
+    cg += tex(uvg);
+    cb += tex(uvb);
+  }
+  cr /= 8.;
+  cg /= 8.;
+  cb /= 8.;
+
+  gl_FragColor = vec4(cr.r, cg.g, cb.b, cr.a + cg.a + cb.a);
+  gl_FragColor.rgb = pow(gl_FragColor.rgb, vec3(.4));
+}
+`;
+
+  let mouse = [0.5, 0.5];
+  let mouseTarget = [0.5, 0.5];
+  let move = [0, 0];
+
+  const lerp = (a, b, t) => a * (1 - t) + b * t;
+
+  window.addEventListener("pointermove", (e) => {
+    const x = e.clientX / window.innerWidth;
+    const y = e.clientY / window.innerHeight;
+    mouseTarget = [x, 1 - y];
+  });
+  window.addEventListener("touchmove", (e) => {
+    const x = e.touches[0].clientX / window.innerWidth;
+    const y = e.touches[0].clientY / window.innerHeight;
+    mouseTarget = [x, 1 - y];
+  });
+
+  const ratio = window.devicePixelRatio;
+
+  const vfx = new VFX();
+  vfx.add(document.querySelector("h2"), {
+    shader,
+    overflow: true,
+    uniforms: {
+      mouse2: () => {
+        const [x, y] = mouse;
+        const [xt, yt] = mouseTarget;
+        move = [xt - x, yt - y];
+        mouse = [lerp(x, xt, 0.03), lerp(y, yt, 0.03)];
+        return [
+          xt * window.innerWidth * ratio,
+          yt * window.innerHeight * ratio,
+          ...move,
+        ];
+      },
+    },
+  });
+</script>

@@ -43,4 +43,48 @@ export const works: Work[] = [
             "CRT display simulation with scanlines, chromatic aberration, and phosphor glow. Emulates the look of analog cathode-ray-tube monitors.",
         url: "./works/crt.html",
     },
+    {
+        id: "pixel-scan",
+        index: "04",
+        title: "Pixel Scan",
+        category: "Transition",
+        year: "2024",
+        author: "AMAGI",
+        description:
+            "Pixel-grid reveal animation sweeping text and images with glowing edge highlights. After Smertimba Graphics.",
+        url: "./works/pixel-scan.html",
+    },
+    {
+        id: "text-scrub",
+        index: "05",
+        title: "Text Scrub",
+        category: "Distortion",
+        year: "2024",
+        author: "AMAGI",
+        description:
+            "Multi-layered chromatic scrub distortion following pointer motion. Reproduction of Daniel Kuntz's work.",
+        url: "./works/text-scrub.html",
+    },
+    {
+        id: "text-3d-sdf",
+        index: "06",
+        title: "Text 3D SDF",
+        category: "Raymarching",
+        year: "2024",
+        author: "AMAGI",
+        description:
+            "3D raymarched SDF of text with floating particles and iridescent hatching. Driven by a signed-distance field baked from the source text.",
+        url: "./works/text-3d-sdf.html",
+    },
+    {
+        id: "text-shadow",
+        index: "07",
+        title: "Text Shadow",
+        category: "Lighting",
+        year: "2024",
+        author: "AMAGI",
+        description:
+            "Cursor-driven light source casting soft shadows through text with rainbow spectrum bleed.",
+        url: "./works/text-shadow.html",
+    },
 ];
