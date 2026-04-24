@@ -84,6 +84,9 @@ body {
     color: #777;
     margin-top: 12px;
 }
+.vf-mdrawer-head .vf-sublabel {
+    margin-top: 0;
+}
 .vf-filters {
     display: flex;
     flex-wrap: wrap;
@@ -401,10 +404,12 @@ body {
     transform: translateY(0);
 }
 .vf-mdrawer-head {
+    box-sizing: border-box;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px;
+    height: 56px;
+    padding: 0 16px;
     border-bottom: 1px solid #232323;
 }
 .vf-mdrawer .vf-filters {

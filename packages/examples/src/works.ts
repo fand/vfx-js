@@ -27,7 +27,7 @@ export const works: Work[] = [
         id: "liquid-glass",
         index: "02",
         title: "Liquid Glass",
-        tags: ["Distortion", "html-in-canvas"],
+        tags: ["Refraction", "html-in-canvas"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -38,7 +38,7 @@ export const works: Work[] = [
         id: "crt",
         index: "03",
         title: "CRT",
-        tags: ["Postprocess"],
+        tags: ["Postprocess", "Glitch", "html-in-canvas"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -115,7 +115,7 @@ export const works: Work[] = [
         id: "web-font-raymarch",
         index: "10",
         title: "Editable Text",
-        tags: ["Typography"],
+        tags: ["Typography", "Refraction"],
         year: "2024",
         author: "AMAGI",
         description:
