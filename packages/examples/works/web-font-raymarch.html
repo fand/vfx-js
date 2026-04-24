@@ -247,7 +247,7 @@ void main() {
 
   let mouse = [0, 0];
   let mouseTarget = [0, 0];
-  window.addEventListener("mousemove", (e) => {
+  window.addEventListener("pointermove", (e) => {
     mouseTarget = [
       (e.clientX / window.innerWidth) * 2 - 1,
       -((e.clientY / window.innerHeight) * 2 - 1),
