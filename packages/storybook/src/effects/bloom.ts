@@ -37,15 +37,28 @@ void main() {
     float srcMask = insideSrc.x * insideSrc.y;
     vec3 srgb = texture(src, clamp(uvInner, 0.0, 1.0)).rgb * srcMask;
     vec3 lin = pow(srgb, vec3(2.2));
-    float lum = dot(lin, vec3(0.2126, 0.7152, 0.0722));
-    float f = smoothstep(threshold, threshold + softness, lum);
+
+    // COD:AW (Jimenez 2014) / Unity HDRP soft-knee brightness
+    // response. Quadratic ramp of half-width (threshold * softness)
+    // centred on the cutoff — softness gates mid-luma pixels on
+    // BOTH sides of threshold, so raising it *widens* the bloom
+    // (the previous one-sided smoothstep did the opposite).
+    // softness=0 collapses to a hard threshold; softness=1 extends
+    // the knee down to zero. br uses max-channel (COD convention)
+    // so saturated primaries still trigger bloom where a Rec.709
+    // luma would have hidden them.
+    float br = max(max(lin.r, lin.g), lin.b);
+    float knee = threshold * softness;
+    float rq = clamp(br - threshold + knee, 0.0, 2.0 * knee);
+    rq = rq * rq / (4.0 * knee + 1e-4);
+    float contribution = max(rq, br - threshold) / max(br, 1e-4);
 
     // Chebyshev distance outside the inner rect in uvInnerDst units;
     // 0 inside, positive in the pad region.
     vec2 outside = max(vec2(0.0), max(-uvInnerDst, uvInnerDst - 1.0));
     float outDist = max(outside.x, outside.y);
     float mask = 1.0 - smoothstep(0.0, edgeFade, outDist);
-    f *= mask;
+    float f = contribution * mask;
 
     outColor = vec4(lin * f, f);
 }
@@ -233,7 +246,14 @@ void main() {
 export type BloomOptions = {
     /** Luminance cutoff in [0,1]. Default 0.7. */
     threshold?: number;
-    /** Smoothstep width above the threshold. Default 0.1. */
+    /**
+     * Soft-knee width, 0..1 (default 0.1). COD:AW-style quadratic
+     * knee of half-width `threshold × softness` centred on the
+     * cutoff. 0 → hard threshold; 1 → knee stretches down to zero
+     * luma so every non-black pixel contributes partially. Higher
+     * values produce softer, wider bloom (was inverted under the
+     * old one-sided smoothstep).
+     */
     softness?: number;
     /** Additive gain on the bloom. Default 1.2. */
     intensity?: number;
