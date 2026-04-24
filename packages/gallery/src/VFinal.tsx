@@ -53,6 +53,8 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                             <span>{active.index}</span>
                             <span>·</span>
                             <span>{active.category}</span>
+                            <span>·</span>
+                            <span>{active.author}</span>
                         </div>
                     </div>
                     <div className={`vf-mdrawer ${mobileOpen ? "open" : ""}`}>
