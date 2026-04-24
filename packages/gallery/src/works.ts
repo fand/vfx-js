@@ -19,7 +19,7 @@ export const works: Work[] = [
         author: "AMAGI",
         description:
             "Real-time fluid dynamics simulation rendered in WebGL. Cursor drags momentum through the velocity field.",
-        url: "https://amagi.dev/vfx-js/test",
+        url: "./works/stable-fluid.html",
     },
     {
         id: "liquid-glass",
@@ -30,7 +30,7 @@ export const works: Work[] = [
         author: "AMAGI",
         description:
             "Refraction-based liquid glass overlay. Perturbs underlying content with a chromatic displacement field.",
-        url: "https://amagi.dev/vfx-js/test-lg",
+        url: "./works/liquid-glass.html",
     },
     {
         id: "crt",
