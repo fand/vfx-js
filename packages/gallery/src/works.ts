@@ -89,4 +89,37 @@ export const works: Work[] = [
             "Cursor-driven light source casting soft shadows through text with rainbow spectrum bleed.",
         url: "./works/text-shadow.html",
     },
+    {
+        id: "block-glitch-transition",
+        index: "08",
+        title: "Block Glitch Transition",
+        category: "Transition",
+        year: "2024",
+        author: "AMAGI",
+        description:
+            "Scroll-triggered block glitch with chromatic offsets. Noise-driven cells displace the text and image as they enter the viewport.",
+        url: "./works/block-glitch-transition.html",
+    },
+    {
+        id: "scroll-rgb-shift",
+        index: "09",
+        title: "Scroll RGB Shift",
+        category: "Distortion",
+        year: "2024",
+        author: "AMAGI",
+        description:
+            "Vertical RGB separation driven by scroll velocity. Per-column jitter turns page motion into chromatic smear.",
+        url: "./works/scroll-rgb-shift.html",
+    },
+    {
+        id: "web-font-raymarch",
+        index: "10",
+        title: "Web Font Raymarch",
+        category: "Raymarching",
+        year: "2024",
+        author: "AMAGI",
+        description:
+            "Raymarched refractive spheres lensing live editable web-font text. Cheap dispersion and fresnel over a 2D text canvas.",
+        url: "./works/web-font-raymarch.html",
+    },
 ];

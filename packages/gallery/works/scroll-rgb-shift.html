@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Scroll RGB Shift</title>
+
+<style>
+  html,
+  body {
+    margin: 0;
+    background: black;
+  }
+  section {
+    height: 100svh;
+    display: grid;
+    place-content: center;
+  }
+  h2 {
+    font-size: 20vw;
+    color: white;
+  }
+  img {
+    position: absolute;
+    width: 100%;
+    height: 300svh;
+    object-fit: cover;
+    opacity: 0.15;
+  }
+</style>
+
+<img src="https://picsum.photos/seed/223/1200" />
+
+<section>
+  <h2>Shift</h2>
+</section>
+<section>
+  <h2>Your</h2>
+</section>
+<section>
+  <h2>Mind.</h2>
+</section>
+
+<script type="module">
+  import { VFX } from "@vfx-js/core";
+
+  const vfx = new VFX();
+
+  const lerp = (a, b, t) => a * (1 - t) + b * t;
+
+  const shaderH = `
+precision highp float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform sampler2D src;
+uniform float scroll;
+
+float inside(vec2 uv) {
+  return step(abs(uv.x - 0.5), 0.5) * step(abs(uv.y - 0.5), 0.5);
+}
+vec4 readTex(vec2 uv) {
+  return texture2D(src, uv) * inside(uv);
+}
+
+void main() {
+  vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+
+  float d = scroll;
+
+  d *= abs(
+    sin(floor(gl_FragCoord.x / 17.) * 7. + time * 2.) +
+    sin(floor(gl_FragCoord.x / 19.) * 19. - time * 3.)
+  );
+
+  vec4 cr = readTex(uv + vec2(0, d));
+  vec4 cg = readTex(uv + vec2(0, d * 2.));
+  vec4 cb = readTex(uv + vec2(0, d * 3.));
+
+  gl_FragColor = vec4(
+    cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a)
+  );
+}
+`;
+
+  let scroll = 0;
+
+  for (const e of document.querySelectorAll("h2")) {
+    vfx.add(e, {
+      shader: shaderH,
+      overflow: 500,
+      uniforms: {
+        scroll: () => {
+          const diff = window.scrollY - scroll;
+          scroll = lerp(scroll, window.scrollY, 0.03);
+          return diff / window.innerHeight;
+        },
+      },
+    });
+  }
+</script>
