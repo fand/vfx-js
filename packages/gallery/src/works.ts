@@ -32,4 +32,15 @@ export const works: Work[] = [
             "Refraction-based liquid glass overlay. Perturbs underlying content with a chromatic displacement field.",
         url: "https://amagi.dev/vfx-js/test-lg",
     },
+    {
+        id: "crt",
+        index: "03",
+        title: "CRT",
+        category: "Postprocess",
+        year: "2024",
+        author: "AMAGI",
+        description:
+            "CRT display simulation with scanlines, chromatic aberration, and phosphor glow. Emulates the look of analog cathode-ray-tube monitors.",
+        url: "https://codepen.io/fand/full/YPXBwVd",
+    },
 ];
