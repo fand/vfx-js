@@ -1,0 +1,54 @@
+name: Deploy PR Preview to Cloudflare Pages
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened]
+
+concurrency:
+    group: cf-preview-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+    pull-requests: write
+
+jobs:
+    deploy-preview:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
+                  cache-dependency-path: "**/package-lock.json"
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build
+              run: npm run build
+
+            - name: Deploy to Cloudflare Pages
+              id: deploy
+              uses: cloudflare/wrangler-action@v3
+              with:
+                  apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+                  command: pages deploy packages/docs/dist --project-name=vfx-js --branch=${{ github.head_ref }}
+
+            - name: Comment preview URL on PR
+              uses: marocchino/sticky-pull-request-comment@v2
+              with:
+                  header: cf-preview
+                  message: |
+                      🚀 **Cloudflare Pages preview** — ${{ github.event.pull_request.head.sha }}
+
+                      | Page | URL |
+                      | --- | --- |
+                      | Top | ${{ steps.deploy.outputs.deployment-url }} |
+                      | Gallery | ${{ steps.deploy.outputs.deployment-url }}/gallery/ |
+                      | Storybook | ${{ steps.deploy.outputs.deployment-url }}/storybook/ |
+                      | Docs | ${{ steps.deploy.outputs.deployment-url }}/docs/ |
