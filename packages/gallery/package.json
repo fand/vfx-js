@@ -1,0 +1,25 @@
+{
+    "name": "@vfx-js/gallery",
+    "private": true,
+    "version": "0.0.19",
+    "type": "module",
+    "scripts": {
+        "dev": "vite --host --port 3002",
+        "build": "vite build",
+        "clean": "rm -rf docs-build",
+        "lint": "biome check src"
+    },
+    "dependencies": {
+        "react": "19.2.5",
+        "react-dom": "19.2.5"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "2.4.11",
+        "@types/node": "24.12.2",
+        "@types/react": "19.2.14",
+        "@types/react-dom": "19.2.3",
+        "@vitejs/plugin-react": "6.0.1",
+        "typescript": "6.0.2",
+        "vite": "8.0.8"
+    }
+}

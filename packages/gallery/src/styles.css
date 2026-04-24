@@ -1,0 +1,412 @@
+html,
+body,
+#root {
+    margin: 0;
+    height: 100%;
+    background: #0a0a0a;
+}
+body {
+    font-family: "Space Grotesk", sans-serif;
+    color: #fff;
+    overflow: hidden;
+}
+
+.vf-desktop-wrap,
+.vf-mobile-wrap {
+    position: absolute;
+    inset: 0;
+    display: block;
+}
+@media (max-width: 768px) {
+    .vf-desktop-wrap {
+        display: none;
+    }
+}
+@media (min-width: 769px) {
+    .vf-mobile-wrap {
+        display: none;
+    }
+}
+
+.vf-root {
+    width: 100%;
+    height: 100%;
+    background: #0a0a0a;
+    color: #f4f4f4;
+    font-family: "Space Grotesk", sans-serif;
+}
+.vf-desktop {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    height: 100%;
+}
+.vf-sidebar {
+    border-right: 1px solid #1a1a1a;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 0;
+    overflow: hidden;
+}
+.vf-brand {
+    padding: 0 28px 32px;
+    border-bottom: 1px solid #1a1a1a;
+    margin-bottom: 20px;
+}
+.vf-logo {
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: -0.04em;
+    line-height: 1;
+}
+.vf-iri {
+    background: linear-gradient(
+        90deg,
+        #ff00c8,
+        #00eaff,
+        #00ff88,
+        #fff200,
+        #ff00c8
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: vfiri 4s linear infinite;
+    background-size: 200% 100%;
+}
+.vf-iri-text {
+    background: linear-gradient(
+        90deg,
+        #ff00c8,
+        #00eaff,
+        #00ff88,
+        #fff200,
+        #ff00c8
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: vfiri 4s linear infinite;
+    background-size: 200% 100%;
+    font-weight: 500;
+}
+@keyframes vfiri {
+    to {
+        background-position: 200% 0;
+    }
+}
+.vf-sublabel {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: #666;
+    margin-top: 12px;
+}
+.vf-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+}
+.vf-item {
+    display: grid;
+    grid-template-columns: 56px 1fr 24px;
+    align-items: center;
+    gap: 16px;
+    padding: 22px 28px;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid #141414;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.25s;
+    font-family: inherit;
+    position: relative;
+}
+.vf-item:hover {
+    background: #121212;
+}
+.vf-item.vf-active {
+    background: #0f0f0f;
+}
+.vf-item.vf-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, #ff00c8, #00eaff, #00ff88);
+}
+.vf-idx {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    color: #555;
+    letter-spacing: 0.05em;
+}
+.vf-item.vf-active .vf-idx {
+    color: #fff;
+}
+.vf-title {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+.vf-cat {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    color: #666;
+    margin-top: 4px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.vf-arrow {
+    color: #333;
+    font-size: 14px;
+    transition:
+        color 0.25s,
+        transform 0.25s;
+}
+.vf-item:hover .vf-arrow,
+.vf-item.vf-active .vf-arrow {
+    color: #fff;
+    transform: translate(2px, -2px);
+}
+.vf-foot {
+    padding: 20px 28px 0;
+    border-top: 1px solid #1a1a1a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.vf-gh {
+    color: #888;
+    transition: color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+}
+.vf-gh:hover {
+    color: #fff;
+}
+.vf-coord {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    color: #444;
+    letter-spacing: 0.1em;
+}
+.vf-main {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    overflow: hidden;
+}
+.vf-topstrip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px;
+    border-bottom: 1px solid #1a1a1a;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: #666;
+    text-transform: uppercase;
+}
+.vf-stage {
+    position: relative;
+    background: #050505;
+    overflow: hidden;
+    margin: 20px;
+    border: 1px solid #1a1a1a;
+}
+.vf-iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+    background: #000;
+}
+.vf-scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent 0 3px,
+        rgba(255, 255, 255, 0.015) 3px 4px
+    );
+    mix-blend-mode: overlay;
+}
+
+.vf-bottom {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 40px;
+    align-items: center;
+    padding: 22px 28px;
+    border-top: 1px solid #1a1a1a;
+}
+.vf-bigtitle {
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, #fff 0%, #fff 50%, #888 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+}
+.vf-desc {
+    font-size: 13px;
+    line-height: 1.55;
+    color: #888;
+    max-width: 520px;
+}
+.vf-specs {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 4px 24px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    color: #ccc;
+    letter-spacing: 0.05em;
+}
+.vf-specs span {
+    color: #555;
+    margin-right: 8px;
+}
+
+.vf-mobile {
+    display: grid;
+    grid-template-rows: 56px 1fr auto;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+.vf-mtop {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid #1a1a1a;
+}
+.vf-mlogo {
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: -0.03em;
+}
+.vf-mmenu {
+    background: transparent;
+    border: 1px solid #333;
+    color: #fff;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    padding: 6px 12px;
+    cursor: pointer;
+}
+.vf-mstage {
+    overflow: hidden;
+    background: #000;
+}
+.vf-mstage .vf-iframe {
+    width: 100%;
+    height: 100%;
+}
+.vf-mcaption {
+    padding: 14px 16px;
+    border-top: 1px solid #1a1a1a;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.vf-mcap-title {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+.vf-mcap-specs {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    color: #666;
+    letter-spacing: 0.12em;
+    display: flex;
+    gap: 8px;
+    text-transform: uppercase;
+}
+.vf-mdrawer {
+    position: absolute;
+    inset: 0;
+    background: #0a0a0a;
+    transform: translateY(-100%);
+    transition: transform 0.5s cubic-bezier(0.77, 0, 0.18, 1);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+}
+.vf-mdrawer.open {
+    transform: translateY(0);
+}
+.vf-mdrawer-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #1a1a1a;
+}
+.vf-mlist {
+    flex: 1;
+    overflow: auto;
+}
+.vf-mitem {
+    display: grid;
+    grid-template-columns: 40px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 22px 16px;
+    border-bottom: 1px solid #141414;
+    background: transparent;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    color: inherit;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+}
+.vf-mitem.vf-active {
+    background: #111;
+}
+.vf-midx {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    color: #555;
+}
+.vf-mitem.vf-active .vf-midx {
+    color: #fff;
+}
+.vf-mtitle {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+.vf-mcat {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px;
+    color: #666;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+.vf-mfoot {
+    padding: 16px;
+    border-top: 1px solid #1a1a1a;
+    display: flex;
+    justify-content: flex-end;
+    color: #888;
+}

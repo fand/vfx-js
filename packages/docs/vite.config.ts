@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => ({
         testLg: resolve(__dirname, "test-lg.html"),
         docs: resolve(__dirname, "typedoc/index.html"),
         storybook: resolve(__dirname, "storybook/index.html"),
+        gallery: resolve(__dirname, "gallery/index.html"),
       },
     },
   },
