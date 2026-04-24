@@ -164,7 +164,7 @@ body {
     align-items: center;
 }
 .vf-gh {
-    color: #9a9a9a;
+    color: #d4d4d4;
     transition: color 0.2s;
     display: inline-flex;
     align-items: center;
@@ -180,7 +180,7 @@ body {
 .vf-coord {
     font-family: "JetBrains Mono", monospace;
     font-size: 10px;
-    color: #555;
+    color: #d4d4d4;
     letter-spacing: 0.1em;
 }
 .vf-main {

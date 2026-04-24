@@ -19,7 +19,7 @@ type Props = {
 };
 
 const SOURCE_BASE =
-    "https://github.com/fand/vfx-js/blob/main/packages/gallery/works";
+    "https://github.com/fand/vfx-js/blob/main/packages/examples/works";
 
 export const VFinal = ({ works, mobile = false }: Props) => {
     const [activeId, setActiveId] = useState(works[0].id);
@@ -61,7 +61,7 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                     </div>
                     <div className={`vf-mdrawer ${mobileOpen ? "open" : ""}`}>
                         <div className="vf-mdrawer-head">
-                            <div className="vf-sublabel">GALLERY / INDEX</div>
+                            <div className="vf-sublabel">EXAMPLES / INDEX</div>
                             <button
                                 type="button"
                                 className="vf-mmenu"

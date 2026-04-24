@@ -7,7 +7,7 @@ export type Work = {
     author: string;
     description: string;
     url: string;
-    /** Optional override. Defaults to packages/gallery/works/<id>.html on main. */
+    /** Optional override. Defaults to packages/examples/works/<id>.html on main. */
     sourceUrl?: string;
 };
 

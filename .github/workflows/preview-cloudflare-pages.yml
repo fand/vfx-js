@@ -49,6 +49,6 @@ jobs:
                       | Page | URL |
                       | --- | --- |
                       | Top | ${{ steps.deploy.outputs.deployment-url }} |
-                      | Gallery | ${{ steps.deploy.outputs.deployment-url }}/gallery/ |
+                      | Examples | ${{ steps.deploy.outputs.deployment-url }}/examples/ |
                       | Storybook | ${{ steps.deploy.outputs.deployment-url }}/storybook/ |
                       | Docs | ${{ steps.deploy.outputs.deployment-url }}/docs/ |
