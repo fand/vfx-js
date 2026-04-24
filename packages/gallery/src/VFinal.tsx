@@ -18,10 +18,14 @@ type Props = {
     mobile?: boolean;
 };
 
+const SOURCE_BASE =
+    "https://github.com/fand/vfx-js/blob/main/packages/gallery/works";
+
 export const VFinal = ({ works, mobile = false }: Props) => {
     const [activeId, setActiveId] = useState(works[0].id);
     const [mobileOpen, setMobileOpen] = useState(false);
     const active = works.find((w) => w.id === activeId) ?? works[0];
+    const sourceUrl = active.sourceUrl ?? `${SOURCE_BASE}/${active.id}.html`;
 
     if (mobile) {
         return (
@@ -169,6 +173,17 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                             <div>
                                 <span>AUTHOR</span>
                                 {active.author}
+                            </div>
+                            <div>
+                                <span>SRC</span>
+                                <a
+                                    href={sourceUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="vf-src-link"
+                                >
+                                    GitHub ↗
+                                </a>
                             </div>
                         </div>
                     </div>

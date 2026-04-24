@@ -252,6 +252,14 @@ body {
     color: #555;
     margin-right: 8px;
 }
+.vf-src-link {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+.vf-src-link:hover {
+    color: #fff;
+}
 
 .vf-mobile {
     display: grid;

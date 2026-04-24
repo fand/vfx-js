@@ -7,6 +7,8 @@ export type Work = {
     author: string;
     description: string;
     url: string;
+    /** Optional override. Defaults to packages/gallery/works/<id>.html on main. */
+    sourceUrl?: string;
 };
 
 export const works: Work[] = [
