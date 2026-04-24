@@ -34,10 +34,11 @@ vfx.add(img, { shader: "glitch", overflow: 100 });
 
 ## Examples
 
-TBD: See VFX-JS website for now.
+You can find basic examples on the VFX-JS website.
+Or visit `VFX-JS Examples` for more advanced use cases.
 
-https://amagi.dev/vfx-js/
-
+- https://amagi.dev/vfx-js/
+- https://amagi.dev/vfx-js/examples
 
 ## Author
 
