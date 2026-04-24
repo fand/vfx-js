@@ -13,6 +13,31 @@ const GHIcon = () => (
     </svg>
 );
 
+const VfxJsLogo = ({ className }: { className?: string }) => (
+    <svg
+        viewBox="0 0 459 211"
+        fill="currentColor"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-label="VFX-JS"
+        className={className}
+    >
+        <path d="M342.863 147V125.027H387.505L314.263 51.7852H425.078V73.7578H367.437L440.679 147H342.863Z" />
+        <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M265 144.352L277.55 131.802L284.325 125.027H308.242V73.41V73.4062L308.24 51.79L308.242 27.7852H330.215V147H292.748H265H262.353L265 144.352Z"
+        />
+        <path d="M296 110H295.379H274.406L263.69 99.39L274.406 88.4062H296V110Z" />
+        <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M166.332 51.7852L213.939 99.3926L128.332 185H159.533L229.54 114.993L252.784 138.237L268.385 122.637L245.14 99.3926L292.748 51.7852H261.547L229.54 83.792L197.533 51.7852H166.332ZM277.55 131.802L262.352 147H292.748L277.55 131.802Z"
+        />
+        <path d="M151.042 73.7578V143L129.069 165V51.7852H188.284V73.7578H151.042ZM163.311 110H162.69V88.4062H184.284L195 99.39L184.284 110H163.311Z" />
+        <path d="M95.2422 116.751V51.7852H117.215V169.925L22 74.71V43.5088L95.2422 116.751Z" />
+    </svg>
+);
+
 type Props = {
     works: Work[];
     mobile?: boolean;
@@ -33,7 +58,8 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                 <div className="vf-mobile">
                     <header className="vf-mtop">
                         <div className="vf-mlogo">
-                            VFX<span className="vf-iri">·</span>JS
+                            <VfxJsLogo className="vf-mlogo-svg" />
+                            <span className="vf-mlogo-examples">Examples</span>
                         </div>
                         <button
                             type="button"
@@ -111,10 +137,8 @@ export const VFinal = ({ works, mobile = false }: Props) => {
             <div className="vf-desktop">
                 <aside className="vf-sidebar">
                     <div className="vf-brand">
-                        <div className="vf-logo">
-                            VFX<span className="vf-iri">·</span>JS
-                        </div>
-                        <div className="vf-sublabel">GALLERY / 2024</div>
+                        <VfxJsLogo className="vf-logo-svg" />
+                        <div className="vf-examples">Examples</div>
                     </div>
                     <div className="vf-list">
                         {works.map((w) => (
@@ -127,9 +151,7 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                 <div className="vf-idx">{w.index}</div>
                                 <div className="vf-meta">
                                     <div className="vf-title">{w.title}</div>
-                                    <div className="vf-cat">
-                                        {w.category} — {w.year}
-                                    </div>
+                                    <div className="vf-cat">{w.category}</div>
                                 </div>
                                 <div className="vf-arrow">↗</div>
                             </button>

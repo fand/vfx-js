@@ -3,7 +3,7 @@ body,
 #root {
     margin: 0;
     height: 100%;
-    background: #0a0a0a;
+    background: #111;
 }
 body {
     font-family: "Space Grotesk", sans-serif;
@@ -31,7 +31,7 @@ body {
 .vf-root {
     width: 100%;
     height: 100%;
-    background: #0a0a0a;
+    background: #111;
     color: #f4f4f4;
     font-family: "Space Grotesk", sans-serif;
 }
@@ -41,7 +41,7 @@ body {
     height: 100%;
 }
 .vf-sidebar {
-    border-right: 1px solid #1a1a1a;
+    border-right: 1px solid #232323;
     display: flex;
     flex-direction: column;
     padding: 32px 0;
@@ -49,14 +49,29 @@ body {
 }
 .vf-brand {
     padding: 0 28px 32px;
-    border-bottom: 1px solid #1a1a1a;
-    margin-bottom: 20px;
+    border-bottom: 1px solid #232323;
 }
 .vf-logo {
+    display: inline-flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 14px;
+}
+.vf-logo-svg {
+    display: block;
+    width: 96px;
+    height: 44px;
+    flex-shrink: 0;
+    color: #fff;
+}
+.vf-examples {
     font-weight: 700;
-    font-size: 34px;
-    letter-spacing: -0.04em;
+    font-size: 20px;
+    letter-spacing: -0.03em;
     line-height: 1;
+    color: #fff;
+    white-space: nowrap;
 }
 .vf-iri {
     background: linear-gradient(
@@ -82,7 +97,7 @@ body {
     font-family: "JetBrains Mono", monospace;
     font-size: 10px;
     letter-spacing: 0.2em;
-    color: #666;
+    color: #777;
     margin-top: 12px;
 }
 .vf-list {
@@ -99,7 +114,7 @@ body {
     padding: 22px 28px;
     background: transparent;
     border: 0;
-    border-bottom: 1px solid #141414;
+    border-bottom: 1px solid #1d1d1d;
     color: inherit;
     text-align: left;
     cursor: pointer;
@@ -108,10 +123,10 @@ body {
     position: relative;
 }
 .vf-item:hover {
-    background: #121212;
+    background: #1b1b1b;
 }
 .vf-item.vf-active {
-    background: #0f0f0f;
+    background: #181818;
 }
 .vf-item.vf-active::before {
     content: "";
@@ -125,7 +140,7 @@ body {
 .vf-idx {
     font-family: "JetBrains Mono", monospace;
     font-size: 12px;
-    color: #555;
+    color: #666;
     letter-spacing: 0.05em;
 }
 .vf-item.vf-active .vf-idx {
@@ -140,13 +155,13 @@ body {
 .vf-cat {
     font-family: "JetBrains Mono", monospace;
     font-size: 10px;
-    color: #666;
+    color: #777;
     margin-top: 4px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
 .vf-arrow {
-    color: #333;
+    color: #3d3d3d;
     font-size: 14px;
     transition:
         color 0.25s,
@@ -159,13 +174,13 @@ body {
 }
 .vf-foot {
     padding: 20px 28px 0;
-    border-top: 1px solid #1a1a1a;
+    border-top: 1px solid #232323;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 .vf-gh {
-    color: #888;
+    color: #9a9a9a;
     transition: color 0.2s;
     display: inline-flex;
     align-items: center;
@@ -181,7 +196,7 @@ body {
 .vf-coord {
     font-family: "JetBrains Mono", monospace;
     font-size: 10px;
-    color: #444;
+    color: #555;
     letter-spacing: 0.1em;
 }
 .vf-main {
@@ -191,10 +206,10 @@ body {
 }
 .vf-stage {
     position: relative;
-    background: #050505;
+    background: #0a0a0a;
     overflow: hidden;
     margin: 20px;
-    border: 1px solid #1a1a1a;
+    border: 1px solid #232323;
 }
 .vf-iframe {
     width: 100%;
@@ -221,23 +236,24 @@ body {
     gap: 40px;
     align-items: center;
     padding: 22px 28px;
-    border-top: 1px solid #1a1a1a;
+    border-top: 1px solid #232323;
 }
 .vf-bigtitle {
     font-size: 40px;
     font-weight: 700;
     letter-spacing: -0.03em;
-    background: linear-gradient(135deg, #fff 0%, #fff 50%, #888 100%);
+    background: linear-gradient(135deg, #fff 0%, #fff 50%, #9a9a9a 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    line-height: 1;
+    line-height: 1.05;
+    max-width: 320px;
+    text-wrap: balance;
 }
 .vf-desc {
     font-size: 13px;
     line-height: 1.55;
-    color: #888;
-    max-width: 520px;
+    color: #9a9a9a;
 }
 .vf-specs {
     display: grid;
@@ -245,11 +261,11 @@ body {
     gap: 4px 24px;
     font-family: "JetBrains Mono", monospace;
     font-size: 10px;
-    color: #ccc;
+    color: #d4d4d4;
     letter-spacing: 0.05em;
 }
 .vf-specs span {
-    color: #555;
+    color: #666;
     margin-right: 8px;
 }
 .vf-src-link {
@@ -273,16 +289,33 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 0 16px;
-    border-bottom: 1px solid #1a1a1a;
+    border-bottom: 1px solid #232323;
 }
 .vf-mlogo {
+    display: inline-flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+}
+.vf-mlogo-svg {
+    display: block;
+    width: 64px;
+    height: 29px;
+    flex-shrink: 0;
+    color: #fff;
+}
+.vf-mlogo-examples {
     font-weight: 700;
     font-size: 20px;
     letter-spacing: -0.03em;
+    line-height: 1;
+    color: #fff;
+    white-space: nowrap;
 }
 .vf-mmenu {
     background: transparent;
-    border: 1px solid #333;
+    border: 1px solid #3d3d3d;
     color: #fff;
     font-family: "JetBrains Mono", monospace;
     font-size: 10px;
@@ -300,7 +333,7 @@ body {
 }
 .vf-mcaption {
     padding: 14px 16px;
-    border-top: 1px solid #1a1a1a;
+    border-top: 1px solid #232323;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -313,7 +346,7 @@ body {
 .vf-mcap-specs {
     font-family: "JetBrains Mono", monospace;
     font-size: 10px;
-    color: #666;
+    color: #777;
     letter-spacing: 0.12em;
     display: flex;
     gap: 8px;
@@ -322,7 +355,7 @@ body {
 .vf-mdrawer {
     position: absolute;
     inset: 0;
-    background: #0a0a0a;
+    background: #111;
     transform: translateY(-100%);
     transition: transform 0.5s cubic-bezier(0.77, 0, 0.18, 1);
     z-index: 10;
@@ -337,7 +370,7 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 16px;
-    border-bottom: 1px solid #1a1a1a;
+    border-bottom: 1px solid #232323;
 }
 .vf-mlist {
     flex: 1;
@@ -349,7 +382,7 @@ body {
     gap: 12px;
     align-items: center;
     padding: 22px 16px;
-    border-bottom: 1px solid #141414;
+    border-bottom: 1px solid #1d1d1d;
     background: transparent;
     border-left: 0;
     border-right: 0;
@@ -361,12 +394,12 @@ body {
     cursor: pointer;
 }
 .vf-mitem.vf-active {
-    background: #111;
+    background: #1b1b1b;
 }
 .vf-midx {
     font-family: "JetBrains Mono", monospace;
     font-size: 11px;
-    color: #555;
+    color: #666;
 }
 .vf-mitem.vf-active .vf-midx {
     color: #fff;
@@ -379,14 +412,14 @@ body {
 .vf-mcat {
     font-family: "JetBrains Mono", monospace;
     font-size: 9px;
-    color: #666;
+    color: #777;
     letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 .vf-mfoot {
     padding: 16px;
-    border-top: 1px solid #1a1a1a;
+    border-top: 1px solid #232323;
     display: flex;
     justify-content: flex-end;
-    color: #888;
+    color: #9a9a9a;
 }
