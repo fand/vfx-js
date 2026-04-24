@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "24.12.2",
+    "@types/prismjs": "1.26.6",
     "npm-run-all2": "^8.0.4",
     "rimraf": "^6.0.1",
     "typescript": "6.0.2",

@@ -1,0 +1,7 @@
+packages:
+  - "packages/*"
+
+linkWorkspacePackages: true
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - "@vfx-js/*"
