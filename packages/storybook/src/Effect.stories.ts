@@ -7,7 +7,7 @@ import { createPixelateEffect } from "./effects/pixelate";
 import { createRgbMixEffect } from "./effects/rgb-mix";
 import { createScanlineEffect } from "./effects/scanline";
 import "./preset.css";
-import { initVFX } from "./utils";
+import { type BloomTweakOpts, attachBloomPane, initVFX } from "./utils";
 
 export default {
     title: "Effect",
@@ -31,14 +31,19 @@ bloom.play = async ({ canvasElement }) => {
     });
 
     const vfx = initVFX();
-    await vfx.add(img, {
-        effect: createBloomEffect({
-            threshold: 0.6,
-            intensity: 0.3,
-            scatter: 0.7,
-            pad: "fullscreen",
-            dither: 1.0,
-        }),
+    const bloomOpts: BloomTweakOpts = {
+        threshold: 0.2,
+        softness: 0.1,
+        intensity: 5,
+        scatter: 1,
+        dither: 0,
+        edgeFade: 0,
+        pad: 50,
+    };
+    await vfx.add(img, { effect: createBloomEffect(bloomOpts) });
+    attachBloomPane("Bloom", bloomOpts, async () => {
+        vfx.remove(img);
+        await vfx.add(img, { effect: createBloomEffect(bloomOpts) });
     });
 };
 
@@ -57,19 +62,28 @@ crtBloom.play = async ({ canvasElement }) => {
     });
 
     const vfx = initVFX();
-    await vfx.add(img, {
-        effect: [
-            createPixelateEffect({ size: 5 }),
-            createScanlineEffect({ spacing: 5 }),
-            // createRgbMixEffect({ gains: [0.5, 1, 1] }),
-            createBloomEffect({
-                threshold: 0.01,
-                softness: 0.2,
-                intensity: 2.0,
-                scatter: 1.0,
-                dither: 0.0,
-                pad: "fullscreen",
-            }),
-        ],
+    const bloomOpts: BloomTweakOpts = {
+        threshold: 0.01,
+        softness: 0.2,
+        intensity: 2.0,
+        scatter: 1.0,
+        dither: 0.0,
+        edgeFade: 0.02,
+        pad: 200,
+    };
+    const buildEffects = () => [
+        createPixelateEffect({ size: 5 }),
+        createScanlineEffect({ spacing: 5 }),
+        createBloomEffect(bloomOpts),
+    ];
+    await vfx.add(img, { effect: buildEffects() });
+    attachBloomPane("CRT Bloom", bloomOpts, async () => {
+        vfx.remove(img);
+        await vfx.add(img, { effect: buildEffects() });
     });
 };
+
+// Keep `createRgbMixEffect` reachable from the module even when the
+// preset above doesn't include it — we toggle it in crtBloom via
+// dev-time edits.
+void createRgbMixEffect;
