@@ -52,7 +52,7 @@ body {
     border-bottom: 1px solid #232323;
 }
 .vf-logo {
-    font-weight: 500;
+    font-weight: 700;
     font-size: 28px;
     letter-spacing: 0;
     line-height: 1;
@@ -176,6 +176,9 @@ body {
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
+.vf-cat > span {
+    white-space: nowrap;
+}
 .vf-arrow {
     color: #3d3d3d;
     font-size: 14px;
@@ -248,7 +251,7 @@ body {
 
 .vf-bottom {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr fit-content(30%);
     gap: 40px;
     align-items: center;
     padding: 22px 28px;
@@ -273,28 +276,20 @@ body {
 }
 .vf-specs {
     display: grid;
-    grid-template-columns: repeat(2, auto);
-    gap: 4px 24px;
+    grid-template-columns: auto 1fr;
+    column-gap: 24px;
+    row-gap: 6px;
+    align-items: start;
     font-family: "JetBrains Mono", monospace;
     font-size: 10px;
     color: #d4d4d4;
     letter-spacing: 0.05em;
 }
-.vf-specs span {
+.vf-label {
     color: #666;
-    margin-right: 8px;
 }
-.vf-specs-tags {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 4px;
-}
-.vf-specs-tags > span {
-    color: #666;
-    margin-right: 4px;
+.vf-author {
+    white-space: nowrap;
 }
 .vf-tags {
     display: flex;
@@ -317,6 +312,7 @@ body {
     color: inherit;
     text-decoration: none;
     transition: color 0.2s;
+    white-space: nowrap;
 }
 .vf-src-link:hover {
     color: #fff;
@@ -405,7 +401,7 @@ body {
 }
 .vf-mitem {
     display: grid;
-    grid-template-columns: 40px 1fr auto;
+    grid-template-columns: 40px 1fr fit-content(50%);
     gap: 12px;
     align-items: center;
     padding: 22px 16px;
@@ -442,6 +438,10 @@ body {
     color: #777;
     letter-spacing: 0.1em;
     text-transform: uppercase;
+    text-align: right;
+}
+.vf-mcat > span {
+    white-space: nowrap;
 }
 .vf-mfoot {
     padding: 16px;

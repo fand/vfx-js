@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { Work } from "./works";
 
 const GHIcon = () => (
@@ -151,7 +151,15 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                     <div className="vf-midx">{w.index}</div>
                                     <div className="vf-mtitle">{w.title}</div>
                                     <div className="vf-mcat">
-                                        {w.tags.join(" · ")}
+                                        {w.tags.map((t, i) => (
+                                            <Fragment key={t}>
+                                                {i > 0 && " "}
+                                                <span>
+                                                    {i > 0 && "· "}
+                                                    {t}
+                                                </span>
+                                            </Fragment>
+                                        ))}
                                     </div>
                                 </button>
                             ))}
@@ -203,7 +211,16 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                 <div className="vf-meta">
                                     <div className="vf-title">{w.title}</div>
                                     <div className="vf-cat">
-                                        {w.tags.join(" · ")}
+                                        {w.tags.map((t, i) => (
+                                            <Fragment key={t}>
+                                                {i > 0 && " "}
+                                                <span>
+                                                    {t}
+                                                    {i < w.tags.length - 1 &&
+                                                        " ·"}
+                                                </span>
+                                            </Fragment>
+                                        ))}
                                     </div>
                                 </div>
                                 <div className="vf-arrow">↗</div>
@@ -242,34 +259,24 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                         <div className="vf-bigtitle">{active.title}</div>
                         <div className="vf-desc">{active.description}</div>
                         <div className="vf-specs">
-                            <div>
-                                <span>IDX</span>
-                                {active.index}
-                            </div>
-                            <div>
-                                <span>AUTHOR</span>
-                                {active.author}
-                            </div>
-                            <div>
-                                <span>SRC</span>
-                                <a
-                                    href={sourceUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="vf-src-link"
-                                >
-                                    GitHub ↗
-                                </a>
-                            </div>
-                            <div className="vf-specs-tags">
-                                <span>TAGS</span>
-                                <div className="vf-tags">
-                                    {active.tags.map((t) => (
-                                        <span key={t} className="vf-tag">
-                                            {t}
-                                        </span>
-                                    ))}
-                                </div>
+                            <span className="vf-label">AUTHOR</span>
+                            <span className="vf-author">{active.author}</span>
+                            <span className="vf-label">SRC</span>
+                            <a
+                                href={sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="vf-src-link"
+                            >
+                                GitHub ↗
+                            </a>
+                            <span className="vf-label">TAGS</span>
+                            <div className="vf-tags">
+                                {active.tags.map((t) => (
+                                    <span key={t} className="vf-tag">
+                                        {t}
+                                    </span>
+                                ))}
                             </div>
                         </div>
                     </div>
