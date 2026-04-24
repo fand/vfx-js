@@ -37,8 +37,10 @@ export function attachBloomPane(
 
     const container = document.createElement("div");
     container.className = BLOOM_PANE_CLASS;
+    // VFX-JS's canvas defaults to `z-index: 9999`, so the pane has to
+    // sit above it to stay clickable.
     container.style.cssText =
-        "position:fixed;top:16px;right:16px;width:280px;z-index:1000";
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
     document.body.appendChild(container);
 
     const pane = new Pane({ container, title });
