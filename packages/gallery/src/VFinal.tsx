@@ -143,13 +143,6 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                     </div>
                 </aside>
                 <main className="vf-main">
-                    <div className="vf-topstrip">
-                        <span>NOW VIEWING</span>
-                        <span className="vf-iri-text">
-                            {active.index} — {active.title.toUpperCase()}
-                        </span>
-                        <span>{active.category}</span>
-                    </div>
                     <div className="vf-stage">
                         <iframe
                             key={active.id}
@@ -172,11 +165,8 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                 {active.category}
                             </div>
                             <div>
-                                <span>YR</span>
-                                {active.year}
-                            </div>
-                            <div>
-                                <span>ENG</span>WEBGL / GLSL
+                                <span>AUTHOR</span>
+                                {active.author}
                             </div>
                         </div>
                     </div>

@@ -73,22 +73,6 @@ body {
     animation: vfiri 4s linear infinite;
     background-size: 200% 100%;
 }
-.vf-iri-text {
-    background: linear-gradient(
-        90deg,
-        #ff00c8,
-        #00eaff,
-        #00ff88,
-        #fff200,
-        #ff00c8
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: vfiri 4s linear infinite;
-    background-size: 200% 100%;
-    font-weight: 500;
-}
 @keyframes vfiri {
     to {
         background-position: 200% 0;
@@ -202,20 +186,8 @@ body {
 }
 .vf-main {
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: 1fr auto;
     overflow: hidden;
-}
-.vf-topstrip {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 28px;
-    border-bottom: 1px solid #1a1a1a;
-    font-family: "JetBrains Mono", monospace;
-    font-size: 10px;
-    letter-spacing: 0.18em;
-    color: #666;
-    text-transform: uppercase;
 }
 .vf-stage {
     position: relative;

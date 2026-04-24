@@ -4,6 +4,7 @@ export type Work = {
     title: string;
     category: string;
     year: string;
+    author: string;
     description: string;
     url: string;
 };
@@ -15,6 +16,7 @@ export const works: Work[] = [
         title: "Stable Fluid",
         category: "Simulation",
         year: "2024",
+        author: "AMAGI",
         description:
             "Real-time fluid dynamics simulation rendered in WebGL. Cursor drags momentum through the velocity field.",
         url: "https://amagi.dev/vfx-js/test",
@@ -25,6 +27,7 @@ export const works: Work[] = [
         title: "Liquid Glass",
         category: "Distortion",
         year: "2024",
+        author: "AMAGI",
         description:
             "Refraction-based liquid glass overlay. Perturbs underlying content with a chromatic displacement field.",
         url: "https://amagi.dev/vfx-js/test-lg",
