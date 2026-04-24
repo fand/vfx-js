@@ -52,26 +52,10 @@ body {
     border-bottom: 1px solid #232323;
 }
 .vf-logo {
-    display: inline-flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 14px;
-}
-.vf-logo-svg {
-    display: block;
-    width: 96px;
-    height: 44px;
-    flex-shrink: 0;
-    color: #fff;
-}
-.vf-examples {
-    font-weight: 700;
-    font-size: 20px;
-    letter-spacing: -0.03em;
+    font-weight: 500;
+    font-size: 28px;
+    letter-spacing: 0;
     line-height: 1;
-    color: #fff;
-    white-space: nowrap;
 }
 .vf-iri {
     background: linear-gradient(
@@ -292,26 +276,9 @@ body {
     border-bottom: 1px solid #232323;
 }
 .vf-mlogo {
-    display: inline-flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 10px;
-}
-.vf-mlogo-svg {
-    display: block;
-    width: 64px;
-    height: 29px;
-    flex-shrink: 0;
-    color: #fff;
-}
-.vf-mlogo-examples {
     font-weight: 700;
     font-size: 20px;
     letter-spacing: -0.03em;
-    line-height: 1;
-    color: #fff;
-    white-space: nowrap;
 }
 .vf-mmenu {
     background: transparent;
