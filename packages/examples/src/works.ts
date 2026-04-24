@@ -2,7 +2,7 @@ export type Work = {
     id: string;
     index: string;
     title: string;
-    category: string;
+    tags: string[];
     year: string;
     author: string;
     description: string;
@@ -16,7 +16,7 @@ export const works: Work[] = [
         id: "stable-fluid",
         index: "01",
         title: "Stable Fluid",
-        category: "Simulation",
+        tags: ["Simulation", "Fluid", "html-in-canvas"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -27,7 +27,7 @@ export const works: Work[] = [
         id: "liquid-glass",
         index: "02",
         title: "Liquid Glass",
-        category: "Distortion",
+        tags: ["Distortion", "html-in-canvas"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -38,7 +38,7 @@ export const works: Work[] = [
         id: "crt",
         index: "03",
         title: "CRT",
-        category: "Postprocess",
+        tags: ["Postprocess"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -49,7 +49,7 @@ export const works: Work[] = [
         id: "pixel-scan",
         index: "04",
         title: "Pixel Scan",
-        category: "Transition",
+        tags: ["Transition"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -60,7 +60,7 @@ export const works: Work[] = [
         id: "text-scrub",
         index: "05",
         title: "Text Scrub",
-        category: "Distortion",
+        tags: ["Distortion", "Typography"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -71,7 +71,7 @@ export const works: Work[] = [
         id: "text-3d-sdf",
         index: "06",
         title: "Text 3D SDF",
-        category: "Raymarching",
+        tags: ["Typography", "3D"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -82,7 +82,7 @@ export const works: Work[] = [
         id: "text-shadow",
         index: "07",
         title: "Text Shadow",
-        category: "Lighting",
+        tags: ["Typography"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -93,7 +93,7 @@ export const works: Work[] = [
         id: "block-glitch-transition",
         index: "08",
         title: "Block Glitch Transition",
-        category: "Transition",
+        tags: ["Transition", "Glitch", "Scroll"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -104,7 +104,7 @@ export const works: Work[] = [
         id: "scroll-rgb-shift",
         index: "09",
         title: "Scroll RGB Shift",
-        category: "Distortion",
+        tags: ["Distortion", "Scroll"],
         year: "2024",
         author: "AMAGI",
         description:
@@ -114,8 +114,8 @@ export const works: Work[] = [
     {
         id: "web-font-raymarch",
         index: "10",
-        title: "Web Font Raymarch",
-        category: "Raymarching",
+        title: "Editable Text",
+        tags: ["Typography"],
         year: "2024",
         author: "AMAGI",
         description:

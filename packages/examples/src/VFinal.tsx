@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Work } from "./works";
 
 const GHIcon = () => (
@@ -21,11 +21,77 @@ type Props = {
 const SOURCE_BASE =
     "https://github.com/fand/vfx-js/blob/main/packages/examples/works";
 
+type FilterBarProps = {
+    allTags: string[];
+    activeTags: string[];
+    onToggle: (tag: string) => void;
+    onClear: () => void;
+};
+
+const FilterBar = ({
+    allTags,
+    activeTags,
+    onToggle,
+    onClear,
+}: FilterBarProps) => (
+    <div className="vf-filters">
+        <button
+            type="button"
+            className={`vf-filter ${activeTags.length === 0 ? "vf-filter-on" : ""}`}
+            onClick={onClear}
+        >
+            ALL
+        </button>
+        {allTags.map((t) => (
+            <button
+                type="button"
+                key={t}
+                className={`vf-filter ${activeTags.includes(t) ? "vf-filter-on" : ""}`}
+                onClick={() => onToggle(t)}
+            >
+                {t}
+            </button>
+        ))}
+    </div>
+);
+
 export const VFinal = ({ works, mobile = false }: Props) => {
     const [activeId, setActiveId] = useState(works[0].id);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [activeTags, setActiveTags] = useState<string[]>([]);
+
+    const allTags = useMemo(() => {
+        const seen = new Set<string>();
+        const out: string[] = [];
+        for (const w of works) {
+            for (const t of w.tags) {
+                if (!seen.has(t)) {
+                    seen.add(t);
+                    out.push(t);
+                }
+            }
+        }
+        return out;
+    }, [works]);
+
+    const filtered = useMemo(
+        () =>
+            activeTags.length === 0
+                ? works
+                : works.filter((w) =>
+                      w.tags.some((t) => activeTags.includes(t)),
+                  ),
+        [works, activeTags],
+    );
+
     const active = works.find((w) => w.id === activeId) ?? works[0];
     const sourceUrl = active.sourceUrl ?? `${SOURCE_BASE}/${active.id}.html`;
+
+    const toggleTag = (tag: string) =>
+        setActiveTags((prev) =>
+            prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+        );
+    const clearTags = () => setActiveTags([]);
 
     if (mobile) {
         return (
@@ -54,9 +120,14 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                         <div className="vf-mcap-specs">
                             <span>{active.index}</span>
                             <span>·</span>
-                            <span>{active.category}</span>
-                            <span>·</span>
                             <span>{active.author}</span>
+                        </div>
+                        <div className="vf-tags">
+                            {active.tags.map((t) => (
+                                <span key={t} className="vf-tag">
+                                    {t}
+                                </span>
+                            ))}
                         </div>
                     </div>
                     <div className={`vf-mdrawer ${mobileOpen ? "open" : ""}`}>
@@ -70,8 +141,14 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                 CLOSE
                             </button>
                         </div>
+                        <FilterBar
+                            allTags={allTags}
+                            activeTags={activeTags}
+                            onToggle={toggleTag}
+                            onClear={clearTags}
+                        />
                         <div className="vf-mlist">
-                            {works.map((w) => (
+                            {filtered.map((w) => (
                                 <button
                                     type="button"
                                     key={w.id}
@@ -83,9 +160,16 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                 >
                                     <div className="vf-midx">{w.index}</div>
                                     <div className="vf-mtitle">{w.title}</div>
-                                    <div className="vf-mcat">{w.category}</div>
+                                    <div className="vf-mcat">
+                                        {w.tags.join(" · ")}
+                                    </div>
                                 </button>
                             ))}
+                            {filtered.length === 0 && (
+                                <div className="vf-empty">
+                                    No works match the selected tags.
+                                </div>
+                            )}
                         </div>
                         <div className="vf-mfoot">
                             <a
@@ -111,8 +195,14 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                     <div className="vf-brand">
                         <div className="vf-logo">VFX-JS Examples</div>
                     </div>
+                    <FilterBar
+                        allTags={allTags}
+                        activeTags={activeTags}
+                        onToggle={toggleTag}
+                        onClear={clearTags}
+                    />
                     <div className="vf-list">
-                        {works.map((w) => (
+                        {filtered.map((w) => (
                             <button
                                 type="button"
                                 key={w.id}
@@ -122,11 +212,18 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                 <div className="vf-idx">{w.index}</div>
                                 <div className="vf-meta">
                                     <div className="vf-title">{w.title}</div>
-                                    <div className="vf-cat">{w.category}</div>
+                                    <div className="vf-cat">
+                                        {w.tags.join(" · ")}
+                                    </div>
                                 </div>
                                 <div className="vf-arrow">↗</div>
                             </button>
                         ))}
+                        {filtered.length === 0 && (
+                            <div className="vf-empty">
+                                No works match the selected tags.
+                            </div>
+                        )}
                     </div>
                     <div className="vf-foot">
                         <a
@@ -160,10 +257,6 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                 {active.index}
                             </div>
                             <div>
-                                <span>CAT</span>
-                                {active.category}
-                            </div>
-                            <div>
                                 <span>AUTHOR</span>
                                 {active.author}
                             </div>
@@ -177,6 +270,16 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                 >
                                     GitHub ↗
                                 </a>
+                            </div>
+                            <div className="vf-specs-tags">
+                                <span>TAGS</span>
+                                <div className="vf-tags">
+                                    {active.tags.map((t) => (
+                                        <span key={t} className="vf-tag">
+                                            {t}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
