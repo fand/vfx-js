@@ -12,6 +12,17 @@
     background: black;
     overflow-x: hidden;
   }
+  html::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: black;
+    z-index: 9999;
+    pointer-events: none;
+  }
+  html.vfx-ready::before {
+    display: none;
+  }
 
   section {
     margin: 40vh 20%;
@@ -221,5 +232,6 @@ void main() {
     });
     await vfx.addHTML(app, { shader: "none" });
     vfx.play();
+    document.documentElement.classList.add("vfx-ready");
   });
 </script>

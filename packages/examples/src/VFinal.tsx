@@ -237,12 +237,12 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                             href="https://github.com/fand/vfx-js"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="vf-gh"
+                            className="vf-foot-link"
                             aria-label="GitHub"
                         >
                             <GHIcon />
+                            <div className="vf-coord">fand/vfx-js</div>
                         </a>
-                        <div className="vf-coord">fand/vfx-js</div>
                     </div>
                 </aside>
                 <main className="vf-main">

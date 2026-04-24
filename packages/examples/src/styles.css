@@ -192,11 +192,34 @@ body {
     transform: translate(2px, -2px);
 }
 .vf-foot {
-    padding: 20px 28px 0;
+    padding: 32px 28px 0;
     border-top: 1px solid #232323;
+}
+.vf-foot-link {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    color: #d4d4d4;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+.vf-foot-link:hover {
+    color: #fff;
+}
+.vf-foot-link:hover .vf-coord {
+    background: linear-gradient(
+        90deg,
+        #ff00c8,
+        #00eaff,
+        #00ff88,
+        #fff200,
+        #ff00c8
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: vfiri 4s linear infinite;
 }
 .vf-gh {
     color: #d4d4d4;
@@ -215,7 +238,7 @@ body {
 .vf-coord {
     font-family: "JetBrains Mono", monospace;
     font-size: 10px;
-    color: #d4d4d4;
+    color: inherit;
     letter-spacing: 0.1em;
 }
 .vf-main {

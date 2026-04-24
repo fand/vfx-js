@@ -15,7 +15,7 @@
     background: black;
     display: grid;
     place-content: center;
-    overflow-x: hidden;
+    overflow: hidden;
   }
   h1 {
     margin: 0;
@@ -220,6 +220,10 @@ void main() {
       pixelRatio: 2,
     });
     sdf.style.opacity = "0";
+    sdf.style.position = "fixed";
+    sdf.style.inset = "0";
+    sdf.style.width = "100vw";
+    sdf.style.height = "100vh";
     document.body.appendChild(sdf);
 
     vfx.add(sdf, { shader });

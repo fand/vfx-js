@@ -8,6 +8,7 @@
   body {
     height: 100%;
     margin: 0;
+    overflow-x: hidden;
   }
   body {
     background: black;
@@ -19,6 +20,7 @@
   }
   img {
     height: 30svh;
+    max-width: 90vw;
     opacity: 0;
   }
   img:first-child {
@@ -31,7 +33,7 @@
     display: block;
     color: white;
     font-family: sans-serif;
-    font-size: 24svh;
+    font-size: min(24svh, 30svw);
     margin: 8svw 0;
   }
 </style>
