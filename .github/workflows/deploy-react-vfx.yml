@@ -10,10 +10,10 @@ jobs:
     deploy:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v6
 
             - name: Setup Node
-              uses: actions/setup-node@v3
+              uses: actions/setup-node@v6
               with:
                   node-version: "24"
                   cache: "npm"
@@ -26,7 +26,7 @@ jobs:
               run: npm run build
 
             - name: Pushes to another repository
-              uses: cpina/github-action-push-to-another-repository@main
+              uses: cpina/github-action-push-to-another-repository@v1.7.3
               env:
                   SSH_DEPLOY_KEY: ${{ secrets.REACT_VFX_DEPLOY_KEY }}
               with:

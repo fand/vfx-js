@@ -16,12 +16,12 @@ jobs:
     deploy-preview:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
 
             - name: Setup Node
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v6
               with:
-                  node-version: "20"
+                  node-version: "24"
                   cache: "npm"
                   cache-dependency-path: "**/package-lock.json"
 
@@ -40,7 +40,7 @@ jobs:
                   command: pages deploy packages/docs/dist --project-name=vfx-js --branch=${{ github.head_ref }}
 
             - name: Comment preview URL on PR
-              uses: marocchino/sticky-pull-request-comment@v2
+              uses: marocchino/sticky-pull-request-comment@v3
               with:
                   header: cf-preview
                   message: |
