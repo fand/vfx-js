@@ -271,19 +271,28 @@ export type BloomOptions = {
 // that scatter no longer dials the filter width.
 const TENT_FILTER = 0.5;
 
+/**
+ * Defaults are written back onto the passed `opts` object so callers
+ * can bind it to a reactive UI (e.g. Tweakpane): every uniform is read
+ * fresh per frame, so post-construction mutations take effect on the
+ * next draw. `pad` is read per frame too, so resizing it drives a
+ * bright-buffer reallocation without re-adding the effect.
+ */
 export function createBloomEffect(opts: BloomOptions = {}): Effect {
-    const threshold = opts.threshold ?? 0.7;
-    const softness = opts.softness ?? 0.1;
-    const intensity = opts.intensity ?? 1.2;
-    const scatter = Math.min(Math.max(opts.scatter ?? 0.7, 0), 1);
-    const dither = Math.max(0, opts.dither ?? 0);
-    const edgeFade = Math.max(1e-6, opts.edgeFade ?? 0.02);
-    const pad = opts.pad ?? 50;
+    opts.threshold ??= 0.7;
+    opts.softness ??= 0.1;
+    opts.intensity ??= 1.2;
+    opts.scatter ??= 0.7;
+    opts.dither ??= 0;
+    opts.edgeFade ??= 0.02;
+    opts.pad ??= 50;
 
     let bright: EffectRenderTarget | null = null;
     const mipsDown: EffectRenderTarget[] = [];
     const mipsUp: EffectRenderTarget[] = [];
     let allocated = false;
+    let lastBaseW = 0;
+    let lastBaseH = 0;
 
     function allocateMips(ctx: EffectContext, baseW: number, baseH: number) {
         if (allocated) {
@@ -330,6 +339,27 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
         render(ctx) {
             if (!bright) {
                 return;
+            }
+            // Read live so a reactive UI driver works; clamps match the
+            // previous factory-time normalisation.
+            const threshold = opts.threshold as number;
+            const softness = opts.softness as number;
+            const intensity = opts.intensity as number;
+            const scatter = Math.min(Math.max(opts.scatter as number, 0), 1);
+            const dither = Math.max(0, opts.dither as number);
+            const edgeFade = Math.max(1e-6, opts.edgeFade as number);
+            // If `pad` changed (outputSize is re-queried every frame by
+            // the host), `bright` auto-resizes — rebuild the pyramid so
+            // mip dims keep matching the buffer.
+            if (
+                bright.width !== lastBaseW ||
+                bright.height !== lastBaseH
+            ) {
+                mipsDown.length = 0;
+                mipsUp.length = 0;
+                allocated = false;
+                lastBaseW = bright.width;
+                lastBaseH = bright.height;
             }
             allocateMips(ctx, bright.width, bright.height);
             const n = mipsDown.length;
@@ -435,10 +465,13 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             mipsDown.length = 0;
             mipsUp.length = 0;
             allocated = false;
+            lastBaseW = 0;
+            lastBaseH = 0;
         },
     };
 
     effect.outputSize = (dims) => {
+        const pad = opts.pad as number | "fullscreen";
         if (pad === "fullscreen") {
             return { pad: dims.fullscreenPad };
         }
