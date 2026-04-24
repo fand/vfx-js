@@ -169,6 +169,35 @@
     border-top: var(--border);
     margin-top: 24px;
   }
+
+  @media (max-width: 768px) {
+    .hero {
+      aspect-ratio: auto;
+      min-height: 70vh;
+    }
+    .hero h1 {
+      font-size: 2.6rem;
+    }
+    .hero h2 {
+      font-size: 1.1rem;
+    }
+    .tiles {
+      grid-template-columns: 1fr;
+    }
+    .tile,
+    .tile.full {
+      aspect-ratio: 4 / 5;
+    }
+    .tile .copy {
+      padding: 32px 20px 0;
+    }
+    .tile h3 {
+      font-size: 2.2rem;
+    }
+    .tile p {
+      font-size: 1.05rem;
+    }
+  }
 </style>
 
 <div id="app">
@@ -297,11 +326,11 @@
   import { VFX } from "@vfx-js/core";
 
   const PARAMS = {
-    sphereR: 0.1,
+    sphereR: 0.12,
     bubbleCount: 8,
     bubbleRadiusMin: 0.03,
-    bubbleRadiusMax: 0.06, // min + range
-    bubbleSpeed: 0.6,
+    bubbleRadiusMax: 0.07,
+    bubbleSpeed: 0.7,
     mouseSmoothing: 0.05,
   };
 
@@ -319,8 +348,8 @@
 
     const float SPHERE_R = ${PARAMS.sphereR.toFixed(4)};
 
-    const float DISP = 0.02;
-    const int   DISP_STEPS = 8;
+    const float DISP = 0.025;
+    const int   DISP_STEPS = 12;
     const float DISP_LO = 0.0;
     const float DISP_HI = 1.0;
 
@@ -328,7 +357,7 @@
 
     const int N_BUBBLES = ${PARAMS.bubbleCount};
     const float BUBBLE_SMOOTH = 0.025;
-    uniform float bubbleData[${PARAMS.bubbleCount * 4}]; // N * (x, y, z, r)
+    uniform float bubbleData[${PARAMS.bubbleCount * 4}];
 
     const vec3 ABSORB = vec3(2.0, 1.2, 1.0) * 3.;
 
@@ -365,7 +394,6 @@
     float map(vec3 p, vec3 c) {
       vec3 q = p - c;
 
-      // Click reaction
       float tt = clickTime * 5.0;
       float bounce = exp(-tt) * sin(tt) * 5. + (1. - exp(-tt));
       float s = bounce * 0.5 + 0.5;
@@ -373,9 +401,8 @@
 
       q.xz *= rot(exp(-clickTime*3.0) * 8.);
 
-      // Main object
       vec3 sp = q;
-      sp.y += sin(sp.z * 29. + time * 4.5) * 0.01;
+      sp.y += sin(sp.z * 29. + time * 6.5) * 0.01;
       sp.z += sin(sp.x * 23. + sp.y * 11. + time * 7.) * 0.01;
       sp.xy *= rot(time*1.3);
       sp.xz *= rot(time*1.1);
@@ -385,12 +412,11 @@
       if (objType == 0) {
         d = sdSphere(sp, SPHERE_R);
       } else if (objType == 1) {
-        d = sdBox(sp, vec3(SPHERE_R), 0.01);
+        d = sdBox(sp, vec3(SPHERE_R*0.8), 0.01);
       } else {
-        d = sdRing(sp, vec2(SPHERE_R, 0.01));
+        d = sdRing(sp, vec2(SPHERE_R*1.1, 0.015));
       }
 
-      // Bubbles (positions from JS uniform)
       for (int i = 0; i < N_BUBBLES; i++) {
         int b = i * 4;
         vec3 bPos = vec3(bubbleData[b], bubbleData[b+1], bubbleData[b+2]);
@@ -410,7 +436,6 @@
       ));
     }
 
-    // x ∈ [0,1]: 0 = red, 1 = violet. Sums to ~white over a full sweep.
     vec3 spectrum(float x) {
       return clamp(vec3(
         1.5 - abs(4.0 * x - 1.0),
@@ -435,14 +460,12 @@
       float focal = 2.0;
       vec3 rd = normalize(vec3(p, focal));
 
-      // coord center
       vec3 c = vec3(mp, 0.0);
 
       vec3 firstN = vec3(0.0);
       vec3 lastN = vec3(0.0);
       int hitCount = 0;
 
-      // Total in-glass distance (Σ over all entry→exit slabs).
       float thickness = 0.0;
       float tEntry = 0.0;
       float t = 0.0;
@@ -453,13 +476,11 @@
         vec3 pos = ro + rd * t;
         float d = map(pos, c);
 
-        // Distance to nearest surface, always positive regardless of side.
         float step = inside ? -d : d;
         if (step < 3e-4) {
           vec3 n = calcNormal(pos, c);
           if (hitCount == 0) firstN = n;
           lastN = n;
-          // Sample t at every entry, accumulate (t - tEntry) at every exit.
           if (!inside) {
             tEntry = t;
           } else {
@@ -470,7 +491,7 @@
           if (hitCount >= 4) { break; }
 
           inside = !inside;
-          t += 0.01; // kick
+          t += 0.01;
         } else {
           t += step;
         }
@@ -482,7 +503,6 @@
         float NdotR = max(dot(firstN, -rd), 0.0);
         float scatter = pow((1.0 - NdotR), 2.0) * SCATTER;
 
-        // dispersion + hash scatter
         vec3 acc = vec3(0.0);
         vec3 wsum = vec3(0.0);
         for (int i = 0; i < DISP_STEPS; i++) {
@@ -498,16 +518,13 @@
 
         col += 0.1;
 
-        // Fresnel
         float fres = pow(1.0 - NdotR, 5.0);
         col *= 1. + fres;
 
-        // Absorb
         float f2 = 1. - pow(NdotR, 3.0);
         col *= mix(vec3(1), exp(-ABSORB * thickness), f2);
         col *= 1. + f2;
 
-        // Lights
         vec3 ld = normalize(vec3(0.5, 0.9, -0.3));
         float spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 200.0);
         col += spec * 30.;
@@ -520,7 +537,6 @@
         spec = pow(max(dot(reflect(-ld, firstN), -rd), 0.0), 30.0);
         col += spec * 0.5;
 
-        // Edge
         col = min(col, 1.);
         col = 1. - abs(col + fres * .5 - 1.);
 
@@ -529,7 +545,7 @@
         outColor = getSrc(uv);
       }
     }
-    `;
+  `;
 
   window.addEventListener("load", async () => {
     const app = document.getElementById("app");
@@ -537,16 +553,19 @@
     const fract = (x) => x - Math.floor(x);
     const rot2d = (x, y, t) => {
       const c = Math.cos(t),
-        s = Math.sin(t);
+            s = Math.sin(t);
       return [x * c - y * s, x * s + y * c];
     };
 
     const p0 = { x: 0, y: 0 };
     const p1 = { x: 0, y: 0 };
     const p2 = { x: 0, y: 0 };
+    let hasMouse = false;
+    let centerBlend = 1.0;
     window.addEventListener("pointermove", (e) => {
       p0.x = e.clientX;
       p0.y = window.innerHeight - e.clientY;
+      hasMouse = true;
     });
 
     let lastClickTime = performance.now() / 1000;
@@ -567,10 +586,11 @@
       p2.x += (p1.x - p2.x) * sm;
       p2.y += (p1.y - p2.y) * sm;
 
+      if (hasMouse) { centerBlend *= 0.95; }
+
       for (let i = 0; i < N; i++) {
         const life = fract(time * PARAMS.bubbleSpeed + i / N);
 
-        // Orbit
         const orbitR = PARAMS.sphereR * (0.3 + life * 0.8);
         const orbitAngle = time * (0.8 + fract(i * 0.618) * 0.7) + i * 1.256;
 
@@ -578,23 +598,19 @@
         let by = 0;
         let bz = Math.sin(orbitAngle) * orbitR;
 
-        // Tilt orbit
         [bx, by] = rot2d(bx, by, i * 2.3);
         [by, bz] = rot2d(by, bz, i * 1.8);
 
         by += life * 0.1;
 
-        // Wobble
         bx += Math.sin(time * 2.7 + i * 4.1) * 0.008 * life;
         bz += Math.cos(time * 3.1 + i * 3.7) * 0.008 * life;
 
-        // Offset from sphere center
         const w = window.innerWidth,
-          h = window.innerHeight;
+              h = window.innerHeight;
         bx += ((p2.x - p1.x) / w) * (h / w);
         by += (p2.y - p1.y) / h;
 
-        // Bubble radius
         const range = PARAMS.bubbleRadiusMax - PARAMS.bubbleRadiusMin;
         const maxR = PARAMS.bubbleRadiusMin + range * fract(i * 0.618);
 
@@ -612,10 +628,13 @@
       postEffect: {
         shader: postEffectShader,
         uniforms: {
-          lag: () => [
-            (p1.x - p0.x) * devicePixelRatio,
-            (p1.y - p0.y) * devicePixelRatio,
-          ],
+          lag: () => {
+            const lx = (p1.x - p0.x) * devicePixelRatio;
+            const ly = (p1.y - p0.y) * devicePixelRatio;
+            const cx = window.innerWidth / 2 * devicePixelRatio * centerBlend;
+            const cy = window.innerHeight / 2 * devicePixelRatio * centerBlend;
+            return [cx + lx, cy + ly];
+          },
           clickTime: () => performance.now() / 1000 - lastClickTime,
           clickCount: () => clickCount,
           bubbleData: () => bubbles,

@@ -17,3 +17,6 @@ typedoc/
 
 # Storybook static build
 storybook/
+
+# Examples static build
+examples/

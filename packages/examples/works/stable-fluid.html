@@ -186,15 +186,9 @@
 <script type="module">
   import { VFX } from "@vfx-js/core";
 
-  // iOS workaround
-  const isIOS =
-    /iPad|iPhone/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  if (isIOS) {
-    import("https://esm.sh/lenis@1.1.20").then(({ default: Lenis }) => {
-      new Lenis({ autoRaf: true, syncTouch: true });
-    });
-  }
+  // Fluid simulation code is based on
+  // "WebGL-Fluid-Simulation" by Pavel DoGreat
+  // https://github.com/PavelDoGreat/WebGL-Fluid-Simulation
 
   // --- Shaders ---
   const copyShader = `
@@ -352,8 +346,8 @@
   uniform vec2 resolution;
   uniform vec2 offset;
   uniform vec2 simSize;
-  uniform float time;
   out vec4 outColor;
+
   vec3 spectrum(float x) {
     return cos((x - vec3(0, .5, 1)) * vec3(.6, 1., .5) * 3.14);
   }
@@ -383,7 +377,10 @@
     outColor = c;
 
     vec4 c2 = vec4(spectrum(sin(v * 2.) * 0.4 + 0.6), 1);
-    outColor += c2 * smoothstep(.2, .8, v) * 0.5;
+    outColor += c2 * (smoothstep(.2, .8, v) * 0.5);
+
+    float edge = smoothstep(.003, .0, abs(v - 0.25));
+    outColor = abs(outColor - edge * 0.5);
   }`;
 
   // --- Build passes ---
@@ -440,9 +437,7 @@
         persistent: true,
         float: true,
         size: simSize,
-        uniforms: {
-          velocityDissipation: opts.velocityDissipation,
-        },
+        uniforms: { velocityDissipation: opts.velocityDissipation },
       },
       {
         frag: displayShader,
@@ -451,24 +446,34 @@
     ];
   }
 
+  // Use Lenis for mobile
+  const isTouchDevice = navigator.maxTouchPoints > 0;
+  if (isTouchDevice) {
+    import("https://esm.sh/lenis@1.3.21").then(({ default: Lenis }) => {
+      new Lenis({ autoRaf: true, syncTouch: true });
+    });
+  }
+
   // --- Main ---
   const app = document.getElementById("app");
 
   // Mouse tracking
   let pos = [-1, -1],
     delta = [0, 0];
-  window.addEventListener("pointermove", (e) => {
-    const x = e.clientX;
-    const y = window.innerHeight - e.clientY;
+
+  function onMove(x, y) {
     if (pos[0] >= 0) {
       delta = [x - pos[0], y - pos[1]];
     }
     pos = [x, y];
+  }
+
+  window.addEventListener("pointermove", (e) => {
+    onMove(e.clientX, window.innerHeight - e.clientY);
   });
 
-  window.addEventListener("load", async () => {
-    const SIM = 128;
-
+  async function init() {
+    const SIM = 256;
     const aspect =
       document.documentElement.clientWidth /
       document.documentElement.clientHeight;
@@ -483,18 +488,22 @@
         delta = [delta[0] * 0.9, delta[1] * 0.9];
         return delta;
       },
-      pressureIterations: 8,
+      pressureIterations: 12,
       curlStrength: 20,
       velocityDissipation: 1,
-      densityDissipation: 1,
       splatForce: 3000,
-      splatRadius: 0.001,
-      time: () => performance.now() / 1000,
+      splatRadius: 0.002,
     });
 
     const vfx = new VFX({ postEffect: passes });
     await vfx.add(app, { shader: "none" });
 
     vfx.play();
-  });
+  }
+
+  if (document.readyState === "complete") {
+    init();
+  } else {
+    window.addEventListener("load", init);
+  }
 </script>
