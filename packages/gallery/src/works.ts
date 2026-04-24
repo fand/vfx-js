@@ -41,6 +41,6 @@ export const works: Work[] = [
         author: "AMAGI",
         description:
             "CRT display simulation with scanlines, chromatic aberration, and phosphor glow. Emulates the look of analog cathode-ray-tube monitors.",
-        url: "https://amagi.dev/vfx-js/test-crt",
+        url: "./works/crt.html",
     },
 ];

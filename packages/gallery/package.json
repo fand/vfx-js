@@ -10,6 +10,7 @@
         "lint": "biome check src"
     },
     "dependencies": {
+        "@vfx-js/core": "0.13.0",
         "react": "19.2.5",
         "react-dom": "19.2.5"
     },
