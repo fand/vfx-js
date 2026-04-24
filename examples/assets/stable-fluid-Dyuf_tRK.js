@@ -1,4 +1,4 @@
-import"./modulepreload-polyfill-CXK8biUa.js";import{t as e}from"./esm-D4FukExZ.js";var t=`modulepreload`,n=function(e,t){return new URL(e,t).href},r={};(/iPad|iPhone/.test(navigator.userAgent)||navigator.platform===`MacIntel`&&navigator.maxTouchPoints>1)&&function(e,i,a){let o=Promise.resolve();if(i&&i.length>0){let e=document.getElementsByTagName(`link`),s=document.querySelector(`meta[property=csp-nonce]`),c=s?.nonce||s?.getAttribute(`nonce`);function l(e){return Promise.all(e.map(e=>Promise.resolve(e).then(e=>({status:`fulfilled`,value:e}),e=>({status:`rejected`,reason:e}))))}o=l(i.map(i=>{if(i=n(i,a),i in r)return;r[i]=!0;let o=i.endsWith(`.css`),s=o?`[rel="stylesheet"]`:``;if(a)for(let t=e.length-1;t>=0;t--){let n=e[t];if(n.href===i&&(!o||n.rel===`stylesheet`))return}else if(document.querySelector(`link[href="${i}"]${s}`))return;let l=document.createElement(`link`);if(l.rel=o?`stylesheet`:t,o||(l.as=`script`),l.crossOrigin=``,l.href=i,c&&l.setAttribute(`nonce`,c),document.head.appendChild(l),o)return new Promise((e,t)=>{l.addEventListener(`load`,e),l.addEventListener(`error`,()=>t(Error(`Unable to preload CSS for ${i}`)))})}))}function s(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return o.then(t=>{for(let e of t||[])e.status===`rejected`&&s(e.reason);return e().catch(s)})}(async()=>{let{default:e}=await import(`https://esm.sh/lenis@1.1.20`);return{default:e}},[],import.meta.url).then(({default:e})=>{new e({autoRaf:!0,syncTouch:!0})});var i=`
+import"./modulepreload-polyfill-N-DOuI4P.js";import{t as e}from"./esm-DHCi-InW.js";var t=`modulepreload`,n=function(e,t){return new URL(e,t).href},r={},i=function(e,i,a){let o=Promise.resolve();if(i&&i.length>0){let e=document.getElementsByTagName(`link`),s=document.querySelector(`meta[property=csp-nonce]`),c=s?.nonce||s?.getAttribute(`nonce`);function l(e){return Promise.all(e.map(e=>Promise.resolve(e).then(e=>({status:`fulfilled`,value:e}),e=>({status:`rejected`,reason:e}))))}o=l(i.map(i=>{if(i=n(i,a),i in r)return;r[i]=!0;let o=i.endsWith(`.css`),s=o?`[rel="stylesheet"]`:``;if(a)for(let t=e.length-1;t>=0;t--){let n=e[t];if(n.href===i&&(!o||n.rel===`stylesheet`))return}else if(document.querySelector(`link[href="${i}"]${s}`))return;let l=document.createElement(`link`);if(l.rel=o?`stylesheet`:t,o||(l.as=`script`),l.crossOrigin=``,l.href=i,c&&l.setAttribute(`nonce`,c),document.head.appendChild(l),o)return new Promise((e,t)=>{l.addEventListener(`load`,e),l.addEventListener(`error`,()=>t(Error(`Unable to preload CSS for ${i}`)))})}))}function s(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return o.then(t=>{for(let e of t||[])e.status===`rejected`&&s(e.reason);return e().catch(s)})},a=`
   precision highp float;
   uniform sampler2D src;
   uniform vec2 resolution;
@@ -7,7 +7,7 @@ import"./modulepreload-polyfill-CXK8biUa.js";import{t as e}from"./esm-D4FukExZ.j
   void main() {
       vec2 uv = (gl_FragCoord.xy - offset) / resolution;
       outColor = texture(src, uv);
-  }`,a=`
+  }`,o=`
   precision highp float;
   uniform sampler2D velocity;
   uniform vec2 resolution;
@@ -21,7 +21,7 @@ import"./modulepreload-polyfill-CXK8biUa.js";import{t as e}from"./esm-D4FukExZ.j
       float T = texture(velocity, uv + vec2(0.0, t.y)).x;
       float B = texture(velocity, uv - vec2(0.0, t.y)).x;
       outColor = vec4(0.5 * (R - L - T + B), 0.0, 0.0, 1.0);
-  }`,o=`
+  }`,s=`
   precision highp float;
   uniform sampler2D velocity;
   uniform sampler2D curl;
@@ -57,7 +57,7 @@ import"./modulepreload-polyfill-CXK8biUa.js";import{t as e}from"./esm-D4FukExZ.j
       float mSplat = exp(-dot(diff, diff) / splatRadius);
       vel += (mouseDelta / resolution) * mSplat * splatForce;
       outColor = vec4(vel, 0.0, 1.0);
-  }`,s=`
+  }`,c=`
   precision highp float;
   uniform sampler2D vort_vel;
   uniform vec2 resolution;
@@ -76,10 +76,10 @@ import"./modulepreload-polyfill-CXK8biUa.js";import{t as e}from"./esm-D4FukExZ.j
       if (uv.y + t.y > 1.0) T = -C.y;
       if (uv.y - t.y < 0.0) B = -C.y;
       outColor = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
-  }`,c=`
+  }`,l=`
   precision highp float;
   out vec4 outColor;
-  void main() { outColor = vec4(0.0); }`,l=`
+  void main() { outColor = vec4(0.0); }`,u=`
   precision highp float;
   uniform sampler2D src;
   uniform sampler2D divergence;
@@ -95,7 +95,7 @@ import"./modulepreload-polyfill-CXK8biUa.js";import{t as e}from"./esm-D4FukExZ.j
       float B = texture(src, uv - vec2(0.0, t.y)).x;
       float div = texture(divergence, uv).x;
       outColor = vec4((L + R + B + T - div) * 0.25, 0.0, 0.0, 1.0);
-  }`;function u(e){return`
+  }`;function d(e){return`
   precision highp float;
   uniform sampler2D vort_vel;
   uniform sampler2D ${e};
@@ -112,7 +112,7 @@ import"./modulepreload-polyfill-CXK8biUa.js";import{t as e}from"./esm-D4FukExZ.j
       vec2 vel = texture(vort_vel, uv).xy;
       vel -= vec2(R - L, T - B);
       outColor = vec4(vel, 0.0, 1.0);
-  }`}var d=`
+  }`}var f=`
   precision highp float;
   uniform sampler2D proj_vel;
   uniform vec2 resolution;
@@ -128,15 +128,15 @@ import"./modulepreload-polyfill-CXK8biUa.js";import{t as e}from"./esm-D4FukExZ.j
       advected /= 1.0 + velocityDissipation * 0.016;
 
       outColor = vec4(advected, 0.0, 1.0);
-  }`,f=`
+  }`,p=`
   precision highp float;
   uniform sampler2D velocity;
   uniform sampler2D canvas;
   uniform vec2 resolution;
   uniform vec2 offset;
   uniform vec2 simSize;
-  uniform float time;
   out vec4 outColor;
+
   vec3 spectrum(float x) {
     return cos((x - vec3(0, .5, 1)) * vec3(.6, 1., .5) * 3.14);
   }
@@ -166,5 +166,8 @@ import"./modulepreload-polyfill-CXK8biUa.js";import{t as e}from"./esm-D4FukExZ.j
     outColor = c;
 
     vec4 c2 = vec4(spectrum(sin(v * 2.) * 0.4 + 0.6), 1);
-    outColor += c2 * smoothstep(.2, .8, v) * 0.5;
-  }`;function p(e){let{simSize:t,mouseDelta:n}=e,r=[];r.push({frag:c,target:`p_a`,float:!0,size:t});let p=`p_a`;for(let n=0;n<e.pressureIterations;n++)p=n%2==0?`p_b`:`p_a`,r.push({frag:l,target:p,float:!0,size:t});return[{frag:i,target:`canvas`},{frag:a,target:`curl`,float:!0,size:t},{frag:o,target:`vort_vel`,float:!0,size:t,uniforms:{mouseDelta:n,curlStrength:e.curlStrength,splatForce:e.splatForce,splatRadius:e.splatRadius}},{frag:s,target:`divergence`,float:!0,size:t},...r,{frag:u(p),target:`proj_vel`,float:!0,size:t},{frag:d,target:`velocity`,persistent:!0,float:!0,size:t,uniforms:{velocityDissipation:e.velocityDissipation}},{frag:f,uniforms:{time:e.time,simSize:t}}]}var m=document.getElementById(`app`),h=[-1,-1],g=[0,0];window.addEventListener(`pointermove`,e=>{let t=e.clientX,n=window.innerHeight-e.clientY;h[0]>=0&&(g=[t-h[0],n-h[1]]),h=[t,n]}),window.addEventListener(`load`,async()=>{let t=document.documentElement.clientWidth/document.documentElement.clientHeight,n=new e({postEffect:p({simSize:t>1?[Math.round(128*t),128]:[128,Math.round(128/t)],mouseDelta:()=>(g=[g[0]*.9,g[1]*.9],g),pressureIterations:8,curlStrength:20,velocityDissipation:1,densityDissipation:1,splatForce:3e3,splatRadius:.001,time:()=>performance.now()/1e3})});await n.add(m,{shader:`none`}),n.play()});
+    outColor += c2 * (smoothstep(.2, .8, v) * 0.5);
+
+    float edge = smoothstep(.003, .0, abs(v - 0.25));
+    outColor = abs(outColor - edge * 0.5);
+  }`;function m(e){let{simSize:t,mouseDelta:n}=e,r=[];r.push({frag:l,target:`p_a`,float:!0,size:t});let i=`p_a`;for(let n=0;n<e.pressureIterations;n++)i=n%2==0?`p_b`:`p_a`,r.push({frag:u,target:i,float:!0,size:t});return[{frag:a,target:`canvas`},{frag:o,target:`curl`,float:!0,size:t},{frag:s,target:`vort_vel`,float:!0,size:t,uniforms:{mouseDelta:n,curlStrength:e.curlStrength,splatForce:e.splatForce,splatRadius:e.splatRadius}},{frag:c,target:`divergence`,float:!0,size:t},...r,{frag:d(i),target:`proj_vel`,float:!0,size:t},{frag:f,target:`velocity`,persistent:!0,float:!0,size:t,uniforms:{velocityDissipation:e.velocityDissipation}},{frag:p,uniforms:{time:e.time,simSize:t}}]}navigator.maxTouchPoints>0&&i(async()=>{let{default:e}=await import(`https://esm.sh/lenis@1.3.21`);return{default:e}},[],import.meta.url).then(({default:e})=>{new e({autoRaf:!0,syncTouch:!0})});var h=document.getElementById(`app`),g=[-1,-1],_=[0,0];function v(e,t){g[0]>=0&&(_=[e-g[0],t-g[1]]),g=[e,t]}window.addEventListener(`pointermove`,e=>{v(e.clientX,window.innerHeight-e.clientY)});async function y(){let t=document.documentElement.clientWidth/document.documentElement.clientHeight,n=new e({postEffect:m({simSize:t>1?[Math.round(256*t),256]:[256,Math.round(256/t)],mouseDelta:()=>(_=[_[0]*.9,_[1]*.9],_),pressureIterations:12,curlStrength:20,velocityDissipation:1,splatForce:3e3,splatRadius:.002})});await n.add(h,{shader:`none`}),n.play()}document.readyState===`complete`?y():window.addEventListener(`load`,y);
