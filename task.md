@@ -278,3 +278,20 @@ type and `dims` fields (documented breaking changes).
   - One entry per 8-N commit, per existing format
   - Flag breaking changes in the Notes: `Effect.outputSize` signature changed; `dims.overflow` → `dims.fullscreenPad`; default vert varyings changed
   - Note: no public API change to `VFXProps` itself (overflow stays as-is for shader path; no `VFXProps.pad` added)
+
+## Backlog (post-review)
+
+Items surfaced during the design review on the effect API that are
+not blocking the initial release. Pick up after Phase 8 lands.
+
+### B-1: VFXProps — type-level `overflow` × `effect` exclusion
+
+- [ ] **B-1**: Make `overflow` and `effect` mutually exclusive at the type level
+  - Today: both can be set; `addEffectElement` emits a runtime `console.warn` and the effect path ignores `overflow` (vfx-player.ts:608-612)
+  - Goal: caller gets a TS error instead of a silent dev-warn
+  - Approach: split `VFXProps` into a discriminated union — `{ shader?, overflow?, ... }` vs `{ effect, ... }` — so `overflow` is only present on the shader branch
+  - Watch out for: existing call sites that pass `VFXProps` as a generic object; the React wrapper (`react-vfx`) and storybook stories may need narrowed types
+  - Acceptance:
+    - `vfx.add(el, { effect, overflow: 10 })` is a TS error
+    - shader-path stories still type-check
+    - the runtime warn in `addEffectElement` can be deleted (TS gate replaces it)
