@@ -59,19 +59,17 @@ export type ChainFrameInput = {
 };
 
 type StageLayout = {
-    /** Src pad entering this stage (physical px per side). */
-    srcPad: Margin;
-    /** Src buffer size (physical px): elementPixel + srcPad sums. */
-    srcBufferSize: [number, number];
     /** Dst pad produced by this stage (physical px per side). */
     dstPad: Margin;
     /** Dst buffer size (physical px): elementPixel + dstPad sums. */
     dstBufferSize: [number, number];
     /** Whether the dst buffer is float. */
     float: boolean;
-    /** Src inner sub-rect in src texture UV (xy = origin, zw = size). */
-    rectSrc: [number, number, number, number];
-    /** Dst inner sub-rect in buffer UV (xy = origin, zw = size). */
+    /**
+     * Content sub-rect within dst buffer UV (xy = origin, zw = size).
+     * Stage k+1's `rectSrc` equals stage k's `rectContent` (src buffer
+     * = previous dst buffer). Stage 0's `rectSrc` is `(0, 0, 1, 1)`.
+     */
     rectContent: [number, number, number, number];
     /**
      * Physical-px viewport on the canvas / final FBO for this stage's
@@ -478,7 +476,6 @@ export class EffectChain {
             const dstBufferSize: [number, number] = resolved.bufferSize;
             const float: boolean = isLast ? false : resolved.float;
 
-            const rectSrc = rectForPad(srcPad, srcBufferSize, elementPixel);
             const rectContent = rectForPad(dstPad, dstBufferSize, elementPixel);
 
             // Stage outputViewport: where the draw lands on its dst buffer.
@@ -504,12 +501,9 @@ export class EffectChain {
             }
 
             this.#stages[k] = {
-                srcPad,
-                srcBufferSize,
                 dstPad,
                 dstBufferSize,
                 float,
-                rectSrc,
                 rectContent,
                 outputViewport,
             };
@@ -747,7 +741,12 @@ export class EffectChain {
             outputH = stage.dstBufferSize[1];
             outputViewport = stage.outputViewport;
             rectContent = stage.rectContent;
-            rectSrc = stage.rectSrc;
+            // Stage k's src buffer is stage k-1's dst buffer; stage 0's
+            // src is the capture (no pad), so rectSrc = (0, 0, 1, 1).
+            rectSrc =
+                renderPos === 0
+                    ? [0, 0, 1, 1]
+                    : this.#stages[renderPos - 1].rectContent;
         }
 
         return {
