@@ -350,8 +350,7 @@ function makeHost() {
     host.setFrameDims({
         outputPhysW: 100,
         outputPhysH: 100,
-        canvasPhysW: 200,
-        canvasPhysH: 200,
+        canvasPhys: [200, 200],
         outputViewport: { x: 0, y: 0, w: 100, h: 100 },
         elementPhysW: 100,
         elementPhysH: 100,
@@ -582,8 +581,7 @@ describe("EffectHost.createRenderTarget", () => {
         host.setFrameDims({
             outputPhysW: 200,
             outputPhysH: 200,
-            canvasPhysW: 200,
-            canvasPhysH: 200,
+            canvasPhys: [200, 200],
             outputViewport: { x: 0, y: 0, w: 200, h: 200 },
             elementPhysW: 200,
             elementPhysH: 200,
@@ -599,8 +597,7 @@ describe("EffectHost.createRenderTarget", () => {
         host.setFrameDims({
             outputPhysW: 120,
             outputPhysH: 110,
-            canvasPhysW: 200,
-            canvasPhysH: 200,
+            canvasPhys: [200, 200],
             outputViewport: { x: 0, y: 0, w: 120, h: 110 },
             elementPhysW: 100,
             elementPhysH: 100,
@@ -619,8 +616,7 @@ describe("EffectHost.createRenderTarget", () => {
         host.setFrameDims({
             outputPhysW: 200,
             outputPhysH: 200,
-            canvasPhysW: 200,
-            canvasPhysH: 200,
+            canvasPhys: [200, 200],
             outputViewport: { x: 0, y: 0, w: 200, h: 200 },
             elementPhysW: 200,
             elementPhysH: 200,
@@ -702,8 +698,7 @@ describe("EffectHost.draw", () => {
         host.setFrameDims({
             outputPhysW: 100,
             outputPhysH: 100,
-            canvasPhysW: 200,
-            canvasPhysH: 200,
+            canvasPhys: [200, 200],
             outputViewport: { x: 0, y: 0, w: 100, h: 100 },
             elementPhysW: 100,
             elementPhysH: 100,

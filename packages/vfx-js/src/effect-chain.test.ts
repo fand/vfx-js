@@ -182,14 +182,11 @@ function makeInput(overrides: Partial<ChainFrameInput> = {}): ChainFrameInput {
         enterTime: 0,
         leaveTime: 0,
         resolvedUniforms: {},
-        canvasPhysW: 100,
-        canvasPhysH: 100,
+        canvasLogical: [50, 50],
+        canvasPhys: [100, 100],
         elementLogical: [50, 50],
         elementPhys: [100, 100],
-        viewportLogical: [50, 50],
-        viewportPhys: [100, 100],
         elementRectOnCanvasPx: { x: 0, y: 0, w: 100, h: 100 },
-        viewportRectOnCanvasPx: { x: 0, y: 0, w: 100, h: 100 },
         finalTarget: null,
         isVisible: true,
         ...overrides,
@@ -523,7 +520,7 @@ describe("EffectChain: outputSize", () => {
         warn.mockRestore();
     });
 
-    it("dims.fullscreenPad equals max(0, viewport-edge distance - srcPad) per side", () => {
+    it("dims.fullscreenPad equals max(0, canvas-edge distance - srcPad) per side", () => {
         const probe = vi.fn().mockReturnValue({ pad: 0 });
         const effects: Effect[] = [
             { render: () => {}, outputSize: probe },
@@ -533,13 +530,12 @@ describe("EffectChain: outputSize", () => {
         chain.run(
             makeInput({
                 elementPhys: [100, 100],
-                viewportPhys: [400, 400],
+                canvasPhys: [400, 400],
                 elementRectOnCanvasPx: { x: 150, y: 150, w: 100, h: 100 },
-                viewportRectOnCanvasPx: { x: 0, y: 0, w: 400, h: 400 },
             }),
         );
         const dims = probe.mock.calls[0][0];
-        // Element origin (150, 150), extent (250, 250). Viewport (0, 0)–(400, 400).
+        // Element origin (150, 150), extent (250, 250). Canvas (0, 0)–(400, 400).
         // Edges: left=150, right=150, bottom=150, top=150. srcPad=0.
         expect(dims.fullscreenPad).toEqual({
             top: 150,
@@ -549,10 +545,11 @@ describe("EffectChain: outputSize", () => {
         });
     });
 
-    it("fullscreenPad reaches canvas edges when viewportRect represents full canvas (= viewport-inner + scrollPadding)", () => {
-        // vfx-player passes the canvas rect (= viewport-inner + scrollPadding
-        // on each side) as `viewportRectOnCanvasPx`. Verify fullscreenPad
-        // reaches the canvas edge, not just the inner viewport.
+    it("fullscreenPad covers scrollPadding (canvas extends viewport-inner by scrollPadding on each side)", () => {
+        // vfx-player passes the canvas size (= viewport-inner +
+        // scrollPadding on each side) as `canvasPhys`. Verify
+        // fullscreenPad reaches the canvas edge, not just the inner
+        // viewport.
         // Sim: viewport-inner 400×400, scrollPadding 40 px/side → canvas 480×480.
         // Element 100×100 at viewport-center → at (190, 190) in canvas-bottom-left.
         const probe = vi.fn().mockReturnValue({ pad: 0 });
@@ -564,9 +561,8 @@ describe("EffectChain: outputSize", () => {
         chain.run(
             makeInput({
                 elementPhys: [100, 100],
-                viewportPhys: [480, 480],
+                canvasPhys: [480, 480],
                 elementRectOnCanvasPx: { x: 190, y: 190, w: 100, h: 100 },
-                viewportRectOnCanvasPx: { x: 0, y: 0, w: 480, h: 480 },
             }),
         );
         // Distance from element to canvas edge: 190 per side.
@@ -623,8 +619,8 @@ describe("EffectChain: outputSize", () => {
         chain.run(
             makeInput({
                 elementPhys: [999, 999], // should be overridden
-                viewportPhys: [640, 480],
-                viewportLogical: [320, 240],
+                canvasPhys: [640, 480],
+                canvasLogical: [320, 240],
             }),
         );
         const dims = probe.mock.calls[0][0];
@@ -677,9 +673,8 @@ describe("EffectChain: outputSize", () => {
         chain.run(
             makeInput({
                 elementPhys: [100, 100],
-                viewportPhys: [400, 400],
+                canvasPhys: [400, 400],
                 elementRectOnCanvasPx: { x: 150, y: 150, w: 100, h: 100 },
-                viewportRectOnCanvasPx: { x: 0, y: 0, w: 400, h: 400 },
             }),
         );
         const s0 = chain.stages[0];

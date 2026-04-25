@@ -81,10 +81,11 @@ export class VFXPlayer {
     #elements: VFXElement[] = [];
     #initTime = Date.now() / 1000.0;
 
-    #viewport: Rect = createRect(0);
+    /** Canvas extent in CSS px (= viewport + scrollPadding on each side). */
+    #canvasRect: Rect = createRect(0);
 
-    /** Actual viewport without padding */
-    #viewportInner: Rect = createRect(0);
+    /** Visible viewport in CSS px (no scrollPadding). */
+    #viewport: Rect = createRect(0);
 
     #canvasSize = [0, 0];
     #paddingX = 0;
@@ -203,13 +204,13 @@ export class VFXPlayer {
                 heightWithPadding,
                 this.#pixelRatio,
             );
-            this.#viewport = createRect({
+            this.#canvasRect = createRect({
                 top: -paddingY,
                 left: -paddingX,
                 right: width + paddingX,
                 bottom: height + paddingY,
             });
-            this.#viewportInner = createRect({
+            this.#viewport = createRect({
                 top: 0,
                 left: 0,
                 right: width,
@@ -893,16 +894,16 @@ export class VFXPlayer {
         gl.viewport(0, 0, this.#canvas.width, this.#canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
-        const viewportWidth = this.#viewport.right - this.#viewport.left;
-        const viewportHeight = this.#viewport.bottom - this.#viewport.top;
-        const viewportGlRect = getGLRect(0, 0, viewportWidth, viewportHeight);
+        const canvasW = this.#canvasRect.right - this.#canvasRect.left;
+        const canvasH = this.#canvasRect.bottom - this.#canvasRect.top;
+        const viewportGlRect = getGLRect(0, 0, canvasW, canvasH);
 
         // Setup post effect render target if needed. Chain-based
         // post-effect is only enabled once its async `init` resolves;
         // until then render directly to canvas (no blank frames).
         const shouldUsePostEffect = this.#shouldUsePostEffect();
         if (shouldUsePostEffect) {
-            this.#setupPostEffectTarget(viewportWidth, viewportHeight);
+            this.#setupPostEffectTarget(canvasW, canvasH);
             if (this.#postEffectTarget) {
                 gl.bindFramebuffer(gl.FRAMEBUFFER, this.#postEffectTarget.fbo);
                 gl.clear(gl.COLOR_BUFFER_BIT);
@@ -920,7 +921,7 @@ export class VFXPlayer {
             }
 
             if (e.chain) {
-                this.#renderEffectElement(e, rect, hit, now, viewportGlRect);
+                this.#renderEffectElement(e, rect, hit, now);
                 continue;
             }
 
@@ -956,13 +957,13 @@ export class VFXPlayer {
 
             const glRect = rectToGLRect(
                 rect,
-                viewportHeight,
+                canvasH,
                 this.#paddingX,
                 this.#paddingY,
             );
             const glRectWithOverflow = rectToGLRect(
                 hit.rectWithOverflow,
-                viewportHeight,
+                canvasH,
                 this.#paddingX,
                 this.#paddingY,
             );
@@ -1132,7 +1133,7 @@ export class VFXPlayer {
                 finalPass.uniforms["backbuffer"].value = e.backbuffer.texture;
 
                 if (e.isFullScreen) {
-                    e.backbuffer.resize(viewportWidth, viewportHeight);
+                    e.backbuffer.resize(canvasW, canvasH);
 
                     this.#setOffset(e, glRect.x, glRect.y);
                     this.#render(
@@ -1234,7 +1235,6 @@ export class VFXPlayer {
             intersection: number;
         },
         now: number,
-        viewportGlRect: GLRect,
     ): void {
         const chain = e.chain;
         if (!chain) {
@@ -1259,12 +1259,12 @@ export class VFXPlayer {
             }
         }
 
-        const viewportWidth = this.#viewport.right - this.#viewport.left;
-        const viewportHeight = this.#viewport.bottom - this.#viewport.top;
+        const canvasW = this.#canvasRect.right - this.#canvasRect.left;
+        const canvasH = this.#canvasRect.bottom - this.#canvasRect.top;
 
         const glRect = rectToGLRect(
             rect,
-            viewportHeight,
+            canvasH,
             this.#paddingX,
             this.#paddingY,
         );
@@ -1299,23 +1299,15 @@ export class VFXPlayer {
             enterTime: now - e.enterTime,
             leaveTime: now - e.leaveTime,
             resolvedUniforms,
-            canvasPhysW: this.#canvas.width,
-            canvasPhysH: this.#canvas.height,
+            canvasLogical: [canvasW, canvasH],
+            canvasPhys: [canvasW * pr, canvasH * pr],
             elementLogical: [elementInnerLogicalW, elementInnerLogicalH],
             elementPhys: [elementInnerLogicalW * pr, elementInnerLogicalH * pr],
-            viewportLogical: [viewportWidth, viewportHeight],
-            viewportPhys: [viewportWidth * pr, viewportHeight * pr],
             elementRectOnCanvasPx: {
                 x: glRect.x * pr,
                 y: glRect.y * pr,
                 w: glRect.w * pr,
                 h: glRect.h * pr,
-            },
-            viewportRectOnCanvasPx: {
-                x: viewportGlRect.x * pr,
-                y: viewportGlRect.y * pr,
-                w: viewportGlRect.w * pr,
-                h: viewportGlRect.h * pr,
             },
             finalTarget,
             isVisible: hit.isVisible,
@@ -1384,10 +1376,10 @@ export class VFXPlayer {
 
         const isInViewport =
             e.isFullScreen ||
-            isRectInViewport(this.#viewportInner, rectWithOverflow);
+            isRectInViewport(this.#viewport, rectWithOverflow);
 
         const viewportWithMargin = growRect(
-            this.#viewportInner,
+            this.#viewport,
             e.intersection.rootMargin,
         );
         const intersection = getIntersection(viewportWithMargin, rect);
@@ -1705,23 +1697,17 @@ export class VFXPlayer {
             resolvedUniforms[k] = gen();
         }
 
-        const viewportWidth = this.#viewport.right - this.#viewport.left;
-        const viewportHeight = this.#viewport.bottom - this.#viewport.top;
+        const canvasW = this.#canvasRect.right - this.#canvasRect.left;
+        const canvasH = this.#canvasRect.bottom - this.#canvasRect.top;
         const prev = this.#postEffectChainLastTime;
         const deltaTime = now - prev;
         this.#postEffectChainLastTime = now;
 
-        // For post-effects `element*` mirrors `viewport*`; overflow is 0.
-        const viewportLogical: [number, number] = [
-            viewportWidth,
-            viewportHeight,
-        ];
-        const viewportPhys: [number, number] = [
-            viewportWidth * pr,
-            viewportHeight * pr,
-        ];
+        // For post-effects `element*` mirrors `canvas*`; overflow is 0.
+        const canvasLogical: [number, number] = [canvasW, canvasH];
+        const canvasPhys: [number, number] = [canvasW * pr, canvasH * pr];
 
-        const viewportOnCanvas = {
+        const canvasOnCanvas = {
             x: viewportGlRect.x * pr,
             y: viewportGlRect.y * pr,
             w: viewportGlRect.w * pr,
@@ -1737,14 +1723,11 @@ export class VFXPlayer {
             enterTime: 0,
             leaveTime: 0,
             resolvedUniforms,
-            canvasPhysW: this.#canvas.width,
-            canvasPhysH: this.#canvas.height,
-            elementLogical: viewportLogical,
-            elementPhys: viewportPhys,
-            viewportLogical,
-            viewportPhys,
-            elementRectOnCanvasPx: viewportOnCanvas,
-            viewportRectOnCanvasPx: viewportOnCanvas,
+            canvasLogical,
+            canvasPhys,
+            elementLogical: canvasLogical,
+            elementPhys: canvasPhys,
+            elementRectOnCanvasPx: canvasOnCanvas,
             finalTarget: null,
             isVisible: true,
         });

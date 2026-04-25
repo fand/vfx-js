@@ -895,13 +895,18 @@ export interface Effect {
      *     triggers a dev warn + clamp.
      *
      * Units:
-     *   input / elementPixel / viewportPixel / fullscreenPad / return →
+     *   input / elementPixel / canvasPixel / fullscreenPad / return →
      *     physical px
-     *   element / viewport → logical px
+     *   element / canvas → logical px
      *   pixelRatio: element × pixelRatio === elementPixel
      *
+     * `canvas` / `canvasPixel` measure the WebGL canvas, which equals
+     * the visible viewport plus `scrollPadding` on each side (10% per side
+     * by default). `dims.fullscreenPad` reaches the canvas edge so
+     * `pad: 'fullscreen'` covers the scrollPadding region too.
+     *
      * Post-effect context: `element` / `elementPixel` mirror
-     * `viewport` / `viewportPixel`; `fullscreenPad` is always zero.
+     * `canvas` / `canvasPixel`; `fullscreenPad` is always zero.
      *
      * Pad tracking is entirely internal to the chain. Effects never
      * observe the accumulated pad — they declare deltas via `pad`, or
@@ -914,8 +919,8 @@ export interface Effect {
         readonly input: readonly [number, number];
         readonly element: readonly [number, number];
         readonly elementPixel: readonly [number, number];
-        readonly viewport: readonly [number, number];
-        readonly viewportPixel: readonly [number, number];
+        readonly canvas: readonly [number, number];
+        readonly canvasPixel: readonly [number, number];
         readonly pixelRatio: number;
         /**
          * Physical-px pad delta needed to extend src to the canvas edge

@@ -332,12 +332,13 @@ export interface Effect {
     //     than `elementPixel` on any axis triggers a dev warn + clamp.
     //
     // Units:
-    //   input / elementPixel / viewportPixel / fullscreenPad / return value → physical px
-    //   element / viewport                                                   → logical px
+    //   input / elementPixel / canvasPixel / fullscreenPad / return value → physical px
+    //   element / canvas                                                  → logical px
     //   pixelRatio → element × pixelRatio === elementPixel
     //
-    // Post-effect context: `element` / `elementPixel` mirror
-    // `viewport` / `viewportPixel`.
+    // `canvas` / `canvasPixel` measure the WebGL canvas (= viewport-inner
+    // + scrollPadding on each side). Post-effect context: `element` /
+    // `elementPixel` mirror `canvas` / `canvasPixel`.
     //
     // Pad tracking is entirely internal to the chain. Effects never
     // observe the chain's accumulated pad directly — they only declare
@@ -350,8 +351,8 @@ export interface Effect {
         readonly input: readonly [number, number];       // src buffer size
         readonly element: readonly [number, number];      // inner, logical px
         readonly elementPixel: readonly [number, number]; // inner, physical px
-        readonly viewport: readonly [number, number];
-        readonly viewportPixel: readonly [number, number];
+        readonly canvas: readonly [number, number];       // viewport+scrollPad, logical
+        readonly canvasPixel: readonly [number, number];  // viewport+scrollPad, physical
         readonly pixelRatio: number;
         // Pad (physical px) needed to extend from src to the canvas edge
         // (= viewport + scrollPadding). Non-negative per side; 0 means
@@ -532,7 +533,7 @@ ctx.draw({
 
 **Pad tracking invariants** (core of the composition model):
 
-- **Inner physical size is constant across the chain** = `elementPixel` (element × pixelRatio) for element effects, `viewportPixel` for post effects.
+- **Inner physical size is constant across the chain** = `elementPixel` (element × pixelRatio) for element effects, `canvasPixel` for post effects.
 - **Each intermediate buffer is `elementPixel + pad_total`** on each axis, where `pad_total.x = pad.left + pad.right` and `pad_total.y = pad.top + pad.bottom`.
 - **Inner is positioned** at `(pad.left, pad.bottom)` within the buffer (GL bottom-left origin).
 - **Pad monotonically non-decreasing**: `dst_pad[side] >= src_pad[side]` per side. Dev warn + clamp if an `outputSize` return would shrink pad on any side.

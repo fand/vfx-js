@@ -160,9 +160,8 @@ export type HostFrameDims = {
     /** Physical-px size of the write buffer for this stage. */
     outputPhysW: number;
     outputPhysH: number;
-    /** Canvas physical-px size for `resolution`. */
-    canvasPhysW: number;
-    canvasPhysH: number;
+    /** Canvas physical-px size (for `ctx.resolution`). */
+    canvasPhys: readonly [number, number];
     /**
      * Physical-px viewport used when the draw's target is the stage's
      * assigned `ctx.output` (or `null` / omitted). For intermediate
@@ -262,8 +261,7 @@ export class EffectHost {
         this.#dims = {
             outputPhysW: 1,
             outputPhysH: 1,
-            canvasPhysW: 1,
-            canvasPhysH: 1,
+            canvasPhys: [1, 1],
             outputViewport: { x: 0, y: 0, w: 1, h: 1 },
             elementPhysW: 1,
             elementPhysH: 1,
@@ -296,7 +294,7 @@ export class EffectHost {
 
     setFrameDims(dims: HostFrameDims): void {
         this.#dims = dims;
-        this.#ctxBacking.resolution = [dims.canvasPhysW, dims.canvasPhysH];
+        this.#ctxBacking.resolution = [dims.canvasPhys[0], dims.canvasPhys[1]];
         // Auto-resize managed RTs whose size tracks this stage's dst
         // buffer (= element + dstPad). Sizing to dst buffer instead of
         // inner element ensures effects can write into the pad region
