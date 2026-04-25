@@ -754,7 +754,7 @@ export type EffectContext = {
      *     the element?" gating.
      *
      * Auto-uploaded uniforms (for custom vertex shaders or advanced use):
-     *   `uniform vec4 uvInnerRect;`  — dst inner sub-rect in buffer UV
+     *   `uniform vec4 dstInnerRect;`  — dst inner sub-rect in buffer UV
      *                                  (xy = origin, zw = size).
      *   `uniform vec4 srcInnerRect;` — src inner sub-rect in src texture UV.
      *                                  `(0,0,1,1)` for capture; with pad

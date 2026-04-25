@@ -78,7 +78,7 @@ type StageLayout = {
     /** Src inner sub-rect in src texture UV (xy = origin, zw = size). */
     srcInnerRect: [number, number, number, number];
     /** Dst inner sub-rect in buffer UV (xy = origin, zw = size). */
-    uvInnerRect: [number, number, number, number];
+    dstInnerRect: [number, number, number, number];
     /**
      * Physical-px viewport on the canvas / final FBO for this stage's
      * draw. Only meaningful for the last rendering stage; intermediate
@@ -118,7 +118,7 @@ type IntermediateEntry = {
  *   (the host still receives `outputPhysW/H = dstBufferSize` so
  *   internal RTs auto-size to include pad). The `float` request is
  *   ignored on the last stage.
- * - `srcInnerRect` / `uvInnerRect` are derived per stage and uploaded as
+ * - `srcInnerRect` / `dstInnerRect` are derived per stage and uploaded as
  *   uniforms so the default vertex shader can emit `uvInner` (src-sampling
  *   UV) and `uvInnerDst` (dst-space 0..1 over element).
  *
@@ -279,7 +279,7 @@ export class EffectChain {
             });
         }
 
-        // 2. Resolve per-stage pad / buffers / srcInnerRect / uvInnerRect.
+        // 2. Resolve per-stage pad / buffers / srcInnerRect / dstInnerRect.
         //    Allocates / reuses intermediate RTs.
         this.#resolveStages(input);
 
@@ -437,7 +437,7 @@ export class EffectChain {
     }
 
     /**
-     * Compute per-stage layout (pad, buffer size, srcInnerRect, uvInnerRect,
+     * Compute per-stage layout (pad, buffer size, srcInnerRect, dstInnerRect,
      * outputViewport) for every rendering stage. Allocates / reuses
      * intermediate RTs.
      */
@@ -488,7 +488,11 @@ export class EffectChain {
                 srcBufferSize,
                 elementPixel,
             );
-            const uvInnerRect = rectForPad(dstPad, dstBufferSize, elementPixel);
+            const dstInnerRect = rectForPad(
+                dstPad,
+                dstBufferSize,
+                elementPixel,
+            );
 
             // Stage outputViewport: where the draw lands on its dst buffer.
             let outputViewport: { x: number; y: number; w: number; h: number };
@@ -519,7 +523,7 @@ export class EffectChain {
                 dstBufferSize,
                 float,
                 srcInnerRect,
-                uvInnerRect,
+                dstInnerRect,
                 outputViewport,
             };
 
@@ -726,14 +730,14 @@ export class EffectChain {
         outputViewport: { x: number; y: number; w: number; h: number };
         elementPhysW: number;
         elementPhysH: number;
-        uvInnerRect: [number, number, number, number];
+        dstInnerRect: [number, number, number, number];
         srcInnerRect: [number, number, number, number];
     } {
         const renderPos = this.#renderingIndices.indexOf(k);
         let outputW: number;
         let outputH: number;
         let outputViewport: { x: number; y: number; w: number; h: number };
-        let uvInnerRect: [number, number, number, number];
+        let dstInnerRect: [number, number, number, number];
         let srcInnerRect: [number, number, number, number];
 
         if (renderPos < 0) {
@@ -741,14 +745,14 @@ export class EffectChain {
             outputW = input.elementPhys[0];
             outputH = input.elementPhys[1];
             outputViewport = { x: 0, y: 0, w: outputW, h: outputH };
-            uvInnerRect = [0, 0, 1, 1];
+            dstInnerRect = [0, 0, 1, 1];
             srcInnerRect = [0, 0, 1, 1];
         } else {
             const stage = this.#stages[renderPos];
             outputW = stage.dstBufferSize[0];
             outputH = stage.dstBufferSize[1];
             outputViewport = stage.outputViewport;
-            uvInnerRect = stage.uvInnerRect;
+            dstInnerRect = stage.dstInnerRect;
             srcInnerRect = stage.srcInnerRect;
         }
 
@@ -760,7 +764,7 @@ export class EffectChain {
             outputViewport,
             elementPhysW: input.elementPhys[0],
             elementPhysH: input.elementPhys[1],
-            uvInnerRect,
+            dstInnerRect,
             srcInnerRect,
         };
     }

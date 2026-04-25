@@ -92,7 +92,7 @@ export function isEffectTexture(v: unknown): v is EffectTexture {
 //                whether src is capture (inner-only) or a prior stage's
 //                intermediate (buffer with pad)
 // Driven by two auto-uploaded uniforms:
-//   uvInnerRect (vec4) — dst inner sub-rect in buffer UV
+//   dstInnerRect (vec4) — dst inner sub-rect in buffer UV
 //   srcInnerRect (vec4) — src inner sub-rect in src texture UV
 // ---------------------------------------------------------------------------
 
@@ -102,12 +102,12 @@ in vec3 position;
 out vec2 uv;
 out vec2 uvInnerDst;
 out vec2 uvInner;
-uniform vec4 uvInnerRect;
+uniform vec4 dstInnerRect;
 uniform vec4 srcInnerRect;
 void main() {
     vec2 bufferUV = position.xy * 0.5 + 0.5;
     uv = bufferUV;
-    uvInnerDst = (bufferUV - uvInnerRect.xy) / uvInnerRect.zw;
+    uvInnerDst = (bufferUV - dstInnerRect.xy) / dstInnerRect.zw;
     uvInner = srcInnerRect.xy + uvInnerDst * srcInnerRect.zw;
     gl_Position = vec4(position, 1.0);
 }
@@ -119,12 +119,12 @@ attribute vec3 position;
 varying vec2 uv;
 varying vec2 uvInnerDst;
 varying vec2 uvInner;
-uniform vec4 uvInnerRect;
+uniform vec4 dstInnerRect;
 uniform vec4 srcInnerRect;
 void main() {
     vec2 bufferUV = position.xy * 0.5 + 0.5;
     uv = bufferUV;
-    uvInnerDst = (bufferUV - uvInnerRect.xy) / uvInnerRect.zw;
+    uvInnerDst = (bufferUV - dstInnerRect.xy) / dstInnerRect.zw;
     uvInner = srcInnerRect.xy + uvInnerDst * srcInnerRect.zw;
     gl_Position = vec4(position, 1.0);
 }
@@ -180,10 +180,10 @@ export type HostFrameDims = {
     elementPhysW: number;
     elementPhysH: number;
     /**
-     * `uvInnerRect` uniform value (dst): inner origin + inner size in
+     * `dstInnerRect` uniform value (dst): inner origin + inner size in
      * buffer-fraction units (0..1). See plan.md "`uvInner` varying".
      */
-    uvInnerRect: [number, number, number, number];
+    dstInnerRect: [number, number, number, number];
     /**
      * `srcInnerRect` uniform value (src): sampling origin + size in src
      * texture UV. Drives `uvInner = srcInnerRect.xy + uvInnerDst *
@@ -267,7 +267,7 @@ export class EffectHost {
             outputViewport: { x: 0, y: 0, w: 1, h: 1 },
             elementPhysW: 1,
             elementPhysH: 1,
-            uvInnerRect: [0, 0, 1, 1],
+            dstInnerRect: [0, 0, 1, 1],
             srcInnerRect: [0, 0, 1, 1],
         };
         this.#ctxBacking = {
@@ -740,9 +740,9 @@ export class EffectHost {
 
     #buildUniforms(userUniforms: EffectUniforms | undefined): Uniforms {
         const out: Uniforms = {};
-        // Auto uniforms: uvInnerRect (dst) + srcInnerRect (src).
-        const dst = this.#dims.uvInnerRect;
-        out["uvInnerRect"] = {
+        // Auto uniforms: dstInnerRect (dst) + srcInnerRect (src).
+        const dst = this.#dims.dstInnerRect;
+        out["dstInnerRect"] = {
             value: [dst[0], dst[1], dst[2], dst[3]] as [
                 number,
                 number,

@@ -355,7 +355,7 @@ function makeHost() {
         outputViewport: { x: 0, y: 0, w: 100, h: 100 },
         elementPhysW: 100,
         elementPhysH: 100,
-        uvInnerRect: [0, 0, 1, 1],
+        dstInnerRect: [0, 0, 1, 1],
         srcInnerRect: [0, 0, 1, 1],
     });
     return { host, gl, glCtx };
@@ -587,7 +587,7 @@ describe("EffectHost.createRenderTarget", () => {
             outputViewport: { x: 0, y: 0, w: 200, h: 200 },
             elementPhysW: 200,
             elementPhysH: 200,
-            uvInnerRect: [0, 0, 1, 1],
+            dstInnerRect: [0, 0, 1, 1],
             srcInnerRect: [0, 0, 1, 1],
         });
         expect(framebuffers[0].width).toBe(200);
@@ -604,7 +604,7 @@ describe("EffectHost.createRenderTarget", () => {
             outputViewport: { x: 0, y: 0, w: 120, h: 110 },
             elementPhysW: 100,
             elementPhysH: 100,
-            uvInnerRect: [0, 0, 1, 1],
+            dstInnerRect: [0, 0, 1, 1],
             srcInnerRect: [0, 0, 1, 1],
         });
         host.ctx.createRenderTarget();
@@ -624,7 +624,7 @@ describe("EffectHost.createRenderTarget", () => {
             outputViewport: { x: 0, y: 0, w: 200, h: 200 },
             elementPhysW: 200,
             elementPhysH: 200,
-            uvInnerRect: [0, 0, 1, 1],
+            dstInnerRect: [0, 0, 1, 1],
             srcInnerRect: [0, 0, 1, 1],
         });
         // Fixed: still 50×50.
@@ -697,7 +697,7 @@ describe("EffectHost.draw", () => {
         warn.mockRestore();
     });
 
-    it("auto-uploads uvInnerRect and srcInnerRect as vec4 uniforms", () => {
+    it("auto-uploads dstInnerRect and srcInnerRect as vec4 uniforms", () => {
         const { host } = makeHost();
         host.setFrameDims({
             outputPhysW: 100,
@@ -707,14 +707,14 @@ describe("EffectHost.draw", () => {
             outputViewport: { x: 0, y: 0, w: 100, h: 100 },
             elementPhysW: 100,
             elementPhysH: 100,
-            uvInnerRect: [0.1, 0.2, 0.3, 0.4],
+            dstInnerRect: [0.1, 0.2, 0.3, 0.4],
             srcInnerRect: [0.5, 0.6, 0.7, 0.8],
         });
         host.setPhase("render");
         host.ctx.draw({ frag: FRAG });
         expect(programs).toHaveLength(1);
         const uploads = programs[0].uploads[0];
-        expect(uploads["uvInnerRect"].value).toEqual([0.1, 0.2, 0.3, 0.4]);
+        expect(uploads["dstInnerRect"].value).toEqual([0.1, 0.2, 0.3, 0.4]);
         expect(uploads["srcInnerRect"].value).toEqual([0.5, 0.6, 0.7, 0.8]);
     });
 
@@ -726,7 +726,7 @@ describe("EffectHost.draw", () => {
         expect(vert).toMatch(/\bout vec2 uv\b/);
         expect(vert).toMatch(/\bout vec2 uvInnerDst\b/);
         expect(vert).toMatch(/\bout vec2 uvInner\b/);
-        expect(vert).toMatch(/uniform vec4 uvInnerRect\b/);
+        expect(vert).toMatch(/uniform vec4 dstInnerRect\b/);
         expect(vert).toMatch(/uniform vec4 srcInnerRect\b/);
     });
 });

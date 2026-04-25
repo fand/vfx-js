@@ -549,7 +549,7 @@ describe("EffectChain: outputSize", () => {
         });
     });
 
-    it("srcInnerRect at stage 0 is (0, 0, 1, 1); uvInnerRect reflects current dst pad", () => {
+    it("srcInnerRect at stage 0 is (0, 0, 1, 1); dstInnerRect reflects current dst pad", () => {
         const effects: Effect[] = [
             { render: () => {}, outputSize: () => ({ pad: 10 }) },
             { render: () => {} },
@@ -561,10 +561,10 @@ describe("EffectChain: outputSize", () => {
         expect(s0.srcInnerRect).toEqual([0, 0, 1, 1]);
         // Stage 0 dst buffer = 120×120 with inner at (10, 10) size 100×100.
         // Ratios: (10/120, 10/120, 100/120, 100/120).
-        expect(s0.uvInnerRect[0]).toBeCloseTo(10 / 120);
-        expect(s0.uvInnerRect[1]).toBeCloseTo(10 / 120);
-        expect(s0.uvInnerRect[2]).toBeCloseTo(100 / 120);
-        expect(s0.uvInnerRect[3]).toBeCloseTo(100 / 120);
+        expect(s0.dstInnerRect[0]).toBeCloseTo(10 / 120);
+        expect(s0.dstInnerRect[1]).toBeCloseTo(10 / 120);
+        expect(s0.dstInnerRect[2]).toBeCloseTo(100 / 120);
+        expect(s0.dstInnerRect[3]).toBeCloseTo(100 / 120);
     });
 
     it("stage k+1 sees dims.input == stage k's dst buffer size", () => {

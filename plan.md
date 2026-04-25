@@ -26,7 +26,7 @@ stage 1 dst pad = src_pad + pad_1
 dst pad >= src pad per side   (monotonic non-decreasing)
 ```
 
-Shader authors sample src content with the auto-injected `uvInner` varying, which is an **src-sampling UV pointing into src's inner region** (valid whether src is capture or a prior intermediate). For "am I inside the element?" gating, use `uvInnerDst` (0..1 over the current dst buffer's inner region; outside [0,1] means overflow pad). Both computed in the default vertex shader from two auto-uniforms `uvInnerRect` (dst) and `srcInnerRect` (src).
+Shader authors sample src content with the auto-injected `uvInner` varying, which is an **src-sampling UV pointing into src's inner region** (valid whether src is capture or a prior intermediate). For "am I inside the element?" gating, use `uvInnerDst` (0..1 over the current dst buffer's inner region; outside [0,1] means overflow pad). Both computed in the default vertex shader from two auto-uniforms `dstInnerRect` (dst) and `srcInnerRect` (src).
 
 To reach viewport edges, an effect returns `{pad: dims.fullscreenPad}`. The chain pre-computes `fullscreenPad` as the per-side delta needed to hit the viewport from the current src pad.
 
@@ -238,7 +238,7 @@ export type EffectContext = {
     //     spread zone). Use for "am I inside the element?" gating.
     //
     // Auto-uploaded uniforms (for custom vertex shaders or advanced use):
-    //   `uniform vec4 uvInnerRect;` — dst inner sub-rect in buffer UV
+    //   `uniform vec4 dstInnerRect;` — dst inner sub-rect in buffer UV
     //                                 (xy = origin, zw = size).
     //   `uniform vec4 srcInnerRect;` — src inner sub-rect in src texture
     //                                   UV. `(0,0,1,1)` for capture;
@@ -560,7 +560,7 @@ ctx.draw({
 **Per-frame execution order** (only runs when the element is visible, i.e. `isVisible === true`. Off-viewport / post-release elements skip the chain entirely — both update and render are suppressed, matching the existing shader path):
 
 1. **uniform resolve**: evaluate function-valued entries in `VFXProps.uniforms` and write the results into each host's `ctx.uniforms`
-2. **outputSize resolve**: walk `renderingIndices` in order, call each effect's `outputSize?.(dims)`, apply pad to src pad to get dst pad, compute buffer size, and reallocate the corresponding intermediate RT only when buffer size / pad / float differ from the previous frame. Update each host's `srcInnerRect` and `uvInnerRect` uniforms for this frame.
+2. **outputSize resolve**: walk `renderingIndices` in order, call each effect's `outputSize?.(dims)`, apply pad to src pad to get dst pad, compute buffer size, and reallocate the corresponding intermediate RT only when buffer size / pad / float differ from the previous frame. Update each host's `srcInnerRect` and `dstInnerRect` uniforms for this frame.
 3. **update phase**: call `update?.(ctx)` on every effect in array order (ctx.src / ctx.output may carry over from the previous frame — update is state-update only). `ctx.draw()` is a no-op when called here (silently ignored, dev warning once per host)
 4. **render phase**: walk `renderingIndices` in order. For the k-th rendering effect (original-array index i):
    - `ctx.src` = (k = 0) ? element capture's `EffectTexture` : the `EffectTexture` resolver pointing at `intermediates[k-1]`'s current read texture
@@ -637,7 +637,7 @@ ctx.draw({
    - Insert the element into `#elements`; `#hitTest` works the same as before
 3. In the loop in `render()` (L668-969), if an element is the effect type, instead of the existing passes rendering:
    - Skip the chain entirely when `!hit.isVisible` (same gate as the shader path), so both update and render are suppressed for off-viewport / post-release elements
-   - Reflect the per-frame chain state into each host's ctx (EffectChain does this in bulk): `time`, `deltaTime`, `pixelRatio`, `resolution`, `mouse` (element-local bottom-left physical px), `mouseViewport` (viewport-local bottom-left physical px), `intersection`, `enterTime`, `leaveTime`, and the resolved `ctx.uniforms`. Also update each host's auto-uniform slots `uvInnerRect` (dst inner sub-rect) and `srcInnerRect` (src inner sub-rect) for the current stage
+   - Reflect the per-frame chain state into each host's ctx (EffectChain does this in bulk): `time`, `deltaTime`, `pixelRatio`, `resolution`, `mouse` (element-local bottom-left physical px), `mouseViewport` (viewport-local bottom-left physical px), `intersection`, `enterTime`, `leaveTime`, and the resolved `ctx.uniforms`. Also update each host's auto-uniform slots `dstInnerRect` (dst inner sub-rect) and `srcInnerRect` (src inner sub-rect) for the current stage
    - Call `chain.run(elementCapture, finalTarget)`
    - `finalTarget` branches on whether post-effects are present:
      - With post-effects: wrap `#postEffectTarget` in an `EffectRenderTarget` handle and pass it. **Handle cached at the host level** and regenerated only when the underlying `Framebuffer` instance changes (`#setupPostEffectTarget` reallocates on viewport resize). This keeps `ctx.output` reference-stable across frames so effects can compare identity for "output changed" checks
@@ -653,12 +653,12 @@ ctx.draw({
 - **Quad fast path**: when `geometry` is `ctx.quad` AND the effect is drawing against the default target region (current stage's dst buffer, or viewport + scrollPadding for post effects), dispatch through `renderPass(gl, this.#quad, pass, target, viewport, ...)` — the same path the shader-based effect pipeline already uses. The NDC -1..1 mapping plus the `viewport` clip rectangle match the existing coordinate convention, so no per-host quad VAO is allocated
 - **`uvInner` / `uvInnerDst` varyings**: the default vertex shader (used when `EffectDrawOpts.vert` is omitted) emits three varyings:
   - `uv` — 0..1 over the full dst buffer (inner + pad).
-  - `uvInnerDst` — `(bufferUV - uvInnerRect.xy) / uvInnerRect.zw`. 0..1 over the current dst buffer's inner region. Used for "am I in the element proper?" gating.
+  - `uvInnerDst` — `(bufferUV - dstInnerRect.xy) / dstInnerRect.zw`. 0..1 over the current dst buffer's inner region. Used for "am I in the element proper?" gating.
   - `uvInner` — `srcInnerRect.xy + uvInnerDst * srcInnerRect.zw`. The src-sampling UV pointing into src's inner region. `texture(src, uvInner)` fetches element content regardless of src's physical layout.
 
   Two auto-uploaded uniforms drive this:
-  - `uniform vec4 uvInnerRect;` — dst inner sub-rect in buffer UV (xy = origin, zw = size). For element effects stage k, `(pad.left / buffer_w, pad.bottom / buffer_h, elementPixel_w / buffer_w, elementPixel_h / buffer_h)`. For post effects (no pad), `(0, 0, 1, 1)`.
-  - `uniform vec4 srcInnerRect;` — src inner sub-rect in src texture UV. `(0, 0, 1, 1)` for stage 0's capture (capture is inner-only). For stage k≥1, matches the previous intermediate's `uvInnerRect`.
+  - `uniform vec4 dstInnerRect;` — dst inner sub-rect in buffer UV (xy = origin, zw = size). For element effects stage k, `(pad.left / buffer_w, pad.bottom / buffer_h, elementPixel_w / buffer_w, elementPixel_h / buffer_h)`. For post effects (no pad), `(0, 0, 1, 1)`.
+  - `uniform vec4 srcInnerRect;` — src inner sub-rect in src texture UV. `(0, 0, 1, 1)` for stage 0's capture (capture is inner-only). For stage k≥1, matches the previous intermediate's `dstInnerRect`.
 
   Custom `vert` users must compute `uvInner` / `uvInnerDst` themselves if they want them; the two `*Rect` uniforms are still auto-uploaded so the data is available.
 - **Custom geometry**: `EffectGeometry` POJO → compiled to a VAO via the `WeakMap<EffectGeometry, Map<Program, VaoEntry>>` cache. Attribute descriptors → `gl.bufferData` + `gl.vertexAttribPointer` (+ `gl.vertexAttribDivisor(loc, 1)` for `perInstance: true`), `indices` → `gl.bufferData(ELEMENT_ARRAY_BUFFER, ...)`, and `mode` maps to the GL primitive (`TRIANGLES` / `LINES` / `LINE_STRIP` / `POINTS`). Each entry implements `Restorable` so a context-lost recovery rebuilds it. Reusing the same POJO reference with the same program is a cache hit; a new reference or a different program rebuilds
@@ -713,7 +713,7 @@ ctx.draw({
      - `dims.fullscreenPad` for post effects is always `{top:0, right:0, bottom:0, left:0}`
      - LAST rendering effect's `outputSize` return value is ignored (final target is fixed)
      - **`srcInnerRect` uniform**: at stage 0 `(0, 0, 1, 1)` for capture; at stage k≥1 matches `pad.left/w, pad.bottom/h, elementPixel_w/w, elementPixel_h/h` of the previous intermediate
-     - **`uvInnerRect` uniform**: per stage matches `pad.left/w, pad.bottom/h, elementPixel_w/w, elementPixel_h/h` of the CURRENT dst buffer
+     - **`dstInnerRect` uniform**: per stage matches `pad.left/w, pad.bottom/h, elementPixel_w/w, elementPixel_h/h` of the CURRENT dst buffer
      - on element resize, intermediate sizes are recomputed and reallocated (reused when size / pad / float are unchanged)
      - `ctx.uniforms` reflects VFXProps.uniforms including function-valued entries (re-evaluated per frame, before update)
      - `ctx.mouse` and `ctx.mouseViewport` both use bottom-left origin and physical pixels; `mouse` is element-local and `mouseViewport` is viewport-local
