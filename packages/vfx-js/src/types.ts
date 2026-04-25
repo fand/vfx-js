@@ -738,29 +738,30 @@ export type EffectContext = {
      * target's viewport rect, so vertex shaders operate in NDC space
      * that maps 1:1 to the target region.
      *
-     * Convenience varyings (default vertex shader only, omit `vert`):
+     * Convenience varyings (default vertex shader only, omit `vert`).
+     * Nested largest-to-smallest by what `[0, 1]` covers:
      *
      *   `in vec2 uv;`
-     *     0..1 over the full dst buffer (inner + pad).
+     *     0..1 over the full dst buffer (captured content + pad).
      *
-     *   `in vec2 uvInner;`
-     *     Sampling UV pointing into `ctx.src`'s INNER region. Always usable
-     *     as `texture(src, uvInner)` to fetch element content regardless of
-     *     whether src is the capture (inner-only) or a prior stage's
-     *     intermediate (buffer with pad). Computed as
-     *     `srcInnerRect.xy + uvInnerDst * srcInnerRect.zw`.
+     *   `in vec2 uvSrc;`
+     *     0..1 over the src buffer. Use as `texture(src, uvSrc)` to fetch
+     *     captured content 1:1, regardless of whether src is the capture
+     *     (content-only) or a prior stage's intermediate (content + pad).
+     *     Computed as `srcInnerRect.xy + uvContent * srcInnerRect.zw`.
      *
-     *   `in vec2 uvInnerDst;`
-     *     0..1 over the CURRENT dst buffer's inner region. Values outside
-     *     `[0, 1]` mean the fragment is in the pad. Use for "am I inside
-     *     the element?" gating.
+     *   `in vec2 uvContent;`
+     *     0..1 over the captured content (element rect, or HTML subtree
+     *     for `vfx.addHTML`). Values outside `[0, 1]` mean the fragment
+     *     is in the pad. Use for "am I inside the element?" gating and
+     *     for spatial computations on the content rect.
      *
      * Auto-uploaded uniforms (for custom vertex shaders or advanced use):
-     *   `uniform vec4 dstInnerRect;`  — dst inner sub-rect in buffer UV
+     *   `uniform vec4 dstInnerRect;` — content rect within dst buffer UV
      *                                  (xy = origin, zw = size).
-     *   `uniform vec4 srcInnerRect;` — src inner sub-rect in src texture UV.
-     *                                  `(0,0,1,1)` for capture; with pad
-     *                                  for intermediate inputs.
+     *   `uniform vec4 srcInnerRect;` — content rect within src texture UV.
+     *                                  `(0, 0, 1, 1)` for capture; offset
+     *                                  by srcPad for intermediate inputs.
      */
     readonly quad: EffectQuad;
 

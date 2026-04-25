@@ -3,20 +3,20 @@ import type { Effect, EffectContext } from "@vfx-js/core";
 
 const FRAG_POSTERIZE = `#version 300 es
 precision highp float;
-in vec2 uvInner;
-in vec2 uvInnerDst;
+in vec2 uvSrc;
+in vec2 uvContent;
 out vec4 outColor;
 uniform sampler2D src;
 uniform float levels;
 
 void main() {
-    // uvInnerDst gates on the element proper (pad yields zeros). uvInner
+    // uvContent gates on the element proper (pad yields zeros). uvSrc
     // resolves the src sample into src's inner region, correct whether
     // src is capture or a prior stage's intermediate.
     vec4 c = vec4(0.0);
-    if (uvInnerDst.x >= 0.0 && uvInnerDst.x <= 1.0 &&
-        uvInnerDst.y >= 0.0 && uvInnerDst.y <= 1.0) {
-        c = texture(src, uvInner);
+    if (uvContent.x >= 0.0 && uvContent.x <= 1.0 &&
+        uvContent.y >= 0.0 && uvContent.y <= 1.0) {
+        c = texture(src, uvSrc);
     }
     // Quantize each channel to N = levels discrete steps.
     // Output bands: 0, 1/N, 2/N, ..., (N-1)/N. Values stay in [0,1).

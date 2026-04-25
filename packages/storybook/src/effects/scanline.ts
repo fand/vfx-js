@@ -3,8 +3,8 @@ import type { Effect, EffectContext } from "@vfx-js/core";
 
 const FRAG_SCANLINE = `#version 300 es
 precision highp float;
-in vec2 uvInner;
-in vec2 uvInnerDst;
+in vec2 uvSrc;
+in vec2 uvContent;
 out vec4 outColor;
 uniform sampler2D src;
 uniform float innerHeight;
@@ -12,12 +12,12 @@ uniform float spacing;
 
 void main() {
     vec4 c = vec4(0.0);
-    if (uvInnerDst.x >= 0.0 && uvInnerDst.x <= 1.0 &&
-        uvInnerDst.y >= 0.0 && uvInnerDst.y <= 1.0) {
+    if (uvContent.x >= 0.0 && uvContent.x <= 1.0 &&
+        uvContent.y >= 0.0 && uvContent.y <= 1.0) {
         // Keep one 1-px line per spacing-px band; rest goes black.
-        float yPx = uvInnerDst.y * innerHeight;
+        float yPx = uvContent.y * innerHeight;
         if (mod(floor(yPx), spacing) < 1.0) {
-            c = texture(src, uvInner);
+            c = texture(src, uvSrc);
         }
     }
     outColor = c;

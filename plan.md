@@ -26,7 +26,7 @@ stage 1 dst pad = src_pad + pad_1
 dst pad >= src pad per side   (monotonic non-decreasing)
 ```
 
-Shader authors sample src content with the auto-injected `uvInner` varying, which is an **src-sampling UV pointing into src's inner region** (valid whether src is capture or a prior intermediate). For "am I inside the element?" gating, use `uvInnerDst` (0..1 over the current dst buffer's inner region; outside [0,1] means overflow pad). Both computed in the default vertex shader from two auto-uniforms `dstInnerRect` (dst) and `srcInnerRect` (src).
+Shader authors sample src content with the auto-injected `uvSrc` varying, which is an **src-sampling UV pointing into src's inner region** (valid whether src is capture or a prior intermediate). For "am I inside the element?" gating, use `uvContent` (0..1 over the current dst buffer's inner region; outside [0,1] means overflow pad). Both computed in the default vertex shader from two auto-uniforms `dstInnerRect` (dst) and `srcInnerRect` (src).
 
 To reach the canvas edges (= viewport-inner + scrollPadding on each side), an effect returns `{pad: dims.fullscreenPad}`. The chain pre-computes `fullscreenPad` as the per-side delta needed to hit the canvas edge from the current src pad. (Despite the `viewport*` field names in `ChainFrameInput`, those values are canvas-equivalent.)
 
@@ -224,15 +224,15 @@ export type EffectContext = {
     //   `in vec2 uv;`
     //     0..1 over the full dst buffer (inner + pad).
     //
-    //   `in vec2 uvInner;`
+    //   `in vec2 uvSrc;`
     //     Sampling UV pointing into `ctx.src`'s INNER region (the
     //     element-content area within src). Always usable as
-    //     `texture(src, uvInner)` to fetch element content regardless
+    //     `texture(src, uvSrc)` to fetch element content regardless
     //     of whether src is the capture (inner-only texture) or a
     //     prior stage's intermediate (buffer with pad). Computed as
-    //     `srcInnerRect.xy + uvInnerDst * srcInnerRect.zw`.
+    //     `srcInnerRect.xy + uvContent * srcInnerRect.zw`.
     //
-    //   `in vec2 uvInnerDst;`
+    //   `in vec2 uvContent;`
     //     0..1 over the CURRENT dst buffer's inner region (the element
     //     area in the buffer we are rendering into). Values outside
     //     [0, 1] mean the fragment is in the pad (overflow / bloom
@@ -454,9 +454,9 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
         },
         render(ctx) {
             if (!bright || !pingA || !pingB) return;
-            // 1. Extract bright pixels. `texture(src, uvInner)` works
+            // 1. Extract bright pixels. `texture(src, uvSrc)` works
             //    whether ctx.src is capture (inner-only) or a prior
-            //    stage's intermediate (buffer with pad) — uvInner is the
+            //    stage's intermediate (buffer with pad) — uvSrc is the
             //    src-sampling UV into src's inner region.
             ctx.draw({
                 frag: FRAG_THRESHOLD,
@@ -656,16 +656,16 @@ ctx.draw({
 - **Self-contained draws**: every `ctx.draw()` call performs a full binding sequence (program → framebuffer → viewport → blend → VAO → uniform upload) before dispatching the draw, so no state leaks from one draw to the next, and any raw `ctx.gl.*` mutations an effect author makes between draws are harmless. No explicit reset API is exposed.
 - **Program cache**: `Map<string, Program>` keyed by `frag + "\x00" + vert` (source-identical draws reuse the compiled program). `Program` already handles active-uniform introspection (the existing `ActiveUniform` table in `gl/program.ts`) and GLSL version auto-detection via `detectGlslVersion`; the host just passes `vfxProps.glslVersion` when provided
 - **Quad fast path**: when `geometry` is `ctx.quad` AND the effect is drawing against the default target region (current stage's dst buffer, or viewport + scrollPadding for post effects), dispatch through `renderPass(gl, this.#quad, pass, target, viewport, ...)` — the same path the shader-based effect pipeline already uses. The NDC -1..1 mapping plus the `viewport` clip rectangle match the existing coordinate convention, so no per-host quad VAO is allocated
-- **`uvInner` / `uvInnerDst` varyings**: the default vertex shader (used when `EffectDrawOpts.vert` is omitted) emits three varyings:
+- **`uvSrc` / `uvContent` varyings**: the default vertex shader (used when `EffectDrawOpts.vert` is omitted) emits three varyings:
   - `uv` — 0..1 over the full dst buffer (inner + pad).
-  - `uvInnerDst` — `(bufferUV - dstInnerRect.xy) / dstInnerRect.zw`. 0..1 over the current dst buffer's inner region. Used for "am I in the element proper?" gating.
-  - `uvInner` — `srcInnerRect.xy + uvInnerDst * srcInnerRect.zw`. The src-sampling UV pointing into src's inner region. `texture(src, uvInner)` fetches element content regardless of src's physical layout.
+  - `uvContent` — `(bufferUV - dstInnerRect.xy) / dstInnerRect.zw`. 0..1 over the current dst buffer's inner region. Used for "am I in the element proper?" gating.
+  - `uvSrc` — `srcInnerRect.xy + uvContent * srcInnerRect.zw`. The src-sampling UV pointing into src's inner region. `texture(src, uvSrc)` fetches element content regardless of src's physical layout.
 
   Two auto-uploaded uniforms drive this:
   - `uniform vec4 dstInnerRect;` — dst inner sub-rect in buffer UV (xy = origin, zw = size). For element effects stage k, `(pad.left / buffer_w, pad.bottom / buffer_h, elementPixel_w / buffer_w, elementPixel_h / buffer_h)`. For post effects (no pad), `(0, 0, 1, 1)`.
   - `uniform vec4 srcInnerRect;` — src inner sub-rect in src texture UV. `(0, 0, 1, 1)` for stage 0's capture (capture is inner-only). For stage k≥1, matches the previous intermediate's `dstInnerRect`.
 
-  Custom `vert` users must compute `uvInner` / `uvInnerDst` themselves if they want them; the two `*Rect` uniforms are still auto-uploaded so the data is available.
+  Custom `vert` users must compute `uvSrc` / `uvContent` themselves if they want them; the two `*Rect` uniforms are still auto-uploaded so the data is available.
 - **Custom geometry**: `EffectGeometry` POJO → compiled to a VAO via the `WeakMap<EffectGeometry, Map<Program, VaoEntry>>` cache. Attribute descriptors → `gl.bufferData` + `gl.vertexAttribPointer` (+ `gl.vertexAttribDivisor(loc, 1)` for `perInstance: true`), `indices` → `gl.bufferData(ELEMENT_ARRAY_BUFFER, ...)`, and `mode` maps to the GL primitive (`TRIANGLES` / `LINES` / `LINE_STRIP` / `POINTS`). Each entry implements `Restorable` so a context-lost recovery rebuilds it. Reusing the same POJO reference with the same program is a cache hit; a new reference or a different program rebuilds
 - **Uniform dispatch**: reuse `Program`'s existing active-uniform table. `EffectUniformValue` → internal `UniformValue` (see `gl/program.ts:6-19`) is a 1:1 map: `number`, `boolean`, tuples, `number[]`, typed arrays (`Float32Array` / `Int32Array` / `Uint32Array`) pass straight through; `EffectTexture` and `EffectRenderTarget` both resolve (at bind time) to the internal `Texture` instance — for persistent RTs this resolves to the current read texture of the underlying `Backbuffer`. The backend assigns a texture unit, calls `Texture.bind(unit)`, and uploads `uniform1i(loc, unit)`
 - **Scalar / tuple type dispatch**: driven entirely by the shader's active uniform type (already handled by `uploadScalarUniform` in `gl/program.ts:243-407`). `[1, 2]` against `uniform vec2` uses `uniform2f`; the same tuple against `uniform ivec2` uses `uniform2i`; `number` against `uniform bool` uses `uniform1i(loc, v ? 1 : 0)`. Effect authors don't need separate tag types

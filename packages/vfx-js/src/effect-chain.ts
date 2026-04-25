@@ -114,8 +114,8 @@ type IntermediateEntry = {
  *   internal RTs auto-size to include pad). The `float` request is
  *   ignored on the last stage.
  * - `srcInnerRect` / `dstInnerRect` are derived per stage and uploaded as
- *   uniforms so the default vertex shader can emit `uvInner` (src-sampling
- *   UV) and `uvInnerDst` (dst-space 0..1 over element).
+ *   uniforms so the default vertex shader can emit `uvSrc` (src-sampling
+ *   UV) and `uvContent` (dst-space 0..1 over element).
  *
  * Error handling:
  * - `init` throws → reverse-dispose prior effects, bubble rejection.

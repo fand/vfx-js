@@ -3,17 +3,17 @@ import type { Effect, EffectContext } from "@vfx-js/core";
 
 const FRAG_RGB_MIX = `#version 300 es
 precision highp float;
-in vec2 uvInner;
-in vec2 uvInnerDst;
+in vec2 uvSrc;
+in vec2 uvContent;
 out vec4 outColor;
 uniform sampler2D src;
 uniform vec3 gains;
 
 void main() {
     vec4 c = vec4(0.0);
-    if (uvInnerDst.x >= 0.0 && uvInnerDst.x <= 1.0 &&
-        uvInnerDst.y >= 0.0 && uvInnerDst.y <= 1.0) {
-        c = texture(src, uvInner);
+    if (uvContent.x >= 0.0 && uvContent.x <= 1.0 &&
+        uvContent.y >= 0.0 && uvContent.y <= 1.0) {
+        c = texture(src, uvSrc);
     }
     outColor = vec4(c.rgb * gains, c.a);
 }

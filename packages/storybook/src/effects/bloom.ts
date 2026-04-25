@@ -19,8 +19,8 @@ import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 // kills the ring at the source.
 const FRAG_THRESHOLD = `#version 300 es
 precision highp float;
-in vec2 uvInner;
-in vec2 uvInnerDst;
+in vec2 uvSrc;
+in vec2 uvContent;
 out vec4 outColor;
 uniform sampler2D src;
 uniform float threshold;
@@ -28,14 +28,14 @@ uniform float softness;
 uniform float edgeFade;
 
 void main() {
-    // Hard-gate sampling to uvInner in [0,1]: a bare clamp would smear
+    // Hard-gate sampling to uvSrc in [0,1]: a bare clamp would smear
     // src's edge pixels into the pad (visible as a stretched image
     // when edgeFade x pad reaches past the src buffer). The clamp on
     // texture() keeps the sampler happy; srcMask zeroes what lies
     // outside the actual src content.
-    vec2 insideSrc = step(vec2(0.0), uvInner) * step(uvInner, vec2(1.0));
+    vec2 insideSrc = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
     float srcMask = insideSrc.x * insideSrc.y;
-    vec3 srgb = texture(src, clamp(uvInner, 0.0, 1.0)).rgb * srcMask;
+    vec3 srgb = texture(src, clamp(uvSrc, 0.0, 1.0)).rgb * srcMask;
     vec3 lin = pow(srgb, vec3(2.2));
 
     // COD:AW (Jimenez 2014) / Unity HDRP soft-knee brightness
@@ -53,9 +53,9 @@ void main() {
     rq = rq * rq / (4.0 * knee + 1e-4);
     float contribution = max(rq, br - threshold) / max(br, 1e-4);
 
-    // Chebyshev distance outside the inner rect in uvInnerDst units;
+    // Chebyshev distance outside the inner rect in uvContent units;
     // 0 inside, positive in the pad region.
-    vec2 outside = max(vec2(0.0), max(-uvInnerDst, uvInnerDst - 1.0));
+    vec2 outside = max(vec2(0.0), max(-uvContent, uvContent - 1.0));
     float outDist = max(outside.x, outside.y);
     float mask = 1.0 - smoothstep(0.0, edgeFade, outDist);
     float f = contribution * mask;
@@ -165,8 +165,8 @@ void main() {
 const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
-in vec2 uvInner;
-in vec2 uvInnerDst;
+in vec2 uvSrc;
+in vec2 uvContent;
 out vec4 outColor;
 uniform sampler2D src;
 uniform sampler2D bloom;
@@ -205,10 +205,10 @@ void main() {
     // threshold pass) kills anything outside src's valid [0,1] so
     // bloom pad extending past the src buffer doesn't repeat edge
     // pixels.
-    vec2 insideSrc = step(vec2(0.0), uvInner) * step(uvInner, vec2(1.0));
+    vec2 insideSrc = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
     float srcMask = insideSrc.x * insideSrc.y;
-    vec4 baseColor = texture(src, clamp(uvInner, 0.0, 1.0)) * srcMask;
-    vec2 outside = max(vec2(0.0), max(-uvInnerDst, uvInnerDst - 1.0));
+    vec4 baseColor = texture(src, clamp(uvSrc, 0.0, 1.0)) * srcMask;
+    vec2 outside = max(vec2(0.0), max(-uvContent, uvContent - 1.0));
     float outDist = max(outside.x, outside.y);
     float baseMask = 1.0 - smoothstep(0.0, edgeFade, outDist);
     baseColor.a *= baseMask;
@@ -272,7 +272,7 @@ export type BloomParams = {
      */
     dither: number;
     /**
-     * Width (in uvInnerDst units) over which the threshold input fades
+     * Width (in uvContent units) over which the threshold input fades
      * to zero past the element boundary.
      */
     edgeFade: number;

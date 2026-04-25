@@ -84,31 +84,31 @@ export function isEffectTexture(v: unknown): v is EffectTexture {
 }
 
 // ---------------------------------------------------------------------------
-// Default vertex shaders (300 es / 100). Emit three varyings:
-//   uv         — 0..1 over the full dst buffer (inner + pad)
-//   uvInnerDst — 0..1 over the CURRENT dst buffer's inner region (element
-//                proper); outside [0, 1] indicates pad
-//   uvInner    — src-sampling UV pointing into src's inner region; valid
-//                whether src is capture (inner-only) or a prior stage's
-//                intermediate (buffer with pad)
+// Default vertex shaders (300 es / 100). Emit three varyings, nested
+// largest-to-smallest in the [0, 1] range:
+//   uv        — 0..1 over the full dst buffer (= captured content + pad)
+//   uvSrc     — 0..1 over the src buffer (capture-only, or prior stage's
+//               intermediate including its pad)
+//   uvContent — 0..1 over the captured content (element / HTML subtree);
+//               outside [0, 1] indicates pad
 // Driven by two auto-uploaded uniforms:
-//   dstInnerRect (vec4) — dst inner sub-rect in buffer UV
-//   srcInnerRect (vec4) — src inner sub-rect in src texture UV
+//   dstInnerRect (vec4) — content sub-rect within dst buffer UV
+//   srcInnerRect (vec4) — content sub-rect within src texture UV
 // ---------------------------------------------------------------------------
 
 const DEFAULT_VERT_300 = `#version 300 es
 precision highp float;
 in vec3 position;
 out vec2 uv;
-out vec2 uvInnerDst;
-out vec2 uvInner;
+out vec2 uvContent;
+out vec2 uvSrc;
 uniform vec4 dstInnerRect;
 uniform vec4 srcInnerRect;
 void main() {
     vec2 bufferUV = position.xy * 0.5 + 0.5;
     uv = bufferUV;
-    uvInnerDst = (bufferUV - dstInnerRect.xy) / dstInnerRect.zw;
-    uvInner = srcInnerRect.xy + uvInnerDst * srcInnerRect.zw;
+    uvContent = (bufferUV - dstInnerRect.xy) / dstInnerRect.zw;
+    uvSrc = srcInnerRect.xy + uvContent * srcInnerRect.zw;
     gl_Position = vec4(position, 1.0);
 }
 `;
@@ -117,15 +117,15 @@ const DEFAULT_VERT_100 = `
 precision highp float;
 attribute vec3 position;
 varying vec2 uv;
-varying vec2 uvInnerDst;
-varying vec2 uvInner;
+varying vec2 uvContent;
+varying vec2 uvSrc;
 uniform vec4 dstInnerRect;
 uniform vec4 srcInnerRect;
 void main() {
     vec2 bufferUV = position.xy * 0.5 + 0.5;
     uv = bufferUV;
-    uvInnerDst = (bufferUV - dstInnerRect.xy) / dstInnerRect.zw;
-    uvInner = srcInnerRect.xy + uvInnerDst * srcInnerRect.zw;
+    uvContent = (bufferUV - dstInnerRect.xy) / dstInnerRect.zw;
+    uvSrc = srcInnerRect.xy + uvContent * srcInnerRect.zw;
     gl_Position = vec4(position, 1.0);
 }
 `;
@@ -180,12 +180,12 @@ export type HostFrameDims = {
     elementPhysH: number;
     /**
      * `dstInnerRect` uniform value (dst): inner origin + inner size in
-     * buffer-fraction units (0..1). See plan.md "`uvInner` varying".
+     * buffer-fraction units (0..1). See plan.md "`uvSrc` varying".
      */
     dstInnerRect: [number, number, number, number];
     /**
      * `srcInnerRect` uniform value (src): sampling origin + size in src
-     * texture UV. Drives `uvInner = srcInnerRect.xy + uvInnerDst *
+     * texture UV. Drives `uvSrc = srcInnerRect.xy + uvContent *
      * srcInnerRect.zw` in the default vertex shader.
      */
     srcInnerRect: [number, number, number, number];

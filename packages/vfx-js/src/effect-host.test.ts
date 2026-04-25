@@ -713,14 +713,14 @@ describe("EffectHost.draw", () => {
         expect(uploads["srcInnerRect"].value).toEqual([0.5, 0.6, 0.7, 0.8]);
     });
 
-    it("default vertex shader emits uv / uvInnerDst / uvInner varyings", () => {
+    it("default vertex shader emits uv / uvContent / uvSrc varyings", () => {
         const { host } = makeHost();
         host.setPhase("render");
         host.ctx.draw({ frag: FRAG });
         const vert = programs[0].vert;
         expect(vert).toMatch(/\bout vec2 uv\b/);
-        expect(vert).toMatch(/\bout vec2 uvInnerDst\b/);
-        expect(vert).toMatch(/\bout vec2 uvInner\b/);
+        expect(vert).toMatch(/\bout vec2 uvContent\b/);
+        expect(vert).toMatch(/\bout vec2 uvSrc\b/);
         expect(vert).toMatch(/uniform vec4 dstInnerRect\b/);
         expect(vert).toMatch(/uniform vec4 srcInnerRect\b/);
     });
