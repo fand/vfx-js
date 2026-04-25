@@ -243,55 +243,49 @@ void main() {
 }
 `;
 
-export type BloomOptions = {
-    /** Luminance cutoff in [0,1]. Default 0.7. */
-    threshold?: number;
+export type BloomParams = {
+    /** Luminance cutoff in [0,1]. */
+    threshold: number;
     /**
-     * Soft-knee width, 0..1 (default 0.1). COD:AW-style quadratic
-     * knee of half-width `threshold × softness` centred on the
-     * cutoff. 0 → hard threshold; 1 → knee stretches down to zero
-     * luma so every non-black pixel contributes partially. Higher
-     * values produce softer, wider bloom (was inverted under the
-     * old one-sided smoothstep).
+     * Soft-knee width, 0..1. COD:AW-style quadratic knee of half-width
+     * `threshold × softness` centred on the cutoff. softness=0 → hard
+     * threshold; 1 → knee stretches down to zero.
      */
-    softness?: number;
-    /** Additive gain on the bloom. Default 1.2. */
-    intensity?: number;
+    softness: number;
+    /** Additive gain on the bloom. */
+    intensity: number;
     /**
-     * Halo spread, 0..1 (default 0.7). Each step of `1/(depth−1)`
-     * activates one more pyramid level, so the knob is linear in
-     * *octaves* of reach: scatter=0 collapses to the shallowest
-     * downsample (≈ 2 src-px halo), scatter=1 engages all levels
-     * (≈ 2^(depth−1) src-px). Radius grows exponentially with the
-     * knob, but that feels linear to the eye — a px-linear mapping
-     * bunches all visible change into scatter<0.2 because the
-     * outermost level dominates visible reach. Intensity is
-     * normalised by active depth, so brightness stays roughly
+     * Halo spread, 0..1. Linear in *octaves* of reach: each step of
+     * `1/(depth−1)` activates one more pyramid level. Intensity is
+     * normalised by active depth so brightness stays roughly
      * scatter-independent.
      */
-    scatter?: number;
+    scatter: number;
     /**
      * Extra pad around the element in CSS (logical) px so the glow has
-     * room to spread. `"fullscreen"` reaches the viewport edges on all
-     * sides. Default 50.
+     * room to spread. `"fullscreen"` reaches the viewport edges.
      */
-    pad?: number | "fullscreen";
+    pad: number | "fullscreen";
     /**
-     * Dither amount 0..1 (default 0). Non-zero injects ±0.5-LSB
-     * interleaved-gradient noise at composite time to mask residual
-     * 8-bit banding from the linear→sRGB re-encode. 1 is typically
-     * invisible but enough to dissolve bands; raise for aggressive
-     * smoothing.
+     * Dither amount 0..1. Non-zero injects ±0.5-LSB interleaved-gradient
+     * noise at composite time to mask 8-bit banding.
      */
-    dither?: number;
+    dither: number;
     /**
-     * Width (in uvInnerDst units, 0..1 spans the element) over which
-     * the threshold input fades to zero past the element boundary.
-     * Default 0.02 (~2 % of element dim). Too small re-introduces
-     * the pad-edge ring; too large trims bright content near the
-     * element's own edge.
+     * Width (in uvInnerDst units) over which the threshold input fades
+     * to zero past the element boundary.
      */
-    edgeFade?: number;
+    edgeFade: number;
+};
+
+const DEFAULT_PARAMS: BloomParams = {
+    threshold: 0.7,
+    softness: 0.1,
+    intensity: 1.2,
+    scatter: 0.7,
+    pad: 50,
+    dither: 0,
+    edgeFade: 0.02,
 };
 
 // Tent offset in mip-texel units. 0.5 here combined with the
@@ -301,30 +295,180 @@ export type BloomOptions = {
 const TENT_FILTER = 0.5;
 
 /**
- * Defaults are written back onto the passed `opts` object so callers
- * can bind it to a reactive UI (e.g. Tweakpane): every uniform is read
- * fresh per frame, so post-construction mutations take effect on the
- * next draw. `pad` is read per frame too, so resizing it drives a
- * bright-buffer reallocation without re-adding the effect.
+ * COD:AW-style bloom. Mutate `params` directly or via `setParams` —
+ * uniforms and `outputSize` read live each frame, so a reactive UI
+ * (e.g. Tweakpane) can bind directly to `effect.params`.
  */
-export function createBloomEffect(opts: BloomOptions = {}): Effect {
-    opts.threshold ??= 0.7;
-    opts.softness ??= 0.1;
-    opts.intensity ??= 1.2;
-    opts.scatter ??= 0.7;
-    opts.dither ??= 0;
-    opts.edgeFade ??= 0.02;
-    opts.pad ??= 50;
+export class BloomEffect implements Effect {
+    params: BloomParams;
 
-    let bright: EffectRenderTarget | null = null;
-    const mipsDown: EffectRenderTarget[] = [];
-    const mipsUp: EffectRenderTarget[] = [];
-    let allocated = false;
-    let lastBaseW = 0;
-    let lastBaseH = 0;
+    #bright: EffectRenderTarget | null = null;
+    #mipsDown: EffectRenderTarget[] = [];
+    #mipsUp: EffectRenderTarget[] = [];
+    #allocated = false;
+    #lastBaseW = 0;
+    #lastBaseH = 0;
 
-    function allocateMips(ctx: EffectContext, baseW: number, baseH: number) {
-        if (allocated) {
+    constructor(initial: Partial<BloomParams> = {}) {
+        this.params = { ...DEFAULT_PARAMS, ...initial };
+    }
+
+    setParams(partial: Partial<BloomParams>): void {
+        Object.assign(this.params, partial);
+    }
+
+    init(ctx: EffectContext): void {
+        // Full-output, auto-resize — threshold needs inner-rect gating.
+        // Float storage so linear-space bloom values keep precision in
+        // the dark end across the downsample chain (8-bit would band).
+        this.#bright = ctx.createRenderTarget({ float: true });
+    }
+
+    render(ctx: EffectContext): void {
+        if (!this.#bright) {
+            return;
+        }
+        const { threshold, softness, intensity } = this.params;
+        const scatter = Math.min(Math.max(this.params.scatter, 0), 1);
+        const dither = Math.max(0, this.params.dither);
+        const edgeFade = Math.max(1e-6, this.params.edgeFade);
+        // If `pad` changed (outputSize is re-queried every frame by
+        // the host), `bright` auto-resizes — rebuild the pyramid so
+        // mip dims keep matching the buffer.
+        if (
+            this.#bright.width !== this.#lastBaseW ||
+            this.#bright.height !== this.#lastBaseH
+        ) {
+            this.#mipsDown.length = 0;
+            this.#mipsUp.length = 0;
+            this.#allocated = false;
+            this.#lastBaseW = this.#bright.width;
+            this.#lastBaseH = this.#bright.height;
+        }
+        this.#allocateMips(ctx, this.#bright.width, this.#bright.height);
+        const n = this.#mipsDown.length;
+        if (n === 0) {
+            return;
+        }
+
+        ctx.draw({
+            frag: FRAG_THRESHOLD,
+            uniforms: { src: ctx.src, threshold, softness, edgeFade },
+            target: this.#bright,
+        });
+
+        // Downsample: bright → mipsDown[0] (Karis) → ... → mipsDown[n-1]
+        ctx.draw({
+            frag: FRAG_DOWNSAMPLE,
+            uniforms: {
+                src: this.#bright,
+                texelSize: [1 / this.#bright.width, 1 / this.#bright.height],
+                karis: 1,
+            },
+            target: this.#mipsDown[0],
+        });
+        for (let i = 1; i < n; i++) {
+            const prev = this.#mipsDown[i - 1];
+            ctx.draw({
+                frag: FRAG_DOWNSAMPLE,
+                uniforms: {
+                    src: prev,
+                    texelSize: [1 / prev.width, 1 / prev.height],
+                    karis: 0,
+                },
+                target: this.#mipsDown[i],
+            });
+        }
+
+        // Additive pyramid upsample with per-level weights.
+        //   upsample[D-1] = mipsDown[D-1] × w[D-1]
+        //   upsample[i]   = mipsDown[i]   × w[i] + tent(upsample[i+1])
+        // weight[i] = clamp(activeDepth − i, 0, 1). activeDepth is
+        // linear in scatter (each step of 1/(n−1) activates one more
+        // level), giving ~even perceptual change across the knob.
+        // A radius-linear (log2) mapping bunches all visible motion
+        // into scatter < 0.2 because halo reach is dominated by the
+        // outermost level — octave-linear is what "feels" linear.
+        //
+        // Tent offsets use the *ideal* (non-floored) texel size
+        //   idealTexelUV = 2^smallLevel / base
+        // where smallLevel = i + 2. Anchoring to the base dimensions
+        // cancels the cumulative floor error from the halving chain.
+        const baseW = this.#bright.width;
+        const baseH = this.#bright.height;
+        const activeDepth = 1 + scatter * Math.max(0, n - 1);
+        const weightFor = (i: number) =>
+            Math.min(1, Math.max(0, activeDepth - i));
+        for (let i = n - 2; i >= 0; i--) {
+            const small =
+                i === n - 2 ? this.#mipsDown[n - 1] : this.#mipsUp[i + 1];
+            const levelScale = 2 ** (i + 2);
+            // Bottom mip is raw downsample — its weight is applied here.
+            // Intermediate upsamples already carry per-level weights
+            // baked in from previous iterations, so pass-through = 1.
+            const wSmall = i === n - 2 ? weightFor(n - 1) : 1.0;
+            ctx.draw({
+                frag: FRAG_UPSAMPLE,
+                uniforms: {
+                    srcSmall: small,
+                    srcLarge: this.#mipsDown[i],
+                    texelSize: [
+                        (TENT_FILTER * levelScale) / baseW,
+                        (TENT_FILTER * levelScale) / baseH,
+                    ],
+                    weightLarge: weightFor(i),
+                    weightSmall: wSmall,
+                },
+                target: this.#mipsUp[i],
+            });
+        }
+
+        const bloomTex = n >= 2 ? this.#mipsUp[0] : this.#mipsDown[0];
+        // Normalise by active depth so bloom amplitude stays roughly
+        // constant across scatter — fully-additive pyramid sums N
+        // levels, so raw amplitude scales with level count otherwise.
+        const effectiveIntensity = intensity / Math.max(1, activeDepth);
+        // bloomTex is always at level 1 (half of base).
+        ctx.draw({
+            frag: FRAG_COMPOSITE,
+            uniforms: {
+                src: ctx.src,
+                bloom: bloomTex,
+                texelSize: [
+                    (TENT_FILTER * 2) / baseW,
+                    (TENT_FILTER * 2) / baseH,
+                ],
+                intensity: effectiveIntensity,
+                dither,
+                edgeFade,
+            },
+            target: ctx.output,
+        });
+    }
+
+    outputSize(dims: Parameters<NonNullable<Effect["outputSize"]>>[0]): {
+        pad:
+            | number
+            | { top: number; right: number; bottom: number; left: number };
+    } {
+        const { pad } = this.params;
+        if (pad === "fullscreen") {
+            return { pad: dims.fullscreenPad };
+        }
+        return { pad: pad * dims.pixelRatio };
+    }
+
+    dispose(): void {
+        this.#bright = null;
+        this.#mipsDown.length = 0;
+        this.#mipsUp.length = 0;
+        this.#allocated = false;
+        this.#lastBaseW = 0;
+        this.#lastBaseH = 0;
+    }
+
+    #allocateMips(ctx: EffectContext, baseW: number, baseH: number): void {
+        if (this.#allocated) {
             return;
         }
         // Auto-depth: halve until both axes hit 1 px, capped at 8
@@ -336,7 +480,7 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
         let w = Math.max(1, Math.floor(baseW / 2));
         let h = Math.max(1, Math.floor(baseH / 2));
         for (let i = 0; i < 8; i++) {
-            mipsDown.push(
+            this.#mipsDown.push(
                 ctx.createRenderTarget({ size: [w, h], float: true }),
             );
             const nw = Math.max(1, Math.floor(w / 2));
@@ -347,165 +491,14 @@ export function createBloomEffect(opts: BloomOptions = {}): Effect {
             w = nw;
             h = nh;
         }
-        for (let i = 0; i < mipsDown.length - 1; i++) {
-            mipsUp.push(
+        for (let i = 0; i < this.#mipsDown.length - 1; i++) {
+            this.#mipsUp.push(
                 ctx.createRenderTarget({
-                    size: [mipsDown[i].width, mipsDown[i].height],
+                    size: [this.#mipsDown[i].width, this.#mipsDown[i].height],
                     float: true,
                 }),
             );
         }
-        allocated = true;
+        this.#allocated = true;
     }
-
-    const effect: Effect = {
-        init(ctx) {
-            // Full-output, auto-resize — threshold needs inner-rect gating.
-            // Float storage so linear-space bloom values keep precision in
-            // the dark end across the downsample chain (8-bit would band).
-            bright = ctx.createRenderTarget({ float: true });
-        },
-        render(ctx) {
-            if (!bright) {
-                return;
-            }
-            // Read live so a reactive UI driver works; clamps match the
-            // previous factory-time normalisation.
-            const threshold = opts.threshold as number;
-            const softness = opts.softness as number;
-            const intensity = opts.intensity as number;
-            const scatter = Math.min(Math.max(opts.scatter as number, 0), 1);
-            const dither = Math.max(0, opts.dither as number);
-            const edgeFade = Math.max(1e-6, opts.edgeFade as number);
-            // If `pad` changed (outputSize is re-queried every frame by
-            // the host), `bright` auto-resizes — rebuild the pyramid so
-            // mip dims keep matching the buffer.
-            if (
-                bright.width !== lastBaseW ||
-                bright.height !== lastBaseH
-            ) {
-                mipsDown.length = 0;
-                mipsUp.length = 0;
-                allocated = false;
-                lastBaseW = bright.width;
-                lastBaseH = bright.height;
-            }
-            allocateMips(ctx, bright.width, bright.height);
-            const n = mipsDown.length;
-            if (n === 0) {
-                return;
-            }
-
-            ctx.draw({
-                frag: FRAG_THRESHOLD,
-                uniforms: { src: ctx.src, threshold, softness, edgeFade },
-                target: bright,
-            });
-
-            // Downsample: bright → mipsDown[0] (Karis) → ... → mipsDown[n-1]
-            ctx.draw({
-                frag: FRAG_DOWNSAMPLE,
-                uniforms: {
-                    src: bright,
-                    texelSize: [1 / bright.width, 1 / bright.height],
-                    karis: 1,
-                },
-                target: mipsDown[0],
-            });
-            for (let i = 1; i < n; i++) {
-                const prev = mipsDown[i - 1];
-                ctx.draw({
-                    frag: FRAG_DOWNSAMPLE,
-                    uniforms: {
-                        src: prev,
-                        texelSize: [1 / prev.width, 1 / prev.height],
-                        karis: 0,
-                    },
-                    target: mipsDown[i],
-                });
-            }
-
-            // Additive pyramid upsample with per-level weights.
-            //   upsample[D-1] = mipsDown[D-1] × w[D-1]
-            //   upsample[i]   = mipsDown[i]   × w[i] + tent(upsample[i+1])
-            // weight[i] = clamp(activeDepth − i, 0, 1). activeDepth is
-            // linear in scatter (each step of 1/(n−1) activates one more
-            // level), giving ~even perceptual change across the knob.
-            // A radius-linear (log2) mapping bunches all visible motion
-            // into scatter < 0.2 because halo reach is dominated by the
-            // outermost level — octave-linear is what "feels" linear.
-            //
-            // Tent offsets use the *ideal* (non-floored) texel size
-            //   idealTexelUV = 2^smallLevel / base
-            // where smallLevel = i + 2. Anchoring to the base dimensions
-            // cancels the cumulative floor error from the halving chain.
-            const baseW = bright.width;
-            const baseH = bright.height;
-            const activeDepth = 1 + scatter * Math.max(0, n - 1);
-            const weightFor = (i: number) =>
-                Math.min(1, Math.max(0, activeDepth - i));
-            for (let i = n - 2; i >= 0; i--) {
-                const small = i === n - 2 ? mipsDown[n - 1] : mipsUp[i + 1];
-                const levelScale = 2 ** (i + 2);
-                // Bottom mip is raw downsample — its weight is applied here.
-                // Intermediate upsamples already carry per-level weights
-                // baked in from previous iterations, so pass-through = 1.
-                const wSmall = i === n - 2 ? weightFor(n - 1) : 1.0;
-                ctx.draw({
-                    frag: FRAG_UPSAMPLE,
-                    uniforms: {
-                        srcSmall: small,
-                        srcLarge: mipsDown[i],
-                        texelSize: [
-                            (TENT_FILTER * levelScale) / baseW,
-                            (TENT_FILTER * levelScale) / baseH,
-                        ],
-                        weightLarge: weightFor(i),
-                        weightSmall: wSmall,
-                    },
-                    target: mipsUp[i],
-                });
-            }
-
-            const bloomTex = n >= 2 ? mipsUp[0] : mipsDown[0];
-            // Normalise by active depth so bloom amplitude stays roughly
-            // constant across scatter — fully-additive pyramid sums N
-            // levels, so raw amplitude scales with level count otherwise.
-            const effectiveIntensity = intensity / Math.max(1, activeDepth);
-            // bloomTex is always at level 1 (half of base).
-            ctx.draw({
-                frag: FRAG_COMPOSITE,
-                uniforms: {
-                    src: ctx.src,
-                    bloom: bloomTex,
-                    texelSize: [
-                        (TENT_FILTER * 2) / baseW,
-                        (TENT_FILTER * 2) / baseH,
-                    ],
-                    intensity: effectiveIntensity,
-                    dither,
-                    edgeFade,
-                },
-                target: ctx.output,
-            });
-        },
-        dispose() {
-            bright = null;
-            mipsDown.length = 0;
-            mipsUp.length = 0;
-            allocated = false;
-            lastBaseW = 0;
-            lastBaseH = 0;
-        },
-    };
-
-    effect.outputSize = (dims) => {
-        const pad = opts.pad as number | "fullscreen";
-        if (pad === "fullscreen") {
-            return { pad: dims.fullscreenPad };
-        }
-        return { pad: pad * dims.pixelRatio };
-    };
-
-    return effect;
 }

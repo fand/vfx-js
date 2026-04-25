@@ -343,8 +343,7 @@ export class EffectChain {
             const i = this.#renderingIndices[k];
             const host = this.#hosts[i];
             const effect = this.#effects[i];
-            const render = effect.render;
-            if (!render) {
+            if (!effect.render) {
                 // renderingIndices filters on render presence — unreachable
                 // unless the Effect mutated its own shape post-construction.
                 continue;
@@ -369,7 +368,9 @@ export class EffectChain {
             host.setOutput(outputHandle);
 
             try {
-                render(host.ctx);
+                // Call on the effect (not a destructured ref) so class-based
+                // Effects keep their `this` binding.
+                effect.render(host.ctx);
             } catch (err) {
                 if (!this.#warnedRender.has(i)) {
                     this.#warnedRender.add(i);
