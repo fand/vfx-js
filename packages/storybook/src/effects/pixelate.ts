@@ -6,7 +6,7 @@ precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
 uniform sampler2D src;
-uniform vec4 srcInnerRect;
+uniform vec4 rectSrc;
 uniform vec2 cellUv;
 
 void main() {
@@ -14,10 +14,10 @@ void main() {
     if (uvContent.x >= 0.0 && uvContent.x <= 1.0 &&
         uvContent.y >= 0.0 && uvContent.y <= 1.0) {
         // Snap to cell centers in dst inner UV, then remap into src
-        // inner region via srcInnerRect so sampling is correct whether
+        // inner region via rectSrc so sampling is correct whether
         // src is capture or a prior stage's padded intermediate.
         vec2 cell = (floor(uvContent / cellUv) + 0.5) * cellUv;
-        vec2 uv = srcInnerRect.xy + clamp(cell, 0.0, 1.0) * srcInnerRect.zw;
+        vec2 uv = rectSrc.xy + clamp(cell, 0.0, 1.0) * rectSrc.zw;
         c = texture(src, uv);
     }
     outColor = c;

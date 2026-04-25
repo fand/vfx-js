@@ -354,8 +354,8 @@ function makeHost() {
         outputViewport: { x: 0, y: 0, w: 100, h: 100 },
         elementPhysW: 100,
         elementPhysH: 100,
-        dstInnerRect: [0, 0, 1, 1],
-        srcInnerRect: [0, 0, 1, 1],
+        rectContent: [0, 0, 1, 1],
+        rectSrc: [0, 0, 1, 1],
     });
     return { host, gl, glCtx };
 }
@@ -585,8 +585,8 @@ describe("EffectHost.createRenderTarget", () => {
             outputViewport: { x: 0, y: 0, w: 200, h: 200 },
             elementPhysW: 200,
             elementPhysH: 200,
-            dstInnerRect: [0, 0, 1, 1],
-            srcInnerRect: [0, 0, 1, 1],
+            rectContent: [0, 0, 1, 1],
+            rectSrc: [0, 0, 1, 1],
         });
         expect(framebuffers[0].width).toBe(200);
     });
@@ -601,8 +601,8 @@ describe("EffectHost.createRenderTarget", () => {
             outputViewport: { x: 0, y: 0, w: 120, h: 110 },
             elementPhysW: 100,
             elementPhysH: 100,
-            dstInnerRect: [0, 0, 1, 1],
-            srcInnerRect: [0, 0, 1, 1],
+            rectContent: [0, 0, 1, 1],
+            rectSrc: [0, 0, 1, 1],
         });
         host.ctx.createRenderTarget();
         // Sized to outputPhys, not elementPhys.
@@ -620,8 +620,8 @@ describe("EffectHost.createRenderTarget", () => {
             outputViewport: { x: 0, y: 0, w: 200, h: 200 },
             elementPhysW: 200,
             elementPhysH: 200,
-            dstInnerRect: [0, 0, 1, 1],
-            srcInnerRect: [0, 0, 1, 1],
+            rectContent: [0, 0, 1, 1],
+            rectSrc: [0, 0, 1, 1],
         });
         // Fixed: still 50×50.
         expect(framebuffers[0].width).toBe(50);
@@ -693,7 +693,7 @@ describe("EffectHost.draw", () => {
         warn.mockRestore();
     });
 
-    it("auto-uploads dstInnerRect and srcInnerRect as vec4 uniforms", () => {
+    it("auto-uploads rectContent and rectSrc as vec4 uniforms", () => {
         const { host } = makeHost();
         host.setFrameDims({
             outputPhysW: 100,
@@ -702,15 +702,15 @@ describe("EffectHost.draw", () => {
             outputViewport: { x: 0, y: 0, w: 100, h: 100 },
             elementPhysW: 100,
             elementPhysH: 100,
-            dstInnerRect: [0.1, 0.2, 0.3, 0.4],
-            srcInnerRect: [0.5, 0.6, 0.7, 0.8],
+            rectContent: [0.1, 0.2, 0.3, 0.4],
+            rectSrc: [0.5, 0.6, 0.7, 0.8],
         });
         host.setPhase("render");
         host.ctx.draw({ frag: FRAG });
         expect(programs).toHaveLength(1);
         const uploads = programs[0].uploads[0];
-        expect(uploads["dstInnerRect"].value).toEqual([0.1, 0.2, 0.3, 0.4]);
-        expect(uploads["srcInnerRect"].value).toEqual([0.5, 0.6, 0.7, 0.8]);
+        expect(uploads["rectContent"].value).toEqual([0.1, 0.2, 0.3, 0.4]);
+        expect(uploads["rectSrc"].value).toEqual([0.5, 0.6, 0.7, 0.8]);
     });
 
     it("default vertex shader emits uv / uvContent / uvSrc varyings", () => {
@@ -721,8 +721,8 @@ describe("EffectHost.draw", () => {
         expect(vert).toMatch(/\bout vec2 uv\b/);
         expect(vert).toMatch(/\bout vec2 uvContent\b/);
         expect(vert).toMatch(/\bout vec2 uvSrc\b/);
-        expect(vert).toMatch(/uniform vec4 dstInnerRect\b/);
-        expect(vert).toMatch(/uniform vec4 srcInnerRect\b/);
+        expect(vert).toMatch(/uniform vec4 rectContent\b/);
+        expect(vert).toMatch(/uniform vec4 rectSrc\b/);
     });
 });
 

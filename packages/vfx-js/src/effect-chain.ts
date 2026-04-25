@@ -70,9 +70,9 @@ type StageLayout = {
     /** Whether the dst buffer is float. */
     float: boolean;
     /** Src inner sub-rect in src texture UV (xy = origin, zw = size). */
-    srcInnerRect: [number, number, number, number];
+    rectSrc: [number, number, number, number];
     /** Dst inner sub-rect in buffer UV (xy = origin, zw = size). */
-    dstInnerRect: [number, number, number, number];
+    rectContent: [number, number, number, number];
     /**
      * Physical-px viewport on the canvas / final FBO for this stage's
      * draw. Only meaningful for the last rendering stage; intermediate
@@ -113,7 +113,7 @@ type IntermediateEntry = {
  *   (the host still receives `outputPhysW/H = dstBufferSize` so
  *   internal RTs auto-size to include pad). The `float` request is
  *   ignored on the last stage.
- * - `srcInnerRect` / `dstInnerRect` are derived per stage and uploaded as
+ * - `rectSrc` / `rectContent` are derived per stage and uploaded as
  *   uniforms so the default vertex shader can emit `uvSrc` (src-sampling
  *   UV) and `uvContent` (dst-space 0..1 over element).
  *
@@ -274,7 +274,7 @@ export class EffectChain {
             });
         }
 
-        // 2. Resolve per-stage pad / buffers / srcInnerRect / dstInnerRect.
+        // 2. Resolve per-stage pad / buffers / rectSrc / rectContent.
         //    Allocates / reuses intermediate RTs.
         this.#resolveStages(input);
 
@@ -432,7 +432,7 @@ export class EffectChain {
     }
 
     /**
-     * Compute per-stage layout (pad, buffer size, srcInnerRect, dstInnerRect,
+     * Compute per-stage layout (pad, buffer size, rectSrc, rectContent,
      * outputViewport) for every rendering stage. Allocates / reuses
      * intermediate RTs.
      */
@@ -478,16 +478,8 @@ export class EffectChain {
             const dstBufferSize: [number, number] = resolved.bufferSize;
             const float: boolean = isLast ? false : resolved.float;
 
-            const srcInnerRect = rectForPad(
-                srcPad,
-                srcBufferSize,
-                elementPixel,
-            );
-            const dstInnerRect = rectForPad(
-                dstPad,
-                dstBufferSize,
-                elementPixel,
-            );
+            const rectSrc = rectForPad(srcPad, srcBufferSize, elementPixel);
+            const rectContent = rectForPad(dstPad, dstBufferSize, elementPixel);
 
             // Stage outputViewport: where the draw lands on its dst buffer.
             let outputViewport: { x: number; y: number; w: number; h: number };
@@ -517,8 +509,8 @@ export class EffectChain {
                 dstPad,
                 dstBufferSize,
                 float,
-                srcInnerRect,
-                dstInnerRect,
+                rectSrc,
+                rectContent,
                 outputViewport,
             };
 
@@ -732,30 +724,30 @@ export class EffectChain {
         outputViewport: { x: number; y: number; w: number; h: number };
         elementPhysW: number;
         elementPhysH: number;
-        dstInnerRect: [number, number, number, number];
-        srcInnerRect: [number, number, number, number];
+        rectContent: [number, number, number, number];
+        rectSrc: [number, number, number, number];
     } {
         const renderPos = this.#renderingIndices.indexOf(k);
         let outputW: number;
         let outputH: number;
         let outputViewport: { x: number; y: number; w: number; h: number };
-        let dstInnerRect: [number, number, number, number];
-        let srcInnerRect: [number, number, number, number];
+        let rectContent: [number, number, number, number];
+        let rectSrc: [number, number, number, number];
 
         if (renderPos < 0) {
             // Not a rendering effect; placeholders.
             outputW = input.elementPhys[0];
             outputH = input.elementPhys[1];
             outputViewport = { x: 0, y: 0, w: outputW, h: outputH };
-            dstInnerRect = [0, 0, 1, 1];
-            srcInnerRect = [0, 0, 1, 1];
+            rectContent = [0, 0, 1, 1];
+            rectSrc = [0, 0, 1, 1];
         } else {
             const stage = this.#stages[renderPos];
             outputW = stage.dstBufferSize[0];
             outputH = stage.dstBufferSize[1];
             outputViewport = stage.outputViewport;
-            dstInnerRect = stage.dstInnerRect;
-            srcInnerRect = stage.srcInnerRect;
+            rectContent = stage.rectContent;
+            rectSrc = stage.rectSrc;
         }
 
         return {
@@ -765,8 +757,8 @@ export class EffectChain {
             outputViewport,
             elementPhysW: input.elementPhys[0],
             elementPhysH: input.elementPhys[1],
-            dstInnerRect,
-            srcInnerRect,
+            rectContent,
+            rectSrc,
         };
     }
 

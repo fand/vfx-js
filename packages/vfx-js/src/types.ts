@@ -748,7 +748,7 @@ export type EffectContext = {
      *     0..1 over the src buffer. Use as `texture(src, uvSrc)` to fetch
      *     captured content 1:1, regardless of whether src is the capture
      *     (content-only) or a prior stage's intermediate (content + pad).
-     *     Computed as `srcInnerRect.xy + uvContent * srcInnerRect.zw`.
+     *     Computed as `rectSrc.xy + uvContent * rectSrc.zw`.
      *
      *   `in vec2 uvContent;`
      *     0..1 over the captured content (element rect, or HTML subtree
@@ -757,9 +757,9 @@ export type EffectContext = {
      *     for spatial computations on the content rect.
      *
      * Auto-uploaded uniforms (for custom vertex shaders or advanced use):
-     *   `uniform vec4 dstInnerRect;` — content rect within dst buffer UV
+     *   `uniform vec4 rectContent;` — content rect within dst buffer UV
      *                                  (xy = origin, zw = size).
-     *   `uniform vec4 srcInnerRect;` — content rect within src texture UV.
+     *   `uniform vec4 rectSrc;` — content rect within src texture UV.
      *                                  `(0, 0, 1, 1)` for capture; offset
      *                                  by srcPad for intermediate inputs.
      */

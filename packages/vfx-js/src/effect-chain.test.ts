@@ -474,7 +474,7 @@ describe("EffectChain: outputSize", () => {
         expect(fbs[1].width).toBe(140); // stage 1 intermediate
     });
 
-    it("asymmetric pad produces asymmetric buffer; srcInnerRect reflects layout", () => {
+    it("asymmetric pad produces asymmetric buffer; rectSrc reflects layout", () => {
         const effects: Effect[] = [
             {
                 render: () => {},
@@ -494,12 +494,12 @@ describe("EffectChain: outputSize", () => {
         expect(fbs[0].width).toBe(200);
         expect(fbs[0].height).toBe(100);
         const s1 = chain.stages[1];
-        // Stage 1's src is stage 0's intermediate. srcInnerRect places
+        // Stage 1's src is stage 0's intermediate. rectSrc places
         // the inner at (50/200, 0/100) with size (100/200, 100/100).
-        expect(s1.srcInnerRect[0]).toBeCloseTo(0.25);
-        expect(s1.srcInnerRect[1]).toBeCloseTo(0);
-        expect(s1.srcInnerRect[2]).toBeCloseTo(0.5);
-        expect(s1.srcInnerRect[3]).toBeCloseTo(1);
+        expect(s1.rectSrc[0]).toBeCloseTo(0.25);
+        expect(s1.rectSrc[1]).toBeCloseTo(0);
+        expect(s1.rectSrc[2]).toBeCloseTo(0.5);
+        expect(s1.rectSrc[3]).toBeCloseTo(1);
     });
 
     it("monotonic clamp: negative pad component dev-warns and clamps to 0", () => {
@@ -574,7 +574,7 @@ describe("EffectChain: outputSize", () => {
         });
     });
 
-    it("srcInnerRect at stage 0 is (0, 0, 1, 1); dstInnerRect reflects current dst pad", () => {
+    it("rectSrc at stage 0 is (0, 0, 1, 1); rectContent reflects current dst pad", () => {
         const effects: Effect[] = [
             { render: () => {}, outputSize: () => ({ pad: 10 }) },
             { render: () => {} },
@@ -583,13 +583,13 @@ describe("EffectChain: outputSize", () => {
         chain.run(makeInput({ elementPhys: [100, 100] }));
         const [s0] = chain.stages;
         // Stage 0 src = capture (inner-only).
-        expect(s0.srcInnerRect).toEqual([0, 0, 1, 1]);
+        expect(s0.rectSrc).toEqual([0, 0, 1, 1]);
         // Stage 0 dst buffer = 120×120 with inner at (10, 10) size 100×100.
         // Ratios: (10/120, 10/120, 100/120, 100/120).
-        expect(s0.dstInnerRect[0]).toBeCloseTo(10 / 120);
-        expect(s0.dstInnerRect[1]).toBeCloseTo(10 / 120);
-        expect(s0.dstInnerRect[2]).toBeCloseTo(100 / 120);
-        expect(s0.dstInnerRect[3]).toBeCloseTo(100 / 120);
+        expect(s0.rectContent[0]).toBeCloseTo(10 / 120);
+        expect(s0.rectContent[1]).toBeCloseTo(10 / 120);
+        expect(s0.rectContent[2]).toBeCloseTo(100 / 120);
+        expect(s0.rectContent[3]).toBeCloseTo(100 / 120);
     });
 
     it("stage k+1 sees dims.input == stage k's dst buffer size", () => {
