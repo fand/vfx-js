@@ -655,7 +655,9 @@ export type EffectGeometry = {
  * Opaque handle for the effect's "target region" fullscreen quad.
  *
  * - element effect → element rect + overflow padding
- * - post effect    → viewport + scrollPadding
+ *                    (with `pad: 'fullscreen'` → reaches canvas edges,
+ *                     i.e. viewport + scrollPadding)
+ * - post effect    → canvas (viewport + scrollPadding)
  *
  * Users cannot construct or extend it; treat it as an injected default.
  */
@@ -882,7 +884,8 @@ export interface Effect {
      *     Grow each side's pad by the given amount (physical px).
      *     `pad: 10` is shorthand for all sides. The dst buffer size
      *     becomes `elementPixel + (src pad + pad)` on each axis. Use
-     *     `dims.fullscreenPad` to reach viewport edges.
+     *     `dims.fullscreenPad` to reach canvas edges (= viewport +
+     *     scrollPadding).
      *
      *   `{ size: [w, h]; float?: boolean }` / `readonly [w, h]`
      *     Explicit absolute buffer size (physical px). Extra pixels
@@ -902,9 +905,10 @@ export interface Effect {
      *
      * Pad tracking is entirely internal to the chain. Effects never
      * observe the accumulated pad — they declare deltas via `pad`, or
-     * absolute buffer sizes. For "reach viewport edges" the chain provides
+     * absolute buffer sizes. For "reach canvas edges" the chain provides
      * `dims.fullscreenPad` — the exact `pad` needed from src's current
-     * pad to hit the viewport (>= 0 per side).
+     * pad to hit the canvas edge (= viewport + scrollPadding; >= 0 per
+     * side).
      */
     outputSize?(dims: {
         readonly input: readonly [number, number];
@@ -914,9 +918,10 @@ export interface Effect {
         readonly viewportPixel: readonly [number, number];
         readonly pixelRatio: number;
         /**
-         * Physical-px pad delta needed to extend src to viewport edges,
-         * per side. Non-negative; 0 means src already spans that edge.
-         * Always zero for post-effects (src already spans the viewport).
+         * Physical-px pad delta needed to extend src to the canvas edge
+         * (= viewport + scrollPadding), per side. Non-negative; 0 means
+         * src already spans that edge. Always zero for post-effects
+         * (src already spans the canvas).
          */
         readonly fullscreenPad: {
             readonly top: number;

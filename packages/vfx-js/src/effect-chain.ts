@@ -38,11 +38,17 @@ export type ChainFrameInput = {
     canvasPhysW: number;
     canvasPhysH: number;
 
-    /** Element rect (inner, no overflow), logical px. Mirrors viewport for post effects. */
+    /** Element rect (inner, no overflow), logical px. Mirrors canvas for post effects. */
     elementLogical: readonly [number, number];
-    /** Element rect (inner, no overflow), physical px. Mirrors viewport for post effects. */
+    /** Element rect (inner, no overflow), physical px. Mirrors canvas for post effects. */
     elementPhys: readonly [number, number];
+    /**
+     * Canvas-equivalent logical px (= viewport-inner + scrollPadding on
+     * each side). Field name retained as `viewport*` for now; rename to
+     * `canvas*` is staged for a follow-up commit.
+     */
     viewportLogical: readonly [number, number];
+    /** Canvas-equivalent physical px. See `viewportLogical`. */
     viewportPhys: readonly [number, number];
     /**
      * Element's inner rect on canvas, bottom-left origin, physical px.
@@ -52,9 +58,10 @@ export type ChainFrameInput = {
      */
     elementRectOnCanvasPx: { x: number; y: number; w: number; h: number };
     /**
-     * Viewport inner rect on canvas, bottom-left origin, physical px.
-     * Used with `elementRectOnCanvasPx` to derive the per-side viewport
-     * edge distance → `dims.fullscreenPad`.
+     * Canvas rect (= viewport-inner + scrollPadding on each side),
+     * bottom-left origin, physical px. Origin is always `(0, 0)` and
+     * size matches `canvasPhysW/H`. Used with `elementRectOnCanvasPx`
+     * to derive the per-side canvas-edge distance → `dims.fullscreenPad`.
      */
     viewportRectOnCanvasPx: { x: number; y: number; w: number; h: number };
 
@@ -110,8 +117,9 @@ type IntermediateEntry = {
  *   or a bare `[w, h]` tuple. Returns are clamped non-monotonic (dst pad
  *   must be >= src pad per side).
  * - `dims.fullscreenPad` is the per-side `pad` delta needed to reach the
- *   viewport edges from the current src pad (non-negative, 0 if already
- *   past the edge). Zero for post-effect chains.
+ *   canvas edges (= viewport + scrollPadding) from the current src pad
+ *   (non-negative, 0 if already past the edge). Zero for post-effect
+ *   chains (src already spans the canvas).
  * - The last rendering effect's `outputSize` is honored too, but no
  *   intermediate buffer is allocated — the dst remains the fixed final
  *   target, and `dstPad` only widens the canvas-space draw viewport
@@ -685,11 +693,21 @@ export class EffectChain {
         };
     }
 
+    /**
+     * Per-side pad (physical px) to extend src out to the canvas edges
+     * (= viewport-inner + scrollPadding on each side). Zero for post-
+     * effect chains because src already spans the canvas.
+     */
     #fullscreenPadFor(input: ChainFrameInput, srcPad: Margin): ChainMargin {
         if (this.#isPostEffect) {
             return ZERO_MARGIN;
         }
         const el = input.elementRectOnCanvasPx;
+        // `viewportRectOnCanvasPx` is canvas extent (origin (0, 0), size
+        // = canvasPhysW/H). `vp.*` here measures distance to canvas edge,
+        // not to viewport-inner edge — `pad: 'fullscreen'` therefore
+        // covers the scrollPadding region as well, which is what `crtBloom`
+        // and other fullscreen effects need to avoid scroll-jank gaps.
         const vp = input.viewportRectOnCanvasPx;
         const distLeft = Math.max(0, el.x - vp.x);
         const distRight = Math.max(0, vp.x + vp.w - (el.x + el.w));

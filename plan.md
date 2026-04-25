@@ -28,7 +28,7 @@ dst pad >= src pad per side   (monotonic non-decreasing)
 
 Shader authors sample src content with the auto-injected `uvInner` varying, which is an **src-sampling UV pointing into src's inner region** (valid whether src is capture or a prior intermediate). For "am I inside the element?" gating, use `uvInnerDst` (0..1 over the current dst buffer's inner region; outside [0,1] means overflow pad). Both computed in the default vertex shader from two auto-uniforms `dstInnerRect` (dst) and `srcInnerRect` (src).
 
-To reach viewport edges, an effect returns `{pad: dims.fullscreenPad}`. The chain pre-computes `fullscreenPad` as the per-side delta needed to hit the viewport from the current src pad.
+To reach the canvas edges (= viewport-inner + scrollPadding on each side), an effect returns `{pad: dims.fullscreenPad}`. The chain pre-computes `fullscreenPad` as the per-side delta needed to hit the canvas edge from the current src pad. (Despite the `viewport*` field names in `ChainFrameInput`, those values are canvas-equivalent.)
 
 ### Public types (add to packages/vfx-js/src/types.ts)
 
@@ -157,8 +157,9 @@ export type EffectGeometry = {
 };
 
 // Opaque handle for the effect's "target region" quad:
-//   element effect → current dst buffer (elementPixel + per-stage pad)
-//   post effect    → viewport + scrollPadding
+//   element effect → current dst buffer (elementPixel + per-stage pad;
+//                    `pad: 'fullscreen'` reaches canvas edges)
+//   post effect    → canvas (= viewport + scrollPadding)
 // Users cannot construct or extend it; treat it as an injected default.
 export type EffectQuad = { readonly __brand: "EffectQuad" };
 
@@ -321,7 +322,8 @@ export interface Effect {
     //     Grow each side's pad by the given amount (physical px).
     //     `pad: 10` is shorthand for `{top:10, right:10, bottom:10, left:10}`.
     //     The dst buffer size becomes `elementPixel + (src pad + pad)`
-    //     on each axis. Use `dims.fullscreenPad` to reach viewport edges.
+    //     on each axis. Use `dims.fullscreenPad` to reach canvas edges
+    //     (= viewport + scrollPadding).
     //   `{ size: [w, h]; float?: boolean }` / `readonly [w, h]`
     //     Explicit absolute buffer size (physical px). The inner region's
     //     pixel size stays at `elementPixel`; extra pixels are distributed
@@ -340,9 +342,10 @@ export interface Effect {
     // Pad tracking is entirely internal to the chain. Effects never
     // observe the chain's accumulated pad directly — they only declare
     // deltas via `pad`, or absolute buffer sizes via `size`/`[w,h]`.
-    // For "reach viewport edges" the chain provides `dims.fullscreenPad`
-    // which is the exact `pad` needed from src's current pad to hit
-    // the viewport boundaries (>= 0 per side, 0 if already at or beyond).
+    // For "reach canvas edges (= viewport + scrollPadding)" the chain
+    // provides `dims.fullscreenPad` which is the exact `pad` needed from
+    // src's current pad to hit the canvas boundaries (>= 0 per side,
+    // 0 if already at or beyond).
     outputSize?(dims: {
         readonly input: readonly [number, number];       // src buffer size
         readonly element: readonly [number, number];      // inner, logical px
@@ -350,9 +353,10 @@ export interface Effect {
         readonly viewport: readonly [number, number];
         readonly viewportPixel: readonly [number, number];
         readonly pixelRatio: number;
-        // Pad (physical px) needed to extend from src to viewport edges.
-        // Non-negative per side; 0 means src already covers that edge.
-        // For post-effects, always 0 (src already spans the viewport).
+        // Pad (physical px) needed to extend from src to the canvas edge
+        // (= viewport + scrollPadding). Non-negative per side; 0 means
+        // src already covers that edge. For post-effects, always 0
+        // (src already spans the canvas).
         readonly fullscreenPad: {
             readonly top: number;
             readonly right: number;
@@ -554,7 +558,7 @@ ctx.draw({
 - For stage k≥1 src (intermediate k-1): `(pad.left / buffer_w, pad.bottom / buffer_h, elementPixel_w / buffer_w, elementPixel_h / buffer_h)` — physical layout of the inner sub-rect within the intermediate.
 
 **`fullscreenPad` computation** (per stage, passed as `dims.fullscreenPad` to `outputSize`):
-- For element effects: `fullscreenPad[side] = max(0, viewport_edge_distance[side] × pixelRatio - src_pad[side])` per side, where `viewport_edge_distance` is the physical-px distance from the element's edge to the viewport edge on that side. An effect returning `{ pad: dims.fullscreenPad }` ends up with `dst_pad = viewport_edge_distance × pixelRatio` (clamped non-negative).
+- For element effects: `fullscreenPad[side] = max(0, canvas_edge_distance[side] - src_pad[side])` per side, where `canvas_edge_distance` is the physical-px distance from the element's edge to the **canvas** edge (= viewport-inner + scrollPadding) on that side. An effect returning `{ pad: dims.fullscreenPad }` ends up with `dst_pad = canvas_edge_distance` (clamped non-negative). The `pad: 'fullscreen'` semantics therefore cover the scrollPadding region — necessary so a scroll within the scrollPadding range doesn't reveal an undrawn band.
 - For post effects: always `{ top: 0, right: 0, bottom: 0, left: 0 }` (src already spans the viewport).
 
 **Per-frame execution order** (only runs when the element is visible, i.e. `isVisible === true`. Off-viewport / post-release elements skip the chain entirely — both update and render are suppressed, matching the existing shader path):
@@ -709,8 +713,8 @@ ctx.draw({
      - **`outputSize({pad: …})` with asymmetric per-side values** (e.g. `{top: 0, right: 50, bottom: 0, left: 50}`) produces an asymmetric buffer and `srcInnerRect` matches the physical layout
      - `outputSize({size: [w, h]})` distributes extra pad proportionally to src's pad ratios; buffer < elementPixel on any axis → dev warn + clamp
      - `outputSize` returning `{pad: M}` with M < 0 on any side → dev warn + clamp to 0 (pad monotonic non-decreasing)
-     - `dims.fullscreenPad` equals the pad needed to extend src to viewport edges per side (non-negative); effect returning `{pad: dims.fullscreenPad}` reaches viewport
-     - `dims.fullscreenPad` for post effects is always `{top:0, right:0, bottom:0, left:0}`
+     - `dims.fullscreenPad` equals the pad needed to extend src to canvas edges (= viewport + scrollPadding) per side (non-negative); effect returning `{pad: dims.fullscreenPad}` reaches canvas
+     - `dims.fullscreenPad` for post effects is always `{top:0, right:0, bottom:0, left:0}` (post-effect src already spans the canvas)
      - LAST rendering effect's `outputSize` return value is ignored (final target is fixed)
      - **`srcInnerRect` uniform**: at stage 0 `(0, 0, 1, 1)` for capture; at stage k≥1 matches `pad.left/w, pad.bottom/h, elementPixel_w/w, elementPixel_h/h` of the previous intermediate
      - **`dstInnerRect` uniform**: per stage matches `pad.left/w, pad.bottom/h, elementPixel_w/w, elementPixel_h/h` of the CURRENT dst buffer

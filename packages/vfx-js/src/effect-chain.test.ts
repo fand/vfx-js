@@ -549,6 +549,35 @@ describe("EffectChain: outputSize", () => {
         });
     });
 
+    it("fullscreenPad reaches canvas edges when viewportRect represents full canvas (= viewport-inner + scrollPadding)", () => {
+        // vfx-player passes the canvas rect (= viewport-inner + scrollPadding
+        // on each side) as `viewportRectOnCanvasPx`. Verify fullscreenPad
+        // reaches the canvas edge, not just the inner viewport.
+        // Sim: viewport-inner 400×400, scrollPadding 40 px/side → canvas 480×480.
+        // Element 100×100 at viewport-center → at (190, 190) in canvas-bottom-left.
+        const probe = vi.fn().mockReturnValue({ pad: 0 });
+        const effects: Effect[] = [
+            { render: () => {}, outputSize: probe },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(
+            makeInput({
+                elementPhys: [100, 100],
+                viewportPhys: [480, 480],
+                elementRectOnCanvasPx: { x: 190, y: 190, w: 100, h: 100 },
+                viewportRectOnCanvasPx: { x: 0, y: 0, w: 480, h: 480 },
+            }),
+        );
+        // Distance from element to canvas edge: 190 per side.
+        expect(probe.mock.calls[0][0].fullscreenPad).toEqual({
+            top: 190,
+            right: 190,
+            bottom: 190,
+            left: 190,
+        });
+    });
+
     it("srcInnerRect at stage 0 is (0, 0, 1, 1); dstInnerRect reflects current dst pad", () => {
         const effects: Effect[] = [
             { render: () => {}, outputSize: () => ({ pad: 10 }) },
