@@ -41,10 +41,10 @@ export type ChainFrameInput = {
     /** Element rect (inner, no overflow), physical px. Mirrors canvas for post effects. */
     elementPhys: readonly [number, number];
     /**
-     * Element's inner rect on canvas, bottom-left origin, physical px.
-     * Used by the chain to compute the final-stage draw viewport after
-     * pad accumulation, and to derive the per-side canvas-edge distance
-     * → `dims.fullscreenPad` (the canvas itself is `(0, 0, canvasPhys)`).
+     * Element's content rect on canvas, bottom-left origin, physical px.
+     * Used to position the final-stage draw viewport (canvas-space) and
+     * to derive `dims.canvasRect` in element-local coords (the canvas
+     * itself is `(0, 0, canvasPhys)` in canvas coords).
      */
     elementRectOnCanvasPx: { x: number; y: number; w: number; h: number };
 
