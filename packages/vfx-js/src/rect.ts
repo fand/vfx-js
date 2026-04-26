@@ -9,16 +9,6 @@ type Tetra = {
 };
 
 /** @internal */
-function tetra(
-    top: number,
-    right: number,
-    bottom: number,
-    left: number,
-): Tetra {
-    return { top, right, bottom, left };
-}
-
-/** @internal */
 function createTetra(r: MarginOpts): Tetra {
     if (typeof r === "number") {
         return {
@@ -51,7 +41,7 @@ function createTetra(r: MarginOpts): Tetra {
  */
 export type Rect = Tetra & { readonly __brand: unique symbol };
 
-export const RECT_ZERO: Rect = tetra(0, 0, 0, 0) as Rect;
+export const RECT_ZERO: Rect = { top: 0, right: 0, bottom: 0, left: 0 } as Rect;
 
 /**
  * @internal
@@ -70,7 +60,12 @@ export function createMargin(r: MarginOpts): Margin {
     return createTetra(r) as Margin;
 }
 
-export const MARGIN_ZERO: Margin = tetra(0, 0, 0, 0) as Margin;
+export const MARGIN_ZERO: Margin = {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+} as Margin;
 
 /**
  * Values to determine a rectangle area for margin, padding etc.

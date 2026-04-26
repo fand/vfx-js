@@ -112,9 +112,6 @@ vi.mock("./effect-host.js", () => {
             },
             _fb: fb,
         }),
-        resolveRt: () => {
-            throw new Error("resolveRt not used by chain tests");
-        },
     };
 });
 

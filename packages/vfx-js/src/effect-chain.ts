@@ -2,7 +2,6 @@ import {
     EffectHost,
     makeEffectRenderTargetFromFb,
     makeEffectTexture,
-    resolveRt,
 } from "./effect-host.js";
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
@@ -59,8 +58,6 @@ type StageLayout = {
     dstRect: ElementRect;
     /** Dst buffer size (physical px): cached for FBO sizing. */
     dstBufferSize: [number, number];
-    /** Whether the dst buffer is float. */
-    float: boolean;
     /** Content sub-rect within dst buffer UV (xy = origin, zw = size). */
     rectContent: [number, number, number, number];
     /**
@@ -77,7 +74,6 @@ type IntermediateEntry = {
     rtHandle: EffectRenderTarget;
     /** Read handle (passed as `ctx.src` to the next stage). */
     texHandle: EffectTexture;
-    float: boolean;
     bufferSize: [number, number];
 };
 
@@ -118,7 +114,7 @@ export class EffectChain {
     #effects: readonly Effect[];
     #hosts: EffectHost[];
     #renderingIndices: number[];
-    #intermediates: (IntermediateEntry | null)[] = [];
+    #intermediates: IntermediateEntry[] = [];
     #stages: StageLayout[] = [];
     #capture: EffectTexture;
     #finalFallbackHandle: EffectRenderTarget | null = null;
@@ -146,6 +142,8 @@ export class EffectChain {
      * a special-case "no chain" branch.
      */
     #emptyPassthroughHost: EffectHost | null = null;
+    /** M=0 passthrough host: `#hosts[0]` if any, else `#emptyPassthroughHost`. */
+    #m0Host: EffectHost;
 
     constructor(
         glCtx: GLContext,
@@ -171,12 +169,13 @@ export class EffectChain {
                 capture,
                 vfxProps,
             );
+            this.#m0Host = this.#emptyPassthroughHost;
+        } else {
+            this.#m0Host = this.#hosts[0];
         }
         this.#renderingIndices = effects
             .map((e, i) => (typeof e.render === "function" ? i : -1))
             .filter((i) => i >= 0);
-        const M = this.#renderingIndices.length;
-        this.#intermediates = new Array(Math.max(0, M - 1)).fill(null);
     }
 
     get effects(): readonly Effect[] {
@@ -293,33 +292,21 @@ export class EffectChain {
         // 5. M = 0 identity copy special case.
         //    `host` is `#hosts[0]` when effects has non-rendering entries,
         //    or the dedicated `#emptyPassthroughHost` when effects is
-        //    empty.
+        //    empty. Constructor guarantees one of the two exists.
         if (M === 0) {
-            const host = this.#hosts[0] ?? this.#emptyPassthroughHost;
-            if (!host) {
-                return;
-            }
-            const srcHandle = this.#capture;
-            const canvasVp = this.#postEffectTargetViewport(input);
-            if (input.finalTarget === null) {
-                host.passthroughCopy(srcHandle, null, canvasVp);
-            } else {
-                const target = this.#getFinalHandle(input.finalTarget);
-                host.passthroughCopy(srcHandle, target, canvasVp);
-            }
+            const target =
+                input.finalTarget === null
+                    ? null
+                    : this.#getFinalHandle(input.finalTarget);
+            this.#m0Host.passthroughCopy(
+                this.#capture,
+                target,
+                input.elementRectOnCanvasPx,
+            );
             return;
         }
 
         // 6. Render phase: walk renderingIndices.
-        const requireIntermediate = (idx: number): IntermediateEntry => {
-            const entry = this.#intermediates[idx];
-            if (!entry) {
-                throw new Error(
-                    `[VFX-JS] intermediate[${idx}] missing during render`,
-                );
-            }
-            return entry;
-        };
         for (let k = 0; k < M; k++) {
             const i = this.#renderingIndices[k];
             const host = this.#hosts[i];
@@ -333,7 +320,7 @@ export class EffectChain {
             host.tickAutoUpdates();
 
             const srcHandle =
-                k === 0 ? this.#capture : requireIntermediate(k - 1).texHandle;
+                k === 0 ? this.#capture : this.#intermediates[k - 1].texHandle;
             host.setSrc(srcHandle);
 
             let outputHandle: EffectRenderTarget | null;
@@ -343,7 +330,7 @@ export class EffectChain {
                         ? null
                         : this.#getFinalHandle(input.finalTarget);
             } else {
-                outputHandle = requireIntermediate(k).rtHandle;
+                outputHandle = this.#intermediates[k].rtHandle;
                 host.clearRt(outputHandle);
             }
             host.setOutput(outputHandle);
@@ -393,7 +380,7 @@ export class EffectChain {
             this.#emptyPassthroughHost = null;
         }
         for (const im of this.#intermediates) {
-            im?.fb.dispose();
+            im.fb.dispose();
         }
         this.#intermediates = [];
         this.#stages = [];
@@ -469,13 +456,12 @@ export class EffectChain {
             this.#stages[k] = {
                 dstRect,
                 dstBufferSize,
-                float: false,
                 rectContent,
                 outputViewport,
             };
 
             if (!isLast) {
-                this.#ensureIntermediate(k, dstBufferSize, false);
+                this.#ensureIntermediate(k, dstBufferSize);
             }
             srcRect = dstRect;
         }
@@ -520,26 +506,19 @@ export class EffectChain {
         return effect.outputRect(dims);
     }
 
-    #ensureIntermediate(
-        k: number,
-        bufferSize: [number, number],
-        float: boolean,
-    ): void {
+    #ensureIntermediate(k: number, bufferSize: [number, number]): void {
         const current = this.#intermediates[k];
         if (
-            current !== null &&
+            current &&
             current.fb.width === bufferSize[0] &&
-            current.fb.height === bufferSize[1] &&
-            current.float === float
+            current.fb.height === bufferSize[1]
         ) {
             return;
         }
         if (current) {
             current.fb.dispose();
         }
-        const fb = new Framebuffer(this.#glCtx, bufferSize[0], bufferSize[1], {
-            float,
-        });
+        const fb = new Framebuffer(this.#glCtx, bufferSize[0], bufferSize[1]);
         const rtHandle = makeEffectRenderTargetFromFb(fb);
         const texHandle = makeEffectTexture(
             () => fb.texture,
@@ -550,7 +529,6 @@ export class EffectChain {
             fb,
             rtHandle,
             texHandle,
-            float,
             bufferSize,
         };
     }
@@ -568,22 +546,6 @@ export class EffectChain {
         }
         const { x, y } = input.elementRectOnCanvasPx;
         return [-x, -y, cw, ch];
-    }
-
-    /** Canvas-space viewport used by the M=0 passthrough copy. */
-    #postEffectTargetViewport(input: ChainFrameInput): {
-        x: number;
-        y: number;
-        w: number;
-        h: number;
-    } {
-        // M=0: src = capture (no pad). Copy fills element's inner rect.
-        return {
-            x: input.elementRectOnCanvasPx.x,
-            y: input.elementRectOnCanvasPx.y,
-            w: input.elementRectOnCanvasPx.w,
-            h: input.elementRectOnCanvasPx.h,
-        };
     }
 
     #hostFrameDims(
@@ -650,6 +612,3 @@ export class EffectChain {
         return this.#finalFallbackHandle;
     }
 }
-
-// Silence unused-import warnings; resolveRt is exported for chain tests.
-export { resolveRt };

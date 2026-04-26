@@ -35,7 +35,6 @@ type NormalizedAttribute = {
     itemSize: 1 | 2 | 3 | 4;
     normalized: boolean;
     perInstance: boolean;
-    location: number | undefined;
 };
 
 function modeEnum(
@@ -96,7 +95,6 @@ function normalizeAttribute(
             itemSize: 2,
             normalized: false,
             perInstance: false,
-            location: undefined,
         };
     }
     const d = desc as Exclude<
@@ -109,7 +107,6 @@ function normalizeAttribute(
         itemSize: d.itemSize,
         normalized: d.normalized ?? false,
         perInstance: d.perInstance ?? false,
-        location: d.location,
     };
 }
 
@@ -166,9 +163,6 @@ export class CompiledGeometry implements Restorable {
 
         for (const [name, descriptor] of Object.entries(this.#geo.attributes)) {
             const attr = normalizeAttribute(name, descriptor);
-            // For GLSL today, `location?` is ignored — program is already
-            // linked and `bindAttribLocation` must precede link. We resolve
-            // via getAttribLocation. WGSL (future) will honor it.
             const loc = gl.getAttribLocation(programHandle, attr.name);
             if (loc < 0) {
                 // Attribute isn't declared in this program; skip silently.

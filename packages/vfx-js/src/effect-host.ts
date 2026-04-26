@@ -739,24 +739,8 @@ export class EffectHost {
     #buildUniforms(userUniforms: EffectUniforms | undefined): Uniforms {
         const out: Uniforms = {};
         // Auto uniforms: rectContent (dst) + rectSrc (src).
-        const dst = this.#dims.rectContent;
-        out["rectContent"] = {
-            value: [dst[0], dst[1], dst[2], dst[3]] as [
-                number,
-                number,
-                number,
-                number,
-            ],
-        };
-        const src = this.#dims.rectSrc;
-        out["rectSrc"] = {
-            value: [src[0], src[1], src[2], src[3]] as [
-                number,
-                number,
-                number,
-                number,
-            ],
-        };
+        out["rectContent"] = { value: this.#dims.rectContent };
+        out["rectSrc"] = { value: this.#dims.rectSrc };
         if (!userUniforms) {
             return out;
         }
