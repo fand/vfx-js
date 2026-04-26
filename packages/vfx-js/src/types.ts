@@ -627,13 +627,6 @@ export type EffectAttributeDescriptor =
           normalized?: boolean;
           /** ANGLE_instanced_arrays / WebGPU `stepMode: "instance"`. */
           perInstance?: boolean;
-          /**
-           * Optional explicit vertex attribute location. GLSL: honored
-           * via `gl.bindAttribLocation` before link. WGSL (future): must
-           * match `@location(N)` in the user shader. Omit for GLSL;
-           * specify when writing raw WGSL.
-           */
-          location?: number;
       };
 
 /**
