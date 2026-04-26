@@ -131,11 +131,15 @@ export type ElementRect = readonly [x: number, y: number, w: number, h: number];
  * @internal
  */
 export function rectInRect(
-    _inner: ElementRect,
-    _outer: ElementRect,
+    inner: ElementRect,
+    outer: ElementRect,
 ): [number, number, number, number] {
-    // STUB: real math comes after TDD tests are reviewed.
-    return [0, 0, 1, 1];
+    const [ix, iy, iw, ih] = inner;
+    const [ox, oy, ow, oh] = outer;
+    if (ow <= 0 || oh <= 0) {
+        return [0, 0, 1, 1];
+    }
+    return [(ix - ox) / ow, (iy - oy) / oh, iw / ow, ih / oh];
 }
 
 /**
