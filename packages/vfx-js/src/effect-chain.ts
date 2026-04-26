@@ -479,7 +479,13 @@ export class EffectChain {
             }
             srcRect = dstRect;
         }
-        this.#lastHitTestPad = createMargin(0);
+        const [lx, ly, lw, lh] = this.#stages[M - 1].dstRect;
+        this.#lastHitTestPad = createMargin({
+            top: Math.max(0, ly + lh - elementPixel[1]),
+            right: Math.max(0, lx + lw - elementPixel[0]),
+            bottom: Math.max(0, -ly),
+            left: Math.max(0, -lx),
+        });
     }
 
     /**
