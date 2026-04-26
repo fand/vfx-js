@@ -11,7 +11,7 @@ A cleaner abstraction: **each stage declares its own rect in element-local coord
 
 ```
 contentRect = [0, 0, elemW, elemH]               // element occupies origin
-outset 10px = [-10, -10, elemW + 20, elemH + 20] // valid; rect extends past element
+outset 10px = [-10, -10, elemW + 20, elemH + 20] // valid; rect extends past element on all sides
 fullscreen  = dims.canvasRect                    // canvas in element-local coords
 ```
 
@@ -24,31 +24,36 @@ Replace `outputSize` with `outputRect`. Drop pad accumulation, monotonic clamp, 
 ### Public API
 
 ```typescript
-/** [x, y, w, h] in element-local physical px, top-left origin. */
-type ElementRect = readonly [number, number, number, number];
+/**
+ * Rect in element-local physical px, **bottom-left origin** (matches GL UV
+ * convention and the chain's `elementRectOnCanvasPx`).
+ *   x: 0 = element's left edge
+ *   y: 0 = element's bottom edge (negative y = below element)
+ *   w/h: extent
+ */
+type ElementRect = readonly [x: number, y: number, w: number, h: number];
 
 interface Effect {
     outputRect?(dims: {
         readonly element: readonly [number, number];      // logical px (CSS)
         readonly elementPixel: readonly [number, number]; // physical px
         readonly canvas: readonly [number, number];       // logical px (CSS)
-        readonly canvasPixel: readonly [number, number];  // physical px
+        readonly canvasPixel: readonly [number, number]; // physical px
         readonly pixelRatio: number;
         /** Element rect in element-local px: `[0, 0, elementPixel[0], elementPixel[1]]`. */
         readonly contentRect: ElementRect;
         /** Src buffer's rect in element-local px (= prev stage's `outputRect`, or `contentRect` at stage 0). */
         readonly srcRect: ElementRect;
-        /** Canvas rect in element-local px (= `[-elementOffsetX, -elementOffsetY, canvasW, canvasH]`). */
+        /** Canvas rect in element-local px (= `[-elementOffsetX, -elementOffsetY, canvasPhys[0], canvasPhys[1]]`). */
         readonly canvasRect: ElementRect;
-    }): ElementRect | { rect: ElementRect; float?: boolean } | undefined;
+    }): ElementRect | undefined;
 }
 ```
 
 Conventions:
-- **Top-left origin**, +x right, +y down (CSS / `getBoundingClientRect` style).
-- **Element-local**: element top-left = (0, 0); element bottom-right = (`elementPixel[0]`, `elementPixel[1]`).
-- **Default (undefined / omitted)**: `dstRect = srcRect` (no growth, mirrors current "no `outputSize` = dst pad = src pad").
-- **Returning a bare `ElementRect`** is shorthand for `{ rect, float: false }`.
+- **Bottom-left origin** (matches `elementRectOnCanvasPx`, GL UV, and the existing `mouse` convention in vfx-js).
+- **Element-local**: element bottom-left = (0, 0); element top-right = (`elementPixel[0]`, `elementPixel[1]`).
+- **Default (undefined / omitted)**: `dstRect = srcRect` (no growth).
 
 ### bloom.ts (only consumer)
 
@@ -66,11 +71,10 @@ outputRect(dims) {
 `StageLayout`:
 ```typescript
 type StageLayout = {
-    /** Stage's rect in element-local physical px. */
+    /** Stage's rect in element-local physical px (bottom-left). */
     dstRect: ElementRect;
     /** dst buffer size (= rect.w, rect.h). Cached for FBO sizing. */
     dstBufferSize: [number, number];
-    float: boolean;
     /** Content rect within dst buffer UV — derived from `dstRect`. */
     rectContent: [number, number, number, number];
     outputViewport: { x: number; y: number; w: number; h: number };
@@ -84,62 +88,58 @@ const canvasRect = this.#canvasRectInElementLocal(input);
 let srcRect: ElementRect = contentRect;
 for (let k = 0; k < M; k++) {
     const dstRect = this.#callOutputRect(effect, dims) ?? srcRect;
-    // Validate: dstRect must contain contentRect (otherwise element gets clipped).
-    // If not, warn + clamp to a containing rect.
-    const validated = clampToContain(dstRect, contentRect);
-    const dstBufferSize: [number, number] = [validated[2], validated[3]];
-    const rectContent = rectInRect(contentRect, validated);
+    const dstBufferSize: [number, number] = [dstRect[2], dstRect[3]];
+    const rectContent = rectInRect(contentRect, dstRect);
     // ...store, allocate intermediate, update outputViewport...
-    srcRect = validated;
+    srcRect = dstRect;
 }
 ```
 
-New helpers (in `effect-chain.ts` or `rect.ts`):
-- `rectInRect(inner: ElementRect, outer: ElementRect): [number, number, number, number]` — returns inner's UV position within outer (`[(inner.x - outer.x)/outer.w, (inner.y - outer.y)/outer.h, inner.w/outer.w, inner.h/outer.h]`).
-- `clampToContain(rect, mustContain): ElementRect` — ensures `rect` covers `mustContain` (extend rect on any side that's too small). Replaces the old `elementPixel` floor.
+New helpers:
+- `rectInRect(inner: ElementRect, outer: ElementRect): [number, number, number, number]` — inner's UV position within outer = `[(inner.x - outer.x)/outer.w, (inner.y - outer.y)/outer.h, inner.w/outer.w, inner.h/outer.h]`. Bottom-left UV (matches GL).
+
+> **TODO (future)**: validate that `dstRect` contains `contentRect` and warn + clamp otherwise. If a stage returns a rect smaller than the element, the element gets clipped. Out of scope for this plan — `dstRect` is used as-is.
 
 `#hostFrameDims`:
 - `rectContent` from current stage's `dstRect`
-- `rectSrc` from prev stage's `dstRect` (or `[0, 0, elementPixel.w, elementPixel.h]` mapped to itself = identity at stage 0)
+- `rectSrc` from prev stage's `dstRect` (or `[0, 0, 1, 1]` UV at stage 0)
 
 ### Removed
 
 - `outputSize` method (replaced by `outputRect`)
 - `{ pad: ... }`, `{ size: ... }`, `[w, h]` return forms
-- `dims.fullscreenPad` / `fullscreenGrow` (use `canvasRect` directly)
-- `Margin`-based pad tracking in `StageLayout` (`srcPad`, `srcBufferSize`, `dstPad` already removed in last commit; `Margin` itself stays in `rect.ts` for non-chain consumers)
+- `dims.fullscreenPad` (use `canvasRect` directly)
 - Monotonic clamp + `#warnedMonotonic` set
 - `distributePad()` helper
 - `#warnedClampBuffer` set
 
 ### Hit-test pad
 
-`EffectChain.hitTestPadPhys` returns `Margin` for `vfx-player`'s visibility hit-test rect grow. Convert from `dstRect` of the last stage:
+`EffectChain.hitTestPadPhys` returns `Margin` for `vfx-player`'s visibility hit-test rect grow. Convert from `dstRect` of the last stage (bottom-left → Margin):
 ```typescript
-const last = stages[M-1].dstRect;
+const [x, y, w, h] = stages[M-1].dstRect;
 return {
-    top:    Math.max(0, -last[1]),
-    right:  Math.max(0, (last[0] + last[2]) - elementPixel[0]),
-    bottom: Math.max(0, (last[1] + last[3]) - elementPixel[1]),
-    left:   Math.max(0, -last[0]),
+    bottom: Math.max(0, -y),                              // rect extends below element bottom
+    top:    Math.max(0, (y + h) - elementPixel[1]),       // rect extends above element top
+    left:   Math.max(0, -x),
+    right:  Math.max(0, (x + w) - elementPixel[0]),
 };
 ```
 
 ## Files to modify
 
+- `packages/vfx-js/src/rect.ts`
+  - Add `ElementRect` type and `rectInRect` helper (chain-scoped utility; export as `@internal`).
 - `packages/vfx-js/src/types.ts`
   - Replace `outputSize?(...)` signature with `outputRect?(...)` per spec above.
-  - Drop `MarginOpts` import in this section if unused after change.
-  - Update JSDoc with rect convention + example.
+  - Update JSDoc with rect convention + bloom example.
 - `packages/vfx-js/src/effect-chain.ts`
   - Rewrite `StageLayout`, `#resolveStages`, `#callOutputSize` (→ `#callOutputRect`), `#fullscreenPadFor` (→ `#canvasRectInElementLocal`), `#hostFrameDims`, `hitTestPadPhys`.
-  - Add `rectInRect` and `clampToContain` helpers (or extract to `rect.ts`).
   - Drop `distributePad`, `rectForPad` (replaced by `rectInRect`), `#warnedMonotonic`, `#warnedClampBuffer`.
   - Update doc comments (top of file) describing the rect model.
 - `packages/vfx-js/src/effect-chain.test.ts`
-  - Rewrite outputSize-related tests for `outputRect`.
-  - Delete `size`-form tests (5 cases).
-  - Add a test for the rect API: stage independence (no monotonic clamp), asymmetric rects, default-undefined inherits srcRect.
+  - Delete all `outputSize`-related tests (clean slate).
+  - Write new tests first (TDD): stage independence (no monotonic clamp), asymmetric rects, default-undefined inherits srcRect, fullscreen via `canvasRect`.
 - `packages/storybook/src/effects/bloom.ts`
   - `outputSize(dims): ...` → `outputRect(dims): ElementRect`. Use `dims.canvasRect` for fullscreen.
 - `plan.md`
@@ -147,20 +147,21 @@ return {
 
 ## Verification
 
-1. **Type check + tests**: `npm --workspace=@vfx-js/core run test` — expect ~125 tests passing after rewriting outputSize tests + dropping size-form tests.
-2. **Lint**: `npm run lint`.
-3. **Manual smoke**: storybook stories — `bloom`, `crtBloom` (chain `[pixelate, scanline, bloom]`), other effect stories — should render identically to before. `pad: 'fullscreen'` should still cover scrollPadding.
-4. **Single commit** unless type-flow forces a staged migration.
+1. **TDD-first**: delete all `outputSize`-related tests, then write new `outputRect` tests up front — stage independence (no monotonic clamp), asymmetric rects, default-undefined inherits `srcRect`, fullscreen via `canvasRect`. Implement against those tests.
+2. **Type check + tests**: `npm --workspace=@vfx-js/core run test`.
+3. **Lint**: `npm run lint`.
+4. **Manual smoke**: storybook stories — `bloom`, `crtBloom` (chain `[pixelate, scanline, bloom]`), other effect stories — should render identically to before. `pad: 'fullscreen'` should still cover scrollPadding.
+5. **Single commit** unless type-flow forces a staged migration.
 
 ## Reused utilities
 
-- `Margin` type in `rect.ts` — kept for hit-test return type; chain-internal use removed.
+- `Margin` type in `rect.ts` — kept for `hitTestPadPhys` return type; chain-internal pad tracking removed.
 - `createMargin` — only used at the hit-test boundary now.
 
 ## Notes
 
-- Coordinate origin (top-left) is documented choice; element-local rects with `(-10, -10)` outset read more naturally with top-left.
-- Tuple `[x, y, w, h]` chosen over `{x, y, w, h}` for concision (matches the user's proposed notation; less verbose for the common case `[-10, -10, w+20, h+20]`).
-- The `contentRect` field in dims is constant `[0, 0, elementPixel[0], elementPixel[1]]` — provided as a convenience so effects can compose helper utilities (`outset(contentRect, n)`) without rebuilding it.
+- **Bottom-left origin** chosen for chain/shader consistency: matches `elementRectOnCanvasPx`, `mouse`, and GL UV. Effect authors writing GLSL think in bottom-left UV; the rect API matches that mental model.
+- **Tuple `[x, y, w, h]`** chosen over object `{x, y, w, h}` for concision (matches the user's proposed notation; less verbose for the common case `[-10, -10, w+20, h+20]`). Named-tuple syntax (`readonly [x: number, ...]`) gives IDE hints on hover.
+- The `contentRect` field in dims is constant `[0, 0, elementPixel[0], elementPixel[1]]` — provided as a convenience so effects can compose helper utilities (e.g. user-side `outset(contentRect, n)`) without rebuilding it.
 - `srcRect` at stage 0 equals `contentRect` (capture is element-only; no pad).
-- `canvasRect` for post-effect chains equals `contentRect` (post-effect's element mirrors the canvas), so `fullscreenPad` continues to be effectively zero — semantics preserved.
+- For post-effect chains the "element" equals the canvas, so `contentRect == canvasRect`. Returning `canvasRect` makes the dst rect cover the full canvas — semantically equivalent to the old `fullscreenPad = 0`.
