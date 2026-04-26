@@ -5,7 +5,7 @@ import type { Framebuffer } from "./gl/framebuffer.js";
 import type { Pass } from "./gl/pass.js";
 import type { GlslVersion, Uniforms } from "./gl/program.js";
 import type { Texture } from "./gl/texture.js";
-import type { Margin, MarginOpts } from "./rect.js";
+import type { ElementRect, Margin, MarginOpts } from "./rect.js";
 
 export type { GlslVersion } from "./gl/program.js";
 
@@ -297,9 +297,10 @@ export type VFXProps = {
      * If you pass an object like `<VFXImg overflow={{ top: 100 }} />`,
      * REACT-VFX will add paddings only to the given direction (only to the `top` in this example).
      *
-     * SHADER PATH ONLY. Ignored by the effect path — effects control pad via
-     * each effect's own `outputSize` return (pad / fullscreenPad). Setting
-     * both `overflow` and `effect` emits a dev warning.
+     * SHADER PATH ONLY. Ignored by the effect path — effects control
+     * their dst rect via each effect's own `outputRect` return (use
+     * `dims.canvasRect` to reach canvas edges). Setting both `overflow`
+     * and `effect` emits a dev warning.
      */
     overflow?: true | MarginOpts;
 
@@ -843,10 +844,10 @@ export type EffectContext = {
  * - `render` runs every frame; omitting it makes the effect TRANSPARENT
  *   in the chain (no pass allocated, previous rendering effect's output
  *   flows directly to the next).
- * - `outputSize` declares the dimensions this effect writes into
- *   `ctx.output`. Default: input size, non-float. The LAST rendering
- *   effect's return value is ignored (its output is the fixed final
- *   target).
+ * - `outputRect` declares the rect this effect writes into `ctx.output`,
+ *   in element-local physical px (bottom-left). Default: `srcRect`
+ *   (no growth). Each stage's rect is independent — no accumulation
+ *   across the chain.
  * - `dispose` runs on element removal, reverse array order.
  */
 export interface Effect {
@@ -867,82 +868,47 @@ export interface Effect {
     dispose?(): void;
 
     /**
-     * Declares how this effect extends its output buffer relative to src.
-     * Called every frame; the chain reallocates the intermediate RT only
-     * when resolved `{ size, float, pad }` differs from the previous frame.
+     * Declares the rect this effect writes into `ctx.output`, in
+     * element-local physical px (bottom-left origin).
      *
-     * Omitted → the effect writes to a buffer of the same size as its src
-     * (no pad added). Right choice for simple filters that don't grow
-     * content (grayscale, invert, posterize).
+     *   `[0, 0, elemW, elemH]`            → element-only (no growth)
+     *   `[-px, -px, elemW + 2px, elemH + 2px]` → outset by `px` on each side
+     *   `dims.canvasRect`                 → reach canvas edges
      *
-     * Only meaningful when `render` is present AND the effect is not the
-     * last rendering effect in the chain (the last effect's output is the
-     * fixed final target, so its return value is ignored).
+     * Omitted → defaults to `srcRect` (= prev stage's `outputRect`, or
+     * `contentRect` at stage 0). Right choice for simple filters that
+     * don't grow content (grayscale, invert, posterize).
      *
-     * Return forms:
-     *
-     *   `{ pad: MarginOpts; float?: boolean }`
-     *     Grow each side's pad by the given amount (physical px).
-     *     `pad: 10` is shorthand for all sides. The dst buffer size
-     *     becomes `elementPixel + (src pad + pad)` on each axis. Use
-     *     `dims.fullscreenPad` to reach canvas edges (= viewport +
-     *     scrollPadding).
-     *
-     *   `{ size: [w, h]; float?: boolean }` / `readonly [w, h]`
-     *     Explicit absolute buffer size (physical px). Extra pixels
-     *     (`buffer - elementPixel`) are distributed to each side of the
-     *     pad proportionally to src's pad ratios (equal split when src
-     *     has no pad). Buffer smaller than `elementPixel` on any axis
-     *     triggers a dev warn + clamp.
+     * Each stage is independent: `[a, b]` with `a` returning a 100×100
+     * rect and `b` returning a 50×50 rect resolves to those exact
+     * sizes — no accumulation, no monotonic clamp. The chain converts
+     * rect → uniforms (`rectSrc` / `rectContent`) via the same affine
+     * map as before.
      *
      * Units:
-     *   input / elementPixel / canvasPixel / fullscreenPad / return →
-     *     physical px
+     *   contentRect / srcRect / canvasRect / return → physical px
      *   element / canvas → logical px
      *   pixelRatio: element × pixelRatio === elementPixel
      *
      * `canvas` / `canvasPixel` measure the WebGL canvas, which equals
-     * the visible viewport plus `scrollPadding` on each side (10% per side
-     * by default). `dims.fullscreenPad` reaches the canvas edge so
-     * `pad: 'fullscreen'` covers the scrollPadding region too.
+     * the visible viewport plus `scrollPadding` on each side (10% per
+     * side by default). `dims.canvasRect` reaches the canvas edge so
+     * `dims.canvasRect`-based effects cover the scrollPadding region too.
      *
      * Post-effect context: `element` / `elementPixel` mirror
-     * `canvas` / `canvasPixel`; `fullscreenPad` is always zero.
-     *
-     * Pad tracking is entirely internal to the chain. Effects never
-     * observe the accumulated pad — they declare deltas via `pad`, or
-     * absolute buffer sizes. For "reach canvas edges" the chain provides
-     * `dims.fullscreenPad` — the exact `pad` needed from src's current
-     * pad to hit the canvas edge (= viewport + scrollPadding; >= 0 per
-     * side).
+     * `canvas` / `canvasPixel`; `contentRect == canvasRect`.
      */
-    outputSize?(dims: {
-        readonly input: readonly [number, number];
+    outputRect?(dims: {
         readonly element: readonly [number, number];
         readonly elementPixel: readonly [number, number];
         readonly canvas: readonly [number, number];
         readonly canvasPixel: readonly [number, number];
         readonly pixelRatio: number;
-        /**
-         * Physical-px pad delta needed to extend src to the canvas edge
-         * (= viewport + scrollPadding), per side. Non-negative; 0 means
-         * src already spans that edge. Always zero for post-effects
-         * (src already spans the canvas).
-         */
-        readonly fullscreenPad: {
-            readonly top: number;
-            readonly right: number;
-            readonly bottom: number;
-            readonly left: number;
-        };
-    }):
-        | readonly [number, number]
-        | {
-              readonly size: readonly [number, number];
-              readonly float?: boolean;
-          }
-        | {
-              readonly pad: MarginOpts;
-              readonly float?: boolean;
-          };
+        /** Element rect in element-local px: `[0, 0, elementPixel[0], elementPixel[1]]`. */
+        readonly contentRect: ElementRect;
+        /** Src buffer's rect in element-local px (= prev stage's `outputRect`, or `contentRect` at stage 0). */
+        readonly srcRect: ElementRect;
+        /** Canvas rect in element-local px. */
+        readonly canvasRect: ElementRect;
+    }): ElementRect | undefined;
 }

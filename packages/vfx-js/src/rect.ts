@@ -113,6 +113,32 @@ function clamp(x: number, xmin: number, xmax: number): number {
 }
 
 /**
+ * Rect in element-local physical px, bottom-left origin (matches GL UV
+ * convention and `elementRectOnCanvasPx`).
+ *
+ * `x: 0` = element's left edge, `y: 0` = element's bottom edge.
+ * Negative coords / oversized w/h extend past the element.
+ *
+ * @internal
+ */
+export type ElementRect = readonly [x: number, y: number, w: number, h: number];
+
+/**
+ * `inner`'s position and size as bottom-left UV within `outer`.
+ * Returns `[(inner.x - outer.x)/outer.w, (inner.y - outer.y)/outer.h,
+ * inner.w/outer.w, inner.h/outer.h]`.
+ *
+ * @internal
+ */
+export function rectInRect(
+    _inner: ElementRect,
+    _outer: ElementRect,
+): [number, number, number, number] {
+    // STUB: real math comes after TDD tests are reviewed.
+    return [0, 0, 1, 1];
+}
+
+/**
  * Calculate the ratio of the intersection between two Rect objects.
  * It returns a number between 0 and 1.
  */

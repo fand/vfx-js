@@ -342,106 +342,45 @@ describe("EffectChain: render-less middle", () => {
 });
 
 // ---------------------------------------------------------------------------
-// outputSize reallocation
+// outputRect: per-stage rect declaration
 // ---------------------------------------------------------------------------
 
-describe("EffectChain: outputSize", () => {
-    it("allocates intermediates at the specified physical-px size (>= elementPixel)", () => {
-        const outputSize = vi.fn().mockReturnValue([256, 300]);
-        const effects: Effect[] = [
-            { render: () => {}, outputSize },
-            { render: () => {} },
-        ];
+describe("EffectChain: outputRect default", () => {
+    it("undefined outputRect → dstRect inherits srcRect (stage 0 = contentRect)", () => {
+        const effects: Effect[] = [{ render: () => {} }, { render: () => {} }];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [200, 200] }));
-        expect(fbs).toHaveLength(1);
-        expect(fbs[0].width).toBe(256);
-        expect(fbs[0].height).toBe(300);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        const [s0, s1] = chain.stages;
+        expect(s0.dstRect).toEqual([0, 0, 100, 100]);
+        expect(s1.dstRect).toEqual([0, 0, 100, 100]);
+        expect(s0.dstBufferSize).toEqual([100, 100]);
     });
 
-    it("clamps up when buffer < elementPixel on any axis + warns once", () => {
-        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-        const outputSize = vi.fn().mockReturnValue([256, 128]);
-        const effects: Effect[] = [
-            { render: () => {}, outputSize },
-            { render: () => {} },
-        ];
-        const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [200, 200] }));
-        expect(fbs).toHaveLength(1);
-        expect(fbs[0].width).toBe(256);
-        // 128 < 200 → clamp to elementPixel (200).
-        expect(fbs[0].height).toBe(200);
-        expect(warn).toHaveBeenCalledTimes(1);
-        warn.mockRestore();
-    });
-
-    it("last rendering effect's outputSize is honored for dstPad / viewport but allocates no intermediate", () => {
-        const middle = vi.fn().mockReturnValue({ pad: 5 });
-        const last = vi.fn().mockReturnValue({ pad: 7 });
-        const effects: Effect[] = [
-            { render: () => {}, outputSize: middle },
-            { render: () => {}, outputSize: last },
-        ];
-        const chain = makeChain(effects);
-        chain.run(
-            makeInput({
-                elementPhys: [100, 100],
-                elementRectOnCanvasPx: { x: 50, y: 60, w: 100, h: 100 },
-            }),
-        );
-        // Middle stage allocates 1 intermediate; last allocates none.
-        expect(fbs).toHaveLength(1);
-        expect(last).toHaveBeenCalled();
-        // Last stage's dstPad accumulates: middle(5) + last(7) = 12.
-        const sLast = chain.stages[1];
-        expect(sLast.dstPad.left).toBe(12);
-        expect(sLast.dstBufferSize).toEqual([124, 124]);
-        // Output viewport on canvas grows by dstPad on the negative side
-        // (origin shifts) and dstBufferSize on the positive side.
-        expect(sLast.outputViewport).toEqual({
-            x: 50 - 12,
-            y: 60 - 12,
-            w: 124,
-            h: 124,
-        });
-    });
-
-    it("allocates float intermediate when outputSize returns { float: true }", () => {
+    it("undefined outputRect on stage k>0 inherits prev stage's dstRect", () => {
         const effects: Effect[] = [
             {
                 render: () => {},
-                outputSize: () => ({ size: [128, 128], float: true }),
+                outputRect: () => [-10, -10, 120, 120] as const,
             },
+            // No outputRect → inherits stage 0's dstRect.
+            { render: () => {} },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [50, 50] }));
-        expect(fbConstructorArgs[0].opts).toEqual({ float: true });
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        const [, s1, s2] = chain.stages;
+        expect(s1.dstRect).toEqual([-10, -10, 120, 120]);
+        expect(s2.dstRect).toEqual([-10, -10, 120, 120]);
     });
+});
 
-    it("reallocates only on size/float delta", () => {
-        const size = vi
-            .fn()
-            .mockReturnValueOnce([100, 100])
-            .mockReturnValueOnce([100, 100]) // same → reuse
-            .mockReturnValueOnce([200, 200]); // changed → reallocate
+describe("EffectChain: outputRect dstBufferSize", () => {
+    it("dstBufferSize = [rect.w, rect.h] regardless of element size", () => {
         const effects: Effect[] = [
-            { render: () => {}, outputSize: size },
-            { render: () => {} },
-        ];
-        const chain = makeChain(effects);
-        chain.run(makeInput());
-        chain.run(makeInput());
-        chain.run(makeInput());
-        // Frame 1 allocates; frame 2 reuses; frame 3 reallocates.
-        expect(fbConstructorArgs).toHaveLength(2);
-        expect(fbs[0].disposed).toBe(true); // old FB disposed
-    });
-
-    it("{ pad: N } at stage 0 → dst pad = N, buffer = elementPixel + 2N per axis", () => {
-        const effects: Effect[] = [
-            { render: () => {}, outputSize: () => ({ pad: 10 }) },
+            {
+                render: () => {},
+                outputRect: () => [-10, -10, 120, 120] as const,
+            },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
@@ -449,82 +388,175 @@ describe("EffectChain: outputSize", () => {
         expect(fbs).toHaveLength(1);
         expect(fbs[0].width).toBe(120);
         expect(fbs[0].height).toBe(120);
-        const stage0 = chain.stages[0];
-        expect(stage0.dstPad).toMatchObject({
-            top: 10,
-            right: 10,
-            bottom: 10,
-            left: 10,
-        });
+        expect(chain.stages[0].dstBufferSize).toEqual([120, 120]);
     });
 
-    it("stacked pad accumulates: [a({pad:10}), b({pad:10})] → stage 1 dst pad = 20", () => {
+    it("asymmetric rect → asymmetric buffer", () => {
         const effects: Effect[] = [
-            { render: () => {}, outputSize: () => ({ pad: 10 }) },
-            { render: () => {}, outputSize: () => ({ pad: 10 }) },
+            {
+                render: () => {},
+                outputRect: () => [-50, 0, 200, 100] as const,
+            },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        expect(fbs[0].width).toBe(200);
+        expect(fbs[0].height).toBe(100);
+    });
+
+    it("reallocates intermediate only on size delta", () => {
+        const rect = vi
+            .fn()
+            .mockReturnValueOnce([0, 0, 100, 100])
+            .mockReturnValueOnce([0, 0, 100, 100]) // same → reuse
+            .mockReturnValueOnce([0, 0, 200, 200]); // changed → reallocate
+        const effects: Effect[] = [
+            { render: () => {}, outputRect: rect },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput());
+        chain.run(makeInput());
+        chain.run(makeInput());
+        expect(fbConstructorArgs).toHaveLength(2);
+        expect(fbs[0].disposed).toBe(true);
+    });
+});
+
+describe("EffectChain: outputRect stage independence", () => {
+    it("[a(big), b(small)] uses each stage's rect as-is — no monotonic clamp", () => {
+        const effects: Effect[] = [
+            {
+                render: () => {},
+                outputRect: () => [-20, -20, 140, 140] as const,
+            },
+            {
+                render: () => {},
+                outputRect: () => [0, 0, 100, 100] as const,
+            },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
         chain.run(makeInput({ elementPhys: [100, 100] }));
         const [s0, s1] = chain.stages;
-        // Stage 1's src pad is implicitly stage 0's dst pad (same buffer).
-        expect(s0.dstPad.left).toBe(10);
-        expect(s1.dstPad.left).toBe(20);
-        expect(fbs[0].width).toBe(120); // stage 0 intermediate
-        expect(fbs[1].width).toBe(140); // stage 1 intermediate
+        expect(s0.dstRect).toEqual([-20, -20, 140, 140]);
+        expect(s1.dstRect).toEqual([0, 0, 100, 100]);
+        // Stage 1 buffer SHRINKS back to element-only — no clamp.
+        expect(fbs[0].width).toBe(140);
+        expect(fbs[1].width).toBe(100);
     });
 
-    it("asymmetric pad produces asymmetric buffer; stage 0's rectContent describes content layout for stage 1's src", () => {
-        const effects: Effect[] = [
-            {
-                render: () => {},
-                outputSize: () => ({
-                    pad: { top: 0, right: 50, bottom: 0, left: 50 },
-                }),
-            },
-            {
-                render: () => {},
-                outputSize: vi.fn().mockReturnValue({ pad: 0 }),
-            },
-            { render: () => {} },
-        ];
-        const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
-        // Stage 0 intermediate: 200×100 (100 + 50 + 50, 100 + 0 + 0).
-        expect(fbs[0].width).toBe(200);
-        expect(fbs[0].height).toBe(100);
-        // Stage 1's src is stage 0's intermediate; its rectSrc uniform is
-        // stage 0's rectContent (same buffer). Inner at (50/200, 0/100)
-        // with size (100/200, 100/100).
-        const s0 = chain.stages[0];
-        expect(s0.rectContent[0]).toBeCloseTo(0.25);
-        expect(s0.rectContent[1]).toBeCloseTo(0);
-        expect(s0.rectContent[2]).toBeCloseTo(0.5);
-        expect(s0.rectContent[3]).toBeCloseTo(1);
-    });
-
-    it("monotonic clamp: negative pad component dev-warns and clamps to 0", () => {
+    it("does not warn when later stage's rect is smaller than earlier stage's", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
         const effects: Effect[] = [
             {
                 render: () => {},
-                outputSize: () => ({
-                    pad: { top: -5, right: 0, bottom: 0, left: 0 },
-                }),
+                outputRect: () => [-50, -50, 200, 200] as const,
+            },
+            {
+                render: () => {},
+                outputRect: () => [0, 0, 100, 100] as const,
             },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
         chain.run(makeInput({ elementPhys: [100, 100] }));
-        expect(chain.stages[0].dstPad.top).toBe(0); // clamped
-        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).not.toHaveBeenCalled();
         warn.mockRestore();
     });
+});
 
-    it("dims.fullscreenPad equals max(0, canvas-edge distance - srcPad) per side", () => {
-        const probe = vi.fn().mockReturnValue({ pad: 0 });
+describe("EffectChain: outputRect rectContent / rectSrc", () => {
+    it("rectContent = rectInRect(contentRect, dstRect) — symmetric outset", () => {
         const effects: Effect[] = [
-            { render: () => {}, outputSize: probe },
+            {
+                render: () => {},
+                outputRect: () => [-10, -10, 120, 120] as const,
+            },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        const [s0] = chain.stages;
+        // contentRect [0,0,100,100] within dstRect [-10,-10,120,120].
+        expect(s0.rectContent[0]).toBeCloseTo(10 / 120);
+        expect(s0.rectContent[1]).toBeCloseTo(10 / 120);
+        expect(s0.rectContent[2]).toBeCloseTo(100 / 120);
+        expect(s0.rectContent[3]).toBeCloseTo(100 / 120);
+    });
+
+    it("rectContent — asymmetric rect", () => {
+        const effects: Effect[] = [
+            {
+                render: () => {},
+                outputRect: () => [-50, 0, 200, 100] as const,
+            },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        const [s0] = chain.stages;
+        expect(s0.rectContent[0]).toBeCloseTo(50 / 200);
+        expect(s0.rectContent[1]).toBeCloseTo(0);
+        expect(s0.rectContent[2]).toBeCloseTo(100 / 200);
+        expect(s0.rectContent[3]).toBeCloseTo(1);
+    });
+
+    it("rectContent for default rect (= contentRect) is (0, 0, 1, 1)", () => {
+        const effects: Effect[] = [{ render: () => {} }, { render: () => {} }];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        expect(chain.stages[0].rectContent).toEqual([0, 0, 1, 1]);
+    });
+});
+
+describe("EffectChain: outputRect dims input", () => {
+    it("contentRect = [0, 0, elementPhys[0], elementPhys[1]]", () => {
+        const probe = vi.fn().mockReturnValue([0, 0, 100, 100]);
+        const effects: Effect[] = [
+            { render: () => {}, outputRect: probe },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 200] }));
+        const dims = probe.mock.calls[0][0];
+        expect(dims.contentRect).toEqual([0, 0, 100, 200]);
+    });
+
+    it("stage 0 srcRect == contentRect", () => {
+        const probe = vi.fn().mockReturnValue([0, 0, 100, 100]);
+        const effects: Effect[] = [
+            { render: () => {}, outputRect: probe },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        const dims = probe.mock.calls[0][0];
+        expect(dims.srcRect).toEqual([0, 0, 100, 100]);
+        expect(dims.srcRect).toEqual(dims.contentRect);
+    });
+
+    it("stage k>0 srcRect == prev stage's dstRect", () => {
+        const probe = vi.fn().mockReturnValue([0, 0, 100, 100]);
+        const effects: Effect[] = [
+            {
+                render: () => {},
+                outputRect: () => [-30, -30, 160, 160] as const,
+            },
+            { render: () => {}, outputRect: probe },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        const dims = probe.mock.calls[0][0];
+        expect(dims.srcRect).toEqual([-30, -30, 160, 160]);
+    });
+
+    it("element-chain canvasRect = [-elementOffsetX, -elementOffsetY, canvasW, canvasH]", () => {
+        const probe = vi.fn().mockReturnValue([0, 0, 100, 100]);
+        const effects: Effect[] = [
+            { render: () => {}, outputRect: probe },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
@@ -532,86 +564,17 @@ describe("EffectChain: outputSize", () => {
             makeInput({
                 elementPhys: [100, 100],
                 canvasPhys: [400, 400],
-                elementRectOnCanvasPx: { x: 150, y: 150, w: 100, h: 100 },
+                elementRectOnCanvasPx: { x: 150, y: 120, w: 100, h: 100 },
             }),
         );
         const dims = probe.mock.calls[0][0];
-        // Element origin (150, 150), extent (250, 250). Canvas (0, 0)–(400, 400).
-        // Edges: left=150, right=150, bottom=150, top=150. srcPad=0.
-        expect(dims.fullscreenPad).toEqual({
-            top: 150,
-            right: 150,
-            bottom: 150,
-            left: 150,
-        });
+        expect(dims.canvasRect).toEqual([-150, -120, 400, 400]);
     });
 
-    it("fullscreenPad covers scrollPadding (canvas extends viewport-inner by scrollPadding on each side)", () => {
-        // vfx-player passes the canvas size (= viewport-inner +
-        // scrollPadding on each side) as `canvasPhys`. Verify
-        // fullscreenPad reaches the canvas edge, not just the inner
-        // viewport.
-        // Sim: viewport-inner 400×400, scrollPadding 40 px/side → canvas 480×480.
-        // Element 100×100 at viewport-center → at (190, 190) in canvas-bottom-left.
-        const probe = vi.fn().mockReturnValue({ pad: 0 });
+    it("post-effect canvasRect = [0, 0, canvasW, canvasH] (= contentRect)", () => {
+        const probe = vi.fn().mockReturnValue([0, 0, 640, 480]);
         const effects: Effect[] = [
-            { render: () => {}, outputSize: probe },
-            { render: () => {} },
-        ];
-        const chain = makeChain(effects);
-        chain.run(
-            makeInput({
-                elementPhys: [100, 100],
-                canvasPhys: [480, 480],
-                elementRectOnCanvasPx: { x: 190, y: 190, w: 100, h: 100 },
-            }),
-        );
-        // Distance from element to canvas edge: 190 per side.
-        expect(probe.mock.calls[0][0].fullscreenPad).toEqual({
-            top: 190,
-            right: 190,
-            bottom: 190,
-            left: 190,
-        });
-    });
-
-    it("rectContent reflects current dst pad (stage 0's rectSrc is implicit (0,0,1,1))", () => {
-        const effects: Effect[] = [
-            { render: () => {}, outputSize: () => ({ pad: 10 }) },
-            { render: () => {} },
-        ];
-        const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
-        const [s0] = chain.stages;
-        // Stage 0 dst buffer = 120×120 with inner at (10, 10) size 100×100.
-        // Ratios: (10/120, 10/120, 100/120, 100/120).
-        expect(s0.rectContent[0]).toBeCloseTo(10 / 120);
-        expect(s0.rectContent[1]).toBeCloseTo(10 / 120);
-        expect(s0.rectContent[2]).toBeCloseTo(100 / 120);
-        expect(s0.rectContent[3]).toBeCloseTo(100 / 120);
-    });
-
-    it("stage k+1 sees dims.input == stage k's dst buffer size", () => {
-        const stage2Probe = vi.fn().mockImplementation(() => {
-            return { pad: 0 };
-        });
-        const effects: Effect[] = [
-            { render: () => {}, outputSize: () => ({ pad: 20 }) },
-            { render: () => {}, outputSize: stage2Probe },
-            { render: () => {} },
-        ];
-        const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
-        expect(stage2Probe).toHaveBeenCalled();
-        // Stage 0 dst: 100 + 20*2 = 140 per axis. Stage 1 sees this as
-        // dims.input.
-        expect(stage2Probe.mock.calls[0][0].input).toEqual([140, 140]);
-    });
-
-    it("post-effect context: element* mirrors viewport* and fullscreenPad is zero", () => {
-        const probe = vi.fn().mockReturnValue([100, 100]);
-        const effects: Effect[] = [
-            { render: () => {}, outputSize: probe },
+            { render: () => {}, outputRect: probe },
             { render: () => {} },
         ];
         const chain = makeChain(effects, /* isPostEffect = */ true);
@@ -623,19 +586,36 @@ describe("EffectChain: outputSize", () => {
             }),
         );
         const dims = probe.mock.calls[0][0];
-        expect(dims.element).toEqual([320, 240]);
         expect(dims.elementPixel).toEqual([640, 480]);
-        expect(dims.fullscreenPad).toEqual({
-            top: 0,
-            right: 0,
-            bottom: 0,
-            left: 0,
-        });
+        expect(dims.contentRect).toEqual([0, 0, 640, 480]);
+        expect(dims.canvasRect).toEqual([0, 0, 640, 480]);
+        expect(dims.canvasRect).toEqual(dims.contentRect);
     });
 
-    it("single-effect pad grows the canvas-space draw viewport", () => {
+    it("pixelRatio = canvasPhys[0] / canvasLogical[0]", () => {
+        const probe = vi.fn().mockReturnValue([0, 0, 100, 100]);
         const effects: Effect[] = [
-            { render: () => {}, outputSize: () => ({ pad: 10 }) },
+            { render: () => {}, outputRect: probe },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(
+            makeInput({
+                canvasLogical: [200, 100],
+                canvasPhys: [400, 200],
+            }),
+        );
+        expect(probe.mock.calls[0][0].pixelRatio).toBe(2);
+    });
+});
+
+describe("EffectChain: outputRect outputViewport", () => {
+    it("last-stage viewport: x/y = elementRectOnCanvasPx + dstRect.xy; w/h = dstRect.wh", () => {
+        const effects: Effect[] = [
+            {
+                render: () => {},
+                outputRect: () => [-10, -10, 120, 120] as const,
+            },
         ];
         const chain = makeChain(effects);
         chain.run(
@@ -644,28 +624,39 @@ describe("EffectChain: outputSize", () => {
                 elementRectOnCanvasPx: { x: 30, y: 40, w: 100, h: 100 },
             }),
         );
-        // No intermediate (last stage = only stage).
+        // Single-stage = last stage; no intermediate.
         expect(fbs).toHaveLength(0);
-        const s0 = chain.stages[0];
-        expect(s0.dstPad).toMatchObject({
-            top: 10,
-            right: 10,
-            bottom: 10,
-            left: 10,
-        });
-        expect(s0.outputViewport).toEqual({
-            x: 30 - 10,
-            y: 40 - 10,
+        expect(chain.stages[0].outputViewport).toEqual({
+            x: 30 + -10,
+            y: 40 + -10,
             w: 120,
             h: 120,
         });
     });
 
-    it("single-effect fullscreen pad reaches viewport edges", () => {
+    it("intermediate-stage viewport: full buffer (origin 0)", () => {
         const effects: Effect[] = [
             {
                 render: () => {},
-                outputSize: (dims) => ({ pad: dims.fullscreenPad }),
+                outputRect: () => [-10, -10, 120, 120] as const,
+            },
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        expect(chain.stages[0].outputViewport).toEqual({
+            x: 0,
+            y: 0,
+            w: 120,
+            h: 120,
+        });
+    });
+
+    it("fullscreen via dims.canvasRect → buffer = canvas, viewport = (0, 0, canvasW, canvasH)", () => {
+        const effects: Effect[] = [
+            {
+                render: () => {},
+                outputRect: (dims) => dims.canvasRect,
             },
         ];
         const chain = makeChain(effects);
@@ -677,9 +668,51 @@ describe("EffectChain: outputSize", () => {
             }),
         );
         const s0 = chain.stages[0];
-        // fullscreenPad = 150 per side → dst buffer 400x400, viewport (0,0,400,400).
+        // canvasRect = [-150, -150, 400, 400] in element-local; on canvas
+        // the viewport is (150 + -150, 150 + -150, 400, 400) = (0,0,400,400).
         expect(s0.dstBufferSize).toEqual([400, 400]);
         expect(s0.outputViewport).toEqual({ x: 0, y: 0, w: 400, h: 400 });
+    });
+
+    it("last-stage outputRect honored (no intermediate)", () => {
+        const middle = vi.fn().mockReturnValue([-5, -5, 110, 110]);
+        const last = vi.fn().mockReturnValue([-12, -12, 124, 124]);
+        const effects: Effect[] = [
+            { render: () => {}, outputRect: middle },
+            { render: () => {}, outputRect: last },
+        ];
+        const chain = makeChain(effects);
+        chain.run(
+            makeInput({
+                elementPhys: [100, 100],
+                elementRectOnCanvasPx: { x: 50, y: 60, w: 100, h: 100 },
+            }),
+        );
+        expect(fbs).toHaveLength(1); // only middle stage
+        expect(last).toHaveBeenCalled();
+        expect(chain.stages[1].dstRect).toEqual([-12, -12, 124, 124]);
+        expect(chain.stages[1].outputViewport).toEqual({
+            x: 50 + -12,
+            y: 60 + -12,
+            w: 124,
+            h: 124,
+        });
+    });
+});
+
+describe("EffectChain: outputRect non-rendering effect", () => {
+    it("outputRect on a non-rendering effect is ignored", () => {
+        const probe = vi.fn().mockReturnValue([-10, -10, 120, 120]);
+        const effects: Effect[] = [
+            { update: () => {}, outputRect: probe }, // no render → not in chain
+            { render: () => {} },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        expect(probe).not.toHaveBeenCalled();
+        // Single rendering stage; default rect.
+        expect(chain.stages).toHaveLength(1);
+        expect(chain.stages[0].dstRect).toEqual([0, 0, 100, 100]);
     });
 });
 
@@ -725,19 +758,68 @@ describe("EffectChain: hitTestPadPhys", () => {
         });
     });
 
-    it("reflects last stage's dstPad after run()", () => {
+    it("derived from last stage's dstRect: how far it extends past contentRect on each side", () => {
+        // Last rect [-10, -10, 120, 120] over content [0, 0, 100, 100]:
+        // bottom = max(0, -y)            = 10
+        // top    = max(0, (y+h) - elemH) = max(0, 110 - 100) = 10
+        // left   = max(0, -x)            = 10
+        // right  = max(0, (x+w) - elemW) = max(0, 110 - 100) = 10
         const effects: Effect[] = [
-            { render: () => {}, outputSize: () => ({ pad: 8 }) },
-            { render: () => {}, outputSize: () => ({ pad: 4 }) },
+            {
+                render: () => {},
+                outputRect: () => [-20, -20, 140, 140] as const,
+            },
+            {
+                render: () => {},
+                outputRect: () => [-10, -10, 120, 120] as const,
+            },
         ];
         const chain = makeChain(effects);
         chain.run(makeInput({ elementPhys: [100, 100] }));
-        // Pad accumulates monotonically: 8 → 12.
         expect(chain.hitTestPadPhys).toMatchObject({
-            top: 12,
-            right: 12,
-            bottom: 12,
-            left: 12,
+            top: 10,
+            right: 10,
+            bottom: 10,
+            left: 10,
+        });
+    });
+
+    it("asymmetric rect produces asymmetric hit-test pad", () => {
+        // Rect [-50, 0, 200, 100] over content [0, 0, 100, 100]:
+        // bottom = max(0, -0) = 0
+        // top    = max(0, 100 - 100) = 0
+        // left   = max(0, 50) = 50
+        // right  = max(0, 150 - 100) = 50
+        const effects: Effect[] = [
+            {
+                render: () => {},
+                outputRect: () => [-50, 0, 200, 100] as const,
+            },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        expect(chain.hitTestPadPhys).toMatchObject({
+            top: 0,
+            right: 50,
+            bottom: 0,
+            left: 50,
+        });
+    });
+
+    it("rect inside content (no extension) → zero pad", () => {
+        const effects: Effect[] = [
+            {
+                render: () => {},
+                outputRect: () => [10, 10, 80, 80] as const,
+            },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput({ elementPhys: [100, 100] }));
+        expect(chain.hitTestPadPhys).toMatchObject({
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
         });
     });
 });

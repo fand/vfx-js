@@ -296,7 +296,7 @@ const TENT_FILTER = 0.5;
 
 /**
  * COD:AW-style bloom. Mutate `params` directly or via `setParams` —
- * uniforms and `outputSize` read live each frame, so a reactive UI
+ * uniforms and `outputRect` read live each frame, so a reactive UI
  * (e.g. Tweakpane) can bind directly to `effect.params`.
  */
 export class BloomEffect implements Effect {
@@ -332,7 +332,7 @@ export class BloomEffect implements Effect {
         const scatter = Math.min(Math.max(this.params.scatter, 0), 1);
         const dither = Math.max(0, this.params.dither);
         const edgeFade = Math.max(1e-6, this.params.edgeFade);
-        // If `pad` changed (outputSize is re-queried every frame by
+        // If `pad` changed (outputRect is re-queried every frame by
         // the host), `bright` auto-resizes — rebuild the pyramid so
         // mip dims keep matching the buffer.
         if (
@@ -446,16 +446,16 @@ export class BloomEffect implements Effect {
         });
     }
 
-    outputSize(dims: Parameters<NonNullable<Effect["outputSize"]>>[0]): {
-        pad:
-            | number
-            | { top: number; right: number; bottom: number; left: number };
-    } {
+    outputRect(
+        dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
+    ): readonly [number, number, number, number] {
         const { pad } = this.params;
         if (pad === "fullscreen") {
-            return { pad: dims.fullscreenPad };
+            return dims.canvasRect;
         }
-        return { pad: pad * dims.pixelRatio };
+        const px = pad * dims.pixelRatio;
+        const [, , ew, eh] = dims.contentRect;
+        return [-px, -px, ew + 2 * px, eh + 2 * px];
     }
 
     dispose(): void {
