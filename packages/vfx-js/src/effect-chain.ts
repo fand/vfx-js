@@ -422,11 +422,6 @@ export class EffectChain {
      * rectContent, outputViewport) for every rendering stage. Allocates
      * / reuses intermediate RTs.
      *
-     * STUB: wires up the call sequence (outputRect → rectInRect →
-     * intermediate alloc) but the rect-math helpers return placeholder
-     * values, so tests asserting on `dstRect` / `rectContent` /
-     * `outputViewport` / `hitTestPadPhys` will fail until the math is
-     * implemented for real.
      */
     #resolveStages(input: ChainFrameInput): void {
         const M = this.#renderingIndices.length;
@@ -434,10 +429,10 @@ export class EffectChain {
         if (M === 0) {
             return;
         }
-        const elementPixel: [number, number] = [
-            input.elementPhys[0],
-            input.elementPhys[1],
-        ];
+        // Post-effect: element mirrors canvas, so contentRect spans canvasPhys.
+        const elementPixel: readonly [number, number] = this.#isPostEffect
+            ? input.canvasPhys
+            : input.elementPhys;
         const contentRect: ElementRect = [
             0,
             0,
@@ -559,12 +554,14 @@ export class EffectChain {
      * chains: canvas == element, so `[0, 0, canvasPhys[0], canvasPhys[1]]`.
      * Element chains: shifted by the element's canvas offset so the
      * element's bottom-left lies at (0, 0).
-     *
-     * STUB: returns a placeholder so the chain runs end-to-end; new TDD
-     * tests assert the real values.
      */
-    #canvasRectInElementLocal(_input: ChainFrameInput): ElementRect {
-        return [0, 0, 0, 0];
+    #canvasRectInElementLocal(input: ChainFrameInput): ElementRect {
+        const [cw, ch] = input.canvasPhys;
+        if (this.#isPostEffect) {
+            return [0, 0, cw, ch];
+        }
+        const { x, y } = input.elementRectOnCanvasPx;
+        return [-x, -y, cw, ch];
     }
 
     /** Canvas-space viewport used by the M=0 passthrough copy. */
