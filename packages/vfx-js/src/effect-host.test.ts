@@ -348,12 +348,12 @@ function makeHost() {
         { autoCrop: true, glslVersion: "300 es" },
     );
     host.setFrameDims({
-        outputPhysW: 100,
-        outputPhysH: 100,
-        canvasPhys: [200, 200],
+        outputBufferW: 100,
+        outputBufferH: 100,
+        canvasBufferSize: [200, 200],
         outputViewport: { x: 0, y: 0, w: 100, h: 100 },
-        elementPhysW: 100,
-        elementPhysH: 100,
+        elementBufferW: 100,
+        elementBufferH: 100,
         rectContent: [0, 0, 1, 1],
         rectSrc: [0, 0, 1, 1],
     });
@@ -539,12 +539,12 @@ describe("EffectHost.createRenderTarget", () => {
         expect(args.h).toBe(200);
     });
 
-    it("auto-size persistent → Backbuffer with pixelRatio=host.pr and logical W/H", () => {
+    it("auto-size persistent → Backbuffer with pixelRatio=host.pr and CSS W/H", () => {
         const { host } = makeHost();
         host.ctx.createRenderTarget({ persistent: true });
         const args = backbuffers[0].ctorArgs;
         expect(args.pr).toBe(2);
-        // elementPhysW / elementPhysH was 100 in makeHost; divided by 2.
+        // elementBufferW / elementBufferH was 100 in makeHost; divided by 2.
         expect(args.w).toBe(50);
         expect(args.h).toBe(50);
     });
@@ -579,33 +579,33 @@ describe("EffectHost.createRenderTarget", () => {
         host.ctx.createRenderTarget();
         // Change element size → auto-track FB.setSize path.
         host.setFrameDims({
-            outputPhysW: 200,
-            outputPhysH: 200,
-            canvasPhys: [200, 200],
+            outputBufferW: 200,
+            outputBufferH: 200,
+            canvasBufferSize: [200, 200],
             outputViewport: { x: 0, y: 0, w: 200, h: 200 },
-            elementPhysW: 200,
-            elementPhysH: 200,
+            elementBufferW: 200,
+            elementBufferH: 200,
             rectContent: [0, 0, 1, 1],
             rectSrc: [0, 0, 1, 1],
         });
         expect(framebuffers[0].width).toBe(200);
     });
 
-    it("auto-size follows outputPhysW/H (= dst buffer = inner + pad), not elementPhysW/H", () => {
+    it("auto-size follows outputBufferW/H (= dst buffer = inner + pad), not elementBufferW/H", () => {
         const { host } = makeHost();
         // dst buffer (120x110) > inner element (100x100) — pad in play.
         host.setFrameDims({
-            outputPhysW: 120,
-            outputPhysH: 110,
-            canvasPhys: [200, 200],
+            outputBufferW: 120,
+            outputBufferH: 110,
+            canvasBufferSize: [200, 200],
             outputViewport: { x: 0, y: 0, w: 120, h: 110 },
-            elementPhysW: 100,
-            elementPhysH: 100,
+            elementBufferW: 100,
+            elementBufferH: 100,
             rectContent: [0, 0, 1, 1],
             rectSrc: [0, 0, 1, 1],
         });
         host.ctx.createRenderTarget();
-        // Sized to outputPhys, not elementPhys.
+        // Sized to outputBuffer, not elementBuffer.
         expect(framebuffers[0].width).toBe(120);
         expect(framebuffers[0].height).toBe(110);
     });
@@ -614,12 +614,12 @@ describe("EffectHost.createRenderTarget", () => {
         const { host } = makeHost();
         host.ctx.createRenderTarget({ size: [50, 50] });
         host.setFrameDims({
-            outputPhysW: 200,
-            outputPhysH: 200,
-            canvasPhys: [200, 200],
+            outputBufferW: 200,
+            outputBufferH: 200,
+            canvasBufferSize: [200, 200],
             outputViewport: { x: 0, y: 0, w: 200, h: 200 },
-            elementPhysW: 200,
-            elementPhysH: 200,
+            elementBufferW: 200,
+            elementBufferH: 200,
             rectContent: [0, 0, 1, 1],
             rectSrc: [0, 0, 1, 1],
         });
@@ -696,12 +696,12 @@ describe("EffectHost.draw", () => {
     it("auto-uploads rectContent and rectSrc as vec4 uniforms", () => {
         const { host } = makeHost();
         host.setFrameDims({
-            outputPhysW: 100,
-            outputPhysH: 100,
-            canvasPhys: [200, 200],
+            outputBufferW: 100,
+            outputBufferH: 100,
+            canvasBufferSize: [200, 200],
             outputViewport: { x: 0, y: 0, w: 100, h: 100 },
-            elementPhysW: 100,
-            elementPhysH: 100,
+            elementBufferW: 100,
+            elementBufferH: 100,
             rectContent: [0.1, 0.2, 0.3, 0.4],
             rectSrc: [0.5, 0.6, 0.7, 0.8],
         });

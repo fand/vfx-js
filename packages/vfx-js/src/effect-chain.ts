@@ -30,23 +30,23 @@ export type ChainFrameInput = {
     leaveTime: number;
     resolvedUniforms: Record<string, EffectUniformValue>;
 
-    /** Canvas size (= viewport-inner + scrollPadding on each side), logical px. */
-    canvasLogical: readonly [number, number];
+    /** Canvas size (= viewport-inner + scrollPadding on each side), CSS px. */
+    canvasSize: readonly [number, number];
 
-    /** Canvas size, physical px. */
-    canvasPhys: readonly [number, number];
+    /** Canvas size, device px. */
+    canvasBufferSize: readonly [number, number];
 
-    /** Element rect (inner, no overflow), logical px. Mirrors canvas for post effects. */
-    elementLogical: readonly [number, number];
+    /** Element rect (inner, no overflow), CSS px. Mirrors canvas for post effects. */
+    elementSize: readonly [number, number];
 
-    /** Element rect (inner, no overflow), physical px. Mirrors canvas for post effects. */
-    elementPhys: readonly [number, number];
+    /** Element rect (inner, no overflow), device px. Mirrors canvas for post effects. */
+    elementBufferSize: readonly [number, number];
 
     /**
-     * Element's content rect on canvas, bottom-left origin, physical px.
+     * Element's content rect on canvas, bottom-left origin, device px.
      * Used to position the final-stage draw viewport (canvas-space) and
      * to derive `dims.canvasRect` in element-local coords (the canvas
-     * itself is `(0, 0, canvasPhys)` in canvas coords).
+     * itself is `(0, 0, canvasBufferSize)` in canvas coords).
      */
     elementRectOnCanvasPx: { x: number; y: number; w: number; h: number };
 
@@ -57,17 +57,17 @@ export type ChainFrameInput = {
 };
 
 type StageLayout = {
-    /** Stage's rect in element-local physical px (bottom-left). */
+    /** Stage's rect in element-local device px (bottom-left). */
     dstRect: ElementRect;
 
-    /** Dst buffer size (physical px): cached for FBO sizing. */
+    /** Dst buffer size (device px): cached for FBO sizing. */
     dstBufferSize: [number, number];
 
     /** Content sub-rect within dst buffer UV (xy = origin, zw = size). */
     rectContent: [number, number, number, number];
 
     /**
-     * Physical-px viewport on the canvas / final FBO for this stage's
+     * Device-px viewport on the canvas / final FBO for this stage's
      * draw. Only meaningful for the last rendering stage; intermediate
      * stages use `(0, 0, dstBufferSize[0], dstBufferSize[1])`.
      */
@@ -90,8 +90,8 @@ type IntermediateEntry = {
  *
  * Rect model:
  * - Each rendering stage declares its own `dstRect` in element-local
- *   physical px (bottom-left). Stage 0's `srcRect` is `contentRect`
- *   (= `[0, 0, elementPhys[0], elementPhys[1]]`); stage k's `srcRect`
+ *   device px (bottom-left). Stage 0's `srcRect` is `contentRect`
+ *   (= `[0, 0, elementBufferSize[0], elementBufferSize[1]]`); stage k's `srcRect`
  *   = stage k-1's `dstRect`.
  * - Each effect's `outputRect(dims)` returns the dst rect, or `undefined`
  *   to inherit `srcRect` (no growth). Stages are independent — no
@@ -102,7 +102,7 @@ type IntermediateEntry = {
  * - The last rendering effect's `outputRect` is honored too, but no
  *   intermediate buffer is allocated — the dst remains the fixed final
  *   target, and `dstRect` only positions / sizes the canvas-space draw
- *   viewport (the host still receives `outputPhysW/H = dstRect[2..3]`
+ *   viewport (the host still receives `outputBufferW/H = dstRect[2..3]`
  *   so internal RTs auto-size to include the rect).
  * - `rectSrc` / `rectContent` are derived per stage from the rect map
  *   (`rectInRect(content, dst)` and `rectInRect(srcRect, dst)`) and
@@ -135,7 +135,7 @@ export class EffectChain {
     #isPostEffect: boolean;
 
     /**
-     * Hit-test pad (per side, physical px) derived from the last
+     * Hit-test pad (per side, device px) derived from the last
      * rendering stage's `dstRect`: how far the rect extends past the
      * element's content rect. Used by the host to grow the visibility
      * rect so glow / trail outside the element keeps the chain running
@@ -208,14 +208,14 @@ export class EffectChain {
     }
 
     /**
-     * Per-side pad in **physical px** to grow the visibility hit-test
+     * Per-side pad in **device px** to grow the visibility hit-test
      * rect by, so glow / trail extending past the element rect keeps
      * the chain running while the padded region is on-screen. Reflects
      * the most recent rendered frame; empty / first-frame chains
      * return zero margins. Caller divides by `pixelRatio` to convert
-     * to logical px before passing to `growRect`.
+     * to CSS px before passing to `growRect`.
      */
-    get hitTestPadPhys(): Margin {
+    get hitTestPadBuffer(): Margin {
         return this.#lastHitTestPad;
     }
 
@@ -428,10 +428,10 @@ export class EffectChain {
         if (M === 0) {
             return;
         }
-        // Post-effect: element mirrors canvas, so contentRect spans canvasPhys.
+        // Post-effect: element mirrors canvas, so contentRect spans canvasBufferSize.
         const elementPixel: readonly [number, number] = this.#isPostEffect
-            ? input.canvasPhys
-            : input.elementPhys;
+            ? input.canvasBufferSize
+            : input.elementBufferSize;
         const contentRect: ElementRect = [
             0,
             0,
@@ -500,16 +500,14 @@ export class EffectChain {
         if (!effect.outputRect) {
             return undefined;
         }
-        const pixelRatio = input.canvasPhys[0] / input.canvasLogical[0] || 1;
+        const pixelRatio = input.canvasBufferSize[0] / input.canvasSize[0] || 1;
         const dims = {
-            element: this.#isPostEffect
-                ? input.canvasLogical
-                : input.elementLogical,
+            element: this.#isPostEffect ? input.canvasSize : input.elementSize,
             elementPixel: this.#isPostEffect
-                ? input.canvasPhys
-                : input.elementPhys,
-            canvas: input.canvasLogical,
-            canvasPixel: input.canvasPhys,
+                ? input.canvasBufferSize
+                : input.elementBufferSize,
+            canvas: input.canvasSize,
+            canvasPixel: input.canvasBufferSize,
             pixelRatio,
             contentRect,
             srcRect,
@@ -546,13 +544,13 @@ export class EffectChain {
     }
 
     /**
-     * Canvas rect in element-local physical px (bottom-left). Post-effect
-     * chains: canvas == element, so `[0, 0, canvasPhys[0], canvasPhys[1]]`.
+     * Canvas rect in element-local device px (bottom-left). Post-effect
+     * chains: canvas == element, so `[0, 0, canvasBufferSize[0], canvasBufferSize[1]]`.
      * Element chains: shifted by the element's canvas offset so the
      * element's bottom-left lies at (0, 0).
      */
     #canvasRectInElementLocal(input: ChainFrameInput): ElementRect {
-        const [cw, ch] = input.canvasPhys;
+        const [cw, ch] = input.canvasBufferSize;
         if (this.#isPostEffect) {
             return [0, 0, cw, ch];
         }
@@ -564,12 +562,12 @@ export class EffectChain {
         k: number,
         input: ChainFrameInput,
     ): {
-        outputPhysW: number;
-        outputPhysH: number;
-        canvasPhys: readonly [number, number];
+        outputBufferW: number;
+        outputBufferH: number;
+        canvasBufferSize: readonly [number, number];
         outputViewport: { x: number; y: number; w: number; h: number };
-        elementPhysW: number;
-        elementPhysH: number;
+        elementBufferW: number;
+        elementBufferH: number;
         rectContent: [number, number, number, number];
         rectSrc: [number, number, number, number];
     } {
@@ -582,8 +580,8 @@ export class EffectChain {
 
         if (renderPos < 0) {
             // Not a rendering effect; placeholders.
-            outputW = input.elementPhys[0];
-            outputH = input.elementPhys[1];
+            outputW = input.elementBufferSize[0];
+            outputH = input.elementBufferSize[1];
             outputViewport = { x: 0, y: 0, w: outputW, h: outputH };
             rectContent = [0, 0, 1, 1];
             rectSrc = [0, 0, 1, 1];
@@ -602,12 +600,12 @@ export class EffectChain {
         }
 
         return {
-            outputPhysW: outputW,
-            outputPhysH: outputH,
-            canvasPhys: input.canvasPhys,
+            outputBufferW: outputW,
+            outputBufferH: outputH,
+            canvasBufferSize: input.canvasBufferSize,
             outputViewport,
-            elementPhysW: input.elementPhys[0],
-            elementPhysH: input.elementPhys[1],
+            elementBufferW: input.elementBufferSize[0],
+            elementBufferH: input.elementBufferSize[1],
             rectContent,
             rectSrc,
         };

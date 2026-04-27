@@ -56,7 +56,7 @@ type RenderTargetResolver = {
     swap?: () => void;
 
     /** Called when the host's element size changes (auto-tracking RTs). */
-    resize?: (physW: number, physH: number) => void;
+    resize?: (bufferW: number, bufferH: number) => void;
     dispose: () => void;
 };
 
@@ -160,15 +160,15 @@ void main() {
 
 /** Element-scope dimensions the orchestrator updates each frame. @internal */
 export type HostFrameDims = {
-    /** Physical-px size of the write buffer for this stage. */
-    outputPhysW: number;
-    outputPhysH: number;
+    /** Device-px size of the write buffer for this stage. */
+    outputBufferW: number;
+    outputBufferH: number;
 
-    /** Canvas physical-px size (for `ctx.resolution`). */
-    canvasPhys: readonly [number, number];
+    /** Canvas device-px size (for `ctx.resolution`). */
+    canvasBufferSize: readonly [number, number];
 
     /**
-     * Physical-px viewport used when the draw's target is the stage's
+     * Device-px viewport used when the draw's target is the stage's
      * assigned `ctx.target` (or `null` / omitted). For intermediate
      * stages this is `(0, 0, bufferW, bufferH)`; for the last stage it
      * is the canvas-space element rect (bottom-left origin). User-
@@ -177,13 +177,13 @@ export type HostFrameDims = {
     outputViewport: { x: number; y: number; w: number; h: number };
 
     /**
-     * Current element physical size (inner, no pad). Provided for
+     * Current element device-px size (inner, no pad). Provided for
      * effects that need the inner extent — auto-resize RTs use
-     * `outputPhysW/H` (= dst buffer = inner + dstPad) instead so they
+     * `outputBufferW/H` (= dst buffer = inner + dstPad) instead so they
      * include this stage's pad region.
      */
-    elementPhysW: number;
-    elementPhysH: number;
+    elementBufferW: number;
+    elementBufferH: number;
 
     /**
      * `rectContent` uniform value (dst): inner origin + inner size in
@@ -265,12 +265,12 @@ export class EffectHost {
         this.#pixelRatio = pixelRatio;
         this.#geometries = new EffectGeometryCache(glCtx, quad);
         this.#dims = {
-            outputPhysW: 1,
-            outputPhysH: 1,
-            canvasPhys: [1, 1],
+            outputBufferW: 1,
+            outputBufferH: 1,
+            canvasBufferSize: [1, 1],
             outputViewport: { x: 0, y: 0, w: 1, h: 1 },
-            elementPhysW: 1,
-            elementPhysH: 1,
+            elementBufferW: 1,
+            elementBufferH: 1,
             rectContent: [0, 0, 1, 1],
             rectSrc: [0, 0, 1, 1],
         };
@@ -300,13 +300,16 @@ export class EffectHost {
 
     setFrameDims(dims: HostFrameDims): void {
         this.#dims = dims;
-        this.#ctxBacking.resolution = [dims.canvasPhys[0], dims.canvasPhys[1]];
+        this.#ctxBacking.resolution = [
+            dims.canvasBufferSize[0],
+            dims.canvasBufferSize[1],
+        ];
         // Auto-resize managed RTs whose size tracks this stage's dst
         // buffer (= element + dstPad). Sizing to dst buffer instead of
         // inner element ensures effects can write into the pad region
         // without manual sizing.
         for (const rt of this.#autoResizeRTs) {
-            rt.resolver.resize?.(dims.outputPhysW, dims.outputPhysH);
+            rt.resolver.resize?.(dims.outputBufferW, dims.outputBufferH);
         }
     }
 
@@ -343,7 +346,7 @@ export class EffectHost {
 
     /**
      * Draws a passthrough copy of `src` into `target` using the host's
-     * own program cache. The viewport passed in is physical-px.
+     * own program cache. The viewport passed in is device-px.
      */
     passthroughCopy(
         src: EffectTexture,
@@ -374,7 +377,7 @@ export class EffectHost {
         }
     }
 
-    /** Clears the given RT with `(0, 0, 0, 0)`. Physical-px target. */
+    /** Clears the given RT with `(0, 0, 0, 0)`. Device-px target. */
     clearRt(rt: EffectRenderTarget): void {
         const gl = this.#gl;
         const resolver = resolveRt(rt);
@@ -456,8 +459,8 @@ export class EffectHost {
         const wrap = normalizeWrap(opts?.wrap);
         const filter = opts?.filter;
         const explicitSize = opts?.size;
-        const sizeW = explicitSize ? explicitSize[0] : this.#dims.outputPhysW;
-        const sizeH = explicitSize ? explicitSize[1] : this.#dims.outputPhysH;
+        const sizeW = explicitSize ? explicitSize[0] : this.#dims.outputBufferW;
+        const sizeH = explicitSize ? explicitSize[1] : this.#dims.outputBufferH;
 
         let resolver: RenderTargetResolver;
         let getW: () => number;
@@ -465,26 +468,22 @@ export class EffectHost {
 
         if (persistent) {
             const pr = explicitSize ? 1 : this.#pixelRatio;
-            const logicalW = explicitSize ? sizeW : sizeW / pr;
-            const logicalH = explicitSize ? sizeH : sizeH / pr;
-            const bb = new Backbuffer(
-                this.#glCtx,
-                logicalW,
-                logicalH,
-                pr,
-                float,
-                { wrap, filter },
-            );
+            const cssW = explicitSize ? sizeW : sizeW / pr;
+            const cssH = explicitSize ? sizeH : sizeH / pr;
+            const bb = new Backbuffer(this.#glCtx, cssW, cssH, pr, float, {
+                wrap,
+                filter,
+            });
             resolver = {
                 getReadTexture: () => bb.texture,
                 getWriteFbo: () => bb.target,
                 swap: () => bb.swap(),
                 resize: explicitSize
                     ? undefined
-                    : (physW, physH) => {
+                    : (bufferW, bufferH) => {
                           bb.resize(
-                              physW / this.#pixelRatio,
-                              physH / this.#pixelRatio,
+                              bufferW / this.#pixelRatio,
+                              bufferH / this.#pixelRatio,
                           );
                       },
                 dispose: () => bb.dispose(),
@@ -502,7 +501,7 @@ export class EffectHost {
                 getWriteFbo: () => fb,
                 resize: explicitSize
                     ? undefined
-                    : (physW, physH) => fb.setSize(physW, physH),
+                    : (bufferW, bufferH) => fb.setSize(bufferW, bufferH),
                 dispose: () => fb.dispose(),
             };
             getW = () => fb.width;

@@ -464,18 +464,18 @@ export class VFXPlayer {
             if (inputPasses[i].persistent) {
                 // Persistent passes use double-buffered Backbuffer
                 const pixelRatio = passSize ? 1 : this.#pixelRatio;
-                const logicalW = passSize
+                const cssW = passSize
                     ? passSize[0]
                     : rectWithOverflow.right - rectWithOverflow.left;
-                const logicalH = passSize
+                const cssH = passSize
                     ? passSize[1]
                     : rectWithOverflow.bottom - rectWithOverflow.top;
                 passBackbuffers.set(
                     targetName,
                     new Backbuffer(
                         this.#ctx,
-                        logicalW,
-                        logicalH,
+                        cssW,
+                        cssH,
                         pixelRatio,
                         inputPasses[i].float,
                     ),
@@ -981,15 +981,15 @@ export class VFXPlayer {
                     : glRectWithOverflow;
                 const tw = Math.max(1, targetRect.w * this.#pixelRatio);
                 const th = Math.max(1, targetRect.h * this.#pixelRatio);
-                const logicalW = Math.max(1, targetRect.w);
-                const logicalH = Math.max(1, targetRect.h);
+                const cssW = Math.max(1, targetRect.w);
+                const cssH = Math.max(1, targetRect.h);
                 for (let i = 0; i < e.passes.length - 1; i++) {
                     const pass = e.passes[i];
                     if (pass.size) {
                         continue; // fixed size, no resize
                     }
                     if (pass.backbuffer) {
-                        pass.backbuffer.resize(logicalW, logicalH);
+                        pass.backbuffer.resize(cssW, cssH);
                     } else {
                         const rt = e.bufferTargets.get(pass.target as string);
                         if (rt && (rt.width !== tw || rt.height !== th)) {
@@ -1278,8 +1278,8 @@ export class VFXPlayer {
         const relMouseX = this.#mouseX + this.#paddingX - glRect.x;
         const relMouseY = this.#mouseY + this.#paddingY - glRect.y;
 
-        const elementInnerLogicalW = rect.right - rect.left;
-        const elementInnerLogicalH = rect.bottom - rect.top;
+        const elementInnerW = rect.right - rect.left;
+        const elementInnerH = rect.bottom - rect.top;
 
         const prevT = e.effectLastRenderTime ?? now;
         const deltaTime = now - prevT;
@@ -1300,10 +1300,10 @@ export class VFXPlayer {
             enterTime: now - e.enterTime,
             leaveTime: now - e.leaveTime,
             resolvedUniforms,
-            canvasLogical: [canvasW, canvasH],
-            canvasPhys: [canvasW * pr, canvasH * pr],
-            elementLogical: [elementInnerLogicalW, elementInnerLogicalH],
-            elementPhys: [elementInnerLogicalW * pr, elementInnerLogicalH * pr],
+            canvasSize: [canvasW, canvasH],
+            canvasBufferSize: [canvasW * pr, canvasH * pr],
+            elementSize: [elementInnerW, elementInnerH],
+            elementBufferSize: [elementInnerW * pr, elementInnerH * pr],
             elementRectOnCanvasPx: {
                 x: glRect.x * pr,
                 y: glRect.y * pr,
@@ -1348,14 +1348,14 @@ export class VFXPlayer {
         }
     }
 
-    #chainMarginLogical(chain: EffectChain): Margin {
-        const padPhys = chain.hitTestPadPhys;
+    #chainMarginCss(chain: EffectChain): Margin {
+        const padBuffer = chain.hitTestPadBuffer;
         const pr = this.#pixelRatio;
         return createMargin({
-            top: padPhys.top / pr,
-            right: padPhys.right / pr,
-            bottom: padPhys.bottom / pr,
-            left: padPhys.left / pr,
+            top: padBuffer.top / pr,
+            right: padBuffer.right / pr,
+            bottom: padBuffer.bottom / pr,
+            left: padBuffer.left / pr,
         });
     }
 
@@ -1367,11 +1367,11 @@ export class VFXPlayer {
         rect: Rect,
         now: number,
     ): { rectWithOverflow: Rect; isVisible: boolean; intersection: number } {
-        // Effect path uses chain's max dst pad (physical px → logical
+        // Effect path uses chain's max dst pad (device px → CSS
         // for growRect) instead of `e.overflow`, which is shader-only.
         // Lags the actual chain pad by one frame on entry; acceptable.
         const visibilityMargin = e.chain
-            ? this.#chainMarginLogical(e.chain)
+            ? this.#chainMarginCss(e.chain)
             : e.overflow;
         const rectWithOverflow = growRect(rect, visibilityMargin);
 
@@ -1705,8 +1705,8 @@ export class VFXPlayer {
         this.#postEffectChainLastTime = now;
 
         // For post-effects `element*` mirrors `canvas*`; overflow is 0.
-        const canvasLogical: [number, number] = [canvasW, canvasH];
-        const canvasPhys: [number, number] = [canvasW * pr, canvasH * pr];
+        const canvasSize: [number, number] = [canvasW, canvasH];
+        const canvasBufferSize: [number, number] = [canvasW * pr, canvasH * pr];
 
         const canvasOnCanvas = {
             x: viewportGlRect.x * pr,
@@ -1724,10 +1724,10 @@ export class VFXPlayer {
             enterTime: 0,
             leaveTime: 0,
             resolvedUniforms,
-            canvasLogical,
-            canvasPhys,
-            elementLogical: canvasLogical,
-            elementPhys: canvasPhys,
+            canvasSize,
+            canvasBufferSize,
+            elementSize: canvasSize,
+            elementBufferSize: canvasBufferSize,
             elementRectOnCanvasPx: canvasOnCanvas,
             finalTarget: null,
             isVisible: true,

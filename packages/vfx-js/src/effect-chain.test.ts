@@ -179,10 +179,10 @@ function makeInput(overrides: Partial<ChainFrameInput> = {}): ChainFrameInput {
         enterTime: 0,
         leaveTime: 0,
         resolvedUniforms: {},
-        canvasLogical: [50, 50],
-        canvasPhys: [100, 100],
-        elementLogical: [50, 50],
-        elementPhys: [100, 100],
+        canvasSize: [50, 50],
+        canvasBufferSize: [100, 100],
+        elementSize: [50, 50],
+        elementBufferSize: [100, 100],
         elementRectOnCanvasPx: { x: 0, y: 0, w: 100, h: 100 },
         finalTarget: null,
         isVisible: true,
@@ -346,7 +346,7 @@ describe("EffectChain: outputRect default", () => {
     it("undefined outputRect → dstRect inherits srcRect (stage 0 = contentRect)", () => {
         const effects: Effect[] = [{ render: () => {} }, { render: () => {} }];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         const [s0, s1] = chain.stages;
         expect(s0.dstRect).toEqual([0, 0, 100, 100]);
         expect(s1.dstRect).toEqual([0, 0, 100, 100]);
@@ -364,7 +364,7 @@ describe("EffectChain: outputRect default", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         const [, s1, s2] = chain.stages;
         expect(s1.dstRect).toEqual([-10, -10, 120, 120]);
         expect(s2.dstRect).toEqual([-10, -10, 120, 120]);
@@ -381,7 +381,7 @@ describe("EffectChain: outputRect dstBufferSize", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         expect(fbs).toHaveLength(1);
         expect(fbs[0].width).toBe(120);
         expect(fbs[0].height).toBe(120);
@@ -397,7 +397,7 @@ describe("EffectChain: outputRect dstBufferSize", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         expect(fbs[0].width).toBe(200);
         expect(fbs[0].height).toBe(100);
     });
@@ -435,7 +435,7 @@ describe("EffectChain: outputRect stage independence", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         const [s0, s1] = chain.stages;
         expect(s0.dstRect).toEqual([-20, -20, 140, 140]);
         expect(s1.dstRect).toEqual([0, 0, 100, 100]);
@@ -458,7 +458,7 @@ describe("EffectChain: outputRect stage independence", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         expect(warn).not.toHaveBeenCalled();
         warn.mockRestore();
     });
@@ -474,7 +474,7 @@ describe("EffectChain: outputRect rectContent / rectSrc", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         const [s0] = chain.stages;
         // contentRect [0,0,100,100] within dstRect [-10,-10,120,120].
         expect(s0.rectContent[0]).toBeCloseTo(10 / 120);
@@ -492,7 +492,7 @@ describe("EffectChain: outputRect rectContent / rectSrc", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         const [s0] = chain.stages;
         expect(s0.rectContent[0]).toBeCloseTo(50 / 200);
         expect(s0.rectContent[1]).toBeCloseTo(0);
@@ -503,20 +503,20 @@ describe("EffectChain: outputRect rectContent / rectSrc", () => {
     it("rectContent for default rect (= contentRect) is (0, 0, 1, 1)", () => {
         const effects: Effect[] = [{ render: () => {} }, { render: () => {} }];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         expect(chain.stages[0].rectContent).toEqual([0, 0, 1, 1]);
     });
 });
 
 describe("EffectChain: outputRect dims input", () => {
-    it("contentRect = [0, 0, elementPhys[0], elementPhys[1]]", () => {
+    it("contentRect = [0, 0, elementBufferSize[0], elementBufferSize[1]]", () => {
         const probe = vi.fn().mockReturnValue([0, 0, 100, 100]);
         const effects: Effect[] = [
             { render: () => {}, outputRect: probe },
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 200] }));
+        chain.run(makeInput({ elementBufferSize: [100, 200] }));
         const dims = probe.mock.calls[0][0];
         expect(dims.contentRect).toEqual([0, 0, 100, 200]);
     });
@@ -528,7 +528,7 @@ describe("EffectChain: outputRect dims input", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         const dims = probe.mock.calls[0][0];
         expect(dims.srcRect).toEqual([0, 0, 100, 100]);
         expect(dims.srcRect).toEqual(dims.contentRect);
@@ -545,7 +545,7 @@ describe("EffectChain: outputRect dims input", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         const dims = probe.mock.calls[0][0];
         expect(dims.srcRect).toEqual([-30, -30, 160, 160]);
     });
@@ -559,8 +559,8 @@ describe("EffectChain: outputRect dims input", () => {
         const chain = makeChain(effects);
         chain.run(
             makeInput({
-                elementPhys: [100, 100],
-                canvasPhys: [400, 400],
+                elementBufferSize: [100, 100],
+                canvasBufferSize: [400, 400],
                 elementRectOnCanvasPx: { x: 150, y: 120, w: 100, h: 100 },
             }),
         );
@@ -577,9 +577,9 @@ describe("EffectChain: outputRect dims input", () => {
         const chain = makeChain(effects, /* isPostEffect = */ true);
         chain.run(
             makeInput({
-                elementPhys: [999, 999], // should be overridden
-                canvasPhys: [640, 480],
-                canvasLogical: [320, 240],
+                elementBufferSize: [999, 999], // should be overridden
+                canvasBufferSize: [640, 480],
+                canvasSize: [320, 240],
             }),
         );
         const dims = probe.mock.calls[0][0];
@@ -589,7 +589,7 @@ describe("EffectChain: outputRect dims input", () => {
         expect(dims.canvasRect).toEqual(dims.contentRect);
     });
 
-    it("pixelRatio = canvasPhys[0] / canvasLogical[0]", () => {
+    it("pixelRatio = canvasBufferSize[0] / canvasSize[0]", () => {
         const probe = vi.fn().mockReturnValue([0, 0, 100, 100]);
         const effects: Effect[] = [
             { render: () => {}, outputRect: probe },
@@ -598,8 +598,8 @@ describe("EffectChain: outputRect dims input", () => {
         const chain = makeChain(effects);
         chain.run(
             makeInput({
-                canvasLogical: [200, 100],
-                canvasPhys: [400, 200],
+                canvasSize: [200, 100],
+                canvasBufferSize: [400, 200],
             }),
         );
         expect(probe.mock.calls[0][0].pixelRatio).toBe(2);
@@ -617,7 +617,7 @@ describe("EffectChain: outputRect outputViewport", () => {
         const chain = makeChain(effects);
         chain.run(
             makeInput({
-                elementPhys: [100, 100],
+                elementBufferSize: [100, 100],
                 elementRectOnCanvasPx: { x: 30, y: 40, w: 100, h: 100 },
             }),
         );
@@ -640,7 +640,7 @@ describe("EffectChain: outputRect outputViewport", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         expect(chain.stages[0].outputViewport).toEqual({
             x: 0,
             y: 0,
@@ -659,8 +659,8 @@ describe("EffectChain: outputRect outputViewport", () => {
         const chain = makeChain(effects);
         chain.run(
             makeInput({
-                elementPhys: [100, 100],
-                canvasPhys: [400, 400],
+                elementBufferSize: [100, 100],
+                canvasBufferSize: [400, 400],
                 elementRectOnCanvasPx: { x: 150, y: 150, w: 100, h: 100 },
             }),
         );
@@ -681,7 +681,7 @@ describe("EffectChain: outputRect outputViewport", () => {
         const chain = makeChain(effects);
         chain.run(
             makeInput({
-                elementPhys: [100, 100],
+                elementBufferSize: [100, 100],
                 elementRectOnCanvasPx: { x: 50, y: 60, w: 100, h: 100 },
             }),
         );
@@ -705,7 +705,7 @@ describe("EffectChain: outputRect non-rendering effect", () => {
             { render: () => {} },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
         expect(probe).not.toHaveBeenCalled();
         // Single rendering stage; default rect.
         expect(chain.stages).toHaveLength(1);
@@ -741,13 +741,13 @@ describe("EffectChain: empty effects", () => {
 });
 
 // ---------------------------------------------------------------------------
-// hitTestPadPhys: visibility margin for the host
+// hitTestPadBuffer: visibility margin for the host
 // ---------------------------------------------------------------------------
 
-describe("EffectChain: hitTestPadPhys", () => {
+describe("EffectChain: hitTestPadBuffer", () => {
     it("starts at zero before any frame", () => {
         const chain = makeChain([{ render: () => {} }]);
-        expect(chain.hitTestPadPhys).toMatchObject({
+        expect(chain.hitTestPadBuffer).toMatchObject({
             top: 0,
             right: 0,
             bottom: 0,
@@ -772,8 +772,8 @@ describe("EffectChain: hitTestPadPhys", () => {
             },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
-        expect(chain.hitTestPadPhys).toMatchObject({
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
+        expect(chain.hitTestPadBuffer).toMatchObject({
             top: 10,
             right: 10,
             bottom: 10,
@@ -794,8 +794,8 @@ describe("EffectChain: hitTestPadPhys", () => {
             },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
-        expect(chain.hitTestPadPhys).toMatchObject({
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
+        expect(chain.hitTestPadBuffer).toMatchObject({
             top: 0,
             right: 50,
             bottom: 0,
@@ -811,8 +811,8 @@ describe("EffectChain: hitTestPadPhys", () => {
             },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ elementPhys: [100, 100] }));
-        expect(chain.hitTestPadPhys).toMatchObject({
+        chain.run(makeInput({ elementBufferSize: [100, 100] }));
+        expect(chain.hitTestPadBuffer).toMatchObject({
             top: 0,
             right: 0,
             bottom: 0,
