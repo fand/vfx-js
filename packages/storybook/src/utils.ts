@@ -29,7 +29,7 @@ export function attachBloomPane(title: string, effect: BloomEffect): Pane {
         "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
     document.body.appendChild(container);
 
-    const pane = new Pane({ container, title });
+    const pane = new Pane({ container, title, expanded: false });
     pane.addBinding(effect.params, "threshold", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect.params, "softness", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect.params, "intensity", {

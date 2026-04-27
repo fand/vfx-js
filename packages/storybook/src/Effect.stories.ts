@@ -61,7 +61,7 @@ crtBloom.play = async ({ canvasElement }) => {
     const bloom = new BloomEffect({
         threshold: 0.01,
         softness: 0.2,
-        intensity: 2.0,
+        intensity: 10.0,
         scatter: 1.0,
         dither: 0.0,
         edgeFade: 0.02,
