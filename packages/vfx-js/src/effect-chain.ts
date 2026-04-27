@@ -146,16 +146,11 @@ export class EffectChain {
     #lastHitTestPad: Margin = createMargin(0);
 
     /**
-     * Dedicated host used for the M=0 passthrough copy when `effects`
-     * is empty (no per-effect host exists). Owned by the chain so user-
-     * driven `vfx.add(el, { effect: [] })` works as a transparent
-     * blit of the captured source — supports dynamic add/remove without
-     * a special-case "no chain" branch.
+     * Chain-owned passthrough host, used when `effects` is empty so
+     * a transparent blit still works without a special-case "no chain"
+     * branch. `null` means reuse `#hosts[0]`.
      */
-    #emptyPassthroughHost: EffectHost | null = null;
-
-    /** M=0 passthrough host: `#hosts[0]` if any, else `#emptyPassthroughHost`. */
-    #m0Host: EffectHost;
+    #ownedPassthroughHost: EffectHost | null = null;
 
     constructor(
         glCtx: GLContext,
@@ -174,16 +169,13 @@ export class EffectChain {
             () => new EffectHost(glCtx, quad, pixelRatio, capture, vfxProps),
         );
         if (effects.length === 0) {
-            this.#emptyPassthroughHost = new EffectHost(
+            this.#ownedPassthroughHost = new EffectHost(
                 glCtx,
                 quad,
                 pixelRatio,
                 capture,
                 vfxProps,
             );
-            this.#m0Host = this.#emptyPassthroughHost;
-        } else {
-            this.#m0Host = this.#hosts[0];
         }
         this.#renderingIndices = effects
             .map((e, i) => (typeof e.render === "function" ? i : -1))
@@ -301,16 +293,16 @@ export class EffectChain {
             }
         }
 
-        // 5. M = 0 identity copy special case.
-        //    `host` is `#hosts[0]` when effects has non-rendering entries,
-        //    or the dedicated `#emptyPassthroughHost` when effects is
-        //    empty. Constructor guarantees one of the two exists.
+        // 5. No rendering effects: passthrough copy.
+        //    Reuse `#hosts[0]` if any; otherwise fall back to the
+        //    chain-owned `#ownedPassthroughHost` (effects is empty).
         if (M === 0) {
             const target =
                 input.finalTarget === null
                     ? null
                     : this.#getFinalHandle(input.finalTarget);
-            this.#m0Host.passthroughCopy(
+            const host = this.#ownedPassthroughHost ?? this.#hosts[0];
+            host.passthroughCopy(
                 this.#capture,
                 target,
                 input.elementRectOnCanvasPx,
@@ -387,9 +379,9 @@ export class EffectChain {
             this.#safeDispose(i);
             this.#hosts[i].dispose();
         }
-        if (this.#emptyPassthroughHost) {
-            this.#emptyPassthroughHost.dispose();
-            this.#emptyPassthroughHost = null;
+        if (this.#ownedPassthroughHost) {
+            this.#ownedPassthroughHost.dispose();
+            this.#ownedPassthroughHost = null;
         }
         for (const im of this.#intermediates) {
             im.fb.dispose();
