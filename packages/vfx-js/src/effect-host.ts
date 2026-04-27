@@ -219,8 +219,6 @@ export class EffectHost {
     #pixelRatio: number;
     #programs = new Map<string, Program>();
     #geometries: EffectGeometryCache;
-    #ownedFbs: Framebuffer[] = [];
-    #ownedBackbuffers: Backbuffer[] = [];
     #ownedTextures: Texture[] = [];
     #ownedRTs: OwnedRT[] = [];
     #autoResizeRTs: OwnedRT[] = [];
@@ -469,7 +467,6 @@ export class EffectHost {
                 float,
                 { wrap, filter },
             );
-            this.#ownedBackbuffers.push(bb);
             resolver = {
                 getReadTexture: () => bb.texture,
                 getWriteFbo: () => bb.target,
@@ -492,7 +489,6 @@ export class EffectHost {
                 wrap,
                 filter,
             });
-            this.#ownedFbs.push(fb);
             resolver = {
                 getReadTexture: () => fb.texture,
                 getWriteFbo: () => fb,
@@ -749,8 +745,6 @@ export class EffectHost {
             rt.resolver.dispose();
         }
         this.#ownedRTs = [];
-        this.#ownedFbs = [];
-        this.#ownedBackbuffers = [];
         this.#autoResizeRTs = [];
         for (const t of this.#ownedTextures) {
             t.dispose();
