@@ -1,17 +1,14 @@
 {
   "name": "vfx-js-monorepo",
   "private": true,
-  "packageManager": "npm@11.4.1",
-  "workspaces": [
-    "packages/*"
-  ],
+  "packageManager": "pnpm@10.33.2",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --ui tui",
     "clean": "turbo run clean",
     "lint": "turbo run lint",
     "prepare": "husky",
-    "test": "npm --workspace=@vfx-js/core test",
+    "test": "pnpm --filter @vfx-js/core test",
     "prepare-release": "changeset && turbo run build lint test && changeset version",
     "release": "changeset publish"
   },

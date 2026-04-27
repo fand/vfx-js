@@ -10,23 +10,24 @@ jobs:
     deploy:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v6
+
+            - uses: pnpm/action-setup@v4
 
             - name: Setup Node
-              uses: actions/setup-node@v3
+              uses: actions/setup-node@v6
               with:
                   node-version: "24"
-                  cache: "npm"
-                  cache-dependency-path: "**/package-lock.json"
+                  cache: "pnpm"
 
             - name: Install dependencies
-              run: npm ci
+              run: pnpm install --frozen-lockfile
 
             - name: Build
-              run: npm run build
+              run: pnpm run build
 
             - name: Pushes to another repository
-              uses: cpina/github-action-push-to-another-repository@main
+              uses: cpina/github-action-push-to-another-repository@v1.7.3
               env:
                   SSH_DEPLOY_KEY: ${{ secrets.REACT_VFX_DEPLOY_KEY }}
               with:

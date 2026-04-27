@@ -21,28 +21,28 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 ## Common Commands
 
 ### Development
-- `npm run dev` - Start development mode for all packages (uses Turborepo TUI)
-- `npm run build` - Build all packages
-- `npm run clean` - Clean build artifacts across all packages
-- `npm run lint` - Run linting across all packages
+- `pnpm run dev` - Start development mode for all packages (uses Turborepo TUI)
+- `pnpm run build` - Build all packages
+- `pnpm run clean` - Clean build artifacts across all packages
+- `pnpm run lint` - Run linting across all packages
 
 ### Testing
-- `npm test` - Run tests (specifically for @vfx-js/core package)
-- `npm --workspace=@vfx-js/core run test:watch` - Run tests in watch mode
+- `pnpm test` - Run tests (specifically for @vfx-js/core package)
+- `pnpm --filter @vfx-js/core run test:watch` - Run tests in watch mode
 
 ### Package-specific Development
-- `npm --workspace=@vfx-js/core run dev` - Develop core library only
-- `npm --workspace=react-vfx run dev` - Develop React bindings only
-- `npm --workspace=docs run dev` - Develop documentation site
+- `pnpm --filter @vfx-js/core run dev` - Develop core library only
+- `pnpm --filter react-vfx run dev` - Develop React bindings only
+- `pnpm --filter docs run dev` - Develop documentation site
 
 ### Linting and Formatting
 - Uses Biome for linting and formatting
-- Individual packages: `npm --workspace=<package> run lint`
-- Format code: `npm --workspace=<package> run format`
+- Individual packages: `pnpm --filter <package> run lint`
+- Format code: `pnpm --filter <package> run format`
 
 ### Release Process
-- `npm run prepare-release` - Prepare a new release (changeset + build + lint + test + version)
-- `npm run release` - Publish packages to npm
+- `pnpm run prepare-release` - Prepare a new release (changeset + build + lint + test + version)
+- `pnpm run release` - Publish packages to npm
 
 ## Development Notes
 
@@ -59,4 +59,4 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 ### Testing
 - Core package uses Vitest for testing
 - Test files are located alongside source files with `.test.ts` extension
-- Run package-specific tests: `npm --workspace=@vfx-js/core run test`
+- Run package-specific tests: `pnpm --filter @vfx-js/core run test`
