@@ -127,11 +127,14 @@ export class CompiledGeometry implements Restorable {
     #ibo: WebGLBuffer | null = null;
 
     mode: number;
+
     /** gl.UNSIGNED_SHORT or gl.UNSIGNED_INT (when indexed). */
     indexType = 0;
     hasIndices = false;
+
     /** Number of vertices / indices to draw (after drawRange). */
     drawCount = 0;
+
     /** Offset in the attribute / index buffer (after drawRange). */
     drawStart = 0;
     instanceCount: number;

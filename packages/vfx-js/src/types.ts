@@ -426,12 +426,16 @@ export type VFXElement = {
     zIndex: number;
     backbuffer?: Backbuffer;
     autoCrop: boolean;
+
     /** Present only for effect-path elements. */
     chain?: EffectChain;
+
     /** Per-frame evaluated generators for effect-path uniforms. */
     effectUniformGenerators?: Record<string, () => EffectUniformValue>;
+
     /** Static effect-path uniforms (merged with generator results). */
     effectStaticUniforms?: Record<string, EffectUniformValue>;
+
     /** Wall-clock seconds of the previous render. Used for ctx.deltaTime. */
     effectLastRenderTime?: number;
 };
@@ -599,6 +603,7 @@ export type EffectAttributeDescriptor =
           data: EffectAttributeTypedArray;
           itemSize: 1 | 2 | 3 | 4;
           normalized?: boolean;
+
           /** ANGLE_instanced_arrays / WebGPU `stepMode: "instance"`. */
           perInstance?: boolean;
       };
@@ -653,6 +658,7 @@ export type EffectDrawOpts = {
 export type EffectVFXProps = {
     /** Default: `true`. */
     readonly autoCrop: boolean;
+
     /** Default: `"300 es"`. */
     readonly glslVersion: "100" | "300 es";
 };
@@ -818,10 +824,13 @@ export interface Effect {
         readonly canvas: readonly [number, number];
         readonly canvasPixel: readonly [number, number];
         readonly pixelRatio: number;
+
         /** Element rect in element-local px: `[0, 0, elementPixel[0], elementPixel[1]]`. */
         readonly contentRect: ElementRect;
+
         /** Src buffer's rect in element-local px (= prev stage's `outputRect`, or `contentRect` at stage 0). */
         readonly srcRect: ElementRect;
+
         /** Canvas rect in element-local px. */
         readonly canvasRect: ElementRect;
     }): ElementRect | undefined;

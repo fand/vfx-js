@@ -66,6 +66,7 @@ export class VFXPlayer {
     // post-effect passes above).
     #postEffectChain: EffectChain | null = null;
     #postEffectChainReady = false;
+
     /**
      * Tracks Effect instances currently attached (element chain or
      * postEffect chain). Used to reject reuse — Effects are stateful

@@ -32,13 +32,16 @@ export type ChainFrameInput = {
 
     /** Canvas size (= viewport-inner + scrollPadding on each side), logical px. */
     canvasLogical: readonly [number, number];
+
     /** Canvas size, physical px. */
     canvasPhys: readonly [number, number];
 
     /** Element rect (inner, no overflow), logical px. Mirrors canvas for post effects. */
     elementLogical: readonly [number, number];
+
     /** Element rect (inner, no overflow), physical px. Mirrors canvas for post effects. */
     elementPhys: readonly [number, number];
+
     /**
      * Element's content rect on canvas, bottom-left origin, physical px.
      * Used to position the final-stage draw viewport (canvas-space) and
@@ -56,10 +59,13 @@ export type ChainFrameInput = {
 type StageLayout = {
     /** Stage's rect in element-local physical px (bottom-left). */
     dstRect: ElementRect;
+
     /** Dst buffer size (physical px): cached for FBO sizing. */
     dstBufferSize: [number, number];
+
     /** Content sub-rect within dst buffer UV (xy = origin, zw = size). */
     rectContent: [number, number, number, number];
+
     /**
      * Physical-px viewport on the canvas / final FBO for this stage's
      * draw. Only meaningful for the last rendering stage; intermediate
@@ -70,8 +76,10 @@ type StageLayout = {
 
 type IntermediateEntry = {
     fb: Framebuffer;
+
     /** Write handle (passed as `ctx.target`). */
     rtHandle: EffectRenderTarget;
+
     /** Read handle (passed as `ctx.src` to the next stage). */
     texHandle: EffectTexture;
     bufferSize: [number, number];
@@ -122,8 +130,10 @@ export class EffectChain {
     #warnedUpdate = new Set<number>();
     #warnedRender = new Set<number>();
     #disposed = false;
+
     /** Post-effect context (element mirrors canvas; contentRect == canvasRect). */
     #isPostEffect: boolean;
+
     /**
      * Hit-test pad (per side, physical px) derived from the last
      * rendering stage's `dstRect`: how far the rect extends past the
@@ -134,6 +144,7 @@ export class EffectChain {
      * and update immediately on the next frame.
      */
     #lastHitTestPad: Margin = createMargin(0);
+
     /**
      * Dedicated host used for the M=0 passthrough copy when `effects`
      * is empty (no per-effect host exists). Owned by the chain so user-
@@ -142,6 +153,7 @@ export class EffectChain {
      * a special-case "no chain" branch.
      */
     #emptyPassthroughHost: EffectHost | null = null;
+
     /** M=0 passthrough host: `#hosts[0]` if any, else `#emptyPassthroughHost`. */
     #m0Host: EffectHost;
 

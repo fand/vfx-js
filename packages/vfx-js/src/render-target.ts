@@ -38,6 +38,7 @@ export function createPassMaterial(
         vertexShader?: string;
         fragmentShader: string;
         uniforms: Uniforms;
+
         /** True when this pass renders into an intermediate RT. */
         renderingToBuffer?: boolean;
         premultipliedAlpha?: boolean;

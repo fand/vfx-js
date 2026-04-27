@@ -48,10 +48,13 @@ export type EffectRenderTargetInternal = EffectRenderTarget & {
 type RenderTargetResolver = {
     /** Current read texture (for sampling the RT as a uniform). */
     getReadTexture(): Texture;
+
     /** Current write target (for `bindFramebuffer`). */
     getWriteFbo(): Framebuffer;
+
     /** Called after a draw that wrote to the RT. `persistent: true` only. */
     swap?: () => void;
+
     /** Called when the host's element size changes (auto-tracking RTs). */
     resize?: (physW: number, physH: number) => void;
     dispose: () => void;
@@ -160,8 +163,10 @@ export type HostFrameDims = {
     /** Physical-px size of the write buffer for this stage. */
     outputPhysW: number;
     outputPhysH: number;
+
     /** Canvas physical-px size (for `ctx.resolution`). */
     canvasPhys: readonly [number, number];
+
     /**
      * Physical-px viewport used when the draw's target is the stage's
      * assigned `ctx.target` (or `null` / omitted). For intermediate
@@ -170,6 +175,7 @@ export type HostFrameDims = {
      * allocated RTs keep their full-dim viewport regardless.
      */
     outputViewport: { x: number; y: number; w: number; h: number };
+
     /**
      * Current element physical size (inner, no pad). Provided for
      * effects that need the inner extent — auto-resize RTs use
@@ -178,11 +184,13 @@ export type HostFrameDims = {
      */
     elementPhysW: number;
     elementPhysH: number;
+
     /**
      * `rectContent` uniform value (dst): inner origin + inner size in
      * buffer-fraction units (0..1). See plan.md "`uvSrc` varying".
      */
     rectContent: [number, number, number, number];
+
     /**
      * `rectSrc` uniform value (src): sampling origin + size in src
      * texture UV. Drives `uvSrc = rectSrc.xy + uvContent *
