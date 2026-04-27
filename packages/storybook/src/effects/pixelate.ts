@@ -45,7 +45,7 @@ export function createPixelateEffect(opts: PixelateOptions = {}): Effect {
                     src: ctx.src,
                     cellUv: [size / w, size / h],
                 },
-                target: ctx.output,
+                target: ctx.target,
             });
         },
     };

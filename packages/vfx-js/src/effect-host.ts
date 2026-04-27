@@ -164,7 +164,7 @@ export type HostFrameDims = {
     canvasPhys: readonly [number, number];
     /**
      * Physical-px viewport used when the draw's target is the stage's
-     * assigned `ctx.output` (or `null` / omitted). For intermediate
+     * assigned `ctx.target` (or `null` / omitted). For intermediate
      * stages this is `(0, 0, bufferW, bufferH)`; for the last stage it
      * is the canvas-space element rect (bottom-left origin). User-
      * allocated RTs keep their full-dim viewport regardless.
@@ -660,7 +660,7 @@ export class EffectHost {
             (this.#ctxBacking.vfxProps.glslVersion === "100"
                 ? DEFAULT_VERT_100
                 : DEFAULT_VERT_300);
-        const key = `${opts.frag}�${vert}`;
+        const key = `${opts.frag} ${vert}`;
         let program = this.#programs.get(key);
         if (!program) {
             program = new Program(
@@ -677,7 +677,7 @@ export class EffectHost {
             opts.target === undefined || opts.target === null
                 ? ctxOutput
                 : opts.target;
-        // Writes to the stage's assigned output (explicit ctx.output, null,
+        // Writes to the stage's assigned target (explicit ctx.target, null,
         // or omitted) honor the chain-computed outputViewport. Writes to a
         // user-allocated RT get full-RT dims.
         const isStageOutput = rawTarget === null || rawTarget === ctxOutput;

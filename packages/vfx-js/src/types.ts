@@ -767,7 +767,7 @@ export interface Effect {
     init?(ctx: EffectContext): void | Promise<void>;
 
     /**
-     * State-update phase. `ctx.src` / `ctx.output` may point to stale /
+     * State-update phase. `ctx.src` / `ctx.target` may point to stale /
      * previous-frame handles here, so `ctx.draw()` MUST NOT be called.
      * If called, the orchestrator silently ignores it.
      */

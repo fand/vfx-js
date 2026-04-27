@@ -70,7 +70,7 @@ type StageLayout = {
 
 type IntermediateEntry = {
     fb: Framebuffer;
-    /** Write handle (passed as `ctx.output`). */
+    /** Write handle (passed as `ctx.target`). */
     rtHandle: EffectRenderTarget;
     /** Read handle (passed as `ctx.src` to the next stage). */
     texHandle: EffectTexture;

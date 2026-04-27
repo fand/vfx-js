@@ -191,7 +191,7 @@ function makeInput(overrides: Partial<ChainFrameInput> = {}): ChainFrameInput {
 }
 
 /**
- * Capture ctx.src / ctx.output at the moment render() is invoked. Can't
+ * Capture ctx.src / ctx.target at the moment render() is invoked. Can't
  * inspect after the fact because the chain mutates the same ctx across
  * passes.
  */
