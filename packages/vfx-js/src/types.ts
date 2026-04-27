@@ -21,9 +21,8 @@ export type VFXTextureFormat = "RGBA" | "Float";
  * referenced as a `sampler2D` uniform in subsequent passes.
  * The last pass in the array renders to the screen.
  *
- * Note: auto-bind matches only `uniform sampler2D <name>;` declarations —
- * `isampler2D` / `usampler2D` are not recognised, and integer render
- * targets are not currently supported.
+ * Note: auto-bind matches only `uniform sampler2D <name>;` declarations.
+ * `isampler2D` / `usampler2D` are not supported yet.
  */
 export type VFXPass = {
     /**
@@ -46,16 +45,13 @@ export type VFXPass = {
     target?: string;
 
     /**
-     * Whether this pass's render target should persist across frames.
-     * When enabled, the previous frame's output is available as
-     * `sampler2D <target>` (i.e. the target name doubles as the
-     * previous-frame texture, following the ISF convention).
+     * Whether the render target should persist across frames.
+     * If enabled, the previous output is available as `sampler2D <target>`.
      */
     persistent?: boolean;
 
     /**
      * Use 32-bit floating point render target. (Default: `false`)
-     * Enable when storing non-visual data or values outside [0, 1].
      */
     float?: boolean;
 
@@ -445,20 +441,14 @@ export type VFXElementIntersection = {
     rootMargin: Margin;
 };
 
-/**
- * Configuration for post effects that are applied to the final canvas output.
- *
- * Note: auto-bind matches only `uniform sampler2D <name>;` declarations —
- * `isampler2D` / `usampler2D` are not recognised, and integer render
- * targets are not currently supported.
- */
+/** Configuration for post effects that are applied to the final canvas output. */
 export type VFXPostEffect = {
     /**
      * Fragment shader code or preset name to be applied as a post effect.
      * You can pass a preset name from ShaderPreset (e.g., "invert", "grayscale", "sepia")
      * or provide custom shader code.
      *
-     * The shader will receive the rendered canvas as a `sampler2D src` uniform.
+     * The shader will receive the whole canvas as `sampler2D src`.
      *
      * Standard uniforms available:
      * - `sampler2D src`: The input texture (rendered canvas)
@@ -469,9 +459,8 @@ export type VFXPostEffect = {
      * - `vec2 mouse`: Mouse position in pixels
      * - `sampler2D backbuffer`: Previous frame texture (if persistent is enabled)
      *
-     * Optional: mutually exclusive with `effect`. One of `shader` or `effect`
-     * must be specified. If both are present, `effect` takes precedence and
-     * a dev warning is emitted.
+     * Optional: `shader` and `effect` are mutually exclusive.
+     * If both are present, `effect` takes precedence.
      */
     shader?: ShaderPreset | string;
 
@@ -483,7 +472,7 @@ export type VFXPostEffect = {
 
     /**
      * Whether the post effect should persist across frames.
-     * When enabled, the previous frame's output is available as `sampler2D backbuffer`.
+     * If enabled, the previous output is available as `sampler2D backbuffer`.
      */
     persistent?: boolean;
 
@@ -497,11 +486,6 @@ export type VFXPostEffect = {
 
     /**
      * Effect (or pipeline of effects) to apply in this post-effect slot.
-     *
-     * When set, the slot runs the Effect pipeline against the viewport
-     * capture instead of the shader-based post-effect pass. Mutually
-     * exclusive with `shader` — if both are specified, `effect` takes
-     * precedence and a dev warning is emitted.
      */
     effect?: Effect | readonly Effect[];
 };
@@ -511,16 +495,14 @@ export type VFXPostEffect = {
 // ---------------------------------------------------------------------------
 
 /**
- * Handle for a GPU texture exposed to effects.
+ * A handle to a GPU texture.
  *
- * Always pass this (not an extracted inner reference) as a uniform; the
- * backend resolves to the current internal Texture at bind time. The
- * resolver form lets `ctx.src` transparently follow a text-element
- * re-render (which swaps the underlying texture).
+ * Effect APIs (`ctx.src`, `ctx.wrapTexture()`) returns
+ * `EffectTexture` as the handle of raw WebGL texture.
+ * To use these textures, you need to pass this handle as `uniform`.
  *
- * `width` / `height` are physical pixels of the source's native size.
- * They may read as 0 before the source is ready (e.g. HTMLImageElement
- * pre-load, HTMLVideoElement pre-play).
+ * `width` / `height` are physical pixels of the source's native size
+ * (`0` for images / videos that haven't loaded yet).
  */
 export type EffectTexture = {
     readonly width: number;
@@ -529,12 +511,14 @@ export type EffectTexture = {
 };
 
 /**
- * Render target handle.
+ * A handle to an offscreen render target.
  *
- * Do NOT retain the underlying texture reference separately — for
- * persistent (double-buffered) RTs the read texture rotates across
- * draws. Always pass the RT itself as a uniform value; the backend
- * resolves the current read texture at bind time.
+ * `ctx.createRenderTarget(...)` returns `EffectRenderTarget` as
+ * the handle of the raw WebGL framebuffer.
+ * You can use it as a draw target (`ctx.draw({ target: rt })`) and
+ * as a `sampler2D` uniform to read it back in a later pass.
+ *
+ * `width` / `height` are physical pixels.
  */
 export type EffectRenderTarget = {
     readonly width: number;
@@ -544,8 +528,6 @@ export type EffectRenderTarget = {
 
 /**
  * Source types accepted by {@link EffectContext.wrapTexture}.
- * Mirrors the internal Texture source list plus a raw WebGLTexture
- * escape hatch for callers that uploaded via `ctx.gl` themselves.
  */
 export type EffectTextureSource =
     | WebGLTexture
@@ -559,14 +541,9 @@ export type EffectTextureWrap = "clamp" | "repeat" | "mirror";
 export type EffectTextureFilter = "nearest" | "linear";
 
 /**
- * Uniform value type.
- *
- * Dispatch is driven by the shader's active uniform type (inspected via
- * `gl.getActiveUniform`), not the JS type alone. For example `[1, 2]`
- * against `uniform ivec2 foo` uploads via `gl.uniform2i(loc, 1, 2)`.
- * `number[]` / typed arrays are polymorphic: length 9 → mat3, length 16
- * → mat4, otherwise array uniform matching the shader's declared type.
- * Length mismatches emit a dev warning and skip the upload.
+ * A value you can assign to a shader uniform.
+ * The upload variant (`uniform1f` etc) is picked automatically
+ * from the shader's declared uniform type.
  */
 export type EffectUniformValue =
     | number
@@ -586,9 +563,8 @@ export type EffectUniforms = { [name: string]: EffectUniformValue };
 export type EffectRenderTargetOpts = {
     /**
      * Size in physical pixels.
-     *
-     * Omit → match element size × pixelRatio and auto-resize on element
-     * resize. Specify a tuple (physical px) → fixed size, no auto-resize.
+     * If omitted, the target size will follow the source element size
+     * (`element size * pixelRatio`, auto-resized)
      */
     size?: readonly [number, number];
 
@@ -596,10 +572,8 @@ export type EffectRenderTargetOpts = {
     float?: boolean;
 
     /**
-     * Double-buffered across frames. (Default: `false`)
-     *
-     * Pass the RT itself as a uniform to read the previous frame's write;
-     * after a draw to it the handle swaps internally.
+     * Whether the target content should persist across frames (Default: `false`).
+     * Useful for feedback effects like trails or motion blur.
      */
     persistent?: boolean;
 
@@ -630,54 +604,52 @@ export type EffectAttributeDescriptor =
       };
 
 /**
- * Geometry POJO. Maps 1:1 to a raw-WebGL VAO today and WebGPU
- * `GPUVertexBufferLayout` + `primitive.topology` tomorrow. Attribute
- * names (not shaderLocation numbers) are the user contract; backend
- * resolves to locations during program link.
+ * Custom geometry for `ctx.draw({ geometry })`.
  */
 export type EffectGeometry = {
-    /** Default: `"triangles"`. */
+    /** Primitive type to draw. (Default: `"triangles"`) */
     mode?: "triangles" | "lines" | "lineStrip" | "points";
-    /** `"position"` is conventional. */
+
+    /**
+     * Vertex attributes keyed by name.
+     * Names must match the `attribute` / `in` declarations
+     * in your vertex shader (`"position"` is conventional).
+     */
     attributes: Record<string, EffectAttributeDescriptor>;
+
+    /** Optional index buffer for indexed drawing. */
     indices?: Uint16Array | Uint32Array;
+
+    /** Number of instances for instanced drawing. */
     instanceCount?: number;
+
+    /** Restrict the draw call to a sub-range of vertices/indices. */
     drawRange?: { start?: number; count?: number };
 };
 
 /**
- * Opaque handle for the effect's "target region" fullscreen quad.
- *
- * - element effect → element rect + overflow padding
- *                    (with `pad: 'fullscreen'` → reaches canvas edges,
- *                     i.e. viewport + scrollPadding)
- * - post effect    → canvas (viewport + scrollPadding)
- *
- * Users cannot construct or extend it; treat it as an injected default.
+ * Opaque handle for the default fullscreen quad.
+ * `ctx.draw()` uses it by default when `geometry` is omitted.
+ * See `EffectContext.quad` for details.
  */
 export type EffectQuad = { readonly __brand: "EffectQuad" };
 
 export type EffectDrawOpts = {
     frag: string;
     vert?: string;
+
     /** Default: `ctx.quad`. */
     geometry?: EffectQuad | EffectGeometry;
     uniforms?: EffectUniforms;
+
     /**
-     * `null` / omitted → use `ctx.output` (which may itself be null → canvas).
-     * Passing `ctx.output` explicitly and passing `null` are equivalent.
+     * Render target of the effect.
+     * It renders to the Canvas if omitted (or `null`).
      */
     target?: EffectRenderTarget | null;
 };
 
-/**
- * Read-only snapshot of VFXProps fields that survive the effect boundary.
- *
- * Orchestrator-level fields (overflow/intersection/release/overlay/zIndex/
- * wrap/type) are applied outside the Effect and NOT surfaced here.
- * `backbuffer` is intentionally omitted — use
- * `ctx.createRenderTarget({ persistent: true })` instead.
- */
+/** Subset of `VFXProps` exposed to effects via `ctx.vfxProps`. */
 export type EffectVFXProps = {
     /** Default: `true`. */
     readonly autoCrop: boolean;
@@ -687,38 +659,32 @@ export type EffectVFXProps = {
 
 /**
  * Context passed to each Effect lifecycle hook.
- *
- * The orchestrator mutates fields (src / output / time / mouse / ...) in
- * place between frames; effect authors should read values through the
- * ctx reference and not cache across frames.
+ * Fields are updated each frame automatically.
  */
 export type EffectContext = {
     readonly time: number;
     readonly deltaTime: number;
     readonly pixelRatio: number;
+
     /** Canvas resolution, physical px. */
     readonly resolution: readonly [number, number];
-    /**
-     * Element-local bottom-left origin, physical px. Bottom-left matches
-     * GLSL `gl_FragCoord` convention.
-     *
-     * NOTE: diverges from the shader path's `mouse` uniform (canvas-space
-     * and pass-dependent). Effect authors migrating a shader should
-     * account for the new origin/space.
-     */
+
+    /** Mouse position on the element (element-local, bottom-left origin). */
     readonly mouse: readonly [number, number];
-    /**
-     * Viewport-local bottom-left origin, physical px. Same value across
-     * all passes (no padding/buffer-space scaling).
-     */
+
+    /** Mouse position on the canvas (canvas-local, bottom-left origin). */
     readonly mouseViewport: readonly [number, number];
+
     readonly intersection: number;
     readonly enterTime: number;
     readonly leaveTime: number;
+
     /** Element capture texture (read-only input for the first stage). */
     readonly src: EffectTexture;
-    /** Final target; `null` → canvas. */
+
+    /** Destination assigned to this stage. `null` means the canvas. */
     readonly output: EffectRenderTarget | null;
+
     /**
      * User-supplied uniforms from `VFXProps.uniforms`, resolved every
      * frame (function-valued entries are evaluated before `update`).
@@ -727,6 +693,7 @@ export type EffectContext = {
      */
     readonly uniforms: Readonly<Record<string, EffectUniformValue>>;
     readonly vfxProps: EffectVFXProps;
+
     /**
      * Canonical fullscreen NDC (-1..1) quad. Draws through it use the
      * target's viewport rect, so vertex shaders operate in NDC space
@@ -754,8 +721,10 @@ export type EffectContext = {
      *   `uniform vec4 rectContent;` — content rect within dst buffer UV
      *                                  (xy = origin, zw = size).
      *   `uniform vec4 rectSrc;` — content rect within src texture UV.
-     *                                  `(0, 0, 1, 1)` for capture; offset
-     *                                  by srcPad for intermediate inputs.
+     *                                  `(0, 0, 1, 1)` for capture; for
+     *                                  intermediate inputs, derived from the
+     *                                  prior stage's content position within
+     *                                  its dst buffer.
      */
     readonly quad: EffectQuad;
 

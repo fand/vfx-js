@@ -64,9 +64,11 @@ void main() {
 }
 `;
 
-// 13-tap downsample. Five 2×2 boxes (4 outer + 1 inner) weighted
-// 0.125×4 + 0.5. `karis=1` → per-box Karis average (weight by
-// 1/(1+luma)) to suppress fireflies on the first downsample.
+// 13-tap downsample. Five 2×2 boxes (4 outer + 1 inner). Default path
+// weights them 0.125×4 + 0.5 (COD:AW partial-overlap). `karis=1`
+// replaces that with a per-box Karis average — boxes are weighted
+// equally and modulated by 1/(1+luma) — to suppress fireflies on the
+// first downsample.
 const FRAG_DOWNSAMPLE = `#version 300 es
 precision highp float;
 in vec2 uv;
