@@ -95,8 +95,8 @@ export function isEffectTexture(v: unknown): v is EffectTexture {
 //   uvContent — 0..1 over the captured content (element / HTML subtree);
 //               outside [0, 1] indicates pad
 // Driven by two auto-uploaded uniforms:
-//   rectContent (vec4) — content sub-rect within dst buffer UV
-//   rectSrc (vec4) — content sub-rect within src texture UV
+//   contentRectUv (vec4) — content sub-rect within dst buffer UV
+//   srcRectUv (vec4) — content sub-rect within src texture UV
 // ---------------------------------------------------------------------------
 
 const DEFAULT_VERT_300 = `#version 300 es
@@ -105,13 +105,13 @@ in vec3 position;
 out vec2 uv;
 out vec2 uvContent;
 out vec2 uvSrc;
-uniform vec4 rectContent;
-uniform vec4 rectSrc;
+uniform vec4 contentRectUv;
+uniform vec4 srcRectUv;
 void main() {
     vec2 bufferUV = position.xy * 0.5 + 0.5;
     uv = bufferUV;
-    uvContent = (bufferUV - rectContent.xy) / rectContent.zw;
-    uvSrc = rectSrc.xy + uvContent * rectSrc.zw;
+    uvContent = (bufferUV - contentRectUv.xy) / contentRectUv.zw;
+    uvSrc = srcRectUv.xy + uvContent * srcRectUv.zw;
     gl_Position = vec4(position, 1.0);
 }
 `;
@@ -122,13 +122,13 @@ attribute vec3 position;
 varying vec2 uv;
 varying vec2 uvContent;
 varying vec2 uvSrc;
-uniform vec4 rectContent;
-uniform vec4 rectSrc;
+uniform vec4 contentRectUv;
+uniform vec4 srcRectUv;
 void main() {
     vec2 bufferUV = position.xy * 0.5 + 0.5;
     uv = bufferUV;
-    uvContent = (bufferUV - rectContent.xy) / rectContent.zw;
-    uvSrc = rectSrc.xy + uvContent * rectSrc.zw;
+    uvContent = (bufferUV - contentRectUv.xy) / contentRectUv.zw;
+    uvSrc = srcRectUv.xy + uvContent * srcRectUv.zw;
     gl_Position = vec4(position, 1.0);
 }
 `;
@@ -186,17 +186,17 @@ export type HostFrameDims = {
     elementBufferH: number;
 
     /**
-     * `rectContent` uniform value (dst): inner origin + inner size in
+     * `contentRectUv` uniform value (dst): inner origin + inner size in
      * buffer-fraction units (0..1). See plan.md "`uvSrc` varying".
      */
-    rectContent: [number, number, number, number];
+    contentRectUv: [number, number, number, number];
 
     /**
-     * `rectSrc` uniform value (src): sampling origin + size in src
-     * texture UV. Drives `uvSrc = rectSrc.xy + uvContent *
-     * rectSrc.zw` in the default vertex shader.
+     * `srcRectUv` uniform value (src): sampling origin + size in src
+     * texture UV. Drives `uvSrc = srcRectUv.xy + uvContent *
+     * srcRectUv.zw` in the default vertex shader.
      */
-    rectSrc: [number, number, number, number];
+    srcRectUv: [number, number, number, number];
 };
 
 type Phase = "init" | "update" | "render" | "disposed";
@@ -271,8 +271,8 @@ export class EffectHost {
             outputViewport: { x: 0, y: 0, w: 1, h: 1 },
             elementBufferW: 1,
             elementBufferH: 1,
-            rectContent: [0, 0, 1, 1],
-            rectSrc: [0, 0, 1, 1],
+            contentRectUv: [0, 0, 1, 1],
+            srcRectUv: [0, 0, 1, 1],
         };
         this.#ctxBacking = {
             time: 0,
@@ -728,9 +728,9 @@ export class EffectHost {
 
     #buildUniforms(userUniforms: EffectUniforms | undefined): Uniforms {
         const out: Uniforms = {};
-        // Auto uniforms: rectContent (dst) + rectSrc (src).
-        out["rectContent"] = { value: this.#dims.rectContent };
-        out["rectSrc"] = { value: this.#dims.rectSrc };
+        // Auto uniforms: contentRectUv (dst) + srcRectUv (src).
+        out["contentRectUv"] = { value: this.#dims.contentRectUv };
+        out["srcRectUv"] = { value: this.#dims.srcRectUv };
         if (!userUniforms) {
             return out;
         }

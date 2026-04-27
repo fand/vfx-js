@@ -464,8 +464,8 @@ describe("EffectChain: outputRect stage independence", () => {
     });
 });
 
-describe("EffectChain: outputRect rectContent / rectSrc", () => {
-    it("rectContent = rectInRect(contentRect, dstRect) — symmetric outset", () => {
+describe("EffectChain: outputRect contentRectUv / srcRectUv", () => {
+    it("contentRectUv = rectInRect(contentRect, dstRect) — symmetric outset", () => {
         const effects: Effect[] = [
             {
                 render: () => {},
@@ -477,13 +477,13 @@ describe("EffectChain: outputRect rectContent / rectSrc", () => {
         chain.run(makeInput({ elementBufferSize: [100, 100] }));
         const [s0] = chain.stages;
         // contentRect [0,0,100,100] within dstRect [-10,-10,120,120].
-        expect(s0.rectContent[0]).toBeCloseTo(10 / 120);
-        expect(s0.rectContent[1]).toBeCloseTo(10 / 120);
-        expect(s0.rectContent[2]).toBeCloseTo(100 / 120);
-        expect(s0.rectContent[3]).toBeCloseTo(100 / 120);
+        expect(s0.contentRectUv[0]).toBeCloseTo(10 / 120);
+        expect(s0.contentRectUv[1]).toBeCloseTo(10 / 120);
+        expect(s0.contentRectUv[2]).toBeCloseTo(100 / 120);
+        expect(s0.contentRectUv[3]).toBeCloseTo(100 / 120);
     });
 
-    it("rectContent — asymmetric rect", () => {
+    it("contentRectUv — asymmetric rect", () => {
         const effects: Effect[] = [
             {
                 render: () => {},
@@ -494,17 +494,17 @@ describe("EffectChain: outputRect rectContent / rectSrc", () => {
         const chain = makeChain(effects);
         chain.run(makeInput({ elementBufferSize: [100, 100] }));
         const [s0] = chain.stages;
-        expect(s0.rectContent[0]).toBeCloseTo(50 / 200);
-        expect(s0.rectContent[1]).toBeCloseTo(0);
-        expect(s0.rectContent[2]).toBeCloseTo(100 / 200);
-        expect(s0.rectContent[3]).toBeCloseTo(1);
+        expect(s0.contentRectUv[0]).toBeCloseTo(50 / 200);
+        expect(s0.contentRectUv[1]).toBeCloseTo(0);
+        expect(s0.contentRectUv[2]).toBeCloseTo(100 / 200);
+        expect(s0.contentRectUv[3]).toBeCloseTo(1);
     });
 
-    it("rectContent for default rect (= contentRect) is (0, 0, 1, 1)", () => {
+    it("contentRectUv for default rect (= contentRect) is (0, 0, 1, 1)", () => {
         const effects: Effect[] = [{ render: () => {} }, { render: () => {} }];
         const chain = makeChain(effects);
         chain.run(makeInput({ elementBufferSize: [100, 100] }));
-        expect(chain.stages[0].rectContent).toEqual([0, 0, 1, 1]);
+        expect(chain.stages[0].contentRectUv).toEqual([0, 0, 1, 1]);
     });
 });
 

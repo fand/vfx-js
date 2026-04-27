@@ -64,7 +64,7 @@ type StageLayout = {
     dstBufferSize: [number, number];
 
     /** Content sub-rect within dst buffer UV (xy = origin, zw = size). */
-    rectContent: [number, number, number, number];
+    contentRectUv: [number, number, number, number];
 
     /**
      * Device-px viewport on the canvas / final FBO for this stage's
@@ -104,7 +104,7 @@ type IntermediateEntry = {
  *   target, and `dstRect` only positions / sizes the canvas-space draw
  *   viewport (the host still receives `outputBufferW/H = dstRect[2..3]`
  *   so internal RTs auto-size to include the rect).
- * - `rectSrc` / `rectContent` are derived per stage from the rect map
+ * - `srcRectUv` / `contentRectUv` are derived per stage from the rect map
  *   (`rectInRect(content, dst)` and `rectInRect(srcRect, dst)`) and
  *   uploaded as uniforms so the default vertex shader can emit `uvSrc`
  *   (src-sampling UV) and `uvContent` (dst-space 0..1 over element).
@@ -271,7 +271,7 @@ export class EffectChain {
             });
         }
 
-        // 2. Resolve per-stage pad / buffers / rectSrc / rectContent.
+        // 2. Resolve per-stage pad / buffers / srcRectUv / contentRectUv.
         //    Allocates / reuses intermediate RTs.
         this.#resolveStages(input);
 
@@ -417,8 +417,8 @@ export class EffectChain {
     }
 
     /**
-     * Compute per-stage layout (dstRect, buffer size, rectSrc,
-     * rectContent, outputViewport) for every rendering stage. Allocates
+     * Compute per-stage layout (dstRect, buffer size, srcRectUv,
+     * contentRectUv, outputViewport) for every rendering stage. Allocates
      * / reuses intermediate RTs.
      *
      */
@@ -454,7 +454,7 @@ export class EffectChain {
             );
             const dstRect: ElementRect = resolved ?? srcRect;
             const dstBufferSize: [number, number] = [dstRect[2], dstRect[3]];
-            const rectContent = rectInRect(contentRect, dstRect);
+            const contentRectUv = rectInRect(contentRect, dstRect);
 
             const outputViewport = isLast
                 ? {
@@ -468,7 +468,7 @@ export class EffectChain {
             this.#stages[k] = {
                 dstRect,
                 dstBufferSize,
-                rectContent,
+                contentRectUv,
                 outputViewport,
             };
 
@@ -568,35 +568,35 @@ export class EffectChain {
         outputViewport: { x: number; y: number; w: number; h: number };
         elementBufferW: number;
         elementBufferH: number;
-        rectContent: [number, number, number, number];
-        rectSrc: [number, number, number, number];
+        contentRectUv: [number, number, number, number];
+        srcRectUv: [number, number, number, number];
     } {
         const renderPos = this.#renderingIndices.indexOf(k);
         let outputW: number;
         let outputH: number;
         let outputViewport: { x: number; y: number; w: number; h: number };
-        let rectContent: [number, number, number, number];
-        let rectSrc: [number, number, number, number];
+        let contentRectUv: [number, number, number, number];
+        let srcRectUv: [number, number, number, number];
 
         if (renderPos < 0) {
             // Not a rendering effect; placeholders.
             outputW = input.elementBufferSize[0];
             outputH = input.elementBufferSize[1];
             outputViewport = { x: 0, y: 0, w: outputW, h: outputH };
-            rectContent = [0, 0, 1, 1];
-            rectSrc = [0, 0, 1, 1];
+            contentRectUv = [0, 0, 1, 1];
+            srcRectUv = [0, 0, 1, 1];
         } else {
             const stage = this.#stages[renderPos];
             outputW = stage.dstBufferSize[0];
             outputH = stage.dstBufferSize[1];
             outputViewport = stage.outputViewport;
-            rectContent = stage.rectContent;
+            contentRectUv = stage.contentRectUv;
             // Stage k's src buffer is stage k-1's dst buffer; stage 0's
-            // src is the capture (no pad), so rectSrc = (0, 0, 1, 1).
-            rectSrc =
+            // src is the capture (no pad), so srcRectUv = (0, 0, 1, 1).
+            srcRectUv =
                 renderPos === 0
                     ? [0, 0, 1, 1]
-                    : this.#stages[renderPos - 1].rectContent;
+                    : this.#stages[renderPos - 1].contentRectUv;
         }
 
         return {
@@ -606,8 +606,8 @@ export class EffectChain {
             outputViewport,
             elementBufferW: input.elementBufferSize[0],
             elementBufferH: input.elementBufferSize[1],
-            rectContent,
-            rectSrc,
+            contentRectUv,
+            srcRectUv,
         };
     }
 
