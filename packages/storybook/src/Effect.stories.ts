@@ -4,7 +4,6 @@ import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
 import { createPixelateEffect } from "./effects/pixelate";
-import { createRgbMixEffect } from "./effects/rgb-mix";
 import { createScanlineEffect } from "./effects/scanline";
 import "./preset.css";
 import { attachBloomPane, initVFX } from "./utils";
@@ -77,8 +76,3 @@ crtBloom.play = async ({ canvasElement }) => {
     });
     attachBloomPane("CRT Bloom", bloom);
 };
-
-// Keep `createRgbMixEffect` reachable from the module even when the
-// preset above doesn't include it — we toggle it in crtBloom via
-// dev-time edits.
-void createRgbMixEffect;
