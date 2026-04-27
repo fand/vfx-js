@@ -18,7 +18,7 @@ type Call = [string, unknown?];
 type MockHost = {
     ctx: {
         src?: unknown;
-        output?: unknown;
+        target?: unknown;
         // Other fields aren't consulted by the chain.
     };
     _calls: Call[];
@@ -70,7 +70,7 @@ vi.mock("./effect-host.js", () => {
             this._calls.push(["setSrc", v]);
         }
         setOutput(v: unknown) {
-            this.ctx.output = v;
+            this.ctx.target = v;
             this._calls.push(["setOutput", v]);
         }
         passthroughCopy(src: unknown, target: unknown, vp: unknown) {
