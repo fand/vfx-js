@@ -1,5 +1,5 @@
 import type { GLContext, Restorable } from "./context.js";
-import { Texture } from "./texture.js";
+import { Texture, type TextureFilter, type TextureWrap } from "./texture.js";
 
 /**
  * Single color-attachment framebuffer. Replaces `THREE.WebGLRenderTarget`.
@@ -25,7 +25,11 @@ export class Framebuffer implements Restorable {
         ctx: GLContext,
         width: number,
         height: number,
-        opts: { float?: boolean } = {},
+        opts: {
+            float?: boolean;
+            wrap?: TextureWrap | readonly [TextureWrap, TextureWrap];
+            filter?: TextureFilter;
+        } = {},
     ) {
         this.#ctx = ctx;
         this.gl = ctx.gl;
@@ -34,6 +38,20 @@ export class Framebuffer implements Restorable {
         this.float = opts.float ?? false;
 
         this.texture = new Texture(ctx, undefined, { autoRegister: false });
+        const w = opts.wrap;
+        if (w !== undefined) {
+            if (typeof w === "string") {
+                this.texture.wrapS = w;
+                this.texture.wrapT = w;
+            } else {
+                this.texture.wrapS = w[0];
+                this.texture.wrapT = w[1];
+            }
+        }
+        if (opts.filter !== undefined) {
+            this.texture.minFilter = opts.filter;
+            this.texture.magFilter = opts.filter;
+        }
         this.#allocate();
         ctx.addResource(this);
     }
@@ -101,10 +119,16 @@ export class Framebuffer implements Restorable {
             type,
             null,
         );
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const minF =
+            this.texture.minFilter === "nearest" ? gl.NEAREST : gl.LINEAR;
+        const magF =
+            this.texture.magFilter === "nearest" ? gl.NEAREST : gl.LINEAR;
+        const wrapS = wrapEnum(gl, this.texture.wrapS);
+        const wrapT = wrapEnum(gl, this.texture.wrapT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minF);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magF);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
         gl.framebufferTexture2D(
@@ -128,4 +152,14 @@ export class Framebuffer implements Restorable {
             gl.deleteFramebuffer(oldFbo);
         }
     }
+}
+
+function wrapEnum(gl: WebGL2RenderingContext, w: TextureWrap): number {
+    if (w === "repeat") {
+        return gl.REPEAT;
+    }
+    if (w === "mirror") {
+        return gl.MIRRORED_REPEAT;
+    }
+    return gl.CLAMP_TO_EDGE;
 }

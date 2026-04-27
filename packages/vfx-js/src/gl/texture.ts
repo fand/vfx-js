@@ -16,6 +16,9 @@ import type { GLContext, Restorable } from "./context.js";
 export type TextureWrap = "clamp" | "repeat" | "mirror";
 
 /** @internal */
+export type TextureFilter = "nearest" | "linear";
+
+/** @internal */
 export type TextureSource =
     | HTMLImageElement
     | HTMLVideoElement
@@ -27,6 +30,13 @@ export type TextureSource =
 export type TextureOpts = {
     /** Default true. Pass false for FBO attachment textures. */
     autoRegister?: boolean;
+    /**
+     * Externally-owned raw WebGL texture handle. When provided, the
+     * Texture wrapper skips creation / upload / deletion — the caller
+     * retains lifetime ownership. Used by
+     * {@link EffectContext.wrapTexture} for WebGLTexture sources.
+     */
+    externalHandle?: WebGLTexture;
 };
 
 /** @internal */
@@ -35,6 +45,8 @@ export class Texture implements Restorable {
     texture!: WebGLTexture;
     wrapS: TextureWrap = "clamp";
     wrapT: TextureWrap = "clamp";
+    minFilter: TextureFilter = "linear";
+    magFilter: TextureFilter = "linear";
     needsUpdate = true;
     /** Source image/canvas/video; exposed for identity comparison. */
     source: TextureSource | null = null;
@@ -42,15 +54,25 @@ export class Texture implements Restorable {
     #ctx: GLContext;
     #uploaded = false;
     #registered: boolean;
+    #external: boolean;
 
     constructor(ctx: GLContext, source?: TextureSource, opts?: TextureOpts) {
         this.#ctx = ctx;
         this.gl = ctx.gl;
-        this.#create();
+        const external = opts?.externalHandle;
+        this.#external = external !== undefined;
+        if (external !== undefined) {
+            // Caller owns the handle; skip create/upload/restore/delete.
+            this.texture = external;
+            this.#uploaded = true;
+            this.needsUpdate = false;
+        } else {
+            this.#create();
+        }
         if (source) {
             this.source = source;
         }
-        this.#registered = opts?.autoRegister !== false;
+        this.#registered = opts?.autoRegister !== false && !this.#external;
         if (this.#registered) {
             ctx.addResource(this);
         }
@@ -65,6 +87,12 @@ export class Texture implements Restorable {
     }
 
     restore(): void {
+        // External handles are dead after context loss; caller rebuilds
+        // them via their onContextRestored subscription and hands a new
+        // Texture back. No-op here.
+        if (this.#external) {
+            return;
+        }
         // Old handle is invalid; create a fresh one and flag for re-upload.
         this.#create();
         this.#uploaded = false;
@@ -134,15 +162,25 @@ export class Texture implements Restorable {
             gl.TEXTURE_WRAP_T,
             wrapEnum(gl, this.wrapT),
         );
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_MIN_FILTER,
+            filterEnum(gl, this.minFilter),
+        );
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_MAG_FILTER,
+            filterEnum(gl, this.magFilter),
+        );
     }
 
     dispose(): void {
         if (this.#registered) {
             this.#ctx.removeResource(this);
         }
-        this.gl.deleteTexture(this.texture);
+        if (!this.#external) {
+            this.gl.deleteTexture(this.texture);
+        }
     }
 }
 
@@ -154,6 +192,10 @@ function wrapEnum(gl: WebGL2RenderingContext, w: TextureWrap): number {
         return gl.MIRRORED_REPEAT;
     }
     return gl.CLAMP_TO_EDGE;
+}
+
+function filterEnum(gl: WebGL2RenderingContext, f: TextureFilter): number {
+    return f === "nearest" ? gl.NEAREST : gl.LINEAR;
 }
 
 /** Load an image from URL with CORS enabled. @internal */

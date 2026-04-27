@@ -9,16 +9,6 @@ type Tetra = {
 };
 
 /** @internal */
-function tetra(
-    top: number,
-    right: number,
-    bottom: number,
-    left: number,
-): Tetra {
-    return { top, right, bottom, left };
-}
-
-/** @internal */
 function createTetra(r: MarginOpts): Tetra {
     if (typeof r === "number") {
         return {
@@ -51,7 +41,7 @@ function createTetra(r: MarginOpts): Tetra {
  */
 export type Rect = Tetra & { readonly __brand: unique symbol };
 
-export const RECT_ZERO: Rect = tetra(0, 0, 0, 0) as Rect;
+export const RECT_ZERO: Rect = { top: 0, right: 0, bottom: 0, left: 0 } as Rect;
 
 /**
  * @internal
@@ -70,7 +60,12 @@ export function createMargin(r: MarginOpts): Margin {
     return createTetra(r) as Margin;
 }
 
-export const MARGIN_ZERO: Margin = tetra(0, 0, 0, 0) as Margin;
+export const MARGIN_ZERO: Margin = {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+} as Margin;
 
 /**
  * Values to determine a rectangle area for margin, padding etc.
@@ -110,6 +105,36 @@ export function shrinkRect(a: Rect, b: Margin): Rect {
 
 function clamp(x: number, xmin: number, xmax: number): number {
     return Math.min(Math.max(x, xmin), xmax);
+}
+
+/**
+ * Rect in element-local physical px, bottom-left origin (matches GL UV
+ * convention and `elementRectOnCanvasPx`).
+ *
+ * `x: 0` = element's left edge, `y: 0` = element's bottom edge.
+ * Negative coords / oversized w/h extend past the element.
+ *
+ * @internal
+ */
+export type ElementRect = readonly [x: number, y: number, w: number, h: number];
+
+/**
+ * `inner`'s position and size as bottom-left UV within `outer`.
+ * Returns `[(inner.x - outer.x)/outer.w, (inner.y - outer.y)/outer.h,
+ * inner.w/outer.w, inner.h/outer.h]`.
+ *
+ * @internal
+ */
+export function rectInRect(
+    inner: ElementRect,
+    outer: ElementRect,
+): [number, number, number, number] {
+    const [ix, iy, iw, ih] = inner;
+    const [ox, oy, ow, oh] = outer;
+    if (ow <= 0 || oh <= 0) {
+        return [0, 0, 1, 1];
+    }
+    return [(ix - ox) / ow, (iy - oy) / oh, iw / ow, ih / oh];
 }
 
 /**

@@ -2,6 +2,8 @@ import { Backbuffer } from "./backbuffer.js";
 import { shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
+import { EffectChain } from "./effect-chain.js";
+import { makeEffectTexture } from "./effect-host.js";
 import GIFData from "./gif.js";
 import { GLContext } from "./gl/context.js";
 import type { Framebuffer } from "./gl/framebuffer.js";
@@ -24,6 +26,9 @@ import {
 } from "./rect.js";
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
 import type {
+    Effect,
+    EffectUniformValue,
+    EffectVFXProps,
     VFXElement,
     VFXElementIntersection,
     VFXElementPass,
@@ -57,15 +62,30 @@ export class VFXPlayer {
     }[] = [];
     #postEffectBufferTargets: Map<string, Framebuffer | undefined> = new Map();
 
+    // Effect-path post-effect state (mutually exclusive with the shader
+    // post-effect passes above).
+    #postEffectChain: EffectChain | null = null;
+    #postEffectChainReady = false;
+    /**
+     * Tracks Effect instances currently attached (element chain or
+     * postEffect chain). Used to reject reuse — Effects are stateful
+     * (own RTs, dims) and cannot safely be shared across hosts.
+     */
+    #registeredEffects: WeakSet<Effect> = new WeakSet();
+    #postEffectChainStaticUniforms: Record<string, EffectUniformValue> = {};
+    #postEffectChainGenerators: Record<string, () => EffectUniformValue> = {};
+    #postEffectChainLastTime = 0;
+
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
     #elements: VFXElement[] = [];
     #initTime = Date.now() / 1000.0;
 
-    #viewport: Rect = createRect(0);
+    /** Canvas extent in CSS px (= viewport + scrollPadding on each side). */
+    #canvasRect: Rect = createRect(0);
 
-    /** Actual viewport without padding */
-    #viewportInner: Rect = createRect(0);
+    /** Visible viewport in CSS px (no scrollPadding). */
+    #viewport: Rect = createRect(0);
 
     #canvasSize = [0, 0];
     #paddingX = 0;
@@ -117,6 +137,11 @@ export class VFXPlayer {
         }
         for (const pass of this.#postEffectPasses) {
             pass.dispose();
+        }
+        if (this.#postEffectChain) {
+            this.#postEffectChain.dispose();
+            this.#postEffectChain = null;
+            this.#postEffectChainReady = false;
         }
         this.#copyPass.dispose();
         this.#quad.dispose();
@@ -179,13 +204,13 @@ export class VFXPlayer {
                 heightWithPadding,
                 this.#pixelRatio,
             );
-            this.#viewport = createRect({
+            this.#canvasRect = createRect({
                 top: -paddingY,
                 left: -paddingX,
                 right: width + paddingX,
                 bottom: height + paddingY,
             });
-            this.#viewportInner = createRect({
+            this.#viewport = createRect({
                 top: 0,
                 left: 0,
                 right: width,
@@ -246,8 +271,7 @@ export class VFXPlayer {
         this.#isRenderingToCanvas.set(e.element, true);
 
         try {
-            const srcUniform = e.passes[0].uniforms["src"];
-            const oldTexture = srcUniform.value as Texture;
+            const oldTexture = e.srcTexture;
             const oldCanvas =
                 oldTexture.source instanceof OffscreenCanvas
                     ? oldTexture.source
@@ -267,7 +291,13 @@ export class VFXPlayer {
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.needsUpdate = true;
-            srcUniform.value = texture;
+            // Effect-path uses a resolver-form EffectTexture that reads
+            // `e.srcTexture` each frame, so updating the field alone is
+            // enough. Shader path also needs the pass-0 src uniform
+            // rewritten.
+            if (!e.chain && e.passes.length > 0) {
+                e.passes[0].uniforms["src"].value = texture;
+            }
             e.srcTexture = texture;
             oldTexture.dispose();
         } catch (e) {
@@ -282,6 +312,16 @@ export class VFXPlayer {
         opts: VFXProps = {},
         initialCapture?: OffscreenCanvas,
     ): Promise<void> {
+        // Effect path: mutually exclusive with `shader`. See plan.md.
+        if (opts.effect !== undefined) {
+            return this.#addEffectElement(
+                element,
+                opts,
+                opts.effect,
+                initialCapture,
+            );
+        }
+
         // Normalize shader input to VFXPass array
         const inputPasses = this.#normalizePasses(opts);
 
@@ -554,6 +594,176 @@ export class VFXPlayer {
         this.#elements.sort((a, b) => a.zIndex - b.zIndex);
     }
 
+    async #addEffectElement(
+        element: HTMLElement,
+        opts: VFXProps,
+        rawEffect: Effect | readonly Effect[],
+        initialCapture?: OffscreenCanvas,
+    ): Promise<void> {
+        if (opts.shader !== undefined) {
+            console.warn(
+                "[VFX-JS] Both `shader` and `effect` specified; `effect` takes precedence.",
+            );
+        }
+
+        if (opts.overflow !== undefined) {
+            console.warn(
+                "[VFX-JS] `overflow` is shader-path only and is ignored by the effect path. Use each effect's own `outputRect` (with `dims.canvasRect` for fullscreen) to control its dst rect.",
+            );
+        }
+
+        const effects: readonly Effect[] = Array.isArray(rawEffect)
+            ? [...rawEffect]
+            : [rawEffect];
+        this.#assertEffectsNotReused(effects);
+
+        // Shared prelude (mirrors shader-path addElement).
+        const domRect = element.getBoundingClientRect();
+        const rect = toRect(domRect);
+        const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
+        const intersectionOpts = parseIntersectionOpts(opts.intersection);
+
+        const originalOpacity =
+            element.style.opacity === ""
+                ? 1
+                : Number.parseFloat(element.style.opacity);
+
+        let texture: Texture;
+        let type: VFXElementType;
+        let isGif = false;
+        if (element instanceof HTMLImageElement) {
+            type = "img" as VFXElementType;
+            isGif = !!element.src.match(/\.gif/i);
+
+            if (isGif) {
+                const gif = await GIFData.create(element.src, this.#pixelRatio);
+                gifFor.set(element, gif);
+                texture = new Texture(this.#ctx, gif.getCanvas());
+            } else {
+                const img = await loadImage(element.src);
+                texture = new Texture(this.#ctx, img);
+            }
+        } else if (element instanceof HTMLVideoElement) {
+            texture = new Texture(this.#ctx, element);
+            type = "video" as VFXElementType;
+        } else if (element instanceof HTMLCanvasElement) {
+            if (element.hasAttribute("layoutsubtree") && initialCapture) {
+                texture = new Texture(this.#ctx, initialCapture);
+                type = "hic" as VFXElementType;
+            } else {
+                texture = new Texture(this.#ctx, element);
+                type = "canvas" as VFXElementType;
+            }
+        } else {
+            const canvas = await dom2canvas(
+                element,
+                originalOpacity,
+                undefined,
+                this.maxTextureSize,
+            );
+            texture = new Texture(this.#ctx, canvas);
+            type = "text" as VFXElementType;
+        }
+
+        const [wrapS, wrapT] = parseWrap(opts.wrap);
+        texture.wrapS = wrapS;
+        texture.wrapT = wrapT;
+        texture.needsUpdate = true;
+
+        const autoCrop = opts.autoCrop ?? true;
+
+        if (type === "hic") {
+            /* onpaint clears the canvas */
+        } else if (opts.overlay === true) {
+            /* overlay mode */
+        } else if (typeof opts.overlay === "number") {
+            element.style.setProperty("opacity", opts.overlay.toString());
+        } else {
+            const opacity = type === "video" ? "0.0001" : "0";
+            element.style.setProperty("opacity", opacity.toString());
+        }
+
+        // Effect-path specifics.
+        const now = Date.now() / 1000;
+        const elem: VFXElement = {
+            type,
+            element,
+            isInViewport: false,
+            isInLogicalViewport: false,
+            width: domRect.width,
+            height: domRect.height,
+            passes: [],
+            bufferTargets: new Map(),
+            startTime: now,
+            enterTime: now,
+            leaveTime: Number.NEGATIVE_INFINITY,
+            release: opts.release ?? Number.POSITIVE_INFINITY,
+            isGif,
+            isFullScreen,
+            overflow,
+            intersection: intersectionOpts,
+            originalOpacity,
+            srcTexture: texture,
+            zIndex: opts.zIndex ?? 0,
+            backbuffer: undefined,
+            autoCrop,
+            effectLastRenderTime: now,
+        };
+
+        // Resolver-form EffectTexture — closure over `elem.srcTexture`
+        // transparently follows text-element re-renders.
+        const captureHandle = makeEffectTexture(
+            () => elem.srcTexture,
+            () => readTextureSourceDim(elem.srcTexture, "w"),
+            () => readTextureSourceDim(elem.srcTexture, "h"),
+        );
+
+        // Split user uniforms into static + generators.
+        const staticUniforms: Record<string, EffectUniformValue> = {};
+        const gens: Record<string, () => EffectUniformValue> = {};
+        if (opts.uniforms) {
+            for (const [k, v] of Object.entries(opts.uniforms)) {
+                if (typeof v === "function") {
+                    gens[k] = v as () => EffectUniformValue;
+                    staticUniforms[k] = v() as EffectUniformValue;
+                } else {
+                    staticUniforms[k] = v as EffectUniformValue;
+                }
+            }
+        }
+        elem.effectUniformGenerators = gens;
+        elem.effectStaticUniforms = staticUniforms;
+
+        const vfxProps: EffectVFXProps = {
+            autoCrop,
+            glslVersion: opts.glslVersion ?? "300 es",
+        };
+        const chain = new EffectChain(
+            this.#ctx,
+            this.#quad,
+            this.#pixelRatio,
+            effects,
+            vfxProps,
+            captureHandle,
+            false,
+        );
+        try {
+            await chain.initAll();
+        } catch (err) {
+            // Chain has already disposed prior effects + failing host.
+            // Release the source texture and restore opacity.
+            this.#releaseEffects(effects);
+            texture.dispose();
+            element.style.setProperty("opacity", originalOpacity.toString());
+            throw err;
+        }
+        elem.chain = chain;
+
+        this.#hitTest(elem, rect, now);
+        this.#elements.push(elem);
+        this.#elements.sort((a, b) => a.zIndex - b.zIndex);
+    }
+
     /**
      * Normalize shader input to a VFXPass array.
      * Per-pass `glslVersion` wins; otherwise `opts.glslVersion` is inherited.
@@ -575,14 +785,21 @@ export class VFXPlayer {
         if (i !== -1) {
             const e = this.#elements.splice(i, 1)[0] as VFXElement;
 
-            for (const rt of e.bufferTargets.values()) {
-                rt.dispose();
+            if (e.chain) {
+                // Effect path: chain disposes its effects + hosts +
+                // intermediates. Source texture + opacity are ours.
+                this.#releaseEffects(e.chain.effects);
+                e.chain.dispose();
+            } else {
+                for (const rt of e.bufferTargets.values()) {
+                    rt.dispose();
+                }
+                for (const p of e.passes) {
+                    p.pass.dispose();
+                    p.backbuffer?.dispose();
+                }
+                e.backbuffer?.dispose();
             }
-            for (const p of e.passes) {
-                p.pass.dispose();
-                p.backbuffer?.dispose();
-            }
-            e.backbuffer?.dispose();
             e.srcTexture.dispose();
 
             // Recover the original state
@@ -604,13 +821,14 @@ export class VFXPlayer {
     updateCanvasElement(element: HTMLCanvasElement): void {
         const e = this.#elements.find((e) => e.element === element);
         if (e) {
-            const srcUniform = e.passes[0].uniforms["src"];
-            const oldTexture = srcUniform.value as Texture;
+            const oldTexture = e.srcTexture;
             const texture = new Texture(this.#ctx, element);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.needsUpdate = true;
-            srcUniform.value = texture;
+            if (!e.chain && e.passes.length > 0) {
+                e.passes[0].uniforms["src"].value = texture;
+            }
             e.srcTexture = texture;
             oldTexture.dispose();
         }
@@ -625,8 +843,7 @@ export class VFXPlayer {
             return;
         }
 
-        const srcUniform = e.passes[0].uniforms["src"];
-        const oldTexture = srcUniform.value as Texture;
+        const oldTexture = e.srcTexture;
 
         if (oldTexture.source === offscreen) {
             oldTexture.needsUpdate = true;
@@ -635,7 +852,9 @@ export class VFXPlayer {
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
             texture.needsUpdate = true;
-            srcUniform.value = texture;
+            if (!e.chain && e.passes.length > 0) {
+                e.passes[0].uniforms["src"].value = texture;
+            }
             e.srcTexture = texture;
             oldTexture.dispose();
         }
@@ -675,14 +894,16 @@ export class VFXPlayer {
         gl.viewport(0, 0, this.#canvas.width, this.#canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
-        const viewportWidth = this.#viewport.right - this.#viewport.left;
-        const viewportHeight = this.#viewport.bottom - this.#viewport.top;
-        const viewportGlRect = getGLRect(0, 0, viewportWidth, viewportHeight);
+        const canvasW = this.#canvasRect.right - this.#canvasRect.left;
+        const canvasH = this.#canvasRect.bottom - this.#canvasRect.top;
+        const viewportGlRect = getGLRect(0, 0, canvasW, canvasH);
 
-        // Setup post effect render target if needed
-        const shouldUsePostEffect = this.#postEffectPasses.length > 0;
+        // Setup post effect render target if needed. Chain-based
+        // post-effect is only enabled once its async `init` resolves;
+        // until then render directly to canvas (no blank frames).
+        const shouldUsePostEffect = this.#shouldUsePostEffect();
         if (shouldUsePostEffect) {
-            this.#setupPostEffectTarget(viewportWidth, viewportHeight);
+            this.#setupPostEffectTarget(canvasW, canvasH);
             if (this.#postEffectTarget) {
                 gl.bindFramebuffer(gl.FRAMEBUFFER, this.#postEffectTarget.fbo);
                 gl.clear(gl.COLOR_BUFFER_BIT);
@@ -696,6 +917,11 @@ export class VFXPlayer {
             const hit = this.#hitTest(e, rect, now);
 
             if (!hit.isVisible) {
+                continue;
+            }
+
+            if (e.chain) {
+                this.#renderEffectElement(e, rect, hit, now);
                 continue;
             }
 
@@ -731,13 +957,13 @@ export class VFXPlayer {
 
             const glRect = rectToGLRect(
                 rect,
-                viewportHeight,
+                canvasH,
                 this.#paddingX,
                 this.#paddingY,
             );
             const glRectWithOverflow = rectToGLRect(
                 hit.rectWithOverflow,
-                viewportHeight,
+                canvasH,
                 this.#paddingX,
                 this.#paddingY,
             );
@@ -907,7 +1133,7 @@ export class VFXPlayer {
                 finalPass.uniforms["backbuffer"].value = e.backbuffer.texture;
 
                 if (e.isFullScreen) {
-                    e.backbuffer.resize(viewportWidth, viewportHeight);
+                    e.backbuffer.resize(canvasW, canvasH);
 
                     this.#setOffset(e, glRect.x, glRect.y);
                     this.#render(
@@ -978,7 +1204,11 @@ export class VFXPlayer {
 
         // Apply post effects
         if (shouldUsePostEffect && this.#postEffectTarget) {
-            this.#renderPostEffects(viewportGlRect, now);
+            if (this.#postEffectChain && this.#postEffectChainReady) {
+                this.#runPostEffectChain(viewportGlRect, now);
+            } else {
+                this.#renderPostEffects(viewportGlRect, now);
+            }
         }
     }
 
@@ -990,6 +1220,145 @@ export class VFXPlayer {
     };
 
     /**
+     * Effect-path render. Assembles the ChainFrameInput for one visible
+     * element and dispatches to its EffectChain.
+     *
+     * Hit-test is already done by the caller; `hit.isVisible === true`
+     * here.
+     */
+    #renderEffectElement(
+        e: VFXElement,
+        rect: Rect,
+        hit: {
+            rectWithOverflow: Rect;
+            isVisible: boolean;
+            intersection: number;
+        },
+        now: number,
+    ): void {
+        const chain = e.chain;
+        if (!chain) {
+            return;
+        }
+
+        const pr = this.#pixelRatio;
+
+        // Video / GIF per-frame re-upload (mirror shader path).
+        gifFor.get(e.element)?.update();
+        if (e.type === "video" || e.isGif) {
+            e.srcTexture.needsUpdate = true;
+        }
+
+        // Resolve per-frame uniforms: static baseline + generator results.
+        const resolvedUniforms: Record<string, EffectUniformValue> = {
+            ...(e.effectStaticUniforms ?? {}),
+        };
+        if (e.effectUniformGenerators) {
+            for (const [k, gen] of Object.entries(e.effectUniformGenerators)) {
+                resolvedUniforms[k] = gen() as EffectUniformValue;
+            }
+        }
+
+        const canvasW = this.#canvasRect.right - this.#canvasRect.left;
+        const canvasH = this.#canvasRect.bottom - this.#canvasRect.top;
+
+        const glRect = rectToGLRect(
+            rect,
+            canvasH,
+            this.#paddingX,
+            this.#paddingY,
+        );
+        // Mouse coordinates (bottom-left origin, physical px).
+        //   mouse: element-local
+        //   mouseViewport: viewport-local
+        // `#mouseX/Y` are viewport-local logical px; adding padding maps
+        // into canvas-local coords, subtracting glRect.x/y maps into
+        // element-local coords.
+        const relMouseX = this.#mouseX + this.#paddingX - glRect.x;
+        const relMouseY = this.#mouseY + this.#paddingY - glRect.y;
+
+        const elementInnerLogicalW = rect.right - rect.left;
+        const elementInnerLogicalH = rect.bottom - rect.top;
+
+        const prevT = e.effectLastRenderTime ?? now;
+        const deltaTime = now - prevT;
+        e.effectLastRenderTime = now;
+
+        const shouldUsePostEffect = this.#shouldUsePostEffect();
+        const finalTarget =
+            shouldUsePostEffect && this.#postEffectTarget
+                ? this.#postEffectTarget
+                : null;
+
+        chain.run({
+            time: now - e.startTime,
+            deltaTime,
+            mouse: [relMouseX * pr, relMouseY * pr],
+            mouseViewport: [this.#mouseX * pr, this.#mouseY * pr],
+            intersection: hit.intersection,
+            enterTime: now - e.enterTime,
+            leaveTime: now - e.leaveTime,
+            resolvedUniforms,
+            canvasLogical: [canvasW, canvasH],
+            canvasPhys: [canvasW * pr, canvasH * pr],
+            elementLogical: [elementInnerLogicalW, elementInnerLogicalH],
+            elementPhys: [elementInnerLogicalW * pr, elementInnerLogicalH * pr],
+            elementRectOnCanvasPx: {
+                x: glRect.x * pr,
+                y: glRect.y * pr,
+                w: glRect.w * pr,
+                h: glRect.h * pr,
+            },
+            finalTarget,
+            isVisible: hit.isVisible,
+        });
+    }
+
+    #shouldUsePostEffect(): boolean {
+        return (
+            this.#postEffectPasses.length > 0 ||
+            (this.#postEffectChain !== null && this.#postEffectChainReady)
+        );
+    }
+
+    /**
+     * Throws if any of the given Effect instances is already attached to
+     * another element/postEffect on this player. Effects own per-host
+     * GPU resources and dims, so reuse silently corrupts state.
+     * Successful assertions register the instances; callers must release
+     * via #releaseEffects on dispose.
+     */
+    #assertEffectsNotReused(effects: readonly Effect[]): void {
+        for (const e of effects) {
+            if (this.#registeredEffects.has(e)) {
+                throw new Error(
+                    "[VFX-JS] Effect instance already attached. Construct a new instance per `vfx.add()` / `postEffect`.",
+                );
+            }
+        }
+        for (const e of effects) {
+            this.#registeredEffects.add(e);
+        }
+    }
+
+    #releaseEffects(effects: readonly Effect[]): void {
+        for (const e of effects) {
+            this.#registeredEffects.delete(e);
+        }
+    }
+
+    #chainMarginLogical(chain: EffectChain): Margin {
+        const padPhys = chain.hitTestPadPhys;
+        const pr = this.#pixelRatio;
+        return createMargin({
+            top: padPhys.top / pr,
+            right: padPhys.right / pr,
+            bottom: padPhys.bottom / pr,
+            left: padPhys.left / pr,
+        });
+    }
+
+    /**
      * Check element intersection with the viewport.
      */
     #hitTest(
@@ -997,14 +1366,20 @@ export class VFXPlayer {
         rect: Rect,
         now: number,
     ): { rectWithOverflow: Rect; isVisible: boolean; intersection: number } {
-        const rectWithOverflow = growRect(rect, e.overflow);
+        // Effect path uses chain's max dst pad (physical px → logical
+        // for growRect) instead of `e.overflow`, which is shader-only.
+        // Lags the actual chain pad by one frame on entry; acceptable.
+        const visibilityMargin = e.chain
+            ? this.#chainMarginLogical(e.chain)
+            : e.overflow;
+        const rectWithOverflow = growRect(rect, visibilityMargin);
 
         const isInViewport =
             e.isFullScreen ||
-            isRectInViewport(this.#viewportInner, rectWithOverflow);
+            isRectInViewport(this.#viewport, rectWithOverflow);
 
         const viewportWithMargin = growRect(
-            this.#viewportInner,
+            this.#viewport,
             e.intersection.rootMargin,
         );
         const intersection = getIntersection(viewportWithMargin, rect);
@@ -1032,7 +1407,7 @@ export class VFXPlayer {
         // Quit if the element has left and the transition has ended
         const isVisible = isInViewport && now - e.leaveTime <= e.release;
 
-        if (isVisible) {
+        if (isVisible && !e.chain && e.passes.length > 0) {
             const u = e.passes[0].uniforms;
             u["intersection"].value = intersection;
             u["enterTime"].value = now - e.enterTime;
@@ -1109,6 +1484,17 @@ export class VFXPlayer {
     }
 
     #initPostEffects(postEffects: (VFXPostEffect | VFXPass)[]) {
+        // Effect-path post-effect: a single-slot VFXPostEffect whose
+        // `effect` field is set. See plan.md task 4-4.
+        const pe =
+            postEffects.length === 1 && !("frag" in postEffects[0])
+                ? (postEffects[0] as VFXPostEffect)
+                : null;
+        if (pe && pe.effect !== undefined) {
+            this.#initPostEffectChain(pe, pe.effect);
+            return;
+        }
+
         // Collect shader source and target names for each pass
         const shaderSources: string[] = [];
         const targetNames: (string | undefined)[] = [];
@@ -1145,6 +1531,11 @@ export class VFXPlayer {
                 );
                 targetNames.push(pe.target);
             } else {
+                if (pe.shader === undefined) {
+                    throw new Error(
+                        "VFXPostEffect requires `shader` (the `effect` path is not implemented yet).",
+                    );
+                }
                 frag = this.#getShader(pe.shader);
                 pass = new PostEffectPass(
                     this.#ctx,
@@ -1199,6 +1590,147 @@ export class VFXPlayer {
                 }
             }
         }
+    }
+
+    /**
+     * Build the Effect-path post-effect chain (single slot). See plan.md
+     * task 4-4. Init is kicked off synchronously but its Promise is
+     * fire-and-forget: until it resolves, `shouldUsePostEffect` remains
+     * false and the scene renders directly to canvas (no blank frame).
+     */
+    #initPostEffectChain(
+        pe: VFXPostEffect,
+        rawEffect: Effect | readonly Effect[],
+    ): void {
+        if (pe.shader !== undefined) {
+            console.warn(
+                "[VFX-JS] Both `shader` and `effect` specified on post-effect; `effect` takes precedence.",
+            );
+        }
+        const effects: readonly Effect[] = Array.isArray(rawEffect)
+            ? [...rawEffect]
+            : [rawEffect];
+        this.#assertEffectsNotReused(effects);
+
+        // Capture resolver: always the current #postEffectTarget texture
+        // (regenerated on viewport resize via #setupPostEffectTarget).
+        const captureHandle = makeEffectTexture(
+            () => {
+                const target = this.#postEffectTarget;
+                if (!target) {
+                    throw new Error(
+                        "[VFX-JS] post-effect chain active without target",
+                    );
+                }
+                return target.texture;
+            },
+            () => this.#postEffectTarget?.width ?? 0,
+            () => this.#postEffectTarget?.height ?? 0,
+        );
+        const vfxProps: EffectVFXProps = {
+            autoCrop: true,
+            glslVersion: pe.glslVersion ?? "300 es",
+        };
+        const chain = new EffectChain(
+            this.#ctx,
+            this.#quad,
+            this.#pixelRatio,
+            effects,
+            vfxProps,
+            captureHandle,
+            true,
+        );
+
+        if (pe.uniforms) {
+            for (const [k, v] of Object.entries(pe.uniforms)) {
+                if (typeof v === "function") {
+                    this.#postEffectChainGenerators[k] =
+                        v as () => EffectUniformValue;
+                    this.#postEffectChainStaticUniforms[k] =
+                        v() as EffectUniformValue;
+                } else {
+                    this.#postEffectChainStaticUniforms[k] =
+                        v as EffectUniformValue;
+                }
+            }
+        }
+
+        this.#postEffectChain = chain;
+        this.#postEffectChainLastTime = Date.now() / 1000;
+
+        chain
+            .initAll()
+            .then(() => {
+                // Guard against destroy() between init kickoff and
+                // resolution.
+                if (this.#postEffectChain === chain) {
+                    this.#postEffectChainReady = true;
+                }
+            })
+            .catch((err) => {
+                console.error(
+                    "[VFX-JS] Post-effect init failed; post-effect disabled:",
+                    err,
+                );
+                if (this.#postEffectChain === chain) {
+                    this.#releaseEffects(this.#postEffectChain.effects);
+                    this.#postEffectChain.dispose();
+                    this.#postEffectChain = null;
+                    this.#postEffectChainReady = false;
+                }
+            });
+    }
+
+    #runPostEffectChain(viewportGlRect: GLRect, now: number): void {
+        const chain = this.#postEffectChain;
+        if (!chain) {
+            return;
+        }
+
+        const pr = this.#pixelRatio;
+        const resolvedUniforms: Record<string, EffectUniformValue> = {
+            ...this.#postEffectChainStaticUniforms,
+        };
+        for (const [k, gen] of Object.entries(
+            this.#postEffectChainGenerators,
+        )) {
+            resolvedUniforms[k] = gen();
+        }
+
+        const canvasW = this.#canvasRect.right - this.#canvasRect.left;
+        const canvasH = this.#canvasRect.bottom - this.#canvasRect.top;
+        const prev = this.#postEffectChainLastTime;
+        const deltaTime = now - prev;
+        this.#postEffectChainLastTime = now;
+
+        // For post-effects `element*` mirrors `canvas*`; overflow is 0.
+        const canvasLogical: [number, number] = [canvasW, canvasH];
+        const canvasPhys: [number, number] = [canvasW * pr, canvasH * pr];
+
+        const canvasOnCanvas = {
+            x: viewportGlRect.x * pr,
+            y: viewportGlRect.y * pr,
+            w: viewportGlRect.w * pr,
+            h: viewportGlRect.h * pr,
+        };
+
+        chain.run({
+            time: now - this.#initTime,
+            deltaTime,
+            mouse: [this.#mouseX * pr, this.#mouseY * pr],
+            mouseViewport: [this.#mouseX * pr, this.#mouseY * pr],
+            intersection: 1,
+            enterTime: 0,
+            leaveTime: 0,
+            resolvedUniforms,
+            canvasLogical,
+            canvasPhys,
+            elementLogical: canvasLogical,
+            elementPhys: canvasPhys,
+            elementRectOnCanvasPx: canvasOnCanvas,
+            finalTarget: null,
+            isVisible: true,
+        });
     }
 
     #renderPostEffects(viewportGlRect: GLRect, now: number) {
@@ -1446,6 +1978,32 @@ export function parseIntersectionOpts(
         threshold,
         rootMargin,
     };
+}
+
+/**
+ * Inspect a Texture's source and return its native width/height.
+ * Used by `ctx.src` for effect-path elements. Returns 0 if the source
+ * is not yet ready (e.g. HTMLImageElement pre-load).
+ */
+function readTextureSourceDim(tex: Texture, axis: "w" | "h"): number {
+    const src = tex.source;
+    if (!src) {
+        return 0;
+    }
+    if (
+        typeof HTMLImageElement !== "undefined" &&
+        src instanceof HTMLImageElement
+    ) {
+        return axis === "w" ? src.naturalWidth : src.naturalHeight;
+    }
+    if (
+        typeof HTMLVideoElement !== "undefined" &&
+        src instanceof HTMLVideoElement
+    ) {
+        return axis === "w" ? src.videoWidth : src.videoHeight;
+    }
+    const wc = src as { width: number; height: number };
+    return axis === "w" ? wc.width : wc.height;
 }
 
 function parseWrapSingle(wrapOpt: VFXWrap): TextureWrap {
