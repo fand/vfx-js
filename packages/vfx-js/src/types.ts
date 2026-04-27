@@ -752,19 +752,16 @@ export type EffectContext = {
 };
 
 /**
- * Effect lifecycle interface.
+ * Effect interface.
  *
- * All hooks are optional:
- * - `init` runs once at registration, sequentially in array order.
- * - `update` runs every frame (state-update only; `ctx.draw` is a no-op).
- * - `render` runs every frame; omitting it makes the effect TRANSPARENT
- *   in the chain (no pass allocated, previous rendering effect's output
- *   flows directly to the next).
- * - `outputRect` declares the rect this effect writes into `ctx.output`,
- *   in element-local physical px (bottom-left). Default: `srcRect`
- *   (no growth). Each stage's rect is independent — no accumulation
- *   across the chain.
- * - `dispose` runs on element removal, reverse array order.
+ * Lifecycle hooks:
+ * - `init`: called once on effect register
+ * - `update`: called every frame, before `render`
+ * - `render`: called every frame. Bypassed if omitted
+ * - `dispose`: called once on removal
+ *
+ * `outputRect` declares the rect this stage writes into, in
+ * element-local physical px. Defaults to the source rect (no growth).
  */
 export interface Effect {
     init?(ctx: EffectContext): void | Promise<void>;
@@ -784,35 +781,36 @@ export interface Effect {
     dispose?(): void;
 
     /**
-     * Declares the rect this effect writes into `ctx.output`, in
-     * element-local physical px (bottom-left origin).
+     * The rect this stage draws into, as `[x, y, w, h]`.
      *
-     *   `[0, 0, elemW, elemH]`            → element-only (no growth)
-     *   `[-px, -px, elemW + 2px, elemH + 2px]` → outset by `px` on each side
-     *   `dims.canvasRect`                 → reach canvas edges
+     * Coordinates are in physical pixels, relative to the element, with
+     * the origin at the bottom-left.
      *
-     * Omitted → defaults to `srcRect` (= prev stage's `outputRect`, or
-     * `contentRect` at stage 0). Right choice for simple filters that
-     * don't grow content (grayscale, invert, posterize).
+     * Omit this method (or return `undefined`) when the effect does not
+     * change the size of the content, such as a grayscale or invert
+     * filter. The stage then draws into the same rect as its input.
      *
-     * Each stage is independent: `[a, b]` with `a` returning a 100×100
-     * rect and `b` returning a 50×50 rect resolves to those exact
-     * sizes — no accumulation, no monotonic clamp. The chain converts
-     * rect → uniforms (`rectSrc` / `rectContent`) via the same affine
-     * map as before.
+     * Some common rects to return:
+     * - `dims.contentRect` — just the element, with no extra space.
+     * - The element plus `px` extra pixels on every side, for effects
+     *   like blur, glow, or drop shadow:
+     *   `[-px, -px, elementPixel[0] + 2 * px, elementPixel[1] + 2 * px]`.
+     * - `dims.canvasRect` — the whole canvas, including the
+     *   `scrollPadding` area around the viewport.
      *
-     * Units:
-     *   contentRect / srcRect / canvasRect / return → physical px
-     *   element / canvas → logical px
-     *   pixelRatio: element × pixelRatio === elementPixel
+     * Each stage picks its own rect. If one stage returns 100×100 and
+     * the next returns 50×50, those are the sizes used; rects do not
+     * grow as the chain runs.
      *
-     * `canvas` / `canvasPixel` measure the WebGL canvas, which equals
-     * the visible viewport plus `scrollPadding` on each side (10% per
-     * side by default). `dims.canvasRect` reaches the canvas edge so
-     * `dims.canvasRect`-based effects cover the scrollPadding region too.
+     * Units in `dims`:
+     * - Physical pixels: `contentRect`, `srcRect`, `canvasRect`, and
+     *   the value you return.
+     * - Logical (CSS) pixels: `element`, `canvas`. Multiply by
+     *   `pixelRatio` to get the matching `elementPixel` / `canvasPixel`.
      *
-     * Post-effect context: `element` / `elementPixel` mirror
-     * `canvas` / `canvasPixel`; `contentRect == canvasRect`.
+     * In a post-effect there is no element, so `element` and
+     * `elementPixel` are the same as `canvas` and `canvasPixel`, and
+     * `contentRect` is the same as `canvasRect`.
      */
     outputRect?(dims: {
         readonly element: readonly [number, number];
