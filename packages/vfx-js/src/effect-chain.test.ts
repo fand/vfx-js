@@ -195,9 +195,9 @@ function makeInput(overrides: Partial<ChainFrameInput> = {}): ChainFrameInput {
  * inspect after the fact because the chain mutates the same ctx across
  * passes.
  */
-function recordingRender(log: Array<{ src: unknown; output: unknown }>) {
-    return (ctx: { src: unknown; output: unknown }) => {
-        log.push({ src: ctx.src, output: ctx.output });
+function recordingRender(log: Array<{ src: unknown; target: unknown }>) {
+    return (ctx: { src: unknown; target: unknown }) => {
+        log.push({ src: ctx.src, target: ctx.target });
     };
 }
 
@@ -258,7 +258,7 @@ describe("EffectChain: M=0 identity copy", () => {
 
 describe("EffectChain: M=3 intermediates + swap", () => {
     it("allocates 2 intermediates and swaps src/output per pass", () => {
-        const log: Array<{ src: unknown; output: unknown }> = [];
+        const log: Array<{ src: unknown; target: unknown }> = [];
         const effects: Effect[] = [
             { render: recordingRender(log) },
             { render: recordingRender(log) },
@@ -276,9 +276,9 @@ describe("EffectChain: M=3 intermediates + swap", () => {
         // Stage 0: src = capture, output = intermediate[0].rtHandle
         expect(log[0].src).toBeDefined();
         expect(
-            (log[0].output as { __brand: string; _fb?: unknown }).__brand,
+            (log[0].target as { __brand: string; _fb?: unknown }).__brand,
         ).toBe("EffectRenderTarget");
-        expect((log[0].output as { _fb: unknown })._fb).toBe(fbs[0]);
+        expect((log[0].target as { _fb: unknown })._fb).toBe(fbs[0]);
         // Ignore the exact `capture` identity; the chain wraps it as the
         // texture handle it stores at construction.
         void capture;
@@ -287,13 +287,13 @@ describe("EffectChain: M=3 intermediates + swap", () => {
         expect((log[1].src as { __brand: string })?.__brand).toBe(
             "EffectTexture",
         );
-        expect((log[1].output as { _fb: unknown })._fb).toBe(fbs[1]);
+        expect((log[1].target as { _fb: unknown })._fb).toBe(fbs[1]);
 
         // Stage 2: src = intermediate[1] (tex handle), output = null (canvas)
         expect((log[2].src as { __brand: string })?.__brand).toBe(
             "EffectTexture",
         );
-        expect(log[2].output).toBe(null);
+        expect(log[2].target).toBe(null);
     });
 
     it("clears each intermediate before its producing effect writes", () => {
@@ -1081,8 +1081,8 @@ describe("EffectChain: frame state", () => {
 
 describe("EffectChain: single effect", () => {
     it("one Effect behaves identically to a length-1 array", () => {
-        const log1: Array<{ src: unknown; output: unknown }> = [];
-        const log2: Array<{ src: unknown; output: unknown }> = [];
+        const log1: Array<{ src: unknown; target: unknown }> = [];
+        const log2: Array<{ src: unknown; target: unknown }> = [];
         const chainA = makeChain([{ render: recordingRender(log1) }]);
         const chainB = makeChain([{ render: recordingRender(log2) }]);
         chainA.run(makeInput({ finalTarget: null }));

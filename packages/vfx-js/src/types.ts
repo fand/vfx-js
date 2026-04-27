@@ -683,49 +683,17 @@ export type EffectContext = {
     readonly src: EffectTexture;
 
     /** Destination assigned to this stage. `null` means the canvas. */
-    readonly output: EffectRenderTarget | null;
+    readonly target: EffectRenderTarget | null;
 
     /**
-     * User-supplied uniforms from `VFXProps.uniforms`, resolved every
-     * frame (function-valued entries are evaluated before `update`).
-     * vfx-js's built-in uniforms (time/mouse/resolution/...) are NOT
-     * included here — they are exposed as top-level ctx fields.
+     * User-defined uniforms from `VFXProps.uniforms`
+     * Values are re-evaluated every frame efore `update()`.
+     * Built-in uniforms (time etc) are exposed as top-level ctx fields instead.
      */
     readonly uniforms: Readonly<Record<string, EffectUniformValue>>;
     readonly vfxProps: EffectVFXProps;
 
-    /**
-     * Canonical fullscreen NDC (-1..1) quad. Draws through it use the
-     * target's viewport rect, so vertex shaders operate in NDC space
-     * that maps 1:1 to the target region.
-     *
-     * Convenience varyings (default vertex shader only, omit `vert`).
-     * Nested largest-to-smallest by what `[0, 1]` covers:
-     *
-     *   `in vec2 uv;`
-     *     0..1 over the full dst buffer (captured content + pad).
-     *
-     *   `in vec2 uvSrc;`
-     *     0..1 over the src buffer. Use as `texture(src, uvSrc)` to fetch
-     *     captured content 1:1, regardless of whether src is the capture
-     *     (content-only) or a prior stage's intermediate (content + pad).
-     *     Computed as `rectSrc.xy + uvContent * rectSrc.zw`.
-     *
-     *   `in vec2 uvContent;`
-     *     0..1 over the captured content (element rect, or HTML subtree
-     *     for `vfx.addHTML`). Values outside `[0, 1]` mean the fragment
-     *     is in the pad. Use for "am I inside the element?" gating and
-     *     for spatial computations on the content rect.
-     *
-     * Auto-uploaded uniforms (for custom vertex shaders or advanced use):
-     *   `uniform vec4 rectContent;` — content rect within dst buffer UV
-     *                                  (xy = origin, zw = size).
-     *   `uniform vec4 rectSrc;` — content rect within src texture UV.
-     *                                  `(0, 0, 1, 1)` for capture; for
-     *                                  intermediate inputs, derived from the
-     *                                  prior stage's content position within
-     *                                  its dst buffer.
-     */
+    /** Default fullscreen quad (NDC -1..1), mapped to the target's viewport. */
     readonly quad: EffectQuad;
 
     /** Allocate a render target. */
@@ -734,19 +702,17 @@ export type EffectContext = {
     /**
      * Wrap an externally-produced texture for use as a uniform.
      *
-     * - `WebGLTexture` source requires `opts.size` (no JS-side
-     *   introspection). Not registered for context-loss recovery:
-     *   caller must re-allocate + re-wrap in `onContextRestored(cb)`.
-     * - DOM sources carry their own dimensions and ARE registered for
-     *   automatic restore.
+     * Each call allocates a new GPU texture (no caching), so call this
+     * once in `init()` and reuse the result across frames.
      *
-     * `autoUpdate` default:
-     *   `HTMLVideoElement` / `HTMLCanvasElement` / `OffscreenCanvas` → true
-     *   `HTMLImageElement` / `ImageBitmap` / `WebGLTexture`         → false
+     * - DOM sources: dimensions are read automatically, and the texture
+     *   is restored after WebGL context loss.
+     * - `WebGLTexture`: you must pass `opts.size`, and you must re-wrap
+     *   the texture yourself from `onContextRestored(cb)`.
      *
-     * No caching: calling `wrapTexture` twice with the same source
-     * allocates two independent GPU textures. Hoist the call into
-     * `init()` and reuse the handle across frames.
+     * `autoUpdate` defaults to `true` for `HTMLVideoElement`,
+     * `HTMLCanvasElement`, and `OffscreenCanvas`, and `false` for
+     * everything else.
      */
     wrapTexture(
         source: EffectTextureSource,
@@ -761,38 +727,26 @@ export type EffectContext = {
     ): EffectTexture;
 
     /**
-     * Dispatch a draw.
-     *
-     * Every call performs a full binding sequence (program → framebuffer
-     * → viewport → blend → VAO → uniforms) before dispatch, so no state
-     * leaks from one draw to the next. Raw `ctx.gl.*` state mutations
-     * between draws are harmless.
-     *
-     * Called from `update()` it is a no-op (silently ignored, dev warning
-     * once per host).
+     * Run a draw call.
+     * Only valid during `Effect.render()`; other calls are ignored.
      */
     draw(opts: EffectDrawOpts): void;
 
     /**
-     * Raw escape hatch: the live WebGL2 context VFX-JS renders into.
+     * Raw WebGL2 context, for low-level operations
+     * (DataTexture upload, extensions, MRT, etc).
      *
-     * Use for custom GL operations (DataTexture upload, extensions, MRT,
-     * etc). Resources allocated via `ctx.gl` are the caller's
-     * responsibility — release them in `dispose()` and re-allocate them
-     * in `onContextRestored(cb)`.
+     * Resources allocated here are the caller's responsibility: free in
+     * `dispose()`, rebuild in `onContextRestored(cb)`.
      */
     readonly gl: WebGL2RenderingContext;
 
     /**
-     * Subscribe to `webglcontextrestored`.
+     * Subscribe to `webglcontextrestored` to rebuild resources allocated
+     * via raw `ctx.gl`. High-level API resources (`createRenderTarget`,
+     * `wrapTexture`, `EffectGeometry`) are restored automatically.
      *
-     * Resources created via the high-level API (createRenderTarget /
-     * wrapTexture / ctx.draw with EffectGeometry) are restored
-     * automatically. Raw `ctx.gl`-allocated resources are the caller's
-     * responsibility to rebuild.
-     *
-     * Returns an unsubscribe function; automatically unsubscribed on
-     * dispose.
+     * Returns an unsubscribe function; auto-unsubscribed on dispose.
      */
     onContextRestored(cb: () => void): () => void;
 };

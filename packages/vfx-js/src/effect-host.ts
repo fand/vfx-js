@@ -242,7 +242,7 @@ export class EffectHost {
         enterTime: number;
         leaveTime: number;
         src: EffectTexture;
-        output: EffectRenderTarget | null;
+        target: EffectRenderTarget | null;
         uniforms: Record<string, EffectUniformValue>;
         vfxProps: EffectVFXProps;
     };
@@ -279,7 +279,7 @@ export class EffectHost {
             enterTime: 0,
             leaveTime: 0,
             src: initialSrc,
-            output: null,
+            target: null,
             uniforms: {},
             vfxProps: initialVfxProps,
         };
@@ -330,7 +330,7 @@ export class EffectHost {
     }
 
     setOutput(output: EffectRenderTarget | null): void {
-        this.#ctxBacking.output = output;
+        this.#ctxBacking.target = output;
     }
 
     // -- internal passthrough pass (used by chain for M=0 / fallback) -------
@@ -346,8 +346,8 @@ export class EffectHost {
     ): void {
         const prevPhase = this.#phase;
         this.#phase = "render";
-        const prevOutput = this.#ctxBacking.output;
-        this.#ctxBacking.output = target;
+        const prevOutput = this.#ctxBacking.target;
+        this.#ctxBacking.target = target;
         try {
             const prevVp = this.#dims.outputViewport;
             this.#dims.outputViewport = { ...viewport };
@@ -363,7 +363,7 @@ export class EffectHost {
             });
             this.#dims.outputViewport = prevVp;
         } finally {
-            this.#ctxBacking.output = prevOutput;
+            this.#ctxBacking.target = prevOutput;
             this.#phase = prevPhase;
         }
     }
@@ -417,8 +417,8 @@ export class EffectHost {
             get src() {
                 return b.src;
             },
-            get output() {
-                return b.output;
+            get target() {
+                return b.target;
             },
             get uniforms() {
                 return b.uniforms;
@@ -660,7 +660,7 @@ export class EffectHost {
             (this.#ctxBacking.vfxProps.glslVersion === "100"
                 ? DEFAULT_VERT_100
                 : DEFAULT_VERT_300);
-        const key = `${opts.frag} ${vert}`;
+        const key = `${opts.frag}�${vert}`;
         let program = this.#programs.get(key);
         if (!program) {
             program = new Program(
@@ -672,7 +672,7 @@ export class EffectHost {
             this.#programs.set(key, program);
         }
 
-        const ctxOutput = this.#ctxBacking.output;
+        const ctxOutput = this.#ctxBacking.target;
         const rawTarget =
             opts.target === undefined || opts.target === null
                 ? ctxOutput
