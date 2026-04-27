@@ -505,13 +505,7 @@ export class EffectHost {
             getH = () => fb.height;
         }
 
-        const handle = Object.create(null) as EffectRenderTargetInternal;
-        Object.defineProperties(handle, {
-            __brand: { value: "EffectRenderTarget", enumerable: true },
-            width: { get: getW, enumerable: true },
-            height: { get: getH, enumerable: true },
-            [RESOLVE_RT]: { value: resolver },
-        });
+        const handle = makeEffectRenderTarget(resolver, getW, getH);
         const owned: OwnedRT = { handle, resolver };
         this.#ownedRTs.push(owned);
         if (!explicitSize) {
@@ -619,14 +613,7 @@ export class EffectHost {
             this.#perFrameAutoUpdate.push(autoUpdateFn);
         }
 
-        const handle = Object.create(null) as EffectTextureInternal;
-        Object.defineProperties(handle, {
-            __brand: { value: "EffectTexture", enumerable: true },
-            width: { get: getW, enumerable: true },
-            height: { get: getH, enumerable: true },
-            [RESOLVE_TEXTURE]: { value: () => texture },
-        });
-        return handle;
+        return makeEffectTexture(() => texture, getW, getH);
     }
 
     #perFrameAutoUpdate: (() => void)[] = [];
@@ -849,14 +836,36 @@ export function makeEffectTexture(
     resolve: () => Texture,
     width: () => number,
     height: () => number,
-): EffectTexture {
-    const handle = Object.create(null) as EffectTextureInternal;
-    Object.defineProperties(handle, {
-        __brand: { value: "EffectTexture", enumerable: true },
-        width: { get: width, enumerable: true },
-        height: { get: height, enumerable: true },
-        [RESOLVE_TEXTURE]: { value: resolve },
-    });
+): EffectTextureInternal {
+    const handle = {
+        __brand: "EffectTexture",
+        get width() {
+            return width();
+        },
+        get height() {
+            return height();
+        },
+    } as EffectTextureInternal;
+    Object.defineProperty(handle, RESOLVE_TEXTURE, { value: resolve });
+    return handle;
+}
+
+/** @internal */
+export function makeEffectRenderTarget(
+    resolver: RenderTargetResolver,
+    width: () => number,
+    height: () => number,
+): EffectRenderTargetInternal {
+    const handle = {
+        __brand: "EffectRenderTarget",
+        get width() {
+            return width();
+        },
+        get height() {
+            return height();
+        },
+    } as EffectRenderTargetInternal;
+    Object.defineProperty(handle, RESOLVE_RT, { value: resolver });
     return handle;
 }
 
@@ -876,14 +885,11 @@ export function makeEffectRenderTargetFromFb(
             // Chain-owned; host does not dispose via handle.
         },
     };
-    const handle = Object.create(null) as EffectRenderTargetInternal;
-    Object.defineProperties(handle, {
-        __brand: { value: "EffectRenderTarget", enumerable: true },
-        width: { get: () => fb.width, enumerable: true },
-        height: { get: () => fb.height, enumerable: true },
-        [RESOLVE_RT]: { value: resolver },
-    });
-    return handle;
+    return makeEffectRenderTarget(
+        resolver,
+        () => fb.width,
+        () => fb.height,
+    );
 }
 
 /** Effect-host-owned type tag re-export for convenience. @internal */
