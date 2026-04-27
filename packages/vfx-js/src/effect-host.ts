@@ -28,22 +28,9 @@ import type {
 } from "./types.js";
 
 // ---------------------------------------------------------------------------
-// Internal resolver shapes — hidden from the public EffectTexture /
-// EffectRenderTarget types via Symbol keys.
+// Internal resolvers — kept off the public handles via module-level
+// WeakMaps so users see only `__brand` / `width` / `height`.
 // ---------------------------------------------------------------------------
-
-const RESOLVE_TEXTURE = Symbol.for("@vfx-js/effect.resolve-texture");
-const RESOLVE_RT = Symbol.for("@vfx-js/effect.resolve-rt");
-
-/** @internal */
-export type EffectTextureInternal = EffectTexture & {
-    readonly [RESOLVE_TEXTURE]: () => Texture;
-};
-
-/** @internal */
-export type EffectRenderTargetInternal = EffectRenderTarget & {
-    readonly [RESOLVE_RT]: RenderTargetResolver;
-};
 
 type RenderTargetResolver = {
     /** Current read texture (for sampling the RT as a uniform). */
@@ -57,12 +44,23 @@ type RenderTargetResolver = {
     dispose: () => void;
 };
 
+const textureResolvers = new WeakMap<EffectTexture, () => Texture>();
+const rtResolvers = new WeakMap<EffectRenderTarget, RenderTargetResolver>();
+
 function resolveTexture(h: EffectTexture): Texture {
-    return (h as EffectTextureInternal)[RESOLVE_TEXTURE]();
+    const fn = textureResolvers.get(h);
+    if (!fn) {
+        throw new Error("[VFX-JS] EffectTexture missing resolver");
+    }
+    return fn();
 }
 
 function resolveRt(h: EffectRenderTarget): RenderTargetResolver {
-    return (h as EffectRenderTargetInternal)[RESOLVE_RT];
+    const r = rtResolvers.get(h);
+    if (!r) {
+        throw new Error("[VFX-JS] EffectRenderTarget missing resolver");
+    }
+    return r;
 }
 
 /** @internal — test helper. */
@@ -194,7 +192,7 @@ export type HostFrameDims = {
 type Phase = "init" | "update" | "render" | "disposed";
 
 type OwnedRT = {
-    handle: EffectRenderTargetInternal;
+    handle: EffectRenderTarget;
     resolver: RenderTargetResolver;
 };
 
@@ -505,13 +503,16 @@ export class EffectHost {
             getH = () => fb.height;
         }
 
-        const handle = Object.create(null) as EffectRenderTargetInternal;
-        Object.defineProperties(handle, {
-            __brand: { value: "EffectRenderTarget", enumerable: true },
-            width: { get: getW, enumerable: true },
-            height: { get: getH, enumerable: true },
-            [RESOLVE_RT]: { value: resolver },
-        });
+        const handle: EffectRenderTarget = {
+            __brand: "EffectRenderTarget",
+            get width() {
+                return getW();
+            },
+            get height() {
+                return getH();
+            },
+        };
+        rtResolvers.set(handle, resolver);
         const owned: OwnedRT = { handle, resolver };
         this.#ownedRTs.push(owned);
         if (!explicitSize) {
@@ -619,13 +620,16 @@ export class EffectHost {
             this.#perFrameAutoUpdate.push(autoUpdateFn);
         }
 
-        const handle = Object.create(null) as EffectTextureInternal;
-        Object.defineProperties(handle, {
-            __brand: { value: "EffectTexture", enumerable: true },
-            width: { get: getW, enumerable: true },
-            height: { get: getH, enumerable: true },
-            [RESOLVE_TEXTURE]: { value: () => texture },
-        });
+        const handle: EffectTexture = {
+            __brand: "EffectTexture",
+            get width() {
+                return getW();
+            },
+            get height() {
+                return getH();
+            },
+        };
+        textureResolvers.set(handle, () => texture);
         return handle;
     }
 
@@ -850,13 +854,16 @@ export function makeEffectTexture(
     width: () => number,
     height: () => number,
 ): EffectTexture {
-    const handle = Object.create(null) as EffectTextureInternal;
-    Object.defineProperties(handle, {
-        __brand: { value: "EffectTexture", enumerable: true },
-        width: { get: width, enumerable: true },
-        height: { get: height, enumerable: true },
-        [RESOLVE_TEXTURE]: { value: resolve },
-    });
+    const handle: EffectTexture = {
+        __brand: "EffectTexture",
+        get width() {
+            return width();
+        },
+        get height() {
+            return height();
+        },
+    };
+    textureResolvers.set(handle, resolve);
     return handle;
 }
 
@@ -876,17 +883,18 @@ export function makeEffectRenderTargetFromFb(
             // Chain-owned; host does not dispose via handle.
         },
     };
-    const handle = Object.create(null) as EffectRenderTargetInternal;
-    Object.defineProperties(handle, {
-        __brand: { value: "EffectRenderTarget", enumerable: true },
-        width: { get: () => fb.width, enumerable: true },
-        height: { get: () => fb.height, enumerable: true },
-        [RESOLVE_RT]: { value: resolver },
-    });
+    const handle: EffectRenderTarget = {
+        __brand: "EffectRenderTarget",
+        get width() {
+            return fb.width;
+        },
+        get height() {
+            return fb.height;
+        },
+    };
+    rtResolvers.set(handle, resolver);
     return handle;
 }
 
 /** Effect-host-owned type tag re-export for convenience. @internal */
 export type { Effect };
-// Re-export resolvers for the chain's internal use.
-export { RESOLVE_RT, RESOLVE_TEXTURE, resolveRt, resolveTexture };
