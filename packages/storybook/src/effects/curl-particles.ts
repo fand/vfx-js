@@ -334,6 +334,10 @@ uniform int particleCount;
 uniform float aliveFraction;
 uniform float alpha;
 uniform float fog;       // 0 = none, 1 = full depth fade
+// Auto-uploaded by vfx-js: rect of the element content within the
+// stage's destination buffer in [0,1] uv. With outputRect=canvasRect
+// this lets element-uv positions map to the (larger) buffer.
+uniform vec4 contentRectUv;
 
 out vec2 vCorner;
 out vec4 vColor;
@@ -354,8 +358,6 @@ void main() {
     float age = texture(spawn, stateUv).w;
 
     vec2 pos = s.xy;
-    bool offscreen = pos.x < 0.0 || pos.x > 1.0
-                  || pos.y < 0.0 || pos.y > 1.0;
 
     // Sin envelope on age. age < 0 = pre-spawn (queued), invisible.
     // alivePhase > 1 = past the visible window, invisible (the rest
@@ -365,7 +367,7 @@ void main() {
         ? sin(alivePhase * 3.14159)
         : 0.0;
 
-    if (offscreen || lifeAlpha <= 0.0) {
+    if (lifeAlpha <= 0.0) {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         vCorner = vec2(0.0);
         vColor = vec4(0.0);
@@ -377,8 +379,15 @@ void main() {
     // alpha smoothly drops between z=-0.5 (front) and z=1 (back).
     float fogFactor = mix(1.0, smoothstep(1.0, -0.5, s.z), fog);
 
-    vec2 ndcPos = pos * 2.0 - 1.0;
-    vec2 ndcOffset = position * pointSize * 2.0 / elementPixel;
+    // Map element-uv (pos.xy) → buffer-uv via contentRectUv so the
+    // particle lands at its element-relative position even when the
+    // dst buffer extends beyond the element (outputRect=canvasRect).
+    vec2 bufferUv = contentRectUv.xy + pos * contentRectUv.zw;
+    vec2 ndcPos = bufferUv * 2.0 - 1.0;
+    // pointSize is in element px → convert to ndc via the buffer's
+    // pixel size (= elementPixel / contentRectUv.zw).
+    vec2 bufferPixel = elementPixel / max(contentRectUv.zw, vec2(1e-6));
+    vec2 ndcOffset = position * pointSize * 2.0 / bufferPixel;
     gl_Position = vec4(ndcPos + ndcOffset, 0.0, 1.0);
     vCorner = position;
     vColor = vec4(c.rgb, c.a * lifeAlpha * alpha * fogFactor);
@@ -445,7 +454,13 @@ uniform sampler2D trail;
 uniform float backgroundOpacity;
 
 void main() {
-    vec4 base = texture(src, uvSrc) * backgroundOpacity;
+    // Mask src to the element's content area — when outputRect is the
+    // canvas, fragments outside [0,1] in src-uv space have no source
+    // pixel, so they should be transparent under the trail.
+    vec2 inside = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
+    float srcMask = inside.x * inside.y;
+    vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0))
+              * backgroundOpacity * srcMask;
     vec4 t = texture(trail, uv);
     // Trail premultiplied-over base.
     outColor = vec4(base.rgb * (1.0 - t.a) + t.rgb, max(base.a, t.a));
@@ -717,5 +732,13 @@ export class CurlParticlesEffect implements Effect {
         this.#trail = null;
         this.#initialized = false;
         this.#geometry = null;
+    }
+
+    // Render into the entire canvas so particles can advect (and trails
+    // can extend) past the element's bounds.
+    outputRect(
+        dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
+    ): readonly [number, number, number, number] {
+        return dims.canvasRect;
     }
 }

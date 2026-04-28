@@ -2,6 +2,7 @@ import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
 import type { CurlParticlesEffect } from "./effects/curl-particles";
+import type { DisintegrateEffect } from "./effects/disintegrate";
 import type { FluidEffect } from "./effects/fluid";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
@@ -215,6 +216,11 @@ const PARTICLES_PANE_CLASS = "particles-tweakpane-container";
 export function attachParticlesPane(
     title: string,
     effect: CurlParticlesEffect,
+    disintegrate?: DisintegrateEffect,
+    srcSelector?: {
+        img: HTMLImageElement;
+        sources: Record<string, string>;
+    },
 ): Pane {
     for (const el of document.querySelectorAll(`.${PARTICLES_PANE_CLASS}`)) {
         el.remove();
@@ -226,7 +232,47 @@ export function attachParticlesPane(
         "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
     document.body.appendChild(container);
 
+    if (disintegrate) {
+        // Share visual params so a single slider drives both effects.
+        // Without this proxy, sliders only mutate the curl-particles
+        // params object — disintegrate keeps its own copy and ignores
+        // changes. trailFade is curl-only (explode doesn't render
+        // trails) so it is intentionally not in this list.
+        for (const key of ["noiseScale", "pointSize", "fog"] as const) {
+            Object.defineProperty(disintegrate.params, key, {
+                get: () => effect.params[key],
+                set: (v: number) => {
+                    effect.params[key] = v;
+                },
+                configurable: true,
+                enumerable: true,
+            });
+        }
+        // disintegrate.duration ← curl-particles.lifespan (different
+        // names, same intent — total animation time the slider drives).
+        Object.defineProperty(disintegrate.params, "duration", {
+            get: () => effect.params.lifespan,
+            set: (v: number) => {
+                effect.params.lifespan = v;
+            },
+            configurable: true,
+            enumerable: true,
+        });
+    }
+
     const pane = new Pane({ container, title, expanded: false });
+    if (srcSelector) {
+        const { img, sources } = srcSelector;
+        const keys = Object.keys(sources);
+        const initialKey = keys.find((k) => sources[k] === img.src) ?? keys[0];
+        const state = { src: initialKey };
+        const options: Record<string, string> = Object.fromEntries(
+            keys.map((k) => [k, k]),
+        );
+        pane.addBinding(state, "src", { options }).on("change", (ev) => {
+            img.src = sources[ev.value as string];
+        });
+    }
     pane.addBinding(effect.params, "lifespan", {
         min: 0.5,
         max: 5,
@@ -280,5 +326,13 @@ export function attachParticlesPane(
         max: 1,
         step: 0.005,
     });
+    if (disintegrate) {
+        pane.addButton({ title: "Explode" }).on("click", () => {
+            disintegrate.trigger();
+        });
+        pane.addButton({ title: "Reset" }).on("click", () => {
+            disintegrate.reset();
+        });
+    }
     return pane;
 }

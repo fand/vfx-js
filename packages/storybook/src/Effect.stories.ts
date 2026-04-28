@@ -4,6 +4,7 @@ import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
 import { CurlParticlesEffect } from "./effects/curl-particles";
+import { DisintegrateEffect } from "./effects/disintegrate";
 import { FluidEffect } from "./effects/fluid";
 import { createPixelateEffect } from "./effects/pixelate";
 import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
@@ -195,8 +196,60 @@ curlParticles.play = async ({ canvasElement }) => {
 
     const vfx = initVFX();
     const effect = new CurlParticlesEffect();
-    await vfx.add(img, { effect });
-    attachParticlesPane("Particles", effect);
+    const disintegrate = new DisintegrateEffect();
+    await vfx.add(img, { effect: [effect, disintegrate] });
+    attachParticlesPane("Particles", effect, disintegrate, {
+        img,
+        sources: { Jellyfish, Logo },
+    });
+
+    seedFluidMotion(canvasElement);
+};
+
+// Same as `curlParticles`, but the Explode burst sizes its particle
+// simulation texture to match the displayed image so there's roughly
+// one particle per pixel — gives a clean dissolve where every pixel of
+// the source contributes a particle. Capped per-axis to stay within
+// reasonable GPU memory limits.
+export const curlParticlesExplode: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Logo;
+        return img;
+    },
+    args: undefined,
+};
+curlParticlesExplode.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+    // Wait one frame so layout is resolved and clientWidth/Height are
+    // populated with the actual rendered pixel size.
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    const dpr = window.devicePixelRatio || 1;
+    const STATE_MAX = 2048;
+    const w = Math.min(
+        STATE_MAX,
+        Math.max(1, Math.round((img.clientWidth || img.naturalWidth) * dpr)),
+    );
+    const h = Math.min(
+        STATE_MAX,
+        Math.max(1, Math.round((img.clientHeight || img.naturalHeight) * dpr)),
+    );
+
+    const vfx = initVFX();
+    // pointSize=1 — with one particle per displayed pixel, each
+    // particle only needs to cover its own pixel. Both effects read
+    // pointSize via the proxy installed in attachParticlesPane.
+    const effect = new CurlParticlesEffect({ pointSize: 1.0 });
+    const disintegrate = new DisintegrateEffect({}, [w, h]);
+    await vfx.add(img, { effect: [effect, disintegrate] });
+    attachParticlesPane("Particles", effect, disintegrate, {
+        img,
+        sources: { Logo, Jellyfish },
+    });
 
     seedFluidMotion(canvasElement);
 };
