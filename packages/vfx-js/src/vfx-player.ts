@@ -3,7 +3,10 @@ import { shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
 import { EffectChain } from "./effect-chain.js";
-import { makeEffectTexture } from "./effect-host.js";
+import {
+    makeEffectRenderTargetFromFb,
+    makeEffectTexture,
+} from "./effect-host.js";
 import GIFData from "./gif.js";
 import { GLContext } from "./gl/context.js";
 import type { Framebuffer } from "./gl/framebuffer.js";
@@ -27,6 +30,7 @@ import {
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
 import type {
     Effect,
+    EffectRenderTarget,
     EffectUniformValue,
     EffectVFXProps,
     VFXElement,
@@ -57,6 +61,7 @@ export class VFXPlayer {
     #postEffectPasses: PostEffectPass[] = [];
     #postEffectPassTargets: (string | undefined)[] = [];
     #postEffectTarget: Framebuffer | undefined;
+    #postEffectTargetHandle: EffectRenderTarget | null = null;
     #postEffectUniformGeneratorsList: {
         [name: string]: () => VFXUniformValue;
     }[] = [];
@@ -133,6 +138,7 @@ export class VFXPlayer {
         }
 
         this.#postEffectTarget?.dispose();
+        this.#postEffectTargetHandle = null;
         for (const rt of this.#postEffectBufferTargets.values()) {
             rt?.dispose();
         }
@@ -1287,9 +1293,7 @@ export class VFXPlayer {
 
         const shouldUsePostEffect = this.#shouldUsePostEffect();
         chain.setFinalTarget(
-            shouldUsePostEffect && this.#postEffectTarget
-                ? this.#postEffectTarget
-                : null,
+            shouldUsePostEffect ? this.#postEffectTargetHandle : null,
         );
 
         chain.run({
@@ -1911,6 +1915,9 @@ export class VFXPlayer {
                 this.#ctx,
                 targetWidth,
                 targetHeight,
+            );
+            this.#postEffectTargetHandle = makeEffectRenderTargetFromFb(
+                this.#postEffectTarget,
             );
         }
 

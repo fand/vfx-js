@@ -2,7 +2,6 @@ import {
     EffectHost,
     makeEffectRenderTargetFromFb,
     makeEffectTexture,
-    resolveRt,
 } from "./effect-host.js";
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
@@ -210,20 +209,11 @@ export class EffectChain {
 
     /**
      * Set the destination for the chain's last rendering stage. `null`
-     * draws to the canvas; an FBO is used when a downstream pipeline
-     * (e.g. a post-effect chain) needs to read this chain's output as
-     * a texture. Caller invokes this only when the destination changes
-     * (post-effect toggle, FBO realloc on resize, etc.).
+     * draws to the canvas; otherwise the handle's underlying FBO is
+     * used (e.g. when a post-effect chain reads this chain's output).
      */
-    setFinalTarget(fb: Framebuffer | null): void {
-        const currentFb = this.#finalTargetHandle
-            ? resolveRt(this.#finalTargetHandle).getWriteFbo()
-            : null;
-        if (fb === currentFb) {
-            return;
-        }
-        this.#finalTargetHandle =
-            fb === null ? null : makeEffectRenderTargetFromFb(fb);
+    setFinalTarget(target: EffectRenderTarget | null): void {
+        this.#finalTargetHandle = target;
     }
 
     /**
