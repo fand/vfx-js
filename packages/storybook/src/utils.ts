@@ -232,6 +232,11 @@ export function attachParticlesPane(
         max: 20,
         step: 0.1,
     });
+    pane.addBinding(effect.params, "aliveFraction", {
+        min: 0.1,
+        max: 1,
+        step: 0.01,
+    });
     pane.addBinding(effect.params, "speed", { min: 0, max: 1, step: 0.005 });
     pane.addBinding(effect.params, "noiseScale", {
         min: 0.5,
@@ -243,15 +248,26 @@ export function attachParticlesPane(
         max: 30,
         step: 0.5,
     });
+    pane.addBinding(effect.params, "alpha", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect.params, "radius", {
         min: 20,
         max: 800,
         step: 10,
     });
+    pane.addBinding(effect.params, "speedDecay", {
+        min: 0.1,
+        max: 10,
+        step: 0.1,
+    });
     pane.addBinding(effect.params, "backgroundOpacity", {
         min: 0,
         max: 1,
         step: 0.01,
+    });
+    pane.addBinding(effect.params, "trailFade", {
+        min: 0,
+        max: 1,
+        step: 0.005,
     });
     return pane;
 }

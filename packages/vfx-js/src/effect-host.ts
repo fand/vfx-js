@@ -642,7 +642,9 @@ export class EffectHost {
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
         gl.viewport(vpX, vpY, vpW, vpH);
         gl.disable(gl.SCISSOR_TEST);
-        applyBlend(gl, rawTarget === null ? "premultiplied" : "none");
+        const blend =
+            opts.blend ?? (rawTarget === null ? "premultiplied" : "none");
+        applyBlend(gl, blend);
 
         program.use();
         const uniforms = this.#buildUniforms(opts.uniforms);

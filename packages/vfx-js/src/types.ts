@@ -639,6 +639,8 @@ export type EffectGeometry = {
  */
 export type EffectQuad = { readonly __brand: "EffectQuad" };
 
+export type EffectBlendMode = "normal" | "premultiplied" | "additive" | "none";
+
 export type EffectDrawOpts = {
     frag: string;
     vert?: string;
@@ -652,6 +654,14 @@ export type EffectDrawOpts = {
      * It renders to the Canvas if omitted (or `null`).
      */
     target?: EffectRenderTarget | null;
+
+    /**
+     * Blend mode override. Default: `"premultiplied"` when drawing to
+     * the canvas (`target` null/omitted), `"none"` when drawing to a
+     * user-allocated render target. Use `"additive"` for accumulating
+     * draws like sparkles or particle stamps.
+     */
+    blend?: EffectBlendMode;
 };
 
 /** Subset of `VFXProps` exposed to effects via `ctx.vfxProps`. */

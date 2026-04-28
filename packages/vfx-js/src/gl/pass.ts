@@ -9,11 +9,14 @@ import type { Quad } from "./quad.js";
  *     Equivalent to Three.js NormalBlending with premultipliedAlpha=false.
  *   - `"premultiplied"`: premultiplied (ONE, ONE_MINUS_SRC_ALPHA).
  *     Equivalent to Three.js NormalBlending with premultipliedAlpha=true.
+ *   - `"additive"`: premultiplied additive (ONE, ONE). Source RGB and
+ *     alpha both accumulate onto the destination — overlapping
+ *     fragments brighten.
  *   - `"none"`: BLEND disabled. Used when rendering to an intermediate
  *     buffer so output is not blended against previous contents.
  * @internal
  */
-export type BlendMode = "normal" | "premultiplied" | "none";
+export type BlendMode = "normal" | "premultiplied" | "additive" | "none";
 
 /** @internal */
 export class Pass {
@@ -99,6 +102,8 @@ export function applyBlend(gl: WebGL2RenderingContext, mode: BlendMode): void {
             gl.ONE,
             gl.ONE_MINUS_SRC_ALPHA,
         );
+    } else if (mode === "additive") {
+        gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ONE, gl.ONE);
     } else {
         gl.blendFuncSeparate(
             gl.SRC_ALPHA,
