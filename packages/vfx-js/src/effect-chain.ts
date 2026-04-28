@@ -249,7 +249,7 @@ export class EffectChain {
 
         const M = this.#renderingIndices.length;
 
-        // 1. Reflect state + uniforms into each host's ctx.
+        // Reflect state + uniforms into each host's ctx.
         for (const host of this.#hosts) {
             host.setFrameState({
                 time: input.time,
@@ -263,16 +263,16 @@ export class EffectChain {
             });
         }
 
-        // 2. Resolve per-stage pad / buffers / srcRectUv / contentRectUv.
-        //    Allocates / reuses intermediate RTs.
+        // Resolve per-stage pad / buffers / srcRectUv / contentRectUv.
+        // Allocates / reuses intermediate RTs.
         this.#resolveStages(input);
 
-        // 3. Apply per-host frame dims.
+        // Apply per-host frame dims.
         for (let k = 0; k < this.#hosts.length; k++) {
             this.#hosts[k].setFrameDims(this.#hostFrameDims(k, input));
         }
 
-        // 4. Update phase (array order). ctx.draw() is a no-op here.
+        // Update phase (array order). ctx.draw() is a no-op here.
         for (let i = 0; i < this.#effects.length; i++) {
             const e = this.#effects[i];
             if (!e.update) {
@@ -293,9 +293,9 @@ export class EffectChain {
             }
         }
 
-        // 5. No rendering effects: passthrough copy.
-        //    Reuse `#hosts[0]` if any; otherwise fall back to the
-        //    chain-owned `#ownedPassthroughHost` (effects is empty).
+        // No rendering effects: passthrough copy.
+        // Reuse `#hosts[0]` if any; otherwise fall back to the
+        // chain-owned `#ownedPassthroughHost` (effects is empty).
         if (M === 0) {
             const target =
                 input.finalTarget === null
@@ -310,7 +310,7 @@ export class EffectChain {
             return;
         }
 
-        // 6. Render phase: walk renderingIndices.
+        // Render phase: walk renderingIndices.
         for (let k = 0; k < M; k++) {
             const i = this.#renderingIndices[k];
             const host = this.#hosts[i];
