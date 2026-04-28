@@ -133,8 +133,8 @@ void main() {
 }
 `;
 
-// Minimal passthrough copy fragment shader (300 es). Used for the M=0
-// identity copy and render-failure fallback.
+// Minimal passthrough copy fragment shader (300 es). Used for the
+// stageCount=0 identity copy and render-failure fallback.
 const PASSTHROUGH_FRAG_300 = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -342,7 +342,7 @@ export class EffectHost {
         this.#ctxBacking.target = output;
     }
 
-    // -- internal passthrough pass (used by chain for M=0 / fallback) -------
+    // -- internal passthrough pass (used by chain for stageCount=0 / fallback)
 
     /**
      * Draws a passthrough copy of `src` into `target` using the host's

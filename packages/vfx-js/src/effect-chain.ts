@@ -247,7 +247,7 @@ export class EffectChain {
             return;
         }
 
-        const M = this.#renderingIndices.length;
+        const stageCount = this.#renderingIndices.length;
 
         // Reflect state + uniforms into each host's ctx.
         for (const host of this.#hosts) {
@@ -296,7 +296,7 @@ export class EffectChain {
         // No rendering effects: passthrough copy.
         // Reuse `#hosts[0]` if any; otherwise fall back to the
         // chain-owned `#ownedPassthroughHost` (effects is empty).
-        if (M === 0) {
+        if (stageCount === 0) {
             const target =
                 input.finalTarget === null
                     ? null
@@ -311,7 +311,7 @@ export class EffectChain {
         }
 
         // Render phase: walk renderingIndices.
-        for (let k = 0; k < M; k++) {
+        for (let k = 0; k < stageCount; k++) {
             const i = this.#renderingIndices[k];
             const host = this.#hosts[i];
             const effect = this.#effects[i];
@@ -328,7 +328,7 @@ export class EffectChain {
             host.setSrc(srcHandle);
 
             let outputHandle: EffectRenderTarget | null;
-            if (k === M - 1) {
+            if (k === stageCount - 1) {
                 outputHandle =
                     input.finalTarget === null
                         ? null
@@ -354,7 +354,7 @@ export class EffectChain {
                 const vp = this.#stages[k].outputViewport;
                 if (outputHandle === null) {
                     host.passthroughCopy(srcHandle, null, vp);
-                } else if (k === M - 1) {
+                } else if (k === stageCount - 1) {
                     host.passthroughCopy(srcHandle, outputHandle, vp);
                 } else {
                     host.passthroughCopy(srcHandle, outputHandle, {
@@ -415,9 +415,9 @@ export class EffectChain {
      *
      */
     #resolveStages(input: ChainFrameInput): void {
-        const M = this.#renderingIndices.length;
-        this.#stages = new Array(M);
-        if (M === 0) {
+        const stageCount = this.#renderingIndices.length;
+        this.#stages = new Array(stageCount);
+        if (stageCount === 0) {
             return;
         }
         // Post-effect: element mirrors canvas, so contentRect spans canvasBufferSize.
@@ -432,10 +432,10 @@ export class EffectChain {
         ];
         const canvasRect = this.#canvasRectInElementLocal(input);
         let srcRect: ElementRect = contentRect;
-        for (let k = 0; k < M; k++) {
+        for (let k = 0; k < stageCount; k++) {
             const i = this.#renderingIndices[k];
             const effect = this.#effects[i];
-            const isLast = k === M - 1;
+            const isLast = k === stageCount - 1;
 
             const resolved = this.#callOutputRect(
                 effect,
@@ -469,7 +469,7 @@ export class EffectChain {
             }
             srcRect = dstRect;
         }
-        const [lx, ly, lw, lh] = this.#stages[M - 1].dstRect;
+        const [lx, ly, lw, lh] = this.#stages[stageCount - 1].dstRect;
         this.#lastHitTestPad = createMargin({
             top: Math.max(0, ly + lh - elementPixel[1]),
             right: Math.max(0, lx + lw - elementPixel[0]),

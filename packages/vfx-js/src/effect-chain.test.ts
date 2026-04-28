@@ -221,17 +221,17 @@ describe("EffectChain: renderingIndices", () => {
         expect(chain.renderingIndices).toEqual([0, 2]);
     });
 
-    it("M=0 when no effect has render", () => {
+    it("stageCount=0 when no effect has render", () => {
         const chain = makeChain([{ update: () => {} }, { init: () => {} }]);
         expect(chain.renderingIndices).toEqual([]);
     });
 });
 
 // ---------------------------------------------------------------------------
-// M=0 identity copy
+// stageCount=0 identity copy
 // ---------------------------------------------------------------------------
 
-describe("EffectChain: M=0 identity copy", () => {
+describe("EffectChain: stageCount=0 identity copy", () => {
     it("copies capture → finalTarget once via passthroughCopy", () => {
         const chain = makeChain([{ update: () => {} }]);
         chain.run(makeInput({ finalTarget: null }));
@@ -241,7 +241,7 @@ describe("EffectChain: M=0 identity copy", () => {
         expect(passthroughCalls).toHaveLength(1);
     });
 
-    it("M=0 does nothing when isVisible is false", () => {
+    it("stageCount=0 does nothing when isVisible is false", () => {
         const chain = makeChain([{ update: () => {} }]);
         chain.run(makeInput({ isVisible: false }));
         for (const h of hosts) {
@@ -253,10 +253,10 @@ describe("EffectChain: M=0 identity copy", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Intermediate allocation + src/output swapping (M=N)
+// Intermediate allocation + src/output swapping (stageCount=N)
 // ---------------------------------------------------------------------------
 
-describe("EffectChain: M=3 intermediates + swap", () => {
+describe("EffectChain: stageCount=3 intermediates + swap", () => {
     it("allocates 2 intermediates and swaps src/output per pass", () => {
         const log: Array<{ src: unknown; target: unknown }> = [];
         const effects: Effect[] = [
@@ -270,7 +270,7 @@ describe("EffectChain: M=3 intermediates + swap", () => {
         // stage's src. finalTarget: null → canvas.
         chain.run(makeInput({ finalTarget: null }));
 
-        // 2 intermediates allocated (M-1 = 3-1 = 2).
+        // 2 intermediates allocated (stageCount-1 = 3-1 = 2).
         expect(fbs).toHaveLength(2);
 
         // Stage 0: src = capture, output = intermediate[0].rtHandle
@@ -333,7 +333,7 @@ describe("EffectChain: render-less middle", () => {
         const chain = makeChain(effects);
         expect(chain.renderingIndices).toEqual([0, 2]);
         chain.run(makeInput());
-        // M=2 → 1 intermediate (not 2).
+        // stageCount=2 → 1 intermediate (not 2).
         expect(fbs).toHaveLength(1);
     });
 });
@@ -714,7 +714,7 @@ describe("EffectChain: outputRect non-rendering effect", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Empty effects: M=0 passthrough via dedicated host
+// Empty effects: stageCount=0 passthrough via dedicated host
 // ---------------------------------------------------------------------------
 
 describe("EffectChain: empty effects", () => {
@@ -724,7 +724,7 @@ describe("EffectChain: empty effects", () => {
         expect(hosts).toHaveLength(1);
     });
 
-    it("M=0 passthrough renders capture → finalTarget on run()", () => {
+    it("stageCount=0 passthrough renders capture → finalTarget on run()", () => {
         const chain = makeChain([]);
         chain.run(makeInput({ finalTarget: null }));
         const passthroughCalls = hosts[0]._calls.filter(
