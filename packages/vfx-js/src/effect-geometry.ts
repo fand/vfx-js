@@ -21,12 +21,7 @@ export const EFFECT_QUAD_TOKEN: EffectQuad = Object.freeze({
 
 /** @internal */
 export function isEffectQuad(g: unknown): g is EffectQuad {
-    return (
-        g === EFFECT_QUAD_TOKEN ||
-        (typeof g === "object" &&
-            g !== null &&
-            (g as { __brand?: unknown }).__brand === "EffectQuad")
-    );
+    return g === EFFECT_QUAD_TOKEN;
 }
 
 type NormalizedAttribute = {

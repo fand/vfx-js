@@ -258,11 +258,7 @@ vi.mock("./effect-geometry.js", async () => {
     });
     return {
         EFFECT_QUAD_TOKEN,
-        isEffectQuad: (g: unknown) =>
-            g === EFFECT_QUAD_TOKEN ||
-            (typeof g === "object" &&
-                g !== null &&
-                (g as { __brand?: unknown }).__brand === "EffectQuad"),
+        isEffectQuad: (g: unknown) => g === EFFECT_QUAD_TOKEN,
         EffectGeometryCache: class {
             quadDrawCount = 0;
             customResolveCount = 0;
