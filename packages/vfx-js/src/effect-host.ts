@@ -56,7 +56,7 @@ type RenderTargetResolver = {
 
     /** Called when the host's element size changes (auto-tracking RTs). */
     resize?: (bufferW: number, bufferH: number) => void;
-    dispose: () => void;
+    dispose?: () => void;
 };
 
 function resolveTexture(h: EffectTexture): Texture {
@@ -671,7 +671,7 @@ export class EffectHost {
         }
         this.#restoredUnsubs = [];
         for (const rt of this.#ownedRTs) {
-            rt.resolver.dispose();
+            rt.resolver.dispose?.();
         }
         this.#ownedRTs = [];
         this.#autoResizeRTs = [];
@@ -804,9 +804,6 @@ export function makeEffectRenderTargetFromFb(
     const resolver: RenderTargetResolver = {
         getReadTexture: () => fb.texture,
         getWriteFbo: () => fb,
-        dispose: () => {
-            // Chain-owned; host does not dispose via handle.
-        },
     };
     return makeEffectRenderTarget(
         resolver,
