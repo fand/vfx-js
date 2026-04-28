@@ -22,7 +22,7 @@
 - 案: `getTargetDimensions()` を削除し呼び出し側を `.size` getter へ移行
 - 注意: 外部の呼び出し箇所を全部更新
 
-### 3. `#warnedUpdate` + `#warnedRender` を統合
+### 3. `#warnedUpdate` + `#warnedRender` を統合 ✅ 完了
 
 - 場所: `packages/vfx-js/src/effect-chain.ts:127-128`
 - 問題: "このエフェクトを警告済みか" を phase ごとに別 Set で管理
