@@ -13,6 +13,7 @@ import { Texture, type TextureWrap } from "./gl/texture.js";
 import type {
     Effect,
     EffectContext,
+    EffectDims,
     EffectDrawOpts,
     EffectGeometry,
     EffectRenderTarget,
@@ -244,6 +245,16 @@ export class EffectHost {
             contentRectUv: [0, 0, 1, 1],
             srcRectUv: [0, 0, 1, 1],
         };
+        const initialDims: EffectDims = {
+            element: [1, 1],
+            elementPixel: [1, 1],
+            canvas: [1, 1],
+            canvasPixel: [1, 1],
+            pixelRatio,
+            contentRect: [0, 0, 1, 1],
+            srcRect: [0, 0, 1, 1],
+            canvasRect: [0, 0, 1, 1],
+        };
         const ctx: EffectContext = {
             time: 0,
             deltaTime: 0,
@@ -258,6 +269,7 @@ export class EffectHost {
             target: null,
             uniforms: {},
             vfxProps: initialVfxProps,
+            dims: initialDims,
             quad: EFFECT_QUAD_TOKEN,
             gl: this.#gl,
             createRenderTarget: (opts) => this.#createRenderTarget(opts),
@@ -295,6 +307,10 @@ export class EffectHost {
         for (const rt of this.#autoResizeRTs) {
             rt.resolver.resize?.(dims.outputBufferW, dims.outputBufferH);
         }
+    }
+
+    setEffectDims(dims: EffectDims): void {
+        this.#mutCtx.dims = dims;
     }
 
     setFrameState(state: {

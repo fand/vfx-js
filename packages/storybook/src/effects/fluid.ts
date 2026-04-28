@@ -283,12 +283,6 @@ export class FluidEffect implements Effect {
 
     #prevMouseUv: [number, number] = [0, 0];
     #prevMouseValid = false;
-    // Element render size in physical px. `ctx.src.width/height` for an
-    // <img> returns naturalWidth/Height (intrinsic resolution, not the
-    // rendered size), so it can't be used to normalize ctx.mouse into
-    // element uv. Cached from outputRect, which the host re-queries
-    // every frame before render.
-    #elementPx: [number, number] = [1, 1];
 
     constructor(initial: Partial<FluidParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
@@ -342,7 +336,7 @@ export class FluidEffect implements Effect {
         } = this.params;
         const simTexel: [number, number] = [1 / simSize[0], 1 / simSize[1]];
 
-        const [elementW, elementH] = this.#elementPx;
+        const [elementW, elementH] = ctx.dims.elementPixel;
         const aspect = elementW / elementH;
         const mouseUv: [number, number] = [
             ctx.mouse[0] / elementW,
@@ -454,14 +448,6 @@ export class FluidEffect implements Effect {
             },
             target: ctx.target,
         });
-    }
-
-    outputRect(
-        dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
-    ): readonly [number, number, number, number] {
-        // Cache element pixel size for mouse-uv normalization in render.
-        this.#elementPx = [dims.elementPixel[0], dims.elementPixel[1]];
-        return dims.contentRect;
     }
 
     dispose(): void {

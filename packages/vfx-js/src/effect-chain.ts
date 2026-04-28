@@ -14,6 +14,7 @@ import {
 } from "./rect.js";
 import type {
     Effect,
+    EffectDims,
     EffectRenderTarget,
     EffectTexture,
     EffectUniformValue,
@@ -268,9 +269,11 @@ export class EffectChain {
         // Allocates / reuses intermediate RTs.
         this.#resolveStages(input);
 
-        // Apply per-host frame dims.
+        // Apply per-host frame dims + per-host EffectDims (the same
+        // shape outputRect saw for this stage, exposed on ctx.dims).
         for (let k = 0; k < this.#hosts.length; k++) {
             this.#hosts[k].setFrameDims(this.#hostFrameDims(k, input));
+            this.#hosts[k].setEffectDims(this.#hostEffectDims(k, input));
         }
 
         // Update phase (array order). ctx.draw() is a no-op here.
@@ -484,8 +487,19 @@ export class EffectChain {
         if (!effect.outputRect) {
             return undefined;
         }
+        return effect.outputRect(
+            this.#buildDims(input, contentRect, srcRect, canvasRect),
+        );
+    }
+
+    #buildDims(
+        input: ChainFrameInput,
+        contentRect: ElementRect,
+        srcRect: ElementRect,
+        canvasRect: ElementRect,
+    ): EffectDims {
         const pixelRatio = input.canvasBufferSize[0] / input.canvasSize[0] || 1;
-        const dims = {
+        return {
             element: this.#isPostEffect ? input.canvasSize : input.elementSize,
             elementPixel: this.#isPostEffect
                 ? input.canvasBufferSize
@@ -497,7 +511,30 @@ export class EffectChain {
             srcRect,
             canvasRect,
         };
-        return effect.outputRect(dims);
+    }
+
+    /**
+     * Per-host EffectDims for `ctx.dims`. Stage k sees the same dims
+     * its `outputRect` was called with: contentRect = full element
+     * rect, srcRect = prev rendering stage's dstRect (or contentRect
+     * at stage 0). Non-rendering hosts get srcRect = contentRect since
+     * they have no own stage.
+     */
+    #hostEffectDims(k: number, input: ChainFrameInput): EffectDims {
+        const elementPixel = this.#isPostEffect
+            ? input.canvasBufferSize
+            : input.elementBufferSize;
+        const contentRect: ElementRect = [
+            0,
+            0,
+            elementPixel[0],
+            elementPixel[1],
+        ];
+        const canvasRect = this.#canvasRectInElementLocal(input);
+        const renderPos = this.#renderingIndices.indexOf(k);
+        const srcRect: ElementRect =
+            renderPos <= 0 ? contentRect : this.#stages[renderPos - 1].dstRect;
+        return this.#buildDims(input, contentRect, srcRect, canvasRect);
     }
 
     #ensureIntermediate(k: number, bufferSize: [number, number]): void {

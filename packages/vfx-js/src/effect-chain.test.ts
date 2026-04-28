@@ -25,6 +25,7 @@ type MockHost = {
     setPhase: (p: string) => void;
     setFrameState: (s: unknown) => void;
     setFrameDims: (d: unknown) => void;
+    setEffectDims: (d: unknown) => void;
     setSrc: (v: unknown) => void;
     setOutput: (v: unknown) => void;
     passthroughCopy: (src: unknown, target: unknown, vp: unknown) => void;
@@ -64,6 +65,9 @@ vi.mock("./effect-host.js", () => {
         }
         setFrameDims(d: unknown) {
             this._calls.push(["setFrameDims", d]);
+        }
+        setEffectDims(d: unknown) {
+            this._calls.push(["setEffectDims", d]);
         }
         setSrc(v: unknown) {
             this.ctx.src = v;
