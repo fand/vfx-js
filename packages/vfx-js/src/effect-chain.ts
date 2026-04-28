@@ -50,9 +50,6 @@ export type ChainFrameInput = {
      */
     elementRectOnCanvasPx: { x: number; y: number; w: number; h: number };
 
-    /** null → canvas; otherwise the already-allocated final FBO. */
-    finalTarget: Framebuffer | null;
-
     isVisible: boolean;
 };
 
@@ -125,8 +122,8 @@ export class EffectChain {
     #intermediates: IntermediateEntry[] = [];
     #stages: StageLayout[] = [];
     #capture: EffectTexture;
-    #finalFallbackHandle: EffectRenderTarget | null = null;
-    #finalFallbackFb: Framebuffer | null = null;
+    #finalTargetFb: Framebuffer | null = null;
+    #finalTargetHandle: EffectRenderTarget | null = null;
     #warnedUpdate = new Set<number>();
     #warnedRender = new Set<number>();
     #disposed = false;
@@ -209,6 +206,22 @@ export class EffectChain {
      */
     get hitTestPadBuffer(): Margin {
         return this.#lastHitTestPad;
+    }
+
+    /**
+     * Set the destination for the chain's last rendering stage. `null`
+     * draws to the canvas; an FBO is used when a downstream pipeline
+     * (e.g. a post-effect chain) needs to read this chain's output as
+     * a texture. Caller invokes this only when the destination changes
+     * (post-effect toggle, FBO realloc on resize, etc.).
+     */
+    setFinalTarget(fb: Framebuffer | null): void {
+        if (fb === this.#finalTargetFb) {
+            return;
+        }
+        this.#finalTargetFb = fb;
+        this.#finalTargetHandle =
+            fb === null ? null : makeEffectRenderTargetFromFb(fb);
     }
 
     /**
@@ -297,14 +310,10 @@ export class EffectChain {
         // Reuse `#hosts[0]` if any; otherwise fall back to the
         // chain-owned `#ownedPassthroughHost` (effects is empty).
         if (stageCount === 0) {
-            const target =
-                input.finalTarget === null
-                    ? null
-                    : this.#getFinalHandle(input.finalTarget);
             const host = this.#ownedPassthroughHost ?? this.#hosts[0];
             host.passthroughCopy(
                 this.#capture,
-                target,
+                this.#finalTargetHandle,
                 input.elementRectOnCanvasPx,
             );
             return;
@@ -329,10 +338,7 @@ export class EffectChain {
 
             let outputHandle: EffectRenderTarget | null;
             if (k === stageCount - 1) {
-                outputHandle =
-                    input.finalTarget === null
-                        ? null
-                        : this.#getFinalHandle(input.finalTarget);
+                outputHandle = this.#finalTargetHandle;
             } else {
                 outputHandle = this.#intermediates[k].rtHandle;
                 host.clearRt(outputHandle);
@@ -388,10 +394,8 @@ export class EffectChain {
         }
         this.#intermediates = [];
         this.#stages = [];
-        if (this.#finalFallbackFb) {
-            this.#finalFallbackFb.dispose();
-            this.#finalFallbackFb = null;
-        }
+        this.#finalTargetFb = null;
+        this.#finalTargetHandle = null;
     }
 
     // -- internals ----------------------------------------------------------
@@ -601,16 +605,5 @@ export class EffectChain {
             contentRectUv,
             srcRectUv,
         };
-    }
-
-    #getFinalHandle(fb: Framebuffer): EffectRenderTarget {
-        if (
-            this.#finalFallbackFb !== fb ||
-            this.#finalFallbackHandle === null
-        ) {
-            this.#finalFallbackFb = fb;
-            this.#finalFallbackHandle = makeEffectRenderTargetFromFb(fb);
-        }
-        return this.#finalFallbackHandle;
     }
 }

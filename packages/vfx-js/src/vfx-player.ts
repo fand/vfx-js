@@ -1286,10 +1286,11 @@ export class VFXPlayer {
         e.effectLastRenderTime = now;
 
         const shouldUsePostEffect = this.#shouldUsePostEffect();
-        const finalTarget =
+        chain.setFinalTarget(
             shouldUsePostEffect && this.#postEffectTarget
                 ? this.#postEffectTarget
-                : null;
+                : null,
+        );
 
         chain.run({
             time: now - e.startTime,
@@ -1310,7 +1311,6 @@ export class VFXPlayer {
                 w: glRect.w * pr,
                 h: glRect.h * pr,
             },
-            finalTarget,
             isVisible: hit.isVisible,
         });
     }
@@ -1729,7 +1729,6 @@ export class VFXPlayer {
             elementSize: canvasSize,
             elementBufferSize: canvasBufferSize,
             elementRectOnCanvasPx: canvasOnCanvas,
-            finalTarget: null,
             isVisible: true,
         });
     }

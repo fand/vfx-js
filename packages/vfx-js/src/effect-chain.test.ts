@@ -184,7 +184,6 @@ function makeInput(overrides: Partial<ChainFrameInput> = {}): ChainFrameInput {
         elementSize: [50, 50],
         elementBufferSize: [100, 100],
         elementRectOnCanvasPx: { x: 0, y: 0, w: 100, h: 100 },
-        finalTarget: null,
         isVisible: true,
         ...overrides,
     };
@@ -234,7 +233,7 @@ describe("EffectChain: renderingIndices", () => {
 describe("EffectChain: stageCount=0 identity copy", () => {
     it("copies capture → finalTarget once via passthroughCopy", () => {
         const chain = makeChain([{ update: () => {} }]);
-        chain.run(makeInput({ finalTarget: null }));
+        chain.run(makeInput());
         const passthroughCalls = hosts[0]._calls.filter(
             (c) => c[0] === "passthroughCopy",
         );
@@ -268,7 +267,7 @@ describe("EffectChain: stageCount=3 intermediates + swap", () => {
         const capture = makeCapture();
         // Capture reference from the chain's constructor via the first
         // stage's src. finalTarget: null → canvas.
-        chain.run(makeInput({ finalTarget: null }));
+        chain.run(makeInput());
 
         // 2 intermediates allocated (stageCount-1 = 3-1 = 2).
         expect(fbs).toHaveLength(2);
@@ -726,7 +725,7 @@ describe("EffectChain: empty effects", () => {
 
     it("stageCount=0 passthrough renders capture → finalTarget on run()", () => {
         const chain = makeChain([]);
-        chain.run(makeInput({ finalTarget: null }));
+        chain.run(makeInput());
         const passthroughCalls = hosts[0]._calls.filter(
             (c) => c[0] === "passthroughCopy",
         );
@@ -1008,7 +1007,7 @@ describe("EffectChain: error handling", () => {
             },
         ];
         const chain = makeChain(effects);
-        chain.run(makeInput({ finalTarget: null }));
+        chain.run(makeInput());
         // host[1] is the last effect → passthroughCopy with target=null.
         const passes = hosts[1]._calls.filter(
             (c) => c[0] === "passthroughCopy",
@@ -1085,8 +1084,8 @@ describe("EffectChain: single effect", () => {
         const log2: Array<{ src: unknown; target: unknown }> = [];
         const chainA = makeChain([{ render: recordingRender(log1) }]);
         const chainB = makeChain([{ render: recordingRender(log2) }]);
-        chainA.run(makeInput({ finalTarget: null }));
-        chainB.run(makeInput({ finalTarget: null }));
+        chainA.run(makeInput());
+        chainB.run(makeInput());
         expect(log1).toEqual(log2);
     });
 });
