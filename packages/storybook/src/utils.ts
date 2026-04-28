@@ -229,7 +229,7 @@ export function attachParticlesPane(
     const pane = new Pane({ container, title, expanded: false });
     pane.addBinding(effect.params, "lifespan", {
         min: 0.5,
-        max: 20,
+        max: 5,
         step: 0.1,
     });
     pane.addBinding(effect.params, "aliveFraction", {
@@ -239,23 +239,34 @@ export function attachParticlesPane(
     });
     pane.addBinding(effect.params, "speed", { min: 0, max: 1, step: 0.005 });
     pane.addBinding(effect.params, "noiseScale", {
-        min: 0.5,
-        max: 30,
-        step: 0.1,
+        min: 0,
+        max: 5,
+        step: 0.05,
+    });
+    pane.addBinding(effect.params, "noiseAnimation", {
+        min: 0,
+        max: 2,
+        step: 0.01,
     });
     pane.addBinding(effect.params, "pointSize", {
         min: 1,
-        max: 30,
-        step: 0.5,
+        max: 5,
+        step: 0.1,
     });
     pane.addBinding(effect.params, "alpha", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect.params, "radius", {
-        min: 20,
-        max: 800,
-        step: 10,
+        min: 10,
+        max: 200,
+        step: 1,
     });
+    pane.addBinding(effect.params, "fog", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect.params, "speedDecay", {
         min: 0.1,
+        max: 10,
+        step: 0.1,
+    });
+    pane.addBinding(effect.params, "idleKill", {
+        min: 0,
         max: 10,
         step: 0.1,
     });

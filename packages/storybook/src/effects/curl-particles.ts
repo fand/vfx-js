@@ -1,16 +1,25 @@
-// GPU particles spawned from a mouse cursor, advected through a 2D
-// curl-noise field. Three sim/render passes:
+// GPU particles spawned from a mouse cursor, advected through a 3D
+// curl-noise field, rendered with parallel (orthographic) projection
+// onto xy. Particles have a true z coordinate and move in 3D — what
+// you see is the xy slice. Three sim/render passes:
 //
-//   pass 1 — state (pos + epoch + isRespawn) in a 256² float ping-pong.
+//   pass 1 — state (pos.xyz + isRespawn) in a 256² float ping-pong.
 //            Per-particle life offset hashed from particle id staggers
 //            spawn/reset timing across particles. On respawn, position
-//            is the mouse + a random offset within `radius` px. On
-//            non-respawn frames, position advects via curl-noise scaled
+//            is sampled uniformly inside a 3D ball around the mouse.
+//            On non-respawn frames, position advects via curl3D scaled
 //            by a smooth speed falloff that drops to zero outside the
-//            mouse radius.
+//            mouse radius (xy-only distance — mouse is 2D).
+//   pass 1b — spawn buffer (xy + speedFactor + age). Snapshots pos.xy
+//             on respawn, low-pass-filters the speedFactor, and
+//             advances the per-particle age. Aging rate is base
+//             1/lifespan accelerated by (1 - speedFactor) * idleKill,
+//             so particles outside the active radius age (and respawn)
+//             faster — alpha is a single sin envelope on age, no
+//             separate distance fade in the vert shader.
 //   pass 2 — saved spawn color in a 256² ping-pong: when the state
 //            pass marks a particle as just-respawned, sample ctx.src
-//            at the spawn uv and freeze that color until next respawn.
+//            at the spawn xy uv and freeze that color until next respawn.
 //   pass 3 — instanced 1×1 quads rendered into a `persistent: true`
 //            trail RT. The fragment mixes the new particle color with
 //            the trail's previous-frame value via
@@ -29,13 +38,26 @@ const STATE_SIZE = 256;
 
 const FRAG_INIT_STATE = `#version 300 es
 precision highp float;
+out vec4 outColor;
+void main() {
+    // Pos sentinel offscreen; respawn flag clear. The real respawn
+    // trigger lives in the spawn buffer's epoch (see FRAG_INIT_SPAWN).
+    outColor = vec4(-1.0, -1.0, -1.0, 0.0);
+}
+`;
+
+const FRAG_INIT_SPAWN = `#version 300 es
+precision highp float;
 in vec2 uv;
 out vec4 outColor;
-
 void main() {
-    // Sentinel state: pos offscreen, epoch = -2 (any real epoch
-    // differs → triggers a real respawn on the first valid frame).
-    outColor = vec4(-1.0, -1.0, -2.0, 0.0);
+    // Per-particle random initial age in [0, 1). Each particle reaches
+    // age=1 at a different time → first respawns are spread across the
+    // full lifespan instead of arriving in one wave. SpeedFactor is
+    // seeded at 1 so initial aging isn't accelerated by idleKill while
+    // the spawn-pos low-pass converges.
+    float h = fract(sin(dot(uv, vec2(127.1, 311.7))) * 43758.5453);
+    outColor = vec4(0.0, 0.0, 1.0, h);
 }
 `;
 
@@ -45,67 +67,81 @@ in vec2 uv;
 out vec4 outColor;
 
 uniform sampler2D state;
-uniform sampler2D spawn;     // spawn pos snapshot from previous frame
+uniform sampler2D spawn;     // .xy: spawn pos, .z: speedFactor, .w: age
 uniform vec2 mouseUv;
 uniform float radius;        // radius in element px
 uniform vec2 elementPixel;
 uniform float time;          // sec
 uniform float dt;            // sec
-uniform float lifespan;      // sec
 uniform float speed;         // uv per sec at full strength
 uniform float noiseScale;
+uniform float noiseAnimation;  // morph rate on the 4th (time) axis
 
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
-// 3D simplex noise (Ashima Arts / Ian McEwan, MIT). Smooth, isotropic.
-// Time goes on the z-axis — the field morphs in place instead of
-// drifting (which the 2D + diagonal-time version did).
-vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+// 4D simplex noise (Ashima Arts / Ian McEwan, MIT). Time becomes a
+// real 4th dimension — the field morphs in place rather than drifting
+// through space.
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+float mod289(float x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
+float permute(float x) { return mod289(((x * 34.0) + 1.0) * x); }
 vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+float taylorInvSqrt(float r) { return 1.79284291400159 - 0.85373472095314 * r; }
 
-float snoise(vec3 v) {
-    const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
-    const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-    vec3 i = floor(v + dot(v, C.yyy));
-    vec3 x0 = v - i + dot(i, C.xxx);
-    vec3 g = step(x0.yzx, x0.xyz);
-    vec3 l = 1.0 - g;
-    vec3 i1 = min(g.xyz, l.zxy);
-    vec3 i2 = max(g.xyz, l.zxy);
-    vec3 x1 = x0 - i1 + C.xxx;
-    vec3 x2 = x0 - i2 + C.yyy;
-    vec3 x3 = x0 - D.yyy;
+vec4 grad4(float j, vec4 ip) {
+    const vec4 ones = vec4(1.0, 1.0, 1.0, -1.0);
+    vec4 p, s;
+    p.xyz = floor(fract(vec3(j) * ip.xyz) * 7.0) * ip.z - 1.0;
+    p.w = 1.5 - dot(abs(p.xyz), ones.xyz);
+    s = vec4(lessThan(p, vec4(0.0)));
+    p.xyz = p.xyz + (s.xyz * 2.0 - 1.0) * s.www;
+    return p;
+}
+
+float snoise(vec4 v) {
+    const vec2 C = vec2(0.138196601125010504,    // (5 - sqrt(5))/20  G4
+                        0.309016994374947451);   // (sqrt(5) - 1)/4   F4
+    vec4 i = floor(v + dot(v, C.yyyy));
+    vec4 x0 = v - i + dot(i, C.xxxx);
+    vec4 i0;
+    vec3 isX = step(x0.yzw, x0.xxx);
+    vec3 isYZ = step(x0.zww, x0.yyz);
+    i0.x = isX.x + isX.y + isX.z;
+    i0.yzw = 1.0 - isX;
+    i0.y += isYZ.x + isYZ.y;
+    i0.zw += 1.0 - isYZ.xy;
+    i0.z += isYZ.z;
+    i0.w += 1.0 - isYZ.z;
+    vec4 i3 = clamp(i0, 0.0, 1.0);
+    vec4 i2 = clamp(i0 - 1.0, 0.0, 1.0);
+    vec4 i1 = clamp(i0 - 2.0, 0.0, 1.0);
+    vec4 x1 = x0 - i1 + 1.0 * C.xxxx;
+    vec4 x2 = x0 - i2 + 2.0 * C.xxxx;
+    vec4 x3 = x0 - i3 + 3.0 * C.xxxx;
+    vec4 x4 = x0 - 1.0 + 4.0 * C.xxxx;
     i = mod289(i);
-    vec4 p = permute(
-        permute(
-            permute(i.z + vec4(0.0, i1.z, i2.z, 1.0))
-            + i.y + vec4(0.0, i1.y, i2.y, 1.0)
-        )
-        + i.x + vec4(0.0, i1.x, i2.x, 1.0)
+    float j0 = permute(
+        permute(permute(permute(i.w) + i.z) + i.y) + i.x
     );
-    float n_ = 0.142857142857;
-    vec3 ns = n_ * D.wyz - D.xzx;
-    vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-    vec4 x_ = floor(j * ns.z);
-    vec4 y_ = floor(j - 7.0 * x_);
-    vec4 x = x_ * ns.x + ns.yyyy;
-    vec4 y = y_ * ns.x + ns.yyyy;
-    vec4 h = 1.0 - abs(x) - abs(y);
-    vec4 b0 = vec4(x.xy, y.xy);
-    vec4 b1 = vec4(x.zw, y.zw);
-    vec4 s0 = floor(b0) * 2.0 + 1.0;
-    vec4 s1 = floor(b1) * 2.0 + 1.0;
-    vec4 sh = -step(h, vec4(0.0));
-    vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
-    vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
-    vec3 p0 = vec3(a0.xy, h.x);
-    vec3 p1 = vec3(a0.zw, h.y);
-    vec3 p2 = vec3(a1.xy, h.z);
-    vec3 p3 = vec3(a1.zw, h.w);
+    vec4 j1 = permute(
+        permute(
+            permute(
+                permute(i.w + vec4(i1.w, i2.w, i3.w, 1.0))
+                + i.z + vec4(i1.z, i2.z, i3.z, 1.0)
+            )
+            + i.y + vec4(i1.y, i2.y, i3.y, 1.0)
+        )
+        + i.x + vec4(i1.x, i2.x, i3.x, 1.0)
+    );
+    vec4 ip = vec4(1.0 / 294.0, 1.0 / 49.0, 1.0 / 7.0, 0.0);
+    vec4 p0 = grad4(j0,   ip);
+    vec4 p1 = grad4(j1.x, ip);
+    vec4 p2 = grad4(j1.y, ip);
+    vec4 p3 = grad4(j1.z, ip);
+    vec4 p4 = grad4(j1.w, ip);
     vec4 norm = taylorInvSqrt(vec4(
         dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)
     ));
@@ -113,75 +149,89 @@ float snoise(vec3 v) {
     p1 *= norm.y;
     p2 *= norm.z;
     p3 *= norm.w;
-    vec4 m = max(
-        0.6 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)),
-        0.0
-    );
-    m = m * m;
-    return 42.0 * dot(
-        m * m,
-        vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3))
+    p4 *= taylorInvSqrt(dot(p4, p4));
+    vec3 m0 = max(0.6 - vec3(dot(x0, x0), dot(x1, x1), dot(x2, x2)), 0.0);
+    vec2 m1 = max(0.6 - vec2(dot(x3, x3), dot(x4, x4)), 0.0);
+    m0 = m0 * m0;
+    m1 = m1 * m1;
+    return 49.0 * (
+        dot(m0 * m0, vec3(dot(p0, x0), dot(p1, x1), dot(p2, x2)))
+        + dot(m1 * m1, vec2(dot(p3, x3), dot(p4, x4)))
     );
 }
 
-vec2 curl2D(vec2 p, float t) {
+// 3D curl of a vector noise potential field. Three decorrelated
+// potential components (Pa, Pb, Pc) sampled with finite differences;
+// 12 snoise calls total. Time is the 4th coordinate of the 4D simplex
+// input — the field morphs in place at a rate set by noiseAnimation.
+vec3 curl3D(vec3 p, float t) {
     float eps = 0.01;
-    float z = t * 0.3;
-    float ny0 = snoise(vec3(p + vec2(0.0, eps), z));
-    float ny1 = snoise(vec3(p - vec2(0.0, eps), z));
-    float nx0 = snoise(vec3(p + vec2(eps, 0.0), z));
-    float nx1 = snoise(vec3(p - vec2(eps, 0.0), z));
-    return vec2(ny0 - ny1, -(nx0 - nx1)) / (2.0 * eps);
+    vec4 dx = vec4(eps, 0.0, 0.0, 0.0);
+    vec4 dy = vec4(0.0, eps, 0.0, 0.0);
+    vec4 dz = vec4(0.0, 0.0, eps, 0.0);
+    vec4 pa = vec4(p,                                          t);
+    vec4 pb = vec4(p + vec3(31.341, 47.853, 19.287),           t);
+    vec4 pc = vec4(p + vec3(83.519, 71.523, 53.819),           t);
+    float dPzdy = snoise(pc + dy) - snoise(pc - dy);
+    float dPydz = snoise(pb + dz) - snoise(pb - dz);
+    float dPxdz = snoise(pa + dz) - snoise(pa - dz);
+    float dPzdx = snoise(pc + dx) - snoise(pc - dx);
+    float dPydx = snoise(pb + dx) - snoise(pb - dx);
+    float dPxdy = snoise(pa + dy) - snoise(pa - dy);
+    return vec3(dPzdy - dPydz, dPxdz - dPzdx, dPydx - dPxdy) / (2.0 * eps);
 }
 
 void main() {
     vec4 s = texture(state, uv);
-    vec2 pos = s.xy;
-    float storedEpoch = s.z;
+    vec3 pos = s.xyz;
+    // age >= 1 → particle has died; trigger a respawn this frame.
+    // age advancement (and the aging-rate multiplier) lives in the
+    // spawn pass; here we only read the value.
+    float age = texture(spawn, uv).w;
+    bool justRespawned = age >= 1.0;
 
-    // Per-particle life offset (stable across frames, hashed from id).
-    float offset = hash21(uv * 137.0 + 0.5) * lifespan;
-    float realEpoch = floor((time + offset) / lifespan);
-
-    bool justRespawned = realEpoch != storedEpoch;
+    float shortAxis = min(elementPixel.x, elementPixel.y);
 
     if (justRespawned) {
-        // Spawn within mouse radius — uniform-area distribution via
-        // sqrt() on the radial hash.
-        float r = sqrt(hash21(uv + vec2(time * 0.317, 0.123))) * radius;
+        // Uniform-volume distribution in a 3D ball: cbrt of a hash on
+        // the radius, isotropic direction from azimuth + cos(polar).
+        float r = pow(
+            hash21(uv + vec2(time * 0.317, 0.123)), 1.0 / 3.0
+        ) * radius;
         float theta = hash21(uv + vec2(0.0, time * 0.413)) * 6.28318530718;
-        vec2 offsetPx = vec2(cos(theta) * r, sin(theta) * r);
-        pos = mouseUv + offsetPx / elementPixel;
-        storedEpoch = realEpoch;
+        float cosPhi = hash21(uv + vec2(time * 0.521, 0.789)) * 2.0 - 1.0;
+        float sinPhi = sqrt(max(0.0, 1.0 - cosPhi * cosPhi));
+        vec3 dir = vec3(cos(theta) * sinPhi, sin(theta) * sinPhi, cosPhi);
+        vec3 offsetPx = dir * r;
+        // xy in element-uv, z normalized by the shorter axis so the
+        // ball is isotropic in pixel space.
+        pos = vec3(
+            mouseUv + offsetPx.xy / elementPixel,
+            offsetPx.z / shortAxis
+        );
     } else {
-        // Curl-driven motion, attenuated by mouse distance.
-        // Sample noise in uv stretched so its cells are isotropic in
-        // pixel space (otherwise non-square elements squash features).
-        // noiseScale is cells across the shorter axis.
-        vec2 stretch = elementPixel / min(elementPixel.x, elementPixel.y);
-        vec2 noiseInput = pos * stretch * noiseScale;
-        vec2 vIn = curl2D(noiseInput, time);
-        // Velocity from noise-input space → pos-uv space: divide by
-        // stretch so per-axis pixel speeds stay equal.
-        vec2 v = vIn / stretch;
-        // speedFactor is computed in FRAG_UPDATE_SPAWN as a smoothed
-        // value driven by spawn-to-mouse distance — using the spawn
-        // pos (not current pos) so the particle doesn't drift its own
-        // attenuation, and time-smoothed so the cursor leaving the
-        // radius decelerates the particle gradually.
+        // Stretch xy so noise cells are isotropic in pixel space; z is
+        // already normalized to shortAxis (stretch = 1).
+        vec3 stretch = vec3(elementPixel / shortAxis, 1.0);
+        vec3 noiseInput = pos * stretch * noiseScale;
+        vec3 vIn = curl3D(noiseInput, time * noiseAnimation);
+        vec3 v = vIn / stretch;
+        // speedFactor: time-smoothed value driven by spawn-xy-to-mouse
+        // distance (FRAG_UPDATE_SPAWN). Using the spawn pos avoids the
+        // particle drifting out of its own attenuation.
         float speedFactor = texture(spawn, uv).z;
         pos += v * speed * dt * speedFactor;
     }
 
-    outColor = vec4(pos, storedEpoch, justRespawned ? 1.0 : 0.0);
+    outColor = vec4(pos, justRespawned ? 1.0 : 0.0);
 }
 `;
 
-// Snapshots the spawn pos on respawn frames, plus low-pass-filters
-// the per-particle speedFactor toward its mouse-distance target. The
-// filtered value lives in spawn.z so FRAG_UPDATE_STATE can apply it
-// without recomputing — particles decelerate smoothly when the mouse
-// leaves the active radius instead of stopping in one frame.
+// Snapshots spawn xy on respawn frames, low-pass-filters the per-
+// particle speedFactor toward its mouse-distance target, and advances
+// the particle's age. Aging rate is base 1/lifespan accelerated by
+// (1 - speedFactor) * idleKill — particles outside the active radius
+// age (and therefore die + respawn) faster.
 const FRAG_UPDATE_SPAWN = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -194,11 +244,19 @@ uniform float radius;
 uniform vec2 elementPixel;
 uniform float speedDecay;  // per-second rate of convergence to target
 uniform float dt;
+uniform float time;
+uniform float lifespan;
+uniform float idleKill;    // extra aging multiplier when speedFactor=0
+
+float hash21(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
 
 void main() {
     vec4 prev = texture(prevSpawn, uv);
     vec2 spawnPos = prev.xy;
     float prevSpeed = prev.z;
+    float age = prev.w;
 
     vec4 s = texture(state, uv);
     bool justRespawned = s.w > 0.5;
@@ -207,8 +265,14 @@ void main() {
         // Newborn particles start at full speed (they spawn inside the
         // radius by construction, so there's no transient to smooth).
         prevSpeed = 1.0;
+        // Negative initial age = a per-particle pre-spawn delay, so
+        // siblings don't all reach age=1 at the same instant. Hashed
+        // with time so subsequent respawns re-stagger.
+        age = -hash21(uv + vec2(time * 0.123, 0.456)) * 0.7;
     }
 
+    // Mouse attenuation is xy-only — the cursor lives on the screen
+    // plane, so z distance shouldn't gate the speedFactor.
     vec2 dPx = (spawnPos - mouseUv) * elementPixel;
     float distPx = length(dPx);
     float target = 1.0 - smoothstep(radius, radius * 3.0, distPx);
@@ -216,7 +280,17 @@ void main() {
     float a = 1.0 - exp(-speedDecay * dt);
     float newSpeed = mix(prevSpeed, target, clamp(a, 0.0, 1.0));
 
-    outColor = vec4(spawnPos, newSpeed, 0.0);
+    if (!justRespawned) {
+        // Per-particle lifespan multiplier (stable, uv-hashed) — gives
+        // each particle a different cycle length so they desynchronize
+        // permanently rather than snapping back to a shared phase.
+        float lifespanScale = 0.6 + hash21(uv * 91.7 + 1.234) * 0.8;
+        // Faster aging when the particle is far from the mouse.
+        float agingRate = 1.0 + idleKill * (1.0 - newSpeed);
+        age += dt * agingRate / (lifespan * lifespanScale);
+    }
+
+    outColor = vec4(spawnPos, newSpeed, age);
 }
 `;
 
@@ -252,21 +326,17 @@ in vec2 position;
 
 uniform sampler2D state;
 uniform sampler2D color;
+uniform sampler2D spawn;  // .w: per-particle age (sin envelope drives alpha)
 uniform vec2 stateSize;
 uniform float pointSize;
 uniform vec2 elementPixel;
 uniform int particleCount;
-uniform float time;
-uniform float lifespan;
 uniform float aliveFraction;
 uniform float alpha;
+uniform float fog;       // 0 = none, 1 = full depth fade
 
 out vec2 vCorner;
 out vec4 vColor;
-
-float hash21(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
 
 void main() {
     int id = gl_InstanceID;
@@ -281,19 +351,17 @@ void main() {
     vec2 stateUv = (vec2(float(sx), float(sy)) + 0.5) / stateSize;
     vec4 s = texture(state, stateUv);
     vec4 c = texture(color, stateUv);
+    float age = texture(spawn, stateUv).w;
 
     vec2 pos = s.xy;
     bool offscreen = pos.x < 0.0 || pos.x > 1.0
                   || pos.y < 0.0 || pos.y > 1.0;
 
-    // Lifecycle alpha — particle is alive for the first aliveFraction
-    // of its cycle and dead (invisible) for the rest. Within the alive
-    // window we apply a sin envelope so spawn/despawn are smooth and
-    // the epoch-boundary teleport is hidden.
-    float lifeOffset = hash21(stateUv * 137.0 + 0.5) * lifespan;
-    float phase = mod(time + lifeOffset, lifespan) / lifespan;  // 0..1
-    float alivePhase = phase / max(aliveFraction, 1e-3);
-    float lifeAlpha = alivePhase < 1.0
+    // Sin envelope on age. age < 0 = pre-spawn (queued), invisible.
+    // alivePhase > 1 = past the visible window, invisible (the rest
+    // of the age cycle is dead time before respawn).
+    float alivePhase = age / max(aliveFraction, 1e-3);
+    float lifeAlpha = (age >= 0.0 && alivePhase < 1.0)
         ? sin(alivePhase * 3.14159)
         : 0.0;
 
@@ -304,11 +372,16 @@ void main() {
         return;
     }
 
+    // Depth fog — particles fade as pos.z increases (deeper into the
+    // scene). At fog=0 the multiplier is 1 everywhere; at fog=1, the
+    // alpha smoothly drops between z=-0.5 (front) and z=1 (back).
+    float fogFactor = mix(1.0, smoothstep(1.0, -0.5, s.z), fog);
+
     vec2 ndcPos = pos * 2.0 - 1.0;
     vec2 ndcOffset = position * pointSize * 2.0 / elementPixel;
     gl_Position = vec4(ndcPos + ndcOffset, 0.0, 1.0);
     vCorner = position;
-    vColor = vec4(c.rgb, c.a * lifeAlpha * alpha);
+    vColor = vec4(c.rgb, c.a * lifeAlpha * alpha * fogFactor);
 }
 `;
 
@@ -390,6 +463,9 @@ export type CurlParticlesParams = {
     speed: number;
     /** Curl-noise frequency (cells per uv unit). */
     noiseScale: number;
+    /** Morph rate of the noise field along the 4th simplex axis
+     * (units per second). 0 = frozen field. */
+    noiseAnimation: number;
     /** Particle quad size in element px. */
     pointSize: number;
     /** Global alpha multiplier on each particle (0..1). */
@@ -402,6 +478,13 @@ export type CurlParticlesParams = {
      * when the mouse arrives or wind down when it leaves.
      */
     speedDecay: number;
+    /**
+     * Extra aging multiplier applied when a particle is far from the
+     * mouse (speedFactor → 0). 0 disables the early kill (particles
+     * just live their full lifespan); higher values make idle
+     * particles die and respawn sooner.
+     */
+    idleKill: number;
     /** Background image opacity 0..1. */
     backgroundOpacity: number;
     /**
@@ -411,6 +494,9 @@ export type CurlParticlesParams = {
      * fade at the same rate as everything else.
      */
     trailFade: number;
+    /** Depth fog 0..1. 0 = none; 1 = particles fade between z=-0.5
+     * (front, fully visible) and z=1 (back, invisible). */
+    fog: number;
 };
 
 const DEFAULT_PARAMS: CurlParticlesParams = {
@@ -418,13 +504,16 @@ const DEFAULT_PARAMS: CurlParticlesParams = {
     lifespan: 3,
     aliveFraction: 0.7,
     speed: 0.15,
-    noiseScale: 5,
-    pointSize: 3,
-    alpha: 1.0,
+    noiseScale: 2.0,
+    noiseAnimation: 0.3,
+    pointSize: 2.0,
+    alpha: 0.5,
     radius: 200,
     speedDecay: 1.5,
-    backgroundOpacity: 0.4,
+    idleKill: 2.0,
+    backgroundOpacity: 1.0,
     trailFade: 0.9,
+    fog: 0.5,
 };
 
 const QUAD_VERTS = new Float32Array([
@@ -514,6 +603,7 @@ export class CurlParticlesEffect implements Effect {
 
         if (!this.#initialized) {
             ctx.draw({ frag: FRAG_INIT_STATE, target: this.#statePos });
+            ctx.draw({ frag: FRAG_INIT_SPAWN, target: this.#stateSpawn });
             this.#initialized = true;
         }
 
@@ -528,9 +618,9 @@ export class CurlParticlesEffect implements Effect {
                 elementPixel,
                 time,
                 dt,
-                lifespan,
                 speed,
                 noiseScale,
+                noiseAnimation: this.params.noiseAnimation,
             },
             target: this.#statePos,
         });
@@ -547,6 +637,9 @@ export class CurlParticlesEffect implements Effect {
                 elementPixel,
                 speedDecay: this.params.speedDecay,
                 dt,
+                time,
+                lifespan,
+                idleKill: this.params.idleKill,
             },
             target: this.#stateSpawn,
         });
@@ -574,6 +667,7 @@ export class CurlParticlesEffect implements Effect {
             uniforms: {
                 state: this.#statePos,
                 color: this.#stateColor,
+                spawn: this.#stateSpawn,
                 stateSize: [STATE_SIZE, STATE_SIZE],
                 pointSize,
                 elementPixel,
@@ -581,10 +675,9 @@ export class CurlParticlesEffect implements Effect {
                     STATE_SIZE * STATE_SIZE,
                     Math.max(1, Math.floor(this.params.count)),
                 ),
-                time,
-                lifespan,
                 aliveFraction: this.params.aliveFraction,
                 alpha: this.params.alpha,
+                fog: this.params.fog,
             },
             geometry: this.#geometry,
             target: this.#particleStamp,
