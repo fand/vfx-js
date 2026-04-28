@@ -30,7 +30,6 @@ import {
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
 import type {
     Effect,
-    EffectRenderTarget,
     EffectUniformValue,
     EffectVFXProps,
     VFXElement,
@@ -61,7 +60,6 @@ export class VFXPlayer {
     #postEffectPasses: PostEffectPass[] = [];
     #postEffectPassTargets: (string | undefined)[] = [];
     #postEffectTarget: Framebuffer | undefined;
-    #postEffectTargetHandle: EffectRenderTarget | null = null;
     #postEffectUniformGeneratorsList: {
         [name: string]: () => VFXUniformValue;
     }[] = [];
@@ -138,7 +136,6 @@ export class VFXPlayer {
         }
 
         this.#postEffectTarget?.dispose();
-        this.#postEffectTargetHandle = null;
         for (const rt of this.#postEffectBufferTargets.values()) {
             rt?.dispose();
         }
@@ -1292,9 +1289,10 @@ export class VFXPlayer {
         e.effectLastRenderTime = now;
 
         const shouldUsePostEffect = this.#shouldUsePostEffect();
-        chain.setFinalTarget(
-            shouldUsePostEffect ? this.#postEffectTargetHandle : null,
-        );
+        const finalTarget =
+            shouldUsePostEffect && this.#postEffectTarget
+                ? makeEffectRenderTargetFromFb(this.#postEffectTarget)
+                : null;
 
         chain.run({
             time: now - e.startTime,
@@ -1315,6 +1313,7 @@ export class VFXPlayer {
                 w: glRect.w * pr,
                 h: glRect.h * pr,
             },
+            finalTarget,
             isVisible: hit.isVisible,
         });
     }
@@ -1733,6 +1732,7 @@ export class VFXPlayer {
             elementSize: canvasSize,
             elementBufferSize: canvasBufferSize,
             elementRectOnCanvasPx: canvasOnCanvas,
+            finalTarget: null,
             isVisible: true,
         });
     }
@@ -1915,9 +1915,6 @@ export class VFXPlayer {
                 this.#ctx,
                 targetWidth,
                 targetHeight,
-            );
-            this.#postEffectTargetHandle = makeEffectRenderTargetFromFb(
-                this.#postEffectTarget,
             );
         }
 

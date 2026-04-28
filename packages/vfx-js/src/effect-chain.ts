@@ -50,6 +50,13 @@ export type ChainFrameInput = {
      */
     elementRectOnCanvasPx: { x: number; y: number; w: number; h: number };
 
+    /**
+     * Destination for the last rendering stage. `null` draws to the
+     * canvas; otherwise the handle's underlying FBO is used (e.g. when
+     * a post-effect chain reads this chain's output as its input).
+     */
+    finalTarget: EffectRenderTarget | null;
+
     isVisible: boolean;
 };
 
@@ -122,7 +129,6 @@ export class EffectChain {
     #intermediates: IntermediateEntry[] = [];
     #stages: StageLayout[] = [];
     #capture: EffectTexture;
-    #finalTargetHandle: EffectRenderTarget | null = null;
     #warnedUpdate = new Set<number>();
     #warnedRender = new Set<number>();
     #disposed = false;
@@ -205,15 +211,6 @@ export class EffectChain {
      */
     get hitTestPadBuffer(): Margin {
         return this.#lastHitTestPad;
-    }
-
-    /**
-     * Set the destination for the chain's last rendering stage. `null`
-     * draws to the canvas; otherwise the handle's underlying FBO is
-     * used (e.g. when a post-effect chain reads this chain's output).
-     */
-    setFinalTarget(target: EffectRenderTarget | null): void {
-        this.#finalTargetHandle = target;
     }
 
     /**
@@ -305,7 +302,7 @@ export class EffectChain {
             const host = this.#ownedPassthroughHost ?? this.#hosts[0];
             host.passthroughCopy(
                 this.#capture,
-                this.#finalTargetHandle,
+                input.finalTarget,
                 input.elementRectOnCanvasPx,
             );
             return;
@@ -330,7 +327,7 @@ export class EffectChain {
 
             let outputHandle: EffectRenderTarget | null;
             if (k === stageCount - 1) {
-                outputHandle = this.#finalTargetHandle;
+                outputHandle = input.finalTarget;
             } else {
                 outputHandle = this.#intermediates[k].rtHandle;
                 host.clearRt(outputHandle);
@@ -386,7 +383,6 @@ export class EffectChain {
         }
         this.#intermediates = [];
         this.#stages = [];
-        this.#finalTargetHandle = null;
     }
 
     // -- internals ----------------------------------------------------------

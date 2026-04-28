@@ -184,6 +184,7 @@ function makeInput(overrides: Partial<ChainFrameInput> = {}): ChainFrameInput {
         elementSize: [50, 50],
         elementBufferSize: [100, 100],
         elementRectOnCanvasPx: { x: 0, y: 0, w: 100, h: 100 },
+        finalTarget: null,
         isVisible: true,
         ...overrides,
     };
