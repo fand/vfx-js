@@ -1765,7 +1765,7 @@ export class VFXPlayer {
             const mouseX = this.#mouseX + this.#paddingX;
             const mouseY = this.#mouseY + this.#paddingY;
 
-            const targetDims = pass.getTargetDimensions();
+            const targetDims = pass.size;
             if (targetDims) {
                 const [tw, th] = targetDims;
                 pass.uniforms.src.value = inputTexture;

@@ -172,14 +172,6 @@ export class PostEffectPass {
         return this.#size;
     }
 
-    /**
-     * Get target dimensions for this pass.
-     * Returns undefined if no custom size is set (uses viewport resolution).
-     */
-    getTargetDimensions(): [number, number] | undefined {
-        return this.#size;
-    }
-
     dispose(): void {
         this.pass.dispose();
         this.#backbuffer?.dispose();
