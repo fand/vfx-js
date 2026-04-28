@@ -2,6 +2,7 @@ import {
     EffectHost,
     makeEffectRenderTargetFromFb,
     makeEffectTexture,
+    resolveRt,
 } from "./effect-host.js";
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
@@ -122,7 +123,6 @@ export class EffectChain {
     #intermediates: IntermediateEntry[] = [];
     #stages: StageLayout[] = [];
     #capture: EffectTexture;
-    #finalTargetFb: Framebuffer | null = null;
     #finalTargetHandle: EffectRenderTarget | null = null;
     #warnedUpdate = new Set<number>();
     #warnedRender = new Set<number>();
@@ -216,10 +216,12 @@ export class EffectChain {
      * (post-effect toggle, FBO realloc on resize, etc.).
      */
     setFinalTarget(fb: Framebuffer | null): void {
-        if (fb === this.#finalTargetFb) {
+        const currentFb = this.#finalTargetHandle
+            ? resolveRt(this.#finalTargetHandle).getWriteFbo()
+            : null;
+        if (fb === currentFb) {
             return;
         }
-        this.#finalTargetFb = fb;
         this.#finalTargetHandle =
             fb === null ? null : makeEffectRenderTargetFromFb(fb);
     }
@@ -394,7 +396,6 @@ export class EffectChain {
         }
         this.#intermediates = [];
         this.#stages = [];
-        this.#finalTargetFb = null;
         this.#finalTargetHandle = null;
     }
 
