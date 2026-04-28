@@ -1,6 +1,7 @@
 import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
+import type { CurlParticlesEffect } from "./effects/curl-particles";
 import type { FluidEffect } from "./effects/fluid";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
@@ -206,5 +207,51 @@ export function attachRDPane(
     pane.addBinding(scaleProxy, "scaleLow", { min: 0.1, max: 5, step: 0.05 });
     pane.addBinding(scaleProxy, "scaleHigh", { min: 0.1, max: 5, step: 0.05 });
     pane.addButton({ title: "reseed" }).on("click", () => effect.reseed());
+    return pane;
+}
+
+const PARTICLES_PANE_CLASS = "particles-tweakpane-container";
+
+export function attachParticlesPane(
+    title: string,
+    effect: CurlParticlesEffect,
+): Pane {
+    for (const el of document.querySelectorAll(`.${PARTICLES_PANE_CLASS}`)) {
+        el.remove();
+    }
+
+    const container = document.createElement("div");
+    container.className = PARTICLES_PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: false });
+    pane.addBinding(effect.params, "lifespan", {
+        min: 0.5,
+        max: 20,
+        step: 0.1,
+    });
+    pane.addBinding(effect.params, "speed", { min: 0, max: 1, step: 0.005 });
+    pane.addBinding(effect.params, "noiseScale", {
+        min: 0.5,
+        max: 30,
+        step: 0.1,
+    });
+    pane.addBinding(effect.params, "pointSize", {
+        min: 1,
+        max: 30,
+        step: 0.5,
+    });
+    pane.addBinding(effect.params, "radius", {
+        min: 20,
+        max: 800,
+        step: 10,
+    });
+    pane.addBinding(effect.params, "backgroundOpacity", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
     return pane;
 }

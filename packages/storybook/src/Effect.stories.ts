@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
+import { CurlParticlesEffect } from "./effects/curl-particles";
 import { FluidEffect } from "./effects/fluid";
 import { createPixelateEffect } from "./effects/pixelate";
 import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
@@ -11,6 +12,7 @@ import "./preset.css";
 import {
     attachBloomPane,
     attachFluidPane,
+    attachParticlesPane,
     attachRDPane,
     initVFX,
 } from "./utils";
@@ -170,6 +172,33 @@ reactionDiffusion.play = async ({ canvasElement }) => {
         vfx.render();
     }
     vfx.play();
+};
+
+// Mouse-driven GPU curl-noise particles. Particles spawn within
+// `radius` px of the cursor, advect along curl noise, and leave fading
+// trails on a persistent buffer. The play() helper sweeps a synthetic
+// pointer in a circle so the captured screenshot already has particles
+// before any human interaction.
+export const curlParticles: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Jellyfish;
+        return img;
+    },
+    args: undefined,
+};
+curlParticles.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+
+    const vfx = initVFX();
+    const effect = new CurlParticlesEffect();
+    await vfx.add(img, { effect });
+    attachParticlesPane("Particles", effect);
+
+    seedFluidMotion(canvasElement);
 };
 
 function seedFluidMotion(canvasElement: HTMLElement): void {
