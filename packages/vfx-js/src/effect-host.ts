@@ -67,24 +67,6 @@ function resolveRt(h: EffectRenderTarget): RenderTargetResolver {
     return (h as EffectRenderTargetInternal)[RESOLVE_RT];
 }
 
-/** @internal — test helper. */
-export function isEffectRenderTarget(v: unknown): v is EffectRenderTarget {
-    return (
-        typeof v === "object" &&
-        v !== null &&
-        (v as { __brand?: unknown }).__brand === "EffectRenderTarget"
-    );
-}
-
-/** @internal — test helper. */
-export function isEffectTexture(v: unknown): v is EffectTexture {
-    return (
-        typeof v === "object" &&
-        v !== null &&
-        (v as { __brand?: unknown }).__brand === "EffectTexture"
-    );
-}
-
 // ---------------------------------------------------------------------------
 // Default vertex shaders (300 es / 100). Emit three varyings, nested
 // largest-to-smallest in the [0, 1] range:
@@ -758,10 +740,10 @@ function normalizeWrap(
 }
 
 function toInternalUniform(value: EffectUniformValue): Uniform {
-    if (isEffectRenderTarget(value)) {
-        return { value: resolveRt(value).getReadTexture() };
-    }
-    if (isEffectTexture(value)) {
+    if (typeof value === "object" && value !== null && "__brand" in value) {
+        if (value.__brand === "EffectRenderTarget") {
+            return { value: resolveRt(value).getReadTexture() };
+        }
         return { value: resolveTexture(value) };
     }
     return { value };
