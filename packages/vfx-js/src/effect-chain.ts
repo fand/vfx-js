@@ -129,8 +129,7 @@ export class EffectChain {
     #intermediates: IntermediateEntry[] = [];
     #stages: StageLayout[] = [];
     #capture: EffectTexture;
-    #warnedUpdate = new Set<number>();
-    #warnedRender = new Set<number>();
+    #warnedEffects = new Set<`${number}:${"update" | "render"}`>();
     #disposed = false;
 
     /** Post-effect context (element mirrors canvas; contentRect == canvasRect). */
@@ -285,8 +284,9 @@ export class EffectChain {
             try {
                 e.update(host.ctx);
             } catch (err) {
-                if (!this.#warnedUpdate.has(i)) {
-                    this.#warnedUpdate.add(i);
+                const key = `${i}:update` as const;
+                if (!this.#warnedEffects.has(key)) {
+                    this.#warnedEffects.add(key);
                     console.warn(
                         `[VFX-JS] effect[${i}].update() threw; skipping this frame's update:`,
                         err,
@@ -339,8 +339,9 @@ export class EffectChain {
                 // Effects keep their `this` binding.
                 effect.render(host.ctx);
             } catch (err) {
-                if (!this.#warnedRender.has(i)) {
-                    this.#warnedRender.add(i);
+                const key = `${i}:render` as const;
+                if (!this.#warnedEffects.has(key)) {
+                    this.#warnedEffects.add(key);
                     console.warn(
                         `[VFX-JS] effect[${i}].render() threw; falling back to passthrough:`,
                         err,
