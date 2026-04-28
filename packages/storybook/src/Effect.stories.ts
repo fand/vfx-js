@@ -5,9 +5,15 @@ import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
 import { FluidEffect } from "./effects/fluid";
 import { createPixelateEffect } from "./effects/pixelate";
+import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 import { createScanlineEffect } from "./effects/scanline";
 import "./preset.css";
-import { attachBloomPane, attachFluidPane, initVFX } from "./utils";
+import {
+    attachBloomPane,
+    attachFluidPane,
+    attachRDPane,
+    initVFX,
+} from "./utils";
 
 export default {
     title: "Effect",
@@ -138,6 +144,34 @@ fluidWithBloom.play = async ({ canvasElement }) => {
 
 // Synthetic pointer sweep: fires a circle of pointermoves so the fluid
 // has visible velocity/dye even before the user interacts.
+// Gray-Scott reaction-diffusion. autoplay:false + a 120-frame manual
+// render warm-up so the captured screenshot already shows an evolved
+// pattern (not just the seed blob).
+export const reactionDiffusion: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Logo;
+        return img;
+    },
+    args: undefined,
+};
+reactionDiffusion.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+
+    const vfx = initVFX({ autoplay: false });
+    const effect = new ReactionDiffusionEffect();
+    await vfx.add(img, { effect });
+    attachRDPane("Reaction-Diffusion", effect);
+
+    for (let i = 0; i < 120; i++) {
+        vfx.render();
+    }
+    vfx.play();
+};
+
 function seedFluidMotion(canvasElement: HTMLElement): void {
     const cx = Math.round(window.innerWidth / 2);
     const cy = Math.round(window.innerHeight / 2);

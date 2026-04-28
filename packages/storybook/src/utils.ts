@@ -2,6 +2,7 @@ import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
 import type { FluidEffect } from "./effects/fluid";
+import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
 export function initVFX(opts?: VFXOpts): VFX {
     const vfx = new VFX(opts);
@@ -113,5 +114,97 @@ export function attachFluidPane(title: string, effect: FluidEffect): Pane {
         step: 0.001,
     });
     pane.addBinding(effect.params, "showDye");
+    return pane;
+}
+
+const RD_PANE_CLASS = "rd-tweakpane-container";
+
+// Classic Gray-Scott parameter pairs. Each gives a distinct family of
+// patterns; switching presets lets you scan the (feed, kill) space.
+const RD_PRESETS = {
+    spots: { feed: 0.0367, kill: 0.0649 },
+    coral: { feed: 0.0545, kill: 0.062 },
+    mitosis: { feed: 0.0367, kill: 0.0649 },
+    solitons: { feed: 0.014, kill: 0.054 },
+    worms: { feed: 0.078, kill: 0.061 },
+    maze: { feed: 0.029, kill: 0.057 },
+} as const;
+
+export function attachRDPane(
+    title: string,
+    effect: ReactionDiffusionEffect,
+): Pane {
+    for (const el of document.querySelectorAll(`.${RD_PANE_CLASS}`)) {
+        el.remove();
+    }
+
+    const container = document.createElement("div");
+    container.className = RD_PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: false });
+
+    // Preset selector — applies a (feed, kill) pair without resetting
+    // other knobs so users can mix preset shape with custom diffusion
+    // / step rates.
+    const presetState = { preset: "spots" as keyof typeof RD_PRESETS };
+    pane.addBinding(presetState, "preset", {
+        options: Object.fromEntries(
+            Object.keys(RD_PRESETS).map((k) => [k, k]),
+        ) as Record<string, string>,
+    }).on("change", (ev) => {
+        const p = RD_PRESETS[ev.value as keyof typeof RD_PRESETS];
+        effect.params.feed = p.feed;
+        effect.params.kill = p.kill;
+        pane.refresh();
+    });
+    pane.addBinding(effect.params, "feed", {
+        min: 0,
+        max: 0.1,
+        step: 0.0001,
+    });
+    pane.addBinding(effect.params, "kill", {
+        min: 0,
+        max: 0.1,
+        step: 0.0001,
+    });
+    pane.addBinding(effect.params, "simMaxDim", {
+        min: 64,
+        max: 768,
+        step: 16,
+    });
+    pane.addBinding(effect.params, "stepsPerFrame", {
+        min: 1,
+        max: 40,
+        step: 1,
+    });
+    pane.addBinding(effect.params, "intensity", { min: 0, max: 2, step: 0.01 });
+    pane.addBinding(effect.params, "source", {
+        options: { alpha: "alpha", luminance: "luminance" },
+    });
+    pane.addBinding(effect.params, "mode", {
+        options: { mask: "mask", scale: "scale" },
+    });
+    // `scaleRange` is a [low, high] tuple; expose as separate sliders
+    // since Tweakpane can't bind to numeric tuples directly.
+    const scaleProxy = {
+        get scaleLow() {
+            return effect.params.scaleRange[0];
+        },
+        set scaleLow(v: number) {
+            effect.params.scaleRange = [v, effect.params.scaleRange[1]];
+        },
+        get scaleHigh() {
+            return effect.params.scaleRange[1];
+        },
+        set scaleHigh(v: number) {
+            effect.params.scaleRange = [effect.params.scaleRange[0], v];
+        },
+    };
+    pane.addBinding(scaleProxy, "scaleLow", { min: 0.1, max: 5, step: 0.05 });
+    pane.addBinding(scaleProxy, "scaleHigh", { min: 0.1, max: 5, step: 0.05 });
+    pane.addButton({ title: "reseed" }).on("click", () => effect.reseed());
     return pane;
 }
