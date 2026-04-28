@@ -15,7 +15,6 @@ import type {
     EffectContext,
     EffectDrawOpts,
     EffectGeometry,
-    EffectQuad,
     EffectRenderTarget,
     EffectRenderTargetOpts,
     EffectTexture,
@@ -201,6 +200,8 @@ export type HostFrameDims = {
 
 type Phase = "init" | "update" | "render" | "disposed";
 
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+
 type OwnedRT = {
     handle: EffectRenderTargetInternal;
     resolver: RenderTargetResolver;
@@ -220,8 +221,6 @@ type OwnedRT = {
  * @internal
  */
 export class EffectHost {
-    readonly ctx: EffectContext;
-
     #glCtx: GLContext;
     #gl: WebGL2RenderingContext;
     #pixelRatio: number;
@@ -235,23 +234,12 @@ export class EffectHost {
     #warnedDrawInUpdate = false;
     #dims: HostFrameDims;
 
-    // Mutable context fields — exposed as `readonly` through the public
-    // EffectContext type. Internally we just assign to them each frame.
-    #ctxBacking: {
-        time: number;
-        deltaTime: number;
-        pixelRatio: number;
-        resolution: [number, number];
-        mouse: [number, number];
-        mouseViewport: [number, number];
-        intersection: number;
-        enterTime: number;
-        leaveTime: number;
-        src: EffectTexture;
-        target: EffectRenderTarget | null;
-        uniforms: Record<string, EffectUniformValue>;
-        vfxProps: EffectVFXProps;
-    };
+    /**
+     * Same object as `this.ctx`, typed as mutable for internal frame
+     * updates. The chain writes to fields here; user effects see the
+     * `readonly` view via `this.ctx`.
+     */
+    #mutCtx: Mutable<EffectContext>;
 
     constructor(
         glCtx: GLContext,
@@ -274,7 +262,7 @@ export class EffectHost {
             contentRectUv: [0, 0, 1, 1],
             srcRectUv: [0, 0, 1, 1],
         };
-        this.#ctxBacking = {
+        const ctx: EffectContext = {
             time: 0,
             deltaTime: 0,
             pixelRatio,
@@ -288,8 +276,22 @@ export class EffectHost {
             target: null,
             uniforms: {},
             vfxProps: initialVfxProps,
+            quad: EFFECT_QUAD_TOKEN,
+            gl: this.#gl,
+            createRenderTarget: (opts) => this.#createRenderTarget(opts),
+            wrapTexture: (source, opts) => this.#wrapTexture(source, opts),
+            draw: (opts) => this.#draw(opts),
+            onContextRestored: (cb) => {
+                const unsub = this.#glCtx.onContextRestored(cb);
+                this.#restoredUnsubs.push(unsub);
+                return unsub;
+            },
         };
-        this.ctx = this.#createContext();
+        this.#mutCtx = ctx as Mutable<EffectContext>;
+    }
+
+    get ctx(): EffectContext {
+        return this.#mutCtx;
     }
 
     // -- orchestrator-facing API --------------------------------------------
@@ -300,7 +302,7 @@ export class EffectHost {
 
     setFrameDims(dims: HostFrameDims): void {
         this.#dims = dims;
-        this.#ctxBacking.resolution = [
+        this.#mutCtx.resolution = [
             dims.canvasBufferSize[0],
             dims.canvasBufferSize[1],
         ];
@@ -323,23 +325,23 @@ export class EffectHost {
         leaveTime: number;
         uniforms: Record<string, EffectUniformValue>;
     }): void {
-        const b = this.#ctxBacking;
-        b.time = state.time;
-        b.deltaTime = state.deltaTime;
-        b.mouse = state.mouse;
-        b.mouseViewport = state.mouseViewport;
-        b.intersection = state.intersection;
-        b.enterTime = state.enterTime;
-        b.leaveTime = state.leaveTime;
-        b.uniforms = state.uniforms;
+        const c = this.#mutCtx;
+        c.time = state.time;
+        c.deltaTime = state.deltaTime;
+        c.mouse = state.mouse;
+        c.mouseViewport = state.mouseViewport;
+        c.intersection = state.intersection;
+        c.enterTime = state.enterTime;
+        c.leaveTime = state.leaveTime;
+        c.uniforms = state.uniforms;
     }
 
     setSrc(src: EffectTexture): void {
-        this.#ctxBacking.src = src;
+        this.#mutCtx.src = src;
     }
 
     setOutput(output: EffectRenderTarget | null): void {
-        this.#ctxBacking.target = output;
+        this.#mutCtx.target = output;
     }
 
     // -- internal passthrough pass (used by chain for stageCount=0 / fallback)
@@ -355,12 +357,12 @@ export class EffectHost {
     ): void {
         const prevPhase = this.#phase;
         this.#phase = "render";
-        const prevOutput = this.#ctxBacking.target;
-        this.#ctxBacking.target = target;
+        const prevOutput = this.#mutCtx.target;
+        this.#mutCtx.target = target;
         try {
             const prevVp = this.#dims.outputViewport;
             this.#dims.outputViewport = { ...viewport };
-            const glslVersion = this.#ctxBacking.vfxProps.glslVersion;
+            const glslVersion = this.#mutCtx.vfxProps.glslVersion;
             const frag =
                 glslVersion === "100"
                     ? PASSTHROUGH_FRAG_100
@@ -372,7 +374,7 @@ export class EffectHost {
             });
             this.#dims.outputViewport = prevVp;
         } finally {
-            this.#ctxBacking.target = prevOutput;
+            this.#mutCtx.target = prevOutput;
             this.#phase = prevPhase;
         }
     }
@@ -387,68 +389,6 @@ export class EffectHost {
         gl.disable(gl.SCISSOR_TEST);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
-
-    // -- public EffectContext impls (bound via #createContext) --------------
-
-    #createContext(): EffectContext {
-        const self = this;
-        const b = this.#ctxBacking;
-        const quadToken: EffectQuad = EFFECT_QUAD_TOKEN;
-        const ctx: EffectContext = {
-            get time() {
-                return b.time;
-            },
-            get deltaTime() {
-                return b.deltaTime;
-            },
-            get pixelRatio() {
-                return b.pixelRatio;
-            },
-            get resolution() {
-                return b.resolution;
-            },
-            get mouse() {
-                return b.mouse;
-            },
-            get mouseViewport() {
-                return b.mouseViewport;
-            },
-            get intersection() {
-                return b.intersection;
-            },
-            get enterTime() {
-                return b.enterTime;
-            },
-            get leaveTime() {
-                return b.leaveTime;
-            },
-            get src() {
-                return b.src;
-            },
-            get target() {
-                return b.target;
-            },
-            get uniforms() {
-                return b.uniforms;
-            },
-            get vfxProps() {
-                return b.vfxProps;
-            },
-            quad: quadToken,
-            get gl() {
-                return self.#gl;
-            },
-            createRenderTarget: (opts) => self.#createRenderTarget(opts),
-            wrapTexture: (source, opts) => self.#wrapTexture(source, opts),
-            draw: (opts) => self.#draw(opts),
-            onContextRestored: (cb) => {
-                const unsub = self.#glCtx.onContextRestored(cb);
-                self.#restoredUnsubs.push(unsub);
-                return unsub;
-            },
-        };
-        return ctx;
     }
 
     // -- createRenderTarget -------------------------------------------------
@@ -647,7 +587,7 @@ export class EffectHost {
         const gl = this.#gl;
         const vert =
             opts.vert ??
-            (this.#ctxBacking.vfxProps.glslVersion === "100"
+            (this.#mutCtx.vfxProps.glslVersion === "100"
                 ? DEFAULT_VERT_100
                 : DEFAULT_VERT_300);
         const key = `${opts.frag} ${vert}`;
@@ -657,12 +597,12 @@ export class EffectHost {
                 this.#glCtx,
                 vert,
                 opts.frag,
-                this.#ctxBacking.vfxProps.glslVersion,
+                this.#mutCtx.vfxProps.glslVersion,
             );
             this.#programs.set(key, program);
         }
 
-        const ctxOutput = this.#ctxBacking.target;
+        const ctxOutput = this.#mutCtx.target;
         const rawTarget =
             opts.target === undefined || opts.target === null
                 ? ctxOutput
