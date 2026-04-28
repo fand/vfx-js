@@ -8,14 +8,14 @@
 
 ## ✅ Verified
 
-### 1. `#finalTargetFb` + `#finalTargetHandle` を1フィールドに
+### 1. `#finalTargetFb` + `#finalTargetHandle` を1フィールドに ✅ 完了
 
 - 場所: `packages/vfx-js/src/effect-chain.ts:125-126`
 - 問題: 2フィールドで1概念。`setFinalTarget()` で常に同期。前回リファクタの遺産
 - 案: `#finalTargetFb` だけ持って handle は使用時に on-demand で wrap（or 単一の `#finalTargetHandle` のみ持って FB はハンドル経由で参照）
 - 注意: `setFinalTarget` の cache invalidation を維持
 
-### 2. `get size()` と `getTargetDimensions()` の重複削除
+### 2. `get size()` と `getTargetDimensions()` の重複削除 ✅ 完了
 
 - 場所: `packages/vfx-js/src/post-effect-pass.ts:171, 179`
 - 問題: 両者とも `this.#size` を返すだけの完全重複
