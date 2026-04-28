@@ -57,12 +57,12 @@ export class VFXPlayer {
     #gl: WebGL2RenderingContext;
     #quad: Quad;
     #copyPass: CopyPass;
-    #postEffectPasses: PostEffectPass[] = [];
-    #postEffectPassTargets: (string | undefined)[] = [];
-    #postEffectTarget: Framebuffer | undefined;
-    #postEffectUniformGeneratorsList: {
-        [name: string]: () => VFXUniformValue;
+    #postEffectEntries: {
+        pass: PostEffectPass;
+        target: string | undefined;
+        generators: { [name: string]: () => VFXUniformValue };
     }[] = [];
+    #postEffectTarget: Framebuffer | undefined;
     #postEffectBufferTargets: Map<string, Framebuffer | undefined> = new Map();
 
     // Effect-path post-effect state (mutually exclusive with the shader
@@ -139,8 +139,8 @@ export class VFXPlayer {
         for (const rt of this.#postEffectBufferTargets.values()) {
             rt?.dispose();
         }
-        for (const pass of this.#postEffectPasses) {
-            pass.dispose();
+        for (const e of this.#postEffectEntries) {
+            e.pass.dispose();
         }
         if (this.#postEffectChain) {
             this.#postEffectChain.dispose();
@@ -1320,7 +1320,7 @@ export class VFXPlayer {
 
     #shouldUsePostEffect(): boolean {
         return (
-            this.#postEffectPasses.length > 0 ||
+            this.#postEffectEntries.length > 0 ||
             (this.#postEffectChain !== null && this.#postEffectChainReady)
         );
     }
@@ -1499,9 +1499,7 @@ export class VFXPlayer {
             return;
         }
 
-        // Collect shader source and target names for each pass
         const shaderSources: string[] = [];
-        const targetNames: (string | undefined)[] = [];
 
         // First pass: assign auto target names for intermediate VFXPass items
         const passItems: VFXPass[] = [];
@@ -1516,10 +1514,10 @@ export class VFXPlayer {
             }
         }
 
-        // Create PostEffectPass objects
         for (const pe of postEffects) {
             let frag: string;
             let pass: PostEffectPass;
+            let target: string | undefined;
 
             if ("frag" in pe) {
                 frag = pe.frag;
@@ -1533,7 +1531,7 @@ export class VFXPlayer {
                     pe.target !== undefined,
                     pe.glslVersion,
                 );
-                targetNames.push(pe.target);
+                target = pe.target;
             } else {
                 if (pe.shader === undefined) {
                     throw new Error(
@@ -1554,10 +1552,9 @@ export class VFXPlayer {
                 if (pe.persistent) {
                     pass.registerBufferUniform("backbuffer");
                 }
-                targetNames.push(undefined);
+                target = undefined;
             }
 
-            this.#postEffectPasses.push(pass);
             shaderSources.push(frag);
 
             const generators: { [name: string]: () => VFXUniformValue } = {};
@@ -1568,10 +1565,9 @@ export class VFXPlayer {
                     }
                 }
             }
-            this.#postEffectUniformGeneratorsList.push(generators);
-        }
 
-        this.#postEffectPassTargets = targetNames;
+            this.#postEffectEntries.push({ pass, target, generators });
+        }
 
         for (const p of passItems) {
             if (p.target) {
@@ -1580,17 +1576,17 @@ export class VFXPlayer {
         }
 
         // Auto-bind named buffer targets referenced in shaders
-        const allTargetNames = targetNames.filter(
-            (n): n is string => n !== undefined,
-        );
-        for (let i = 0; i < this.#postEffectPasses.length; i++) {
+        const allTargetNames = this.#postEffectEntries
+            .map((e) => e.target)
+            .filter((n): n is string => n !== undefined);
+        for (let i = 0; i < this.#postEffectEntries.length; i++) {
             for (const name of allTargetNames) {
                 if (
                     shaderSources[i].match(
                         new RegExp(`uniform\\s+sampler2D\\s+${name}\\b`),
                     )
                 ) {
-                    this.#postEffectPasses[i].registerBufferUniform(name);
+                    this.#postEffectEntries[i].pass.registerBufferUniform(name);
                 }
             }
         }
@@ -1748,19 +1744,19 @@ export class VFXPlayer {
 
         // Pre-register persistent backbuffer textures so that earlier passes
         // can read from later passes' previous-frame output.
-        for (let i = 0; i < this.#postEffectPasses.length; i++) {
-            const pass = this.#postEffectPasses[i];
-            const targetName = this.#postEffectPassTargets[i];
-            if (targetName && pass.backbuffer) {
-                resolvedTargets.set(targetName, pass.backbuffer.texture);
+        for (const { pass, target } of this.#postEffectEntries) {
+            if (target && pass.backbuffer) {
+                resolvedTargets.set(target, pass.backbuffer.texture);
             }
         }
 
-        for (let i = 0; i < this.#postEffectPasses.length; i++) {
-            const pass = this.#postEffectPasses[i];
-            const isLastPass = i === this.#postEffectPasses.length - 1;
-            const generators = this.#postEffectUniformGeneratorsList[i];
-            const targetName = this.#postEffectPassTargets[i];
+        for (let i = 0; i < this.#postEffectEntries.length; i++) {
+            const {
+                pass,
+                target: targetName,
+                generators,
+            } = this.#postEffectEntries[i];
+            const isLastPass = i === this.#postEffectEntries.length - 1;
 
             const mouseX = this.#mouseX + this.#paddingX;
             const mouseY = this.#mouseY + this.#paddingY;
@@ -1919,7 +1915,7 @@ export class VFXPlayer {
         }
 
         // Initialize/resize post effect backbuffers
-        for (const pass of this.#postEffectPasses) {
+        for (const { pass } of this.#postEffectEntries) {
             if (pass.persistent && !pass.backbuffer) {
                 pass.initializeBackbuffer(
                     this.#ctx,
