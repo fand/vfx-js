@@ -3,10 +3,11 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
+import { FluidEffect } from "./effects/fluid";
 import { createPixelateEffect } from "./effects/pixelate";
 import { createScanlineEffect } from "./effects/scanline";
 import "./preset.css";
-import { attachBloomPane, initVFX } from "./utils";
+import { attachBloomPane, attachFluidPane, initVFX } from "./utils";
 
 export default {
     title: "Effect",
@@ -76,3 +77,84 @@ crtBloom.play = async ({ canvasElement }) => {
     });
     attachBloomPane("CRT Bloom", bloom);
 };
+
+// Stable Fluid as a single Effect. Drives mouse splats off real pointer
+// events; the play() call seeds a circular sweep so the story renders a
+// non-empty frame on first capture.
+export const fluid: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Jellyfish;
+        return img;
+    },
+    args: undefined,
+};
+fluid.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+
+    const vfx = initVFX();
+    const effect = new FluidEffect();
+    await vfx.add(img, { effect });
+    attachFluidPane("Fluid", effect);
+
+    seedFluidMotion(canvasElement);
+};
+
+// Fluid → Bloom chain. Demonstrates the new effect API's composability:
+// the same FluidEffect plugs into a multi-stage chain unchanged.
+export const fluidWithBloom: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Jellyfish;
+        return img;
+    },
+    args: undefined,
+};
+fluidWithBloom.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+
+    const vfx = initVFX();
+    const fluid = new FluidEffect({ showDye: true });
+    const bloom = new BloomEffect({
+        threshold: 0.4,
+        softness: 0.3,
+        intensity: 3.0,
+        scatter: 0.8,
+        edgeFade: 0.02,
+        pad: 80,
+    });
+    await vfx.add(img, { effect: [fluid, bloom] });
+    attachFluidPane("Fluid", fluid);
+    attachBloomPane("Bloom", bloom);
+
+    seedFluidMotion(canvasElement);
+};
+
+// Synthetic pointer sweep: fires a circle of pointermoves so the fluid
+// has visible velocity/dye even before the user interacts.
+function seedFluidMotion(canvasElement: HTMLElement): void {
+    const cx = Math.round(window.innerWidth / 2);
+    const cy = Math.round(window.innerHeight / 2);
+    const radius = Math.min(cx, cy) * 0.4;
+    let i = 0;
+    const id = window.setInterval(() => {
+        const angle = (i / 60) * Math.PI * 2;
+        canvasElement.dispatchEvent(
+            new MouseEvent("pointermove", {
+                clientX: cx + Math.cos(angle) * radius,
+                clientY: cy + Math.sin(angle) * radius,
+                bubbles: true,
+            }),
+        );
+        i++;
+        if (i > 120) {
+            clearInterval(id);
+        }
+    }, 16);
+}
