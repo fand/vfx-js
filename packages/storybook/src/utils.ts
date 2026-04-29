@@ -4,6 +4,7 @@ import type { BloomEffect } from "./effects/bloom";
 import type { CurlParticlesEffect } from "./effects/curl-particles";
 import type { DisintegrateEffect } from "./effects/disintegrate";
 import type { FluidEffect } from "./effects/fluid";
+import { ImplodeEffect } from "./effects/implode";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
 export function initVFX(opts?: VFXOpts): VFX {
@@ -216,7 +217,7 @@ const PARTICLES_PANE_CLASS = "particles-tweakpane-container";
 export function attachParticlesPane(
     title: string,
     effect: CurlParticlesEffect,
-    disintegrate?: DisintegrateEffect,
+    burst?: DisintegrateEffect | ImplodeEffect,
     srcSelector?: {
         img: HTMLImageElement;
         sources: Record<string, string>;
@@ -232,14 +233,14 @@ export function attachParticlesPane(
         "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
     document.body.appendChild(container);
 
-    if (disintegrate) {
+    if (burst) {
         // Share visual params so a single slider drives both effects.
         // Without this proxy, sliders only mutate the curl-particles
-        // params object — disintegrate keeps its own copy and ignores
-        // changes. trailFade is curl-only (explode doesn't render
-        // trails) so it is intentionally not in this list.
+        // params object — the burst effect keeps its own copy and
+        // ignores changes. trailFade is curl-only (the burst doesn't
+        // render trails) so it is intentionally not in this list.
         for (const key of ["noiseScale", "pointSize", "fog"] as const) {
-            Object.defineProperty(disintegrate.params, key, {
+            Object.defineProperty(burst.params, key, {
                 get: () => effect.params[key],
                 set: (v: number) => {
                     effect.params[key] = v;
@@ -248,9 +249,9 @@ export function attachParticlesPane(
                 enumerable: true,
             });
         }
-        // disintegrate.duration ← curl-particles.lifespan (different
-        // names, same intent — total animation time the slider drives).
-        Object.defineProperty(disintegrate.params, "duration", {
+        // burst.duration ← curl-particles.lifespan (different names,
+        // same intent — total animation time the slider drives).
+        Object.defineProperty(burst.params, "duration", {
             get: () => effect.params.lifespan,
             set: (v: number) => {
                 effect.params.lifespan = v;
@@ -326,12 +327,14 @@ export function attachParticlesPane(
         max: 1,
         step: 0.005,
     });
-    if (disintegrate) {
-        pane.addButton({ title: "Explode" }).on("click", () => {
-            disintegrate.trigger();
+    if (burst) {
+        const triggerLabel =
+            burst instanceof ImplodeEffect ? "Implode" : "Explode";
+        pane.addButton({ title: triggerLabel }).on("click", () => {
+            burst.trigger();
         });
         pane.addButton({ title: "Reset" }).on("click", () => {
-            disintegrate.reset();
+            burst.reset();
         });
     }
     return pane;

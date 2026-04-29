@@ -6,6 +6,7 @@ import { BloomEffect } from "./effects/bloom";
 import { CurlParticlesEffect } from "./effects/curl-particles";
 import { DisintegrateEffect } from "./effects/disintegrate";
 import { FluidEffect } from "./effects/fluid";
+import { ImplodeEffect } from "./effects/implode";
 import { createPixelateEffect } from "./effects/pixelate";
 import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 import { createScanlineEffect } from "./effects/scanline";
@@ -247,6 +248,49 @@ curlParticlesExplode.play = async ({ canvasElement }) => {
     const disintegrate = new DisintegrateEffect({}, [w, h]);
     await vfx.add(img, { effect: [effect, disintegrate] });
     attachParticlesPane("Particles", effect, disintegrate, {
+        img,
+        sources: { Logo, Jellyfish },
+    });
+
+    seedFluidMotion(canvasElement);
+};
+
+// Reverse of the explode burst — initially the element is hidden
+// behind opaque black; clicking Implode scatters the element's pixels
+// outward and lerps them back to their target positions, after which
+// the underlying element is revealed normally. Mouse-follow trails
+// kick in once the element is visible.
+export const curlParticlesImplode: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Logo;
+        return img;
+    },
+    args: undefined,
+};
+curlParticlesImplode.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    const dpr = window.devicePixelRatio || 1;
+    const STATE_MAX = 2048;
+    const w = Math.min(
+        STATE_MAX,
+        Math.max(1, Math.round((img.clientWidth || img.naturalWidth) * dpr)),
+    );
+    const h = Math.min(
+        STATE_MAX,
+        Math.max(1, Math.round((img.clientHeight || img.naturalHeight) * dpr)),
+    );
+
+    const vfx = initVFX();
+    const effect = new CurlParticlesEffect({ pointSize: 1.0 });
+    const implode = new ImplodeEffect({}, [w, h]);
+    await vfx.add(img, { effect: [effect, implode] });
+    attachParticlesPane("Particles", effect, implode, {
         img,
         sources: { Logo, Jellyfish },
     });
