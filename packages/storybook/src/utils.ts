@@ -360,26 +360,26 @@ export function attachMotionBlurPane(
     const pane = new Pane({ container, title, expanded: false });
     pane.addBinding(effect.params, "strength", {
         min: 0,
-        max: 200,
-        step: 0.5,
+        max: 50,
+        step: 0.1,
     });
-    pane.addBinding(effect.params, "lambda", {
-        min: 1e-6,
-        max: 0.01,
-        step: 1e-5,
+    pane.addBinding(effect.params, "lkRadius", {
+        min: 1,
+        max: 5,
+        step: 1,
+    });
+    pane.addBinding(effect.params, "dilateRadius", {
+        min: 0,
+        max: 64,
+        step: 1,
     });
     pane.addBinding(effect.params, "samples", {
         min: 1,
         max: 64,
         step: 1,
     });
-    pane.addBinding(effect.params, "velocitySmoothing", {
-        min: 0,
-        max: 0.95,
-        step: 0.01,
-    });
     pane.addBinding(effect.params, "debug", {
-        options: { off: 0, "flow (px/frame)": 1, "post-strength offset": 2 },
+        options: { off: 0, "raw flow": 1, "dilated flow": 2 },
     });
     pane.addBinding(effect.params, "debugScale", {
         min: 0.01,

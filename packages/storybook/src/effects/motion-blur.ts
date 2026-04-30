@@ -1,63 +1,136 @@
-// Two-pass motion blur. Pass 1 estimates per-pixel optical flow with
-// the keeffEoghan/MIOFlow normal-flow formula:
-//   flow = It · ∇I / (|∇I| + λ)
-// vs. the textbook Horn-Schunck point estimate (-It·∇I/|∇I|²) it
-// trades unbounded magnitude for bounded `|It|`-scaled magnitude:
-//   • spatial ∇I is centred-difference summed over BOTH frames so the
-//     "between" region of a feature trajectory still has signal,
-//   • RGB channels are kept (luma collapse loses 70 % of red contrast),
-//   • normalisation is by `|∇I|` not `|∇I|²` so the result doesn't
-//     blow up where gradients are tiny.
-// Pass 2 averages `samples` taps along that vector through the source.
-// A persistent buffer holds the previous frame for the temporal diff.
+// Five-pass screen-space motion blur (McGuire 2012-style reconstruction
+// filter, depthless, with Lucas-Kanade flow).
 //
-// Per-pixel optical flow still gives 0 in uniform-colour interiors
-// (`|∇I| = 0` everywhere except at edges) and underestimates motion
-// bigger than the gradient's spatial support — those need post-blur
-// of the flow field or a multi-scale pyramid to fix.
+// Why LK over normal-flow: normal-flow `It·∇I/|∇I|` only recovers the
+// motion component along the edge normal (aperture problem) — a circle
+// moving horizontally produces radially-pointing flow at each edge, so
+// the blur fans out concentrically instead of along the true motion.
+// LK assumes flow is locally constant in a window and solves a 2×2
+// system for the true 2D velocity, giving consistent vectors across an
+// object's edges.
 //
-// `window.scrollX/Y` delta is folded in as a global fallback (EMA-
-// smoothed because wheel scroll arrives in bursts).
+//   pass0 (FRAG_GRAD)   per-pixel (Ix, Iy, It) from src + prev frames.
+//   pass1 (FRAG_LK)     Lucas-Kanade solve over a (2*lkRadius+1)²
+//                       window. Output is in pixel-velocity units.
+//   pass2 (FRAG_DILATE) separable max-magnitude dilation. LK is sparse
+//                       (untextured interiors → det ≈ 0 → flow 0); the
+//                       dilation propagates each moving feature's
+//                       velocity into its surrounding halo so the
+//                       gather pass has a velocity to follow there.
+//   pass3 (FRAG_BLUR)   stochastic gather along the dilated velocity,
+//                       with McGuire forward/backward cone + cylinder
+//                       weighting (using the dilated flow as the per-
+//                       sample velocity reference, since LK is sparse).
+//   pass4 (FRAG_COPY)   stash this frame's src for next frame's It.
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 
-const FRAG_FLOW = `#version 300 es
+const FRAG_GRAD = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
 uniform sampler2D prev;
-uniform float lambda;
 
 void main() {
     vec2 t = 1.0 / vec2(textureSize(src, 0));
     vec2 ox = vec2(t.x, 0.0);
     vec2 oy = vec2(0.0, t.y);
 
-    // Centred finite-difference, summed over both frames. Sobel was
-    // localised to the current frame's edge — for any motion bigger
-    // than 1-2 px, the new-frame gradient and the temporal change live
-    // at different positions and the formula collapses. Folding in the
-    // previous frame's gradient extends the "sensitive zone" along the
-    // feature's trajectory.
-    vec4 gradX = (texture(src,  uvSrc + ox) - texture(src,  uvSrc - ox))
-               + (texture(prev, uvSrc + ox) - texture(prev, uvSrc - ox));
-    vec4 gradY = (texture(src,  uvSrc + oy) - texture(src,  uvSrc - oy))
-               + (texture(prev, uvSrc + oy) - texture(prev, uvSrc - oy));
-    vec4 diff  =  texture(src,  uvSrc) - texture(prev, uvSrc);
+    // Centred diff over both frames → twice the per-frame gradient,
+    // halved below. Sampling both frames extends the sensitive zone
+    // along the trajectory (single-frame gradient would only see the
+    // new edge).
+    vec4 sx = (texture(src,  uvSrc + ox) - texture(src,  uvSrc - ox))
+            + (texture(prev, uvSrc + ox) - texture(prev, uvSrc - ox));
+    vec4 sy = (texture(src,  uvSrc + oy) - texture(src,  uvSrc - oy))
+            + (texture(prev, uvSrc + oy) - texture(prev, uvSrc - oy));
+    vec4 d  =  texture(src,  uvSrc) - texture(prev, uvSrc);
 
-    // Per-channel gradient magnitude with lambda softening (avoids
-    // div-by-zero in flat regions instead of returning huge spurious
-    // flow like an inv-grad-squared denominator would).
-    vec4 gradMag = sqrt(gradX * gradX + gradY * gradY + vec4(lambda));
+    // RGB-summed (not luma): preserves single-channel features that
+    // luma weights would attenuate (red ball on dark bg etc.).
+    float Ix = (sx.r + sx.g + sx.b) * 0.5;
+    float Iy = (sy.r + sy.g + sy.b) * 0.5;
+    float It =  d.r + d.g + d.b;
 
-    // flow_c = It_c * gradI_c / |gradI|_c per channel, then sum across
-    // RGB (red ball over dark bg: R channel dominates; luma weights
-    // would cut it by ~70%). Output magnitude is in luma units, not
-    // texels.
-    vec4 fx = diff * gradX / gradMag;
-    vec4 fy = diff * gradY / gradMag;
-    vec2 flow = vec2(fx.r + fx.g + fx.b, fy.r + fy.g + fy.b);
+    outColor = vec4(Ix, Iy, It, 0.0);
+}
+`;
+
+const FRAG_LK = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;     // grad texture (Ix, Iy, It)
+uniform int radius;
+uniform float minDet;
+
+const int MAX_RADIUS = 5;
+
+void main() {
+    vec2 t = 1.0 / vec2(textureSize(src, 0));
+
+    // Structure-tensor sums over a (2r+1)² window.
+    float a = 0.0;   // Σ Ix²
+    float b = 0.0;   // Σ Iy²
+    float c = 0.0;   // Σ IxIy
+    float dx = 0.0;  // Σ IxIt
+    float dy = 0.0;  // Σ IyIt
+
+    for (int j = -MAX_RADIUS; j <= MAX_RADIUS; j++) {
+        if (abs(j) > radius) continue;
+        for (int i = -MAX_RADIUS; i <= MAX_RADIUS; i++) {
+            if (abs(i) > radius) continue;
+            vec3 g = texture(src, uvSrc + vec2(i, j) * t).xyz;
+            a  += g.x * g.x;
+            b  += g.y * g.y;
+            c  += g.x * g.y;
+            dx += g.x * g.z;
+            dy += g.y * g.z;
+        }
+    }
+
+    // [a c; c b] v = -[dx; dy]. Det threshold drops untextured /
+    // ill-conditioned windows (single-edge → aperture, flat → noise).
+    float det = a * b - c * c;
+    vec2 flow = vec2(0.0);
+    if (det > minDet) {
+        flow.x = (-b * dx + c * dy) / det;
+        flow.y = ( c * dx - a * dy) / det;
+    }
     outColor = vec4(flow, 0.0, 1.0);
+}
+`;
+
+// Separable max-magnitude dilation. Two passes (axis = (1,0), (0,1))
+// fill each pixel with the largest velocity vector inside a
+// (2r+1)×(2r+1) box.
+const FRAG_DILATE = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+uniform vec2 axis;
+uniform int radius;
+
+const int MAX_RADIUS = 64;
+
+void main() {
+    vec2 t = 1.0 / vec2(textureSize(src, 0));
+    vec2 stepUV = axis * t;
+
+    vec2 best = vec2(0.0);
+    float bestSq = -1.0;
+
+    for (int i = -MAX_RADIUS; i <= MAX_RADIUS; i++) {
+        if (abs(i) > radius) continue;
+        vec2 v = texture(src, uvSrc + stepUV * float(i)).xy;
+        float l = dot(v, v);
+        if (l > bestSq) {
+            bestSq = l;
+            best = v;
+        }
+    }
+    outColor = vec4(best, 0.0, 1.0);
 }
 `;
 
@@ -68,49 +141,91 @@ in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
 uniform sampler2D flow;
-uniform vec2 globalFlow;
+uniform sampler2D flowMax;
 uniform float strength;
 uniform int samples;
 uniform int debug;
 uniform float debugScale;
 
 const int MAX_SAMPLES = 64;
+const float HALF_VEL = 0.5;
+
+float hash(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
+float cone(float T, float v) {
+    return clamp(1.0 - T / max(v, HALF_VEL), 0.0, 1.0);
+}
+
+float cylinder(float v, float vMax) {
+    return 1.0 - smoothstep(0.95 * vMax, 1.05 * vMax, v);
+}
 
 void main() {
     vec2 srcTexel = 1.0 / vec2(textureSize(src, 0));
-    vec2 fpx = texture(flow, uv).xy;
-    vec2 flw = (fpx + globalFlow) * srcTexel * strength;
+    // flow / flowMax are in pixel-velocity units (px/frame). Strength
+    // is a blur exaggeration multiplier on top.
+    vec2 vMax    = texture(flowMax, uv).xy * strength;
+    vec2 vCenter = texture(flowMax, uv).xy * strength;
+    float vMaxLen = length(vMax);
+    float vCenterLen = vMaxLen;
 
     if (debug == 1) {
-        // Per-pixel flow magnitude. R = |x|, G = |y|, B = sign-or-zero.
-        outColor = vec4(
-            abs(fpx.x) * debugScale,
-            abs(fpx.y) * debugScale,
-            (fpx.x > 0.0 ? 0.5 : 0.0) + (fpx.y > 0.0 ? 0.5 : 0.0),
-            1.0
-        );
+        vec2 raw = texture(flow, uv).xy;
+        outColor = vec4(abs(raw.x) * debugScale, abs(raw.y) * debugScale,
+                        0.0, 1.0);
         return;
     }
     if (debug == 2) {
-        // Final blur offset (post-strength). Bigger = more visible blur.
-        outColor = vec4(
-            abs(flw.x) * debugScale * 100.0,
-            abs(flw.y) * debugScale * 100.0,
-            0.0,
-            1.0
-        );
+        vec2 raw = texture(flowMax, uv).xy;
+        outColor = vec4(abs(raw.x) * debugScale, abs(raw.y) * debugScale,
+                        0.0, 1.0);
         return;
     }
 
     int n = max(1, min(samples, MAX_SAMPLES));
-    vec4 sum = vec4(0.0);
+
+    if (vMaxLen < HALF_VEL) {
+        outColor = texture(src, uvSrc);
+        return;
+    }
+
+    float jitter = hash(gl_FragCoord.xy) - 0.5;
+
+    vec4 sumColor = texture(src, uvSrc);
+    float sumWeight = 1.0;
+
     for (int i = 0; i < MAX_SAMPLES; i++) {
         if (i >= n) break;
-        // Centred kernel: t ∈ [-0.5, +0.5] so blur stays symmetric.
-        float t = (n == 1) ? 0.0 : float(i) / float(n - 1) - 0.5;
-        sum += texture(src, uvSrc + flw * t);
+        float t = (float(i) + 0.5 + jitter) / float(n) - 0.5;
+        vec2 offUV = vMax * t * srcTexel;
+        float T = abs(t) * vMaxLen;
+
+        // Use dilated flow for the per-sample velocity reference. LK is
+        // sparse (zero in untextured interiors), so reading the raw
+        // flow there would give cone=0 and we would lose the
+        // contribution from a moving feature passing through a uniform
+        // region. Dilation hallucinates a dense velocity field
+        // consistent with the dominant nearby motion.
+        vec2 vS = texture(flowMax, uv + offUV).xy * strength;
+        float vSLen = length(vS);
+
+        // Forward cone — does S's velocity reach D within one frame.
+        float wf = cone(T, vSLen);
+        // Backward cone — does D's velocity reach S (D moving through S).
+        float wb = cone(T, vCenterLen);
+        float wc = cylinder(vSLen, vMaxLen);
+
+        float w = wf + wb * 0.5 + wc * 2.0;
+
+        sumColor += texture(src, uvSrc + offUV) * w;
+        sumWeight += w;
     }
-    outColor = sum / float(n);
+
+    outColor = sumColor / sumWeight;
 }
 `;
 
@@ -123,111 +238,111 @@ void main() { outColor = texture(src, uvSrc); }
 `;
 
 export type MotionBlurParams = {
-    /** Multiplier on the optical-flow vector. */
+    /**
+     * Blur exaggeration multiplier on the per-pixel pixel-velocity from
+     * LK. 1.0 ≈ realistic per-frame motion blur, >1 stretches the trail.
+     */
     strength: number;
     /** Tap count along the flow direction. Clamped to [1, 64]. */
     samples: number;
     /**
-     * EMA smoothing on the element-velocity input, 0..1. Higher = more
-     * averaging across frames. Wheel scroll arrives in bursts (e.g.
-     * `0,0,50,0,0,60`) so the raw per-frame delta flickers; smoothing
-     * decouples the visible blur amount from event timing.
+     * Half-width (px) of the LK solve window. Bigger window → more
+     * stable flow vectors and better aperture-problem mitigation, but
+     * blurs flow across motion boundaries. Clamped to [1, 5].
      */
-    velocitySmoothing: number;
+    lkRadius: number;
     /**
-     * 0 = normal blur. 1 = visualise per-pixel flow (R = |fx|, G = |fy|).
-     * 2 = visualise the final post-strength blur offset. Use to confirm
-     * whether optical flow is producing signal at all.
+     * Half-width (px) of the separable max-magnitude dilation.
+     * Untextured interiors and halos within this many pixels of a
+     * moving feature inherit that feature's velocity. Should be at
+     * least as large as the typical blur span (≈ strength × motion).
+     * Clamped to [0, 64].
+     */
+    dilateRadius: number;
+    /**
+     * 0 = normal blur. 1 = raw LK flow visualisation. 2 = dilated flow.
      */
     debug: number;
     /** Brightness multiplier for the debug visualisation. */
     debugScale: number;
-    /**
-     * Softening constant inside the gradient-magnitude denominator
-     * (added under the sqrt). Bigger → flat regions output smaller
-     * flow but edges are also slightly desensitised.
-     */
-    lambda: number;
 };
 
 const DEFAULT_PARAMS: MotionBlurParams = {
-    // Output of FRAG_FLOW is now in luma units (≈ 0..3 RGB-summed),
-    // not pixels — strength multiplies that into a UV offset (via
-    // srcTexel) so the natural range that gives a visible blur is
-    // higher than the old impl. Tune in the pane.
-    strength: 20,
+    strength: 5,
     samples: 16,
-    velocitySmoothing: 0.6,
+    lkRadius: 3,
+    dilateRadius: 24,
     debug: 0,
     debugScale: 0.2,
-    lambda: 1e-4,
 };
 
 export class MotionBlurEffect implements Effect {
     params: MotionBlurParams;
 
     #prev: EffectRenderTarget | null = null;
+    #grad: EffectRenderTarget | null = null;
     #flow: EffectRenderTarget | null = null;
-
-    #prevScrollX = 0;
-    #prevScrollY = 0;
-    #prevScrollValid = false;
-    #smoothedGx = 0;
-    #smoothedGy = 0;
+    #flowH: EffectRenderTarget | null = null;
+    #flowMax: EffectRenderTarget | null = null;
 
     constructor(initial: Partial<MotionBlurParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
     }
 
     init(ctx: EffectContext): void {
-        // Persistent → host ping-pongs so this frame's read sees last
-        // frame's write.
         this.#prev = ctx.createRenderTarget({ persistent: true });
-        // Float so flow vectors keep sign/precision in flat regions
-        // where Ix² + Iy² is tiny.
+        this.#grad = ctx.createRenderTarget({ float: true });
         this.#flow = ctx.createRenderTarget({ float: true });
+        this.#flowH = ctx.createRenderTarget({ float: true });
+        this.#flowMax = ctx.createRenderTarget({ float: true });
     }
 
     render(ctx: EffectContext): void {
-        if (!this.#prev || !this.#flow) {
+        if (
+            !this.#prev ||
+            !this.#grad ||
+            !this.#flow ||
+            !this.#flowH ||
+            !this.#flowMax
+        ) {
             return;
         }
 
-        // Track scroll velocity directly. For a post-effect, ctx.src is
-        // the whole canvas — its pixels shift with scroll, so optical
-        // flow already sees motion, but underestimates magnitude in
-        // oblique-gradient regions. Adding scroll delta restores the
-        // true global magnitude. Sign-agnostic: the blur kernel is
-        // centred on uvSrc so direction line is what matters.
-        const sx = typeof window !== "undefined" ? window.scrollX : 0;
-        const sy = typeof window !== "undefined" ? window.scrollY : 0;
-        let rawGx = 0;
-        let rawGy = 0;
-        if (this.#prevScrollValid) {
-            // Convert logical-px scroll delta → src-texel units
-            // (≈ physical px, since src is canvas-sized).
-            rawGx = (sx - this.#prevScrollX) * ctx.pixelRatio;
-            rawGy = (sy - this.#prevScrollY) * ctx.pixelRatio;
-        }
-        this.#prevScrollX = sx;
-        this.#prevScrollY = sy;
-        this.#prevScrollValid = true;
-
-        // EMA: a higher `velocitySmoothing` makes `smoothed` lag the
-        // raw delta further, hiding wheel-scroll burst quantisation.
-        const s = Math.max(0, Math.min(1, this.params.velocitySmoothing));
-        const a = 1 - s;
-        this.#smoothedGx = this.#smoothedGx * (1 - a) + rawGx * a;
-        this.#smoothedGy = this.#smoothedGy * (1 - a) + rawGy * a;
+        const lkRadius = Math.max(
+            1,
+            Math.min(5, Math.round(this.params.lkRadius)),
+        );
+        const dilateRadius = Math.max(
+            0,
+            Math.min(64, Math.round(this.params.dilateRadius)),
+        );
 
         ctx.draw({
-            frag: FRAG_FLOW,
+            frag: FRAG_GRAD,
+            uniforms: { src: ctx.src, prev: this.#prev },
+            target: this.#grad,
+        });
+
+        ctx.draw({
+            frag: FRAG_LK,
             uniforms: {
-                src: ctx.src,
-                prev: this.#prev,
-                lambda: Math.max(1e-8, this.params.lambda),
+                src: this.#grad,
+                radius: lkRadius,
+                minDet: 1e-3,
             },
             target: this.#flow,
+        });
+
+        ctx.draw({
+            frag: FRAG_DILATE,
+            uniforms: { src: this.#flow, axis: [1, 0], radius: dilateRadius },
+            target: this.#flowH,
+        });
+
+        ctx.draw({
+            frag: FRAG_DILATE,
+            uniforms: { src: this.#flowH, axis: [0, 1], radius: dilateRadius },
+            target: this.#flowMax,
         });
 
         ctx.draw({
@@ -235,7 +350,7 @@ export class MotionBlurEffect implements Effect {
             uniforms: {
                 src: ctx.src,
                 flow: this.#flow,
-                globalFlow: [this.#smoothedGx, this.#smoothedGy],
+                flowMax: this.#flowMax,
                 strength: Math.max(0, this.params.strength),
                 samples: Math.max(
                     1,
@@ -247,7 +362,6 @@ export class MotionBlurEffect implements Effect {
             target: ctx.target,
         });
 
-        // Stash this frame's src for next frame's temporal gradient.
         ctx.draw({
             frag: FRAG_COPY,
             uniforms: { src: ctx.src },
@@ -257,9 +371,9 @@ export class MotionBlurEffect implements Effect {
 
     dispose(): void {
         this.#prev = null;
+        this.#grad = null;
         this.#flow = null;
-        this.#prevScrollValid = false;
-        this.#smoothedGx = 0;
-        this.#smoothedGy = 0;
+        this.#flowH = null;
+        this.#flowMax = null;
     }
 }
