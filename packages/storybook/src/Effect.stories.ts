@@ -10,6 +10,7 @@ import { ImplodeEffect } from "./effects/implode";
 import { createPixelateEffect } from "./effects/pixelate";
 import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 import { createScanlineEffect } from "./effects/scanline";
+import { createVoronoiEffect } from "./effects/voronoi";
 import "./preset.css";
 import {
     attachBloomPane,
@@ -296,6 +297,26 @@ curlParticlesImplode.play = async ({ canvasElement }) => {
     });
 
     seedFluidMotion(canvasElement);
+};
+
+// Voronoi cell borders revealed in a halo around the mouse — image
+// passes through unchanged elsewhere.
+export const voronoi: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Jellyfish;
+        return img;
+    },
+    args: undefined,
+};
+voronoi.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+
+    const vfx = initVFX();
+    await vfx.add(img, { effect: createVoronoiEffect() });
 };
 
 function seedFluidMotion(canvasElement: HTMLElement): void {
