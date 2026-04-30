@@ -7,7 +7,6 @@ import { CurlParticlesEffect } from "./effects/curl-particles";
 import { DisintegrateEffect } from "./effects/disintegrate";
 import { FluidEffect } from "./effects/fluid";
 import { ImplodeEffect } from "./effects/implode";
-import { MotionBlurEffect } from "./effects/motion-blur";
 import { createPixelateEffect } from "./effects/pixelate";
 import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 import { createScanlineEffect } from "./effects/scanline";
@@ -15,7 +14,6 @@ import "./preset.css";
 import {
     attachBloomPane,
     attachFluidPane,
-    attachMotionBlurPane,
     attachParticlesPane,
     attachRDPane,
     initVFX,
@@ -298,83 +296,6 @@ curlParticlesImplode.play = async ({ canvasElement }) => {
     });
 
     seedFluidMotion(canvasElement);
-};
-
-// Motion blur as a post-effect over an html-in-canvas subtree. The
-// container is wrapped in a `<canvas layoutsubtree>` whose `onpaint`
-// hands the rendered DOM tree to drawElementImage every frame — so
-// CSS animations and scroll motion inside the container show up live
-// in `ctx.src`, and per-pixel optical flow reads real motion.
-export const motionBlur: StoryObj<undefined> = {
-    render: () => {
-        // preset.css centers #storybook-root with height:100% — undo
-        // so the absolute container measures from the viewport.
-        const root = document.getElementById("storybook-root");
-        if (root) {
-            root.style.height = "auto";
-            root.style.display = "block";
-        }
-
-        const container = document.createElement("div");
-        container.style.cssText =
-            "position:absolute;inset:0;overflow:auto;background:#101015";
-
-        const styles = document.createElement("style");
-        styles.textContent = `
-            @keyframes motion-blur-ball {
-                from { transform: translateX(-40vw); }
-                to   { transform: translateX( 40vw); }
-            }
-        `;
-        container.appendChild(styles);
-
-        // Sticky ball stays visible while the user scrolls past the
-        // imgs below; CSS animation gives constant motion signal.
-        const ball = document.createElement("div");
-        ball.style.cssText =
-            "position:sticky;top:80px;width:80px;height:80px;margin:80px auto;border-radius:50%;background:#ff4040;animation:motion-blur-ball 0.5s ease-in-out infinite alternate";
-        container.appendChild(ball);
-
-        const stack = document.createElement("div");
-        stack.style.cssText =
-            "display:flex;flex-direction:column;align-items:center;gap:60vh;padding:20vh 0 50vh";
-        for (let i = 0; i < 4; i++) {
-            const img = document.createElement("img");
-            img.src = i % 2 === 0 ? Jellyfish : Logo;
-            img.style.cssText =
-                "width:60vw;max-width:560px;height:auto;display:block";
-            stack.appendChild(img);
-        }
-        container.appendChild(stack);
-
-        return container;
-    },
-    args: undefined,
-};
-motionBlur.play = async ({ canvasElement }) => {
-    const container = canvasElement.querySelector("div") as HTMLDivElement;
-    const imgs = Array.from(
-        container.querySelectorAll("img"),
-    ) as HTMLImageElement[];
-    await Promise.all(
-        imgs.map(
-            (img) =>
-                new Promise<void>((resolve) => {
-                    if (img.complete) {
-                        resolve();
-                    } else {
-                        img.onload = () => resolve();
-                    }
-                }),
-        ),
-    );
-
-    const blur = new MotionBlurEffect();
-    const vfx = initVFX({ postEffect: { effect: blur } });
-    await vfx.addHTML(container, { shader: "none" });
-    // const vfx = initVFX();
-    // await vfx.addHTML(container, { effect: blur });
-    attachMotionBlurPane("Motion Blur", blur);
 };
 
 function seedFluidMotion(canvasElement: HTMLElement): void {

@@ -5,7 +5,6 @@ import type { CurlParticlesEffect } from "./effects/curl-particles";
 import type { DisintegrateEffect } from "./effects/disintegrate";
 import type { FluidEffect } from "./effects/fluid";
 import { ImplodeEffect } from "./effects/implode";
-import type { MotionBlurEffect } from "./effects/motion-blur";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
 export function initVFX(opts?: VFXOpts): VFX {
@@ -338,53 +337,5 @@ export function attachParticlesPane(
             burst.reset();
         });
     }
-    return pane;
-}
-
-const MOTION_BLUR_PANE_CLASS = "motion-blur-tweakpane-container";
-
-export function attachMotionBlurPane(
-    title: string,
-    effect: MotionBlurEffect,
-): Pane {
-    for (const el of document.querySelectorAll(`.${MOTION_BLUR_PANE_CLASS}`)) {
-        el.remove();
-    }
-
-    const container = document.createElement("div");
-    container.className = MOTION_BLUR_PANE_CLASS;
-    container.style.cssText =
-        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
-    document.body.appendChild(container);
-
-    const pane = new Pane({ container, title, expanded: false });
-    pane.addBinding(effect.params, "strength", {
-        min: 0,
-        max: 50,
-        step: 0.1,
-    });
-    pane.addBinding(effect.params, "lkRadius", {
-        min: 1,
-        max: 5,
-        step: 1,
-    });
-    pane.addBinding(effect.params, "dilateRadius", {
-        min: 0,
-        max: 64,
-        step: 1,
-    });
-    pane.addBinding(effect.params, "samples", {
-        min: 1,
-        max: 64,
-        step: 1,
-    });
-    pane.addBinding(effect.params, "debug", {
-        options: { off: 0, "raw flow": 1, "dilated flow": 2 },
-    });
-    pane.addBinding(effect.params, "debugScale", {
-        min: 0.01,
-        max: 5,
-        step: 0.01,
-    });
     return pane;
 }
