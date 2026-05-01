@@ -299,14 +299,13 @@ curlParticlesImplode.play = async ({ canvasElement }) => {
     seedFluidMotion(canvasElement);
 };
 
-// Voronoi cell borders revealed in a halo around the mouse — image
-// passes through unchanged elsewhere. Follows Presets.stories pattern:
+// Voronoi cells shrink in a halo around the mouse — image passes
+// through unchanged elsewhere. Follows Presets.stories pattern:
 // render() does the full setup every time. Storybook re-runs render()
 // on each args change; initVFX() tears down the previous VFX before
 // creating a new one, so the swap is clean.
 type VoronoiArgs = {
     cellSize: number;
-    borderWidth: number;
     falloffRadius: number;
     maxShrink: number;
     flatCells: boolean;
@@ -330,7 +329,6 @@ export const voronoi: StoryObj<VoronoiArgs> = {
     },
     args: {
         cellSize: 40,
-        borderWidth: 1.5,
         falloffRadius: 200,
         maxShrink: 1,
         flatCells: false,
@@ -338,14 +336,11 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         speed: 0,
         breathe: 0,
         breatheSpeed: 0,
-        breatheScale: 1,
+        breatheScale: 40,
         bgColor: "#00000000",
     },
     argTypes: {
         cellSize: { control: { type: "range", min: 5, max: 200, step: 1 } },
-        borderWidth: {
-            control: { type: "range", min: 0, max: 10, step: 0.1 },
-        },
         falloffRadius: {
             control: { type: "range", min: 0, max: 800, step: 10 },
         },
@@ -358,7 +353,7 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         },
         breatheSpeed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
         breatheScale: {
-            control: { type: "range", min: 1, max: 20, step: 0.1 },
+            control: { type: "range", min: 10, max: 500, step: 5 },
         },
         bgColor: { control: { type: "color" } },
     },
