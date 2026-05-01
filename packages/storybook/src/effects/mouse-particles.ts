@@ -180,7 +180,6 @@ void main() {
 const FRAG_SPAWN_POS = `#version 300 es
 precision highp float;
 in vec2 vSpawnUv;
-in float vLifeJitter;
 out vec4 outColor;
 
 uniform sampler2D src;
