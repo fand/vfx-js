@@ -311,6 +311,8 @@ type VoronoiArgs = {
     maxShrink: number;
     flatCells: boolean;
     seed: number;
+    speed: number;
+    bgColor: string;
 };
 export const voronoi: StoryObj<VoronoiArgs> = {
     render: (args) => {
@@ -330,6 +332,8 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         maxShrink: 20,
         flatCells: false,
         seed: 0,
+        speed: 0,
+        bgColor: "#00000000",
     },
     argTypes: {
         cellSize: { control: { type: "range", min: 5, max: 200, step: 1 } },
@@ -342,6 +346,8 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         maxShrink: { control: { type: "range", min: 0, max: 200, step: 1 } },
         flatCells: { control: { type: "boolean" } },
         seed: { control: { type: "range", min: 0, max: 1000, step: 1 } },
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        bgColor: { control: { type: "color" } },
     },
 };
 

@@ -31,10 +31,30 @@ uniform float falloffRadius;
 uniform float maxShrink;
 uniform float seed;
 uniform float flatCells;
+uniform float time;
+uniform float speed;
+uniform vec4 bgColor;
 
 vec2 hash22(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
     return fract(sin(p) * 43758.5453);
+}
+
+// Per-cell jitter. speed = 0 → static (matches the legacy hash). When
+// speed > 0 each site orbits its hashed base position on a Lissajous
+// path, with a per-cell phase offset so neighbours don't move in sync.
+// Amplitude is capped at 0.25 so sites stay inside the 3×3 search
+// neighbourhood worst-case.
+vec2 jitterFor(vec2 cell) {
+    vec2 base = hash22(cell + vec2(seed));
+    if (speed > 0.0) {
+        vec2 phase = hash22(cell + vec2(seed + 100.0)) * 6.2831853;
+        base += 0.25 * vec2(
+            sin(time * speed + phase.x),
+            cos(time * speed + phase.y)
+        );
+    }
+    return base;
 }
 
 void main() {
@@ -48,7 +68,7 @@ void main() {
     for (int j = -1; j <= 1; j++) {
         for (int i = -1; i <= 1; i++) {
             vec2 g = vec2(i, j);
-            vec2 site = g + hash22(ipart + g + vec2(seed));
+            vec2 site = g + jitterFor(ipart + g);
             float d = dot(site - fpart, site - fpart);
             if (d < minDistSq) {
                 minDistSq = d;
@@ -63,7 +83,7 @@ void main() {
     for (int j = -1; j <= 1; j++) {
         for (int i = -1; i <= 1; i++) {
             vec2 g = vec2(i, j);
-            vec2 site = g + hash22(ipart + g + vec2(seed));
+            vec2 site = g + jitterFor(ipart + g);
             vec2 d = site - nearestSite;
             if (dot(d, d) > 1e-4) {
                 float t = dot((site + nearestSite) * 0.5 - fpart,
@@ -123,10 +143,15 @@ void main() {
     float borderActive = smoothstep(0.5, 1.5, shrinkPx);
     float borderMix = (1.0 - imageMask) * borderActive;
 
-    vec3 rgb = mix(base.rgb, vec3(0.0), borderMix);
+    vec3 cellRgb = mix(base.rgb, vec3(0.0), borderMix);
     // In the border region we want full opacity so black covers the
-    // gap edge cleanly; outside the border alpha follows the source.
-    float alpha = mix(base.a, 1.0, borderMix) * visibleMask;
+    // gap cleanly; outside the border alpha follows the source.
+    float cellAlpha = mix(base.a, 1.0, borderMix);
+    // Composite the cell layer over bgColor, gated by visibleMask. In
+    // the gap (visibleMask=0) we get pure bgColor, inside the cell
+    // (visibleMask=1) the original cell rgb/alpha.
+    vec3 rgb = mix(bgColor.rgb, cellRgb, visibleMask);
+    float alpha = mix(bgColor.a, cellAlpha, visibleMask);
     outColor = vec4(rgb, alpha);
 }
 `;
@@ -151,6 +176,19 @@ export type VoronoiParams = {
     flatCells: boolean;
     /** Hash seed; change to get a different cell layout. */
     seed: number;
+    /**
+     * Animation rate, in radians/second. 0 = static (sites pinned to
+     * the hash positions); >0 makes each site orbit on a Lissajous
+     * path with a per-cell phase, so the layout breathes.
+     */
+    speed: number;
+    /**
+     * Hex colour painted into the gaps left by shrunk cells. Accepts
+     * `#rgb`, `#rgba`, `#rrggbb`, or `#rrggbbaa`. Alpha defaults to ff
+     * when omitted. Default `#00000000` (fully transparent — original
+     * behaviour, page background shows through).
+     */
+    bgColor: string;
 };
 
 const DEFAULT_PARAMS: VoronoiParams = {
@@ -160,7 +198,27 @@ const DEFAULT_PARAMS: VoronoiParams = {
     maxShrink: 20,
     flatCells: false,
     seed: 0,
+    speed: 0,
+    bgColor: "#00000000",
 };
+
+function parseHexColor(hex: string): [number, number, number, number] {
+    let s = hex.startsWith("#") ? hex.slice(1) : hex;
+    // Expand short forms (#rgb / #rgba) to long form.
+    if (s.length === 3 || s.length === 4) {
+        s = s
+            .split("")
+            .map((c) => c + c)
+            .join("");
+    }
+    if (s.length === 6) s += "ff";
+    if (s.length !== 8) return [0, 0, 0, 0];
+    const r = Number.parseInt(s.slice(0, 2), 16) / 255;
+    const g = Number.parseInt(s.slice(2, 4), 16) / 255;
+    const b = Number.parseInt(s.slice(4, 6), 16) / 255;
+    const a = Number.parseInt(s.slice(6, 8), 16) / 255;
+    return [r, g, b, a];
+}
 
 export class VoronoiEffect implements Effect {
     params: VoronoiParams;
@@ -192,6 +250,9 @@ export class VoronoiEffect implements Effect {
                 maxShrink: p.maxShrink,
                 flatCells: p.flatCells ? 1 : 0,
                 seed: p.seed,
+                time: ctx.time,
+                speed: Math.max(0, p.speed),
+                bgColor: parseHexColor(p.bgColor),
             },
             target: ctx.target,
         });
