@@ -4,6 +4,7 @@ import type { BloomEffect } from "./effects/bloom";
 import type { CurlParticlesEffect } from "./effects/curl-particles";
 import type { ExplodeEffect } from "./effects/explode";
 import type { FluidEffect } from "./effects/fluid";
+import type { MouseParticlesEffect } from "./effects/mouse-particles";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
 const PANE_CLASS = "vfx-tweakpane-container";
@@ -335,6 +336,90 @@ export function attachParticlesPane(
             burst.reset();
         });
     }
+    trackPane(pane);
+    return pane;
+}
+
+export function attachMouseParticlesPane(
+    title: string,
+    effect: MouseParticlesEffect,
+    srcSelector?: {
+        img: HTMLImageElement;
+        sources: Record<string, string>;
+    },
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: false });
+    if (srcSelector) {
+        const { img, sources } = srcSelector;
+        const keys = Object.keys(sources);
+        const initialKey = keys.find((k) => sources[k] === img.src) ?? keys[0];
+        const state = { src: initialKey };
+        const options: Record<string, string> = Object.fromEntries(
+            keys.map((k) => [k, k]),
+        );
+        pane.addBinding(state, "src", { options }).on("change", (ev) => {
+            img.src = sources[ev.value as string];
+        });
+    }
+    // count caps the ring buffer at runtime; the renderable instance
+    // count was locked at construction (256*256 by default).
+    pane.addBinding(effect.params, "count", {
+        min: 1,
+        max: 256 * 256,
+        step: 1,
+    });
+    pane.addBinding(effect.params, "birthRate", {
+        min: 0,
+        max: 10000,
+        step: 50,
+    });
+    pane.addBinding(effect.params, "life", { min: 0.2, max: 10, step: 0.1 });
+    pane.addBinding(effect.params, "speed", { min: 0, max: 1, step: 0.005 });
+    pane.addBinding(effect.params, "noiseScale", {
+        min: 0.05,
+        max: 3,
+        step: 0.01,
+    });
+    pane.addBinding(effect.params, "noiseAnimation", {
+        min: 0,
+        max: 2,
+        step: 0.01,
+    });
+    pane.addBinding(effect.params, "pointSize", {
+        min: 1,
+        max: 10,
+        step: 0.1,
+    });
+    pane.addBinding(effect.params, "alpha", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect.params, "radius", { min: 5, max: 300, step: 1 });
+    pane.addBinding(effect.params, "speedDecay", {
+        min: 0.1,
+        max: 5,
+        step: 0.05,
+    });
+    pane.addBinding(effect.params, "alphaThreshold", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
+    pane.addBinding(effect.params, "spawnOnIdle");
+    pane.addBinding(effect.params, "backgroundOpacity", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
+    pane.addBinding(effect.params, "trailFade", {
+        min: 0,
+        max: 1,
+        step: 0.005,
+    });
+    pane.addBinding(effect.params, "fog", { min: 0, max: 1, step: 0.01 });
     trackPane(pane);
     return pane;
 }

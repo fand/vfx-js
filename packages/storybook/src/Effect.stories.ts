@@ -15,6 +15,7 @@ import "./preset.css";
 import {
     attachBloomPane,
     attachFluidPane,
+    attachMouseParticlesPane,
     attachParticlesPane,
     attachRDPane,
     initVFX,
@@ -240,6 +241,10 @@ mouseParticles.play = async ({ canvasElement }) => {
     const vfx = initVFX();
     const effect = new MouseParticlesEffect();
     await vfx.add(img, { effect });
+    attachMouseParticlesPane("Mouse Particles", effect, {
+        img,
+        sources: { Jellyfish, Logo },
+    });
 
     seedFluidMotion(canvasElement);
 };
