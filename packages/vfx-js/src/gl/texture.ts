@@ -30,6 +30,7 @@ export type TextureSource =
 export type TextureOpts = {
     /** Default true. Pass false for FBO attachment textures. */
     autoRegister?: boolean;
+
     /**
      * Externally-owned raw WebGL texture handle. When provided, the
      * Texture wrapper skips creation / upload / deletion — the caller
@@ -48,6 +49,7 @@ export class Texture implements Restorable {
     minFilter: TextureFilter = "linear";
     magFilter: TextureFilter = "linear";
     needsUpdate = true;
+
     /** Source image/canvas/video; exposed for identity comparison. */
     source: TextureSource | null = null;
 

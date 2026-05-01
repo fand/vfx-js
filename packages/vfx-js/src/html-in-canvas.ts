@@ -268,6 +268,10 @@ export async function wrapElement(
     canvas.style.setProperty("padding", "0");
     canvas.style.setProperty("border", "none");
     canvas.style.setProperty("box-sizing", "content-box");
+    // Element's bg is already baked into the captured texture; if we
+    // inherit it as the canvas's CSS bg too, alpha=0 fragments show the
+    // bg again instead of what's behind the canvas.
+    canvas.style.setProperty("background", "transparent");
 
     // Computed-style overrides
     const cs = getComputedStyle(element);

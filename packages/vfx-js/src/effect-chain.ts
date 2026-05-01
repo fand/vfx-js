@@ -14,6 +14,7 @@ import {
 } from "./rect.js";
 import type {
     Effect,
+    EffectDims,
     EffectRenderTarget,
     EffectTexture,
     EffectUniformValue,
@@ -30,38 +31,48 @@ export type ChainFrameInput = {
     leaveTime: number;
     resolvedUniforms: Record<string, EffectUniformValue>;
 
-    /** Canvas size (= viewport-inner + scrollPadding on each side), logical px. */
-    canvasLogical: readonly [number, number];
-    /** Canvas size, physical px. */
-    canvasPhys: readonly [number, number];
+    /** Canvas size (= viewport-inner + scrollPadding on each side), CSS px. */
+    canvasSize: readonly [number, number];
 
-    /** Element rect (inner, no overflow), logical px. Mirrors canvas for post effects. */
-    elementLogical: readonly [number, number];
-    /** Element rect (inner, no overflow), physical px. Mirrors canvas for post effects. */
-    elementPhys: readonly [number, number];
+    /** Canvas size, device px. */
+    canvasBufferSize: readonly [number, number];
+
+    /** Element rect (inner, no overflow), CSS px. Mirrors canvas for post effects. */
+    elementSize: readonly [number, number];
+
+    /** Element rect (inner, no overflow), device px. Mirrors canvas for post effects. */
+    elementBufferSize: readonly [number, number];
+
     /**
-     * Element's content rect on canvas, bottom-left origin, physical px.
+     * Element's content rect on canvas, bottom-left origin, device px.
      * Used to position the final-stage draw viewport (canvas-space) and
      * to derive `dims.canvasRect` in element-local coords (the canvas
-     * itself is `(0, 0, canvasPhys)` in canvas coords).
+     * itself is `(0, 0, canvasBufferSize)` in canvas coords).
      */
     elementRectOnCanvasPx: { x: number; y: number; w: number; h: number };
 
-    /** null → canvas; otherwise the already-allocated final FBO. */
-    finalTarget: Framebuffer | null;
+    /**
+     * Destination for the last rendering stage. `null` draws to the
+     * canvas; otherwise the handle's underlying FBO is used (e.g. when
+     * a post-effect chain reads this chain's output as its input).
+     */
+    finalTarget: EffectRenderTarget | null;
 
     isVisible: boolean;
 };
 
 type StageLayout = {
-    /** Stage's rect in element-local physical px (bottom-left). */
+    /** Stage's rect in element-local device px (bottom-left). */
     dstRect: ElementRect;
-    /** Dst buffer size (physical px): cached for FBO sizing. */
+
+    /** Dst buffer size (device px): cached for FBO sizing. */
     dstBufferSize: [number, number];
+
     /** Content sub-rect within dst buffer UV (xy = origin, zw = size). */
-    rectContent: [number, number, number, number];
+    contentRectUv: [number, number, number, number];
+
     /**
-     * Physical-px viewport on the canvas / final FBO for this stage's
+     * Device-px viewport on the canvas / final FBO for this stage's
      * draw. Only meaningful for the last rendering stage; intermediate
      * stages use `(0, 0, dstBufferSize[0], dstBufferSize[1])`.
      */
@@ -70,8 +81,10 @@ type StageLayout = {
 
 type IntermediateEntry = {
     fb: Framebuffer;
-    /** Write handle (passed as `ctx.output`). */
+
+    /** Write handle (passed as `ctx.target`). */
     rtHandle: EffectRenderTarget;
+
     /** Read handle (passed as `ctx.src` to the next stage). */
     texHandle: EffectTexture;
     bufferSize: [number, number];
@@ -82,8 +95,8 @@ type IntermediateEntry = {
  *
  * Rect model:
  * - Each rendering stage declares its own `dstRect` in element-local
- *   physical px (bottom-left). Stage 0's `srcRect` is `contentRect`
- *   (= `[0, 0, elementPhys[0], elementPhys[1]]`); stage k's `srcRect`
+ *   device px (bottom-left). Stage 0's `srcRect` is `contentRect`
+ *   (= `[0, 0, elementBufferSize[0], elementBufferSize[1]]`); stage k's `srcRect`
  *   = stage k-1's `dstRect`.
  * - Each effect's `outputRect(dims)` returns the dst rect, or `undefined`
  *   to inherit `srcRect` (no growth). Stages are independent — no
@@ -94,9 +107,9 @@ type IntermediateEntry = {
  * - The last rendering effect's `outputRect` is honored too, but no
  *   intermediate buffer is allocated — the dst remains the fixed final
  *   target, and `dstRect` only positions / sizes the canvas-space draw
- *   viewport (the host still receives `outputPhysW/H = dstRect[2..3]`
+ *   viewport (the host still receives `outputBufferW/H = dstRect[2..3]`
  *   so internal RTs auto-size to include the rect).
- * - `rectSrc` / `rectContent` are derived per stage from the rect map
+ * - `srcRectUv` / `contentRectUv` are derived per stage from the rect map
  *   (`rectInRect(content, dst)` and `rectInRect(srcRect, dst)`) and
  *   uploaded as uniforms so the default vertex shader can emit `uvSrc`
  *   (src-sampling UV) and `uvContent` (dst-space 0..1 over element).
@@ -117,15 +130,14 @@ export class EffectChain {
     #intermediates: IntermediateEntry[] = [];
     #stages: StageLayout[] = [];
     #capture: EffectTexture;
-    #finalFallbackHandle: EffectRenderTarget | null = null;
-    #finalFallbackFb: Framebuffer | null = null;
-    #warnedUpdate = new Set<number>();
-    #warnedRender = new Set<number>();
+    #warnedEffects = new Set<`${number}:${"update" | "render"}`>();
     #disposed = false;
+
     /** Post-effect context (element mirrors canvas; contentRect == canvasRect). */
     #isPostEffect: boolean;
+
     /**
-     * Hit-test pad (per side, physical px) derived from the last
+     * Hit-test pad (per side, device px) derived from the last
      * rendering stage's `dstRect`: how far the rect extends past the
      * element's content rect. Used by the host to grow the visibility
      * rect so glow / trail outside the element keeps the chain running
@@ -134,16 +146,13 @@ export class EffectChain {
      * and update immediately on the next frame.
      */
     #lastHitTestPad: Margin = createMargin(0);
+
     /**
-     * Dedicated host used for the M=0 passthrough copy when `effects`
-     * is empty (no per-effect host exists). Owned by the chain so user-
-     * driven `vfx.add(el, { effect: [] })` works as a transparent
-     * blit of the captured source — supports dynamic add/remove without
-     * a special-case "no chain" branch.
+     * Chain-owned passthrough host, used when `effects` is empty so
+     * a transparent blit still works without a special-case "no chain"
+     * branch. `null` means reuse `#hosts[0]`.
      */
-    #emptyPassthroughHost: EffectHost | null = null;
-    /** M=0 passthrough host: `#hosts[0]` if any, else `#emptyPassthroughHost`. */
-    #m0Host: EffectHost;
+    #ownedPassthroughHost: EffectHost | null = null;
 
     constructor(
         glCtx: GLContext,
@@ -162,16 +171,13 @@ export class EffectChain {
             () => new EffectHost(glCtx, quad, pixelRatio, capture, vfxProps),
         );
         if (effects.length === 0) {
-            this.#emptyPassthroughHost = new EffectHost(
+            this.#ownedPassthroughHost = new EffectHost(
                 glCtx,
                 quad,
                 pixelRatio,
                 capture,
                 vfxProps,
             );
-            this.#m0Host = this.#emptyPassthroughHost;
-        } else {
-            this.#m0Host = this.#hosts[0];
         }
         this.#renderingIndices = effects
             .map((e, i) => (typeof e.render === "function" ? i : -1))
@@ -196,14 +202,14 @@ export class EffectChain {
     }
 
     /**
-     * Per-side pad in **physical px** to grow the visibility hit-test
+     * Per-side pad in **device px** to grow the visibility hit-test
      * rect by, so glow / trail extending past the element rect keeps
      * the chain running while the padded region is on-screen. Reflects
      * the most recent rendered frame; empty / first-frame chains
      * return zero margins. Caller divides by `pixelRatio` to convert
-     * to logical px before passing to `growRect`.
+     * to CSS px before passing to `growRect`.
      */
-    get hitTestPadPhys(): Margin {
+    get hitTestPadBuffer(): Margin {
         return this.#lastHitTestPad;
     }
 
@@ -243,9 +249,9 @@ export class EffectChain {
             return;
         }
 
-        const M = this.#renderingIndices.length;
+        const stageCount = this.#renderingIndices.length;
 
-        // 1. Reflect state + uniforms into each host's ctx.
+        // Reflect state + uniforms into each host's ctx.
         for (const host of this.#hosts) {
             host.setFrameState({
                 time: input.time,
@@ -259,16 +265,18 @@ export class EffectChain {
             });
         }
 
-        // 2. Resolve per-stage pad / buffers / rectSrc / rectContent.
-        //    Allocates / reuses intermediate RTs.
+        // Resolve per-stage pad / buffers / srcRectUv / contentRectUv.
+        // Allocates / reuses intermediate RTs.
         this.#resolveStages(input);
 
-        // 3. Apply per-host frame dims.
+        // Apply per-host frame dims + per-host EffectDims (the same
+        // shape outputRect saw for this stage, exposed on ctx.dims).
         for (let k = 0; k < this.#hosts.length; k++) {
             this.#hosts[k].setFrameDims(this.#hostFrameDims(k, input));
+            this.#hosts[k].setEffectDims(this.#hostEffectDims(k, input));
         }
 
-        // 4. Update phase (array order). ctx.draw() is a no-op here.
+        // Update phase (array order). ctx.draw() is a no-op here.
         for (let i = 0; i < this.#effects.length; i++) {
             const e = this.#effects[i];
             if (!e.update) {
@@ -279,8 +287,9 @@ export class EffectChain {
             try {
                 e.update(host.ctx);
             } catch (err) {
-                if (!this.#warnedUpdate.has(i)) {
-                    this.#warnedUpdate.add(i);
+                const key = `${i}:update` as const;
+                if (!this.#warnedEffects.has(key)) {
+                    this.#warnedEffects.add(key);
                     console.warn(
                         `[VFX-JS] effect[${i}].update() threw; skipping this frame's update:`,
                         err,
@@ -289,25 +298,21 @@ export class EffectChain {
             }
         }
 
-        // 5. M = 0 identity copy special case.
-        //    `host` is `#hosts[0]` when effects has non-rendering entries,
-        //    or the dedicated `#emptyPassthroughHost` when effects is
-        //    empty. Constructor guarantees one of the two exists.
-        if (M === 0) {
-            const target =
-                input.finalTarget === null
-                    ? null
-                    : this.#getFinalHandle(input.finalTarget);
-            this.#m0Host.passthroughCopy(
+        // No rendering effects: passthrough copy.
+        // Reuse `#hosts[0]` if any; otherwise fall back to the
+        // chain-owned `#ownedPassthroughHost` (effects is empty).
+        if (stageCount === 0) {
+            const host = this.#ownedPassthroughHost ?? this.#hosts[0];
+            host.passthroughCopy(
                 this.#capture,
-                target,
+                input.finalTarget,
                 input.elementRectOnCanvasPx,
             );
             return;
         }
 
-        // 6. Render phase: walk renderingIndices.
-        for (let k = 0; k < M; k++) {
+        // Render phase: walk renderingIndices.
+        for (let k = 0; k < stageCount; k++) {
             const i = this.#renderingIndices[k];
             const host = this.#hosts[i];
             const effect = this.#effects[i];
@@ -324,11 +329,8 @@ export class EffectChain {
             host.setSrc(srcHandle);
 
             let outputHandle: EffectRenderTarget | null;
-            if (k === M - 1) {
-                outputHandle =
-                    input.finalTarget === null
-                        ? null
-                        : this.#getFinalHandle(input.finalTarget);
+            if (k === stageCount - 1) {
+                outputHandle = input.finalTarget;
             } else {
                 outputHandle = this.#intermediates[k].rtHandle;
                 host.clearRt(outputHandle);
@@ -340,8 +342,9 @@ export class EffectChain {
                 // Effects keep their `this` binding.
                 effect.render(host.ctx);
             } catch (err) {
-                if (!this.#warnedRender.has(i)) {
-                    this.#warnedRender.add(i);
+                const key = `${i}:render` as const;
+                if (!this.#warnedEffects.has(key)) {
+                    this.#warnedEffects.add(key);
                     console.warn(
                         `[VFX-JS] effect[${i}].render() threw; falling back to passthrough:`,
                         err,
@@ -350,7 +353,7 @@ export class EffectChain {
                 const vp = this.#stages[k].outputViewport;
                 if (outputHandle === null) {
                     host.passthroughCopy(srcHandle, null, vp);
-                } else if (k === M - 1) {
+                } else if (k === stageCount - 1) {
                     host.passthroughCopy(srcHandle, outputHandle, vp);
                 } else {
                     host.passthroughCopy(srcHandle, outputHandle, {
@@ -375,19 +378,15 @@ export class EffectChain {
             this.#safeDispose(i);
             this.#hosts[i].dispose();
         }
-        if (this.#emptyPassthroughHost) {
-            this.#emptyPassthroughHost.dispose();
-            this.#emptyPassthroughHost = null;
+        if (this.#ownedPassthroughHost) {
+            this.#ownedPassthroughHost.dispose();
+            this.#ownedPassthroughHost = null;
         }
         for (const im of this.#intermediates) {
             im.fb.dispose();
         }
         this.#intermediates = [];
         this.#stages = [];
-        if (this.#finalFallbackFb) {
-            this.#finalFallbackFb.dispose();
-            this.#finalFallbackFb = null;
-        }
     }
 
     // -- internals ----------------------------------------------------------
@@ -405,21 +404,21 @@ export class EffectChain {
     }
 
     /**
-     * Compute per-stage layout (dstRect, buffer size, rectSrc,
-     * rectContent, outputViewport) for every rendering stage. Allocates
+     * Compute per-stage layout (dstRect, buffer size, srcRectUv,
+     * contentRectUv, outputViewport) for every rendering stage. Allocates
      * / reuses intermediate RTs.
      *
      */
     #resolveStages(input: ChainFrameInput): void {
-        const M = this.#renderingIndices.length;
-        this.#stages = new Array(M);
-        if (M === 0) {
+        const stageCount = this.#renderingIndices.length;
+        this.#stages = new Array(stageCount);
+        if (stageCount === 0) {
             return;
         }
-        // Post-effect: element mirrors canvas, so contentRect spans canvasPhys.
+        // Post-effect: element mirrors canvas, so contentRect spans canvasBufferSize.
         const elementPixel: readonly [number, number] = this.#isPostEffect
-            ? input.canvasPhys
-            : input.elementPhys;
+            ? input.canvasBufferSize
+            : input.elementBufferSize;
         const contentRect: ElementRect = [
             0,
             0,
@@ -428,10 +427,10 @@ export class EffectChain {
         ];
         const canvasRect = this.#canvasRectInElementLocal(input);
         let srcRect: ElementRect = contentRect;
-        for (let k = 0; k < M; k++) {
+        for (let k = 0; k < stageCount; k++) {
             const i = this.#renderingIndices[k];
             const effect = this.#effects[i];
-            const isLast = k === M - 1;
+            const isLast = k === stageCount - 1;
 
             const resolved = this.#callOutputRect(
                 effect,
@@ -442,7 +441,7 @@ export class EffectChain {
             );
             const dstRect: ElementRect = resolved ?? srcRect;
             const dstBufferSize: [number, number] = [dstRect[2], dstRect[3]];
-            const rectContent = rectInRect(contentRect, dstRect);
+            const contentRectUv = rectInRect(contentRect, dstRect);
 
             const outputViewport = isLast
                 ? {
@@ -456,7 +455,7 @@ export class EffectChain {
             this.#stages[k] = {
                 dstRect,
                 dstBufferSize,
-                rectContent,
+                contentRectUv,
                 outputViewport,
             };
 
@@ -465,7 +464,7 @@ export class EffectChain {
             }
             srcRect = dstRect;
         }
-        const [lx, ly, lw, lh] = this.#stages[M - 1].dstRect;
+        const [lx, ly, lw, lh] = this.#stages[stageCount - 1].dstRect;
         this.#lastHitTestPad = createMargin({
             top: Math.max(0, ly + lh - elementPixel[1]),
             right: Math.max(0, lx + lw - elementPixel[0]),
@@ -488,22 +487,54 @@ export class EffectChain {
         if (!effect.outputRect) {
             return undefined;
         }
-        const pixelRatio = input.canvasPhys[0] / input.canvasLogical[0] || 1;
-        const dims = {
-            element: this.#isPostEffect
-                ? input.canvasLogical
-                : input.elementLogical,
+        return effect.outputRect(
+            this.#buildDims(input, contentRect, srcRect, canvasRect),
+        );
+    }
+
+    #buildDims(
+        input: ChainFrameInput,
+        contentRect: ElementRect,
+        srcRect: ElementRect,
+        canvasRect: ElementRect,
+    ): EffectDims {
+        const pixelRatio = input.canvasBufferSize[0] / input.canvasSize[0] || 1;
+        return {
+            element: this.#isPostEffect ? input.canvasSize : input.elementSize,
             elementPixel: this.#isPostEffect
-                ? input.canvasPhys
-                : input.elementPhys,
-            canvas: input.canvasLogical,
-            canvasPixel: input.canvasPhys,
+                ? input.canvasBufferSize
+                : input.elementBufferSize,
+            canvas: input.canvasSize,
+            canvasPixel: input.canvasBufferSize,
             pixelRatio,
             contentRect,
             srcRect,
             canvasRect,
         };
-        return effect.outputRect(dims);
+    }
+
+    /**
+     * Per-host EffectDims for `ctx.dims`. Stage k sees the same dims
+     * its `outputRect` was called with: contentRect = full element
+     * rect, srcRect = prev rendering stage's dstRect (or contentRect
+     * at stage 0). Non-rendering hosts get srcRect = contentRect since
+     * they have no own stage.
+     */
+    #hostEffectDims(k: number, input: ChainFrameInput): EffectDims {
+        const elementPixel = this.#isPostEffect
+            ? input.canvasBufferSize
+            : input.elementBufferSize;
+        const contentRect: ElementRect = [
+            0,
+            0,
+            elementPixel[0],
+            elementPixel[1],
+        ];
+        const canvasRect = this.#canvasRectInElementLocal(input);
+        const renderPos = this.#renderingIndices.indexOf(k);
+        const srcRect: ElementRect =
+            renderPos <= 0 ? contentRect : this.#stages[renderPos - 1].dstRect;
+        return this.#buildDims(input, contentRect, srcRect, canvasRect);
     }
 
     #ensureIntermediate(k: number, bufferSize: [number, number]): void {
@@ -534,13 +565,13 @@ export class EffectChain {
     }
 
     /**
-     * Canvas rect in element-local physical px (bottom-left). Post-effect
-     * chains: canvas == element, so `[0, 0, canvasPhys[0], canvasPhys[1]]`.
+     * Canvas rect in element-local device px (bottom-left). Post-effect
+     * chains: canvas == element, so `[0, 0, canvasBufferSize[0], canvasBufferSize[1]]`.
      * Element chains: shifted by the element's canvas offset so the
      * element's bottom-left lies at (0, 0).
      */
     #canvasRectInElementLocal(input: ChainFrameInput): ElementRect {
-        const [cw, ch] = input.canvasPhys;
+        const [cw, ch] = input.canvasBufferSize;
         if (this.#isPostEffect) {
             return [0, 0, cw, ch];
         }
@@ -552,63 +583,52 @@ export class EffectChain {
         k: number,
         input: ChainFrameInput,
     ): {
-        outputPhysW: number;
-        outputPhysH: number;
-        canvasPhys: readonly [number, number];
+        outputBufferW: number;
+        outputBufferH: number;
+        canvasBufferSize: readonly [number, number];
         outputViewport: { x: number; y: number; w: number; h: number };
-        elementPhysW: number;
-        elementPhysH: number;
-        rectContent: [number, number, number, number];
-        rectSrc: [number, number, number, number];
+        elementBufferW: number;
+        elementBufferH: number;
+        contentRectUv: [number, number, number, number];
+        srcRectUv: [number, number, number, number];
     } {
         const renderPos = this.#renderingIndices.indexOf(k);
         let outputW: number;
         let outputH: number;
         let outputViewport: { x: number; y: number; w: number; h: number };
-        let rectContent: [number, number, number, number];
-        let rectSrc: [number, number, number, number];
+        let contentRectUv: [number, number, number, number];
+        let srcRectUv: [number, number, number, number];
 
         if (renderPos < 0) {
             // Not a rendering effect; placeholders.
-            outputW = input.elementPhys[0];
-            outputH = input.elementPhys[1];
+            outputW = input.elementBufferSize[0];
+            outputH = input.elementBufferSize[1];
             outputViewport = { x: 0, y: 0, w: outputW, h: outputH };
-            rectContent = [0, 0, 1, 1];
-            rectSrc = [0, 0, 1, 1];
+            contentRectUv = [0, 0, 1, 1];
+            srcRectUv = [0, 0, 1, 1];
         } else {
             const stage = this.#stages[renderPos];
             outputW = stage.dstBufferSize[0];
             outputH = stage.dstBufferSize[1];
             outputViewport = stage.outputViewport;
-            rectContent = stage.rectContent;
+            contentRectUv = stage.contentRectUv;
             // Stage k's src buffer is stage k-1's dst buffer; stage 0's
-            // src is the capture (no pad), so rectSrc = (0, 0, 1, 1).
-            rectSrc =
+            // src is the capture (no pad), so srcRectUv = (0, 0, 1, 1).
+            srcRectUv =
                 renderPos === 0
                     ? [0, 0, 1, 1]
-                    : this.#stages[renderPos - 1].rectContent;
+                    : this.#stages[renderPos - 1].contentRectUv;
         }
 
         return {
-            outputPhysW: outputW,
-            outputPhysH: outputH,
-            canvasPhys: input.canvasPhys,
+            outputBufferW: outputW,
+            outputBufferH: outputH,
+            canvasBufferSize: input.canvasBufferSize,
             outputViewport,
-            elementPhysW: input.elementPhys[0],
-            elementPhysH: input.elementPhys[1],
-            rectContent,
-            rectSrc,
+            elementBufferW: input.elementBufferSize[0],
+            elementBufferH: input.elementBufferSize[1],
+            contentRectUv,
+            srcRectUv,
         };
-    }
-
-    #getFinalHandle(fb: Framebuffer): EffectRenderTarget {
-        if (
-            this.#finalFallbackFb !== fb ||
-            this.#finalFallbackHandle === null
-        ) {
-            this.#finalFallbackFb = fb;
-            this.#finalFallbackHandle = makeEffectRenderTargetFromFb(fb);
-        }
-        return this.#finalFallbackHandle;
     }
 }

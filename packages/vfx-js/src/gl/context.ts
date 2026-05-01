@@ -17,8 +17,10 @@ export class GLContext {
     gl: WebGL2RenderingContext;
     canvas: HTMLCanvasElement;
     maxTextureSize: number;
+
     /** True if `OES_texture_float_linear` is available. */
     floatLinearFilter: boolean;
+
     /** True between `webglcontextlost` and `webglcontextrestored`. */
     isContextLost = false;
 

@@ -258,11 +258,7 @@ vi.mock("./effect-geometry.js", async () => {
     });
     return {
         EFFECT_QUAD_TOKEN,
-        isEffectQuad: (g: unknown) =>
-            g === EFFECT_QUAD_TOKEN ||
-            (typeof g === "object" &&
-                g !== null &&
-                (g as { __brand?: unknown }).__brand === "EffectQuad"),
+        isEffectQuad: (g: unknown) => g === EFFECT_QUAD_TOKEN,
         EffectGeometryCache: class {
             quadDrawCount = 0;
             customResolveCount = 0;
@@ -348,14 +344,14 @@ function makeHost() {
         { autoCrop: true, glslVersion: "300 es" },
     );
     host.setFrameDims({
-        outputPhysW: 100,
-        outputPhysH: 100,
-        canvasPhys: [200, 200],
+        outputBufferW: 100,
+        outputBufferH: 100,
+        canvasBufferSize: [200, 200],
         outputViewport: { x: 0, y: 0, w: 100, h: 100 },
-        elementPhysW: 100,
-        elementPhysH: 100,
-        rectContent: [0, 0, 1, 1],
-        rectSrc: [0, 0, 1, 1],
+        elementBufferW: 100,
+        elementBufferH: 100,
+        contentRectUv: [0, 0, 1, 1],
+        srcRectUv: [0, 0, 1, 1],
     });
     return { host, gl, glCtx };
 }
@@ -539,12 +535,12 @@ describe("EffectHost.createRenderTarget", () => {
         expect(args.h).toBe(200);
     });
 
-    it("auto-size persistent → Backbuffer with pixelRatio=host.pr and logical W/H", () => {
+    it("auto-size persistent → Backbuffer with pixelRatio=host.pr and CSS W/H", () => {
         const { host } = makeHost();
         host.ctx.createRenderTarget({ persistent: true });
         const args = backbuffers[0].ctorArgs;
         expect(args.pr).toBe(2);
-        // elementPhysW / elementPhysH was 100 in makeHost; divided by 2.
+        // elementBufferW / elementBufferH was 100 in makeHost; divided by 2.
         expect(args.w).toBe(50);
         expect(args.h).toBe(50);
     });
@@ -579,33 +575,33 @@ describe("EffectHost.createRenderTarget", () => {
         host.ctx.createRenderTarget();
         // Change element size → auto-track FB.setSize path.
         host.setFrameDims({
-            outputPhysW: 200,
-            outputPhysH: 200,
-            canvasPhys: [200, 200],
+            outputBufferW: 200,
+            outputBufferH: 200,
+            canvasBufferSize: [200, 200],
             outputViewport: { x: 0, y: 0, w: 200, h: 200 },
-            elementPhysW: 200,
-            elementPhysH: 200,
-            rectContent: [0, 0, 1, 1],
-            rectSrc: [0, 0, 1, 1],
+            elementBufferW: 200,
+            elementBufferH: 200,
+            contentRectUv: [0, 0, 1, 1],
+            srcRectUv: [0, 0, 1, 1],
         });
         expect(framebuffers[0].width).toBe(200);
     });
 
-    it("auto-size follows outputPhysW/H (= dst buffer = inner + pad), not elementPhysW/H", () => {
+    it("auto-size follows outputBufferW/H (= dst buffer = inner + pad), not elementBufferW/H", () => {
         const { host } = makeHost();
         // dst buffer (120x110) > inner element (100x100) — pad in play.
         host.setFrameDims({
-            outputPhysW: 120,
-            outputPhysH: 110,
-            canvasPhys: [200, 200],
+            outputBufferW: 120,
+            outputBufferH: 110,
+            canvasBufferSize: [200, 200],
             outputViewport: { x: 0, y: 0, w: 120, h: 110 },
-            elementPhysW: 100,
-            elementPhysH: 100,
-            rectContent: [0, 0, 1, 1],
-            rectSrc: [0, 0, 1, 1],
+            elementBufferW: 100,
+            elementBufferH: 100,
+            contentRectUv: [0, 0, 1, 1],
+            srcRectUv: [0, 0, 1, 1],
         });
         host.ctx.createRenderTarget();
-        // Sized to outputPhys, not elementPhys.
+        // Sized to outputBuffer, not elementBuffer.
         expect(framebuffers[0].width).toBe(120);
         expect(framebuffers[0].height).toBe(110);
     });
@@ -614,14 +610,14 @@ describe("EffectHost.createRenderTarget", () => {
         const { host } = makeHost();
         host.ctx.createRenderTarget({ size: [50, 50] });
         host.setFrameDims({
-            outputPhysW: 200,
-            outputPhysH: 200,
-            canvasPhys: [200, 200],
+            outputBufferW: 200,
+            outputBufferH: 200,
+            canvasBufferSize: [200, 200],
             outputViewport: { x: 0, y: 0, w: 200, h: 200 },
-            elementPhysW: 200,
-            elementPhysH: 200,
-            rectContent: [0, 0, 1, 1],
-            rectSrc: [0, 0, 1, 1],
+            elementBufferW: 200,
+            elementBufferH: 200,
+            contentRectUv: [0, 0, 1, 1],
+            srcRectUv: [0, 0, 1, 1],
         });
         // Fixed: still 50×50.
         expect(framebuffers[0].width).toBe(50);
@@ -693,24 +689,24 @@ describe("EffectHost.draw", () => {
         warn.mockRestore();
     });
 
-    it("auto-uploads rectContent and rectSrc as vec4 uniforms", () => {
+    it("auto-uploads contentRectUv and srcRectUv as vec4 uniforms", () => {
         const { host } = makeHost();
         host.setFrameDims({
-            outputPhysW: 100,
-            outputPhysH: 100,
-            canvasPhys: [200, 200],
+            outputBufferW: 100,
+            outputBufferH: 100,
+            canvasBufferSize: [200, 200],
             outputViewport: { x: 0, y: 0, w: 100, h: 100 },
-            elementPhysW: 100,
-            elementPhysH: 100,
-            rectContent: [0.1, 0.2, 0.3, 0.4],
-            rectSrc: [0.5, 0.6, 0.7, 0.8],
+            elementBufferW: 100,
+            elementBufferH: 100,
+            contentRectUv: [0.1, 0.2, 0.3, 0.4],
+            srcRectUv: [0.5, 0.6, 0.7, 0.8],
         });
         host.setPhase("render");
         host.ctx.draw({ frag: FRAG });
         expect(programs).toHaveLength(1);
         const uploads = programs[0].uploads[0];
-        expect(uploads["rectContent"].value).toEqual([0.1, 0.2, 0.3, 0.4]);
-        expect(uploads["rectSrc"].value).toEqual([0.5, 0.6, 0.7, 0.8]);
+        expect(uploads["contentRectUv"].value).toEqual([0.1, 0.2, 0.3, 0.4]);
+        expect(uploads["srcRectUv"].value).toEqual([0.5, 0.6, 0.7, 0.8]);
     });
 
     it("default vertex shader emits uv / uvContent / uvSrc varyings", () => {
@@ -721,8 +717,8 @@ describe("EffectHost.draw", () => {
         expect(vert).toMatch(/\bout vec2 uv\b/);
         expect(vert).toMatch(/\bout vec2 uvContent\b/);
         expect(vert).toMatch(/\bout vec2 uvSrc\b/);
-        expect(vert).toMatch(/uniform vec4 rectContent\b/);
-        expect(vert).toMatch(/uniform vec4 rectSrc\b/);
+        expect(vert).toMatch(/uniform vec4 contentRectUv\b/);
+        expect(vert).toMatch(/uniform vec4 srcRectUv\b/);
     });
 });
 

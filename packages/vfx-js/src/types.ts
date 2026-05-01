@@ -426,12 +426,16 @@ export type VFXElement = {
     zIndex: number;
     backbuffer?: Backbuffer;
     autoCrop: boolean;
+
     /** Present only for effect-path elements. */
     chain?: EffectChain;
+
     /** Per-frame evaluated generators for effect-path uniforms. */
     effectUniformGenerators?: Record<string, () => EffectUniformValue>;
+
     /** Static effect-path uniforms (merged with generator results). */
     effectStaticUniforms?: Record<string, EffectUniformValue>;
+
     /** Wall-clock seconds of the previous render. Used for ctx.deltaTime. */
     effectLastRenderTime?: number;
 };
@@ -599,6 +603,7 @@ export type EffectAttributeDescriptor =
           data: EffectAttributeTypedArray;
           itemSize: 1 | 2 | 3 | 4;
           normalized?: boolean;
+
           /** ANGLE_instanced_arrays / WebGPU `stepMode: "instance"`. */
           perInstance?: boolean;
       };
@@ -634,6 +639,8 @@ export type EffectGeometry = {
  */
 export type EffectQuad = { readonly __brand: "EffectQuad" };
 
+export type EffectBlendMode = "normal" | "premultiplied" | "additive" | "none";
+
 export type EffectDrawOpts = {
     frag: string;
     vert?: string;
@@ -647,12 +654,21 @@ export type EffectDrawOpts = {
      * It renders to the Canvas if omitted (or `null`).
      */
     target?: EffectRenderTarget | null;
+
+    /**
+     * Blend mode override. Default: `"premultiplied"` when drawing to
+     * the canvas (`target` null/omitted), `"none"` when drawing to a
+     * user-allocated render target. Use `"additive"` for accumulating
+     * draws like sparkles or particle stamps.
+     */
+    blend?: EffectBlendMode;
 };
 
 /** Subset of `VFXProps` exposed to effects via `ctx.vfxProps`. */
 export type EffectVFXProps = {
     /** Default: `true`. */
     readonly autoCrop: boolean;
+
     /** Default: `"300 es"`. */
     readonly glslVersion: "100" | "300 es";
 };
@@ -692,6 +708,13 @@ export type EffectContext = {
      */
     readonly uniforms: Readonly<Record<string, EffectUniformValue>>;
     readonly vfxProps: EffectVFXProps;
+
+    /**
+     * Per-stage layout snapshot — same shape as `Effect.outputRect`'s
+     * `dims` argument. Fresh in `update` and `render`; in `init` it
+     * holds placeholder values until the first frame resolves.
+     */
+    readonly dims: EffectDims;
 
     /** Default fullscreen quad (NDC -1..1), mapped to the target's viewport. */
     readonly quad: EffectQuad;
@@ -752,6 +775,37 @@ export type EffectContext = {
 };
 
 /**
+ * Per-stage layout snapshot. Same shape on `EffectContext.dims`
+ * (frame-fresh in `update` / `render`) and as the argument to
+ * `Effect.outputRect`.
+ *
+ * Units:
+ * - Physical pixels: `contentRect`, `srcRect`, `canvasRect`, `elementPixel`, `canvasPixel`.
+ * - Logical (CSS) pixels: `element`, `canvas`. Multiply by
+ *   `pixelRatio` to get the matching `elementPixel` / `canvasPixel`.
+ *
+ * In a post-effect there is no element, so `element` / `elementPixel`
+ * mirror `canvas` / `canvasPixel`, and `contentRect` mirrors
+ * `canvasRect`.
+ */
+export type EffectDims = {
+    readonly element: readonly [number, number];
+    readonly elementPixel: readonly [number, number];
+    readonly canvas: readonly [number, number];
+    readonly canvasPixel: readonly [number, number];
+    readonly pixelRatio: number;
+
+    /** Element rect in element-local px: `[0, 0, elementPixel[0], elementPixel[1]]`. */
+    readonly contentRect: ElementRect;
+
+    /** Src buffer's rect in element-local px (= prev stage's `outputRect`, or `contentRect` at stage 0). */
+    readonly srcRect: ElementRect;
+
+    /** Canvas rect in element-local px. */
+    readonly canvasRect: ElementRect;
+};
+
+/**
  * Effect interface.
  *
  * Lifecycle hooks:
@@ -767,7 +821,7 @@ export interface Effect {
     init?(ctx: EffectContext): void | Promise<void>;
 
     /**
-     * State-update phase. `ctx.src` / `ctx.output` may point to stale /
+     * State-update phase. `ctx.src` / `ctx.target` may point to stale /
      * previous-frame handles here, so `ctx.draw()` MUST NOT be called.
      * If called, the orchestrator silently ignores it.
      */
@@ -801,28 +855,6 @@ export interface Effect {
      * Each stage picks its own rect. If one stage returns 100×100 and
      * the next returns 50×50, those are the sizes used; rects do not
      * grow as the chain runs.
-     *
-     * Units in `dims`:
-     * - Physical pixels: `contentRect`, `srcRect`, `canvasRect`, and
-     *   the value you return.
-     * - Logical (CSS) pixels: `element`, `canvas`. Multiply by
-     *   `pixelRatio` to get the matching `elementPixel` / `canvasPixel`.
-     *
-     * In a post-effect there is no element, so `element` and
-     * `elementPixel` are the same as `canvas` and `canvasPixel`, and
-     * `contentRect` is the same as `canvasRect`.
      */
-    outputRect?(dims: {
-        readonly element: readonly [number, number];
-        readonly elementPixel: readonly [number, number];
-        readonly canvas: readonly [number, number];
-        readonly canvasPixel: readonly [number, number];
-        readonly pixelRatio: number;
-        /** Element rect in element-local px: `[0, 0, elementPixel[0], elementPixel[1]]`. */
-        readonly contentRect: ElementRect;
-        /** Src buffer's rect in element-local px (= prev stage's `outputRect`, or `contentRect` at stage 0). */
-        readonly srcRect: ElementRect;
-        /** Canvas rect in element-local px. */
-        readonly canvasRect: ElementRect;
-    }): ElementRect | undefined;
+    outputRect?(dims: EffectDims): ElementRect | undefined;
 }

@@ -44,7 +44,7 @@ export function createScanlineEffect(opts: ScanlineOptions = {}): Effect {
                     innerHeight: ctx.src.height || 1,
                     spacing,
                 },
-                target: ctx.output,
+                target: ctx.target,
             });
         },
     };

@@ -27,9 +27,17 @@ export default preview;
 export const decorators = [
     (story) => {
         // biome-ignore lint/suspicious/noExplicitAny: use global VFX
-        (window as any).vfx?.destroy();
-        // biome-ignore lint/suspicious/noExplicitAny: use global Timer
-        (window as any).timer?.dispose();
+        const w = window as any;
+        w.vfx?.destroy();
+        w.timer?.dispose();
+        // biome-ignore lint/suspicious/noExplicitAny: tweakpane Pane
+        for (const p of (w.__vfxPanes ?? []) as any[]) {
+            p.dispose?.();
+        }
+        w.__vfxPanes = [];
+        for (const el of document.querySelectorAll(".vfx-tweakpane-container")) {
+            el.remove();
+        }
 
         // Reset storybook-root styles (may be modified by wrapper stories)
         const root = document.getElementById("storybook-root");

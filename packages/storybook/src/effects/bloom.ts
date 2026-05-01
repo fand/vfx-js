@@ -444,7 +444,7 @@ export class BloomEffect implements Effect {
                 dither,
                 edgeFade,
             },
-            target: ctx.output,
+            target: ctx.target,
         });
     }
 
