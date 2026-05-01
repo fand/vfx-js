@@ -199,6 +199,7 @@ uniform float dt;
 uniform float time;
 uniform float lifespan;
 uniform float idleKill;    // extra aging multiplier when speedFactor=0
+uniform float speedKillThreshold;  // force respawn when speedFactor falls below
 
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -232,6 +233,11 @@ void main() {
         float lifespanScale = 0.6 + hash21(uv * 91.7 + 1.234) * 0.8;
         float agingRate = 1.0 + idleKill * (1.0 - newSpeed);
         age += dt * agingRate / (lifespan * lifespanScale);
+        // Hard kill once activity has decayed. Without this, drifted
+        // particles reactivate when the mouse revisits their spawnPos.
+        if (newSpeed < speedKillThreshold) {
+            age = max(age, 1.0);
+        }
     }
 
     outColor = vec4(spawnPos, newSpeed, age);
@@ -428,6 +434,12 @@ export type CurlParticlesParams = {
      * particles die and respawn sooner.
      */
     idleKill: number;
+    /**
+     * speedFactor below which a particle is force-killed. Prevents
+     * drifted particles from reactivating when the mouse revisits
+     * their original spawn position.
+     */
+    speedKillThreshold: number;
     /** Background image opacity 0..1. */
     backgroundOpacity: number;
     /**
@@ -451,9 +463,10 @@ const DEFAULT_PARAMS: CurlParticlesParams = {
     noiseAnimation: 0.3,
     pointSize: 2.0,
     alpha: 0.5,
-    radius: 200,
+    radius: 30,
     speedDecay: 1.5,
     idleKill: 2.0,
+    speedKillThreshold: 0.05,
     backgroundOpacity: 1.0,
     trailFade: 0.9,
     fog: 0.5,
@@ -574,6 +587,7 @@ export class CurlParticlesEffect implements Effect {
                 time,
                 lifespan,
                 idleKill: this.params.idleKill,
+                speedKillThreshold: this.params.speedKillThreshold,
             },
             target: this.#stateSpawn,
         });
