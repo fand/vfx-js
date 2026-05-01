@@ -35,7 +35,7 @@ in vec2 uv;
 out vec4 outColor;
 
 uniform sampler2D state;
-uniform sampler2D spawn;     // .z: speedFactor, .w: age
+uniform sampler2D spawn;     // .w: age
 uniform vec2 mouseUv;
 uniform float radius;        // radius in element px
 uniform vec2 elementPixel;
@@ -44,6 +44,7 @@ uniform float dt;            // sec
 uniform float speed;         // uv per sec at full strength
 uniform float noiseScale;
 uniform float noiseAnimation;  // morph rate on the 4th (time) axis
+uniform float aliveFraction;
 
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -174,17 +175,17 @@ void main() {
         vec3 noiseInput = pos * stretch * noiseScale;
         vec3 vIn = curl3D(noiseInput, time * noiseAnimation);
         vec3 v = vIn / stretch;
-        float speedFactor = texture(spawn, uv).z;
-        pos += v * speed * dt * speedFactor;
+        // Linear life taper: full speed at spawn, zero at end of visible life.
+        float lifeSpeed = clamp(1.0 - age / max(aliveFraction, 1e-3), 0.0, 1.0);
+        pos += v * speed * dt * lifeSpeed;
     }
 
     outColor = vec4(pos, justRespawned ? 1.0 : 0.0);
 }
 `;
 
-// speedFactor low-pass + age advance. speedFactor target falls as the
-// particle's current position drifts away from the cursor. Idle
-// particles age faster via (1 - speedFactor) * idleKill.
+// Age advance only. Speed taper now lives in FRAG_UPDATE_STATE and is
+// purely a function of age; mouse position only drives the spawn point.
 const FRAG_UPDATE_SPAWN = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -192,55 +193,29 @@ out vec4 outColor;
 
 uniform sampler2D state;
 uniform sampler2D prevSpawn;
-uniform vec2 mouseUv;
-uniform float radius;
-uniform vec2 elementPixel;
-uniform float speedDecay;  // per-second rate of convergence to target
 uniform float dt;
 uniform float time;
 uniform float lifespan;
-uniform float idleKill;    // extra aging multiplier when speedFactor=0
-uniform float speedKillThreshold;  // force respawn when speedFactor falls below
 
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
 void main() {
-    vec4 prev = texture(prevSpawn, uv);
-    float prevSpeed = prev.z;
-    float age = prev.w;
+    float age = texture(prevSpawn, uv).w;
 
     vec4 s = texture(state, uv);
     bool justRespawned = s.w > 0.5;
     if (justRespawned) {
-        prevSpeed = 1.0;
         // Negative age = pre-spawn delay so siblings desync.
         age = -hash21(uv + vec2(time * 0.123, 0.456)) * 0.7;
-    }
-
-    // Distance from current particle position to mouse (xy only —
-    // cursor is 2D). Drives "fast near cursor, slow as it drifts."
-    vec2 dPx = (s.xy - mouseUv) * elementPixel;
-    float distPx = length(dPx);
-    float target = 1.0 - smoothstep(radius, radius * 3.0, distPx);
-    // Frame-rate independent low-pass.
-    float a = 1.0 - exp(-speedDecay * dt);
-    float newSpeed = mix(prevSpeed, target, clamp(a, 0.0, 1.0));
-
-    if (!justRespawned) {
+    } else {
         // Per-particle lifespan jitter to permanently desync particles.
         float lifespanScale = 0.6 + hash21(uv * 91.7 + 1.234) * 0.8;
-        float agingRate = 1.0 + idleKill * (1.0 - newSpeed);
-        age += dt * agingRate / (lifespan * lifespanScale);
-        // Hard kill once activity has decayed. Without this, drifted
-        // particles reactivate when the mouse revisits their spawnPos.
-        if (newSpeed < speedKillThreshold) {
-            age = max(age, 1.0);
-        }
+        age += dt / (lifespan * lifespanScale);
     }
 
-    outColor = vec4(0.0, 0.0, newSpeed, age);
+    outColor = vec4(0.0, 0.0, 0.0, age);
 }
 `;
 
@@ -419,27 +394,8 @@ export type CurlParticlesParams = {
     pointSize: number;
     /** Global alpha multiplier on each particle (0..1). */
     alpha: number;
-    /** Mouse spawn / activity radius in element px. */
+    /** Mouse spawn radius in element px. */
     radius: number;
-    /**
-     * How quickly per-particle speedFactor catches up to its target
-     * (per second). Lower values = particles take longer to spin up
-     * when the mouse arrives or wind down when it leaves.
-     */
-    speedDecay: number;
-    /**
-     * Extra aging multiplier applied when a particle is far from the
-     * mouse (speedFactor → 0). 0 disables the early kill (particles
-     * just live their full lifespan); higher values make idle
-     * particles die and respawn sooner.
-     */
-    idleKill: number;
-    /**
-     * speedFactor below which a particle is force-killed. Prevents
-     * drifted particles from reactivating when the mouse revisits
-     * their original spawn position.
-     */
-    speedKillThreshold: number;
     /** Background image opacity 0..1. */
     backgroundOpacity: number;
     /**
@@ -464,9 +420,6 @@ const DEFAULT_PARAMS: CurlParticlesParams = {
     pointSize: 2.0,
     alpha: 0.5,
     radius: 30,
-    speedDecay: 1.5,
-    idleKill: 2.0,
-    speedKillThreshold: 0.05,
     backgroundOpacity: 1.0,
     trailFade: 0.9,
     fog: 0.5,
@@ -569,25 +522,20 @@ export class CurlParticlesEffect implements Effect {
                 speed,
                 noiseScale,
                 noiseAnimation: this.params.noiseAnimation,
+                aliveFraction: this.params.aliveFraction,
             },
             target: this.#statePos,
         });
 
-        // Spawn snapshot + speedFactor low-pass.
+        // Age advance.
         ctx.draw({
             frag: FRAG_UPDATE_SPAWN,
             uniforms: {
                 state: this.#statePos,
                 prevSpawn: this.#stateSpawn,
-                mouseUv,
-                radius,
-                elementPixel,
-                speedDecay: this.params.speedDecay,
                 dt,
                 time,
                 lifespan,
-                idleKill: this.params.idleKill,
-                speedKillThreshold: this.params.speedKillThreshold,
             },
             target: this.#stateSpawn,
         });

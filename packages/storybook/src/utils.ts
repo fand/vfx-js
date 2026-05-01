@@ -312,16 +312,6 @@ export function attachParticlesPane(
         step: 1,
     });
     pane.addBinding(effect.params, "fog", { min: 0, max: 1, step: 0.01 });
-    pane.addBinding(effect.params, "speedDecay", {
-        min: 0.1,
-        max: 10,
-        step: 0.1,
-    });
-    pane.addBinding(effect.params, "idleKill", {
-        min: 0,
-        max: 10,
-        step: 0.1,
-    });
     pane.addBinding(effect.params, "backgroundOpacity", {
         min: 0,
         max: 1,
