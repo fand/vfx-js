@@ -6,6 +6,29 @@ import type { ExplodeEffect } from "./effects/explode";
 import type { FluidEffect } from "./effects/fluid";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
+const PANE_CLASS = "vfx-tweakpane-container";
+
+function disposeAllPanes(): void {
+    // biome-ignore lint/suspicious/noExplicitAny: window-bag access
+    const w = window as any;
+    const panes: Pane[] = w.__vfxPanes ?? [];
+    for (const p of panes) {
+        p.dispose();
+    }
+    w.__vfxPanes = [];
+    // Story transitions don't re-run play(), so disposed panes' DOM
+    // could outlive the story. Sweep any stragglers by class.
+    for (const el of document.querySelectorAll(`.${PANE_CLASS}`)) {
+        el.remove();
+    }
+}
+
+function trackPane(pane: Pane): void {
+    // biome-ignore lint/suspicious/noExplicitAny: window-bag access
+    const w = window as any;
+    (w.__vfxPanes ??= []).push(pane);
+}
+
 export function initVFX(opts?: VFXOpts): VFX {
     // biome-ignore lint/suspicious/noExplicitAny: window-bag access
     const w = window as any;
@@ -16,24 +39,16 @@ export function initVFX(opts?: VFXOpts): VFX {
     if (w.vfx && typeof w.vfx.destroy === "function") {
         w.vfx.destroy();
     }
+    disposeAllPanes();
     const vfx = new VFX(opts);
     w.vfx = vfx;
 
     return vfx;
 }
 
-const BLOOM_PANE_CLASS = "bloom-tweakpane-container";
-
 export function attachBloomPane(title: string, effect: BloomEffect): Pane {
-    // Re-playing a story or hot-reloading `play()` would leave the
-    // previous panel attached — clear any stragglers before creating
-    // a fresh one so we don't stack multiple copies.
-    for (const el of document.querySelectorAll(`.${BLOOM_PANE_CLASS}`)) {
-        el.remove();
-    }
-
     const container = document.createElement("div");
-    container.className = BLOOM_PANE_CLASS;
+    container.className = PANE_CLASS;
     // VFX-JS's canvas defaults to `z-index: 9999`, so the pane has to
     // sit above it to stay clickable.
     container.style.cssText =
@@ -64,18 +79,13 @@ export function attachBloomPane(title: string, effect: BloomEffect): Pane {
         step: 1,
         view: "number",
     });
+    trackPane(pane);
     return pane;
 }
 
-const FLUID_PANE_CLASS = "fluid-tweakpane-container";
-
 export function attachFluidPane(title: string, effect: FluidEffect): Pane {
-    for (const el of document.querySelectorAll(`.${FLUID_PANE_CLASS}`)) {
-        el.remove();
-    }
-
     const container = document.createElement("div");
-    container.className = FLUID_PANE_CLASS;
+    container.className = PANE_CLASS;
     // Stack below the bloom pane so a chain story can show both.
     container.style.cssText =
         "position:fixed;top:16px;left:16px;width:280px;z-index:10000";
@@ -123,10 +133,9 @@ export function attachFluidPane(title: string, effect: FluidEffect): Pane {
         step: 0.001,
     });
     pane.addBinding(effect.params, "showDye");
+    trackPane(pane);
     return pane;
 }
-
-const RD_PANE_CLASS = "rd-tweakpane-container";
 
 // Classic Gray-Scott parameter pairs. Each gives a distinct family of
 // patterns; switching presets lets you scan the (feed, kill) space.
@@ -143,12 +152,8 @@ export function attachRDPane(
     title: string,
     effect: ReactionDiffusionEffect,
 ): Pane {
-    for (const el of document.querySelectorAll(`.${RD_PANE_CLASS}`)) {
-        el.remove();
-    }
-
     const container = document.createElement("div");
-    container.className = RD_PANE_CLASS;
+    container.className = PANE_CLASS;
     container.style.cssText =
         "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
     document.body.appendChild(container);
@@ -215,10 +220,9 @@ export function attachRDPane(
     pane.addBinding(scaleProxy, "scaleLow", { min: 0.1, max: 5, step: 0.05 });
     pane.addBinding(scaleProxy, "scaleHigh", { min: 0.1, max: 5, step: 0.05 });
     pane.addButton({ title: "reseed" }).on("click", () => effect.reseed());
+    trackPane(pane);
     return pane;
 }
-
-const PARTICLES_PANE_CLASS = "particles-tweakpane-container";
 
 export function attachParticlesPane(
     title: string,
@@ -229,12 +233,8 @@ export function attachParticlesPane(
         sources: Record<string, string>;
     },
 ): Pane {
-    for (const el of document.querySelectorAll(`.${PARTICLES_PANE_CLASS}`)) {
-        el.remove();
-    }
-
     const container = document.createElement("div");
-    container.className = PARTICLES_PANE_CLASS;
+    container.className = PANE_CLASS;
     container.style.cssText =
         "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
     document.body.appendChild(container);
@@ -341,5 +341,6 @@ export function attachParticlesPane(
             burst.reset();
         });
     }
+    trackPane(pane);
     return pane;
 }
