@@ -397,7 +397,7 @@ void main() {
     vec3 pos = s.xyz + v * speed * dt * taper;
 
     float lifeMul = max(texture(colorTex, uv).w, 1e-3);
-    age += dt / max(life * lifeMul, 1e-3);
+    age += dt / (max(life, 1e-3) * lifeMul);
 
     outColor = vec4(pos, age);
 }
