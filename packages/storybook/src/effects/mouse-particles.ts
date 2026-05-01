@@ -1,6 +1,7 @@
 // Mouse-driven GPU particles. CPU spawn scheduler picks ring-buffer
-// slots each frame; particles advect along a 3D curl-noise field and
-// composite over a persistent trail buffer.
+// slots each frame; the per-texel UPDATE pass either applies the
+// matching spawn or advects through a 3D curl-noise field. Composited
+// over a persistent trail buffer.
 import type {
     Effect,
     EffectContext,
@@ -19,8 +20,9 @@ const IDLE_THRESHOLD = 0.1;
 const LIFE_JITTER_MIN = 0.7;
 const LIFE_JITTER_MAX = 1.3;
 
-// age = 2.0 keeps every slot dead until the spawn pass writes a fresh
-// particle in.
+const STATE_SIZE_VEC: [number, number] = [STATE_SIZE, STATE_SIZE];
+
+// age = 2.0 keeps every slot dead until UPDATE writes a fresh particle.
 const FRAG_INIT_POS = `#version 300 es
 precision highp float;
 out vec4 outColor;
@@ -131,84 +133,6 @@ vec3 curl3D(vec3 p, float t) {
     float dPydx = snoise(pb + dx) - snoise(pb - dx);
     float dPxdy = snoise(pa + dy) - snoise(pa - dy);
     return vec3(dPzdy - dPydz, dPxdz - dPzdx, dPydx - dPxdy) / (2.0 * eps);
-}
-`;
-
-// Per-instance dummy vertex stream for the spawn point primitive. The
-// framework computes vertex count from the `position` attribute, so we
-// must declare and reference it in the vertex shader (see
-// effect-geometry.ts).
-const SPAWN_DUMMY_POSITION = new Float32Array([0, 0]);
-
-// Spawn pass — writes new particles into specific texels of the state
-// textures. One point per spawn, vertex shader maps slot → state-texel
-// NDC position.
-const VERT_SPAWN = `#version 300 es
-precision highp float;
-in vec2 position;
-uniform vec4 uSpawn[${MAX_SPAWNS_PER_FRAME}];   // [slotIdx, spawnUv.x, spawnUv.y, lifeJitter]
-uniform int uSpawnCount;
-uniform vec2 stateSize;
-
-out vec2 vSpawnUv;
-out float vLifeJitter;
-
-void main() {
-    int id = gl_InstanceID;
-    if (id >= uSpawnCount) {
-        // Skip unused instance slots by emitting an off-screen vertex.
-        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-        gl_PointSize = 0.0;
-        vSpawnUv = vec2(0.0);
-        vLifeJitter = 0.0;
-        return;
-    }
-    vec4 d = uSpawn[id];
-    float idx = d.x;
-    float sx = mod(idx, stateSize.x);
-    float sy = floor(idx / stateSize.x);
-    vec2 stateUv = (vec2(sx, sy) + 0.5) / stateSize;
-    // Adding the always-zero position attribute keeps it referenced
-    // through compilation (the framework derives vertex count from it).
-    gl_Position = vec4(stateUv * 2.0 - 1.0 + position, 0.0, 1.0);
-    gl_PointSize = 1.0;
-    vSpawnUv = d.yz;
-    vLifeJitter = d.w;
-}
-`;
-
-const FRAG_SPAWN_POS = `#version 300 es
-precision highp float;
-in vec2 vSpawnUv;
-out vec4 outColor;
-
-uniform sampler2D src;
-uniform float alphaThreshold;
-
-void main() {
-    // Reject spawns outside the element rect or where src is transparent.
-    vec2 inside = step(vec2(0.0), vSpawnUv) * step(vSpawnUv, vec2(1.0));
-    float visible = inside.x * inside.y;
-    float a = texture(src, clamp(vSpawnUv, 0.0, 1.0)).a * visible;
-    if (a < alphaThreshold) {
-        outColor = vec4(0.0, 0.0, 0.0, 2.0);   // born dead
-        return;
-    }
-    outColor = vec4(vSpawnUv, 0.0, 0.0);
-}
-`;
-
-const FRAG_SPAWN_COLOR = `#version 300 es
-precision highp float;
-in vec2 vSpawnUv;
-in float vLifeJitter;
-out vec4 outColor;
-
-uniform sampler2D src;
-
-void main() {
-    vec4 c = texture(src, clamp(vSpawnUv, 0.0, 1.0));
-    outColor = vec4(c.rgb, vLifeJitter);
 }
 `;
 
@@ -347,15 +271,19 @@ void main() {
 }
 `;
 
-// Pure advect + age. Dead slots (age >= 1) pass through unchanged so
-// they stay invisible until the spawn pass overwrites them.
-const FRAG_UPDATE = `#version 300 es
+// Combined spawn + advect. Each texel is either overwritten with a new
+// particle (slot matches one of this frame's spawns) or advected. Every
+// texel is unconditionally written so the persistent (auto-swapped) RT
+// stays consistent.
+const FRAG_UPDATE_POS = `#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
 
 uniform sampler2D posTex;
 uniform sampler2D colorTex;
+uniform sampler2D src;
+uniform vec2 stateSize;
 uniform vec2 elementPixel;
 uniform float time;
 uniform float dt;
@@ -364,8 +292,29 @@ uniform float noiseScale;
 uniform float noiseAnimation;
 uniform float speedDecay;
 uniform float life;
+uniform float alphaThreshold;
+uniform vec4 uSpawn[${MAX_SPAWNS_PER_FRAME}];
+uniform int uSpawnCount;
 ${GLSL_CURL_NOISE}
+
 void main() {
+    ivec2 pix = ivec2(floor(uv * stateSize));
+    int myId = pix.y * int(stateSize.x) + pix.x;
+
+    for (int i = 0; i < uSpawnCount; i++) {
+        if (int(uSpawn[i].x) != myId) continue;
+        vec2 spawnUv = uSpawn[i].yz;
+        vec2 inside = step(vec2(0.0), spawnUv) * step(spawnUv, vec2(1.0));
+        float visible = inside.x * inside.y;
+        float a = texture(src, clamp(spawnUv, 0.0, 1.0)).a * visible;
+        if (a < alphaThreshold) {
+            outColor = vec4(0.0, 0.0, 0.0, 2.0);   // born dead
+            return;
+        }
+        outColor = vec4(spawnUv, 0.0, 0.0);
+        return;
+    }
+
     vec4 s = texture(posTex, uv);
     float age = s.w;
     if (age >= 1.0) {
@@ -385,6 +334,34 @@ void main() {
     age += dt / (max(life, 1e-3) * lifeMul);
 
     outColor = vec4(pos, age);
+}
+`;
+
+// Sibling of FRAG_UPDATE_POS for the color/lifeJitter buffer. Spawn
+// texels grab the src color; everything else passes through.
+const FRAG_UPDATE_COLOR = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 outColor;
+
+uniform sampler2D colorTex;
+uniform sampler2D src;
+uniform vec2 stateSize;
+uniform vec4 uSpawn[${MAX_SPAWNS_PER_FRAME}];
+uniform int uSpawnCount;
+
+void main() {
+    ivec2 pix = ivec2(floor(uv * stateSize));
+    int myId = pix.y * int(stateSize.x) + pix.x;
+
+    for (int i = 0; i < uSpawnCount; i++) {
+        if (int(uSpawn[i].x) != myId) continue;
+        vec4 c = texture(src, clamp(uSpawn[i].yz, 0.0, 1.0));
+        outColor = vec4(c.rgb, uSpawn[i].w);
+        return;
+    }
+
+    outColor = texture(colorTex, uv);
 }
 `;
 
@@ -451,24 +428,13 @@ const DEFAULT_PARAMS: MouseParticlesParams = {
 export class MouseParticlesEffect implements Effect {
     params: MouseParticlesParams;
 
-    // Manual posTex ping-pong: UPDATE writes the advanced state to the
-    // write target, then SPAWN overlays a few texels with new particle
-    // data. A persistent (auto-swapped) RT would alternate stale/fresh
-    // for non-spawned slots — explicit alternation avoids that.
-    #posA: EffectRenderTarget | null = null;
-    #posB: EffectRenderTarget | null = null;
+    #posTex: EffectRenderTarget | null = null;
     #colorTex: EffectRenderTarget | null = null;
     #stampTex: EffectRenderTarget | null = null;
     #trail: EffectRenderTarget | null = null;
-    #posReadIsA = false;
     #initialized = false;
 
     #spawnUniform = new Float32Array(MAX_SPAWNS_PER_FRAME * 4);
-    #spawnGeometry: EffectGeometry = {
-        mode: "points",
-        attributes: { position: SPAWN_DUMMY_POSITION },
-        instanceCount: MAX_SPAWNS_PER_FRAME,
-    };
     #particleGeometry: EffectGeometry | null = null;
     #nextSlot = 0;
     #birthAccumulator = 0;
@@ -484,11 +450,11 @@ export class MouseParticlesEffect implements Effect {
         const stateOpts = {
             size: [STATE_SIZE, STATE_SIZE] as [number, number],
             float: true,
+            persistent: true as const,
             wrap: "clamp" as const,
             filter: "nearest" as const,
         };
-        this.#posA = ctx.createRenderTarget(stateOpts);
-        this.#posB = ctx.createRenderTarget(stateOpts);
+        this.#posTex = ctx.createRenderTarget(stateOpts);
         this.#colorTex = ctx.createRenderTarget(stateOpts);
         this.#stampTex = ctx.createRenderTarget({
             float: false,
@@ -511,8 +477,7 @@ export class MouseParticlesEffect implements Effect {
 
     render(ctx: EffectContext): void {
         if (
-            !this.#posA ||
-            !this.#posB ||
+            !this.#posTex ||
             !this.#colorTex ||
             !this.#stampTex ||
             !this.#trail ||
@@ -522,10 +487,7 @@ export class MouseParticlesEffect implements Effect {
         }
 
         if (!this.#initialized) {
-            // Init both ping-pong sides so the first UPDATE has a clean
-            // read texture.
-            ctx.draw({ frag: FRAG_INIT_POS, target: this.#posA });
-            ctx.draw({ frag: FRAG_INIT_POS, target: this.#posB });
+            ctx.draw({ frag: FRAG_INIT_POS, target: this.#posTex });
             ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#colorTex });
             this.#initialized = true;
         }
@@ -537,14 +499,15 @@ export class MouseParticlesEffect implements Effect {
             ctx.dims.elementPixel[1],
         ];
 
-        const posRead = this.#posReadIsA ? this.#posA : this.#posB;
-        const posWrite = this.#posReadIsA ? this.#posB : this.#posA;
+        const nSpawn = this.#scheduleSpawns(ctx, dt, elementPixel);
 
         ctx.draw({
-            frag: FRAG_UPDATE,
+            frag: FRAG_UPDATE_POS,
             uniforms: {
-                posTex: posRead,
+                posTex: this.#posTex,
                 colorTex: this.#colorTex,
+                src: ctx.src,
+                stateSize: STATE_SIZE_VEC,
                 elementPixel,
                 time: ctx.time,
                 dt,
@@ -553,47 +516,33 @@ export class MouseParticlesEffect implements Effect {
                 noiseAnimation: this.params.noiseAnimation,
                 speedDecay: this.params.speedDecay,
                 life: this.params.life,
-            },
-            target: posWrite,
-        });
-
-        const nSpawn = this.#scheduleSpawns(ctx, dt, elementPixel);
-        if (nSpawn > 0) {
-            const spawnUniforms = {
+                alphaThreshold: this.params.alphaThreshold,
                 uSpawn: this.#spawnUniform,
                 uSpawnCount: nSpawn,
-                stateSize: [STATE_SIZE, STATE_SIZE] as [number, number],
+            },
+            target: this.#posTex,
+        });
+
+        ctx.draw({
+            frag: FRAG_UPDATE_COLOR,
+            uniforms: {
+                colorTex: this.#colorTex,
                 src: ctx.src,
-                alphaThreshold: this.params.alphaThreshold,
-            };
-            ctx.draw({
-                vert: VERT_SPAWN,
-                frag: FRAG_SPAWN_POS,
-                uniforms: spawnUniforms,
-                geometry: this.#spawnGeometry,
-                target: posWrite,
-            });
-            ctx.draw({
-                vert: VERT_SPAWN,
-                frag: FRAG_SPAWN_COLOR,
-                uniforms: spawnUniforms,
-                geometry: this.#spawnGeometry,
-                target: this.#colorTex,
-            });
-        }
-
-        this.#posReadIsA = !this.#posReadIsA;
-
-        const renderRead = this.#posReadIsA ? this.#posA : this.#posB;
+                stateSize: STATE_SIZE_VEC,
+                uSpawn: this.#spawnUniform,
+                uSpawnCount: nSpawn,
+            },
+            target: this.#colorTex,
+        });
 
         ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
         ctx.draw({
             vert: VERT_PARTICLE,
             frag: FRAG_PARTICLE,
             uniforms: {
-                posTex: renderRead,
+                posTex: this.#posTex,
                 colorTex: this.#colorTex,
-                stateSize: [STATE_SIZE, STATE_SIZE],
+                stateSize: STATE_SIZE_VEC,
                 pointSize: this.params.pointSize,
                 elementPixel,
                 particleCount: this.#cap(),
@@ -721,8 +670,7 @@ export class MouseParticlesEffect implements Effect {
     }
 
     dispose(): void {
-        this.#posA = null;
-        this.#posB = null;
+        this.#posTex = null;
         this.#colorTex = null;
         this.#stampTex = null;
         this.#trail = null;
