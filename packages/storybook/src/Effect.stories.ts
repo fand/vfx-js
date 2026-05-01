@@ -317,7 +317,7 @@ type VoronoiArgs = {
 export const voronoi: StoryObj<VoronoiArgs> = {
     render: (args) => {
         const img = document.createElement("img");
-        img.src = Jellyfish;
+        img.src = Logo;
 
         const vfx = initVFX();
         const effect = new VoronoiEffect(args);
