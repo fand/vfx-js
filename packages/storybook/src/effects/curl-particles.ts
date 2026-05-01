@@ -1,32 +1,6 @@
-// GPU particles spawned from a mouse cursor, advected through a 3D
-// curl-noise field, rendered with parallel (orthographic) projection
-// onto xy. Particles have a true z coordinate and move in 3D — what
-// you see is the xy slice. Three sim/render passes:
-//
-//   pass 1 — state (pos.xyz + isRespawn) in a 256² float ping-pong.
-//            Per-particle life offset hashed from particle id staggers
-//            spawn/reset timing across particles. On respawn, position
-//            is sampled uniformly inside a 3D ball around the mouse.
-//            On non-respawn frames, position advects via curl3D scaled
-//            by a smooth speed falloff that drops to zero outside the
-//            mouse radius (xy-only distance — mouse is 2D).
-//   pass 1b — spawn buffer (xy + speedFactor + age). Snapshots pos.xy
-//             on respawn, low-pass-filters the speedFactor, and
-//             advances the per-particle age. Aging rate is base
-//             1/lifespan accelerated by (1 - speedFactor) * idleKill,
-//             so particles outside the active radius age (and respawn)
-//             faster — alpha is a single sin envelope on age, no
-//             separate distance fade in the vert shader.
-//   pass 2 — saved spawn color in a 256² ping-pong: when the state
-//            pass marks a particle as just-respawned, sample ctx.src
-//            at the spawn xy uv and freeze that color until next respawn.
-//   pass 3 — instanced 1×1 quads rendered into a `persistent: true`
-//            trail RT. The fragment mixes the new particle color with
-//            the trail's previous-frame value via
-//                outColor = mix(newColor, prevColor, 0.1)
-//            so the persistent buffer accumulates fading streaks.
-//
-// A final pass composites the trail over ctx.src into ctx.target.
+// Mouse-spawned GPU particles advected through a 3D curl-noise field,
+// rendered as the xy slice of true 3D motion. Persistent trail buffer
+// composited over ctx.src.
 import type {
     Effect,
     EffectContext,
@@ -40,8 +14,6 @@ const FRAG_INIT_STATE = `#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() {
-    // Pos sentinel offscreen; respawn flag clear. The real respawn
-    // trigger lives in the spawn buffer's epoch (see FRAG_INIT_SPAWN).
     outColor = vec4(-1.0, -1.0, -1.0, 0.0);
 }
 `;
@@ -51,11 +23,7 @@ precision highp float;
 in vec2 uv;
 out vec4 outColor;
 void main() {
-    // Per-particle random initial age in [0, 1). Each particle reaches
-    // age=1 at a different time → first respawns are spread across the
-    // full lifespan instead of arriving in one wave. SpeedFactor is
-    // seeded at 1 so initial aging isn't accelerated by idleKill while
-    // the spawn-pos low-pass converges.
+    // Random initial age stagger first respawns across the lifespan.
     float h = fract(sin(dot(uv, vec2(127.1, 311.7))) * 43758.5453);
     outColor = vec4(0.0, 0.0, 1.0, h);
 }
@@ -81,9 +49,7 @@ float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
-// 4D simplex noise (Ashima Arts / Ian McEwan, MIT). Time becomes a
-// real 4th dimension — the field morphs in place rather than drifting
-// through space.
+// 4D simplex noise (Ashima Arts / Ian McEwan, MIT).
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 float mod289(float x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
@@ -160,10 +126,8 @@ float snoise(vec4 v) {
     );
 }
 
-// 3D curl of a vector noise potential field. Three decorrelated
-// potential components (Pa, Pb, Pc) sampled with finite differences;
-// 12 snoise calls total. Time is the 4th coordinate of the 4D simplex
-// input — the field morphs in place at a rate set by noiseAnimation.
+// 3D curl of a vector noise potential field. Time enters as the 4th
+// simplex axis so the field morphs in place.
 vec3 curl3D(vec3 p, float t) {
     float eps = 0.01;
     vec4 dx = vec4(eps, 0.0, 0.0, 0.0);
@@ -184,17 +148,13 @@ vec3 curl3D(vec3 p, float t) {
 void main() {
     vec4 s = texture(state, uv);
     vec3 pos = s.xyz;
-    // age >= 1 → particle has died; trigger a respawn this frame.
-    // age advancement (and the aging-rate multiplier) lives in the
-    // spawn pass; here we only read the value.
     float age = texture(spawn, uv).w;
     bool justRespawned = age >= 1.0;
 
     float shortAxis = min(elementPixel.x, elementPixel.y);
 
     if (justRespawned) {
-        // Uniform-volume distribution in a 3D ball: cbrt of a hash on
-        // the radius, isotropic direction from azimuth + cos(polar).
+        // Uniform 3D ball: cbrt(radius hash), isotropic direction.
         float r = pow(
             hash21(uv + vec2(time * 0.317, 0.123)), 1.0 / 3.0
         ) * radius;
@@ -203,22 +163,17 @@ void main() {
         float sinPhi = sqrt(max(0.0, 1.0 - cosPhi * cosPhi));
         vec3 dir = vec3(cos(theta) * sinPhi, sin(theta) * sinPhi, cosPhi);
         vec3 offsetPx = dir * r;
-        // xy in element-uv, z normalized by the shorter axis so the
-        // ball is isotropic in pixel space.
+        // z normalized by shortAxis so the ball stays isotropic.
         pos = vec3(
             mouseUv + offsetPx.xy / elementPixel,
             offsetPx.z / shortAxis
         );
     } else {
-        // Stretch xy so noise cells are isotropic in pixel space; z is
-        // already normalized to shortAxis (stretch = 1).
+        // Stretch xy so noise cells are pixel-isotropic.
         vec3 stretch = vec3(elementPixel / shortAxis, 1.0);
         vec3 noiseInput = pos * stretch * noiseScale;
         vec3 vIn = curl3D(noiseInput, time * noiseAnimation);
         vec3 v = vIn / stretch;
-        // speedFactor: time-smoothed value driven by spawn-xy-to-mouse
-        // distance (FRAG_UPDATE_SPAWN). Using the spawn pos avoids the
-        // particle drifting out of its own attenuation.
         float speedFactor = texture(spawn, uv).z;
         pos += v * speed * dt * speedFactor;
     }
@@ -227,11 +182,8 @@ void main() {
 }
 `;
 
-// Snapshots spawn xy on respawn frames, low-pass-filters the per-
-// particle speedFactor toward its mouse-distance target, and advances
-// the particle's age. Aging rate is base 1/lifespan accelerated by
-// (1 - speedFactor) * idleKill — particles outside the active radius
-// age (and therefore die + respawn) faster.
+// Spawn snapshot + speedFactor low-pass + age advance. Idle particles
+// (far from mouse) age faster via (1 - speedFactor) * idleKill.
 const FRAG_UPDATE_SPAWN = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -262,30 +214,22 @@ void main() {
     bool justRespawned = s.w > 0.5;
     if (justRespawned) {
         spawnPos = s.xy;
-        // Newborn particles start at full speed (they spawn inside the
-        // radius by construction, so there's no transient to smooth).
         prevSpeed = 1.0;
-        // Negative initial age = a per-particle pre-spawn delay, so
-        // siblings don't all reach age=1 at the same instant. Hashed
-        // with time so subsequent respawns re-stagger.
+        // Negative age = pre-spawn delay so siblings desync.
         age = -hash21(uv + vec2(time * 0.123, 0.456)) * 0.7;
     }
 
-    // Mouse attenuation is xy-only — the cursor lives on the screen
-    // plane, so z distance shouldn't gate the speedFactor.
+    // xy-only mouse distance (cursor is 2D).
     vec2 dPx = (spawnPos - mouseUv) * elementPixel;
     float distPx = length(dPx);
     float target = 1.0 - smoothstep(radius, radius * 3.0, distPx);
-    // Frame-rate independent low-pass: alpha = 1 - exp(-rate * dt).
+    // Frame-rate independent low-pass.
     float a = 1.0 - exp(-speedDecay * dt);
     float newSpeed = mix(prevSpeed, target, clamp(a, 0.0, 1.0));
 
     if (!justRespawned) {
-        // Per-particle lifespan multiplier (stable, uv-hashed) — gives
-        // each particle a different cycle length so they desynchronize
-        // permanently rather than snapping back to a shared phase.
+        // Per-particle lifespan jitter to permanently desync particles.
         float lifespanScale = 0.6 + hash21(uv * 91.7 + 1.234) * 0.8;
-        // Faster aging when the particle is far from the mouse.
         float agingRate = 1.0 + idleKill * (1.0 - newSpeed);
         age += dt * agingRate / (lifespan * lifespanScale);
     }
@@ -307,8 +251,6 @@ void main() {
     vec4 s = texture(state, uv);
     bool justRespawned = s.w > 0.5;
     if (justRespawned) {
-        // Sample input image at the spawn uv (clamped — particles can
-        // spawn slightly outside [0,1] when the mouse is near edges).
         vec2 spawnUv = clamp(s.xy, 0.0, 1.0);
         outColor = texture(src, spawnUv);
     } else {
@@ -317,9 +259,8 @@ void main() {
 }
 `;
 
-// Particle render. gl_InstanceID drives state-texture lookup; the unit
-// quad's per-vertex `position ∈ [-0.5, 0.5]²` expands into a pointSize
-// billboard centered on the particle's element-uv position.
+// Particle render. gl_InstanceID drives state lookup; unit quad
+// expands into a pointSize billboard.
 const VERT_PARTICLE = `#version 300 es
 precision highp float;
 in vec2 position;
@@ -333,10 +274,8 @@ uniform vec2 elementPixel;
 uniform int particleCount;
 uniform float aliveFraction;
 uniform float alpha;
-uniform float fog;       // 0 = none, 1 = full depth fade
-// Auto-uploaded by vfx-js: rect of the element content within the
-// stage's destination buffer in [0,1] uv. With outputRect=canvasRect
-// this lets element-uv positions map to the (larger) buffer.
+uniform float fog;  // 0 = none, 1 = full depth fade
+
 uniform vec4 contentRectUv;
 
 out vec2 vCorner;
@@ -359,9 +298,9 @@ void main() {
 
     vec2 pos = s.xy;
 
-    // Sin envelope on age. age < 0 = pre-spawn (queued), invisible.
-    // alivePhase > 1 = past the visible window, invisible (the rest
-    // of the age cycle is dead time before respawn).
+    // Sin envelope on age.
+    // age < 0: pre-spawn (queued)
+    // alivePhase > 1: dead
     float alivePhase = age / max(aliveFraction, 1e-3);
     float lifeAlpha = (age >= 0.0 && alivePhase < 1.0)
         ? sin(alivePhase * 3.14159)
@@ -374,21 +313,18 @@ void main() {
         return;
     }
 
-    // Depth fog — particles fade as pos.z increases (deeper into the
-    // scene). At fog=0 the multiplier is 1 everywhere; at fog=1, the
-    // alpha smoothly drops between z=-0.5 (front) and z=1 (back).
+    // Depth fog
     float fogFactor = mix(1.0, smoothstep(1.0, -0.5, s.z), fog);
 
-    // Map element-uv (pos.xy) → buffer-uv via contentRectUv so the
-    // particle lands at its element-relative position even when the
-    // dst buffer extends beyond the element (outputRect=canvasRect).
+    // Map pos to buffer-uv
     vec2 bufferUv = contentRectUv.xy + pos * contentRectUv.zw;
     vec2 ndcPos = bufferUv * 2.0 - 1.0;
-    // pointSize is in element px → convert to ndc via the buffer's
-    // pixel size (= elementPixel / contentRectUv.zw).
+
+    // Calculate position from pointSize
     vec2 bufferPixel = elementPixel / max(contentRectUv.zw, vec2(1e-6));
     vec2 ndcOffset = position * pointSize * 2.0 / bufferPixel;
     gl_Position = vec4(ndcPos + ndcOffset, 0.0, 1.0);
+
     vCorner = position;
     vColor = vec4(c.rgb, c.a * lifeAlpha * alpha * fogFactor);
 }
@@ -400,10 +336,7 @@ out vec4 outColor;
 void main() { outColor = vec4(0.0); }
 `;
 
-// Particle render: writes premultiplied particle color into a per-frame
-// stamp buffer. The trail composite (next pass) is what creates the
-// fading-trail effect — it's a fullscreen pass so non-covered pixels
-// also decay each frame, which is what makes dead particles disappear.
+// Premultiplied particle color into per-frame stamp buffer.
 const FRAG_PARTICLE = `#version 300 es
 precision highp float;
 in vec2 vCorner;
@@ -419,10 +352,8 @@ void main() {
 }
 `;
 
-// Trail composite: persistent prev * trailFade (decays everywhere)
-// plus per-frame additive particle stamp. The stamp is built up
-// additively in the previous pass so overlapping particles can
-// brighten beyond a single particle's intensity.
+// Trail = prev * trailFade + particle stamp. Fullscreen so dead-
+// particle pixels also decay.
 const FRAG_TRAIL_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -454,15 +385,12 @@ uniform sampler2D trail;
 uniform float backgroundOpacity;
 
 void main() {
-    // Mask src to the element's content area — when outputRect is the
-    // canvas, fragments outside [0,1] in src-uv space have no source
-    // pixel, so they should be transparent under the trail.
+    // Mask src to [0,1] — trail buffer is canvas-sized.
     vec2 inside = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
     float srcMask = inside.x * inside.y;
     vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0))
               * backgroundOpacity * srcMask;
     vec4 t = texture(trail, uv);
-    // Trail premultiplied-over base.
     outColor = vec4(base.rgb * (1.0 - t.a) + t.rgb, max(base.a, t.a));
 }
 `;
@@ -535,11 +463,8 @@ const QUAD_VERTS = new Float32Array([
     -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5,
 ]);
 
-/**
- * Mouse-driven curl-noise GPU particles. Mutate
- * `params.lifespan` / `speed` / `noiseScale` / `pointSize` / `radius`
- * / `backgroundOpacity` at runtime. `count` is locked at construction.
- */
+// Mouse-driven curl-noise GPU particles. Mutate `params` at runtime;
+// `count` is locked at construction.
 export class CurlParticlesEffect implements Effect {
     params: CurlParticlesParams;
 
@@ -566,14 +491,11 @@ export class CurlParticlesEffect implements Effect {
         this.#statePos = ctx.createRenderTarget(stateOpts);
         this.#stateSpawn = ctx.createRenderTarget(stateOpts);
         this.#stateColor = ctx.createRenderTarget(stateOpts);
-        // Per-frame particle stamp (cleared and rewritten each frame).
         this.#particleStamp = ctx.createRenderTarget({
             float: false,
             wrap: "clamp",
             filter: "linear",
         });
-        // Trail auto-resizes to dst buffer (= element); persistent so
-        // the fullscreen composite has a real previous frame to fade.
         this.#trail = ctx.createRenderTarget({
             float: false,
             persistent: true,
@@ -602,9 +524,7 @@ export class CurlParticlesEffect implements Effect {
             return;
         }
         const { lifespan, speed, noiseScale, pointSize, radius } = this.params;
-        // ctx.time / ctx.deltaTime are in seconds (vfx-player builds
-        // them off Date.now() / 1000). Cap dt to keep big tab-switch
-        // pauses from teleporting particles.
+        // Cap dt so tab-switch pauses don't teleport particles.
         const dt = Math.min(0.1, Math.max(0, ctx.deltaTime));
         const time = ctx.time;
         const elementPixel: [number, number] = [
@@ -622,7 +542,7 @@ export class CurlParticlesEffect implements Effect {
             this.#initialized = true;
         }
 
-        // Pass 1: state update — reads prev spawn pos for the speedFactor.
+        // State update.
         ctx.draw({
             frag: FRAG_UPDATE_STATE,
             uniforms: {
@@ -640,8 +560,7 @@ export class CurlParticlesEffect implements Effect {
             target: this.#statePos,
         });
 
-        // Pass 1b: snapshot pos as new spawn on respawn frames + low-
-        // pass-filter the speedFactor so particles decelerate smoothly.
+        // Spawn snapshot + speedFactor low-pass.
         ctx.draw({
             frag: FRAG_UPDATE_SPAWN,
             uniforms: {
@@ -659,7 +578,7 @@ export class CurlParticlesEffect implements Effect {
             target: this.#stateSpawn,
         });
 
-        // Pass 2: per-particle saved color.
+        // Saved color per particle.
         ctx.draw({
             frag: FRAG_UPDATE_COLOR,
             uniforms: {
@@ -670,12 +589,8 @@ export class CurlParticlesEffect implements Effect {
             target: this.#stateColor,
         });
 
-        // Pass 3a: clear the per-frame particle stamp buffer.
+        // Clear stamp, then additive instanced quads so overlaps brighten.
         ctx.draw({ frag: FRAG_CLEAR, target: this.#particleStamp });
-
-        // Pass 3b: instanced quads → particleStamp with additive
-        // blending so overlapping particles brighten instead of
-        // overwriting each other.
         ctx.draw({
             vert: VERT_PARTICLE,
             frag: FRAG_PARTICLE,
@@ -699,9 +614,7 @@ export class CurlParticlesEffect implements Effect {
             blend: "additive",
         });
 
-        // Pass 3c: trail = prev * trailFade composited with stamp.
-        // Fullscreen pass — every pixel decays each frame, so dead
-        // particles' last positions can't linger.
+        // Trail composite (fullscreen, decays everywhere).
         ctx.draw({
             frag: FRAG_TRAIL_COMPOSITE,
             uniforms: {
@@ -712,7 +625,6 @@ export class CurlParticlesEffect implements Effect {
             target: this.#trail,
         });
 
-        // Output composite.
         ctx.draw({
             frag: FRAG_OUTPUT,
             uniforms: {
@@ -734,8 +646,7 @@ export class CurlParticlesEffect implements Effect {
         this.#geometry = null;
     }
 
-    // Render into the entire canvas so particles can advect (and trails
-    // can extend) past the element's bounds.
+    // Particles and trails extend past the element bounds.
     outputRect(
         dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
     ): readonly [number, number, number, number] {
