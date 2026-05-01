@@ -52,12 +52,15 @@ void main() {
     vec2 ipart = floor(p);
     vec2 fpart = fract(p);
 
+    // Get grid-cell info for 9 neighbors
+    vec2 sites[9];
     vec2 nearestSite = vec2(0.0);
     float minDistSq = 1e9;
     for (int j = -1; j <= 1; j++) {
         for (int i = -1; i <= 1; i++) {
             vec2 g = vec2(i, j);
             vec2 site = g + jitterFor(ipart + g);
+            sites[(j + 1) * 3 + (i + 1)] = site;
             float d = dot(site - fpart, site - fpart);
             if (d < minDistSq) {
                 minDistSq = d;
@@ -66,37 +69,31 @@ void main() {
         }
     }
 
-    // IQ's two-pass perpendicular-bisector distance — uniform-width
-    // borders, unlike the cheaper d2-d1 approximation.
+    // Calculate distance to the voronoi-cell edge
+    // (IQ's two-pass perpendicular-bisector distance)
     float minEdge = 1e9;
-    for (int j = -1; j <= 1; j++) {
-        for (int i = -1; i <= 1; i++) {
-            vec2 g = vec2(i, j);
-            vec2 site = g + jitterFor(ipart + g);
-            vec2 d = site - nearestSite;
-            if (dot(d, d) > 1e-4) {
-                float t = dot((site + nearestSite) * 0.5 - fpart,
-                              normalize(d));
-                minEdge = min(minEdge, t);
-            }
+    for (int k = 0; k < 9; k++) {
+        vec2 site = sites[k];
+        vec2 d = site - nearestSite;
+        if (dot(d, d) > 1e-4) {
+            float t = dot((site + nearestSite) * 0.5 - fpart,
+                          normalize(d));
+            minEdge = min(minEdge, t);
         }
     }
 
-    // Per-cell falloff (site→mouse) so the whole cell shrinks
-    // uniformly rather than warping.
+    // Voronoi-cell falloff (site→mouse)
     vec2 siteWorldPx = (ipart + nearestSite) * cellSize;
     vec2 mousePx = mouseUv * elementPx;
     float falloff = smoothstep(falloffRadius, 0.,
                                distance(siteWorldPx, mousePx));
 
+    // Pull the wall toward the site
     float edgePx = minEdge * cellSize;
-    // maxShrink ∈ [0, 1] as a fraction of the cell half-width, so 1.0
-    // collapses a fully-falloff cell to its site.
     float shrinkPx = falloff * maxShrink * cellSize * 0.5;
     float wallDist = edgePx - shrinkPx;
 
-    // Scale UV around the site so the original cell content
-    // compresses into the shrunken footprint instead of being clipped.
+    // Scale UV around the site
     float cellScale = max(0.001, 1.0 - shrinkPx / (cellSize * 0.5));
     vec2 siteUvContent = (ipart + nearestSite) * cellSize / elementPx;
     vec2 scaledUvContent =
@@ -107,18 +104,17 @@ void main() {
     float aa = fwidth(wallDist);
     float imageMask =
         smoothstep(borderWidth - aa, borderWidth + aa, wallDist);
-    // One-sided: fade only into the gap, so on-wall pixels stay solid
-    // when shrink is 0.
+
+    // Cell visibility mask
     float visibleMask = smoothstep(-aa, 0.0, wallDist);
-    // Threshold on shrinkPx — must NOT be a smooth function of
-    // falloff. mix(base, 0, falloff) at mid-falloff cells leaks 30%+
-    // base colour through the cell outline.
+
+    // Border enable
     float borderActive = smoothstep(0.5, 1.5, shrinkPx);
     float borderMix = (1.0 - imageMask) * borderActive;
 
     vec3 cellRgb = mix(base.rgb, vec3(0.0), borderMix);
-    // Force opacity to 1 in the border so black covers the gap edge
-    // cleanly even when the source has alpha < 1.
+
+    // Force border alpha = 1
     float cellAlpha = mix(base.a, 1.0, borderMix);
     vec3 rgb = mix(bgColor.rgb, cellRgb, visibleMask);
     float alpha = mix(bgColor.a, cellAlpha, visibleMask);
