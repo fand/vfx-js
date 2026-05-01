@@ -231,6 +231,7 @@ uniform float pointSize;
 uniform vec2 elementPixel;
 uniform int particleCount;
 uniform float alpha;
+uniform float alphaDecay;
 uniform float fog;
 uniform vec4 contentRectUv;
 
@@ -253,8 +254,9 @@ void main() {
 
     float age = s.w;
     // age < 0: pre-spawn, age >= 1: dead.
+    // alphaDecay > 1 holds peak alpha longer; < 1 sharpens fade-in/out.
     float lifeAlpha = (age >= 0.0 && age < 1.0)
-        ? sin(age * 3.14159)
+        ? pow(sin(age * 3.14159), alphaDecay)
         : 0.0;
     if (lifeAlpha <= 0.0) {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -406,6 +408,8 @@ export type MouseParticlesParams = {
     radius: number;
     /** Life-taper curve exponent (>1 holds full speed longer). */
     speedDecay: number;
+    /** Alpha-envelope shape exponent (>1 holds peak alpha longer; <1 sharpens fade). */
+    alphaDecay: number;
     /** Reject spawns where src.a is below this. */
     alphaThreshold: number;
     /** Emit even when the mouse is stationary. */
@@ -429,6 +433,7 @@ const DEFAULT_PARAMS: MouseParticlesParams = {
     alpha: 0.5,
     radius: 30,
     speedDecay: 1.0,
+    alphaDecay: 1.0,
     alphaThreshold: 0.05,
     spawnOnIdle: false,
     backgroundOpacity: 1.0,
@@ -593,6 +598,7 @@ export class MouseParticlesEffect implements Effect {
                     Math.max(1, Math.floor(this.params.count)),
                 ),
                 alpha: this.params.alpha,
+                alphaDecay: this.params.alphaDecay,
                 fog: this.params.fog,
             },
             geometry: this.#particleGeometry,

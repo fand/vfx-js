@@ -403,6 +403,11 @@ export function attachMouseParticlesPane(
         max: 5,
         step: 0.05,
     });
+    pane.addBinding(effect.params, "alphaDecay", {
+        min: 0.1,
+        max: 5,
+        step: 0.05,
+    });
     pane.addBinding(effect.params, "alphaThreshold", {
         min: 0,
         max: 1,
