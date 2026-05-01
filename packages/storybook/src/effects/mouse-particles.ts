@@ -213,6 +213,137 @@ void main() {
 }
 `;
 
+// Quad expanded around each particle; pointSize is applied in NDC
+// using elementPixel so quads stay visually sized regardless of buffer
+// scale.
+const QUAD_VERTS = new Float32Array([
+    -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5,
+]);
+
+const VERT_PARTICLE = `#version 300 es
+precision highp float;
+in vec2 position;
+
+uniform sampler2D posTex;
+uniform sampler2D colorTex;
+uniform vec2 stateSize;
+uniform float pointSize;
+uniform vec2 elementPixel;
+uniform int particleCount;
+uniform float alpha;
+uniform float fog;
+uniform vec4 contentRectUv;
+
+out vec2 vCorner;
+out vec4 vColor;
+
+void main() {
+    int id = gl_InstanceID;
+    if (id >= particleCount) {
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        vCorner = vec2(0.0);
+        vColor = vec4(0.0);
+        return;
+    }
+    int sx = id % int(stateSize.x);
+    int sy = id / int(stateSize.x);
+    vec2 stateUv = (vec2(float(sx), float(sy)) + 0.5) / stateSize;
+    vec4 s = texture(posTex, stateUv);
+    vec4 c = texture(colorTex, stateUv);
+
+    float age = s.w;
+    // age < 0: pre-spawn, age >= 1: dead.
+    float lifeAlpha = (age >= 0.0 && age < 1.0)
+        ? sin(age * 3.14159)
+        : 0.0;
+    if (lifeAlpha <= 0.0) {
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        vCorner = vec2(0.0);
+        vColor = vec4(0.0);
+        return;
+    }
+
+    float fogFactor = mix(1.0, smoothstep(1.0, -0.5, s.z), fog);
+
+    vec2 bufferUv = contentRectUv.xy + s.xy * contentRectUv.zw;
+    vec2 ndcPos = bufferUv * 2.0 - 1.0;
+
+    vec2 bufferPixel = elementPixel / max(contentRectUv.zw, vec2(1e-6));
+    vec2 ndcOffset = position * pointSize * 2.0 / bufferPixel;
+    gl_Position = vec4(ndcPos + ndcOffset, 0.0, 1.0);
+
+    vCorner = position;
+    vColor = vec4(c.rgb, lifeAlpha * alpha * fogFactor);
+}
+`;
+
+// Premultiplied output: additive blend lets overlapping particles
+// brighten naturally.
+const FRAG_PARTICLE = `#version 300 es
+precision highp float;
+in vec2 vCorner;
+in vec4 vColor;
+out vec4 outColor;
+
+void main() {
+    float d = length(vCorner) * 2.0;
+    float fall = 1.0 - smoothstep(0.6, 1.0, d);
+    if (fall <= 0.0) discard;
+    float a = vColor.a * fall;
+    outColor = vec4(vColor.rgb * a, a);
+}
+`;
+
+const FRAG_CLEAR = `#version 300 es
+precision highp float;
+out vec4 outColor;
+void main() { outColor = vec4(0.0); }
+`;
+
+// trailFade applies to the whole trail buffer so dead-particle pixels
+// decay at the same rate as everything else.
+const FRAG_TRAIL_COMPOSITE = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 outColor;
+
+uniform sampler2D trailPrev;
+uniform sampler2D particleStamp;
+uniform float trailFade;
+
+void main() {
+    vec4 prev = texture(trailPrev, uv);
+    vec4 stamp = texture(particleStamp, uv);
+    vec4 faded = prev * trailFade;
+    outColor = vec4(
+        faded.rgb + stamp.rgb,
+        clamp(faded.a + stamp.a, 0.0, 1.0)
+    );
+}
+`;
+
+const FRAG_OUTPUT = `#version 300 es
+precision highp float;
+in vec2 uv;
+in vec2 uvSrc;
+out vec4 outColor;
+
+uniform sampler2D src;
+uniform sampler2D trail;
+uniform float backgroundOpacity;
+
+void main() {
+    // src is element-sized; the trail buffer extends to the canvas, so
+    // mask src outside [0,1].
+    vec2 inside = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
+    float srcMask = inside.x * inside.y;
+    vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0))
+              * backgroundOpacity * srcMask;
+    vec4 t = texture(trail, uv);
+    outColor = vec4(base.rgb * (1.0 - t.a) + t.rgb, max(base.a, t.a));
+}
+`;
+
 // Pure advect + age. Dead slots (age >= 1) pass through unchanged so
 // they stay invisible until the spawn pass overwrites them.
 const FRAG_UPDATE = `#version 300 es
@@ -326,6 +457,7 @@ export class MouseParticlesEffect implements Effect {
         attributes: { position: SPAWN_DUMMY_POSITION },
         instanceCount: MAX_SPAWNS_PER_FRAME,
     };
+    #particleGeometry: EffectGeometry | null = null;
     #nextSlot = 0;
     #birthAccumulator = 0;
     #lastMouseUv: [number, number] | null = null;
@@ -356,6 +488,16 @@ export class MouseParticlesEffect implements Effect {
             wrap: "clamp",
             filter: "linear",
         });
+        // instanceCount is captured at compile time, so cap to the
+        // construction-time params.count (or the state texture).
+        const cap = Math.max(
+            1,
+            Math.min(STATE_SIZE * STATE_SIZE, Math.floor(this.params.count)),
+        );
+        this.#particleGeometry = {
+            attributes: { position: QUAD_VERTS },
+            instanceCount: cap,
+        };
     }
 
     render(ctx: EffectContext): void {
@@ -364,7 +506,8 @@ export class MouseParticlesEffect implements Effect {
             !this.#posB ||
             !this.#colorTex ||
             !this.#stampTex ||
-            !this.#trail
+            !this.#trail ||
+            !this.#particleGeometry
         ) {
             return;
         }
@@ -432,7 +575,50 @@ export class MouseParticlesEffect implements Effect {
 
         this.#posReadIsA = !this.#posReadIsA;
 
-        // Particle-stamp / trail / output passes follow in the next commit.
+        // After the toggle posRead is the freshly written state.
+        const renderRead = this.#posReadIsA ? this.#posA : this.#posB;
+
+        ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
+        ctx.draw({
+            vert: VERT_PARTICLE,
+            frag: FRAG_PARTICLE,
+            uniforms: {
+                posTex: renderRead,
+                colorTex: this.#colorTex,
+                stateSize: [STATE_SIZE, STATE_SIZE],
+                pointSize: this.params.pointSize,
+                elementPixel,
+                particleCount: Math.min(
+                    STATE_SIZE * STATE_SIZE,
+                    Math.max(1, Math.floor(this.params.count)),
+                ),
+                alpha: this.params.alpha,
+                fog: this.params.fog,
+            },
+            geometry: this.#particleGeometry,
+            target: this.#stampTex,
+            blend: "additive",
+        });
+
+        ctx.draw({
+            frag: FRAG_TRAIL_COMPOSITE,
+            uniforms: {
+                trailPrev: this.#trail,
+                particleStamp: this.#stampTex,
+                trailFade: this.params.trailFade,
+            },
+            target: this.#trail,
+        });
+
+        ctx.draw({
+            frag: FRAG_OUTPUT,
+            uniforms: {
+                src: ctx.src,
+                trail: this.#trail,
+                backgroundOpacity: this.params.backgroundOpacity,
+            },
+            target: ctx.target,
+        });
     }
 
     #scheduleSpawns(
@@ -503,6 +689,7 @@ export class MouseParticlesEffect implements Effect {
         this.#colorTex = null;
         this.#stampTex = null;
         this.#trail = null;
+        this.#particleGeometry = null;
         this.#initialized = false;
     }
 
