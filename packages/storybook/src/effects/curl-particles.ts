@@ -35,7 +35,7 @@ in vec2 uv;
 out vec4 outColor;
 
 uniform sampler2D state;
-uniform sampler2D spawn;     // .xy: spawn pos, .z: speedFactor, .w: age
+uniform sampler2D spawn;     // .z: speedFactor, .w: age
 uniform vec2 mouseUv;
 uniform float radius;        // radius in element px
 uniform vec2 elementPixel;
@@ -182,8 +182,9 @@ void main() {
 }
 `;
 
-// Spawn snapshot + speedFactor low-pass + age advance. Idle particles
-// (far from mouse) age faster via (1 - speedFactor) * idleKill.
+// speedFactor low-pass + age advance. speedFactor target falls as the
+// particle's current position drifts away from the cursor. Idle
+// particles age faster via (1 - speedFactor) * idleKill.
 const FRAG_UPDATE_SPAWN = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -207,21 +208,20 @@ float hash21(vec2 p) {
 
 void main() {
     vec4 prev = texture(prevSpawn, uv);
-    vec2 spawnPos = prev.xy;
     float prevSpeed = prev.z;
     float age = prev.w;
 
     vec4 s = texture(state, uv);
     bool justRespawned = s.w > 0.5;
     if (justRespawned) {
-        spawnPos = s.xy;
         prevSpeed = 1.0;
         // Negative age = pre-spawn delay so siblings desync.
         age = -hash21(uv + vec2(time * 0.123, 0.456)) * 0.7;
     }
 
-    // xy-only mouse distance (cursor is 2D).
-    vec2 dPx = (spawnPos - mouseUv) * elementPixel;
+    // Distance from current particle position to mouse (xy only —
+    // cursor is 2D). Drives "fast near cursor, slow as it drifts."
+    vec2 dPx = (s.xy - mouseUv) * elementPixel;
     float distPx = length(dPx);
     float target = 1.0 - smoothstep(radius, radius * 3.0, distPx);
     // Frame-rate independent low-pass.
@@ -240,7 +240,7 @@ void main() {
         }
     }
 
-    outColor = vec4(spawnPos, newSpeed, age);
+    outColor = vec4(0.0, 0.0, newSpeed, age);
 }
 `;
 
