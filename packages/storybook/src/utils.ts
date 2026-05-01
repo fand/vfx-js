@@ -4,7 +4,6 @@ import type { BloomEffect } from "./effects/bloom";
 import type { CurlParticlesEffect } from "./effects/curl-particles";
 import type { ExplodeEffect } from "./effects/explode";
 import type { FluidEffect } from "./effects/fluid";
-import { ImplodeEffect } from "./effects/implode";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
 export function initVFX(opts?: VFXOpts): VFX {
@@ -224,7 +223,7 @@ const PARTICLES_PANE_CLASS = "particles-tweakpane-container";
 export function attachParticlesPane(
     title: string,
     effect: CurlParticlesEffect,
-    burst?: ExplodeEffect | ImplodeEffect,
+    burst?: ExplodeEffect,
     srcSelector?: {
         img: HTMLImageElement;
         sources: Record<string, string>;
@@ -335,9 +334,7 @@ export function attachParticlesPane(
         step: 0.005,
     });
     if (burst) {
-        const triggerLabel =
-            burst instanceof ImplodeEffect ? "Implode" : "Explode";
-        pane.addButton({ title: triggerLabel }).on("click", () => {
+        pane.addButton({ title: "Explode" }).on("click", () => {
             burst.trigger();
         });
         pane.addButton({ title: "Reset" }).on("click", () => {
