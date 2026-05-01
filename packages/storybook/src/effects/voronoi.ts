@@ -1,7 +1,6 @@
 // Jittered-grid voronoi: cells appear as a hover effect near the
-// mouse. Each affected cell shrinks toward its site (perpendicular-
-// bisector offset, not radial scale — keeps the polygon shape);
-// gaps fall back to bgColor.
+// mouse. Each affected cell scales uniformly around its site
+// (preserves polygon shape); gaps fall back to bgColor.
 import type { Effect, EffectContext } from "@vfx-js/core";
 
 const FRAG_VORONOI = `#version 300 es
@@ -148,26 +147,12 @@ void main() {
     }
     vec2 ownerCell = ipart + nearestG;
 
-    // Calculate distance to the voronoi-cell edge
-    // (IQ's two-pass perpendicular-bisector distance)
-    float minEdge = 1e9;
-    for (int k = 0; k < 9; k++) {
-        vec2 site = sites[k];
-        vec2 d = site - nearestSite;
-        if (dot(d, d) > 1e-4) {
-            float t = dot((site + nearestSite) * 0.5 - fpart,
-                          normalize(d));
-            minEdge = min(minEdge, t);
-        }
-    }
-
-    // Voronoi-cell falloff (site→mouse)
+    // Mouse falloff + per-cell breathe noise → total shrink.
     vec2 siteWorldPx = (ipart + nearestSite) * cellSize;
     vec2 mousePx = mouseUv * elementPx;
     float falloff = smoothstep(pressRadius, 0.,
                                distance(siteWorldPx, mousePx));
 
-    // Per-cell noise shrink for cells outside mouse falloff
     float noiseShrink = 0.0;
     if (breathe > 0.0) {
         vec3 noisePos = vec3(
@@ -178,10 +163,24 @@ void main() {
     }
     float shrink = noiseShrink + press * falloff;
 
-    // Pull the wall toward the site
-    float edgePx = minEdge * cellSize;
-    float shrinkPx = shrink * cellSize * 0.5;
-    float wallDist = edgePx - shrinkPx;
+    // Distance to original cell edge (for stable AA), and to the
+    // edge of the cell scaled uniformly around its site by
+    // (1 - shrink) — per-neighbour offset preserves polygon shape.
+    float minEdgeOrig = 1e9;
+    float minEdgeShrunk = 1e9;
+    for (int k = 0; k < 9; k++) {
+        vec2 site = sites[k];
+        vec2 d = site - nearestSite;
+        float dlen2 = dot(d, d);
+        if (dlen2 > 1e-4) {
+            float dlen = sqrt(dlen2);
+            float t = dot((site + nearestSite) * 0.5 - fpart, d / dlen);
+            minEdgeOrig = min(minEdgeOrig, t);
+            minEdgeShrunk = min(minEdgeShrunk, t - dlen * 0.5 * shrink);
+        }
+    }
+    float edgePx = minEdgeOrig * cellSize;
+    float wallDist = minEdgeShrunk * cellSize;
 
     // Scale UV around the site
     float cellScale = max(0.001, 1.0 - shrink);
