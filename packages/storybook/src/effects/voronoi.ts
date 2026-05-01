@@ -79,9 +79,7 @@ void main() {
     vec2 siteWorldPx = (ipart + nearestSite) * cellSize;
     vec2 mousePx = mouseUv * elementPx;
     float distMouseToSitePx = distance(siteWorldPx, mousePx);
-    float falloff = 1.0 - smoothstep(falloffRadius * 0.5,
-                                     falloffRadius,
-                                     distMouseToSitePx);
+    float falloff = smoothstep(falloffRadius, 0., distMouseToSitePx);
 
     // Move the wall inward by shrinkPx → cells contract; gaps where
     // wallDist goes negative become transparent.
@@ -103,16 +101,29 @@ void main() {
     vec2 sampleUv = srcRectUv.xy + sampleContent * srcRectUv.zw;
     vec4 base = texture(src, sampleUv);
 
-    float cellAlpha = smoothstep(-0.5, 0.5, wallDist);
-    // Border = 1px-AA band of borderWidth just inside the wall. Gated
-    // by cellAlpha (no border in the gap) and falloff (no borders far
-    // from the mouse, so the input passes through cleanly).
-    float borderMask =
-        (1.0 - smoothstep(borderWidth, borderWidth + 1.0, wallDist))
-        * cellAlpha * falloff;
+    // Use the actual screen-space derivative of wallDist for AA — its
+    // magnitude is ~1 px in well-behaved regions, but spikes at cell
+    // triple points and shrinks if the canvas is downscaled. fwidth
+    // keeps the transition one pixel wide wherever you are.
+    float aa = fwidth(wallDist);
+    // borderFactor: 1 inside the border band, 0 deep in the cell.
+    // NOT gated by cell-visibility — if it were, the rgb mix at the
+    // gap edge would collapse to mix(base, black, 0.5), letting base
+    // colour leak through outside the border. Keeping it pure means
+    // the border stays solid black right up to where alpha goes to 0.
+    float imageMask =
+        smoothstep(borderWidth - aa, borderWidth + aa, wallDist);
+    float borderFactor = (1.0 - imageMask) * falloff;
+    // visibleMask: 1 anywhere inside the cell (wallDist ≥ 0), fading
+    // to 0 across the wall into the gap. One-sided so on-wall pixels
+    // don't become half-transparent when shrink is 0.
+    float visibleMask = smoothstep(-aa, 0.0, wallDist);
 
-    vec3 rgb = mix(base.rgb, vec3(0.0), borderMask);
-    outColor = vec4(rgb, base.a * cellAlpha);
+    vec3 rgb = mix(base.rgb, vec3(0.0), borderFactor);
+    // In the border region we want full opacity so black covers the
+    // gap edge cleanly; outside the border alpha follows the source.
+    float alpha = mix(base.a, 1.0, borderFactor) * visibleMask;
+    outColor = vec4(rgb, alpha);
 }
 `;
 
