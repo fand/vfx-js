@@ -522,13 +522,9 @@ export class MouseParticlesEffect implements Effect {
         });
         // instanceCount is captured at compile time, so cap to the
         // construction-time params.count (or the state texture).
-        const cap = Math.max(
-            1,
-            Math.min(STATE_SIZE * STATE_SIZE, Math.floor(this.params.count)),
-        );
         this.#particleGeometry = {
             attributes: { position: QUAD_VERTS },
-            instanceCount: cap,
+            instanceCount: this.#cap(),
         };
     }
 
@@ -624,10 +620,7 @@ export class MouseParticlesEffect implements Effect {
                 stateSize: [STATE_SIZE, STATE_SIZE],
                 pointSize: this.params.pointSize,
                 elementPixel,
-                particleCount: Math.min(
-                    STATE_SIZE * STATE_SIZE,
-                    Math.max(1, Math.floor(this.params.count)),
-                ),
+                particleCount: this.#cap(),
                 alpha: this.params.alpha,
                 alphaDecay: this.params.alphaDecay,
                 fog: this.params.fog,
@@ -710,10 +703,7 @@ export class MouseParticlesEffect implements Effect {
             return 0;
         }
 
-        const cap = Math.max(
-            1,
-            Math.min(STATE_SIZE * STATE_SIZE, Math.floor(this.params.count)),
-        );
+        const cap = this.#cap();
         const elemPxX = Math.max(1, elementPixel[0]);
         const elemPxY = Math.max(1, elementPixel[1]);
         const buf = this.#spawnUniform;
@@ -747,6 +737,13 @@ export class MouseParticlesEffect implements Effect {
             this.#nextSlot = (this.#nextSlot + 1) % cap;
         }
         return total;
+    }
+
+    #cap(): number {
+        return Math.max(
+            1,
+            Math.min(STATE_SIZE * STATE_SIZE, Math.floor(this.params.count)),
+        );
     }
 
     dispose(): void {
