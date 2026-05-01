@@ -6,6 +6,7 @@ import { BloomEffect } from "./effects/bloom";
 import { CurlParticlesEffect } from "./effects/curl-particles";
 import { ExplodeEffect } from "./effects/explode";
 import { FluidEffect } from "./effects/fluid";
+import { MouseParticlesEffect } from "./effects/mouse-particles";
 import { createPixelateEffect } from "./effects/pixelate";
 import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 import { createScanlineEffect } from "./effects/scanline";
@@ -216,6 +217,29 @@ curlParticlesExplode.play = async ({ canvasElement }) => {
         img,
         sources: { Logo, Jellyfish },
     });
+
+    seedFluidMotion(canvasElement);
+};
+
+// Mouse-driven emitter particles. Spawns happen only at the cursor's
+// recent position and skip transparent regions of the source image.
+export const mouseParticles: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Jellyfish;
+        return img;
+    },
+    args: undefined,
+};
+mouseParticles.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+
+    const vfx = initVFX();
+    const effect = new MouseParticlesEffect();
+    await vfx.add(img, { effect });
 
     seedFluidMotion(canvasElement);
 };
