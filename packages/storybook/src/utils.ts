@@ -384,69 +384,86 @@ export function attachMouseParticlesPane(
             }
         });
     }
+    const emitter = pane.addFolder({ title: "Emitter", expanded: true });
     // count caps the ring buffer at runtime; the renderable instance
     // count was locked at construction (256*256 by default).
-    pane.addBinding(effect.params, "count", {
+    emitter.addBinding(effect.params, "count", {
         min: 1,
         max: 256 * 256,
         step: 1,
     });
-    pane.addBinding(effect.params, "birthRate", {
+    emitter.addBinding(effect.params, "birthRate", {
         min: 0,
         max: 10000,
         step: 50,
     });
-    pane.addBinding(effect.params, "life", { min: 0.2, max: 10, step: 0.1 });
-    pane.addBinding(effect.params, "speed", { min: 0, max: 1, step: 0.005 });
-    pane.addBinding(effect.params, "noiseScale", {
+    emitter.addBinding(effect.params, "radius", { min: 5, max: 300, step: 1 });
+    emitter.addBinding(effect.params, "alphaThreshold", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
+    emitter.addBinding(effect.params, "spawnOnIdle");
+
+    const lifetime = pane.addFolder({ title: "Lifetime", expanded: true });
+    lifetime.addBinding(effect.params, "life", {
+        min: 0.2,
+        max: 10,
+        step: 0.1,
+    });
+    lifetime.addBinding(effect.params, "alphaDecay", {
+        min: 0.1,
+        max: 5,
+        step: 0.05,
+    });
+    lifetime.addBinding(effect.params, "speedDecay", {
+        min: 0.1,
+        max: 5,
+        step: 0.05,
+    });
+
+    const motion = pane.addFolder({ title: "Motion", expanded: true });
+    motion.addBinding(effect.params, "speed", { min: 0, max: 1, step: 0.005 });
+    motion.addBinding(effect.params, "noiseScale", {
         min: 0.05,
         max: 3,
         step: 0.01,
     });
-    pane.addBinding(effect.params, "noiseAnimation", {
+    motion.addBinding(effect.params, "noiseAnimation", {
         min: 0,
         max: 2,
         step: 0.01,
     });
-    pane.addBinding(effect.params, "pointSize", {
+
+    const appearance = pane.addFolder({ title: "Appearance", expanded: true });
+    appearance.addBinding(effect.params, "pointSize", {
         min: 1,
         max: 10,
         step: 0.1,
     });
-    pane.addBinding(effect.params, "alpha", { min: 0, max: 1, step: 0.01 });
-    pane.addBinding(effect.params, "radius", { min: 5, max: 300, step: 1 });
-    pane.addBinding(effect.params, "speedDecay", {
-        min: 0.1,
-        max: 5,
-        step: 0.05,
+    appearance.addBinding(effect.params, "alpha", {
+        min: 0,
+        max: 1,
+        step: 0.01,
     });
-    pane.addBinding(effect.params, "alphaDecay", {
-        min: 0.1,
-        max: 5,
-        step: 0.05,
-    });
-    pane.addBinding(effect.params, "speedThreshold", {
+    appearance.addBinding(effect.params, "speedThreshold", {
         min: 0,
         max: 0.5,
         step: 0.005,
     });
-    pane.addBinding(effect.params, "alphaThreshold", {
-        min: 0,
-        max: 1,
-        step: 0.01,
-    });
-    pane.addBinding(effect.params, "spawnOnIdle");
-    pane.addBinding(effect.params, "backgroundOpacity", {
-        min: 0,
-        max: 1,
-        step: 0.01,
-    });
-    pane.addBinding(effect.params, "trailFade", {
+    appearance.addBinding(effect.params, "fog", { min: 0, max: 1, step: 0.01 });
+
+    const composite = pane.addFolder({ title: "Composite", expanded: true });
+    composite.addBinding(effect.params, "trailFade", {
         min: 0,
         max: 1,
         step: 0.005,
     });
-    pane.addBinding(effect.params, "fog", { min: 0, max: 1, step: 0.01 });
+    composite.addBinding(effect.params, "backgroundOpacity", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
     trackPane(pane);
     return pane;
 }
