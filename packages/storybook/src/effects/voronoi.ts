@@ -90,7 +90,9 @@ void main() {
                                distance(siteWorldPx, mousePx));
 
     float edgePx = minEdge * cellSize;
-    float shrinkPx = falloff * maxShrink;
+    // maxShrink ∈ [0, 1] as a fraction of the cell half-width, so 1.0
+    // collapses a fully-falloff cell to its site.
+    float shrinkPx = falloff * maxShrink * cellSize * 0.5;
     float wallDist = edgePx - shrinkPx;
 
     // Scale UV around the site so the original cell content
@@ -132,8 +134,8 @@ export type VoronoiParams = {
     /** Distance from mouse at which the effect fades to 0, in physical px. */
     falloffRadius: number;
     /**
-     * Max wall offset toward the cell centre at full falloff, in
-     * physical px. Cells whose half-width is smaller fully collapse.
+     * Max shrink at full falloff, as a fraction of the cell
+     * half-width. 0 = no shrink, 1 = the cell collapses to its site.
      */
     maxShrink: number;
     /** Sample at the cell's site only — mosaic / stained-glass look. */
@@ -153,7 +155,7 @@ const DEFAULT_PARAMS: VoronoiParams = {
     cellSize: 40,
     borderWidth: 1.5,
     falloffRadius: 200,
-    maxShrink: 20,
+    maxShrink: 1,
     flatCells: false,
     seed: 0,
     speed: 0,

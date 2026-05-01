@@ -329,7 +329,7 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         cellSize: 40,
         borderWidth: 1.5,
         falloffRadius: 200,
-        maxShrink: 20,
+        maxShrink: 1,
         flatCells: false,
         seed: 0,
         speed: 0,
@@ -343,7 +343,7 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         falloffRadius: {
             control: { type: "range", min: 0, max: 800, step: 10 },
         },
-        maxShrink: { control: { type: "range", min: 0, max: 200, step: 1 } },
+        maxShrink: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         flatCells: { control: { type: "boolean" } },
         seed: { control: { type: "range", min: 0, max: 1000, step: 1 } },
         speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
