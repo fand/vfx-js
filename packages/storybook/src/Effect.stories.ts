@@ -304,7 +304,9 @@ curlParticlesImplode.play = async ({ canvasElement }) => {
 // render() does the full setup every time. Storybook re-runs render()
 // on each args change; initVFX() tears down the previous VFX before
 // creating a new one, so the swap is clean.
+type VoronoiSrc = "Logo" | "Jellyfish" | "Webpage";
 type VoronoiArgs = {
+    src: VoronoiSrc;
     cellSize: number;
     pressRadius: number;
     press: number;
@@ -316,18 +318,72 @@ type VoronoiArgs = {
     breatheScale: number;
     bgColor: string;
 };
+function createVoronoiWebpage(): HTMLElement {
+    const wrap = document.createElement("article");
+    wrap.style.cssText =
+        "width: 600px; padding: 32px; background: #fff; color: #202122;" +
+        " font-family: sans-serif; line-height: 1.6;" +
+        " border: 1px solid #a2a9b1;";
+    wrap.innerHTML = `
+        <h1 style="font-family: serif; font-weight: normal;
+                   border-bottom: 1px solid #a2a9b1;
+                   padding-bottom: 4px; margin: 0 0 4px;">
+            Voronoi diagram
+        </h1>
+        <div style="font-size: 0.85em; color: #54595d; margin-bottom: 16px;">
+            From Wikipedia, the free encyclopedia
+        </div>
+        <p>
+            In mathematics, a <b>Voronoi diagram</b> is a partition of a
+            plane into regions close to each of a given set of objects.
+            It is named after Georgy Voronoy.
+        </p>
+        <h2 style="font-family: serif; font-weight: normal;
+                   border-bottom: 1px solid #a2a9b1; padding-bottom: 4px;
+                   margin-top: 20px;">
+            Definition
+        </h2>
+        <p>
+            For each seed there is a corresponding region, called a
+            <i>Voronoi cell</i>, consisting of all points of the plane
+            closer to that seed than to any other.
+        </p>
+        <h2 style="font-family: serif; font-weight: normal;
+                   border-bottom: 1px solid #a2a9b1; padding-bottom: 4px;
+                   margin-top: 20px;">
+            Applications
+        </h2>
+        <p>
+            Voronoi diagrams have practical and theoretical uses in
+            many fields, mainly in science and technology, but also in
+            visual art.
+        </p>
+    `;
+    return wrap;
+}
 export const voronoi: StoryObj<VoronoiArgs> = {
     render: (args) => {
-        const img = document.createElement("img");
-        img.src = Logo;
-
+        const { src, ...effectArgs } = args;
         const vfx = initVFX();
-        const effect = new VoronoiEffect(args);
-        vfx.add(img, { effect });
+        const effect = new VoronoiEffect(effectArgs);
 
+        if (src === "Webpage") {
+            // wrapElement needs a parentNode at addHTML time so it can
+            // splice the canvas wrapper between parent and target.
+            const wrapper = document.createElement("div");
+            const article = createVoronoiWebpage();
+            wrapper.appendChild(article);
+            vfx.addHTML(article, { effect });
+            return wrapper;
+        }
+
+        const img = document.createElement("img");
+        img.src = src === "Jellyfish" ? Jellyfish : Logo;
+        vfx.add(img, { effect });
         return img;
     },
     args: {
+        src: "Webpage",
         cellSize: 40,
         pressRadius: 200,
         press: 1,
@@ -340,6 +396,10 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         bgColor: "#00000000",
     },
     argTypes: {
+        src: {
+            control: { type: "select" },
+            options: ["Logo", "Jellyfish", "Webpage"],
+        },
         cellSize: { control: { type: "range", min: 5, max: 200, step: 1 } },
         pressRadius: {
             control: { type: "range", min: 0, max: 800, step: 10 },
@@ -351,7 +411,9 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         breathe: {
             control: { type: "range", min: 0, max: 1, step: 0.01 },
         },
-        breatheSpeed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        breatheSpeed: {
+            control: { type: "range", min: 0, max: 5, step: 0.05 },
+        },
         breatheScale: {
             control: { type: "range", min: 10, max: 500, step: 5 },
         },
