@@ -425,11 +425,6 @@ export function attachMouseParticlesPane(
         max: 5,
         step: 0.05,
     });
-    pane.addBinding(effect.params, "speedThreshold", {
-        min: 0,
-        max: 0.5,
-        step: 0.005,
-    });
     pane.addBinding(effect.params, "alphaThreshold", {
         min: 0,
         max: 1,
