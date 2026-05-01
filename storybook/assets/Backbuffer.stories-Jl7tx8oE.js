@@ -1,4 +1,4 @@
-import{n as e}from"./chunk-BneVvdWh.js";import{n as t,r as n}from"./utils-DoNm3-kt.js";import{n as r,r as i,t as a}from"./preset-hB8Fk8QM.js";var o,s,c,l,u,d,f,p,m;e((()=>{n(),r(),a(),o={title:`Backbuffer`,parameters:{layout:`fullscreen`}},s=`
+import{n as e}from"./chunk-BneVvdWh.js";import{a as t,o as n}from"./utils-BLrKilFH.js";import{n as r,r as i,t as a}from"./preset-hB8Fk8QM.js";var o,s,c,l,u,d,f,p,m;e((()=>{n(),r(),a(),o={title:`Backbuffer`,parameters:{layout:`fullscreen`}},s=`
 precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;

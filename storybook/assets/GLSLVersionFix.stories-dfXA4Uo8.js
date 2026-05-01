@@ -1,4 +1,4 @@
-import{n as e}from"./chunk-BneVvdWh.js";import{n as t,t as n}from"./src-CDm94Wc7.js";import{n as r,t as i}from"./jellyfish-D2xsay8i.js";var a,o,s,c,l;e((()=>{n(),i(),a={title:`Tests/GLSL Version Auto Detection`,parameters:{layout:`fullscreen`}},o=`
+import{n as e}from"./chunk-BneVvdWh.js";import{n as t,t as n}from"./src-BLtUJGVA.js";import{n as r,t as i}from"./jellyfish-D2xsay8i.js";var a,o,s,c,l;e((()=>{n(),i(),a={title:`Tests/GLSL Version Auto Detection`,parameters:{layout:`fullscreen`}},o=`
 precision highp float;
 uniform vec2 resolution;
 uniform vec2 offset;

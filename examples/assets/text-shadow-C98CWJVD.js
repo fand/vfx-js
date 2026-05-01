@@ -1,4 +1,4 @@
-import"./modulepreload-polyfill-N-DOuI4P.js";import{t as e}from"./esm-C6Ll2yP5.js";new e().add(document.querySelector(`h1`),{shader:`
+import"./modulepreload-polyfill-N-DOuI4P.js";import{t as e}from"./esm-CeNsHEOB.js";new e().add(document.querySelector(`h1`),{shader:`
 precision highp float;
 uniform vec2 resolution;
 uniform vec2 offset;

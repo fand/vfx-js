@@ -1,4 +1,4 @@
-import{n as e}from"./chunk-BneVvdWh.js";import{n as t,r as n}from"./utils-DoNm3-kt.js";import{n as r,r as i,t as a}from"./preset-hB8Fk8QM.js";import{n as o,t as s}from"./jellyfish-D2xsay8i.js";import{n as c,t as l}from"./Timer-D-Ck6ryf.js";var u,d,f,p,m,h,g,_,v,y,b,x,S,C,w,T,E,D,O,k;e((()=>{n(),c(),r(),s(),a(),u=`
+import{n as e}from"./chunk-BneVvdWh.js";import{a as t,o as n}from"./utils-BLrKilFH.js";import{n as r,r as i,t as a}from"./preset-hB8Fk8QM.js";import{n as o,t as s}from"./jellyfish-D2xsay8i.js";import{n as c,t as l}from"./Timer-D-Ck6ryf.js";var u,d,f,p,m,h,g,_,v,y,b,x,S,C,w,T,E,D,O,k;e((()=>{n(),c(),r(),s(),a(),u=`
 precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;

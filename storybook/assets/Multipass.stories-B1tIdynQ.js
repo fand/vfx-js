@@ -1,4 +1,4 @@
-import{n as e}from"./chunk-BneVvdWh.js";import{n as t,r as n}from"./utils-DoNm3-kt.js";import{n as r,r as i,t as a}from"./preset-hB8Fk8QM.js";import{n as o,t as s}from"./jellyfish-D2xsay8i.js";function c(e){return`
+import{n as e}from"./chunk-BneVvdWh.js";import{a as t,o as n}from"./utils-BLrKilFH.js";import{n as r,r as i,t as a}from"./preset-hB8Fk8QM.js";import{n as o,t as s}from"./jellyfish-D2xsay8i.js";function c(e){return`
 precision highp float;
 uniform sampler2D vort_vel;
 uniform sampler2D ${e};
