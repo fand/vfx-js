@@ -18,6 +18,7 @@ import {
     attachMouseParticlesPane,
     attachParticlesPane,
     attachRDPane,
+    disposeAllPanes,
     initVFX,
 } from "./utils";
 
@@ -158,18 +159,37 @@ export const curlParticles: StoryObj<undefined> = {
 };
 curlParticles.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
-    await new Promise((o) => {
-        img.onload = o;
+    await new Promise<void>((o) => {
+        img.onload = () => o();
     });
 
     const vfx = initVFX();
-    const effect = new CurlParticlesEffect();
-    const explode = new ExplodeEffect();
-    await vfx.add(img, { effect: [effect, explode] });
-    attachParticlesPane("Particles", effect, explode, {
-        img,
-        sources: { Jellyfish, Logo },
-    });
+    const sources = { Jellyfish, Logo };
+    let effect: CurlParticlesEffect | null = null;
+    let explode: ExplodeEffect | null = null;
+    const setup = async () => {
+        const savedEffect = effect ? { ...effect.params } : {};
+        const savedBurst = explode ? { ...explode.params } : {};
+        if (effect) {
+            vfx.remove(img);
+            disposeAllPanes();
+        }
+        effect = new CurlParticlesEffect(savedEffect);
+        explode = new ExplodeEffect(savedBurst);
+        await vfx.add(img, { effect: [effect, explode] });
+        attachParticlesPane("Particles", effect, explode, {
+            img,
+            sources,
+            onSrcChange: async (key) => {
+                img.src = sources[key as keyof typeof sources];
+                await new Promise<void>((o) => {
+                    img.onload = () => o();
+                });
+                await setup();
+            },
+        });
+    };
+    await setup();
 
     seedFluidMotion(canvasElement);
 };
@@ -189,8 +209,8 @@ export const curlParticlesExplode: StoryObj<undefined> = {
 };
 curlParticlesExplode.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
-    await new Promise((o) => {
-        img.onload = o;
+    await new Promise<void>((o) => {
+        img.onload = () => o();
     });
     // Wait one frame so layout is resolved and clientWidth/Height are
     // populated with the actual rendered pixel size.
@@ -198,26 +218,55 @@ curlParticlesExplode.play = async ({ canvasElement }) => {
 
     const dpr = window.devicePixelRatio || 1;
     const STATE_MAX = 2048;
-    const w = Math.min(
-        STATE_MAX,
-        Math.max(1, Math.round((img.clientWidth || img.naturalWidth) * dpr)),
-    );
-    const h = Math.min(
-        STATE_MAX,
-        Math.max(1, Math.round((img.clientHeight || img.naturalHeight) * dpr)),
-    );
+    const computeSize = (): [number, number] => [
+        Math.min(
+            STATE_MAX,
+            Math.max(
+                1,
+                Math.round((img.clientWidth || img.naturalWidth) * dpr),
+            ),
+        ),
+        Math.min(
+            STATE_MAX,
+            Math.max(
+                1,
+                Math.round((img.clientHeight || img.naturalHeight) * dpr),
+            ),
+        ),
+    ];
 
     const vfx = initVFX();
+    const sources = { Logo, Jellyfish };
     // pointSize=1 — with one particle per displayed pixel, each
     // particle only needs to cover its own pixel. Both effects read
     // pointSize via the proxy installed in attachParticlesPane.
-    const effect = new CurlParticlesEffect({ pointSize: 1.0 });
-    const explode = new ExplodeEffect({}, [w, h]);
-    await vfx.add(img, { effect: [effect, explode] });
-    attachParticlesPane("Particles", effect, explode, {
-        img,
-        sources: { Logo, Jellyfish },
-    });
+    let effect: CurlParticlesEffect | null = null;
+    let explode: ExplodeEffect | null = null;
+    const setup = async () => {
+        const savedEffect = effect ? { ...effect.params } : { pointSize: 1.0 };
+        const savedBurst = explode ? { ...explode.params } : {};
+        if (effect) {
+            vfx.remove(img);
+            disposeAllPanes();
+        }
+        // Wait a frame so the resized img has up-to-date clientWidth/H.
+        await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+        effect = new CurlParticlesEffect(savedEffect);
+        explode = new ExplodeEffect(savedBurst, computeSize());
+        await vfx.add(img, { effect: [effect, explode] });
+        attachParticlesPane("Particles", effect, explode, {
+            img,
+            sources,
+            onSrcChange: async (key) => {
+                img.src = sources[key as keyof typeof sources];
+                await new Promise<void>((o) => {
+                    img.onload = () => o();
+                });
+                await setup();
+            },
+        });
+    };
+    await setup();
 
     seedFluidMotion(canvasElement);
 };
@@ -234,17 +283,37 @@ export const mouseParticles: StoryObj<undefined> = {
 };
 mouseParticles.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
-    await new Promise((o) => {
-        img.onload = o;
+    await new Promise<void>((o) => {
+        img.onload = () => o();
     });
 
     const vfx = initVFX();
-    const effect = new MouseParticlesEffect();
-    await vfx.add(img, { effect });
-    attachMouseParticlesPane("Mouse Particles", effect, {
-        img,
-        sources: { Jellyfish, Logo },
-    });
+    const sources = { Jellyfish, Logo };
+    // The framework loads img.src once at vfx.add and never observes
+    // later changes, so swapping requires remove + new effect (with
+    // preserved params) + add + reattach pane.
+    let effect: MouseParticlesEffect | null = null;
+    const setup = async () => {
+        const savedParams = effect ? { ...effect.params } : {};
+        if (effect) {
+            vfx.remove(img);
+            disposeAllPanes();
+        }
+        effect = new MouseParticlesEffect(savedParams);
+        await vfx.add(img, { effect });
+        attachMouseParticlesPane("Mouse Particles", effect, {
+            img,
+            sources,
+            onSrcChange: async (key) => {
+                img.src = sources[key as keyof typeof sources];
+                await new Promise<void>((o) => {
+                    img.onload = () => o();
+                });
+                await setup();
+            },
+        });
+    };
+    await setup();
 
     seedFluidMotion(canvasElement);
 };

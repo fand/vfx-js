@@ -9,7 +9,7 @@ import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
 const PANE_CLASS = "vfx-tweakpane-container";
 
-function disposeAllPanes(): void {
+export function disposeAllPanes(): void {
     // biome-ignore lint/suspicious/noExplicitAny: window-bag access
     const w = window as any;
     const panes: Pane[] = w.__vfxPanes ?? [];
@@ -231,6 +231,10 @@ export function attachParticlesPane(
     srcSelector?: {
         img: HTMLImageElement;
         sources: Record<string, string>;
+        // Called instead of mutating img.src directly. The framework
+        // doesn't observe src changes on HTMLImageElement, so swapping
+        // requires vfx.remove + vfx.add — the story owns that.
+        onSrcChange?: (key: string) => void | Promise<void>;
     },
 ): Pane {
     const container = document.createElement("div");
@@ -269,7 +273,7 @@ export function attachParticlesPane(
 
     const pane = new Pane({ container, title, expanded: false });
     if (srcSelector) {
-        const { img, sources } = srcSelector;
+        const { img, sources, onSrcChange } = srcSelector;
         const keys = Object.keys(sources);
         const initialKey = keys.find((k) => sources[k] === img.src) ?? keys[0];
         const state = { src: initialKey };
@@ -277,7 +281,12 @@ export function attachParticlesPane(
             keys.map((k) => [k, k]),
         );
         pane.addBinding(state, "src", { options }).on("change", (ev) => {
-            img.src = sources[ev.value as string];
+            const next = ev.value as string;
+            if (onSrcChange) {
+                onSrcChange(next);
+            } else {
+                img.src = sources[next];
+            }
         });
     }
     pane.addBinding(effect.params, "lifespan", {
@@ -346,6 +355,9 @@ export function attachMouseParticlesPane(
     srcSelector?: {
         img: HTMLImageElement;
         sources: Record<string, string>;
+        // See attachParticlesPane: framework can't observe img.src
+        // changes, so the story does the swap.
+        onSrcChange?: (key: string) => void | Promise<void>;
     },
 ): Pane {
     const container = document.createElement("div");
@@ -356,7 +368,7 @@ export function attachMouseParticlesPane(
 
     const pane = new Pane({ container, title, expanded: false });
     if (srcSelector) {
-        const { img, sources } = srcSelector;
+        const { img, sources, onSrcChange } = srcSelector;
         const keys = Object.keys(sources);
         const initialKey = keys.find((k) => sources[k] === img.src) ?? keys[0];
         const state = { src: initialKey };
@@ -364,7 +376,12 @@ export function attachMouseParticlesPane(
             keys.map((k) => [k, k]),
         );
         pane.addBinding(state, "src", { options }).on("change", (ev) => {
-            img.src = sources[ev.value as string];
+            const next = ev.value as string;
+            if (onSrcChange) {
+                onSrcChange(next);
+            } else {
+                img.src = sources[next];
+            }
         });
     }
     // count caps the ring buffer at runtime; the renderable instance
