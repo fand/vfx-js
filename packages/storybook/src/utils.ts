@@ -439,6 +439,11 @@ export function attachMouseParticlesPane(
         max: 2,
         step: 0.01,
     });
+    motion.addBinding(effect.params, "speedThreshold", {
+        min: 0,
+        max: 0.5,
+        step: 0.005,
+    });
 
     const appearance = pane.addFolder({ title: "Appearance", expanded: true });
     appearance.addBinding(effect.params, "pointSize", {
@@ -450,11 +455,6 @@ export function attachMouseParticlesPane(
         min: 0,
         max: 1,
         step: 0.01,
-    });
-    appearance.addBinding(effect.params, "speedThreshold", {
-        min: 0,
-        max: 0.5,
-        step: 0.005,
     });
     appearance.addBinding(effect.params, "fog", { min: 0, max: 1, step: 0.01 });
 
