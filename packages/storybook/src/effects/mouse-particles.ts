@@ -234,7 +234,16 @@ uniform float alpha;
 uniform float alphaDecay;
 uniform float fog;
 uniform vec4 contentRectUv;
-
+// Speed-based alpha gate. Re-evaluates the curl field at the
+// particle's position to estimate its current speed; threshold <= 0
+// short-circuits the computation.
+uniform float time;
+uniform float speed;
+uniform float speedDecay;
+uniform float noiseScale;
+uniform float noiseAnimation;
+uniform float speedThreshold;
+${GLSL_CURL_NOISE}
 out vec2 vCorner;
 out vec4 vColor;
 
@@ -267,6 +276,17 @@ void main() {
 
     float fogFactor = mix(1.0, smoothstep(1.0, -0.5, s.z), fog);
 
+    float speedAlpha = 1.0;
+    if (speedThreshold > 0.0) {
+        float shortAxis = min(elementPixel.x, elementPixel.y);
+        vec3 stretch = vec3(elementPixel / shortAxis, 1.0);
+        vec3 noiseInput = s.xyz * stretch / max(noiseScale, 1e-4);
+        vec3 v = curl3D(noiseInput, time * noiseAnimation) / stretch;
+        float taper = pow(clamp(1.0 - age, 0.0, 1.0), speedDecay);
+        float speedMag = length(v) * speed * taper;
+        speedAlpha = smoothstep(0.0, speedThreshold, speedMag);
+    }
+
     vec2 bufferUv = contentRectUv.xy + s.xy * contentRectUv.zw;
     vec2 ndcPos = bufferUv * 2.0 - 1.0;
 
@@ -275,7 +295,7 @@ void main() {
     gl_Position = vec4(ndcPos + ndcOffset, 0.0, 1.0);
 
     vCorner = position;
-    vColor = vec4(c.rgb, lifeAlpha * alpha * fogFactor);
+    vColor = vec4(c.rgb, lifeAlpha * alpha * fogFactor * speedAlpha);
 }
 `;
 
@@ -410,6 +430,9 @@ export type MouseParticlesParams = {
     speedDecay: number;
     /** Alpha-envelope shape exponent (>1 holds peak alpha longer; <1 sharpens fade). */
     alphaDecay: number;
+    /** Speed (uv/sec) at which a particle reaches full alpha; below this it
+     * fades smoothly to invisible. 0 disables the gate. */
+    speedThreshold: number;
     /** Reject spawns where src.a is below this. */
     alphaThreshold: number;
     /** Emit even when the mouse is stationary. */
@@ -434,6 +457,7 @@ const DEFAULT_PARAMS: MouseParticlesParams = {
     radius: 30,
     speedDecay: 1.0,
     alphaDecay: 1.0,
+    speedThreshold: 0.05,
     alphaThreshold: 0.05,
     spawnOnIdle: false,
     backgroundOpacity: 1.0,
@@ -600,6 +624,12 @@ export class MouseParticlesEffect implements Effect {
                 alpha: this.params.alpha,
                 alphaDecay: this.params.alphaDecay,
                 fog: this.params.fog,
+                time: ctx.time,
+                speed: this.params.speed,
+                speedDecay: this.params.speedDecay,
+                noiseScale: this.params.noiseScale,
+                noiseAnimation: this.params.noiseAnimation,
+                speedThreshold: this.params.speedThreshold,
             },
             geometry: this.#particleGeometry,
             target: this.#stampTex,
