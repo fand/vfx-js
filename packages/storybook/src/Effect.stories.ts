@@ -306,8 +306,8 @@ curlParticlesImplode.play = async ({ canvasElement }) => {
 // creating a new one, so the swap is clean.
 type VoronoiArgs = {
     cellSize: number;
-    falloffRadius: number;
-    maxShrink: number;
+    pressRadius: number;
+    press: number;
     flatCells: boolean;
     seed: number;
     speed: number;
@@ -329,8 +329,8 @@ export const voronoi: StoryObj<VoronoiArgs> = {
     },
     args: {
         cellSize: 40,
-        falloffRadius: 200,
-        maxShrink: 1,
+        pressRadius: 200,
+        press: 1,
         flatCells: false,
         seed: 0,
         speed: 0,
@@ -341,10 +341,10 @@ export const voronoi: StoryObj<VoronoiArgs> = {
     },
     argTypes: {
         cellSize: { control: { type: "range", min: 5, max: 200, step: 1 } },
-        falloffRadius: {
+        pressRadius: {
             control: { type: "range", min: 0, max: 800, step: 10 },
         },
-        maxShrink: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        press: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         flatCells: { control: { type: "boolean" } },
         seed: { control: { type: "range", min: 0, max: 1000, step: 1 } },
         speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },

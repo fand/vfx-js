@@ -17,8 +17,8 @@ uniform vec4 srcRectUv;
 uniform vec2 mouseUv;
 uniform vec2 elementPx;
 uniform float cellSize;
-uniform float falloffRadius;
-uniform float maxShrink;
+uniform float pressRadius;
+uniform float press;
 uniform float seed;
 uniform float flatCells;
 uniform float time;
@@ -164,7 +164,7 @@ void main() {
     // Voronoi-cell falloff (site→mouse)
     vec2 siteWorldPx = (ipart + nearestSite) * cellSize;
     vec2 mousePx = mouseUv * elementPx;
-    float falloff = smoothstep(falloffRadius, 0.,
+    float falloff = smoothstep(pressRadius, 0.,
                                distance(siteWorldPx, mousePx));
 
     // Per-cell noise shrink for cells outside mouse falloff
@@ -176,7 +176,7 @@ void main() {
         );
         noiseShrink = breathe * max(0.0, snoise(noisePos));
     }
-    float shrink = mix(noiseShrink, maxShrink, falloff);
+    float shrink = mix(noiseShrink, press, falloff);
 
     // Pull the wall toward the site
     float edgePx = minEdge * cellSize;
@@ -202,13 +202,13 @@ void main() {
 export type VoronoiParams = {
     /** Cell pitch in physical px. */
     cellSize: number;
-    /** Distance from mouse at which the effect fades to 0, in physical px. */
-    falloffRadius: number;
+    /** Distance from mouse at which `press` fades to 0, in physical px. */
+    pressRadius: number;
     /**
-     * Max shrink at full falloff, as a fraction of the cell
-     * half-width. 0 = no shrink, 1 = the cell collapses to its site.
+     * Mouse-driven shrink, as a fraction of the cell half-width.
+     * 0 = no shrink, 1 = the cell collapses to its site.
      */
-    maxShrink: number;
+    press: number;
     /** Sample at the cell's site only — mosaic / stained-glass look. */
     flatCells: boolean;
     /** Hash seed; change for a different cell layout. */
@@ -230,8 +230,8 @@ export type VoronoiParams = {
 
 const DEFAULT_PARAMS: VoronoiParams = {
     cellSize: 40,
-    falloffRadius: 200,
-    maxShrink: 1,
+    pressRadius: 200,
+    press: 1,
     flatCells: false,
     seed: 0,
     speed: 0,
@@ -282,8 +282,8 @@ export class VoronoiEffect implements Effect {
                 mouseUv: [ctx.mouse[0] / ew, ctx.mouse[1] / eh],
                 elementPx: [ew, eh],
                 cellSize: p.cellSize,
-                falloffRadius: p.falloffRadius,
-                maxShrink: p.maxShrink,
+                pressRadius: p.pressRadius,
+                press: p.press,
                 flatCells: p.flatCells ? 1 : 0,
                 seed: p.seed,
                 time: ctx.time,
