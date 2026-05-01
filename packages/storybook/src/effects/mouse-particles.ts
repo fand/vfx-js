@@ -407,8 +407,13 @@ void main() {
 export type MouseParticlesParams = {
     /** Max particles. Capped at construction by the state texture size. */
     count: number;
-    /** Particles per second emitted while the mouse is active. */
+    /** Particles per second emitted within `radius` of the mouse while
+     * the mouse is active. */
     birthRate: number;
+    /** Particles per second emitted at uniform-random positions across
+     * the element. Independent of mouse motion; only gated by visibility
+     * and the same alpha-rejection as mouse spawns. */
+    screenBirthRate: number;
     /** Base lifespan (sec); actual life is jittered per-particle. */
     life: number;
     /** uv-displacement-per-second at full strength. */
@@ -445,6 +450,7 @@ export type MouseParticlesParams = {
 const DEFAULT_PARAMS: MouseParticlesParams = {
     count: STATE_SIZE * STATE_SIZE,
     birthRate: 4000,
+    screenBirthRate: 0,
     life: 3,
     speed: 0.15,
     noiseScale: 0.5,
@@ -486,6 +492,7 @@ export class MouseParticlesEffect implements Effect {
     #particleGeometry: EffectGeometry | null = null;
     #nextSlot = 0;
     #birthAccumulator = 0;
+    #screenBirthAccumulator = 0;
     #lastMouseUv: [number, number] | null = null;
     #lastMoveTime = -Infinity;
 
@@ -674,19 +681,33 @@ export class MouseParticlesEffect implements Effect {
 
         const visible = ctx.intersection > 0;
         const recent = ctx.time - this.#lastMoveTime < IDLE_THRESHOLD;
-        const active = visible && (recent || this.params.spawnOnIdle);
-        if (!active) {
+        const mouseActive = visible && (recent || this.params.spawnOnIdle);
+
+        if (mouseActive) {
+            this.#birthAccumulator += this.params.birthRate * dt;
+        } else {
             this.#birthAccumulator = 0;
-            return 0;
+        }
+        if (visible) {
+            this.#screenBirthAccumulator += this.params.screenBirthRate * dt;
+        } else {
+            this.#screenBirthAccumulator = 0;
         }
 
-        this.#birthAccumulator += this.params.birthRate * dt;
-        const nSpawn = Math.min(
+        // Mouse takes priority for the per-frame slot budget — when the
+        // user is dragging fast we'd rather show that than the ambient.
+        let nMouse = Math.min(
             MAX_SPAWNS_PER_FRAME,
             Math.floor(this.#birthAccumulator),
         );
-        this.#birthAccumulator -= nSpawn;
-        if (nSpawn === 0) {
+        let nScreen = Math.min(
+            MAX_SPAWNS_PER_FRAME - nMouse,
+            Math.floor(this.#screenBirthAccumulator),
+        );
+        this.#birthAccumulator -= nMouse;
+        this.#screenBirthAccumulator -= nScreen;
+        const total = nMouse + nScreen;
+        if (total === 0) {
             return 0;
         }
 
@@ -697,7 +718,8 @@ export class MouseParticlesEffect implements Effect {
         const elemPxX = Math.max(1, elementPixel[0]);
         const elemPxY = Math.max(1, elementPixel[1]);
         const buf = this.#spawnUniform;
-        for (let i = 0; i < nSpawn; i++) {
+        let i = 0;
+        for (; i < nMouse; i++) {
             const r = Math.sqrt(Math.random()) * this.params.radius;
             const theta = Math.random() * Math.PI * 2;
             const dx = Math.cos(theta) * r;
@@ -713,7 +735,19 @@ export class MouseParticlesEffect implements Effect {
             buf[o + 3] = lifeJitter;
             this.#nextSlot = (this.#nextSlot + 1) % cap;
         }
-        return nSpawn;
+        for (let j = 0; j < nScreen; j++, i++) {
+            const lifeJitter =
+                LIFE_JITTER_MIN +
+                Math.random() * (LIFE_JITTER_MAX - LIFE_JITTER_MIN);
+
+            const o = i * 4;
+            buf[o + 0] = this.#nextSlot;
+            buf[o + 1] = Math.random();
+            buf[o + 2] = Math.random();
+            buf[o + 3] = lifeJitter;
+            this.#nextSlot = (this.#nextSlot + 1) % cap;
+        }
+        return total;
     }
 
     dispose(): void {

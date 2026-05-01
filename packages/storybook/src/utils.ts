@@ -397,6 +397,11 @@ export function attachMouseParticlesPane(
         max: 10000,
         step: 50,
     });
+    emitter.addBinding(effect.params, "screenBirthRate", {
+        min: 0,
+        max: 10000,
+        step: 50,
+    });
     emitter.addBinding(effect.params, "radius", { min: 5, max: 300, step: 1 });
     emitter.addBinding(effect.params, "alphaThreshold", {
         min: 0,
