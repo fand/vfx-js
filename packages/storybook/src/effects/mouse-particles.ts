@@ -225,6 +225,7 @@ precision highp float;
 in vec2 position;
 
 uniform sampler2D posTex;
+uniform sampler2D posTexPrev;
 uniform sampler2D colorTex;
 uniform vec2 stateSize;
 uniform float pointSize;
@@ -234,6 +235,11 @@ uniform float alpha;
 uniform float alphaDecay;
 uniform float fog;
 uniform vec4 contentRectUv;
+// Speed-based alpha gate. Speed is estimated from the position delta
+// between the two ping-pong buffers, so it costs only one extra texture
+// read instead of re-evaluating the curl field. <=0 disables the gate.
+uniform float dt;
+uniform float speedThreshold;
 
 out vec2 vCorner;
 out vec4 vColor;
@@ -267,6 +273,17 @@ void main() {
 
     float fogFactor = mix(1.0, smoothstep(1.0, -0.5, s.z), fog);
 
+    float speedAlpha = 1.0;
+    if (speedThreshold > 0.0 && dt > 0.0) {
+        vec4 sPrev = texture(posTexPrev, stateUv);
+        // Skip freshly (re)spawned slots: their previous state was dead
+        // or held a different particle, so the position delta is garbage.
+        if (sPrev.w < 1.0) {
+            float speedMag = length(s.xy - sPrev.xy) / dt;
+            speedAlpha = smoothstep(0.0, speedThreshold, speedMag);
+        }
+    }
+
     vec2 bufferUv = contentRectUv.xy + s.xy * contentRectUv.zw;
     vec2 ndcPos = bufferUv * 2.0 - 1.0;
 
@@ -275,7 +292,7 @@ void main() {
     gl_Position = vec4(ndcPos + ndcOffset, 0.0, 1.0);
 
     vCorner = position;
-    vColor = vec4(c.rgb, lifeAlpha * alpha * fogFactor);
+    vColor = vec4(c.rgb, lifeAlpha * alpha * fogFactor * speedAlpha);
 }
 `;
 
@@ -410,6 +427,9 @@ export type MouseParticlesParams = {
     speedDecay: number;
     /** Alpha-envelope shape exponent (>1 holds peak alpha longer; <1 sharpens fade). */
     alphaDecay: number;
+    /** Per-particle speed (uv/sec) at which alpha reaches 1; below this it
+     * fades smoothly to 0. Set to 0 to disable. */
+    speedThreshold: number;
     /** Reject spawns where src.a is below this. */
     alphaThreshold: number;
     /** Emit even when the mouse is stationary. */
@@ -434,6 +454,7 @@ const DEFAULT_PARAMS: MouseParticlesParams = {
     radius: 30,
     speedDecay: 1.0,
     alphaDecay: 1.0,
+    speedThreshold: 0.05,
     alphaThreshold: 0.05,
     spawnOnIdle: false,
     backgroundOpacity: 1.0,
@@ -580,8 +601,11 @@ export class MouseParticlesEffect implements Effect {
 
         this.#posReadIsA = !this.#posReadIsA;
 
-        // After the toggle posRead is the freshly written state.
+        // After the toggle posRead is the freshly written state; the
+        // other ping-pong side still holds last frame's state, used for
+        // the speed-from-position-delta gate.
         const renderRead = this.#posReadIsA ? this.#posA : this.#posB;
+        const renderPrev = this.#posReadIsA ? this.#posB : this.#posA;
 
         ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
         ctx.draw({
@@ -589,6 +613,7 @@ export class MouseParticlesEffect implements Effect {
             frag: FRAG_PARTICLE,
             uniforms: {
                 posTex: renderRead,
+                posTexPrev: renderPrev,
                 colorTex: this.#colorTex,
                 stateSize: [STATE_SIZE, STATE_SIZE],
                 pointSize: this.params.pointSize,
@@ -600,6 +625,8 @@ export class MouseParticlesEffect implements Effect {
                 alpha: this.params.alpha,
                 alphaDecay: this.params.alphaDecay,
                 fog: this.params.fog,
+                dt,
+                speedThreshold: this.params.speedThreshold,
             },
             geometry: this.#particleGeometry,
             target: this.#stampTex,
