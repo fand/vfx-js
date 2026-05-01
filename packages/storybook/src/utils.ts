@@ -8,10 +8,17 @@ import { ImplodeEffect } from "./effects/implode";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
 export function initVFX(opts?: VFXOpts): VFX {
+    // biome-ignore lint/suspicious/noExplicitAny: window-bag access
+    const w = window as any;
+    // Storybook re-runs play() on every arg change without disposing
+    // the previous VFX. Tear it down here so the new instance owns the
+    // canvas alone — otherwise the old canvas keeps painting on top
+    // and arg changes look ignored.
+    if (w.vfx && typeof w.vfx.destroy === "function") {
+        w.vfx.destroy();
+    }
     const vfx = new VFX(opts);
-
-    // biome-ignore lint/suspicious/noExplicitAny: Expose VFX instance globally
-    (window as any).vfx = vfx;
+    w.vfx = vfx;
 
     return vfx;
 }

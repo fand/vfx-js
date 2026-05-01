@@ -10,7 +10,7 @@ import { ImplodeEffect } from "./effects/implode";
 import { createPixelateEffect } from "./effects/pixelate";
 import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 import { createScanlineEffect } from "./effects/scanline";
-import { createVoronoiEffect } from "./effects/voronoi";
+import { VoronoiEffect } from "./effects/voronoi";
 import "./preset.css";
 import {
     attachBloomPane,
@@ -300,23 +300,49 @@ curlParticlesImplode.play = async ({ canvasElement }) => {
 };
 
 // Voronoi cell borders revealed in a halo around the mouse — image
-// passes through unchanged elsewhere.
-export const voronoi: StoryObj<undefined> = {
-    render: () => {
+// passes through unchanged elsewhere. Follows Presets.stories pattern:
+// render() does the full setup every time. Storybook re-runs render()
+// on each args change; initVFX() tears down the previous VFX before
+// creating a new one, so the swap is clean.
+type VoronoiArgs = {
+    cellSize: number;
+    borderWidth: number;
+    falloffRadius: number;
+    maxShrink: number;
+    flatCells: boolean;
+    seed: number;
+};
+export const voronoi: StoryObj<VoronoiArgs> = {
+    render: (args) => {
         const img = document.createElement("img");
         img.src = Jellyfish;
+
+        const vfx = initVFX();
+        const effect = new VoronoiEffect(args);
+        vfx.add(img, { effect });
+
         return img;
     },
-    args: undefined,
-};
-voronoi.play = async ({ canvasElement }) => {
-    const img = canvasElement.querySelector("img") as HTMLImageElement;
-    await new Promise((o) => {
-        img.onload = o;
-    });
-
-    const vfx = initVFX();
-    await vfx.add(img, { effect: createVoronoiEffect() });
+    args: {
+        cellSize: 40,
+        borderWidth: 1.5,
+        falloffRadius: 200,
+        maxShrink: 20,
+        flatCells: false,
+        seed: 0,
+    },
+    argTypes: {
+        cellSize: { control: { type: "range", min: 5, max: 200, step: 1 } },
+        borderWidth: {
+            control: { type: "range", min: 0, max: 10, step: 0.1 },
+        },
+        falloffRadius: {
+            control: { type: "range", min: 0, max: 800, step: 10 },
+        },
+        maxShrink: { control: { type: "range", min: 0, max: 200, step: 1 } },
+        flatCells: { control: { type: "boolean" } },
+        seed: { control: { type: "range", min: 0, max: 1000, step: 1 } },
+    },
 };
 
 function seedFluidMotion(canvasElement: HTMLElement): void {
