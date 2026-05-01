@@ -2,7 +2,7 @@ import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
 import type { CurlParticlesEffect } from "./effects/curl-particles";
-import type { DisintegrateEffect } from "./effects/disintegrate";
+import type { ExplodeEffect } from "./effects/explode";
 import type { FluidEffect } from "./effects/fluid";
 import { ImplodeEffect } from "./effects/implode";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
@@ -224,7 +224,7 @@ const PARTICLES_PANE_CLASS = "particles-tweakpane-container";
 export function attachParticlesPane(
     title: string,
     effect: CurlParticlesEffect,
-    burst?: DisintegrateEffect | ImplodeEffect,
+    burst?: ExplodeEffect | ImplodeEffect,
     srcSelector?: {
         img: HTMLImageElement;
         sources: Record<string, string>;

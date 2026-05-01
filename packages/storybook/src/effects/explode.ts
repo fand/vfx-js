@@ -1,11 +1,7 @@
-// One-shot particle disintegration. trigger() converts the rendered
-// element into instanced particles whose initial positions tile the
-// element's uv space. Simulation texture size is configurable via the
-// constructor — pass element-pixel dimensions to get ~one particle per
-// displayed pixel. Particles advect via 2D curl noise plus a radial
-// outward bias and fade out via a cos envelope while the underlying
-// src is faded out in parallel. After `duration` seconds the effect
-// renders a transparent target (element appears gone).
+// One-shot particle explode. trigger() turns the rendered element into
+// instanced particles that advect via 3D curl noise + radial outward
+// bias and fade out over `duration`. Pass element-pixel `stateSize` for
+// ~one particle per displayed pixel.
 import type {
     Effect,
     EffectContext,
@@ -27,12 +23,8 @@ float hash21(vec2 p) {
 }
 
 void main() {
-    // Initial pos = state-uv jittered within its texel cell so there's
-    // no visible grid pattern. age starts at 0 (full alpha) so on the
-    // trigger frame every particle is immediately visible. z gets a
-    // small per-particle offset so curl3D + outward bias have a non-
-    // zero z direction to amplify (otherwise particles would all stay
-    // on the z=0 plane until curl noise nudges them out).
+    // Texel-cell jitter to avoid a visible grid; small z seed so curl3D
+    // and outward bias have non-zero z to amplify.
     vec2 jitter = (vec2(hash21(uv * 17.31), hash21(uv * 23.79)) - 0.5)
                   / stateSize;
     float z0 = (hash21(uv * 53.7 + 0.81) - 0.5) * 0.02;
@@ -47,10 +39,6 @@ out vec4 outColor;
 
 uniform sampler2D state;
 uniform sampler2D src;
-// Auto-uploaded: maps element-uv → src-texture-uv. When src is a prior
-// stage's output (canvas-sized via outputRect=canvasRect), srcRectUv
-// is the element's sub-rect within src; for capture-only inputs it is
-// (0, 0, 1, 1) so the mapping reduces to identity.
 uniform vec4 srcRectUv;
 
 void main() {
@@ -141,9 +129,7 @@ float snoise(vec3 v) {
     );
 }
 
-// 3D curl from 3D simplex potentials, with time entering as a slow
-// uniform drift on the noise input. 12 snoise calls per particle —
-// heavier than curl2D but gives a divergence-free 3D velocity field.
+// 3D curl with time as slow drift on the noise input.
 vec3 curl3D(vec3 p, float t) {
     float eps = 0.01;
     vec3 dx = vec3(eps, 0.0, 0.0);
@@ -167,21 +153,17 @@ void main() {
     vec3 pos = s.xyz;
     float age = s.w;
 
-    // Per-particle lifespan scale (stable, uv-hashed) so deaths stagger
-    // instead of all snapping to invisibility at age=1 simultaneously.
+    // Per-particle lifespan jitter so deaths stagger.
     float lifespanScale = 0.7 + hash21(uv * 91.7 + 1.234) * 0.6;
     age += dt / (duration * lifespanScale);
 
     if (age >= 0.0 && age < 1.0) {
-        // Stretch xy so noise cells are isotropic in pixel space; z is
-        // already in shortAxis-normalized units (stretch = 1).
+        // Stretch xy so noise cells are pixel-isotropic.
         float shortAxis = min(elementPixel.x, elementPixel.y);
         vec3 stretch = vec3(elementPixel / shortAxis, 1.0);
         vec3 noiseInput = pos * stretch * noiseScale;
         vec3 vNoise = curl3D(noiseInput, time) / stretch;
-        // Outward bias from element center in 3D — xy from element
-        // center (0.5, 0.5), z from the spawn z=0 plane (using current
-        // pos.z which was seeded with a small per-particle jitter).
+        // Outward from element center (xy from 0.5, z from spawn plane).
         vec3 outward = vec3(pos.xy - vec2(0.5), pos.z) * outwardBias;
         pos += (vNoise + outward) * speed * dt;
     }
@@ -201,9 +183,7 @@ uniform float pointSize;
 uniform vec2 elementPixel;
 uniform int particleCount;
 uniform float fog;
-// Auto-uploaded by vfx-js: the element's content rect within the
-// stage's destination buffer in [0,1] uv. With outputRect=canvasRect
-// this lets element-uv particle positions land in the (larger) buffer.
+
 uniform vec4 contentRectUv;
 
 out vec2 vCorner;
@@ -224,15 +204,11 @@ void main() {
     vec4 c = texture(color, stateUv);
 
     float age = s.w;
-    // Quarter cosine: alpha=1 at age=0 (trigger frame), alpha=0 at
-    // age=1. Particles are visible at full strength immediately when
-    // the burst fires, then fade as they advect away.
+    // Quarter-cosine envelope: full alpha at trigger, 0 at age=1.
     float lifeAlpha = (age >= 0.0 && age <= 1.0)
         ? cos(age * 1.5707963)
         : 0.0;
-    // Depth fog — particles fade as pos.z increases (deeper). At fog=0
-    // the multiplier is 1 everywhere; at fog=1 alpha drops smoothly
-    // between z=-0.5 (front) and z=1 (back).
+    // Depth fog
     float fogFactor = mix(1.0, smoothstep(1.0, -0.5, s.z), fog);
 
     if (lifeAlpha <= 0.0) {
@@ -242,14 +218,15 @@ void main() {
         return;
     }
 
-    // Map element-uv → buffer-uv so particles land at their element-
-    // relative position even when the dst buffer is larger than the
-    // element (outputRect=canvasRect).
+    // Map pos to buffer-uv
     vec2 bufferUv = contentRectUv.xy + s.xy * contentRectUv.zw;
     vec2 ndcPos = bufferUv * 2.0 - 1.0;
+
+    // Calculate position from pointSize
     vec2 bufferPixel = elementPixel / max(contentRectUv.zw, vec2(1e-6));
     vec2 ndcOffset = position * pointSize * 2.0 / bufferPixel;
     gl_Position = vec4(ndcPos + ndcOffset, 0.0, 1.0);
+
     vCorner = position;
     vColor = vec4(c.rgb, c.a * lifeAlpha * fogFactor);
 }
@@ -278,9 +255,6 @@ out vec4 outColor;
 uniform sampler2D particles;
 
 void main() {
-    // src colors were captured into the per-particle color buffer at
-    // trigger time, so post-trigger we only need to render the particle
-    // stamp — the underlying src vanishes in a single frame.
     vec4 p = texture(particles, uv);
     outColor = vec4(p.rgb, p.a);
 }
@@ -306,7 +280,7 @@ const QUAD_VERTS = new Float32Array([
     -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5,
 ]);
 
-export type DisintegrateParams = {
+export type ExplodeParams = {
     /** Particle count. Locked at construction. */
     count: number;
     /** Total animation duration (sec). */
@@ -319,13 +293,11 @@ export type DisintegrateParams = {
     outwardBias: number;
     /** Particle quad size in element px. */
     pointSize: number;
-    /** Depth fog 0..1 (0 = none, 1 = full). Particles fade as their z
-     * coordinate increases — gives a depth cue under the parallel
-     * projection so the 3D motion is visually distinguishable from 2D. */
+    /** Depth fog 0..1 (0 = none, 1 = full). */
     fog: number;
 };
 
-const DEFAULT_PARAMS: DisintegrateParams = {
+const DEFAULT_PARAMS: ExplodeParams = {
     count: STATE_SIZE_DEFAULT * STATE_SIZE_DEFAULT,
     duration: 1.5,
     speed: 0.4,
@@ -335,13 +307,10 @@ const DEFAULT_PARAMS: DisintegrateParams = {
     fog: 0.5,
 };
 
-/**
- * One-shot disintegration effect. Construct a new instance per
- * `vfx.add()` call. Call `trigger()` to start the animation; query
- * `isDone()` to detect completion.
- */
-export class DisintegrateEffect implements Effect {
-    params: DisintegrateParams;
+// One-shot explode. Construct a new instance per `vfx.add()`. Call
+// `trigger()` to start; query `isDone()` to detect completion.
+export class ExplodeEffect implements Effect {
+    params: ExplodeParams;
 
     #state: EffectRenderTarget | null = null;
     #color: EffectRenderTarget | null = null;
@@ -354,15 +323,8 @@ export class DisintegrateEffect implements Effect {
     #stateInitialized = false;
     #lastElapsed = 0;
 
-    /**
-     * @param initial Partial param overrides. `count` is auto-set from
-     *   `stateSize` if not provided.
-     * @param stateSize Particle simulation texture size. Pass element
-     *   pixel dimensions for ~one particle per displayed pixel; default
-     *   is 256×256.
-     */
     constructor(
-        initial: Partial<DisintegrateParams> = {},
+        initial: Partial<ExplodeParams> = {},
         stateSize?: readonly [number, number],
     ) {
         this.#stateSize = stateSize
@@ -378,7 +340,6 @@ export class DisintegrateEffect implements Effect {
         this.#stateInitialized = false;
     }
 
-    /** Cancel any in-flight burst and revert to the passthrough state. */
     reset(): void {
         this.#triggered = false;
         this.#startTime = -1;
@@ -483,8 +444,9 @@ export class DisintegrateEffect implements Effect {
             target: this.#state,
         });
 
+        // Clear stamp, then additive instanced quads so opaque particles
+        // survive over transparent ones.
         ctx.draw({ frag: FRAG_CLEAR, target: this.#particleStamp });
-
         ctx.draw({
             vert: VERT_PARTICLE,
             frag: FRAG_PARTICLE,
@@ -502,11 +464,6 @@ export class DisintegrateEffect implements Effect {
             },
             geometry: this.#geometry,
             target: this.#particleStamp,
-            // Default blend for a user-allocated RT is "none" (last
-            // write wins), which lets transparent source pixels paint
-            // (0,0,0,0) over earlier opaque particles. Additive sums
-            // premultiplied contributions instead — transparent
-            // particles contribute nothing, so opaque ones survive.
             blend: "additive",
         });
 
@@ -524,9 +481,7 @@ export class DisintegrateEffect implements Effect {
         this.#geometry = null;
     }
 
-    // Render into the entire canvas so the burst can scatter past the
-    // element's bounds — clipping at the element edge would chop the
-    // outward-flying particles short.
+    // Burst can scatter past the element bounds.
     outputRect(
         dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
     ): readonly [number, number, number, number] {

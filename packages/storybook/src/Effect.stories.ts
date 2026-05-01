@@ -4,7 +4,7 @@ import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
 import { CurlParticlesEffect } from "./effects/curl-particles";
-import { DisintegrateEffect } from "./effects/disintegrate";
+import { ExplodeEffect } from "./effects/explode";
 import { FluidEffect } from "./effects/fluid";
 import { ImplodeEffect } from "./effects/implode";
 import { createPixelateEffect } from "./effects/pixelate";
@@ -198,9 +198,9 @@ curlParticles.play = async ({ canvasElement }) => {
 
     const vfx = initVFX();
     const effect = new CurlParticlesEffect();
-    const disintegrate = new DisintegrateEffect();
-    await vfx.add(img, { effect: [effect, disintegrate] });
-    attachParticlesPane("Particles", effect, disintegrate, {
+    const explode = new ExplodeEffect();
+    await vfx.add(img, { effect: [effect, explode] });
+    attachParticlesPane("Particles", effect, explode, {
         img,
         sources: { Jellyfish, Logo },
     });
@@ -246,9 +246,9 @@ curlParticlesExplode.play = async ({ canvasElement }) => {
     // particle only needs to cover its own pixel. Both effects read
     // pointSize via the proxy installed in attachParticlesPane.
     const effect = new CurlParticlesEffect({ pointSize: 1.0 });
-    const disintegrate = new DisintegrateEffect({}, [w, h]);
-    await vfx.add(img, { effect: [effect, disintegrate] });
-    attachParticlesPane("Particles", effect, disintegrate, {
+    const explode = new ExplodeEffect({}, [w, h]);
+    await vfx.add(img, { effect: [effect, explode] });
+    attachParticlesPane("Particles", effect, explode, {
         img,
         sources: { Logo, Jellyfish },
     });

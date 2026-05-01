@@ -1,5 +1,5 @@
 // One-shot implosion / materialize effect — visual reverse of the
-// disintegrate burst. Each particle starts scattered around the element
+// explode burst. Each particle starts scattered around the element
 // center and integrates a velocity that's a blend of curl-noise (strong
 // at the start) and a target-attractor (strong at the end). The
 // attractor's pull rate ramps quadratically with progress so the field
@@ -52,7 +52,7 @@ void main() {
 }
 `;
 
-// 3D simplex noise + curl3D (same as disintegrate).
+// 3D simplex noise + curl3D (same as explode).
 const NOISE_GLSL = `
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
