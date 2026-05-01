@@ -106,23 +106,27 @@ void main() {
     // triple points and shrinks if the canvas is downscaled. fwidth
     // keeps the transition one pixel wide wherever you are.
     float aa = fwidth(wallDist);
-    // borderFactor: 1 inside the border band, 0 deep in the cell.
-    // NOT gated by cell-visibility — if it were, the rgb mix at the
-    // gap edge would collapse to mix(base, black, 0.5), letting base
-    // colour leak through outside the border. Keeping it pure means
-    // the border stays solid black right up to where alpha goes to 0.
     float imageMask =
         smoothstep(borderWidth - aa, borderWidth + aa, wallDist);
-    float borderFactor = (1.0 - imageMask) * falloff;
     // visibleMask: 1 anywhere inside the cell (wallDist ≥ 0), fading
     // to 0 across the wall into the gap. One-sided so on-wall pixels
     // don't become half-transparent when shrink is 0.
     float visibleMask = smoothstep(-aa, 0.0, wallDist);
+    // borderActive is a near-hard threshold on shrinkPx — must NOT be
+    // a smooth function of falloff. Earlier we mixed base toward black
+    // by the falloff value, which at mid-falloff cells (a neighbour-
+    // of-neighbour at ~0.65) collapsed the rgb to mix(base, 0, 0.65)
+    // = 35% base + 65% black, leaking the source colour through the
+    // cell outline. With a step in shrinkPx space, every cell inside
+    // the falloffRadius gets a fully opaque black stroke; only a 1-px
+    // shell of cells right at the edge has any rgb interpolation.
+    float borderActive = smoothstep(0.5, 1.5, shrinkPx);
+    float borderMix = (1.0 - imageMask) * borderActive;
 
-    vec3 rgb = mix(base.rgb, vec3(0.0), borderFactor);
+    vec3 rgb = mix(base.rgb, vec3(0.0), borderMix);
     // In the border region we want full opacity so black covers the
     // gap edge cleanly; outside the border alpha follows the source.
-    float alpha = mix(base.a, 1.0, borderFactor) * visibleMask;
+    float alpha = mix(base.a, 1.0, borderMix) * visibleMask;
     outColor = vec4(rgb, alpha);
 }
 `;
