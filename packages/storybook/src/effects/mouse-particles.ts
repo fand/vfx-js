@@ -270,7 +270,9 @@ void main() {
         return;
     }
 
-    float fogFactor = mix(1.0, smoothstep(1.0, -0.5, s.z), fog);
+    float fogFactor = fog > 0.0
+        ? mix(1.0, smoothstep(1.0, -0.5, s.z), fog)
+        : 1.0;
 
     float speedAlpha = 1.0;
     if (speedThreshold > 0.0 && dt > 0.0) {
