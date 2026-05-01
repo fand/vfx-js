@@ -45,6 +45,7 @@ uniform float speed;         // uv per sec at full strength
 uniform float noiseScale;
 uniform float noiseAnimation;  // morph rate on the 4th (time) axis
 uniform float aliveFraction;
+uniform float speedDecay;      // life-taper curve exponent
 
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -175,8 +176,10 @@ void main() {
         vec3 noiseInput = pos * stretch * noiseScale;
         vec3 vIn = curl3D(noiseInput, time * noiseAnimation);
         vec3 v = vIn / stretch;
-        // Linear life taper: full speed at spawn, zero at end of visible life.
-        float lifeSpeed = clamp(1.0 - age / max(aliveFraction, 1e-3), 0.0, 1.0);
+        // Life taper: full speed at spawn, zero at end of visible life.
+        // speedDecay > 1 holds high speed longer; < 1 decays fast early.
+        float lifeRemaining = clamp(1.0 - age / max(aliveFraction, 1e-3), 0.0, 1.0);
+        float lifeSpeed = pow(lifeRemaining, speedDecay);
         pos += v * speed * dt * lifeSpeed;
     }
 
@@ -396,6 +399,12 @@ export type CurlParticlesParams = {
     alpha: number;
     /** Mouse spawn radius in element px. */
     radius: number;
+    /**
+     * Life-taper curve exponent. 1 = linear; >1 holds full speed
+     * longer then slows quickly near the end; <1 decays sharply at
+     * spawn and lingers slow.
+     */
+    speedDecay: number;
     /** Background image opacity 0..1. */
     backgroundOpacity: number;
     /**
@@ -420,6 +429,7 @@ const DEFAULT_PARAMS: CurlParticlesParams = {
     pointSize: 2.0,
     alpha: 0.5,
     radius: 30,
+    speedDecay: 1.0,
     backgroundOpacity: 1.0,
     trailFade: 0.9,
     fog: 0.5,
@@ -523,6 +533,7 @@ export class CurlParticlesEffect implements Effect {
                 noiseScale,
                 noiseAnimation: this.params.noiseAnimation,
                 aliveFraction: this.params.aliveFraction,
+                speedDecay: this.params.speedDecay,
             },
             target: this.#statePos,
         });
