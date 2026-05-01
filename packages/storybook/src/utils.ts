@@ -86,9 +86,8 @@ export function attachBloomPane(title: string, effect: BloomEffect): Pane {
 export function attachFluidPane(title: string, effect: FluidEffect): Pane {
     const container = document.createElement("div");
     container.className = PANE_CLASS;
-    // Stack below the bloom pane so a chain story can show both.
     container.style.cssText =
-        "position:fixed;top:16px;left:16px;width:280px;z-index:10000";
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
     document.body.appendChild(container);
 
     const pane = new Pane({ container, title, expanded: false });
