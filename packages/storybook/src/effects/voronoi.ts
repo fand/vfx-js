@@ -176,7 +176,7 @@ void main() {
         );
         noiseShrink = breathe * max(0.0, snoise(noisePos));
     }
-    float shrink = mix(noiseShrink, press, falloff);
+    float shrink = noiseShrink + press * falloff;
 
     // Pull the wall toward the site
     float edgePx = minEdge * cellSize;
@@ -191,8 +191,9 @@ void main() {
     vec2 sampleContent = mix(scaledUvContent, siteUvContent, flatCells);
     vec4 base = texture(src, srcRectUv.xy + sampleContent * srcRectUv.zw);
 
-    // Cell visibility mask
-    float aa = fwidth(wallDist);
+    // fwidth on edgePx, not wallDist: shrink jumps at cell seams and
+    // would spike fwidth there, leaking src through 1 px of bgColor.
+    float aa = fwidth(edgePx);
     float visibleMask = smoothstep(-aa, 0.0, wallDist);
 
     outColor = mix(bgColor, base, visibleMask);
