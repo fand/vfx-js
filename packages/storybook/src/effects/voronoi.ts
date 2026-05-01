@@ -1,14 +1,7 @@
-// Jittered-grid voronoi where the cells exist only as a hover effect
-// near the mouse. Far from the cursor the input passes through
-// unchanged; near the cursor each cell shrinks toward its site
-// (perpendicular-bisector offset, *not* radial scale — keeps the
-// polygonal shape) leaving transparent gaps, and the shrunken walls
-// are stroked black.
-//
-// Border distance uses IQ's two-pass perpendicular-bisector metric (one
-// pass to find the nearest site, one to take the min distance to any
-// neighbour's bisector) — gives uniform-thickness borders regardless of
-// site distribution, unlike the cheaper `d2 - d1` approximation.
+// Jittered-grid voronoi: cells appear as a hover effect near the
+// mouse. Each affected cell shrinks toward its site (perpendicular-
+// bisector offset, not radial scale — keeps the polygon shape) and
+// gets a black stroke; gaps fall back to bgColor.
 import type { Effect, EffectContext } from "@vfx-js/core";
 
 const FRAG_VORONOI = `#version 300 es
@@ -19,9 +12,8 @@ in vec2 uvSrc;
 out vec4 outColor;
 
 uniform sampler2D src;
-// Auto-uploaded by the host; needed here because we sample src at a
-// non-default UV (scaled around the cell site) and have to redo the
-// content→src remap that the default vertex shader handles.
+// Auto-uploaded by the host; we redo the content→src remap manually
+// because we sample at a UV scaled around the site.
 uniform vec4 srcRectUv;
 uniform vec2 mouseUv;
 uniform vec2 elementPx;
@@ -40,14 +32,11 @@ vec2 hash22(vec2 p) {
     return fract(sin(p) * 43758.5453);
 }
 
-// Per-cell jitter. speed = 0 → static (matches the legacy hash). When
-// speed > 0 each site orbits its hashed base position on a Lissajous
-// path, with a per-cell phase offset so neighbours don't move in sync.
-// Amplitude is capped at 0.25 so sites stay inside the 3×3 search
-// neighbourhood worst-case.
 vec2 jitterFor(vec2 cell) {
     vec2 base = hash22(cell + vec2(seed));
     if (speed > 0.0) {
+        // Amplitude capped at 0.25 so sites stay inside the 3×3
+        // search neighbourhood as they orbit.
         vec2 phase = hash22(cell + vec2(seed + 100.0)) * 6.2831853;
         base += 0.25 * vec2(
             sin(time * speed + phase.x),
@@ -77,8 +66,8 @@ void main() {
         }
     }
 
-    // Min distance to any neighbour's perpendicular bisector — the
-    // actual nearest cell wall. Skip the nearest site itself.
+    // IQ's two-pass perpendicular-bisector distance — uniform-width
+    // borders, unlike the cheaper d2-d1 approximation.
     float minEdge = 1e9;
     for (int j = -1; j <= 1; j++) {
         for (int i = -1; i <= 1; i++) {
@@ -93,63 +82,42 @@ void main() {
         }
     }
 
-    // Per-cell mouse falloff. Distance is measured site→mouse so every
-    // pixel in a cell shrinks by the same amount (otherwise the cell
-    // would warp instead of shrinking uniformly).
+    // Per-cell falloff (site→mouse) so the whole cell shrinks
+    // uniformly rather than warping.
     vec2 siteWorldPx = (ipart + nearestSite) * cellSize;
     vec2 mousePx = mouseUv * elementPx;
-    float distMouseToSitePx = distance(siteWorldPx, mousePx);
-    float falloff = smoothstep(falloffRadius, 0., distMouseToSitePx);
+    float falloff = smoothstep(falloffRadius, 0.,
+                               distance(siteWorldPx, mousePx));
 
-    // Move the wall inward by shrinkPx → cells contract; gaps where
-    // wallDist goes negative become transparent.
     float edgePx = minEdge * cellSize;
     float shrinkPx = falloff * maxShrink;
     float wallDist = edgePx - shrinkPx;
 
-    // Scale the source UV around the site so the cell's original
-    // content gets compressed into the shrunken footprint instead of
-    // being clipped. cellScale ∈ (0, 1]: 1 → no scale, → 0 as the
-    // cell collapses to its site.
+    // Scale UV around the site so the original cell content
+    // compresses into the shrunken footprint instead of being clipped.
     float cellScale = max(0.001, 1.0 - shrinkPx / (cellSize * 0.5));
     vec2 siteUvContent = (ipart + nearestSite) * cellSize / elementPx;
     vec2 scaledUvContent =
         siteUvContent + (uvContent - siteUvContent) / cellScale;
-    // flatCells = 1 → sample at the site only; whole cell takes that
-    // single colour. Useful for a stained-glass / mosaic look.
     vec2 sampleContent = mix(scaledUvContent, siteUvContent, flatCells);
-    vec2 sampleUv = srcRectUv.xy + sampleContent * srcRectUv.zw;
-    vec4 base = texture(src, sampleUv);
+    vec4 base = texture(src, srcRectUv.xy + sampleContent * srcRectUv.zw);
 
-    // Use the actual screen-space derivative of wallDist for AA — its
-    // magnitude is ~1 px in well-behaved regions, but spikes at cell
-    // triple points and shrinks if the canvas is downscaled. fwidth
-    // keeps the transition one pixel wide wherever you are.
     float aa = fwidth(wallDist);
     float imageMask =
         smoothstep(borderWidth - aa, borderWidth + aa, wallDist);
-    // visibleMask: 1 anywhere inside the cell (wallDist ≥ 0), fading
-    // to 0 across the wall into the gap. One-sided so on-wall pixels
-    // don't become half-transparent when shrink is 0.
+    // One-sided: fade only into the gap, so on-wall pixels stay solid
+    // when shrink is 0.
     float visibleMask = smoothstep(-aa, 0.0, wallDist);
-    // borderActive is a near-hard threshold on shrinkPx — must NOT be
-    // a smooth function of falloff. Earlier we mixed base toward black
-    // by the falloff value, which at mid-falloff cells (a neighbour-
-    // of-neighbour at ~0.65) collapsed the rgb to mix(base, 0, 0.65)
-    // = 35% base + 65% black, leaking the source colour through the
-    // cell outline. With a step in shrinkPx space, every cell inside
-    // the falloffRadius gets a fully opaque black stroke; only a 1-px
-    // shell of cells right at the edge has any rgb interpolation.
+    // Threshold on shrinkPx — must NOT be a smooth function of
+    // falloff. mix(base, 0, falloff) at mid-falloff cells leaks 30%+
+    // base colour through the cell outline.
     float borderActive = smoothstep(0.5, 1.5, shrinkPx);
     float borderMix = (1.0 - imageMask) * borderActive;
 
     vec3 cellRgb = mix(base.rgb, vec3(0.0), borderMix);
-    // In the border region we want full opacity so black covers the
-    // gap cleanly; outside the border alpha follows the source.
+    // Force opacity to 1 in the border so black covers the gap edge
+    // cleanly even when the source has alpha < 1.
     float cellAlpha = mix(base.a, 1.0, borderMix);
-    // Composite the cell layer over bgColor, gated by visibleMask. In
-    // the gap (visibleMask=0) we get pure bgColor, inside the cell
-    // (visibleMask=1) the original cell rgb/alpha.
     vec3 rgb = mix(bgColor.rgb, cellRgb, visibleMask);
     float alpha = mix(bgColor.a, cellAlpha, visibleMask);
     outColor = vec4(rgb, alpha);
@@ -164,29 +132,19 @@ export type VoronoiParams = {
     /** Distance from mouse at which the effect fades to 0, in physical px. */
     falloffRadius: number;
     /**
-     * Max wall offset toward the cell centre at full mouse-falloff, in
-     * physical px. Cells whose half-width is smaller fully collapse —
-     * useful for "hole around the cursor" feel.
+     * Max wall offset toward the cell centre at full falloff, in
+     * physical px. Cells whose half-width is smaller fully collapse.
      */
     maxShrink: number;
-    /**
-     * Sample the source at the cell's site only — every pixel in a cell
-     * gets the same colour (mosaic / stained-glass look).
-     */
+    /** Sample at the cell's site only — mosaic / stained-glass look. */
     flatCells: boolean;
-    /** Hash seed; change to get a different cell layout. */
+    /** Hash seed; change for a different cell layout. */
     seed: number;
-    /**
-     * Animation rate, in radians/second. 0 = static (sites pinned to
-     * the hash positions); >0 makes each site orbit on a Lissajous
-     * path with a per-cell phase, so the layout breathes.
-     */
+    /** Animation rate, rad/sec. 0 = static. */
     speed: number;
     /**
-     * Hex colour painted into the gaps left by shrunk cells. Accepts
-     * `#rgb`, `#rgba`, `#rrggbb`, or `#rrggbbaa`. Alpha defaults to ff
-     * when omitted. Default `#00000000` (fully transparent — original
-     * behaviour, page background shows through).
+     * Hex fill for shrunk-cell gaps. `#rgb`, `#rgba`, `#rrggbb`, or
+     * `#rrggbbaa`; alpha defaults to ff. Default `#00000000`.
      */
     bgColor: string;
 };
@@ -204,7 +162,6 @@ const DEFAULT_PARAMS: VoronoiParams = {
 
 function parseHexColor(hex: string): [number, number, number, number] {
     let s = hex.startsWith("#") ? hex.slice(1) : hex;
-    // Expand short forms (#rgb / #rgba) to long form.
     if (s.length === 3 || s.length === 4) {
         s = s
             .split("")
@@ -227,7 +184,6 @@ export class VoronoiEffect implements Effect {
         this.params = { ...DEFAULT_PARAMS, ...initial };
     }
 
-    /** Live-update params without recreating the effect or VFX. */
     setParams(updates: Partial<VoronoiParams>): void {
         Object.assign(this.params, updates);
     }
