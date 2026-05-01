@@ -8,7 +8,6 @@ const FRAG_VORONOI = `#version 300 es
 precision highp float;
 
 in vec2 uvContent;
-in vec2 uvSrc;
 out vec4 outColor;
 
 uniform sampler2D src;
@@ -25,11 +24,37 @@ uniform float seed;
 uniform float flatCells;
 uniform float time;
 uniform float speed;
+uniform float breatheSpeed;
+uniform float breathe;
+uniform float breatheScale;
 uniform vec4 bgColor;
 
 vec2 hash22(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
     return fract(sin(p) * 43758.5453);
+}
+
+float hash31(vec3 p) {
+    return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
+float valueNoise3D(vec3 p) {
+    vec3 ip = floor(p);
+    vec3 fp = fract(p);
+    fp = fp * fp * (3.0 - 2.0 * fp);
+    float c000 = hash31(ip);
+    float c100 = hash31(ip + vec3(1.0, 0.0, 0.0));
+    float c010 = hash31(ip + vec3(0.0, 1.0, 0.0));
+    float c110 = hash31(ip + vec3(1.0, 1.0, 0.0));
+    float c001 = hash31(ip + vec3(0.0, 0.0, 1.0));
+    float c101 = hash31(ip + vec3(1.0, 0.0, 1.0));
+    float c011 = hash31(ip + vec3(0.0, 1.0, 1.0));
+    float c111 = hash31(ip + vec3(1.0, 1.0, 1.0));
+    return mix(
+        mix(mix(c000, c100, fp.x), mix(c010, c110, fp.x), fp.y),
+        mix(mix(c001, c101, fp.x), mix(c011, c111, fp.x), fp.y),
+        fp.z
+    );
 }
 
 vec2 jitterFor(vec2 cell) {
@@ -55,6 +80,7 @@ void main() {
     // Get grid-cell info for 9 neighbors
     vec2 sites[9];
     vec2 nearestSite = vec2(0.0);
+    vec2 nearestG = vec2(0.0);
     float minDistSq = 1e9;
     for (int j = -1; j <= 1; j++) {
         for (int i = -1; i <= 1; i++) {
@@ -65,9 +91,11 @@ void main() {
             if (d < minDistSq) {
                 minDistSq = d;
                 nearestSite = site;
+                nearestG = g;
             }
         }
     }
+    vec2 ownerCell = ipart + nearestG;
 
     // Calculate distance to the voronoi-cell edge
     // (IQ's two-pass perpendicular-bisector distance)
@@ -88,14 +116,25 @@ void main() {
     float falloff = smoothstep(falloffRadius, 0.,
                                distance(siteWorldPx, mousePx));
 
+    // Per-cell noise shrink for cells outside mouse falloff
+    float noiseShrink = 0.0;
+    if (breathe > 0.0) {
+        vec3 noisePos = vec3(
+            ownerCell / breatheScale + vec2(seed + 200.0),
+            time * breatheSpeed
+        );
+        noiseShrink = breathe * valueNoise3D(noisePos);
+    }
+    float shrink = mix(noiseShrink, maxShrink, falloff);
+
     // Pull the wall toward the site
     float edgePx = minEdge * cellSize;
-    float shrinkPx = falloff * maxShrink * cellSize * 0.5;
+    float shrinkPx = shrink * cellSize * 0.5;
     float wallDist = edgePx - shrinkPx;
 
     // Scale UV around the site
-    float cellScale = max(0.001, 1.0 - shrinkPx / (cellSize * 0.5));
-    vec2 siteUvContent = (ipart + nearestSite) * cellSize / elementPx;
+    float cellScale = max(0.001, 1.0 - shrink);
+    vec2 siteUvContent = siteWorldPx / elementPx;
     vec2 scaledUvContent =
         siteUvContent + (uvContent - siteUvContent) / cellScale;
     vec2 sampleContent = mix(scaledUvContent, siteUvContent, flatCells);
@@ -112,13 +151,9 @@ void main() {
     float borderActive = smoothstep(0.5, 1.5, shrinkPx);
     float borderMix = (1.0 - imageMask) * borderActive;
 
-    vec3 cellRgb = mix(base.rgb, vec3(0.0), borderMix);
-
-    // Force border alpha = 1
-    float cellAlpha = mix(base.a, 1.0, borderMix);
-    vec3 rgb = mix(bgColor.rgb, cellRgb, visibleMask);
-    float alpha = mix(bgColor.a, cellAlpha, visibleMask);
-    outColor = vec4(rgb, alpha);
+    // Border = opaque black; gap = bgColor
+    vec4 cell = mix(base, vec4(0.0, 0.0, 0.0, 1.0), borderMix);
+    outColor = mix(bgColor, cell, visibleMask);
 }
 `;
 
@@ -140,6 +175,12 @@ export type VoronoiParams = {
     seed: number;
     /** Animation rate, rad/sec. 0 = static. */
     speed: number;
+    /** Noise-driven shrink for cells outside mouse falloff, in [0, 1]. */
+    breathe: number;
+    /** Animation rate of `breathe`. 0 = static. */
+    breatheSpeed: number;
+    /** Spatial cluster size of `breathe` noise; 1 = each cell independent. */
+    breatheScale: number;
     /**
      * Hex fill for shrunk-cell gaps. `#rgb`, `#rgba`, `#rrggbb`, or
      * `#rrggbbaa`; alpha defaults to ff. Default `#00000000`.
@@ -155,6 +196,9 @@ const DEFAULT_PARAMS: VoronoiParams = {
     flatCells: false,
     seed: 0,
     speed: 0,
+    breathe: 0,
+    breatheSpeed: 0,
+    breatheScale: 1,
     bgColor: "#00000000",
 };
 
@@ -206,6 +250,9 @@ export class VoronoiEffect implements Effect {
                 seed: p.seed,
                 time: ctx.time,
                 speed: Math.max(0, p.speed),
+                breathe: Math.max(0, p.breathe),
+                breatheSpeed: Math.max(0, p.breatheSpeed),
+                breatheScale: Math.max(1, p.breatheScale),
                 bgColor: parseHexColor(p.bgColor),
             },
             target: ctx.target,

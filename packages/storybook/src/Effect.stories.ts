@@ -312,6 +312,9 @@ type VoronoiArgs = {
     flatCells: boolean;
     seed: number;
     speed: number;
+    breathe: number;
+    breatheSpeed: number;
+    breatheScale: number;
     bgColor: string;
 };
 export const voronoi: StoryObj<VoronoiArgs> = {
@@ -333,6 +336,9 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         flatCells: false,
         seed: 0,
         speed: 0,
+        breathe: 0,
+        breatheSpeed: 0,
+        breatheScale: 1,
         bgColor: "#00000000",
     },
     argTypes: {
@@ -347,6 +353,13 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         flatCells: { control: { type: "boolean" } },
         seed: { control: { type: "range", min: 0, max: 1000, step: 1 } },
         speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        breathe: {
+            control: { type: "range", min: 0, max: 1, step: 0.01 },
+        },
+        breatheSpeed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        breatheScale: {
+            control: { type: "range", min: 1, max: 20, step: 0.1 },
+        },
         bgColor: { control: { type: "color" } },
     },
 };
