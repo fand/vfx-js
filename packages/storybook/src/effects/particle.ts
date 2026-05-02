@@ -1,18 +1,24 @@
 // Mouse-driven GPU particles. CPU spawn scheduler picks ring-buffer
-// slots each frame; the per-texel UPDATE pass either applies the
-// matching spawn or advects through a 3D curl-noise field. Composited
-// over a persistent trail buffer.
+// slots each frame and uploads them to a data texture. A full-screen
+// advect pass moves every live particle through a 3D curl-noise field;
+// a separate gl.POINTS spawn pass overwrites the just-advected texels
+// for slots that received fresh spawns. State RTs ping-pong manually.
+// Composited over a persistent trail buffer.
 import type {
     Effect,
     EffectContext,
     EffectGeometry,
     EffectRenderTarget,
+    EffectTexture,
 } from "@vfx-js/core";
 
 const STATE_SIZE = 256;
-// Per-frame uniform array budget for spawn data. 128 vec4 = 512 vertex
-// uniform components, well under the WebGL2 1024-component minimum.
-const MAX_SPAWNS_PER_FRAME = 128;
+// Per-frame spawn budget. Spawn entries are uploaded to a square data
+// texture (vec4 per entry: slotId, uvX, uvY, lifeJitter) sampled by the
+// gl.POINTS spawn pass. 64×64 = 4096 spawns/frame ≈ 245k spawns/sec at
+// 60 fps.
+const SPAWN_TEX_SIZE = 64;
+const MAX_SPAWNS_PER_FRAME = SPAWN_TEX_SIZE * SPAWN_TEX_SIZE;
 // Active mouse if it moved within this window (sec) — otherwise spawn
 // only when `params.spawnOnIdle` is set.
 const IDLE_THRESHOLD = 0.1;
@@ -21,6 +27,15 @@ const LIFE_JITTER_MIN = 0.7;
 const LIFE_JITTER_MAX = 1.3;
 
 const STATE_SIZE_VEC: [number, number] = [STATE_SIZE, STATE_SIZE];
+const SPAWN_TEX_SIZE_VEC: [number, number] = [SPAWN_TEX_SIZE, SPAWN_TEX_SIZE];
+
+// Vertex index per spawn slot. Read in VERT_SPAWN as `int(position)` to
+// pick the right entry in uSpawnTex without depending on gl_VertexID,
+// and to give EffectGeometry a `position` attribute it can count.
+const SPAWN_VERTEX_INDICES = new Float32Array(MAX_SPAWNS_PER_FRAME);
+for (let i = 0; i < MAX_SPAWNS_PER_FRAME; i++) {
+    SPAWN_VERTEX_INDICES[i] = i;
+}
 
 // age = 2.0 keeps every slot dead until UPDATE writes a fresh particle.
 const FRAG_INIT_POS = `#version 300 es
@@ -271,19 +286,16 @@ void main() {
 }
 `;
 
-// Combined spawn + advect. Each texel is either overwritten with a new
-// particle (slot matches one of this frame's spawns) or advected. Every
-// texel is unconditionally written so the persistent (auto-swapped) RT
-// stays consistent.
-const FRAG_UPDATE_POS = `#version 300 es
+// Full-screen advect pass. Reads posTex (and colorTex.w for life
+// jitter), advects through the curl-noise field. Spawns are written
+// separately by the gl.POINTS spawn pass below.
+const FRAG_ADVECT_POS = `#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
 
 uniform sampler2D posTex;
 uniform sampler2D colorTex;
-uniform sampler2D src;
-uniform vec2 stateSize;
 uniform vec2 elementPixel;
 uniform float time;
 uniform float dt;
@@ -292,29 +304,9 @@ uniform float noiseScale;
 uniform float noiseAnimation;
 uniform float speedDecay;
 uniform float life;
-uniform float alphaThreshold;
-uniform vec4 uSpawn[${MAX_SPAWNS_PER_FRAME}];
-uniform int uSpawnCount;
 ${GLSL_CURL_NOISE}
 
 void main() {
-    ivec2 pix = ivec2(floor(uv * stateSize));
-    int myId = pix.y * int(stateSize.x) + pix.x;
-
-    for (int i = 0; i < uSpawnCount; i++) {
-        if (int(uSpawn[i].x) != myId) continue;
-        vec2 spawnUv = uSpawn[i].yz;
-        vec2 inside = step(vec2(0.0), spawnUv) * step(spawnUv, vec2(1.0));
-        float visible = inside.x * inside.y;
-        float a = texture(src, clamp(spawnUv, 0.0, 1.0)).a * visible;
-        if (a < alphaThreshold) {
-            outColor = vec4(0.0, 0.0, 0.0, 2.0);   // born dead
-            return;
-        }
-        outColor = vec4(spawnUv, 0.0, 0.0);
-        return;
-    }
-
     vec4 s = texture(posTex, uv);
     float age = s.w;
     if (age >= 1.0) {
@@ -337,31 +329,84 @@ void main() {
 }
 `;
 
-// Sibling of FRAG_UPDATE_POS for the color/lifeJitter buffer. Spawn
-// texels grab the src color; everything else passes through.
-const FRAG_UPDATE_COLOR = `#version 300 es
+// Color buffer pass-through; spawns are written sparsely by the
+// gl.POINTS spawn pass.
+const FRAG_ADVECT_COLOR = `#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
-
 uniform sampler2D colorTex;
-uniform sampler2D src;
-uniform vec2 stateSize;
-uniform vec4 uSpawn[${MAX_SPAWNS_PER_FRAME}];
+void main() { outColor = texture(colorTex, uv); }
+`;
+
+// Spawn pass: gl.POINTS, one point per spawn entry. Each vertex pulls
+// (slotId, uvX, uvY, lifeJitter) from uSpawnTex, computes the target
+// state texel center as gl_Position, and writes a single texel of the
+// pos / color RT. The `position` attribute carries the spawn-slot
+// index (0..MAX-1) and gives EffectGeometry its vertex count.
+const VERT_SPAWN = `#version 300 es
+precision highp float;
+in float position;
+
+uniform sampler2D uSpawnTex;
+uniform vec2 uSpawnTexSize;
 uniform int uSpawnCount;
+uniform vec2 stateSize;
+
+out vec4 vSpawn;
 
 void main() {
-    ivec2 pix = ivec2(floor(uv * stateSize));
-    int myId = pix.y * int(stateSize.x) + pix.x;
-
-    for (int i = 0; i < uSpawnCount; i++) {
-        if (int(uSpawn[i].x) != myId) continue;
-        vec4 c = texture(src, clamp(uSpawn[i].yz, 0.0, 1.0));
-        outColor = vec4(c.rgb, uSpawn[i].w);
+    int idx = int(position);
+    if (idx >= uSpawnCount) {
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        gl_PointSize = 0.0;
+        vSpawn = vec4(0.0);
         return;
     }
+    int sx = idx % int(uSpawnTexSize.x);
+    int sy = idx / int(uSpawnTexSize.x);
+    vec4 s = texelFetch(uSpawnTex, ivec2(sx, sy), 0);
+    int slot = int(s.x);
+    int tx = slot % int(stateSize.x);
+    int ty = slot / int(stateSize.x);
+    vec2 ndc = (vec2(float(tx), float(ty)) + 0.5) / stateSize * 2.0 - 1.0;
+    gl_Position = vec4(ndc, 0.0, 1.0);
+    gl_PointSize = 1.0;
+    vSpawn = s;
+}
+`;
 
-    outColor = texture(colorTex, uv);
+const FRAG_SPAWN_POS = `#version 300 es
+precision highp float;
+in vec4 vSpawn;
+out vec4 outColor;
+
+uniform sampler2D src;
+uniform float alphaThreshold;
+
+void main() {
+    vec2 spawnUv = vSpawn.yz;
+    vec2 inside = step(vec2(0.0), spawnUv) * step(spawnUv, vec2(1.0));
+    float visible = inside.x * inside.y;
+    float a = texture(src, clamp(spawnUv, 0.0, 1.0)).a * visible;
+    if (a < alphaThreshold) {
+        outColor = vec4(0.0, 0.0, 0.0, 2.0); // born dead
+        return;
+    }
+    outColor = vec4(spawnUv, 0.0, 0.0);
+}
+`;
+
+const FRAG_SPAWN_COLOR = `#version 300 es
+precision highp float;
+in vec4 vSpawn;
+out vec4 outColor;
+
+uniform sampler2D src;
+
+void main() {
+    vec4 c = texture(src, clamp(vSpawn.yz, 0.0, 1.0));
+    outColor = vec4(c.rgb, vSpawn.w);
 }
 `;
 
@@ -428,14 +473,22 @@ const DEFAULT_PARAMS: ParticleParams = {
 export class ParticleEffect implements Effect {
     params: ParticleParams;
 
-    #posTex: EffectRenderTarget | null = null;
-    #colorTex: EffectRenderTarget | null = null;
+    #posTex0: EffectRenderTarget | null = null;
+    #posTex1: EffectRenderTarget | null = null;
+    #colorTex0: EffectRenderTarget | null = null;
+    #colorTex1: EffectRenderTarget | null = null;
+    #stateIndex: 0 | 1 = 0;
     #stampTex: EffectRenderTarget | null = null;
     #trail: EffectRenderTarget | null = null;
     #initialized = false;
 
     #spawnUniform = new Float32Array(MAX_SPAWNS_PER_FRAME * 4);
+    #spawnRawTex: WebGLTexture | null = null;
+    #spawnTexHandle: EffectTexture | null = null;
+    #spawnGeometry: EffectGeometry | null = null;
     #particleGeometry: EffectGeometry | null = null;
+    #gl: WebGL2RenderingContext | null = null;
+    #contextRestoredUnsub: (() => void) | null = null;
     #nextSlot = 0;
     #birthAccumulator = 0;
     #screenBirthAccumulator = 0;
@@ -450,12 +503,16 @@ export class ParticleEffect implements Effect {
         const stateOpts = {
             size: [STATE_SIZE, STATE_SIZE] as [number, number],
             float: true,
-            persistent: true as const,
             wrap: "clamp" as const,
             filter: "nearest" as const,
         };
-        this.#posTex = ctx.createRenderTarget(stateOpts);
-        this.#colorTex = ctx.createRenderTarget(stateOpts);
+        // Manual ping-pong: a sparse spawn pass into a persistent
+        // (auto-swapped) RT would clobber the inactive buffer; two
+        // non-persistent RTs sidestep that.
+        this.#posTex0 = ctx.createRenderTarget(stateOpts);
+        this.#posTex1 = ctx.createRenderTarget(stateOpts);
+        this.#colorTex0 = ctx.createRenderTarget(stateOpts);
+        this.#colorTex1 = ctx.createRenderTarget(stateOpts);
         this.#stampTex = ctx.createRenderTarget({
             float: false,
             wrap: "clamp",
@@ -467,28 +524,106 @@ export class ParticleEffect implements Effect {
             wrap: "clamp",
             filter: "linear",
         });
-        // instanceCount is captured at compile time, so cap to the
-        // construction-time params.count (or the state texture).
         this.#particleGeometry = {
             attributes: { position: QUAD_VERTS },
             instanceCount: this.#cap(),
         };
+        this.#spawnGeometry = {
+            mode: "points",
+            attributes: {
+                position: { data: SPAWN_VERTEX_INDICES, itemSize: 1 },
+            },
+        };
+        this.#gl = ctx.gl;
+        this.#allocSpawnTex(ctx);
+        this.#contextRestoredUnsub = ctx.onContextRestored(() => {
+            this.#gl = ctx.gl;
+            this.#allocSpawnTex(ctx);
+            this.#initialized = false;
+        });
+    }
+
+    #allocSpawnTex(ctx: EffectContext): void {
+        const gl = ctx.gl;
+        const tex = gl.createTexture();
+        if (!tex) {
+            throw new Error("[ParticleEffect] Failed to create spawn texture");
+        }
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        // Counteract the global UNPACK_FLIP_Y_WEBGL=true that the
+        // framework sets for DOM source uploads — our spawn data is a
+        // raw float buffer with row 0 at the top, no flip wanted.
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA32F,
+            SPAWN_TEX_SIZE,
+            SPAWN_TEX_SIZE,
+            0,
+            gl.RGBA,
+            gl.FLOAT,
+            null,
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        this.#spawnRawTex = tex;
+        this.#spawnTexHandle = ctx.wrapTexture(tex, {
+            size: [SPAWN_TEX_SIZE, SPAWN_TEX_SIZE],
+            filter: "nearest",
+            wrap: "clamp",
+        });
+    }
+
+    #uploadSpawnTex(ctx: EffectContext): void {
+        if (!this.#spawnRawTex) {
+            return;
+        }
+        const gl = ctx.gl;
+        gl.bindTexture(gl.TEXTURE_2D, this.#spawnRawTex);
+        // The framework sets UNPACK_FLIP_Y_WEBGL=true globally for DOM
+        // source uploads; reset it for our raw float data so row 0 of
+        // the array stays at row 0 of the texture.
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.texSubImage2D(
+            gl.TEXTURE_2D,
+            0,
+            0,
+            0,
+            SPAWN_TEX_SIZE,
+            SPAWN_TEX_SIZE,
+            gl.RGBA,
+            gl.FLOAT,
+            this.#spawnUniform,
+        );
+        gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
     render(ctx: EffectContext): void {
         if (
-            !this.#posTex ||
-            !this.#colorTex ||
+            !this.#posTex0 ||
+            !this.#posTex1 ||
+            !this.#colorTex0 ||
+            !this.#colorTex1 ||
             !this.#stampTex ||
             !this.#trail ||
-            !this.#particleGeometry
+            !this.#particleGeometry ||
+            !this.#spawnGeometry ||
+            !this.#spawnTexHandle ||
+            !this.#spawnRawTex
         ) {
             return;
         }
 
         if (!this.#initialized) {
-            ctx.draw({ frag: FRAG_INIT_POS, target: this.#posTex });
-            ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#colorTex });
+            ctx.draw({ frag: FRAG_INIT_POS, target: this.#posTex0 });
+            ctx.draw({ frag: FRAG_INIT_POS, target: this.#posTex1 });
+            ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#colorTex0 });
+            ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#colorTex1 });
+            this.#stateIndex = 0;
             this.#initialized = true;
         }
 
@@ -500,14 +635,22 @@ export class ParticleEffect implements Effect {
         ];
 
         const nSpawn = this.#scheduleSpawns(ctx, dt, elementPixel);
+        if (nSpawn > 0) {
+            this.#uploadSpawnTex(ctx);
+        }
+
+        const i = this.#stateIndex;
+        const next: 0 | 1 = i === 0 ? 1 : 0;
+        const posCurr = i === 0 ? this.#posTex0 : this.#posTex1;
+        const posNext = next === 0 ? this.#posTex0 : this.#posTex1;
+        const colorCurr = i === 0 ? this.#colorTex0 : this.#colorTex1;
+        const colorNext = next === 0 ? this.#colorTex0 : this.#colorTex1;
 
         ctx.draw({
-            frag: FRAG_UPDATE_POS,
+            frag: FRAG_ADVECT_POS,
             uniforms: {
-                posTex: this.#posTex,
-                colorTex: this.#colorTex,
-                src: ctx.src,
-                stateSize: STATE_SIZE_VEC,
+                posTex: posCurr,
+                colorTex: colorCurr,
                 elementPixel,
                 time: ctx.time,
                 dt,
@@ -516,32 +659,55 @@ export class ParticleEffect implements Effect {
                 noiseAnimation: this.params.noiseAnimation,
                 speedDecay: this.params.speedDecay,
                 life: this.params.life,
-                alphaThreshold: this.params.alphaThreshold,
-                uSpawn: this.#spawnUniform,
-                uSpawnCount: nSpawn,
             },
-            target: this.#posTex,
+            target: posNext,
         });
-
         ctx.draw({
-            frag: FRAG_UPDATE_COLOR,
-            uniforms: {
-                colorTex: this.#colorTex,
-                src: ctx.src,
-                stateSize: STATE_SIZE_VEC,
-                uSpawn: this.#spawnUniform,
-                uSpawnCount: nSpawn,
-            },
-            target: this.#colorTex,
+            frag: FRAG_ADVECT_COLOR,
+            uniforms: { colorTex: colorCurr },
+            target: colorNext,
         });
+        this.#stateIndex = next;
+
+        if (nSpawn > 0) {
+            ctx.draw({
+                vert: VERT_SPAWN,
+                frag: FRAG_SPAWN_POS,
+                geometry: this.#spawnGeometry,
+                uniforms: {
+                    uSpawnTex: this.#spawnTexHandle,
+                    uSpawnTexSize: SPAWN_TEX_SIZE_VEC,
+                    uSpawnCount: nSpawn,
+                    stateSize: STATE_SIZE_VEC,
+                    src: ctx.src,
+                    alphaThreshold: this.params.alphaThreshold,
+                },
+                target: posNext,
+                blend: "none",
+            });
+            ctx.draw({
+                vert: VERT_SPAWN,
+                frag: FRAG_SPAWN_COLOR,
+                geometry: this.#spawnGeometry,
+                uniforms: {
+                    uSpawnTex: this.#spawnTexHandle,
+                    uSpawnTexSize: SPAWN_TEX_SIZE_VEC,
+                    uSpawnCount: nSpawn,
+                    stateSize: STATE_SIZE_VEC,
+                    src: ctx.src,
+                },
+                target: colorNext,
+                blend: "none",
+            });
+        }
 
         ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
         ctx.draw({
             vert: VERT_PARTICLE,
             frag: FRAG_PARTICLE,
             uniforms: {
-                posTex: this.#posTex,
-                colorTex: this.#colorTex,
+                posTex: posNext,
+                colorTex: colorNext,
                 stateSize: STATE_SIZE_VEC,
                 pointSize: this.params.pointSize,
                 elementPixel,
@@ -670,8 +836,19 @@ export class ParticleEffect implements Effect {
     }
 
     dispose(): void {
-        this.#posTex = null;
-        this.#colorTex = null;
+        this.#contextRestoredUnsub?.();
+        this.#contextRestoredUnsub = null;
+        if (this.#gl && this.#spawnRawTex) {
+            this.#gl.deleteTexture(this.#spawnRawTex);
+        }
+        this.#spawnRawTex = null;
+        this.#spawnTexHandle = null;
+        this.#spawnGeometry = null;
+        this.#gl = null;
+        this.#posTex0 = null;
+        this.#posTex1 = null;
+        this.#colorTex0 = null;
+        this.#colorTex1 = null;
         this.#stampTex = null;
         this.#trail = null;
         this.#particleGeometry = null;
