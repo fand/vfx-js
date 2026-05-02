@@ -144,7 +144,7 @@ reactionDiffusion.play = async ({ canvasElement }) => {
 
 // Mouse-driven emitter particles. Spawns happen only at the cursor's
 // recent position and skip transparent regions of the source image.
-export const mouseParticles: StoryObj<undefined> = {
+export const particle: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
         img.src = Jellyfish;
@@ -152,7 +152,7 @@ export const mouseParticles: StoryObj<undefined> = {
     },
     args: undefined,
 };
-mouseParticles.play = async ({ canvasElement }) => {
+particle.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
     await new Promise<void>((o) => {
         img.onload = () => o();
@@ -172,7 +172,7 @@ mouseParticles.play = async ({ canvasElement }) => {
         }
         effect = new MouseParticlesEffect(savedParams);
         await vfx.add(img, { effect });
-        attachMouseParticlesPane("Mouse Particles", effect, undefined, {
+        attachMouseParticlesPane("Particle", effect, undefined, {
             img,
             sources,
             onSrcChange: async (key) => {
@@ -189,11 +189,10 @@ mouseParticles.play = async ({ canvasElement }) => {
     seedFluidMotion(canvasElement);
 };
 
-// Same as `mouseParticles`, but adds a one-shot Explode burst sized to
-// match the displayed image (~one particle per pixel). Click the Explode
-// button in the pane to shatter the element into mouse-particle-style
-// curl-noise debris.
-export const mouseParticlesExplode: StoryObj<undefined> = {
+// Same as `particle`, but adds a one-shot Explode burst sized to match
+// the displayed image (~one particle per pixel). Click the Explode
+// button in the pane to shatter the element into curl-noise debris.
+export const particleExplode: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
         img.src = Logo;
@@ -201,7 +200,7 @@ export const mouseParticlesExplode: StoryObj<undefined> = {
     },
     args: undefined,
 };
-mouseParticlesExplode.play = async ({ canvasElement }) => {
+particleExplode.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
     await new Promise<void>((o) => {
         img.onload = () => o();
@@ -242,7 +241,7 @@ mouseParticlesExplode.play = async ({ canvasElement }) => {
         effect = new MouseParticlesEffect(savedEffect);
         explode = new MouseParticleExplodeEffect(savedBurst, computeSize());
         await vfx.add(img, { effect: [effect, explode] });
-        attachMouseParticlesPane("Mouse Particles", effect, explode, {
+        attachMouseParticlesPane("Particle", effect, explode, {
             img,
             sources,
             onSrcChange: async (key) => {
