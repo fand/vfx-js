@@ -352,6 +352,12 @@ export function attachParticlePane(
         step: 0.01,
     });
     appearance.addBinding(effect.params, "fog", { min: 0, max: 1, step: 0.01 });
+    appearance.addBinding(effect.params, "color", { view: "color" });
+    appearance.addBinding(effect.params, "colorMix", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
 
     const composite = pane.addFolder({ title: "Composite", expanded: true });
     composite.addBinding(effect.params, "trailFade", {

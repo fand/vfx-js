@@ -403,10 +403,12 @@ in vec4 vSpawn;
 out vec4 outColor;
 
 uniform sampler2D src;
+uniform vec3 color;
+uniform float colorMix;
 
 void main() {
     vec4 c = texture(src, clamp(vSpawn.yz, 0.0, 1.0));
-    outColor = vec4(c.rgb, vSpawn.w);
+    outColor = vec4(mix(c.rgb, color, colorMix), vSpawn.w);
 }
 `;
 
@@ -448,6 +450,10 @@ export type ParticleParams = {
     trailFade: number;
     /** Depth fog 0..1. */
     fog: number;
+    /** Base color blended into particle rgb (hex 0xRRGGBB). */
+    color: number;
+    /** Mix amount between src color (0) and `color` (1). */
+    colorMix: number;
 };
 
 const DEFAULT_PARAMS: ParticleParams = {
@@ -468,6 +474,8 @@ const DEFAULT_PARAMS: ParticleParams = {
     backgroundOpacity: 1.0,
     trailFade: 0.5,
     fog: 0.5,
+    color: 0xffffff,
+    colorMix: 0,
 };
 
 export class ParticleEffect implements Effect {
@@ -685,6 +693,12 @@ export class ParticleEffect implements Effect {
                 target: posNext,
                 blend: "none",
             });
+            const cHex = this.params.color | 0;
+            const colorRGB: [number, number, number] = [
+                ((cHex >> 16) & 0xff) / 255,
+                ((cHex >> 8) & 0xff) / 255,
+                (cHex & 0xff) / 255,
+            ];
             ctx.draw({
                 vert: VERT_SPAWN,
                 frag: FRAG_SPAWN_COLOR,
@@ -695,6 +709,8 @@ export class ParticleEffect implements Effect {
                     uSpawnCount: nSpawn,
                     stateSize: STATE_SIZE_VEC,
                     src: ctx.src,
+                    color: colorRGB,
+                    colorMix: this.params.colorMix,
                 },
                 target: colorNext,
                 blend: "none",
