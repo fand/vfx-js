@@ -390,7 +390,11 @@ export class MouseParticleExplodeEffect implements Effect {
             : [STATE_SIZE_DEFAULT, STATE_SIZE_DEFAULT];
         this.#stateSizeVec = [this.#stateSize[0], this.#stateSize[1]];
         const fullCount = this.#stateSize[0] * this.#stateSize[1];
-        this.params = { ...DEFAULT_PARAMS, count: fullCount, ...initial };
+        // count must be last so a saved-from-previous-instance value
+        // (carried via { ...explode.params } when the story re-creates
+        // the effect with a different stateSize) can't shrink the new
+        // state and leave the top rows unrendered.
+        this.params = { ...DEFAULT_PARAMS, ...initial, count: fullCount };
     }
 
     trigger(): void {
