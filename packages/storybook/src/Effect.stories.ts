@@ -3,9 +3,9 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
-import { MouseParticleExplodeEffect } from "./effects/mouse-particle-explode";
 import { FluidEffect } from "./effects/fluid";
-import { MouseParticlesEffect } from "./effects/mouse-particles";
+import { ParticleExplodeEffect } from "./effects/particle-explode";
+import { ParticleEffect } from "./effects/particle";
 import { createPixelateEffect } from "./effects/pixelate";
 import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 import { createScanlineEffect } from "./effects/scanline";
@@ -14,7 +14,7 @@ import "./preset.css";
 import {
     attachBloomPane,
     attachFluidPane,
-    attachMouseParticlesPane,
+    attachParticlePane,
     attachRDPane,
     disposeAllPanes,
     initVFX,
@@ -163,16 +163,16 @@ particle.play = async ({ canvasElement }) => {
     // The framework loads img.src once at vfx.add and never observes
     // later changes, so swapping requires remove + new effect (with
     // preserved params) + add + reattach pane.
-    let effect: MouseParticlesEffect | null = null;
+    let effect: ParticleEffect | null = null;
     const setup = async () => {
         const savedParams = effect ? { ...effect.params } : {};
         if (effect) {
             vfx.remove(img);
             disposeAllPanes();
         }
-        effect = new MouseParticlesEffect(savedParams);
+        effect = new ParticleEffect(savedParams);
         await vfx.add(img, { effect });
-        attachMouseParticlesPane("Particle", effect, undefined, {
+        attachParticlePane("Particle", effect, undefined, {
             img,
             sources,
             onSrcChange: async (key) => {
@@ -228,8 +228,8 @@ particleExplode.play = async ({ canvasElement }) => {
 
     const vfx = initVFX();
     const sources = { Logo, Jellyfish };
-    let effect: MouseParticlesEffect | null = null;
-    let explode: MouseParticleExplodeEffect | null = null;
+    let effect: ParticleEffect | null = null;
+    let explode: ParticleExplodeEffect | null = null;
     const setup = async () => {
         const savedEffect = effect ? { ...effect.params } : { pointSize: 1.0 };
         const savedBurst = explode ? { ...explode.params } : {};
@@ -238,10 +238,10 @@ particleExplode.play = async ({ canvasElement }) => {
             disposeAllPanes();
         }
         await new Promise((r) => requestAnimationFrame(() => r(undefined)));
-        effect = new MouseParticlesEffect(savedEffect);
-        explode = new MouseParticleExplodeEffect(savedBurst, computeSize());
+        effect = new ParticleEffect(savedEffect);
+        explode = new ParticleExplodeEffect(savedBurst, computeSize());
         await vfx.add(img, { effect: [effect, explode] });
-        attachMouseParticlesPane("Particle", effect, explode, {
+        attachParticlePane("Particle", effect, explode, {
             img,
             sources,
             onSrcChange: async (key) => {

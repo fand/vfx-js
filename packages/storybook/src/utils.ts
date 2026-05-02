@@ -1,9 +1,9 @@
 import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
-import type { MouseParticleExplodeEffect } from "./effects/mouse-particle-explode";
 import type { FluidEffect } from "./effects/fluid";
-import type { MouseParticlesEffect } from "./effects/mouse-particles";
+import type { ParticleExplodeEffect } from "./effects/particle-explode";
+import type { ParticleEffect } from "./effects/particle";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
 const PANE_CLASS = "vfx-tweakpane-container";
@@ -223,10 +223,10 @@ export function attachRDPane(
     return pane;
 }
 
-export function attachMouseParticlesPane(
+export function attachParticlePane(
     title: string,
-    effect: MouseParticlesEffect,
-    burst?: MouseParticleExplodeEffect,
+    effect: ParticleEffect,
+    burst?: ParticleExplodeEffect,
     srcSelector?: {
         img: HTMLImageElement;
         sources: Record<string, string>;

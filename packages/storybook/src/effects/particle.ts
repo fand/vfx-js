@@ -365,7 +365,7 @@ void main() {
 }
 `;
 
-export type MouseParticlesParams = {
+export type ParticleParams = {
     /** Max particles. Capped at construction by the state texture size. */
     count: number;
     /** Particles per second emitted within `radius` of the mouse while
@@ -405,7 +405,7 @@ export type MouseParticlesParams = {
     fog: number;
 };
 
-const DEFAULT_PARAMS: MouseParticlesParams = {
+const DEFAULT_PARAMS: ParticleParams = {
     count: STATE_SIZE * STATE_SIZE,
     birthRate: 4000,
     screenBirthRate: 0,
@@ -425,8 +425,8 @@ const DEFAULT_PARAMS: MouseParticlesParams = {
     fog: 0.5,
 };
 
-export class MouseParticlesEffect implements Effect {
-    params: MouseParticlesParams;
+export class ParticleEffect implements Effect {
+    params: ParticleParams;
 
     #posTex: EffectRenderTarget | null = null;
     #colorTex: EffectRenderTarget | null = null;
@@ -442,7 +442,7 @@ export class MouseParticlesEffect implements Effect {
     #lastMouseUv: [number, number] | null = null;
     #lastMoveTime = -Infinity;
 
-    constructor(initial: Partial<MouseParticlesParams> = {}) {
+    constructor(initial: Partial<ParticleParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
     }
 

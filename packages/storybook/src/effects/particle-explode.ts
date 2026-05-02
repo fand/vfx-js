@@ -1,4 +1,4 @@
-// One-shot full-element burst that reuses mouse-particles' curl-noise
+// One-shot full-element burst that reuses particle.ts's curl-noise
 // advection. trigger() seeds every state texel from its own uv (so the
 // element "shatters" into ~one particle per state slot); particles
 // then advect via 3D curl + radial outward bias and fade out over
@@ -14,7 +14,7 @@ import type {
 const STATE_SIZE_DEFAULT = 256;
 
 // 4D simplex noise (Ashima Arts / Ian McEwan, MIT) + 3D curl on top —
-// identical to mouse-particles so the two effects animate consistently.
+// identical to particle.ts so the two effects animate consistently.
 const GLSL_CURL_NOISE = `
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 float mod289(float x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -320,7 +320,7 @@ void main() {
 }
 `;
 
-export type MouseParticleExplodeParams = {
+export type ParticleExplodeParams = {
     /** Particle count. Locked at construction by the state texture size. */
     count: number;
     /** Total burst duration (sec); per-particle life is jittered. */
@@ -348,7 +348,7 @@ export type MouseParticleExplodeParams = {
     trailFade: number;
 };
 
-const DEFAULT_PARAMS: MouseParticleExplodeParams = {
+const DEFAULT_PARAMS: ParticleExplodeParams = {
     count: STATE_SIZE_DEFAULT * STATE_SIZE_DEFAULT,
     duration: 1.5,
     speed: 0.4,
@@ -365,8 +365,8 @@ const DEFAULT_PARAMS: MouseParticleExplodeParams = {
 
 // One-shot explode. Construct a new instance per `vfx.add()`. Call
 // `trigger()` to start; query `isDone()` to detect completion.
-export class MouseParticleExplodeEffect implements Effect {
-    params: MouseParticleExplodeParams;
+export class ParticleExplodeEffect implements Effect {
+    params: ParticleExplodeParams;
 
     #posTex: EffectRenderTarget | null = null;
     #colorTex: EffectRenderTarget | null = null;
@@ -382,7 +382,7 @@ export class MouseParticleExplodeEffect implements Effect {
     #lastElapsed = 0;
 
     constructor(
-        initial: Partial<MouseParticleExplodeParams> = {},
+        initial: Partial<ParticleExplodeParams> = {},
         stateSize?: readonly [number, number],
     ) {
         this.#stateSize = stateSize
