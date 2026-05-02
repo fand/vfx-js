@@ -352,6 +352,7 @@ export function attachParticlesPane(
 export function attachMouseParticlesPane(
     title: string,
     effect: MouseParticlesEffect,
+    burst?: MouseParticleExplodeEffect,
     srcSelector?: {
         img: HTMLImageElement;
         sources: Record<string, string>;
@@ -365,6 +366,31 @@ export function attachMouseParticlesPane(
     container.style.cssText =
         "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
     document.body.appendChild(container);
+
+    if (burst) {
+        // Share visual params so a single slider drives both effects.
+        // trailFade, life/duration, and burst-only knobs (outwardBias)
+        // stay independent.
+        for (const key of [
+            "speed",
+            "noiseScale",
+            "noiseAnimation",
+            "pointSize",
+            "alpha",
+            "alphaDecay",
+            "speedDecay",
+            "fog",
+        ] as const) {
+            Object.defineProperty(burst.params, key, {
+                get: () => effect.params[key],
+                set: (v: number) => {
+                    effect.params[key] = v;
+                },
+                configurable: true,
+                enumerable: true,
+            });
+        }
+    }
 
     const pane = new Pane({ container, title, expanded: false });
     if (srcSelector) {
@@ -464,6 +490,32 @@ export function attachMouseParticlesPane(
         max: 1,
         step: 0.01,
     });
+
+    if (burst) {
+        const burstFolder = pane.addFolder({ title: "Burst", expanded: true });
+        burstFolder.addBinding(burst.params, "duration", {
+            min: 0.2,
+            max: 5,
+            step: 0.1,
+        });
+        burstFolder.addBinding(burst.params, "outwardBias", {
+            min: 0,
+            max: 5,
+            step: 0.05,
+        });
+        burstFolder.addBinding(burst.params, "trailFade", {
+            min: 0,
+            max: 1,
+            step: 0.005,
+        });
+        burstFolder.addButton({ title: "Explode" }).on("click", () => {
+            burst.trigger();
+        });
+        burstFolder.addButton({ title: "Reset" }).on("click", () => {
+            burst.reset();
+        });
+    }
+
     trackPane(pane);
     return pane;
 }

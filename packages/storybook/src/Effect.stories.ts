@@ -301,7 +301,77 @@ mouseParticles.play = async ({ canvasElement }) => {
         }
         effect = new MouseParticlesEffect(savedParams);
         await vfx.add(img, { effect });
-        attachMouseParticlesPane("Mouse Particles", effect, {
+        attachMouseParticlesPane("Mouse Particles", effect, undefined, {
+            img,
+            sources,
+            onSrcChange: async (key) => {
+                img.src = sources[key as keyof typeof sources];
+                await new Promise<void>((o) => {
+                    img.onload = () => o();
+                });
+                await setup();
+            },
+        });
+    };
+    await setup();
+
+    seedFluidMotion(canvasElement);
+};
+
+// Same as `mouseParticles`, but adds a one-shot Explode burst sized to
+// match the displayed image (~one particle per pixel). Click the Explode
+// button in the pane to shatter the element into mouse-particle-style
+// curl-noise debris.
+export const mouseParticlesExplode: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Logo;
+        return img;
+    },
+    args: undefined,
+};
+mouseParticlesExplode.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise<void>((o) => {
+        img.onload = () => o();
+    });
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    const dpr = window.devicePixelRatio || 1;
+    const STATE_MAX = 2048;
+    const computeSize = (): [number, number] => [
+        Math.min(
+            STATE_MAX,
+            Math.max(
+                1,
+                Math.round((img.clientWidth || img.naturalWidth) * dpr),
+            ),
+        ),
+        Math.min(
+            STATE_MAX,
+            Math.max(
+                1,
+                Math.round((img.clientHeight || img.naturalHeight) * dpr),
+            ),
+        ),
+    ];
+
+    const vfx = initVFX();
+    const sources = { Logo, Jellyfish };
+    let effect: MouseParticlesEffect | null = null;
+    let explode: MouseParticleExplodeEffect | null = null;
+    const setup = async () => {
+        const savedEffect = effect ? { ...effect.params } : { pointSize: 1.0 };
+        const savedBurst = explode ? { ...explode.params } : {};
+        if (effect) {
+            vfx.remove(img);
+            disposeAllPanes();
+        }
+        await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+        effect = new MouseParticlesEffect(savedEffect);
+        explode = new MouseParticleExplodeEffect(savedBurst, computeSize());
+        await vfx.add(img, { effect: [effect, explode] });
+        attachMouseParticlesPane("Mouse Particles", effect, explode, {
             img,
             sources,
             onSrcChange: async (key) => {
