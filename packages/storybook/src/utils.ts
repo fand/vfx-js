@@ -2,7 +2,7 @@ import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
 import type { CurlParticlesEffect } from "./effects/curl-particles";
-import type { ExplodeEffect } from "./effects/explode";
+import type { MouseParticleExplodeEffect } from "./effects/mouse-particle-explode";
 import type { FluidEffect } from "./effects/fluid";
 import type { MouseParticlesEffect } from "./effects/mouse-particles";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
@@ -227,7 +227,7 @@ export function attachRDPane(
 export function attachParticlesPane(
     title: string,
     effect: CurlParticlesEffect,
-    burst?: ExplodeEffect,
+    burst?: MouseParticleExplodeEffect,
     srcSelector?: {
         img: HTMLImageElement;
         sources: Record<string, string>;

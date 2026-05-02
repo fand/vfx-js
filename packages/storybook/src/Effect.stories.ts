@@ -4,7 +4,7 @@ import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
 import { CurlParticlesEffect } from "./effects/curl-particles";
-import { ExplodeEffect } from "./effects/explode";
+import { MouseParticleExplodeEffect } from "./effects/mouse-particle-explode";
 import { FluidEffect } from "./effects/fluid";
 import { MouseParticlesEffect } from "./effects/mouse-particles";
 import { createPixelateEffect } from "./effects/pixelate";
@@ -166,7 +166,7 @@ curlParticles.play = async ({ canvasElement }) => {
     const vfx = initVFX();
     const sources = { Jellyfish, Logo };
     let effect: CurlParticlesEffect | null = null;
-    let explode: ExplodeEffect | null = null;
+    let explode: MouseParticleExplodeEffect | null = null;
     const setup = async () => {
         const savedEffect = effect ? { ...effect.params } : {};
         const savedBurst = explode ? { ...explode.params } : {};
@@ -175,7 +175,7 @@ curlParticles.play = async ({ canvasElement }) => {
             disposeAllPanes();
         }
         effect = new CurlParticlesEffect(savedEffect);
-        explode = new ExplodeEffect(savedBurst);
+        explode = new MouseParticleExplodeEffect(savedBurst);
         await vfx.add(img, { effect: [effect, explode] });
         attachParticlesPane("Particles", effect, explode, {
             img,
@@ -241,7 +241,7 @@ curlParticlesExplode.play = async ({ canvasElement }) => {
     // particle only needs to cover its own pixel. Both effects read
     // pointSize via the proxy installed in attachParticlesPane.
     let effect: CurlParticlesEffect | null = null;
-    let explode: ExplodeEffect | null = null;
+    let explode: MouseParticleExplodeEffect | null = null;
     const setup = async () => {
         const savedEffect = effect ? { ...effect.params } : { pointSize: 1.0 };
         const savedBurst = explode ? { ...explode.params } : {};
@@ -252,7 +252,7 @@ curlParticlesExplode.play = async ({ canvasElement }) => {
         // Wait a frame so the resized img has up-to-date clientWidth/H.
         await new Promise((r) => requestAnimationFrame(() => r(undefined)));
         effect = new CurlParticlesEffect(savedEffect);
-        explode = new ExplodeEffect(savedBurst, computeSize());
+        explode = new MouseParticleExplodeEffect(savedBurst, computeSize());
         await vfx.add(img, { effect: [effect, explode] });
         attachParticlesPane("Particles", effect, explode, {
             img,
