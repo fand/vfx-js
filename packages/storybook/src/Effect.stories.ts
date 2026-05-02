@@ -3,7 +3,6 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
-import { CurlParticlesEffect } from "./effects/curl-particles";
 import { MouseParticleExplodeEffect } from "./effects/mouse-particle-explode";
 import { FluidEffect } from "./effects/fluid";
 import { MouseParticlesEffect } from "./effects/mouse-particles";
@@ -16,7 +15,6 @@ import {
     attachBloomPane,
     attachFluidPane,
     attachMouseParticlesPane,
-    attachParticlesPane,
     attachRDPane,
     disposeAllPanes,
     initVFX,
@@ -142,133 +140,6 @@ reactionDiffusion.play = async ({ canvasElement }) => {
         vfx.render();
     }
     vfx.play();
-};
-
-// Mouse-driven GPU curl-noise particles. Particles spawn within
-// `radius` px of the cursor, advect along curl noise, and leave fading
-// trails on a persistent buffer. The play() helper sweeps a synthetic
-// pointer in a circle so the captured screenshot already has particles
-// before any human interaction.
-export const curlParticles: StoryObj<undefined> = {
-    render: () => {
-        const img = document.createElement("img");
-        img.src = Jellyfish;
-        return img;
-    },
-    args: undefined,
-};
-curlParticles.play = async ({ canvasElement }) => {
-    const img = canvasElement.querySelector("img") as HTMLImageElement;
-    await new Promise<void>((o) => {
-        img.onload = () => o();
-    });
-
-    const vfx = initVFX();
-    const sources = { Jellyfish, Logo };
-    let effect: CurlParticlesEffect | null = null;
-    let explode: MouseParticleExplodeEffect | null = null;
-    const setup = async () => {
-        const savedEffect = effect ? { ...effect.params } : {};
-        const savedBurst = explode ? { ...explode.params } : {};
-        if (effect) {
-            vfx.remove(img);
-            disposeAllPanes();
-        }
-        effect = new CurlParticlesEffect(savedEffect);
-        explode = new MouseParticleExplodeEffect(savedBurst);
-        await vfx.add(img, { effect: [effect, explode] });
-        attachParticlesPane("Particles", effect, explode, {
-            img,
-            sources,
-            onSrcChange: async (key) => {
-                img.src = sources[key as keyof typeof sources];
-                await new Promise<void>((o) => {
-                    img.onload = () => o();
-                });
-                await setup();
-            },
-        });
-    };
-    await setup();
-
-    seedFluidMotion(canvasElement);
-};
-
-// Same as `curlParticles`, but the Explode burst sizes its particle
-// simulation texture to match the displayed image so there's roughly
-// one particle per pixel — gives a clean dissolve where every pixel of
-// the source contributes a particle. Capped per-axis to stay within
-// reasonable GPU memory limits.
-export const curlParticlesExplode: StoryObj<undefined> = {
-    render: () => {
-        const img = document.createElement("img");
-        img.src = Logo;
-        return img;
-    },
-    args: undefined,
-};
-curlParticlesExplode.play = async ({ canvasElement }) => {
-    const img = canvasElement.querySelector("img") as HTMLImageElement;
-    await new Promise<void>((o) => {
-        img.onload = () => o();
-    });
-    // Wait one frame so layout is resolved and clientWidth/Height are
-    // populated with the actual rendered pixel size.
-    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
-
-    const dpr = window.devicePixelRatio || 1;
-    const STATE_MAX = 2048;
-    const computeSize = (): [number, number] => [
-        Math.min(
-            STATE_MAX,
-            Math.max(
-                1,
-                Math.round((img.clientWidth || img.naturalWidth) * dpr),
-            ),
-        ),
-        Math.min(
-            STATE_MAX,
-            Math.max(
-                1,
-                Math.round((img.clientHeight || img.naturalHeight) * dpr),
-            ),
-        ),
-    ];
-
-    const vfx = initVFX();
-    const sources = { Logo, Jellyfish };
-    // pointSize=1 — with one particle per displayed pixel, each
-    // particle only needs to cover its own pixel. Both effects read
-    // pointSize via the proxy installed in attachParticlesPane.
-    let effect: CurlParticlesEffect | null = null;
-    let explode: MouseParticleExplodeEffect | null = null;
-    const setup = async () => {
-        const savedEffect = effect ? { ...effect.params } : { pointSize: 1.0 };
-        const savedBurst = explode ? { ...explode.params } : {};
-        if (effect) {
-            vfx.remove(img);
-            disposeAllPanes();
-        }
-        // Wait a frame so the resized img has up-to-date clientWidth/H.
-        await new Promise((r) => requestAnimationFrame(() => r(undefined)));
-        effect = new CurlParticlesEffect(savedEffect);
-        explode = new MouseParticleExplodeEffect(savedBurst, computeSize());
-        await vfx.add(img, { effect: [effect, explode] });
-        attachParticlesPane("Particles", effect, explode, {
-            img,
-            sources,
-            onSrcChange: async (key) => {
-                img.src = sources[key as keyof typeof sources];
-                await new Promise<void>((o) => {
-                    img.onload = () => o();
-                });
-                await setup();
-            },
-        });
-    };
-    await setup();
-
-    seedFluidMotion(canvasElement);
 };
 
 // Mouse-driven emitter particles. Spawns happen only at the cursor's

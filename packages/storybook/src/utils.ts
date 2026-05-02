@@ -1,7 +1,6 @@
 import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
-import type { CurlParticlesEffect } from "./effects/curl-particles";
 import type { MouseParticleExplodeEffect } from "./effects/mouse-particle-explode";
 import type { FluidEffect } from "./effects/fluid";
 import type { MouseParticlesEffect } from "./effects/mouse-particles";
@@ -220,131 +219,6 @@ export function attachRDPane(
     pane.addBinding(scaleProxy, "scaleLow", { min: 0.1, max: 5, step: 0.05 });
     pane.addBinding(scaleProxy, "scaleHigh", { min: 0.1, max: 5, step: 0.05 });
     pane.addButton({ title: "reseed" }).on("click", () => effect.reseed());
-    trackPane(pane);
-    return pane;
-}
-
-export function attachParticlesPane(
-    title: string,
-    effect: CurlParticlesEffect,
-    burst?: MouseParticleExplodeEffect,
-    srcSelector?: {
-        img: HTMLImageElement;
-        sources: Record<string, string>;
-        // Called instead of mutating img.src directly. The framework
-        // doesn't observe src changes on HTMLImageElement, so swapping
-        // requires vfx.remove + vfx.add — the story owns that.
-        onSrcChange?: (key: string) => void | Promise<void>;
-    },
-): Pane {
-    const container = document.createElement("div");
-    container.className = PANE_CLASS;
-    container.style.cssText =
-        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
-    document.body.appendChild(container);
-
-    if (burst) {
-        // Share visual params so a single slider drives both effects.
-        // Without this proxy, sliders only mutate the curl-particles
-        // params object — the burst effect keeps its own copy and
-        // ignores changes. trailFade is curl-only (the burst doesn't
-        // render trails) so it is intentionally not in this list.
-        for (const key of ["noiseScale", "pointSize", "fog"] as const) {
-            Object.defineProperty(burst.params, key, {
-                get: () => effect.params[key],
-                set: (v: number) => {
-                    effect.params[key] = v;
-                },
-                configurable: true,
-                enumerable: true,
-            });
-        }
-        // burst.duration ← curl-particles.lifespan (different names,
-        // same intent — total animation time the slider drives).
-        Object.defineProperty(burst.params, "duration", {
-            get: () => effect.params.lifespan,
-            set: (v: number) => {
-                effect.params.lifespan = v;
-            },
-            configurable: true,
-            enumerable: true,
-        });
-    }
-
-    const pane = new Pane({ container, title, expanded: false });
-    if (srcSelector) {
-        const { img, sources, onSrcChange } = srcSelector;
-        const keys = Object.keys(sources);
-        const initialKey = keys.find((k) => sources[k] === img.src) ?? keys[0];
-        const state = { src: initialKey };
-        const options: Record<string, string> = Object.fromEntries(
-            keys.map((k) => [k, k]),
-        );
-        pane.addBinding(state, "src", { options }).on("change", (ev) => {
-            const next = ev.value as string;
-            if (onSrcChange) {
-                onSrcChange(next);
-            } else {
-                img.src = sources[next];
-            }
-        });
-    }
-    pane.addBinding(effect.params, "lifespan", {
-        min: 0.5,
-        max: 5,
-        step: 0.1,
-    });
-    pane.addBinding(effect.params, "aliveFraction", {
-        min: 0.1,
-        max: 1,
-        step: 0.01,
-    });
-    pane.addBinding(effect.params, "speed", { min: 0, max: 1, step: 0.005 });
-    pane.addBinding(effect.params, "noiseScale", {
-        min: 0,
-        max: 5,
-        step: 0.05,
-    });
-    pane.addBinding(effect.params, "noiseAnimation", {
-        min: 0,
-        max: 2,
-        step: 0.01,
-    });
-    pane.addBinding(effect.params, "pointSize", {
-        min: 1,
-        max: 5,
-        step: 0.1,
-    });
-    pane.addBinding(effect.params, "alpha", { min: 0, max: 1, step: 0.01 });
-    pane.addBinding(effect.params, "radius", {
-        min: 10,
-        max: 200,
-        step: 1,
-    });
-    pane.addBinding(effect.params, "fog", { min: 0, max: 1, step: 0.01 });
-    pane.addBinding(effect.params, "speedDecay", {
-        min: 0.1,
-        max: 5,
-        step: 0.1,
-    });
-    pane.addBinding(effect.params, "backgroundOpacity", {
-        min: 0,
-        max: 1,
-        step: 0.01,
-    });
-    pane.addBinding(effect.params, "trailFade", {
-        min: 0,
-        max: 1,
-        step: 0.005,
-    });
-    if (burst) {
-        pane.addButton({ title: "Explode" }).on("click", () => {
-            burst.trigger();
-        });
-        pane.addButton({ title: "Reset" }).on("click", () => {
-            burst.reset();
-        });
-    }
     trackPane(pane);
     return pane;
 }
