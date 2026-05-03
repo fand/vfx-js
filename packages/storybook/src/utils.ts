@@ -292,15 +292,18 @@ export function attachParticlePane(
         max: STATE_SIZE * STATE_SIZE,
         step: 1,
     });
+    // Effective spawn cap is MAX_SPAWNS_PER_FRAME × 60 ≈ 245k/sec
+    // (mouse + screen combined). Per-slider 200k leaves headroom while
+    // staying under the per-frame budget when only one is engaged.
     emitter.addBinding(effect.params, "birthRate", {
         min: 0,
-        max: 10000,
-        step: 50,
+        max: 200000,
+        step: 1000,
     });
     emitter.addBinding(effect.params, "screenBirthRate", {
         min: 0,
-        max: 10000,
-        step: 50,
+        max: 200000,
+        step: 1000,
     });
     emitter.addBinding(effect.params, "radius", { min: 5, max: 300, step: 1 });
     emitter.addBinding(effect.params, "alphaThreshold", {
