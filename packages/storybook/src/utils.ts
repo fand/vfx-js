@@ -3,7 +3,7 @@ import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
 import type { FluidEffect } from "./effects/fluid";
 import type { ParticleExplodeEffect } from "./effects/particle-explode";
-import type { ParticleEffect } from "./effects/particle";
+import { STATE_SIZE, type ParticleEffect } from "./effects/particle";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
 const PANE_CLASS = "vfx-tweakpane-container";
@@ -286,10 +286,10 @@ export function attachParticlePane(
     }
     const emitter = pane.addFolder({ title: "Emitter", expanded: true });
     // count caps the ring buffer at runtime; the renderable instance
-    // count was locked at construction (256*256 by default).
+    // count was locked at construction (STATE_SIZE² by default).
     emitter.addBinding(effect.params, "count", {
         min: 1,
-        max: 256 * 256,
+        max: STATE_SIZE * STATE_SIZE,
         step: 1,
     });
     emitter.addBinding(effect.params, "birthRate", {

@@ -12,7 +12,11 @@ import type {
     EffectTexture,
 } from "@vfx-js/core";
 
-const STATE_SIZE = 256;
+// State texture footprint: 4 RTs (pos×2, color×2) × STATE_SIZE² × 16 B
+// = 64 MB at 1024 (RGBA32F) / 32 MB at RGBA16F fallback. Within budget
+// for desktop and modern mobile; bump down to 512 if a target device
+// struggles.
+export const STATE_SIZE = 1024;
 // Per-frame spawn budget. Spawn entries are uploaded to a square data
 // texture (vec4 per entry: slotId, uvX, uvY, lifeJitter) sampled by the
 // gl.POINTS spawn pass. 64×64 = 4096 spawns/frame ≈ 245k spawns/sec at
