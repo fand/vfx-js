@@ -2,8 +2,8 @@ import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
 import type { FluidEffect } from "./effects/fluid";
+import { type ParticleEffect, STATE_SIZE } from "./effects/particle";
 import type { ParticleExplodeEffect } from "./effects/particle-explode";
-import { STATE_SIZE, type ParticleEffect } from "./effects/particle";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
 const PANE_CLASS = "vfx-tweakpane-container";
@@ -376,6 +376,11 @@ export function attachParticlePane(
 
     if (burst) {
         const burstFolder = pane.addFolder({ title: "Burst", expanded: true });
+        burstFolder.addBinding(burst.params, "count", {
+            min: 1,
+            max: STATE_SIZE * STATE_SIZE,
+            step: 1,
+        });
         burstFolder.addBinding(burst.params, "duration", {
             min: 0.2,
             max: 5,

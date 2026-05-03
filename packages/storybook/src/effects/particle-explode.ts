@@ -11,7 +11,11 @@ import type {
     EffectRenderTarget,
 } from "@vfx-js/core";
 
-const STATE_SIZE_DEFAULT = 256;
+// State texture size is now decoupled from image resolution. Each
+// texel is a particle slot; on burst, slots with id < params.count
+// emit at a hashed random uv across the element. Slots beyond count
+// stay dead. 1024² gives a 1M-particle ceiling.
+const STATE_SIZE_DEFAULT = 1024;
 
 // 4D simplex noise (Ashima Arts / Ian McEwan, MIT) + 3D curl on top —
 // identical to particle.ts so the two effects animate consistently.
@@ -114,9 +118,9 @@ float hash21(vec2 p) {
 }
 `;
 
-// On burst: every texel writes a fresh spawn at its own uv (with cell
-// jitter so the grid doesn't show through). Otherwise advects via
-// curl + radial outward bias.
+// On burst: slots with id < count emit at a hashed uv (random point on
+// the element); slots beyond count are written dead (age=2). Otherwise
+// advects via curl + radial outward bias.
 const FRAG_UPDATE_POS = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -133,15 +137,24 @@ uniform float noiseAnimation;
 uniform float speedDecay;
 uniform float outwardBias;
 uniform float duration;
+uniform float count;
 uniform int uBurst;
 ${GLSL_CURL_NOISE}
 
 void main() {
     if (uBurst == 1) {
-        vec2 jitter = (vec2(hash21(uv * 17.31), hash21(uv * 23.79)) - 0.5)
-                      / stateSize;
+        ivec2 pix = ivec2(floor(uv * stateSize));
+        float fid = float(pix.y * int(stateSize.x) + pix.x);
+        if (fid >= count) {
+            outColor = vec4(0.0, 0.0, 0.0, 2.0); // dead
+            return;
+        }
+        vec2 spawnUv = vec2(
+            hash21(uv * 31.7 + 11.13),
+            hash21(uv * 73.13 + 7.71)
+        );
         float z0 = (hash21(uv * 53.7 + 0.81) - 0.5) * 0.02;
-        outColor = vec4(uv + jitter, z0, 0.0);
+        outColor = vec4(spawnUv, z0, 0.0);
         return;
     }
 
@@ -168,8 +181,9 @@ void main() {
 }
 `;
 
-// On burst: capture src color at this texel's uv (the spawn position).
-// Otherwise pass through the previously-captured color.
+// On burst: slots with id < count sample src at the same hashed uv
+// FRAG_UPDATE_POS uses for their spawn position. Slots beyond count
+// get cleared. Otherwise pass through the previously-captured color.
 const FRAG_UPDATE_COLOR = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -178,11 +192,23 @@ out vec4 outColor;
 uniform sampler2D colorTex;
 uniform sampler2D src;
 uniform vec4 srcRectUv;
+uniform vec2 stateSize;
+uniform float count;
 uniform int uBurst;
 
 void main() {
     if (uBurst == 1) {
-        vec2 sampleUv = srcRectUv.xy + uv * srcRectUv.zw;
+        ivec2 pix = ivec2(floor(uv * stateSize));
+        float fid = float(pix.y * int(stateSize.x) + pix.x);
+        if (fid >= count) {
+            outColor = vec4(0.0);
+            return;
+        }
+        vec2 spawnUv = vec2(
+            hash21(uv * 31.7 + 11.13),
+            hash21(uv * 73.13 + 7.71)
+        );
+        vec2 sampleUv = srcRectUv.xy + spawnUv * srcRectUv.zw;
         outColor = texture(src, sampleUv);
         return;
     }
@@ -321,7 +347,7 @@ void main() {
 `;
 
 export type ParticleExplodeParams = {
-    /** Particle count. Locked at construction by the state texture size. */
+    /** Particle count. Hard-capped by the state texture size² (default 1M). */
     count: number;
     /** Total burst duration (sec); per-particle life is jittered. */
     duration: number;
@@ -389,12 +415,7 @@ export class ParticleExplodeEffect implements Effect {
             ? [Math.max(1, stateSize[0]), Math.max(1, stateSize[1])]
             : [STATE_SIZE_DEFAULT, STATE_SIZE_DEFAULT];
         this.#stateSizeVec = [this.#stateSize[0], this.#stateSize[1]];
-        const fullCount = this.#stateSize[0] * this.#stateSize[1];
-        // count must be last so a saved-from-previous-instance value
-        // (carried via { ...explode.params } when the story re-creates
-        // the effect with a different stateSize) can't shrink the new
-        // state and leave the top rows unrendered.
-        this.params = { ...DEFAULT_PARAMS, ...initial, count: fullCount };
+        this.params = { ...DEFAULT_PARAMS, ...initial };
     }
 
     trigger(): void {
@@ -436,9 +457,12 @@ export class ParticleExplodeEffect implements Effect {
             wrap: "clamp",
             filter: "linear",
         });
+        // Always allocate the full state capacity so params.count can be
+        // raised at runtime without recreating the effect (the shader
+        // gates by particleCount uniform per-frame).
         this.#particleGeometry = {
             attributes: { position: QUAD_VERTS },
-            instanceCount: this.#cap(),
+            instanceCount: this.#stateSize[0] * this.#stateSize[1],
         };
     }
 
@@ -483,6 +507,7 @@ export class ParticleExplodeEffect implements Effect {
         const burst = this.#burstPending ? 1 : 0;
         this.#burstPending = false;
 
+        const cap = this.#cap();
         ctx.draw({
             frag: FRAG_UPDATE_POS,
             uniforms: {
@@ -497,6 +522,7 @@ export class ParticleExplodeEffect implements Effect {
                 speedDecay: this.params.speedDecay,
                 outwardBias: this.params.outwardBias,
                 duration: this.params.duration,
+                count: cap,
                 uBurst: burst,
             },
             target: this.#posTex,
@@ -507,6 +533,8 @@ export class ParticleExplodeEffect implements Effect {
             uniforms: {
                 colorTex: this.#colorTex,
                 src: ctx.src,
+                stateSize: this.#stateSizeVec,
+                count: cap,
                 uBurst: burst,
             },
             target: this.#colorTex,

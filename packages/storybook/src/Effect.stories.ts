@@ -4,8 +4,8 @@ import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
 import { FluidEffect } from "./effects/fluid";
-import { ParticleExplodeEffect } from "./effects/particle-explode";
 import { ParticleEffect } from "./effects/particle";
+import { ParticleExplodeEffect } from "./effects/particle-explode";
 import { createPixelateEffect } from "./effects/pixelate";
 import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 import { createScanlineEffect } from "./effects/scanline";
@@ -189,9 +189,10 @@ particle.play = async ({ canvasElement }) => {
     seedFluidMotion(canvasElement);
 };
 
-// Same as `particle`, but adds a one-shot Explode burst sized to match
-// the displayed image (~one particle per pixel). Click the Explode
-// button in the pane to shatter the element into curl-noise debris.
+// Same as `particle`, but adds a one-shot Explode burst that scatters
+// `count` particles at random points across the element. Click the
+// Explode button in the pane to shatter the element into curl-noise
+// debris.
 export const particleExplode: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
@@ -207,25 +208,6 @@ particleExplode.play = async ({ canvasElement }) => {
     });
     await new Promise((r) => requestAnimationFrame(() => r(undefined)));
 
-    const dpr = window.devicePixelRatio || 1;
-    const STATE_MAX = 2048;
-    const computeSize = (): [number, number] => [
-        Math.min(
-            STATE_MAX,
-            Math.max(
-                1,
-                Math.round((img.clientWidth || img.naturalWidth) * dpr),
-            ),
-        ),
-        Math.min(
-            STATE_MAX,
-            Math.max(
-                1,
-                Math.round((img.clientHeight || img.naturalHeight) * dpr),
-            ),
-        ),
-    ];
-
     const vfx = initVFX();
     const sources = { Logo, Jellyfish };
     let effect: ParticleEffect | null = null;
@@ -239,7 +221,7 @@ particleExplode.play = async ({ canvasElement }) => {
         }
         await new Promise((r) => requestAnimationFrame(() => r(undefined)));
         effect = new ParticleEffect(savedEffect);
-        explode = new ParticleExplodeEffect(savedBurst, computeSize());
+        explode = new ParticleExplodeEffect(savedBurst);
         await vfx.add(img, { effect: [effect, explode] });
         attachParticlePane("Particle", effect, explode, {
             img,
