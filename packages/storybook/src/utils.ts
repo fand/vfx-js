@@ -246,7 +246,7 @@ export function attachParticlePane(
         // trailFade, life/duration, and burst-only knobs (outwardBias)
         // stay independent.
         for (const key of [
-            "speed",
+            "noiseSpeed",
             "noiseScale",
             "noiseAnimation",
             "pointSize",
@@ -256,11 +256,12 @@ export function attachParticlePane(
             "fog",
             "color",
             "colorMix",
+            "blend",
         ] as const) {
             Object.defineProperty(burst.params, key, {
                 get: () => effect.params[key],
-                set: (v: number) => {
-                    effect.params[key] = v;
+                set: (v: ParticleEffect["params"][typeof key]) => {
+                    (effect.params as Record<string, unknown>)[key] = v;
                 },
                 configurable: true,
                 enumerable: true,
@@ -326,6 +327,11 @@ export function attachParticlePane(
         max: 5,
         step: 0.05,
     });
+    lifetime.addBinding(effect.params, "fadeIn", {
+        min: 0,
+        max: 1,
+        step: 0.005,
+    });
     lifetime.addBinding(effect.params, "speedDecay", {
         min: 0.1,
         max: 5,
@@ -333,7 +339,21 @@ export function attachParticlePane(
     });
 
     const motion = pane.addFolder({ title: "Motion", expanded: true });
-    motion.addBinding(effect.params, "speed", { min: 0, max: 1, step: 0.005 });
+    motion.addBinding(effect.params, "emitSpeed", {
+        min: 0,
+        max: 3000,
+        step: 10,
+    });
+    motion.addBinding(effect.params, "noiseDelay", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
+    motion.addBinding(effect.params, "noiseSpeed", {
+        min: 0,
+        max: 1,
+        step: 0.005,
+    });
     motion.addBinding(effect.params, "noiseScale", {
         min: 0.05,
         max: 3,
@@ -365,6 +385,9 @@ export function attachParticlePane(
     });
 
     const composite = pane.addFolder({ title: "Composite", expanded: true });
+    composite.addBinding(effect.params, "blend", {
+        options: { add: "add", normal: "normal" },
+    });
     composite.addBinding(effect.params, "trailFade", {
         min: 0,
         max: 1,

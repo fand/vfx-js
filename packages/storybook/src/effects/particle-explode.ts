@@ -138,7 +138,7 @@ uniform vec2 stateSize;
 uniform vec2 elementPixel;
 uniform float time;
 uniform float dt;
-uniform float speed;
+uniform float noiseSpeed;
 uniform float noiseScale;
 uniform float noiseAnimation;
 uniform float speedDecay;
@@ -180,7 +180,7 @@ void main() {
     vec3 outward = vec3(s.xy - vec2(0.5), s.z) * outwardBias;
 
     float taper = pow(clamp(1.0 - age, 0.0, 1.0), speedDecay);
-    vec3 pos = s.xyz + (vNoise + outward) * speed * dt * taper;
+    vec3 pos = s.xyz + (vNoise + outward) * noiseSpeed * dt * taper;
 
     float lifespanScale = 0.7 + hash21(uv * 91.7 + 1.234) * 0.6;
     age += dt / max(duration * lifespanScale, 1e-3);
@@ -322,15 +322,23 @@ out vec4 outColor;
 uniform sampler2D trailPrev;
 uniform sampler2D particleStamp;
 uniform float trailFade;
+uniform int blendMode;
 
 void main() {
     vec4 prev = texture(trailPrev, uv);
     vec4 stamp = texture(particleStamp, uv);
     vec4 faded = prev * trailFade;
-    outColor = vec4(
-        faded.rgb + stamp.rgb,
-        clamp(faded.a + stamp.a, 0.0, 1.0)
-    );
+    if (blendMode == 1) {
+        outColor = vec4(
+            stamp.rgb + faded.rgb * (1.0 - stamp.a),
+            clamp(stamp.a + faded.a * (1.0 - stamp.a), 0.0, 1.0)
+        );
+    } else {
+        outColor = vec4(
+            faded.rgb + stamp.rgb,
+            clamp(faded.a + stamp.a, 0.0, 1.0)
+        );
+    }
 }
 `;
 
@@ -364,7 +372,7 @@ export type ParticleExplodeParams = {
     /** Total burst duration (sec); per-particle life is jittered. */
     duration: number;
     /** uv-displacement-per-second at full strength. */
-    speed: number;
+    noiseSpeed: number;
     /** Approximate swirl size in uv units (larger → bigger swirls). */
     noiseScale: number;
     /** Morph rate on the 4th simplex axis (units per second). */
@@ -388,12 +396,15 @@ export type ParticleExplodeParams = {
     color: number;
     /** Mix amount between src color (0) and `color` (1). */
     colorMix: number;
+    /** Stamp blend mode. "add" brightens overlaps; "normal" composites
+     * with premultiplied-alpha over. */
+    blend: "add" | "normal";
 };
 
 const DEFAULT_PARAMS: ParticleExplodeParams = {
     count: 1024 * 1024,
     duration: 1.5,
-    speed: 0.4,
+    noiseSpeed: 0.4,
     noiseScale: 0.5,
     noiseAnimation: 1.0,
     outwardBias: 1.5,
@@ -405,6 +416,7 @@ const DEFAULT_PARAMS: ParticleExplodeParams = {
     trailFade: 0.0,
     color: 0xffffff,
     colorMix: 0,
+    blend: "add",
 };
 
 // One-shot explode. Construct a new instance per `vfx.add()`. Call
@@ -534,7 +546,7 @@ export class ParticleExplodeEffect implements Effect {
                 elementPixel,
                 time: ctx.time,
                 dt,
-                speed: this.params.speed,
+                noiseSpeed: this.params.noiseSpeed,
                 noiseScale: this.params.noiseScale,
                 noiseAnimation: this.params.noiseAnimation,
                 speedDecay: this.params.speedDecay,
@@ -583,7 +595,7 @@ export class ParticleExplodeEffect implements Effect {
             },
             geometry: this.#particleGeometry,
             target: this.#stampTex,
-            blend: "additive",
+            blend: this.params.blend === "normal" ? "premultiplied" : "additive",
         });
 
         ctx.draw({
@@ -592,6 +604,7 @@ export class ParticleExplodeEffect implements Effect {
                 trailPrev: this.#trail,
                 particleStamp: this.#stampTex,
                 trailFade: this.params.trailFade,
+                blendMode: this.params.blend === "normal" ? 1 : 0,
             },
             target: this.#trail,
         });
