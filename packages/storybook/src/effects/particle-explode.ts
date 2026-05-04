@@ -436,6 +436,7 @@ export class ParticleExplodeEffect implements Effect {
     #burstPending = false;
     #startTime = -1;
     #lastElapsed = 0;
+    #fadeOutFrames = 0;
 
     constructor(initial: Partial<ParticleExplodeParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
@@ -453,6 +454,7 @@ export class ParticleExplodeEffect implements Effect {
         this.#burstPending = true;
         this.#startTime = -1;
         this.#lastElapsed = 0;
+        this.#fadeOutFrames = 0;
     }
 
     reset(): void {
@@ -460,10 +462,31 @@ export class ParticleExplodeEffect implements Effect {
         this.#burstPending = false;
         this.#startTime = -1;
         this.#lastElapsed = 0;
+        this.#fadeOutFrames = 0;
     }
 
     isDone(): boolean {
-        return this.#triggered && this.#lastElapsed >= this.params.duration;
+        if (!this.#triggered) {
+            return false;
+        }
+        if (this.#lastElapsed < this.params.duration) {
+            return false;
+        }
+        return this.#fadeOutFrames >= this.#estimatedFadeFrames();
+    }
+
+    // trailFade is applied per-frame, so the trail decays geometrically
+    // by trailFade^N. Stop once it falls under ~1/255 (alpha-quantized
+    // invisible). Capped to prevent runaway when trailFade≈1.
+    #estimatedFadeFrames(): number {
+        const tf = this.params.trailFade;
+        if (tf <= 0) {
+            return 1;
+        }
+        if (tf >= 0.999) {
+            return 600;
+        }
+        return Math.ceil(-Math.log(255) / Math.log(tf));
     }
 
     init(ctx: EffectContext): void {
@@ -522,7 +545,9 @@ export class ParticleExplodeEffect implements Effect {
         const elapsed = ctx.time - this.#startTime;
         this.#lastElapsed = elapsed;
 
-        if (elapsed >= this.params.duration) {
+        const inFadeOut = elapsed >= this.params.duration;
+        // Particles done AND trail decayed to invisible — stop drawing.
+        if (inFadeOut && this.#fadeOutFrames >= this.#estimatedFadeFrames()) {
             ctx.draw({ frag: FRAG_CLEAR, target: ctx.target });
             return;
         }
@@ -534,69 +559,79 @@ export class ParticleExplodeEffect implements Effect {
             ctx.dims.elementPixel[1],
         ];
 
-        const burst = this.#burstPending ? 1 : 0;
-        this.#burstPending = false;
+        if (!inFadeOut) {
+            const burst = this.#burstPending ? 1 : 0;
+            this.#burstPending = false;
 
-        const cap = this.#cap();
-        ctx.draw({
-            frag: FRAG_UPDATE_POS,
-            uniforms: {
-                posTex: this.#posTex,
-                stateSize: this.#stateSizeVec,
-                elementPixel,
-                time: ctx.time,
-                dt,
-                noiseSpeed: this.params.noiseSpeed,
-                noiseScale: this.params.noiseScale,
-                noiseAnimation: this.params.noiseAnimation,
-                speedDecay: this.params.speedDecay,
-                outwardBias: this.params.outwardBias,
-                duration: this.params.duration,
-                count: cap,
-                uBurst: burst,
-            },
-            target: this.#posTex,
-        });
+            const cap = this.#cap();
+            ctx.draw({
+                frag: FRAG_UPDATE_POS,
+                uniforms: {
+                    posTex: this.#posTex,
+                    stateSize: this.#stateSizeVec,
+                    elementPixel,
+                    time: ctx.time,
+                    dt,
+                    noiseSpeed: this.params.noiseSpeed,
+                    noiseScale: this.params.noiseScale,
+                    noiseAnimation: this.params.noiseAnimation,
+                    speedDecay: this.params.speedDecay,
+                    outwardBias: this.params.outwardBias,
+                    duration: this.params.duration,
+                    count: cap,
+                    uBurst: burst,
+                },
+                target: this.#posTex,
+            });
 
-        const cHex = this.params.color | 0;
-        const colorRGB: [number, number, number] = [
-            ((cHex >> 16) & 0xff) / 255,
-            ((cHex >> 8) & 0xff) / 255,
-            (cHex & 0xff) / 255,
-        ];
-        ctx.draw({
-            frag: FRAG_UPDATE_COLOR,
-            uniforms: {
-                colorTex: this.#colorTex,
-                src: ctx.src,
-                stateSize: this.#stateSizeVec,
-                count: cap,
-                uBurst: burst,
-                color: colorRGB,
-                colorMix: this.params.colorMix,
-            },
-            target: this.#colorTex,
-        });
+            const cHex = this.params.color | 0;
+            const colorRGB: [number, number, number] = [
+                ((cHex >> 16) & 0xff) / 255,
+                ((cHex >> 8) & 0xff) / 255,
+                (cHex & 0xff) / 255,
+            ];
+            ctx.draw({
+                frag: FRAG_UPDATE_COLOR,
+                uniforms: {
+                    colorTex: this.#colorTex,
+                    src: ctx.src,
+                    stateSize: this.#stateSizeVec,
+                    count: cap,
+                    uBurst: burst,
+                    color: colorRGB,
+                    colorMix: this.params.colorMix,
+                },
+                target: this.#colorTex,
+            });
 
-        ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
-        ctx.draw({
-            vert: VERT_PARTICLE,
-            frag: FRAG_PARTICLE,
-            uniforms: {
-                posTex: this.#posTex,
-                colorTex: this.#colorTex,
-                stateSize: this.#stateSizeVec,
-                pointSize: this.params.pointSize,
-                elementPixel,
-                particleCount: this.#cap(),
-                alpha: this.params.alpha,
-                alphaDecay: this.params.alphaDecay,
-                fog: this.params.fog,
-            },
-            geometry: this.#particleGeometry,
-            target: this.#stampTex,
-            blend: this.params.blend === "normal" ? "premultiplied" : "additive",
-        });
+            ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
+            ctx.draw({
+                vert: VERT_PARTICLE,
+                frag: FRAG_PARTICLE,
+                uniforms: {
+                    posTex: this.#posTex,
+                    colorTex: this.#colorTex,
+                    stateSize: this.#stateSizeVec,
+                    pointSize: this.params.pointSize,
+                    elementPixel,
+                    particleCount: this.#cap(),
+                    alpha: this.params.alpha,
+                    alphaDecay: this.params.alphaDecay,
+                    fog: this.params.fog,
+                },
+                geometry: this.#particleGeometry,
+                target: this.#stampTex,
+                blend:
+                    this.params.blend === "normal"
+                        ? "premultiplied"
+                        : "additive",
+            });
+        } else {
+            // Particles done; keep decaying the trail with an empty stamp
+            // so trailFade can fade out gracefully instead of cutting.
+            ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
+            this.#fadeOutFrames++;
+        }
 
         ctx.draw({
             frag: FRAG_TRAIL_COMPOSITE,
