@@ -368,7 +368,7 @@ export function attachParticlePane(
     const appearance = pane.addFolder({ title: "Appearance", expanded: true });
     appearance.addBinding(effect.params, "pointSize", {
         min: 1,
-        max: 100,
+        max: 10,
         step: 0.1,
     });
     appearance.addBinding(effect.params, "alpha", {
