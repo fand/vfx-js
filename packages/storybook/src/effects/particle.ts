@@ -238,8 +238,10 @@ void main() {
 }
 `;
 
-// Premultiplied output: additive blend lets overlapping particles
-// brighten naturally.
+// Impostor sphere: vCorner spans [-0.5, 0.5]; treat the quad as a unit
+// disk in xy and reconstruct a hemispheric normal so a hardcoded key
+// light can shade overlapping particles like real spheres. Edge is
+// derivative-AA'd so the rim stays smooth at any pointSize.
 const FRAG_PARTICLE = `#version 300 es
 precision highp float;
 in vec2 vCorner;
@@ -247,11 +249,25 @@ in vec4 vColor;
 out vec4 outColor;
 
 void main() {
-    float d = length(vCorner) * 2.0;
-    float fall = 1.0 - smoothstep(0.6, 1.0, d);
-    if (fall <= 0.0) discard;
-    float a = vColor.a * fall;
-    outColor = vec4(vColor.rgb * a, a);
+    vec2 p = vCorner * 2.0;
+    float r2 = dot(p, p);
+    if (r2 > 1.0) discard;
+    float nz = sqrt(1.0 - r2);
+    vec3 N = vec3(p, nz);
+
+    vec3 L = normalize(vec3(0.35, 0.55, 0.75));
+    vec3 V = vec3(0.0, 0.0, 1.0);
+    vec3 H = normalize(L + V);
+    float diff = dot(N, L) * 0.5 + 0.5;
+    float spec = pow(max(0.0, dot(N, H)), 24.0);
+
+    float r = sqrt(r2);
+    float aa = max(fwidth(r), 1e-4);
+    float edge = 1.0 - smoothstep(1.0 - aa, 1.0, r);
+
+    float a = vColor.a * edge;
+    vec3 rgb = vColor.rgb * diff + vec3(spec);
+    outColor = vec4(rgb * a, a);
 }
 `;
 
