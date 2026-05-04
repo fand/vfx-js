@@ -113,6 +113,9 @@ vec3 curl3D(vec3 p, float t) {
     return vec3(dPzdy - dPydz, dPxdz - dPzdx, dPydx - dPxdy) / (2.0 * eps);
 }
 
+`;
+
+const GLSL_HASH = `
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
@@ -139,6 +142,7 @@ uniform float outwardBias;
 uniform float duration;
 uniform float count;
 uniform int uBurst;
+${GLSL_HASH}
 ${GLSL_CURL_NOISE}
 
 void main() {
@@ -195,6 +199,7 @@ uniform vec4 srcRectUv;
 uniform vec2 stateSize;
 uniform float count;
 uniform int uBurst;
+${GLSL_HASH}
 
 void main() {
     if (uBurst == 1) {
