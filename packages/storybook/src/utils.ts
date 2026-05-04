@@ -2,7 +2,7 @@ import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
 import type { FluidEffect } from "./effects/fluid";
-import { type ParticleEffect, STATE_SIZE } from "./effects/particle";
+import type { ParticleEffect } from "./effects/particle";
 import type { ParticleExplodeEffect } from "./effects/particle-explode";
 import type { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 
@@ -287,11 +287,11 @@ export function attachParticlePane(
         });
     }
     const emitter = pane.addFolder({ title: "Emitter", expanded: true });
-    // count caps the ring buffer at runtime; the renderable instance
-    // count was locked at construction (STATE_SIZE² by default).
+    // Slider ceiling is the auto-derived state-texture capacity from
+    // the construction-time count.
     emitter.addBinding(effect.params, "count", {
         min: 1,
-        max: STATE_SIZE * STATE_SIZE,
+        max: effect.maxCount,
         step: 1,
     });
     // Effective spawn cap is MAX_SPAWNS_PER_FRAME × 60 ≈ 245k/sec
@@ -380,7 +380,7 @@ export function attachParticlePane(
         const burstFolder = pane.addFolder({ title: "Burst", expanded: true });
         burstFolder.addBinding(burst.params, "count", {
             min: 1,
-            max: STATE_SIZE * STATE_SIZE,
+            max: burst.maxCount,
             step: 1,
         });
         burstFolder.addBinding(burst.params, "duration", {

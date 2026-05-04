@@ -12,11 +12,15 @@ import type {
     EffectTexture,
 } from "@vfx-js/core";
 
-// State texture footprint: 4 RTs (pos×2, color×2) × STATE_SIZE² × 16 B
-// = 64 MB at 1024 (RGBA32F) / 32 MB at RGBA16F fallback. Within budget
-// for desktop and modern mobile; bump down to 512 if a target device
-// struggles.
-export const STATE_SIZE = 1024;
+// State texture footprint: 4 RTs (pos×2, color×2) × stateSize² × 16 B
+// = 64 MB at 1024 (RGBA32F) / 32 MB at RGBA16F fallback at the 1M cap.
+// Smaller `count` shrinks the texture proportionally — smallest power-
+// of-two square grid that fits `count` slots.
+function stateSizeFromCount(count: number): number {
+    const n = Math.max(1, Math.floor(count));
+    return 2 ** Math.ceil(Math.log2(Math.sqrt(n)));
+}
+
 // Per-frame spawn budget. Spawn entries are uploaded to a square data
 // texture (vec4 per entry: slotId, uvX, uvY, lifeJitter) sampled by the
 // gl.POINTS spawn pass. 64×64 = 4096 spawns/frame ≈ 245k spawns/sec at
@@ -30,7 +34,6 @@ const IDLE_THRESHOLD = 0.1;
 const LIFE_JITTER_MIN = 0.7;
 const LIFE_JITTER_MAX = 1.3;
 
-const STATE_SIZE_VEC: [number, number] = [STATE_SIZE, STATE_SIZE];
 const SPAWN_TEX_SIZE_VEC: [number, number] = [SPAWN_TEX_SIZE, SPAWN_TEX_SIZE];
 
 // Vertex index per spawn slot. Read in VERT_SPAWN as `int(position)` to
@@ -461,7 +464,7 @@ export type ParticleParams = {
 };
 
 const DEFAULT_PARAMS: ParticleParams = {
-    count: STATE_SIZE * STATE_SIZE,
+    count: 1024 * 1024,
     birthRate: 10000,
     screenBirthRate: 5000,
     life: 1,
@@ -494,6 +497,10 @@ export class ParticleEffect implements Effect {
     #trail: EffectRenderTarget | null = null;
     #initialized = false;
 
+    #stateSize: number;
+    #stateSizeVec: [number, number];
+    #stateCapacity: number;
+
     #spawnUniform = new Float32Array(MAX_SPAWNS_PER_FRAME * 4);
     #spawnRawTex: WebGLTexture | null = null;
     #spawnTexHandle: EffectTexture | null = null;
@@ -509,11 +516,18 @@ export class ParticleEffect implements Effect {
 
     constructor(initial: Partial<ParticleParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
+        this.#stateSize = stateSizeFromCount(this.params.count);
+        this.#stateSizeVec = [this.#stateSize, this.#stateSize];
+        this.#stateCapacity = this.#stateSize * this.#stateSize;
+    }
+
+    get maxCount(): number {
+        return this.#stateCapacity;
     }
 
     init(ctx: EffectContext): void {
         const stateOpts = {
-            size: [STATE_SIZE, STATE_SIZE] as [number, number],
+            size: [this.#stateSize, this.#stateSize] as [number, number],
             float: true,
             wrap: "clamp" as const,
             filter: "nearest" as const,
@@ -536,9 +550,11 @@ export class ParticleEffect implements Effect {
             wrap: "clamp",
             filter: "linear",
         });
+        // Allocate the full state capacity so params.count can grow at
+        // runtime up to the auto-derived ceiling without re-init.
         this.#particleGeometry = {
             attributes: { position: QUAD_VERTS },
-            instanceCount: this.#cap(),
+            instanceCount: this.#stateCapacity,
         };
         this.#spawnGeometry = {
             mode: "points",
@@ -690,7 +706,7 @@ export class ParticleEffect implements Effect {
                     uSpawnTex: this.#spawnTexHandle,
                     uSpawnTexSize: SPAWN_TEX_SIZE_VEC,
                     uSpawnCount: nSpawn,
-                    stateSize: STATE_SIZE_VEC,
+                    stateSize: this.#stateSizeVec,
                     src: ctx.src,
                     alphaThreshold: this.params.alphaThreshold,
                 },
@@ -711,7 +727,7 @@ export class ParticleEffect implements Effect {
                     uSpawnTex: this.#spawnTexHandle,
                     uSpawnTexSize: SPAWN_TEX_SIZE_VEC,
                     uSpawnCount: nSpawn,
-                    stateSize: STATE_SIZE_VEC,
+                    stateSize: this.#stateSizeVec,
                     src: ctx.src,
                     color: colorRGB,
                     colorMix: this.params.colorMix,
@@ -728,7 +744,7 @@ export class ParticleEffect implements Effect {
             uniforms: {
                 posTex: posNext,
                 colorTex: colorNext,
-                stateSize: STATE_SIZE_VEC,
+                stateSize: this.#stateSizeVec,
                 pointSize: this.params.pointSize,
                 elementPixel,
                 particleCount: this.#cap(),
@@ -851,7 +867,7 @@ export class ParticleEffect implements Effect {
     #cap(): number {
         return Math.max(
             1,
-            Math.min(STATE_SIZE * STATE_SIZE, Math.floor(this.params.count)),
+            Math.min(this.#stateCapacity, Math.floor(this.params.count)),
         );
     }
 

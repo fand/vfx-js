@@ -11,11 +11,15 @@ import type {
     EffectRenderTarget,
 } from "@vfx-js/core";
 
-// State texture size is now decoupled from image resolution. Each
-// texel is a particle slot; on burst, slots with id < params.count
-// emit at a hashed random uv across the element. Slots beyond count
-// stay dead. 1024² gives a 1M-particle ceiling.
-const STATE_SIZE_DEFAULT = 1024;
+// State texture size is decoupled from image resolution and auto-
+// derived from `count` (smallest power-of-two square grid that fits).
+// Each texel is a particle slot; on burst, slots with id < params.count
+// emit at a hashed random uv across the element. 1024² is the 1M cap
+// at the default `count`.
+function stateSizeFromCount(count: number): number {
+    const n = Math.max(1, Math.floor(count));
+    return 2 ** Math.ceil(Math.log2(Math.sqrt(n)));
+}
 
 // 4D simplex noise (Ashima Arts / Ian McEwan, MIT) + 3D curl on top —
 // identical to particle.ts so the two effects animate consistently.
@@ -387,7 +391,7 @@ export type ParticleExplodeParams = {
 };
 
 const DEFAULT_PARAMS: ParticleExplodeParams = {
-    count: STATE_SIZE_DEFAULT * STATE_SIZE_DEFAULT,
+    count: 1024 * 1024,
     duration: 1.5,
     speed: 0.4,
     noiseScale: 0.5,
@@ -421,15 +425,15 @@ export class ParticleExplodeEffect implements Effect {
     #startTime = -1;
     #lastElapsed = 0;
 
-    constructor(
-        initial: Partial<ParticleExplodeParams> = {},
-        stateSize?: readonly [number, number],
-    ) {
-        this.#stateSize = stateSize
-            ? [Math.max(1, stateSize[0]), Math.max(1, stateSize[1])]
-            : [STATE_SIZE_DEFAULT, STATE_SIZE_DEFAULT];
-        this.#stateSizeVec = [this.#stateSize[0], this.#stateSize[1]];
+    constructor(initial: Partial<ParticleExplodeParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
+        const s = stateSizeFromCount(this.params.count);
+        this.#stateSize = [s, s];
+        this.#stateSizeVec = [s, s];
+    }
+
+    get maxCount(): number {
+        return this.#stateSize[0] * this.#stateSize[1];
     }
 
     trigger(): void {
