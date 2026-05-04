@@ -7,7 +7,6 @@ import { FluidEffect } from "./effects/fluid";
 import { ParticleEffect } from "./effects/particle";
 import { ParticleExplodeEffect } from "./effects/particle-explode";
 import { createPixelateEffect } from "./effects/pixelate";
-import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 import { createScanlineEffect } from "./effects/scanline";
 import { VoronoiEffect } from "./effects/voronoi";
 import "./preset.css";
@@ -15,7 +14,6 @@ import {
     attachBloomPane,
     attachFluidPane,
     attachParticlePane,
-    attachRDPane,
     disposeAllPanes,
     initVFX,
 } from "./utils";
@@ -112,34 +110,6 @@ fluid.play = async ({ canvasElement }) => {
     attachFluidPane("Fluid", effect);
 
     seedFluidMotion(canvasElement);
-};
-
-// Gray-Scott reaction-diffusion. autoplay:false + a 120-frame manual
-// render warm-up so the captured screenshot already shows an evolved
-// pattern (not just the seed blob).
-export const reactionDiffusion: StoryObj<undefined> = {
-    render: () => {
-        const img = document.createElement("img");
-        img.src = Logo;
-        return img;
-    },
-    args: undefined,
-};
-reactionDiffusion.play = async ({ canvasElement }) => {
-    const img = canvasElement.querySelector("img") as HTMLImageElement;
-    await new Promise((o) => {
-        img.onload = o;
-    });
-
-    const vfx = initVFX({ autoplay: false });
-    const effect = new ReactionDiffusionEffect();
-    await vfx.add(img, { effect });
-    attachRDPane("Reaction-Diffusion", effect);
-
-    for (let i = 0; i < 120; i++) {
-        vfx.render();
-    }
-    vfx.play();
 };
 
 // Mouse-driven emitter particles. Spawns happen only at the cursor's
