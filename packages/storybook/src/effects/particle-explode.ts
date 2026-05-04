@@ -199,6 +199,8 @@ uniform vec4 srcRectUv;
 uniform vec2 stateSize;
 uniform float count;
 uniform int uBurst;
+uniform vec3 color;
+uniform float colorMix;
 ${GLSL_HASH}
 
 void main() {
@@ -214,7 +216,8 @@ void main() {
             hash21(uv * 73.13 + 7.71)
         );
         vec2 sampleUv = srcRectUv.xy + spawnUv * srcRectUv.zw;
-        outColor = texture(src, sampleUv);
+        vec4 c = texture(src, sampleUv);
+        outColor = vec4(mix(c.rgb, color, colorMix), c.a);
         return;
     }
     outColor = texture(colorTex, uv);
@@ -377,6 +380,10 @@ export type ParticleExplodeParams = {
     /** Per-frame trail decay (0..1). 0 = stamp shows directly without
      * smear; higher values leave longer trails. */
     trailFade: number;
+    /** Base color blended into particle rgb (hex 0xRRGGBB). */
+    color: number;
+    /** Mix amount between src color (0) and `color` (1). */
+    colorMix: number;
 };
 
 const DEFAULT_PARAMS: ParticleExplodeParams = {
@@ -392,6 +399,8 @@ const DEFAULT_PARAMS: ParticleExplodeParams = {
     speedDecay: 1.0,
     fog: 0.5,
     trailFade: 0.0,
+    color: 0xffffff,
+    colorMix: 0,
 };
 
 // One-shot explode. Construct a new instance per `vfx.add()`. Call
@@ -533,6 +542,12 @@ export class ParticleExplodeEffect implements Effect {
             target: this.#posTex,
         });
 
+        const cHex = this.params.color | 0;
+        const colorRGB: [number, number, number] = [
+            ((cHex >> 16) & 0xff) / 255,
+            ((cHex >> 8) & 0xff) / 255,
+            (cHex & 0xff) / 255,
+        ];
         ctx.draw({
             frag: FRAG_UPDATE_COLOR,
             uniforms: {
@@ -541,6 +556,8 @@ export class ParticleExplodeEffect implements Effect {
                 stateSize: this.#stateSizeVec,
                 count: cap,
                 uBurst: burst,
+                color: colorRGB,
+                colorMix: this.params.colorMix,
             },
             target: this.#colorTex,
         });

@@ -254,6 +254,8 @@ export function attachParticlePane(
             "alphaDecay",
             "speedDecay",
             "fog",
+            "color",
+            "colorMix",
         ] as const) {
             Object.defineProperty(burst.params, key, {
                 get: () => effect.params[key],
