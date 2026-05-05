@@ -411,7 +411,6 @@ export class ParticleEffect implements Effect {
     #initialized = false;
 
     #stateSize: number;
-    #stateSizeVec: [number, number];
     #stateCapacity: number;
 
     #spawnUniform = new Float32Array(MAX_SPAWNS_PER_FRAME * 4);
@@ -431,7 +430,6 @@ export class ParticleEffect implements Effect {
         this.params = { ...DEFAULT_PARAMS, ...initial };
         installCountSetter(this.params);
         this.#stateSize = stateSizeFromCount(this.params.count);
-        this.#stateSizeVec = [this.#stateSize, this.#stateSize];
         this.#stateCapacity = this.#stateSize * this.#stateSize;
     }
 
@@ -587,7 +585,6 @@ export class ParticleEffect implements Effect {
         if (newSize !== this.#stateSize) {
             this.#disposeStateRTs();
             this.#stateSize = newSize;
-            this.#stateSizeVec = [newSize, newSize];
             this.#stateCapacity = newSize * newSize;
             this.#allocStateRTs(ctx);
             this.#particleGeometry.instanceCount = this.#stateCapacity;
@@ -610,6 +607,10 @@ export class ParticleEffect implements Effect {
         const elementPixel: [number, number] = [
             ctx.dims.elementPixel[0],
             ctx.dims.elementPixel[1],
+        ];
+        const stateSizeVec: [number, number] = [
+            this.#stateSize,
+            this.#stateSize,
         ];
 
         const nSpawn = this.#scheduleSpawns(ctx, dt, elementPixel);
@@ -648,7 +649,7 @@ export class ParticleEffect implements Effect {
                 uSpawnTex: this.#spawnTexHandle,
                 uSpawnTexSize: SPAWN_TEX_SIZE_VEC,
                 uSpawnCount: nSpawn,
-                stateSize: this.#stateSizeVec,
+                stateSize: stateSizeVec,
             };
             ctx.draw({
                 vert: VERT_SPAWN,
@@ -693,7 +694,7 @@ export class ParticleEffect implements Effect {
             uniforms: {
                 posTex: this.#posTex,
                 colorTex: this.#colorTex,
-                stateSize: this.#stateSizeVec,
+                stateSize: stateSizeVec,
                 pointSize: this.params.pointSize,
                 elementPixel,
                 particleCount: this.#cap(),

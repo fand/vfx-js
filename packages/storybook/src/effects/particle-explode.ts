@@ -284,7 +284,6 @@ export class ParticleExplodeEffect implements Effect {
     #trail: EffectRenderTarget | null = null;
     #particleGeometry: EffectGeometry | null = null;
     #stateSize: [number, number];
-    #stateSizeVec: [number, number];
 
     #triggered = false;
     #burstPending = false;
@@ -297,7 +296,6 @@ export class ParticleExplodeEffect implements Effect {
         installCountSetter(this.params);
         const s = stateSizeFromCount(this.params.count);
         this.#stateSize = [s, s];
-        this.#stateSizeVec = [s, s];
     }
 
     get maxCount(): number {
@@ -411,7 +409,6 @@ export class ParticleExplodeEffect implements Effect {
         if (newSize !== this.#stateSize[0] && !this.#triggered) {
             this.#disposeStateRTs();
             this.#stateSize = [newSize, newSize];
-            this.#stateSizeVec = [newSize, newSize];
             this.#allocStateRTs(ctx);
             this.#particleGeometry.instanceCount = newSize * newSize;
         }
@@ -453,7 +450,7 @@ export class ParticleExplodeEffect implements Effect {
                 frag: FRAG_UPDATE_POS,
                 uniforms: {
                     posTex: this.#posTex,
-                    stateSize: this.#stateSizeVec,
+                    stateSize: this.#stateSize,
                     elementPixel,
                     time: ctx.time,
                     dt,
@@ -474,7 +471,7 @@ export class ParticleExplodeEffect implements Effect {
                     frag: FRAG_BURST_COLOR,
                     uniforms: {
                         src: ctx.src,
-                        stateSize: this.#stateSizeVec,
+                        stateSize: this.#stateSize,
                         count: cap,
                         color: hexToRgb(this.params.color),
                         colorMix: this.params.colorMix,
@@ -490,7 +487,7 @@ export class ParticleExplodeEffect implements Effect {
                 uniforms: {
                     posTex: this.#posTex,
                     colorTex: this.#colorTex,
-                    stateSize: this.#stateSizeVec,
+                    stateSize: this.#stateSize,
                     pointSize: this.params.pointSize,
                     elementPixel,
                     particleCount: this.#cap(),
