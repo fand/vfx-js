@@ -523,11 +523,16 @@ export type EffectTexture = {
  * as a `sampler2D` uniform to read it back in a later pass.
  *
  * `width` / `height` are physical pixels.
+ *
+ * Call `dispose()` to release the underlying GL resources eagerly.
+ * Idempotent. Framework-owned RTs (e.g. `ctx.target`, `ctx.src`) ignore
+ * the call. Do not use the handle after disposing it.
  */
 export type EffectRenderTarget = {
     readonly width: number;
     readonly height: number;
     readonly __brand: "EffectRenderTarget";
+    dispose(): void;
 };
 
 /**

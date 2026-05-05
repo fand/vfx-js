@@ -446,13 +446,28 @@ export class EffectHost {
             getH = () => fb.height;
         }
 
-        const handle = makeEffectRenderTarget(resolver, getW, getH);
-        const owned: OwnedRT = { handle, resolver };
+        let owned: OwnedRT;
+        const dispose = () => this.#disposeOwnedRT(owned);
+        const handle = makeEffectRenderTarget(resolver, getW, getH, dispose);
+        owned = { handle, resolver };
         this.#ownedRTs.push(owned);
         if (!explicitSize) {
             this.#autoResizeRTs.push(owned);
         }
         return handle;
+    }
+
+    #disposeOwnedRT(owned: OwnedRT): void {
+        const idx = this.#ownedRTs.indexOf(owned);
+        if (idx < 0) {
+            return; // already disposed
+        }
+        this.#ownedRTs.splice(idx, 1);
+        const aIdx = this.#autoResizeRTs.indexOf(owned);
+        if (aIdx >= 0) {
+            this.#autoResizeRTs.splice(aIdx, 1);
+        }
+        owned.resolver.dispose?.();
     }
 
     // -- wrapTexture --------------------------------------------------------
@@ -796,6 +811,7 @@ export function makeEffectRenderTarget(
     resolver: RenderTargetResolver,
     width: () => number,
     height: () => number,
+    dispose?: () => void,
 ): EffectRenderTargetInternal {
     const handle = {
         __brand: "EffectRenderTarget",
@@ -805,6 +821,9 @@ export function makeEffectRenderTarget(
         get height() {
             return height();
         },
+        // Framework-owned RTs pass no dispose; the no-op makes
+        // `rt.dispose()` always safe to call.
+        dispose: dispose ?? (() => {}),
     } as EffectRenderTargetInternal;
     Object.defineProperty(handle, RESOLVE_RT, { value: resolver });
     return handle;

@@ -623,6 +623,65 @@ describe("EffectHost.createRenderTarget", () => {
         expect(framebuffers[0].width).toBe(50);
         expect(framebuffers[0].height).toBe(50);
     });
+
+    it("rt.dispose() releases the underlying Framebuffer", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        expect(framebuffers[0].disposed).toBe(false);
+        rt.dispose();
+        expect(framebuffers[0].disposed).toBe(true);
+    });
+
+    it("rt.dispose() on persistent RT releases the Backbuffer", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        expect(backbuffers[0].disposed).toBe(false);
+        rt.dispose();
+        expect(backbuffers[0].disposed).toBe(true);
+    });
+
+    it("rt.dispose() is idempotent", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        rt.dispose();
+        // Second call must not throw and must not double-dispose the fb.
+        expect(() => rt.dispose()).not.toThrow();
+    });
+
+    it("disposed RT no longer auto-resizes", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        rt.dispose();
+        // Reset the mock fb's setSize tracking by recording size now.
+        const widthAfterDispose = framebuffers[0].width;
+        host.setFrameDims({
+            outputBufferW: 200,
+            outputBufferH: 200,
+            canvasBufferSize: [200, 200],
+            outputViewport: { x: 0, y: 0, w: 200, h: 200 },
+            elementBufferW: 200,
+            elementBufferH: 200,
+            contentRectUv: [0, 0, 1, 1],
+            srcRectUv: [0, 0, 1, 1],
+        });
+        // Disposed RT removed from auto-resize list → unchanged.
+        expect(framebuffers[0].width).toBe(widthAfterDispose);
+    });
+
+    it("host.dispose() does not double-dispose a manually-disposed RT", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        const fb = framebuffers[0];
+        rt.dispose();
+        let disposeCount = 0;
+        const original = fb.dispose;
+        fb.dispose = () => {
+            disposeCount++;
+            original.call(fb);
+        };
+        host.dispose();
+        expect(disposeCount).toBe(0);
+    });
 });
 
 // ---------------------------------------------------------------------------
