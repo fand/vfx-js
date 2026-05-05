@@ -106,22 +106,12 @@ void main() {
     vec4 c = texture(colorTex, stateUv);
 
     float age = s.w;
-    // age >= 1: dead. Linear ramp to peak at age=fadeIn, then
-    // alphaDecay-shaped decay over the remaining life. Small fadeIn
-    // keeps the radial-emit phase visible; larger values restore the
-    // slow fade-in look.
-    float lifeAlpha;
-    if (age >= 1.0) {
-        lifeAlpha = 0.0;
-    } else {
-        float fi = max(fadeIn, 1e-4);
-        float rise = clamp(age / fi, 0.0, 1.0);
-        float fall = pow(
-            clamp((1.0 - age) / max(1.0 - fi, 1e-4), 0.0, 1.0),
-            alphaDecay
-        );
-        lifeAlpha = rise * fall;
-    }
+    // smoothstep rise to ~1 at age=fadeIn, then pow-shaped decay to 0
+    // at age=1. Small fadeIn keeps the radial-emit phase visible;
+    // larger values restore the slow fade-in look.
+    float rise = fadeIn > 0.0 ? smoothstep(0.0, fadeIn, age) : 1.0;
+    float fall = pow(max(1.0 - age, 0.0), alphaDecay);
+    float lifeAlpha = rise * fall;
     if (lifeAlpha <= 0.0) {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         vCorner = vec2(0.0);
