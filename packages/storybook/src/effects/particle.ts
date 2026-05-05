@@ -2,7 +2,9 @@
 // slots each frame and uploads them to a data texture. A full-screen
 // advect pass moves every live particle through a 3D curl-noise field;
 // a separate gl.POINTS spawn pass overwrites the just-advected texels
-// for slots that received fresh spawns. State RTs ping-pong manually.
+// for slots that received fresh spawns. pos/color use the framework's
+// auto-ping-pong (`persistent: true`) — advect runs with `swap: false`
+// so the spawn pass lands in the same internal buffer.
 // Composited over a persistent trail buffer.
 import type {
     Effect,
@@ -17,10 +19,11 @@ import {
     LIFE_JITTER_MIN,
 } from "./_curl-noise";
 
-// State texture footprint: 5 RTs (pos×2, color×2, vel×1) × stateSize² ×
-// 16 B = 80 MB at 1024 (RGBA32F) / 40 MB at RGBA16F fallback at the 1M
-// cap. velTex is single because spawns sparse-write it and advect only
-// reads. Smaller `count` shrinks the texture proportionally — smallest
+// State texture footprint: 5 buffers total (pos / color persistent =
+// 2 internal each, vel single) × stateSize² × 16 B = 80 MB at 1024
+// (RGBA32F) / 40 MB at RGBA16F fallback at the 1M cap. velTex is
+// single because spawns sparse-write it and advect only reads.
+// Smaller `count` shrinks the texture proportionally — smallest
 // power-of-two square grid that fits `count` slots.
 function stateSizeFromCount(count: number): number {
     const n = Math.max(1, Math.floor(count));
@@ -467,12 +470,9 @@ const DEFAULT_PARAMS: ParticleParams = {
 export class ParticleEffect implements Effect {
     params: ParticleParams;
 
-    #posTex0: EffectRenderTarget | null = null;
-    #posTex1: EffectRenderTarget | null = null;
-    #colorTex0: EffectRenderTarget | null = null;
-    #colorTex1: EffectRenderTarget | null = null;
+    #posTex: EffectRenderTarget | null = null;
+    #colorTex: EffectRenderTarget | null = null;
     #velTex: EffectRenderTarget | null = null;
-    #stateIndex: 0 | 1 = 0;
     #stampTex: EffectRenderTarget | null = null;
     #trail: EffectRenderTarget | null = null;
     #initialized = false;
@@ -544,27 +544,27 @@ export class ParticleEffect implements Effect {
             wrap: "clamp" as const,
             filter: "nearest" as const,
         };
-        // Manual ping-pong (pos/color): a sparse spawn pass into a
-        // persistent (auto-swapped) RT would clobber the inactive
-        // buffer. velTex is single — sparsely written at spawn, only
-        // read in advect.
-        this.#posTex0 = ctx.createRenderTarget(stateOpts);
-        this.#posTex1 = ctx.createRenderTarget(stateOpts);
-        this.#colorTex0 = ctx.createRenderTarget(stateOpts);
-        this.#colorTex1 = ctx.createRenderTarget(stateOpts);
+        // pos/color use auto-ping-pong (`persistent: true`); the spawn
+        // pass writes sparsely with `swap: false` after advect so both
+        // passes land in the same internal buffer. velTex is single —
+        // sparse-written at spawn, only read in advect.
+        this.#posTex = ctx.createRenderTarget({
+            ...stateOpts,
+            persistent: true,
+        });
+        this.#colorTex = ctx.createRenderTarget({
+            ...stateOpts,
+            persistent: true,
+        });
         this.#velTex = ctx.createRenderTarget(stateOpts);
     }
 
     #disposeStateRTs(): void {
-        this.#posTex0?.dispose();
-        this.#posTex1?.dispose();
-        this.#colorTex0?.dispose();
-        this.#colorTex1?.dispose();
+        this.#posTex?.dispose();
+        this.#colorTex?.dispose();
         this.#velTex?.dispose();
-        this.#posTex0 = null;
-        this.#posTex1 = null;
-        this.#colorTex0 = null;
-        this.#colorTex1 = null;
+        this.#posTex = null;
+        this.#colorTex = null;
         this.#velTex = null;
     }
 
@@ -636,10 +636,8 @@ export class ParticleEffect implements Effect {
 
     render(ctx: EffectContext): void {
         if (
-            !this.#posTex0 ||
-            !this.#posTex1 ||
-            !this.#colorTex0 ||
-            !this.#colorTex1 ||
+            !this.#posTex ||
+            !this.#colorTex ||
             !this.#velTex ||
             !this.#stampTex ||
             !this.#trail ||
@@ -667,12 +665,11 @@ export class ParticleEffect implements Effect {
         }
 
         if (!this.#initialized) {
-            ctx.draw({ frag: FRAG_INIT_POS, target: this.#posTex0 });
-            ctx.draw({ frag: FRAG_INIT_POS, target: this.#posTex1 });
-            ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#colorTex0 });
-            ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#colorTex1 });
+            // The "stale" half of each persistent RT gets overwritten on
+            // the first advect+swap, so a single init draw is enough.
+            ctx.draw({ frag: FRAG_INIT_POS, target: this.#posTex });
+            ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#colorTex });
             ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#velTex });
-            this.#stateIndex = 0;
             this.#initialized = true;
         }
 
@@ -688,18 +685,16 @@ export class ParticleEffect implements Effect {
             this.#uploadSpawnTextures(ctx);
         }
 
-        const i = this.#stateIndex;
-        const next: 0 | 1 = i === 0 ? 1 : 0;
-        const posCurr = i === 0 ? this.#posTex0 : this.#posTex1;
-        const posNext = next === 0 ? this.#posTex0 : this.#posTex1;
-        const colorCurr = i === 0 ? this.#colorTex0 : this.#colorTex1;
-        const colorNext = next === 0 ? this.#colorTex0 : this.#colorTex1;
-
+        // advect skips its swap when a spawn pass follows, so both
+        // passes write into the same internal buffer of the persistent
+        // RT. The spawn pass (or advect itself when nSpawn === 0)
+        // triggers the per-frame swap.
+        const advectSwap = nSpawn === 0;
         ctx.draw({
             frag: FRAG_ADVECT_POS,
             uniforms: {
-                posTex: posCurr,
-                colorTex: colorCurr,
+                posTex: this.#posTex,
+                colorTex: this.#colorTex,
                 velTex: this.#velTex,
                 elementPixel,
                 time: ctx.time,
@@ -712,14 +707,15 @@ export class ParticleEffect implements Effect {
                 speedDecay: this.params.speedDecay,
                 life: this.params.life,
             },
-            target: posNext,
+            target: this.#posTex,
+            swap: advectSwap,
         });
         ctx.draw({
             frag: FRAG_ADVECT_COLOR,
-            uniforms: { colorTex: colorCurr },
-            target: colorNext,
+            uniforms: { colorTex: this.#colorTex },
+            target: this.#colorTex,
+            swap: advectSwap,
         });
-        this.#stateIndex = next;
 
         if (nSpawn > 0) {
             const spawnUniforms = {
@@ -737,7 +733,7 @@ export class ParticleEffect implements Effect {
                     src: ctx.src,
                     alphaThreshold: this.params.alphaThreshold,
                 },
-                target: posNext,
+                target: this.#posTex,
                 blend: "none",
             });
             const cHex = this.params.color | 0;
@@ -757,7 +753,7 @@ export class ParticleEffect implements Effect {
                     colorMix: this.params.colorMix,
                     lifeJitterRange: [LIFE_JITTER_MIN, LIFE_JITTER_MAX],
                 },
-                target: colorNext,
+                target: this.#colorTex,
                 blend: "none",
             });
             ctx.draw({
@@ -775,8 +771,8 @@ export class ParticleEffect implements Effect {
             vert: VERT_PARTICLE,
             frag: FRAG_PARTICLE,
             uniforms: {
-                posTex: posNext,
-                colorTex: colorNext,
+                posTex: this.#posTex,
+                colorTex: this.#colorTex,
                 stateSize: this.#stateSizeVec,
                 pointSize: this.params.pointSize,
                 elementPixel,
@@ -788,7 +784,8 @@ export class ParticleEffect implements Effect {
             },
             geometry: this.#particleGeometry,
             target: this.#stampTex,
-            blend: this.params.blend === "normal" ? "premultiplied" : "additive",
+            blend:
+                this.params.blend === "normal" ? "premultiplied" : "additive",
         });
 
         ctx.draw({
@@ -848,11 +845,11 @@ export class ParticleEffect implements Effect {
 
         // Mouse takes priority for the per-frame slot budget — when the
         // user is dragging fast we'd rather show that than the ambient.
-        let nMouse = Math.min(
+        const nMouse = Math.min(
             MAX_SPAWNS_PER_FRAME,
             Math.floor(this.#birthAccumulator),
         );
-        let nScreen = Math.min(
+        const nScreen = Math.min(
             MAX_SPAWNS_PER_FRAME - nMouse,
             Math.floor(this.#screenBirthAccumulator),
         );
@@ -914,10 +911,8 @@ export class ParticleEffect implements Effect {
         this.#spawnTexHandle = null;
         this.#spawnGeometry = null;
         this.#gl = null;
-        this.#posTex0 = null;
-        this.#posTex1 = null;
-        this.#colorTex0 = null;
-        this.#colorTex1 = null;
+        this.#posTex = null;
+        this.#colorTex = null;
         this.#velTex = null;
         this.#stampTex = null;
         this.#trail = null;
