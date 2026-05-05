@@ -13,9 +13,10 @@ import type {
 } from "@vfx-js/core";
 import { GLSL_CURL_NOISE } from "./_curl-noise";
 
-// State texture footprint: 6 RTs (pos×2, color×2, vel×2) × stateSize² ×
-// 16 B = 96 MB at 1024 (RGBA32F) / 48 MB at RGBA16F fallback at the 1M
-// cap. Smaller `count` shrinks the texture proportionally — smallest
+// State texture footprint: 5 RTs (pos×2, color×2, vel×1) × stateSize² ×
+// 16 B = 80 MB at 1024 (RGBA32F) / 40 MB at RGBA16F fallback at the 1M
+// cap. velTex is single because spawns sparse-write it and advect only
+// reads. Smaller `count` shrinks the texture proportionally — smallest
 // power-of-two square grid that fits `count` slots.
 function stateSizeFromCount(count: number): number {
     const n = Math.max(1, Math.floor(count));
@@ -285,16 +286,6 @@ uniform sampler2D colorTex;
 void main() { outColor = texture(colorTex, uv); }
 `;
 
-// Velocity buffer pass-through. Velocity is set sparsely by the spawn
-// pass and read by FRAG_ADVECT_POS; we just preserve it across frames.
-const FRAG_ADVECT_VEL = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D velTex;
-void main() { outColor = texture(velTex, uv); }
-`;
-
 // Spawn pass: gl.POINTS, one point per spawn entry. Each vertex pulls
 // (slotId, uvX, uvY, lifeJitter) from uSpawnTex, computes the target
 // state texel center as gl_Position, and writes a single texel of the
@@ -475,8 +466,7 @@ export class ParticleEffect implements Effect {
     #posTex1: EffectRenderTarget | null = null;
     #colorTex0: EffectRenderTarget | null = null;
     #colorTex1: EffectRenderTarget | null = null;
-    #velTex0: EffectRenderTarget | null = null;
-    #velTex1: EffectRenderTarget | null = null;
+    #velTex: EffectRenderTarget | null = null;
     #stateIndex: 0 | 1 = 0;
     #stampTex: EffectRenderTarget | null = null;
     #trail: EffectRenderTarget | null = null;
@@ -520,15 +510,15 @@ export class ParticleEffect implements Effect {
             wrap: "clamp" as const,
             filter: "nearest" as const,
         };
-        // Manual ping-pong: a sparse spawn pass into a persistent
-        // (auto-swapped) RT would clobber the inactive buffer; two
-        // non-persistent RTs sidestep that.
+        // Manual ping-pong (pos/color): a sparse spawn pass into a
+        // persistent (auto-swapped) RT would clobber the inactive
+        // buffer; two non-persistent RTs sidestep that. velTex is
+        // single — sparsely written at spawn, only read in advect.
         this.#posTex0 = ctx.createRenderTarget(stateOpts);
         this.#posTex1 = ctx.createRenderTarget(stateOpts);
         this.#colorTex0 = ctx.createRenderTarget(stateOpts);
         this.#colorTex1 = ctx.createRenderTarget(stateOpts);
-        this.#velTex0 = ctx.createRenderTarget(stateOpts);
-        this.#velTex1 = ctx.createRenderTarget(stateOpts);
+        this.#velTex = ctx.createRenderTarget(stateOpts);
         this.#stampTex = ctx.createRenderTarget({
             float: false,
             wrap: "clamp",
@@ -651,8 +641,7 @@ export class ParticleEffect implements Effect {
             !this.#posTex1 ||
             !this.#colorTex0 ||
             !this.#colorTex1 ||
-            !this.#velTex0 ||
-            !this.#velTex1 ||
+            !this.#velTex ||
             !this.#stampTex ||
             !this.#trail ||
             !this.#particleGeometry ||
@@ -670,8 +659,7 @@ export class ParticleEffect implements Effect {
             ctx.draw({ frag: FRAG_INIT_POS, target: this.#posTex1 });
             ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#colorTex0 });
             ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#colorTex1 });
-            ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#velTex0 });
-            ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#velTex1 });
+            ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#velTex });
             this.#stateIndex = 0;
             this.#initialized = true;
         }
@@ -694,15 +682,13 @@ export class ParticleEffect implements Effect {
         const posNext = next === 0 ? this.#posTex0 : this.#posTex1;
         const colorCurr = i === 0 ? this.#colorTex0 : this.#colorTex1;
         const colorNext = next === 0 ? this.#colorTex0 : this.#colorTex1;
-        const velCurr = i === 0 ? this.#velTex0 : this.#velTex1;
-        const velNext = next === 0 ? this.#velTex0 : this.#velTex1;
 
         ctx.draw({
             frag: FRAG_ADVECT_POS,
             uniforms: {
                 posTex: posCurr,
                 colorTex: colorCurr,
-                velTex: velCurr,
+                velTex: this.#velTex,
                 elementPixel,
                 time: ctx.time,
                 dt,
@@ -720,11 +706,6 @@ export class ParticleEffect implements Effect {
             frag: FRAG_ADVECT_COLOR,
             uniforms: { colorTex: colorCurr },
             target: colorNext,
-        });
-        ctx.draw({
-            frag: FRAG_ADVECT_VEL,
-            uniforms: { velTex: velCurr },
-            target: velNext,
         });
         this.#stateIndex = next;
 
@@ -772,7 +753,7 @@ export class ParticleEffect implements Effect {
                 frag: FRAG_SPAWN_VEL,
                 geometry: this.#spawnGeometry,
                 uniforms: spawnUniforms,
-                target: velNext,
+                target: this.#velTex,
                 blend: "none",
             });
         }
@@ -948,8 +929,7 @@ export class ParticleEffect implements Effect {
         this.#posTex1 = null;
         this.#colorTex0 = null;
         this.#colorTex1 = null;
-        this.#velTex0 = null;
-        this.#velTex1 = null;
+        this.#velTex = null;
         this.#stampTex = null;
         this.#trail = null;
         this.#particleGeometry = null;
