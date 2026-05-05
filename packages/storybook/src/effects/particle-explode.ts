@@ -225,7 +225,8 @@ export type ParticleExplodeParams = {
     count: number;
     /** Total burst duration (sec); per-particle life is jittered. */
     duration: number;
-    /** uv-displacement-per-second at full strength. */
+    /** Curl-noise + outward-bias drift speed (uv/sec, short-axis-
+     * normalized) at full strength. */
     noiseSpeed: number;
     /** Approximate swirl size in uv units (larger → bigger swirls). */
     noiseScale: number;
