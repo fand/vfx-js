@@ -22,8 +22,8 @@ import {
     FRAG_TRAIL_COMPOSITE,
     GLSL_HASH,
     hexToRgb,
-    installCountSetter,
     QUAD_VERTS,
+    sanitizeCount,
     stateSizeFromCount,
 } from "./_particle-common";
 
@@ -277,7 +277,15 @@ const DEFAULT_PARAMS: ParticleExplodeParams = {
 // One-shot explode. Construct a new instance per `vfx.add()`. Call
 // `trigger()` to start; query `isDone()` to detect completion.
 export class ParticleExplodeEffect implements Effect {
-    params: ParticleExplodeParams;
+    #params: ParticleExplodeParams;
+
+    /** Read-only view of the current params. Use `setParam(key, value)`
+     * to mutate so values like `count` are sanitized. (External tools
+     * such as tweakpane bind directly to the underlying object and
+     * skip the validation; the type marker is for programmatic use.) */
+    get params(): Readonly<ParticleExplodeParams> {
+        return this.#params;
+    }
 
     #posTex: EffectRenderTarget | null = null;
     #colorTex: EffectRenderTarget | null = null;
@@ -293,14 +301,28 @@ export class ParticleExplodeEffect implements Effect {
     #fadeOutFrames = 0;
 
     constructor(initial: Partial<ParticleExplodeParams> = {}) {
-        this.params = { ...DEFAULT_PARAMS, ...initial };
-        installCountSetter(this.params);
-        const s = stateSizeFromCount(this.params.count);
+        this.#params = { ...DEFAULT_PARAMS, ...initial };
+        this.#params.count = sanitizeCount(this.#params.count);
+        const s = stateSizeFromCount(this.#params.count);
         this.#stateSize = [s, s];
     }
 
     get maxCount(): number {
         return this.#stateSize[0] * this.#stateSize[1];
+    }
+
+    /** Validated single-key setter. Use this instead of mutating
+     * `params` directly when you need bad inputs (NaN, negative count,
+     * etc) coerced to valid values. */
+    setParam<K extends keyof ParticleExplodeParams>(
+        key: K,
+        value: ParticleExplodeParams[K],
+    ): void {
+        if (key === "count") {
+            this.#params.count = sanitizeCount(value as number);
+        } else {
+            this.#params[key] = value;
+        }
     }
 
     trigger(): void {

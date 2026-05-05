@@ -27,8 +27,8 @@ import {
     FRAG_TRAIL_COMPOSITE,
     GLSL_HASH,
     hexToRgb,
-    installCountSetter,
     QUAD_VERTS,
+    sanitizeCount,
     stateSizeFromCount,
 } from "./_particle-common";
 
@@ -401,7 +401,15 @@ const DEFAULT_PARAMS: ParticleParams = {
 };
 
 export class ParticleEffect implements Effect {
-    params: ParticleParams;
+    #params: ParticleParams;
+
+    /** Read-only view of the current params. Use `setParam(key, value)`
+     * to mutate so values like `count` are sanitized. (External tools
+     * such as tweakpane bind directly to the underlying object and
+     * skip the validation; the type marker is for programmatic use.) */
+    get params(): Readonly<ParticleParams> {
+        return this.#params;
+    }
 
     #posTex: EffectRenderTarget | null = null;
     #colorTex: EffectRenderTarget | null = null;
@@ -427,14 +435,28 @@ export class ParticleEffect implements Effect {
     #lastMoveTime = -Infinity;
 
     constructor(initial: Partial<ParticleParams> = {}) {
-        this.params = { ...DEFAULT_PARAMS, ...initial };
-        installCountSetter(this.params);
-        this.#stateSize = stateSizeFromCount(this.params.count);
+        this.#params = { ...DEFAULT_PARAMS, ...initial };
+        this.#params.count = sanitizeCount(this.#params.count);
+        this.#stateSize = stateSizeFromCount(this.#params.count);
         this.#stateCapacity = this.#stateSize * this.#stateSize;
     }
 
     get maxCount(): number {
         return this.#stateCapacity;
+    }
+
+    /** Validated single-key setter. Use this instead of mutating
+     * `params` directly when you need bad inputs (NaN, negative count,
+     * etc) coerced to valid values. */
+    setParam<K extends keyof ParticleParams>(
+        key: K,
+        value: ParticleParams[K],
+    ): void {
+        if (key === "count") {
+            this.#params.count = sanitizeCount(value as number);
+        } else {
+            this.#params[key] = value;
+        }
     }
 
     init(ctx: EffectContext): void {
