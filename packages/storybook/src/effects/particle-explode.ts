@@ -22,6 +22,7 @@ import {
     FRAG_TRAIL_COMPOSITE,
     GLSL_HASH,
     hexToRgb,
+    installCountSetter,
     QUAD_VERTS,
     stateSizeFromCount,
 } from "./_particle-common";
@@ -293,6 +294,7 @@ export class ParticleExplodeEffect implements Effect {
 
     constructor(initial: Partial<ParticleExplodeParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
+        installCountSetter(this.params);
         const s = stateSizeFromCount(this.params.count);
         this.#stateSize = [s, s];
         this.#stateSizeVec = [s, s];

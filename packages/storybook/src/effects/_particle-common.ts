@@ -70,8 +70,35 @@ void main() {
 
 // Smallest power-of-two square grid that fits `count` slots.
 export function stateSizeFromCount(count: number): number {
-    const n = Math.max(1, Math.floor(count));
+    const n = sanitizeCount(count);
     return 2 ** Math.ceil(Math.log2(Math.sqrt(n)));
+}
+
+// Coerce user input to a valid particle count. NaN / non-finite /
+// negative / fractional values fall back to a positive integer.
+export function sanitizeCount(count: number): number {
+    if (!Number.isFinite(count)) {
+        return 1;
+    }
+    return Math.max(1, Math.floor(count));
+}
+
+// Replace `params.count` with an accessor that runs `sanitizeCount` on
+// every write, so `params.count = NaN` (etc) can't cascade into
+// stateSizeFromCount and produce invalid RT dimensions. The initial
+// `count` value is also sanitized.
+export function installCountSetter<P extends { count: number }>(
+    params: P,
+): void {
+    let storage = sanitizeCount(params.count);
+    Object.defineProperty(params, "count", {
+        get: () => storage,
+        set: (v: number) => {
+            storage = sanitizeCount(v);
+        },
+        enumerable: true,
+        configurable: true,
+    });
 }
 
 export function hexToRgb(hex: number): [number, number, number] {
