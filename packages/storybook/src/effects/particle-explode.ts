@@ -404,15 +404,7 @@ export class ParticleExplodeEffect implements Effect {
     }
 
     init(ctx: EffectContext): void {
-        const stateOpts = {
-            size: this.#stateSize,
-            float: true,
-            persistent: true as const,
-            wrap: "clamp" as const,
-            filter: "nearest" as const,
-        };
-        this.#posTex = ctx.createRenderTarget(stateOpts);
-        this.#colorTex = ctx.createRenderTarget(stateOpts);
+        this.#allocStateRTs(ctx);
         this.#stampTex = ctx.createRenderTarget({
             float: false,
             wrap: "clamp",
@@ -424,13 +416,29 @@ export class ParticleExplodeEffect implements Effect {
             wrap: "clamp",
             filter: "linear",
         });
-        // Always allocate the full state capacity so params.count can be
-        // raised at runtime without recreating the effect (the shader
-        // gates by particleCount uniform per-frame).
         this.#particleGeometry = {
             attributes: { position: QUAD_VERTS },
             instanceCount: this.#stateSize[0] * this.#stateSize[1],
         };
+    }
+
+    #allocStateRTs(ctx: EffectContext): void {
+        const stateOpts = {
+            size: this.#stateSize,
+            float: true,
+            persistent: true as const,
+            wrap: "clamp" as const,
+            filter: "nearest" as const,
+        };
+        this.#posTex = ctx.createRenderTarget(stateOpts);
+        this.#colorTex = ctx.createRenderTarget(stateOpts);
+    }
+
+    #disposeStateRTs(): void {
+        this.#posTex?.dispose();
+        this.#colorTex?.dispose();
+        this.#posTex = null;
+        this.#colorTex = null;
     }
 
     render(ctx: EffectContext): void {
@@ -442,6 +450,17 @@ export class ParticleExplodeEffect implements Effect {
             !this.#particleGeometry
         ) {
             return;
+        }
+
+        // Resize state RTs while idle. We never realloc mid-burst —
+        // doing so would discard the in-flight particle state.
+        const newSize = stateSizeFromCount(this.params.count);
+        if (newSize !== this.#stateSize[0] && !this.#triggered) {
+            this.#disposeStateRTs();
+            this.#stateSize = [newSize, newSize];
+            this.#stateSizeVec = [newSize, newSize];
+            this.#allocStateRTs(ctx);
+            this.#particleGeometry.instanceCount = newSize * newSize;
         }
 
         if (!this.#triggered) {
