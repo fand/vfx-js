@@ -24,9 +24,11 @@ function stateSizeFromCount(count: number): number {
 }
 
 // Per-frame spawn budget. Spawn entries are uploaded to a square data
-// texture (vec4 per entry: slotId, uvX, uvY, lifeJitter) sampled by the
-// gl.POINTS spawn pass. 64×64 = 4096 spawns/frame ≈ 245k spawns/sec at
-// 60 fps.
+// texture (vec4 per entry: slotId, uvX, uvY, dirAngle) sampled by the
+// gl.POINTS spawn pass. dirAngle = theta in [0, 2π) for mouse spawns,
+// -1 sentinel for screen spawns (no radial impulse). lifeJitter is
+// derived on the GPU via hash. 64×64 = 4096 spawns/frame ≈ 245k
+// spawns/sec at 60 fps.
 const SPAWN_TEX_SIZE = 64;
 const MAX_SPAWNS_PER_FRAME = SPAWN_TEX_SIZE * SPAWN_TEX_SIZE;
 // Active mouse if it moved within this window (sec) — otherwise spawn
@@ -286,23 +288,28 @@ uniform sampler2D colorTex;
 void main() { outColor = texture(colorTex, uv); }
 `;
 
+// hash21 for GPU-side lifeJitter generation.
+const GLSL_HASH = `
+float hash21(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+`;
+
 // Spawn pass: gl.POINTS, one point per spawn entry. Each vertex pulls
-// (slotId, uvX, uvY, lifeJitter) from uSpawnTex, computes the target
+// (slotId, uvX, uvY, dirAngle) from uSpawnTex, computes the target
 // state texel center as gl_Position, and writes a single texel of the
-// pos / color RT. The `position` attribute carries the spawn-slot
+// pos / color / vel RT. The `position` attribute carries the spawn-slot
 // index (0..MAX-1) and gives EffectGeometry its vertex count.
 const VERT_SPAWN = `#version 300 es
 precision highp float;
 in float position;
 
 uniform sampler2D uSpawnTex;
-uniform sampler2D uSpawnVelTex;
 uniform vec2 uSpawnTexSize;
 uniform int uSpawnCount;
 uniform vec2 stateSize;
 
 out vec4 vSpawn;
-out vec4 vSpawnVel;
 
 void main() {
     int idx = int(position);
@@ -310,13 +317,11 @@ void main() {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         gl_PointSize = 0.0;
         vSpawn = vec4(0.0);
-        vSpawnVel = vec4(0.0);
         return;
     }
     int sx = idx % int(uSpawnTexSize.x);
     int sy = idx / int(uSpawnTexSize.x);
     vec4 s = texelFetch(uSpawnTex, ivec2(sx, sy), 0);
-    vec4 sv = texelFetch(uSpawnVelTex, ivec2(sx, sy), 0);
     int slot = int(s.x);
     int tx = slot % int(stateSize.x);
     int ty = slot / int(stateSize.x);
@@ -324,7 +329,6 @@ void main() {
     gl_Position = vec4(ndc, 0.0, 1.0);
     gl_PointSize = 1.0;
     vSpawn = s;
-    vSpawnVel = sv;
 }
 `;
 
@@ -349,6 +353,8 @@ void main() {
 }
 `;
 
+// lifeJitter is hashed from the spawn entry (slot id + uv) to keep
+// every spawn varied without a CPU-side random.
 const FRAG_SPAWN_COLOR = `#version 300 es
 precision highp float;
 in vec4 vSpawn;
@@ -357,21 +363,29 @@ out vec4 outColor;
 uniform sampler2D src;
 uniform vec3 color;
 uniform float colorMix;
+uniform vec2 lifeJitterRange;
+${GLSL_HASH}
 
 void main() {
     vec4 c = texture(src, clamp(vSpawn.yz, 0.0, 1.0));
-    outColor = vec4(mix(c.rgb, color, colorMix), vSpawn.w);
+    float h = hash21(vSpawn.yz + vec2(vSpawn.x) * 1.7);
+    float lifeJitter = mix(lifeJitterRange.x, lifeJitterRange.y, h);
+    outColor = vec4(mix(c.rgb, color, colorMix), lifeJitter);
 }
 `;
 
 // Writes the radial direction (unit vector in pixel space) per spawn
-// slot. Mouse spawns carry the cos/sin of the spawn ray; screen spawns
-// are zero so they receive only curl-noise advection.
+// slot from vSpawn.w (theta). Screen spawns carry -1 sentinel and get
+// zero velocity so they receive only curl-noise advection.
 const FRAG_SPAWN_VEL = `#version 300 es
 precision highp float;
-in vec4 vSpawnVel;
+in vec4 vSpawn;
 out vec4 outColor;
-void main() { outColor = vSpawnVel; }
+void main() {
+    float theta = vSpawn.w;
+    vec2 dir = theta >= 0.0 ? vec2(cos(theta), sin(theta)) : vec2(0.0);
+    outColor = vec4(dir, 0.0, 0.0);
+}
 `;
 
 export type ParticleParams = {
@@ -477,11 +491,8 @@ export class ParticleEffect implements Effect {
     #stateCapacity: number;
 
     #spawnUniform = new Float32Array(MAX_SPAWNS_PER_FRAME * 4);
-    #spawnVelUniform = new Float32Array(MAX_SPAWNS_PER_FRAME * 4);
     #spawnRawTex: WebGLTexture | null = null;
     #spawnTexHandle: EffectTexture | null = null;
-    #spawnVelRawTex: WebGLTexture | null = null;
-    #spawnVelTexHandle: EffectTexture | null = null;
     #spawnGeometry: EffectGeometry | null = null;
     #particleGeometry: EffectGeometry | null = null;
     #gl: WebGL2RenderingContext | null = null;
@@ -593,45 +604,27 @@ export class ParticleEffect implements Effect {
         const a = this.#createSpawnTex(ctx);
         this.#spawnRawTex = a.raw;
         this.#spawnTexHandle = a.handle;
-        const b = this.#createSpawnTex(ctx);
-        this.#spawnVelRawTex = b.raw;
-        this.#spawnVelTexHandle = b.handle;
     }
 
     #uploadSpawnTextures(ctx: EffectContext): void {
+        if (!this.#spawnRawTex) return;
         const gl = ctx.gl;
-        // The framework sets UNPACK_FLIP_Y_WEBGL=true globally for DOM
-        // source uploads; reset it for our raw float data so row 0 of
-        // the array stays at row 0 of the texture.
+        // Reset framework's global UNPACK_FLIP_Y_WEBGL=true (set for
+        // DOM source uploads) so row 0 of our raw float buffer maps to
+        // row 0 of the texture.
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-        if (this.#spawnRawTex) {
-            gl.bindTexture(gl.TEXTURE_2D, this.#spawnRawTex);
-            gl.texSubImage2D(
-                gl.TEXTURE_2D,
-                0,
-                0,
-                0,
-                SPAWN_TEX_SIZE,
-                SPAWN_TEX_SIZE,
-                gl.RGBA,
-                gl.FLOAT,
-                this.#spawnUniform,
-            );
-        }
-        if (this.#spawnVelRawTex) {
-            gl.bindTexture(gl.TEXTURE_2D, this.#spawnVelRawTex);
-            gl.texSubImage2D(
-                gl.TEXTURE_2D,
-                0,
-                0,
-                0,
-                SPAWN_TEX_SIZE,
-                SPAWN_TEX_SIZE,
-                gl.RGBA,
-                gl.FLOAT,
-                this.#spawnVelUniform,
-            );
-        }
+        gl.bindTexture(gl.TEXTURE_2D, this.#spawnRawTex);
+        gl.texSubImage2D(
+            gl.TEXTURE_2D,
+            0,
+            0,
+            0,
+            SPAWN_TEX_SIZE,
+            SPAWN_TEX_SIZE,
+            gl.RGBA,
+            gl.FLOAT,
+            this.#spawnUniform,
+        );
         gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
@@ -647,9 +640,7 @@ export class ParticleEffect implements Effect {
             !this.#particleGeometry ||
             !this.#spawnGeometry ||
             !this.#spawnTexHandle ||
-            !this.#spawnVelTexHandle ||
-            !this.#spawnRawTex ||
-            !this.#spawnVelRawTex
+            !this.#spawnRawTex
         ) {
             return;
         }
@@ -712,7 +703,6 @@ export class ParticleEffect implements Effect {
         if (nSpawn > 0) {
             const spawnUniforms = {
                 uSpawnTex: this.#spawnTexHandle,
-                uSpawnVelTex: this.#spawnVelTexHandle,
                 uSpawnTexSize: SPAWN_TEX_SIZE_VEC,
                 uSpawnCount: nSpawn,
                 stateSize: this.#stateSizeVec,
@@ -744,6 +734,7 @@ export class ParticleEffect implements Effect {
                     src: ctx.src,
                     color: colorRGB,
                     colorMix: this.params.colorMix,
+                    lifeJitterRange: [LIFE_JITTER_MIN, LIFE_JITTER_MAX],
                 },
                 target: colorNext,
                 blend: "none",
@@ -855,47 +846,31 @@ export class ParticleEffect implements Effect {
         const elemPxX = Math.max(1, elementPixel[0]);
         const elemPxY = Math.max(1, elementPixel[1]);
         const buf = this.#spawnUniform;
-        const velBuf = this.#spawnVelUniform;
         let i = 0;
+        // .w = theta in [0, 2π) for mouse spawns. FRAG_SPAWN_VEL turns
+        // it into a unit (cosθ, sinθ) in pixel space; FRAG_ADVECT_POS
+        // divides by elementPixel for circular symmetry on non-square
+        // elements.
         for (; i < nMouse; i++) {
             const r = Math.sqrt(Math.random()) * this.params.radius;
             const theta = Math.random() * Math.PI * 2;
-            const cosT = Math.cos(theta);
-            const sinT = Math.sin(theta);
-            const dx = cosT * r;
-            const dy = sinT * r;
-            const lifeJitter =
-                LIFE_JITTER_MIN +
-                Math.random() * (LIFE_JITTER_MAX - LIFE_JITTER_MIN);
+            const dx = Math.cos(theta) * r;
+            const dy = Math.sin(theta) * r;
 
             const o = i * 4;
             buf[o + 0] = this.#nextSlot;
             buf[o + 1] = mouseUv[0] + dx / elemPxX;
             buf[o + 2] = mouseUv[1] + dy / elemPxY;
-            buf[o + 3] = lifeJitter;
-            // Unit direction in pixel space; FRAG_ADVECT_POS divides by
-            // elementPixel to get a uv-space velocity that keeps
-            // circular symmetry on non-square elements.
-            velBuf[o + 0] = cosT;
-            velBuf[o + 1] = sinT;
-            velBuf[o + 2] = 0;
-            velBuf[o + 3] = 0;
+            buf[o + 3] = theta;
             this.#nextSlot = (this.#nextSlot + 1) % cap;
         }
+        // .w = -1 sentinel: no radial impulse (curl-noise only).
         for (let j = 0; j < nScreen; j++, i++) {
-            const lifeJitter =
-                LIFE_JITTER_MIN +
-                Math.random() * (LIFE_JITTER_MAX - LIFE_JITTER_MIN);
-
             const o = i * 4;
             buf[o + 0] = this.#nextSlot;
             buf[o + 1] = Math.random();
             buf[o + 2] = Math.random();
-            buf[o + 3] = lifeJitter;
-            velBuf[o + 0] = 0;
-            velBuf[o + 1] = 0;
-            velBuf[o + 2] = 0;
-            velBuf[o + 3] = 0;
+            buf[o + 3] = -1;
             this.#nextSlot = (this.#nextSlot + 1) % cap;
         }
         return total;
@@ -911,18 +886,11 @@ export class ParticleEffect implements Effect {
     dispose(): void {
         this.#contextRestoredUnsub?.();
         this.#contextRestoredUnsub = null;
-        if (this.#gl) {
-            if (this.#spawnRawTex) {
-                this.#gl.deleteTexture(this.#spawnRawTex);
-            }
-            if (this.#spawnVelRawTex) {
-                this.#gl.deleteTexture(this.#spawnVelRawTex);
-            }
+        if (this.#gl && this.#spawnRawTex) {
+            this.#gl.deleteTexture(this.#spawnRawTex);
         }
         this.#spawnRawTex = null;
         this.#spawnTexHandle = null;
-        this.#spawnVelRawTex = null;
-        this.#spawnVelTexHandle = null;
         this.#spawnGeometry = null;
         this.#gl = null;
         this.#posTex0 = null;
