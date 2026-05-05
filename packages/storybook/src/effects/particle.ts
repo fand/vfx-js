@@ -106,12 +106,12 @@ void main() {
     vec4 c = texture(colorTex, stateUv);
 
     float age = s.w;
-    // age < 0: pre-spawn, age >= 1: dead.
-    // Linear ramp to peak at age=fadeIn, then alphaDecay-shaped decay
-    // over the remaining life. Small fadeIn keeps the radial-emit
-    // phase visible; larger values restore the slow fade-in look.
+    // age >= 1: dead. Linear ramp to peak at age=fadeIn, then
+    // alphaDecay-shaped decay over the remaining life. Small fadeIn
+    // keeps the radial-emit phase visible; larger values restore the
+    // slow fade-in look.
     float lifeAlpha;
-    if (age < 0.0 || age >= 1.0) {
+    if (age >= 1.0) {
         lifeAlpha = 0.0;
     } else {
         float fi = max(fadeIn, 1e-4);
