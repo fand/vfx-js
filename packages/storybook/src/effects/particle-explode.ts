@@ -311,17 +311,14 @@ export class ParticleExplodeEffect implements Effect {
         return this.#stateSize[0] * this.#stateSize[1];
     }
 
-    /** Validated single-key setter. Use this instead of mutating
-     * `params` directly when you need bad inputs (NaN, negative count,
-     * etc) coerced to valid values. */
-    setParam<K extends keyof ParticleExplodeParams>(
-        key: K,
-        value: ParticleExplodeParams[K],
-    ): void {
-        if (key === "count") {
-            this.#params.count = sanitizeCount(value as number);
-        } else {
-            this.#params[key] = value;
+    /** Validated bulk setter. Pass any subset of params; bad inputs
+     * (NaN / negative `count`, etc) are coerced to valid values
+     * before applying. */
+    setParam(updates: Partial<ParticleExplodeParams>): void {
+        const target = this.#params as Record<string, unknown>;
+        for (const [k, v] of Object.entries(updates)) {
+            if (v === undefined) continue;
+            target[k] = k === "count" ? sanitizeCount(v as number) : v;
         }
     }
 
