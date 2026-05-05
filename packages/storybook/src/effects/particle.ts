@@ -506,21 +506,7 @@ export class ParticleEffect implements Effect {
     }
 
     init(ctx: EffectContext): void {
-        const stateOpts = {
-            size: [this.#stateSize, this.#stateSize] as [number, number],
-            float: true,
-            wrap: "clamp" as const,
-            filter: "nearest" as const,
-        };
-        // Manual ping-pong (pos/color): a sparse spawn pass into a
-        // persistent (auto-swapped) RT would clobber the inactive
-        // buffer; two non-persistent RTs sidestep that. velTex is
-        // single — sparsely written at spawn, only read in advect.
-        this.#posTex0 = ctx.createRenderTarget(stateOpts);
-        this.#posTex1 = ctx.createRenderTarget(stateOpts);
-        this.#colorTex0 = ctx.createRenderTarget(stateOpts);
-        this.#colorTex1 = ctx.createRenderTarget(stateOpts);
-        this.#velTex = ctx.createRenderTarget(stateOpts);
+        this.#allocStateRTs(ctx);
         this.#stampTex = ctx.createRenderTarget({
             float: false,
             wrap: "clamp",
@@ -532,8 +518,6 @@ export class ParticleEffect implements Effect {
             wrap: "clamp",
             filter: "linear",
         });
-        // Allocate the full state capacity so params.count can grow at
-        // runtime up to the auto-derived ceiling without re-init.
         this.#particleGeometry = {
             attributes: { position: QUAD_VERTS },
             instanceCount: this.#stateCapacity,
@@ -551,6 +535,37 @@ export class ParticleEffect implements Effect {
             this.#allocSpawnTextures(ctx);
             this.#initialized = false;
         });
+    }
+
+    #allocStateRTs(ctx: EffectContext): void {
+        const stateOpts = {
+            size: [this.#stateSize, this.#stateSize] as [number, number],
+            float: true,
+            wrap: "clamp" as const,
+            filter: "nearest" as const,
+        };
+        // Manual ping-pong (pos/color): a sparse spawn pass into a
+        // persistent (auto-swapped) RT would clobber the inactive
+        // buffer. velTex is single — sparsely written at spawn, only
+        // read in advect.
+        this.#posTex0 = ctx.createRenderTarget(stateOpts);
+        this.#posTex1 = ctx.createRenderTarget(stateOpts);
+        this.#colorTex0 = ctx.createRenderTarget(stateOpts);
+        this.#colorTex1 = ctx.createRenderTarget(stateOpts);
+        this.#velTex = ctx.createRenderTarget(stateOpts);
+    }
+
+    #disposeStateRTs(): void {
+        this.#posTex0?.dispose();
+        this.#posTex1?.dispose();
+        this.#colorTex0?.dispose();
+        this.#colorTex1?.dispose();
+        this.#velTex?.dispose();
+        this.#posTex0 = null;
+        this.#posTex1 = null;
+        this.#colorTex0 = null;
+        this.#colorTex1 = null;
+        this.#velTex = null;
     }
 
     #createSpawnTex(ctx: EffectContext): {
@@ -634,6 +649,21 @@ export class ParticleEffect implements Effect {
             !this.#spawnRawTex
         ) {
             return;
+        }
+
+        // Resize state RTs if `params.count` crossed a power-of-two
+        // boundary. dispose-then-create keeps peak GPU memory minimal;
+        // the FRAG_INIT pass below seeds the fresh RTs.
+        const newSize = stateSizeFromCount(this.params.count);
+        if (newSize !== this.#stateSize) {
+            this.#disposeStateRTs();
+            this.#stateSize = newSize;
+            this.#stateSizeVec = [newSize, newSize];
+            this.#stateCapacity = newSize * newSize;
+            this.#allocStateRTs(ctx);
+            this.#particleGeometry.instanceCount = this.#stateCapacity;
+            this.#nextSlot = 0;
+            this.#initialized = false;
         }
 
         if (!this.#initialized) {
