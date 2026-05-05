@@ -1,3 +1,8 @@
+// Per-particle lifespan multiplier range (centred on 1.0). Shared so
+// both particle effects produce visually similar life-jitter curves.
+export const LIFE_JITTER_MIN = 0.7;
+export const LIFE_JITTER_MAX = 1.3;
+
 // 4D simplex noise (Ashima Arts / Ian McEwan, MIT) + 3D curl built on
 // top. The 4th simplex axis carries time so the field morphs in place.
 // Shared between particle.ts and particle-explode.ts.

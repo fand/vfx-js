@@ -11,7 +11,11 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
-import { GLSL_CURL_NOISE } from "./_curl-noise";
+import {
+    GLSL_CURL_NOISE,
+    LIFE_JITTER_MAX,
+    LIFE_JITTER_MIN,
+} from "./_curl-noise";
 
 // State texture footprint: 5 RTs (pos×2, color×2, vel×1) × stateSize² ×
 // 16 B = 80 MB at 1024 (RGBA32F) / 40 MB at RGBA16F fallback at the 1M
@@ -34,9 +38,6 @@ const MAX_SPAWNS_PER_FRAME = SPAWN_TEX_SIZE * SPAWN_TEX_SIZE;
 // Active mouse if it moved within this window (sec) — otherwise spawn
 // only when `params.spawnOnIdle` is set.
 const IDLE_THRESHOLD = 0.1;
-// Per-particle lifespan multiplier range (centred on 1.0).
-const LIFE_JITTER_MIN = 0.7;
-const LIFE_JITTER_MAX = 1.3;
 
 const SPAWN_TEX_SIZE_VEC: [number, number] = [SPAWN_TEX_SIZE, SPAWN_TEX_SIZE];
 

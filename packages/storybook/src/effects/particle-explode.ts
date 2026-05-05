@@ -10,7 +10,14 @@ import type {
     EffectGeometry,
     EffectRenderTarget,
 } from "@vfx-js/core";
-import { GLSL_CURL_NOISE } from "./_curl-noise";
+import {
+    GLSL_CURL_NOISE,
+    LIFE_JITTER_MAX,
+    LIFE_JITTER_MIN,
+} from "./_curl-noise";
+
+const LIFE_JITTER_MIN_GLSL = LIFE_JITTER_MIN.toFixed(4);
+const LIFE_JITTER_MAX_GLSL = LIFE_JITTER_MAX.toFixed(4);
 
 // State texture size is decoupled from image resolution and auto-
 // derived from `count` (smallest power-of-two square grid that fits).
@@ -85,7 +92,11 @@ void main() {
     float taper = pow(clamp(1.0 - age, 0.0, 1.0), speedDecay);
     vec3 pos = s.xyz + (vNoise + outward) * noiseSpeed * dt * taper;
 
-    float lifespanScale = 0.7 + hash21(uv * 91.7 + 1.234) * 0.6;
+    float lifespanScale = mix(
+        ${LIFE_JITTER_MIN_GLSL},
+        ${LIFE_JITTER_MAX_GLSL},
+        hash21(uv * 91.7 + 1.234)
+    );
     age += dt / max(duration * lifespanScale, 1e-3);
 
     outColor = vec4(pos, age);
