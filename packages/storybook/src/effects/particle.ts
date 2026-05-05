@@ -452,7 +452,6 @@ export class ParticleEffect implements Effect {
         });
         this.#particleGeometry = {
             attributes: { position: QUAD_VERTS },
-            instanceCount: this.#stateCapacity,
         };
         this.#spawnGeometry = {
             mode: "points",
@@ -587,7 +586,6 @@ export class ParticleEffect implements Effect {
             this.#stateSize = newSize;
             this.#stateCapacity = newSize * newSize;
             this.#allocStateRTs(ctx);
-            this.#particleGeometry.instanceCount = this.#stateCapacity;
             this.#nextSlot = 0;
             this.#initialized = false;
         }
@@ -687,6 +685,8 @@ export class ParticleEffect implements Effect {
             });
         }
 
+        const cap = this.#cap();
+        this.#particleGeometry.instanceCount = cap;
         ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
         ctx.draw({
             vert: VERT_PARTICLE,
@@ -697,7 +697,7 @@ export class ParticleEffect implements Effect {
                 stateSize: stateSizeVec,
                 pointSize: this.params.pointSize,
                 elementPixel,
-                particleCount: this.#cap(),
+                particleCount: cap,
                 alpha: this.params.alpha,
                 alphaDecay: this.params.alphaDecay,
                 fadeIn: this.params.fadeIn,

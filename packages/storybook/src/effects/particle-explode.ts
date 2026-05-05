@@ -357,7 +357,6 @@ export class ParticleExplodeEffect implements Effect {
         });
         this.#particleGeometry = {
             attributes: { position: QUAD_VERTS },
-            instanceCount: this.#stateSize[0] * this.#stateSize[1],
         };
     }
 
@@ -410,7 +409,6 @@ export class ParticleExplodeEffect implements Effect {
             this.#disposeStateRTs();
             this.#stateSize = [newSize, newSize];
             this.#allocStateRTs(ctx);
-            this.#particleGeometry.instanceCount = newSize * newSize;
         }
 
         if (!this.#triggered) {
@@ -480,6 +478,7 @@ export class ParticleExplodeEffect implements Effect {
                 });
             }
 
+            this.#particleGeometry.instanceCount = cap;
             ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
             ctx.draw({
                 vert: VERT_PARTICLE,
@@ -490,7 +489,7 @@ export class ParticleExplodeEffect implements Effect {
                     stateSize: this.#stateSize,
                     pointSize: this.params.pointSize,
                     elementPixel,
-                    particleCount: this.#cap(),
+                    particleCount: cap,
                     alpha: this.params.alpha,
                     alphaDecay: this.params.alphaDecay,
                     fog: this.params.fog,
