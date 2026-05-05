@@ -15,6 +15,16 @@ import {
     LIFE_JITTER_MAX,
     LIFE_JITTER_MIN,
 } from "./_curl-noise";
+import {
+    clampDt,
+    FRAG_CLEAR,
+    FRAG_PARTICLE,
+    FRAG_TRAIL_COMPOSITE,
+    GLSL_HASH,
+    hexToRgb,
+    QUAD_VERTS,
+    stateSizeFromCount,
+} from "./_particle-common";
 
 const LIFE_JITTER_MIN_GLSL = LIFE_JITTER_MIN.toFixed(4);
 const LIFE_JITTER_MAX_GLSL = LIFE_JITTER_MAX.toFixed(4);
@@ -24,16 +34,6 @@ const LIFE_JITTER_MAX_GLSL = LIFE_JITTER_MAX.toFixed(4);
 // Each texel is a particle slot; on burst, slots with id < params.count
 // emit at a hashed random uv across the element. 1024² is the 1M cap
 // at the default `count`.
-function stateSizeFromCount(count: number): number {
-    const n = Math.max(1, Math.floor(count));
-    return 2 ** Math.ceil(Math.log2(Math.sqrt(n)));
-}
-
-const GLSL_HASH = `
-float hash21(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-`;
 
 // On burst: slots with id < count emit at a hashed uv (random point on
 // the element); slots beyond count are written dead (age=2). Otherwise
@@ -83,10 +83,7 @@ void main() {
         return;
     }
 
-    float shortAxis = min(elementPixel.x, elementPixel.y);
-    vec3 stretch = vec3(elementPixel / shortAxis, 1.0);
-    vec3 noiseInput = s.xyz * stretch / max(noiseScale, 1e-4);
-    vec3 vNoise = curl3D(noiseInput, time * noiseAnimation) / stretch;
+    vec3 vNoise = sampleCurl(s.xyz, elementPixel, noiseScale, time * noiseAnimation);
     vec3 outward = vec3(s.xy - vec2(0.5), s.z) * outwardBias;
 
     float taper = pow(clamp(1.0 - age, 0.0, 1.0), speedDecay);
@@ -103,48 +100,39 @@ void main() {
 }
 `;
 
-// On burst: slots with id < count sample src at the same hashed uv
-// FRAG_UPDATE_POS uses for their spawn position. Slots beyond count
-// get cleared. Otherwise pass through the previously-captured color.
-const FRAG_UPDATE_COLOR = `#version 300 es
+// Burst-only color seed: slots with id < count sample src at the same
+// hashed uv FRAG_UPDATE_POS uses for their spawn position; slots
+// beyond count are cleared. Color is static after burst, so this runs
+// once per trigger and colorTex is single-buffer (no ping-pong).
+const FRAG_BURST_COLOR = `#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
 
-uniform sampler2D colorTex;
 uniform sampler2D src;
 uniform vec4 srcRectUv;
 uniform vec2 stateSize;
 uniform float count;
-uniform int uBurst;
 uniform vec3 color;
 uniform float colorMix;
 ${GLSL_HASH}
 
 void main() {
-    if (uBurst == 1) {
-        ivec2 pix = ivec2(floor(uv * stateSize));
-        float fid = float(pix.y * int(stateSize.x) + pix.x);
-        if (fid >= count) {
-            outColor = vec4(0.0);
-            return;
-        }
-        vec2 spawnUv = vec2(
-            hash21(uv * 31.7 + 11.13),
-            hash21(uv * 73.13 + 7.71)
-        );
-        vec2 sampleUv = srcRectUv.xy + spawnUv * srcRectUv.zw;
-        vec4 c = texture(src, sampleUv);
-        outColor = vec4(mix(c.rgb, color, colorMix), c.a);
+    ivec2 pix = ivec2(floor(uv * stateSize));
+    float fid = float(pix.y * int(stateSize.x) + pix.x);
+    if (fid >= count) {
+        outColor = vec4(0.0);
         return;
     }
-    outColor = texture(colorTex, uv);
+    vec2 spawnUv = vec2(
+        hash21(uv * 31.7 + 11.13),
+        hash21(uv * 73.13 + 7.71)
+    );
+    vec2 sampleUv = srcRectUv.xy + spawnUv * srcRectUv.zw;
+    vec4 c = texture(src, sampleUv);
+    outColor = vec4(mix(c.rgb, color, colorMix), c.a);
 }
 `;
-
-const QUAD_VERTS = new Float32Array([
-    -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5,
-]);
 
 const VERT_PARTICLE = `#version 300 es
 precision highp float;
@@ -204,55 +192,6 @@ void main() {
 
     vCorner = position;
     vColor = vec4(c.rgb, c.a * lifeAlpha * alpha * fogFactor);
-}
-`;
-
-const FRAG_PARTICLE = `#version 300 es
-precision highp float;
-in vec2 vCorner;
-in vec4 vColor;
-out vec4 outColor;
-
-void main() {
-    float d = length(vCorner) * 2.0;
-    float fall = 1.0 - smoothstep(0.6, 1.0, d);
-    if (fall <= 0.0) discard;
-    float a = vColor.a * fall;
-    outColor = vec4(vColor.rgb * a, a);
-}
-`;
-
-const FRAG_CLEAR = `#version 300 es
-precision highp float;
-out vec4 outColor;
-void main() { outColor = vec4(0.0); }
-`;
-
-const FRAG_TRAIL_COMPOSITE = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-
-uniform sampler2D trailPrev;
-uniform sampler2D particleStamp;
-uniform float trailFade;
-uniform int blendMode;
-
-void main() {
-    vec4 prev = texture(trailPrev, uv);
-    vec4 stamp = texture(particleStamp, uv);
-    vec4 faded = prev * trailFade;
-    if (blendMode == 1) {
-        outColor = vec4(
-            stamp.rgb + faded.rgb * (1.0 - stamp.a),
-            clamp(stamp.a + faded.a * (1.0 - stamp.a), 0.0, 1.0)
-        );
-    } else {
-        outColor = vec4(
-            faded.rgb + stamp.rgb,
-            clamp(faded.a + stamp.a, 0.0, 1.0)
-        );
-    }
 }
 `;
 
@@ -423,15 +362,19 @@ export class ParticleExplodeEffect implements Effect {
     }
 
     #allocStateRTs(ctx: EffectContext): void {
-        const stateOpts = {
+        const stateBase = {
             size: this.#stateSize,
             float: true,
-            persistent: true as const,
             wrap: "clamp" as const,
             filter: "nearest" as const,
         };
-        this.#posTex = ctx.createRenderTarget(stateOpts);
-        this.#colorTex = ctx.createRenderTarget(stateOpts);
+        // posTex needs ping-pong (advect reads + writes); colorTex is
+        // burst-seeded once and never advected, so single-buffer is enough.
+        this.#posTex = ctx.createRenderTarget({
+            ...stateBase,
+            persistent: true,
+        });
+        this.#colorTex = ctx.createRenderTarget(stateBase);
     }
 
     #disposeStateRTs(): void {
@@ -485,8 +428,7 @@ export class ParticleExplodeEffect implements Effect {
             return;
         }
 
-        // Cap dt so tab-switch pauses don't teleport particles.
-        const dt = Math.min(0.1, Math.max(0, ctx.deltaTime));
+        const dt = clampDt(ctx.deltaTime);
         const elementPixel: [number, number] = [
             ctx.dims.elementPixel[0],
             ctx.dims.elementPixel[1],
@@ -517,25 +459,19 @@ export class ParticleExplodeEffect implements Effect {
                 target: this.#posTex,
             });
 
-            const cHex = this.params.color | 0;
-            const colorRGB: [number, number, number] = [
-                ((cHex >> 16) & 0xff) / 255,
-                ((cHex >> 8) & 0xff) / 255,
-                (cHex & 0xff) / 255,
-            ];
-            ctx.draw({
-                frag: FRAG_UPDATE_COLOR,
-                uniforms: {
-                    colorTex: this.#colorTex,
-                    src: ctx.src,
-                    stateSize: this.#stateSizeVec,
-                    count: cap,
-                    uBurst: burst,
-                    color: colorRGB,
-                    colorMix: this.params.colorMix,
-                },
-                target: this.#colorTex,
-            });
+            if (burst === 1) {
+                ctx.draw({
+                    frag: FRAG_BURST_COLOR,
+                    uniforms: {
+                        src: ctx.src,
+                        stateSize: this.#stateSizeVec,
+                        count: cap,
+                        color: hexToRgb(this.params.color),
+                        colorMix: this.params.colorMix,
+                    },
+                    target: this.#colorTex,
+                });
+            }
 
             ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
             ctx.draw({
@@ -590,8 +526,9 @@ export class ParticleExplodeEffect implements Effect {
     }
 
     dispose(): void {
-        this.#posTex = null;
-        this.#colorTex = null;
+        this.#disposeStateRTs();
+        this.#stampTex?.dispose();
+        this.#trail?.dispose();
         this.#stampTex = null;
         this.#trail = null;
         this.#particleGeometry = null;

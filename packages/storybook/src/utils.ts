@@ -258,8 +258,8 @@ export function attachParticlePane(
     const motion = pane.addFolder({ title: "Motion", expanded: true });
     motion.addBinding(effect.params, "emitSpeed", {
         min: 0,
-        max: 3000,
-        step: 10,
+        max: 5,
+        step: 0.05,
     });
     motion.addBinding(effect.params, "noiseDelay", {
         min: 0,

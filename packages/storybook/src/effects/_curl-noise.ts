@@ -99,4 +99,14 @@ vec3 curl3D(vec3 p, float t) {
     float dPxdy = snoise(pa + dy) - snoise(pa - dy);
     return vec3(dPzdy - dPydz, dPxdz - dPzdx, dPydx - dPxdy) / (2.0 * eps);
 }
+
+// Aspect-corrected curl sampler. stretch maps element px so the noise
+// grid is isotropic in screen space; the inverse scaling on the output
+// keeps the velocity field circular regardless of element aspect.
+vec3 sampleCurl(vec3 pos, vec2 elementPixel, float scale, float animTime) {
+    float shortAxis = min(elementPixel.x, elementPixel.y);
+    vec3 stretch = vec3(elementPixel / shortAxis, 1.0);
+    vec3 noiseInput = pos * stretch / max(scale, 1e-4);
+    return curl3D(noiseInput, animTime) / stretch;
+}
 `;

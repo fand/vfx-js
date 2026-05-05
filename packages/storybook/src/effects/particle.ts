@@ -2,9 +2,11 @@
 // slots each frame and uploads them to a data texture. A full-screen
 // advect pass moves every live particle through a 3D curl-noise field;
 // a separate gl.POINTS spawn pass overwrites the just-advected texels
-// for slots that received fresh spawns. pos/color use the framework's
-// auto-ping-pong (`persistent: true`) — advect runs with `swap: false`
-// so the spawn pass lands in the same internal buffer.
+// for slots that received fresh spawns. pos uses the framework's auto-
+// ping-pong (`persistent: true`); advect runs with `swap: false` so the
+// subsequent spawn pass lands in the same internal buffer. color/vel
+// are single-buffer — only the spawn pass writes to them, and the other
+// texels persist naturally without ping-pong.
 // Composited over a persistent trail buffer.
 import type {
     Effect,
@@ -18,17 +20,22 @@ import {
     LIFE_JITTER_MAX,
     LIFE_JITTER_MIN,
 } from "./_curl-noise";
+import {
+    clampDt,
+    FRAG_CLEAR,
+    FRAG_PARTICLE,
+    FRAG_TRAIL_COMPOSITE,
+    GLSL_HASH,
+    hexToRgb,
+    QUAD_VERTS,
+    stateSizeFromCount,
+} from "./_particle-common";
 
-// State texture footprint: 5 buffers total (pos / color persistent =
-// 2 internal each, vel single) × stateSize² × 16 B = 80 MB at 1024
-// (RGBA32F) / 40 MB at RGBA16F fallback at the 1M cap. velTex is
-// single because spawns sparse-write it and advect only reads.
-// Smaller `count` shrinks the texture proportionally — smallest
-// power-of-two square grid that fits `count` slots.
-function stateSizeFromCount(count: number): number {
-    const n = Math.max(1, Math.floor(count));
-    return 2 ** Math.ceil(Math.log2(Math.sqrt(n)));
-}
+// State texture footprint: 4 internal buffers total (pos persistent =
+// 2 internal, color + vel single = 1 each) × stateSize² × 16 B =
+// 64 MB at 1024 (RGBA32F) / 32 MB at RGBA16F fallback at the 1M cap.
+// color/vel can be single-buffer because only the spawn pass writes
+// to them and the other texels persist naturally.
 
 // Per-frame spawn budget. Spawn entries are uploaded to a square data
 // texture (vec4 per entry: slotId, uvX, uvY, dirAngle) sampled by the
@@ -68,13 +75,6 @@ void main() {
     outColor = vec4(0.0);
 }
 `;
-
-// Quad expanded around each particle; pointSize is applied in NDC
-// using elementPixel so quads stay visually sized regardless of buffer
-// scale.
-const QUAD_VERTS = new Float32Array([
-    -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5,
-]);
 
 const VERT_PARTICLE = `#version 300 es
 precision highp float;
@@ -139,60 +139,6 @@ void main() {
 }
 `;
 
-// Premultiplied output: additive blend lets overlapping particles
-// brighten naturally.
-const FRAG_PARTICLE = `#version 300 es
-precision highp float;
-in vec2 vCorner;
-in vec4 vColor;
-out vec4 outColor;
-
-void main() {
-    float d = length(vCorner) * 2.0;
-    float fall = 1.0 - smoothstep(0.6, 1.0, d);
-    if (fall <= 0.0) discard;
-    float a = vColor.a * fall;
-    outColor = vec4(vColor.rgb * a, a);
-}
-`;
-
-const FRAG_CLEAR = `#version 300 es
-precision highp float;
-out vec4 outColor;
-void main() { outColor = vec4(0.0); }
-`;
-
-// trailFade applies to the whole trail buffer so dead-particle pixels
-// decay at the same rate as everything else. blendMode mirrors the
-// stamp blend: 0 = add, 1 = premultiplied over.
-const FRAG_TRAIL_COMPOSITE = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-
-uniform sampler2D trailPrev;
-uniform sampler2D particleStamp;
-uniform float trailFade;
-uniform int blendMode;
-
-void main() {
-    vec4 prev = texture(trailPrev, uv);
-    vec4 stamp = texture(particleStamp, uv);
-    vec4 faded = prev * trailFade;
-    if (blendMode == 1) {
-        outColor = vec4(
-            stamp.rgb + faded.rgb * (1.0 - stamp.a),
-            clamp(stamp.a + faded.a * (1.0 - stamp.a), 0.0, 1.0)
-        );
-    } else {
-        outColor = vec4(
-            faded.rgb + stamp.rgb,
-            clamp(faded.a + stamp.a, 0.0, 1.0)
-        );
-    }
-}
-`;
-
 const FRAG_OUTPUT = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -247,17 +193,19 @@ void main() {
         return;
     }
 
-    float shortAxis = min(elementPixel.x, elementPixel.y);
-    vec3 stretch = vec3(elementPixel / shortAxis, 1.0);
-    vec3 noiseInput = s.xyz * stretch / max(noiseScale, 1e-4);
-    vec3 curlV = curl3D(noiseInput, time * noiseAnimation) / stretch;
+    vec3 curlV = sampleCurl(s.xyz, elementPixel, noiseScale, time * noiseAnimation);
 
     // velTex.xy is a unit direction in pixel space (0 for screen
-    // spawns). Convert to uv-space velocity by dividing by elementPixel
-    // so the radial blast keeps circular symmetry on non-square
-    // elements.
+    // spawns). Multiplying by shortAxis/elementPixel converts to a
+    // uv-space velocity that's isotropic in screen px (circular blast
+    // on non-square elements) and short-axis-normalized so emitSpeed
+    // and noiseSpeed share the same uv/sec scale.
     vec2 radialDirPx = texture(velTex, uv).xy;
-    vec3 radialV = vec3(radialDirPx / max(elementPixel, vec2(1.0)), 0.0);
+    float shortAxis = min(elementPixel.x, elementPixel.y);
+    vec3 radialV = vec3(
+        radialDirPx * shortAxis / max(elementPixel, vec2(1.0)),
+        0.0
+    );
 
     float blend = noiseDelay > 0.0 ? smoothstep(0.0, noiseDelay, age) : 1.0;
     vec3 v = mix(radialV * emitSpeed, curlV * noiseSpeed, blend);
@@ -269,23 +217,6 @@ void main() {
     age += dt / (max(life, 1e-3) * lifeMul);
 
     outColor = vec4(pos, age);
-}
-`;
-
-// Color buffer pass-through; spawns are written sparsely by the
-// gl.POINTS spawn pass.
-const FRAG_ADVECT_COLOR = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D colorTex;
-void main() { outColor = texture(colorTex, uv); }
-`;
-
-// hash21 for GPU-side lifeJitter generation.
-const GLSL_HASH = `
-float hash21(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 `;
 
@@ -394,11 +325,12 @@ export type ParticleParams = {
     screenBirthRate: number;
     /** Base lifespan (sec); actual life is jittered per-particle. */
     life: number;
-    /** Curl-noise drift speed (uv/sec) once the emit impulse decays. */
+    /** Curl-noise drift speed (uv/sec, short-axis-normalized) once the
+     * emit impulse decays. */
     noiseSpeed: number;
-    /** Initial outward speed (px/sec) applied to mouse-spawned particles
-     * — fades to curl-noise drift over `noiseDelay`. Screen-spawned
-     * particles ignore this. */
+    /** Initial outward speed (uv/sec, short-axis-normalized) applied
+     * to mouse-spawned particles — fades to curl-noise drift over
+     * `noiseDelay`. Screen-spawned particles ignore this. */
     emitSpeed: number;
     /** Fraction of life (0..1) over which motion smoothstep-blends from
      * the radial impulse at spawn to the curl-noise field. 0 disables
@@ -447,7 +379,7 @@ const DEFAULT_PARAMS: ParticleParams = {
     screenBirthRate: 5000,
     life: 1,
     noiseSpeed: 0.3,
-    emitSpeed: 600,
+    emitSpeed: 1.0,
     noiseDelay: 0.15,
     noiseScale: 1,
     noiseAnimation: 0.3,
@@ -544,18 +476,15 @@ export class ParticleEffect implements Effect {
             wrap: "clamp" as const,
             filter: "nearest" as const,
         };
-        // pos/color use auto-ping-pong (`persistent: true`); the spawn
-        // pass writes sparsely with `swap: false` after advect so both
-        // passes land in the same internal buffer. velTex is single —
-        // sparse-written at spawn, only read in advect.
+        // pos uses auto-ping-pong (`persistent: true`); advect runs
+        // with `swap: false` so the subsequent spawn pass lands in the
+        // same internal buffer. color/vel are single-buffer — only the
+        // spawn pass writes them, other texels persist naturally.
         this.#posTex = ctx.createRenderTarget({
             ...stateOpts,
             persistent: true,
         });
-        this.#colorTex = ctx.createRenderTarget({
-            ...stateOpts,
-            persistent: true,
-        });
+        this.#colorTex = ctx.createRenderTarget(stateOpts);
         this.#velTex = ctx.createRenderTarget(stateOpts);
     }
 
@@ -665,16 +594,17 @@ export class ParticleEffect implements Effect {
         }
 
         if (!this.#initialized) {
-            // The "stale" half of each persistent RT gets overwritten on
-            // the first advect+swap, so a single init draw is enough.
+            // posTex's "stale" half gets overwritten on the first
+            // advect+swap, so a single init draw is enough. color/vel
+            // are single-buffer; one clear gives every dead slot known
+            // contents until the spawn pass writes it.
             ctx.draw({ frag: FRAG_INIT_POS, target: this.#posTex });
             ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#colorTex });
             ctx.draw({ frag: FRAG_INIT_COLOR, target: this.#velTex });
             this.#initialized = true;
         }
 
-        // Cap dt so tab-switch pauses don't teleport particles.
-        const dt = Math.min(0.1, Math.max(0, ctx.deltaTime));
+        const dt = clampDt(ctx.deltaTime);
         const elementPixel: [number, number] = [
             ctx.dims.elementPixel[0],
             ctx.dims.elementPixel[1],
@@ -687,7 +617,7 @@ export class ParticleEffect implements Effect {
 
         // advect skips its swap when a spawn pass follows, so both
         // passes write into the same internal buffer of the persistent
-        // RT. The spawn pass (or advect itself when nSpawn === 0)
+        // posTex. The spawn pass (or advect itself when nSpawn === 0)
         // triggers the per-frame swap.
         const advectSwap = nSpawn === 0;
         ctx.draw({
@@ -710,12 +640,6 @@ export class ParticleEffect implements Effect {
             target: this.#posTex,
             swap: advectSwap,
         });
-        ctx.draw({
-            frag: FRAG_ADVECT_COLOR,
-            uniforms: { colorTex: this.#colorTex },
-            target: this.#colorTex,
-            swap: advectSwap,
-        });
 
         if (nSpawn > 0) {
             const spawnUniforms = {
@@ -736,12 +660,6 @@ export class ParticleEffect implements Effect {
                 target: this.#posTex,
                 blend: "none",
             });
-            const cHex = this.params.color | 0;
-            const colorRGB: [number, number, number] = [
-                ((cHex >> 16) & 0xff) / 255,
-                ((cHex >> 8) & 0xff) / 255,
-                (cHex & 0xff) / 255,
-            ];
             ctx.draw({
                 vert: VERT_SPAWN,
                 frag: FRAG_SPAWN_COLOR,
@@ -749,7 +667,7 @@ export class ParticleEffect implements Effect {
                 uniforms: {
                     ...spawnUniforms,
                     src: ctx.src,
-                    color: colorRGB,
+                    color: hexToRgb(this.params.color),
                     colorMix: this.params.colorMix,
                     lifeJitterRange: [LIFE_JITTER_MIN, LIFE_JITTER_MAX],
                 },
@@ -911,9 +829,9 @@ export class ParticleEffect implements Effect {
         this.#spawnTexHandle = null;
         this.#spawnGeometry = null;
         this.#gl = null;
-        this.#posTex = null;
-        this.#colorTex = null;
-        this.#velTex = null;
+        this.#disposeStateRTs();
+        this.#stampTex?.dispose();
+        this.#trail?.dispose();
         this.#stampTex = null;
         this.#trail = null;
         this.#particleGeometry = null;
