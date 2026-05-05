@@ -395,6 +395,14 @@ export class ParticleExplodeEffect implements Effect {
             return;
         }
 
+        // Off-screen: pause everything. The burst's elapsed timer only
+        // ticks while visible, so the user sees the full animation
+        // whenever they scroll into view (no silent "burst already
+        // played" surprise).
+        if (ctx.intersection <= 0) {
+            return;
+        }
+
         // Resize state RTs while idle. We never realloc mid-burst —
         // doing so would discard the in-flight particle state.
         const newSize = stateSizeFromCount(this.params.count);
