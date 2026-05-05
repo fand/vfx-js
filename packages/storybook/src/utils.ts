@@ -7,6 +7,13 @@ import type { ParticleExplodeEffect } from "./effects/particle-explode";
 
 const PANE_CLASS = "vfx-tweakpane-container";
 
+// Fixed upper bound for the count slider, independent of the effect's
+// construction-time maxCount. Effects realloc state RTs when count
+// crosses a power-of-two boundary, so the slider can drive the grow
+// path. 2048² = ~4M particles ≈ 320MB across the 5 state RTs at
+// RGBA32F — heavy but tolerable on dev hardware.
+const PARTICLE_COUNT_SLIDER_MAX = 2048 * 2048;
+
 export function disposeAllPanes(): void {
     // biome-ignore lint/suspicious/noExplicitAny: window-bag access
     const w = window as any;
@@ -200,11 +207,9 @@ export function attachParticlePane(
         });
     }
     const emitter = pane.addFolder({ title: "Emitter", expanded: true });
-    // Slider ceiling is the auto-derived state-texture capacity from
-    // the construction-time count.
     emitter.addBinding(effect.params, "count", {
         min: 1,
-        max: effect.maxCount,
+        max: PARTICLE_COUNT_SLIDER_MAX,
         step: 1,
     });
     // Effective spawn cap is MAX_SPAWNS_PER_FRAME × 60 ≈ 245k/sec
@@ -315,7 +320,7 @@ export function attachParticlePane(
         const burstFolder = pane.addFolder({ title: "Burst", expanded: true });
         burstFolder.addBinding(burst.params, "count", {
             min: 1,
-            max: burst.maxCount,
+            max: PARTICLE_COUNT_SLIDER_MAX,
             step: 1,
         });
         burstFolder.addBinding(burst.params, "duration", {
