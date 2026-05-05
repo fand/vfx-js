@@ -750,13 +750,23 @@ export class ParticleEffect implements Effect {
         const recent = ctx.time - this.#lastMoveTime < IDLE_THRESHOLD;
         const mouseActive = visible && (recent || this.params.spawnOnIdle);
 
+        // Cap accumulators at the per-frame budget so a birthRate that
+        // exceeds MAX_SPAWNS_PER_FRAME × fps doesn't queue indefinitely
+        // and bleed spawns past when the user expects (e.g., still
+        // emitting after the cursor stops on a high birthRate setting).
         if (mouseActive) {
-            this.#birthAccumulator += this.params.birthRate * dt;
+            this.#birthAccumulator = Math.min(
+                this.#birthAccumulator + this.params.birthRate * dt,
+                MAX_SPAWNS_PER_FRAME,
+            );
         } else {
             this.#birthAccumulator = 0;
         }
         if (visible) {
-            this.#screenBirthAccumulator += this.params.screenBirthRate * dt;
+            this.#screenBirthAccumulator = Math.min(
+                this.#screenBirthAccumulator + this.params.screenBirthRate * dt,
+                MAX_SPAWNS_PER_FRAME,
+            );
         } else {
             this.#screenBirthAccumulator = 0;
         }
