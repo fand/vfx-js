@@ -779,6 +779,37 @@ describe("EffectHost.draw", () => {
         expect(vert).toMatch(/uniform vec4 contentRectUv\b/);
         expect(vert).toMatch(/uniform vec4 srcRectUv\b/);
     });
+
+    it("persistent RT: default draw advances Backbuffer.swap()", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        expect(backbuffers).toHaveLength(1);
+        host.ctx.draw({ frag: FRAG, target: rt });
+        host.ctx.draw({ frag: FRAG, target: rt });
+        expect(backbuffers[0].swaps).toBe(2);
+    });
+
+    it("persistent RT: swap:false skips Backbuffer.swap()", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        host.ctx.draw({ frag: FRAG, target: rt }); // swap → 1
+        host.ctx.draw({ frag: FRAG, target: rt, swap: false }); // no-op
+        host.ctx.draw({ frag: FRAG, target: rt, swap: false }); // no-op
+        host.ctx.draw({ frag: FRAG, target: rt }); // swap → 2
+        expect(backbuffers[0].swaps).toBe(2);
+    });
+
+    it("non-persistent RT: swap:false is harmless (no-op)", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget(); // not persistent
+        host.ctx.draw({ frag: FRAG, target: rt, swap: false });
+        host.ctx.draw({ frag: FRAG, target: rt });
+        // No backbuffer at all; nothing to assert beyond "did not throw".
+        expect(backbuffers).toHaveLength(0);
+    });
 });
 
 // ---------------------------------------------------------------------------

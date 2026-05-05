@@ -676,7 +676,7 @@ export class EffectHost {
             compiled.draw();
         }
 
-        if (swap) {
+        if (swap && opts.swap !== false) {
             swap();
         }
     }
