@@ -118,7 +118,7 @@ fluid.play = async ({ canvasElement }) => {
 export const particle: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
-        img.src = Jellyfish;
+        img.src = Logo;
         return img;
     },
     args: undefined,
@@ -160,10 +160,9 @@ particle.play = async ({ canvasElement }) => {
     seedFluidMotion(canvasElement);
 };
 
-// Same as `particle`, but adds a one-shot Explode burst that scatters
-// `count` particles at random points across the element. Click the
-// Explode button in the pane to shatter the element into curl-noise
-// debris.
+// One-shot Explode burst that scatters `count` particles at random
+// points across the element. Click the Explode button in the pane to
+// shatter the element into curl-noise debris.
 export const particleExplode: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
@@ -181,19 +180,16 @@ particleExplode.play = async ({ canvasElement }) => {
 
     const vfx = initVFX();
     const sources = { Logo, Jellyfish };
-    let effect: ParticleEffect | null = null;
     let explode: ParticleExplodeEffect | null = null;
     const setup = async () => {
-        const savedEffect = effect ? { ...effect.params } : { pointSize: 1.0 };
         const savedBurst = explode ? { ...explode.params } : {};
-        if (effect) {
+        if (explode) {
             vfx.remove(img);
             disposeAllPanes();
         }
         await new Promise((r) => requestAnimationFrame(() => r(undefined)));
-        effect = new ParticleEffect(savedEffect);
         explode = new ParticleExplodeEffect(savedBurst);
-        await vfx.add(img, { effect: [effect, explode] });
+        await vfx.add(img, { effect: explode });
         attachParticleExplodePane("Particle Explode", explode, {
             img,
             sources,
@@ -207,8 +203,6 @@ particleExplode.play = async ({ canvasElement }) => {
         });
     };
     await setup();
-
-    seedFluidMotion(canvasElement);
 };
 
 // Voronoi cells shrink in a halo around the mouse — image passes

@@ -2,8 +2,7 @@
 // advection. trigger() seeds every state texel from its own uv (so the
 // element "shatters" into ~one particle per state slot); particles
 // then advect via 3D curl + radial outward bias and fade out over
-// `duration`. The persistent trail buffer is shared with mouse-
-// particles for visual consistency; set trailFade=0 to disable.
+// `duration`. Set trailFade=0 to disable the persistent trail.
 import type {
     Effect,
     EffectContext,
@@ -279,11 +278,7 @@ const DEFAULT_PARAMS: ParticleExplodeParams = {
 export class ParticleExplodeEffect implements Effect {
     #params: ParticleExplodeParams;
 
-    /** Read-only view of the current params. Use `setParam(key, value)`
-     * to mutate so values like `count` are sanitized. (External tools
-     * such as tweakpane bind directly to the underlying object and
-     * skip the validation; the type marker is for programmatic use.) */
-    get params(): Readonly<ParticleExplodeParams> {
+    get params(): ParticleExplodeParams {
         return this.#params;
     }
 
@@ -305,21 +300,6 @@ export class ParticleExplodeEffect implements Effect {
         this.#params.count = sanitizeCount(this.#params.count);
         const s = stateSizeFromCount(this.#params.count);
         this.#stateSize = [s, s];
-    }
-
-    get maxCount(): number {
-        return this.#stateSize[0] * this.#stateSize[1];
-    }
-
-    /** Validated bulk setter. Pass any subset of params; bad inputs
-     * (NaN / negative `count`, etc) are coerced to valid values
-     * before applying. */
-    setParam(updates: Partial<ParticleExplodeParams>): void {
-        const target = this.#params as Record<string, unknown>;
-        for (const [k, v] of Object.entries(updates)) {
-            if (v === undefined) continue;
-            target[k] = k === "count" ? sanitizeCount(v as number) : v;
-        }
     }
 
     trigger(): void {
