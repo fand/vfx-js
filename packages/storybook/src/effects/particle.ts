@@ -148,7 +148,7 @@ out vec4 outColor;
 
 uniform sampler2D src;
 uniform sampler2D trail;
-uniform float backgroundOpacity;
+uniform float srcOpacity;
 
 void main() {
     // src is element-sized; the trail buffer extends to the canvas, so
@@ -156,7 +156,7 @@ void main() {
     vec2 inside = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
     float srcMask = inside.x * inside.y;
     vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0))
-              * backgroundOpacity * srcMask;
+              * srcOpacity * srcMask;
     vec4 t = texture(trail, uv);
     outColor = vec4(base.rgb * (1.0 - t.a) + t.rgb, max(base.a, t.a));
 }
@@ -359,8 +359,8 @@ export type ParticleParams = {
     alphaThreshold: number;
     /** Emit even when the mouse is stationary. */
     spawnOnIdle: boolean;
-    /** Background image opacity 0..1. */
-    backgroundOpacity: number;
+    /** Source element opacity (0..1) shown beneath the particles. */
+    srcOpacity: number;
     /** Per-frame trail decay (0..1). Higher = longer trails. */
     trailFade: number;
     /** Depth fog 0..1. */
@@ -392,7 +392,7 @@ const DEFAULT_PARAMS: ParticleParams = {
     fadeIn: 0.05,
     alphaThreshold: 0.05,
     spawnOnIdle: true,
-    backgroundOpacity: 1.0,
+    srcOpacity: 1.0,
     trailFade: 0.5,
     fog: 0.5,
     color: 0xffffff,
@@ -744,7 +744,7 @@ export class ParticleEffect implements Effect {
             uniforms: {
                 src: ctx.src,
                 trail: this.#trail,
-                backgroundOpacity: this.params.backgroundOpacity,
+                srcOpacity: this.params.srcOpacity,
             },
             target: ctx.target,
         });
