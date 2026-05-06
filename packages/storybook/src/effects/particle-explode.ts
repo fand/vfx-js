@@ -496,6 +496,9 @@ export class ParticleExplodeEffect implements Effect {
                     },
                     target: this.#colorTex,
                 });
+                // Drop residual trail from a previous burst so the new
+                // burst doesn't composite the old image on top of itself.
+                ctx.draw({ frag: FRAG_CLEAR, target: this.#trail });
             }
 
             this.#particleGeometry.instanceCount = cap;
