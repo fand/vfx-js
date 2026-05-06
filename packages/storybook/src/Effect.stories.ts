@@ -4,6 +4,7 @@ import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
 import { FluidEffect } from "./effects/fluid";
+import { HalftoneEffect } from "./effects/halftone";
 import { ParticleEffect } from "./effects/particle";
 import { ParticleExplodeEffect } from "./effects/particle-explode";
 import { createPixelateEffect } from "./effects/pixelate";
@@ -111,6 +112,43 @@ fluid.play = async ({ canvasElement }) => {
     attachFluidPane("Fluid", effect);
 
     seedFluidMotion(canvasElement);
+};
+
+// CMYK-style halftone via three rotated dot grids. Render() does the
+// full setup every time so changing args swaps the effect cleanly.
+type HalftoneSrc = "Logo" | "Jellyfish";
+type HalftoneArgs = {
+    src: HalftoneSrc;
+    gridSize: number;
+    dotSize: number;
+    smoothing: number;
+};
+export const halftone: StoryObj<HalftoneArgs> = {
+    render: (args) => {
+        const { src, ...effectArgs } = args;
+        const vfx = initVFX();
+        const effect = new HalftoneEffect(effectArgs);
+
+        const img = document.createElement("img");
+        img.src = src === "Jellyfish" ? Jellyfish : Logo;
+        vfx.add(img, { effect });
+        return img;
+    },
+    args: {
+        src: "Jellyfish",
+        gridSize: 10,
+        dotSize: 0.7,
+        smoothing: 0.15,
+    },
+    argTypes: {
+        src: {
+            control: { type: "select" },
+            options: ["Logo", "Jellyfish"],
+        },
+        gridSize: { control: { type: "range", min: 2, max: 50, step: 0.5 } },
+        dotSize: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        smoothing: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+    },
 };
 
 // Mouse-driven emitter particles. Spawns happen only at the cursor's
