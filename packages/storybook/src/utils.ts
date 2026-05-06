@@ -313,43 +313,6 @@ export function attachParticleExplodePane(
         addSrcBinding(pane, srcSelector);
     }
 
-    const burstFolder = pane.addFolder({ title: "Burst", expanded: true });
-    burstFolder.addBinding(burst.params, "count", {
-        min: 1,
-        max: PARTICLE_COUNT_SLIDER_MAX,
-        step: 1,
-    });
-    burstFolder.addBinding(burst.params, "duration", {
-        min: 0.2,
-        max: 5,
-        step: 0.1,
-    });
-    burstFolder.addBinding(burst.params, "noiseSpeed", {
-        min: 0,
-        max: 20,
-        step: 0.1,
-    });
-    burstFolder.addBinding(burst.params, "noiseScale", {
-        min: 0.05,
-        max: 3,
-        step: 0.01,
-    });
-    burstFolder.addBinding(burst.params, "noiseAnimation", {
-        min: 0,
-        max: 2,
-        step: 0.01,
-    });
-    burstFolder.addBinding(burst.params, "outwardBias", {
-        min: 0,
-        max: 5,
-        step: 0.05,
-    });
-    burstFolder.addBinding(burst.params, "speedDecay", {
-        min: 0.1,
-        max: 5,
-        step: 0.05,
-    });
-
     const appearance = pane.addFolder({ title: "Appearance", expanded: true });
     appearance.addBinding(burst.params, "pointSize", {
         min: 1,
@@ -384,10 +347,46 @@ export function attachParticleExplodePane(
         step: 0.005,
     });
 
-    burstFolder.addButton({ title: "Explode" }).on("click", () => {
+    const explodeFolder = pane.addFolder({ title: "Explode", expanded: true });
+    explodeFolder.addBinding(burst.params, "count", {
+        min: 1,
+        max: PARTICLE_COUNT_SLIDER_MAX,
+        step: 1,
+    });
+    explodeFolder.addBinding(burst.params, "duration", {
+        min: 0.2,
+        max: 5,
+        step: 0.1,
+    });
+    explodeFolder.addBinding(burst.params, "noiseSpeed", {
+        min: 0,
+        max: 20,
+        step: 0.1,
+    });
+    explodeFolder.addBinding(burst.params, "noiseScale", {
+        min: 0.05,
+        max: 3,
+        step: 0.01,
+    });
+    explodeFolder.addBinding(burst.params, "noiseAnimation", {
+        min: 0,
+        max: 2,
+        step: 0.01,
+    });
+    explodeFolder.addBinding(burst.params, "outwardBias", {
+        min: 0,
+        max: 5,
+        step: 0.05,
+    });
+    explodeFolder.addBinding(burst.params, "speedDecay", {
+        min: 0.1,
+        max: 5,
+        step: 0.05,
+    });
+    explodeFolder.addButton({ title: "Explode" }).on("click", () => {
         burst.trigger();
     });
-    burstFolder.addButton({ title: "Reset" }).on("click", () => {
+    explodeFolder.addButton({ title: "Reset" }).on("click", () => {
         burst.reset();
     });
 
