@@ -2,6 +2,7 @@ import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
 import type { FluidEffect } from "./effects/fluid";
+import type { HalftoneEffect } from "./effects/halftone";
 import type { ParticleEffect } from "./effects/particle";
 import type { ParticleExplodeEffect } from "./effects/particle-explode";
 
@@ -138,6 +139,51 @@ export function attachFluidPane(title: string, effect: FluidEffect): Pane {
         step: 0.001,
     });
     pane.addBinding(effect.params, "showDye");
+    trackPane(pane);
+    return pane;
+}
+
+export function attachHalftonePane(
+    title: string,
+    effect: HalftoneEffect,
+    srcSelector?: SrcSelector,
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: false });
+    if (srcSelector) {
+        addSrcBinding(pane, srcSelector);
+    }
+    pane.addBinding(effect.params, "mode", {
+        options: { rgb: "rgb", cmyk: "cmyk" },
+    });
+    pane.addBinding(effect.params, "gridSize", {
+        min: 2,
+        max: 50,
+        step: 0.5,
+    });
+    pane.addBinding(effect.params, "dotSize", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect.params, "smoothing", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect.params, "trimEdge");
+    pane.addBinding(effect.params, "bgOpacity", { min: 0, max: 1, step: 0.01 });
+
+    // Tweakpane can't bind a 4-tuple directly, and the all-channel
+    // scalar is the only knob the story exposes. Mirror writes onto
+    // every channel of inkFactor.
+    const inkState = { inkStrength: effect.params.inkFactor[0] };
+    pane.addBinding(inkState, "inkStrength", {
+        min: 0,
+        max: 2,
+        step: 0.01,
+    }).on("change", (ev) => {
+        const v = ev.value;
+        effect.params.inkFactor = [v, v, v, v];
+    });
+
     trackPane(pane);
     return pane;
 }
