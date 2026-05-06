@@ -257,18 +257,18 @@ export type ParticleExplodeParams = {
 };
 
 const DEFAULT_PARAMS: ParticleExplodeParams = {
-    count: 10000,
+    count: 100000,
     duration: 1.0,
-    noiseSpeed: 1.0,
-    noiseScale: 0.5,
+    noiseSpeed: 1.5,
+    noiseScale: 1.0,
     noiseAnimation: 1.0,
     outwardBias: 1.0,
-    pointSize: 10.0,
+    pointSize: 3.0,
     alpha: 1.0,
     alphaDecay: 5.0,
     speedDecay: 2.0,
     fog: 0.0,
-    trailFade: 0.7,
+    trailFade: 0.5,
     color: 0xffffff,
     colorMix: 0,
     blend: "add",
@@ -423,9 +423,11 @@ export class ParticleExplodeEffect implements Effect {
         }
 
         // Resize state RTs while idle. We never realloc mid-burst —
-        // doing so would discard the in-flight particle state.
+        // doing so would discard the in-flight particle state. Allowed
+        // before the first trigger and after a burst has fully faded.
         const newSize = stateSizeFromCount(this.params.count);
-        if (newSize !== this.#stateSize[0] && !this.#triggered) {
+        const idle = !this.#triggered || this.isDone();
+        if (newSize !== this.#stateSize[0] && idle) {
             this.#disposeStateRTs();
             this.#stateSize = [newSize, newSize];
             this.#allocStateRTs(ctx);

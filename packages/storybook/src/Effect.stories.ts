@@ -13,6 +13,7 @@ import "./preset.css";
 import {
     attachBloomPane,
     attachFluidPane,
+    attachParticleExplodePane,
     attachParticlePane,
     disposeAllPanes,
     initVFX,
@@ -142,7 +143,7 @@ particle.play = async ({ canvasElement }) => {
         }
         effect = new ParticleEffect(savedParams);
         await vfx.add(img, { effect });
-        attachParticlePane("Particle", effect, undefined, {
+        attachParticlePane("Particle", effect, {
             img,
             sources,
             onSrcChange: async (key) => {
@@ -193,7 +194,7 @@ particleExplode.play = async ({ canvasElement }) => {
         effect = new ParticleEffect(savedEffect);
         explode = new ParticleExplodeEffect(savedBurst);
         await vfx.add(img, { effect: [effect, explode] });
-        attachParticlePane("Particle", effect, explode, {
+        attachParticleExplodePane("Particle Explode", explode, {
             img,
             sources,
             onSrcChange: async (key) => {

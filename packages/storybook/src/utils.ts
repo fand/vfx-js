@@ -142,69 +142,52 @@ export function attachFluidPane(title: string, effect: FluidEffect): Pane {
     return pane;
 }
 
-export function attachParticlePane(
-    title: string,
-    effect: ParticleEffect,
-    burst?: ParticleExplodeEffect,
-    srcSelector?: {
-        img: HTMLImageElement;
-        sources: Record<string, string>;
-        // See attachParticlesPane: framework can't observe img.src
-        // changes, so the story does the swap.
-        onSrcChange?: (key: string) => void | Promise<void>;
-    },
-): Pane {
+type SrcSelector = {
+    img: HTMLImageElement;
+    sources: Record<string, string>;
+    // See attachParticlesPane: framework can't observe img.src
+    // changes, so the story does the swap.
+    onSrcChange?: (key: string) => void | Promise<void>;
+};
+
+function createParticlePaneContainer(title: string): {
+    pane: Pane;
+} {
     const container = document.createElement("div");
     container.className = PANE_CLASS;
     container.style.cssText =
         "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
     document.body.appendChild(container);
-
-    if (burst) {
-        // Share visual params so a single slider drives both effects.
-        // noiseSpeed is per-effect (different shader scales), trailFade,
-        // life/duration, and burst-only knobs (outwardBias) stay
-        // independent.
-        for (const key of [
-            "noiseScale",
-            "noiseAnimation",
-            "pointSize",
-            "alpha",
-            "alphaDecay",
-            "speedDecay",
-            "fog",
-            "color",
-            "colorMix",
-            "blend",
-        ] as const) {
-            Object.defineProperty(burst.params, key, {
-                get: () => effect.params[key],
-                set: (v: ParticleEffect["params"][typeof key]) => {
-                    (effect.params as Record<string, unknown>)[key] = v;
-                },
-                configurable: true,
-                enumerable: true,
-            });
-        }
-    }
-
     const pane = new Pane({ container, title, expanded: false });
+    return { pane };
+}
+
+function addSrcBinding(pane: Pane, srcSelector: SrcSelector): void {
+    const { img, sources, onSrcChange } = srcSelector;
+    const keys = Object.keys(sources);
+    const initialKey = keys.find((k) => sources[k] === img.src) ?? keys[0];
+    const state = { src: initialKey };
+    const options: Record<string, string> = Object.fromEntries(
+        keys.map((k) => [k, k]),
+    );
+    pane.addBinding(state, "src", { options }).on("change", (ev) => {
+        const next = ev.value as string;
+        if (onSrcChange) {
+            onSrcChange(next);
+        } else {
+            img.src = sources[next];
+        }
+    });
+}
+
+export function attachParticlePane(
+    title: string,
+    effect: ParticleEffect,
+    srcSelector?: SrcSelector,
+): Pane {
+    const { pane } = createParticlePaneContainer(title);
     if (srcSelector) {
-        const { img, sources, onSrcChange } = srcSelector;
-        const keys = Object.keys(sources);
-        const initialKey = keys.find((k) => sources[k] === img.src) ?? keys[0];
-        const state = { src: initialKey };
-        const options: Record<string, string> = Object.fromEntries(
-            keys.map((k) => [k, k]),
-        );
-        pane.addBinding(state, "src", { options }).on("change", (ev) => {
-            const next = ev.value as string;
-            if (onSrcChange) {
-                onSrcChange(next);
-            } else {
-                img.src = sources[next];
-            }
-        });
+        addSrcBinding(pane, srcSelector);
     }
     const emitter = pane.addFolder({ title: "Emitter", expanded: true });
     emitter.addBinding(effect.params, "count", {
@@ -316,40 +299,97 @@ export function attachParticlePane(
         step: 0.01,
     });
 
-    if (burst) {
-        const burstFolder = pane.addFolder({ title: "Burst", expanded: true });
-        burstFolder.addBinding(burst.params, "count", {
-            min: 1,
-            max: PARTICLE_COUNT_SLIDER_MAX,
-            step: 1,
-        });
-        burstFolder.addBinding(burst.params, "duration", {
-            min: 0.2,
-            max: 5,
-            step: 0.1,
-        });
-        burstFolder.addBinding(burst.params, "noiseSpeed", {
-            min: 0,
-            max: 20,
-            step: 0.1,
-        });
-        burstFolder.addBinding(burst.params, "outwardBias", {
-            min: 0,
-            max: 5,
-            step: 0.05,
-        });
-        burstFolder.addBinding(burst.params, "trailFade", {
-            min: 0,
-            max: 1,
-            step: 0.005,
-        });
-        burstFolder.addButton({ title: "Explode" }).on("click", () => {
-            burst.trigger();
-        });
-        burstFolder.addButton({ title: "Reset" }).on("click", () => {
-            burst.reset();
-        });
+    trackPane(pane);
+    return pane;
+}
+
+export function attachParticleExplodePane(
+    title: string,
+    burst: ParticleExplodeEffect,
+    srcSelector?: SrcSelector,
+): Pane {
+    const { pane } = createParticlePaneContainer(title);
+    if (srcSelector) {
+        addSrcBinding(pane, srcSelector);
     }
+
+    const burstFolder = pane.addFolder({ title: "Burst", expanded: true });
+    burstFolder.addBinding(burst.params, "count", {
+        min: 1,
+        max: PARTICLE_COUNT_SLIDER_MAX,
+        step: 1,
+    });
+    burstFolder.addBinding(burst.params, "duration", {
+        min: 0.2,
+        max: 5,
+        step: 0.1,
+    });
+    burstFolder.addBinding(burst.params, "noiseSpeed", {
+        min: 0,
+        max: 20,
+        step: 0.1,
+    });
+    burstFolder.addBinding(burst.params, "noiseScale", {
+        min: 0.05,
+        max: 3,
+        step: 0.01,
+    });
+    burstFolder.addBinding(burst.params, "noiseAnimation", {
+        min: 0,
+        max: 2,
+        step: 0.01,
+    });
+    burstFolder.addBinding(burst.params, "outwardBias", {
+        min: 0,
+        max: 5,
+        step: 0.05,
+    });
+    burstFolder.addBinding(burst.params, "speedDecay", {
+        min: 0.1,
+        max: 5,
+        step: 0.05,
+    });
+
+    const appearance = pane.addFolder({ title: "Appearance", expanded: true });
+    appearance.addBinding(burst.params, "pointSize", {
+        min: 1,
+        max: 10,
+        step: 0.1,
+    });
+    appearance.addBinding(burst.params, "alpha", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
+    appearance.addBinding(burst.params, "alphaDecay", {
+        min: 0.1,
+        max: 5,
+        step: 0.05,
+    });
+    appearance.addBinding(burst.params, "fog", { min: 0, max: 1, step: 0.01 });
+    appearance.addBinding(burst.params, "color", { view: "color" });
+    appearance.addBinding(burst.params, "colorMix", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
+
+    const composite = pane.addFolder({ title: "Composite", expanded: true });
+    composite.addBinding(burst.params, "blend", {
+        options: { add: "add", normal: "normal" },
+    });
+    composite.addBinding(burst.params, "trailFade", {
+        min: 0,
+        max: 1,
+        step: 0.005,
+    });
+
+    burstFolder.addButton({ title: "Explode" }).on("click", () => {
+        burst.trigger();
+    });
+    burstFolder.addButton({ title: "Reset" }).on("click", () => {
+        burst.reset();
+    });
 
     trackPane(pane);
     return pane;
