@@ -523,11 +523,16 @@ export type EffectTexture = {
  * as a `sampler2D` uniform to read it back in a later pass.
  *
  * `width` / `height` are physical pixels.
+ *
+ * Call `dispose()` to release the underlying GL resources eagerly.
+ * Idempotent. Framework-owned RTs (e.g. `ctx.target`, `ctx.src`) ignore
+ * the call. Do not use the handle after disposing it.
  */
 export type EffectRenderTarget = {
     readonly width: number;
     readonly height: number;
     readonly __brand: "EffectRenderTarget";
+    dispose(): void;
 };
 
 /**
@@ -662,6 +667,21 @@ export type EffectDrawOpts = {
      * draws like sparkles or particle stamps.
      */
     blend?: EffectBlendMode;
+
+    /**
+     * Whether to advance the persistent RT's read/write buffers after
+     * this draw. Default: `true`.
+     *
+     * Set to `false` when you need to write to the same physical buffer
+     * across multiple draws in one frame — e.g. a full-screen pass that
+     * fills every texel followed by a sparse pass that surgically
+     * overwrites a few. Without `swap: false`, the second draw would
+     * land in the other (stale) buffer of the ping-pong pair and the
+     * first draw's output would be lost.
+     *
+     * No-op for non-persistent RTs and for canvas writes.
+     */
+    swap?: boolean;
 };
 
 /** Subset of `VFXProps` exposed to effects via `ctx.vfxProps`. */

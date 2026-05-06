@@ -3,19 +3,19 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
-import { CurlParticlesEffect } from "./effects/curl-particles";
-import { ExplodeEffect } from "./effects/explode";
 import { FluidEffect } from "./effects/fluid";
+import { ParticleEffect } from "./effects/particle";
+import { ParticleExplodeEffect } from "./effects/particle-explode";
 import { createPixelateEffect } from "./effects/pixelate";
-import { ReactionDiffusionEffect } from "./effects/reaction-diffusion";
 import { createScanlineEffect } from "./effects/scanline";
 import { VoronoiEffect } from "./effects/voronoi";
 import "./preset.css";
 import {
     attachBloomPane,
     attachFluidPane,
-    attachParticlesPane,
-    attachRDPane,
+    attachParticleExplodePane,
+    attachParticlePane,
+    disposeAllPanes,
     initVFX,
 } from "./utils";
 
@@ -113,10 +113,9 @@ fluid.play = async ({ canvasElement }) => {
     seedFluidMotion(canvasElement);
 };
 
-// Gray-Scott reaction-diffusion. autoplay:false + a 120-frame manual
-// render warm-up so the captured screenshot already shows an evolved
-// pattern (not just the seed blob).
-export const reactionDiffusion: StoryObj<undefined> = {
+// Mouse-driven emitter particles. Spawns happen only at the cursor's
+// recent position and skip transparent regions of the source image.
+export const particle: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
         img.src = Logo;
@@ -124,60 +123,47 @@ export const reactionDiffusion: StoryObj<undefined> = {
     },
     args: undefined,
 };
-reactionDiffusion.play = async ({ canvasElement }) => {
+particle.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
-    await new Promise((o) => {
-        img.onload = o;
-    });
-
-    const vfx = initVFX({ autoplay: false });
-    const effect = new ReactionDiffusionEffect();
-    await vfx.add(img, { effect });
-    attachRDPane("Reaction-Diffusion", effect);
-
-    for (let i = 0; i < 120; i++) {
-        vfx.render();
-    }
-    vfx.play();
-};
-
-// Mouse-driven GPU curl-noise particles. Particles spawn within
-// `radius` px of the cursor, advect along curl noise, and leave fading
-// trails on a persistent buffer. The play() helper sweeps a synthetic
-// pointer in a circle so the captured screenshot already has particles
-// before any human interaction.
-export const curlParticles: StoryObj<undefined> = {
-    render: () => {
-        const img = document.createElement("img");
-        img.src = Jellyfish;
-        return img;
-    },
-    args: undefined,
-};
-curlParticles.play = async ({ canvasElement }) => {
-    const img = canvasElement.querySelector("img") as HTMLImageElement;
-    await new Promise((o) => {
-        img.onload = o;
+    await new Promise<void>((o) => {
+        img.onload = () => o();
     });
 
     const vfx = initVFX();
-    const effect = new CurlParticlesEffect();
-    const explode = new ExplodeEffect();
-    await vfx.add(img, { effect: [effect, explode] });
-    attachParticlesPane("Particles", effect, explode, {
-        img,
-        sources: { Jellyfish, Logo },
-    });
+    const sources = { Jellyfish, Logo };
+    // The framework loads img.src once at vfx.add and never observes
+    // later changes, so swapping requires remove + new effect (with
+    // preserved params) + add + reattach pane.
+    let effect: ParticleEffect | null = null;
+    const setup = async () => {
+        const savedParams = effect ? { ...effect.params } : {};
+        if (effect) {
+            vfx.remove(img);
+            disposeAllPanes();
+        }
+        effect = new ParticleEffect(savedParams);
+        await vfx.add(img, { effect });
+        attachParticlePane("Particle", effect, {
+            img,
+            sources,
+            onSrcChange: async (key) => {
+                img.src = sources[key as keyof typeof sources];
+                await new Promise<void>((o) => {
+                    img.onload = () => o();
+                });
+                await setup();
+            },
+        });
+    };
+    await setup();
 
     seedFluidMotion(canvasElement);
 };
 
-// Same as `curlParticles`, but the Explode burst sizes its particle
-// simulation texture to match the displayed image so there's roughly
-// one particle per pixel — gives a clean dissolve where every pixel of
-// the source contributes a particle. Capped per-axis to stay within
-// reasonable GPU memory limits.
-export const curlParticlesExplode: StoryObj<undefined> = {
+// One-shot Explode burst that scatters `count` particles at random
+// points across the element. Click the Explode button in the pane to
+// shatter the element into curl-noise debris.
+export const particleExplode: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
         img.src = Logo;
@@ -185,39 +171,38 @@ export const curlParticlesExplode: StoryObj<undefined> = {
     },
     args: undefined,
 };
-curlParticlesExplode.play = async ({ canvasElement }) => {
+particleExplode.play = async ({ canvasElement }) => {
     const img = canvasElement.querySelector("img") as HTMLImageElement;
-    await new Promise((o) => {
-        img.onload = o;
+    await new Promise<void>((o) => {
+        img.onload = () => o();
     });
-    // Wait one frame so layout is resolved and clientWidth/Height are
-    // populated with the actual rendered pixel size.
     await new Promise((r) => requestAnimationFrame(() => r(undefined)));
 
-    const dpr = window.devicePixelRatio || 1;
-    const STATE_MAX = 2048;
-    const w = Math.min(
-        STATE_MAX,
-        Math.max(1, Math.round((img.clientWidth || img.naturalWidth) * dpr)),
-    );
-    const h = Math.min(
-        STATE_MAX,
-        Math.max(1, Math.round((img.clientHeight || img.naturalHeight) * dpr)),
-    );
-
     const vfx = initVFX();
-    // pointSize=1 — with one particle per displayed pixel, each
-    // particle only needs to cover its own pixel. Both effects read
-    // pointSize via the proxy installed in attachParticlesPane.
-    const effect = new CurlParticlesEffect({ pointSize: 1.0 });
-    const explode = new ExplodeEffect({}, [w, h]);
-    await vfx.add(img, { effect: [effect, explode] });
-    attachParticlesPane("Particles", effect, explode, {
-        img,
-        sources: { Logo, Jellyfish },
-    });
-
-    seedFluidMotion(canvasElement);
+    const sources = { Logo, Jellyfish };
+    let explode: ParticleExplodeEffect | null = null;
+    const setup = async () => {
+        const savedBurst = explode ? { ...explode.params } : {};
+        if (explode) {
+            vfx.remove(img);
+            disposeAllPanes();
+        }
+        await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+        explode = new ParticleExplodeEffect(savedBurst);
+        await vfx.add(img, { effect: explode });
+        attachParticleExplodePane("Particle Explode", explode, {
+            img,
+            sources,
+            onSrcChange: async (key) => {
+                img.src = sources[key as keyof typeof sources];
+                await new Promise<void>((o) => {
+                    img.onload = () => o();
+                });
+                await setup();
+            },
+        });
+    };
+    await setup();
 };
 
 // Voronoi cells shrink in a halo around the mouse — image passes

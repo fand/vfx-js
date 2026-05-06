@@ -623,6 +623,65 @@ describe("EffectHost.createRenderTarget", () => {
         expect(framebuffers[0].width).toBe(50);
         expect(framebuffers[0].height).toBe(50);
     });
+
+    it("rt.dispose() releases the underlying Framebuffer", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        expect(framebuffers[0].disposed).toBe(false);
+        rt.dispose();
+        expect(framebuffers[0].disposed).toBe(true);
+    });
+
+    it("rt.dispose() on persistent RT releases the Backbuffer", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        expect(backbuffers[0].disposed).toBe(false);
+        rt.dispose();
+        expect(backbuffers[0].disposed).toBe(true);
+    });
+
+    it("rt.dispose() is idempotent", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        rt.dispose();
+        // Second call must not throw and must not double-dispose the fb.
+        expect(() => rt.dispose()).not.toThrow();
+    });
+
+    it("disposed RT no longer auto-resizes", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        rt.dispose();
+        // Reset the mock fb's setSize tracking by recording size now.
+        const widthAfterDispose = framebuffers[0].width;
+        host.setFrameDims({
+            outputBufferW: 200,
+            outputBufferH: 200,
+            canvasBufferSize: [200, 200],
+            outputViewport: { x: 0, y: 0, w: 200, h: 200 },
+            elementBufferW: 200,
+            elementBufferH: 200,
+            contentRectUv: [0, 0, 1, 1],
+            srcRectUv: [0, 0, 1, 1],
+        });
+        // Disposed RT removed from auto-resize list → unchanged.
+        expect(framebuffers[0].width).toBe(widthAfterDispose);
+    });
+
+    it("host.dispose() does not double-dispose a manually-disposed RT", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        const fb = framebuffers[0];
+        rt.dispose();
+        let disposeCount = 0;
+        const original = fb.dispose;
+        fb.dispose = () => {
+            disposeCount++;
+            original.call(fb);
+        };
+        host.dispose();
+        expect(disposeCount).toBe(0);
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -719,6 +778,37 @@ describe("EffectHost.draw", () => {
         expect(vert).toMatch(/\bout vec2 uvSrc\b/);
         expect(vert).toMatch(/uniform vec4 contentRectUv\b/);
         expect(vert).toMatch(/uniform vec4 srcRectUv\b/);
+    });
+
+    it("persistent RT: default draw advances Backbuffer.swap()", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        expect(backbuffers).toHaveLength(1);
+        host.ctx.draw({ frag: FRAG, target: rt });
+        host.ctx.draw({ frag: FRAG, target: rt });
+        expect(backbuffers[0].swaps).toBe(2);
+    });
+
+    it("persistent RT: swap:false skips Backbuffer.swap()", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        host.ctx.draw({ frag: FRAG, target: rt }); // swap → 1
+        host.ctx.draw({ frag: FRAG, target: rt, swap: false }); // no-op
+        host.ctx.draw({ frag: FRAG, target: rt, swap: false }); // no-op
+        host.ctx.draw({ frag: FRAG, target: rt }); // swap → 2
+        expect(backbuffers[0].swaps).toBe(2);
+    });
+
+    it("non-persistent RT: swap:false is harmless (no-op)", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget(); // not persistent
+        host.ctx.draw({ frag: FRAG, target: rt, swap: false });
+        host.ctx.draw({ frag: FRAG, target: rt });
+        // No backbuffer at all; nothing to assert beyond "did not throw".
+        expect(backbuffers).toHaveLength(0);
     });
 });
 
