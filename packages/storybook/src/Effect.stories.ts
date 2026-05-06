@@ -14,6 +14,7 @@ import "./preset.css";
 import {
     attachBloomPane,
     attachFluidPane,
+    attachHalftonePane,
     attachParticleExplodePane,
     attachParticlePane,
     disposeAllPanes,
@@ -115,56 +116,50 @@ fluid.play = async ({ canvasElement }) => {
 };
 
 // Halftone with RGB (additive) or CMYK (subtractive ink-mix) modes.
-// Render() does the full setup every time so changing args swaps the
-// effect cleanly.
-type HalftoneSrc = "Logo" | "Jellyfish";
-type HalftoneArgs = {
-    src: HalftoneSrc;
-    mode: "rgb" | "cmyk";
-    gridSize: number;
-    dotSize: number;
-    smoothing: number;
-    trimEdge: boolean;
-    bgOpacity: number;
-    inkStrength: number;
-};
-export const halftone: StoryObj<HalftoneArgs> = {
-    render: (args) => {
-        const { src, inkStrength, ...rest } = args;
-        const vfx = initVFX();
-        const effect = new HalftoneEffect({
-            ...rest,
-            inkFactor: [inkStrength, inkStrength, inkStrength, inkStrength],
-        });
-
+// play()-driven so Tweakpane mutates effect.params in place — uniform
+// tweaks don't recompile the shader. Only the src swap rebuilds (the
+// framework loads img.src once at vfx.add and never observes later
+// changes), following the particle story's remove + re-add pattern.
+export const halftone: StoryObj<undefined> = {
+    render: () => {
         const img = document.createElement("img");
-        img.src = src === "Jellyfish" ? Jellyfish : Logo;
-        vfx.add(img, { effect });
+        img.src = Jellyfish;
         return img;
     },
-    args: {
-        src: "Jellyfish",
-        mode: "cmyk",
-        gridSize: 10,
-        dotSize: 0.7,
-        smoothing: 0.15,
-        trimEdge: false,
-        bgOpacity: 1,
-        inkStrength: 1,
-    },
-    argTypes: {
-        src: {
-            control: { type: "select" },
-            options: ["Logo", "Jellyfish"],
-        },
-        mode: { control: { type: "inline-radio" }, options: ["rgb", "cmyk"] },
-        gridSize: { control: { type: "range", min: 2, max: 50, step: 0.5 } },
-        dotSize: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        smoothing: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        trimEdge: { control: { type: "boolean" } },
-        bgOpacity: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        inkStrength: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
-    },
+    args: undefined,
+};
+halftone.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+
+    const vfx = initVFX();
+    const sources = { Jellyfish, Logo };
+    let effect: HalftoneEffect | null = null;
+    const setup = async () => {
+        const savedParams: Partial<HalftoneEffect["params"]> = effect
+            ? { ...effect.params }
+            : { mode: "cmyk" };
+        if (effect) {
+            vfx.remove(img);
+            disposeAllPanes();
+        }
+        effect = new HalftoneEffect(savedParams);
+        await vfx.add(img, { effect });
+        attachHalftonePane("Halftone", effect, {
+            img,
+            sources,
+            onSrcChange: async (key) => {
+                img.src = sources[key as keyof typeof sources];
+                await new Promise<void>((o) => {
+                    img.onload = () => o();
+                });
+                await setup();
+            },
+        });
+    };
+    await setup();
 };
 
 // Mouse-driven emitter particles. Spawns happen only at the cursor's
