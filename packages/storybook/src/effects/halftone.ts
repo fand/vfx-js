@@ -1,8 +1,12 @@
-// CMYK-style halftone: three rotated dot grids (one per RGB channel)
-// where each dot's radius is driven by the source channel intensity at
-// the dot's center. Per-fragment 9-cell neighbour search keeps overlap
-// correct as dots grow toward the cell pitch.
+// CMYK / RGB halftone: per-channel rotated dot grids whose dot radii
+// track the source channel intensity at the dot center. CMYK mode
+// converts the source to CMYK, samples four screens (C/M/Y/K) at the
+// classic newspaper angles, and recombines via subtractive ink mixing
+// on white paper. RGB mode is additive — three rotated grids whose
+// channel sums form the output color directly.
 import type { Effect, EffectContext } from "@vfx-js/core";
+
+export type HalftoneMode = "rgb" | "cmyk";
 
 const FRAG_HALFTONE = `#version 300 es
 precision highp float;
@@ -16,71 +20,126 @@ uniform vec2 elementPx;
 uniform float gridSize;
 uniform float dotSize;
 uniform float smoothing;
+uniform int ymck;          // 0 = RGB (additive), 1 = CMYK (subtractive)
+uniform int trimEdge;      // 1 = skip dots whose extent crosses the image edge
+uniform float bgOpacity;   // CMYK only: opacity of non-inked paper area (0..1)
+uniform vec4 inkFactor;    // per-channel scale
 
-const vec3 gridRot = vec3(15.0, 45.0, 75.0);
+const vec3 RGB_ANGLES = vec3(15.0, 45.0, 75.0);
+const vec4 CMYK_ANGLES = vec4(15.0, 75.0, 0.0, 45.0);
 
 const vec2 cellOffsets[9] = vec2[9](
-    vec2(0.0),
-    vec2(-1.0, 0.0), vec2(1.0, 0.0), vec2(0.0, -1.0), vec2(0.0, 1.0),
-    vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0), vec2(1.0)
+    vec2(0),
+    vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2(0, 1),
+    vec2(-1, -1), vec2(1, -1), vec2(-1, 1), vec2(1)
 );
+
+// Ink target colors at 100% coverage on white paper
+const vec3 cyanInk    = vec3(0.15, 0.73, 0.88);
+const vec3 magentaInk = vec3(0.88, 0.12, 0.55);
+const vec3 yellowInk  = vec3(0.97, 0.93, 0.08);
+const vec3 blackInk   = vec3(0.1);
+const vec3 paper      = vec3(0.99);
 
 vec4 sampleSrc(vec2 px) {
     vec2 uv = clamp(px / elementPx, 0.0, 1.0);
     return texture(src, srcRectUv.xy + uv * srcRectUv.zw);
 }
 
+float cmykChannel(vec3 rgb, int i) {
+    float k = 1.0 - max(rgb.r, max(rgb.g, rgb.b));
+    if (i == 3) return k;
+    return (1.0 - rgb[i] - k) / max(1.0 - k, 1e-6);
+}
+
+vec3 inkMix(vec4 cmyk) {
+    return paper
+        * mix(vec3(1.0), cyanInk,    cmyk.x)
+        * mix(vec3(1.0), magentaInk, cmyk.y)
+        * mix(vec3(1.0), yellowInk,  cmyk.z)
+        * mix(vec3(1.0), blackInk,   cmyk.w);
+}
+
 void main() {
     vec2 fragCoord = uvContent * elementPx;
-    vec3 rgbAmounts = vec3(0.0);
+    bool isRgb = ymck == 0;
+    int channelCount = isRgb ? 3 : 4;
+    float maxDotRadius = gridSize * dotSize;
 
-    // Axis neighbors only reach when dotSize >= 0.5; diagonals only
-    // when dotSize >= 1/sqrt(2) ~= 0.7071.
+    // Axis neighbors only reach when dotSize >= 0.5,
+    // diagonals only when dotSize >= 1/sqrt(2) ~= 0.7071
     int cellCount = dotSize < 0.5 ? 1 : (dotSize < 0.7071068 ? 5 : 9);
 
-    for (int i = 0; i < 3; ++i) {
-        float rotRad = radians(gridRot[i]);
+    vec4 amounts = vec4(0.0);
+
+    for (int i = 0; i < 4; ++i) {
+        if (i >= channelCount) break;
+
+        float angle = isRgb ? RGB_ANGLES[i] : CMYK_ANGLES[i];
+        float rotRad = radians(angle);
         float c = cos(rotRad);
         float s = sin(rotRad);
 
-        // cTrans rotates screen -> grid space; ccTrans is its inverse.
+        // cTrans rotates screen -> grid space; ccTrans is its inverse
         mat2 ccTrans = mat2(c, s, -s, c);
         mat2 cTrans = mat2(c, -s, s, c);
 
         vec2 gridFragLoc = cTrans * fragCoord;
         vec2 gridOriginLoc = floor(gridFragLoc / gridSize);
 
-        float maxDotRadius = gridSize * dotSize;
         for (int j = 0; j < 9; ++j) {
-            if (j >= cellCount) { break; }
-
+            if (j >= cellCount) break;
             vec2 cell = gridOriginLoc + cellOffsets[j];
-            vec2 gridDotLoc = cell * gridSize + vec2(gridSize * 0.5);
+            vec2 gridDotLoc = cell * gridSize + vec2(gridSize / 2.0);
             vec2 renderDotLoc = ccTrans * gridDotLoc;
 
-            float fragDist = distance(fragCoord, renderDotLoc);
-            if (fragDist > maxDotRadius) { continue; }
+            // Early-exit: skip texture fetch if fragment can't be covered
+            float fragDistanceToDotCenter = distance(fragCoord, renderDotLoc);
+            if (fragDistanceToDotCenter > maxDotRadius) continue;
 
-            float chan = sampleSrc(renderDotLoc)[i];
-            float dotRadius = chan * maxDotRadius;
-            if (fragDist < dotRadius) {
-                rgbAmounts[i] += smoothstep(
+            // Skip dots whose maximum extent would cross the image edge
+            if (trimEdge == 1 && (
+                any(lessThan(renderDotLoc, vec2(maxDotRadius))) ||
+                any(greaterThan(renderDotLoc, elementPx - vec2(maxDotRadius)))
+            )) continue;
+
+            vec4 dotColor = sampleSrc(renderDotLoc);
+            float channelAmount = isRgb
+                ? dotColor[i]
+                : cmykChannel(dotColor.rgb, i);
+            float dotRadius = channelAmount * maxDotRadius;
+            if (fragDistanceToDotCenter < dotRadius) {
+                amounts[i] += smoothstep(
                     dotRadius,
                     dotRadius - dotRadius * smoothing,
-                    fragDist
+                    fragDistanceToDotCenter
                 );
             }
         }
     }
 
-    vec4 original = sampleSrc(fragCoord);
-    float alpha = clamp(
-        rgbAmounts.r + rgbAmounts.g + rgbAmounts.b + original.a,
-        0.0,
-        1.0
-    );
+    amounts *= inkFactor;
 
-    outColor = vec4(rgbAmounts, alpha);
+    vec4 original = sampleSrc(fragCoord);
+
+    vec3 color;
+    float alpha;
+    if (isRgb) {
+        color = amounts.rgb;
+        alpha = clamp(
+            amounts.r + amounts.g + amounts.b + original.a,
+            0.0,
+            1.0
+        );
+    } else {
+        vec4 inks = clamp(amounts, 0.0, 1.0);
+        color = inkMix(inks);
+        // Ink pixels stay opaque; empty paper uses bgOpacity
+        float inkCoverage = max(max(inks.r, inks.g), max(inks.b, inks.a));
+        alpha = mix(inkCoverage, 1.0, bgOpacity * original.a);
+    }
+
+    outColor = vec4(color, alpha);
 }
 `;
 
@@ -91,12 +150,27 @@ export type HalftoneParams = {
     dotSize: number;
     /** Soft-edge fraction of the dot radius, in [0, 1]. */
     smoothing: number;
+    /** `"rgb"` (additive) or `"cmyk"` (subtractive ink simulation). */
+    mode: HalftoneMode;
+    /** Skip dots whose maximum extent would cross the image edge. */
+    trimEdge: boolean;
+    /** CMYK only: opacity of empty paper, in [0, 1]. */
+    bgOpacity: number;
+    /**
+     * Per-channel ink/intensity scale. RGB mode reads `[r, g, b]`;
+     * CMYK mode reads `[c, m, y, k]`. Default `[1, 1, 1, 1]`.
+     */
+    inkFactor: [number, number, number, number];
 };
 
 const DEFAULT_PARAMS: HalftoneParams = {
     gridSize: 10,
     dotSize: 0.7,
     smoothing: 0.15,
+    mode: "rgb",
+    trimEdge: false,
+    bgOpacity: 1,
+    inkFactor: [1, 1, 1, 1],
 };
 
 export class HalftoneEffect implements Effect {
@@ -124,6 +198,10 @@ export class HalftoneEffect implements Effect {
                 gridSize: Math.max(1, p.gridSize),
                 dotSize: Math.max(0, p.dotSize),
                 smoothing: Math.max(0, Math.min(1, p.smoothing)),
+                ymck: p.mode === "cmyk" ? 1 : 0,
+                trimEdge: p.trimEdge ? 1 : 0,
+                bgOpacity: Math.max(0, Math.min(1, p.bgOpacity)),
+                inkFactor: p.inkFactor,
             },
             target: ctx.target,
         });
