@@ -162,10 +162,10 @@ export function attachParticlePane(
 
     if (burst) {
         // Share visual params so a single slider drives both effects.
-        // trailFade, life/duration, and burst-only knobs (outwardBias)
-        // stay independent.
+        // noiseSpeed is per-effect (different shader scales), trailFade,
+        // life/duration, and burst-only knobs (outwardBias) stay
+        // independent.
         for (const key of [
-            "noiseSpeed",
             "noiseScale",
             "noiseAnimation",
             "pointSize",
@@ -326,6 +326,11 @@ export function attachParticlePane(
         burstFolder.addBinding(burst.params, "duration", {
             min: 0.2,
             max: 5,
+            step: 0.1,
+        });
+        burstFolder.addBinding(burst.params, "noiseSpeed", {
+            min: 0,
+            max: 20,
             step: 0.1,
         });
         burstFolder.addBinding(burst.params, "outwardBias", {
