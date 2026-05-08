@@ -56,13 +56,6 @@ vec4 sampleSrcNearest(vec2 px) {
     return texelFetch(src, ivec2(texUv * srcSizePx), 0);
 }
 
-// LINEAR read for the per-fragment silhouette mask used on the
-// background fill — we want a soft alpha edge here, not a stair-step.
-float sampleSrcAlphaLinear(vec2 px) {
-    vec2 uv = clamp(px / elementPx, 0.0, 1.0);
-    return texture(src, srcRectUv.xy + uv * srcRectUv.zw).a;
-}
-
 float cmykChannel(vec3 rgb, int i) {
     float k = 1.0 - max(rgb.r, max(rgb.g, rgb.b));
     if (i == 3) return k;
@@ -142,8 +135,6 @@ void main() {
         }
     }
 
-    float originalA = sampleSrcAlphaLinear(fragCoord);
-
     // Build the foreground (dot layer). Alpha is the dot coverage so
     // SRC-OVER lets the background show through between dots.
     // inkFactor scales the per-channel ink AFTER the saturation clamp:
@@ -168,14 +159,13 @@ void main() {
         fg = vec4(inkMix(inks), inkCoverage);
     }
 
-    // Background is masked by the source alpha so the halftone
-    // respects holes in transparent source images.
-    vec4 bg = vec4(background.rgb, background.a * originalA);
-
     // SRC-OVER, premultiplied output (the framework's canvas blend
-    // expects rgb already multiplied by alpha).
-    float outA = fg.a + bg.a * (1.0 - fg.a);
-    vec3 outRgbPremul = fg.rgb * fg.a + bg.rgb * bg.a * (1.0 - fg.a);
+    // expects rgb already multiplied by alpha). Background is the
+    // user-supplied colour as-is — it fills the canvas; halftone-only
+    // composition is just background.a = 0.
+    float outA = fg.a + background.a * (1.0 - fg.a);
+    vec3 outRgbPremul =
+        fg.rgb * fg.a + background.rgb * background.a * (1.0 - fg.a);
 
     outColor = vec4(outRgbPremul, outA);
 }
