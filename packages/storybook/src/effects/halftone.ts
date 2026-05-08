@@ -142,13 +142,12 @@ void main() {
     // respects holes in transparent source images.
     vec4 bg = vec4(background.rgb, background.a * original.a);
 
-    // SRC-OVER, non-premultiplied I/O.
+    // SRC-OVER, premultiplied output (the framework's canvas blend
+    // expects rgb already multiplied by alpha).
     float outA = fg.a + bg.a * (1.0 - fg.a);
-    vec3 outRgb = outA > 0.0
-        ? (fg.rgb * fg.a + bg.rgb * bg.a * (1.0 - fg.a)) / outA
-        : vec3(0.0);
+    vec3 outRgbPremul = fg.rgb * fg.a + bg.rgb * bg.a * (1.0 - fg.a);
 
-    outColor = vec4(outRgb, outA);
+    outColor = vec4(outRgbPremul, outA);
 }
 `;
 
