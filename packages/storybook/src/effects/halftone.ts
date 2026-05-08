@@ -37,12 +37,12 @@ const vec2 cellOffsets[9] = vec2[9](
     vec2(-1, -1), vec2(1, -1), vec2(-1, 1), vec2(1)
 );
 
-// Ink target colors at 100% coverage on white paper
+// Ink target colors at 100% coverage. No paper constant — paper is
+// the user-supplied background and shows through via SRC-OVER.
 const vec3 cyanInk    = vec3(0.15, 0.73, 0.88);
 const vec3 magentaInk = vec3(0.88, 0.12, 0.55);
 const vec3 yellowInk  = vec3(0.97, 0.93, 0.08);
 const vec3 blackInk   = vec3(0.1);
-const vec3 paper      = vec3(0.99);
 
 // NEAREST read for dot-centre samples. The framework binds src with
 // LINEAR filter, but bilinear interpolation between an opaque colour
@@ -63,11 +63,10 @@ float cmykChannel(vec3 rgb, int i) {
 }
 
 vec3 inkMix(vec4 cmyk) {
-    return paper
-        * mix(vec3(1.0), cyanInk,    cmyk.x)
-        * mix(vec3(1.0), magentaInk, cmyk.y)
-        * mix(vec3(1.0), yellowInk,  cmyk.z)
-        * mix(vec3(1.0), blackInk,   cmyk.w);
+    return mix(vec3(1.0), cyanInk,    cmyk.x)
+         * mix(vec3(1.0), magentaInk, cmyk.y)
+         * mix(vec3(1.0), yellowInk,  cmyk.z)
+         * mix(vec3(1.0), blackInk,   cmyk.w);
 }
 
 void main() {
@@ -135,28 +134,41 @@ void main() {
         }
     }
 
-    // Build the foreground (dot layer). Alpha is the dot coverage so
-    // SRC-OVER lets the background show through between dots.
-    // inkFactor scales the per-channel ink AFTER the saturation clamp:
-    // pre-clamp scaling let neighbour-dot overlap "boost" the visible
-    // density past 1.0 before the clamp ate it, so lowering the factor
-    // gave less reduction than expected. Post-clamp + re-clamp makes
-    // it a true density dial.
+    // Build the foreground (dot layer). Coverage and density are split:
+    // fg.rgb is the FULL-STRENGTH ink colour (independent of how much
+    // of this fragment a dot covers) and fg.a is the geometric coverage.
+    // Mixing the two via SRC-OVER then gives the right perceptual blend
+    // with the background, e.g. K=0.5 at an AA edge over white paper
+    // becomes 0.5*black + 0.5*paper instead of getting paper-tinted
+    // twice (once in inkMix, once in SRC-OVER) and going light gray.
+    //
+    // inkFactor scales post-clamp + re-clamp so it's a true density dial
+    // (pre-clamp scaling let neighbour-dot overlap >1 absorb reductions).
     vec4 fg;
     if (isRgb) {
         vec3 rgbInks = clamp(
             clamp(amounts.rgb, 0.0, 1.0) * inkFactor.rgb,
             0.0, 1.0
         );
-        float dotMask = clamp(rgbInks.r + rgbInks.g + rgbInks.b, 0.0, 1.0);
-        fg = vec4(rgbInks, dotMask);
+        // Normalise to max so the colour at AA edges stays full strength.
+        float maxInk = max(max(rgbInks.r, rgbInks.g), rgbInks.b);
+        vec3 inkColor = maxInk > 0.0 ? rgbInks / maxInk : vec3(0.0);
+        // Multiplicative complement: probability that AT LEAST ONE
+        // channel covers this fragment (channels overlap stochastically).
+        float dotMask = 1.0
+            - (1.0 - rgbInks.r) * (1.0 - rgbInks.g) * (1.0 - rgbInks.b);
+        fg = vec4(inkColor, dotMask);
     } else {
         vec4 inks = clamp(
             clamp(amounts, 0.0, 1.0) * inkFactor,
             0.0, 1.0
         );
-        float inkCoverage = max(max(inks.r, inks.g), max(inks.b, inks.a));
-        fg = vec4(inkMix(inks), inkCoverage);
+        float maxInk = max(max(inks.x, inks.y), max(inks.z, inks.w));
+        vec4 normInks = maxInk > 0.0 ? inks / maxInk : vec4(0.0);
+        vec3 inkColor = inkMix(normInks);
+        float inkCoverage = 1.0
+            - (1.0 - inks.x) * (1.0 - inks.y) * (1.0 - inks.z) * (1.0 - inks.w);
+        fg = vec4(inkColor, inkCoverage);
     }
 
     // SRC-OVER, premultiplied output (the framework's canvas blend
