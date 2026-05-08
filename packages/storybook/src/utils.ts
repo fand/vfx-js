@@ -186,15 +186,18 @@ export function attachHalftonePane(
         ];
     });
 
-    // Same trick for inkFactor — slider mirrors the all-channel value.
-    const inkState = { inkStrength: effect.params.inkFactor[0] };
-    pane.addBinding(inkState, "inkStrength", {
-        min: 0,
-        max: 2,
-        step: 0.01,
+    // Tweakpane renders {x,y,z,w} as a point4d (4 stacked sliders).
+    // Axis labels are fixed to x/y/z/w; in CMYK mode they map to
+    // C/M/Y/K, in RGB mode to R/G/B (w unused).
+    const [ix, iy, iz, iw] = effect.params.inkFactor;
+    const inkState = { inkFactor: { x: ix, y: iy, z: iz, w: iw } };
+    pane.addBinding(inkState, "inkFactor", {
+        x: { min: 0, max: 2, step: 0.01 },
+        y: { min: 0, max: 2, step: 0.01 },
+        z: { min: 0, max: 2, step: 0.01 },
+        w: { min: 0, max: 2, step: 0.01 },
     }).on("change", (ev) => {
-        const v = ev.value;
-        effect.params.inkFactor = [v, v, v, v];
+        effect.params.inkFactor = [ev.value.x, ev.value.y, ev.value.z, ev.value.w];
     });
 
     trackPane(pane);
