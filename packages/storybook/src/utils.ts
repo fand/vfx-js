@@ -169,11 +169,24 @@ export function attachHalftonePane(
     pane.addBinding(effect.params, "dotSize", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect.params, "smoothing", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect.params, "trimEdge");
-    pane.addBinding(effect.params, "bgOpacity", { min: 0, max: 1, step: 0.01 });
 
-    // Tweakpane can't bind a 4-tuple directly, and the all-channel
-    // scalar is the only knob the story exposes. Mirror writes onto
-    // every channel of inkFactor.
+    // Tweakpane can't bind a 4-tuple directly. Mirror onto an {r,g,b,a}
+    // float color object — Tweakpane renders it as an RGBA picker —
+    // and write back to effect.params on change.
+    const [br, bg, bb, ba] = effect.params.background;
+    const bgState = { background: { r: br, g: bg, b: bb, a: ba } };
+    pane.addBinding(bgState, "background", {
+        color: { type: "float", alpha: true },
+    }).on("change", (ev) => {
+        effect.params.background = [
+            ev.value.r,
+            ev.value.g,
+            ev.value.b,
+            ev.value.a,
+        ];
+    });
+
+    // Same trick for inkFactor — slider mirrors the all-channel value.
     const inkState = { inkStrength: effect.params.inkFactor[0] };
     pane.addBinding(inkState, "inkStrength", {
         min: 0,
