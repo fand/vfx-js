@@ -134,11 +134,12 @@ void main() {
     vec2 gridCenter = elementPx * 0.5;
     bool isRgb = ymck == 0;
     int channelCount = isRgb ? 3 : 4;
-    float maxDotRadius = gridSize * dotSize;
+    // dotSize is normalised so 1.0 = dot exactly reaches the cell
+    // corners (no overlap); >1.0 lets dots overlap into neighbours.
+    float maxDotRadius = gridSize * dotSize * 0.7071068;
 
-    // Axis neighbors only reach when dotSize >= 0.5,
-    // diagonals only when dotSize >= 1/sqrt(2) ~= 0.7071
-    int cellCount = dotSize < 0.5 ? 1 : (dotSize < 0.7071068 ? 5 : 9);
+    // 5 cells once axis neighbours are in reach, 9 once diagonals are.
+    int cellCount = dotSize < 0.7071068 ? 1 : (dotSize < 1.0 ? 5 : 9);
 
     vec4 amounts = vec4(0.0);
 
@@ -241,7 +242,11 @@ void main() {
 export type HalftoneParams = {
     /** Grid pitch in physical px. */
     gridSize: number;
-    /** Max dot radius as a fraction of `gridSize`, in [0, 1]. */
+    /**
+     * Dot size relative to the cell. 1.0 = dot exactly reaches the
+     * cell corners (saturation threshold); >1.0 lets dots overlap
+     * into neighbours.
+     */
     dotSize: number;
     /** Soft-edge fraction of the dot radius, in [0, 1]. */
     smoothing: number;
@@ -278,7 +283,7 @@ const DEFAULT_INK_PALETTE: HalftoneInkPalette = {
 
 const DEFAULT_PARAMS: HalftoneParams = {
     gridSize: 10,
-    dotSize: 0.7,
+    dotSize: 1.0,
     smoothing: 0.15,
     angle: 0,
     mode: "cmyk",
