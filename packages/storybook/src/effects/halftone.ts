@@ -296,7 +296,7 @@ const DEFAULT_PARAMS: HalftoneParams = {
     dotSize: 1.0,
     smoothing: 0.15,
     angle: 0,
-    mode: "cmyk",
+    mode: "rgb",
     blackAmount: 1,
     trimEdge: true,
     background: [0, 0, 0, 0],
