@@ -119,18 +119,28 @@ void main() {
         }
     }
 
-    amounts *= inkFactor;
-
     vec4 original = sampleSrc(fragCoord);
 
     // Build the foreground (dot layer). Alpha is the dot coverage so
     // SRC-OVER lets the background show through between dots.
+    // inkFactor scales the per-channel ink AFTER the saturation clamp:
+    // pre-clamp scaling let neighbour-dot overlap "boost" the visible
+    // density past 1.0 before the clamp ate it, so lowering the factor
+    // gave less reduction than expected. Post-clamp + re-clamp makes
+    // it a true density dial.
     vec4 fg;
     if (isRgb) {
-        float dotMask = clamp(amounts.r + amounts.g + amounts.b, 0.0, 1.0);
-        fg = vec4(amounts.rgb, dotMask);
+        vec3 rgbInks = clamp(
+            clamp(amounts.rgb, 0.0, 1.0) * inkFactor.rgb,
+            0.0, 1.0
+        );
+        float dotMask = clamp(rgbInks.r + rgbInks.g + rgbInks.b, 0.0, 1.0);
+        fg = vec4(rgbInks, dotMask);
     } else {
-        vec4 inks = clamp(amounts, 0.0, 1.0);
+        vec4 inks = clamp(
+            clamp(amounts, 0.0, 1.0) * inkFactor,
+            0.0, 1.0
+        );
         float inkCoverage = max(max(inks.r, inks.g), max(inks.b, inks.a));
         fg = vec4(inkMix(inks), inkCoverage);
     }
