@@ -1,10 +1,9 @@
 // CMYK / RGB halftone: per-channel rotated dot grids whose dot radii
 // track the source channel intensity at the dot center. CMYK mode
-// converts the source to CMYK and samples four screens (C/M/Y/K) at the
-// classic newspaper angles; RGB mode is additive on three rotated
-// grids. Both modes treat the dot mask as the foreground alpha and
-// SRC-OVER-blend onto a user-supplied `background` (RGBA premul-style
-// non-premul intermediate).
+// converts the source to CMYK and samples four screens (C/M/Y/K) at
+// the classic newspaper angles; RGB mode is additive on three rotated
+// grids. Both modes SRC-OVER-blend the dot layer onto a user-supplied
+// `background`.
 import type { Effect, EffectContext } from "@vfx-js/core";
 
 export type HalftoneMode = "rgb" | "cmyk";
@@ -27,8 +26,6 @@ export type HalftoneInkPresetName =
     | "riso-fluo"
     | "riso-classic";
 
-// Each preset is a partial overlay so applying a CMYK-only preset
-// (e.g. fogra51) keeps the user's RGB inks, and vice versa.
 // FOGRA51 / SWOP values are CIELab(D50) solids from the standards
 // converted to sRGB (rounded to 3dp), so they're representative not
 // colorimetrically exact — the gamuts don't fit losslessly in sRGB.
@@ -166,7 +163,7 @@ void main() {
             vec2 gridDotLoc = cell * gridSize + vec2(gridSize / 2.0);
             vec2 renderDotLoc = ccTrans * gridDotLoc + gridCenter;
 
-            // Early-exit: skip texture fetch if fragment can't be covered
+            // Skip texture fetch if fragment can't be covered.
             float fragDistanceToDotCenter = distance(fragCoord, renderDotLoc);
             if (fragDistanceToDotCenter > maxDotRadius) continue;
 
@@ -195,26 +192,18 @@ void main() {
         }
     }
 
-    // Build the foreground (dot layer). Coverage and density are split:
-    // fg.rgb is the FULL-STRENGTH ink colour (independent of how much
-    // of this fragment a dot covers) and fg.a is the geometric coverage.
-    // Mixing the two via SRC-OVER then gives the right perceptual blend
-    // with the background, e.g. K=0.5 at an AA edge over white paper
-    // becomes 0.5*black + 0.5*paper instead of getting paper-tinted
-    // twice (once in inkMix, once in SRC-OVER) and going light gray.
-    //
-    // inkFactor scales post-clamp + re-clamp so it's a true density dial
-    // (pre-clamp scaling let neighbour-dot overlap >1 absorb reductions).
+    // Split coverage and density: fg.rgb is the full-strength ink
+    // colour, fg.a is the geometric coverage. SRC-OVER then blends
+    // correctly at AA edges (otherwise the background tints twice —
+    // once in inkMix, once in SRC-OVER — and edges go washed out).
+    // inkFactor is applied post-clamp + re-clamp so it's a true density
+    // dial (pre-clamp let neighbour-dot overlap >1 absorb reductions).
     vec4 fg;
     if (isRgb) {
         vec3 rgbInks = clamp(
             clamp(amounts.rgb, 0.0, 1.0) * inkFactor.rgb,
             0.0, 1.0
         );
-        // Weighted sum of per-channel ink colours. With pure inks
-        // (rInk=(1,0,0), gInk=(0,1,0), bInk=(0,0,1)) this reduces to
-        // weighted=rgbInks; with arbitrary inks (e.g. riso fluo pink /
-        // teal / yellow) it produces the additive mix.
         vec3 weighted = rInk * rgbInks.r + gInk * rgbInks.g + bInk * rgbInks.b;
         // Normalise to max so the colour at AA edges stays full strength.
         float maxComp = max(max(weighted.r, weighted.g), weighted.b);
@@ -264,8 +253,7 @@ export type HalftoneParams = {
     trimEdge: boolean;
     /**
      * SRC-OVER backdrop behind the dots, RGBA in [0, 1] (non-premul).
-     * Alpha is multiplied by the source alpha so transparent source
-     * regions clear the backdrop too. Default `[0, 0, 0, 0]`.
+     * Default `[0, 0, 0, 0]`.
      */
     background: [number, number, number, number];
     /**
@@ -282,8 +270,7 @@ export type HalftoneParams = {
     inkPalette: HalftoneInkPalette;
 };
 
-// Default = full palette: pure RGB inks + the pre-existing newsprint
-// CMYK inks. Picked to preserve the prior look exactly.
+// Default: pure RGB inks + newsprint CMYK inks.
 const DEFAULT_INK_PALETTE: HalftoneInkPalette = {
     ...(HALFTONE_INK_PRESETS.pure as HalftoneInkPalette),
     ...HALFTONE_INK_PRESETS.newsprint,

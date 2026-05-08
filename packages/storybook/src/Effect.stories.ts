@@ -116,10 +116,6 @@ fluid.play = async ({ canvasElement }) => {
 };
 
 // Halftone with RGB (additive) or CMYK (subtractive ink-mix) modes.
-// play()-driven so Tweakpane mutates effect.params in place — uniform
-// tweaks don't recompile the shader. Only the src swap rebuilds (the
-// framework loads img.src once at vfx.add and never observes later
-// changes), following the particle story's remove + re-add pattern.
 export const halftone: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
