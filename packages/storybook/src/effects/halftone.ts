@@ -86,7 +86,7 @@ uniform float gridSize;
 uniform float dotSize;
 uniform float smoothing;
 uniform float angle;       // global grid rotation in degrees, added to per-channel angles
-uniform float gcr;         // gray component replacement amount: 1.0 = max GCR, 0.0 = pure CMY (no K)
+uniform float blackAmount; // GCR amount: 1.0 = max GCR (k = 1 - max(rgb)), 0.0 = pure CMY (no K)
 uniform int ymck;          // 0 = RGB (additive), 1 = CMYK (subtractive)
 uniform int trimEdge;      // 1 = skip dots whose extent crosses the image edge
 uniform vec4 background;   // SRC-OVER backdrop, RGBA in [0, 1], non-premul
@@ -115,10 +115,10 @@ vec4 sampleSrcNearest(vec2 px) {
     return texelFetch(src, ivec2(texUv * srcSizePx), 0);
 }
 
-// Lower gcr shifts ink from K to CMY (paint model still holds for
-// any k <= 1 - max(rgb)), preserving hue where max-GCR collapses to K.
+// Lower blackAmount shifts ink from K to CMY (paint model still holds
+// for any k <= 1 - max(rgb)), preserving hue where max-GCR collapses to K.
 float cmykChannel(vec3 rgb, int i) {
-    float k = gcr * (1.0 - max(rgb.r, max(rgb.g, rgb.b)));
+    float k = blackAmount * (1.0 - max(rgb.r, max(rgb.g, rgb.b)));
     if (i == 3) return k;
     return (1.0 - rgb[i] - k) / max(1.0 - k, 1e-6);
 }
@@ -258,12 +258,12 @@ export type HalftoneParams = {
     /** `"rgb"` (additive) or `"cmyk"` (subtractive ink simulation). */
     mode: HalftoneMode;
     /**
-     * Gray component replacement, [0, 1]. CMYK only: `1` = max GCR
-     * (`k = 1 - max(rgb)`, current behaviour); `0` = pure CMY, no K.
+     * How much black ink to use during CMYK separation, [0, 1]. CMYK
+     * only: `1` = max GCR (`k = 1 - max(rgb)`); `0` = pure CMY, no K.
      * Lowering it preserves hue in dark regions that max-GCR would
      * collapse to a flat K stack.
      */
-    gcr: number;
+    blackAmount: number;
     /** Skip dots whose maximum extent would cross the image edge. */
     trimEdge: boolean;
     /**
@@ -297,7 +297,7 @@ const DEFAULT_PARAMS: HalftoneParams = {
     smoothing: 0.15,
     angle: 0,
     mode: "cmyk",
-    gcr: 1,
+    blackAmount: 1,
     trimEdge: true,
     background: [0, 0, 0, 0],
     inkFactor: [1, 1, 1, 1],
@@ -352,7 +352,7 @@ export class HalftoneEffect implements Effect {
                 dotSize: Math.max(0, p.dotSize),
                 smoothing: Math.max(0, Math.min(1, p.smoothing)),
                 angle: p.angle,
-                gcr: Math.max(0, Math.min(1, p.gcr)),
+                blackAmount: Math.max(0, Math.min(1, p.blackAmount)),
                 ymck: p.mode === "cmyk" ? 1 : 0,
                 trimEdge: p.trimEdge ? 1 : 0,
                 background: p.background,

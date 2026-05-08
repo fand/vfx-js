@@ -173,7 +173,7 @@ export function attachHalftonePane(
     pane.addBinding(effect.params, "dotSize", { min: 0, max: 2, step: 0.01 });
     pane.addBinding(effect.params, "smoothing", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect.params, "angle", { min: -180, max: 180, step: 1 });
-    pane.addBinding(effect.params, "gcr", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect.params, "blackAmount", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect.params, "trimEdge");
 
     // Tweakpane can't bind a 4-tuple directly. Mirror onto an {r,g,b,a}
