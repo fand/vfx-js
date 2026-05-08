@@ -21,6 +21,7 @@ uniform vec2 elementPx;
 uniform float gridSize;
 uniform float dotSize;
 uniform float smoothing;
+uniform float angle;       // global grid rotation in degrees, added to per-channel angles
 uniform int ymck;          // 0 = RGB (additive), 1 = CMYK (subtractive)
 uniform int trimEdge;      // 1 = skip dots whose extent crosses the image edge
 uniform vec4 background;   // SRC-OVER backdrop, RGBA in [0, 1], non-premul
@@ -79,8 +80,8 @@ void main() {
     for (int i = 0; i < 4; ++i) {
         if (i >= channelCount) break;
 
-        float angle = isRgb ? RGB_ANGLES[i] : CMYK_ANGLES[i];
-        float rotRad = radians(angle);
+        float channelAngle = isRgb ? RGB_ANGLES[i] : CMYK_ANGLES[i];
+        float rotRad = radians(channelAngle + angle);
         float c = cos(rotRad);
         float s = sin(rotRad);
 
@@ -171,6 +172,8 @@ export type HalftoneParams = {
     dotSize: number;
     /** Soft-edge fraction of the dot radius, in [0, 1]. */
     smoothing: number;
+    /** Global grid rotation in degrees, added to per-channel angles. */
+    angle: number;
     /** `"rgb"` (additive) or `"cmyk"` (subtractive ink simulation). */
     mode: HalftoneMode;
     /** Skip dots whose maximum extent would cross the image edge. */
@@ -192,6 +195,7 @@ const DEFAULT_PARAMS: HalftoneParams = {
     gridSize: 10,
     dotSize: 0.7,
     smoothing: 0.15,
+    angle: 0,
     mode: "rgb",
     trimEdge: false,
     background: [0, 0, 0, 0],
@@ -223,6 +227,7 @@ export class HalftoneEffect implements Effect {
                 gridSize: Math.max(1, p.gridSize),
                 dotSize: Math.max(0, p.dotSize),
                 smoothing: Math.max(0, Math.min(1, p.smoothing)),
+                angle: p.angle,
                 ymck: p.mode === "cmyk" ? 1 : 0,
                 trimEdge: p.trimEdge ? 1 : 0,
                 background: p.background,
