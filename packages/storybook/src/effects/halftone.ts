@@ -17,6 +17,7 @@ out vec4 outColor;
 
 uniform sampler2D src;
 uniform vec4 srcRectUv;
+uniform vec2 srcSizePx;    // src texture size in texels
 uniform vec2 elementPx;
 uniform float gridSize;
 uniform float dotSize;
@@ -43,9 +44,23 @@ const vec3 yellowInk  = vec3(0.97, 0.93, 0.08);
 const vec3 blackInk   = vec3(0.1);
 const vec3 paper      = vec3(0.99);
 
-vec4 sampleSrc(vec2 px) {
+// NEAREST read for dot-centre samples. The framework binds src with
+// LINEAR filter, but bilinear interpolation between an opaque colour
+// pixel and an adjacent transparent (rgb=0, a=0) pixel produces gray
+// rgb at the boundary, which cmykChannel turns into a black K dot —
+// the classic non-premul filter artefact. texelFetch ignores the
+// filter mode so we get the actual stored texel.
+vec4 sampleSrcNearest(vec2 px) {
     vec2 uv = clamp(px / elementPx, 0.0, 1.0);
-    return texture(src, srcRectUv.xy + uv * srcRectUv.zw);
+    vec2 texUv = srcRectUv.xy + uv * srcRectUv.zw;
+    return texelFetch(src, ivec2(texUv * srcSizePx), 0);
+}
+
+// LINEAR read for the per-fragment silhouette mask used on the
+// background fill — we want a soft alpha edge here, not a stair-step.
+float sampleSrcAlphaLinear(vec2 px) {
+    vec2 uv = clamp(px / elementPx, 0.0, 1.0);
+    return texture(src, srcRectUv.xy + uv * srcRectUv.zw).a;
 }
 
 float cmykChannel(vec3 rgb, int i) {
@@ -108,7 +123,7 @@ void main() {
                 any(greaterThan(renderDotLoc, elementPx - vec2(maxDotRadius)))
             )) continue;
 
-            vec4 dotColor = sampleSrc(renderDotLoc);
+            vec4 dotColor = sampleSrcNearest(renderDotLoc);
             float channelAmount = isRgb
                 ? dotColor[i]
                 : cmykChannel(dotColor.rgb, i);
@@ -127,7 +142,7 @@ void main() {
         }
     }
 
-    vec4 original = sampleSrc(fragCoord);
+    float originalA = sampleSrcAlphaLinear(fragCoord);
 
     // Build the foreground (dot layer). Alpha is the dot coverage so
     // SRC-OVER lets the background show through between dots.
@@ -155,7 +170,7 @@ void main() {
 
     // Background is masked by the source alpha so the halftone
     // respects holes in transparent source images.
-    vec4 bg = vec4(background.rgb, background.a * original.a);
+    vec4 bg = vec4(background.rgb, background.a * originalA);
 
     // SRC-OVER, premultiplied output (the framework's canvas blend
     // expects rgb already multiplied by alpha).
@@ -224,6 +239,7 @@ export class HalftoneEffect implements Effect {
             frag: FRAG_HALFTONE,
             uniforms: {
                 src: ctx.src,
+                srcSizePx: [ctx.src.width || 1, ctx.src.height || 1],
                 elementPx: [ew, eh],
                 gridSize: Math.max(1, p.gridSize),
                 dotSize: Math.max(0, p.dotSize),
