@@ -2,7 +2,11 @@ import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
 import type { FluidEffect } from "./effects/fluid";
-import type { HalftoneEffect } from "./effects/halftone";
+import type {
+    HalftoneEffect,
+    HalftoneInkPalette,
+    HalftoneInkPresetName,
+} from "./effects/halftone";
 import type { ParticleEffect } from "./effects/particle";
 import type { ParticleExplodeEffect } from "./effects/particle-explode";
 
@@ -198,11 +202,91 @@ export function attachHalftonePane(
         z: { min: 0, max: 2, step: 0.01 },
         w: { min: 0, max: 2, step: 0.01 },
     }).on("change", (ev) => {
-        effect.params.inkFactor = [ev.value.x, ev.value.y, ev.value.z, ev.value.w];
+        effect.params.inkFactor = [
+            ev.value.x,
+            ev.value.y,
+            ev.value.z,
+            ev.value.w,
+        ];
     });
+
+    addInkPaletteBindings(pane, effect);
 
     trackPane(pane);
     return pane;
+}
+
+const INK_PRESET_OPTIONS: Record<string, HalftoneInkPresetName> = {
+    "Pure CMYK / RGB": "pure",
+    Newsprint: "newsprint",
+    "FOGRA51 (offset)": "fogra51",
+    "SWOP 2013": "swop",
+    "Riso fluo (pink/teal/yellow)": "riso-fluo",
+    "Riso classic (red/blue/yellow)": "riso-classic",
+};
+
+const CMYK_INK_KEYS = ["cyan", "magenta", "yellow", "black"] as const;
+const RGB_INK_KEYS = ["red", "green", "blue"] as const;
+type InkKey = (typeof CMYK_INK_KEYS)[number] | (typeof RGB_INK_KEYS)[number];
+
+// Tweakpane binds object-shaped colours, not tuples. Mirror each
+// palette entry into an {r,g,b} object on the pane's local state, then
+// write the tuple back into effect.params.inkPalette on change. When a
+// preset is applied, mutate the mirror in place and refresh() so the
+// pickers redraw.
+function addInkPaletteBindings(pane: Pane, effect: HalftoneEffect): void {
+    const mirror: Record<InkKey, { r: number; g: number; b: number }> =
+        {} as Record<InkKey, { r: number; g: number; b: number }>;
+    const syncMirrorFromPalette = (): void => {
+        for (const key of [...CMYK_INK_KEYS, ...RGB_INK_KEYS] as InkKey[]) {
+            const [r, g, b] = effect.params.inkPalette[key];
+            mirror[key] = { r, g, b };
+        }
+    };
+    syncMirrorFromPalette();
+
+    const presetState = { preset: "newsprint" as HalftoneInkPresetName };
+    pane.addBinding(presetState, "preset", {
+        label: "ink preset",
+        options: INK_PRESET_OPTIONS,
+    }).on("change", (ev) => {
+        effect.setInkPreset(ev.value);
+        // Re-mirror in place — replacing the mirror objects breaks the
+        // bindings' references. Mutate r/g/b and call refresh() instead.
+        for (const key of [...CMYK_INK_KEYS, ...RGB_INK_KEYS] as InkKey[]) {
+            const [r, g, b] = effect.params.inkPalette[key];
+            mirror[key].r = r;
+            mirror[key].g = g;
+            mirror[key].b = b;
+        }
+        pane.refresh();
+    });
+
+    const cmykFolder = pane.addFolder({ title: "CMYK inks", expanded: false });
+    for (const key of CMYK_INK_KEYS) {
+        cmykFolder
+            .addBinding(mirror, key, { color: { type: "float" } })
+            .on("change", (ev) => {
+                effect.params.inkPalette[key] = [
+                    ev.value.r,
+                    ev.value.g,
+                    ev.value.b,
+                ] as HalftoneInkPalette[typeof key];
+            });
+    }
+
+    const rgbFolder = pane.addFolder({ title: "RGB inks", expanded: false });
+    for (const key of RGB_INK_KEYS) {
+        rgbFolder
+            .addBinding(mirror, key, { color: { type: "float" } })
+            .on("change", (ev) => {
+                effect.params.inkPalette[key] = [
+                    ev.value.r,
+                    ev.value.g,
+                    ev.value.b,
+                ] as HalftoneInkPalette[typeof key];
+            });
+    }
 }
 
 type SrcSelector = {

@@ -9,6 +9,72 @@ import type { Effect, EffectContext } from "@vfx-js/core";
 
 export type HalftoneMode = "rgb" | "cmyk";
 
+export type HalftoneInkPalette = {
+    cyan: [number, number, number];
+    magenta: [number, number, number];
+    yellow: [number, number, number];
+    black: [number, number, number];
+    red: [number, number, number];
+    green: [number, number, number];
+    blue: [number, number, number];
+};
+
+export type HalftoneInkPresetName =
+    | "pure"
+    | "newsprint"
+    | "fogra51"
+    | "swop"
+    | "riso-fluo"
+    | "riso-classic";
+
+// Each preset is a partial overlay so applying a CMYK-only preset
+// (e.g. fogra51) keeps the user's RGB inks, and vice versa.
+// FOGRA51 / SWOP values are CIELab(D50) solids from the standards
+// converted to sRGB (rounded to 3dp), so they're representative not
+// colorimetrically exact — the gamuts don't fit losslessly in sRGB.
+export const HALFTONE_INK_PRESETS: Record<
+    HalftoneInkPresetName,
+    Partial<HalftoneInkPalette>
+> = {
+    pure: {
+        cyan: [0, 1, 1],
+        magenta: [1, 0, 1],
+        yellow: [1, 1, 0],
+        black: [0, 0, 0],
+        red: [1, 0, 0],
+        green: [0, 1, 0],
+        blue: [0, 0, 1],
+    },
+    newsprint: {
+        cyan: [0.15, 0.73, 0.88],
+        magenta: [0.88, 0.12, 0.55],
+        yellow: [0.97, 0.93, 0.08],
+        black: [0.1, 0.1, 0.1],
+    },
+    fogra51: {
+        cyan: [0.0, 0.525, 0.765],
+        magenta: [0.827, 0.0, 0.486],
+        yellow: [0.984, 0.91, 0.0],
+        black: [0.145, 0.145, 0.145],
+    },
+    swop: {
+        cyan: [0.0, 0.557, 0.769],
+        magenta: [0.827, 0.02, 0.478],
+        yellow: [0.984, 0.902, 0.027],
+        black: [0.169, 0.169, 0.169],
+    },
+    "riso-fluo": {
+        red: [1.0, 0.29, 0.59],
+        green: [0.0, 0.69, 0.71],
+        blue: [1.0, 0.9, 0.0],
+    },
+    "riso-classic": {
+        red: [1.0, 0.18, 0.21],
+        green: [0.24, 0.32, 0.56],
+        blue: [1.0, 0.9, 0.0],
+    },
+};
+
 const FRAG_HALFTONE = `#version 300 es
 precision highp float;
 
@@ -27,6 +93,8 @@ uniform int ymck;          // 0 = RGB (additive), 1 = CMYK (subtractive)
 uniform int trimEdge;      // 1 = skip dots whose extent crosses the image edge
 uniform vec4 background;   // SRC-OVER backdrop, RGBA in [0, 1], non-premul
 uniform vec4 inkFactor;    // per-channel scale
+uniform vec3 cInk, mInk, yInk, kInk;  // CMYK ink solids at 100% coverage
+uniform vec3 rInk, gInk, bInk;        // RGB inks (per-channel "ink" colour)
 
 const vec3 RGB_ANGLES = vec3(15.0, 45.0, 75.0);
 const vec4 CMYK_ANGLES = vec4(15.0, 75.0, 0.0, 45.0);
@@ -36,13 +104,6 @@ const vec2 cellOffsets[9] = vec2[9](
     vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2(0, 1),
     vec2(-1, -1), vec2(1, -1), vec2(-1, 1), vec2(1)
 );
-
-// Ink target colors at 100% coverage. No paper constant — paper is
-// the user-supplied background and shows through via SRC-OVER.
-const vec3 cyanInk    = vec3(0.15, 0.73, 0.88);
-const vec3 magentaInk = vec3(0.88, 0.12, 0.55);
-const vec3 yellowInk  = vec3(0.97, 0.93, 0.08);
-const vec3 blackInk   = vec3(0.1);
 
 // NEAREST read for dot-centre samples. The framework binds src with
 // LINEAR filter, but bilinear interpolation between an opaque colour
@@ -63,10 +124,10 @@ float cmykChannel(vec3 rgb, int i) {
 }
 
 vec3 inkMix(vec4 cmyk) {
-    return mix(vec3(1.0), cyanInk,    cmyk.x)
-         * mix(vec3(1.0), magentaInk, cmyk.y)
-         * mix(vec3(1.0), yellowInk,  cmyk.z)
-         * mix(vec3(1.0), blackInk,   cmyk.w);
+    return mix(vec3(1.0), cInk, cmyk.x)
+         * mix(vec3(1.0), mInk, cmyk.y)
+         * mix(vec3(1.0), yInk, cmyk.z)
+         * mix(vec3(1.0), kInk, cmyk.w);
 }
 
 void main() {
@@ -150,9 +211,14 @@ void main() {
             clamp(amounts.rgb, 0.0, 1.0) * inkFactor.rgb,
             0.0, 1.0
         );
+        // Weighted sum of per-channel ink colours. With pure inks
+        // (rInk=(1,0,0), gInk=(0,1,0), bInk=(0,0,1)) this reduces to
+        // weighted=rgbInks; with arbitrary inks (e.g. riso fluo pink /
+        // teal / yellow) it produces the additive mix.
+        vec3 weighted = rInk * rgbInks.r + gInk * rgbInks.g + bInk * rgbInks.b;
         // Normalise to max so the colour at AA edges stays full strength.
-        float maxInk = max(max(rgbInks.r, rgbInks.g), rgbInks.b);
-        vec3 inkColor = maxInk > 0.0 ? rgbInks / maxInk : vec3(0.0);
+        float maxComp = max(max(weighted.r, weighted.g), weighted.b);
+        vec3 inkColor = maxComp > 0.0 ? weighted / maxComp : vec3(0.0);
         // Multiplicative complement: probability that AT LEAST ONE
         // channel covers this fragment (channels overlap stochastically).
         float dotMask = 1.0
@@ -207,6 +273,20 @@ export type HalftoneParams = {
      * CMYK mode reads `[c, m, y, k]`. Default `[1, 1, 1, 1]`.
      */
     inkFactor: [number, number, number, number];
+    /**
+     * Per-channel ink colours. CMYK mode uses `cyan/magenta/yellow/black`;
+     * RGB mode uses `red/green/blue`. Use {@link HalftoneEffect.setInkPreset}
+     * to apply named presets, or write into the palette directly for
+     * fully custom inks.
+     */
+    inkPalette: HalftoneInkPalette;
+};
+
+// Default = full palette: pure RGB inks + the pre-existing newsprint
+// CMYK inks. Picked to preserve the prior look exactly.
+const DEFAULT_INK_PALETTE: HalftoneInkPalette = {
+    ...(HALFTONE_INK_PRESETS.pure as HalftoneInkPalette),
+    ...HALFTONE_INK_PRESETS.newsprint,
 };
 
 const DEFAULT_PARAMS: HalftoneParams = {
@@ -218,17 +298,38 @@ const DEFAULT_PARAMS: HalftoneParams = {
     trimEdge: false,
     background: [0, 0, 0, 0],
     inkFactor: [1, 1, 1, 1],
+    inkPalette: DEFAULT_INK_PALETTE,
 };
 
 export class HalftoneEffect implements Effect {
     params: HalftoneParams;
 
     constructor(initial: Partial<HalftoneParams> = {}) {
-        this.params = { ...DEFAULT_PARAMS, ...initial };
+        this.params = {
+            ...DEFAULT_PARAMS,
+            ...initial,
+            // Always clone the palette so each effect has its own;
+            // otherwise mutating one effect's palette colours would
+            // bleed into every other effect using the default.
+            inkPalette: {
+                ...DEFAULT_INK_PALETTE,
+                ...(initial.inkPalette ?? {}),
+            },
+        };
     }
 
     setParams(updates: Partial<HalftoneParams>): void {
         Object.assign(this.params, updates);
+    }
+
+    /**
+     * Apply a named ink preset. Presets are partial overlays — applying
+     * a CMYK-only preset (e.g. `"fogra51"`) leaves the RGB inks alone
+     * and vice versa, so a story can switch presets per mode without
+     * resetting the other side.
+     */
+    setInkPreset(name: HalftoneInkPresetName): void {
+        Object.assign(this.params.inkPalette, HALFTONE_INK_PRESETS[name]);
     }
 
     render(ctx: EffectContext): void {
@@ -236,6 +337,7 @@ export class HalftoneEffect implements Effect {
         const ew = Math.max(1, w);
         const eh = Math.max(1, h);
         const p = this.params;
+        const ink = p.inkPalette;
 
         ctx.draw({
             frag: FRAG_HALFTONE,
@@ -251,6 +353,13 @@ export class HalftoneEffect implements Effect {
                 trimEdge: p.trimEdge ? 1 : 0,
                 background: p.background,
                 inkFactor: p.inkFactor,
+                cInk: ink.cyan,
+                mInk: ink.magenta,
+                yInk: ink.yellow,
+                kInk: ink.black,
+                rInk: ink.red,
+                gInk: ink.green,
+                bInk: ink.blue,
             },
             target: ctx.target,
         });
