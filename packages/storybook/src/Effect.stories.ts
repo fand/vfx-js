@@ -140,7 +140,7 @@ halftone.play = async ({ canvasElement }) => {
     const setup = async () => {
         const savedParams: Partial<HalftoneEffect["params"]> = effect
             ? { ...effect.params }
-            : { mode: "cmyk" };
+            : { mode: "cmyk", background: [0.99, 0.99, 0.99, 1] };
         if (effect) {
             vfx.remove(img);
             disposeAllPanes();
