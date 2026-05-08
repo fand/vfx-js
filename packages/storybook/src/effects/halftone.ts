@@ -63,6 +63,9 @@ vec3 inkMix(vec4 cmyk) {
 
 void main() {
     vec2 fragCoord = uvContent * elementPx;
+    // Anchor the grid at the element centre so resizing gridSize scales
+    // cells around the centre instead of the bottom-left corner.
+    vec2 gridCenter = elementPx * 0.5;
     bool isRgb = ymck == 0;
     int channelCount = isRgb ? 3 : 4;
     float maxDotRadius = gridSize * dotSize;
@@ -85,14 +88,14 @@ void main() {
         mat2 ccTrans = mat2(c, s, -s, c);
         mat2 cTrans = mat2(c, -s, s, c);
 
-        vec2 gridFragLoc = cTrans * fragCoord;
+        vec2 gridFragLoc = cTrans * (fragCoord - gridCenter);
         vec2 gridOriginLoc = floor(gridFragLoc / gridSize);
 
         for (int j = 0; j < 9; ++j) {
             if (j >= cellCount) break;
             vec2 cell = gridOriginLoc + cellOffsets[j];
             vec2 gridDotLoc = cell * gridSize + vec2(gridSize / 2.0);
-            vec2 renderDotLoc = ccTrans * gridDotLoc;
+            vec2 renderDotLoc = ccTrans * gridDotLoc + gridCenter;
 
             // Early-exit: skip texture fetch if fragment can't be covered
             float fragDistanceToDotCenter = distance(fragCoord, renderDotLoc);
