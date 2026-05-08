@@ -1,9 +1,10 @@
 // CMYK / RGB halftone: per-channel rotated dot grids whose dot radii
 // track the source channel intensity at the dot center. CMYK mode
-// converts the source to CMYK, samples four screens (C/M/Y/K) at the
-// classic newspaper angles, and recombines via subtractive ink mixing
-// on white paper. RGB mode is additive — three rotated grids whose
-// channel sums form the output color directly.
+// converts the source to CMYK and samples four screens (C/M/Y/K) at the
+// classic newspaper angles; RGB mode is additive on three rotated
+// grids. Both modes treat the dot mask as the foreground alpha and
+// SRC-OVER-blend onto a user-supplied `background` (RGBA premul-style
+// non-premul intermediate).
 import type { Effect, EffectContext } from "@vfx-js/core";
 
 export type HalftoneMode = "rgb" | "cmyk";
@@ -22,7 +23,7 @@ uniform float dotSize;
 uniform float smoothing;
 uniform int ymck;          // 0 = RGB (additive), 1 = CMYK (subtractive)
 uniform int trimEdge;      // 1 = skip dots whose extent crosses the image edge
-uniform float bgOpacity;   // CMYK only: opacity of non-inked paper area (0..1)
+uniform vec4 background;   // SRC-OVER backdrop, RGBA in [0, 1], non-premul
 uniform vec4 inkFactor;    // per-channel scale
 
 const vec3 RGB_ANGLES = vec3(15.0, 45.0, 75.0);
@@ -122,24 +123,32 @@ void main() {
 
     vec4 original = sampleSrc(fragCoord);
 
-    vec3 color;
-    float alpha;
+    // Build the foreground (dot layer). Alpha is the dot coverage so
+    // SRC-OVER lets the background show through between dots.
+    vec4 fg;
     if (isRgb) {
-        color = amounts.rgb;
-        alpha = clamp(
-            amounts.r + amounts.g + amounts.b + original.a,
-            0.0,
-            1.0
-        );
+        float dotMask = clamp(amounts.r + amounts.g + amounts.b, 0.0, 1.0);
+        fg = vec4(amounts.rgb, dotMask);
     } else {
         vec4 inks = clamp(amounts, 0.0, 1.0);
-        color = inkMix(inks);
-        // Ink pixels stay opaque; empty paper uses bgOpacity
         float inkCoverage = max(max(inks.r, inks.g), max(inks.b, inks.a));
-        alpha = mix(inkCoverage, 1.0, bgOpacity * original.a);
+        fg = vec4(inkMix(inks), inkCoverage);
     }
+    // Gate by source alpha so transparent regions of the source clear
+    // the dots — without this, CMYK turns transparent pixels black (k=1).
+    fg.a *= original.a;
 
-    outColor = vec4(color, alpha);
+    // Background is also masked by the source alpha so the halftone
+    // respects holes in transparent source images.
+    vec4 bg = vec4(background.rgb, background.a * original.a);
+
+    // SRC-OVER, non-premultiplied I/O.
+    float outA = fg.a + bg.a * (1.0 - fg.a);
+    vec3 outRgb = outA > 0.0
+        ? (fg.rgb * fg.a + bg.rgb * bg.a * (1.0 - fg.a)) / outA
+        : vec3(0.0);
+
+    outColor = vec4(outRgb, outA);
 }
 `;
 
@@ -154,8 +163,12 @@ export type HalftoneParams = {
     mode: HalftoneMode;
     /** Skip dots whose maximum extent would cross the image edge. */
     trimEdge: boolean;
-    /** CMYK only: opacity of empty paper, in [0, 1]. */
-    bgOpacity: number;
+    /**
+     * SRC-OVER backdrop behind the dots, RGBA in [0, 1] (non-premul).
+     * Alpha is multiplied by the source alpha so transparent source
+     * regions clear the backdrop too. Default `[0, 0, 0, 0]`.
+     */
+    background: [number, number, number, number];
     /**
      * Per-channel ink/intensity scale. RGB mode reads `[r, g, b]`;
      * CMYK mode reads `[c, m, y, k]`. Default `[1, 1, 1, 1]`.
@@ -169,7 +182,7 @@ const DEFAULT_PARAMS: HalftoneParams = {
     smoothing: 0.15,
     mode: "rgb",
     trimEdge: false,
-    bgOpacity: 1,
+    background: [0, 0, 0, 0],
     inkFactor: [1, 1, 1, 1],
 };
 
@@ -200,7 +213,7 @@ export class HalftoneEffect implements Effect {
                 smoothing: Math.max(0, Math.min(1, p.smoothing)),
                 ymck: p.mode === "cmyk" ? 1 : 0,
                 trimEdge: p.trimEdge ? 1 : 0,
-                bgOpacity: Math.max(0, Math.min(1, p.bgOpacity)),
+                background: p.background,
                 inkFactor: p.inkFactor,
             },
             target: ctx.target,
