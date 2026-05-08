@@ -112,7 +112,11 @@ void main() {
             float channelAmount = isRgb
                 ? dotColor[i]
                 : cmykChannel(dotColor.rgb, i);
-            float dotRadius = channelAmount * maxDotRadius;
+            // Scale by source alpha at the dot centre so dots shrink
+            // (instead of getting hard-clipped) at the source silhouette.
+            // Also kills the CMYK k=1 black artefact for transparent
+            // pixels (rgb=0 → k=1 without this).
+            float dotRadius = channelAmount * dotColor.a * maxDotRadius;
             if (fragDistanceToDotCenter < dotRadius) {
                 amounts[i] += smoothstep(
                     dotRadius,
@@ -148,11 +152,8 @@ void main() {
         float inkCoverage = max(max(inks.r, inks.g), max(inks.b, inks.a));
         fg = vec4(inkMix(inks), inkCoverage);
     }
-    // Gate by source alpha so transparent regions of the source clear
-    // the dots — without this, CMYK turns transparent pixels black (k=1).
-    fg.a *= original.a;
 
-    // Background is also masked by the source alpha so the halftone
+    // Background is masked by the source alpha so the halftone
     // respects holes in transparent source images.
     vec4 bg = vec4(background.rgb, background.a * original.a);
 
