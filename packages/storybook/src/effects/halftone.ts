@@ -1,9 +1,5 @@
-// CMYK / RGB halftone: per-channel rotated dot grids whose dot radii
-// track the source channel intensity at the dot center. CMYK mode
-// converts the source to CMYK and samples four screens (C/M/Y/K) at
-// the classic newspaper angles; RGB mode is additive on three rotated
-// grids. Both modes SRC-OVER-blend the dot layer onto a user-supplied
-// `background`.
+// CMYK/RGB halftone. Per-channel rotated dot grids; dot radius tracks
+// channel intensity at the dot centre. SRC-OVER onto `background`.
 import type { Effect, EffectContext } from "@vfx-js/core";
 
 export type HalftoneMode = "rgb" | "cmyk";
@@ -103,12 +99,9 @@ const vec2 cellOffsets[9] = vec2[9](
     vec2(-1, -1), vec2(1, -1), vec2(-1, 1), vec2(1)
 );
 
-// NEAREST read for dot-centre samples. The framework binds src with
-// LINEAR filter, but bilinear interpolation between an opaque colour
-// pixel and an adjacent transparent (rgb=0, a=0) pixel produces gray
-// rgb at the boundary, which cmykChannel turns into a black K dot —
-// the classic non-premul filter artefact. texelFetch ignores the
-// filter mode so we get the actual stored texel.
+// texelFetch bypasses the framework's LINEAR filter. Bilinear at a
+// transparent/opaque boundary yields gray, which cmykChannel turns
+// into a phantom K dot.
 vec4 sampleSrcNearest(vec2 px) {
     vec2 uv = clamp(px / elementPx, 0.0, 1.0);
     vec2 texUv = srcRectUv.xy + uv * srcRectUv.zw;
@@ -137,8 +130,6 @@ void main() {
     vec2 gridCenter = elementPx * 0.5;
     bool isRgb = ymck == 0;
     int channelCount = isRgb ? 3 : 4;
-    // dotSize is normalised so 1.0 = dot exactly reaches the cell
-    // corners (no overlap); >1.0 lets dots overlap into neighbours.
     float maxDotRadius = gridSize * dotSize * 0.7071068;
 
     // 5 cells once axis neighbours are in reach, 9 once diagonals are.
@@ -171,7 +162,6 @@ void main() {
             float fragDistanceToDotCenter = distance(fragCoord, renderDotLoc);
             if (fragDistanceToDotCenter > maxDotRadius) continue;
 
-            // Skip dots whose maximum extent would cross the image edge
             if (trimEdge == 1 && (
                 any(lessThan(renderDotLoc, vec2(maxDotRadius))) ||
                 any(greaterThan(renderDotLoc, elementPx - vec2(maxDotRadius)))
@@ -196,12 +186,9 @@ void main() {
         }
     }
 
-    // Split coverage and density: fg.rgb is the full-strength ink
-    // colour, fg.a is the geometric coverage. SRC-OVER then blends
-    // correctly at AA edges (otherwise the background tints twice —
-    // once in inkMix, once in SRC-OVER — and edges go washed out).
-    // inkFactor is applied post-clamp + re-clamp so it's a true density
-    // dial (pre-clamp let neighbour-dot overlap >1 absorb reductions).
+    // fg.rgb = full-strength ink, fg.a = geometric coverage. Splitting
+    // these keeps AA edges from double-tinting the background.
+    // inkFactor applies post-clamp + re-clamp for a true density dial.
     vec4 fg;
     if (isRgb) {
         vec3 rgbInks = clamp(
@@ -230,10 +217,8 @@ void main() {
         fg = vec4(inkColor, inkCoverage);
     }
 
-    // SRC-OVER, premultiplied output (the framework's canvas blend
-    // expects rgb already multiplied by alpha). Background is the
-    // user-supplied colour as-is — it fills the canvas; halftone-only
-    // composition is just background.a = 0.
+    // SRC-OVER, premultiplied (framework expects rgb*alpha).
+    // background.a=0 disables the backdrop.
     float outA = fg.a + background.a * (1.0 - fg.a);
     vec3 outRgbPremul =
         fg.rgb * fg.a + background.rgb * background.a * (1.0 - fg.a);

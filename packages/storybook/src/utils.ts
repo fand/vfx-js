@@ -173,12 +173,15 @@ export function attachHalftonePane(
     pane.addBinding(effect.params, "dotSize", { min: 0, max: 2, step: 0.01 });
     pane.addBinding(effect.params, "smoothing", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect.params, "angle", { min: -180, max: 180, step: 1 });
-    pane.addBinding(effect.params, "blackAmount", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect.params, "blackAmount", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
     pane.addBinding(effect.params, "trimEdge");
 
-    // Tweakpane can't bind a 4-tuple directly. Mirror onto an {r,g,b,a}
-    // float color object — Tweakpane renders it as an RGBA picker —
-    // and write back to effect.params on change.
+    // Tweakpane needs object-shaped state, not tuples — mirror to
+    // {r,g,b,a} / {x,y,z,w} and write the tuple back on change.
     const [br, bg, bb, ba] = effect.params.background;
     const bgState = { background: { r: br, g: bg, b: bb, a: ba } };
     pane.addBinding(bgState, "background", {
@@ -192,9 +195,7 @@ export function attachHalftonePane(
         ];
     });
 
-    // Tweakpane renders {x,y,z,w} as a point4d (4 stacked sliders).
-    // Axis labels are fixed to x/y/z/w; in CMYK mode they map to
-    // C/M/Y/K, in RGB mode to R/G/B (w unused).
+    // x/y/z/w map to C/M/Y/K in CMYK mode, R/G/B in RGB (w unused).
     const [ix, iy, iz, iw] = effect.params.inkFactor;
     const inkState = { inkFactor: { x: ix, y: iy, z: iz, w: iw } };
     pane.addBinding(inkState, "inkFactor", {
@@ -230,21 +231,15 @@ const CMYK_INK_KEYS = ["cyan", "magenta", "yellow", "black"] as const;
 const RGB_INK_KEYS = ["red", "green", "blue"] as const;
 type InkKey = (typeof CMYK_INK_KEYS)[number] | (typeof RGB_INK_KEYS)[number];
 
-// Tweakpane binds object-shaped colours, not tuples. Mirror each
-// palette entry into an {r,g,b} object on the pane's local state, then
-// write the tuple back into effect.params.inkPalette on change. When a
-// preset is applied, mutate the mirror in place and refresh() so the
-// pickers redraw.
+// Mirror each palette entry to {r,g,b} for Tweakpane and write the
+// tuple back on change. Presets mutate the mirror in place (replacing
+// would break binding refs) then refresh() to redraw pickers.
 function addInkPaletteBindings(pane: Pane, effect: HalftoneEffect): void {
-    const mirror: Record<InkKey, { r: number; g: number; b: number }> =
-        {} as Record<InkKey, { r: number; g: number; b: number }>;
-    const syncMirrorFromPalette = (): void => {
-        for (const key of [...CMYK_INK_KEYS, ...RGB_INK_KEYS] as InkKey[]) {
-            const [r, g, b] = effect.params.inkPalette[key];
-            mirror[key] = { r, g, b };
-        }
-    };
-    syncMirrorFromPalette();
+    const mirror = {} as Record<InkKey, { r: number; g: number; b: number }>;
+    for (const key of [...CMYK_INK_KEYS, ...RGB_INK_KEYS] as InkKey[]) {
+        const [r, g, b] = effect.params.inkPalette[key];
+        mirror[key] = { r, g, b };
+    }
 
     const presetState = { preset: "newsprint" as HalftoneInkPresetName };
     pane.addBinding(presetState, "preset", {
@@ -252,8 +247,6 @@ function addInkPaletteBindings(pane: Pane, effect: HalftoneEffect): void {
         options: INK_PRESET_OPTIONS,
     }).on("change", (ev) => {
         effect.setInkPreset(ev.value);
-        // Re-mirror in place — replacing the mirror objects breaks the
-        // bindings' references. Mutate r/g/b and call refresh() instead.
         for (const key of [...CMYK_INK_KEYS, ...RGB_INK_KEYS] as InkKey[]) {
             const [r, g, b] = effect.params.inkPalette[key];
             mirror[key].r = r;
@@ -263,31 +256,22 @@ function addInkPaletteBindings(pane: Pane, effect: HalftoneEffect): void {
         pane.refresh();
     });
 
-    const cmykFolder = pane.addFolder({ title: "CMYK inks", expanded: false });
-    for (const key of CMYK_INK_KEYS) {
-        cmykFolder
-            .addBinding(mirror, key, { color: { type: "float" } })
-            .on("change", (ev) => {
-                effect.params.inkPalette[key] = [
-                    ev.value.r,
-                    ev.value.g,
-                    ev.value.b,
-                ] as HalftoneInkPalette[typeof key];
-            });
-    }
-
-    const rgbFolder = pane.addFolder({ title: "RGB inks", expanded: false });
-    for (const key of RGB_INK_KEYS) {
-        rgbFolder
-            .addBinding(mirror, key, { color: { type: "float" } })
-            .on("change", (ev) => {
-                effect.params.inkPalette[key] = [
-                    ev.value.r,
-                    ev.value.g,
-                    ev.value.b,
-                ] as HalftoneInkPalette[typeof key];
-            });
-    }
+    const addInkFolder = (title: string, keys: readonly InkKey[]): void => {
+        const folder = pane.addFolder({ title, expanded: false });
+        for (const key of keys) {
+            folder
+                .addBinding(mirror, key, { color: { type: "float" } })
+                .on("change", (ev) => {
+                    effect.params.inkPalette[key] = [
+                        ev.value.r,
+                        ev.value.g,
+                        ev.value.b,
+                    ] as HalftoneInkPalette[typeof key];
+                });
+        }
+    };
+    addInkFolder("CMYK inks", CMYK_INK_KEYS);
+    addInkFolder("RGB inks", RGB_INK_KEYS);
 }
 
 type SrcSelector = {
