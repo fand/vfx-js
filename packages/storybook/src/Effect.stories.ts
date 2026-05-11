@@ -4,6 +4,7 @@ import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { BloomEffect } from "./effects/bloom";
 import { FluidEffect } from "./effects/fluid";
+import { HalftoneEffect } from "./effects/halftone";
 import { ParticleEffect } from "./effects/particle";
 import { ParticleExplodeEffect } from "./effects/particle-explode";
 import { createPixelateEffect } from "./effects/pixelate";
@@ -13,6 +14,7 @@ import "./preset.css";
 import {
     attachBloomPane,
     attachFluidPane,
+    attachHalftonePane,
     attachParticleExplodePane,
     attachParticlePane,
     disposeAllPanes,
@@ -111,6 +113,49 @@ fluid.play = async ({ canvasElement }) => {
     attachFluidPane("Fluid", effect);
 
     seedFluidMotion(canvasElement);
+};
+
+// Halftone with RGB (additive) or CMYK (subtractive ink-mix) modes.
+export const halftone: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Jellyfish;
+        return img;
+    },
+    args: undefined,
+};
+halftone.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+
+    const vfx = initVFX();
+    const sources = { Jellyfish, Logo };
+    let effect: HalftoneEffect | null = null;
+    const setup = async () => {
+        const savedParams: Partial<HalftoneEffect["params"]> = effect
+            ? { ...effect.params }
+            : {};
+        if (effect) {
+            vfx.remove(img);
+            disposeAllPanes();
+        }
+        effect = new HalftoneEffect(savedParams);
+        await vfx.add(img, { effect });
+        attachHalftonePane("Halftone", effect, {
+            img,
+            sources,
+            onSrcChange: async (key) => {
+                img.src = sources[key as keyof typeof sources];
+                await new Promise<void>((o) => {
+                    img.onload = () => o();
+                });
+                await setup();
+            },
+        });
+    };
+    await setup();
 };
 
 // Mouse-driven emitter particles. Spawns happen only at the cursor's

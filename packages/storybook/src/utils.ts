@@ -2,6 +2,7 @@ import { VFX, type VFXOpts } from "@vfx-js/core";
 import { Pane } from "tweakpane";
 import type { BloomEffect } from "./effects/bloom";
 import type { FluidEffect } from "./effects/fluid";
+import type { HalftoneEffect, HalftoneInkPresetName } from "./effects/halftone";
 import type { ParticleEffect } from "./effects/particle";
 import type { ParticleExplodeEffect } from "./effects/particle-explode";
 
@@ -140,6 +141,132 @@ export function attachFluidPane(title: string, effect: FluidEffect): Pane {
     pane.addBinding(effect.params, "showDye");
     trackPane(pane);
     return pane;
+}
+
+export function attachHalftonePane(
+    title: string,
+    effect: HalftoneEffect,
+    srcSelector?: SrcSelector,
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: false });
+    if (srcSelector) {
+        addSrcBinding(pane, srcSelector);
+    }
+    pane.addBinding(effect.params, "mode", {
+        options: { rgb: "rgb", cmyk: "cmyk" },
+    });
+    pane.addBinding(effect.params, "gridSize", {
+        min: 2,
+        max: 50,
+        step: 0.5,
+    });
+    pane.addBinding(effect.params, "dotSize", { min: 0, max: 2, step: 0.01 });
+    pane.addBinding(effect.params, "smoothing", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect.params, "angle", { min: -180, max: 180, step: 1 });
+    pane.addBinding(effect.params, "blackAmount", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
+    pane.addBinding(effect.params, "trimEdge");
+
+    // Tweakpane's color picker needs {r,g,b,a}, not a tuple — mirror
+    // the background and write the tuple back on change.
+    const [br, bg, bb, ba] = effect.params.background;
+    const bgState = { background: { r: br, g: bg, b: bb, a: ba } };
+    pane.addBinding(bgState, "background", {
+        color: { type: "float", alpha: true },
+    }).on("change", (ev) => {
+        effect.params.background = [
+            ev.value.r,
+            ev.value.g,
+            ev.value.b,
+            ev.value.a,
+        ];
+    });
+
+    addInkPaletteBindings(pane, effect);
+
+    trackPane(pane);
+    return pane;
+}
+
+const INK_PRESET_OPTIONS: Record<string, HalftoneInkPresetName> = {
+    "Pure CMYK / RGB": "pure",
+    Newsprint: "newsprint",
+    "FOGRA51 (offset)": "fogra51",
+    "SWOP 2013": "swop",
+};
+
+const CMYK_INK_KEYS = ["cyan", "magenta", "yellow", "black"] as const;
+const RGB_INK_KEYS = ["red", "green", "blue"] as const;
+type InkKey = (typeof CMYK_INK_KEYS)[number] | (typeof RGB_INK_KEYS)[number];
+
+// Mirror each ink to {color: {r,g,b}, density} for Tweakpane (the color
+// picker needs an object, the density slider needs a number sibling)
+// and write back the [r,g,b,d] tuple on change. Presets mutate the
+// mirror in place — replacing the objects breaks the binding refs —
+// then refresh() redraws every picker/slider.
+type InkMirror = {
+    color: { r: number; g: number; b: number };
+    density: number;
+};
+
+function addInkPaletteBindings(pane: Pane, effect: HalftoneEffect): void {
+    const mirror = {} as Record<InkKey, InkMirror>;
+    for (const key of [...CMYK_INK_KEYS, ...RGB_INK_KEYS] as InkKey[]) {
+        const [r, g, b, d] = effect.params.inkPalette[key];
+        mirror[key] = { color: { r, g, b }, density: d };
+    }
+
+    const writeBack = (key: InkKey): void => {
+        const { color, density } = mirror[key];
+        effect.params.inkPalette[key] = [color.r, color.g, color.b, density];
+    };
+
+    const presetState = { preset: "newsprint" as HalftoneInkPresetName };
+    pane.addBinding(presetState, "preset", {
+        label: "ink preset",
+        options: INK_PRESET_OPTIONS,
+    }).on("change", (ev) => {
+        effect.setInkPreset(ev.value);
+        for (const key of [...CMYK_INK_KEYS, ...RGB_INK_KEYS] as InkKey[]) {
+            const [r, g, b, d] = effect.params.inkPalette[key];
+            mirror[key].color.r = r;
+            mirror[key].color.g = g;
+            mirror[key].color.b = b;
+            mirror[key].density = d;
+        }
+        pane.refresh();
+    });
+
+    const addInkFolder = (title: string, keys: readonly InkKey[]): void => {
+        const folder = pane.addFolder({ title, expanded: false });
+        for (const key of keys) {
+            folder
+                .addBinding(mirror[key], "color", {
+                    color: { type: "float" },
+                    label: key,
+                })
+                .on("change", () => writeBack(key));
+            folder
+                .addBinding(mirror[key], "density", {
+                    label: `${key} density`,
+                    min: 0,
+                    max: 1,
+                    step: 0.01,
+                })
+                .on("change", () => writeBack(key));
+        }
+    };
+    addInkFolder("CMYK inks", CMYK_INK_KEYS);
+    addInkFolder("RGB inks", RGB_INK_KEYS);
 }
 
 type SrcSelector = {
