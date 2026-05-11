@@ -176,8 +176,8 @@ export function attachHalftonePane(
     });
     pane.addBinding(effect.params, "trimEdge");
 
-    // Tweakpane needs object-shaped state, not tuples — mirror to
-    // {r,g,b,a} / {x,y,z,w} and write the tuple back on change.
+    // Tweakpane's color picker needs {r,g,b,a}, not a tuple — mirror
+    // the background and write the tuple back on change.
     const [br, bg, bb, ba] = effect.params.background;
     const bgState = { background: { r: br, g: bg, b: bb, a: ba } };
     pane.addBinding(bgState, "background", {

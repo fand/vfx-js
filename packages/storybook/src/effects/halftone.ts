@@ -4,10 +4,9 @@ import type { Effect, EffectContext } from "@vfx-js/core";
 
 export type HalftoneMode = "rgb" | "cmyk";
 
-// Per-ink tuple: [r, g, b, density]. Density scales the channel's
-// dot coverage (and indirectly colour, via post-clamp normalisation);
-// 0 disables the channel, 1 is nominal, up to ~2 boosts. Color and
-// density travel together so each ink is one self-contained value.
+// Per-ink tuple: [r, g, b, density]. Density in [0, 1] scales the
+// channel's dot coverage (0 disables, 1 = full). Values >1 don't add
+// ink — they just collapse the AA band — so the slider caps at 1.
 export type HalftoneInk = [number, number, number, number];
 
 export type HalftoneInkPalette = {
@@ -251,11 +250,10 @@ export type HalftoneParams = {
     background: [number, number, number, number];
     /**
      * Per-channel inks. CMYK mode uses `cyan/magenta/yellow/black`,
-     * RGB mode uses `red/green/blue`. Each ink is `[r, g, b, density]`:
-     * `density` scales coverage independently of colour (0 disables the
-     * channel, 1 = nominal, up to ~2 boosts). Use
-     * {@link HalftoneEffect.setInkPreset} to apply named presets, or
-     * write into the palette directly for fully custom inks.
+     * RGB mode uses `red/green/blue`. Each ink is `[r, g, b, density]`,
+     * with `density` in [0, 1] scaling coverage independently of
+     * colour. Use {@link HalftoneEffect.setInkPreset} to apply named
+     * presets, or write into the palette directly for custom inks.
      */
     inkPalette: HalftoneInkPalette;
 };
@@ -285,9 +283,9 @@ export class HalftoneEffect implements Effect {
         this.params = {
             ...DEFAULT_PARAMS,
             ...initial,
-            // Always clone the palette so each effect has its own;
-            // otherwise mutating one effect's palette colours would
-            // bleed into every other effect using the default.
+            // Shallow-clone the palette dict so swapping a whole ink
+            // (`palette.cyan = [...]`) doesn't bleed across effects.
+            // Tuples are still shared; replace, don't mutate in place.
             inkPalette: {
                 ...DEFAULT_INK_PALETTE,
                 ...(initial.inkPalette ?? {}),
