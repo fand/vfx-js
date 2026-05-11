@@ -12,6 +12,7 @@ const VFX_PROP_KEYS: readonly (keyof VFXProps)[] = [
     "backbuffer",
     "autoCrop",
     "glslVersion",
+    "effect",
 ] as const;
 
 export function splitVFXProps<T extends VFXProps>(

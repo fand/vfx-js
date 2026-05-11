@@ -41,7 +41,7 @@ export function createScanlineEffect(opts: ScanlineOptions = {}): Effect {
                 frag: FRAG_SCANLINE,
                 uniforms: {
                     src: ctx.src,
-                    innerHeight: ctx.src.height || 1,
+                    innerHeight: ctx.dims.elementPixel[1] || 1,
                     spacing,
                 },
                 target: ctx.target,
