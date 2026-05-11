@@ -4,14 +4,20 @@ import type { Effect, EffectContext } from "@vfx-js/core";
 
 export type HalftoneMode = "rgb" | "cmyk";
 
+// Per-ink tuple: [r, g, b, density]. Density scales the channel's
+// dot coverage (and indirectly colour, via post-clamp normalisation);
+// 0 disables the channel, 1 is nominal, up to ~2 boosts. Color and
+// density travel together so each ink is one self-contained value.
+export type HalftoneInk = [number, number, number, number];
+
 export type HalftoneInkPalette = {
-    cyan: [number, number, number];
-    magenta: [number, number, number];
-    yellow: [number, number, number];
-    black: [number, number, number];
-    red: [number, number, number];
-    green: [number, number, number];
-    blue: [number, number, number];
+    cyan: HalftoneInk;
+    magenta: HalftoneInk;
+    yellow: HalftoneInk;
+    black: HalftoneInk;
+    red: HalftoneInk;
+    green: HalftoneInk;
+    blue: HalftoneInk;
 };
 
 export type HalftoneInkPresetName = "pure" | "newsprint" | "fogra51" | "swop";
@@ -24,31 +30,31 @@ export const HALFTONE_INK_PRESETS: Record<
     Partial<HalftoneInkPalette>
 > = {
     pure: {
-        cyan: [0, 1, 1],
-        magenta: [1, 0, 1],
-        yellow: [1, 1, 0],
-        black: [0, 0, 0],
-        red: [1, 0, 0],
-        green: [0, 1, 0],
-        blue: [0, 0, 1],
+        cyan: [0, 1, 1, 1],
+        magenta: [1, 0, 1, 1],
+        yellow: [1, 1, 0, 1],
+        black: [0, 0, 0, 1],
+        red: [1, 0, 0, 1],
+        green: [0, 1, 0, 1],
+        blue: [0, 0, 1, 1],
     },
     newsprint: {
-        cyan: [0.15, 0.73, 0.88],
-        magenta: [0.88, 0.12, 0.55],
-        yellow: [0.97, 0.93, 0.08],
-        black: [0.1, 0.1, 0.1],
+        cyan: [0.15, 0.73, 0.88, 1],
+        magenta: [0.88, 0.12, 0.55, 1],
+        yellow: [0.97, 0.93, 0.08, 1],
+        black: [0.1, 0.1, 0.1, 1],
     },
     fogra51: {
-        cyan: [0.0, 0.525, 0.765],
-        magenta: [0.827, 0.0, 0.486],
-        yellow: [0.984, 0.91, 0.0],
-        black: [0.145, 0.145, 0.145],
+        cyan: [0.0, 0.525, 0.765, 1],
+        magenta: [0.827, 0.0, 0.486, 1],
+        yellow: [0.984, 0.91, 0.0, 1],
+        black: [0.145, 0.145, 0.145, 1],
     },
     swop: {
-        cyan: [0.0, 0.557, 0.769],
-        magenta: [0.827, 0.02, 0.478],
-        yellow: [0.984, 0.902, 0.027],
-        black: [0.169, 0.169, 0.169],
+        cyan: [0.0, 0.557, 0.769, 1],
+        magenta: [0.827, 0.02, 0.478, 1],
+        yellow: [0.984, 0.902, 0.027, 1],
+        black: [0.169, 0.169, 0.169, 1],
     },
 };
 
@@ -70,9 +76,8 @@ uniform float blackAmount; // GCR amount: 1.0 = max GCR (k = 1 - max(rgb)), 0.0 
 uniform int ymck;          // 0 = RGB (additive), 1 = CMYK (subtractive)
 uniform int trimEdge;      // 1 = skip dots whose extent crosses the image edge
 uniform vec4 background;   // SRC-OVER backdrop, RGBA in [0, 1], non-premul
-uniform vec4 inkFactor;    // per-channel scale
-uniform vec3 cInk, mInk, yInk, kInk;  // CMYK ink solids at 100% coverage
-uniform vec3 rInk, gInk, bInk;        // RGB inks (per-channel "ink" colour)
+uniform vec4 cInk, mInk, yInk, kInk;  // CMYK inks: .rgb = solid colour, .a = density
+uniform vec4 rInk, gInk, bInk;        // RGB inks: .rgb = colour, .a = density
 
 const vec3 RGB_ANGLES = vec3(15.0, 45.0, 75.0);
 const vec4 CMYK_ANGLES = vec4(15.0, 75.0, 0.0, 45.0);
@@ -101,10 +106,10 @@ float cmykChannel(vec3 rgb, int i) {
 }
 
 vec3 inkMix(vec4 cmyk) {
-    return mix(vec3(1.0), cInk, cmyk.x)
-         * mix(vec3(1.0), mInk, cmyk.y)
-         * mix(vec3(1.0), yInk, cmyk.z)
-         * mix(vec3(1.0), kInk, cmyk.w);
+    return mix(vec3(1.0), cInk.rgb, cmyk.x)
+         * mix(vec3(1.0), mInk.rgb, cmyk.y)
+         * mix(vec3(1.0), yInk.rgb, cmyk.z)
+         * mix(vec3(1.0), kInk.rgb, cmyk.w);
 }
 
 void main() {
@@ -172,14 +177,17 @@ void main() {
 
     // fg.rgb = full-strength ink, fg.a = geometric coverage. Splitting
     // these keeps AA edges from double-tinting the background.
-    // inkFactor applies post-clamp + re-clamp for a true density dial.
+    // Per-ink density applies post-clamp + re-clamp for a true density
+    // dial (pre-clamp scaling lets neighbour-dot overlap >1 absorb
+    // reductions).
     vec4 fg;
     if (isRgb) {
+        vec3 rgbDensity = vec3(rInk.a, gInk.a, bInk.a);
         vec3 rgbInks = clamp(
-            clamp(amounts.rgb, 0.0, 1.0) * inkFactor.rgb,
+            clamp(amounts.rgb, 0.0, 1.0) * rgbDensity,
             0.0, 1.0
         );
-        vec3 weighted = rInk * rgbInks.r + gInk * rgbInks.g + bInk * rgbInks.b;
+        vec3 weighted = rInk.rgb * rgbInks.r + gInk.rgb * rgbInks.g + bInk.rgb * rgbInks.b;
         // Normalise to max so the colour at AA edges stays full strength.
         float maxComp = max(max(weighted.r, weighted.g), weighted.b);
         vec3 inkColor = maxComp > 0.0 ? weighted / maxComp : vec3(0.0);
@@ -189,8 +197,9 @@ void main() {
             - (1.0 - rgbInks.r) * (1.0 - rgbInks.g) * (1.0 - rgbInks.b);
         fg = vec4(inkColor, dotMask);
     } else {
+        vec4 cmykDensity = vec4(cInk.a, mInk.a, yInk.a, kInk.a);
         vec4 inks = clamp(
-            clamp(amounts, 0.0, 1.0) * inkFactor,
+            clamp(amounts, 0.0, 1.0) * cmykDensity,
             0.0, 1.0
         );
         float maxInk = max(max(inks.x, inks.y), max(inks.z, inks.w));
@@ -241,15 +250,12 @@ export type HalftoneParams = {
      */
     background: [number, number, number, number];
     /**
-     * Per-channel ink/intensity scale. RGB mode reads `[r, g, b]`;
-     * CMYK mode reads `[c, m, y, k]`. Default `[1, 1, 1, 1]`.
-     */
-    inkFactor: [number, number, number, number];
-    /**
-     * Per-channel ink colours. CMYK mode uses `cyan/magenta/yellow/black`;
-     * RGB mode uses `red/green/blue`. Use {@link HalftoneEffect.setInkPreset}
-     * to apply named presets, or write into the palette directly for
-     * fully custom inks.
+     * Per-channel inks. CMYK mode uses `cyan/magenta/yellow/black`,
+     * RGB mode uses `red/green/blue`. Each ink is `[r, g, b, density]`:
+     * `density` scales coverage independently of colour (0 disables the
+     * channel, 1 = nominal, up to ~2 boosts). Use
+     * {@link HalftoneEffect.setInkPreset} to apply named presets, or
+     * write into the palette directly for fully custom inks.
      */
     inkPalette: HalftoneInkPalette;
 };
@@ -269,7 +275,6 @@ const DEFAULT_PARAMS: HalftoneParams = {
     blackAmount: 1,
     trimEdge: true,
     background: [0, 0, 0, 0],
-    inkFactor: [1, 1, 1, 1],
     inkPalette: DEFAULT_INK_PALETTE,
 };
 
@@ -325,7 +330,6 @@ export class HalftoneEffect implements Effect {
                 ymck: p.mode === "cmyk" ? 1 : 0,
                 trimEdge: p.trimEdge ? 1 : 0,
                 background: p.background,
-                inkFactor: p.inkFactor,
                 cInk: ink.cyan,
                 mInk: ink.magenta,
                 yInk: ink.yellow,
