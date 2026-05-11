@@ -1,4 +1,4 @@
-import{n as e}from"./chunk-BneVvdWh.js";import{a as t,i as n,n as r,o as i,r as a,s as o,t as s}from"./utils-BF6EA5O5.js";import{n as c,r as l,t as u}from"./preset-hB8Fk8QM.js";import{n as d,t as f}from"./jellyfish-D2xsay8i.js";var p,m,h,g,_,v,y,ee=e((()=>{p=`#version 300 es
+import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,i as r,n as i,o as a,r as o,s,t as c}from"./utils-CIO8SNtI.js";import{n as l,r as u,t as d}from"./preset-hB8Fk8QM.js";import{n as f,t as p}from"./jellyfish-D2xsay8i.js";var m,h,g,_,v,y,b,ee=e((()=>{m=`#version 300 es
 precision highp float;
 in vec2 uvSrc;
 in vec2 uvContent;
@@ -43,7 +43,7 @@ void main() {
 
     outColor = vec4(lin * f, f);
 }
-`,m=`#version 300 es
+`,h=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -91,7 +91,7 @@ void main() {
     }
     outColor = color;
 }
-`,h=`#version 300 es
+`,g=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -116,7 +116,7 @@ void main() {
     sum *= (1.0 / 16.0);
     outColor = texture(srcLarge, uv) * weightLarge + sum * weightSmall;
 }
-`,g=`#version 300 es
+`,_=`#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvSrc;
@@ -195,7 +195,7 @@ void main() {
     float a = clamp(max(baseColor.a, b.a * intensity), 0.0, 1.0);
     outColor = vec4(rgb * a, a);
 }
-`,_={threshold:.7,softness:.1,intensity:1.2,scatter:.7,pad:50,dither:0,edgeFade:.02},v=.5,y=class{params;#e=null;#t=[];#n=[];#r=!1;#i=0;#a=0;constructor(e={}){this.params={..._,...e}}setParams(e){Object.assign(this.params,e)}init(e){this.#e=e.createRenderTarget({float:!0})}render(e){if(!this.#e)return;let{threshold:t,softness:n,intensity:r}=this.params,i=Math.min(Math.max(this.params.scatter,0),1),a=Math.max(0,this.params.dither),o=Math.max(1e-6,this.params.edgeFade);(this.#e.width!==this.#i||this.#e.height!==this.#a)&&(this.#t.length=0,this.#n.length=0,this.#r=!1,this.#i=this.#e.width,this.#a=this.#e.height),this.#o(e,this.#e.width,this.#e.height);let s=this.#t.length;if(s===0)return;e.draw({frag:p,uniforms:{src:e.src,threshold:t,softness:n,edgeFade:o},target:this.#e}),e.draw({frag:m,uniforms:{src:this.#e,texelSize:[1/this.#e.width,1/this.#e.height],karis:1},target:this.#t[0]});for(let t=1;t<s;t++){let n=this.#t[t-1];e.draw({frag:m,uniforms:{src:n,texelSize:[1/n.width,1/n.height],karis:0},target:this.#t[t]})}let c=this.#e.width,l=this.#e.height,u=1+i*Math.max(0,s-1),d=e=>Math.min(1,Math.max(0,u-e));for(let t=s-2;t>=0;t--){let n=t===s-2?this.#t[s-1]:this.#n[t+1],r=2**(t+2),i=t===s-2?d(s-1):1;e.draw({frag:h,uniforms:{srcSmall:n,srcLarge:this.#t[t],texelSize:[v*r/c,v*r/l],weightLarge:d(t),weightSmall:i},target:this.#n[t]})}let f=s>=2?this.#n[0]:this.#t[0],_=r/Math.max(1,u);e.draw({frag:g,uniforms:{src:e.src,bloom:f,texelSize:[v*2/c,v*2/l],intensity:_,dither:a,edgeFade:o},target:e.target})}outputRect(e){let{pad:t}=this.params;if(t===`fullscreen`)return e.canvasRect;let n=t*e.pixelRatio,[,,r,i]=e.contentRect;return[-n,-n,r+2*n,i+2*n]}dispose(){this.#e=null,this.#t.length=0,this.#n.length=0,this.#r=!1,this.#i=0,this.#a=0}#o(e,t,n){if(this.#r)return;let r=Math.max(1,Math.floor(t/2)),i=Math.max(1,Math.floor(n/2));for(let t=0;t<8;t++){this.#t.push(e.createRenderTarget({size:[r,i],float:!0}));let t=Math.max(1,Math.floor(r/2)),n=Math.max(1,Math.floor(i/2));if(t===r&&n===i)break;r=t,i=n}for(let t=0;t<this.#t.length-1;t++)this.#n.push(e.createRenderTarget({size:[this.#t[t].width,this.#t[t].height],float:!0}));this.#r=!0}}})),te,b,x,S,C,ne,re,ie,ae,oe,se,ce=e((()=>{te=`#version 300 es
+`,v={threshold:.7,softness:.1,intensity:1.2,scatter:.7,pad:50,dither:0,edgeFade:.02},y=.5,b=class{params;#e=null;#t=[];#n=[];#r=!1;#i=0;#a=0;constructor(e={}){this.params={...v,...e}}setParams(e){Object.assign(this.params,e)}init(e){this.#e=e.createRenderTarget({float:!0})}render(e){if(!this.#e)return;let{threshold:t,softness:n,intensity:r}=this.params,i=Math.min(Math.max(this.params.scatter,0),1),a=Math.max(0,this.params.dither),o=Math.max(1e-6,this.params.edgeFade);(this.#e.width!==this.#i||this.#e.height!==this.#a)&&(this.#t.length=0,this.#n.length=0,this.#r=!1,this.#i=this.#e.width,this.#a=this.#e.height),this.#o(e,this.#e.width,this.#e.height);let s=this.#t.length;if(s===0)return;e.draw({frag:m,uniforms:{src:e.src,threshold:t,softness:n,edgeFade:o},target:this.#e}),e.draw({frag:h,uniforms:{src:this.#e,texelSize:[1/this.#e.width,1/this.#e.height],karis:1},target:this.#t[0]});for(let t=1;t<s;t++){let n=this.#t[t-1];e.draw({frag:h,uniforms:{src:n,texelSize:[1/n.width,1/n.height],karis:0},target:this.#t[t]})}let c=this.#e.width,l=this.#e.height,u=1+i*Math.max(0,s-1),d=e=>Math.min(1,Math.max(0,u-e));for(let t=s-2;t>=0;t--){let n=t===s-2?this.#t[s-1]:this.#n[t+1],r=2**(t+2),i=t===s-2?d(s-1):1;e.draw({frag:g,uniforms:{srcSmall:n,srcLarge:this.#t[t],texelSize:[y*r/c,y*r/l],weightLarge:d(t),weightSmall:i},target:this.#n[t]})}let f=s>=2?this.#n[0]:this.#t[0],p=r/Math.max(1,u);e.draw({frag:_,uniforms:{src:e.src,bloom:f,texelSize:[y*2/c,y*2/l],intensity:p,dither:a,edgeFade:o},target:e.target})}outputRect(e){let{pad:t}=this.params;if(t===`fullscreen`)return e.canvasRect;let n=t*e.pixelRatio,[,,r,i]=e.contentRect;return[-n,-n,r+2*n,i+2*n]}dispose(){this.#e=null,this.#t.length=0,this.#n.length=0,this.#r=!1,this.#i=0,this.#a=0}#o(e,t,n){if(this.#r)return;let r=Math.max(1,Math.floor(t/2)),i=Math.max(1,Math.floor(n/2));for(let t=0;t<8;t++){this.#t.push(e.createRenderTarget({size:[r,i],float:!0}));let t=Math.max(1,Math.floor(r/2)),n=Math.max(1,Math.floor(i/2));if(t===r&&n===i)break;r=t,i=n}for(let t=0;t<this.#t.length-1;t++)this.#n.push(e.createRenderTarget({size:[this.#t[t].width,this.#t[t].height],float:!0}));this.#r=!0}}})),te,x,S,C,w,ne,re,ie,ae,T,oe,se=e((()=>{te=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -209,7 +209,7 @@ void main() {
     float B = texture(velocity, uv - vec2(0.0, simTexel.y)).x;
     outColor = vec4(0.5 * (R - L - T + B), 0.0, 0.0, 1.0);
 }
-`,b=`#version 300 es
+`,x=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -249,7 +249,7 @@ void main() {
 
     outColor = vec4(vel, 0.0, 1.0);
 }
-`,x=`#version 300 es
+`,S=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -269,11 +269,11 @@ void main() {
     if (uv.y - simTexel.y < 0.0) B = -C.y;
     outColor = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
 }
-`,S=`#version 300 es
+`,C=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() { outColor = vec4(0.0); }
-`,C=`#version 300 es
+`,w=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -397,7 +397,167 @@ void main() {
                   * smoothstep(.2, .8, v) * 0.2;
     }
 }
-`,oe={simSize:[256,256],pressureIterations:1,curlStrength:13,velocityDissipation:.6,densityDissipation:.65,splatForce:6e3,splatRadius:.002,dyeSplatRadius:.001,dyeSplatIntensity:.005,showDye:!1},se=class{params;#e=null;#t=null;#n=null;#r=null;#i=null;#a=null;#o=null;#s=null;#c=[0,0];#l=!1;constructor(e={}){this.params={...oe,...e}}init(e){let t=this.params.simSize,n={size:t,float:!0};this.#e=e.createRenderTarget(n),this.#t=e.createRenderTarget(n),this.#n=e.createRenderTarget(n),this.#r=e.createRenderTarget(n),this.#i=e.createRenderTarget(n),this.#a=e.createRenderTarget(n),this.#o=e.createRenderTarget({size:t,float:!0,persistent:!0}),this.#s=e.createRenderTarget({float:!0,persistent:!0})}render(e){if(!this.#e||!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||!this.#o||!this.#s)return;let{simSize:t,pressureIterations:n,curlStrength:r,velocityDissipation:i,densityDissipation:a,splatForce:o,splatRadius:s,dyeSplatRadius:c,dyeSplatIntensity:l,showDye:u}=this.params,d=[1/t[0],1/t[1]],[f,p]=e.dims.elementPixel,m=f/p,h=[e.mouse[0]/f,e.mouse[1]/p],g=this.#l?[h[0]-this.#c[0],h[1]-this.#c[1]]:[0,0];this.#c=h,this.#l=!0,e.draw({frag:te,uniforms:{velocity:this.#o,simTexel:d},target:this.#e}),e.draw({frag:b,uniforms:{velocity:this.#o,curl:this.#e,simTexel:d,aspect:m,mouseUv:h,mouseDeltaUv:g,curlStrength:r,splatForce:o,splatRadius:s},target:this.#t}),e.draw({frag:x,uniforms:{vortVel:this.#t,simTexel:d},target:this.#n}),e.draw({frag:S,target:this.#r});let _=this.#r,v=this.#i;for(let t=0;t<n;t++){e.draw({frag:C,uniforms:{pressure:_,divergence:this.#n,simTexel:d},target:v});let t=_;_=v,v=t}e.draw({frag:ne,uniforms:{vortVel:this.#t,pressure:_,simTexel:d},target:this.#a}),e.draw({frag:re,uniforms:{projVel:this.#a,simTexel:d,velocityDissipation:i},target:this.#o}),e.draw({frag:ie,uniforms:{velocity:this.#o,dye:this.#s,time:e.time,aspect:m,mouseUv:h,mouseDeltaUv:g,simSize:t,densityDissipation:a,dyeSplatRadius:c,dyeSplatIntensity:l},target:this.#s}),e.draw({frag:ae,uniforms:{src:e.src,dye:this.#s,velocity:this.#o,simSize:t,showDye:+!!u,time:e.time},target:e.target})}dispose(){this.#e=null,this.#t=null,this.#n=null,this.#r=null,this.#i=null,this.#a=null,this.#o=null,this.#s=null,this.#l=!1}}})),w,T,E,le=e((()=>{w=.7,T=1.3,E=`
+`,T={simSize:[256,256],pressureIterations:1,curlStrength:13,velocityDissipation:.6,densityDissipation:.65,splatForce:6e3,splatRadius:.002,dyeSplatRadius:.001,dyeSplatIntensity:.005,showDye:!1},oe=class{params;#e=null;#t=null;#n=null;#r=null;#i=null;#a=null;#o=null;#s=null;#c=[0,0];#l=!1;constructor(e={}){this.params={...T,...e}}init(e){let t=this.params.simSize,n={size:t,float:!0};this.#e=e.createRenderTarget(n),this.#t=e.createRenderTarget(n),this.#n=e.createRenderTarget(n),this.#r=e.createRenderTarget(n),this.#i=e.createRenderTarget(n),this.#a=e.createRenderTarget(n),this.#o=e.createRenderTarget({size:t,float:!0,persistent:!0}),this.#s=e.createRenderTarget({float:!0,persistent:!0})}render(e){if(!this.#e||!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||!this.#o||!this.#s)return;let{simSize:t,pressureIterations:n,curlStrength:r,velocityDissipation:i,densityDissipation:a,splatForce:o,splatRadius:s,dyeSplatRadius:c,dyeSplatIntensity:l,showDye:u}=this.params,d=[1/t[0],1/t[1]],[f,p]=e.dims.elementPixel,m=f/p,h=[e.mouse[0]/f,e.mouse[1]/p],g=this.#l?[h[0]-this.#c[0],h[1]-this.#c[1]]:[0,0];this.#c=h,this.#l=!0,e.draw({frag:te,uniforms:{velocity:this.#o,simTexel:d},target:this.#e}),e.draw({frag:x,uniforms:{velocity:this.#o,curl:this.#e,simTexel:d,aspect:m,mouseUv:h,mouseDeltaUv:g,curlStrength:r,splatForce:o,splatRadius:s},target:this.#t}),e.draw({frag:S,uniforms:{vortVel:this.#t,simTexel:d},target:this.#n}),e.draw({frag:C,target:this.#r});let _=this.#r,v=this.#i;for(let t=0;t<n;t++){e.draw({frag:w,uniforms:{pressure:_,divergence:this.#n,simTexel:d},target:v});let t=_;_=v,v=t}e.draw({frag:ne,uniforms:{vortVel:this.#t,pressure:_,simTexel:d},target:this.#a}),e.draw({frag:re,uniforms:{projVel:this.#a,simTexel:d,velocityDissipation:i},target:this.#o}),e.draw({frag:ie,uniforms:{velocity:this.#o,dye:this.#s,time:e.time,aspect:m,mouseUv:h,mouseDeltaUv:g,simSize:t,densityDissipation:a,dyeSplatRadius:c,dyeSplatIntensity:l},target:this.#s}),e.draw({frag:ae,uniforms:{src:e.src,dye:this.#s,velocity:this.#o,simSize:t,showDye:+!!u,time:e.time},target:e.target})}dispose(){this.#e=null,this.#t=null,this.#n=null,this.#r=null,this.#i=null,this.#a=null,this.#o=null,this.#s=null,this.#l=!1}}})),E,ce,D,le,O,ue=e((()=>{E={pure:{cyan:[0,1,1,1],magenta:[1,0,1,1],yellow:[1,1,0,1],black:[0,0,0,1],red:[1,0,0,1],green:[0,1,0,1],blue:[0,0,1,1]},newsprint:{cyan:[.15,.73,.88,1],magenta:[.88,.12,.55,1],yellow:[.97,.93,.08,1],black:[.1,.1,.1,1]},fogra51:{cyan:[0,.525,.765,1],magenta:[.827,0,.486,1],yellow:[.984,.91,0,1],black:[.145,.145,.145,1]},swop:{cyan:[0,.557,.769,1],magenta:[.827,.02,.478,1],yellow:[.984,.902,.027,1],black:[.169,.169,.169,1]}},ce=`#version 300 es
+precision highp float;
+
+in vec2 uvContent;
+out vec4 outColor;
+
+uniform sampler2D src;
+uniform vec4 srcRectUv;
+uniform vec2 srcSizePx;    // src texture size in texels
+uniform vec2 elementPx;
+uniform float gridSize;
+uniform float dotSize;
+uniform float smoothing;
+uniform float angle;       // global grid rotation in degrees, added to per-channel angles
+uniform float blackAmount; // GCR amount: 1.0 = max GCR (k = 1 - max(rgb)), 0.0 = pure CMY (no K)
+uniform int ymck;          // 0 = RGB (additive), 1 = CMYK (subtractive)
+uniform int trimEdge;      // 1 = skip dots whose extent crosses the image edge
+uniform vec4 background;   // SRC-OVER backdrop, RGBA in [0, 1], non-premul
+uniform vec4 cInk, mInk, yInk, kInk;  // CMYK inks: .rgb = solid colour, .a = density
+uniform vec4 rInk, gInk, bInk;        // RGB inks: .rgb = colour, .a = density
+
+const vec3 RGB_ANGLES = vec3(15.0, 45.0, 75.0);
+const vec4 CMYK_ANGLES = vec4(15.0, 75.0, 0.0, 45.0);
+
+const vec2 cellOffsets[9] = vec2[9](
+    vec2(0),
+    vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2(0, 1),
+    vec2(-1, -1), vec2(1, -1), vec2(-1, 1), vec2(1)
+);
+
+// texelFetch bypasses the framework's LINEAR filter. Bilinear at a
+// transparent/opaque boundary yields gray, which cmykChannel turns
+// into a phantom K dot.
+vec4 sampleSrcNearest(vec2 px) {
+    vec2 uv = clamp(px / elementPx, 0.0, 1.0);
+    vec2 texUv = srcRectUv.xy + uv * srcRectUv.zw;
+    return texelFetch(src, ivec2(texUv * srcSizePx), 0);
+}
+
+// Lower blackAmount shifts ink from K to CMY (paint model still holds
+// for any k <= 1 - max(rgb)), preserving hue where max-GCR collapses to K.
+float cmykChannel(vec3 rgb, int i) {
+    float k = blackAmount * (1.0 - max(rgb.r, max(rgb.g, rgb.b)));
+    if (i == 3) return k;
+    return (1.0 - rgb[i] - k) / max(1.0 - k, 1e-6);
+}
+
+vec3 inkMix(vec4 cmyk) {
+    return mix(vec3(1.0), cInk.rgb, cmyk.x)
+         * mix(vec3(1.0), mInk.rgb, cmyk.y)
+         * mix(vec3(1.0), yInk.rgb, cmyk.z)
+         * mix(vec3(1.0), kInk.rgb, cmyk.w);
+}
+
+void main() {
+    vec2 fragCoord = uvContent * elementPx;
+    // Anchor the grid at the element centre so resizing gridSize scales
+    // cells around the centre instead of the bottom-left corner.
+    vec2 gridCenter = elementPx * 0.5;
+    bool isRgb = ymck == 0;
+    int channelCount = isRgb ? 3 : 4;
+    float maxDotRadius = gridSize * dotSize * 0.7071068;
+
+    // 5 cells once axis neighbours are in reach, 9 once diagonals are.
+    int cellCount = dotSize < 0.7071068 ? 1 : (dotSize < 1.0 ? 5 : 9);
+
+    vec4 amounts = vec4(0.0);
+
+    for (int i = 0; i < 4; ++i) {
+        if (i >= channelCount) break;
+
+        float channelAngle = isRgb ? RGB_ANGLES[i] : CMYK_ANGLES[i];
+        float rotRad = radians(channelAngle + angle);
+        float c = cos(rotRad);
+        float s = sin(rotRad);
+
+        // cTrans rotates screen -> grid space; ccTrans is its inverse
+        mat2 ccTrans = mat2(c, s, -s, c);
+        mat2 cTrans = mat2(c, -s, s, c);
+
+        vec2 gridFragLoc = cTrans * (fragCoord - gridCenter);
+        vec2 gridOriginLoc = floor(gridFragLoc / gridSize);
+
+        for (int j = 0; j < 9; ++j) {
+            if (j >= cellCount) break;
+            vec2 cell = gridOriginLoc + cellOffsets[j];
+            vec2 gridDotLoc = cell * gridSize + vec2(gridSize / 2.0);
+            vec2 renderDotLoc = ccTrans * gridDotLoc + gridCenter;
+
+            // Skip texture fetch if fragment can't be covered.
+            float fragDistanceToDotCenter = distance(fragCoord, renderDotLoc);
+            if (fragDistanceToDotCenter > maxDotRadius) continue;
+
+            if (trimEdge == 1 && (
+                any(lessThan(renderDotLoc, vec2(maxDotRadius))) ||
+                any(greaterThan(renderDotLoc, elementPx - vec2(maxDotRadius)))
+            )) continue;
+
+            vec4 dotColor = sampleSrcNearest(renderDotLoc);
+            float channelAmount = isRgb
+                ? dotColor[i]
+                : cmykChannel(dotColor.rgb, i);
+            // Scale by source alpha at the dot centre so dots shrink
+            // (instead of getting hard-clipped) at the source silhouette.
+            // Also kills the CMYK k=1 black artefact for transparent
+            // pixels (rgb=0 → k=1 without this).
+            float dotRadius = channelAmount * dotColor.a * maxDotRadius;
+            if (fragDistanceToDotCenter < dotRadius) {
+                amounts[i] += smoothstep(
+                    dotRadius,
+                    dotRadius - dotRadius * smoothing,
+                    fragDistanceToDotCenter
+                );
+            }
+        }
+    }
+
+    // fg.rgb = full-strength ink, fg.a = geometric coverage. Splitting
+    // these keeps AA edges from double-tinting the background.
+    // Per-ink density applies post-clamp + re-clamp for a true density
+    // dial (pre-clamp scaling lets neighbour-dot overlap >1 absorb
+    // reductions).
+    vec4 fg;
+    if (isRgb) {
+        vec3 rgbDensity = vec3(rInk.a, gInk.a, bInk.a);
+        vec3 rgbInks = clamp(
+            clamp(amounts.rgb, 0.0, 1.0) * rgbDensity,
+            0.0, 1.0
+        );
+        vec3 weighted = rInk.rgb * rgbInks.r + gInk.rgb * rgbInks.g + bInk.rgb * rgbInks.b;
+        // Normalise to max so the colour at AA edges stays full strength.
+        float maxComp = max(max(weighted.r, weighted.g), weighted.b);
+        vec3 inkColor = maxComp > 0.0 ? weighted / maxComp : vec3(0.0);
+        // Multiplicative complement: probability that AT LEAST ONE
+        // channel covers this fragment (channels overlap stochastically).
+        float dotMask = 1.0
+            - (1.0 - rgbInks.r) * (1.0 - rgbInks.g) * (1.0 - rgbInks.b);
+        fg = vec4(inkColor, dotMask);
+    } else {
+        vec4 cmykDensity = vec4(cInk.a, mInk.a, yInk.a, kInk.a);
+        vec4 inks = clamp(
+            clamp(amounts, 0.0, 1.0) * cmykDensity,
+            0.0, 1.0
+        );
+        float maxInk = max(max(inks.x, inks.y), max(inks.z, inks.w));
+        vec4 normInks = maxInk > 0.0 ? inks / maxInk : vec4(0.0);
+        vec3 inkColor = inkMix(normInks);
+        float inkCoverage = 1.0
+            - (1.0 - inks.x) * (1.0 - inks.y) * (1.0 - inks.z) * (1.0 - inks.w);
+        fg = vec4(inkColor, inkCoverage);
+    }
+
+    // SRC-OVER, premultiplied (framework expects rgb*alpha).
+    // background.a=0 disables the backdrop.
+    float outA = fg.a + background.a * (1.0 - fg.a);
+    vec3 outRgbPremul =
+        fg.rgb * fg.a + background.rgb * background.a * (1.0 - fg.a);
+
+    outColor = vec4(outRgbPremul, outA);
+}
+`,D={...E.pure,...E.newsprint},le={gridSize:10,dotSize:1,smoothing:.15,angle:0,mode:`rgb`,blackAmount:1,trimEdge:!0,background:[0,0,0,0],inkPalette:D},O=class{params;constructor(e={}){this.params={...le,...e,inkPalette:{...D,...e.inkPalette??{}}}}setParams(e){Object.assign(this.params,e)}setInkPreset(e){Object.assign(this.params.inkPalette,E[e])}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params,o=a.inkPalette;e.draw({frag:ce,uniforms:{src:e.src,srcSizePx:[e.src.width||1,e.src.height||1],elementPx:[r,i],gridSize:Math.max(1,a.gridSize),dotSize:Math.max(0,a.dotSize),smoothing:Math.max(0,Math.min(1,a.smoothing)),angle:a.angle,blackAmount:Math.max(0,Math.min(1,a.blackAmount)),ymck:+(a.mode===`cmyk`),trimEdge:+!!a.trimEdge,background:a.background,cInk:o.cyan,mInk:o.magenta,yInk:o.yellow,kInk:o.black,rInk:o.red,gInk:o.green,bInk:o.blue},target:e.target})}}})),k,A,j,de=e((()=>{k=.7,A=1.3,j=`
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 float mod289(float x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
@@ -500,15 +660,15 @@ vec3 sampleCurl(vec3 pos, vec2 elementPixel, float scale, float animTime) {
     vec3 noiseInput = pos * stretch / max(scale, 1e-4);
     return curl3D(noiseInput, animTime) / stretch;
 }
-`}));function D(e){let t=O(e);return 2**Math.ceil(Math.log2(Math.sqrt(t)))}function O(e){return Number.isFinite(e)?Math.max(1,Math.floor(e)):1}function k(e){let t=e|0;return[(t>>16&255)/255,(t>>8&255)/255,(t&255)/255]}function A(e){return Math.min(I,Math.max(0,e))}var j,M,N,P,F,I,L=e((()=>{j=new Float32Array([-.5,-.5,.5,-.5,.5,.5,-.5,-.5,.5,.5,-.5,.5]),M=`
+`}));function M(e){let t=N(e);return 2**Math.ceil(Math.log2(Math.sqrt(t)))}function N(e){return Number.isFinite(e)?Math.max(1,Math.floor(e)):1}function fe(e){let t=e|0;return[(t>>16&255)/255,(t>>8&255)/255,(t&255)/255]}function P(e){return Math.min(B,Math.max(0,e))}var F,I,L,R,z,B,V=e((()=>{F=new Float32Array([-.5,-.5,.5,-.5,.5,.5,-.5,-.5,.5,.5,-.5,.5]),I=`
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
-`,N=`#version 300 es
+`,L=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() { outColor = vec4(0.0); }
-`,P=`#version 300 es
+`,R=`#version 300 es
 precision highp float;
 in vec2 vCorner;
 in vec4 vColor;
@@ -521,7 +681,7 @@ void main() {
     float a = vColor.a * fall;
     outColor = vec4(vColor.rgb * a, a);
 }
-`,F=`#version 300 es
+`,z=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -547,19 +707,19 @@ void main() {
         );
     }
 }
-`,I=.1})),R,z,B,V,H,U,W,G,ue,de,K,fe,pe,me,he,ge,_e=e((()=>{le(),L(),R=64,z=R*R,B=.1,V=[R,R],H=new Float32Array(z);for(let e=0;e<z;e++)H[e]=e;U=`#version 300 es
+`,B=.1})),H,U,pe,me,W,he,G,ge,_e,ve,K,ye,be,xe,Se,Ce,we=e((()=>{de(),V(),H=64,U=H*H,pe=.1,me=[H,H],W=new Float32Array(U);for(let e=0;e<U;e++)W[e]=e;he=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() {
     outColor = vec4(0.0, 0.0, 0.0, 2.0);
 }
-`,W=`#version 300 es
+`,G=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() {
     outColor = vec4(0.0);
 }
-`,G=`#version 300 es
+`,ge=`#version 300 es
 precision highp float;
 in vec2 position;
 
@@ -620,7 +780,7 @@ void main() {
     vCorner = position;
     vColor = vec4(c.rgb, lifeAlpha * alpha * fogFactor);
 }
-`,ue=`#version 300 es
+`,_e=`#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvSrc;
@@ -640,7 +800,7 @@ void main() {
     vec4 t = texture(trail, uv);
     outColor = vec4(base.rgb * (1.0 - t.a) + t.rgb, max(base.a, t.a));
 }
-`,de=`#version 300 es
+`,ve=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -658,7 +818,7 @@ uniform float noiseScale;
 uniform float noiseAnimation;
 uniform float speedDecay;
 uniform float life;
-${E}
+${j}
 
 void main() {
     vec4 s = texture(posTex, uv);
@@ -723,7 +883,7 @@ void main() {
     gl_PointSize = 1.0;
     vSpawn = s;
 }
-`,fe=`#version 300 es
+`,ye=`#version 300 es
 precision highp float;
 in vec4 vSpawn;
 out vec4 outColor;
@@ -742,7 +902,7 @@ void main() {
     }
     outColor = vec4(spawnUv, 0.0, 0.0);
 }
-`,pe=`#version 300 es
+`,be=`#version 300 es
 precision highp float;
 in vec4 vSpawn;
 out vec4 outColor;
@@ -751,7 +911,7 @@ uniform sampler2D src;
 uniform vec3 color;
 uniform float colorMix;
 uniform vec2 lifeJitterRange;
-${M}
+${I}
 
 void main() {
     vec4 c = texture(src, clamp(vSpawn.yz, 0.0, 1.0));
@@ -759,7 +919,7 @@ void main() {
     float lifeJitter = mix(lifeJitterRange.x, lifeJitterRange.y, h);
     outColor = vec4(mix(c.rgb, color, colorMix), lifeJitter);
 }
-`,me=`#version 300 es
+`,xe=`#version 300 es
 precision highp float;
 in vec4 vSpawn;
 out vec4 outColor;
@@ -768,7 +928,7 @@ void main() {
     vec2 dir = theta >= 0.0 ? vec2(cos(theta), sin(theta)) : vec2(0.0);
     outColor = vec4(dir, 0.0, 0.0);
 }
-`,he={count:1024*1024,birthRate:3e4,screenBirthRate:1e4,life:1,noiseSpeed:.3,emitSpeed:1,noiseDelay:.15,noiseScale:1,noiseAnimation:.3,pointSize:10,alpha:1,radius:300,speedDecay:1,alphaDecay:5,fadeIn:.05,alphaThreshold:.05,spawnOnIdle:!0,srcOpacity:0,trailFade:.75,fog:.5,color:16777215,colorMix:0,blend:`add`},ge=class{#e;get params(){return this.#e}#t=null;#n=null;#r=null;#i=null;#a=null;#o=!1;#s;#c;#l=new Float32Array(z*4);#u=null;#d=null;#f=null;#p=null;#m=null;#h=null;#g=0;#_=0;#v=0;#y=null;#b=-1/0;constructor(e={}){this.#e={...he,...e},this.#e.count=O(this.#e.count),this.#s=D(this.#e.count),this.#c=this.#s*this.#s}get maxCount(){return this.#c}setParam(e){let t=this.#e;for(let[n,r]of Object.entries(e))r!==void 0&&(t[n]=n===`count`?O(r):r)}init(e){this.#x(e),this.#i=e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),this.#a=e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),this.#p={attributes:{position:j}},this.#f={mode:`points`,attributes:{position:{data:H,itemSize:1}}},this.#m=e.gl,this.#w(e),this.#h=e.onContextRestored(()=>{this.#m=e.gl,this.#w(e),this.#o=!1})}#x(e){let t={size:[this.#s,this.#s],float:!0,wrap:`clamp`,filter:`nearest`};this.#t=e.createRenderTarget({...t,persistent:!0}),this.#n=e.createRenderTarget(t),this.#r=e.createRenderTarget(t)}#S(){this.#t?.dispose(),this.#n?.dispose(),this.#r?.dispose(),this.#t=null,this.#n=null,this.#r=null}#C(e){let t=e.gl,n=t.createTexture();if(!n)throw Error(`[ParticleEffect] Failed to create spawn texture`);return t.bindTexture(t.TEXTURE_2D,n),t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.texImage2D(t.TEXTURE_2D,0,t.RGBA32F,R,R,0,t.RGBA,t.FLOAT,null),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MIN_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MAG_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_S,t.CLAMP_TO_EDGE),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_T,t.CLAMP_TO_EDGE),t.bindTexture(t.TEXTURE_2D,null),{raw:n,handle:e.wrapTexture(n,{size:[R,R],filter:`nearest`,wrap:`clamp`})}}#w(e){let t=this.#C(e);this.#u=t.raw,this.#d=t.handle}#T(e){if(!this.#u)return;let t=e.gl;t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.bindTexture(t.TEXTURE_2D,this.#u),t.texSubImage2D(t.TEXTURE_2D,0,0,0,R,R,t.RGBA,t.FLOAT,this.#l),t.bindTexture(t.TEXTURE_2D,null)}render(e){if(!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||!this.#p||!this.#f||!this.#d||!this.#u)return;let t=D(this.params.count);t!==this.#s&&(this.#S(),this.#s=t,this.#c=t*t,this.#x(e),this.#g=0,this.#o=!1),this.#o||=(e.draw({frag:U,target:this.#t}),e.draw({frag:W,target:this.#n}),e.draw({frag:W,target:this.#r}),!0);let n=A(e.deltaTime),r=[e.dims.elementPixel[0],e.dims.elementPixel[1]],i=[this.#s,this.#s],a=this.#E(e,n,r);a>0&&this.#T(e);let o=a===0;if(e.draw({frag:de,uniforms:{posTex:this.#t,colorTex:this.#n,velTex:this.#r,elementPixel:r,time:e.time,dt:n,noiseSpeed:this.params.noiseSpeed,emitSpeed:this.params.emitSpeed,noiseDelay:this.params.noiseDelay,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,life:this.params.life},target:this.#t,swap:o}),a>0){let t={uSpawnTex:this.#d,uSpawnTexSize:V,uSpawnCount:a,stateSize:i};e.draw({vert:K,frag:fe,geometry:this.#f,uniforms:{...t,src:e.src,alphaThreshold:this.params.alphaThreshold},target:this.#t,blend:`none`}),e.draw({vert:K,frag:pe,geometry:this.#f,uniforms:{...t,src:e.src,color:k(this.params.color),colorMix:this.params.colorMix,lifeJitterRange:[w,T]},target:this.#n,blend:`none`}),e.draw({vert:K,frag:me,geometry:this.#f,uniforms:t,target:this.#r,blend:`none`})}let s=this.#D();this.#p.instanceCount=s,e.draw({frag:N,target:this.#i}),e.draw({vert:G,frag:P,uniforms:{posTex:this.#t,colorTex:this.#n,stateSize:i,pointSize:this.params.pointSize,elementPixel:r,particleCount:s,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fadeIn:this.params.fadeIn,fog:this.params.fog},geometry:this.#p,target:this.#i,blend:this.params.blend===`normal`?`premultiplied`:`additive`}),e.draw({frag:F,uniforms:{trailPrev:this.#a,particleStamp:this.#i,trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:this.#a}),e.draw({frag:ue,uniforms:{src:e.src,trail:this.#a,srcOpacity:this.params.srcOpacity},target:e.target})}#E(e,t,n){let r=[e.mouse[0]/Math.max(1,n[0]),e.mouse[1]/Math.max(1,n[1])];(!this.#y||Math.abs(r[0]-this.#y[0])>1e-6||Math.abs(r[1]-this.#y[1])>1e-6)&&(this.#b=e.time),this.#y=r;let i=e.intersection>0,a=e.time-this.#b<B;i&&(a||this.params.spawnOnIdle)?this.#_=Math.min(this.#_+this.params.birthRate*t,z):this.#_=0,i?this.#v=Math.min(this.#v+this.params.screenBirthRate*t,z):this.#v=0;let o=Math.min(z,Math.floor(this.#_)),s=Math.min(z-o,Math.floor(this.#v));this.#_-=o,this.#v-=s;let c=o+s;if(c===0)return 0;let l=this.#D(),u=Math.max(1,n[0]),d=Math.max(1,n[1]),f=this.#l,p=0;for(;p<o;p++){let e=Math.sqrt(Math.random())*this.params.radius,t=Math.random()*Math.PI*2,n=Math.cos(t)*e,i=Math.sin(t)*e,a=p*4;f[a+0]=this.#g,f[a+1]=r[0]+n/u,f[a+2]=r[1]+i/d,f[a+3]=t,this.#g=(this.#g+1)%l}for(let e=0;e<s;e++,p++){let e=p*4;f[e+0]=this.#g,f[e+1]=Math.random(),f[e+2]=Math.random(),f[e+3]=-1,this.#g=(this.#g+1)%l}return c}#D(){return Math.max(1,Math.min(this.#c,Math.floor(this.params.count)))}dispose(){this.#h?.(),this.#h=null,this.#m&&this.#u&&this.#m.deleteTexture(this.#u),this.#u=null,this.#d=null,this.#f=null,this.#m=null,this.#S(),this.#i?.dispose(),this.#a?.dispose(),this.#i=null,this.#a=null,this.#p=null,this.#o=!1}outputRect(e){return e.canvasRect}}})),ve,ye,be,xe,Se,Ce,we,Te=e((()=>{le(),L(),ve=`#version 300 es
+`,Se={count:1024*1024,birthRate:3e4,screenBirthRate:1e4,life:1,noiseSpeed:.3,emitSpeed:1,noiseDelay:.15,noiseScale:1,noiseAnimation:.3,pointSize:10,alpha:1,radius:300,speedDecay:1,alphaDecay:5,fadeIn:.05,alphaThreshold:.05,spawnOnIdle:!0,srcOpacity:0,trailFade:.75,fog:.5,color:16777215,colorMix:0,blend:`add`},Ce=class{#e;get params(){return this.#e}#t=null;#n=null;#r=null;#i=null;#a=null;#o=!1;#s;#c;#l=new Float32Array(U*4);#u=null;#d=null;#f=null;#p=null;#m=null;#h=null;#g=0;#_=0;#v=0;#y=null;#b=-1/0;constructor(e={}){this.#e={...Se,...e},this.#e.count=N(this.#e.count),this.#s=M(this.#e.count),this.#c=this.#s*this.#s}get maxCount(){return this.#c}setParam(e){let t=this.#e;for(let[n,r]of Object.entries(e))r!==void 0&&(t[n]=n===`count`?N(r):r)}init(e){this.#x(e),this.#i=e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),this.#a=e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),this.#p={attributes:{position:F}},this.#f={mode:`points`,attributes:{position:{data:W,itemSize:1}}},this.#m=e.gl,this.#w(e),this.#h=e.onContextRestored(()=>{this.#m=e.gl,this.#w(e),this.#o=!1})}#x(e){let t={size:[this.#s,this.#s],float:!0,wrap:`clamp`,filter:`nearest`};this.#t=e.createRenderTarget({...t,persistent:!0}),this.#n=e.createRenderTarget(t),this.#r=e.createRenderTarget(t)}#S(){this.#t?.dispose(),this.#n?.dispose(),this.#r?.dispose(),this.#t=null,this.#n=null,this.#r=null}#C(e){let t=e.gl,n=t.createTexture();if(!n)throw Error(`[ParticleEffect] Failed to create spawn texture`);return t.bindTexture(t.TEXTURE_2D,n),t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.texImage2D(t.TEXTURE_2D,0,t.RGBA32F,H,H,0,t.RGBA,t.FLOAT,null),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MIN_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MAG_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_S,t.CLAMP_TO_EDGE),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_T,t.CLAMP_TO_EDGE),t.bindTexture(t.TEXTURE_2D,null),{raw:n,handle:e.wrapTexture(n,{size:[H,H],filter:`nearest`,wrap:`clamp`})}}#w(e){let t=this.#C(e);this.#u=t.raw,this.#d=t.handle}#T(e){if(!this.#u)return;let t=e.gl;t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.bindTexture(t.TEXTURE_2D,this.#u),t.texSubImage2D(t.TEXTURE_2D,0,0,0,H,H,t.RGBA,t.FLOAT,this.#l),t.bindTexture(t.TEXTURE_2D,null)}render(e){if(!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||!this.#p||!this.#f||!this.#d||!this.#u)return;let t=M(this.params.count);t!==this.#s&&(this.#S(),this.#s=t,this.#c=t*t,this.#x(e),this.#g=0,this.#o=!1),this.#o||=(e.draw({frag:he,target:this.#t}),e.draw({frag:G,target:this.#n}),e.draw({frag:G,target:this.#r}),!0);let n=P(e.deltaTime),r=[e.dims.elementPixel[0],e.dims.elementPixel[1]],i=[this.#s,this.#s],a=this.#E(e,n,r);a>0&&this.#T(e);let o=a===0;if(e.draw({frag:ve,uniforms:{posTex:this.#t,colorTex:this.#n,velTex:this.#r,elementPixel:r,time:e.time,dt:n,noiseSpeed:this.params.noiseSpeed,emitSpeed:this.params.emitSpeed,noiseDelay:this.params.noiseDelay,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,life:this.params.life},target:this.#t,swap:o}),a>0){let t={uSpawnTex:this.#d,uSpawnTexSize:me,uSpawnCount:a,stateSize:i};e.draw({vert:K,frag:ye,geometry:this.#f,uniforms:{...t,src:e.src,alphaThreshold:this.params.alphaThreshold},target:this.#t,blend:`none`}),e.draw({vert:K,frag:be,geometry:this.#f,uniforms:{...t,src:e.src,color:fe(this.params.color),colorMix:this.params.colorMix,lifeJitterRange:[k,A]},target:this.#n,blend:`none`}),e.draw({vert:K,frag:xe,geometry:this.#f,uniforms:t,target:this.#r,blend:`none`})}let s=this.#D();this.#p.instanceCount=s,e.draw({frag:L,target:this.#i}),e.draw({vert:ge,frag:R,uniforms:{posTex:this.#t,colorTex:this.#n,stateSize:i,pointSize:this.params.pointSize,elementPixel:r,particleCount:s,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fadeIn:this.params.fadeIn,fog:this.params.fog},geometry:this.#p,target:this.#i,blend:this.params.blend===`normal`?`premultiplied`:`additive`}),e.draw({frag:z,uniforms:{trailPrev:this.#a,particleStamp:this.#i,trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:this.#a}),e.draw({frag:_e,uniforms:{src:e.src,trail:this.#a,srcOpacity:this.params.srcOpacity},target:e.target})}#E(e,t,n){let r=[e.mouse[0]/Math.max(1,n[0]),e.mouse[1]/Math.max(1,n[1])];(!this.#y||Math.abs(r[0]-this.#y[0])>1e-6||Math.abs(r[1]-this.#y[1])>1e-6)&&(this.#b=e.time),this.#y=r;let i=e.intersection>0,a=e.time-this.#b<pe;i&&(a||this.params.spawnOnIdle)?this.#_=Math.min(this.#_+this.params.birthRate*t,U):this.#_=0,i?this.#v=Math.min(this.#v+this.params.screenBirthRate*t,U):this.#v=0;let o=Math.min(U,Math.floor(this.#_)),s=Math.min(U-o,Math.floor(this.#v));this.#_-=o,this.#v-=s;let c=o+s;if(c===0)return 0;let l=this.#D(),u=Math.max(1,n[0]),d=Math.max(1,n[1]),f=this.#l,p=0;for(;p<o;p++){let e=Math.sqrt(Math.random())*this.params.radius,t=Math.random()*Math.PI*2,n=Math.cos(t)*e,i=Math.sin(t)*e,a=p*4;f[a+0]=this.#g,f[a+1]=r[0]+n/u,f[a+2]=r[1]+i/d,f[a+3]=t,this.#g=(this.#g+1)%l}for(let e=0;e<s;e++,p++){let e=p*4;f[e+0]=this.#g,f[e+1]=Math.random(),f[e+2]=Math.random(),f[e+3]=-1,this.#g=(this.#g+1)%l}return c}#D(){return Math.max(1,Math.min(this.#c,Math.floor(this.params.count)))}dispose(){this.#h?.(),this.#h=null,this.#m&&this.#u&&this.#m.deleteTexture(this.#u),this.#u=null,this.#d=null,this.#f=null,this.#m=null,this.#S(),this.#i?.dispose(),this.#a?.dispose(),this.#i=null,this.#a=null,this.#p=null,this.#o=!1}outputRect(e){return e.canvasRect}}})),Te,Ee,De,Oe,ke,Ae,je,Me=e((()=>{de(),V(),Te=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -786,8 +946,8 @@ uniform float outwardBias;
 uniform float duration;
 uniform float count;
 uniform int uBurst;
-${M}
-${E}
+${I}
+${j}
 
 void main() {
     if (uBurst == 1) {
@@ -820,15 +980,15 @@ void main() {
     vec3 pos = s.xyz + (vNoise + outward) * noiseSpeed * dt * taper;
 
     float lifespanScale = mix(
-        ${w.toFixed(4)},
-        ${T.toFixed(4)},
+        ${k.toFixed(4)},
+        ${A.toFixed(4)},
         hash21(uv * 91.7 + 1.234)
     );
     age += dt / max(duration * lifespanScale, 1e-3);
 
     outColor = vec4(pos, age);
 }
-`,ye=`#version 300 es
+`,Ee=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -839,7 +999,7 @@ uniform vec2 stateSize;
 uniform float count;
 uniform vec3 color;
 uniform float colorMix;
-${M}
+${I}
 
 void main() {
     ivec2 pix = ivec2(floor(uv * stateSize));
@@ -856,7 +1016,7 @@ void main() {
     vec4 c = texture(src, sampleUv);
     outColor = vec4(mix(c.rgb, color, colorMix), c.a);
 }
-`,be=`#version 300 es
+`,De=`#version 300 es
 precision highp float;
 in vec2 position;
 
@@ -915,7 +1075,7 @@ void main() {
     vCorner = position;
     vColor = vec4(c.rgb, c.a * lifeAlpha * alpha * fogFactor);
 }
-`,xe=`#version 300 es
+`,Oe=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -925,7 +1085,7 @@ uniform sampler2D trail;
 void main() {
     outColor = texture(trail, uv);
 }
-`,Se=`#version 300 es
+`,ke=`#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
@@ -933,7 +1093,7 @@ uniform sampler2D src;
 void main() {
     outColor = texture(src, uvSrc);
 }
-`,Ce={count:1e5,duration:1,noiseSpeed:1.5,noiseScale:1,noiseAnimation:1,outwardBias:1,pointSize:3,alpha:1,alphaDecay:5,speedDecay:2,fog:0,trailFade:.5,color:16777215,colorMix:0,blend:`add`},we=class{#e;get params(){return this.#e}#t=null;#n=null;#r=null;#i=null;#a=null;#o;#s=!1;#c=!1;#l=-1;#u=0;#d=0;constructor(e={}){this.#e={...Ce,...e},this.#e.count=O(this.#e.count);let t=D(this.#e.count);this.#o=[t,t]}trigger(){this.#s=!0,this.#c=!0,this.#l=-1,this.#u=0,this.#d=0}reset(){this.#s=!1,this.#c=!1,this.#l=-1,this.#u=0,this.#d=0}isDone(){return!this.#s||this.#u<this.params.duration?!1:this.#d>=this.#f()}#f(){let e=this.params.trailFade;return e<=0?1:e>=.999?600:Math.ceil(-Math.log(255)/Math.log(e))}init(e){this.#p(e),this.#r=e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),this.#i=e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),this.#a={attributes:{position:j}}}#p(e){let t={size:this.#o,float:!0,wrap:`clamp`,filter:`nearest`};this.#t=e.createRenderTarget({...t,persistent:!0}),this.#n=e.createRenderTarget(t)}#m(){this.#t?.dispose(),this.#n?.dispose(),this.#t=null,this.#n=null}render(e){if(!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||e.intersection<=0)return;let t=D(this.params.count),n=!this.#s||this.isDone();if(t!==this.#o[0]&&n&&(this.#m(),this.#o=[t,t],this.#p(e)),!this.#s){e.draw({frag:Se,uniforms:{src:e.src},target:e.target});return}this.#l<0&&(this.#l=e.time);let r=e.time-this.#l;this.#u=r;let i=r>=this.params.duration;if(i&&this.#d>=this.#f()){e.draw({frag:N,target:e.target});return}let a=A(e.deltaTime),o=[e.dims.elementPixel[0],e.dims.elementPixel[1]];if(i)e.draw({frag:N,target:this.#r}),this.#d++;else{let t=+!!this.#c;this.#c=!1;let n=this.#h();e.draw({frag:ve,uniforms:{posTex:this.#t,stateSize:this.#o,elementPixel:o,time:e.time,dt:a,noiseSpeed:this.params.noiseSpeed,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,outwardBias:this.params.outwardBias,duration:this.params.duration,count:n,uBurst:t},target:this.#t}),t===1&&(e.draw({frag:ye,uniforms:{src:e.src,stateSize:this.#o,count:n,color:k(this.params.color),colorMix:this.params.colorMix},target:this.#n}),e.draw({frag:N,target:this.#i})),this.#a.instanceCount=n,e.draw({frag:N,target:this.#r}),e.draw({vert:be,frag:P,uniforms:{posTex:this.#t,colorTex:this.#n,stateSize:this.#o,pointSize:this.params.pointSize,elementPixel:o,particleCount:n,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fog:this.params.fog},geometry:this.#a,target:this.#r,blend:this.params.blend===`normal`?`premultiplied`:`additive`})}e.draw({frag:F,uniforms:{trailPrev:this.#i,particleStamp:this.#r,trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:this.#i}),e.draw({frag:xe,uniforms:{trail:this.#i},target:e.target})}#h(){let e=this.#o[0]*this.#o[1];return Math.max(1,Math.min(e,Math.floor(this.params.count)))}dispose(){this.#m(),this.#r?.dispose(),this.#i?.dispose(),this.#r=null,this.#i=null,this.#a=null}outputRect(e){return e.canvasRect}}}));function Ee(e={}){let t=e.size??10;return{render(e){let n=e.src.width||1,r=e.src.height||1;e.draw({frag:De,uniforms:{src:e.src,cellUv:[t/n,t/r]},target:e.target})}}}var De,Oe=e((()=>{De=`#version 300 es
+`,Ae={count:1e5,duration:1,noiseSpeed:1.5,noiseScale:1,noiseAnimation:1,outwardBias:1,pointSize:3,alpha:1,alphaDecay:5,speedDecay:2,fog:0,trailFade:.5,color:16777215,colorMix:0,blend:`add`},je=class{#e;get params(){return this.#e}#t=null;#n=null;#r=null;#i=null;#a=null;#o;#s=!1;#c=!1;#l=-1;#u=0;#d=0;constructor(e={}){this.#e={...Ae,...e},this.#e.count=N(this.#e.count);let t=M(this.#e.count);this.#o=[t,t]}trigger(){this.#s=!0,this.#c=!0,this.#l=-1,this.#u=0,this.#d=0}reset(){this.#s=!1,this.#c=!1,this.#l=-1,this.#u=0,this.#d=0}isDone(){return!this.#s||this.#u<this.params.duration?!1:this.#d>=this.#f()}#f(){let e=this.params.trailFade;return e<=0?1:e>=.999?600:Math.ceil(-Math.log(255)/Math.log(e))}init(e){this.#p(e),this.#r=e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),this.#i=e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),this.#a={attributes:{position:F}}}#p(e){let t={size:this.#o,float:!0,wrap:`clamp`,filter:`nearest`};this.#t=e.createRenderTarget({...t,persistent:!0}),this.#n=e.createRenderTarget(t)}#m(){this.#t?.dispose(),this.#n?.dispose(),this.#t=null,this.#n=null}render(e){if(!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||e.intersection<=0)return;let t=M(this.params.count),n=!this.#s||this.isDone();if(t!==this.#o[0]&&n&&(this.#m(),this.#o=[t,t],this.#p(e)),!this.#s){e.draw({frag:ke,uniforms:{src:e.src},target:e.target});return}this.#l<0&&(this.#l=e.time);let r=e.time-this.#l;this.#u=r;let i=r>=this.params.duration;if(i&&this.#d>=this.#f()){e.draw({frag:L,target:e.target});return}let a=P(e.deltaTime),o=[e.dims.elementPixel[0],e.dims.elementPixel[1]];if(i)e.draw({frag:L,target:this.#r}),this.#d++;else{let t=+!!this.#c;this.#c=!1;let n=this.#h();e.draw({frag:Te,uniforms:{posTex:this.#t,stateSize:this.#o,elementPixel:o,time:e.time,dt:a,noiseSpeed:this.params.noiseSpeed,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,outwardBias:this.params.outwardBias,duration:this.params.duration,count:n,uBurst:t},target:this.#t}),t===1&&(e.draw({frag:Ee,uniforms:{src:e.src,stateSize:this.#o,count:n,color:fe(this.params.color),colorMix:this.params.colorMix},target:this.#n}),e.draw({frag:L,target:this.#i})),this.#a.instanceCount=n,e.draw({frag:L,target:this.#r}),e.draw({vert:De,frag:R,uniforms:{posTex:this.#t,colorTex:this.#n,stateSize:this.#o,pointSize:this.params.pointSize,elementPixel:o,particleCount:n,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fog:this.params.fog},geometry:this.#a,target:this.#r,blend:this.params.blend===`normal`?`premultiplied`:`additive`})}e.draw({frag:z,uniforms:{trailPrev:this.#i,particleStamp:this.#r,trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:this.#i}),e.draw({frag:Oe,uniforms:{trail:this.#i},target:e.target})}#h(){let e=this.#o[0]*this.#o[1];return Math.max(1,Math.min(e,Math.floor(this.params.count)))}dispose(){this.#m(),this.#r?.dispose(),this.#i?.dispose(),this.#r=null,this.#i=null,this.#a=null}outputRect(e){return e.canvasRect}}}));function Ne(e={}){let t=e.size??10;return{render(e){let n=e.src.width||1,r=e.src.height||1;e.draw({frag:Pe,uniforms:{src:e.src,cellUv:[t/n,t/r]},target:e.target})}}}var Pe,Fe=e((()=>{Pe=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -954,7 +1114,7 @@ void main() {
     }
     outColor = c;
 }
-`}));function ke(e={}){let t=e.spacing??4;return{render(e){e.draw({frag:Ae,uniforms:{src:e.src,innerHeight:e.src.height||1,spacing:t},target:e.target})}}}var Ae,je=e((()=>{Ae=`#version 300 es
+`}));function Ie(e={}){let t=e.spacing??4;return{render(e){e.draw({frag:Le,uniforms:{src:e.src,innerHeight:e.src.height||1,spacing:t},target:e.target})}}}var Le,Re=e((()=>{Le=`#version 300 es
 precision highp float;
 in vec2 uvSrc;
 in vec2 uvContent;
@@ -975,7 +1135,7 @@ void main() {
     }
     outColor = c;
 }
-`}));function Me(e){let t=e.startsWith(`#`)?e.slice(1):e;return(t.length===3||t.length===4)&&(t=t.split(``).map(e=>e+e).join(``)),t.length===6&&(t+=`ff`),t.length===8?[Number.parseInt(t.slice(0,2),16)/255,Number.parseInt(t.slice(2,4),16)/255,Number.parseInt(t.slice(4,6),16)/255,Number.parseInt(t.slice(6,8),16)/255]:[0,0,0,0]}var Ne,Pe,q,Fe=e((()=>{Ne=`#version 300 es
+`}));function ze(e){let t=e.startsWith(`#`)?e.slice(1):e;return(t.length===3||t.length===4)&&(t=t.split(``).map(e=>e+e).join(``)),t.length===6&&(t+=`ff`),t.length===8?[Number.parseInt(t.slice(0,2),16)/255,Number.parseInt(t.slice(2,4),16)/255,Number.parseInt(t.slice(4,6),16)/255,Number.parseInt(t.slice(6,8),16)/255]:[0,0,0,0]}var Be,Ve,He,Ue=e((()=>{Be=`#version 300 es
 precision highp float;
 
 in vec2 uvContent;
@@ -1169,7 +1329,7 @@ void main() {
 
     outColor = mix(bgColor, base, visibleMask);
 }
-`,Pe={cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},q=class{params;constructor(e={}){this.params={...Pe,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params;e.draw({frag:Ne,uniforms:{src:e.src,mouseUv:[e.mouse[0]/r,e.mouse[1]/i],elementPx:[r,i],cellSize:a.cellSize,pressRadius:a.pressRadius,press:a.press,flatCells:+!!a.flatCells,seed:a.seed,time:e.time,speed:Math.max(0,a.speed),breathe:Math.max(0,a.breathe),breatheSpeed:Math.max(0,a.breatheSpeed),breatheScale:Math.max(1,a.breatheScale),bgColor:Me(a.bgColor)},target:e.target})}}}));function Ie(){let e=document.createElement(`article`);e.style.cssText=`width: 600px; padding: 32px; background: #fff; color: #202122; font-family: sans-serif; line-height: 1.6; border: 1px solid #a2a9b1;`;let t=`font-family: serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; padding-bottom: 4px; margin-top: 24px;`,n=`margin: 20px 0; text-align: center;`,r=`font-size: 0.85em; color: #54595d; margin-top: 4px;`,i=`width: 100%; height: auto; max-width: 480px; background: #f8f9fa; border: 1px solid #a2a9b1;`;return e.innerHTML=`
+`,Ve={cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},He=class{params;constructor(e={}){this.params={...Ve,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params;e.draw({frag:Be,uniforms:{src:e.src,mouseUv:[e.mouse[0]/r,e.mouse[1]/i],elementPx:[r,i],cellSize:a.cellSize,pressRadius:a.pressRadius,press:a.press,flatCells:+!!a.flatCells,seed:a.seed,time:e.time,speed:Math.max(0,a.speed),breathe:Math.max(0,a.breathe),breatheSpeed:Math.max(0,a.breatheSpeed),breatheScale:Math.max(1,a.breatheScale),bgColor:ze(a.bgColor)},target:e.target})}}}));function We(){let e=document.createElement(`article`);e.style.cssText=`width: 600px; padding: 32px; background: #fff; color: #202122; font-family: sans-serif; line-height: 1.6; border: 1px solid #a2a9b1;`;let t=`font-family: serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; padding-bottom: 4px; margin-top: 24px;`,n=`margin: 20px 0; text-align: center;`,r=`font-size: 0.85em; color: #54595d; margin-top: 4px;`,i=`width: 100%; height: auto; max-width: 480px; background: #f8f9fa; border: 1px solid #a2a9b1;`;return e.innerHTML=`
         <h1 style="font-family: serif; font-weight: normal;
                    border-bottom: 1px solid #a2a9b1;
                    padding-bottom: 4px; margin: 0 0 4px;">
@@ -1332,12 +1492,19 @@ void main() {
                 <i>Spatial Tessellations: Concepts and Applications of
                 Voronoi Diagrams</i> (2nd ed.). Wiley.</li>
         </ol>
-    `,e}function Le(e){let t=Math.round(window.innerWidth/2),n=Math.round(window.innerHeight/2),r=Math.min(t,n)*.4,i=0,a=window.setInterval(()=>{let o=i/60*Math.PI*2;e.dispatchEvent(new MouseEvent(`pointermove`,{clientX:t+Math.cos(o)*r,clientY:n+Math.sin(o)*r,bubbles:!0})),i++,i>120&&clearInterval(a)},16)}var Re,J,Y,X,Z,Q,$,ze;e((()=>{f(),c(),ee(),ce(),_e(),Te(),Oe(),je(),Fe(),u(),o(),Re={title:`Effect`,parameters:{layout:`fullscreen`}},J={render:()=>{let e=document.createElement(`img`);return e.src=l,e.style.display=`block`,e.style.margin=`40px auto`,e},args:void 0},J.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),r=new y({threshold:.2,softness:.1,intensity:5,scatter:1,dither:0,edgeFade:0,pad:50});await n.add(t,{effect:r}),s(`Bloom`,r)},Y={render:()=>{let e=document.createElement(`img`);return e.src=d,e},args:void 0},Y.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),r=new y({threshold:.01,softness:.2,intensity:10,scatter:1,dither:0,edgeFade:.02,pad:200});await n.add(t,{effect:[Ee({size:10}),ke({spacing:5}),r]}),s(`CRT Bloom`,r)},X={render:()=>{let e=document.createElement(`img`);return e.src=d,e},args:void 0},X.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),a=new se;await n.add(t,{effect:a}),r(`Fluid`,a),Le(e)},Z={render:()=>{let e=document.createElement(`img`);return e.src=l,e},args:void 0},Z.play=async({canvasElement:e})=>{let r=e.querySelector(`img`);await new Promise(e=>{r.onload=()=>e()});let a=i(),o={Jellyfish:d,Logo:l},s=null,c=async()=>{let e=s?{...s.params}:{};s&&(a.remove(r),t()),s=new ge(e),await a.add(r,{effect:s}),n(`Particle`,s,{img:r,sources:o,onSrcChange:async e=>{r.src=o[e],await new Promise(e=>{r.onload=()=>e()}),await c()}})};await c(),Le(e)},Q={render:()=>{let e=document.createElement(`img`);return e.src=l,e},args:void 0},Q.play=async({canvasElement:e})=>{let n=e.querySelector(`img`);await new Promise(e=>{n.onload=()=>e()}),await new Promise(e=>requestAnimationFrame(()=>e(void 0)));let r=i(),o={Logo:l,Jellyfish:d},s=null,c=async()=>{let e=s?{...s.params}:{};s&&(r.remove(n),t()),await new Promise(e=>requestAnimationFrame(()=>e(void 0))),s=new we(e),await r.add(n,{effect:s}),a(`Particle Explode`,s,{img:n,sources:o,onSrcChange:async e=>{n.src=o[e],await new Promise(e=>{n.onload=()=>e()}),await c()}})};await c()},$={render:e=>{let{src:t,...n}=e,r=i(),a=new q(n);if(t===`Webpage`){let e=document.getElementById(`storybook-root`);e&&(e.style.height=`auto`,e.style.display=`block`);let t=document.createElement(`div`);t.style.display=`flex`,t.style.justifyContent=`center`;let n=Ie();return t.appendChild(n),r.addHTML(n,{effect:a}),t}let o=document.createElement(`img`);return o.src=t===`Jellyfish`?d:l,r.add(o,{effect:a}),o},args:{src:`Webpage`,cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},argTypes:{src:{control:{type:`select`},options:[`Logo`,`Jellyfish`,`Webpage`]},cellSize:{control:{type:`range`,min:5,max:200,step:1}},pressRadius:{control:{type:`range`,min:0,max:800,step:10}},press:{control:{type:`range`,min:0,max:1,step:.01}},flatCells:{control:{type:`boolean`}},seed:{control:{type:`range`,min:0,max:1e3,step:1}},speed:{control:{type:`range`,min:0,max:5,step:.05}},breathe:{control:{type:`range`,min:0,max:1,step:.01}},breatheSpeed:{control:{type:`range`,min:0,max:5,step:.05}},breatheScale:{control:{type:`range`,min:10,max:500,step:5}},bgColor:{control:{type:`color`}}}},J.parameters={...J.parameters,docs:{...J.parameters?.docs,source:{originalSource:`{
+    `,e}function Ge(e){let t=Math.round(window.innerWidth/2),n=Math.round(window.innerHeight/2),r=Math.min(t,n)*.4,i=0,a=window.setInterval(()=>{let o=i/60*Math.PI*2;e.dispatchEvent(new MouseEvent(`pointermove`,{clientX:t+Math.cos(o)*r,clientY:n+Math.sin(o)*r,bubbles:!0})),i++,i>120&&clearInterval(a)},16)}var Ke,q,J,Y,X,Z,Q,$,qe;e((()=>{p(),l(),ee(),se(),ue(),we(),Me(),Fe(),Re(),Ue(),d(),n(),Ke={title:`Effect`,parameters:{layout:`fullscreen`}},q={render:()=>{let e=document.createElement(`img`);return e.src=u,e.style.display=`block`,e.style.margin=`40px auto`,e},args:void 0},q.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r=new b({threshold:.2,softness:.1,intensity:5,scatter:1,dither:0,edgeFade:0,pad:50});await n.add(t,{effect:r}),c(`Bloom`,r)},J={render:()=>{let e=document.createElement(`img`);return e.src=f,e},args:void 0},J.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r=new b({threshold:.01,softness:.2,intensity:10,scatter:1,dither:0,edgeFade:.02,pad:200});await n.add(t,{effect:[Ne({size:10}),Ie({spacing:5}),r]}),c(`CRT Bloom`,r)},Y={render:()=>{let e=document.createElement(`img`);return e.src=f,e},args:void 0},Y.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r=new oe;await n.add(t,{effect:r}),i(`Fluid`,r),Ge(e)},X={render:()=>{let e=document.createElement(`img`);return e.src=f,e},args:void 0},X.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r={Jellyfish:f,Logo:u},i=null,c=async()=>{let e=i?{...i.params}:{};i&&(n.remove(t),a()),i=new O(e),await n.add(t,{effect:i}),o(`Halftone`,i,{img:t,sources:r,onSrcChange:async e=>{t.src=r[e],await new Promise(e=>{t.onload=()=>e()}),await c()}})};await c()},Z={render:()=>{let e=document.createElement(`img`);return e.src=u,e},args:void 0},Z.play=async({canvasElement:e})=>{let n=e.querySelector(`img`);await new Promise(e=>{n.onload=()=>e()});let r=s(),i={Jellyfish:f,Logo:u},o=null,c=async()=>{let e=o?{...o.params}:{};o&&(r.remove(n),a()),o=new Ce(e),await r.add(n,{effect:o}),t(`Particle`,o,{img:n,sources:i,onSrcChange:async e=>{n.src=i[e],await new Promise(e=>{n.onload=()=>e()}),await c()}})};await c(),Ge(e)},Q={render:()=>{let e=document.createElement(`img`);return e.src=u,e},args:void 0},Q.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=()=>e()}),await new Promise(e=>requestAnimationFrame(()=>e(void 0)));let n=s(),i={Logo:u,Jellyfish:f},o=null,c=async()=>{let e=o?{...o.params}:{};o&&(n.remove(t),a()),await new Promise(e=>requestAnimationFrame(()=>e(void 0))),o=new je(e),await n.add(t,{effect:o}),r(`Particle Explode`,o,{img:t,sources:i,onSrcChange:async e=>{t.src=i[e],await new Promise(e=>{t.onload=()=>e()}),await c()}})};await c()},$={render:e=>{let{src:t,...n}=e,r=s(),i=new He(n);if(t===`Webpage`){let e=document.getElementById(`storybook-root`);e&&(e.style.height=`auto`,e.style.display=`block`);let t=document.createElement(`div`);t.style.display=`flex`,t.style.justifyContent=`center`;let n=We();return t.appendChild(n),r.addHTML(n,{effect:i}),t}let a=document.createElement(`img`);return a.src=t===`Jellyfish`?f:u,r.add(a,{effect:i}),a},args:{src:`Webpage`,cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},argTypes:{src:{control:{type:`select`},options:[`Logo`,`Jellyfish`,`Webpage`]},cellSize:{control:{type:`range`,min:5,max:200,step:1}},pressRadius:{control:{type:`range`,min:0,max:800,step:10}},press:{control:{type:`range`,min:0,max:1,step:.01}},flatCells:{control:{type:`boolean`}},seed:{control:{type:`range`,min:0,max:1e3,step:1}},speed:{control:{type:`range`,min:0,max:5,step:.05}},breathe:{control:{type:`range`,min:0,max:1,step:.01}},breatheSpeed:{control:{type:`range`,min:0,max:5,step:.05}},breatheScale:{control:{type:`range`,min:10,max:500,step:5}},bgColor:{control:{type:`color`}}}},q.parameters={...q.parameters,docs:{...q.parameters?.docs,source:{originalSource:`{
   render: () => {
     const img = document.createElement("img");
     img.src = Logo;
     img.style.display = "block";
     img.style.margin = "40px auto";
+    return img;
+  },
+  args: undefined
+}`,...q.parameters?.docs?.source}}},J.parameters={...J.parameters,docs:{...J.parameters?.docs,source:{originalSource:`{
+  render: () => {
+    const img = document.createElement("img");
+    img.src = Jellyfish;
     return img;
   },
   args: undefined
@@ -1501,4 +1668,4 @@ void main() {
       }
     }
   }
-}`,...$.parameters?.docs?.source}}},ze=[`bloom`,`crtBloom`,`fluid`,`particle`,`particleExplode`,`voronoi`]}))();export{ze as __namedExportsOrder,J as bloom,Y as crtBloom,Re as default,X as fluid,Z as particle,Q as particleExplode,$ as voronoi};
+}`,...$.parameters?.docs?.source}}},qe=[`bloom`,`crtBloom`,`fluid`,`halftone`,`particle`,`particleExplode`,`voronoi`]}))();export{qe as __namedExportsOrder,q as bloom,J as crtBloom,Ke as default,Y as fluid,X as halftone,Z as particle,Q as particleExplode,$ as voronoi};
