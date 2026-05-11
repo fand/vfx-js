@@ -14,13 +14,7 @@ export type HalftoneInkPalette = {
     blue: [number, number, number];
 };
 
-export type HalftoneInkPresetName =
-    | "pure"
-    | "newsprint"
-    | "fogra51"
-    | "swop"
-    | "riso-fluo"
-    | "riso-classic";
+export type HalftoneInkPresetName = "pure" | "newsprint" | "fogra51" | "swop";
 
 // FOGRA51 / SWOP values are CIELab(D50) solids from the standards
 // converted to sRGB (rounded to 3dp), so they're representative not
@@ -55,16 +49,6 @@ export const HALFTONE_INK_PRESETS: Record<
         magenta: [0.827, 0.02, 0.478],
         yellow: [0.984, 0.902, 0.027],
         black: [0.169, 0.169, 0.169],
-    },
-    "riso-fluo": {
-        red: [1.0, 0.29, 0.59],
-        green: [0.0, 0.69, 0.71],
-        blue: [1.0, 0.9, 0.0],
-    },
-    "riso-classic": {
-        red: [1.0, 0.18, 0.21],
-        green: [0.24, 0.32, 0.56],
-        blue: [1.0, 0.9, 0.0],
     },
 };
 

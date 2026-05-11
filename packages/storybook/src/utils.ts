@@ -223,8 +223,6 @@ const INK_PRESET_OPTIONS: Record<string, HalftoneInkPresetName> = {
     Newsprint: "newsprint",
     "FOGRA51 (offset)": "fogra51",
     "SWOP 2013": "swop",
-    "Riso fluo (pink/teal/yellow)": "riso-fluo",
-    "Riso classic (red/blue/yellow)": "riso-classic",
 };
 
 const CMYK_INK_KEYS = ["cyan", "magenta", "yellow", "black"] as const;
