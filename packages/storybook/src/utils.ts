@@ -259,7 +259,7 @@ function addInkPaletteBindings(pane: Pane, effect: HalftoneEffect): void {
                 .addBinding(mirror[key], "density", {
                     label: `${key} density`,
                     min: 0,
-                    max: 2,
+                    max: 1,
                     step: 0.01,
                 })
                 .on("change", () => writeBack(key));
