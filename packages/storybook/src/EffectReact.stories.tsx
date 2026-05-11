@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { Effect } from "@vfx-js/core";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { VFXImg, VFXProvider } from "react-vfx";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -17,11 +17,11 @@ export default {
 type EffectId = "pixelate" | "scanline" | "bloom";
 type ChainItem = { id: EffectId; enabled: boolean };
 
-const FACTORIES: Record<EffectId, () => Effect> = {
-    pixelate: () => createPixelateEffect({ size: 10 }),
-    scanline: () => createScanlineEffect({ spacing: 5 }),
-    bloom: () =>
-        new BloomEffect({
+function buildEffectInstances(): Record<EffectId, Effect> {
+    return {
+        pixelate: createPixelateEffect({ size: 10 }),
+        scanline: createScanlineEffect({ spacing: 5 }),
+        bloom: new BloomEffect({
             threshold: 0.01,
             softness: 0.2,
             intensity: 10.0,
@@ -30,7 +30,8 @@ const FACTORIES: Record<EffectId, () => Effect> = {
             edgeFade: 0.02,
             pad: 200,
         }),
-};
+    };
+}
 
 const INITIAL_CHAIN: ChainItem[] = [
     { id: "pixelate", enabled: true },
@@ -171,17 +172,24 @@ function SortableList({
 function CRTBloomReactApp(): React.ReactElement {
     const [chain, setChain] = useState<ChainItem[]>(INITIAL_CHAIN);
 
-    const effects = useMemo(
-        () => chain.filter((c) => c.enabled).map((c) => FACTORIES[c.id]()),
-        [chain],
-    );
+    // Persist effect instances across re-renders. vfx-js still rebuilds
+    // its internal EffectChain on every vfx.add (no live mutation API),
+    // but the JS objects (and their params) survive sort/toggle.
+    const instancesRef = useRef<Record<EffectId, Effect> | null>(null);
+    if (!instancesRef.current) {
+        instancesRef.current = buildEffectInstances();
+    }
+    const instances = instancesRef.current;
 
-    const remountKey = chain.map((c) => `${c.id}:${c.enabled}`).join("|");
+    const effects = useMemo(
+        () => chain.filter((c) => c.enabled).map((c) => instances[c.id]),
+        [chain, instances],
+    );
 
     return (
         <VFXProvider>
             <SortableList items={chain} onChange={setChain} />
-            <VFXImg key={remountKey} src={Jellyfish} effect={effects} />
+            <VFXImg src={Jellyfish} effect={effects} />
         </VFXProvider>
     );
 }
