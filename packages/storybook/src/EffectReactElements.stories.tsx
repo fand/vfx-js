@@ -11,7 +11,7 @@ import "./preset.css";
 // across registered elements, and these all share one VFXProvider.
 
 export default {
-    title: "Effect/React Elements",
+    title: "Effect/React",
     parameters: { layout: "fullscreen" },
 } satisfies Meta<undefined>;
 
@@ -119,7 +119,8 @@ function SmokeTestApp(): React.ReactElement {
     );
 }
 
-export const smokeTest: StoryObj<undefined> = {
+export const elementsSmokeTest: StoryObj<undefined> = {
+    name: "Elements Smoke Test",
     render: () => {
         const root = document.getElementById("storybook-root");
         if (root) {
@@ -131,7 +132,7 @@ export const smokeTest: StoryObj<undefined> = {
     },
     args: undefined,
 };
-smokeTest.play = async ({ canvasElement }) => {
+elementsSmokeTest.play = async ({ canvasElement }) => {
     await new Promise((r) => requestAnimationFrame(r));
     const container = canvasElement.firstElementChild as HTMLElement;
     const root = createRoot(container);

@@ -14,6 +14,11 @@ export default {
     parameters: { layout: "fullscreen" },
 } satisfies Meta<undefined>;
 
+// Stories under Effect/React are co-located by file:
+//   EffectReact.stories.tsx          — VFXImg
+//   EffectReactCanvas.stories.tsx    — VFXCanvas (HIC)
+//   EffectReactElements.stories.tsx  — VFXVideo / VFXSpan / VFXDiv / VFXP smoke
+
 type EffectId = "pixelate" | "scanline" | "bloom";
 type ChainItem = { id: EffectId; enabled: boolean };
 
@@ -194,14 +199,15 @@ function CRTBloomReactApp(): React.ReactElement {
     );
 }
 
-export const crtBloom: StoryObj<undefined> = {
+export const crtBloomImg: StoryObj<undefined> = {
+    name: "CRT Bloom (VFXImg)",
     render: () => {
         const container = document.createElement("div");
         return container;
     },
     args: undefined,
 };
-crtBloom.play = async ({ canvasElement }) => {
+crtBloomImg.play = async ({ canvasElement }) => {
     await new Promise((r) => requestAnimationFrame(r));
     const container = canvasElement.firstElementChild as HTMLElement;
     const root = createRoot(container);

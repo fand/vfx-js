@@ -9,7 +9,7 @@ import { createScanlineEffect } from "./effects/scanline";
 import "./preset.css";
 
 export default {
-    title: "Effect/React Canvas",
+    title: "Effect/React",
     parameters: { layout: "fullscreen" },
 } satisfies Meta<undefined>;
 
@@ -262,14 +262,15 @@ function CRTBloomCanvasApp(): React.ReactElement {
     );
 }
 
-export const crtBloom: StoryObj<undefined> = {
+export const crtBloomCanvas: StoryObj<undefined> = {
+    name: "CRT Bloom (VFXCanvas)",
     render: () => {
         const container = document.createElement("div");
         return container;
     },
     args: undefined,
 };
-crtBloom.play = async ({ canvasElement }) => {
+crtBloomCanvas.play = async ({ canvasElement }) => {
     await new Promise((r) => requestAnimationFrame(r));
     const container = canvasElement.firstElementChild as HTMLElement;
     const root = createRoot(container);
