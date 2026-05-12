@@ -124,6 +124,9 @@ type IntermediateEntry = {
  */
 export class EffectChain {
     #glCtx: GLContext;
+    #quad: Quad;
+    #pixelRatio: number;
+    #vfxProps: EffectVFXProps;
     #effects: readonly Effect[];
     #hosts: EffectHost[];
     #renderingIndices: number[];
@@ -164,20 +167,15 @@ export class EffectChain {
         isPostEffect: boolean,
     ) {
         this.#glCtx = glCtx;
+        this.#quad = quad;
+        this.#pixelRatio = pixelRatio;
+        this.#vfxProps = vfxProps;
         this.#effects = effects;
         this.#capture = capture;
         this.#isPostEffect = isPostEffect;
-        this.#hosts = effects.map(
-            () => new EffectHost(glCtx, quad, pixelRatio, capture, vfxProps),
-        );
+        this.#hosts = effects.map(() => this.#newHost());
         if (effects.length === 0) {
-            this.#ownedPassthroughHost = new EffectHost(
-                glCtx,
-                quad,
-                pixelRatio,
-                capture,
-                vfxProps,
-            );
+            this.#ownedPassthroughHost = this.#newHost();
         }
         this.#renderingIndices = effects
             .map((e, i) => (typeof e.render === "function" ? i : -1))
@@ -389,7 +387,122 @@ export class EffectChain {
         this.#stages = [];
     }
 
+    /**
+     * Replace the chain's effects with a new array, preserving hosts /
+     * init state for effects whose reference is unchanged. Reordering
+     * the same set of effects calls no `init` / `dispose`. Newly added
+     * effects get a fresh host and `init`; removed effects' `dispose`
+     * runs and their host is destroyed. Intermediate RTs are torn down
+     * and lazily rebuilt on the next frame (sizes follow the new chain).
+     *
+     * On `init` failure of a newly-added effect, the freshly-created
+     * hosts are rolled back and the existing chain is left intact.
+     */
+    async replaceEffects(newEffects: readonly Effect[]): Promise<void> {
+        if (this.#disposed) {
+            throw new Error("[VFX-JS] replaceEffects on disposed chain");
+        }
+
+        const oldEffects = this.#effects;
+        const oldHosts = this.#hosts;
+        const reusedHostByEffect = new Map<Effect, EffectHost>();
+        for (let i = 0; i < oldEffects.length; i++) {
+            reusedHostByEffect.set(oldEffects[i], oldHosts[i]);
+        }
+
+        const nextHosts: EffectHost[] = new Array(newEffects.length);
+        const newlyCreated: { host: EffectHost; effect: Effect }[] = [];
+        for (let i = 0; i < newEffects.length; i++) {
+            const e = newEffects[i];
+            const reused = reusedHostByEffect.get(e);
+            if (reused) {
+                nextHosts[i] = reused;
+                reusedHostByEffect.delete(e);
+            } else {
+                const host = this.#newHost();
+                nextHosts[i] = host;
+                newlyCreated.push({ host, effect: e });
+            }
+        }
+
+        for (let i = 0; i < newlyCreated.length; i++) {
+            const { host, effect } = newlyCreated[i];
+            host.setPhase("init");
+            try {
+                if (effect.init) {
+                    await effect.init(host.ctx);
+                }
+                host.setPhase("update");
+            } catch (err) {
+                console.error(
+                    "[VFX-JS] replaceEffects: new effect init() failed:",
+                    err,
+                );
+                for (let j = i - 1; j >= 0; j--) {
+                    const prior = newlyCreated[j];
+                    if (prior.effect.dispose) {
+                        try {
+                            prior.effect.dispose();
+                        } catch (e2) {
+                            console.error(
+                                "[VFX-JS] dispose during init rollback threw:",
+                                e2,
+                            );
+                        }
+                    }
+                    prior.host.dispose();
+                }
+                host.dispose();
+                throw err;
+            }
+        }
+
+        for (const [effect, host] of reusedHostByEffect) {
+            if (effect.dispose) {
+                try {
+                    effect.dispose();
+                } catch (err) {
+                    console.error(
+                        "[VFX-JS] effect.dispose() threw during replaceEffects:",
+                        err,
+                    );
+                }
+            }
+            host.dispose();
+        }
+
+        for (const im of this.#intermediates) {
+            im.fb.dispose();
+        }
+        this.#intermediates = [];
+        this.#stages = [];
+
+        if (newEffects.length === 0 && !this.#ownedPassthroughHost) {
+            this.#ownedPassthroughHost = this.#newHost();
+        } else if (newEffects.length > 0 && this.#ownedPassthroughHost) {
+            this.#ownedPassthroughHost.dispose();
+            this.#ownedPassthroughHost = null;
+        }
+
+        this.#effects = newEffects;
+        this.#hosts = nextHosts;
+        this.#renderingIndices = newEffects
+            .map((e, i) => (typeof e.render === "function" ? i : -1))
+            .filter((i) => i >= 0);
+        this.#warnedEffects.clear();
+    }
+
     // -- internals ----------------------------------------------------------
+
+    #newHost(): EffectHost {
+        return new EffectHost(
+            this.#glCtx,
+            this.#quad,
+            this.#pixelRatio,
+            this.#capture,
+            this.#vfxProps,
+        );
+    }
 
     #safeDispose(i: number): void {
         const e = this.#effects[i];

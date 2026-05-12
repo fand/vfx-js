@@ -172,9 +172,9 @@ function SortableList({
 function CRTBloomReactApp(): React.ReactElement {
     const [chain, setChain] = useState<ChainItem[]>(INITIAL_CHAIN);
 
-    // Persist effect instances across re-renders. vfx-js still rebuilds
-    // its internal EffectChain on every vfx.add (no live mutation API),
-    // but the JS objects (and their params) survive sort/toggle.
+    // Persist effect instances across re-renders so react-vfx's
+    // `vfx.updateEffects` fast path can match references and skip
+    // `init`/`dispose` for kept effects.
     const instancesRef = useRef<Record<EffectId, Effect> | null>(null);
     if (!instancesRef.current) {
         instancesRef.current = buildEffectInstances();

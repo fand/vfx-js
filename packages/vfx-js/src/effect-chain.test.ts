@@ -1095,6 +1095,201 @@ describe("EffectChain: single effect", () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// replaceEffects: reference-based diff
+// ---------------------------------------------------------------------------
+
+describe("EffectChain: replaceEffects", () => {
+    it("reordering keeps every host (no init / dispose)", async () => {
+        const a: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const b: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const c: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const chain = makeChain([a, b, c]);
+        await chain.initAll();
+        const hostA = hosts[0];
+        const hostB = hosts[1];
+        const hostC = hosts[2];
+
+        await chain.replaceEffects([c, a, b]);
+
+        expect(a.init).toHaveBeenCalledTimes(1);
+        expect(b.init).toHaveBeenCalledTimes(1);
+        expect(c.init).toHaveBeenCalledTimes(1);
+        expect(a.dispose).not.toHaveBeenCalled();
+        expect(b.dispose).not.toHaveBeenCalled();
+        expect(c.dispose).not.toHaveBeenCalled();
+
+        // Hosts ride along to the new positions.
+        expect(chain.hosts).toEqual([hostC, hostA, hostB]);
+        expect(chain.effects).toEqual([c, a, b]);
+        expect(chain.renderingIndices).toEqual([0, 1, 2]);
+    });
+
+    it("adding a new effect inits it and reuses kept hosts", async () => {
+        const a: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const b: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const chain = makeChain([a]);
+        await chain.initAll();
+        const hostA = hosts[0];
+
+        await chain.replaceEffects([a, b]);
+
+        expect(a.init).toHaveBeenCalledTimes(1); // not re-init'd
+        expect(b.init).toHaveBeenCalledTimes(1); // newly init'd
+        expect(a.dispose).not.toHaveBeenCalled();
+        expect(b.dispose).not.toHaveBeenCalled();
+        expect(chain.hosts[0]).toBe(hostA);
+        expect(chain.effects).toEqual([a, b]);
+    });
+
+    it("removing an effect disposes it + its host (kept hosts untouched)", async () => {
+        const a: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const b: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const chain = makeChain([a, b]);
+        await chain.initAll();
+        const hostA = hosts[0];
+        const hostB = hosts[1];
+
+        await chain.replaceEffects([a]);
+
+        expect(a.dispose).not.toHaveBeenCalled();
+        expect(b.dispose).toHaveBeenCalledTimes(1);
+        expect(hostA._calls.some((c) => c[0] === "dispose")).toBe(false);
+        expect(hostB._calls.some((c) => c[0] === "dispose")).toBe(true);
+        expect(chain.hosts).toEqual([hostA]);
+        expect(chain.effects).toEqual([a]);
+    });
+
+    it("non-overlapping swap inits new + disposes old", async () => {
+        const a: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const b: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const c: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const chain = makeChain([a, b]);
+        await chain.initAll();
+
+        await chain.replaceEffects([c]);
+
+        expect(a.dispose).toHaveBeenCalledTimes(1);
+        expect(b.dispose).toHaveBeenCalledTimes(1);
+        expect(c.init).toHaveBeenCalledTimes(1);
+        expect(chain.effects).toEqual([c]);
+    });
+
+    it("transitioning to empty disposes all and creates passthrough host", async () => {
+        const a: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const chain = makeChain([a]);
+        await chain.initAll();
+        const hostsBefore = hosts.length;
+
+        await chain.replaceEffects([]);
+
+        expect(a.dispose).toHaveBeenCalledTimes(1);
+        expect(chain.effects).toEqual([]);
+        expect(chain.hosts).toEqual([]);
+        // A new owned passthrough host is created on transition to empty.
+        expect(hosts.length).toBeGreaterThan(hostsBefore);
+
+        // Run still works (passthroughCopy via owned host).
+        chain.run(makeInput());
+    });
+
+    it("transitioning from empty disposes the passthrough host", async () => {
+        const a: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const chain = makeChain([]);
+        await chain.initAll();
+        const passthroughHost = hosts[0]; // ownedPassthroughHost
+
+        await chain.replaceEffects([a]);
+
+        expect(passthroughHost._calls.some((c) => c[0] === "dispose")).toBe(
+            true,
+        );
+        expect(a.init).toHaveBeenCalledTimes(1);
+        expect(chain.effects).toEqual([a]);
+    });
+
+    it("init throw on a new effect rolls back: old chain intact, new hosts disposed", async () => {
+        const a: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
+        const bad: Effect = {
+            init: vi.fn(() => {
+                throw new Error("boom");
+            }),
+            dispose: vi.fn(),
+            render: () => {},
+        };
+        const chain = makeChain([a]);
+        await chain.initAll();
+        const hostA = hosts[0];
+
+        const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        await expect(chain.replaceEffects([a, bad])).rejects.toThrow("boom");
+        errSpy.mockRestore();
+
+        // Old chain preserved.
+        expect(chain.effects).toEqual([a]);
+        expect(chain.hosts).toEqual([hostA]);
+        expect(a.dispose).not.toHaveBeenCalled();
+        // The failing effect's own dispose is NOT called (matches initAll
+        // contract). Its newly-created host IS disposed.
+        expect(bad.dispose).not.toHaveBeenCalled();
+        const badHost = hosts[hosts.length - 1];
+        expect(badHost._calls.some((c) => c[0] === "dispose")).toBe(true);
+    });
+
+    it("disposes intermediate FBOs so the next frame rebuilds for the new shape", async () => {
+        const a: Effect = { render: () => {} };
+        const b: Effect = { render: () => {} };
+        const chain = makeChain([a, b]);
+        await chain.initAll();
+        chain.run(makeInput()); // allocates 1 intermediate
+        const allocated = fbs.length;
+        expect(allocated).toBeGreaterThan(0);
+        const fbBefore = fbs[fbs.length - 1];
+        expect(fbBefore.disposed).toBe(false);
+
+        await chain.replaceEffects([a]); // single stage → no intermediates
+
+        expect(fbBefore.disposed).toBe(true);
+
+        // Next frame still runs (no leftover stage state).
+        chain.run(makeInput());
+    });
+
+    it("clears rendering-error suppression so new effects can warn afresh", async () => {
+        const errSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const throwing: Effect = {
+            render: () => {
+                throw new Error("render fail");
+            },
+        };
+        const chain = makeChain([throwing]);
+        chain.run(makeInput());
+        chain.run(makeInput());
+        // Warned once across two frames thanks to dedupe.
+        expect(errSpy).toHaveBeenCalledTimes(1);
+
+        const replacement: Effect = {
+            render: () => {
+                throw new Error("render fail 2");
+            },
+        };
+        await chain.replaceEffects([replacement]);
+        chain.run(makeInput());
+        // Suppression set was cleared on replace → new warning fires.
+        expect(errSpy).toHaveBeenCalledTimes(2);
+        errSpy.mockRestore();
+    });
+
+    it("rejects when called on a disposed chain", async () => {
+        const chain = makeChain([{ render: () => {} }]);
+        await chain.initAll();
+        chain.dispose();
+        await expect(
+            chain.replaceEffects([{ render: () => {} }]),
+        ).rejects.toThrow(/disposed/i);
+    });
+});
+
 afterEach(() => {
     vi.restoreAllMocks();
 });

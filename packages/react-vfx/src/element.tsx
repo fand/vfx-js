@@ -2,6 +2,7 @@ import type { VFXProps } from "@vfx-js/core";
 import * as React from "react";
 import { useContext, useEffect, useState } from "react";
 import { VFXContext } from "./context.js";
+import { useVFXLifecycle } from "./lifecycle.js";
 import { splitVFXProps } from "./split-props.js";
 
 type VFXElementProps<T extends keyof React.JSX.IntrinsicElements> =
@@ -30,26 +31,22 @@ export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
 
         const { vfxProps, domProps } = splitVFXProps(props);
 
-        // Create scene
+        useVFXLifecycle(element, vfx, vfxProps);
+
+        // MutationObserver lives alongside the lifecycle so dynamic text /
+        // attribute changes still propagate to the underlying texture.
         useEffect(() => {
             if (!vfx || !element) {
                 return;
             }
-
-            vfx.add(element, vfxProps);
-
             const mo = new MutationObserver(() => vfx.update(element));
             mo.observe(element, {
                 characterData: true,
                 attributes: true,
                 subtree: true,
             });
-
-            return () => {
-                mo.disconnect();
-                vfx.remove(element);
-            };
-        }, [element, vfx, vfxProps]);
+            return () => mo.disconnect();
+        }, [element, vfx]);
 
         return React.createElement(type, { ...domProps, ref });
     });
