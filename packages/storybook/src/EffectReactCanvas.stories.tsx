@@ -168,10 +168,17 @@ function SortableList({
     );
 }
 
-const CARD_STYLE: React.CSSProperties = {
+const CANVAS_STYLE: React.CSSProperties = {
     display: "block",
     width: "min(640px, 90vw)",
     margin: "64px auto",
+};
+
+// All visual styling lives on this inner div — putting padding /
+// background on the <canvas layoutsubtree> itself would stretch the
+// captured texture (canvas box includes padding, capture only sees
+// children's render area).
+const CARD_STYLE: React.CSSProperties = {
     padding: "40px 48px",
     background: "linear-gradient(135deg, #1a0030 0%, #001a30 100%)",
     borderRadius: 12,
@@ -196,55 +203,59 @@ function CRTBloomCanvasApp(): React.ReactElement {
     return (
         <VFXProvider>
             <SortableList items={chain} onChange={setChain} />
-            <VFXCanvas effect={effects} style={CARD_STYLE}>
-                <h1
-                    style={{
-                        margin: 0,
-                        fontSize: 48,
-                        fontWeight: 800,
-                        color: "#ff4fa3",
-                        textShadow: "0 0 12px rgba(255,79,163,0.6)",
-                        letterSpacing: -1,
-                    }}
-                >
-                    VFX-JS
-                </h1>
-                <p
-                    style={{
-                        margin: "24px 0 0",
-                        fontSize: 18,
-                        lineHeight: 1.6,
-                        color: "#a0e4ff",
-                    }}
-                >
-                    Live HTML captured into a WebGL texture via{" "}
-                    <strong style={{ color: "#ffe066" }}>html-in-canvas</strong>
-                    , then run through an effect chain. Reorder or toggle the
-                    effects on the right.
-                </p>
-                <div
-                    style={{
-                        marginTop: 28,
-                        display: "flex",
-                        gap: 12,
-                        flexWrap: "wrap",
-                    }}
-                >
-                    {["pixelate", "scanline", "bloom"].map((label) => (
-                        <span
-                            key={label}
-                            style={{
-                                padding: "6px 14px",
-                                borderRadius: 999,
-                                background: "rgba(255,255,255,0.08)",
-                                border: "1px solid rgba(255,255,255,0.2)",
-                                color: "#fff",
-                                fontSize: 14,
-                            }}
-                        >
-                            {label}
-                        </span>
-                    ))}
+            <VFXCanvas effect={effects} style={CANVAS_STYLE}>
+                <div style={CARD_STYLE}>
+                    <h1
+                        style={{
+                            margin: 0,
+                            fontSize: 48,
+                            fontWeight: 800,
+                            color: "#ff4fa3",
+                            textShadow: "0 0 12px rgba(255,79,163,0.6)",
+                            letterSpacing: -1,
+                        }}
+                    >
+                        VFX-JS
+                    </h1>
+                    <p
+                        style={{
+                            margin: "24px 0 0",
+                            fontSize: 18,
+                            lineHeight: 1.6,
+                            color: "#a0e4ff",
+                        }}
+                    >
+                        Live HTML captured into a WebGL texture via{" "}
+                        <strong style={{ color: "#ffe066" }}>
+                            html-in-canvas
+                        </strong>
+                        , then run through an effect chain. Reorder or toggle
+                        the effects on the right.
+                    </p>
+                    <div
+                        style={{
+                            marginTop: 28,
+                            display: "flex",
+                            gap: 12,
+                            flexWrap: "wrap",
+                        }}
+                    >
+                        {["pixelate", "scanline", "bloom"].map((label) => (
+                            <span
+                                key={label}
+                                style={{
+                                    padding: "6px 14px",
+                                    borderRadius: 999,
+                                    background: "rgba(255,255,255,0.08)",
+                                    border: "1px solid rgba(255,255,255,0.2)",
+                                    color: "#fff",
+                                    fontSize: 14,
+                                }}
+                            >
+                                {label}
+                            </span>
+                        ))}
+                    </div>
                 </div>
             </VFXCanvas>
         </VFXProvider>
