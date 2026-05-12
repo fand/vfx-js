@@ -15,7 +15,7 @@ const NON_EFFECT_KEYS: readonly (keyof VFXProps)[] = [
     "glslVersion",
 ] as const;
 
-function nonEffectKeysEqual(a: VFXProps, b: VFXProps): boolean {
+export function nonEffectKeysEqual(a: VFXProps, b: VFXProps): boolean {
     for (const k of NON_EFFECT_KEYS) {
         if (a[k] !== b[k]) {
             return false;

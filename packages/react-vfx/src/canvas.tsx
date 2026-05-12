@@ -1,4 +1,4 @@
-import type { VFXProps } from "@vfx-js/core";
+import type { VFX, VFXProps } from "@vfx-js/core";
 import {
     setupCapture,
     supportsHtmlInCanvas,
@@ -7,6 +7,7 @@ import {
 import * as React from "react";
 import { useContext, useEffect, useRef } from "react";
 import { VFXContext } from "./context.js";
+import { nonEffectKeysEqual } from "./lifecycle.js";
 import { splitVFXProps } from "./split-props.js";
 
 type VFXCanvasProps = React.PropsWithChildren<
@@ -15,6 +16,39 @@ type VFXCanvasProps = React.PropsWithChildren<
         style?: React.CSSProperties;
     }
 >;
+
+function applyCanvasDelta(
+    vfx: VFX,
+    target: HTMLElement,
+    isHIC: boolean,
+    latestCapture: OffscreenCanvas | null,
+    prev: VFXProps,
+    next: VFXProps,
+): void {
+    const onlyEffect = nonEffectKeysEqual(prev, next);
+    if (onlyEffect && prev.effect === next.effect) {
+        return;
+    }
+    if (onlyEffect && next.effect !== undefined) {
+        vfx.updateEffects(target, next.effect).catch((err) => {
+            console.error("[react-vfx] updateEffects failed:", err);
+        });
+        return;
+    }
+    vfx.remove(target);
+    // HIC's `layoutsubtree && initialCapture` branch in VFX.add needs the
+    // capture handed in; pass the most recent one so the slow path stays
+    // on the HIC route instead of falling through to plain canvas.
+    if (isHIC && latestCapture && target instanceof HTMLCanvasElement) {
+        vfx.add(target, next, latestCapture).catch((err) => {
+            console.error("[react-vfx] add (delta) failed:", err);
+        });
+    } else {
+        vfx.add(target, next).catch((err) => {
+            console.error("[react-vfx] add (delta) failed:", err);
+        });
+    }
+}
 
 /**
  * Wraps children in a `<canvas layoutsubtree>` and applies VFX via html-in-canvas.
@@ -33,7 +67,12 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
 
         const isSupported = supportsHtmlInCanvas();
 
-        // Forward ref
+        const propsRef = useRef(vfxProps);
+        propsRef.current = vfxProps;
+
+        const lastAppliedRef = useRef<VFXProps | null>(null);
+        const latestCaptureRef = useRef<OffscreenCanvas | null>(null);
+
         useEffect(() => {
             const el = isSupported ? canvasRef.current : fallbackRef.current;
             if (parentRef instanceof Function) {
@@ -43,7 +82,6 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
             }
         }, [parentRef, isSupported]);
 
-        // VFX registration
         useEffect(() => {
             if (!vfx) {
                 return;
@@ -54,33 +92,82 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                 if (!canvas) {
                     return;
                 }
-
+                const initial = propsRef.current;
                 let cancelled = false;
+
                 setupCapture(canvas, {
-                    onCapture: (offscreen) =>
-                        vfx.updateHICTexture(canvas, offscreen),
+                    onCapture: (offscreen) => {
+                        latestCaptureRef.current = offscreen;
+                        vfx.updateHICTexture(canvas, offscreen);
+                    },
                     maxSize: vfx.maxTextureSize,
-                }).then((initialCapture) => {
-                    if (cancelled) {
-                        return;
-                    }
-                    vfx.add(canvas, vfxProps, initialCapture);
-                });
+                })
+                    .then((initialCapture) => {
+                        if (cancelled) {
+                            return;
+                        }
+                        latestCaptureRef.current = initialCapture;
+                        return vfx.add(canvas, initial, initialCapture);
+                    })
+                    .then(() => {
+                        if (cancelled) {
+                            return;
+                        }
+                        lastAppliedRef.current = initial;
+                        const latest = propsRef.current;
+                        if (latest !== initial) {
+                            applyCanvasDelta(
+                                vfx,
+                                canvas,
+                                true,
+                                latestCaptureRef.current,
+                                initial,
+                                latest,
+                            );
+                            lastAppliedRef.current = latest;
+                        }
+                    })
+                    .catch((err) => {
+                        console.error(
+                            "[react-vfx] VFXCanvas mount failed:",
+                            err,
+                        );
+                    });
 
                 return () => {
                     cancelled = true;
                     teardownCapture(canvas);
                     vfx.remove(canvas);
+                    lastAppliedRef.current = null;
+                    latestCaptureRef.current = null;
                 };
             }
 
-            // Fallback: behave like VFXDiv
             const el = fallbackRef.current;
             if (!el) {
                 return;
             }
+            const initial = propsRef.current;
+            let cancelled = false;
 
-            vfx.add(el, vfxProps);
+            vfx.add(el, initial)
+                .then(() => {
+                    if (cancelled) {
+                        return;
+                    }
+                    lastAppliedRef.current = initial;
+                    const latest = propsRef.current;
+                    if (latest !== initial) {
+                        applyCanvasDelta(vfx, el, false, null, initial, latest);
+                        lastAppliedRef.current = latest;
+                    }
+                })
+                .catch((err) => {
+                    console.error(
+                        "[react-vfx] VFXCanvas (fallback) mount failed:",
+                        err,
+                    );
+                });
 
             const mo = new MutationObserver(() => vfx.update(el));
             mo.observe(el, {
@@ -91,10 +178,37 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
             });
 
             return () => {
+                cancelled = true;
                 mo.disconnect();
                 vfx.remove(el);
+                lastAppliedRef.current = null;
             };
-        }, [vfx, vfxProps, isSupported]);
+        }, [vfx, isSupported]);
+
+        useEffect(() => {
+            if (!vfx) {
+                return;
+            }
+            const target = isSupported
+                ? canvasRef.current
+                : fallbackRef.current;
+            if (!target) {
+                return;
+            }
+            const last = lastAppliedRef.current;
+            if (!last || last === vfxProps) {
+                return;
+            }
+            applyCanvasDelta(
+                vfx,
+                target,
+                isSupported,
+                latestCaptureRef.current,
+                last,
+                vfxProps,
+            );
+            lastAppliedRef.current = vfxProps;
+        }, [vfx, isSupported, vfxProps]);
 
         if (isSupported) {
             return React.createElement(
