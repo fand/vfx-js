@@ -196,6 +196,9 @@ importers:
       typescript:
         specifier: 6.0.2
         version: 6.0.2
+      vitest:
+        specifier: 4.1.4
+        version: 4.1.4(@types/node@24.12.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.7)(yaml@2.8.3))
 
   packages/storybook:
     dependencies:

@@ -8,7 +8,7 @@
     "clean": "turbo run clean",
     "lint": "turbo run lint",
     "prepare": "husky",
-    "test": "pnpm --filter @vfx-js/core test",
+    "test": "turbo run test",
     "prepare-release": "changeset && turbo run build lint test && changeset version",
     "release": "changeset publish"
   },

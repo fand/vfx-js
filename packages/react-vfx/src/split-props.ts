@@ -1,6 +1,6 @@
 import type { VFXProps } from "@vfx-js/core";
 
-const VFX_PROP_KEYS: readonly (keyof VFXProps)[] = [
+export const VFX_PROP_KEYS: readonly (keyof VFXProps)[] = [
     "shader",
     "release",
     "uniforms",
