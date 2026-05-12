@@ -25,7 +25,7 @@ void main() {
 `;
 
 export type ScanlineOptions = {
-    /** Line spacing in physical px. Default 4. */
+    /** Line spacing in CSS px. Default 4. */
     spacing?: number;
 };
 
@@ -41,7 +41,7 @@ export function createScanlineEffect(opts: ScanlineOptions = {}): Effect {
                 frag: FRAG_SCANLINE,
                 uniforms: {
                     src: ctx.src,
-                    innerHeight: ctx.dims.elementPixel[1] || 1,
+                    innerHeight: ctx.dims.element[1] || 1,
                     spacing,
                 },
                 target: ctx.target,

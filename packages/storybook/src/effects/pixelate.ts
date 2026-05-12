@@ -25,7 +25,7 @@ void main() {
 `;
 
 export type PixelateOptions = {
-    /** Cell size in physical px. Default 10. */
+    /** Cell size in CSS px. Default 10. */
     size?: number;
 };
 
@@ -37,7 +37,7 @@ export function createPixelateEffect(opts: PixelateOptions = {}): Effect {
     const size = opts.size ?? 10;
     return {
         render(ctx: EffectContext) {
-            const [w, h] = ctx.dims.elementPixel;
+            const [w, h] = ctx.dims.element;
             ctx.draw({
                 frag: FRAG_PIXELATE,
                 uniforms: {
