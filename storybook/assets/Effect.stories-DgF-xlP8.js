@@ -1,201 +1,4 @@
-import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,i as r,n as i,o as a,r as o,s,t as c}from"./utils-CIO8SNtI.js";import{n as l,r as u,t as d}from"./preset-hB8Fk8QM.js";import{n as f,t as p}from"./jellyfish-D2xsay8i.js";var m,h,g,_,v,y,b,ee=e((()=>{m=`#version 300 es
-precision highp float;
-in vec2 uvSrc;
-in vec2 uvContent;
-out vec4 outColor;
-uniform sampler2D src;
-uniform float threshold;
-uniform float softness;
-uniform float edgeFade;
-
-void main() {
-    // Hard-gate sampling to uvSrc in [0,1]: a bare clamp would smear
-    // src's edge pixels into the pad (visible as a stretched image
-    // when edgeFade x pad reaches past the src buffer). The clamp on
-    // texture() keeps the sampler happy; srcMask zeroes what lies
-    // outside the actual src content.
-    vec2 insideSrc = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
-    float srcMask = insideSrc.x * insideSrc.y;
-    vec3 srgb = texture(src, clamp(uvSrc, 0.0, 1.0)).rgb * srcMask;
-    vec3 lin = pow(srgb, vec3(2.2));
-
-    // COD:AW (Jimenez 2014) / Unity HDRP soft-knee brightness
-    // response. Quadratic ramp of half-width (threshold * softness)
-    // centred on the cutoff — softness gates mid-luma pixels on
-    // BOTH sides of threshold, so raising it *widens* the bloom
-    // (the previous one-sided smoothstep did the opposite).
-    // softness=0 collapses to a hard threshold; softness=1 extends
-    // the knee down to zero. br uses max-channel (COD convention)
-    // so saturated primaries still trigger bloom where a Rec.709
-    // luma would have hidden them.
-    float br = max(max(lin.r, lin.g), lin.b);
-    float knee = threshold * softness;
-    float rq = clamp(br - threshold + knee, 0.0, 2.0 * knee);
-    rq = rq * rq / (4.0 * knee + 1e-4);
-    float contribution = max(rq, br - threshold) / max(br, 1e-4);
-
-    // Chebyshev distance outside the inner rect in uvContent units;
-    // 0 inside, positive in the pad region.
-    vec2 outside = max(vec2(0.0), max(-uvContent, uvContent - 1.0));
-    float outDist = max(outside.x, outside.y);
-    float mask = 1.0 - smoothstep(0.0, edgeFade, outDist);
-    float f = contribution * mask;
-
-    outColor = vec4(lin * f, f);
-}
-`,h=`#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D src;
-uniform vec2 texelSize;
-uniform int karis;
-
-vec4 s(vec2 o) { return texture(src, uv + o); }
-float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
-
-void main() {
-    vec2 t = texelSize;
-    vec4 a = s(vec2(-2.0 * t.x, -2.0 * t.y));
-    vec4 b = s(vec2( 0.0,       -2.0 * t.y));
-    vec4 c = s(vec2( 2.0 * t.x, -2.0 * t.y));
-    vec4 d = s(vec2(-2.0 * t.x,  0.0));
-    vec4 e = s(vec2( 0.0,        0.0));
-    vec4 f = s(vec2( 2.0 * t.x,  0.0));
-    vec4 g = s(vec2(-2.0 * t.x,  2.0 * t.y));
-    vec4 h = s(vec2( 0.0,        2.0 * t.y));
-    vec4 i = s(vec2( 2.0 * t.x,  2.0 * t.y));
-    vec4 j = s(vec2(-1.0 * t.x, -1.0 * t.y));
-    vec4 k = s(vec2( 1.0 * t.x, -1.0 * t.y));
-    vec4 l = s(vec2(-1.0 * t.x,  1.0 * t.y));
-    vec4 m = s(vec2( 1.0 * t.x,  1.0 * t.y));
-
-    vec4 box1 = (a + b + d + e) * 0.25;
-    vec4 box2 = (b + c + e + f) * 0.25;
-    vec4 box3 = (d + e + g + h) * 0.25;
-    vec4 box4 = (e + f + h + i) * 0.25;
-    vec4 box5 = (j + k + l + m) * 0.25;
-
-    vec4 color;
-    if (karis == 1) {
-        float w1 = 1.0 / (1.0 + luma(box1.rgb));
-        float w2 = 1.0 / (1.0 + luma(box2.rgb));
-        float w3 = 1.0 / (1.0 + luma(box3.rgb));
-        float w4 = 1.0 / (1.0 + luma(box4.rgb));
-        float w5 = 1.0 / (1.0 + luma(box5.rgb));
-        color = (box1 * w1 + box2 * w2 + box3 * w3 + box4 * w4 + box5 * w5)
-              / (w1 + w2 + w3 + w4 + w5);
-    } else {
-        color = box1 * 0.125 + box2 * 0.125 + box3 * 0.125 + box4 * 0.125
-              + box5 * 0.5;
-    }
-    outColor = color;
-}
-`,g=`#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D srcSmall;
-uniform sampler2D srcLarge;
-uniform vec2 texelSize;
-uniform float weightLarge;
-uniform float weightSmall;
-
-void main() {
-    vec2 t = texelSize;
-    vec4 sum = vec4(0.0);
-    sum += texture(srcSmall, uv + vec2(-t.x, -t.y)) * 1.0;
-    sum += texture(srcSmall, uv + vec2( 0.0, -t.y)) * 2.0;
-    sum += texture(srcSmall, uv + vec2( t.x, -t.y)) * 1.0;
-    sum += texture(srcSmall, uv + vec2(-t.x,  0.0)) * 2.0;
-    sum += texture(srcSmall, uv                  ) * 4.0;
-    sum += texture(srcSmall, uv + vec2( t.x,  0.0)) * 2.0;
-    sum += texture(srcSmall, uv + vec2(-t.x,  t.y)) * 1.0;
-    sum += texture(srcSmall, uv + vec2( 0.0,  t.y)) * 2.0;
-    sum += texture(srcSmall, uv + vec2( t.x,  t.y)) * 1.0;
-    sum *= (1.0 / 16.0);
-    outColor = texture(srcLarge, uv) * weightLarge + sum * weightSmall;
-}
-`,_=`#version 300 es
-precision highp float;
-in vec2 uv;
-in vec2 uvSrc;
-in vec2 uvContent;
-out vec4 outColor;
-uniform sampler2D src;
-uniform sampler2D bloom;
-uniform vec2 texelSize;
-uniform float intensity;
-uniform float dither;
-uniform float edgeFade;
-
-// Interleaved gradient noise (Jimenez 2014). Cheap, high-quality,
-// spatially decorrelated — perfect for breaking 8-bit quantisation
-// bands in the gamma-encoded bloom halo.
-float ign(vec2 p) {
-    return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
-}
-
-void main() {
-    // 5×5 binomial gaussian ([1,4,6,4,1]/16 outer-producted) via 9
-    // bilinear taps at ±1.2 source texels. Each bilinear fetch
-    // integrates a tap-pair perfectly, so result ≡ 25-tap convolution.
-    vec2 t = texelSize * 1.2;
-    vec4 b = vec4(0.0);
-    b += texture(bloom, uv + vec2(-t.x, -t.y)) * 25.0;
-    b += texture(bloom, uv + vec2( 0.0, -t.y)) * 30.0;
-    b += texture(bloom, uv + vec2( t.x, -t.y)) * 25.0;
-    b += texture(bloom, uv + vec2(-t.x,  0.0)) * 30.0;
-    b += texture(bloom, uv                  ) * 36.0;
-    b += texture(bloom, uv + vec2( t.x,  0.0)) * 30.0;
-    b += texture(bloom, uv + vec2(-t.x,  t.y)) * 25.0;
-    b += texture(bloom, uv + vec2( 0.0,  t.y)) * 30.0;
-    b += texture(bloom, uv + vec2( t.x,  t.y)) * 25.0;
-    b *= (1.0 / 256.0);
-
-    // Same soft edge-fade as threshold so base and bloom share a
-    // coverage footprint — base alpha tapers into the pad instead of
-    // stepping from 1 to 0. The hard srcMask (same shape as the
-    // threshold pass) kills anything outside src's valid [0,1] so
-    // bloom pad extending past the src buffer doesn't repeat edge
-    // pixels.
-    vec2 insideSrc = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
-    float srcMask = insideSrc.x * insideSrc.y;
-    vec4 baseColor = texture(src, clamp(uvSrc, 0.0, 1.0)) * srcMask;
-    vec2 outside = max(vec2(0.0), max(-uvContent, uvContent - 1.0));
-    float outDist = max(outside.x, outside.y);
-    float baseMask = 1.0 - smoothstep(0.0, edgeFade, outDist);
-    baseColor.a *= baseMask;
-
-    // Linear composite: decode base, add linear bloom, single pow out.
-    vec3 baseLin = pow(baseColor.rgb, vec3(2.2));
-    vec3 lin = baseLin + max(b.rgb, vec3(0.0)) * intensity;
-    vec3 rgb = pow(max(lin, vec3(0.0)), vec3(1.0 / 2.2));
-
-    // TPDF dither just before 8-bit quantisation. Two IGN samples
-    // summed give a triangular PDF in [-1, 1], which decorrelates the
-    // quantisation error from the signal (uniform dither doesn't).
-    // Independent per channel to avoid tinted bands.
-    vec3 n1 = vec3(
-        ign(gl_FragCoord.xy),
-        ign(gl_FragCoord.xy + 17.0),
-        ign(gl_FragCoord.xy + 41.0)
-    );
-    vec3 n2 = vec3(
-        ign(gl_FragCoord.xy + 113.0),
-        ign(gl_FragCoord.xy + 131.0),
-        ign(gl_FragCoord.xy + 149.0)
-    );
-    vec3 n = n1 + n2 - 1.0;
-    rgb += n * dither / 255.0;
-
-    // Premultiply with the union coverage of base and bloom. At pad
-    // edges both feed zero so rgb × a → 0 and the halo dissolves
-    // instead of leaving a gamma-boosted floor behind.
-    float a = clamp(max(baseColor.a, b.a * intensity), 0.0, 1.0);
-    outColor = vec4(rgb * a, a);
-}
-`,v={threshold:.7,softness:.1,intensity:1.2,scatter:.7,pad:50,dither:0,edgeFade:.02},y=.5,b=class{params;#e=null;#t=[];#n=[];#r=!1;#i=0;#a=0;constructor(e={}){this.params={...v,...e}}setParams(e){Object.assign(this.params,e)}init(e){this.#e=e.createRenderTarget({float:!0})}render(e){if(!this.#e)return;let{threshold:t,softness:n,intensity:r}=this.params,i=Math.min(Math.max(this.params.scatter,0),1),a=Math.max(0,this.params.dither),o=Math.max(1e-6,this.params.edgeFade);(this.#e.width!==this.#i||this.#e.height!==this.#a)&&(this.#t.length=0,this.#n.length=0,this.#r=!1,this.#i=this.#e.width,this.#a=this.#e.height),this.#o(e,this.#e.width,this.#e.height);let s=this.#t.length;if(s===0)return;e.draw({frag:m,uniforms:{src:e.src,threshold:t,softness:n,edgeFade:o},target:this.#e}),e.draw({frag:h,uniforms:{src:this.#e,texelSize:[1/this.#e.width,1/this.#e.height],karis:1},target:this.#t[0]});for(let t=1;t<s;t++){let n=this.#t[t-1];e.draw({frag:h,uniforms:{src:n,texelSize:[1/n.width,1/n.height],karis:0},target:this.#t[t]})}let c=this.#e.width,l=this.#e.height,u=1+i*Math.max(0,s-1),d=e=>Math.min(1,Math.max(0,u-e));for(let t=s-2;t>=0;t--){let n=t===s-2?this.#t[s-1]:this.#n[t+1],r=2**(t+2),i=t===s-2?d(s-1):1;e.draw({frag:g,uniforms:{srcSmall:n,srcLarge:this.#t[t],texelSize:[y*r/c,y*r/l],weightLarge:d(t),weightSmall:i},target:this.#n[t]})}let f=s>=2?this.#n[0]:this.#t[0],p=r/Math.max(1,u);e.draw({frag:_,uniforms:{src:e.src,bloom:f,texelSize:[y*2/c,y*2/l],intensity:p,dither:a,edgeFade:o},target:e.target})}outputRect(e){let{pad:t}=this.params;if(t===`fullscreen`)return e.canvasRect;let n=t*e.pixelRatio,[,,r,i]=e.contentRect;return[-n,-n,r+2*n,i+2*n]}dispose(){this.#e=null,this.#t.length=0,this.#n.length=0,this.#r=!1,this.#i=0,this.#a=0}#o(e,t,n){if(this.#r)return;let r=Math.max(1,Math.floor(t/2)),i=Math.max(1,Math.floor(n/2));for(let t=0;t<8;t++){this.#t.push(e.createRenderTarget({size:[r,i],float:!0}));let t=Math.max(1,Math.floor(r/2)),n=Math.max(1,Math.floor(i/2));if(t===r&&n===i)break;r=t,i=n}for(let t=0;t<this.#t.length-1;t++)this.#n.push(e.createRenderTarget({size:[this.#t[t].width,this.#t[t].height],float:!0}));this.#r=!0}}})),te,x,S,C,w,ne,re,ie,ae,T,oe,se=e((()=>{te=`#version 300 es
+import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,i as r,n as i,o as a,r as o,s,t as c}from"./utils-BhXNjmT_.js";import{n as l,t as u}from"./logo-640w-20p-DamX1-bG.js";import{t as d}from"./preset-B7f9t9lo.js";import{n as f,t as p}from"./jellyfish-B6nQsbyY.js";import{a as m,i as h,n as g,o as _,r as v,t as ee}from"./scanline-2v0BbA_z.js";var te,ne,re,ie,ae,oe,y,b,x,S,C,se=e((()=>{te=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -209,7 +12,7 @@ void main() {
     float B = texture(velocity, uv - vec2(0.0, simTexel.y)).x;
     outColor = vec4(0.5 * (R - L - T + B), 0.0, 0.0, 1.0);
 }
-`,x=`#version 300 es
+`,ne=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -249,7 +52,7 @@ void main() {
 
     outColor = vec4(vel, 0.0, 1.0);
 }
-`,S=`#version 300 es
+`,re=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -269,11 +72,11 @@ void main() {
     if (uv.y - simTexel.y < 0.0) B = -C.y;
     outColor = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
 }
-`,C=`#version 300 es
+`,ie=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() { outColor = vec4(0.0); }
-`,w=`#version 300 es
+`,ae=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -289,7 +92,7 @@ void main() {
     float div = texture(divergence, uv).x;
     outColor = vec4((L + R + B + T - div) * 0.25, 0.0, 0.0, 1.0);
 }
-`,ne=`#version 300 es
+`,oe=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -306,7 +109,7 @@ void main() {
     vel -= vec2(R - L, T - B);
     outColor = vec4(vel, 0.0, 1.0);
 }
-`,re=`#version 300 es
+`,y=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -321,7 +124,7 @@ void main() {
     advected /= 1.0 + velocityDissipation * 0.016;
     outColor = vec4(advected, 0.0, 1.0);
 }
-`,ie=`#version 300 es
+`,b=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -361,7 +164,7 @@ void main() {
 
     outColor = vec4(max(d, vec3(0.0)), 1.0);
 }
-`,ae=`#version 300 es
+`,x=`#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvSrc;
@@ -397,7 +200,7 @@ void main() {
                   * smoothstep(.2, .8, v) * 0.2;
     }
 }
-`,T={simSize:[256,256],pressureIterations:1,curlStrength:13,velocityDissipation:.6,densityDissipation:.65,splatForce:6e3,splatRadius:.002,dyeSplatRadius:.001,dyeSplatIntensity:.005,showDye:!1},oe=class{params;#e=null;#t=null;#n=null;#r=null;#i=null;#a=null;#o=null;#s=null;#c=[0,0];#l=!1;constructor(e={}){this.params={...T,...e}}init(e){let t=this.params.simSize,n={size:t,float:!0};this.#e=e.createRenderTarget(n),this.#t=e.createRenderTarget(n),this.#n=e.createRenderTarget(n),this.#r=e.createRenderTarget(n),this.#i=e.createRenderTarget(n),this.#a=e.createRenderTarget(n),this.#o=e.createRenderTarget({size:t,float:!0,persistent:!0}),this.#s=e.createRenderTarget({float:!0,persistent:!0})}render(e){if(!this.#e||!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||!this.#o||!this.#s)return;let{simSize:t,pressureIterations:n,curlStrength:r,velocityDissipation:i,densityDissipation:a,splatForce:o,splatRadius:s,dyeSplatRadius:c,dyeSplatIntensity:l,showDye:u}=this.params,d=[1/t[0],1/t[1]],[f,p]=e.dims.elementPixel,m=f/p,h=[e.mouse[0]/f,e.mouse[1]/p],g=this.#l?[h[0]-this.#c[0],h[1]-this.#c[1]]:[0,0];this.#c=h,this.#l=!0,e.draw({frag:te,uniforms:{velocity:this.#o,simTexel:d},target:this.#e}),e.draw({frag:x,uniforms:{velocity:this.#o,curl:this.#e,simTexel:d,aspect:m,mouseUv:h,mouseDeltaUv:g,curlStrength:r,splatForce:o,splatRadius:s},target:this.#t}),e.draw({frag:S,uniforms:{vortVel:this.#t,simTexel:d},target:this.#n}),e.draw({frag:C,target:this.#r});let _=this.#r,v=this.#i;for(let t=0;t<n;t++){e.draw({frag:w,uniforms:{pressure:_,divergence:this.#n,simTexel:d},target:v});let t=_;_=v,v=t}e.draw({frag:ne,uniforms:{vortVel:this.#t,pressure:_,simTexel:d},target:this.#a}),e.draw({frag:re,uniforms:{projVel:this.#a,simTexel:d,velocityDissipation:i},target:this.#o}),e.draw({frag:ie,uniforms:{velocity:this.#o,dye:this.#s,time:e.time,aspect:m,mouseUv:h,mouseDeltaUv:g,simSize:t,densityDissipation:a,dyeSplatRadius:c,dyeSplatIntensity:l},target:this.#s}),e.draw({frag:ae,uniforms:{src:e.src,dye:this.#s,velocity:this.#o,simSize:t,showDye:+!!u,time:e.time},target:e.target})}dispose(){this.#e=null,this.#t=null,this.#n=null,this.#r=null,this.#i=null,this.#a=null,this.#o=null,this.#s=null,this.#l=!1}}})),E,ce,D,le,O,ue=e((()=>{E={pure:{cyan:[0,1,1,1],magenta:[1,0,1,1],yellow:[1,1,0,1],black:[0,0,0,1],red:[1,0,0,1],green:[0,1,0,1],blue:[0,0,1,1]},newsprint:{cyan:[.15,.73,.88,1],magenta:[.88,.12,.55,1],yellow:[.97,.93,.08,1],black:[.1,.1,.1,1]},fogra51:{cyan:[0,.525,.765,1],magenta:[.827,0,.486,1],yellow:[.984,.91,0,1],black:[.145,.145,.145,1]},swop:{cyan:[0,.557,.769,1],magenta:[.827,.02,.478,1],yellow:[.984,.902,.027,1],black:[.169,.169,.169,1]}},ce=`#version 300 es
+`,S={simSize:[256,256],pressureIterations:1,curlStrength:13,velocityDissipation:.6,densityDissipation:.65,splatForce:6e3,splatRadius:.002,dyeSplatRadius:.001,dyeSplatIntensity:.005,showDye:!1},C=class{params;#e=null;#t=null;#n=null;#r=null;#i=null;#a=null;#o=null;#s=null;#c=[0,0];#l=!1;constructor(e={}){this.params={...S,...e}}init(e){let t=this.params.simSize,n={size:t,float:!0};this.#e=e.createRenderTarget(n),this.#t=e.createRenderTarget(n),this.#n=e.createRenderTarget(n),this.#r=e.createRenderTarget(n),this.#i=e.createRenderTarget(n),this.#a=e.createRenderTarget(n),this.#o=e.createRenderTarget({size:t,float:!0,persistent:!0}),this.#s=e.createRenderTarget({float:!0,persistent:!0})}render(e){if(!this.#e||!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||!this.#o||!this.#s)return;let{simSize:t,pressureIterations:n,curlStrength:r,velocityDissipation:i,densityDissipation:a,splatForce:o,splatRadius:s,dyeSplatRadius:c,dyeSplatIntensity:l,showDye:u}=this.params,d=[1/t[0],1/t[1]],[f,p]=e.dims.elementPixel,m=f/p,h=[e.mouse[0]/f,e.mouse[1]/p],g=this.#l?[h[0]-this.#c[0],h[1]-this.#c[1]]:[0,0];this.#c=h,this.#l=!0,e.draw({frag:te,uniforms:{velocity:this.#o,simTexel:d},target:this.#e}),e.draw({frag:ne,uniforms:{velocity:this.#o,curl:this.#e,simTexel:d,aspect:m,mouseUv:h,mouseDeltaUv:g,curlStrength:r,splatForce:o,splatRadius:s},target:this.#t}),e.draw({frag:re,uniforms:{vortVel:this.#t,simTexel:d},target:this.#n}),e.draw({frag:ie,target:this.#r});let _=this.#r,v=this.#i;for(let t=0;t<n;t++){e.draw({frag:ae,uniforms:{pressure:_,divergence:this.#n,simTexel:d},target:v});let t=_;_=v,v=t}e.draw({frag:oe,uniforms:{vortVel:this.#t,pressure:_,simTexel:d},target:this.#a}),e.draw({frag:y,uniforms:{projVel:this.#a,simTexel:d,velocityDissipation:i},target:this.#o}),e.draw({frag:b,uniforms:{velocity:this.#o,dye:this.#s,time:e.time,aspect:m,mouseUv:h,mouseDeltaUv:g,simSize:t,densityDissipation:a,dyeSplatRadius:c,dyeSplatIntensity:l},target:this.#s}),e.draw({frag:x,uniforms:{src:e.src,dye:this.#s,velocity:this.#o,simSize:t,showDye:+!!u,time:e.time},target:e.target})}dispose(){this.#e=null,this.#t=null,this.#n=null,this.#r=null,this.#i=null,this.#a=null,this.#o=null,this.#s=null,this.#l=!1}}})),w,ce,T,le,ue,de=e((()=>{w={pure:{cyan:[0,1,1,1],magenta:[1,0,1,1],yellow:[1,1,0,1],black:[0,0,0,1],red:[1,0,0,1],green:[0,1,0,1],blue:[0,0,1,1]},newsprint:{cyan:[.15,.73,.88,1],magenta:[.88,.12,.55,1],yellow:[.97,.93,.08,1],black:[.1,.1,.1,1]},fogra51:{cyan:[0,.525,.765,1],magenta:[.827,0,.486,1],yellow:[.984,.91,0,1],black:[.145,.145,.145,1]},swop:{cyan:[0,.557,.769,1],magenta:[.827,.02,.478,1],yellow:[.984,.902,.027,1],black:[.169,.169,.169,1]}},ce=`#version 300 es
 precision highp float;
 
 in vec2 uvContent;
@@ -557,7 +360,7 @@ void main() {
 
     outColor = vec4(outRgbPremul, outA);
 }
-`,D={...E.pure,...E.newsprint},le={gridSize:10,dotSize:1,smoothing:.15,angle:0,mode:`rgb`,blackAmount:1,trimEdge:!0,background:[0,0,0,0],inkPalette:D},O=class{params;constructor(e={}){this.params={...le,...e,inkPalette:{...D,...e.inkPalette??{}}}}setParams(e){Object.assign(this.params,e)}setInkPreset(e){Object.assign(this.params.inkPalette,E[e])}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params,o=a.inkPalette;e.draw({frag:ce,uniforms:{src:e.src,srcSizePx:[e.src.width||1,e.src.height||1],elementPx:[r,i],gridSize:Math.max(1,a.gridSize),dotSize:Math.max(0,a.dotSize),smoothing:Math.max(0,Math.min(1,a.smoothing)),angle:a.angle,blackAmount:Math.max(0,Math.min(1,a.blackAmount)),ymck:+(a.mode===`cmyk`),trimEdge:+!!a.trimEdge,background:a.background,cInk:o.cyan,mInk:o.magenta,yInk:o.yellow,kInk:o.black,rInk:o.red,gInk:o.green,bInk:o.blue},target:e.target})}}})),k,A,j,de=e((()=>{k=.7,A=1.3,j=`
+`,T={...w.pure,...w.newsprint},le={gridSize:10,dotSize:1,smoothing:.15,angle:0,mode:`rgb`,blackAmount:1,trimEdge:!0,background:[0,0,0,0],inkPalette:T},ue=class{params;constructor(e={}){this.params={...le,...e,inkPalette:{...T,...e.inkPalette??{}}}}setParams(e){Object.assign(this.params,e)}setInkPreset(e){Object.assign(this.params.inkPalette,w[e])}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params,o=a.inkPalette;e.draw({frag:ce,uniforms:{src:e.src,srcSizePx:[e.src.width||1,e.src.height||1],elementPx:[r,i],gridSize:Math.max(1,a.gridSize),dotSize:Math.max(0,a.dotSize),smoothing:Math.max(0,Math.min(1,a.smoothing)),angle:a.angle,blackAmount:Math.max(0,Math.min(1,a.blackAmount)),ymck:+(a.mode===`cmyk`),trimEdge:+!!a.trimEdge,background:a.background,cInk:o.cyan,mInk:o.magenta,yInk:o.yellow,kInk:o.black,rInk:o.red,gInk:o.green,bInk:o.blue},target:e.target})}}})),E,D,O,fe=e((()=>{E=.7,D=1.3,O=`
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 float mod289(float x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
@@ -660,15 +463,15 @@ vec3 sampleCurl(vec3 pos, vec2 elementPixel, float scale, float animTime) {
     vec3 noiseInput = pos * stretch / max(scale, 1e-4);
     return curl3D(noiseInput, animTime) / stretch;
 }
-`}));function M(e){let t=N(e);return 2**Math.ceil(Math.log2(Math.sqrt(t)))}function N(e){return Number.isFinite(e)?Math.max(1,Math.floor(e)):1}function fe(e){let t=e|0;return[(t>>16&255)/255,(t>>8&255)/255,(t&255)/255]}function P(e){return Math.min(B,Math.max(0,e))}var F,I,L,R,z,B,V=e((()=>{F=new Float32Array([-.5,-.5,.5,-.5,.5,.5,-.5,-.5,.5,.5,-.5,.5]),I=`
+`}));function k(e){let t=A(e);return 2**Math.ceil(Math.log2(Math.sqrt(t)))}function A(e){return Number.isFinite(e)?Math.max(1,Math.floor(e)):1}function pe(e){let t=e|0;return[(t>>16&255)/255,(t>>8&255)/255,(t&255)/255]}function j(e){return Math.min(L,Math.max(0,e))}var M,N,P,F,I,L,R=e((()=>{M=new Float32Array([-.5,-.5,.5,-.5,.5,.5,-.5,-.5,.5,.5,-.5,.5]),N=`
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
-`,L=`#version 300 es
+`,P=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() { outColor = vec4(0.0); }
-`,R=`#version 300 es
+`,F=`#version 300 es
 precision highp float;
 in vec2 vCorner;
 in vec4 vColor;
@@ -681,7 +484,7 @@ void main() {
     float a = vColor.a * fall;
     outColor = vec4(vColor.rgb * a, a);
 }
-`,z=`#version 300 es
+`,I=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -707,19 +510,19 @@ void main() {
         );
     }
 }
-`,B=.1})),H,U,pe,me,W,he,G,ge,_e,ve,K,ye,be,xe,Se,Ce,we=e((()=>{de(),V(),H=64,U=H*H,pe=.1,me=[H,H],W=new Float32Array(U);for(let e=0;e<U;e++)W[e]=e;he=`#version 300 es
+`,L=.1})),z,B,V,H,U,me,W,he,ge,_e,G,ve,ye,be,xe,Se,Ce=e((()=>{fe(),R(),z=64,B=z*z,V=.1,H=[z,z],U=new Float32Array(B);for(let e=0;e<B;e++)U[e]=e;me=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() {
     outColor = vec4(0.0, 0.0, 0.0, 2.0);
 }
-`,G=`#version 300 es
+`,W=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() {
     outColor = vec4(0.0);
 }
-`,ge=`#version 300 es
+`,he=`#version 300 es
 precision highp float;
 in vec2 position;
 
@@ -780,7 +583,7 @@ void main() {
     vCorner = position;
     vColor = vec4(c.rgb, lifeAlpha * alpha * fogFactor);
 }
-`,_e=`#version 300 es
+`,ge=`#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvSrc;
@@ -800,7 +603,7 @@ void main() {
     vec4 t = texture(trail, uv);
     outColor = vec4(base.rgb * (1.0 - t.a) + t.rgb, max(base.a, t.a));
 }
-`,ve=`#version 300 es
+`,_e=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -818,7 +621,7 @@ uniform float noiseScale;
 uniform float noiseAnimation;
 uniform float speedDecay;
 uniform float life;
-${j}
+${O}
 
 void main() {
     vec4 s = texture(posTex, uv);
@@ -853,7 +656,7 @@ void main() {
 
     outColor = vec4(pos, age);
 }
-`,K=`#version 300 es
+`,G=`#version 300 es
 precision highp float;
 in float position;
 
@@ -883,7 +686,7 @@ void main() {
     gl_PointSize = 1.0;
     vSpawn = s;
 }
-`,ye=`#version 300 es
+`,ve=`#version 300 es
 precision highp float;
 in vec4 vSpawn;
 out vec4 outColor;
@@ -902,7 +705,7 @@ void main() {
     }
     outColor = vec4(spawnUv, 0.0, 0.0);
 }
-`,be=`#version 300 es
+`,ye=`#version 300 es
 precision highp float;
 in vec4 vSpawn;
 out vec4 outColor;
@@ -911,7 +714,7 @@ uniform sampler2D src;
 uniform vec3 color;
 uniform float colorMix;
 uniform vec2 lifeJitterRange;
-${I}
+${N}
 
 void main() {
     vec4 c = texture(src, clamp(vSpawn.yz, 0.0, 1.0));
@@ -919,7 +722,7 @@ void main() {
     float lifeJitter = mix(lifeJitterRange.x, lifeJitterRange.y, h);
     outColor = vec4(mix(c.rgb, color, colorMix), lifeJitter);
 }
-`,xe=`#version 300 es
+`,be=`#version 300 es
 precision highp float;
 in vec4 vSpawn;
 out vec4 outColor;
@@ -928,7 +731,7 @@ void main() {
     vec2 dir = theta >= 0.0 ? vec2(cos(theta), sin(theta)) : vec2(0.0);
     outColor = vec4(dir, 0.0, 0.0);
 }
-`,Se={count:1024*1024,birthRate:3e4,screenBirthRate:1e4,life:1,noiseSpeed:.3,emitSpeed:1,noiseDelay:.15,noiseScale:1,noiseAnimation:.3,pointSize:10,alpha:1,radius:300,speedDecay:1,alphaDecay:5,fadeIn:.05,alphaThreshold:.05,spawnOnIdle:!0,srcOpacity:0,trailFade:.75,fog:.5,color:16777215,colorMix:0,blend:`add`},Ce=class{#e;get params(){return this.#e}#t=null;#n=null;#r=null;#i=null;#a=null;#o=!1;#s;#c;#l=new Float32Array(U*4);#u=null;#d=null;#f=null;#p=null;#m=null;#h=null;#g=0;#_=0;#v=0;#y=null;#b=-1/0;constructor(e={}){this.#e={...Se,...e},this.#e.count=N(this.#e.count),this.#s=M(this.#e.count),this.#c=this.#s*this.#s}get maxCount(){return this.#c}setParam(e){let t=this.#e;for(let[n,r]of Object.entries(e))r!==void 0&&(t[n]=n===`count`?N(r):r)}init(e){this.#x(e),this.#i=e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),this.#a=e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),this.#p={attributes:{position:F}},this.#f={mode:`points`,attributes:{position:{data:W,itemSize:1}}},this.#m=e.gl,this.#w(e),this.#h=e.onContextRestored(()=>{this.#m=e.gl,this.#w(e),this.#o=!1})}#x(e){let t={size:[this.#s,this.#s],float:!0,wrap:`clamp`,filter:`nearest`};this.#t=e.createRenderTarget({...t,persistent:!0}),this.#n=e.createRenderTarget(t),this.#r=e.createRenderTarget(t)}#S(){this.#t?.dispose(),this.#n?.dispose(),this.#r?.dispose(),this.#t=null,this.#n=null,this.#r=null}#C(e){let t=e.gl,n=t.createTexture();if(!n)throw Error(`[ParticleEffect] Failed to create spawn texture`);return t.bindTexture(t.TEXTURE_2D,n),t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.texImage2D(t.TEXTURE_2D,0,t.RGBA32F,H,H,0,t.RGBA,t.FLOAT,null),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MIN_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MAG_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_S,t.CLAMP_TO_EDGE),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_T,t.CLAMP_TO_EDGE),t.bindTexture(t.TEXTURE_2D,null),{raw:n,handle:e.wrapTexture(n,{size:[H,H],filter:`nearest`,wrap:`clamp`})}}#w(e){let t=this.#C(e);this.#u=t.raw,this.#d=t.handle}#T(e){if(!this.#u)return;let t=e.gl;t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.bindTexture(t.TEXTURE_2D,this.#u),t.texSubImage2D(t.TEXTURE_2D,0,0,0,H,H,t.RGBA,t.FLOAT,this.#l),t.bindTexture(t.TEXTURE_2D,null)}render(e){if(!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||!this.#p||!this.#f||!this.#d||!this.#u)return;let t=M(this.params.count);t!==this.#s&&(this.#S(),this.#s=t,this.#c=t*t,this.#x(e),this.#g=0,this.#o=!1),this.#o||=(e.draw({frag:he,target:this.#t}),e.draw({frag:G,target:this.#n}),e.draw({frag:G,target:this.#r}),!0);let n=P(e.deltaTime),r=[e.dims.elementPixel[0],e.dims.elementPixel[1]],i=[this.#s,this.#s],a=this.#E(e,n,r);a>0&&this.#T(e);let o=a===0;if(e.draw({frag:ve,uniforms:{posTex:this.#t,colorTex:this.#n,velTex:this.#r,elementPixel:r,time:e.time,dt:n,noiseSpeed:this.params.noiseSpeed,emitSpeed:this.params.emitSpeed,noiseDelay:this.params.noiseDelay,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,life:this.params.life},target:this.#t,swap:o}),a>0){let t={uSpawnTex:this.#d,uSpawnTexSize:me,uSpawnCount:a,stateSize:i};e.draw({vert:K,frag:ye,geometry:this.#f,uniforms:{...t,src:e.src,alphaThreshold:this.params.alphaThreshold},target:this.#t,blend:`none`}),e.draw({vert:K,frag:be,geometry:this.#f,uniforms:{...t,src:e.src,color:fe(this.params.color),colorMix:this.params.colorMix,lifeJitterRange:[k,A]},target:this.#n,blend:`none`}),e.draw({vert:K,frag:xe,geometry:this.#f,uniforms:t,target:this.#r,blend:`none`})}let s=this.#D();this.#p.instanceCount=s,e.draw({frag:L,target:this.#i}),e.draw({vert:ge,frag:R,uniforms:{posTex:this.#t,colorTex:this.#n,stateSize:i,pointSize:this.params.pointSize,elementPixel:r,particleCount:s,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fadeIn:this.params.fadeIn,fog:this.params.fog},geometry:this.#p,target:this.#i,blend:this.params.blend===`normal`?`premultiplied`:`additive`}),e.draw({frag:z,uniforms:{trailPrev:this.#a,particleStamp:this.#i,trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:this.#a}),e.draw({frag:_e,uniforms:{src:e.src,trail:this.#a,srcOpacity:this.params.srcOpacity},target:e.target})}#E(e,t,n){let r=[e.mouse[0]/Math.max(1,n[0]),e.mouse[1]/Math.max(1,n[1])];(!this.#y||Math.abs(r[0]-this.#y[0])>1e-6||Math.abs(r[1]-this.#y[1])>1e-6)&&(this.#b=e.time),this.#y=r;let i=e.intersection>0,a=e.time-this.#b<pe;i&&(a||this.params.spawnOnIdle)?this.#_=Math.min(this.#_+this.params.birthRate*t,U):this.#_=0,i?this.#v=Math.min(this.#v+this.params.screenBirthRate*t,U):this.#v=0;let o=Math.min(U,Math.floor(this.#_)),s=Math.min(U-o,Math.floor(this.#v));this.#_-=o,this.#v-=s;let c=o+s;if(c===0)return 0;let l=this.#D(),u=Math.max(1,n[0]),d=Math.max(1,n[1]),f=this.#l,p=0;for(;p<o;p++){let e=Math.sqrt(Math.random())*this.params.radius,t=Math.random()*Math.PI*2,n=Math.cos(t)*e,i=Math.sin(t)*e,a=p*4;f[a+0]=this.#g,f[a+1]=r[0]+n/u,f[a+2]=r[1]+i/d,f[a+3]=t,this.#g=(this.#g+1)%l}for(let e=0;e<s;e++,p++){let e=p*4;f[e+0]=this.#g,f[e+1]=Math.random(),f[e+2]=Math.random(),f[e+3]=-1,this.#g=(this.#g+1)%l}return c}#D(){return Math.max(1,Math.min(this.#c,Math.floor(this.params.count)))}dispose(){this.#h?.(),this.#h=null,this.#m&&this.#u&&this.#m.deleteTexture(this.#u),this.#u=null,this.#d=null,this.#f=null,this.#m=null,this.#S(),this.#i?.dispose(),this.#a?.dispose(),this.#i=null,this.#a=null,this.#p=null,this.#o=!1}outputRect(e){return e.canvasRect}}})),Te,Ee,De,Oe,ke,Ae,je,Me=e((()=>{de(),V(),Te=`#version 300 es
+`,xe={count:1024*1024,birthRate:3e4,screenBirthRate:1e4,life:1,noiseSpeed:.3,emitSpeed:1,noiseDelay:.15,noiseScale:1,noiseAnimation:.3,pointSize:10,alpha:1,radius:300,speedDecay:1,alphaDecay:5,fadeIn:.05,alphaThreshold:.05,spawnOnIdle:!0,srcOpacity:0,trailFade:.75,fog:.5,color:16777215,colorMix:0,blend:`add`},Se=class{#e;get params(){return this.#e}#t=null;#n=null;#r=null;#i=null;#a=null;#o=!1;#s;#c;#l=new Float32Array(B*4);#u=null;#d=null;#f=null;#p=null;#m=null;#h=null;#g=0;#_=0;#v=0;#y=null;#b=-1/0;constructor(e={}){this.#e={...xe,...e},this.#e.count=A(this.#e.count),this.#s=k(this.#e.count),this.#c=this.#s*this.#s}get maxCount(){return this.#c}setParam(e){let t=this.#e;for(let[n,r]of Object.entries(e))r!==void 0&&(t[n]=n===`count`?A(r):r)}init(e){this.#x(e),this.#i=e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),this.#a=e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),this.#p={attributes:{position:M}},this.#f={mode:`points`,attributes:{position:{data:U,itemSize:1}}},this.#m=e.gl,this.#w(e),this.#h=e.onContextRestored(()=>{this.#m=e.gl,this.#w(e),this.#o=!1})}#x(e){let t={size:[this.#s,this.#s],float:!0,wrap:`clamp`,filter:`nearest`};this.#t=e.createRenderTarget({...t,persistent:!0}),this.#n=e.createRenderTarget(t),this.#r=e.createRenderTarget(t)}#S(){this.#t?.dispose(),this.#n?.dispose(),this.#r?.dispose(),this.#t=null,this.#n=null,this.#r=null}#C(e){let t=e.gl,n=t.createTexture();if(!n)throw Error(`[ParticleEffect] Failed to create spawn texture`);return t.bindTexture(t.TEXTURE_2D,n),t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.texImage2D(t.TEXTURE_2D,0,t.RGBA32F,z,z,0,t.RGBA,t.FLOAT,null),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MIN_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MAG_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_S,t.CLAMP_TO_EDGE),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_T,t.CLAMP_TO_EDGE),t.bindTexture(t.TEXTURE_2D,null),{raw:n,handle:e.wrapTexture(n,{size:[z,z],filter:`nearest`,wrap:`clamp`})}}#w(e){let t=this.#C(e);this.#u=t.raw,this.#d=t.handle}#T(e){if(!this.#u)return;let t=e.gl;t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.bindTexture(t.TEXTURE_2D,this.#u),t.texSubImage2D(t.TEXTURE_2D,0,0,0,z,z,t.RGBA,t.FLOAT,this.#l),t.bindTexture(t.TEXTURE_2D,null)}render(e){if(!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||!this.#p||!this.#f||!this.#d||!this.#u)return;let t=k(this.params.count);t!==this.#s&&(this.#S(),this.#s=t,this.#c=t*t,this.#x(e),this.#g=0,this.#o=!1),this.#o||=(e.draw({frag:me,target:this.#t}),e.draw({frag:W,target:this.#n}),e.draw({frag:W,target:this.#r}),!0);let n=j(e.deltaTime),r=[e.dims.elementPixel[0],e.dims.elementPixel[1]],i=[this.#s,this.#s],a=this.#E(e,n,r);a>0&&this.#T(e);let o=a===0;if(e.draw({frag:_e,uniforms:{posTex:this.#t,colorTex:this.#n,velTex:this.#r,elementPixel:r,time:e.time,dt:n,noiseSpeed:this.params.noiseSpeed,emitSpeed:this.params.emitSpeed,noiseDelay:this.params.noiseDelay,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,life:this.params.life},target:this.#t,swap:o}),a>0){let t={uSpawnTex:this.#d,uSpawnTexSize:H,uSpawnCount:a,stateSize:i};e.draw({vert:G,frag:ve,geometry:this.#f,uniforms:{...t,src:e.src,alphaThreshold:this.params.alphaThreshold},target:this.#t,blend:`none`}),e.draw({vert:G,frag:ye,geometry:this.#f,uniforms:{...t,src:e.src,color:pe(this.params.color),colorMix:this.params.colorMix,lifeJitterRange:[E,D]},target:this.#n,blend:`none`}),e.draw({vert:G,frag:be,geometry:this.#f,uniforms:t,target:this.#r,blend:`none`})}let s=this.#D();this.#p.instanceCount=s,e.draw({frag:P,target:this.#i}),e.draw({vert:he,frag:F,uniforms:{posTex:this.#t,colorTex:this.#n,stateSize:i,pointSize:this.params.pointSize,elementPixel:r,particleCount:s,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fadeIn:this.params.fadeIn,fog:this.params.fog},geometry:this.#p,target:this.#i,blend:this.params.blend===`normal`?`premultiplied`:`additive`}),e.draw({frag:I,uniforms:{trailPrev:this.#a,particleStamp:this.#i,trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:this.#a}),e.draw({frag:ge,uniforms:{src:e.src,trail:this.#a,srcOpacity:this.params.srcOpacity},target:e.target})}#E(e,t,n){let r=[e.mouse[0]/Math.max(1,n[0]),e.mouse[1]/Math.max(1,n[1])];(!this.#y||Math.abs(r[0]-this.#y[0])>1e-6||Math.abs(r[1]-this.#y[1])>1e-6)&&(this.#b=e.time),this.#y=r;let i=e.intersection>0,a=e.time-this.#b<V;i&&(a||this.params.spawnOnIdle)?this.#_=Math.min(this.#_+this.params.birthRate*t,B):this.#_=0,i?this.#v=Math.min(this.#v+this.params.screenBirthRate*t,B):this.#v=0;let o=Math.min(B,Math.floor(this.#_)),s=Math.min(B-o,Math.floor(this.#v));this.#_-=o,this.#v-=s;let c=o+s;if(c===0)return 0;let l=this.#D(),u=Math.max(1,n[0]),d=Math.max(1,n[1]),f=this.#l,p=0;for(;p<o;p++){let e=Math.sqrt(Math.random())*this.params.radius,t=Math.random()*Math.PI*2,n=Math.cos(t)*e,i=Math.sin(t)*e,a=p*4;f[a+0]=this.#g,f[a+1]=r[0]+n/u,f[a+2]=r[1]+i/d,f[a+3]=t,this.#g=(this.#g+1)%l}for(let e=0;e<s;e++,p++){let e=p*4;f[e+0]=this.#g,f[e+1]=Math.random(),f[e+2]=Math.random(),f[e+3]=-1,this.#g=(this.#g+1)%l}return c}#D(){return Math.max(1,Math.min(this.#c,Math.floor(this.params.count)))}dispose(){this.#h?.(),this.#h=null,this.#m&&this.#u&&this.#m.deleteTexture(this.#u),this.#u=null,this.#d=null,this.#f=null,this.#m=null,this.#S(),this.#i?.dispose(),this.#a?.dispose(),this.#i=null,this.#a=null,this.#p=null,this.#o=!1}outputRect(e){return e.canvasRect}}})),we,Te,Ee,De,Oe,ke,Ae,je=e((()=>{fe(),R(),we=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -946,8 +749,8 @@ uniform float outwardBias;
 uniform float duration;
 uniform float count;
 uniform int uBurst;
-${I}
-${j}
+${N}
+${O}
 
 void main() {
     if (uBurst == 1) {
@@ -980,15 +783,15 @@ void main() {
     vec3 pos = s.xyz + (vNoise + outward) * noiseSpeed * dt * taper;
 
     float lifespanScale = mix(
-        ${k.toFixed(4)},
-        ${A.toFixed(4)},
+        ${E.toFixed(4)},
+        ${D.toFixed(4)},
         hash21(uv * 91.7 + 1.234)
     );
     age += dt / max(duration * lifespanScale, 1e-3);
 
     outColor = vec4(pos, age);
 }
-`,Ee=`#version 300 es
+`,Te=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -999,7 +802,7 @@ uniform vec2 stateSize;
 uniform float count;
 uniform vec3 color;
 uniform float colorMix;
-${I}
+${N}
 
 void main() {
     ivec2 pix = ivec2(floor(uv * stateSize));
@@ -1016,7 +819,7 @@ void main() {
     vec4 c = texture(src, sampleUv);
     outColor = vec4(mix(c.rgb, color, colorMix), c.a);
 }
-`,De=`#version 300 es
+`,Ee=`#version 300 es
 precision highp float;
 in vec2 position;
 
@@ -1075,7 +878,7 @@ void main() {
     vCorner = position;
     vColor = vec4(c.rgb, c.a * lifeAlpha * alpha * fogFactor);
 }
-`,Oe=`#version 300 es
+`,De=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -1085,7 +888,7 @@ uniform sampler2D trail;
 void main() {
     outColor = texture(trail, uv);
 }
-`,ke=`#version 300 es
+`,Oe=`#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
@@ -1093,49 +896,7 @@ uniform sampler2D src;
 void main() {
     outColor = texture(src, uvSrc);
 }
-`,Ae={count:1e5,duration:1,noiseSpeed:1.5,noiseScale:1,noiseAnimation:1,outwardBias:1,pointSize:3,alpha:1,alphaDecay:5,speedDecay:2,fog:0,trailFade:.5,color:16777215,colorMix:0,blend:`add`},je=class{#e;get params(){return this.#e}#t=null;#n=null;#r=null;#i=null;#a=null;#o;#s=!1;#c=!1;#l=-1;#u=0;#d=0;constructor(e={}){this.#e={...Ae,...e},this.#e.count=N(this.#e.count);let t=M(this.#e.count);this.#o=[t,t]}trigger(){this.#s=!0,this.#c=!0,this.#l=-1,this.#u=0,this.#d=0}reset(){this.#s=!1,this.#c=!1,this.#l=-1,this.#u=0,this.#d=0}isDone(){return!this.#s||this.#u<this.params.duration?!1:this.#d>=this.#f()}#f(){let e=this.params.trailFade;return e<=0?1:e>=.999?600:Math.ceil(-Math.log(255)/Math.log(e))}init(e){this.#p(e),this.#r=e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),this.#i=e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),this.#a={attributes:{position:F}}}#p(e){let t={size:this.#o,float:!0,wrap:`clamp`,filter:`nearest`};this.#t=e.createRenderTarget({...t,persistent:!0}),this.#n=e.createRenderTarget(t)}#m(){this.#t?.dispose(),this.#n?.dispose(),this.#t=null,this.#n=null}render(e){if(!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||e.intersection<=0)return;let t=M(this.params.count),n=!this.#s||this.isDone();if(t!==this.#o[0]&&n&&(this.#m(),this.#o=[t,t],this.#p(e)),!this.#s){e.draw({frag:ke,uniforms:{src:e.src},target:e.target});return}this.#l<0&&(this.#l=e.time);let r=e.time-this.#l;this.#u=r;let i=r>=this.params.duration;if(i&&this.#d>=this.#f()){e.draw({frag:L,target:e.target});return}let a=P(e.deltaTime),o=[e.dims.elementPixel[0],e.dims.elementPixel[1]];if(i)e.draw({frag:L,target:this.#r}),this.#d++;else{let t=+!!this.#c;this.#c=!1;let n=this.#h();e.draw({frag:Te,uniforms:{posTex:this.#t,stateSize:this.#o,elementPixel:o,time:e.time,dt:a,noiseSpeed:this.params.noiseSpeed,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,outwardBias:this.params.outwardBias,duration:this.params.duration,count:n,uBurst:t},target:this.#t}),t===1&&(e.draw({frag:Ee,uniforms:{src:e.src,stateSize:this.#o,count:n,color:fe(this.params.color),colorMix:this.params.colorMix},target:this.#n}),e.draw({frag:L,target:this.#i})),this.#a.instanceCount=n,e.draw({frag:L,target:this.#r}),e.draw({vert:De,frag:R,uniforms:{posTex:this.#t,colorTex:this.#n,stateSize:this.#o,pointSize:this.params.pointSize,elementPixel:o,particleCount:n,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fog:this.params.fog},geometry:this.#a,target:this.#r,blend:this.params.blend===`normal`?`premultiplied`:`additive`})}e.draw({frag:z,uniforms:{trailPrev:this.#i,particleStamp:this.#r,trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:this.#i}),e.draw({frag:Oe,uniforms:{trail:this.#i},target:e.target})}#h(){let e=this.#o[0]*this.#o[1];return Math.max(1,Math.min(e,Math.floor(this.params.count)))}dispose(){this.#m(),this.#r?.dispose(),this.#i?.dispose(),this.#r=null,this.#i=null,this.#a=null}outputRect(e){return e.canvasRect}}}));function Ne(e={}){let t=e.size??10;return{render(e){let n=e.src.width||1,r=e.src.height||1;e.draw({frag:Pe,uniforms:{src:e.src,cellUv:[t/n,t/r]},target:e.target})}}}var Pe,Fe=e((()=>{Pe=`#version 300 es
-precision highp float;
-in vec2 uvContent;
-out vec4 outColor;
-uniform sampler2D src;
-uniform vec4 srcRectUv;
-uniform vec2 cellUv;
-
-void main() {
-    vec4 c = vec4(0.0);
-    if (uvContent.x >= 0.0 && uvContent.x <= 1.0 &&
-        uvContent.y >= 0.0 && uvContent.y <= 1.0) {
-        // Snap to cell centers in dst inner UV, then remap into src
-        // inner region via srcRectUv so sampling is correct whether
-        // src is capture or a prior stage's padded intermediate.
-        vec2 cell = (floor(uvContent / cellUv) + 0.5) * cellUv;
-        vec2 uv = srcRectUv.xy + clamp(cell, 0.0, 1.0) * srcRectUv.zw;
-        c = texture(src, uv);
-    }
-    outColor = c;
-}
-`}));function Ie(e={}){let t=e.spacing??4;return{render(e){e.draw({frag:Le,uniforms:{src:e.src,innerHeight:e.src.height||1,spacing:t},target:e.target})}}}var Le,Re=e((()=>{Le=`#version 300 es
-precision highp float;
-in vec2 uvSrc;
-in vec2 uvContent;
-out vec4 outColor;
-uniform sampler2D src;
-uniform float innerHeight;
-uniform float spacing;
-
-void main() {
-    vec4 c = vec4(0.0);
-    if (uvContent.x >= 0.0 && uvContent.x <= 1.0 &&
-        uvContent.y >= 0.0 && uvContent.y <= 1.0) {
-        // Keep one 1-px line per spacing-px band; rest goes black.
-        float yPx = uvContent.y * innerHeight;
-        if (mod(floor(yPx), spacing) < 1.0) {
-            c = texture(src, uvSrc);
-        }
-    }
-    outColor = c;
-}
-`}));function ze(e){let t=e.startsWith(`#`)?e.slice(1):e;return(t.length===3||t.length===4)&&(t=t.split(``).map(e=>e+e).join(``)),t.length===6&&(t+=`ff`),t.length===8?[Number.parseInt(t.slice(0,2),16)/255,Number.parseInt(t.slice(2,4),16)/255,Number.parseInt(t.slice(4,6),16)/255,Number.parseInt(t.slice(6,8),16)/255]:[0,0,0,0]}var Be,Ve,He,Ue=e((()=>{Be=`#version 300 es
+`,ke={count:1e5,duration:1,noiseSpeed:1.5,noiseScale:1,noiseAnimation:1,outwardBias:1,pointSize:3,alpha:1,alphaDecay:5,speedDecay:2,fog:0,trailFade:.5,color:16777215,colorMix:0,blend:`add`},Ae=class{#e;get params(){return this.#e}#t=null;#n=null;#r=null;#i=null;#a=null;#o;#s=!1;#c=!1;#l=-1;#u=0;#d=0;constructor(e={}){this.#e={...ke,...e},this.#e.count=A(this.#e.count);let t=k(this.#e.count);this.#o=[t,t]}trigger(){this.#s=!0,this.#c=!0,this.#l=-1,this.#u=0,this.#d=0}reset(){this.#s=!1,this.#c=!1,this.#l=-1,this.#u=0,this.#d=0}isDone(){return!this.#s||this.#u<this.params.duration?!1:this.#d>=this.#f()}#f(){let e=this.params.trailFade;return e<=0?1:e>=.999?600:Math.ceil(-Math.log(255)/Math.log(e))}init(e){this.#p(e),this.#r=e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),this.#i=e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),this.#a={attributes:{position:M}}}#p(e){let t={size:this.#o,float:!0,wrap:`clamp`,filter:`nearest`};this.#t=e.createRenderTarget({...t,persistent:!0}),this.#n=e.createRenderTarget(t)}#m(){this.#t?.dispose(),this.#n?.dispose(),this.#t=null,this.#n=null}render(e){if(!this.#t||!this.#n||!this.#r||!this.#i||!this.#a||e.intersection<=0)return;let t=k(this.params.count),n=!this.#s||this.isDone();if(t!==this.#o[0]&&n&&(this.#m(),this.#o=[t,t],this.#p(e)),!this.#s){e.draw({frag:Oe,uniforms:{src:e.src},target:e.target});return}this.#l<0&&(this.#l=e.time);let r=e.time-this.#l;this.#u=r;let i=r>=this.params.duration;if(i&&this.#d>=this.#f()){e.draw({frag:P,target:e.target});return}let a=j(e.deltaTime),o=[e.dims.elementPixel[0],e.dims.elementPixel[1]];if(i)e.draw({frag:P,target:this.#r}),this.#d++;else{let t=+!!this.#c;this.#c=!1;let n=this.#h();e.draw({frag:we,uniforms:{posTex:this.#t,stateSize:this.#o,elementPixel:o,time:e.time,dt:a,noiseSpeed:this.params.noiseSpeed,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,outwardBias:this.params.outwardBias,duration:this.params.duration,count:n,uBurst:t},target:this.#t}),t===1&&(e.draw({frag:Te,uniforms:{src:e.src,stateSize:this.#o,count:n,color:pe(this.params.color),colorMix:this.params.colorMix},target:this.#n}),e.draw({frag:P,target:this.#i})),this.#a.instanceCount=n,e.draw({frag:P,target:this.#r}),e.draw({vert:Ee,frag:F,uniforms:{posTex:this.#t,colorTex:this.#n,stateSize:this.#o,pointSize:this.params.pointSize,elementPixel:o,particleCount:n,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fog:this.params.fog},geometry:this.#a,target:this.#r,blend:this.params.blend===`normal`?`premultiplied`:`additive`})}e.draw({frag:I,uniforms:{trailPrev:this.#i,particleStamp:this.#r,trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:this.#i}),e.draw({frag:De,uniforms:{trail:this.#i},target:e.target})}#h(){let e=this.#o[0]*this.#o[1];return Math.max(1,Math.min(e,Math.floor(this.params.count)))}dispose(){this.#m(),this.#r?.dispose(),this.#i?.dispose(),this.#r=null,this.#i=null,this.#a=null}outputRect(e){return e.canvasRect}}}));function Me(e){let t=e.startsWith(`#`)?e.slice(1):e;return(t.length===3||t.length===4)&&(t=t.split(``).map(e=>e+e).join(``)),t.length===6&&(t+=`ff`),t.length===8?[Number.parseInt(t.slice(0,2),16)/255,Number.parseInt(t.slice(2,4),16)/255,Number.parseInt(t.slice(4,6),16)/255,Number.parseInt(t.slice(6,8),16)/255]:[0,0,0,0]}var Ne,Pe,K,Fe=e((()=>{Ne=`#version 300 es
 precision highp float;
 
 in vec2 uvContent;
@@ -1329,7 +1090,7 @@ void main() {
 
     outColor = mix(bgColor, base, visibleMask);
 }
-`,Ve={cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},He=class{params;constructor(e={}){this.params={...Ve,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params;e.draw({frag:Be,uniforms:{src:e.src,mouseUv:[e.mouse[0]/r,e.mouse[1]/i],elementPx:[r,i],cellSize:a.cellSize,pressRadius:a.pressRadius,press:a.press,flatCells:+!!a.flatCells,seed:a.seed,time:e.time,speed:Math.max(0,a.speed),breathe:Math.max(0,a.breathe),breatheSpeed:Math.max(0,a.breatheSpeed),breatheScale:Math.max(1,a.breatheScale),bgColor:ze(a.bgColor)},target:e.target})}}}));function We(){let e=document.createElement(`article`);e.style.cssText=`width: 600px; padding: 32px; background: #fff; color: #202122; font-family: sans-serif; line-height: 1.6; border: 1px solid #a2a9b1;`;let t=`font-family: serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; padding-bottom: 4px; margin-top: 24px;`,n=`margin: 20px 0; text-align: center;`,r=`font-size: 0.85em; color: #54595d; margin-top: 4px;`,i=`width: 100%; height: auto; max-width: 480px; background: #f8f9fa; border: 1px solid #a2a9b1;`;return e.innerHTML=`
+`,Pe={cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},K=class{params;constructor(e={}){this.params={...Pe,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params;e.draw({frag:Ne,uniforms:{src:e.src,mouseUv:[e.mouse[0]/r,e.mouse[1]/i],elementPx:[r,i],cellSize:a.cellSize,pressRadius:a.pressRadius,press:a.press,flatCells:+!!a.flatCells,seed:a.seed,time:e.time,speed:Math.max(0,a.speed),breathe:Math.max(0,a.breathe),breatheSpeed:Math.max(0,a.breatheSpeed),breatheScale:Math.max(1,a.breatheScale),bgColor:Me(a.bgColor)},target:e.target})}}}));function Ie(){let e=document.createElement(`article`);e.style.cssText=`width: 600px; padding: 32px; background: #fff; color: #202122; font-family: sans-serif; line-height: 1.6; border: 1px solid #a2a9b1;`;let t=`font-family: serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; padding-bottom: 4px; margin-top: 24px;`,n=`margin: 20px 0; text-align: center;`,r=`font-size: 0.85em; color: #54595d; margin-top: 4px;`,i=`width: 100%; height: auto; max-width: 480px; background: #f8f9fa; border: 1px solid #a2a9b1;`;return e.innerHTML=`
         <h1 style="font-family: serif; font-weight: normal;
                    border-bottom: 1px solid #a2a9b1;
                    padding-bottom: 4px; margin: 0 0 4px;">
@@ -1492,7 +1253,7 @@ void main() {
                 <i>Spatial Tessellations: Concepts and Applications of
                 Voronoi Diagrams</i> (2nd ed.). Wiley.</li>
         </ol>
-    `,e}function Ge(e){let t=Math.round(window.innerWidth/2),n=Math.round(window.innerHeight/2),r=Math.min(t,n)*.4,i=0,a=window.setInterval(()=>{let o=i/60*Math.PI*2;e.dispatchEvent(new MouseEvent(`pointermove`,{clientX:t+Math.cos(o)*r,clientY:n+Math.sin(o)*r,bubbles:!0})),i++,i>120&&clearInterval(a)},16)}var Ke,q,J,Y,X,Z,Q,$,qe;e((()=>{p(),l(),ee(),se(),ue(),we(),Me(),Fe(),Re(),Ue(),d(),n(),Ke={title:`Effect`,parameters:{layout:`fullscreen`}},q={render:()=>{let e=document.createElement(`img`);return e.src=u,e.style.display=`block`,e.style.margin=`40px auto`,e},args:void 0},q.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r=new b({threshold:.2,softness:.1,intensity:5,scatter:1,dither:0,edgeFade:0,pad:50});await n.add(t,{effect:r}),c(`Bloom`,r)},J={render:()=>{let e=document.createElement(`img`);return e.src=f,e},args:void 0},J.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r=new b({threshold:.01,softness:.2,intensity:10,scatter:1,dither:0,edgeFade:.02,pad:200});await n.add(t,{effect:[Ne({size:10}),Ie({spacing:5}),r]}),c(`CRT Bloom`,r)},Y={render:()=>{let e=document.createElement(`img`);return e.src=f,e},args:void 0},Y.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r=new oe;await n.add(t,{effect:r}),i(`Fluid`,r),Ge(e)},X={render:()=>{let e=document.createElement(`img`);return e.src=f,e},args:void 0},X.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r={Jellyfish:f,Logo:u},i=null,c=async()=>{let e=i?{...i.params}:{};i&&(n.remove(t),a()),i=new O(e),await n.add(t,{effect:i}),o(`Halftone`,i,{img:t,sources:r,onSrcChange:async e=>{t.src=r[e],await new Promise(e=>{t.onload=()=>e()}),await c()}})};await c()},Z={render:()=>{let e=document.createElement(`img`);return e.src=u,e},args:void 0},Z.play=async({canvasElement:e})=>{let n=e.querySelector(`img`);await new Promise(e=>{n.onload=()=>e()});let r=s(),i={Jellyfish:f,Logo:u},o=null,c=async()=>{let e=o?{...o.params}:{};o&&(r.remove(n),a()),o=new Ce(e),await r.add(n,{effect:o}),t(`Particle`,o,{img:n,sources:i,onSrcChange:async e=>{n.src=i[e],await new Promise(e=>{n.onload=()=>e()}),await c()}})};await c(),Ge(e)},Q={render:()=>{let e=document.createElement(`img`);return e.src=u,e},args:void 0},Q.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=()=>e()}),await new Promise(e=>requestAnimationFrame(()=>e(void 0)));let n=s(),i={Logo:u,Jellyfish:f},o=null,c=async()=>{let e=o?{...o.params}:{};o&&(n.remove(t),a()),await new Promise(e=>requestAnimationFrame(()=>e(void 0))),o=new je(e),await n.add(t,{effect:o}),r(`Particle Explode`,o,{img:t,sources:i,onSrcChange:async e=>{t.src=i[e],await new Promise(e=>{t.onload=()=>e()}),await c()}})};await c()},$={render:e=>{let{src:t,...n}=e,r=s(),i=new He(n);if(t===`Webpage`){let e=document.getElementById(`storybook-root`);e&&(e.style.height=`auto`,e.style.display=`block`);let t=document.createElement(`div`);t.style.display=`flex`,t.style.justifyContent=`center`;let n=We();return t.appendChild(n),r.addHTML(n,{effect:i}),t}let a=document.createElement(`img`);return a.src=t===`Jellyfish`?f:u,r.add(a,{effect:i}),a},args:{src:`Webpage`,cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},argTypes:{src:{control:{type:`select`},options:[`Logo`,`Jellyfish`,`Webpage`]},cellSize:{control:{type:`range`,min:5,max:200,step:1}},pressRadius:{control:{type:`range`,min:0,max:800,step:10}},press:{control:{type:`range`,min:0,max:1,step:.01}},flatCells:{control:{type:`boolean`}},seed:{control:{type:`range`,min:0,max:1e3,step:1}},speed:{control:{type:`range`,min:0,max:5,step:.05}},breathe:{control:{type:`range`,min:0,max:1,step:.01}},breatheSpeed:{control:{type:`range`,min:0,max:5,step:.05}},breatheScale:{control:{type:`range`,min:10,max:500,step:5}},bgColor:{control:{type:`color`}}}},q.parameters={...q.parameters,docs:{...q.parameters?.docs,source:{originalSource:`{
+    `,e}function Le(e){let t=Math.round(window.innerWidth/2),n=Math.round(window.innerHeight/2),r=Math.min(t,n)*.4,i=0,a=window.setInterval(()=>{let o=i/60*Math.PI*2;e.dispatchEvent(new MouseEvent(`pointermove`,{clientX:t+Math.cos(o)*r,clientY:n+Math.sin(o)*r,bubbles:!0})),i++,i>120&&clearInterval(a)},16)}var Re,q,J,Y,X,Z,Q,$,ze;e((()=>{p(),u(),_(),se(),de(),Ce(),je(),h(),g(),Fe(),d(),n(),Re={title:`Effect`,parameters:{layout:`fullscreen`}},q={render:()=>{let e=document.createElement(`img`);return e.src=l,e.style.display=`block`,e.style.margin=`40px auto`,e},args:void 0},q.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r=new m({threshold:.2,softness:.1,intensity:5,scatter:1,dither:0,edgeFade:0,pad:50});await n.add(t,{effect:r}),c(`Bloom`,r)},J={render:()=>{let e=document.createElement(`img`);return e.src=f,e},args:void 0},J.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r=new m({threshold:.01,softness:.2,intensity:10,scatter:1,dither:0,edgeFade:.02,pad:200});await n.add(t,{effect:[v({size:10}),ee({spacing:5}),r]}),c(`CRT Bloom`,r)},Y={render:()=>{let e=document.createElement(`img`);return e.src=f,e},args:void 0},Y.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r=new C;await n.add(t,{effect:r}),i(`Fluid`,r),Le(e)},X={render:()=>{let e=document.createElement(`img`);return e.src=f,e},args:void 0},X.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=s(),r={Jellyfish:f,Logo:l},i=null,c=async()=>{let e=i?{...i.params}:{};i&&(n.remove(t),a()),i=new ue(e),await n.add(t,{effect:i}),o(`Halftone`,i,{img:t,sources:r,onSrcChange:async e=>{t.src=r[e],await new Promise(e=>{t.onload=()=>e()}),await c()}})};await c()},Z={render:()=>{let e=document.createElement(`img`);return e.src=l,e},args:void 0},Z.play=async({canvasElement:e})=>{let n=e.querySelector(`img`);await new Promise(e=>{n.onload=()=>e()});let r=s(),i={Jellyfish:f,Logo:l},o=null,c=async()=>{let e=o?{...o.params}:{};o&&(r.remove(n),a()),o=new Se(e),await r.add(n,{effect:o}),t(`Particle`,o,{img:n,sources:i,onSrcChange:async e=>{n.src=i[e],await new Promise(e=>{n.onload=()=>e()}),await c()}})};await c(),Le(e)},Q={render:()=>{let e=document.createElement(`img`);return e.src=l,e},args:void 0},Q.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=()=>e()}),await new Promise(e=>requestAnimationFrame(()=>e(void 0)));let n=s(),i={Logo:l,Jellyfish:f},o=null,c=async()=>{let e=o?{...o.params}:{};o&&(n.remove(t),a()),await new Promise(e=>requestAnimationFrame(()=>e(void 0))),o=new Ae(e),await n.add(t,{effect:o}),r(`Particle Explode`,o,{img:t,sources:i,onSrcChange:async e=>{t.src=i[e],await new Promise(e=>{t.onload=()=>e()}),await c()}})};await c()},$={render:e=>{let{src:t,...n}=e,r=s(),i=new K(n);if(t===`Webpage`){let e=document.getElementById(`storybook-root`);e&&(e.style.height=`auto`,e.style.display=`block`);let t=document.createElement(`div`);t.style.display=`flex`,t.style.justifyContent=`center`;let n=Ie();return t.appendChild(n),r.addHTML(n,{effect:i}),t}let a=document.createElement(`img`);return a.src=t===`Jellyfish`?f:l,r.add(a,{effect:i}),a},args:{src:`Webpage`,cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},argTypes:{src:{control:{type:`select`},options:[`Logo`,`Jellyfish`,`Webpage`]},cellSize:{control:{type:`range`,min:5,max:200,step:1}},pressRadius:{control:{type:`range`,min:0,max:800,step:10}},press:{control:{type:`range`,min:0,max:1,step:.01}},flatCells:{control:{type:`boolean`}},seed:{control:{type:`range`,min:0,max:1e3,step:1}},speed:{control:{type:`range`,min:0,max:5,step:.05}},breathe:{control:{type:`range`,min:0,max:1,step:.01}},breatheSpeed:{control:{type:`range`,min:0,max:5,step:.05}},breatheScale:{control:{type:`range`,min:10,max:500,step:5}},bgColor:{control:{type:`color`}}}},q.parameters={...q.parameters,docs:{...q.parameters?.docs,source:{originalSource:`{
   render: () => {
     const img = document.createElement("img");
     img.src = Logo;
@@ -1668,4 +1429,4 @@ void main() {
       }
     }
   }
-}`,...$.parameters?.docs?.source}}},qe=[`bloom`,`crtBloom`,`fluid`,`halftone`,`particle`,`particleExplode`,`voronoi`]}))();export{qe as __namedExportsOrder,q as bloom,J as crtBloom,Ke as default,Y as fluid,X as halftone,Z as particle,Q as particleExplode,$ as voronoi};
+}`,...$.parameters?.docs?.source}}},ze=[`bloom`,`crtBloom`,`fluid`,`halftone`,`particle`,`particleExplode`,`voronoi`]}))();export{ze as __namedExportsOrder,q as bloom,J as crtBloom,Re as default,Y as fluid,X as halftone,Z as particle,Q as particleExplode,$ as voronoi};
