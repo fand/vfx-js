@@ -1,6 +1,11 @@
 import { unwrapElement, wrapElement } from "./html-in-canvas.js";
 import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
-import { getVFXOpts, type VFXOpts, type VFXProps } from "./types.js";
+import {
+    type Effect,
+    getVFXOpts,
+    type VFXOpts,
+    type VFXProps,
+} from "./types.js";
 import { VFXPlayer } from "./vfx-player.js";
 import { isWebGLAvailable } from "./webgl-support.js";
 
@@ -168,6 +173,23 @@ export class VFX {
         } else {
             this.#player.removeElement(element);
         }
+    }
+
+    /**
+     * Replace the effect chain on an already-registered effect-path
+     * element in-place. Effects whose reference is unchanged keep their
+     * init state and GPU resources; only added/removed effects run
+     * `init` / `dispose`. The element's source texture is preserved.
+     *
+     * Useful for live UIs that reorder or toggle effects without paying
+     * the cost of `vfx.remove` + `vfx.add` (which reloads the source).
+     */
+    updateEffects(
+        element: HTMLElement,
+        effect: Effect | readonly Effect[],
+    ): Promise<void> {
+        const target = this.#wrapperCanvases.get(element) ?? element;
+        return this.#player.updateElementEffects(target, effect);
     }
 
     /**

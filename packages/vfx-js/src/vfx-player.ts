@@ -784,6 +784,61 @@ export class VFXPlayer {
         return [inherit({ frag: shaderCode })];
     }
 
+    /**
+     * Replace the effect chain on an already-registered effect-path
+     * element. Effects whose reference is unchanged keep their host /
+     * init state; only added/removed effects run init/dispose. Throws
+     * when the element is not registered, lives on the shader path, or
+     * when a *new* effect (not already in the current chain) is already
+     * attached to another element/postEffect on this player.
+     */
+    async updateElementEffects(
+        element: HTMLElement,
+        rawEffect: Effect | readonly Effect[],
+    ): Promise<void> {
+        const e = this.#elements.find((x) => x.element === element);
+        if (!e) {
+            throw new Error(
+                "[VFX-JS] updateElementEffects: element not registered",
+            );
+        }
+        if (!e.chain) {
+            throw new Error(
+                "[VFX-JS] updateElementEffects: element is on the shader path; effect-only updates are not supported",
+            );
+        }
+
+        const newEffects: readonly Effect[] = Array.isArray(rawEffect)
+            ? [...rawEffect]
+            : [rawEffect];
+
+        const oldEffects = e.chain.effects;
+        const oldSet = new Set(oldEffects);
+        const reallyNew: Effect[] = [];
+        for (const eff of newEffects) {
+            if (!oldSet.has(eff)) {
+                if (this.#registeredEffects.has(eff)) {
+                    throw new Error(
+                        "[VFX-JS] Effect instance already attached. Construct a new instance per `vfx.add()` / `postEffect`.",
+                    );
+                }
+                reallyNew.push(eff);
+            }
+        }
+
+        await e.chain.replaceEffects(newEffects);
+
+        const newSet = new Set(newEffects);
+        for (const eff of oldEffects) {
+            if (!newSet.has(eff)) {
+                this.#registeredEffects.delete(eff);
+            }
+        }
+        for (const eff of reallyNew) {
+            this.#registeredEffects.add(eff);
+        }
+    }
+
     removeElement(element: HTMLElement): void {
         const i = this.#elements.findIndex((e) => e.element === element);
         if (i !== -1) {
