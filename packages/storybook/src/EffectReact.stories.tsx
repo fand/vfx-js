@@ -14,11 +14,6 @@ export default {
     parameters: { layout: "fullscreen" },
 } satisfies Meta<undefined>;
 
-// Stories under Effect/React are co-located by file:
-//   EffectReact.stories.tsx          — VFXImg
-//   EffectReactCanvas.stories.tsx    — VFXCanvas (HIC)
-//   EffectReactElements.stories.tsx  — VFXVideo / VFXSpan / VFXDiv / VFXP smoke
-
 type EffectId = "pixelate" | "scanline" | "bloom";
 type ChainItem = { id: EffectId; enabled: boolean };
 
@@ -177,9 +172,6 @@ function SortableList({
 function CRTBloomReactApp(): React.ReactElement {
     const [chain, setChain] = useState<ChainItem[]>(INITIAL_CHAIN);
 
-    // Persist effect instances across re-renders so react-vfx's
-    // `vfx.updateEffects` fast path can match references and skip
-    // `init`/`dispose` for kept effects.
     const instancesRef = useRef<Record<EffectId, Effect> | null>(null);
     if (!instancesRef.current) {
         instancesRef.current = buildEffectInstances();

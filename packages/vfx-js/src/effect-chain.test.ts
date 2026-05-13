@@ -1095,10 +1095,6 @@ describe("EffectChain: single effect", () => {
     });
 });
 
-// ---------------------------------------------------------------------------
-// replaceEffects: reference-based diff
-// ---------------------------------------------------------------------------
-
 describe("EffectChain: replaceEffects", () => {
     it("reordering keeps every host (no init / dispose)", async () => {
         const a: Effect = { init: vi.fn(), dispose: vi.fn(), render: () => {} };
