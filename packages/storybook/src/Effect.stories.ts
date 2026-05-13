@@ -2,14 +2,16 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
-import { BloomEffect } from "./effects/bloom";
-import { FluidEffect } from "./effects/fluid";
-import { HalftoneEffect } from "./effects/halftone";
-import { ParticleEffect } from "./effects/particle";
-import { ParticleExplodeEffect } from "./effects/particle-explode";
-import { createPixelateEffect } from "./effects/pixelate";
-import { createScanlineEffect } from "./effects/scanline";
-import { VoronoiEffect } from "./effects/voronoi";
+import {
+    BloomEffect,
+    createPixelateEffect,
+    createScanlineEffect,
+    FluidEffect,
+    HalftoneEffect,
+    ParticleEffect,
+    ParticleExplodeEffect,
+    VoronoiEffect,
+} from "@vfx-js/effects";
 import "./preset.css";
 import {
     attachBloomPane,

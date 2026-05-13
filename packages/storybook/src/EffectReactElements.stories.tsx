@@ -1,10 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import { createRoot } from "react-dom/client";
 import { VFXDiv, VFXP, VFXProvider, VFXSpan, VFXVideo } from "react-vfx";
+import {
+    BloomEffect,
+    createPixelateEffect,
+    createScanlineEffect,
+} from "@vfx-js/effects";
 import JellyfishMp4 from "./assets/jellyfish.mp4";
-import { BloomEffect } from "./effects/bloom";
-import { createPixelateEffect } from "./effects/pixelate";
-import { createScanlineEffect } from "./effects/scanline";
 import "./preset.css";
 
 // Each component gets its own Effect instance — vfx-js rejects reuse

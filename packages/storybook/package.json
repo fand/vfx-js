@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@vfx-js/core": "0.13.0",
+    "@vfx-js/effects": "workspace:*",
     "react": "19.2.5",
     "react-dom": "19.2.5",
     "react-vfx": "0.18.0"

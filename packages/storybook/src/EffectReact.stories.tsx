@@ -3,10 +3,12 @@ import type { Effect } from "@vfx-js/core";
 import { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { VFXImg, VFXProvider } from "react-vfx";
+import {
+    BloomEffect,
+    createPixelateEffect,
+    createScanlineEffect,
+} from "@vfx-js/effects";
 import Jellyfish from "./assets/jellyfish.webp";
-import { BloomEffect } from "./effects/bloom";
-import { createPixelateEffect } from "./effects/pixelate";
-import { createScanlineEffect } from "./effects/scanline";
 import "./preset.css";
 
 export default {

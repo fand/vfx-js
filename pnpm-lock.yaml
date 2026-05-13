@@ -232,6 +232,9 @@ importers:
       '@vfx-js/core':
         specifier: 0.13.0
         version: link:../vfx-js
+      '@vfx-js/effects':
+        specifier: workspace:*
+        version: link:../effects
       react:
         specifier: 19.2.5
         version: 19.2.5
