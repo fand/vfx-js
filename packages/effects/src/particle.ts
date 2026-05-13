@@ -451,7 +451,9 @@ export class ParticleEffect implements Effect {
     setParam(updates: Partial<ParticleParams>): void {
         const target = this.#params as Record<string, unknown>;
         for (const [k, v] of Object.entries(updates)) {
-            if (v === undefined) continue;
+            if (v === undefined) {
+                continue;
+            }
             target[k] = k === "count" ? sanitizeCount(v as number) : v;
         }
     }
@@ -560,7 +562,9 @@ export class ParticleEffect implements Effect {
     }
 
     #uploadSpawnTextures(ctx: EffectContext): void {
-        if (!this.#spawnRawTex) return;
+        if (!this.#spawnRawTex) {
+            return;
+        }
         const gl = ctx.gl;
         // Reset framework's global UNPACK_FLIP_Y_WEBGL=true (set for
         // DOM source uploads) so row 0 of our raw float buffer maps to
