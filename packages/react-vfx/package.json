@@ -59,12 +59,12 @@
     ]
   },
   "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
-  "homepage": "https://amagi.dev/react-vfx",
+  "homepage": "https://amagi.dev/vfx-js",
   "repository": {
-    "url": "https://github.com/fand/react-vfx"
+    "url": "https://github.com/fand/vfx-js"
   },
   "bugs": {
-    "url": "https://github.com/fand/react-vfx/issues"
+    "url": "https://github.com/fand/vfx-js/issues"
   },
   "keywords": [
     "glsl",
