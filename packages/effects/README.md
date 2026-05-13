@@ -25,14 +25,14 @@ Chain multiple effects:
 ```ts
 import {
     BloomEffect,
-    createPixelateEffect,
-    createScanlineEffect,
+    PixelateEffect,
+    ScanlineEffect,
 } from "@vfx-js/effects";
 
 await vfx.add(img, {
     effect: [
-        createPixelateEffect({ size: 10 }),
-        createScanlineEffect({ spacing: 5 }),
+        new PixelateEffect({ size: 10 }),
+        new ScanlineEffect({ spacing: 5 }),
         new BloomEffect({ intensity: 10 }),
     ],
 });
@@ -48,8 +48,8 @@ await vfx.add(img, {
 | `ParticleEffect`         | Mouse-emitter GPU particles, skips transparent source regions   |
 | `ParticleExplodeEffect`  | One-shot curl-noise burst that shatters the source element      |
 | `VoronoiEffect`          | Voronoi cells shrunken in a halo around the cursor              |
-| `createPixelateEffect`   | Nearest-neighbour pixelation                                    |
-| `createScanlineEffect`   | CRT scanline overlay                                            |
+| `PixelateEffect`         | Nearest-neighbour pixelation                                    |
+| `ScanlineEffect`         | CRT scanline overlay                                            |
 
 See the [Storybook demos](https://amagi.dev/vfx-js/storybook) for live examples.
 

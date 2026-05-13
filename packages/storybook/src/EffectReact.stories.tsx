@@ -5,8 +5,8 @@ import { createRoot } from "react-dom/client";
 import { VFXImg, VFXProvider } from "react-vfx";
 import {
     BloomEffect,
-    createPixelateEffect,
-    createScanlineEffect,
+    PixelateEffect,
+    ScanlineEffect,
 } from "@vfx-js/effects";
 import Jellyfish from "./assets/jellyfish.webp";
 import "./preset.css";
@@ -21,8 +21,8 @@ type ChainItem = { id: EffectId; enabled: boolean };
 
 function buildEffectInstances(): Record<EffectId, Effect> {
     return {
-        pixelate: createPixelateEffect({ size: 10 }),
-        scanline: createScanlineEffect({ spacing: 5 }),
+        pixelate: new PixelateEffect({ size: 10 }),
+        scanline: new ScanlineEffect({ spacing: 5 }),
         bloom: new BloomEffect({
             threshold: 0.01,
             softness: 0.2,

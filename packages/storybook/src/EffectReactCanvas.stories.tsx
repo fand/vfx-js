@@ -5,8 +5,8 @@ import { createRoot } from "react-dom/client";
 import { VFXCanvas, VFXProvider } from "react-vfx";
 import {
     BloomEffect,
-    createPixelateEffect,
-    createScanlineEffect,
+    PixelateEffect,
+    ScanlineEffect,
 } from "@vfx-js/effects";
 import "./preset.css";
 
@@ -20,8 +20,8 @@ type ChainItem = { id: EffectId; enabled: boolean };
 
 function buildEffectInstances(): Record<EffectId, Effect> {
     return {
-        pixelate: createPixelateEffect({ size: 6 }),
-        scanline: createScanlineEffect({ spacing: 4 }),
+        pixelate: new PixelateEffect({ size: 6 }),
+        scanline: new ScanlineEffect({ spacing: 4 }),
         bloom: new BloomEffect({
             threshold: 0.4,
             softness: 0.3,

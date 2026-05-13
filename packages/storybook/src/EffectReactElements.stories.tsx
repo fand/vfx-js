@@ -3,8 +3,8 @@ import { createRoot } from "react-dom/client";
 import { VFXDiv, VFXP, VFXProvider, VFXSpan, VFXVideo } from "react-vfx";
 import {
     BloomEffect,
-    createPixelateEffect,
-    createScanlineEffect,
+    PixelateEffect,
+    ScanlineEffect,
 } from "@vfx-js/effects";
 import JellyfishMp4 from "./assets/jellyfish.mp4";
 import "./preset.css";
@@ -59,7 +59,7 @@ function SmokeTestApp(): React.ReactElement {
                         muted
                         playsInline
                         style={{ width: 320, marginTop: 12 }}
-                        effect={[createPixelateEffect({ size: 8 })]}
+                        effect={[new PixelateEffect({ size: 8 })]}
                     />
                 </section>
 
@@ -109,7 +109,7 @@ function SmokeTestApp(): React.ReactElement {
                             lineHeight: 1.6,
                             color: "#a0e4ff",
                         }}
-                        effect={[createScanlineEffect({ spacing: 4 })]}
+                        effect={[new ScanlineEffect({ spacing: 4 })]}
                     >
                         VFXP is the paragraph variant. Text elements go through
                         dom2canvas, then the effect chain runs against that

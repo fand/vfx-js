@@ -24,28 +24,34 @@ void main() {
 }
 `;
 
-export type PixelateOptions = {
-    /** Cell size in CSS px. Default 10. */
-    size?: number;
+export type PixelateParams = {
+    /** Cell size in CSS px. */
+    size: number;
 };
 
-/**
- * Stateful pixelate effect — do NOT reuse across elements; construct a
- * new instance via this factory per `vfx.add()` call.
- */
-export function createPixelateEffect(opts: PixelateOptions = {}): Effect {
-    const size = opts.size ?? 10;
-    return {
-        render(ctx: EffectContext) {
-            const [w, h] = ctx.dims.element;
-            ctx.draw({
-                frag: FRAG_PIXELATE,
-                uniforms: {
-                    src: ctx.src,
-                    cellUv: [size / (w || 1), size / (h || 1)],
-                },
-                target: ctx.target,
-            });
-        },
-    };
+const DEFAULT_PARAMS: PixelateParams = { size: 10 };
+
+export class PixelateEffect implements Effect {
+    params: PixelateParams;
+
+    constructor(initial: Partial<PixelateParams> = {}) {
+        this.params = { ...DEFAULT_PARAMS, ...initial };
+    }
+
+    setParams(updates: Partial<PixelateParams>): void {
+        Object.assign(this.params, updates);
+    }
+
+    render(ctx: EffectContext): void {
+        const [w, h] = ctx.dims.element;
+        const { size } = this.params;
+        ctx.draw({
+            frag: FRAG_PIXELATE,
+            uniforms: {
+                src: ctx.src,
+                cellUv: [size / (w || 1), size / (h || 1)],
+            },
+            target: ctx.target,
+        });
+    }
 }

@@ -24,28 +24,34 @@ void main() {
 }
 `;
 
-export type ScanlineOptions = {
-    /** Line spacing in CSS px. Default 4. */
-    spacing?: number;
+export type ScanlineParams = {
+    /** Line spacing in CSS px. */
+    spacing: number;
 };
 
-/**
- * Stateful scanline effect — do NOT reuse across elements; construct a
- * new instance via this factory per `vfx.add()` call.
- */
-export function createScanlineEffect(opts: ScanlineOptions = {}): Effect {
-    const spacing = opts.spacing ?? 4;
-    return {
-        render(ctx: EffectContext) {
-            ctx.draw({
-                frag: FRAG_SCANLINE,
-                uniforms: {
-                    src: ctx.src,
-                    innerHeight: ctx.dims.element[1] || 1,
-                    spacing,
-                },
-                target: ctx.target,
-            });
-        },
-    };
+const DEFAULT_PARAMS: ScanlineParams = { spacing: 4 };
+
+export class ScanlineEffect implements Effect {
+    params: ScanlineParams;
+
+    constructor(initial: Partial<ScanlineParams> = {}) {
+        this.params = { ...DEFAULT_PARAMS, ...initial };
+    }
+
+    setParams(updates: Partial<ScanlineParams>): void {
+        Object.assign(this.params, updates);
+    }
+
+    render(ctx: EffectContext): void {
+        const { spacing } = this.params;
+        ctx.draw({
+            frag: FRAG_SCANLINE,
+            uniforms: {
+                src: ctx.src,
+                innerHeight: ctx.dims.element[1] || 1,
+                spacing,
+            },
+            target: ctx.target,
+        });
+    }
 }

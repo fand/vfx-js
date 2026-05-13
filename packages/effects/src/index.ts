@@ -3,6 +3,6 @@ export { FluidEffect } from "./fluid";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
 export { ParticleEffect } from "./particle";
 export { ParticleExplodeEffect } from "./particle-explode";
-export { createPixelateEffect } from "./pixelate";
-export { createScanlineEffect } from "./scanline";
+export { PixelateEffect } from "./pixelate";
+export { ScanlineEffect } from "./scanline";
 export { VoronoiEffect } from "./voronoi";

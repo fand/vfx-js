@@ -4,8 +4,8 @@ import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import {
     BloomEffect,
-    createPixelateEffect,
-    createScanlineEffect,
+    PixelateEffect,
+    ScanlineEffect,
     FluidEffect,
     HalftoneEffect,
     ParticleEffect,
@@ -84,8 +84,8 @@ crtBloom.play = async ({ canvasElement }) => {
     });
     await vfx.add(img, {
         effect: [
-            createPixelateEffect({ size: 10 }),
-            createScanlineEffect({ spacing: 5 }),
+            new PixelateEffect({ size: 10 }),
+            new ScanlineEffect({ spacing: 5 }),
             bloom,
         ],
     });
