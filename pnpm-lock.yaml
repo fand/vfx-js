@@ -126,6 +126,33 @@ importers:
         specifier: 8.0.8
         version: 8.0.8(@types/node@24.12.2)(esbuild@0.27.7)(yaml@2.8.3)
 
+  packages/effects:
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.4.11
+        version: 2.4.11
+      '@types/node':
+        specifier: 24.12.2
+        version: 24.12.2
+      '@vfx-js/core':
+        specifier: workspace:*
+        version: link:../vfx-js
+      lint-staged:
+        specifier: ^16.1.0
+        version: 16.1.0
+      npm-run-all2:
+        specifier: ^8.0.4
+        version: 8.0.4
+      rimraf:
+        specifier: ^6.0.1
+        version: 6.0.1
+      tsconfig-to-dual-package:
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@6.0.2)
+      typescript:
+        specifier: 6.0.2
+        version: 6.0.2
+
   packages/examples:
     dependencies:
       '@vfx-js/core':

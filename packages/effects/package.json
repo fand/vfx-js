@@ -1,0 +1,69 @@
+{
+  "name": "@vfx-js/effects",
+  "description": "Ready-made WebGL effects for @vfx-js/core",
+  "version": "0.1.0",
+  "files": [
+    "package.json",
+    "README.md",
+    "lib/"
+  ],
+  "type": "module",
+  "main": "./lib/esm/index.js",
+  "types": "lib/esm/index.d.ts",
+  "exports": {
+    "require": {
+      "types": "./lib/cjs/index.d.ts",
+      "default": "./lib/cjs/index.js"
+    },
+    "import": {
+      "types": "./lib/esm/index.d.ts",
+      "default": "./lib/esm/index.js"
+    }
+  },
+  "scripts": {
+    "build": "run-s clean build:cjs build:esm build:dual",
+    "build:cjs": "tsc -d",
+    "build:esm": "tsc -d -p tsconfig.esm.json",
+    "build:dual": "tsconfig-to-dual-package",
+    "clean": "rimraf lib",
+    "dev": "run-p watch:cjs watch:esm",
+    "watch:cjs": "tsc -d -w",
+    "watch:esm": "tsc -d -w -p tsconfig.esm.json",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "lint-staged": "lint-staged"
+  },
+  "peerDependencies": {
+    "@vfx-js/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.11",
+    "@types/node": "24.12.2",
+    "@vfx-js/core": "workspace:*",
+    "lint-staged": "^16.1.0",
+    "npm-run-all2": "^8.0.4",
+    "rimraf": "^6.0.1",
+    "tsconfig-to-dual-package": "^1.2.0",
+    "typescript": "6.0.2"
+  },
+  "lint-staged": {
+    "src/*.ts": [
+      "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
+    ]
+  },
+  "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
+  "homepage": "https://amagi.dev/vfx-js",
+  "repository": {
+    "url": "https://github.com/fand/react-vfx"
+  },
+  "bugs": {
+    "url": "https://github.com/fand/react-vfx/issues"
+  },
+  "keywords": [
+    "glsl",
+    "webgl",
+    "webgl2",
+    "effects"
+  ],
+  "license": "MIT"
+}
