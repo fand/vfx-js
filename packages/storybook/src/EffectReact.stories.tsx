@@ -1,12 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { Effect } from "@vfx-js/core";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { VFXImg, VFXProvider } from "react-vfx";
+import {
+    BloomEffect,
+    PixelateEffect,
+    ScanlineEffect,
+} from "@vfx-js/effects";
 import Jellyfish from "./assets/jellyfish.webp";
-import { BloomEffect } from "./effects/bloom";
-import { createPixelateEffect } from "./effects/pixelate";
-import { createScanlineEffect } from "./effects/scanline";
 import "./preset.css";
 
 export default {
@@ -19,8 +21,8 @@ type ChainItem = { id: EffectId; enabled: boolean };
 
 function buildEffectInstances(): Record<EffectId, Effect> {
     return {
-        pixelate: createPixelateEffect({ size: 10 }),
-        scanline: createScanlineEffect({ spacing: 5 }),
+        pixelate: new PixelateEffect({ size: 10 }),
+        scanline: new ScanlineEffect({ spacing: 5 }),
         bloom: new BloomEffect({
             threshold: 0.01,
             softness: 0.2,
@@ -171,12 +173,7 @@ function SortableList({
 
 function CRTBloomReactApp(): React.ReactElement {
     const [chain, setChain] = useState<ChainItem[]>(INITIAL_CHAIN);
-
-    const instancesRef = useRef<Record<EffectId, Effect> | null>(null);
-    if (!instancesRef.current) {
-        instancesRef.current = buildEffectInstances();
-    }
-    const instances = instancesRef.current;
+    const [instances] = useState(buildEffectInstances);
 
     const effects = useMemo(
         () => chain.filter((c) => c.enabled).map((c) => instances[c.id]),

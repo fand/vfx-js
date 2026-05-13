@@ -1,7 +1,7 @@
 {
-  "name": "react-vfx",
-  "description": "WebGL effects for React elements",
-  "version": "0.18.0",
+  "name": "@vfx-js/effects",
+  "description": "Ready-made WebGL effects for @vfx-js/core",
+  "version": "0.1.0",
   "files": [
     "package.json",
     "README.md",
@@ -31,31 +31,24 @@
     "watch:esm": "tsc -d -w -p tsconfig.esm.json",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "lint-staged": "lint-staged",
-    "test": "vitest --dir src --run",
-    "test:watch": "vitest --dir src"
+    "lint-staged": "lint-staged"
   },
   "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
-  },
-  "dependencies": {
-    "@vfx-js/core": "0.13.0"
+    "@vfx-js/core": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.11",
     "@types/node": "24.12.2",
-    "@types/react": "^19.1.6",
+    "@vfx-js/core": "workspace:*",
     "lint-staged": "^16.1.0",
     "npm-run-all2": "^8.0.4",
     "rimraf": "^6.0.1",
     "tsconfig-to-dual-package": "^1.2.0",
-    "typescript": "6.0.2",
-    "vitest": "4.1.4"
+    "typescript": "6.0.2"
   },
   "lint-staged": {
-    "src/*.{ts,tsx}": [
-      "biome check --no-errors-on-unmatched --files-ignore-unknown=true"
+    "src/*.ts": [
+      "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
     ]
   },
   "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
@@ -68,9 +61,9 @@
   },
   "keywords": [
     "glsl",
-    "react",
-    "threejs",
-    "webgl"
+    "webgl",
+    "webgl2",
+    "effects"
   ],
   "license": "MIT"
 }

@@ -249,8 +249,12 @@ function parseHexColor(hex: string): [number, number, number, number] {
             .map((c) => c + c)
             .join("");
     }
-    if (s.length === 6) s += "ff";
-    if (s.length !== 8) return [0, 0, 0, 0];
+    if (s.length === 6) {
+        s += "ff";
+    }
+    if (s.length !== 8) {
+        return [0, 0, 0, 0];
+    }
     const r = Number.parseInt(s.slice(0, 2), 16) / 255;
     const g = Number.parseInt(s.slice(2, 4), 16) / 255;
     const b = Number.parseInt(s.slice(4, 6), 16) / 255;

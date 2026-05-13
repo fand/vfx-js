@@ -1,10 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import { createRoot } from "react-dom/client";
 import { VFXDiv, VFXP, VFXProvider, VFXSpan, VFXVideo } from "react-vfx";
+import {
+    BloomEffect,
+    PixelateEffect,
+    ScanlineEffect,
+} from "@vfx-js/effects";
 import JellyfishMp4 from "./assets/jellyfish.mp4";
-import { BloomEffect } from "./effects/bloom";
-import { createPixelateEffect } from "./effects/pixelate";
-import { createScanlineEffect } from "./effects/scanline";
 import "./preset.css";
 
 // Each component gets its own Effect instance — vfx-js rejects reuse
@@ -57,7 +59,7 @@ function SmokeTestApp(): React.ReactElement {
                         muted
                         playsInline
                         style={{ width: 320, marginTop: 12 }}
-                        effect={[createPixelateEffect({ size: 8 })]}
+                        effect={[new PixelateEffect({ size: 8 })]}
                     />
                 </section>
 
@@ -107,7 +109,7 @@ function SmokeTestApp(): React.ReactElement {
                             lineHeight: 1.6,
                             color: "#a0e4ff",
                         }}
-                        effect={[createScanlineEffect({ spacing: 4 })]}
+                        effect={[new ScanlineEffect({ spacing: 4 })]}
                     >
                         VFXP is the paragraph variant. Text elements go through
                         dom2canvas, then the effect chain runs against that

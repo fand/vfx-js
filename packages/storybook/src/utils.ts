@@ -1,10 +1,13 @@
 import { VFX, type VFXOpts } from "@vfx-js/core";
+import type {
+    BloomEffect,
+    FluidEffect,
+    HalftoneEffect,
+    HalftoneInkPresetName,
+    ParticleEffect,
+    ParticleExplodeEffect,
+} from "@vfx-js/effects";
 import { Pane } from "tweakpane";
-import type { BloomEffect } from "./effects/bloom";
-import type { FluidEffect } from "./effects/fluid";
-import type { HalftoneEffect, HalftoneInkPresetName } from "./effects/halftone";
-import type { ParticleEffect } from "./effects/particle";
-import type { ParticleExplodeEffect } from "./effects/particle-explode";
 
 const PANE_CLASS = "vfx-tweakpane-container";
 
