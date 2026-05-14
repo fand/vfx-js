@@ -1,4 +1,4 @@
-import{n as e}from"./chunk-BneVvdWh.js";import{c as t,s as n}from"./utils-BhXNjmT_.js";import{n as r,t as i}from"./logo-640w-20p-DamX1-bG.js";import{t as a}from"./preset-B7f9t9lo.js";import{n as o,t as s}from"./jellyfish-B6nQsbyY.js";import{n as c,t as l}from"./Timer-D-KEr5Rw.js";var u,d,f,p,m,h,g,_,v,y,b,x,S,C,w,T,E,D,O,k;e((()=>{t(),c(),i(),s(),a(),u=`
+import{n as e}from"./chunk-BneVvdWh.js";import{c as t,s as n}from"./utils-qfLy7bzh.js";import{n as r,t as i}from"./logo-640w-20p-DamX1-bG.js";import{t as a}from"./preset-B7f9t9lo.js";import{n as o,t as s}from"./jellyfish-B6nQsbyY.js";import{n as c,t as l}from"./Timer-D-KEr5Rw.js";var u,d,f,p,m,h,g,_,v,y,b,x,S,C,w,T,E,D,O,k;e((()=>{t(),c(),i(),s(),a(),u=`
 precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;
