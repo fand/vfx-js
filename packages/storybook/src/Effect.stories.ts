@@ -28,6 +28,9 @@ export default {
     parameters: { layout: "fullscreen" },
 } satisfies Meta<undefined>;
 
+const isChromatic = (): boolean =>
+    typeof navigator !== "undefined" && /Chromatic/.test(navigator.userAgent);
+
 export const bloom: StoryObj<undefined> = {
     render: () => {
         const img = document.createElement("img");
@@ -183,12 +186,18 @@ particle.play = async ({ canvasElement }) => {
     // preserved params) + add + reattach pane.
     let effect: ParticleEffect | null = null;
     const setup = async () => {
-        const savedParams = effect ? { ...effect.params } : {};
+        // SwiftShader (Chromatic capture env) can't allocate the
+        // default 1M-particle state RTs within the 30s load budget.
+        const initialParams = effect
+            ? { ...effect.params }
+            : isChromatic()
+              ? { count: 256 * 256 }
+              : {};
         if (effect) {
             vfx.remove(img);
             disposeAllPanes();
         }
-        effect = new ParticleEffect(savedParams);
+        effect = new ParticleEffect(initialParams);
         await vfx.add(img, { effect });
         attachParticlePane("Particle", effect, {
             img,

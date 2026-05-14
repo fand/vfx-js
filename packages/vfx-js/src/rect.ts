@@ -85,6 +85,24 @@ export function toRect(r: DOMRect): Rect {
     } as Rect;
 }
 
+/**
+ * Like {@link toRect} but ceils width and height to integer CSS pixels while
+ * keeping the left/top origin. Used by text-path elements: their texture is
+ * captured at ceil(rect.width) × ceil(rect.height) in dom-to-canvas (a tiny
+ * sub-pixel buffer that absorbs DOM-vs-foreignObject text-metric mismatches),
+ * so the on-screen quad must use the same ceiled dimensions to map the
+ * texture 1:1 without any scaling/squish.
+ * @internal
+ */
+export function toCeiledRect(r: DOMRect): Rect {
+    return {
+        top: r.top,
+        left: r.left,
+        right: r.left + Math.ceil(r.right - r.left),
+        bottom: r.top + Math.ceil(r.bottom - r.top),
+    } as Rect;
+}
+
 export function growRect(a: Rect, b: Margin): Rect {
     return {
         top: a.top - b.top,
