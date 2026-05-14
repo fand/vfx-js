@@ -37,8 +37,12 @@ export default async function getCanvasFromElement(
 
     const ratio = window.devicePixelRatio;
 
-    const fullW = rect.width * ratio;
-    const fullH = rect.height * ratio;
+    // Ceil to integer pixels — see clone-width override below.
+    const ceilW = Math.ceil(rect.width);
+    const ceilH = Math.ceil(rect.height);
+
+    const fullW = ceilW * ratio;
+    const fullH = ceilH * ratio;
 
     // Clamp to GL MAX_TEXTURE_SIZE.
     let clampScale = 1;
@@ -62,6 +66,16 @@ export default async function getCanvasFromElement(
     newElement.style.setProperty("opacity", originalOpacity.toString());
     newElement.style.setProperty("margin", "0px");
     zeroCollapsingMargins(newElement);
+    // Pin the clone's outer box to integer pixels. Host-DOM text metrics and
+    // the SVG rasterizer's text metrics can disagree by tiny sub-pixel
+    // amounts (visibly so at non-100% browser zoom); a 0–1 px buffer here
+    // absorbs that mismatch so single-line text doesn't spill to a 2nd line
+    // and multi-line break positions stay stable. The texture is then mapped
+    // back to the original sub-pixel rect at render time — the resulting
+    // squish is <1% and visually imperceptible.
+    newElement.style.setProperty("box-sizing", "border-box");
+    newElement.style.setProperty("width", `${ceilW}px`);
+    newElement.style.setProperty("height", `${ceilH}px`);
 
     // Build SVG at full (unclamped) physical-pixel size.
     const html = newElement.outerHTML;

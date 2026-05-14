@@ -25,6 +25,7 @@ import {
     MARGIN_ZERO,
     type Margin,
     type Rect,
+    toCeiledRect,
     toRect,
 } from "./rect.js";
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
@@ -241,20 +242,24 @@ export class VFXPlayer {
             for (const e of this.#elements) {
                 if (e.type === "text" && e.isInViewport) {
                     const rect = e.element.getBoundingClientRect();
-                    if (rect.width !== e.width || rect.height !== e.height) {
+                    const w = Math.ceil(rect.width);
+                    const h = Math.ceil(rect.height);
+                    if (w !== e.width || h !== e.height) {
                         await this.#rerenderTextElement(e);
-                        e.width = rect.width;
-                        e.height = rect.height;
+                        e.width = w;
+                        e.height = h;
                     }
                 }
             }
             for (const e of this.#elements) {
                 if (e.type === "text" && !e.isInViewport) {
                     const rect = e.element.getBoundingClientRect();
-                    if (rect.width !== e.width || rect.height !== e.height) {
+                    const w = Math.ceil(rect.width);
+                    const h = Math.ceil(rect.height);
+                    if (w !== e.width || h !== e.height) {
                         await this.#rerenderTextElement(e);
-                        e.width = rect.width;
-                        e.height = rect.height;
+                        e.width = w;
+                        e.height = h;
                     }
                 }
             }
@@ -330,7 +335,9 @@ export class VFXPlayer {
         const inputPasses = this.#normalizePasses(opts);
 
         const domRect = element.getBoundingClientRect();
-        const rect = toRect(domRect);
+        const rect = isTextPathElement(element)
+            ? toCeiledRect(domRect)
+            : toRect(domRect);
         const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
         const rectWithOverflow = growRect(rect, overflow);
 
@@ -570,8 +577,10 @@ export class VFXPlayer {
             element,
             isInViewport: false,
             isInLogicalViewport: false,
-            width: domRect.width,
-            height: domRect.height,
+            // Match the (possibly-ceiled) rect so #resize's width/height
+            // comparison stays in the same coordinate system.
+            width: rect.right - rect.left,
+            height: rect.bottom - rect.top,
             passes,
             bufferTargets,
             startTime: now,
@@ -623,7 +632,9 @@ export class VFXPlayer {
 
         // Shared prelude (mirrors shader-path addElement).
         const domRect = element.getBoundingClientRect();
-        const rect = toRect(domRect);
+        const rect = isTextPathElement(element)
+            ? toCeiledRect(domRect)
+            : toRect(domRect);
         const [isFullScreen, overflow] = parseOverflowOpts(opts.overflow);
         const intersectionOpts = parseIntersectionOpts(opts.intersection);
 
@@ -694,8 +705,10 @@ export class VFXPlayer {
             element,
             isInViewport: false,
             isInLogicalViewport: false,
-            width: domRect.width,
-            height: domRect.height,
+            // Match the (possibly-ceiled) rect so #resize's width/height
+            // comparison stays in the same coordinate system.
+            width: rect.right - rect.left,
+            height: rect.bottom - rect.top,
             passes: [],
             bufferTargets: new Map(),
             startTime: now,
@@ -972,7 +985,10 @@ export class VFXPlayer {
 
         for (const e of this.#elements) {
             const domRect = e.element.getBoundingClientRect();
-            const rect = toRect(domRect);
+            // text-path texture is captured at ceil dimensions — match the
+            // quad so the texture maps 1:1 with no sub-pixel squish.
+            const rect =
+                e.type === "text" ? toCeiledRect(domRect) : toRect(domRect);
             const hit = this.#hitTest(e, rect, now);
 
             if (!hit.isVisible) {
@@ -988,8 +1004,8 @@ export class VFXPlayer {
             const u = e.passes[0].uniforms;
             u["time"].value = now - e.startTime;
             (u["resolution"].value as Vec2).set(
-                domRect.width * this.#pixelRatio,
-                domRect.height * this.#pixelRatio,
+                (rect.right - rect.left) * this.#pixelRatio,
+                (rect.bottom - rect.top) * this.#pixelRatio,
             );
             // #mouseX/Y are in viewport-Y-up coords, but gl_FragCoord in
             // the canvas is in canvas-Y-up coords (canvas extends paddingX/Y
@@ -2087,4 +2103,18 @@ function parseWrap(
 
 function clamp(x: number, xmin: number, xmax: number): number {
     return Math.max(xmin, Math.min(xmax, x));
+}
+
+/**
+ * Whether `element` goes through the text path (i.e. `dom2canvas`). These
+ * elements have their texture captured at ceiled CSS-pixel dimensions, so
+ * their on-screen rect must use {@link toCeiledRect} as well.
+ * @internal
+ */
+function isTextPathElement(element: HTMLElement): boolean {
+    return !(
+        element instanceof HTMLImageElement ||
+        element instanceof HTMLVideoElement ||
+        element instanceof HTMLCanvasElement
+    );
 }
