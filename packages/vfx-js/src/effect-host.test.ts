@@ -721,6 +721,24 @@ describe("EffectHost.createRenderTarget", () => {
             expect(framebuffers[0].opts?.mipmap).toBe(true);
         });
 
+        it("mipmap:'manual' promotes filter (mipmap:true + filter forwarded together)", () => {
+            // mipmap:true at the Framebuffer level is what gates the
+            // MIN_FILTER promotion (covered by framebuffer.test.ts).
+            // Verify both "manual" and `true` reach Framebuffer with
+            // the same mipmap flag + the user's filter intact, so the
+            // downstream promotion fires in both modes.
+            const { host } = makeHost();
+            host.ctx.createRenderTarget({ mipmap: true, filter: "nearest" });
+            host.ctx.createRenderTarget({
+                mipmap: "manual",
+                filter: "nearest",
+            });
+            expect(framebuffers[0].opts?.mipmap).toBe(true);
+            expect(framebuffers[0].opts?.filter).toBe("nearest");
+            expect(framebuffers[1].opts?.mipmap).toBe(true);
+            expect(framebuffers[1].opts?.filter).toBe("nearest");
+        });
+
         it("mipmap:true on persistent → flows to Backbuffer opts", () => {
             const { host } = makeHost();
             host.ctx.createRenderTarget({ persistent: true, mipmap: true });
