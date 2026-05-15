@@ -81,7 +81,7 @@ const UsageSection: React.FC = () => (
         <section>
             <h2 id="usage">Usage</h2>
             <p>
-                REACT-VFX consists of{" "}
+                @vfx-js/react consists of{" "}
                 <b>
                     <i>VFX Provider</i>
                 </b>{" "}
@@ -181,7 +181,7 @@ const UsageSection: React.FC = () => (
         </section>
         <section>
             <h2 id="custom-shaders">Custom Shaders</h2>
-            <p>You can use your own shader in REACT-VFX.</p>
+            <p>You can use your own shader in @vfx-js/react.</p>
             <Code>{dedent`
         import { VFXSpan } from '@vfx-js/react';
 
@@ -218,7 +218,7 @@ const UsageSection: React.FC = () => (
             <section className="Secton3">
                 <h3>Transition</h3>
                 <p>
-                    REACT-VFX provides a uniform variable{" "}
+                    @vfx-js/react provides a uniform variable{" "}
                     <InlineCode>float enterTime;</InlineCode> to write
                     transition effects.{" "}
                 </p>
@@ -261,7 +261,7 @@ const UsageSection: React.FC = () => (
             <section className="Secton4">
                 <h3>Custom Uniforms</h3>
                 <p>
-                    REACT-VFX accepts custom uniform variables as `uniforms`.
+                    @vfx-js/react accepts custom uniform variables as `uniforms`.
                     You can pass objects of parameters or functions:
                 </p>
                 <Code>
@@ -271,7 +271,7 @@ const UsageSection: React.FC = () => (
                 [name: string]: VFXUniformValue | (() => VFXUniformValue);
             };
 
-            // REACT-VFX currently supports float, vec2, vec3 and vec4.
+            // @vfx-js/react currently supports float, vec2, vec3 and vec4.
             export type VFXUniformValue =
                 | number // float
                 | [number, number] // vec2

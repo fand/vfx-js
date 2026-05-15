@@ -110,7 +110,7 @@ export class VFX {
 
     /**
      * Update the HIC texture for a layoutsubtree canvas.
-     * @internal Used by VFXCanvas (react-vfx).
+     * @internal Used by VFXCanvas (@vfx-js/react).
      */
     updateHICTexture(
         canvas: HTMLCanvasElement,

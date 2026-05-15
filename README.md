@@ -10,7 +10,7 @@ VFX-JS is a JavaScript library to add WebGL-powered effects to your website.
 You can easily attach it to normal `<img>`, `<video>` elements etc.
 
 
-This is the core implementation of [REACT-VFX](https://amagi.dev/react-vfx).
+See also [`@vfx-js/react`](https://www.npmjs.com/package/@vfx-js/react) for React bindings.
 
 
 ## Usage

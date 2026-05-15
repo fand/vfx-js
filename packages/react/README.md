@@ -1,6 +1,6 @@
 <div align="center">
-  <img alt="REACT-VFX" src="https://user-images.githubusercontent.com/1403842/71323457-c69e6900-2516-11ea-958c-b96b2121387b.png" width="100%"/>
-  <h1>REACT-VFX: WebGL effects for React elements!!</h1>
+  <a href="https://amagi.dev/vfx-js/" target="_blank"><img alt="VFX-JS" src="../docs/public/og_image.jpg" width="100%"/></a>
+  <h1>@vfx-js/react: WebGL effects for React elements!!</h1>
   <br/>
   <br/>
 </div>
@@ -8,16 +8,16 @@
 ## Install
 
 ```
-npm i react-vfx
+npm i @vfx-js/react
 ```
 
 ## Usage
 
-REACT-VFX exports `VFXImg`, `VFXVideo`, `VFXSpan` and `VFXDiv`.
+@vfx-js/react exports `VFXImg`, `VFXVideo`, `VFXSpan` and `VFXDiv`.
 These components works just like `<img>`, `<video>`, `<span>` and `<div>` - accepts all properties they have, but they are rendered in WebGL world with shader effects!
 
 ```ts
-import * as VFX from 'react-vfx';
+import * as VFX from '@vfx-js/react';
 
 export default () => (
     <VFX.VFXProvider>
@@ -56,7 +56,7 @@ NOTE: `VFXSpan` doesn't work if the content includes child nodes.
 ### Custom Shader
 
 ```ts
-import { VFXSpan } from 'react-vfx';
+import { VFXSpan } from '@vfx-js/react';
 
 const blink = `
 uniform vec2 resolution;

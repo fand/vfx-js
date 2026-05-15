@@ -227,6 +227,46 @@ importers:
         specifier: 4.1.4
         version: 4.1.4(@types/node@24.12.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.7)(yaml@2.8.3))
 
+  packages/react-vfx:
+    dependencies:
+      '@vfx-js/react':
+        specifier: 0.18.0
+        version: link:../react
+      react:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.2.5
+      react-dom:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.2.5(react@19.2.5)
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.4.11
+        version: 2.4.11
+      '@types/node':
+        specifier: 24.12.2
+        version: 24.12.2
+      '@types/react':
+        specifier: ^19.1.6
+        version: 19.2.14
+      lint-staged:
+        specifier: ^16.1.0
+        version: 16.1.0
+      npm-run-all2:
+        specifier: ^8.0.4
+        version: 8.0.4
+      rimraf:
+        specifier: ^6.0.1
+        version: 6.0.1
+      tsconfig-to-dual-package:
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@6.0.2)
+      typescript:
+        specifier: 6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: 4.1.4
+        version: 4.1.4(@types/node@24.12.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.7)(yaml@2.8.3))
+
   packages/storybook:
     dependencies:
       '@vfx-js/core':

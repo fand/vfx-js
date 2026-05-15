@@ -1,0 +1,23 @@
+{
+    "compilerOptions": {
+        "target": "es2020",
+        "module": "CommonJS",
+        "lib": ["es2020", "dom"],
+        "sourceMap": true,
+        "outDir": "lib/cjs",
+        "rootDir": "src",
+        "ignoreDeprecations": "6.0",
+        "removeComments": false,
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "moduleResolution": "node",
+        "jsx": "react-jsx",
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "allowJs": true
+    },
+    "include": ["src"]
+}
