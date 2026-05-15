@@ -15,7 +15,10 @@ function makeMockGl() {
         TEXTURE_MAG_FILTER: 0x2800,
         TEXTURE_WRAP_S: 0x2802,
         TEXTURE_WRAP_T: 0x2803,
+        NEAREST: 0x2600,
         LINEAR: 0x2601,
+        NEAREST_MIPMAP_NEAREST: 0x2700,
+        LINEAR_MIPMAP_LINEAR: 0x2703,
         CLAMP_TO_EDGE: 0x812f,
         RGBA: 0x1908,
         RGBA8: 0x8058,
@@ -32,9 +35,11 @@ function makeMockGl() {
         deleteTexture: vi.fn(),
         bindFramebuffer: noop,
         bindTexture: noop,
-        texImage2D: noop,
-        texParameteri: noop,
+        texImage2D: vi.fn(),
+        texStorage2D: vi.fn(),
+        texParameteri: vi.fn(),
         framebufferTexture2D: noop,
+        generateMipmap: vi.fn(),
     };
 }
 
@@ -78,5 +83,93 @@ describe("Framebuffer", () => {
         gl.deleteFramebuffer.mockImplementationOnce(() => order.push("delete"));
         fb.setSize(20, 20);
         expect(order).toEqual(["create", "delete"]);
+    });
+
+    describe("mipmap", () => {
+        it("default (no opt) → texImage2D level 0 only, base filter", () => {
+            const gl = makeMockGl();
+            new Framebuffer(makeCtx(gl), 16, 16);
+            expect(gl.texImage2D).toHaveBeenCalledTimes(1);
+            // MIN_FILTER set to base LINEAR (no mipmap promotion).
+            const minCall = gl.texParameteri.mock.calls.find(
+                (c) => c[1] === gl.TEXTURE_MIN_FILTER,
+            );
+            expect(minCall?.[2]).toBe(gl.LINEAR);
+        });
+
+        it("mipmap:true → per-level texImage2D with log2(max) + 1 levels", () => {
+            const gl = makeMockGl();
+            new Framebuffer(makeCtx(gl), 64, 32, { mipmap: true });
+            // 64x32 → log2(64) + 1 = 7 levels
+            expect(gl.texImage2D).toHaveBeenCalledTimes(7);
+            const levels = gl.texImage2D.mock.calls.map((c) => c[1]);
+            expect(levels).toEqual([0, 1, 2, 3, 4, 5, 6]);
+            expect(gl.texImage2D.mock.calls[0][3]).toBe(64);
+            expect(gl.texImage2D.mock.calls[0][4]).toBe(32);
+            // Level 6 → 1×1 (after 6 halvings of 64x32, clamped).
+            const last = gl.texImage2D.mock.calls[6];
+            expect(last[3]).toBe(1);
+            expect(last[4]).toBe(1);
+        });
+
+        it("mipmap:true + filter:'linear' (default) → MIN=LINEAR_MIPMAP_LINEAR, MAG=LINEAR", () => {
+            const gl = makeMockGl();
+            new Framebuffer(makeCtx(gl), 16, 16, { mipmap: true });
+            const min = gl.texParameteri.mock.calls.find(
+                (c) => c[1] === gl.TEXTURE_MIN_FILTER,
+            );
+            const mag = gl.texParameteri.mock.calls.find(
+                (c) => c[1] === gl.TEXTURE_MAG_FILTER,
+            );
+            expect(min?.[2]).toBe(gl.LINEAR_MIPMAP_LINEAR);
+            expect(mag?.[2]).toBe(gl.LINEAR);
+        });
+
+        it("mipmap:true + filter:'nearest' → MIN=NEAREST_MIPMAP_NEAREST, MAG=NEAREST", () => {
+            const gl = makeMockGl();
+            new Framebuffer(makeCtx(gl), 16, 16, {
+                mipmap: true,
+                filter: "nearest",
+            });
+            const min = gl.texParameteri.mock.calls.find(
+                (c) => c[1] === gl.TEXTURE_MIN_FILTER,
+            );
+            const mag = gl.texParameteri.mock.calls.find(
+                (c) => c[1] === gl.TEXTURE_MAG_FILTER,
+            );
+            expect(min?.[2]).toBe(gl.NEAREST_MIPMAP_NEAREST);
+            expect(mag?.[2]).toBe(gl.NEAREST);
+        });
+
+        it("1x1 mipmap RT → 1 level (no crash)", () => {
+            const gl = makeMockGl();
+            new Framebuffer(makeCtx(gl), 1, 1, { mipmap: true });
+            expect(gl.texImage2D).toHaveBeenCalledTimes(1);
+            expect(gl.texImage2D.mock.calls[0][1]).toBe(0);
+        });
+
+        it("generateMipmaps() calls gl.generateMipmap when mipmap:true", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16, { mipmap: true });
+            fb.generateMipmaps();
+            expect(gl.generateMipmap).toHaveBeenCalledWith(gl.TEXTURE_2D);
+        });
+
+        it("generateMipmaps() is no-op when mipmap:false", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16);
+            fb.generateMipmaps();
+            expect(gl.generateMipmap).not.toHaveBeenCalled();
+        });
+
+        it("setSize on mipmap RT reallocates with new level count", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16, { mipmap: true });
+            // 16 → 5 levels
+            expect(gl.texImage2D).toHaveBeenCalledTimes(5);
+            fb.setSize(64, 64);
+            // +7 levels for the new size = 12 total
+            expect(gl.texImage2D).toHaveBeenCalledTimes(12);
+        });
     });
 });

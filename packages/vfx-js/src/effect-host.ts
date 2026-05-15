@@ -58,6 +58,19 @@ type RenderTargetResolver = {
     /** Called when the host's element size changes (auto-tracking RTs). */
     resize?: (bufferW: number, bufferH: number) => void;
     dispose?: () => void;
+
+    /**
+     * Regenerate mips on the current write FB. Present only when the
+     * RT was created with `mipmap: true | "manual"`. Always safe to
+     * call; no-op for non-mipmap RTs (handled at the FB layer).
+     */
+    regenerateMipmaps?: () => void;
+
+    /**
+     * True iff `mipmap: true` (auto mode). EffectHost calls
+     * `regenerateMipmaps` post-draw, pre-swap when set.
+     */
+    mipmapAutoRegen?: boolean;
 };
 
 function resolveTexture(h: EffectTexture): Texture {
@@ -396,6 +409,9 @@ export class EffectHost {
         const float = opts?.float ?? false;
         const wrap = normalizeWrap(opts?.wrap);
         const filter = opts?.filter;
+        const mipmapOpt = opts?.mipmap ?? false;
+        const mipmap = mipmapOpt !== false;
+        const mipmapAutoRegen = mipmapOpt === true;
         const explicitSize = opts?.size;
         const sizeW = explicitSize ? explicitSize[0] : this.#dims.outputBufferW;
         const sizeH = explicitSize ? explicitSize[1] : this.#dims.outputBufferH;
@@ -411,6 +427,7 @@ export class EffectHost {
             const bb = new Backbuffer(this.#glCtx, cssW, cssH, pr, float, {
                 wrap,
                 filter,
+                mipmap,
             });
             resolver = {
                 getReadTexture: () => bb.texture,
@@ -426,6 +443,10 @@ export class EffectHost {
                       },
                 dispose: () => bb.dispose(),
             };
+            if (mipmap) {
+                resolver.regenerateMipmaps = () => bb.target.generateMipmaps();
+                resolver.mipmapAutoRegen = mipmapAutoRegen;
+            }
             getW = () => bb.target.width;
             getH = () => bb.target.height;
         } else {
@@ -433,6 +454,7 @@ export class EffectHost {
                 float,
                 wrap,
                 filter,
+                mipmap,
             });
             resolver = {
                 getReadTexture: () => fb.texture,
@@ -442,6 +464,10 @@ export class EffectHost {
                     : (bufferW, bufferH) => fb.setSize(bufferW, bufferH),
                 dispose: () => fb.dispose(),
             };
+            if (mipmap) {
+                resolver.regenerateMipmaps = () => fb.generateMipmaps();
+                resolver.mipmapAutoRegen = mipmapAutoRegen;
+            }
             getW = () => fb.width;
             getH = () => fb.height;
         }
@@ -631,6 +657,7 @@ export class EffectHost {
         let vpW: number;
         let vpH: number;
         let swap: (() => void) | undefined;
+        let regenerateMipmaps: (() => void) | undefined;
         if (rawTarget === null) {
             fbo = null;
             vpX = this.#dims.outputViewport.x;
@@ -652,6 +679,9 @@ export class EffectHost {
                 vpH = rawTarget.height;
             }
             swap = resolver.swap;
+            if (resolver.mipmapAutoRegen) {
+                regenerateMipmaps = resolver.regenerateMipmaps;
+            }
         }
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -676,6 +706,10 @@ export class EffectHost {
             compiled.draw();
         }
 
+        // Regen pre-swap: getWriteFbo() returned the buffer we just
+        // drew to. After swap, that buffer rotates to the read side
+        // and the next draw would land on the stale partner.
+        regenerateMipmaps?.();
         if (swap && opts.swap !== false) {
             swap();
         }
@@ -824,6 +858,8 @@ export function makeEffectRenderTarget(
         // Framework-owned RTs pass no dispose; the no-op makes
         // `rt.dispose()` always safe to call.
         dispose: dispose ?? (() => {}),
+        // No-op when the underlying RT has no mip storage.
+        generateMipmaps: () => resolver.regenerateMipmaps?.(),
     } as EffectRenderTargetInternal;
     Object.defineProperty(handle, RESOLVE_RT, { value: resolver });
     return handle;

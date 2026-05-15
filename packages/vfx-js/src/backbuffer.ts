@@ -24,6 +24,7 @@ export class Backbuffer {
         opts: {
             wrap?: TextureWrap | readonly [TextureWrap, TextureWrap];
             filter?: TextureFilter;
+            mipmap?: boolean;
         } = {},
     ) {
         this.#width = width;
@@ -32,7 +33,12 @@ export class Backbuffer {
 
         const pwidth = width * pixelRatio;
         const pheight = height * pixelRatio;
-        const fbOpts = { float, wrap: opts.wrap, filter: opts.filter };
+        const fbOpts = {
+            float,
+            wrap: opts.wrap,
+            filter: opts.filter,
+            mipmap: opts.mipmap,
+        };
         this.#buffers = [
             new Framebuffer(ctx, pwidth, pheight, fbOpts),
             new Framebuffer(ctx, pwidth, pheight, fbOpts),
