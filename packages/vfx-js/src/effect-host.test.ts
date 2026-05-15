@@ -68,7 +68,16 @@ type MockFramebuffer = {
     disposed: boolean;
     dispose: () => void;
     setSize: (w: number, h: number) => void;
-    opts: { float?: boolean; wrap?: unknown; filter?: string } | undefined;
+    generateMipmapsCount: number;
+    generateMipmaps: () => void;
+    opts:
+        | {
+              float?: boolean;
+              wrap?: unknown;
+              filter?: string;
+              mipmap?: boolean;
+          }
+        | undefined;
 };
 
 type MockBackbuffer = {
@@ -77,7 +86,7 @@ type MockBackbuffer = {
         h: number;
         pr: number;
         float?: boolean;
-        opts?: { wrap?: unknown; filter?: string };
+        opts?: { wrap?: unknown; filter?: string; mipmap?: boolean };
     };
     target: MockFramebuffer;
     texture: unknown;
@@ -151,6 +160,7 @@ vi.mock("./gl/framebuffer.js", () => {
         fbo = { _brand: "mock-fbo" };
         texture = { _brand: "mock-fb-tex" };
         disposed = false;
+        generateMipmapsCount = 0;
         opts: MockFramebuffer["opts"];
         constructor(
             _ctx: unknown,
@@ -170,6 +180,9 @@ vi.mock("./gl/framebuffer.js", () => {
             this.width = w;
             this.height = h;
         }
+        generateMipmaps() {
+            this.generateMipmapsCount += 1;
+        }
     }
     return { Framebuffer };
 });
@@ -187,7 +200,7 @@ vi.mock("./backbuffer.js", () => {
             h: number,
             pr: number,
             float: boolean,
-            opts?: { wrap?: unknown; filter?: string },
+            opts?: { wrap?: unknown; filter?: string; mipmap?: boolean },
         ) {
             this.ctorArgs = { w, h, pr, float, opts };
             this.target = {
@@ -198,6 +211,10 @@ vi.mock("./backbuffer.js", () => {
                 disposed: false,
                 dispose: () => {},
                 setSize: () => {},
+                generateMipmapsCount: 0,
+                generateMipmaps() {
+                    this.generateMipmapsCount += 1;
+                },
                 opts: undefined,
             };
             backbuffers.push(this as unknown as MockBackbuffer);
@@ -681,6 +698,95 @@ describe("EffectHost.createRenderTarget", () => {
         };
         host.dispose();
         expect(disposeCount).toBe(0);
+    });
+
+    describe("mipmap", () => {
+        const FRAG = "void main(){}";
+
+        it("default (no opt) → mipmap:false in Framebuffer opts", () => {
+            const { host } = makeHost();
+            host.ctx.createRenderTarget();
+            expect(framebuffers[0].opts?.mipmap).toBe(false);
+        });
+
+        it("mipmap:true → mipmap:true flows to Framebuffer opts", () => {
+            const { host } = makeHost();
+            host.ctx.createRenderTarget({ mipmap: true });
+            expect(framebuffers[0].opts?.mipmap).toBe(true);
+        });
+
+        it("mipmap:'manual' also allocates storage (mipmap:true to Framebuffer)", () => {
+            const { host } = makeHost();
+            host.ctx.createRenderTarget({ mipmap: "manual" });
+            expect(framebuffers[0].opts?.mipmap).toBe(true);
+        });
+
+        it("mipmap:true on persistent → flows to Backbuffer opts", () => {
+            const { host } = makeHost();
+            host.ctx.createRenderTarget({ persistent: true, mipmap: true });
+            expect(backbuffers[0].ctorArgs.opts?.mipmap).toBe(true);
+        });
+
+        it("auto mode (mipmap:true): draw regenerates mipmaps", () => {
+            const { host } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({ mipmap: true });
+            host.ctx.draw({ frag: FRAG, target: rt });
+            host.ctx.draw({ frag: FRAG, target: rt });
+            expect(framebuffers[0].generateMipmapsCount).toBe(2);
+        });
+
+        it("manual mode (mipmap:'manual'): draw does NOT auto-regenerate", () => {
+            const { host } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({ mipmap: "manual" });
+            host.ctx.draw({ frag: FRAG, target: rt });
+            host.ctx.draw({ frag: FRAG, target: rt });
+            expect(framebuffers[0].generateMipmapsCount).toBe(0);
+        });
+
+        it("manual mode: rt.generateMipmaps() forwards to Framebuffer", () => {
+            const { host } = makeHost();
+            const rt = host.ctx.createRenderTarget({ mipmap: "manual" });
+            rt.generateMipmaps();
+            rt.generateMipmaps();
+            expect(framebuffers[0].generateMipmapsCount).toBe(2);
+        });
+
+        it("auto mode: rt.generateMipmaps() is callable on top of auto-regen", () => {
+            const { host } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({ mipmap: true });
+            host.ctx.draw({ frag: FRAG, target: rt });
+            rt.generateMipmaps();
+            expect(framebuffers[0].generateMipmapsCount).toBe(2);
+        });
+
+        it("mipmap:false: rt.generateMipmaps() is a silent no-op", () => {
+            const { host } = makeHost();
+            const rt = host.ctx.createRenderTarget();
+            expect(() => rt.generateMipmaps()).not.toThrow();
+            expect(framebuffers[0].generateMipmapsCount).toBe(0);
+        });
+
+        it("auto mode + persistent: regen targets Backbuffer write FB before swap", () => {
+            const { host } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({
+                persistent: true,
+                mipmap: true,
+            });
+            host.ctx.draw({ frag: FRAG, target: rt });
+            expect(backbuffers[0].target.generateMipmapsCount).toBe(1);
+            expect(backbuffers[0].swaps).toBe(1);
+        });
+
+        it("non-mipmap target with canvas (null target): no regen attempted", () => {
+            const { host } = makeHost();
+            host.setPhase("render");
+            // Default canvas draw — no target → no resolver → safe.
+            expect(() => host.ctx.draw({ frag: FRAG })).not.toThrow();
+        });
     });
 });
 
