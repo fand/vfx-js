@@ -29,7 +29,7 @@ const config: StorybookConfig = {
                 ...config.resolve?.alias,
                 // During development, resolve to source files for hot reloading
                 "@vfx-js/core": join(__dirname, "../../vfx-js/src/index.ts"),
-                "react-vfx": join(__dirname, "../../react-vfx/src/react-vfx.ts"),
+                "@vfx-js/react": join(__dirname, "../../react/src/react.ts"),
             },
         },
     }),

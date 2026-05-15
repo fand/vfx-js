@@ -70,7 +70,7 @@ await vfx.addHTML(element, { shader: "rainbow" });
 if (supportsHtmlInCanvas()) { ... }
 ```
 
-### React (`react-vfx`)
+### React (`@vfx-js/react`)
 
 ```tsx
 <VFXCanvas shader="rainbow">

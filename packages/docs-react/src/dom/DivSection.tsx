@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import * as VFX from "react-vfx";
+import * as VFX from "@vfx-js/react";
 import "./DivSection.css";
 import { InlineCode } from "./Code";
 

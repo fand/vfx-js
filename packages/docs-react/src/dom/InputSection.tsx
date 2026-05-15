@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import * as VFX from "react-vfx";
+import * as VFX from "@vfx-js/react";
 import "./InputSection.css";
 import { Code, InlineCode } from "./Code";
 import dedent from "dedent";
@@ -17,7 +17,7 @@ const InputSection: React.FC = () => {
             </p>
             <Code>
                 {dedent`
-                import { VFXSpan } from 'react-vfx';
+                import { VFXSpan } from '@vfx-js/react';
 
                 <VFXSpan>Hello world!</VFXSpan>
             `}

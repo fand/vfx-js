@@ -1,5 +1,5 @@
 import React from "react";
-import * as VFX from "react-vfx";
+import * as VFX from "@vfx-js/react";
 import "./AuthorSection.css";
 
 function pub(name: string): string {

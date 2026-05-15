@@ -1,6 +1,6 @@
 {
-  "name": "react-vfx",
-  "description": "Renamed to @vfx-js/react. This package re-exports @vfx-js/react for backward compatibility.",
+  "name": "@vfx-js/react",
+  "description": "WebGL effects for React elements",
   "version": "0.18.0",
   "files": [
     "package.json",
@@ -40,7 +40,7 @@
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
-    "@vfx-js/react": "0.18.0"
+    "@vfx-js/core": "0.13.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.11",

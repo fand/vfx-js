@@ -31,7 +31,7 @@ jobs:
               env:
                   SSH_DEPLOY_KEY: ${{ secrets.REACT_VFX_DEPLOY_KEY }}
               with:
-                  source-directory: "packages/docs-react-vfx/dist"
+                  source-directory: "packages/docs-react/dist"
                   destination-github-username: "fand"
                   destination-repository-name: "react-vfx-docs"
                   user-email: mail@amagi.dev

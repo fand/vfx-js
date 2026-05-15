@@ -1,136 +1,37 @@
-<div align="center">
-  <img alt="REACT-VFX" src="https://user-images.githubusercontent.com/1403842/71323457-c69e6900-2516-11ea-958c-b96b2121387b.png" width="100%"/>
-  <h1>REACT-VFX: WebGL effects for React elements!!</h1>
-  <br/>
-  <br/>
-</div>
+# react-vfx
 
-## Install
+> **This package has been renamed to [`@vfx-js/react`](https://www.npmjs.com/package/@vfx-js/react).**
+>
+> This `react-vfx` package now re-exports `@vfx-js/react` for backward compatibility. New projects should depend on `@vfx-js/react` directly.
 
-```
-npm i react-vfx
-```
+## Migrating
 
-## Usage
-
-REACT-VFX exports `VFXImg`, `VFXVideo`, `VFXSpan` and `VFXDiv`.
-These components works just like `<img>`, `<video>`, `<span>` and `<div>` - accepts all properties they have, but they are rendered in WebGL world with shader effects!
-
-```ts
-import * as VFX from 'react-vfx';
-
-export default () => (
-    <VFX.VFXProvider>
-        {/* Render image with shader */}
-        <VFX.VFXImg src="cat.png" alt="image" shader="rgbShift"/>
-
-        {/* It also supports animated GIFs! */}
-        <VFX.VFXImg src="doge.gif" shader="pixelate"/>
-
-        {/* and videos! */}
-        <VFX.VFXVideo src="mind_blown.mp4"
-            autoplay playsinline loop muted
-            shader="halftone"/>
-
-        {/* Render text as image, then apply the shader effect! */}
-        <VFX.VFXSpan shader="rainbow">Hi there!</VFX.VFXSpan>
-
-        {/* Or even inputs! */}
-        <VFX.VFXDiv shader="rainbow">
-            <input type="text" value="hello" />
-        </VFX.VFXDiv>
-    </VFX.VFXProvider>
-);
+```sh
+npm uninstall react-vfx
+npm install @vfx-js/react
 ```
 
-NOTE: `VFXSpan` doesn't work if the content includes child nodes.
+Then update your imports:
 
-```ts
-// OK
-<a href="https://example.com"><VFXSpan>Yo</VFXSpan></a>
-
-// NG: link styles are not rendered correctly
-<VFXSpan><a href="https://example.com">Yo</a></VFXSpan>
+```diff
+- import { VFXProvider, VFXImg } from "react-vfx";
++ import { VFXProvider, VFXImg } from "@vfx-js/react";
 ```
 
-### Custom Shader
+The two packages export exactly the same API. Switching is a pure rename.
 
-```ts
-import { VFXSpan } from 'react-vfx';
+## Staying on the legacy 0.x API
 
-const blink = `
-uniform vec2 resolution;
-uniform vec2 offset;
-uniform float time;
-uniform sampler2D src;
-out vec4 outColor;
+If you need the pre-1.0 API, pin `react-vfx@0.18.x`:
 
-void main() {
-    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    outColor = texture2D(src, uv) * step(.5, fract(time));
+```json
+{
+  "dependencies": {
+    "react-vfx": "0.18.x"
+  }
 }
-`;
-
-export default = () => (
-    <VFXSpan shader={blink}></VFXSpan>
-);
 ```
 
-<!-- #### Passing Uniforms
+## Documentation
 
-```ts
-type Uniform = THREE.IUniform | number | number[];
-
-type UniformObject = {
-    [name: string]: THREE.IUniform;
-}
-
-type Uniforms = UniformObject | () => UniformObject;
-```
-
-```ts
-import React, { useState } from 'react';
-
-export default () => {
-    const [count, setCount] = useState(0);
-
-    return (
-        <VFXImg src="main_texture.png"
-            uniforms={{
-                foo: [1, 2, 3], // vec3
-                foo: [1, 2, 3], // vec3
-                foo: [1, 2, 3] // vec3
-            }}/>
-
-        <button type="button" onClick={() => setCount(count + 1)}>
-        <VFXImg src="main_texture.png"
-            shader={animated}
-            uniforms={{ count }}/>
-    );
-};
-```
-
-### Textures
-
-```ts
-<VFXImg src="main_texture.png" textures={["tex1.png", "tex2.png"]}/>
-```
-
-```glsl
-uniform sampler2D input;
-uniform sampler2D texture1;
-uniform sampler2D texture2;
-``` -->
-
-## Future work
-
--   Passing custom uniforms
--   Passing custom textures
-
-## Author
-
-[AMAGI](https://twitter.com/amagitakayosi)
-
-## LICENSE
-
-MIT
+See the main project: <https://github.com/fand/vfx-js>

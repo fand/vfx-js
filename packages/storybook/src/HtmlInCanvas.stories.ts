@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { VFXCanvas, VFXProvider } from "react-vfx";
+import { VFXCanvas, VFXProvider } from "@vfx-js/react";
 import { Timer } from "./Timer";
 import { initVFX } from "./utils";
 
@@ -265,7 +265,7 @@ export const ReactVFXCanvas: StoryObj = {
                         uniforms: { time: () => timer.time },
                         style: { display: "block", width: "100%" },
                     },
-                    h("h2", null, "VFXCanvas (react-vfx)"),
+                    h("h2", null, "VFXCanvas (@vfx-js/react)"),
                     h(
                         "p",
                         {

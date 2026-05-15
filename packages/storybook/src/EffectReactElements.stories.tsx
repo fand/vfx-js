@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import { createRoot } from "react-dom/client";
-import { VFXDiv, VFXP, VFXProvider, VFXSpan, VFXVideo } from "react-vfx";
+import { VFXDiv, VFXP, VFXProvider, VFXSpan, VFXVideo } from "@vfx-js/react";
 import {
     BloomEffect,
     PixelateEffect,

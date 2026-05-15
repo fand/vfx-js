@@ -56,7 +56,7 @@ importers:
         specifier: 8.0.8
         version: 8.0.8(@types/node@24.12.2)(esbuild@0.27.7)(yaml@2.8.3)
 
-  packages/docs-react-vfx:
+  packages/docs-react:
     dependencies:
       '@react-spring/web':
         specifier: ^10.0.1
@@ -67,6 +67,9 @@ importers:
       '@react-three/postprocessing':
         specifier: ^3.0.4
         version: 3.0.4(@react-three/fiber@9.1.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(three@0.183.2))(@types/three@0.183.1)(react@19.2.5)(three@0.183.2)
+      '@vfx-js/react':
+        specifier: 0.18.0
+        version: link:../react
       dedent:
         specifier: ^1.6.0
         version: 1.6.0
@@ -91,9 +94,6 @@ importers:
       react-intersection-observer:
         specifier: ^10.0.3
         version: 10.0.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      react-vfx:
-        specifier: 0.18.0
-        version: link:../react-vfx
       three:
         specifier: 0.183.2
         version: 0.183.2
@@ -187,11 +187,51 @@ importers:
         specifier: 8.0.8
         version: 8.0.8(@types/node@24.12.2)(esbuild@0.27.7)(yaml@2.8.3)
 
-  packages/react-vfx:
+  packages/react:
     dependencies:
       '@vfx-js/core':
         specifier: 0.13.0
         version: link:../vfx-js
+      react:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.2.5
+      react-dom:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.2.5(react@19.2.5)
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.4.11
+        version: 2.4.11
+      '@types/node':
+        specifier: 24.12.2
+        version: 24.12.2
+      '@types/react':
+        specifier: ^19.1.6
+        version: 19.2.14
+      lint-staged:
+        specifier: ^16.1.0
+        version: 16.1.0
+      npm-run-all2:
+        specifier: ^8.0.4
+        version: 8.0.4
+      rimraf:
+        specifier: ^6.0.1
+        version: 6.0.1
+      tsconfig-to-dual-package:
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@6.0.2)
+      typescript:
+        specifier: 6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: 4.1.4
+        version: 4.1.4(@types/node@24.12.2)(vite@8.0.8(@types/node@24.12.2)(esbuild@0.27.7)(yaml@2.8.3))
+
+  packages/react-vfx:
+    dependencies:
+      '@vfx-js/react':
+        specifier: 0.18.0
+        version: link:../react
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.2.5
@@ -235,15 +275,15 @@ importers:
       '@vfx-js/effects':
         specifier: workspace:*
         version: link:../effects
+      '@vfx-js/react':
+        specifier: 0.18.0
+        version: link:../react
       react:
         specifier: 19.2.5
         version: 19.2.5
       react-dom:
         specifier: 19.2.5
         version: 19.2.5(react@19.2.5)
-      react-vfx:
-        specifier: 0.18.0
-        version: link:../react-vfx
     devDependencies:
       '@chromatic-com/storybook':
         specifier: 5.1.2
@@ -947,9 +987,6 @@ packages:
 
   '@types/node@24.12.2':
     resolution: {integrity: sha512-A1sre26ke7HDIuY/M23nd9gfB+nrmhtYyMINbjI1zHJxYteKR6qSMX56FsmjMcDb3SMcjJg5BiRRgOCC/yBD0g==}
-
-  '@types/prismjs@1.26.5':
-    resolution: {integrity: sha512-AUZTa7hQ2KY5L7AmtSiqxlhWxb4ina0yd8hNbl4TWuqnv/pFP0nDMb3YrfSBf4hJVGLh2YEIBfKaBW/9UEl6IQ==}
 
   '@types/prismjs@1.26.6':
     resolution: {integrity: sha512-vqlvI7qlMvcCBbVe0AKAb4f97//Hy0EBTaiW8AalRnG/xAN5zOiWWyrNqNXeq8+KAuvRewjCVY1+IPxk4RdNYw==}
@@ -2946,8 +2983,6 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
-  '@types/prismjs@1.26.5': {}
-
   '@types/prismjs@1.26.6': {}
 
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
@@ -3681,7 +3716,7 @@ snapshots:
 
   prism-react-renderer@2.4.1(react@19.2.5):
     dependencies:
-      '@types/prismjs': 1.26.5
+      '@types/prismjs': 1.26.6
       clsx: 2.1.1
       react: 19.2.5
 

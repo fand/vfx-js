@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => ({
     resolve: mode === "development" ? {
         alias: {
             "@vfx-js/core": resolve(__dirname, "../vfx-js/src/index.ts"),
-            "react-vfx": resolve(__dirname, "../react-vfx/src/index.ts"),
+            "@vfx-js/react": resolve(__dirname, "../react/src/index.ts"),
         },
     } : undefined,
 }));

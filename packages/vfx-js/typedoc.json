@@ -15,7 +15,7 @@
     },
     "navigationLinks": {
         "Home": "https://amagi.dev/vfx-js",
-        "GitHub": "https://github.com/fand/react-vfx"
+        "GitHub": "https://github.com/fand/vfx-js"
     },
     "highlightLanguages": ["javascript", "typescript", "tsx", "json", "jsonc"],
     "markdownItOptions": {
