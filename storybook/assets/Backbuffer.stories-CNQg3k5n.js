@@ -1,4 +1,4 @@
-import{n as e}from"./chunk-BneVvdWh.js";import{c as t,s as n}from"./utils-qfLy7bzh.js";import{n as r,t as i}from"./logo-640w-20p-DamX1-bG.js";import{t as a}from"./preset-B7f9t9lo.js";var o,s,c,l,u,d,f,p,m;e((()=>{t(),i(),a(),o={title:`Backbuffer`,parameters:{layout:`fullscreen`}},s=`
+import{n as e}from"./chunk-BneVvdWh.js";import{c as t,s as n}from"./utils-75XtCKbd.js";import{n as r,t as i}from"./logo-640w-20p-DamX1-bG.js";import{t as a}from"./preset-B7f9t9lo.js";var o,s,c,l,u,d,f,p,m;e((()=>{t(),i(),a(),o={title:`Backbuffer`,parameters:{layout:`fullscreen`}},s=`
 precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;

@@ -1,4 +1,4 @@
-import"./modulepreload-polyfill-N-DOuI4P.js";import{t as e}from"./esm-Bj3Tt-_M.js";var t={sphereR:.12,bubbleCount:8,bubbleRadiusMin:.03,bubbleRadiusMax:.07,bubbleSpeed:.7,mouseSmoothing:.05},n=`
+import"./modulepreload-polyfill-N-DOuI4P.js";import{t as e}from"./esm-BFeQjI7L.js";var t={sphereR:.12,bubbleCount:8,bubbleRadiusMin:.03,bubbleRadiusMax:.07,bubbleSpeed:.7,mouseSmoothing:.05},n=`
     precision highp float;
     uniform sampler2D src;
     uniform vec2 resolution;
