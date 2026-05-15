@@ -67,6 +67,9 @@ importers:
       '@react-three/postprocessing':
         specifier: ^3.0.4
         version: 3.0.4(@react-three/fiber@9.1.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(three@0.183.2))(@types/three@0.183.1)(react@19.2.5)(three@0.183.2)
+      '@vfx-js/react':
+        specifier: 0.18.0
+        version: link:../react
       dedent:
         specifier: ^1.6.0
         version: 1.6.0
@@ -91,9 +94,6 @@ importers:
       react-intersection-observer:
         specifier: ^10.0.3
         version: 10.0.3(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      react-vfx:
-        specifier: 0.18.0
-        version: link:../react-vfx
       three:
         specifier: 0.183.2
         version: 0.183.2
@@ -187,7 +187,7 @@ importers:
         specifier: 8.0.8
         version: 8.0.8(@types/node@24.12.2)(esbuild@0.27.7)(yaml@2.8.3)
 
-  packages/react-vfx:
+  packages/react:
     dependencies:
       '@vfx-js/core':
         specifier: 0.13.0
@@ -235,15 +235,15 @@ importers:
       '@vfx-js/effects':
         specifier: workspace:*
         version: link:../effects
+      '@vfx-js/react':
+        specifier: 0.18.0
+        version: link:../react
       react:
         specifier: 19.2.5
         version: 19.2.5
       react-dom:
         specifier: 19.2.5
         version: 19.2.5(react@19.2.5)
-      react-vfx:
-        specifier: 0.18.0
-        version: link:../react-vfx
     devDependencies:
       '@chromatic-com/storybook':
         specifier: 5.1.2

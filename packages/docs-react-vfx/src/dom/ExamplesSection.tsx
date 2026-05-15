@@ -1,6 +1,6 @@
 import React from "react";
 import { useInView } from "react-intersection-observer";
-import * as VFX from "react-vfx";
+import * as VFX from "@vfx-js/react";
 import "./ExamplesSection.css";
 
 function pub(name: string): string {

@@ -14,7 +14,7 @@
     "@vfx-js/effects": "workspace:*",
     "react": "19.2.5",
     "react-dom": "19.2.5",
-    "react-vfx": "0.18.0"
+    "@vfx-js/react": "0.18.0"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "5.1.2",

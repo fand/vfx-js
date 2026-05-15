@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { Effect } from "@vfx-js/core";
 import { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { VFXImg, VFXProvider } from "react-vfx";
+import { VFXImg, VFXProvider } from "@vfx-js/react";
 import {
     BloomEffect,
     PixelateEffect,

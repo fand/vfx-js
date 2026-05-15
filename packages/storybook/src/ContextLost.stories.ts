@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import React, { useCallback, useContext, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { VFXContext, VFXImg, VFXProvider } from "react-vfx";
+import { VFXContext, VFXImg, VFXProvider } from "@vfx-js/react";
 import Logo from "./assets/logo-640w-20p.svg";
 import { initVFX } from "./utils";
 import "./preset.css";

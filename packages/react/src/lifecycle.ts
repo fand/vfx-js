@@ -108,7 +108,7 @@ export function useVFXLifecycle(
                 await vfx.add(element, initial);
                 lastAppliedRef.current = initial;
             } catch (err) {
-                console.error("[react-vfx] add failed:", err);
+                console.error("[@vfx-js/react] add failed:", err);
             }
         });
 
@@ -142,7 +142,7 @@ export function useVFXLifecycle(
                 );
                 lastAppliedRef.current = next;
             } catch (err) {
-                console.error("[react-vfx] applyDelta failed:", err);
+                console.error("[@vfx-js/react] applyDelta failed:", err);
             }
         });
     }, [vfx, element, vfxProps]);

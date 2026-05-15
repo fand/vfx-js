@@ -1,5 +1,5 @@
 {
-  "name": "react-vfx",
+  "name": "@vfx-js/react",
   "description": "WebGL effects for React elements",
   "version": "0.18.0",
   "files": [

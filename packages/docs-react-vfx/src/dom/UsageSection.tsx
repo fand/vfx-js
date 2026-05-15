@@ -1,5 +1,5 @@
 import React from "react";
-import * as VFX from "react-vfx";
+import * as VFX from "@vfx-js/react";
 import InputSection from "./InputSection";
 import DivSection from "./DivSection";
 import dedent from "dedent";
@@ -64,12 +64,12 @@ const UsageSection: React.FC = () => (
     <>
         <section>
             <h2 id="install">Install</h2>
-            <code>npm i react-vfx</code>
+            <code>npm i @vfx-js/react</code>
 
             <p>
                 See{" "}
                 <a
-                    href="https://github.com/fand/vfx-js/tree/main/packages/react-vfx"
+                    href="https://github.com/fand/vfx-js/tree/main/packages/react"
                     target="_blank"
                     rel="noopener noreferrer"
                 >
@@ -97,7 +97,7 @@ const UsageSection: React.FC = () => (
             </p>
             <Code>
                 {dedent`
-            import { VFXProvider } from 'react-vfx';
+            import { VFXProvider } from '@vfx-js/react';
 
             function App {
               return (
@@ -131,7 +131,7 @@ const UsageSection: React.FC = () => (
             </p>
             <Code>
                 {dedent`
-            import { VFXImg } from 'react-vfx';
+            import { VFXImg } from '@vfx-js/react';
 
             function Component {
               return (
@@ -150,7 +150,7 @@ const UsageSection: React.FC = () => (
                 </p>
                 <Code>
                     {dedent`
-                import { VFXImg } from 'react-vfx';
+                import { VFXImg } from '@vfx-js/react';
 
                 <VFXImg src="react-logo.png" shader="rainbow"/>
 
@@ -170,7 +170,7 @@ const UsageSection: React.FC = () => (
                 </p>
                 <Code>
                     {dedent`
-                import { VFXVideo } from 'react-vfx';
+                import { VFXVideo } from '@vfx-js/react';
 
                 <VFXVideo src="mind_blown.mp4" shader="halftone"/>
             `}
@@ -183,7 +183,7 @@ const UsageSection: React.FC = () => (
             <h2 id="custom-shaders">Custom Shaders</h2>
             <p>You can use your own shader in REACT-VFX.</p>
             <Code>{dedent`
-        import { VFXSpan } from 'react-vfx';
+        import { VFXSpan } from '@vfx-js/react';
 
         const blink = \`
         uniform vec2 resolution; // Resolution of the element
@@ -223,7 +223,7 @@ const UsageSection: React.FC = () => (
                     transition effects.{" "}
                 </p>
                 <Code>{dedent`
-            import { VFXSpan } from 'react-vfx';
+            import { VFXSpan } from '@vfx-js/react';
 
             const fadeIn = \`
             uniform vec2 resolution;
@@ -285,7 +285,7 @@ const UsageSection: React.FC = () => (
                     value to avoid performance problem.
                 </p>
                 <Code>{dedent`
-            import { VFXSpan } from 'react-vfx';
+            import { VFXSpan } from '@vfx-js/react';
 
             const scrollByScroll = \`
             uniform vec2 resolution;

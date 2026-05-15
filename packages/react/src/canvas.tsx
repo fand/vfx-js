@@ -89,7 +89,7 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                         lastAppliedRef.current = initial;
                     } catch (err) {
                         console.error(
-                            "[react-vfx] VFXCanvas mount failed:",
+                            "[@vfx-js/react] VFXCanvas mount failed:",
                             err,
                         );
                     }
@@ -122,7 +122,7 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                     lastAppliedRef.current = initial;
                 } catch (err) {
                     console.error(
-                        "[react-vfx] VFXCanvas (fallback) mount failed:",
+                        "[@vfx-js/react] VFXCanvas (fallback) mount failed:",
                         err,
                     );
                 }
@@ -182,7 +182,7 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                     });
                     lastAppliedRef.current = next;
                 } catch (err) {
-                    console.error("[react-vfx] applyDelta failed:", err);
+                    console.error("[@vfx-js/react] applyDelta failed:", err);
                 }
             });
         }, [vfx, isSupported, vfxProps]);
