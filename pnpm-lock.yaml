@@ -56,7 +56,7 @@ importers:
         specifier: 8.0.8
         version: 8.0.8(@types/node@24.12.2)(esbuild@0.27.7)(yaml@2.8.3)
 
-  packages/docs-react-vfx:
+  packages/docs-react:
     dependencies:
       '@react-spring/web':
         specifier: ^10.0.1
@@ -947,9 +947,6 @@ packages:
 
   '@types/node@24.12.2':
     resolution: {integrity: sha512-A1sre26ke7HDIuY/M23nd9gfB+nrmhtYyMINbjI1zHJxYteKR6qSMX56FsmjMcDb3SMcjJg5BiRRgOCC/yBD0g==}
-
-  '@types/prismjs@1.26.5':
-    resolution: {integrity: sha512-AUZTa7hQ2KY5L7AmtSiqxlhWxb4ina0yd8hNbl4TWuqnv/pFP0nDMb3YrfSBf4hJVGLh2YEIBfKaBW/9UEl6IQ==}
 
   '@types/prismjs@1.26.6':
     resolution: {integrity: sha512-vqlvI7qlMvcCBbVe0AKAb4f97//Hy0EBTaiW8AalRnG/xAN5zOiWWyrNqNXeq8+KAuvRewjCVY1+IPxk4RdNYw==}
@@ -2946,8 +2943,6 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
-  '@types/prismjs@1.26.5': {}
-
   '@types/prismjs@1.26.6': {}
 
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
@@ -3681,7 +3676,7 @@ snapshots:
 
   prism-react-renderer@2.4.1(react@19.2.5):
     dependencies:
-      '@types/prismjs': 1.26.5
+      '@types/prismjs': 1.26.6
       clsx: 2.1.1
       react: 19.2.5
 
