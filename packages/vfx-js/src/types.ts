@@ -533,6 +533,14 @@ export type EffectRenderTarget = {
     readonly height: number;
     readonly __brand: "EffectRenderTarget";
     dispose(): void;
+
+    /**
+     * Regenerate mips from level 0. No-op when the RT was not created
+     * with `mipmap: true | "manual"`. Auto mode regenerates after every
+     * draw already; call this in `"manual"` mode after the last draw
+     * before the RT is sampled at non-zero LOD.
+     */
+    generateMipmaps(): void;
 };
 
 /**
@@ -591,6 +599,22 @@ export type EffectRenderTargetOpts = {
 
     /** Default: `"linear"`. */
     filter?: EffectTextureFilter;
+
+    /**
+     * Allocate a full mip chain (Default: `false`).
+     *
+     * - `false`: no mip storage, single level. Identical to the
+     *   pre-mipmap behaviour.
+     * - `true`: full mip chain allocated, auto-regenerated after every
+     *   draw whose `target` is this RT.
+     * - `"manual"`: full mip chain allocated, regenerated only when
+     *   `rt.generateMipmaps()` is called.
+     *
+     * When mipmap is enabled, `filter` is auto-promoted on the MIN side:
+     * `"linear"` → trilinear, `"nearest"` → nearest-mip-nearest. MAG
+     * stays bilinear / nearest.
+     */
+    mipmap?: boolean | "manual";
 };
 
 export type EffectAttributeTypedArray =
