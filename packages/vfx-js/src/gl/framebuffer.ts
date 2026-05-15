@@ -16,6 +16,7 @@ export class Framebuffer implements Restorable {
     width: number;
     height: number;
     float: boolean;
+    mipmap: boolean;
     fbo!: WebGLFramebuffer;
     texture: Texture;
 
@@ -29,6 +30,7 @@ export class Framebuffer implements Restorable {
             float?: boolean;
             wrap?: TextureWrap | readonly [TextureWrap, TextureWrap];
             filter?: TextureFilter;
+            mipmap?: boolean;
         } = {},
     ) {
         this.#ctx = ctx;
@@ -36,6 +38,7 @@ export class Framebuffer implements Restorable {
         this.width = Math.max(1, Math.floor(width));
         this.height = Math.max(1, Math.floor(height));
         this.float = opts.float ?? false;
+        this.mipmap = opts.mipmap ?? false;
 
         this.texture = new Texture(ctx, undefined, { autoRegister: false });
         const w = opts.wrap;
@@ -81,6 +84,20 @@ export class Framebuffer implements Restorable {
         this.texture.dispose();
     }
 
+    /**
+     * Regenerate mips from level 0. No-op when this FB was not created
+     * with `mipmap: true`.
+     */
+    generateMipmaps(): void {
+        if (!this.mipmap) {
+            return;
+        }
+        const gl = this.gl;
+        gl.bindTexture(gl.TEXTURE_2D, this.texture.texture);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+
     #allocate(): void {
         const gl = this.gl;
         const oldFbo = this.fbo;
@@ -108,21 +125,45 @@ export class Framebuffer implements Restorable {
                 : gl.HALF_FLOAT
             : gl.UNSIGNED_BYTE;
 
-        gl.texImage2D(
-            gl.TEXTURE_2D,
-            0,
-            internalFormat,
-            this.width,
-            this.height,
-            0,
-            gl.RGBA,
-            type,
-            null,
-        );
-        const minF =
+        // Immutable mip storage when mipmapped; per-level texImage2D
+        // would leave the chain mutable, allowing accidental
+        // texImage2D(level=0) that could resize the texture out from
+        // under us. texStorage2D is the WebGL2 idiom for "I want N
+        // levels, allocated up front, no surprises".
+        const levels = this.mipmap
+            ? Math.floor(Math.log2(Math.max(this.width, this.height))) + 1
+            : 1;
+        if (this.mipmap) {
+            gl.texStorage2D(
+                gl.TEXTURE_2D,
+                levels,
+                internalFormat,
+                this.width,
+                this.height,
+            );
+        } else {
+            gl.texImage2D(
+                gl.TEXTURE_2D,
+                0,
+                internalFormat,
+                this.width,
+                this.height,
+                0,
+                gl.RGBA,
+                type,
+                null,
+            );
+        }
+        const baseMin =
             this.texture.minFilter === "nearest" ? gl.NEAREST : gl.LINEAR;
         const magF =
             this.texture.magFilter === "nearest" ? gl.NEAREST : gl.LINEAR;
+        // Auto-promote MIN to mipmap-aware variant when mip storage exists.
+        const minF = this.mipmap
+            ? this.texture.minFilter === "nearest"
+                ? gl.NEAREST_MIPMAP_NEAREST
+                : gl.LINEAR_MIPMAP_LINEAR
+            : baseMin;
         const wrapS = wrapEnum(gl, this.texture.wrapS);
         const wrapT = wrapEnum(gl, this.texture.wrapT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minF);

@@ -33,8 +33,13 @@ function makeMockGl() {
         bindFramebuffer: noop,
         bindTexture: noop,
         texImage2D: noop,
+        texStorage2D: noop,
         texParameteri: noop,
         framebufferTexture2D: noop,
+        generateMipmap: noop,
+        NEAREST: 0x2600,
+        NEAREST_MIPMAP_NEAREST: 0x2700,
+        LINEAR_MIPMAP_LINEAR: 0x2703,
     };
 }
 
