@@ -125,22 +125,30 @@ export class Framebuffer implements Restorable {
                 : gl.HALF_FLOAT
             : gl.UNSIGNED_BYTE;
 
-        // Immutable mip storage when mipmapped; per-level texImage2D
-        // would leave the chain mutable, allowing accidental
-        // texImage2D(level=0) that could resize the texture out from
-        // under us. texStorage2D is the WebGL2 idiom for "I want N
-        // levels, allocated up front, no surprises".
-        const levels = this.mipmap
-            ? Math.floor(Math.log2(Math.max(this.width, this.height))) + 1
-            : 1;
+        // Per-level texImage2D for both mip and non-mip — the texture
+        // handle is reused across setSize / restore, and texStorage2D
+        // makes it immutable so re-allocate would fail. Per-level keeps
+        // the storage mutable and matches the non-mip code path.
         if (this.mipmap) {
-            gl.texStorage2D(
-                gl.TEXTURE_2D,
-                levels,
-                internalFormat,
-                this.width,
-                this.height,
-            );
+            const levels =
+                Math.floor(Math.log2(Math.max(this.width, this.height))) + 1;
+            let w = this.width;
+            let h = this.height;
+            for (let level = 0; level < levels; level++) {
+                gl.texImage2D(
+                    gl.TEXTURE_2D,
+                    level,
+                    internalFormat,
+                    w,
+                    h,
+                    0,
+                    gl.RGBA,
+                    type,
+                    null,
+                );
+                w = Math.max(1, w >> 1);
+                h = Math.max(1, h >> 1);
+            }
         } else {
             gl.texImage2D(
                 gl.TEXTURE_2D,

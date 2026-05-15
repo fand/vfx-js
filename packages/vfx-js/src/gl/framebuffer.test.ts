@@ -86,11 +86,10 @@ describe("Framebuffer", () => {
     });
 
     describe("mipmap", () => {
-        it("default (no opt) → texImage2D, single level, base filter", () => {
+        it("default (no opt) → texImage2D level 0 only, base filter", () => {
             const gl = makeMockGl();
             new Framebuffer(makeCtx(gl), 16, 16);
-            expect(gl.texImage2D).toHaveBeenCalled();
-            expect(gl.texStorage2D).not.toHaveBeenCalled();
+            expect(gl.texImage2D).toHaveBeenCalledTimes(1);
             // MIN_FILTER set to base LINEAR (no mipmap promotion).
             const minCall = gl.texParameteri.mock.calls.find(
                 (c) => c[1] === gl.TEXTURE_MIN_FILTER,
@@ -98,16 +97,19 @@ describe("Framebuffer", () => {
             expect(minCall?.[2]).toBe(gl.LINEAR);
         });
 
-        it("mipmap:true → texStorage2D with log2(max) + 1 levels", () => {
+        it("mipmap:true → per-level texImage2D with log2(max) + 1 levels", () => {
             const gl = makeMockGl();
             new Framebuffer(makeCtx(gl), 64, 32, { mipmap: true });
-            expect(gl.texImage2D).not.toHaveBeenCalled();
-            expect(gl.texStorage2D).toHaveBeenCalledTimes(1);
             // 64x32 → log2(64) + 1 = 7 levels
-            const call = gl.texStorage2D.mock.calls[0];
-            expect(call[1]).toBe(7);
-            expect(call[3]).toBe(64);
-            expect(call[4]).toBe(32);
+            expect(gl.texImage2D).toHaveBeenCalledTimes(7);
+            const levels = gl.texImage2D.mock.calls.map((c) => c[1]);
+            expect(levels).toEqual([0, 1, 2, 3, 4, 5, 6]);
+            expect(gl.texImage2D.mock.calls[0][3]).toBe(64);
+            expect(gl.texImage2D.mock.calls[0][4]).toBe(32);
+            // Level 6 → 1×1 (after 6 halvings of 64x32, clamped).
+            const last = gl.texImage2D.mock.calls[6];
+            expect(last[3]).toBe(1);
+            expect(last[4]).toBe(1);
         });
 
         it("mipmap:true + filter:'linear' (default) → MIN=LINEAR_MIPMAP_LINEAR, MAG=LINEAR", () => {
@@ -142,7 +144,8 @@ describe("Framebuffer", () => {
         it("1x1 mipmap RT → 1 level (no crash)", () => {
             const gl = makeMockGl();
             new Framebuffer(makeCtx(gl), 1, 1, { mipmap: true });
-            expect(gl.texStorage2D.mock.calls[0][1]).toBe(1);
+            expect(gl.texImage2D).toHaveBeenCalledTimes(1);
+            expect(gl.texImage2D.mock.calls[0][1]).toBe(0);
         });
 
         it("generateMipmaps() calls gl.generateMipmap when mipmap:true", () => {
@@ -163,10 +166,10 @@ describe("Framebuffer", () => {
             const gl = makeMockGl();
             const fb = new Framebuffer(makeCtx(gl), 16, 16, { mipmap: true });
             // 16 → 5 levels
-            expect(gl.texStorage2D.mock.calls[0][1]).toBe(5);
+            expect(gl.texImage2D).toHaveBeenCalledTimes(5);
             fb.setSize(64, 64);
-            // 64 → 7 levels
-            expect(gl.texStorage2D.mock.calls[1][1]).toBe(7);
+            // +7 levels for the new size = 12 total
+            expect(gl.texImage2D).toHaveBeenCalledTimes(12);
         });
     });
 });
