@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@vfx-js/core": "0.13.0",
+    "@vfx-js/effects": "workspace:*",
     "@vfx-js/examples": "0.0.19",
     "@vfx-js/storybook": "0.0.19",
     "prism-themes": "^1.9.0",

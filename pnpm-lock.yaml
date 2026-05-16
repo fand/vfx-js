@@ -24,6 +24,9 @@ importers:
       '@vfx-js/core':
         specifier: 0.13.0
         version: link:../vfx-js
+      '@vfx-js/effects':
+        specifier: workspace:*
+        version: link:../effects
       '@vfx-js/examples':
         specifier: 0.0.19
         version: link:../examples
