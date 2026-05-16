@@ -52,7 +52,7 @@
         <link rel="apple-touch-icon" href="favicon/favicon-180.png" />
         <link rel="manifest" href="./assets/manifest-BmSZvifo.webmanifest" />
 
-      <script type="module" crossorigin src="./assets/index-Cyi9Hx1x.js"></script>
+      <script type="module" crossorigin src="./assets/index-C69W0iFL.js"></script>
       <link rel="modulepreload" crossorigin href="./assets/chunk-t0nojR_f.js">
       <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-BxR_cmXS.js">
       <link rel="stylesheet" crossorigin href="./assets/index-xd3yWrQb.css">
@@ -480,6 +480,88 @@ vfx.add(el, {
                         <img id="custom" src="./vfx-js-logo-no-padding.svg" />
                     </div>
                 </div>
+            </div>
+
+            <div>
+                <h3>Effects</h3>
+                <p>
+                    <code>@vfx-js/effects</code> ships ready-made
+                    <code>Effect</code> classes — bloom, halftone, pixelate,
+                    scanline, fluid, particles, voronoi. Each owns its own
+                    params; mutate <code>effect.params</code> (or call
+                    <code>effect.setParams</code>) to drive them live.
+                </p>
+                <pre><code class="language-bash">npm i @vfx-js/core @vfx-js/effects</code></pre>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+import { VFX } from "@vfx-js/core";
+import { BloomEffect } from "@vfx-js/effects";
+
+const vfx = new VFX();
+const effect = new BloomEffect({
+    threshold: 0.2,
+    intensity: 5,
+});
+await vfx.add(img, { effect });
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <img
+                            id="effect-bloom"
+                            src="./vfx-js-logo-no-padding.svg"
+                        />
+                    </div>
+                </div>
+
+                <p>
+                    Chain effects by passing an array — each runs in order, the
+                    next reads the previous output as <code>src</code>.
+                </p>
+                <div class="row">
+                    <div class="col">
+                        <pre><code class="language-javascript">
+import {
+    BloomEffect,
+    PixelateEffect,
+    ScanlineEffect,
+} from "@vfx-js/effects";
+
+await vfx.add(img, {
+    effect: [
+        new PixelateEffect({ size: 10 }),
+        new ScanlineEffect({ spacing: 5 }),
+        new BloomEffect({
+            threshold: 0.01,
+            intensity: 10,
+            pad: 200,
+        }),
+    ],
+});
+                        </code></pre>
+                    </div>
+                    <div class="col">
+                        <video
+                            id="effect-crt"
+                            src="./jellyfish.mp4"
+                            autoplay
+                            loop
+                            muted
+                        />
+                    </div>
+                </div>
+
+                <p>
+                    See the
+                    <a
+                        href="https://github.com/fand/vfx-js/tree/main/packages/effects#readme"
+                        target="_blank"
+                        >effects README</a
+                    >
+                    for the full effect list, or the
+                    <a href="./storybook/" target="_blank">Storybook</a> for
+                    interactive demos.
+                </p>
             </div>
 
             <div>
