@@ -1,4 +1,9 @@
 import { VFX } from "@vfx-js/core";
+import {
+    BloomEffect,
+    PixelateEffect,
+    ScanlineEffect,
+} from "@vfx-js/effects";
 
 import Prism from "prismjs";
 import "prism-themes/themes/prism-nord.min.css";
@@ -363,6 +368,28 @@ class App {
         });
     }
 
+    async initEffects() {
+        const bloom = $("#effect-bloom") as HTMLImageElement;
+        await this.vfx.add(bloom, {
+            effect: new BloomEffect({ threshold: 0.2, intensity: 5 }),
+        });
+
+        const crt = $("#effect-crt") as unknown as HTMLVideoElement;
+        await this.vfx.add(crt, {
+            effect: [
+                new PixelateEffect({ size: 10 }),
+                new ScanlineEffect({ spacing: 5 }),
+                new BloomEffect({
+                    threshold: 0.01,
+                    softness: 0.2,
+                    intensity: 10,
+                    scatter: 1,
+                    pad: 200,
+                }),
+            ],
+        });
+    }
+
     async initMultipass() {
         const e = $("#multipass");
         await this.vfx.add(e, {
@@ -462,6 +489,7 @@ window.addEventListener("load", async () => {
         app.initCanvas(),
         app.initCustomShader(),
         app.initMultipass(),
+        app.initEffects(),
     ]);
 
     app.hideMask();
