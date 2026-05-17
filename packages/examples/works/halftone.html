@@ -180,12 +180,10 @@
 
   .photo {
     position: absolute;
-    box-shadow: 6px 8px 0 rgba(13, 12, 10, 0.7);
-    background: #000;
+    /*background: #000;*/
     overflow: hidden;
-    --rot: 0deg;
     --py: 0px;
-    transform: rotate(var(--rot)) translate3d(0, var(--py), 0);
+    transform: translate3d(0, var(--py), 0);
     will-change: transform;
   }
   .photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -208,11 +206,10 @@
     top: 160px;
     width: 520px;
     height: 680px;
-    --rot: 2.5deg;
   }
   .photo.hero-portrait .cap { bottom: -26px; text-align: right; }
-  .photo.f-a { left: 58%; top: 80px; width: 170px; height: 220px; --rot: -9deg; }
-  .photo.f-b { left: 46%; bottom: 48px; width: 200px; height: 140px; --rot: 6deg; }
+  .photo.f-a { left: 58%; top: 80px; width: 170px; height: 220px; }
+  .photo.f-b { left: 46%; bottom: 48px; width: 200px; height: 140px; }
 
   /* ==== SECTION RULES ==== */
   .section-rule {
@@ -576,12 +573,12 @@
     </p>
   </div>
 
-  <figure class="photo marg" style="right: 56px; top: 120px; width: 220px; height: 280px; --rot: 8deg" data-cmyk data-parallax="-0.2">
+  <figure class="photo marg" style="right: 56px; top: 120px; width: 220px; height: 280px" data-cmyk data-parallax="-0.2">
     <img src="https://picsum.photos/seed/halftone-detail/220/280" crossorigin="anonymous" alt="" />
     <figcaption class="cap"><b>Fig. 04</b> Detail · 4.5× pitch</figcaption>
   </figure>
 
-  <figure class="photo marg" style="right: 140px; bottom: 60px; width: 170px; height: 170px; --rot: -7deg" data-cmyk data-parallax="-0.14">
+  <figure class="photo marg" style="right: 140px; bottom: 60px; width: 170px; height: 170px" data-cmyk data-parallax="-0.14">
     <img src="https://picsum.photos/seed/halftone-fogra/170/170" crossorigin="anonymous" alt="" />
     <figcaption class="cap"><b>Fig. 05</b> FOGRA51 · 6px</figcaption>
   </figure>
@@ -606,32 +603,32 @@
     Six images, four inks, no guarantees. Each separated at the standard newsprint angles — <b>C·15° / M·75° / Y·0° / K·45°</b> — and printed back together at varying pitches. Read them however you like.
   </p>
 
-  <figure class="photo" style="left: 5%; top: 240px; width: 280px; height: 200px; --rot: -7deg" data-cmyk data-parallax="-0.12">
+  <figure class="photo" style="left: 5%; top: 240px; width: 280px; height: 200px" data-cmyk data-parallax="-0.12">
     <img src="https://picsum.photos/seed/halftone-avenue/280/200" crossorigin="anonymous" alt="" />
     <figcaption class="cap"><b>06 ·</b> Avenue, late October</figcaption>
   </figure>
 
-  <figure class="photo" style="left: 30%; top: 200px; width: 240px; height: 300px; --rot: 5deg" data-cmyk data-parallax="-0.22">
+  <figure class="photo" style="left: 30%; top: 200px; width: 240px; height: 300px" data-cmyk data-parallax="-0.22">
     <img src="https://picsum.photos/seed/halftone-self/240/300" crossorigin="anonymous" alt="" />
     <figcaption class="cap"><b>07 ·</b> Self-portrait, 4 a.m.</figcaption>
   </figure>
 
-  <figure class="photo" style="right: 18%; top: 140px; width: 300px; height: 220px; --rot: -3deg" data-cmyk data-parallax="-0.16">
+  <figure class="photo" style="right: 18%; top: 140px; width: 300px; height: 220px" data-cmyk data-parallax="-0.16">
     <img src="https://picsum.photos/seed/halftone-train/300/220" crossorigin="anonymous" alt="" />
     <figcaption class="cap"><b>08 ·</b> A train, departing.</figcaption>
   </figure>
 
-  <figure class="photo" style="left: 14%; bottom: 140px; width: 200px; height: 280px; --rot: 8deg" data-cmyk data-parallax="-0.26">
+  <figure class="photo" style="left: 14%; bottom: 140px; width: 200px; height: 280px" data-cmyk data-parallax="-0.26">
     <img src="https://picsum.photos/seed/halftone-stranger/200/280" crossorigin="anonymous" alt="" />
     <figcaption class="cap"><b>09 ·</b> Stranger, Shinjuku</figcaption>
   </figure>
 
-  <figure class="photo" style="left: 42%; bottom: 110px; width: 260px; height: 200px; --rot: -9deg" data-cmyk data-parallax="-0.1">
+  <figure class="photo" style="left: 42%; bottom: 110px; width: 260px; height: 200px" data-cmyk data-parallax="-0.1">
     <img src="https://picsum.photos/seed/halftone-hands/260/200" crossorigin="anonymous" alt="" />
     <figcaption class="cap"><b>10 ·</b> Hands, in conversation</figcaption>
   </figure>
 
-  <figure class="photo" style="right: 6%; bottom: 80px; width: 280px; height: 240px; --rot: 4deg" data-cmyk data-parallax="-0.2">
+  <figure class="photo" style="right: 6%; bottom: 80px; width: 280px; height: 240px" data-cmyk data-parallax="-0.2">
     <img src="https://picsum.photos/seed/halftone-reading/280/240" crossorigin="anonymous" alt="" />
     <figcaption class="cap"><b>11 ·</b> Reading, slowly.</figcaption>
   </figure>
@@ -662,12 +659,12 @@
     </p>
   </div>
 
-  <figure class="photo marg" style="right: 56px; top: 180px; width: 200px; height: 240px; --rot: -6deg" data-cmyk data-parallax="-0.15">
+  <figure class="photo marg" style="right: 56px; top: 180px; width: 200px; height: 240px" data-cmyk data-parallax="-0.15">
     <img src="https://picsum.photos/seed/halftone-fig12/200/240" crossorigin="anonymous" alt="" />
     <figcaption class="cap"><b>Fig. 12</b> · 5px / newsprint</figcaption>
   </figure>
 
-  <figure class="photo marg" style="right: 300px; bottom: 80px; width: 160px; height: 200px; --rot: 11deg" data-cmyk data-parallax="-0.23">
+  <figure class="photo marg" style="right: 300px; bottom: 80px; width: 160px; height: 200px" data-cmyk data-parallax="-0.23">
     <img src="https://picsum.photos/seed/halftone-fig13/160/200" crossorigin="anonymous" alt="" />
     <figcaption class="cap"><b>Fig. 13</b> · 4px / FOGRA51</figcaption>
   </figure>
