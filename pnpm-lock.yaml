@@ -22,16 +22,16 @@ importers:
   packages/docs:
     dependencies:
       '@vfx-js/core':
-        specifier: 0.13.0
+        specifier: 1.0.0
         version: link:../vfx-js
       '@vfx-js/effects':
         specifier: workspace:*
         version: link:../effects
       '@vfx-js/examples':
-        specifier: 0.0.19
+        specifier: 0.0.20
         version: link:../examples
       '@vfx-js/storybook':
-        specifier: 0.0.19
+        specifier: 0.0.20
         version: link:../storybook
       prism-themes:
         specifier: ^1.9.0
@@ -71,7 +71,7 @@ importers:
         specifier: ^3.0.4
         version: 3.0.4(@react-three/fiber@9.1.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(three@0.183.2))(@types/three@0.183.1)(react@19.2.5)(three@0.183.2)
       '@vfx-js/react':
-        specifier: 0.18.0
+        specifier: 1.0.0
         version: link:../react
       dedent:
         specifier: ^1.6.0
@@ -159,7 +159,7 @@ importers:
   packages/examples:
     dependencies:
       '@vfx-js/core':
-        specifier: 0.13.0
+        specifier: 1.0.0
         version: link:../vfx-js
       react:
         specifier: 19.2.5
@@ -193,7 +193,7 @@ importers:
   packages/react:
     dependencies:
       '@vfx-js/core':
-        specifier: 0.13.0
+        specifier: 1.0.0
         version: link:../vfx-js
       react:
         specifier: ^18.0.0 || ^19.0.0
@@ -233,7 +233,7 @@ importers:
   packages/react-vfx:
     dependencies:
       '@vfx-js/react':
-        specifier: 0.18.0
+        specifier: 1.0.0
         version: link:../react
       react:
         specifier: ^18.0.0 || ^19.0.0
@@ -273,13 +273,13 @@ importers:
   packages/storybook:
     dependencies:
       '@vfx-js/core':
-        specifier: 0.13.0
+        specifier: 1.0.0
         version: link:../vfx-js
       '@vfx-js/effects':
         specifier: workspace:*
         version: link:../effects
       '@vfx-js/react':
-        specifier: 0.18.0
+        specifier: 1.0.0
         version: link:../react
       react:
         specifier: 19.2.5
