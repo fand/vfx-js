@@ -31,17 +31,6 @@
   }
   body { min-height: 100%; overflow-x: hidden; }
 
-  /* hide raw HTML until VFX has rasterised the first frame, to avoid FOUC */
-  html::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background: var(--paper);
-    z-index: 9999;
-    pointer-events: none;
-  }
-  html.vfx-ready::before { display: none; }
-
   /* paper grain */
   body::after {
     content: "";
@@ -518,8 +507,6 @@
 </head>
 <body>
 
-<div id="app">
-
 <header class="mast">
   <div class="title">STATIC <em>noise</em></div>
   <div class="center"><b>A Quarterly Review of Image &amp; Type</b><br />Vol. 07 · Spring MMXXVI · <b>Feature</b> 03 / 09</div>
@@ -731,8 +718,6 @@
   </div>
 </footer>
 
-</div>
-
 <div class="hint" id="hint"><span class="arrow">↓</span> scroll — long form</div>
 
 <script>
@@ -762,31 +747,35 @@
   import { VFX } from "@vfx-js/core";
   import { HalftoneEffect } from "@vfx-js/effects";
 
-  // CMYK halftone applied to the entire page as a postEffect. The whole
-  // article (text, rules, photos) is rasterised into the VFX canvas and
-  // dot-screened in one pass — the rosette grid is fixed in screen space,
-  // so content parallaxes through it like ink on a moving press.
+  // A single CMYK halftone applied to the whole VFX canvas as a postEffect.
+  // The rosette grid is fixed in screen space; images parallax through it
+  // like print on a real press.
   const halftone = new HalftoneEffect({
     mode: "cmyk",
     gridSize: 5,
-    dotSize: 1.0,
-    smoothing: 0.1,
+    dotSize: 1.05,
+    smoothing: 0.18,
     angle: 0,
-    blackAmount: 0.0,
+    blackAmount: 0.9,
     trimEdge: false,
-    background: [0xf1 / 255, 0xec / 255, 0xe1 / 255, 1],
+    background: [0, 0, 0, 0],
   });
-  // halftone.setInkPreset("newsprint");
+  halftone.setInkPreset("newsprint");
 
   const vfx = new VFX({
     pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
     postEffect: { effect: halftone },
   });
 
-  const app = document.getElementById("app");
-  await vfx.addHTML(app, { shader: "none" });
-  vfx.play();
-  document.documentElement.classList.add("vfx-ready");
+  function attach(fig) {
+    const img = fig.querySelector("img");
+    if (!img) return;
+    const go = () => vfx.add(img, { shader: "none" });
+    if (img.complete && img.naturalWidth > 0) go();
+    else img.addEventListener("load", go, { once: true });
+  }
+
+  document.querySelectorAll("figure.photo[data-cmyk]").forEach(attach);
 </script>
 
 <script>
