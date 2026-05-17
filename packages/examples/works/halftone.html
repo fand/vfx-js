@@ -773,6 +773,12 @@
   }
 
   document.querySelectorAll("figure.photo[data-cmyk]").forEach(attach);
+
+  // Halftone the display type too. h1..h4 carry all the editorial type
+  // (masthead title, hero kicker, chapter heads, pull-quote, colophon).
+  document
+    .querySelectorAll("h1, h2, h3, h4")
+    .forEach((el) => vfx.add(el, { shader: "none" }));
 </script>
 
 <script>
