@@ -1,7 +1,7 @@
 {
   "name": "@vfx-js/storybook",
   "private": true,
-  "version": "0.0.19",
+  "version": "0.0.20",
   "type": "module",
   "scripts": {
     "dev": "storybook dev -p 6006 --no-open",
@@ -10,11 +10,11 @@
     "clean": "rm -rf docs-build"
   },
   "dependencies": {
-    "@vfx-js/core": "0.13.0",
+    "@vfx-js/core": "1.0.0",
     "@vfx-js/effects": "workspace:*",
     "react": "19.2.5",
     "react-dom": "19.2.5",
-    "@vfx-js/react": "0.18.0"
+    "@vfx-js/react": "1.0.0"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "5.1.2",
