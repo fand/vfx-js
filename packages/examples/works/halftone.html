@@ -759,8 +759,9 @@
 
   // CMYK halftone is attached per element instead of as a global
   // postEffect. Effect instances can't be reused across elements, so
-  // we mint a fresh one each time with the same settings.
-  function makeHalftone() {
+  // we mint a fresh one each time. Text gets a finer dot pitch than
+  // images so display type stays legible.
+  function makeHalftone(overrides = {}) {
     return new HalftoneEffect({
       mode: "cmyk",
       gridSize: 10,
@@ -770,6 +771,7 @@
       blackAmount: 0.3,
       trimEdge: true,
       background: [0, 0, 0, 0],
+      ...overrides,
     });
   }
 
@@ -786,12 +788,14 @@
   await document.fonts.ready;
 
   async function attach(el) {
-    const opts = { effect: makeHalftone() };
     if (el instanceof HTMLImageElement) {
+      const opts = { effect: makeHalftone() };
       const go = () => vfx.add(el, opts);
       if (el.complete && el.naturalWidth > 0) go();
       else el.addEventListener("load", go, { once: true });
     } else {
+      // zIndex > 0 so display type always draws on top of photos.
+      const opts = { effect: makeHalftone({ gridSize: 3 }), zIndex: 1 };
       await vfx.addHTML(el, opts);
     }
   }
