@@ -140,13 +140,14 @@
     mix-blend-mode: multiply;
   }
   .hero h1.bigtitle span { display: block; }
-  /* Inflated bbox so the italic overhang on the first/last lines isn't
-     cropped during halftone capture; negative margin compensates so the
-     visual layout is unchanged. */
+  /* Use margin (not transform) to shift .l1/.l3 horizontally: VFX captures
+     the clone via foreignObject which bakes transforms into the texture,
+     then draws at the post-transform bbox.left — double-application. The
+     padding+negative-margin combo additionally inflates the bbox to catch
+     italic overhang without changing the visible content position. */
   .hero h1.bigtitle .l1 {
-    transform: translateX(-2%);
+    margin-left: calc(-2% - 0.12em);
     padding-left: 0.12em;
-    margin-left: -0.12em;
   }
   .hero h1.bigtitle .l2 {
     font-style: normal;
@@ -158,10 +159,10 @@
     margin: 24px 0 14px 8px;
   }
   .hero h1.bigtitle .l3 {
-    transform: translateX(22%);
-    font-weight: 900;
-    padding-right: 0.12em;
+    margin-left: 22%;
     margin-right: -0.12em;
+    padding-right: 0.12em;
+    font-weight: 900;
   }
   .hero h1.bigtitle .l3 i { font-style: italic; color: var(--accent); font-weight: 900; }
 
@@ -761,35 +762,43 @@
   // like print on a real press.
   const halftone = new HalftoneEffect({
     mode: "cmyk",
-    gridSize: 5,
-    dotSize: 1.0,
+    gridSize: 10,
+    dotSize:1.0,
     smoothing: 0.1,
-    angle: 0,
+    angle: 10.0,
     blackAmount: 0.3,
     trimEdge: true,
     background: [0, 0, 0, 0],
   });
-  halftone.setInkPreset("newsprint");
+  // halftone.setInkPreset("");
 
   const vfx = new VFX({
     pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
     postEffect: { effect: halftone },
   });
 
-  // Opt-in via [data-halftone]; images defer until loaded so the bbox
-  // is known when vfx captures them.
-  function attach(el) {
+  // Opt-in via [data-halftone]. Text elements go through vfx.addHTML,
+  // which uses the html-in-canvas drawElementImage API to capture them
+  // with the document's real web fonts (vfx.add → dom2canvas would route
+  // via an `<img src="data:image/svg+xml,...">` whose isolated context
+  // can't see document-loaded fonts and falls back to system serif).
+  // Images keep vfx.add — they're already raster, no font issue.
+  await document.fonts.ready;
+
+  async function attach(el) {
     const opts = { shader: "none" };
     if (el instanceof HTMLImageElement) {
       const go = () => vfx.add(el, opts);
       if (el.complete && el.naturalWidth > 0) go();
       else el.addEventListener("load", go, { once: true });
     } else {
-      vfx.add(el, opts);
+      await vfx.addHTML(el, opts);
     }
   }
 
-  document.querySelectorAll("[data-halftone]").forEach(attach);
+  for (const el of document.querySelectorAll("[data-halftone]")) {
+    attach(el);
+  }
 </script>
 
 <script>
