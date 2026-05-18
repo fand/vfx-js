@@ -192,7 +192,7 @@
 
   .photo {
     position: absolute;
-    /*background: #000;*/
+    /*background: rgba(1, 1, 1, 0.1);*/
     overflow: hidden;
     --py: 0px;
     transform: translate3d(0, var(--py), 0);
@@ -762,11 +762,11 @@
   const halftone = new HalftoneEffect({
     mode: "cmyk",
     gridSize: 5,
-    dotSize: 1.05,
-    smoothing: 0.18,
+    dotSize: 1.0,
+    smoothing: 0.1,
     angle: 0,
-    blackAmount: 0.9,
-    trimEdge: false,
+    blackAmount: 0.3,
+    trimEdge: true,
     background: [0, 0, 0, 0],
   });
   halftone.setInkPreset("newsprint");
