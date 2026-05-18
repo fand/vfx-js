@@ -757,24 +757,24 @@
   import { VFX } from "@vfx-js/core";
   import { HalftoneEffect } from "@vfx-js/effects";
 
-  // A single CMYK halftone applied to the whole VFX canvas as a postEffect.
-  // The rosette grid is fixed in screen space; images parallax through it
-  // like print on a real press.
-  const halftone = new HalftoneEffect({
-    mode: "cmyk",
-    gridSize: 10,
-    dotSize:1.0,
-    smoothing: 0.1,
-    angle: 10.0,
-    blackAmount: 0.3,
-    trimEdge: true,
-    background: [0, 0, 0, 0],
-  });
-  // halftone.setInkPreset("");
+  // CMYK halftone is attached per element instead of as a global
+  // postEffect. Effect instances can't be reused across elements, so
+  // we mint a fresh one each time with the same settings.
+  function makeHalftone() {
+    return new HalftoneEffect({
+      mode: "cmyk",
+      gridSize: 10,
+      dotSize: 1.0,
+      smoothing: 0.1,
+      angle: 10.0,
+      blackAmount: 0.3,
+      trimEdge: true,
+      background: [0, 0, 0, 0],
+    });
+  }
 
   const vfx = new VFX({
     pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-    postEffect: { effect: halftone },
   });
 
   // Opt-in via [data-halftone]. Text elements go through vfx.addHTML,
@@ -786,7 +786,7 @@
   await document.fonts.ready;
 
   async function attach(el) {
-    const opts = { shader: "none" };
+    const opts = { effect: makeHalftone() };
     if (el instanceof HTMLImageElement) {
       const go = () => vfx.add(el, opts);
       if (el.complete && el.naturalWidth > 0) go();
