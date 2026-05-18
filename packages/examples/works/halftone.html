@@ -324,7 +324,11 @@
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
-  .pull blockquote::before {
+  /* padding inflates the bbox so addHTML catches italic overhang
+     + the oversized ::before quote mark. Horizontal in px so .src
+     (11px font) can mirror it without an em-scale mismatch. */
+  .pull .quote-body { padding: 0.15em 24px 0.2em; }
+  .pull .quote-body::before {
     content: "\201C";
     font-family: "Fraunces", serif;
     font-style: italic;
@@ -338,6 +342,9 @@
   .pull blockquote .src {
     display: block;
     margin-top: 32px;
+    /* match .quote-body horizontal padding so .src aligns with the
+       quoted text above. */
+    padding: 0 24px;
     font-family: "JetBrains Mono", monospace;
     font-size: 11px;
     font-style: normal;
@@ -598,8 +605,10 @@
 </section>
 
 <section class="pull">
-  <blockquote data-halftone>
-    "The grain isn't a flaw in the picture. <em>The grain is the picture.</em> Everything else is just an agreement we made with our own eyes."
+  <blockquote>
+    <div class="quote-body" data-halftone>
+      "The grain isn't a flaw in the picture. <em>The grain is the picture.</em> Everything else is just an agreement we made with our own eyes."
+    </div>
     <span class="src">— <b>K. ARAKAWA</b>, <i>On Printing, &amp; Other Quiet Catastrophes</i> · 1987</span>
   </blockquote>
 </section>
