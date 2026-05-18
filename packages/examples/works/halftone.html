@@ -140,7 +140,14 @@
     mix-blend-mode: multiply;
   }
   .hero h1.bigtitle span { display: block; }
-  .hero h1.bigtitle .l1 { transform: translateX(-2%); }
+  /* Inflated bbox so the italic overhang on the first/last lines isn't
+     cropped during halftone capture; negative margin compensates so the
+     visual layout is unchanged. */
+  .hero h1.bigtitle .l1 {
+    transform: translateX(-2%);
+    padding-left: 0.12em;
+    margin-left: -0.12em;
+  }
   .hero h1.bigtitle .l2 {
     font-style: normal;
     font-weight: 400;
@@ -150,7 +157,12 @@
     color: var(--accent);
     margin: 24px 0 14px 8px;
   }
-  .hero h1.bigtitle .l3 { transform: translateX(22%); font-weight: 900; }
+  .hero h1.bigtitle .l3 {
+    transform: translateX(22%);
+    font-weight: 900;
+    padding-right: 0.12em;
+    margin-right: -0.12em;
+  }
   .hero h1.bigtitle .l3 i { font-style: italic; color: var(--accent); font-weight: 900; }
 
   .hero .standfirst {
@@ -522,9 +534,9 @@
   <div class="feature-tag">★ COVER STORY</div>
 
   <h1 class="bigtitle">
-    <span class="l1">A Portrait</span>
+    <span class="l1" data-halftone>A Portrait</span>
     <span class="l2">— a study in four inks —</span>
-    <span class="l3">in <i>Dots.</i></span>
+    <span class="l3" data-halftone>in <i>Dots.</i></span>
   </h1>
 
   <p class="standfirst">
@@ -533,18 +545,18 @@
   </p>
 
   <div class="cluster">
-    <figure class="photo hero-portrait" data-cmyk data-parallax="-0.06">
-      <img src="https://picsum.photos/seed/halftone-portrait/520/680" crossorigin="anonymous" alt="" />
+    <figure class="photo hero-portrait" data-parallax="-0.06">
+      <img src="https://picsum.photos/seed/halftone-portrait/520/680" crossorigin="anonymous" alt="" data-halftone />
       <figcaption class="cap"><b>Fig. 01</b> &nbsp; Untitled portrait, 2026 — separation: C 15° / M 75° / Y 0° / K 45°</figcaption>
     </figure>
 
-    <figure class="photo f-a" data-cmyk data-parallax="-0.24">
-      <img src="https://picsum.photos/seed/halftone-hand/170/220" crossorigin="anonymous" alt="" />
+    <figure class="photo f-a" data-parallax="-0.24">
+      <img src="https://picsum.photos/seed/halftone-hand/170/220" crossorigin="anonymous" alt="" data-halftone />
       <figcaption class="cap"><b>Fig. 02</b> Hand · gesture</figcaption>
     </figure>
 
-    <figure class="photo f-b" data-cmyk data-parallax="-0.18">
-      <img src="https://picsum.photos/seed/halftone-window/200/140" crossorigin="anonymous" alt="" />
+    <figure class="photo f-b" data-parallax="-0.18">
+      <img src="https://picsum.photos/seed/halftone-window/200/140" crossorigin="anonymous" alt="" data-halftone />
       <figcaption class="cap"><b>Fig. 03</b> Late afternoon, west window</figcaption>
     </figure>
   </div>
@@ -557,8 +569,8 @@
 </div>
 
 <section class="body-section">
-  <h2 class="section-num">CHAPTER ONE</h2>
-  <h2 class="kicker">There are four <em>colors</em> in the world, and one of them is black.</h2>
+  <h2 class="section-num" data-halftone>CHAPTER ONE</h2>
+  <h2 class="kicker" data-halftone>There are four <em>colors</em> in the world, and one of them is black.</h2>
 
   <div class="col">
     <p class="dropcap">
@@ -573,19 +585,19 @@
     </p>
   </div>
 
-  <figure class="photo marg" style="right: 56px; top: 120px; width: 220px; height: 280px" data-cmyk data-parallax="-0.2">
-    <img src="https://picsum.photos/seed/halftone-detail/220/280" crossorigin="anonymous" alt="" />
+  <figure class="photo marg" style="right: 56px; top: 120px; width: 220px; height: 280px" data-parallax="-0.2">
+    <img src="https://picsum.photos/seed/halftone-detail/220/280" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>Fig. 04</b> Detail · 4.5× pitch</figcaption>
   </figure>
 
-  <figure class="photo marg" style="right: 140px; bottom: 60px; width: 170px; height: 170px" data-cmyk data-parallax="-0.14">
-    <img src="https://picsum.photos/seed/halftone-fogra/170/170" crossorigin="anonymous" alt="" />
+  <figure class="photo marg" style="right: 140px; bottom: 60px; width: 170px; height: 170px" data-parallax="-0.14">
+    <img src="https://picsum.photos/seed/halftone-fogra/170/170" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>Fig. 05</b> FOGRA51 · 6px</figcaption>
   </figure>
 </section>
 
 <section class="pull">
-  <blockquote>
+  <blockquote data-halftone>
     "The grain isn't a flaw in the picture. <em>The grain is the picture.</em> Everything else is just an agreement we made with our own eyes."
     <span class="src">— <b>K. ARAKAWA</b>, <i>On Printing, &amp; Other Quiet Catastrophes</i> · 1987</span>
   </blockquote>
@@ -598,38 +610,38 @@
 </div>
 
 <section class="spread">
-  <h3><span class="num">02</span>An incomplete index of <em>dots,</em> arranged loosely.</h3>
+  <h3 data-halftone><span class="num">02</span>An incomplete index of <em>dots,</em> arranged loosely.</h3>
   <p class="index">
     Six images, four inks, no guarantees. Each separated at the standard newsprint angles — <b>C·15° / M·75° / Y·0° / K·45°</b> — and printed back together at varying pitches. Read them however you like.
   </p>
 
-  <figure class="photo" style="left: 5%; top: 240px; width: 280px; height: 200px" data-cmyk data-parallax="-0.12">
-    <img src="https://picsum.photos/seed/halftone-avenue/280/200" crossorigin="anonymous" alt="" />
+  <figure class="photo" style="left: 5%; top: 240px; width: 280px; height: 200px" data-parallax="-0.12">
+    <img src="https://picsum.photos/seed/halftone-avenue/280/200" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>06 ·</b> Avenue, late October</figcaption>
   </figure>
 
-  <figure class="photo" style="left: 30%; top: 200px; width: 240px; height: 300px" data-cmyk data-parallax="-0.22">
-    <img src="https://picsum.photos/seed/halftone-self/240/300" crossorigin="anonymous" alt="" />
+  <figure class="photo" style="left: 30%; top: 200px; width: 240px; height: 300px" data-parallax="-0.22">
+    <img src="https://picsum.photos/seed/halftone-self/240/300" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>07 ·</b> Self-portrait, 4 a.m.</figcaption>
   </figure>
 
-  <figure class="photo" style="right: 18%; top: 140px; width: 300px; height: 220px" data-cmyk data-parallax="-0.16">
-    <img src="https://picsum.photos/seed/halftone-train/300/220" crossorigin="anonymous" alt="" />
+  <figure class="photo" style="right: 18%; top: 140px; width: 300px; height: 220px" data-parallax="-0.16">
+    <img src="https://picsum.photos/seed/halftone-train/300/220" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>08 ·</b> A train, departing.</figcaption>
   </figure>
 
-  <figure class="photo" style="left: 14%; bottom: 140px; width: 200px; height: 280px" data-cmyk data-parallax="-0.26">
-    <img src="https://picsum.photos/seed/halftone-stranger/200/280" crossorigin="anonymous" alt="" />
+  <figure class="photo" style="left: 14%; bottom: 140px; width: 200px; height: 280px" data-parallax="-0.26">
+    <img src="https://picsum.photos/seed/halftone-stranger/200/280" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>09 ·</b> Stranger, Shinjuku</figcaption>
   </figure>
 
-  <figure class="photo" style="left: 42%; bottom: 110px; width: 260px; height: 200px" data-cmyk data-parallax="-0.1">
-    <img src="https://picsum.photos/seed/halftone-hands/260/200" crossorigin="anonymous" alt="" />
+  <figure class="photo" style="left: 42%; bottom: 110px; width: 260px; height: 200px" data-parallax="-0.1">
+    <img src="https://picsum.photos/seed/halftone-hands/260/200" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>10 ·</b> Hands, in conversation</figcaption>
   </figure>
 
-  <figure class="photo" style="right: 6%; bottom: 80px; width: 280px; height: 240px" data-cmyk data-parallax="-0.2">
-    <img src="https://picsum.photos/seed/halftone-reading/280/240" crossorigin="anonymous" alt="" />
+  <figure class="photo" style="right: 6%; bottom: 80px; width: 280px; height: 240px" data-parallax="-0.2">
+    <img src="https://picsum.photos/seed/halftone-reading/280/240" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>11 ·</b> Reading, slowly.</figcaption>
   </figure>
 </section>
@@ -643,8 +655,8 @@
 </div>
 
 <section class="body-section">
-  <h2 class="section-num">CHAPTER TWO</h2>
-  <h2 class="kicker">What <em>resolves,</em> and what refuses.</h2>
+  <h2 class="section-num" data-halftone>CHAPTER TWO</h2>
+  <h2 class="kicker" data-halftone>What <em>resolves,</em> and what refuses.</h2>
 
   <div class="col">
     <p class="dropcap">
@@ -659,13 +671,13 @@
     </p>
   </div>
 
-  <figure class="photo marg" style="right: 56px; top: 180px; width: 200px; height: 240px" data-cmyk data-parallax="-0.15">
-    <img src="https://picsum.photos/seed/halftone-fig12/200/240" crossorigin="anonymous" alt="" />
+  <figure class="photo marg" style="right: 56px; top: 180px; width: 200px; height: 240px" data-parallax="-0.15">
+    <img src="https://picsum.photos/seed/halftone-fig12/200/240" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>Fig. 12</b> · 5px / newsprint</figcaption>
   </figure>
 
-  <figure class="photo marg" style="right: 300px; bottom: 80px; width: 160px; height: 200px" data-cmyk data-parallax="-0.23">
-    <img src="https://picsum.photos/seed/halftone-fig13/160/200" crossorigin="anonymous" alt="" />
+  <figure class="photo marg" style="right: 300px; bottom: 80px; width: 160px; height: 200px" data-parallax="-0.23">
+    <img src="https://picsum.photos/seed/halftone-fig13/160/200" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>Fig. 13</b> · 4px / FOGRA51</figcaption>
   </figure>
 </section>
@@ -673,7 +685,7 @@
 <footer class="colophon">
   <div class="colophon-grid">
     <div>
-      <h4>Colophon · Spring 2026</h4>
+      <h4 data-halftone>Colophon · Spring 2026</h4>
       <p>
         Set in <em>Bodoni Moda</em> (display, body) and <em>JetBrains Mono</em> (meta, captions).
         Photographs separated and dot-screened in the browser, in real time, with the <em>halftone</em> shader from <em>@vfx-js/effects v1.0</em>.
@@ -684,7 +696,7 @@
       </p>
     </div>
     <div>
-      <h4>Credits</h4>
+      <h4 data-halftone>Credits</h4>
       <div class="credit-list">
         <div><b>Editor</b> A. Mizuhara</div>
         <div><b>Type</b> N. Calderón</div>
@@ -695,7 +707,7 @@
       </div>
     </div>
     <div>
-      <h4>Subscribe · Next issue</h4>
+      <h4 data-halftone>Subscribe · Next issue</h4>
       <p>
         <em>No. 08 — Summer 2026 —</em> on transparency, ghosting, and the things printers do at night when the lights are off.
       </p>
@@ -764,21 +776,20 @@
     postEffect: { effect: halftone },
   });
 
-  function attach(fig) {
-    const img = fig.querySelector("img");
-    if (!img) return;
-    const go = () => vfx.add(img, { shader: "none" });
-    if (img.complete && img.naturalWidth > 0) go();
-    else img.addEventListener("load", go, { once: true });
+  // Opt-in via [data-halftone]; images defer until loaded so the bbox
+  // is known when vfx captures them.
+  function attach(el) {
+    const opts = { shader: "none" };
+    if (el instanceof HTMLImageElement) {
+      const go = () => vfx.add(el, opts);
+      if (el.complete && el.naturalWidth > 0) go();
+      else el.addEventListener("load", go, { once: true });
+    } else {
+      vfx.add(el, opts);
+    }
   }
 
-  document.querySelectorAll("figure.photo[data-cmyk]").forEach(attach);
-
-  // Halftone the display type too. h1..h4 carry all the editorial type
-  // (masthead title, hero kicker, chapter heads, pull-quote, colophon).
-  document
-    .querySelectorAll("h1, h2, h3, h4")
-    .forEach((el) => vfx.add(el, { shader: "none" }));
+  document.querySelectorAll("[data-halftone]").forEach(attach);
 </script>
 
 <script>
