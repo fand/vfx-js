@@ -870,5 +870,12 @@
   })();
 </script>
 
+<!-- Lenis smooth scroll. Remove this block to disable. -->
+<script type="module">
+  import Lenis from "https://esm.sh/lenis";
+  const lenis = new Lenis();
+  (function raf(t) { lenis.raf(t); requestAnimationFrame(raf); })();
+</script>
+
 </body>
 </html>
