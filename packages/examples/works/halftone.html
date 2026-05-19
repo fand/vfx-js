@@ -583,9 +583,55 @@
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(3px); }
   }
+
+  /* Hold the page until images are loaded — otherwise halftone attaches
+     before pixels exist and the first paint is a flash of empty rosettes. */
+  .loader {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: var(--paper);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    transition: transform 0.7s cubic-bezier(0.76, 0, 0.24, 1);
+  }
+  .loader.gone { transform: translateY(-100%); pointer-events: none; }
+  .loader .label {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.6);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .loader .label .pct { color: var(--ink); font-weight: 500; min-width: 4ch; text-align: right; }
+  .loader .bar {
+    position: relative;
+    width: 220px;
+    height: 2px;
+    background: rgba(13, 12, 10, 0.15);
+    overflow: hidden;
+  }
+  .loader .bar i {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.2s ease;
+  }
 </style>
 </head>
 <body>
+
+<div class="loader" id="loader">
+  <div class="bar"><i id="loader-bar"></i></div>
+  <div class="label"><span>Loading press</span><span class="pct" id="loader-pct">0%</span></div>
+</div>
 
 <header class="mast">
   <div class="title">STATIC <em>noise</em></div>
@@ -823,6 +869,40 @@
   function dismissHint() { if (dismissed) return; dismissed = true; hint.classList.add("gone"); }
   window.addEventListener("scroll", dismissHint, { once: true, passive: true });
   setTimeout(dismissHint, 5500);
+
+  // Loader: track image load progress + font readiness, then fade out.
+  // Exposed as window.__pagePreloaded so the VFX module can wait until
+  // pixels exist before attaching the halftone effect.
+  window.__pagePreloaded = (function () {
+    const loader = document.getElementById("loader");
+    const bar = document.getElementById("loader-bar");
+    const pct = document.getElementById("loader-pct");
+    const imgs = [...document.querySelectorAll("img")];
+    const total = imgs.length + 1; // +1 for fonts.ready
+    let done = 0;
+    function tick() {
+      done++;
+      const p = Math.round((done / total) * 100);
+      bar.style.width = p + "%";
+      pct.textContent = p + "%";
+    }
+    const promises = imgs.map((im) => {
+      if (im.complete && im.naturalWidth > 0) { tick(); return Promise.resolve(); }
+      return new Promise((res) => {
+        const fin = () => { tick(); res(); };
+        im.addEventListener("load", fin, { once: true });
+        im.addEventListener("error", fin, { once: true });
+      });
+    });
+    promises.push(document.fonts.ready.then(tick));
+    return Promise.all(promises).then(() => {
+      // Brief beat so the bar visibly reaches 100% before fading.
+      return new Promise((res) => setTimeout(() => {
+        loader.classList.add("gone");
+        res();
+      }, 200));
+    });
+  })();
 </script>
 
 <script type="module">
@@ -857,7 +937,10 @@
   // via an `<img src="data:image/svg+xml,...">` whose isolated context
   // can't see document-loaded fonts and falls back to system serif).
   // Images keep vfx.add — they're already raster, no font issue.
-  await document.fonts.ready;
+  // Wait until all images + fonts are loaded (and the loader has faded)
+  // before attaching effects. Halftone reads from the texture on first
+  // render; attaching pre-load gives a frame of blank rosettes.
+  await window.__pagePreloaded;
 
   const effects = [];
 
