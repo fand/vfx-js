@@ -859,22 +859,35 @@
   // Images keep vfx.add — they're already raster, no font issue.
   await document.fonts.ready;
 
+  const effects = [];
+
   async function attach(el) {
     if (el instanceof HTMLImageElement) {
-      const opts = { effect: makeHalftone() };
-      const go = () => vfx.add(el, opts);
+      const effect = makeHalftone();
+      effects.push(effect);
+      const go = () => vfx.add(el, { effect });
       if (el.complete && el.naturalWidth > 0) go();
       else el.addEventListener("load", go, { once: true });
     } else {
       // zIndex > 0 so display type always draws on top of photos.
-      const opts = { effect: makeHalftone({ gridSize: 3 }), zIndex: 1 };
-      await vfx.addHTML(el, opts);
+      const effect = makeHalftone({ gridSize: 3 });
+      effects.push(effect);
+      await vfx.addHTML(el, { effect, zIndex: 1 });
     }
   }
 
   for (const el of document.querySelectorAll("[data-halftone]")) {
     attach(el);
   }
+
+  // Drive angle from scroll position; per-channel angles stack on top
+  // so the CMYK rosette rotates as a whole.
+  function updateAngle() {
+    const angle = (window.scrollY || window.pageYOffset) * 0.1;
+    for (const e of effects) e.setParams({ angle });
+  }
+  updateAngle();
+  window.addEventListener("scroll", updateAngle, { passive: true });
 </script>
 
 <script>
