@@ -250,7 +250,6 @@
   .body-section {
     position: relative;
     padding: 64px 56px;
-    min-height: 900px;
     overflow: hidden;
   }
   .body-section h2.section-num {
@@ -275,19 +274,63 @@
   .body-section h2.kicker em { font-style: italic; font-weight: 400; color: var(--accent); }
 
   .col {
-    column-width: 20.625rem;
-    column-gap: 38px;
-    column-rule: 1px solid var(--rule-thin);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 38px;
     font-family: "Fraunces", serif;
     font-weight: 400;
     font-size: 1.0625rem;
     line-height: 1.5;
     text-align: justify;
     hyphens: auto;
-    max-width: 68.75rem;
     text-wrap: pretty;
   }
+  /* Body text uses 2 sub-columns within the first 2 grid tracks, so
+     reading widths roughly match a single grid track. */
+  .col .text-cols {
+    grid-column: 1 / span 2;
+    column-count: 2;
+    column-gap: 38px;
+    column-rule: 1px solid var(--rule-thin);
+  }
   .col p { margin-bottom: 14px; break-inside: avoid-column; orphans: 3; widows: 3; }
+
+  /* Image stack pinned to the last grid track. Photos overrun the
+     track edges for play. */
+  .col-figures {
+    grid-column: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 46px;
+  }
+  .col-figures .photo {
+    position: relative;
+    display: block;
+    overflow: visible;
+  }
+  .col-figures .photo:first-child {
+    aspect-ratio: 4 / 5;
+    margin-left: -1rem;
+    width: calc(100% + 1.25rem);
+  }
+  .col-figures .photo:nth-child(2) {
+    aspect-ratio: 1 / 1;
+    align-self: flex-end;
+    width: calc(100% + 0.5rem);
+    margin-right: -0.75rem;
+  }
+  /* Top-bleed variant: whole stack rides up to the section's Y-start so
+     it sits alongside the section header. Negative margin-bottom shrinks
+     the grid track by the lift amount so no phantom space is left below.
+     --lift is per-section so each chapter can match its header height. */
+  .col-figures.lifted {
+    position: relative;
+    top: var(--lift, -20rem);
+    margin-bottom: var(--lift, -20rem);
+  }
+  .col-figures.lifted .photo:first-child {
+    aspect-ratio: 2 / 3;
+  }
   .col p:first-of-type:first-line { font-variant: small-caps; letter-spacing: 0.06em; }
   .col .dropcap::first-letter {
     font-family: "Fraunces", serif;
@@ -296,7 +339,7 @@
     font-size: 5.6em;
     line-height: 0.78;
     float: left;
-    margin: 6px 8px 0 -2px;
+    margin: 6px 16px 0 -2px;
     color: var(--accent);
   }
   .col em { font-style: italic; }
@@ -586,27 +629,26 @@
   <h2 class="kicker" data-halftone>There are four <em>colors</em> in the world, and one of them is black.</h2>
 
   <div class="col">
-    <p class="dropcap">
-      The strange thing about printing — and by printing I mean the long, mechanical business of pressing wet pigment onto dry paper, not the cleaner abstractions of the screen — is that for a hundred and fifty years it has only known how to do one thing, which is to lie. <span class="marker">[01]</span>
-      A photograph contains, in principle, every shade between deepest black and the white of the paper it is printed on. The press has four inks. To bridge the gap from continuous tone to four discrete colors it invented the halftone: a grid of dots so small the eye averages them out, mixes the wet color with the dry paper, and politely agrees to call the result an image.
-    </p>
-    <p>
-      <strong>The trick is older than photography.</strong> The first halftones were hand-engraved — tiny grooves of varying width, each one a rough cousin to the dot patterns we now generate at six thousand lines per inch. What changed was scale: when the dots got small enough, and the screens got accurate enough, the lie became invisible. We stopped seeing the dots and started seeing photographs. The mechanism became the medium.
-    </p>
-    <p>
-      And then it went underground. Halftone is now everywhere and nowhere; in every newspaper, every magazine, every cheap poster pasted to a hoarding — and yet we look <em>through</em> it, the way you look through a screen door at a yard. The first time you really see the dots is the first time you stand too close, or the first time someone enlarges a page in a museum and you discover, with a small thrill of betrayal, that the woman in the photograph was never anything but rosettes all along.
-    </p>
+    <div class="text-cols">
+      <p class="dropcap">
+        The strange thing about printing — by which I mean pressing wet pigment onto dry paper, not the cleaner abstractions of the screen — is that for a hundred and fifty years it has only known how to lie. <span class="marker">[01]</span>
+        A photograph contains every shade between deepest black and the white of the paper. The press has four inks. To bridge the gap it invented the halftone: a grid of dots so small the eye averages them out and politely agrees to call the result an image.
+      </p>
+      <p>
+        <strong>The trick is older than photography.</strong> The first halftones were hand-engraved — tiny grooves of varying width, cousins to the dot patterns we now generate at six thousand lines per inch. When the dots got small enough, the lie became invisible. The mechanism became the medium.
+      </p>
+      <p>
+        And then it went underground. Halftone is everywhere and nowhere — in every newspaper, every cheap poster pasted to a hoarding — and yet we look <em>through</em> it, the way you look through a screen door at a yard.
+      </p>
+    </div>
+
+    <div class="col-figures lifted">
+      <figure class="photo">
+        <img src="https://picsum.photos/seed/halftone-detail/350/415" crossorigin="anonymous" alt="" data-halftone />
+        <figcaption class="cap"><b>Fig. 04</b> Detail · 4.5× pitch</figcaption>
+      </figure>
+    </div>
   </div>
-
-  <figure class="photo marg" style="right: 56px; top: 7.5rem; width: 26rem; height: 31rem" data-parallax="-0.2">
-    <img src="https://picsum.photos/seed/halftone-detail/350/415" crossorigin="anonymous" alt="" data-halftone />
-    <figcaption class="cap"><b>Fig. 04</b> Detail · 4.5× pitch</figcaption>
-  </figure>
-
-  <figure class="photo marg" style="right: 8.75rem; bottom: 3.75rem; width: 8rem; height: 8rem" data-parallax="-0.14">
-    <img src="https://picsum.photos/seed/halftone-fogra/105/105" crossorigin="anonymous" alt="" data-halftone />
-    <figcaption class="cap"><b>Fig. 05</b> FOGRA51 · 6px</figcaption>
-  </figure>
 </section>
 
 <section class="pull">
@@ -674,27 +716,26 @@
   <h2 class="kicker" data-halftone>What <em>resolves,</em> and what refuses.</h2>
 
   <div class="col">
-    <p class="dropcap">
-      Every halftone is a negotiation between four lies and one truth. The four lies are the screens themselves — cyan, magenta, yellow, and black, each rotated to its own angle so that the rosettes interfere with one another in the most flattering possible way. The truth is the paper underneath. <span class="marker">[02]</span>
-      Without the paper the screens are nothing; pull them apart in software and each one looks, individually, like static. A cyan storm. A magenta storm. A yellow storm. A small, dense, certain shadow that turns out to be black. Lay them down together, at the right four angles, and they cohere — barely, miraculously — into a face.
-    </p>
-    <p>
-      <strong>You can change the angles.</strong> The press shop calls this "the screen set" and treats it as nearly sacred. C·15°, M·75°, Y·0°, K·45° is the canonical western arrangement; some Japanese newspapers prefer C·15°, M·45°, Y·0°, K·75°, which throws the rosette in a slightly different direction. Get the angles wrong by even three or four degrees and the moire blooms — that ugly, low-frequency rippling that the eye cannot un-see. Get them right, and the page is invisible.
-    </p>
-    <p>
-      What we are doing, in a way, is teaching the computer to make the same mistakes the press makes — on purpose, with affection. The shader rotates four virtual screens. It samples at the center of each cell. It blends them subtractively, the way ink layers on paper. And then it accepts, as part of its definition, that the result will never quite resolve. <em>That is the point.</em> A perfect halftone is a halftone that almost works.
-    </p>
+    <div class="text-cols">
+      <p class="dropcap">
+        Every halftone is a negotiation between four lies and one truth. The four lies are the screens themselves — cyan, magenta, yellow, and black, each rotated to its own angle so that the rosettes interfere with one another in the most flattering possible way. The truth is the paper underneath. <span class="marker">[02]</span>
+        Without the paper the screens are nothing; pull them apart in software and each one looks, individually, like static. A cyan storm. A magenta storm. A yellow storm. A small, dense, certain shadow that turns out to be black. Lay them down together, at the right four angles, and they cohere — barely, miraculously — into a face.
+      </p>
+      <p>
+        <strong>You can change the angles.</strong> The press shop calls this "the screen set" and treats it as nearly sacred. C·15°, M·75°, Y·0°, K·45° is the canonical western arrangement; some Japanese newspapers prefer C·15°, M·45°, Y·0°, K·75°, which throws the rosette in a slightly different direction. Get the angles wrong by even three or four degrees and the moire blooms — that ugly, low-frequency rippling that the eye cannot un-see. Get them right, and the page is invisible.
+      </p>
+      <p>
+        What we are doing, in a way, is teaching the computer to make the same mistakes the press makes — on purpose, with affection. The shader rotates four virtual screens. It samples at the center of each cell. It blends them subtractively, the way ink layers on paper. And then it accepts, as part of its definition, that the result will never quite resolve. <em>That is the point.</em> A perfect halftone is a halftone that almost works.
+      </p>
+    </div>
+
+    <div class="col-figures lifted" style="--lift: -14rem">
+      <figure class="photo">
+        <img src="https://picsum.photos/seed/halftone-fig12/290/355" crossorigin="anonymous" alt="" data-halftone />
+        <figcaption class="cap"><b>Fig. 12</b> · 5px / newsprint</figcaption>
+      </figure>
+    </div>
   </div>
-
-  <figure class="photo marg" style="right: 56px; top: 11.25rem; width: 22rem; height: 26rem" data-parallax="-0.15">
-    <img src="https://picsum.photos/seed/halftone-fig12/290/355" crossorigin="anonymous" alt="" data-halftone />
-    <figcaption class="cap"><b>Fig. 12</b> · 5px / newsprint</figcaption>
-  </figure>
-
-  <figure class="photo marg" style="right: 18.75rem; bottom: 5rem; width: 8rem; height: 10rem" data-parallax="-0.23">
-    <img src="https://picsum.photos/seed/halftone-fig13/105/130" crossorigin="anonymous" alt="" data-halftone />
-    <figcaption class="cap"><b>Fig. 13</b> · 4px / FOGRA51</figcaption>
-  </figure>
 </section>
 
 <footer class="colophon">
