@@ -84,7 +84,8 @@
     line-height: 1.6;
     color: rgba(13, 12, 10, 0.7);
   }
-  .mast .meta .accent { color: var(--accent); }
+  .mast .meta a { color: var(--ink); text-decoration: none; }
+  .mast .meta a:hover { text-decoration: underline; }
 
   .sub-mast {
     display: grid;
@@ -405,41 +406,31 @@
   .spread {
     position: relative;
     padding: 64px 56px 120px;
-    min-height: 1300px;
+    min-height: 940px;
     overflow: hidden;
   }
-  .spread h3 {
+  .spread .center-text {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    z-index: 10;
+    padding: 0 56px;
     font-family: "Fraunces", serif;
     font-style: italic;
     font-weight: 400;
-    font-size: 2.625rem;
-    letter-spacing: -0.015em;
-    margin-bottom: 28px;
-    max-width: 18ch;
+    font-size: clamp(48px, 8vw, 9rem);
     line-height: 1;
+    text-align: center;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
   }
-  .spread h3 .num {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 14px;
-    letter-spacing: 0.32em;
+  .spread .center-text em {
+    font-style: italic;
     color: var(--accent);
-    font-style: normal;
-    text-transform: uppercase;
-    display: inline-block;
-    margin-right: 14px;
-    vertical-align: 5px;
+    font-weight: 900;
   }
-  .spread .index {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 10px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: rgba(13, 12, 10, 0.7);
-    max-width: 340px;
-    line-height: 1.6;
-    margin-top: 8px;
-  }
-  .spread .index b { color: var(--ink); font-weight: 500; }
 
   /* ==== FOOTER ==== */
   .colophon {
@@ -573,8 +564,11 @@
 
 <header class="mast">
   <div class="title">STATIC <em>noise</em></div>
-  <div class="center"><b>A Quarterly Review of Image &amp; Type</b><br />Vol. 07 · Spring MMXXVI · <b>Feature</b> 03 / 09</div>
-  <div class="meta">No. 07 — Spring 2026<br />$24 USD · €22 EUR · ¥3200 JPY<br /><span class="accent">ISSN 2710-4419</span></div>
+  <div class="center"><b>A Quarterly Review of Image &amp; Type</b><br />This magazine is entirely <b>fictional</b> — built as a demo.</div>
+  <div class="meta">
+    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">VFX-JS repository ↗</a><br />
+    <a href="https://github.com/fand/vfx-js/blob/main/packages/examples/works/halftone.html" target="_blank" rel="noopener">View source of this page ↗</a>
+  </div>
 </header>
 
 <nav class="sub-mast">
@@ -667,39 +661,24 @@
 </div>
 
 <section class="spread">
-  <h3 data-halftone><span class="num">02</span>An incomplete index of <em>dots,</em> arranged loosely.</h3>
-  <p class="index">
-    Six images, four inks, no guarantees. Each separated at the standard newsprint angles — <b>C·15° / M·75° / Y·0° / K·45°</b> — and printed back together at varying pitches. Read them however you like.
-  </p>
+  <div class="center-text" data-halftone>
+    Step back — and the picture <em>resolves.</em>
+  </div>
 
-  <figure class="photo" style="left: 5%; top: 15rem; width: 28rem; height: 20rem" data-parallax="-0.12">
-    <img src="https://picsum.photos/seed/halftone-avenue/370/270" crossorigin="anonymous" alt="" data-halftone />
-    <figcaption class="cap"><b>06 ·</b> Avenue, late October</figcaption>
+  <figure class="photo" style="left: 2%; top: 4rem; width: 32rem; height: 22rem" data-parallax="-0.14">
+    <img src="https://picsum.photos/seed/halftone-avenue/420/290" crossorigin="anonymous" alt="" data-halftone />
   </figure>
 
-  <figure class="photo" style="left: 36%; top: 12.5rem; width: 11rem; height: 13rem" data-parallax="-0.22">
-    <img src="https://picsum.photos/seed/halftone-self/145/175" crossorigin="anonymous" alt="" data-halftone />
-    <figcaption class="cap"><b>07 ·</b> Self-portrait, 4 a.m.</figcaption>
+  <figure class="photo" style="right: 4%; top: 9rem; width: 28rem; height: 18rem" data-parallax="-0.22">
+    <img src="https://picsum.photos/seed/halftone-train/370/240" crossorigin="anonymous" alt="" data-halftone />
   </figure>
 
-  <figure class="photo" style="right: 18%; top: 8.75rem; width: 17rem; height: 12rem" data-parallax="-0.16">
-    <img src="https://picsum.photos/seed/halftone-train/225/160" crossorigin="anonymous" alt="" data-halftone />
-    <figcaption class="cap"><b>08 ·</b> A train, departing.</figcaption>
+  <figure class="photo" style="left: 10%; bottom: 6rem; width: 30rem; height: 20rem" data-parallax="-0.18">
+    <img src="https://picsum.photos/seed/halftone-stranger/395/265" crossorigin="anonymous" alt="" data-halftone />
   </figure>
 
-  <figure class="photo" style="left: 8%; bottom: 8.75rem; width: 19rem; height: 25rem" data-parallax="-0.26">
-    <img src="https://picsum.photos/seed/halftone-stranger/255/335" crossorigin="anonymous" alt="" data-halftone />
-    <figcaption class="cap"><b>09 ·</b> Stranger, Shinjuku</figcaption>
-  </figure>
-
-  <figure class="photo" style="left: 42%; bottom: 6.875rem; width: 8rem; height: 6rem" data-parallax="-0.1">
-    <img src="https://picsum.photos/seed/halftone-hands/105/80" crossorigin="anonymous" alt="" data-halftone />
-    <figcaption class="cap"><b>10 ·</b> Hands, in conversation</figcaption>
-  </figure>
-
-  <figure class="photo" style="right: 6%; bottom: 5rem; width: 25rem; height: 22rem" data-parallax="-0.2">
-    <img src="https://picsum.photos/seed/halftone-reading/340/290" crossorigin="anonymous" alt="" data-halftone />
-    <figcaption class="cap"><b>11 ·</b> Reading, slowly.</figcaption>
+  <figure class="photo" style="right: 3%; bottom: 9rem; width: 28rem; height: 21rem" data-parallax="-0.1">
+    <img src="https://picsum.photos/seed/halftone-reading/370/280" crossorigin="anonymous" alt="" data-halftone />
   </figure>
 </section>
 
