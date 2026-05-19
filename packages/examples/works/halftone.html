@@ -21,8 +21,7 @@
     --rule: rgba(13, 12, 10, 0.85);
     --rule-thin: rgba(13, 12, 10, 0.2);
   }
-  /* Root font scales with viewport so headings/photos (in rem) grow on
-     wide screens. Stays at 16px below ~1440px, ramps to 28px above ~3300px. */
+  /* rem scales with viewport: 16px under ~1440px, ramps to 28px above ~3300px. */
   html { font-size: clamp(16px, calc(8px + 0.6vw), 28px); }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -144,11 +143,9 @@
     mix-blend-mode: multiply;
   }
   .hero h1.bigtitle span { display: block; }
-  /* Use margin (not transform) to shift .l1/.l3 horizontally: VFX captures
-     the clone via foreignObject which bakes transforms into the texture,
-     then draws at the post-transform bbox.left — double-application. The
-     padding+negative-margin combo additionally inflates the bbox to catch
-     italic overhang without changing the visible content position. */
+  /* Shift .l1/.l3 with margin, not transform: foreignObject bakes transforms
+     into the texture and VFX also draws at the post-transform bbox.left.
+     padding + negative margin inflates the bbox so italic overhang is caught. */
   .hero h1.bigtitle .l1 {
     margin-left: calc(-2% - 0.12em);
     padding-left: 0.12em;
@@ -198,7 +195,6 @@
 
   .photo {
     position: absolute;
-    /*background: rgba(1, 1, 1, 0.1);*/
     overflow: hidden;
     --py: 0px;
     transform: translate3d(0, var(--py), 0);
@@ -287,8 +283,7 @@
     hyphens: auto;
     text-wrap: pretty;
   }
-  /* Body text uses 2 sub-columns within the first 2 grid tracks, so
-     reading widths roughly match a single grid track. */
+  /* 2 sub-columns across the first 2 tracks so reading width ≈ one track. */
   .col .text-cols {
     grid-column: 1 / span 2;
     column-count: 2;
@@ -297,8 +292,6 @@
   }
   .col p { margin-bottom: 14px; break-inside: avoid-column; orphans: 3; widows: 3; }
 
-  /* Image stack pinned to the last grid track. Photos overrun the
-     track edges for play. */
   .col-figures {
     grid-column: 3;
     display: flex;
@@ -321,10 +314,8 @@
     width: calc(100% + 0.5rem);
     margin-right: -0.75rem;
   }
-  /* Top-bleed variant: whole stack rides up to the section's Y-start so
-     it sits alongside the section header. Negative margin-bottom shrinks
-     the grid track by the lift amount so no phantom space is left below.
-     --lift is per-section so each chapter can match its header height. */
+  /* Top-bleed: stack rises by --lift to sit beside the header; negative
+     margin-bottom cancels the phantom space below. */
   .col-figures.lifted {
     position: relative;
     top: var(--lift, -20rem);
@@ -346,9 +337,6 @@
   }
   .col em { font-style: italic; }
   .col strong { font-weight: 700; }
-
-  .marg { position: absolute; z-index: 5; }
-  .marg .cap { text-align: left; }
 
   /* ==== PULLQUOTE ==== */
   .pull {
@@ -372,10 +360,8 @@
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
-  /* padding inflates the bbox so addHTML catches italic overhang
-     + the oversized ::before quote mark. Use vw (not em) so .quote-body
-     and .src — different font-sizes — resolve to the same px and stay
-     aligned at wide viewports. */
+  /* padding inflates bbox for italic overhang + oversized ::before quote.
+     vw (not em) keeps .quote-body and .src aligned across font-sizes. */
   .pull .quote-body { padding: 0.15em max(24px, 1.2vw) 0.2em; }
   .pull .quote-body::before {
     content: "\201C";
@@ -391,8 +377,7 @@
   .pull blockquote .src {
     display: block;
     margin-top: 32px;
-    /* match .quote-body horizontal padding so .src aligns with the
-       quoted text above. */
+    /* match .quote-body horizontal padding for alignment */
     padding: 0 max(24px, 1.2vw);
     font-family: "JetBrains Mono", monospace;
     font-size: 11px;
@@ -404,9 +389,7 @@
   .pull blockquote .src b { color: var(--ink); font-weight: 500; }
 
   /* ==== SPREAD ==== */
-  /* container-type lets children use cqw so the whole composition
-     scales as one unit with section width — no horizontal reflow when
-     the window resizes. */
+  /* container-type enables cqw so the composition scales with section width. */
   .spread {
     position: relative;
     padding: 64px 56px 120px;
@@ -589,8 +572,7 @@
     50% { transform: translateY(3px); }
   }
 
-  /* Hold the page until images are loaded — otherwise halftone attaches
-     before pixels exist and the first paint is a flash of empty rosettes. */
+  /* Hold the page until images load — otherwise halftone attaches to empty pixels. */
   .loader {
     position: fixed;
     inset: 0;
@@ -672,7 +654,6 @@
   <div class="cluster">
     <figure class="photo hero-portrait" data-parallax="-0.06">
        <img src="https://images.unsplash.com/photo-1640600984860-9580f0b45ad5?w=720&amp;h=940&amp;fit=crop" crossorigin="anonymous" alt="" data-halftone />
-      <!--<img src="https://images.unsplash.com/photo-1588209986656-0f0f7aee7945?w=720&amp;h=940&amp;fit=crop" crossorigin="anonymous" alt="" data-halftone />-->
       <figcaption class="cap"><b>Fig. 01</b> &nbsp; Untitled portrait, 2026 — separation: C 15° / M 75° / Y 0° / K 45°</figcaption>
     </figure>
 
@@ -854,7 +835,6 @@
 <div class="hint" id="hint"><span class="arrow">↓</span> scroll — long form</div>
 
 <script>
-  // barcode
   (function () {
     const bc = document.getElementById("bc");
     let s = 11 * 9301 + 49297;
@@ -868,16 +848,13 @@
     }
   })();
 
-  // hint dismissal
   const hint = document.getElementById("hint");
   let dismissed = false;
   function dismissHint() { if (dismissed) return; dismissed = true; hint.classList.add("gone"); }
   window.addEventListener("scroll", dismissHint, { once: true, passive: true });
   setTimeout(dismissHint, 5500);
 
-  // Loader: track image load progress + font readiness, then fade out.
-  // Exposed as window.__pagePreloaded so the VFX module can wait until
-  // pixels exist before attaching the halftone effect.
+  // Exposed so the VFX module waits for pixels before attaching halftone.
   window.__pagePreloaded = (function () {
     const loader = document.getElementById("loader");
     const bar = document.getElementById("loader-bar");
@@ -901,7 +878,7 @@
     });
     promises.push(document.fonts.ready.then(tick));
     return Promise.all(promises).then(() => {
-      // Brief beat so the bar visibly reaches 100% before fading.
+      // brief beat so the bar visibly hits 100% before fade
       return new Promise((res) => setTimeout(() => {
         loader.classList.add("gone");
         res();
@@ -914,10 +891,7 @@
   import { VFX } from "@vfx-js/core";
   import { HalftoneEffect } from "@vfx-js/effects";
 
-  // CMYK halftone is attached per element instead of as a global
-  // postEffect. Effect instances can't be reused across elements, so
-  // we mint a fresh one each time. Text gets a finer dot pitch than
-  // images so display type stays legible.
+  // Effect instances aren't reusable across elements; mint one per target.
   function makeHalftone(overrides = {}) {
     return new HalftoneEffect({
       mode: "cmyk",
@@ -936,15 +910,10 @@
     pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
   });
 
-  // Opt-in via [data-halftone]. Text elements go through vfx.addHTML,
-  // which uses the html-in-canvas drawElementImage API to capture them
-  // with the document's real web fonts (vfx.add → dom2canvas would route
-  // via an `<img src="data:image/svg+xml,...">` whose isolated context
-  // can't see document-loaded fonts and falls back to system serif).
-  // Images keep vfx.add — they're already raster, no font issue.
-  // Wait until all images + fonts are loaded (and the loader has faded)
-  // before attaching effects. Halftone reads from the texture on first
-  // render; attaching pre-load gives a frame of blank rosettes.
+  // Text goes via vfx.addHTML so drawElementImage sees real web fonts;
+  // vfx.add → dom2canvas would route through an SVG <img> and fall back
+  // to system serif. Images keep vfx.add — already raster.
+  // Wait for pixels first: halftone reads texture on first render.
   await window.__pagePreloaded;
 
   const effects = [];
@@ -957,7 +926,7 @@
       if (el.complete && el.naturalWidth > 0) go();
       else el.addEventListener("load", go, { once: true });
     } else {
-      // zIndex > 0 so display type always draws on top of photos.
+      // zIndex > 0 keeps display type on top of photos
       const effect = makeHalftone({ gridSize: 3 });
       effects.push(effect);
       await vfx.addHTML(el, { effect, zIndex: 1 });
@@ -970,10 +939,8 @@
   }
   await Promise.all(tasks);
 
-  // Animate the title spans' font-weight from 100 → 900 via JS so the
-  // layoutsubtree canvas sees an actual DOM mutation each frame (a CSS
-  // transition stays in compositor-land and never invalidates the
-  // subtree). Then ping requestPaint so the wrap canvas re-rasterises.
+  // Drive font-weight via JS so the layoutsubtree canvas sees DOM mutation
+  // each frame (CSS transitions stay in compositor-land), then requestPaint.
   (function tween() {
     const titles = [...document.querySelectorAll(".bigtitle .l1, .bigtitle .l3")];
     const dur = 1600;
@@ -994,8 +961,7 @@
     requestAnimationFrame(tick);
   })();
 
-  // Drive angle from scroll position; per-channel angles stack on top
-  // so the CMYK rosette rotates as a whole.
+  // Scroll rotates the CMYK rosette as a whole.
   function updateAngle() {
     const angle = (window.scrollY || window.pageYOffset) * 0.1;
     for (const e of effects) e.setParams({ angle });
@@ -1005,8 +971,7 @@
 </script>
 
 <script>
-  // Parallax — each .photo[data-parallax] translates relative to its rest
-  // position by speed * (viewportCenterY - elementCenterY_pageRelative).
+  // Parallax: translate each .photo by speed * (viewportCenterY - elementCenterY).
   (function () {
     const els = [...document.querySelectorAll(".photo[data-parallax]")];
     if (!els.length) return;
@@ -1035,28 +1000,14 @@
     function onScroll() {
       if (!ticking) { requestAnimationFrame(frame); ticking = true; }
     }
-    let pending = els.filter((el) => {
-      const im = el.querySelector("img");
-      return im && !im.complete;
-    }).length;
-    function ready() { measure(); frame(); }
-    if (pending === 0) {
-      ready();
-    } else {
-      els.forEach((el) => {
-        const im = el.querySelector("img");
-        if (im && !im.complete) {
-          im.addEventListener("load", () => { if (--pending === 0) ready(); }, { once: true });
-        }
-      });
-      setTimeout(ready, 1500);
-    }
+    measure();
+    frame();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", () => { measure(); frame(); });
   })();
 </script>
 
-<!-- Lenis smooth scroll. Remove this block to disable. -->
+<!-- Lenis smooth scroll -->
 <script type="module">
   import Lenis from "https://esm.sh/lenis";
   const lenis = new Lenis();
