@@ -478,6 +478,31 @@
     text-transform: uppercase;
     font-size: 9.5px;
   }
+  .colophon .credit-list a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .colophon .credit-list a:hover { color: var(--accent); }
+  .colophon .photo-credits { margin-top: 24px; }
+  .colophon .photo-credits ul {
+    list-style: none;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    line-height: 1.9;
+    color: rgba(13, 12, 10, 0.85);
+  }
+  .colophon .photo-credits li { display: inline; }
+  .colophon .photo-credits li:not(:last-child)::after { content: " · "; color: rgba(13, 12, 10, 0.4); }
+  .colophon .photo-credits a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .colophon .photo-credits a:hover { color: var(--accent); }
+  .colophon .photo-credits .via {
+    margin-top: 8px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.55);
+  }
+  .colophon .photo-credits .via a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .colophon .photo-credits .via a:hover { color: var(--accent); }
   .footer-rule {
     margin-top: 48px;
     padding-top: 18px;
@@ -733,12 +758,25 @@
     <div>
       <h4>Credits</h4>
       <div class="credit-list">
-        <div><b>Editor</b> A. Mizuhara</div>
-        <div><b>Type</b> N. Calderón</div>
-        <div><b>Photos</b> Picsum</div>
+        <div><b>Type</b> Fraunces · JetBrains Mono</div>
         <div><b>Press</b> WebGL2 / 4-ink sim.</div>
-        <div><b>Shader</b> @vfx-js/effects · 1.0</div>
+        <div><b>Shader</b> <a href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">@vfx-js/effects</a></div>
         <div><b>Paper</b> #f1ece1 — cream wove</div>
+      </div>
+      <div class="photo-credits">
+        <h4>Photos</h4>
+        <ul>
+          <li><a href="https://unsplash.com/photos/eNj4Kw4qu2g" target="_blank" rel="noopener">Dynamic Wang</a></li>
+          <li><a href="https://unsplash.com/photos/T7K4aEPoGGk" target="_blank" rel="noopener">Pietro De Grandi</a></li>
+          <li><a href="https://unsplash.com/photos/78A265wPiO4" target="_blank" rel="noopener">Urban Vintage</a></li>
+          <li><a href="https://unsplash.com/photos/NRQV-hBF10M" target="_blank" rel="noopener">Bailey Zindel</a></li>
+          <li><a href="https://unsplash.com/photos/twukN12EN7c" target="_blank" rel="noopener">Simon Berger</a></li>
+          <li><a href="https://unsplash.com/photos/hlnucYOsL-c" target="_blank" rel="noopener">Matteo Minelli</a></li>
+          <li><a href="https://unsplash.com/photos/j0g8taxHZa0" target="_blank" rel="noopener">Samuel Zeller</a></li>
+          <li><a href="https://unsplash.com/photos/-tXkzUEuheU" target="_blank" rel="noopener">Michael Hirsch</a></li>
+          <li><a href="https://unsplash.com/photos/tCICLJ5ktBE" target="_blank" rel="noopener">Vadim Sherbakov</a></li>
+        </ul>
+        <p class="via">All photos via <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a></p>
       </div>
     </div>
     <div>
