@@ -150,6 +150,7 @@
     margin-left: calc(-2% - 0.12em);
     padding-left: 0.12em;
     font-weight: 100;
+    opacity: 0;
   }
   .hero h1.bigtitle .l2 {
     font-style: normal;
@@ -165,6 +166,7 @@
     margin-right: -0.12em;
     padding-right: 0.12em;
     font-weight: 100;
+    opacity: 0;
   }
   .hero h1.bigtitle .l3 i { font-style: italic; color: var(--accent); font-weight: inherit; }
 
@@ -360,9 +362,14 @@
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
-  /* padding inflates bbox for italic overhang + oversized ::before quote.
-     vw (not em) keeps .quote-body and .src aligned across font-sizes. */
-  .pull .quote-body { padding: 0.15em max(24px, 1.2vw) 0.2em; }
+  /* Negative margin-left + matching padding extend bbox left so the hanging
+     ::before stays inside VFX's capture rect; text inner-edge still aligns
+     with .src. vw (not em) keeps both aligned across font-sizes. */
+  .pull .quote-body {
+    position: relative;
+    margin-left: -1.5em;
+    padding: 0.15em max(24px, 1.2vw) 0.2em calc(max(24px, 1.2vw) + 1.5em);
+  }
   .pull .quote-body::before {
     content: "\201C";
     font-family: "Fraunces", serif;
@@ -371,8 +378,9 @@
     font-size: 1.8em;
     line-height: 1;
     color: var(--accent);
-    display: block;
-    margin-bottom: -0.15em;
+    position: absolute;
+    left: 0.4em;
+    top: 0;
   }
   .pull blockquote .src {
     display: block;
@@ -705,7 +713,7 @@
 <section class="pull">
   <blockquote>
     <div class="quote-body" data-halftone>
-      "The grain isn't a flaw in the picture. <em>The grain is the picture.</em> Everything else is just an agreement we made with our own eyes."
+      The grain isn't a flaw in the picture. <em>The grain is the picture.</em> Everything else is just an agreement we made with our own eyes.
     </div>
     <span class="src">— <b>K. ARAKAWA</b>, <i>On Printing, &amp; Other Quiet Catastrophes</i> · 1987</span>
   </blockquote>
@@ -785,6 +793,9 @@
       <p>
         Standard newsprint angles. The <em>newsprint</em> ink preset across thirteen figures, dot-screened at a fixed pitch in screen space — images parallax through the grid as on a real press.
         No press was harmed in the printing of this issue.
+      </p>
+      <p>
+        <em>K. Arakawa,</em> his 1987 monograph, and the pull-quote attributed to him are invented for this demo — props, not citations.
       </p>
     </div>
     <div>
@@ -943,22 +954,25 @@
   // each frame (CSS transitions stay in compositor-land), then requestPaint.
   (function tween() {
     const titles = [...document.querySelectorAll(".bigtitle .l1, .bigtitle .l3")];
-    const dur = 1600;
-    const t0 = performance.now();
-    function tick() {
-      const t = Math.min(1, (performance.now() - t0) / dur);
-      const e = 1 - (1 - t) ** 3;
-      const w = Math.round(100 + 800 * e);
-      for (const el of titles) {
-        el.style.fontWeight = w;
-        const wrap = el.parentNode;
-        if (wrap && wrap.tagName === "CANVAS" && typeof wrap.requestPaint === "function") {
-          wrap.requestPaint();
+    const dur = 1500;
+    setTimeout(() => {
+      const t0 = performance.now();
+      function tick() {
+        const t = Math.min(1, (performance.now() - t0) / dur);
+        const e = 1 - (1 - t) ** 3;
+        const w = Math.round(100 + 800 * e);
+        for (const el of titles) {
+          el.style.fontWeight = w;
+          el.style.opacity = Math.min(e * 5, 1.0);
+          const wrap = el.parentNode;
+          if (wrap && wrap.tagName === "CANVAS" && typeof wrap.requestPaint === "function") {
+            wrap.requestPaint();
+          }
         }
+        if (t < 1) requestAnimationFrame(tick);
       }
-      if (t < 1) requestAnimationFrame(tick);
-    }
-    requestAnimationFrame(tick);
+      requestAnimationFrame(tick);
+    }, 500);
   })();
 
   // Scroll rotates the CMYK rosette as a whole.
