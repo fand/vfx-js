@@ -152,6 +152,7 @@
   .hero h1.bigtitle .l1 {
     margin-left: calc(-2% - 0.12em);
     padding-left: 0.12em;
+    font-weight: 100;
   }
   .hero h1.bigtitle .l2 {
     font-style: normal;
@@ -166,9 +167,9 @@
     margin-left: 22%;
     margin-right: -0.12em;
     padding-right: 0.12em;
-    font-weight: 900;
+    font-weight: 100;
   }
-  .hero h1.bigtitle .l3 i { font-style: italic; color: var(--accent); font-weight: 900; }
+  .hero h1.bigtitle .l3 i { font-style: italic; color: var(--accent); font-weight: inherit; }
 
   .hero .standfirst {
     position: relative;
@@ -365,7 +366,7 @@
     margin: 0 auto;
     font-family: "Fraunces", serif;
     font-style: italic;
-    font-weight: 400;
+    font-weight: 500;
     font-size: clamp(40px, 5.4vw, 6rem);
     line-height: 1.04;
     letter-spacing: -0.02em;
@@ -959,9 +960,35 @@
     }
   }
 
+  const tasks = [];
   for (const el of document.querySelectorAll("[data-halftone]")) {
-    attach(el);
+    tasks.push(attach(el));
   }
+  await Promise.all(tasks);
+
+  // Animate the title spans' font-weight from 100 → 900 via JS so the
+  // layoutsubtree canvas sees an actual DOM mutation each frame (a CSS
+  // transition stays in compositor-land and never invalidates the
+  // subtree). Then ping requestPaint so the wrap canvas re-rasterises.
+  (function tween() {
+    const titles = [...document.querySelectorAll(".bigtitle .l1, .bigtitle .l3")];
+    const dur = 1600;
+    const t0 = performance.now();
+    function tick() {
+      const t = Math.min(1, (performance.now() - t0) / dur);
+      const e = 1 - (1 - t) ** 3;
+      const w = Math.round(100 + 800 * e);
+      for (const el of titles) {
+        el.style.fontWeight = w;
+        const wrap = el.parentNode;
+        if (wrap && wrap.tagName === "CANVAS" && typeof wrap.requestPaint === "function") {
+          wrap.requestPaint();
+        }
+      }
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  })();
 
   // Drive angle from scroll position; per-channel angles stack on top
   // so the CMYK rosette rotates as a whole.
