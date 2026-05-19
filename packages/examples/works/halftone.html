@@ -21,6 +21,9 @@
     --rule: rgba(13, 12, 10, 0.85);
     --rule-thin: rgba(13, 12, 10, 0.2);
   }
+  /* Root font scales with viewport so headings/photos (in rem) grow on
+     wide screens. Stays at 16px below ~1440px, ramps to 28px above ~3300px. */
+  html { font-size: clamp(16px, calc(8px + 0.6vw), 28px); }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     background: var(--paper);
@@ -56,7 +59,7 @@
   .mast .title {
     font-family: "Fraunces", serif;
     font-weight: 900;
-    font-size: 54px;
+    font-size: 3.375rem;
     line-height: 0.85;
     letter-spacing: -0.025em;
   }
@@ -133,10 +136,10 @@
     font-family: "Fraunces", serif;
     font-weight: 900;
     font-style: italic;
-    font-size: clamp(120px, 17vw, 240px);
+    font-size: clamp(120px, 17vw, 24rem);
     line-height: 0.82;
     letter-spacing: -0.05em;
-    margin-top: 60px;
+    margin-top: 3.75rem;
     mix-blend-mode: multiply;
   }
   .hero h1.bigtitle span { display: block; }
@@ -169,12 +172,12 @@
   .hero .standfirst {
     position: relative;
     z-index: 3;
-    max-width: 520px;
-    margin: 48px 0 0 6px;
+    max-width: 32.5rem;
+    margin: 3rem 0 0 6px;
     font-family: "Fraunces", serif;
     font-style: italic;
     font-weight: 400;
-    font-size: 22px;
+    font-size: 1.375rem;
     line-height: 1.35;
     letter-spacing: -0.005em;
     color: rgba(13, 12, 10, 0.85);
@@ -216,13 +219,13 @@
 
   .photo.hero-portrait {
     right: 56px;
-    top: 160px;
-    width: 520px;
-    height: 680px;
+    top: 10rem;
+    width: 32.5rem;
+    height: 42.5rem;
   }
   .photo.hero-portrait .cap { bottom: -26px; text-align: right; }
-  .photo.f-a { left: 58%; top: 80px; width: 170px; height: 220px; }
-  .photo.f-b { left: 46%; bottom: 48px; width: 200px; height: 140px; }
+  .photo.f-a { left: 58%; top: 5rem; width: 10.625rem; height: 13.75rem; }
+  .photo.f-b { left: 46%; bottom: 3rem; width: 12.5rem; height: 8.75rem; }
 
   /* ==== SECTION RULES ==== */
   .section-rule {
@@ -262,26 +265,26 @@
   .body-section h2.kicker {
     font-family: "Fraunces", serif;
     font-weight: 900;
-    font-size: 64px;
+    font-size: 4rem;
     line-height: 0.95;
     letter-spacing: -0.022em;
-    margin-bottom: 32px;
+    margin-bottom: 2rem;
     max-width: 14ch;
     text-wrap: balance;
   }
   .body-section h2.kicker em { font-style: italic; font-weight: 400; color: var(--accent); }
 
   .col {
-    column-width: 330px;
+    column-width: 20.625rem;
     column-gap: 38px;
     column-rule: 1px solid var(--rule-thin);
     font-family: "Fraunces", serif;
     font-weight: 400;
-    font-size: 17px;
+    font-size: 1.0625rem;
     line-height: 1.5;
     text-align: justify;
     hyphens: auto;
-    max-width: 1100px;
+    max-width: 68.75rem;
     text-wrap: pretty;
   }
   .col p { margin-bottom: 14px; break-inside: avoid-column; orphans: 3; widows: 3; }
@@ -314,20 +317,21 @@
   .pull blockquote {
     position: relative;
     z-index: 3;
-    max-width: 1100px;
+    max-width: 68.75rem;
     margin: 0 auto;
     font-family: "Fraunces", serif;
     font-style: italic;
     font-weight: 400;
-    font-size: clamp(40px, 5.4vw, 76px);
+    font-size: clamp(40px, 5.4vw, 6rem);
     line-height: 1.04;
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
   /* padding inflates the bbox so addHTML catches italic overhang
-     + the oversized ::before quote mark. Horizontal in px so .src
-     (11px font) can mirror it without an em-scale mismatch. */
-  .pull .quote-body { padding: 0.15em 24px 0.2em; }
+     + the oversized ::before quote mark. Use vw (not em) so .quote-body
+     and .src — different font-sizes — resolve to the same px and stay
+     aligned at wide viewports. */
+  .pull .quote-body { padding: 0.15em max(24px, 1.2vw) 0.2em; }
   .pull .quote-body::before {
     content: "\201C";
     font-family: "Fraunces", serif;
@@ -344,7 +348,7 @@
     margin-top: 32px;
     /* match .quote-body horizontal padding so .src aligns with the
        quoted text above. */
-    padding: 0 24px;
+    padding: 0 max(24px, 1.2vw);
     font-family: "JetBrains Mono", monospace;
     font-size: 11px;
     font-style: normal;
@@ -365,7 +369,7 @@
     font-family: "Fraunces", serif;
     font-style: italic;
     font-weight: 400;
-    font-size: 42px;
+    font-size: 2.625rem;
     letter-spacing: -0.015em;
     margin-bottom: 28px;
     max-width: 18ch;
@@ -593,12 +597,12 @@
     </p>
   </div>
 
-  <figure class="photo marg" style="right: 56px; top: 120px; width: 220px; height: 280px" data-parallax="-0.2">
+  <figure class="photo marg" style="right: 56px; top: 7.5rem; width: 13.75rem; height: 17.5rem" data-parallax="-0.2">
     <img src="https://picsum.photos/seed/halftone-detail/220/280" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>Fig. 04</b> Detail · 4.5× pitch</figcaption>
   </figure>
 
-  <figure class="photo marg" style="right: 140px; bottom: 60px; width: 170px; height: 170px" data-parallax="-0.14">
+  <figure class="photo marg" style="right: 8.75rem; bottom: 3.75rem; width: 10.625rem; height: 10.625rem" data-parallax="-0.14">
     <img src="https://picsum.photos/seed/halftone-fogra/170/170" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>Fig. 05</b> FOGRA51 · 6px</figcaption>
   </figure>
@@ -625,32 +629,32 @@
     Six images, four inks, no guarantees. Each separated at the standard newsprint angles — <b>C·15° / M·75° / Y·0° / K·45°</b> — and printed back together at varying pitches. Read them however you like.
   </p>
 
-  <figure class="photo" style="left: 5%; top: 240px; width: 280px; height: 200px" data-parallax="-0.12">
+  <figure class="photo" style="left: 5%; top: 15rem; width: 17.5rem; height: 12.5rem" data-parallax="-0.12">
     <img src="https://picsum.photos/seed/halftone-avenue/280/200" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>06 ·</b> Avenue, late October</figcaption>
   </figure>
 
-  <figure class="photo" style="left: 30%; top: 200px; width: 240px; height: 300px" data-parallax="-0.22">
+  <figure class="photo" style="left: 30%; top: 12.5rem; width: 15rem; height: 18.75rem" data-parallax="-0.22">
     <img src="https://picsum.photos/seed/halftone-self/240/300" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>07 ·</b> Self-portrait, 4 a.m.</figcaption>
   </figure>
 
-  <figure class="photo" style="right: 18%; top: 140px; width: 300px; height: 220px" data-parallax="-0.16">
+  <figure class="photo" style="right: 18%; top: 8.75rem; width: 18.75rem; height: 13.75rem" data-parallax="-0.16">
     <img src="https://picsum.photos/seed/halftone-train/300/220" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>08 ·</b> A train, departing.</figcaption>
   </figure>
 
-  <figure class="photo" style="left: 14%; bottom: 140px; width: 200px; height: 280px" data-parallax="-0.26">
+  <figure class="photo" style="left: 14%; bottom: 8.75rem; width: 12.5rem; height: 17.5rem" data-parallax="-0.26">
     <img src="https://picsum.photos/seed/halftone-stranger/200/280" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>09 ·</b> Stranger, Shinjuku</figcaption>
   </figure>
 
-  <figure class="photo" style="left: 42%; bottom: 110px; width: 260px; height: 200px" data-parallax="-0.1">
+  <figure class="photo" style="left: 42%; bottom: 6.875rem; width: 16.25rem; height: 12.5rem" data-parallax="-0.1">
     <img src="https://picsum.photos/seed/halftone-hands/260/200" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>10 ·</b> Hands, in conversation</figcaption>
   </figure>
 
-  <figure class="photo" style="right: 6%; bottom: 80px; width: 280px; height: 240px" data-parallax="-0.2">
+  <figure class="photo" style="right: 6%; bottom: 5rem; width: 17.5rem; height: 15rem" data-parallax="-0.2">
     <img src="https://picsum.photos/seed/halftone-reading/280/240" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>11 ·</b> Reading, slowly.</figcaption>
   </figure>
@@ -681,12 +685,12 @@
     </p>
   </div>
 
-  <figure class="photo marg" style="right: 56px; top: 180px; width: 200px; height: 240px" data-parallax="-0.15">
+  <figure class="photo marg" style="right: 56px; top: 11.25rem; width: 12.5rem; height: 15rem" data-parallax="-0.15">
     <img src="https://picsum.photos/seed/halftone-fig12/200/240" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>Fig. 12</b> · 5px / newsprint</figcaption>
   </figure>
 
-  <figure class="photo marg" style="right: 300px; bottom: 80px; width: 160px; height: 200px" data-parallax="-0.23">
+  <figure class="photo marg" style="right: 18.75rem; bottom: 5rem; width: 10rem; height: 12.5rem" data-parallax="-0.23">
     <img src="https://picsum.photos/seed/halftone-fig13/160/200" crossorigin="anonymous" alt="" data-halftone />
     <figcaption class="cap"><b>Fig. 13</b> · 4px / FOGRA51</figcaption>
   </figure>
