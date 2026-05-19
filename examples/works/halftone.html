@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>STATIC NOISE · 07 · A Portrait in Dots</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,100..900,0..100,0..1;1,9..144,100..900,0..100,0..1&family=JetBrains+Mono:wght@400;500&display=swap"
+/>
+
+<style>
+  :root {
+    --paper: #f1ece1;
+    --paper-dark: #e8e0cf;
+    --ink: #0d0c0a;
+    --accent: #b53216;
+    --rule: rgba(13, 12, 10, 0.85);
+    --rule-thin: rgba(13, 12, 10, 0.2);
+  }
+  /* rem scales with viewport: 16px under ~1440px, ramps to 28px above ~3300px. */
+  html { font-size: clamp(16px, calc(8px + 0.6vw), 28px); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Fraunces", serif;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "liga", "onum";
+  }
+  body { min-height: 100%; overflow-x: hidden; }
+
+  /* paper grain */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+    opacity: 0.35;
+    z-index: 1000;
+    background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyMDAnIGhlaWdodD0nMjAwJz48ZmlsdGVyIGlkPSduJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC44NScgbnVtT2N0YXZlcz0nMicgc3RpdGNoVGlsZXM9J3N0aXRjaCcvPjxmZUNvbG9yTWF0cml4IHZhbHVlcz0nMCAwIDAgMCAwLjA2ICAwIDAgMCAwIDAuMDUgIDAgMCAwIDAgMC4wNCAgMCAwIDAgMC4xOCAwJy8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsdGVyPSd1cmwoI24pJy8+PC9zdmc+");
+  }
+
+  /* ==== MAST ==== */
+  .mast {
+    position: relative;
+    padding: 24px 56px 14px;
+    border-bottom: 1.5px solid var(--rule);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: end;
+    gap: 28px;
+  }
+  .mast .title {
+    font-family: "Fraunces", serif;
+    font-weight: 900;
+    font-size: 2rem;
+    line-height: 1;
+    letter-spacing: -0.025em;
+  }
+  .mast .title em { font-style: italic; font-weight: 400; color: var(--accent); }
+  .mast .center {
+    justify-self: center;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1.6;
+    color: rgba(13, 12, 10, 0.7);
+  }
+  .mast .center b { color: var(--ink); font-weight: 500; letter-spacing: 0.22em; }
+  .mast .meta {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    text-align: right;
+    line-height: 1.6;
+    color: rgba(13, 12, 10, 0.7);
+  }
+  .mast .meta a { color: var(--ink); text-decoration: none; }
+  .mast .meta a:hover { text-decoration: underline; }
+
+  .sub-mast {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    padding: 8px 56px;
+    border-bottom: 1.5px solid var(--rule);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.8);
+  }
+  .sub-mast .c { display: flex; gap: 8px; align-items: center; }
+  .sub-mast .dot { display: inline-block; width: 4px; height: 4px; background: var(--ink); }
+
+  /* ==== HERO ==== */
+  .hero {
+    position: relative;
+    padding: 48px 56px 72px;
+    min-height: 920px;
+    overflow: hidden;
+  }
+  .hero .folio {
+    position: absolute;
+    top: 48px;
+    left: 56px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.7);
+  }
+  .hero .folio b { color: var(--accent); }
+  .hero .feature-tag {
+    position: absolute;
+    top: 48px;
+    right: 56px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border: 1.5px solid var(--ink);
+  }
+
+  .hero h1.bigtitle {
+    position: relative;
+    z-index: 3;
+    font-family: "Fraunces", serif;
+    font-weight: 900;
+    font-style: italic;
+    font-size: clamp(120px, 17vw, 24rem);
+    line-height: 0.82;
+    letter-spacing: -0.05em;
+    margin-top: 3.75rem;
+    mix-blend-mode: multiply;
+  }
+  .hero h1.bigtitle span { display: block; }
+  /* Shift .l1/.l3 with margin, not transform: foreignObject bakes transforms
+     into the texture and VFX also draws at the post-transform bbox.left.
+     padding + negative margin inflates the bbox so italic overhang is caught. */
+  .hero h1.bigtitle .l1 {
+    margin-left: calc(-2% - 0.12em);
+    padding-left: 0.12em;
+    font-weight: 100;
+    opacity: 0;
+  }
+  .hero h1.bigtitle .l2 {
+    font-style: normal;
+    font-weight: 400;
+    font-size: 0.16em;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 24px 0 14px 8px;
+  }
+  .hero h1.bigtitle .l3 {
+    margin-left: 22%;
+    margin-right: -0.12em;
+    padding-right: 0.12em;
+    font-weight: 100;
+    opacity: 0;
+  }
+  .hero h1.bigtitle .l3 i { font-style: italic; color: var(--accent); font-weight: inherit; }
+
+  .hero .standfirst {
+    position: relative;
+    z-index: 3;
+    max-width: 32.5rem;
+    margin: 3rem 0 0 6px;
+    font-family: "Fraunces", serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.375rem;
+    line-height: 1.35;
+    letter-spacing: -0.005em;
+    color: rgba(13, 12, 10, 0.85);
+    text-wrap: balance;
+  }
+  .hero .standfirst::before {
+    content: "";
+    display: block;
+    width: 64px;
+    height: 2px;
+    background: var(--ink);
+    margin-bottom: 18px;
+  }
+
+  .hero .cluster { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+
+  .photo {
+    position: absolute;
+    overflow: hidden;
+    --py: 0px;
+    transform: translate3d(0, var(--py), 0);
+    will-change: transform;
+  }
+  .photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .photo .cap {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -22px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.6);
+    padding: 6px 2px;
+  }
+  .photo .cap b { color: var(--ink); font-weight: 500; letter-spacing: 0.2em; }
+
+  .photo.hero-portrait {
+    right: 56px;
+    top: 10rem;
+    width: 30rem;
+    height: 40rem;
+  }
+  .photo.hero-portrait .cap { bottom: -26px; text-align: right; }
+  .photo.f-a { left: 64%; top: 8rem; width: 13rem; height: 8rem; }
+  .photo.f-b { left: 45%; bottom: 5rem; width: 22rem; height: 14.5rem; }
+
+  /* ==== SECTION RULES ==== */
+  .section-rule {
+    margin: 0 56px;
+    border-top: 1.5px solid var(--rule);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 0;
+  }
+  .section-rule .l, .section-rule .r { height: 1px; background: var(--rule-thin); }
+  .section-rule .c {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.7);
+  }
+
+  /* ==== ARTICLE BODY ==== */
+  .body-section {
+    position: relative;
+    padding: 64px 56px;
+    overflow: hidden;
+  }
+  .body-section h2.section-num {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  .body-section h2.kicker {
+    font-family: "Fraunces", serif;
+    font-weight: 900;
+    font-size: 4rem;
+    line-height: 0.95;
+    letter-spacing: -0.022em;
+    margin-bottom: 2rem;
+    max-width: 14ch;
+    text-wrap: balance;
+  }
+  .body-section h2.kicker em { font-style: italic; font-weight: 400; color: var(--accent); }
+
+  .col {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 38px;
+    font-family: "Fraunces", serif;
+    font-weight: 400;
+    font-size: 1.0625rem;
+    line-height: 1.5;
+    text-align: justify;
+    hyphens: auto;
+    text-wrap: pretty;
+  }
+  /* 2 sub-columns across the first 2 tracks so reading width ≈ one track. */
+  .col .text-cols {
+    grid-column: 1 / span 2;
+    column-count: 2;
+    column-gap: 38px;
+    column-rule: 1px solid var(--rule-thin);
+  }
+  .col p { margin-bottom: 14px; break-inside: avoid-column; orphans: 3; widows: 3; }
+
+  .col-figures {
+    grid-column: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 46px;
+  }
+  .col-figures .photo {
+    position: relative;
+    display: block;
+    overflow: visible;
+  }
+  .col-figures .photo:first-child {
+    aspect-ratio: 4 / 5;
+    margin-left: -1rem;
+    width: calc(100% + 1.25rem);
+  }
+  .col-figures .photo:nth-child(2) {
+    aspect-ratio: 1 / 1;
+    align-self: flex-end;
+    width: calc(100% + 0.5rem);
+    margin-right: -0.75rem;
+  }
+  /* Top-bleed: stack rises by --lift to sit beside the header; negative
+     margin-bottom cancels the phantom space below. */
+  .col-figures.lifted {
+    position: relative;
+    top: var(--lift, -20rem);
+    margin-bottom: var(--lift, -20rem);
+  }
+  .col-figures.lifted .photo:first-child {
+    aspect-ratio: 2 / 3;
+  }
+  .col p:first-of-type:first-line { font-variant: small-caps; letter-spacing: 0.06em; }
+  .col .dropcap::first-letter {
+    font-family: "Fraunces", serif;
+    font-weight: 900;
+    font-style: italic;
+    font-size: 5.6em;
+    line-height: 0.78;
+    float: left;
+    margin: 6px 16px 0 -2px;
+    color: var(--accent);
+  }
+  .col em { font-style: italic; }
+  .col strong { font-weight: 700; }
+
+  /* ==== PULLQUOTE ==== */
+  .pull {
+    position: relative;
+    padding: 80px 56px;
+    background: var(--paper-dark);
+    border-top: 1.5px solid var(--rule);
+    border-bottom: 1.5px solid var(--rule);
+    overflow: hidden;
+  }
+  .pull blockquote {
+    position: relative;
+    z-index: 3;
+    max-width: 68.75rem;
+    margin: 0 auto;
+    font-family: "Fraunces", serif;
+    font-style: italic;
+    font-weight: 500;
+    font-size: clamp(40px, 5.4vw, 6rem);
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  /* Negative margin-left + matching padding extend bbox left so the hanging
+     ::before stays inside VFX's capture rect; text inner-edge still aligns
+     with .src. vw (not em) keeps both aligned across font-sizes. */
+  .pull .quote-body {
+    position: relative;
+    margin-left: -1.5em;
+    padding: 0.15em max(24px, 1.2vw) 0.2em calc(max(24px, 1.2vw) + 1.5em);
+  }
+  .pull .quote-body::before {
+    content: "\201C";
+    font-family: "Fraunces", serif;
+    font-style: italic;
+    font-weight: 900;
+    font-size: 1.8em;
+    line-height: 1;
+    color: var(--accent);
+    position: absolute;
+    left: 0.4em;
+    top: 0;
+  }
+  .pull blockquote .src {
+    display: block;
+    margin-top: 32px;
+    /* match .quote-body horizontal padding for alignment */
+    padding: 0 max(24px, 1.2vw);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    font-style: normal;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.7);
+  }
+  .pull blockquote .src b { color: var(--ink); font-weight: 500; }
+
+  /* ==== SPREAD ==== */
+  /* container-type enables cqw so the composition scales with section width. */
+  .spread {
+    position: relative;
+    padding: 64px 56px 120px;
+    container-type: inline-size;
+    min-height: 70cqw;
+    overflow: hidden;
+  }
+  .spread .center-text {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    z-index: 10;
+    padding: 0 56px;
+    font-family: "Fraunces", serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(48px, 8vw, 9rem);
+    line-height: 1;
+    text-align: center;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+  .spread .center-text em {
+    font-style: italic;
+    color: var(--accent);
+    font-weight: 900;
+  }
+
+  /* ==== FOOTER ==== */
+  .colophon {
+    position: relative;
+    padding: 64px 56px 90px;
+    border-top: 1.5px solid var(--rule);
+    background: var(--paper);
+  }
+  .colophon-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 48px;
+  }
+  .colophon h4 {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .colophon p {
+    font-family: "Fraunces", serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: rgba(13, 12, 10, 0.85);
+    max-width: 42ch;
+    text-wrap: pretty;
+  }
+  .colophon p + p { margin-top: 10px; }
+  .colophon .credit-list {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    line-height: 1.9;
+    color: rgba(13, 12, 10, 0.85);
+  }
+  .colophon .credit-list b {
+    display: inline-block;
+    width: 9ch;
+    letter-spacing: 0.18em;
+    color: rgba(13, 12, 10, 0.55);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 9.5px;
+  }
+  .colophon .credit-list a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .colophon .credit-list a:hover { color: var(--accent); }
+  .colophon .photo-credits { margin-top: 24px; }
+  .colophon .photo-credits ul {
+    list-style: none;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    line-height: 1.9;
+    color: rgba(13, 12, 10, 0.85);
+  }
+  .colophon .photo-credits li { display: inline; }
+  .colophon .photo-credits li:not(:last-child)::after { content: " · "; color: rgba(13, 12, 10, 0.4); }
+  .colophon .photo-credits a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .colophon .photo-credits a:hover { color: var(--accent); }
+  .colophon .photo-credits .via {
+    margin-top: 8px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.55);
+  }
+  .colophon .photo-credits .via a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .colophon .photo-credits .via a:hover { color: var(--accent); }
+  .footer-rule {
+    margin-top: 48px;
+    padding-top: 18px;
+    border-top: 1.5px solid var(--rule);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 20px;
+    align-items: end;
+  }
+  .footer-rule .l {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.7);
+  }
+  .footer-rule .c {
+    font-family: "Fraunces", serif;
+    font-style: italic;
+    font-size: 18px;
+    text-align: center;
+    text-wrap: balance;
+  }
+  .footer-rule .r { justify-self: end; display: flex; align-items: flex-end; gap: 18px; }
+  .pageno {
+    font-family: "Fraunces", serif;
+    font-weight: 900;
+    font-style: italic;
+    font-size: 48px;
+    line-height: 0.85;
+    color: var(--accent);
+  }
+  .barcode { display: inline-flex; gap: 1.5px; align-items: flex-end; height: 36px; }
+  .barcode i { display: block; width: 1.6px; background: var(--ink); }
+
+  .marker {
+    display: inline-block;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    color: var(--accent);
+    text-transform: uppercase;
+    vertical-align: super;
+    font-weight: 500;
+  }
+
+  .ornament {
+    text-align: center;
+    font-family: "Fraunces", serif;
+    font-style: italic;
+    color: rgba(13, 12, 10, 0.5);
+    font-size: 22px;
+    letter-spacing: 0.6em;
+    padding: 10px 0;
+  }
+
+  .hint {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 200;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.55);
+    background: var(--paper);
+    border: 1px solid var(--rule-thin);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: opacity 0.4s;
+  }
+  .hint.gone { opacity: 0; pointer-events: none; }
+  .hint .arrow { display: inline-block; animation: bounce 1.4s ease-in-out infinite; }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+  }
+
+  /* Hold the page until images load — otherwise halftone attaches to empty pixels. */
+  .loader {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: var(--paper);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    transition: transform 0.7s cubic-bezier(0.76, 0, 0.24, 1);
+  }
+  .loader.gone { transform: translateY(-100%); pointer-events: none; }
+  .loader .label {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(13, 12, 10, 0.6);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .loader .label .pct { color: var(--ink); font-weight: 500; min-width: 4ch; text-align: right; }
+  .loader .bar {
+    position: relative;
+    width: 220px;
+    height: 2px;
+    background: rgba(13, 12, 10, 0.15);
+    overflow: hidden;
+  }
+  .loader .bar i {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.2s ease;
+  }
+</style>
+  <script type="module" crossorigin src="../assets/halftone-DLfsN3UI.js"></script>
+  <link rel="modulepreload" crossorigin href="../assets/modulepreload-polyfill-Da00irRU.js">
+  <link rel="modulepreload" crossorigin href="../assets/esm-D5qVztXh.js">
+</head>
+<body>
+
+<div class="loader" id="loader">
+  <div class="bar"><i id="loader-bar"></i></div>
+  <div class="label"><span>Loading press</span><span class="pct" id="loader-pct">0%</span></div>
+</div>
+
+<header class="mast">
+  <div class="title">STATIC <em>noise</em></div>
+  <div class="center"><b>A Quarterly Review of Image &amp; Type</b><br />This magazine is entirely <b>fictional</b> — built as a demo.</div>
+  <div class="meta">
+    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">VFX-JS repository ↗</a><br />
+    <a href="https://github.com/fand/vfx-js/blob/main/packages/examples/works/halftone.html" target="_blank" rel="noopener">View source of this page ↗</a>
+  </div>
+</header>
+
+<nav class="sub-mast">
+  <div class="c"><span class="dot"></span>FRONTMATTER</div>
+  <div class="c"><span class="dot"></span>FEATURES — <b>YOU ARE HERE</b></div>
+  <div class="c"><span class="dot"></span>PORTFOLIOS</div>
+  <div class="c"><span class="dot"></span>COLOPHON</div>
+</nav>
+
+<section class="hero">
+  <div class="folio">PAGE <b>14</b> · SPRING 2026 · FEATURE NO. 03</div>
+  <div class="feature-tag">★ COVER STORY</div>
+
+  <h1 class="bigtitle">
+    <span class="l1" data-halftone>Portrait</span>
+    <span class="l2">— a study in four inks —</span>
+    <span class="l3" data-halftone>in <i>Dots.</i></span>
+  </h1>
+
+  <p class="standfirst">
+    The picture refuses to resolve. Up close it is rosettes, screen angles, the faint registration error of a press just slightly out of tune. Step back and a face appears, almost.
+    A meditation on what happens when an image is broken into <em>cyan, magenta, yellow,</em> and the small, certain, terminal weight of <em>black</em>.
+  </p>
+
+  <div class="cluster">
+    <figure class="photo hero-portrait" data-parallax="-0.06">
+       <img src="https://images.unsplash.com/photo-1640600984860-9580f0b45ad5?w=720&amp;h=940&amp;fit=crop" crossorigin="anonymous" alt="" data-halftone />
+      <figcaption class="cap"><b>Fig. 01</b> &nbsp; Untitled portrait, 2026 — separation: C 15° / M 75° / Y 0° / K 45°</figcaption>
+    </figure>
+
+    <figure class="photo f-a" data-parallax="-0.24">
+      <img src="https://picsum.photos/seed/halftone-hand/165/100" crossorigin="anonymous" alt="" data-halftone />
+      <figcaption class="cap"><b>Fig. 02</b> Hand · gesture</figcaption>
+    </figure>
+
+    <figure class="photo f-b" data-parallax="-0.18">
+      <img src="https://picsum.photos/seed/halftone-window/290/195" crossorigin="anonymous" alt="" data-halftone />
+      <figcaption class="cap"><b>Fig. 03</b> Late afternoon, west window</figcaption>
+    </figure>
+  </div>
+</section>
+
+<div class="section-rule">
+  <span class="l"></span>
+  <span class="c">§ I — ENTRY</span>
+  <span class="r"></span>
+</div>
+
+<section class="body-section">
+  <h2 class="section-num">CHAPTER ONE</h2>
+  <h2 class="kicker">There are four <em>colors</em> in the world, and one of them is black.</h2>
+
+  <div class="col">
+    <div class="text-cols">
+      <p class="dropcap">
+        The strange thing about printing — by which I mean pressing wet pigment onto dry paper, not the cleaner abstractions of the screen — is that for a hundred and fifty years it has only known how to lie. <span class="marker">[01]</span>
+        A photograph contains every shade between deepest black and the white of the paper. The press has four inks. To bridge the gap it invented the halftone: a grid of dots so small the eye averages them out and politely agrees to call the result an image.
+      </p>
+      <p>
+        <strong>The trick is older than photography.</strong> The first halftones were hand-engraved — tiny grooves of varying width, cousins to the dot patterns we now generate at six thousand lines per inch. When the dots got small enough, the lie became invisible. The mechanism became the medium.
+      </p>
+      <p>
+        And then it went underground. Halftone is everywhere and nowhere — in every newspaper, every cheap poster pasted to a hoarding — and yet we look <em>through</em> it, the way you look through a screen door at a yard.
+      </p>
+    </div>
+
+    <div class="col-figures lifted">
+      <figure class="photo">
+        <img src="https://picsum.photos/seed/halftone-detail/350/415" crossorigin="anonymous" alt="" data-halftone />
+        <figcaption class="cap"><b>Fig. 04</b> Detail · 4.5× pitch</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="pull">
+  <blockquote>
+    <div class="quote-body" data-halftone>
+      The grain isn't a flaw in the picture. <em>The grain is the picture.</em> Everything else is just an agreement we made with our own eyes.
+    </div>
+    <span class="src">— <b>K. ARAKAWA</b>, <i>On Printing, &amp; Other Quiet Catastrophes</i> · 1987</span>
+  </blockquote>
+</section>
+
+<div class="section-rule">
+  <span class="l"></span>
+  <span class="c">§ II — INDEX OF DOTS</span>
+  <span class="r"></span>
+</div>
+
+<section class="spread">
+  <div class="center-text" data-halftone>
+    Step back — and the picture <em>resolves.</em>
+  </div>
+
+  <figure class="photo" style="left: 5cqw; top: 7cqw; width: 46cqw; height: 29cqw" data-parallax="-0.14">
+    <img src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=462&amp;h=320&amp;fit=crop" crossorigin="anonymous" alt="" data-halftone />
+  </figure>
+
+  <figure class="photo" style="right: 16cqw; top: 19cqw; width: 28cqw; height: 19cqw" data-parallax="-0.27">
+    <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=320&amp;h=205&amp;fit=crop" crossorigin="anonymous" alt="" data-halftone />
+  </figure>
+
+  <figure class="photo" style="left: 13cqw; bottom: 10cqw; width: 37cqw; height: 27cqw" data-parallax="-0.18">
+    <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=435&amp;h=290&amp;fit=crop" crossorigin="anonymous" alt="" data-halftone />
+  </figure>
+
+  <figure class="photo" style="right: 10cqw; bottom: 13cqw; width: 40cqw; height: 28cqw" data-parallax="-0.1">
+    <img src="https://images.unsplash.com/photo-1500964757637-c85e8a162699?w=410&amp;h=310&amp;fit=crop" crossorigin="anonymous" alt="" data-halftone />
+  </figure>
+</section>
+
+<div class="ornament">· · · ❀ · · ·</div>
+
+<div class="section-rule">
+  <span class="l"></span>
+  <span class="c">§ III — RESOLUTION</span>
+  <span class="r"></span>
+</div>
+
+<section class="body-section">
+  <h2 class="section-num">CHAPTER TWO</h2>
+  <h2 class="kicker">What <em>resolves,</em> and what refuses.</h2>
+
+  <div class="col">
+    <div class="text-cols">
+      <p class="dropcap">
+        Every halftone is a negotiation between four lies and one truth. The four lies are the screens themselves — cyan, magenta, yellow, and black, each rotated to its own angle so that the rosettes interfere with one another in the most flattering possible way. The truth is the paper underneath. <span class="marker">[02]</span>
+        Without the paper the screens are nothing; pull them apart in software and each one looks, individually, like static. A cyan storm. A magenta storm. A yellow storm. A small, dense, certain shadow that turns out to be black. Lay them down together, at the right four angles, and they cohere — barely, miraculously — into a face.
+      </p>
+      <p>
+        <strong>You can change the angles.</strong> The press shop calls this "the screen set" and treats it as nearly sacred. C·15°, M·75°, Y·0°, K·45° is the canonical western arrangement; some Japanese newspapers prefer C·15°, M·45°, Y·0°, K·75°, which throws the rosette in a slightly different direction. Get the angles wrong by even three or four degrees and the moire blooms — that ugly, low-frequency rippling that the eye cannot un-see. Get them right, and the page is invisible.
+      </p>
+      <p>
+        What we are doing, in a way, is teaching the computer to make the same mistakes the press makes — on purpose, with affection. The shader rotates four virtual screens. It samples at the center of each cell. It blends them subtractively, the way ink layers on paper. And then it accepts, as part of its definition, that the result will never quite resolve. <em>That is the point.</em> A perfect halftone is a halftone that almost works.
+      </p>
+    </div>
+
+    <div class="col-figures lifted" style="--lift: -14rem">
+      <figure class="photo">
+        <img src="https://picsum.photos/seed/halftone-fig12/290/355" crossorigin="anonymous" alt="" data-halftone />
+        <figcaption class="cap"><b>Fig. 12</b> · 5px / newsprint</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<footer class="colophon">
+  <div class="colophon-grid">
+    <div>
+      <h4>Colophon · Spring 2026</h4>
+      <p>
+        Set in <em>Fraunces</em> (display, body) and <em>JetBrains Mono</em> (meta, captions).
+        Photographs separated and dot-screened in the browser, in real time, with the <em>halftone</em> shader from <em>@vfx-js/effects v1.0</em>.
+      </p>
+      <p>
+        Standard newsprint angles. The <em>newsprint</em> ink preset across thirteen figures, dot-screened at a fixed pitch in screen space — images parallax through the grid as on a real press.
+        No press was harmed in the printing of this issue.
+      </p>
+      <p>
+        <em>K. Arakawa,</em> his 1987 monograph, and the pull-quote attributed to him are invented for this demo — props, not citations.
+      </p>
+    </div>
+    <div>
+      <h4>Credits</h4>
+      <div class="credit-list">
+        <div><b>Type</b> Fraunces · JetBrains Mono</div>
+        <div><b>Press</b> WebGL2 / 4-ink sim.</div>
+        <div><b>Shader</b> <a href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">@vfx-js/effects</a></div>
+        <div><b>Paper</b> #f1ece1 — cream wove</div>
+      </div>
+      <div class="photo-credits">
+        <h4>Photos</h4>
+        <ul>
+          <li><a href="https://unsplash.com/photos/eNj4Kw4qu2g" target="_blank" rel="noopener">Dynamic Wang</a></li>
+          <li><a href="https://unsplash.com/photos/T7K4aEPoGGk" target="_blank" rel="noopener">Pietro De Grandi</a></li>
+          <li><a href="https://unsplash.com/photos/78A265wPiO4" target="_blank" rel="noopener">Urban Vintage</a></li>
+          <li><a href="https://unsplash.com/photos/NRQV-hBF10M" target="_blank" rel="noopener">Bailey Zindel</a></li>
+          <li><a href="https://unsplash.com/photos/twukN12EN7c" target="_blank" rel="noopener">Simon Berger</a></li>
+          <li><a href="https://unsplash.com/photos/hlnucYOsL-c" target="_blank" rel="noopener">Matteo Minelli</a></li>
+          <li><a href="https://unsplash.com/photos/j0g8taxHZa0" target="_blank" rel="noopener">Samuel Zeller</a></li>
+          <li><a href="https://unsplash.com/photos/-tXkzUEuheU" target="_blank" rel="noopener">Michael Hirsch</a></li>
+          <li><a href="https://unsplash.com/photos/tCICLJ5ktBE" target="_blank" rel="noopener">Vadim Sherbakov</a></li>
+        </ul>
+        <p class="via">All photos via <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a></p>
+      </div>
+    </div>
+    <div>
+      <h4>Subscribe · Next issue</h4>
+      <p>
+        <em>No. 08 — Summer 2026 —</em> on transparency, ghosting, and the things printers do at night when the lights are off.
+      </p>
+      <p style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(13, 12, 10, 0.7); margin-top: 14px">
+        4 issues · $84 — staticnoise.press
+      </p>
+    </div>
+  </div>
+
+  <div class="footer-rule">
+    <div class="l">— END OF FEATURE 03 —</div>
+    <div class="c">"The grain is the picture."</div>
+    <div class="r">
+      <span class="barcode" id="bc"></span>
+      <span class="pageno">21</span>
+    </div>
+  </div>
+</footer>
+
+<div class="hint" id="hint"><span class="arrow">↓</span> scroll — long form</div>
+
+<script>
+  (function () {
+    const bc = document.getElementById("bc");
+    let s = 11 * 9301 + 49297;
+    for (let i = 0; i < 36; i++) {
+      s = (s * 9301 + 49297) % 233280;
+      const v = s / 233280;
+      const e = document.createElement("i");
+      e.style.height = (14 + Math.floor(v * 16)) + "px";
+      e.style.width = (v > 0.7 ? 2.5 : 1.6) + "px";
+      bc.appendChild(e);
+    }
+  })();
+
+  const hint = document.getElementById("hint");
+  let dismissed = false;
+  function dismissHint() { if (dismissed) return; dismissed = true; hint.classList.add("gone"); }
+  window.addEventListener("scroll", dismissHint, { once: true, passive: true });
+  setTimeout(dismissHint, 5500);
+
+  // Exposed so the VFX module waits for pixels before attaching halftone.
+  window.__pagePreloaded = (function () {
+    const loader = document.getElementById("loader");
+    const bar = document.getElementById("loader-bar");
+    const pct = document.getElementById("loader-pct");
+    const imgs = [...document.querySelectorAll("img")];
+    const total = imgs.length + 1; // +1 for fonts.ready
+    let done = 0;
+    function tick() {
+      done++;
+      const p = Math.round((done / total) * 100);
+      bar.style.width = p + "%";
+      pct.textContent = p + "%";
+    }
+    const promises = imgs.map((im) => {
+      if (im.complete && im.naturalWidth > 0) { tick(); return Promise.resolve(); }
+      return new Promise((res) => {
+        const fin = () => { tick(); res(); };
+        im.addEventListener("load", fin, { once: true });
+        im.addEventListener("error", fin, { once: true });
+      });
+    });
+    promises.push(document.fonts.ready.then(tick));
+    return Promise.all(promises).then(() => {
+      // brief beat so the bar visibly hits 100% before fade
+      return new Promise((res) => setTimeout(() => {
+        loader.classList.add("gone");
+        res();
+      }, 200));
+    });
+  })();
+</script>
+
+
+<script>
+  // Parallax: translate each .photo by speed * (viewportCenterY - elementCenterY).
+  (function () {
+    const els = [...document.querySelectorAll(".photo[data-parallax]")];
+    if (!els.length) return;
+    let data = [];
+    function measure() {
+      const sy = window.scrollY || window.pageYOffset;
+      data = els.map((el) => {
+        const prev = el.style.getPropertyValue("--py");
+        el.style.setProperty("--py", "0px");
+        const r = el.getBoundingClientRect();
+        const anchorY = sy + r.top + r.height / 2;
+        if (prev) el.style.setProperty("--py", prev);
+        return { el, anchorY, speed: parseFloat(el.dataset.parallax) || 0 };
+      });
+    }
+    let ticking = false;
+    function frame() {
+      ticking = false;
+      const vh = window.innerHeight;
+      const vc = (window.scrollY || window.pageYOffset) + vh / 2;
+      for (const d of data) {
+        const py = (vc - d.anchorY) * d.speed;
+        d.el.style.setProperty("--py", py.toFixed(2) + "px");
+      }
+    }
+    function onScroll() {
+      if (!ticking) { requestAnimationFrame(frame); ticking = true; }
+    }
+    measure();
+    frame();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", () => { measure(); frame(); });
+  })();
+</script>
+
+<!-- Lenis smooth scroll -->
+
+</body>
+</html>
