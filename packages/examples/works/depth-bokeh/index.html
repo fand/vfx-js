@@ -206,12 +206,14 @@
     out vec4 outColor;
 
     void main() {
-      // Standard src-over composite: the scatter pass already produced
-      // a premultiplied disk layer in accum, so just place it over the
-      // sharp source image.
+      // Normalize the additive accumulator into the gather-equivalent
+      // weighted average, then mix it over the sharp source by the
+      // clamped alpha so in-focus regions (no splats) keep the original.
       vec3 sharp = texture(src, uvSrc).rgb;
-      vec4 layer = texture(accum, uv);
-      outColor = vec4(layer.rgb + sharp * (1.0 - layer.a), 1.0);
+      vec4 c = texture(accum, uv);
+      vec3 bokeh = c.a > 1e-4 ? c.rgb / c.a : vec3(0.0);
+      float cov = clamp(c.a, 0.0, 1.0);
+      outColor = vec4(mix(sharp, bokeh, cov), 1.0);
     }
   `;
 
@@ -338,9 +340,11 @@
         frag: FRAG_SCATTER,
         geometry: this._geometry,
         target: this._accum,
-        // src-over with premultiplied output — each splat layers on top
-        // of the existing accumulator instead of summing into HDR.
-        blend: "premultiplied",
+        // Additive (energy-conserving): rgb accumulates Σ(color*mask),
+        // alpha accumulates Σ(mask). The composite divides them to get
+        // the gather-equivalent weighted average, so multiple overlapping
+        // splats blur together instead of expanding a near silhouette.
+        blend: "additive",
         uniforms: {
           src: ctx.src,
           depthTex: this._depthTex,
