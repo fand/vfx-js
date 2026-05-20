@@ -80,8 +80,9 @@
   // Single-pass DoF. For each output pixel:
   //   - CoC = |depth - focal| * aperture
   //   - Disk blur: golden-spiral disk gather, per-pixel start-angle jitter.
-  //   - Swirl blur: sample along an arc concentric to the image center
-  //     with angular extent proportional to CoC (1D rotational blur).
+  //   - Swirl blur: arc-shaped kernel concentric to image center —
+  //     tangentially elongated (mapped to angular sweep) and radially
+  //     narrow, so highlights become visibly curved streaks.
   // Final = mix(disk, swirl, swirl uniform).
   const BLUR_SAMPLES = 64;
   const FRAG_BLUR = `#version 300 es
@@ -122,19 +123,29 @@
       }
       vec3 diskBlur = diskAcc / float(${BLUR_SAMPLES});
 
-      // Swirl blur path: arc concentric to image center. Compute in
-      // pixel space so the path stays circular under non-square aspect
-      // ratios, then convert back to UV when sampling.
+      // Swirl blur path: arc-shaped kernel. ASPECT > 1 stretches the
+      // kernel tangentially (mapped to angular sweep around the image
+      // center) and shrinks it radially, so out-of-focus highlights
+      // become visibly curved streaks instead of disks. arcAng is
+      // capped to one radian to avoid wrap-around for pixels near the
+      // image center.
+      const float SWIRL_ASPECT = 3.0;
       vec2 imgCenter = vec2(0.5);
       vec2 fromCpx = (uvSrc - imgCenter) * dstSize;
       float rPx = length(fromCpx);
       float baseAng = atan(fromCpx.y, fromCpx.x);
-      float arcSpan = min(coc / max(rPx, 1.0), 3.14159);
+      float tangLen = coc * SWIRL_ASPECT;
+      float radExt = coc / SWIRL_ASPECT;
+      float arcAng = min(tangLen / max(rPx, 1.0), 1.0);
       vec3 swirlAcc = vec3(0.0);
       for (int i = 0; i < ${BLUR_SAMPLES}; i++) {
         float t = (float(i) + 0.5) / float(${BLUR_SAMPLES});
-        float ang = baseAng + (t - 0.5) * arcSpan * 2.0 + (a0 - 3.14159) * 0.01;
-        vec2 sOff = rPx * vec2(cos(ang), sin(ang)) / dstSize;
+        float r = sqrt(t);
+        float a = a0 + float(i) * 2.39996323;
+        float dAng = cos(a) * r * arcAng;
+        float dRad = sin(a) * r * radExt;
+        float newR = rPx + dRad;
+        vec2 sOff = newR * vec2(cos(baseAng + dAng), sin(baseAng + dAng)) / dstSize;
         vec2 sPos = clamp(imgCenter + sOff, vec2(0.0), vec2(1.0));
         swirlAcc += texture(src, sPos).rgb;
       }
