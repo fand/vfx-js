@@ -200,8 +200,8 @@
     precision highp float;
     in vec2 position;
     in vec2 instanceUv;
+    in float instanceDepth;
     uniform sampler2D src;
-    uniform sampler2D depthTex;
     uniform vec2 dstSize;
     uniform float focal;
     uniform float aperture;
@@ -210,10 +210,10 @@
     uniform float lumGamma;
     uniform float diskOpacity;
     out vec2 v_quadUv;
+    out vec2 v_uv;
     out vec3 v_color;
     out float v_opacity;
-
-    ${decodeDepthGLSL}
+    out float v_depth;
 
     void main() {
       vec3 color = texture(src, instanceUv).rgb;
@@ -221,36 +221,45 @@
       float opacity =
         pow(smoothstep(lumThreshold, 1.0, lum), lumGamma) * diskOpacity;
 
-      float depth = decodeDepth(texture(depthTex, instanceUv).rgb);
-      float coc = abs(depth - focal) * aperture;
+      float coc = abs(instanceDepth - focal) * aperture;
       float diskRadius = coc * diskScale;
 
       if (opacity < 0.005 || diskRadius < 0.5) {
         gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
         v_quadUv = vec2(0.0);
+        v_uv = vec2(0.0);
         v_color = vec3(0.0);
         v_opacity = 0.0;
+        v_depth = 0.0;
         return;
       }
 
       vec2 centerNdc = instanceUv * 2.0 - 1.0;
       vec2 sizeNdc = (diskRadius * 2.0) / dstSize;
-      gl_Position = vec4(centerNdc + position * sizeNdc, 0.0, 1.0);
+      vec2 ndc = centerNdc + position * sizeNdc;
+      gl_Position = vec4(ndc, 0.0, 1.0);
       v_quadUv = position;
+      v_uv = ndc * 0.5 + 0.5;
       v_color = color;
       v_opacity = opacity;
+      v_depth = instanceDepth;
     }
   `;
 
   const FRAG_DISK = `#version 300 es
     precision highp float;
     in vec2 v_quadUv;
+    in vec2 v_uv;
     in vec3 v_color;
     in float v_opacity;
+    in float v_depth;
+    uniform sampler2D depthTex;
     uniform float diskBlades;
     uniform float diskSoftness;
     uniform float diskAngle;
     out vec4 outColor;
+
+    ${decodeDepthGLSL}
 
     void main() {
       // diskBlades < 3 → circular disk; otherwise regular N-gon
@@ -271,7 +280,18 @@
       if (dist > 1.0) discard;
       float edge = max(1.0 - diskSoftness, 0.001);
       float mask = smoothstep(1.0, edge, dist);
+
+      // Depth occlusion against the source depth map: if the underlying
+      // pixel is closer to camera than this disk's source pixel, the
+      // disk should be hidden behind it (no foreground overlap). Disks
+      // are also pre-sorted far-to-near on the CPU so src-over gives
+      // correct disk-vs-disk ordering.
+      float pixelDepth = decodeDepth(texture(depthTex, v_uv).rgb);
+      float occlusion = smoothstep(0.02, 0.08, pixelDepth - v_depth);
+      mask *= 1.0 - occlusion;
+
       float alpha = mask * v_opacity;
+      if (alpha < 1e-4) discard;
       outColor = vec4(v_color * alpha, alpha);
     }
   `;
@@ -304,6 +324,40 @@
         filter: "linear",
         wrap: "clamp",
       });
+
+      // Decode depth per Halton instance and sort far → near so that
+      // src-over (back-to-front) gives correct disk-vs-disk occlusion.
+      const dC = document.createElement("canvas");
+      dC.width = img.naturalWidth;
+      dC.height = img.naturalHeight;
+      const d2 = dC.getContext("2d", { willReadFrequently: true });
+      d2.drawImage(img, 0, 0);
+      const dData = d2.getImageData(0, 0, dC.width, dC.height).data;
+      const idx = new Uint32Array(DISK_COUNT);
+      const depths = new Float32Array(DISK_COUNT);
+      for (let i = 0; i < DISK_COUNT; i++) {
+        idx[i] = i;
+        const u = diskInstanceUv[i * 2];
+        const v = diskInstanceUv[i * 2 + 1];
+        const px = Math.min(dC.width - 1, Math.floor(u * dC.width));
+        const py = Math.min(dC.height - 1, Math.floor(v * dC.height));
+        const p = (py * dC.width + px) * 4;
+        depths[i] = decodeDepthRGB(
+          dData[p] / 255,
+          dData[p + 1] / 255,
+          dData[p + 2] / 255,
+        );
+      }
+      idx.sort((a, b) => depths[a] - depths[b]);
+      const sortedUv = new Float32Array(DISK_COUNT * 2);
+      const sortedDepth = new Float32Array(DISK_COUNT);
+      for (let j = 0; j < DISK_COUNT; j++) {
+        const i = idx[j];
+        sortedUv[j * 2] = diskInstanceUv[i * 2];
+        sortedUv[j * 2 + 1] = diskInstanceUv[i * 2 + 1];
+        sortedDepth[j] = depths[i];
+      }
+
       this._diskGeometry = {
         attributes: {
           position: {
@@ -311,8 +365,13 @@
             itemSize: 2,
           },
           instanceUv: {
-            data: diskInstanceUv,
+            data: sortedUv,
             itemSize: 2,
+            perInstance: true,
+          },
+          instanceDepth: {
+            data: sortedDepth,
+            itemSize: 1,
             perInstance: true,
           },
         },
