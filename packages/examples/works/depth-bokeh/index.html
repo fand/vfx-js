@@ -92,6 +92,11 @@
   // sharp image shows through.
   const VIS_FADE_LO = 0.5;
   const VIS_FADE_HI = 4.0;
+  // Half-width of the focal-plane transition band in depth units. The
+  // depth map has anti-aliased silhouette edges that span ~0.03 in
+  // depth; a hard `d >= focal` threshold turns that into pixel-level
+  // jitter, so blur and splat both fade smoothly across this band.
+  const FOCAL_TRANSITION = 0.03;
 
   const VERT_SCATTER = `#version 300 es
     precision highp float;
@@ -101,10 +106,11 @@
     uniform sampler2D depthTex;
     uniform sampler2D src;
     uniform vec2 dstSize;
-    uniform float focus;
+    uniform float focal;
     uniform float aperture;
     uniform float visLo;
     uniform float visHi;
+    uniform float focalTransition;
     out vec2 v_quadUv;
     out vec3 v_splatColor;
     out float v_angle;
@@ -115,11 +121,12 @@
 
     void main() {
       float d = decodeDepth(texture(depthTex, instanceUv).rgb);
-      float coc = abs(d - focus) * aperture;
-      float vis = smoothstep(visLo, visHi, coc);
+      // Soft foreground/background gate: splats fade in over a thin
+      // transition band around the focal plane rather than snapping.
+      float bgFactor = smoothstep(focal + focalTransition, focal - focalTransition, d);
+      float coc = (focal - d) * aperture;
+      float vis = smoothstep(visLo, visHi, coc) * bgFactor;
       if (vis < 0.01) {
-        // Source pixel is in focus — cull the splat so only the
-        // underlying sharp image shows through here.
         gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
         v_quadUv = vec2(0.0);
         v_splatColor = vec3(0.0);
@@ -197,23 +204,72 @@
     void main() { outColor = vec4(0.0); }
   `;
 
-  const FRAG_COMPOSITE = `#version 300 es
+  // Depth-aware gather blur for the background layer. Foreground pixels
+  // (depth >= focal) are passed through as the sharp source so the
+  // subject silhouette stays crisp; in the background, the kernel
+  // radius grows with distance behind the focal plane, and neighbor
+  // samples that fall on foreground are dropped to prevent silhouette
+  // halos.
+  const BLUR_SAMPLES = 32;
+  const FRAG_BLUR = `#version 300 es
     precision highp float;
     in vec2 uv;
     in vec2 uvSrc;
-    uniform sampler2D accum;
     uniform sampler2D src;
+    uniform sampler2D depthTex;
+    uniform vec2 dstSize;
+    uniform float focal;
+    uniform float aperture;
+    uniform float focalTransition;
+    out vec4 outColor;
+
+    ${decodeDepthGLSL}
+
+    void main() {
+      float d = decodeDepth(texture(depthTex, uv).rgb);
+      vec3 sharp = texture(src, uvSrc).rgb;
+      float bgFactor = smoothstep(focal + focalTransition, focal - focalTransition, d);
+      float coc = max((focal - d) * aperture, 0.0);
+      if (bgFactor < 0.01 || coc < 0.5) {
+        outColor = vec4(sharp, 1.0);
+        return;
+      }
+      vec3 acc = vec3(0.0);
+      float wsum = 0.0;
+      for (int i = 0; i < ${BLUR_SAMPLES}; i++) {
+        float t = (float(i) + 0.5) / float(${BLUR_SAMPLES});
+        float r = sqrt(t) * coc;
+        float a = float(i) * 2.39996323;
+        vec2 off = vec2(cos(a), sin(a)) * r / dstSize;
+        vec2 sUv = clamp(uv + off, vec2(0.0), vec2(1.0));
+        vec2 sUvSrc = clamp(uvSrc + off, vec2(0.0), vec2(1.0));
+        float sd = decodeDepth(texture(depthTex, sUv).rgb);
+        // Soft depth-aware gate: neighbors fade out as they cross the
+        // focal plane instead of being rejected per-pixel.
+        float w = smoothstep(focal + focalTransition, focal - focalTransition, sd);
+        acc += texture(src, sUvSrc).rgb * w;
+        wsum += w;
+      }
+      vec3 blurred = wsum > 0.0 ? acc / wsum : sharp;
+      outColor = vec4(mix(sharp, blurred, bgFactor), 1.0);
+    }
+  `;
+
+  const FRAG_COMPOSITE = `#version 300 es
+    precision highp float;
+    in vec2 uv;
+    uniform sampler2D blurTex;
+    uniform sampler2D accum;
     out vec4 outColor;
 
     void main() {
-      // Normalize the additive accumulator into the gather-equivalent
-      // weighted average, then mix it over the sharp source by the
-      // clamped alpha so in-focus regions (no splats) keep the original.
-      vec3 sharp = texture(src, uvSrc).rgb;
+      // blurTex already carries sharp foreground / blurred background;
+      // overlay the depth-sorted scatter accumulator as bokeh balls.
+      vec3 base = texture(blurTex, uv).rgb;
       vec4 c = texture(accum, uv);
       vec3 bokeh = c.a > 1e-4 ? c.rgb / c.a : vec3(0.0);
       float cov = clamp(c.a, 0.0, 1.0);
-      outColor = vec4(mix(sharp, bokeh, cov), 1.0);
+      outColor = vec4(mix(base, bokeh, cov), 1.0);
     }
   `;
 
@@ -290,7 +346,9 @@
 
   class DepthBokehEffect {
     constructor() {
-      this.focus = 0.65;
+      // Focal-plane depth: pixels with depth >= focal stay sharp
+      // (foreground); deeper pixels blur and emit bokeh splats.
+      this.focal = 0.65;
       this.aperture = 80.0;
       // 0/1/2 → circular disk; 3+ → N-gon aperture (e.g. 6 = hex).
       this.blades = 0;
@@ -302,6 +360,7 @@
       this.count = 16384;
       this._depthTex = null;
       this._accum = null;
+      this._blur = null;
       this._geometry = null;
       this._haltonSamples = null;
     }
@@ -316,6 +375,7 @@
         wrap: "clamp",
       });
       this._accum = ctx.createRenderTarget({ float: true });
+      this._blur = ctx.createRenderTarget();
       this._haltonSamples = computeHaltonSamples(img);
       this._geometry = buildScatterGeometry(this._haltonSamples, this.count);
     }
@@ -326,7 +386,7 @@
     }
 
     render(ctx) {
-      if (!this._depthTex || !this._accum || !this._geometry) return;
+      if (!this._depthTex || !this._accum || !this._blur || !this._geometry) return;
       const dstSize = [ctx.dims.elementPixel[0], ctx.dims.elementPixel[1]];
 
       ctx.draw({
@@ -349,13 +409,28 @@
           src: ctx.src,
           depthTex: this._depthTex,
           dstSize,
-          focus: this.focus,
+          focal: this.focal,
           aperture: this.aperture,
           visLo: VIS_FADE_LO,
           visHi: VIS_FADE_HI,
+          focalTransition: FOCAL_TRANSITION,
           blades: this.blades,
           softness: this.softness,
           opacity: this.opacity,
+        },
+      });
+
+      ctx.draw({
+        frag: FRAG_BLUR,
+        target: this._blur,
+        blend: "none",
+        uniforms: {
+          src: ctx.src,
+          depthTex: this._depthTex,
+          dstSize,
+          focal: this.focal,
+          aperture: this.aperture,
+          focalTransition: FOCAL_TRANSITION,
         },
       });
 
@@ -364,14 +439,16 @@
         target: ctx.target,
         uniforms: {
           accum: this._accum,
-          src: ctx.src,
+          blurTex: this._blur,
         },
       });
     }
 
     dispose() {
       this._accum?.dispose();
+      this._blur?.dispose();
       this._accum = null;
+      this._blur = null;
       this._depthTex = null;
       this._geometry = null;
       this._haltonSamples = null;
@@ -415,8 +492,8 @@
     const effect = new DepthBokehEffect();
     await vfx.add(img, { effect });
 
-    let target = effect.focus;
-    function setFocusFromClient(cx, cy) {
+    let target = effect.focal;
+    function setFocalFromClient(cx, cy) {
       const r = img.getBoundingClientRect();
       const u = (cx - r.left) / r.width;
       const v = (cy - r.top) / r.height;
@@ -428,10 +505,10 @@
     }
 
     window.addEventListener("pointermove", (e) => {
-      setFocusFromClient(e.clientX, e.clientY);
+      setFocalFromClient(e.clientX, e.clientY);
     });
     window.addEventListener("pointerdown", (e) => {
-      setFocusFromClient(e.clientX, e.clientY);
+      setFocalFromClient(e.clientX, e.clientY);
     });
 
     // VFX-JS's canvas sits at z-index 9999, so mount the pane inside a
@@ -441,6 +518,13 @@
       "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
     document.body.appendChild(paneContainer);
     const pane = new Pane({ container: paneContainer, title: "Bokeh" });
+    pane
+      .addBinding(effect, "focal", { min: 0, max: 1, step: 0.001 })
+      .on("change", () => {
+        // User drag of the focal slider — snap the pointer-driven
+        // target so the smoothing tween settles at the new value.
+        target = effect.focal;
+      });
     pane.addBinding(effect, "blades", { min: 0, max: 12, step: 1 });
     pane.addBinding(effect, "opacity", { min: 0, max: 1, step: 0.01 });
     pane.addBinding(effect, "softness", { min: 0, max: 1, step: 0.01 });
@@ -453,7 +537,9 @@
       });
 
     (function tick() {
-      effect.focus += (target - effect.focus) * 0.08;
+      effect.focal += (target - effect.focal) * 0.08;
+      // Keep the focal slider in sync with the pointer-driven value.
+      pane.refresh();
       requestAnimationFrame(tick);
     })();
   });
