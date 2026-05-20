@@ -111,15 +111,19 @@
       // breaks up concentric kernel banding into noise.
       float a0 = fract(sin(dot(uv * dstSize, vec2(12.9898, 78.233))) * 43758.5453) * 6.28318530;
 
-      // Disk blur path.
+      // Disk blur path. OOB samples drop to zero (no edge-color
+      // smear); divide by total sample count so partial-OOB kernels
+      // naturally dim toward the image edge.
       vec3 diskAcc = vec3(0.0);
       for (int i = 0; i < ${BLUR_SAMPLES}; i++) {
         float t = (float(i) + 0.5) / float(${BLUR_SAMPLES});
         float r = sqrt(t) * coc;
         float a = a0 + float(i) * 2.39996323;
         vec2 off = vec2(cos(a), sin(a)) * r / dstSize;
-        vec2 sUvSrc = clamp(uvSrc + off, vec2(0.0), vec2(1.0));
-        diskAcc += texture(src, sUvSrc).rgb;
+        vec2 sUvSrc = uvSrc + off;
+        float inB = step(0.0, sUvSrc.x) * step(sUvSrc.x, 1.0)
+                  * step(0.0, sUvSrc.y) * step(sUvSrc.y, 1.0);
+        diskAcc += texture(src, sUvSrc).rgb * inB;
       }
       vec3 diskBlur = diskAcc / float(${BLUR_SAMPLES});
 
@@ -146,8 +150,10 @@
         float dRad = sin(a) * r * radExt;
         float newR = rPx + dRad;
         vec2 sOff = newR * vec2(cos(baseAng + dAng), sin(baseAng + dAng)) / dstSize;
-        vec2 sPos = clamp(imgCenter + sOff, vec2(0.0), vec2(1.0));
-        swirlAcc += texture(src, sPos).rgb;
+        vec2 sPos = imgCenter + sOff;
+        float inB = step(0.0, sPos.x) * step(sPos.x, 1.0)
+                  * step(0.0, sPos.y) * step(sPos.y, 1.0);
+        swirlAcc += texture(src, sPos).rgb * inB;
       }
       vec3 swirlBlur = swirlAcc / float(${BLUR_SAMPLES});
 
