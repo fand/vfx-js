@@ -42,7 +42,7 @@
 </style>
 
 <img id="photo" src="./img1.png" alt="" />
-<div class="hint">Move the cursor to refocus &middot; depth via Depth Anything</div>
+<div class="hint">Move to refocus &middot; press <kbd>H</kbd> to toggle hex bokeh</div>
 
 <script type="module">
   import { VFX } from "@vfx-js/core";
@@ -79,56 +79,185 @@
     }
   `;
 
-  const FRAG = `#version 300 es
-    precision highp float;
-    in vec2 uv;
-    in vec2 uvSrc;
-    in vec2 uvContent;
-    out vec4 outColor;
+  // Scatter bokeh: source-side splats. Each of N pre-baked sample points
+  // reads its depth + color, then a quad sized by `CoC = |depth-focus| * aperture`
+  // is splatted additively into a float accum RT. The composite normalizes
+  // by accumulated alpha. Bright pixels are pre-boosted in the VS so they
+  // form visible bokeh balls instead of washing out in the average.
+  const GRID = 256; // 256x256 = 65k instances
+  const N_INSTANCES = GRID * GRID;
+  // The disk layer fades in as the source pixel's CoC grows past
+  // `VIS_FADE_LO`; below it the splat is culled and only the underlying
+  // sharp image shows through.
+  const VIS_FADE_LO = 0.5;
+  const VIS_FADE_HI = 4.0;
+  const SHAPE_DISK = 0;
+  const SHAPE_HEX = 1;
 
-    uniform sampler2D src;
+  const VERT_SCATTER = `#version 300 es
+    precision highp float;
+    in vec2 position;       // quad corner [-1, 1]
+    in vec2 instanceUv;     // 0..1 sample position
+    in float instanceAngle; // per-instance rotation for hex shape (radians)
     uniform sampler2D depthTex;
-    uniform vec2 resolution;
+    uniform sampler2D src;
+    uniform vec2 dstSize;
     uniform float focus;
     uniform float aperture;
-    uniform float time;
-
-    #define SAMPLES 48
-    #define GA 2.39996323
+    uniform float visLo;
+    uniform float visHi;
+    out vec2 v_quadUv;
+    out vec3 v_splatColor;
+    out float v_angle;
+    out float v_vis;
+    out float v_splatDepth;
 
     ${decodeDepthGLSL}
 
     void main() {
-      vec3 dCol = texture(depthTex, uvContent).rgb;
-      float d = decodeDepth(dCol);
-
+      float d = decodeDepth(texture(depthTex, instanceUv).rgb);
       float coc = abs(d - focus) * aperture;
-      float jitter = fract(sin(dot(uv * resolution, vec2(12.9898, 78.233))) * 43758.5453);
-      float a0 = jitter * 6.2831853;
-
-      vec3 acc = vec3(0.0);
-      float wsum = 0.0;
-      for (int i = 0; i < SAMPLES; i++) {
-        float t = (float(i) + 0.5) / float(SAMPLES);
-        float r = sqrt(t) * coc;
-        float a = a0 + float(i) * GA;
-        vec2 off = vec2(cos(a), sin(a)) * r / resolution;
-        vec2 suv = uvSrc + off;
-        vec3 s = texture(src, suv).rgb;
-        float lum = max(s.r, max(s.g, s.b));
-        float w = 1.0 + pow(lum, 6.0) * 4.0;
-        acc += s * w;
-        wsum += w;
+      float vis = smoothstep(visLo, visHi, coc);
+      if (vis < 0.01) {
+        // Source pixel is in focus — cull the splat so only the
+        // underlying sharp image shows through here.
+        gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+        v_quadUv = vec2(0.0);
+        v_splatColor = vec3(0.0);
+        v_angle = 0.0;
+        v_vis = 0.0;
+        v_splatDepth = 0.0;
+        return;
       }
-      outColor = vec4(acc / wsum, 1.0);
+
+      vec2 centerNdc = instanceUv * 2.0 - 1.0;
+      vec2 sizeNdc = (coc * 2.0) / dstSize;
+      gl_Position = vec4(centerNdc + position * sizeNdc, 0.0, 1.0);
+
+      v_quadUv = position;
+      // No highlight boost: src-over already preserves splat color
+      // intensity, and boosting > 1 causes saturated highlights that
+      // read as additive in the final composite.
+      v_splatColor = texture(src, instanceUv).rgb;
+      v_angle = instanceAngle;
+      v_vis = vis;
+      v_splatDepth = d;
     }
   `;
+
+  const FRAG_SCATTER = `#version 300 es
+    precision highp float;
+    in vec2 v_quadUv;
+    in vec3 v_splatColor;
+    in float v_angle;
+    in float v_vis;
+    in float v_splatDepth;
+    uniform int bokehShape;
+    uniform sampler2D depthTex;
+    uniform vec2 dstSize;
+    out vec4 outColor;
+
+    ${decodeDepthGLSL}
+
+    void main() {
+      // Depth occlusion: discard fragments where the source pixel at
+      // this output location is closer to the camera than the splat's
+      // origin, so far-plane splats do not leak over near-plane subjects.
+      vec2 pixelUv = gl_FragCoord.xy / dstSize;
+      float pixelDepth = decodeDepth(texture(depthTex, pixelUv).rgb);
+      float occlusion = smoothstep(0.02, 0.08, pixelDepth - v_splatDepth);
+
+      vec2 p = v_quadUv;
+      float mask;
+      if (bokehShape == ${SHAPE_HEX}) {
+        float c = cos(v_angle), s = sin(v_angle);
+        p = mat2(c, -s, s, c) * p;
+        vec2 ap = abs(p);
+        // Unit hexagon distance: edges of a flat-top hex inscribed in r=1.
+        float dh = max(ap.y, ap.x * 0.866025 + ap.y * 0.5);
+        if (dh > 1.0) discard;
+        mask = smoothstep(1.0, 0.92, dh);
+      } else {
+        float r2 = dot(p, p);
+        if (r2 > 1.0) discard;
+        // Quartic kernel (1 - r²)²: smooth radial falloff, ∈ [0, 1].
+        float t = 1.0 - r2;
+        mask = t * t;
+      }
+      mask *= v_vis * (1.0 - occlusion);
+      if (mask < 1e-4) discard;
+      outColor = vec4(v_splatColor * mask, mask);
+    }
+  `;
+
+  const FRAG_CLEAR = `#version 300 es
+    precision highp float;
+    out vec4 outColor;
+    void main() { outColor = vec4(0.0); }
+  `;
+
+  const FRAG_COMPOSITE = `#version 300 es
+    precision highp float;
+    in vec2 uv;
+    in vec2 uvSrc;
+    uniform sampler2D accum;
+    uniform sampler2D src;
+    out vec4 outColor;
+
+    void main() {
+      // Standard src-over composite: the scatter pass already produced
+      // a premultiplied disk layer in accum, so just place it over the
+      // sharp source image.
+      vec3 sharp = texture(src, uvSrc).rgb;
+      vec4 layer = texture(accum, uv);
+      outColor = vec4(layer.rgb + sharp * (1.0 - layer.a), 1.0);
+    }
+  `;
+
+  // Halton(b) for low-discrepancy "scattered" sample distribution.
+  function halton(idx, base) {
+    let f = 1, r = 0, i = idx;
+    while (i > 0) {
+      f /= base;
+      r += f * (i % base);
+      i = Math.floor(i / base);
+    }
+    return r;
+  }
+
+  function buildScatterGeometry() {
+    const instanceUvs = new Float32Array(N_INSTANCES * 2);
+    const instanceAngles = new Float32Array(N_INSTANCES);
+    for (let i = 0; i < N_INSTANCES; i++) {
+      instanceUvs[i * 2] = halton(i + 1, 2);
+      instanceUvs[i * 2 + 1] = halton(i + 1, 3);
+      // Keep hex orientation consistent across splats so the shape
+      // survives additive blending instead of averaging out to a disk.
+      instanceAngles[i] = 0;
+    }
+    const quadPos = new Float32Array([
+      -1, -1,   1, -1,   1, 1,
+      -1, -1,   1,  1,  -1, 1,
+    ]);
+    return {
+      mode: "triangles",
+      attributes: {
+        position: { data: quadPos, itemSize: 2 },
+        instanceUv: { data: instanceUvs, itemSize: 2, perInstance: true },
+        instanceAngle: { data: instanceAngles, itemSize: 1, perInstance: true },
+      },
+      instanceCount: N_INSTANCES,
+    };
+  }
 
   class DepthBokehEffect {
     constructor() {
       this.focus = 0.65;
       this.aperture = 80.0;
+      this.shape = SHAPE_DISK;
       this._depthTex = null;
+      this._accum = null;
+      this._geometry = null;
     }
 
     async init(ctx) {
@@ -140,22 +269,55 @@
         filter: "linear",
         wrap: "clamp",
       });
+      this._accum = ctx.createRenderTarget({ float: true });
+      this._geometry = buildScatterGeometry();
     }
 
     render(ctx) {
-      if (!this._depthTex) return;
+      if (!this._depthTex || !this._accum || !this._geometry) return;
+      const dstSize = [ctx.dims.elementPixel[0], ctx.dims.elementPixel[1]];
+
       ctx.draw({
-        frag: FRAG,
+        frag: FRAG_CLEAR,
+        target: this._accum,
+        blend: "none",
+      });
+
+      ctx.draw({
+        vert: VERT_SCATTER,
+        frag: FRAG_SCATTER,
+        geometry: this._geometry,
+        target: this._accum,
+        // src-over with premultiplied output — each splat layers on top
+        // of the existing accumulator instead of summing into HDR.
+        blend: "premultiplied",
         uniforms: {
           src: ctx.src,
           depthTex: this._depthTex,
-          resolution: [ctx.dims.elementPixel[0], ctx.dims.elementPixel[1]],
+          dstSize,
           focus: this.focus,
           aperture: this.aperture,
-          time: ctx.time,
+          visLo: VIS_FADE_LO,
+          visHi: VIS_FADE_HI,
+          bokehShape: this.shape,
         },
-        target: ctx.target,
       });
+
+      ctx.draw({
+        frag: FRAG_COMPOSITE,
+        target: ctx.target,
+        uniforms: {
+          accum: this._accum,
+          src: ctx.src,
+        },
+      });
+    }
+
+    dispose() {
+      this._accum?.dispose();
+      this._accum = null;
+      this._depthTex = null;
+      this._geometry = null;
     }
   }
 
@@ -213,6 +375,11 @@
     });
     window.addEventListener("pointerdown", (e) => {
       setFocusFromClient(e.clientX, e.clientY);
+    });
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "h" || e.key === "H") {
+        effect.shape = effect.shape === 0 ? 1 : 0;
+      }
     });
 
     (function tick() {
