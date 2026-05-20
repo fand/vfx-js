@@ -745,7 +745,6 @@ export class EffectHost {
             t.dispose();
         }
         this.#ownedTextures = [];
-        // Programs are owned by the VFX-scoped ProgramCache; do not dispose here.
         this.#geometries.dispose();
         this.#perFrameAutoUpdate = [];
     }
