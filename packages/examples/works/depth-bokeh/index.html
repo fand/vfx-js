@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Depth Bokeh</title>
+
+<style>
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    background: #0a0a0a;
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #photo {
+    max-width: 100vw;
+    max-height: 100vh;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .hint {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 6px 12px;
+    border-radius: 999px;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+</style>
+
+<img id="photo" src="./img1.png" alt="" />
+<div class="hint">Move the cursor to refocus &middot; depth via Depth Anything</div>
+
+<script type="module">
+  import { VFX } from "@vfx-js/core";
+
+  const DEPTH_SRC = "./img1_depth.webp";
+
+  // Depth map from Depth Anything is colored with a Spectral_r ramp:
+  // far ~ purple-blue (hue ≈ 0.70), through cyan/green/yellow, to the
+  // near end at magenta-red (hue ≈ 0.93, past pure red). The hue path
+  // wraps over 1.0, so we walk CW from `HUE_FAR` and divide by the
+  // total range. Pixels whose hue falls outside the colormap arc (e.g.
+  // purple just past the far end) wrap into a large `phi`; gate those
+  // explicitly to far so the deepest blue does not collapse to near.
+  const HUE_FAR = 0.70;
+  const HUE_NEAR = 0.93;
+  const HUE_RANGE = ((HUE_FAR - HUE_NEAR) % 1 + 1) % 1;
+  const decodeDepthGLSL = `
+    const float HUE_FAR = ${HUE_FAR};
+    const float HUE_RANGE = ${HUE_RANGE};
+    float decodeDepth(vec3 col) {
+      float maxC = max(max(col.r, col.g), col.b);
+      float minC = min(min(col.r, col.g), col.b);
+      float dC = maxC - minC;
+      float h = 0.0;
+      if (dC > 1e-4) {
+        if (maxC == col.r) h = mod((col.g - col.b) / dC, 6.0);
+        else if (maxC == col.g) h = (col.b - col.r) / dC + 2.0;
+        else h = (col.r - col.g) / dC + 4.0;
+      }
+      h /= 6.0;
+      float phi = mod(HUE_FAR - h + 1.0, 1.0);
+      if (phi > HUE_RANGE + 0.02) return 0.0;
+      return clamp(phi / HUE_RANGE, 0.0, 1.0);
+    }
+  `;
+
+  const FRAG = `#version 300 es
+    precision highp float;
+    in vec2 uv;
+    in vec2 uvSrc;
+    in vec2 uvContent;
+    out vec4 outColor;
+
+    uniform sampler2D src;
+    uniform sampler2D depthTex;
+    uniform vec2 resolution;
+    uniform float focus;
+    uniform float aperture;
+    uniform float time;
+
+    #define SAMPLES 48
+    #define GA 2.39996323
+
+    ${decodeDepthGLSL}
+
+    void main() {
+      vec3 dCol = texture(depthTex, uvContent).rgb;
+      float d = decodeDepth(dCol);
+
+      float coc = abs(d - focus) * aperture;
+      float jitter = fract(sin(dot(uv * resolution, vec2(12.9898, 78.233))) * 43758.5453);
+      float a0 = jitter * 6.2831853;
+
+      vec3 acc = vec3(0.0);
+      float wsum = 0.0;
+      for (int i = 0; i < SAMPLES; i++) {
+        float t = (float(i) + 0.5) / float(SAMPLES);
+        float r = sqrt(t) * coc;
+        float a = a0 + float(i) * GA;
+        vec2 off = vec2(cos(a), sin(a)) * r / resolution;
+        vec2 suv = uvSrc + off;
+        vec3 s = texture(src, suv).rgb;
+        float lum = max(s.r, max(s.g, s.b));
+        float w = 1.0 + pow(lum, 6.0) * 4.0;
+        acc += s * w;
+        wsum += w;
+      }
+      outColor = vec4(acc / wsum, 1.0);
+    }
+  `;
+
+  class DepthBokehEffect {
+    constructor() {
+      this.focus = 0.65;
+      this.aperture = 80.0;
+      this._depthTex = null;
+    }
+
+    async init(ctx) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = DEPTH_SRC;
+      await img.decode();
+      this._depthTex = ctx.wrapTexture(img, {
+        filter: "linear",
+        wrap: "clamp",
+      });
+    }
+
+    render(ctx) {
+      if (!this._depthTex) return;
+      ctx.draw({
+        frag: FRAG,
+        uniforms: {
+          src: ctx.src,
+          depthTex: this._depthTex,
+          resolution: [ctx.dims.elementPixel[0], ctx.dims.elementPixel[1]],
+          focus: this.focus,
+          aperture: this.aperture,
+          time: ctx.time,
+        },
+        target: ctx.target,
+      });
+    }
+  }
+
+  function decodeDepthRGB(r, g, b) {
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    const dC = maxC - minC;
+    let h = 0;
+    if (dC > 1e-4) {
+      if (maxC === r) h = (((g - b) / dC) % 6 + 6) % 6;
+      else if (maxC === g) h = (b - r) / dC + 2;
+      else h = (r - g) / dC + 4;
+    }
+    h /= 6;
+    const phi = ((HUE_FAR - h) % 1 + 1) % 1;
+    if (phi > HUE_RANGE + 0.02) return 0;
+    return Math.min(1, Math.max(0, phi / HUE_RANGE));
+  }
+
+  window.addEventListener("load", async () => {
+    const img = document.getElementById("photo");
+    if (!img.complete) {
+      await new Promise((r) => {
+        img.onload = r;
+      });
+    }
+
+    const depthImg = new Image();
+    depthImg.src = DEPTH_SRC;
+    await depthImg.decode();
+    const dCanvas = document.createElement("canvas");
+    dCanvas.width = depthImg.naturalWidth;
+    dCanvas.height = depthImg.naturalHeight;
+    const dCtx = dCanvas.getContext("2d", { willReadFrequently: true });
+    dCtx.drawImage(depthImg, 0, 0);
+
+    const vfx = new VFX();
+    const effect = new DepthBokehEffect();
+    await vfx.add(img, { effect });
+
+    let target = effect.focus;
+    function setFocusFromClient(cx, cy) {
+      const r = img.getBoundingClientRect();
+      const u = (cx - r.left) / r.width;
+      const v = (cy - r.top) / r.height;
+      if (u < 0 || u > 1 || v < 0 || v > 1) return;
+      const x = Math.min(dCanvas.width - 1, Math.floor(u * dCanvas.width));
+      const y = Math.min(dCanvas.height - 1, Math.floor(v * dCanvas.height));
+      const [r8, g8, b8] = dCtx.getImageData(x, y, 1, 1).data;
+      target = decodeDepthRGB(r8 / 255, g8 / 255, b8 / 255);
+    }
+
+    window.addEventListener("pointermove", (e) => {
+      setFocusFromClient(e.clientX, e.clientY);
+    });
+    window.addEventListener("pointerdown", (e) => {
+      setFocusFromClient(e.clientX, e.clientY);
+    });
+
+    (function tick() {
+      effect.focus += (target - effect.focus) * 0.08;
+      requestAnimationFrame(tick);
+    })();
+  });
+</script>
