@@ -173,6 +173,113 @@
     }
   `;
 
+  // Bokeh disk scatter pass. Halton-distributed splats; per-splat
+  // opacity is driven by source luminance through a threshold + gamma
+  // curve, size by CoC at the splat's depth. Composited onto the
+  // gather output with src-over (premultiplied alpha).
+  const DISK_GRID = 128;
+  const DISK_COUNT = DISK_GRID * DISK_GRID;
+
+  function halton(i, b) {
+    let f = 1, r = 0;
+    while (i > 0) {
+      f /= b;
+      r += f * (i % b);
+      i = Math.floor(i / b);
+    }
+    return r;
+  }
+
+  const diskInstanceUv = new Float32Array(DISK_COUNT * 2);
+  const diskInstanceAngle = new Float32Array(DISK_COUNT);
+  for (let i = 0; i < DISK_COUNT; i++) {
+    diskInstanceUv[i * 2] = halton(i + 1, 2);
+    diskInstanceUv[i * 2 + 1] = halton(i + 1, 3);
+    diskInstanceAngle[i] = (i * 2.39996323) % (Math.PI * 2);
+  }
+
+  const VERT_DISK = `#version 300 es
+    precision highp float;
+    in vec2 position;
+    in vec2 instanceUv;
+    in float instanceAngle;
+    uniform sampler2D src;
+    uniform sampler2D depthTex;
+    uniform vec2 dstSize;
+    uniform float focal;
+    uniform float aperture;
+    uniform float diskScale;
+    uniform float lumThreshold;
+    uniform float lumGamma;
+    uniform float diskOpacity;
+    out vec2 v_quadUv;
+    out vec3 v_color;
+    out float v_angle;
+    out float v_opacity;
+
+    ${decodeDepthGLSL}
+
+    void main() {
+      vec3 color = texture(src, instanceUv).rgb;
+      float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+      float opacity =
+        pow(smoothstep(lumThreshold, 1.0, lum), lumGamma) * diskOpacity;
+
+      float depth = decodeDepth(texture(depthTex, instanceUv).rgb);
+      float coc = abs(depth - focal) * aperture;
+      float diskRadius = coc * diskScale;
+
+      if (opacity < 0.005 || diskRadius < 0.5) {
+        gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+        v_quadUv = vec2(0.0);
+        v_color = vec3(0.0);
+        v_angle = 0.0;
+        v_opacity = 0.0;
+        return;
+      }
+
+      vec2 centerNdc = instanceUv * 2.0 - 1.0;
+      vec2 sizeNdc = (diskRadius * 2.0) / dstSize;
+      gl_Position = vec4(centerNdc + position * sizeNdc, 0.0, 1.0);
+      v_quadUv = position;
+      v_color = color;
+      v_angle = instanceAngle;
+      v_opacity = opacity;
+    }
+  `;
+
+  const FRAG_DISK = `#version 300 es
+    precision highp float;
+    in vec2 v_quadUv;
+    in vec3 v_color;
+    in float v_angle;
+    in float v_opacity;
+    uniform float diskBlades;
+    uniform float diskSoftness;
+    out vec4 outColor;
+
+    void main() {
+      // diskBlades < 3 → circular disk; otherwise regular N-gon
+      // inscribed in the unit circle (signed dist from center).
+      float dist;
+      if (diskBlades < 2.5) {
+        dist = length(v_quadUv);
+      } else {
+        float c = cos(v_angle), s = sin(v_angle);
+        vec2 p = mat2(c, -s, s, c) * v_quadUv;
+        float ang = atan(p.x, p.y) + 3.14159265;
+        float seg = 6.28318530 / diskBlades;
+        float a = mod(ang, seg) - seg * 0.5;
+        dist = length(p) * cos(a) / cos(seg * 0.5);
+      }
+      if (dist > 1.0) discard;
+      float edge = max(1.0 - diskSoftness, 0.001);
+      float mask = smoothstep(1.0, edge, dist);
+      float alpha = mask * v_opacity;
+      outColor = vec4(v_color * alpha, alpha);
+    }
+  `;
+
   class DepthBokehEffect {
     constructor() {
       this.focal = 0.65;
@@ -180,7 +287,15 @@
       // 0 = pure disk blur, 1 = pure rotational/swirl blur around the
       // image centre. Anything in between cross-fades the two.
       this.swirl = 0;
+      // Disk scatter pass.
+      this.diskScale = 0.6;       // radius in CoC units
+      this.diskOpacity = 0.8;
+      this.diskBlades = 6;
+      this.diskSoftness = 0.25;
+      this.lumThreshold = 0.65;
+      this.lumGamma = 2.0;
       this._depthTex = null;
+      this._diskGeometry = null;
     }
 
     async init(ctx) {
@@ -192,26 +307,68 @@
         filter: "linear",
         wrap: "clamp",
       });
+      this._diskGeometry = {
+        attributes: {
+          position: {
+            data: new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]),
+            itemSize: 2,
+          },
+          instanceUv: {
+            data: diskInstanceUv,
+            itemSize: 2,
+            perInstance: true,
+          },
+          instanceAngle: {
+            data: diskInstanceAngle,
+            itemSize: 1,
+            perInstance: true,
+          },
+        },
+        indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
+        instanceCount: DISK_COUNT,
+      };
     }
 
     render(ctx) {
       if (!this._depthTex) return;
+      const dstSize = [ctx.dims.elementPixel[0], ctx.dims.elementPixel[1]];
       ctx.draw({
         frag: FRAG_BLUR,
         target: ctx.target,
         uniforms: {
           src: ctx.src,
           depthTex: this._depthTex,
-          dstSize: [ctx.dims.elementPixel[0], ctx.dims.elementPixel[1]],
+          dstSize,
           focal: this.focal,
           aperture: this.aperture,
           swirl: this.swirl,
+        },
+      });
+      ctx.draw({
+        vert: VERT_DISK,
+        frag: FRAG_DISK,
+        target: ctx.target,
+        blend: "premultiplied",
+        geometry: this._diskGeometry,
+        uniforms: {
+          src: ctx.src,
+          depthTex: this._depthTex,
+          dstSize,
+          focal: this.focal,
+          aperture: this.aperture,
+          diskScale: this.diskScale,
+          diskOpacity: this.diskOpacity,
+          diskBlades: this.diskBlades,
+          diskSoftness: this.diskSoftness,
+          lumThreshold: this.lumThreshold,
+          lumGamma: this.lumGamma,
         },
       });
     }
 
     dispose() {
       this._depthTex = null;
+      this._diskGeometry = null;
     }
   }
 
@@ -285,6 +442,14 @@
       });
     pane.addBinding(effect, "aperture", { min: 0, max: 200, step: 1 });
     pane.addBinding(effect, "swirl", { min: 0, max: 1, step: 0.01 });
+
+    const disk = pane.addFolder({ title: "Disk" });
+    disk.addBinding(effect, "diskScale", { min: 0, max: 2, step: 0.01 });
+    disk.addBinding(effect, "diskOpacity", { min: 0, max: 2, step: 0.01 });
+    disk.addBinding(effect, "diskBlades", { min: 0, max: 12, step: 1 });
+    disk.addBinding(effect, "diskSoftness", { min: 0, max: 1, step: 0.01 });
+    disk.addBinding(effect, "lumThreshold", { min: 0, max: 1, step: 0.01 });
+    disk.addBinding(effect, "lumGamma", { min: 0.1, max: 5, step: 0.01 });
 
     (function tick() {
       effect.focal += (target - effect.focal) * 0.08;
