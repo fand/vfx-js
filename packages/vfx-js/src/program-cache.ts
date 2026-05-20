@@ -3,12 +3,12 @@ import { type GlslVersion, Program } from "./gl/program.js";
 
 /**
  * VFX-instance-scoped cache of compiled {@link Program}s keyed by
- * `${frag}\0${vert}`. Lifted out of {@link EffectHost} so multiple
- * hosts (one per attached Effect instance) sharing the same `GLContext`
- * compile each unique shader pair exactly once.
+ * `${frag}\0${vert}\0${glslVersion}`. Lifted out of {@link EffectHost}
+ * so multiple hosts (one per attached Effect instance) sharing the
+ * same `GLContext` compile each unique shader triple exactly once.
  *
  * Lifetime: programs live until {@link dispose} is called by the
- * owning `VFXPlayer`. Effects/hosts no longer dispose programs.
+ * owning `VFXPlayer`.
  *
  * @internal
  */
@@ -21,7 +21,7 @@ export class ProgramCache {
     }
 
     get(vert: string, frag: string, glslVersion?: GlslVersion): Program {
-        const key = `${frag}\0${vert}`;
+        const key = `${frag}\0${vert}\0${glslVersion ?? ""}`;
         let p = this.#programs.get(key);
         if (!p) {
             p = new Program(this.#glCtx, vert, frag, glslVersion);

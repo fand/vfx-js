@@ -76,6 +76,15 @@ describe("ProgramCache", () => {
         expect(programs[0].glslVersion).toBe("300 es");
     });
 
+    it("different glslVersion → new Program", () => {
+        programs.length = 0;
+        const cache = new ProgramCache(makeCtx());
+        const a = cache.get("VERT", "FRAG", "100");
+        const b = cache.get("VERT", "FRAG", "300 es");
+        expect(a).not.toBe(b);
+        expect(programs).toHaveLength(2);
+    });
+
     it("key collision guard: concatenated frag+vert that overlaps another pair", () => {
         // Without the NUL separator, ("a", "bc") and ("ab", "c") would
         // share a key. The \0 delimiter prevents that.
