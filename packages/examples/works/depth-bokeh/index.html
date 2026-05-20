@@ -42,10 +42,11 @@
 </style>
 
 <img id="photo" src="./img1.png" alt="" />
-<div class="hint">Move to refocus &middot; press <kbd>H</kbd> to toggle hex bokeh</div>
+<div class="hint">Move to refocus &middot; tweak bokeh in the panel</div>
 
 <script type="module">
   import { VFX } from "@vfx-js/core";
+  import { Pane } from "https://esm.sh/tweakpane@4.0.5";
 
   const DEPTH_SRC = "./img1_depth.webp";
 
@@ -84,15 +85,13 @@
   // is splatted additively into a float accum RT. The composite normalizes
   // by accumulated alpha. Bright pixels are pre-boosted in the VS so they
   // form visible bokeh balls instead of washing out in the average.
-  const GRID = 256; // 256x256 = 65k instances
-  const N_INSTANCES = GRID * GRID;
+  const GRID = 256; // 256x256 = 65k instances (upper bound)
+  const MAX_INSTANCES = GRID * GRID;
   // The disk layer fades in as the source pixel's CoC grows past
   // `VIS_FADE_LO`; below it the splat is culled and only the underlying
   // sharp image shows through.
   const VIS_FADE_LO = 0.5;
   const VIS_FADE_HI = 4.0;
-  const SHAPE_DISK = 0;
-  const SHAPE_HEX = 1;
 
   const VERT_SCATTER = `#version 300 es
     precision highp float;
@@ -152,7 +151,9 @@
     in float v_angle;
     in float v_vis;
     in float v_splatDepth;
-    uniform int bokehShape;
+    uniform float blades;
+    uniform float softness;
+    uniform float opacity;
     uniform sampler2D depthTex;
     uniform vec2 dstSize;
     out vec4 outColor;
@@ -167,24 +168,24 @@
       float pixelDepth = decodeDepth(texture(depthTex, pixelUv).rgb);
       float occlusion = smoothstep(0.02, 0.08, pixelDepth - v_splatDepth);
 
-      vec2 p = v_quadUv;
-      float mask;
-      if (bokehShape == ${SHAPE_HEX}) {
-        float c = cos(v_angle), s = sin(v_angle);
-        p = mat2(c, -s, s, c) * p;
-        vec2 ap = abs(p);
-        // Unit hexagon distance: edges of a flat-top hex inscribed in r=1.
-        float dh = max(ap.y, ap.x * 0.866025 + ap.y * 0.5);
-        if (dh > 1.0) discard;
-        mask = smoothstep(1.0, 0.92, dh);
+      // Generalized "aperture blades": blades < 3 → circular disk;
+      // blades >= 3 → regular N-gon (inscribed in unit circle).
+      float dist;
+      if (blades < 2.5) {
+        dist = length(v_quadUv);
       } else {
-        float r2 = dot(p, p);
-        if (r2 > 1.0) discard;
-        // Quartic kernel (1 - r²)²: smooth radial falloff, ∈ [0, 1].
-        float t = 1.0 - r2;
-        mask = t * t;
+        float c = cos(v_angle), s = sin(v_angle);
+        vec2 p = mat2(c, -s, s, c) * v_quadUv;
+        float ang = atan(p.x, p.y) + 3.14159265;
+        float seg = 6.28318530 / blades;
+        float a = mod(ang, seg) - seg * 0.5;
+        dist = length(p) * cos(a) / cos(seg * 0.5);
       }
-      mask *= v_vis * (1.0 - occlusion);
+      if (dist > 1.0) discard;
+      float edge = max(1.0 - softness, 0.001);
+      float mask = smoothstep(1.0, edge, dist);
+
+      mask *= v_vis * opacity * (1.0 - occlusion);
       if (mask < 1e-4) discard;
       outColor = vec4(v_splatColor * mask, mask);
     }
@@ -225,10 +226,10 @@
     return r;
   }
 
-  function buildScatterGeometry(depthImage) {
-    // Pre-sort splats far-to-near so src-over draws nearer splats on
-    // top of farther ones. Sampling matches the GLSL side: framework
-    // uploads with UNPACK_FLIP_Y_WEBGL, so JS y is (1 - v) * H.
+  // Sample MAX_INSTANCES Halton points and their depths once. Any
+  // prefix of this list keeps a uniform spatial distribution, so we can
+  // realize an arbitrary smaller count by slicing it.
+  function computeHaltonSamples(depthImage) {
     const W = depthImage.naturalWidth;
     const H = depthImage.naturalHeight;
     const c = document.createElement("canvas");
@@ -238,42 +239,50 @@
     cx.drawImage(depthImage, 0, 0);
     const data = cx.getImageData(0, 0, W, H).data;
 
-    const samples = new Array(N_INSTANCES);
-    for (let i = 0; i < N_INSTANCES; i++) {
+    const samples = new Array(MAX_INSTANCES);
+    for (let i = 0; i < MAX_INSTANCES; i++) {
       const u = halton(i + 1, 2);
       const v = halton(i + 1, 3);
       const x = Math.min(W - 1, Math.floor(u * W));
       const y = Math.min(H - 1, Math.floor((1 - v) * H));
       const off = (y * W + x) * 4;
+      // UNPACK_FLIP_Y_WEBGL is enabled by the framework, so v is
+      // bottom-up; flip back to raster order for the imageData lookup.
       samples[i] = {
         u,
         v,
         d: decodeDepthRGB(data[off] / 255, data[off + 1] / 255, data[off + 2] / 255),
       };
     }
-    samples.sort((a, b) => a.d - b.d);
+    return samples;
+  }
 
-    const instanceUvs = new Float32Array(N_INSTANCES * 2);
-    const instanceAngles = new Float32Array(N_INSTANCES);
-    for (let i = 0; i < N_INSTANCES; i++) {
-      instanceUvs[i * 2] = samples[i].u;
-      instanceUvs[i * 2 + 1] = samples[i].v;
-      // Keep hex orientation consistent across splats so the shape
-      // survives layering instead of averaging out to a disk.
+  const QUAD_POS = new Float32Array([
+    -1, -1,   1, -1,   1, 1,
+    -1, -1,   1,  1,  -1, 1,
+  ]);
+
+  // Build a fresh EffectGeometry for the given count. Caller picks the
+  // first `count` Halton samples (uniform subset), this function depth-
+  // sorts them so src-over draws near splats on top of far ones.
+  function buildScatterGeometry(samples, count) {
+    const subset = samples.slice(0, count);
+    subset.sort((a, b) => a.d - b.d);
+    const instanceUvs = new Float32Array(count * 2);
+    const instanceAngles = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      instanceUvs[i * 2] = subset[i].u;
+      instanceUvs[i * 2 + 1] = subset[i].v;
       instanceAngles[i] = 0;
     }
-    const quadPos = new Float32Array([
-      -1, -1,   1, -1,   1, 1,
-      -1, -1,   1,  1,  -1, 1,
-    ]);
     return {
       mode: "triangles",
       attributes: {
-        position: { data: quadPos, itemSize: 2 },
+        position: { data: QUAD_POS, itemSize: 2 },
         instanceUv: { data: instanceUvs, itemSize: 2, perInstance: true },
         instanceAngle: { data: instanceAngles, itemSize: 1, perInstance: true },
       },
-      instanceCount: N_INSTANCES,
+      instanceCount: count,
     };
   }
 
@@ -281,10 +290,18 @@
     constructor() {
       this.focus = 0.65;
       this.aperture = 80.0;
-      this.shape = SHAPE_DISK;
+      // 0/1/2 → circular disk; 3+ → N-gon aperture (e.g. 6 = hex).
+      this.blades = 0;
+      // Edge softness ∈ [0, 1]: 0 = hard, 1 = full radial gradient.
+      this.softness = 0.7;
+      // Overall splat layer opacity. 1 = full bokeh; 0 = none.
+      this.opacity = 1.0;
+      // Tweakable splat count. Geometry is rebuilt on change.
+      this.count = 16384;
       this._depthTex = null;
       this._accum = null;
       this._geometry = null;
+      this._haltonSamples = null;
     }
 
     async init(ctx) {
@@ -297,7 +314,13 @@
         wrap: "clamp",
       });
       this._accum = ctx.createRenderTarget({ float: true });
-      this._geometry = buildScatterGeometry(img);
+      this._haltonSamples = computeHaltonSamples(img);
+      this._geometry = buildScatterGeometry(this._haltonSamples, this.count);
+    }
+
+    rebuildGeometry() {
+      if (!this._haltonSamples) return;
+      this._geometry = buildScatterGeometry(this._haltonSamples, this.count);
     }
 
     render(ctx) {
@@ -326,7 +349,9 @@
           aperture: this.aperture,
           visLo: VIS_FADE_LO,
           visHi: VIS_FADE_HI,
-          bokehShape: this.shape,
+          blades: this.blades,
+          softness: this.softness,
+          opacity: this.opacity,
         },
       });
 
@@ -345,6 +370,7 @@
       this._accum = null;
       this._depthTex = null;
       this._geometry = null;
+      this._haltonSamples = null;
     }
   }
 
@@ -403,11 +429,24 @@
     window.addEventListener("pointerdown", (e) => {
       setFocusFromClient(e.clientX, e.clientY);
     });
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "h" || e.key === "H") {
-        effect.shape = effect.shape === 0 ? 1 : 0;
-      }
-    });
+
+    // VFX-JS's canvas sits at z-index 9999, so mount the pane inside a
+    // higher-z-index container to keep it interactive.
+    const paneContainer = document.createElement("div");
+    paneContainer.style.cssText =
+      "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(paneContainer);
+    const pane = new Pane({ container: paneContainer, title: "Bokeh" });
+    pane.addBinding(effect, "blades", { min: 0, max: 12, step: 1 });
+    pane.addBinding(effect, "opacity", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect, "softness", { min: 0, max: 1, step: 0.01 });
+    pane
+      .addBinding(effect, "count", { min: 1024, max: 65536, step: 1024 })
+      .on("change", (ev) => {
+        // Rebuild only on release; per-frame rebuild during drag would
+        // stutter on the ~10ms sort + Float32Array allocation.
+        if (ev.last) effect.rebuildGeometry();
+      });
 
     (function tick() {
       effect.focus += (target - effect.focus) * 0.08;
