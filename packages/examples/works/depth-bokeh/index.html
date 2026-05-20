@@ -147,11 +147,13 @@
 
         // Sample contributes iff its own bokeh circle reaches this
         // pixel. Blocks in-focus foreground from bleeding into bg
-        // gathers and vice versa.
+        // gathers and vice versa. Use the logical disk distance
+        // (r*coc), not the actual sPos distance — the swirl kernel
+        // is an artistic remapping of the disk, and using physical
+        // distance would reject all the off-axis swirl samples.
         float depthS = decodeDepth(texture(depthTex, sPos).rgb);
         float cocS = abs(depthS - focal) * aperture;
-        float distPx = length((sPos - uvSrc) * dstSize);
-        float depthW = smoothstep(-1.0, 1.0, cocS - distPx);
+        float depthW = smoothstep(-1.0, 1.0, cocS - r * coc);
 
         // Flat interior + soft edge. Smooths kernel rim and stops
         // individual samples from showing as discrete bright dots in
