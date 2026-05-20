@@ -126,6 +126,7 @@
       float arcAng = min(tangLen / max(rPx, 1.0), 1.0);
 
       vec3 acc = vec3(0.0);
+      float weightSum = 0.0;
       for (int i = 0; i < ${BLUR_SAMPLES}; i++) {
         float t = (float(i) + 0.5) / float(${BLUR_SAMPLES});
         float r = sqrt(t);
@@ -143,9 +144,24 @@
         vec2 sPos = mix(diskPos, swirlPos, swirl);
         float inB = step(0.0, sPos.x) * step(sPos.x, 1.0)
                   * step(0.0, sPos.y) * step(sPos.y, 1.0);
-        acc += texture(src, sPos).rgb * inB;
+
+        // Sample contributes iff its own bokeh circle reaches this
+        // pixel. Blocks in-focus foreground from bleeding into bg
+        // gathers and vice versa.
+        float depthS = decodeDepth(texture(depthTex, sPos).rgb);
+        float cocS = abs(depthS - focal) * aperture;
+        float distPx = length((sPos - uvSrc) * dstSize);
+        float depthW = smoothstep(-1.0, 1.0, cocS - distPx);
+
+        // OOB samples keep wDiv=1 so partial-OOB kernels still dim
+        // (cat's-eye). Depth-rejected in-bounds samples drop out of
+        // the divisor entirely so silhouettes don't get dark halos.
+        float wAcc = inB * depthW;
+        float wDiv = mix(1.0, depthW, inB);
+        acc += texture(src, sPos).rgb * wAcc;
+        weightSum += wDiv;
       }
-      outColor = vec4(acc / float(${BLUR_SAMPLES}), 1.0);
+      outColor = vec4(acc / max(weightSum, 1.0), 1.0);
     }
   `;
 
