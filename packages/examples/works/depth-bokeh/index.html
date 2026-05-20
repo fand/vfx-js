@@ -77,11 +77,13 @@
     }
   `;
 
-  // Single-pass DoF: each output pixel reads its own depth, sets CoC
-  // = |depth - focal| * aperture, and gathers a golden-spiral disk of
-  // src samples at that radius. No depth-aware kernel weighting —
-  // simplest possible blur.
-  const BLUR_SAMPLES = 32;
+  // Single-pass DoF. For each output pixel:
+  //   - CoC = |depth - focal| * aperture
+  //   - Disk blur: golden-spiral disk gather, per-pixel start-angle jitter.
+  //   - Swirl blur: sample along an arc concentric to the image center
+  //     with angular extent proportional to CoC (1D rotational blur).
+  // Final = mix(disk, swirl, swirl uniform).
+  const BLUR_SAMPLES = 64;
   const FRAG_BLUR = `#version 300 es
     precision highp float;
     in vec2 uv;
@@ -91,6 +93,7 @@
     uniform vec2 dstSize;
     uniform float focal;
     uniform float aperture;
+    uniform float swirl;
     out vec4 outColor;
 
     ${decodeDepthGLSL}
@@ -103,16 +106,41 @@
         outColor = vec4(sharp, 1.0);
         return;
       }
-      vec3 acc = vec3(0.0);
+      // Hash for per-pixel rotation of the golden-spiral sample set;
+      // breaks up concentric kernel banding into noise.
+      float a0 = fract(sin(dot(uv * dstSize, vec2(12.9898, 78.233))) * 43758.5453) * 6.28318530;
+
+      // Disk blur path.
+      vec3 diskAcc = vec3(0.0);
       for (int i = 0; i < ${BLUR_SAMPLES}; i++) {
         float t = (float(i) + 0.5) / float(${BLUR_SAMPLES});
         float r = sqrt(t) * coc;
-        float a = float(i) * 2.39996323;
+        float a = a0 + float(i) * 2.39996323;
         vec2 off = vec2(cos(a), sin(a)) * r / dstSize;
         vec2 sUvSrc = clamp(uvSrc + off, vec2(0.0), vec2(1.0));
-        acc += texture(src, sUvSrc).rgb;
+        diskAcc += texture(src, sUvSrc).rgb;
       }
-      outColor = vec4(acc / float(${BLUR_SAMPLES}), 1.0);
+      vec3 diskBlur = diskAcc / float(${BLUR_SAMPLES});
+
+      // Swirl blur path: arc concentric to image center. Compute in
+      // pixel space so the path stays circular under non-square aspect
+      // ratios, then convert back to UV when sampling.
+      vec2 imgCenter = vec2(0.5);
+      vec2 fromCpx = (uvSrc - imgCenter) * dstSize;
+      float rPx = length(fromCpx);
+      float baseAng = atan(fromCpx.y, fromCpx.x);
+      float arcSpan = min(coc / max(rPx, 1.0), 3.14159);
+      vec3 swirlAcc = vec3(0.0);
+      for (int i = 0; i < ${BLUR_SAMPLES}; i++) {
+        float t = (float(i) + 0.5) / float(${BLUR_SAMPLES});
+        float ang = baseAng + (t - 0.5) * arcSpan * 2.0 + (a0 - 3.14159) * 0.01;
+        vec2 sOff = rPx * vec2(cos(ang), sin(ang)) / dstSize;
+        vec2 sPos = clamp(imgCenter + sOff, vec2(0.0), vec2(1.0));
+        swirlAcc += texture(src, sPos).rgb;
+      }
+      vec3 swirlBlur = swirlAcc / float(${BLUR_SAMPLES});
+
+      outColor = vec4(mix(diskBlur, swirlBlur, swirl), 1.0);
     }
   `;
 
@@ -120,6 +148,9 @@
     constructor() {
       this.focal = 0.65;
       this.aperture = 80.0;
+      // 0 = pure disk blur, 1 = pure rotational/swirl blur around the
+      // image centre. Anything in between cross-fades the two.
+      this.swirl = 0;
       this._depthTex = null;
     }
 
@@ -145,6 +176,7 @@
           dstSize: [ctx.dims.elementPixel[0], ctx.dims.elementPixel[1]],
           focal: this.focal,
           aperture: this.aperture,
+          swirl: this.swirl,
         },
       });
     }
@@ -223,6 +255,7 @@
         target = effect.focal;
       });
     pane.addBinding(effect, "aperture", { min: 0, max: 200, step: 1 });
+    pane.addBinding(effect, "swirl", { min: 0, max: 1, step: 0.01 });
 
     (function tick() {
       effect.focal += (target - effect.focal) * 0.08;
