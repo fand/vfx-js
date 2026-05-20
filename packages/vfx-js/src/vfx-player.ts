@@ -17,6 +17,7 @@ import { loadImage, Texture, type TextureWrap } from "./gl/texture.js";
 import { Vec2, Vec4 } from "./gl/vec.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import { PostEffectPass } from "./post-effect-pass.js";
+import { ProgramCache } from "./program-cache.js";
 import {
     createMargin,
     createRect,
@@ -57,6 +58,7 @@ export class VFXPlayer {
     #ctx: GLContext;
     #gl: WebGL2RenderingContext;
     #quad: Quad;
+    #programCache: ProgramCache;
     #copyPass: CopyPass;
     #postEffectEntries: {
         pass: PostEffectPass;
@@ -111,6 +113,7 @@ export class VFXPlayer {
         this.#pixelRatio = opts.pixelRatio;
 
         this.#quad = new Quad(this.#ctx);
+        this.#programCache = new ProgramCache(this.#ctx);
 
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.#resize);
@@ -149,6 +152,7 @@ export class VFXPlayer {
             this.#postEffectChainReady = false;
         }
         this.#copyPass.dispose();
+        this.#programCache.dispose();
         this.#quad.dispose();
     }
 
@@ -763,6 +767,7 @@ export class VFXPlayer {
             vfxProps,
             captureHandle,
             false,
+            this.#programCache,
         );
         try {
             await chain.initAll();
@@ -1710,6 +1715,7 @@ export class VFXPlayer {
             vfxProps,
             captureHandle,
             true,
+            this.#programCache,
         );
 
         if (pe.uniforms) {

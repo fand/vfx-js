@@ -7,9 +7,10 @@ import {
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
 import { applyBlend } from "./gl/pass.js";
-import { Program, type Uniform, type Uniforms } from "./gl/program.js";
+import type { Uniform, Uniforms } from "./gl/program.js";
 import type { Quad } from "./gl/quad.js";
 import { Texture, type TextureWrap } from "./gl/texture.js";
+import type { ProgramCache } from "./program-cache.js";
 import type {
     Effect,
     EffectContext,
@@ -209,9 +210,11 @@ type OwnedRT = {
  * The orchestrator ({@link EffectChain}) mutates fields on `ctx` each
  * frame (time / src / output / etc.) for reference stability and to
  * reduce allocations. Owns:
- * - Program cache (keyed `frag + "\0" + vert`)
  * - Managed Framebuffer / Backbuffer / Texture / VAO entries
  * - Phase flag for `ctx.draw()` suppression in the update phase
+ *
+ * Compiled {@link Program}s are not owned here — they live in the
+ * VFX-scoped {@link ProgramCache} and are shared across hosts.
  *
  * See plan.md "effect-host.ts" for the full behavior spec.
  * @internal
@@ -220,7 +223,7 @@ export class EffectHost {
     #glCtx: GLContext;
     #gl: WebGL2RenderingContext;
     #pixelRatio: number;
-    #programs = new Map<string, Program>();
+    #programCache: ProgramCache;
     #geometries: EffectGeometryCache;
     #ownedTextures: Texture[] = [];
     #ownedRTs: OwnedRT[] = [];
@@ -243,10 +246,12 @@ export class EffectHost {
         pixelRatio: number,
         initialSrc: EffectTexture,
         initialVfxProps: EffectVFXProps,
+        programCache: ProgramCache,
     ) {
         this.#glCtx = glCtx;
         this.#gl = glCtx.gl;
         this.#pixelRatio = pixelRatio;
+        this.#programCache = programCache;
         this.#geometries = new EffectGeometryCache(glCtx, quad);
         this.#dims = {
             outputBufferW: 1,
@@ -629,17 +634,11 @@ export class EffectHost {
             (this.#mutCtx.vfxProps.glslVersion === "100"
                 ? DEFAULT_VERT_100
                 : DEFAULT_VERT_300);
-        const key = `${opts.frag} ${vert}`;
-        let program = this.#programs.get(key);
-        if (!program) {
-            program = new Program(
-                this.#glCtx,
-                vert,
-                opts.frag,
-                this.#mutCtx.vfxProps.glslVersion,
-            );
-            this.#programs.set(key, program);
-        }
+        const program = this.#programCache.get(
+            vert,
+            opts.frag,
+            this.#mutCtx.vfxProps.glslVersion,
+        );
 
         const ctxOutput = this.#mutCtx.target;
         const rawTarget =
@@ -746,10 +745,7 @@ export class EffectHost {
             t.dispose();
         }
         this.#ownedTextures = [];
-        for (const p of this.#programs.values()) {
-            p.dispose();
-        }
-        this.#programs.clear();
+        // Programs are owned by the VFX-scoped ProgramCache; do not dispose here.
         this.#geometries.dispose();
         this.#perFrameAutoUpdate = [];
     }
