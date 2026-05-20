@@ -346,7 +346,7 @@ export class EffectGeometryCache {
         }
         this.#all.clear();
         // WeakMap entries become unreachable naturally when the user
-        // releases their geometry refs; the Programs are disposed by the
-        // host separately.
+        // releases their geometry refs; the Programs are disposed by
+        // the VFX-scoped ProgramCache.
     }
 }
