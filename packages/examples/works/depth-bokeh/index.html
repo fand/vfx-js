@@ -339,8 +339,15 @@
         idx[i] = i;
         const u = diskInstanceUv[i * 2];
         const v = diskInstanceUv[i * 2 + 1];
+        // GL textures upload with UNPACK_FLIP_Y_WEBGL=true, so
+        // instanceUv.y=0 maps to the bottom of the image; getImageData
+        // is top-down. Flip v when indexing the canvas so v_depth
+        // matches the pixel the disk actually lands on.
         const px = Math.min(dC.width - 1, Math.floor(u * dC.width));
-        const py = Math.min(dC.height - 1, Math.floor(v * dC.height));
+        const py = Math.min(
+          dC.height - 1,
+          Math.floor((1 - v) * dC.height),
+        );
         const p = (py * dC.width + px) * 4;
         depths[i] = decodeDepthRGB(
           dData[p] / 255,
