@@ -153,11 +153,17 @@
         float distPx = length((sPos - uvSrc) * dstSize);
         float depthW = smoothstep(-1.0, 1.0, cocS - distPx);
 
-        // OOB samples keep wDiv=1 so partial-OOB kernels still dim
-        // (cat's-eye). Depth-rejected in-bounds samples drop out of
-        // the divisor entirely so silhouettes don't get dark halos.
-        float wAcc = inB * depthW;
-        float wDiv = mix(1.0, depthW, inB);
+        // Flat interior + soft edge. Smooths kernel rim and stops
+        // individual samples from showing as discrete bright dots in
+        // bright highlights.
+        float kernelW = 1.0 - smoothstep(0.5, 1.0, r);
+
+        // OOB samples keep wDiv proportional to kernelW so partial-OOB
+        // kernels still dim (cat's-eye). Depth-rejected in-bounds
+        // samples drop out of the divisor entirely so silhouettes
+        // don't get dark halos.
+        float wAcc = inB * depthW * kernelW;
+        float wDiv = mix(1.0, depthW, inB) * kernelW;
         acc += texture(src, sPos).rgb * wAcc;
         weightSum += wDiv;
       }
