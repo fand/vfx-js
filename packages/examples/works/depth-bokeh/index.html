@@ -245,7 +245,7 @@
 
       // Quad is symmetric in (tang, radial) basis around the image
       // center; the half-moon vignette mask is applied in the FS using
-      // v_squash + the diskSwirlOuter uniform. Deforming the quad here
+      // v_squash + the diskSwirlBias uniform. Deforming the quad here
       // would just produce a pinched trapezoid (sides shifted outward),
       // not a clean half-moon.
       vec2 fromCenterPx = (instanceUv - 0.5) * dstSize;
@@ -284,19 +284,19 @@
     uniform float diskSoftness;
     uniform float diskAngle;
     uniform float diskFill;
-    uniform float diskSwirlOuter;
+    uniform float diskSwirlBias;
     out vec4 outColor;
 
     ${decodeDepthGLSL}
 
     void main() {
-      // Half-moon vignette mask: outward half (v_quadUv.y > 0) keeps
-      // the full radius scaled by (1 - squash*outer), inward half
-      // (y < 0) is compressed to (1 - squash). Dividing v_quadUv.y by
-      // that scale before the radial distance test stretches the
-      // unit-circle/n-gon mask into a half-moon shape, with the round
-      // side facing outward from the image center.
-      float outwardR = max(1.0 - v_squash * diskSwirlOuter, 1e-3);
+      // Half-moon vignette mask: outward half (v_quadUv.y > 0) is
+      // compressed by squash*bias, inward half (y < 0) by squash.
+      // bias=0 leaves the outward half at full radius (flat-bottom
+      // half-moon); bias=1 compresses both halves equally (symmetric
+      // ellipse). Dividing v_quadUv.y by the scale stretches the
+      // unit-circle / n-gon mask into the chosen half-moon shape.
+      float outwardR = max(1.0 - v_squash * diskSwirlBias, 1e-3);
       float inwardR = max(1.0 - v_squash, 1e-3);
       float yScale = v_quadUv.y > 0.0 ? outwardR : inwardR;
       vec2 maskUv = vec2(v_quadUv.x, v_quadUv.y / yScale);
@@ -360,7 +360,7 @@
       this.diskSoftness = 0.1;
       this.diskFill = 0.7;        // interior opacity (1=solid, 0=ring)
       this.diskSwirl = 1.2;       // inward squash strength at periphery
-      this.diskSwirlOuter = 0.7;  // outward squash (0=half-moon, 1=ellipse)
+      this.diskSwirlBias = 0.7;  // outward squash as fraction of inward (0=half-moon, 1=symmetric ellipse)
       this.lumThreshold = 0;
       this.lumGamma = 2.0;
       this._resources = new Map();
@@ -502,7 +502,7 @@
           aperture: this.aperture,
           diskScale: this.diskScale,
           diskSwirl: this.diskSwirl,
-          diskSwirlOuter: this.diskSwirlOuter,
+          diskSwirlBias: this.diskSwirlBias,
           diskCount: this.diskCount,
           diskOpacity: this.diskOpacity,
           diskBlades: this.diskBlades,
@@ -610,7 +610,7 @@
     disk.addBinding(effect, "diskCount", { min: 0, max: 65536, step: 256 });
     disk.addBinding(effect, "diskScale", { min: 0, max: 2, step: 0.01 });
     disk.addBinding(effect, "diskSwirl", { min: 0, max: 3, step: 0.01 });
-    disk.addBinding(effect, "diskSwirlOuter", { min: 0, max: 3, step: 0.01 });
+    disk.addBinding(effect, "diskSwirlBias", { min: 0, max: 1, step: 0.01 });
     disk.addBinding(effect, "diskOpacity", { min: 0, max: 2, step: 0.01 });
     disk.addBinding(effect, "diskBlades", { min: 0, max: 12, step: 1 });
     disk.addBinding(effect, "diskAngle", { min: 0, max: 6.283, step: 0.01 });
