@@ -341,18 +341,18 @@
       this.aperture = 0;
       // 0 = pure disk blur, 1 = pure rotational/swirl blur around the
       // image centre. Anything in between cross-fades the two.
-      this.swirl = 0;
+      this.swirl = 0.1;
       // Disk scatter pass.
       this.diskCount = 16384;     // up to DISK_COUNT (256*256 = 65536)
       this.diskScale = 0.6;       // radius in CoC units
       this.diskOpacity = 0.8;
-      this.diskBlades = 6;
-      this.diskAngle = 0;
-      this.diskSoftness = 0.25;
-      this.diskFill = 1.0;        // interior opacity (1=solid, 0=ring)
-      this.diskSwirl = 0;         // inward squash strength at periphery
-      this.diskSwirlOuter = 0;    // outward squash (0=half-moon, 1=ellipse)
-      this.lumThreshold = 0.65;
+      this.diskBlades = 7;
+      this.diskAngle = 1.0;
+      this.diskSoftness = 0.1;
+      this.diskFill = 0.7;        // interior opacity (1=solid, 0=ring)
+      this.diskSwirl = 1.0;       // inward squash strength at periphery
+      this.diskSwirlOuter = 0.7;  // outward squash (0=half-moon, 1=ellipse)
+      this.lumThreshold = 0;
       this.lumGamma = 2.0;
       this._resources = new Map();
       this._activeId = IMAGES[0].id;
@@ -528,7 +528,7 @@
     await vfx.add(img, { effect });
 
     let focalTarget = effect.focal;
-    const state = { maxAperture: 80, pressed: false };
+    const state = { maxAperture: 120, pressed: false };
 
     function imageUv(cx, cy) {
       const r = img.getBoundingClientRect();
