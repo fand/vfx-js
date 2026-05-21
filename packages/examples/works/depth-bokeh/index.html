@@ -527,6 +527,7 @@
     const effect = new DepthBokehEffect();
     await vfx.add(img, { effect });
 
+    let focalTarget = effect.focal;
     const state = { maxAperture: 80, pressed: false };
 
     function imageUv(cx, cy) {
@@ -544,7 +545,7 @@
       const [r8, g8, b8] = dC
         .getContext("2d")
         .getImageData(x, y, 1, 1).data;
-      effect.focal = decodeDepthRGB(r8 / 255, g8 / 255, b8 / 255);
+      focalTarget = decodeDepthRGB(r8 / 255, g8 / 255, b8 / 255);
     }
 
     window.addEventListener("pointerdown", (e) => {
@@ -588,7 +589,11 @@
         effect.setActiveImage(e.value);
       });
 
-    pane.addBinding(effect, "focal", { min: 0, max: 1, step: 0.001 });
+    pane
+      .addBinding(effect, "focal", { min: 0, max: 1, step: 0.001 })
+      .on("change", () => {
+        focalTarget = effect.focal;
+      });
     pane.addBinding(state, "maxAperture", { min: 0, max: 200, step: 1 });
     pane.addBinding(effect, "swirl", { min: 0, max: 1, step: 0.01 });
 
@@ -606,6 +611,7 @@
     disk.addBinding(effect, "lumGamma", { min: 0.1, max: 5, step: 0.01 });
 
     (function tick() {
+      effect.focal += (focalTarget - effect.focal) * 0.5;
       const apTarget = state.pressed ? state.maxAperture : 0;
       effect.aperture += (apTarget - effect.aperture) * 0.15;
       pane.refresh();
