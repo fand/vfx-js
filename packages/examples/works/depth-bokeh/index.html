@@ -42,7 +42,11 @@
 </style>
 
 <img id="photo" src="./img1.png" alt="" />
-<div class="hint">Press &amp; drag to focus &middot; release for pan-focus</div>
+<div class="hint">Press &amp; drag to focus &middot; ← / → to switch image</div>
+<div
+  id="fade"
+  style="position:fixed;inset:0;background:#0a0a0a;opacity:0;pointer-events:none;z-index:10001;transition:opacity 180ms ease-out"
+></div>
 
 <script type="module">
   import { VFX } from "@vfx-js/core";
@@ -587,16 +591,39 @@
     const pane = new Pane({ container: paneContainer, title: "Bokeh" });
 
     const imgParams = { image: IMAGES[0].id };
+    const fadeEl = document.getElementById("fade");
+    let switching = false;
+
+    async function switchImage(id) {
+      const spec = IMAGES.find((i) => i.id === id);
+      if (!spec || switching || imgParams.image === id) return;
+      switching = true;
+      fadeEl.style.opacity = "1";
+      await new Promise((r) => setTimeout(r, 180));
+      img.src = spec.color;
+      effect.setActiveImage(id);
+      imgParams.image = id;
+      fadeEl.style.opacity = "0";
+      await new Promise((r) => setTimeout(r, 180));
+      switching = false;
+    }
+
     pane
       .addBinding(imgParams, "image", {
         options: Object.fromEntries(IMAGES.map((i) => [i.id, i.id])),
       })
-      .on("change", (e) => {
-        const spec = IMAGES.find((i) => i.id === e.value);
-        if (!spec) return;
-        img.src = spec.color;
-        effect.setActiveImage(e.value);
-      });
+      .on("change", (e) => switchImage(e.value));
+
+    window.addEventListener("keydown", (e) => {
+      let delta = 0;
+      if (e.key === "ArrowLeft") delta = -1;
+      else if (e.key === "ArrowRight") delta = 1;
+      else return;
+      e.preventDefault();
+      const cur = IMAGES.findIndex((i) => i.id === imgParams.image);
+      const next = (cur + delta + IMAGES.length) % IMAGES.length;
+      switchImage(IMAGES[next].id);
+    });
 
     pane
       .addBinding(effect, "focal", { min: 0, max: 1, step: 0.001 })
