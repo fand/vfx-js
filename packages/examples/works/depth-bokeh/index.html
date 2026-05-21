@@ -206,6 +206,7 @@
     uniform float focal;
     uniform float aperture;
     uniform float diskScale;
+    uniform float diskSwirl;
     uniform float lumThreshold;
     uniform float lumGamma;
     uniform float diskOpacity;
@@ -235,8 +236,25 @@
       }
 
       vec2 centerNdc = instanceUv * 2.0 - 1.0;
-      vec2 sizeNdc = (diskRadius * 2.0) / dstSize;
-      vec2 ndc = centerNdc + position * sizeNdc;
+
+      // Helios-style radial squash. The quad's local position is split
+      // into (tangential, radial) basis around the image center, then
+      // the radial axis is compressed proportional to the distance
+      // from center. Disks near the center stay circular; disks near
+      // the edges get squashed into tangentially-oriented ellipses.
+      vec2 fromCenterPx = (instanceUv - 0.5) * dstSize;
+      float rPx = length(fromCenterPx);
+      vec2 radialDir = rPx > 1.0 ? fromCenterPx / rPx : vec2(1.0, 0.0);
+      vec2 tangDir = vec2(-radialDir.y, radialDir.x);
+      float halfDiag = length(dstSize) * 0.5;
+      float rNorm = rPx / halfDiag;
+      float squash = clamp(diskSwirl * rNorm, 0.0, 0.95);
+
+      vec2 pxOffset = (
+        tangDir * position.x +
+        radialDir * position.y * (1.0 - squash)
+      ) * diskRadius;
+      vec2 ndc = centerNdc + pxOffset * 2.0 / dstSize;
       gl_Position = vec4(ndc, 0.0, 1.0);
       v_quadUv = position;
       v_uv = ndc * 0.5 + 0.5;
@@ -309,6 +327,7 @@
       this.diskBlades = 6;
       this.diskAngle = 0;
       this.diskSoftness = 0.25;
+      this.diskSwirl = 0;         // radial squash strength (Helios)
       this.lumThreshold = 0.65;
       this.lumGamma = 2.0;
       this._depthTex = null;
@@ -415,6 +434,7 @@
           focal: this.focal,
           aperture: this.aperture,
           diskScale: this.diskScale,
+          diskSwirl: this.diskSwirl,
           diskOpacity: this.diskOpacity,
           diskBlades: this.diskBlades,
           diskAngle: this.diskAngle,
@@ -504,6 +524,7 @@
 
     const disk = pane.addFolder({ title: "Disk" });
     disk.addBinding(effect, "diskScale", { min: 0, max: 2, step: 0.01 });
+    disk.addBinding(effect, "diskSwirl", { min: 0, max: 1, step: 0.01 });
     disk.addBinding(effect, "diskOpacity", { min: 0, max: 2, step: 0.01 });
     disk.addBinding(effect, "diskBlades", { min: 0, max: 12, step: 1 });
     disk.addBinding(effect, "diskAngle", { min: 0, max: 6.283, step: 0.01 });
