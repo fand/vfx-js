@@ -42,7 +42,7 @@
 </style>
 
 <img id="photo" src="./img1.png" alt="" />
-<div class="hint">Move to refocus &middot; tweak focal / aperture in the panel</div>
+<div class="hint">Press &amp; drag to focus &middot; release for pan-focus</div>
 
 <script type="module">
   import { VFX } from "@vfx-js/core";
@@ -336,7 +336,9 @@
   class DepthBokehEffect {
     constructor() {
       this.focal = 0.65;
-      this.aperture = 80.0;
+      // Actual aperture used for rendering. Starts at 0 (pan-focus)
+      // and is animated externally by the press/release loop.
+      this.aperture = 0;
       // 0 = pure disk blur, 1 = pure rotational/swirl blur around the
       // image centre. Anything in between cross-fades the two.
       this.swirl = 0;
@@ -525,28 +527,47 @@
     const effect = new DepthBokehEffect();
     await vfx.add(img, { effect });
 
-    let target = effect.focal;
-    function setFocalFromClient(cx, cy) {
+    let focalTarget = effect.focal;
+    const state = { maxAperture: 80, pressed: false };
+
+    function imageUv(cx, cy) {
       const r = img.getBoundingClientRect();
       const u = (cx - r.left) / r.width;
       const v = (cy - r.top) / r.height;
-      if (u < 0 || u > 1 || v < 0 || v > 1) return;
+      return u >= 0 && u <= 1 && v >= 0 && v <= 1 ? [u, v] : null;
+    }
+
+    function setFocal(uv) {
       const dC = effect.activeDepthCanvas();
       if (!dC) return;
-      const x = Math.min(dC.width - 1, Math.floor(u * dC.width));
-      const y = Math.min(dC.height - 1, Math.floor(v * dC.height));
+      const x = Math.min(dC.width - 1, Math.floor(uv[0] * dC.width));
+      const y = Math.min(dC.height - 1, Math.floor(uv[1] * dC.height));
       const [r8, g8, b8] = dC
         .getContext("2d")
         .getImageData(x, y, 1, 1).data;
-      target = decodeDepthRGB(r8 / 255, g8 / 255, b8 / 255);
+      focalTarget = decodeDepthRGB(r8 / 255, g8 / 255, b8 / 255);
     }
 
-    window.addEventListener("pointermove", (e) => {
-      setFocalFromClient(e.clientX, e.clientY);
-    });
     window.addEventListener("pointerdown", (e) => {
-      setFocalFromClient(e.clientX, e.clientY);
+      const uv = imageUv(e.clientX, e.clientY);
+      if (!uv) return;
+      state.pressed = true;
+      setFocal(uv);
     });
+    window.addEventListener("pointermove", (e) => {
+      if (!state.pressed) return;
+      const uv = imageUv(e.clientX, e.clientY);
+      if (!uv) {
+        state.pressed = false;
+        return;
+      }
+      setFocal(uv);
+    });
+    const release = () => {
+      state.pressed = false;
+    };
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
 
     // VFX-JS's canvas sits at z-index 9999, so mount the pane inside a
     // higher-z-index container to keep it interactive.
@@ -571,9 +592,9 @@
     pane
       .addBinding(effect, "focal", { min: 0, max: 1, step: 0.001 })
       .on("change", () => {
-        target = effect.focal;
+        focalTarget = effect.focal;
       });
-    pane.addBinding(effect, "aperture", { min: 0, max: 200, step: 1 });
+    pane.addBinding(state, "maxAperture", { min: 0, max: 200, step: 1 });
     pane.addBinding(effect, "swirl", { min: 0, max: 1, step: 0.01 });
 
     const disk = pane.addFolder({ title: "Disk" });
@@ -590,7 +611,9 @@
     disk.addBinding(effect, "lumGamma", { min: 0.1, max: 5, step: 0.01 });
 
     (function tick() {
-      effect.focal += (target - effect.focal) * 0.08;
+      effect.focal += (focalTarget - effect.focal) * 0.08;
+      const apTarget = state.pressed ? state.maxAperture : 0;
+      effect.aperture += (apTarget - effect.aperture) * 0.15;
       pane.refresh();
       requestAnimationFrame(tick);
     })();
