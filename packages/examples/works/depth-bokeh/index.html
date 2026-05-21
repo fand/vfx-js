@@ -291,12 +291,12 @@
 
     void main() {
       // Half-moon vignette mask: outward half (v_quadUv.y > 0) is
-      // compressed by squash*bias, inward half (y < 0) by squash.
-      // bias=0 leaves the outward half at full radius (flat-bottom
-      // half-moon); bias=1 compresses both halves equally (symmetric
-      // ellipse). Dividing v_quadUv.y by the scale stretches the
+      // compressed by squash*(1-bias), inward half (y < 0) by squash.
+      // bias=0 compresses both halves equally (symmetric ellipse);
+      // bias=1 leaves the outward half at full radius (flat-bottom
+      // half-moon). Dividing v_quadUv.y by the scale stretches the
       // unit-circle / n-gon mask into the chosen half-moon shape.
-      float outwardR = max(1.0 - v_squash * diskSwirlBias, 1e-3);
+      float outwardR = max(1.0 - v_squash * (1.0 - diskSwirlBias), 1e-3);
       float inwardR = max(1.0 - v_squash, 1e-3);
       float yScale = v_quadUv.y > 0.0 ? outwardR : inwardR;
       vec2 maskUv = vec2(v_quadUv.x, v_quadUv.y / yScale);
@@ -360,7 +360,7 @@
       this.diskSoftness = 0.1;
       this.diskFill = 0.7;        // interior opacity (1=solid, 0=ring)
       this.diskSwirl = 1.2;       // inward squash strength at periphery
-      this.diskSwirlBias = 0.7;  // outward squash as fraction of inward (0=half-moon, 1=symmetric ellipse)
+      this.diskSwirlBias = 0.7;  // 0 = symmetric ellipse, 1 = flat-bottom half-moon
       this.lumThreshold = 0;
       this.lumGamma = 2.0;
       this._resources = new Map();
