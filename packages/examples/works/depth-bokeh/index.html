@@ -51,6 +51,7 @@
   const IMAGES = [
     { id: "img1", color: "./img1.png", depth: "./img1_depth.png" },
     { id: "img2", color: "./img2.png", depth: "./img2_depth.png" },
+    { id: "img3", color: "./img3.png", depth: "./img3_depth.png" },
   ];
 
   // Grayscale depth map: white = near (depth 1), black = far (depth 0).
@@ -161,7 +162,12 @@
   // opacity is driven by source luminance through a threshold + gamma
   // curve, size by CoC at the splat's depth. Composited onto the
   // gather output with src-over (premultiplied alpha).
-  const DISK_GRID = 128;
+  // 256x256 = 65536 is the upper bound; the actual count rendered is
+  // capped by the diskCount uniform, which VS-culls instances whose
+  // Halton rank exceeds the active count. Because Halton sequences
+  // are low-discrepancy at every prefix length, any active count
+  // gives a roughly uniform sub-sampling of the full set.
+  const DISK_GRID = 256;
   const DISK_COUNT = DISK_GRID * DISK_GRID;
 
   function halton(i, b) {
@@ -185,6 +191,7 @@
     in vec2 position;
     in vec2 instanceUv;
     in float instanceDepth;
+    in float instanceRank;
     uniform sampler2D colorTex;
     uniform vec2 dstSize;
     uniform float focal;
@@ -192,6 +199,7 @@
     uniform float diskScale;
     uniform float diskSwirl;
     uniform float diskSwirlOuter;
+    uniform float diskCount;
     uniform float lumThreshold;
     uniform float lumGamma;
     uniform float diskOpacity;
@@ -202,6 +210,18 @@
     out float v_depth;
 
     void main() {
+      // Prefix-cull by Halton rank so the rendered set is always a
+      // low-discrepancy subset of the full pre-baked instance pool.
+      if (instanceRank >= diskCount) {
+        gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+        v_quadUv = vec2(0.0);
+        v_uv = vec2(0.0);
+        v_color = vec3(0.0);
+        v_opacity = 0.0;
+        v_depth = 0.0;
+        return;
+      }
+
       vec3 color = texture(colorTex, instanceUv).rgb;
       float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
       float opacity =
@@ -321,6 +341,7 @@
       // image centre. Anything in between cross-fades the two.
       this.swirl = 0;
       // Disk scatter pass.
+      this.diskCount = 16384;     // up to DISK_COUNT (256*256 = 65536)
       this.diskScale = 0.6;       // radius in CoC units
       this.diskOpacity = 0.8;
       this.diskBlades = 6;
@@ -394,11 +415,13 @@
       idx.sort((a, b) => depths[a] - depths[b]);
       const sortedUv = new Float32Array(DISK_COUNT * 2);
       const sortedDepth = new Float32Array(DISK_COUNT);
+      const sortedRank = new Float32Array(DISK_COUNT);
       for (let j = 0; j < DISK_COUNT; j++) {
         const i = idx[j];
         sortedUv[j * 2] = diskInstanceUv[i * 2];
         sortedUv[j * 2 + 1] = diskInstanceUv[i * 2 + 1];
         sortedDepth[j] = depths[i];
+        sortedRank[j] = i;
       }
 
       const geometry = {
@@ -414,6 +437,11 @@
           },
           instanceDepth: {
             data: sortedDepth,
+            itemSize: 1,
+            perInstance: true,
+          },
+          instanceRank: {
+            data: sortedRank,
             itemSize: 1,
             perInstance: true,
           },
@@ -464,6 +492,7 @@
           diskScale: this.diskScale,
           diskSwirl: this.diskSwirl,
           diskSwirlOuter: this.diskSwirlOuter,
+          diskCount: this.diskCount,
           diskOpacity: this.diskOpacity,
           diskBlades: this.diskBlades,
           diskAngle: this.diskAngle,
@@ -548,6 +577,7 @@
     pane.addBinding(effect, "swirl", { min: 0, max: 1, step: 0.01 });
 
     const disk = pane.addFolder({ title: "Disk" });
+    disk.addBinding(effect, "diskCount", { min: 0, max: 65536, step: 256 });
     disk.addBinding(effect, "diskScale", { min: 0, max: 2, step: 0.01 });
     disk.addBinding(effect, "diskSwirl", { min: 0, max: 1, step: 0.01 });
     disk.addBinding(effect, "diskSwirlOuter", { min: 0, max: 1, step: 0.01 });
