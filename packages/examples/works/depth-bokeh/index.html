@@ -191,6 +191,7 @@
     uniform float aperture;
     uniform float diskScale;
     uniform float diskSwirl;
+    uniform float diskSwirlOuter;
     uniform float lumThreshold;
     uniform float lumGamma;
     uniform float diskOpacity;
@@ -222,11 +223,13 @@
       vec2 centerNdc = instanceUv * 2.0 - 1.0;
 
       // Asymmetric vignette squash. The quad's local position is
-      // split into (tangential, radial) basis around the image center.
-      // Only the inward-facing half (position.y < 0, toward the image
-      // center) is compressed; the outward half keeps its full radius,
-      // so each disk becomes a half-moon with the round side facing
-      // away from center. Smooth transition across position.y = 0.
+      // split into (tangential, radial) basis around the image center;
+      // the inward-facing half (position.y < 0, toward the image
+      // center) is compressed by `squash`, the outward half by
+      // `squash * diskSwirlOuter`. diskSwirlOuter=0 gives a clean
+      // half-moon (outer keeps full radius); =1 gives a symmetric
+      // ellipse (both halves equally squashed); in between scales the
+      // overall disk size down while keeping the half-moon character.
       vec2 fromCenterPx = (instanceUv - 0.5) * dstSize;
       float rPx = length(fromCenterPx);
       vec2 radialDir = rPx > 1.0 ? fromCenterPx / rPx : vec2(1.0, 0.0);
@@ -235,7 +238,8 @@
       float rNorm = rPx / halfDiag;
       float squash = clamp(diskSwirl * rNorm, 0.0, 0.98);
       float side = smoothstep(-0.15, 0.15, position.y);
-      float radialFactor = mix(1.0 - squash, 1.0, side);
+      float radialFactor =
+        mix(1.0 - squash, 1.0 - squash * diskSwirlOuter, side);
 
       vec2 pxOffset = (
         tangDir * position.x +
@@ -323,7 +327,8 @@
       this.diskAngle = 0;
       this.diskSoftness = 0.25;
       this.diskFill = 1.0;        // interior opacity (1=solid, 0=ring)
-      this.diskSwirl = 0;         // radial squash strength (Helios)
+      this.diskSwirl = 0;         // inward squash strength at periphery
+      this.diskSwirlOuter = 0;    // outward squash (0=half-moon, 1=ellipse)
       this.lumThreshold = 0.65;
       this.lumGamma = 2.0;
       this._resources = new Map();
@@ -458,6 +463,7 @@
           aperture: this.aperture,
           diskScale: this.diskScale,
           diskSwirl: this.diskSwirl,
+          diskSwirlOuter: this.diskSwirlOuter,
           diskOpacity: this.diskOpacity,
           diskBlades: this.diskBlades,
           diskAngle: this.diskAngle,
@@ -544,6 +550,7 @@
     const disk = pane.addFolder({ title: "Disk" });
     disk.addBinding(effect, "diskScale", { min: 0, max: 2, step: 0.01 });
     disk.addBinding(effect, "diskSwirl", { min: 0, max: 1, step: 0.01 });
+    disk.addBinding(effect, "diskSwirlOuter", { min: 0, max: 1, step: 0.01 });
     disk.addBinding(effect, "diskOpacity", { min: 0, max: 2, step: 0.01 });
     disk.addBinding(effect, "diskBlades", { min: 0, max: 12, step: 1 });
     disk.addBinding(effect, "diskAngle", { min: 0, max: 6.283, step: 0.01 });
