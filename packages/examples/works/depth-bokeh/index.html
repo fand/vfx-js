@@ -355,11 +355,11 @@
       this.diskCount = 16384;     // up to DISK_COUNT (256*256 = 65536)
       this.diskScale = 0.6;       // radius in CoC units
       this.diskOpacity = 0.8;
-      this.diskBlades = 7;
+      this.diskBlades = 9;
       this.diskAngle = 1.0;
       this.diskSoftness = 0.1;
       this.diskFill = 0.7;        // interior opacity (1=solid, 0=ring)
-      this.diskSwirl = 1.0;       // inward squash strength at periphery
+      this.diskSwirl = 1.2;       // inward squash strength at periphery
       this.diskSwirlOuter = 0.7;  // outward squash (0=half-moon, 1=ellipse)
       this.lumThreshold = 0;
       this.lumGamma = 2.0;
@@ -610,7 +610,7 @@
     disk.addBinding(effect, "diskCount", { min: 0, max: 65536, step: 256 });
     disk.addBinding(effect, "diskScale", { min: 0, max: 2, step: 0.01 });
     disk.addBinding(effect, "diskSwirl", { min: 0, max: 3, step: 0.01 });
-    disk.addBinding(effect, "diskSwirlOuter", { min: 0, max: 1, step: 0.01 });
+    disk.addBinding(effect, "diskSwirlOuter", { min: 0, max: 3, step: 0.01 });
     disk.addBinding(effect, "diskOpacity", { min: 0, max: 2, step: 0.01 });
     disk.addBinding(effect, "diskBlades", { min: 0, max: 12, step: 1 });
     disk.addBinding(effect, "diskAngle", { min: 0, max: 6.283, step: 0.01 });
