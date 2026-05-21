@@ -198,7 +198,6 @@
     uniform float aperture;
     uniform float diskScale;
     uniform float diskSwirl;
-    uniform float diskSwirlOuter;
     uniform float diskCount;
     uniform float lumThreshold;
     uniform float lumGamma;
@@ -208,6 +207,7 @@
     out vec3 v_color;
     out float v_opacity;
     out float v_depth;
+    out float v_squash;
 
     void main() {
       // Prefix-cull by Halton rank so the rendered set is always a
@@ -237,19 +237,17 @@
         v_color = vec3(0.0);
         v_opacity = 0.0;
         v_depth = 0.0;
+        v_squash = 0.0;
         return;
       }
 
       vec2 centerNdc = instanceUv * 2.0 - 1.0;
 
-      // Asymmetric vignette squash. The quad's local position is
-      // split into (tangential, radial) basis around the image center;
-      // the inward-facing half (position.y < 0, toward the image
-      // center) is compressed by 'squash', the outward half by
-      // 'squash * diskSwirlOuter'. diskSwirlOuter=0 gives a clean
-      // half-moon (outer keeps full radius); =1 gives a symmetric
-      // ellipse (both halves equally squashed); in between scales the
-      // overall disk size down while keeping the half-moon character.
+      // Quad is symmetric in (tang, radial) basis around the image
+      // center; the half-moon vignette mask is applied in the FS using
+      // v_squash + the diskSwirlOuter uniform. Deforming the quad here
+      // would just produce a pinched trapezoid (sides shifted outward),
+      // not a clean half-moon.
       vec2 fromCenterPx = (instanceUv - 0.5) * dstSize;
       float rPx = length(fromCenterPx);
       vec2 radialDir = rPx > 1.0 ? fromCenterPx / rPx : vec2(1.0, 0.0);
@@ -257,13 +255,10 @@
       float halfDiag = length(dstSize) * 0.5;
       float rNorm = rPx / halfDiag;
       float squash = clamp(diskSwirl * rNorm, 0.0, 0.98);
-      float side = smoothstep(-0.15, 0.15, position.y);
-      float radialFactor =
-        mix(1.0 - squash, 1.0 - squash * diskSwirlOuter, side);
 
       vec2 pxOffset = (
         tangDir * position.x +
-        radialDir * position.y * radialFactor
+        radialDir * position.y
       ) * diskRadius;
       vec2 ndc = centerNdc + pxOffset * 2.0 / dstSize;
       gl_Position = vec4(ndc, 0.0, 1.0);
@@ -272,6 +267,7 @@
       v_color = color;
       v_opacity = opacity;
       v_depth = instanceDepth;
+      v_squash = squash;
     }
   `;
 
@@ -282,26 +278,39 @@
     in vec3 v_color;
     in float v_opacity;
     in float v_depth;
+    in float v_squash;
     uniform sampler2D depthTex;
     uniform float diskBlades;
     uniform float diskSoftness;
     uniform float diskAngle;
     uniform float diskFill;
+    uniform float diskSwirlOuter;
     out vec4 outColor;
 
     ${decodeDepthGLSL}
 
     void main() {
+      // Half-moon vignette mask: outward half (v_quadUv.y > 0) keeps
+      // the full radius scaled by (1 - squash*outer), inward half
+      // (y < 0) is compressed to (1 - squash). Dividing v_quadUv.y by
+      // that scale before the radial distance test stretches the
+      // unit-circle/n-gon mask into a half-moon shape, with the round
+      // side facing outward from the image center.
+      float outwardR = max(1.0 - v_squash * diskSwirlOuter, 1e-3);
+      float inwardR = max(1.0 - v_squash, 1e-3);
+      float yScale = v_quadUv.y > 0.0 ? outwardR : inwardR;
+      vec2 maskUv = vec2(v_quadUv.x, v_quadUv.y / yScale);
+
       // diskBlades < 3 → circular disk; otherwise regular N-gon
       // inscribed in the unit circle (signed dist from center). All
       // splats share diskAngle: real apertures are fixed for the
       // whole frame, not randomly oriented per highlight.
       float dist;
       if (diskBlades < 2.5) {
-        dist = length(v_quadUv);
+        dist = length(maskUv);
       } else {
         float c = cos(diskAngle), s = sin(diskAngle);
-        vec2 p = mat2(c, -s, s, c) * v_quadUv;
+        vec2 p = mat2(c, -s, s, c) * maskUv;
         float ang = atan(p.x, p.y) + 3.14159265;
         float seg = 6.28318530 / diskBlades;
         float a = mod(ang, seg) - seg * 0.5;
