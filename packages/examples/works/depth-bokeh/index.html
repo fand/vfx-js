@@ -39,13 +39,34 @@
     pointer-events: none;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
+  .indicator {
+    position: fixed;
+    left: 50%;
+    bottom: 48px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    pointer-events: none;
+    z-index: 10001;
+  }
+  .indicator .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transition: background 180ms;
+  }
+  .indicator .dot.active {
+    background: #fff;
+  }
 </style>
 
 <img id="photo" src="./img1.png" alt="" />
+<div class="indicator"></div>
 <div class="hint">Press &amp; drag to focus &middot; ← / → to switch image</div>
 <div
   id="fade"
-  style="position:fixed;inset:0;background:#0a0a0a;opacity:0;pointer-events:none;z-index:10001;transition:opacity 180ms ease-out"
+  style="position:fixed;background:#0a0a0a;opacity:0;pointer-events:none;z-index:10001;transition:opacity 180ms ease-out"
 ></div>
 
 <script type="module">
@@ -592,17 +613,41 @@
 
     const imgParams = { image: IMAGES[0].id };
     const fadeEl = document.getElementById("fade");
-    let switching = false;
+    const indicatorEl = document.querySelector(".indicator");
+    for (const spec of IMAGES) {
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.dataset.id = spec.id;
+      indicatorEl.appendChild(dot);
+    }
+    function updateIndicator(id) {
+      for (const dot of indicatorEl.querySelectorAll(".dot")) {
+        dot.classList.toggle("active", dot.dataset.id === id);
+      }
+    }
+    function syncFadeBounds() {
+      const r = img.getBoundingClientRect();
+      fadeEl.style.left = r.left + "px";
+      fadeEl.style.top = r.top + "px";
+      fadeEl.style.width = r.width + "px";
+      fadeEl.style.height = r.height + "px";
+    }
+    syncFadeBounds();
+    updateIndicator(imgParams.image);
+    window.addEventListener("resize", syncFadeBounds);
 
+    let switching = false;
     async function switchImage(id) {
       const spec = IMAGES.find((i) => i.id === id);
       if (!spec || switching || imgParams.image === id) return;
       switching = true;
+      syncFadeBounds();
       fadeEl.style.opacity = "1";
       await new Promise((r) => setTimeout(r, 180));
       img.src = spec.color;
       effect.setActiveImage(id);
       imgParams.image = id;
+      updateIndicator(id);
       fadeEl.style.opacity = "0";
       await new Promise((r) => setTimeout(r, 180));
       switching = false;
