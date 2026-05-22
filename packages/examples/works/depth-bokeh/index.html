@@ -134,10 +134,23 @@
     RawImage,
   } from "https://esm.sh/@huggingface/transformers@3.7.1";
 
+  // new URL(literal, import.meta.url) so Vite emits these as bundled assets.
   const IMAGES = [
-    { id: "img1", color: "./img1.png", depth: "./img1_depth.png" },
-    { id: "img2", color: "./img2.png", depth: "./img2_depth.png" },
-    { id: "img3", color: "./img3.png", depth: "./img3_depth.png" },
+    {
+      id: "img1",
+      color: new URL("./img1.png", import.meta.url).href,
+      depth: new URL("./img1_depth.png", import.meta.url).href,
+    },
+    {
+      id: "img2",
+      color: new URL("./img2.png", import.meta.url).href,
+      depth: new URL("./img2_depth.png", import.meta.url).href,
+    },
+    {
+      id: "img3",
+      color: new URL("./img3.png", import.meta.url).href,
+      depth: new URL("./img3_depth.png", import.meta.url).href,
+    },
     { id: "webcam", live: true },
   ];
 
