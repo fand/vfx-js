@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Depth Bokeh</title>
+
+<style>
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    background: #0a0a0a;
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #photo {
+    max-width: 100vw;
+    max-height: 100vh;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .hint {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 6px 12px;
+    border-radius: 999px;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    z-index: 10001;
+  }
+  .indicator {
+    position: fixed;
+    left: 50%;
+    bottom: 48px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    pointer-events: none;
+    z-index: 10001;
+  }
+  .indicator .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transition: background 180ms;
+  }
+  .indicator .dot.active {
+    background: #fff;
+  }
+  #webcam-overlay {
+    position: fixed;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 10001;
+    background: rgba(0, 0, 0, 0.6);
+    color: #eee;
+    text-align: center;
+    padding: 24px;
+    box-sizing: border-box;
+    pointer-events: auto;
+    font-size: 0.9rem;
+    transition: opacity 180ms ease-out;
+  }
+  #webcam-overlay button {
+    appearance: none;
+    border: 0;
+    background: #fff;
+    color: #111;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 10px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  #webcam-overlay button:hover {
+    background: #f0f0f0;
+  }
+  #webcam-overlay .bar {
+    width: 220px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    overflow: hidden;
+  }
+  #webcam-overlay .bar > span {
+    display: block;
+    height: 100%;
+    background: #fff;
+    transition: width 120ms;
+  }
+  #webcam-overlay .label {
+    font-size: 0.8rem;
+    opacity: 0.75;
+    word-break: break-all;
+    max-width: 260px;
+  }
+  #webcam-overlay .err {
+    color: #ffb4b4;
+    max-width: 260px;
+  }
+</style>
+
+<img id="photo" src="./img1.png" alt="" />
+<div class="indicator"></div>
+<div class="hint">Press &amp; drag to focus &middot; ← / → to switch image</div>
+<div
+  id="fade"
+  style="position:fixed;background:#0a0a0a;opacity:0;pointer-events:none;z-index:10001;transition:opacity 180ms ease-out"
+></div>
+<div id="webcam-overlay"></div>
+
+<script type="module">
+  import { VFX } from "@vfx-js/core";
+  import { Pane } from "https://esm.sh/tweakpane@4.0.5";
+  import {
+    AutoModel,
+    AutoImageProcessor,
+    RawImage,
+  } from "https://esm.sh/@huggingface/transformers@3.7.1";
+
+  // new URL(literal, import.meta.url) so Vite emits these as bundled assets.
+  const IMAGES = [
+    {
+      id: "img1",
+      color: new URL("./img1.png", import.meta.url).href,
+      depth: new URL("./img1_depth.png", import.meta.url).href,
+    },
+    {
+      id: "img2",
+      color: new URL("./img2.png", import.meta.url).href,
+      depth: new URL("./img2_depth.png", import.meta.url).href,
+    },
+    {
+      id: "img3",
+      color: new URL("./img3.png", import.meta.url).href,
+      depth: new URL("./img3_depth.png", import.meta.url).href,
+    },
+    { id: "webcam", live: true },
+  ];
+
+  const WEBCAM_MODEL_ID = "onnx-community/depth-anything-v2-small";
+  const TRANSPARENT_PNG =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+  // Grayscale depth map: white = near (depth 1), black = far (depth 0).
+  // All channels carry the same value, so any one of them works.
+  const decodeDepthGLSL = `
+    float decodeDepth(vec3 col) {
+      return col.r;
+    }
+  `;
+
+  // Single-pass DoF. For each output pixel:
+  //   - CoC = |depth - focal| * aperture
+  //   - Disk kernel: golden-spiral disk, radius coc.
+  //   - Swirl kernel: same samples remapped onto a tangentially
+  //     elongated / radially narrow arc concentric to the image
+  //     center, so highlights become curved streaks.
+  // Each sample is taken at mix(diskPos, swirlPos, swirl) — a single
+  // gather over a smoothly morphing kernel shape, not a blend of two
+  // finished blurs.
+  const BLUR_SAMPLES = 64;
+  const FRAG_BLUR = `#version 300 es
+    precision highp float;
+    in vec2 uv;
+    in vec2 uvSrc;
+    uniform sampler2D colorTex;
+    uniform sampler2D depthTex;
+    uniform vec2 dstSize;
+    uniform float focal;
+    uniform float aperture;
+    uniform float swirl;
+    out vec4 outColor;
+
+    ${decodeDepthGLSL}
+
+    void main() {
+      float d = decodeDepth(texture(depthTex, uv).rgb);
+      vec3 sharp = texture(colorTex, uvSrc).rgb;
+      float coc = abs(d - focal) * aperture;
+      if (coc < 0.5) {
+        outColor = vec4(sharp, 1.0);
+        return;
+      }
+      // Hash for per-pixel rotation of the golden-spiral sample set;
+      // breaks up concentric kernel banding into noise.
+      float a0 = fract(sin(dot(uv * dstSize, vec2(12.9898, 78.233))) * 43758.5453) * 6.28318530;
+
+      // Swirl kernel parameters. ASPECT > 1 stretches tangentially
+      // (mapped to angular sweep) and shrinks radially. arcAng capped
+      // to one radian so pixels near the image center don't wrap.
+      const float SWIRL_ASPECT = 3.0;
+      vec2 imgCenter = vec2(0.5);
+      vec2 fromCpx = (uvSrc - imgCenter) * dstSize;
+      float rPx = length(fromCpx);
+      float baseAng = atan(fromCpx.y, fromCpx.x);
+      float tangLen = coc * SWIRL_ASPECT;
+      float radExt = coc / SWIRL_ASPECT;
+      float arcAng = min(tangLen / max(rPx, 1.0), 1.0);
+
+      vec3 acc = vec3(0.0);
+      float weightSum = 0.0;
+      for (int i = 0; i < ${BLUR_SAMPLES}; i++) {
+        float t = (float(i) + 0.5) / float(${BLUR_SAMPLES});
+        float r = sqrt(t);
+        float a = a0 + float(i) * 2.39996323;
+        float ux = cos(a) * r;
+        float uy = sin(a) * r;
+
+        vec2 diskPos = uvSrc + vec2(ux, uy) * coc / dstSize;
+
+        float dAng = ux * arcAng;
+        float newR = rPx + uy * radExt;
+        vec2 swirlPos = imgCenter
+          + newR * vec2(cos(baseAng + dAng), sin(baseAng + dAng)) / dstSize;
+
+        vec2 sPos = mix(diskPos, swirlPos, swirl);
+        float inB = step(0.0, sPos.x) * step(sPos.x, 1.0)
+                  * step(0.0, sPos.y) * step(sPos.y, 1.0);
+
+        // Sample contributes iff its own bokeh circle reaches this
+        // pixel. Blocks in-focus foreground from bleeding into bg
+        // gathers and vice versa. Use the logical disk distance
+        // (r*coc), not the actual sPos distance — the swirl kernel
+        // is an artistic remapping of the disk, and using physical
+        // distance would reject all the off-axis swirl samples.
+        float depthS = decodeDepth(texture(depthTex, sPos).rgb);
+        float cocS = abs(depthS - focal) * aperture;
+        float depthW = smoothstep(-1.0, 1.0, cocS - r * coc);
+
+        // Flat interior + soft edge. Smooths kernel rim and stops
+        // individual samples from showing as discrete bright dots in
+        // bright highlights.
+        float kernelW = 1.0 - smoothstep(0.5, 1.0, r);
+
+        // OOB samples keep wDiv proportional to kernelW so partial-OOB
+        // kernels still dim (cat's-eye). Depth-rejected in-bounds
+        // samples drop out of the divisor entirely so silhouettes
+        // don't get dark halos.
+        float wAcc = inB * depthW * kernelW;
+        float wDiv = mix(1.0, depthW, inB) * kernelW;
+        acc += texture(colorTex, sPos).rgb * wAcc;
+        weightSum += wDiv;
+      }
+      outColor = vec4(acc / max(weightSum, 1.0), 1.0);
+    }
+  `;
+
+  // Bokeh disk scatter pass. Halton-distributed splats; per-splat
+  // opacity is driven by source luminance through a threshold + gamma
+  // curve, size by CoC at the splat's depth. Composited onto the
+  // gather output with src-over (premultiplied alpha).
+  // 256x256 = 65536 is the upper bound; the actual count rendered is
+  // capped by the diskCount uniform, which VS-culls instances whose
+  // Halton rank exceeds the active count. Because Halton sequences
+  // are low-discrepancy at every prefix length, any active count
+  // gives a roughly uniform sub-sampling of the full set.
+  const DISK_GRID = 256;
+  const DISK_COUNT = DISK_GRID * DISK_GRID;
+
+  function halton(i, b) {
+    let f = 1, r = 0;
+    while (i > 0) {
+      f /= b;
+      r += f * (i % b);
+      i = Math.floor(i / b);
+    }
+    return r;
+  }
+
+  const diskInstanceUv = new Float32Array(DISK_COUNT * 2);
+  for (let i = 0; i < DISK_COUNT; i++) {
+    diskInstanceUv[i * 2] = halton(i + 1, 2);
+    diskInstanceUv[i * 2 + 1] = halton(i + 1, 3);
+  }
+
+  const VERT_DISK = `#version 300 es
+    precision highp float;
+    in vec2 position;
+    in vec2 instanceUv;
+    in float instanceDepth;
+    in float instanceRank;
+    uniform sampler2D colorTex;
+    uniform vec2 dstSize;
+    uniform float focal;
+    uniform float aperture;
+    uniform float diskScale;
+    uniform float diskSwirl;
+    uniform float diskCount;
+    uniform float lumThreshold;
+    uniform float lumGamma;
+    uniform float diskOpacity;
+    out vec2 v_quadUv;
+    out vec2 v_uv;
+    out vec3 v_color;
+    out float v_opacity;
+    out float v_depth;
+    out float v_squash;
+
+    void main() {
+      // Prefix-cull by Halton rank so the rendered set is always a
+      // low-discrepancy subset of the full pre-baked instance pool.
+      if (instanceRank >= diskCount) {
+        gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+        v_quadUv = vec2(0.0);
+        v_uv = vec2(0.0);
+        v_color = vec3(0.0);
+        v_opacity = 0.0;
+        v_depth = 0.0;
+        return;
+      }
+
+      vec3 color = texture(colorTex, instanceUv).rgb;
+      float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+      float opacity =
+        pow(smoothstep(lumThreshold, 1.0, lum), lumGamma) * diskOpacity;
+
+      float coc = abs(instanceDepth - focal) * aperture;
+      float diskRadius = coc * diskScale;
+
+      if (opacity < 0.005 || diskRadius < 0.5) {
+        gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+        v_quadUv = vec2(0.0);
+        v_uv = vec2(0.0);
+        v_color = vec3(0.0);
+        v_opacity = 0.0;
+        v_depth = 0.0;
+        v_squash = 0.0;
+        return;
+      }
+
+      vec2 centerNdc = instanceUv * 2.0 - 1.0;
+
+      // Quad is symmetric in (tang, radial) basis around the image
+      // center; the half-moon vignette mask is applied in the FS using
+      // v_squash + the diskSwirlBias uniform. Deforming the quad here
+      // would just produce a pinched trapezoid (sides shifted outward),
+      // not a clean half-moon.
+      vec2 fromCenterPx = (instanceUv - 0.5) * dstSize;
+      float rPx = length(fromCenterPx);
+      vec2 radialDir = rPx > 1.0 ? fromCenterPx / rPx : vec2(1.0, 0.0);
+      vec2 tangDir = vec2(-radialDir.y, radialDir.x);
+      float halfDiag = length(dstSize) * 0.5;
+      float rNorm = rPx / halfDiag;
+      float squash = clamp(diskSwirl * rNorm, 0.0, 0.98);
+
+      vec2 pxOffset = (
+        tangDir * position.x +
+        radialDir * position.y
+      ) * diskRadius;
+      vec2 ndc = centerNdc + pxOffset * 2.0 / dstSize;
+      gl_Position = vec4(ndc, 0.0, 1.0);
+      v_quadUv = position;
+      v_uv = ndc * 0.5 + 0.5;
+      v_color = color;
+      v_opacity = opacity;
+      v_depth = instanceDepth;
+      v_squash = squash;
+    }
+  `;
+
+  // Live variant: instanceDepth is read from depthTex in the VS instead
+  // of an attribute, so the same Halton geometry can be reused as the
+  // depth map changes per inference. Cost: no CPU sort → disk-vs-disk
+  // ordering follows Halton index, not depth. Disk-vs-scene occlusion is
+  // still correct because that's handled in FRAG_DISK against depthTex.
+  const VERT_DISK_LIVE = `#version 300 es
+    precision highp float;
+    in vec2 position;
+    in vec2 instanceUv;
+    in float instanceRank;
+    uniform sampler2D colorTex;
+    uniform sampler2D depthTex;
+    uniform vec2 dstSize;
+    uniform float focal;
+    uniform float aperture;
+    uniform float diskScale;
+    uniform float diskSwirl;
+    uniform float diskCount;
+    uniform float lumThreshold;
+    uniform float lumGamma;
+    uniform float diskOpacity;
+    out vec2 v_quadUv;
+    out vec2 v_uv;
+    out vec3 v_color;
+    out float v_opacity;
+    out float v_depth;
+    out float v_squash;
+
+    ${decodeDepthGLSL}
+
+    void main() {
+      if (instanceRank >= diskCount) {
+        gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+        v_quadUv = vec2(0.0);
+        v_uv = vec2(0.0);
+        v_color = vec3(0.0);
+        v_opacity = 0.0;
+        v_depth = 0.0;
+        v_squash = 0.0;
+        return;
+      }
+
+      float instanceDepth = decodeDepth(texture(depthTex, instanceUv).rgb);
+
+      vec3 color = texture(colorTex, instanceUv).rgb;
+      float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+      float opacity =
+        pow(smoothstep(lumThreshold, 1.0, lum), lumGamma) * diskOpacity;
+
+      float coc = abs(instanceDepth - focal) * aperture;
+      float diskRadius = coc * diskScale;
+
+      if (opacity < 0.005 || diskRadius < 0.5) {
+        gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+        v_quadUv = vec2(0.0);
+        v_uv = vec2(0.0);
+        v_color = vec3(0.0);
+        v_opacity = 0.0;
+        v_depth = 0.0;
+        v_squash = 0.0;
+        return;
+      }
+
+      vec2 centerNdc = instanceUv * 2.0 - 1.0;
+      vec2 fromCenterPx = (instanceUv - 0.5) * dstSize;
+      float rPx = length(fromCenterPx);
+      vec2 radialDir = rPx > 1.0 ? fromCenterPx / rPx : vec2(1.0, 0.0);
+      vec2 tangDir = vec2(-radialDir.y, radialDir.x);
+      float halfDiag = length(dstSize) * 0.5;
+      float rNorm = rPx / halfDiag;
+      float squash = clamp(diskSwirl * rNorm, 0.0, 0.98);
+
+      vec2 pxOffset = (
+        tangDir * position.x +
+        radialDir * position.y
+      ) * diskRadius;
+      vec2 ndc = centerNdc + pxOffset * 2.0 / dstSize;
+      gl_Position = vec4(ndc, 0.0, 1.0);
+      v_quadUv = position;
+      v_uv = ndc * 0.5 + 0.5;
+      v_color = color;
+      v_opacity = opacity;
+      v_depth = instanceDepth;
+      v_squash = squash;
+    }
+  `;
+
+  // Shared geometry for live sources: Halton points in natural order, no
+  // pre-baked instanceDepth attribute. Built once at module load.
+  const liveDiskRank = new Float32Array(DISK_COUNT);
+  for (let i = 0; i < DISK_COUNT; i++) liveDiskRank[i] = i;
+  const LIVE_DISK_GEOMETRY = {
+    attributes: {
+      position: {
+        data: new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]),
+        itemSize: 2,
+      },
+      instanceUv: {
+        data: diskInstanceUv,
+        itemSize: 2,
+        perInstance: true,
+      },
+      instanceRank: {
+        data: liveDiskRank,
+        itemSize: 1,
+        perInstance: true,
+      },
+    },
+    indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
+    instanceCount: DISK_COUNT,
+  };
+
+  const FRAG_DISK = `#version 300 es
+    precision highp float;
+    in vec2 v_quadUv;
+    in vec2 v_uv;
+    in vec3 v_color;
+    in float v_opacity;
+    in float v_depth;
+    in float v_squash;
+    uniform sampler2D depthTex;
+    uniform float diskBlades;
+    uniform float diskSoftness;
+    uniform float diskAngle;
+    uniform float diskFill;
+    uniform float diskSwirlBias;
+    out vec4 outColor;
+
+    ${decodeDepthGLSL}
+
+    void main() {
+      // Half-moon vignette mask: outward half (v_quadUv.y > 0) is
+      // compressed by squash*(1-bias), inward half (y < 0) by squash.
+      // bias=0 compresses both halves equally (symmetric ellipse);
+      // bias=1 leaves the outward half at full radius (flat-bottom
+      // half-moon). Dividing v_quadUv.y by the scale stretches the
+      // unit-circle / n-gon mask into the chosen half-moon shape.
+      float outwardR = max(1.0 - v_squash * (1.0 - diskSwirlBias), 1e-3);
+      float inwardR = max(1.0 - v_squash, 1e-3);
+      float yScale = v_quadUv.y > 0.0 ? outwardR : inwardR;
+      vec2 maskUv = vec2(v_quadUv.x, v_quadUv.y / yScale);
+
+      // diskBlades < 3 → circular disk; otherwise regular N-gon
+      // inscribed in the unit circle (signed dist from center). All
+      // splats share diskAngle: real apertures are fixed for the
+      // whole frame, not randomly oriented per highlight.
+      float dist;
+      if (diskBlades < 2.5) {
+        dist = length(maskUv);
+      } else {
+        float c = cos(diskAngle), s = sin(diskAngle);
+        vec2 p = mat2(c, -s, s, c) * maskUv;
+        float ang = atan(p.x, p.y) + 3.14159265;
+        float seg = 6.28318530 / diskBlades;
+        float a = mod(ang, seg) - seg * 0.5;
+        dist = length(p) * cos(a) / cos(seg * 0.5);
+      }
+      if (dist > 1.0) discard;
+      // Two-zone radial profile: outer fade (rim → 0 at the edge) and
+      // inner blend (rim plateau → diskFill in the centre). diskFill=1
+      // matches the previous solid-disk look; diskFill=0 leaves only
+      // the rim visible.
+      float rimAt = max(1.0 - diskSoftness, 0.001);
+      float fillAt = max(rimAt - diskSoftness, 0.0);
+      float outer = smoothstep(1.0, rimAt, dist);
+      float inner = smoothstep(rimAt, fillAt, dist);
+      float mask = outer * mix(1.0, diskFill, inner);
+
+      // Depth occlusion against the source depth map: if the underlying
+      // pixel is closer to camera than this disk's source pixel, the
+      // disk should be hidden behind it (no foreground overlap). Disks
+      // are also pre-sorted far-to-near on the CPU so src-over gives
+      // correct disk-vs-disk ordering.
+      float pixelDepth = decodeDepth(texture(depthTex, v_uv).rgb);
+      float occlusion = smoothstep(0.02, 0.08, pixelDepth - v_depth);
+      mask *= 1.0 - occlusion;
+
+      float alpha = mask * v_opacity;
+      if (alpha < 1e-4) discard;
+      outColor = vec4(v_color * alpha, alpha);
+    }
+  `;
+
+  class DepthBokehEffect {
+    constructor() {
+      this.focal = 0.65;
+      // Actual aperture used for rendering. Starts at 0 (pan-focus)
+      // and is animated externally by the press/release loop.
+      this.aperture = 0;
+      // 0 = pure disk blur, 1 = pure rotational/swirl blur around the
+      // image centre. Anything in between cross-fades the two.
+      this.swirl = 0.1;
+      // Disk scatter pass.
+      this.diskCount = 16384;     // up to DISK_COUNT (256*256 = 65536)
+      this.diskScale = 0.6;       // radius in CoC units
+      this.diskOpacity = 0.8;
+      this.diskBlades = 9;
+      this.diskAngle = 1.0;
+      this.diskSoftness = 0.1;
+      this.diskFill = 0.7;        // interior opacity (1=solid, 0=ring)
+      this.diskSwirl = 1.2;       // inward squash strength at periphery
+      this.diskSwirlBias = 0.3;  // 0 = symmetric ellipse, 1 = flat-bottom half-moon
+      this.lumThreshold = 0;
+      this.lumGamma = 2.0;
+      this._resources = new Map();
+      this._activeId = IMAGES[0].id;
+    }
+
+    async init(ctx) {
+      this._ctx = ctx;
+      for (const spec of IMAGES) {
+        if (spec.live) {
+          // Pre-install a 1×1 black placeholder so the canvas clears to
+          // black on activation; installLiveSource replaces it later.
+          this._installBlackPlaceholder(spec.id);
+          continue;
+        }
+        this._resources.set(spec.id, await this._loadImage(ctx, spec));
+      }
+    }
+
+    _installBlackPlaceholder(id) {
+      const c = document.createElement("canvas");
+      c.width = c.height = 1;
+      const cx = c.getContext("2d");
+      cx.fillStyle = "#000";
+      cx.fillRect(0, 0, 1, 1);
+      const colorTex = this._ctx.wrapTexture(c, {
+        filter: "linear",
+        wrap: "clamp",
+        autoUpdate: false,
+      });
+      const depthTex = this._ctx.wrapTexture(c, {
+        filter: "linear",
+        wrap: "clamp",
+        autoUpdate: false,
+      });
+      this._resources.set(id, {
+        colorTex,
+        depthTex,
+        geometry: LIVE_DISK_GEOMETRY,
+        depthCanvas: c,
+        live: true,
+      });
+    }
+
+    installLiveSource(id, { displayCanvas, depthCanvas }) {
+      const colorTex = this._ctx.wrapTexture(displayCanvas, {
+        filter: "linear",
+        wrap: "clamp",
+      });
+      const depthTex = this._ctx.wrapTexture(depthCanvas, {
+        filter: "linear",
+        wrap: "clamp",
+      });
+      this._resources.set(id, {
+        colorTex,
+        depthTex,
+        geometry: LIVE_DISK_GEOMETRY,
+        depthCanvas,
+        live: true,
+      });
+    }
+
+    async _loadImage(ctx, spec) {
+      const [colorImg, depthImg] = await Promise.all(
+        [spec.color, spec.depth].map(async (src) => {
+          const i = new Image();
+          i.crossOrigin = "anonymous";
+          i.src = src;
+          await i.decode();
+          return i;
+        }),
+      );
+      const colorTex = ctx.wrapTexture(colorImg, {
+        filter: "linear",
+        wrap: "clamp",
+      });
+      const depthTex = ctx.wrapTexture(depthImg, {
+        filter: "linear",
+        wrap: "clamp",
+      });
+
+      // CPU-decode the depth map so we can (a) feed per-instance depth
+      // to the disk geometry and pre-sort far → near for correct
+      // disk-vs-disk occlusion, and (b) answer pointer-driven focal
+      // lookups without an extra readback per click.
+      const dC = document.createElement("canvas");
+      dC.width = depthImg.naturalWidth;
+      dC.height = depthImg.naturalHeight;
+      const d2 = dC.getContext("2d", { willReadFrequently: true });
+      d2.drawImage(depthImg, 0, 0);
+      const dData = d2.getImageData(0, 0, dC.width, dC.height).data;
+      const idx = new Uint32Array(DISK_COUNT);
+      const depths = new Float32Array(DISK_COUNT);
+      for (let i = 0; i < DISK_COUNT; i++) {
+        idx[i] = i;
+        const u = diskInstanceUv[i * 2];
+        const v = diskInstanceUv[i * 2 + 1];
+        // GL textures upload with UNPACK_FLIP_Y_WEBGL=true, so
+        // instanceUv.y=0 maps to the bottom of the image; getImageData
+        // is top-down. Flip v when indexing the canvas.
+        const px = Math.min(dC.width - 1, Math.floor(u * dC.width));
+        const py = Math.min(
+          dC.height - 1,
+          Math.floor((1 - v) * dC.height),
+        );
+        const p = (py * dC.width + px) * 4;
+        depths[i] = decodeDepthRGB(
+          dData[p] / 255,
+          dData[p + 1] / 255,
+          dData[p + 2] / 255,
+        );
+      }
+      idx.sort((a, b) => depths[a] - depths[b]);
+      const sortedUv = new Float32Array(DISK_COUNT * 2);
+      const sortedDepth = new Float32Array(DISK_COUNT);
+      const sortedRank = new Float32Array(DISK_COUNT);
+      for (let j = 0; j < DISK_COUNT; j++) {
+        const i = idx[j];
+        sortedUv[j * 2] = diskInstanceUv[i * 2];
+        sortedUv[j * 2 + 1] = diskInstanceUv[i * 2 + 1];
+        sortedDepth[j] = depths[i];
+        sortedRank[j] = i;
+      }
+
+      const geometry = {
+        attributes: {
+          position: {
+            data: new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]),
+            itemSize: 2,
+          },
+          instanceUv: {
+            data: sortedUv,
+            itemSize: 2,
+            perInstance: true,
+          },
+          instanceDepth: {
+            data: sortedDepth,
+            itemSize: 1,
+            perInstance: true,
+          },
+          instanceRank: {
+            data: sortedRank,
+            itemSize: 1,
+            perInstance: true,
+          },
+        },
+        indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
+        instanceCount: DISK_COUNT,
+      };
+
+      return { colorTex, depthTex, geometry, depthCanvas: dC };
+    }
+
+    setActiveImage(id) {
+      if (this._resources.has(id)) this._activeId = id;
+    }
+
+    activeDepthCanvas() {
+      return this._resources.get(this._activeId)?.depthCanvas ?? null;
+    }
+
+    render(ctx) {
+      const r = this._resources.get(this._activeId);
+      if (!r) return;
+      const dstSize = [ctx.dims.elementPixel[0], ctx.dims.elementPixel[1]];
+      ctx.draw({
+        frag: FRAG_BLUR,
+        target: ctx.target,
+        uniforms: {
+          colorTex: r.colorTex,
+          depthTex: r.depthTex,
+          dstSize,
+          focal: this.focal,
+          aperture: this.aperture,
+          swirl: this.swirl,
+        },
+      });
+      // Live sources sample depth in the VS (VERT_DISK_LIVE) so the same
+      // Halton geometry can be reused as the depth map updates. They lose
+      // disk-vs-disk depth sorting; disk-vs-scene occlusion still works
+      // via FRAG_DISK's sample of depthTex.
+      if (r.geometry) {
+        ctx.draw({
+          vert: r.live ? VERT_DISK_LIVE : VERT_DISK,
+          frag: FRAG_DISK,
+          target: ctx.target,
+          blend: "premultiplied",
+          geometry: r.geometry,
+          uniforms: {
+            colorTex: r.colorTex,
+            depthTex: r.depthTex,
+            dstSize,
+            focal: this.focal,
+            aperture: this.aperture,
+            diskScale: this.diskScale,
+            diskSwirl: this.diskSwirl,
+            diskSwirlBias: this.diskSwirlBias,
+            diskCount: this.diskCount,
+            diskOpacity: this.diskOpacity,
+            diskBlades: this.diskBlades,
+            diskAngle: this.diskAngle,
+            diskSoftness: this.diskSoftness,
+            diskFill: this.diskFill,
+            lumThreshold: this.lumThreshold,
+            lumGamma: this.lumGamma,
+          },
+        });
+      }
+    }
+
+    dispose() {
+      this._resources.clear();
+    }
+  }
+
+  function decodeDepthRGB(r, _g, _b) {
+    return Math.min(1, Math.max(0, r));
+  }
+
+  // Pick model-input dims matching the video aspect, with both dims a
+  // multiple of 14 (depth-anything's patch size). Aim for roughly the
+  // same pixel area as the reference's 504×504 square so inference cost
+  // is comparable across aspects.
+  function pickProcDims(vw, vh, area = 504 * 504, mult = 14) {
+    const aspect = vw / vh;
+    const h0 = Math.sqrt(area / aspect);
+    const h = Math.max(mult, Math.round(h0 / mult) * mult);
+    const w = Math.max(mult, Math.round((h * aspect) / mult) * mult);
+    return { width: w, height: h };
+  }
+
+  // Realtime depth from webcam, via Depth-Anything-V2-small on WebGPU.
+  // Inference runs on its own rAF, gated by _inferring so the main UI
+  // (pane, pointer, keys) stays responsive between inferences.
+  class WebcamSource {
+    constructor() {
+      this.state = "idle"; // idle | requestingCam | loadingModel | ready | error
+      this.error = null;
+      this.progress = 0;
+      this.progressLabel = "";
+      this.video = null;
+      this.displayCanvas = null;
+      this.depthCanvas = null;
+      this.displayWidth = 0;
+      this.displayHeight = 0;
+      this._displayCtx = null;
+      this._depthCtx = null;
+      this._readCanvas = null;
+      this._readCtx = null;
+      this._stream = null;
+      this.model = null;
+      this.processor = null;
+      this._inferring = false;
+      this._loopScheduled = false;
+      this._gateActive = () => false;
+      this._onStateChange = () => {};
+      this._onReady = () => {};
+      // Track per-file progress so the label reflects the largest in-flight
+      // download (the .onnx weights dwarf the config files).
+      this._fileProgress = new Map();
+    }
+
+    _setState(s, err) {
+      this.state = s;
+      this.error = err ?? null;
+      this._onStateChange();
+    }
+
+    async start() {
+      if (this.state === "ready" || this.state === "requestingCam" || this.state === "loadingModel") {
+        return;
+      }
+      try {
+        if (!navigator.gpu) {
+          throw new Error(
+            "WebGPU is required for realtime depth. Try Chrome 113+ or enable the WebGPU flag.",
+          );
+        }
+
+        this._setState("requestingCam");
+        this._stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720 },
+          audio: false,
+        });
+        const video = document.createElement("video");
+        video.srcObject = this._stream;
+        video.playsInline = true;
+        video.muted = true;
+        video.autoplay = true;
+        await video.play();
+        if (!video.videoWidth) {
+          await new Promise((r) =>
+            video.addEventListener("loadedmetadata", r, { once: true }),
+          );
+        }
+        this.video = video;
+
+        // Display canvas at the native video aspect (cap long edge at
+        // 1280 to bound per-frame upload size).
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const cap = 1280;
+        const scale = Math.min(1, cap / Math.max(vw, vh));
+        this.displayWidth = Math.max(2, Math.round(vw * scale));
+        this.displayHeight = Math.max(2, Math.round(vh * scale));
+        this.displayCanvas = document.createElement("canvas");
+        this.displayCanvas.width = this.displayWidth;
+        this.displayCanvas.height = this.displayHeight;
+        this._displayCtx = this.displayCanvas.getContext("2d");
+
+        // Inference + depth output canvases sized to match video aspect
+        // at the model's preferred patch grid. depthCanvas is resized to
+        // predicted_depth.dims on the first inference.
+        const proc = pickProcDims(vw, vh);
+        this.depthCanvas = document.createElement("canvas");
+        this.depthCanvas.width = proc.width;
+        this.depthCanvas.height = proc.height;
+        this._depthCtx = this.depthCanvas.getContext("2d", {
+          willReadFrequently: true,
+        });
+
+        this._readCanvas = document.createElement("canvas");
+        this._readCanvas.width = proc.width;
+        this._readCanvas.height = proc.height;
+        this._readCtx = this._readCanvas.getContext("2d", {
+          willReadFrequently: true,
+        });
+
+        this._setState("loadingModel");
+        const progress_callback = (e) => this._handleProgress(e);
+        this.model = await AutoModel.from_pretrained(WEBCAM_MODEL_ID, {
+          device: "webgpu",
+          dtype: "fp32",
+          progress_callback,
+        });
+        this.processor = await AutoImageProcessor.from_pretrained(
+          WEBCAM_MODEL_ID,
+          { progress_callback },
+        );
+        // Override the default square resize so the model preserves the
+        // video aspect ratio. Both dims are multiples of 14 (patch size).
+        this.processor.size = { width: proc.width, height: proc.height };
+
+        this._setState("ready");
+        this._onReady();
+        this._scheduleLoop();
+      } catch (err) {
+        console.error(err);
+        if (this._stream) {
+          for (const t of this._stream.getTracks()) t.stop();
+          this._stream = null;
+        }
+        this._setState("error", err);
+      }
+    }
+
+    _handleProgress(e) {
+      if (e.status === "progress" && e.total) {
+        this._fileProgress.set(e.file, { loaded: e.loaded, total: e.total });
+      } else if (e.status === "done" && e.file) {
+        const cur = this._fileProgress.get(e.file);
+        if (cur) {
+          this._fileProgress.set(e.file, { loaded: cur.total, total: cur.total });
+        }
+      }
+      let topFile = "";
+      let topLoaded = 0;
+      let topTotal = 0;
+      for (const [file, p] of this._fileProgress) {
+        if (p.total > topTotal) {
+          topTotal = p.total;
+          topLoaded = p.loaded;
+          topFile = file;
+        }
+      }
+      if (topTotal > 0) {
+        this.progress = topLoaded / topTotal;
+        const mb = (n) => (n / 1024 / 1024).toFixed(1);
+        this.progressLabel = `${topFile.split("/").pop()} · ${mb(topLoaded)} / ${mb(topTotal)} MB`;
+      } else if (e.status === "ready") {
+        this.progressLabel = "warming up";
+      } else if (e.status === "initiate" && e.file) {
+        this.progressLabel = `fetching ${e.file.split("/").pop()}`;
+      }
+      this._onStateChange();
+    }
+
+    _scheduleLoop() {
+      if (this._loopScheduled) return;
+      this._loopScheduled = true;
+      const tick = () => {
+        this._loopScheduled = false;
+        requestAnimationFrame(() => this._scheduleLoop());
+        if (this.state !== "ready") return;
+        if (this._inferring) return;
+        if (!this._gateActive()) return;
+        if (!this.video || this.video.readyState < 2) return;
+        this._inferring = true;
+        this._inferOnce()
+          .catch((err) => console.error("[webcam] inference error", err))
+          .finally(() => {
+            this._inferring = false;
+          });
+      };
+      requestAnimationFrame(tick);
+    }
+
+    // Copy the latest video frame into displayCanvas (native aspect).
+    // Called from the main render tick so the color texture stays smooth
+    // even when inference is bottlenecked.
+    drawDisplayFrame() {
+      const v = this.video;
+      if (!v || v.readyState < 2) return;
+      this._displayCtx.drawImage(
+        v,
+        0,
+        0,
+        this.displayCanvas.width,
+        this.displayCanvas.height,
+      );
+    }
+
+    async _inferOnce() {
+      const v = this.video;
+      const rw = this._readCanvas.width;
+      const rh = this._readCanvas.height;
+      this._readCtx.drawImage(v, 0, 0, rw, rh);
+      const frame = this._readCtx.getImageData(0, 0, rw, rh);
+      const image = new RawImage(frame.data, rw, rh, 4);
+
+      const inputs = await this.processor(image);
+      const { predicted_depth } = await this.model(inputs);
+      const data = predicted_depth.data;
+      const [, oh, ow] = predicted_depth.dims;
+
+      // Depth-Anything outputs inverse depth (larger=nearer); mapping
+      // max→1, min→0 keeps the white=near convention the static images use.
+      let mn = Infinity;
+      let mx = -Infinity;
+      for (let i = 0; i < data.length; i++) {
+        const v2 = data[i];
+        if (v2 < mn) mn = v2;
+        if (v2 > mx) mx = v2;
+      }
+      const range = mx - mn || 1;
+
+      if (this.depthCanvas.width !== ow || this.depthCanvas.height !== oh) {
+        this.depthCanvas.width = ow;
+        this.depthCanvas.height = oh;
+      }
+      const out = this._depthCtx.createImageData(ow, oh);
+      const pix = out.data;
+      for (let i = 0, j = 0; i < data.length; i++, j += 4) {
+        const norm = Math.round(((data[i] - mn) / range) * 255);
+        pix[j] = norm;
+        pix[j + 1] = norm;
+        pix[j + 2] = norm;
+        pix[j + 3] = 255;
+      }
+      this._depthCtx.putImageData(out, 0, 0);
+    }
+  }
+
+  window.addEventListener("load", async () => {
+    const img = document.getElementById("photo");
+    if (!img.complete) {
+      await new Promise((r) => {
+        img.onload = r;
+      });
+    }
+
+    const vfx = new VFX();
+    const effect = new DepthBokehEffect();
+    await vfx.add(img, { effect });
+
+    let focalTarget = effect.focal;
+    const state = { maxAperture: 120, pressed: false, pointerUv: null };
+
+    function imageUv(cx, cy) {
+      const r = img.getBoundingClientRect();
+      const u = (cx - r.left) / r.width;
+      const v = (cy - r.top) / r.height;
+      return u >= 0 && u <= 1 && v >= 0 && v <= 1 ? [u, v] : null;
+    }
+
+    // Sample depth at the current pointer UV. Called from the main rAF
+    // so the focal target stays live as the depth map updates (webcam),
+    // not just when the pointer fires move events.
+    function sampleFocal(uv) {
+      const dC = effect.activeDepthCanvas();
+      if (!dC) return;
+      const x = Math.min(dC.width - 1, Math.floor(uv[0] * dC.width));
+      const y = Math.min(dC.height - 1, Math.floor(uv[1] * dC.height));
+      const [r8, g8, b8] = dC
+        .getContext("2d")
+        .getImageData(x, y, 1, 1).data;
+      focalTarget = decodeDepthRGB(r8 / 255, g8 / 255, b8 / 255);
+    }
+
+    window.addEventListener("pointerdown", (e) => {
+      const uv = imageUv(e.clientX, e.clientY);
+      if (!uv) return;
+      state.pressed = true;
+      state.pointerUv = uv;
+    });
+    window.addEventListener("pointermove", (e) => {
+      if (!state.pressed) return;
+      const uv = imageUv(e.clientX, e.clientY);
+      if (!uv) {
+        state.pressed = false;
+        return;
+      }
+      state.pointerUv = uv;
+    });
+    const release = () => {
+      state.pressed = false;
+    };
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+
+    // VFX-JS's canvas sits at z-index 9999, so mount the pane inside a
+    // higher-z-index container to keep it interactive.
+    const paneContainer = document.createElement("div");
+    paneContainer.style.cssText =
+      "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(paneContainer);
+    const pane = new Pane({ container: paneContainer, title: "Bokeh" });
+
+    const imgParams = { image: IMAGES[0].id };
+    const fadeEl = document.getElementById("fade");
+    const overlayEl = document.getElementById("webcam-overlay");
+    const indicatorEl = document.querySelector(".indicator");
+    for (const spec of IMAGES) {
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.dataset.id = spec.id;
+      indicatorEl.appendChild(dot);
+    }
+    function updateIndicator(id) {
+      for (const dot of indicatorEl.querySelectorAll(".dot")) {
+        dot.classList.toggle("active", dot.dataset.id === id);
+      }
+    }
+    function syncFadeBounds() {
+      const r = img.getBoundingClientRect();
+      fadeEl.style.left = r.left + "px";
+      fadeEl.style.top = r.top + "px";
+      fadeEl.style.width = r.width + "px";
+      fadeEl.style.height = r.height + "px";
+      overlayEl.style.left = r.left + "px";
+      overlayEl.style.top = r.top + "px";
+      overlayEl.style.width = r.width + "px";
+      overlayEl.style.height = r.height + "px";
+    }
+    syncFadeBounds();
+    updateIndicator(imgParams.image);
+    window.addEventListener("resize", syncFadeBounds);
+
+    const webcam = new WebcamSource();
+    webcam._gateActive = () => imgParams.image === "webcam";
+    webcam._onStateChange = () => renderStartOverlay();
+    webcam._onReady = () => {
+      // Lock layout to the actual capture size before swapping the live
+      // source in, so the first live frame already renders at the
+      // correct aspect (no 1-frame stretched flash).
+      if (imgParams.image === "webcam") {
+        applyWebcamSizing();
+        syncFadeBounds();
+      }
+      effect.installLiveSource("webcam", webcam);
+      if (imgParams.image === "webcam") {
+        effect.setActiveImage("webcam");
+      }
+    };
+
+    // Authoritative host-img sizing for webcam mode. CSS-only because
+    // setting both width and height HTML attrs makes the browser ignore
+    // aspect-ratio and clamp the two axes independently against
+    // max-width: 100vw / max-height: 100vh -- which squashes the image
+    // on narrow viewports. With CSS aspect-ratio + height:auto, clamping
+    // one axis re-derives the other proportionally.
+    function applyWebcamSizing() {
+      const vw = webcam.video?.videoWidth || webcam.displayWidth || 640;
+      const vh = webcam.video?.videoHeight || webcam.displayHeight || 360;
+      img.removeAttribute("width");
+      img.removeAttribute("height");
+      img.style.width = `${vw}px`;
+      img.style.height = "auto";
+      img.style.aspectRatio = `${vw} / ${vh}`;
+    }
+
+    function renderStartOverlay() {
+      if (imgParams.image !== "webcam" || webcam.state === "ready") {
+        overlayEl.style.display = "none";
+        overlayEl.replaceChildren();
+        return;
+      }
+      overlayEl.style.display = "flex";
+      overlayEl.replaceChildren();
+      const make = (tag, props = {}, text) => {
+        const el = document.createElement(tag);
+        Object.assign(el, props);
+        if (text !== undefined) el.textContent = text;
+        return el;
+      };
+      if (webcam.state === "idle") {
+        overlayEl.appendChild(
+          make("div", {}, "Live webcam + realtime depth estimation"),
+        );
+        overlayEl.appendChild(
+          make("div", { className: "label" }, "Depth-Anything-V2 (small) on WebGPU"),
+        );
+        const btn = make("button", { type: "button" }, "Start webcam");
+        btn.addEventListener("click", () => webcam.start());
+        overlayEl.appendChild(btn);
+      } else if (webcam.state === "requestingCam") {
+        overlayEl.appendChild(make("div", {}, "Requesting camera access…"));
+      } else if (webcam.state === "loadingModel") {
+        overlayEl.appendChild(make("div", {}, "Loading model…"));
+        const bar = make("div", { className: "bar" });
+        const fill = make("span");
+        fill.style.width =
+          Math.round(Math.min(1, Math.max(0, webcam.progress)) * 100) + "%";
+        bar.appendChild(fill);
+        overlayEl.appendChild(bar);
+        overlayEl.appendChild(
+          make("div", { className: "label" }, webcam.progressLabel || ""),
+        );
+      } else if (webcam.state === "error") {
+        overlayEl.appendChild(
+          make(
+            "div",
+            { className: "err" },
+            webcam.error?.message || String(webcam.error),
+          ),
+        );
+        const btn = make("button", { type: "button" }, "Retry");
+        btn.addEventListener("click", () => webcam.start());
+        overlayEl.appendChild(btn);
+      }
+    }
+
+    let switching = false;
+    async function switchImage(id) {
+      const spec = IMAGES.find((i) => i.id === id);
+      if (!spec || switching || imgParams.image === id) return;
+      switching = true;
+      syncFadeBounds();
+      fadeEl.style.opacity = "1";
+      await new Promise((r) => setTimeout(r, 180));
+      if (spec.live) {
+        img.src = TRANSPARENT_PNG;
+        applyWebcamSizing();
+      } else {
+        img.removeAttribute("width");
+        img.removeAttribute("height");
+        img.style.width = "";
+        img.style.height = "";
+        img.style.aspectRatio = "";
+        img.src = spec.color;
+      }
+      effect.setActiveImage(id);
+      imgParams.image = id;
+      updateIndicator(id);
+      syncFadeBounds();
+      renderStartOverlay();
+      fadeEl.style.opacity = "0";
+      await new Promise((r) => setTimeout(r, 180));
+      switching = false;
+    }
+
+    pane
+      .addBinding(imgParams, "image", {
+        options: Object.fromEntries(IMAGES.map((i) => [i.id, i.id])),
+      })
+      .on("change", (e) => switchImage(e.value));
+
+    window.addEventListener("keydown", (e) => {
+      let delta = 0;
+      if (e.key === "ArrowLeft") delta = -1;
+      else if (e.key === "ArrowRight") delta = 1;
+      else return;
+      e.preventDefault();
+      const cur = IMAGES.findIndex((i) => i.id === imgParams.image);
+      const next = (cur + delta + IMAGES.length) % IMAGES.length;
+      switchImage(IMAGES[next].id);
+    });
+
+    pane
+      .addBinding(effect, "focal", { min: 0, max: 1, step: 0.001 })
+      .on("change", () => {
+        focalTarget = effect.focal;
+      });
+    pane.addBinding(state, "maxAperture", { min: 0, max: 200, step: 1 });
+    pane.addBinding(effect, "swirl", { min: 0, max: 1, step: 0.01 });
+
+    const disk = pane.addFolder({ title: "Disk" });
+    disk.addBinding(effect, "diskCount", { min: 0, max: 65536, step: 256 });
+    disk.addBinding(effect, "diskScale", { min: 0, max: 2, step: 0.01 });
+    disk.addBinding(effect, "diskSwirl", { min: 0, max: 3, step: 0.01 });
+    disk.addBinding(effect, "diskSwirlBias", { min: 0, max: 1, step: 0.01 });
+    disk.addBinding(effect, "diskOpacity", { min: 0, max: 2, step: 0.01 });
+    disk.addBinding(effect, "diskBlades", { min: 0, max: 12, step: 1 });
+    disk.addBinding(effect, "diskAngle", { min: 0, max: 6.283, step: 0.01 });
+    disk.addBinding(effect, "diskSoftness", { min: 0, max: 1, step: 0.01 });
+    disk.addBinding(effect, "diskFill", { min: 0, max: 1, step: 0.01 });
+    disk.addBinding(effect, "lumThreshold", { min: 0, max: 1, step: 0.01 });
+    disk.addBinding(effect, "lumGamma", { min: 0.1, max: 5, step: 0.01 });
+
+    renderStartOverlay();
+
+    (function tick() {
+      if (imgParams.image === "webcam" && webcam.state === "ready") {
+        webcam.drawDisplayFrame();
+      }
+      if (state.pressed && state.pointerUv) sampleFocal(state.pointerUv);
+      effect.focal += (focalTarget - effect.focal) * 0.5;
+      const apTarget = state.pressed ? state.maxAperture : 0;
+      effect.aperture += (apTarget - effect.aperture) * 0.15;
+      pane.refresh();
+      requestAnimationFrame(tick);
+    })();
+  });
+</script>
