@@ -126,7 +126,7 @@ export const works: Work[] = [
         id: "halftone",
         index: "11",
         title: "Halftone",
-        tags: ["Postprocess", "Print", "CMYK", "html-in-canvas"],
+        tags: ["effect-api", "html-in-canvas", "postprocess"],
         year: "2026",
         author: "AMAGI",
         description:
@@ -137,7 +137,7 @@ export const works: Work[] = [
         id: "depth-bokeh",
         index: "12",
         title: "Depth Bokeh",
-        tags: ["Postprocess", "Depth", "Bokeh", "WebGPU"],
+        tags: ["effect-api", "3d"],
         year: "2026",
         author: "AMAGI",
         description:
