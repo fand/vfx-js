@@ -1139,15 +1139,19 @@
       }
     };
 
-    // Authoritative host-img sizing for webcam mode. Sets width/height
-    // attrs (VFX-JS measures these via getBoundingClientRect) and
-    // additionally locks the aspect via CSS so flex/max-* layout can't
-    // drift away from the video's native ratio.
+    // Authoritative host-img sizing for webcam mode. CSS-only because
+    // setting both width and height HTML attrs makes the browser ignore
+    // aspect-ratio and clamp the two axes independently against
+    // max-width: 100vw / max-height: 100vh -- which squashes the image
+    // on narrow viewports. With CSS aspect-ratio + height:auto, clamping
+    // one axis re-derives the other proportionally.
     function applyWebcamSizing() {
       const vw = webcam.video?.videoWidth || webcam.displayWidth || 640;
       const vh = webcam.video?.videoHeight || webcam.displayHeight || 360;
-      img.width = vw;
-      img.height = vh;
+      img.removeAttribute("width");
+      img.removeAttribute("height");
+      img.style.width = `${vw}px`;
+      img.style.height = "auto";
       img.style.aspectRatio = `${vw} / ${vh}`;
     }
 
@@ -1216,6 +1220,8 @@
       } else {
         img.removeAttribute("width");
         img.removeAttribute("height");
+        img.style.width = "";
+        img.style.height = "";
         img.style.aspectRatio = "";
         img.src = spec.color;
       }
