@@ -143,5 +143,7 @@ export const works: Work[] = [
         description:
             "Depth-driven bokeh with swirl-shaped highlights. Click-and-drag to set focal depth; switch between baked depth maps or a live webcam stream paired with realtime depth estimation (Depth-Anything-V2 on WebGPU).",
         url: "./works/depth-bokeh/",
+        sourceUrl:
+            "https://github.com/fand/vfx-js/blob/main/packages/examples/works/depth-bokeh/index.html",
     },
 ];
