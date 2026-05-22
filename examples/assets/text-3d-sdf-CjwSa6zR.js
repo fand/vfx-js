@@ -1,4 +1,4 @@
-import"./modulepreload-polyfill-Da00irRU.js";import{t as e}from"./esm-BRJ0Jz9O.js";import{getSDFImage as t}from"https://esm.sh/@fand/image-to-sdf@0.1.0";var n=`
+import"./modulepreload-polyfill-Ke7zwH0v.js";import{t as e}from"./esm-CNUY2jBp.js";import{getSDFImage as t}from"https://esm.sh/@fand/image-to-sdf@0.1.0";var n=`
 precision highp float;
 uniform vec2 resolution;
 uniform vec2 mouse;

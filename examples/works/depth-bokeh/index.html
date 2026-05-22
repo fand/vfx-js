@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<script type="module" crossorigin src="../../assets/depth-bokeh-gcF3zbjs.js"></script>
+<link rel="modulepreload" crossorigin href="../../assets/modulepreload-polyfill-Ke7zwH0v.js">
+<link rel="modulepreload" crossorigin href="../../assets/esm-CNUY2jBp.js">
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Depth Bokeh</title>
+
+<style>
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    background: #0a0a0a;
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #photo {
+    max-width: 100vw;
+    max-height: 100vh;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .hint {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 6px 12px;
+    border-radius: 999px;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    z-index: 10001;
+  }
+  .indicator {
+    position: fixed;
+    left: 50%;
+    bottom: 48px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    pointer-events: none;
+    z-index: 10001;
+  }
+  .indicator .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transition: background 180ms;
+  }
+  .indicator .dot.active {
+    background: #fff;
+  }
+  #webcam-overlay {
+    position: fixed;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 10001;
+    background: rgba(0, 0, 0, 0.6);
+    color: #eee;
+    text-align: center;
+    padding: 24px;
+    box-sizing: border-box;
+    pointer-events: auto;
+    font-size: 0.9rem;
+    transition: opacity 180ms ease-out;
+  }
+  #webcam-overlay button {
+    appearance: none;
+    border: 0;
+    background: #fff;
+    color: #111;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 10px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  #webcam-overlay button:hover {
+    background: #f0f0f0;
+  }
+  #webcam-overlay .bar {
+    width: 220px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    overflow: hidden;
+  }
+  #webcam-overlay .bar > span {
+    display: block;
+    height: 100%;
+    background: #fff;
+    transition: width 120ms;
+  }
+  #webcam-overlay .label {
+    font-size: 0.8rem;
+    opacity: 0.75;
+    word-break: break-all;
+    max-width: 260px;
+  }
+  #webcam-overlay .err {
+    color: #ffb4b4;
+    max-width: 260px;
+  }
+</style>
+
+<img id="photo" src="../../assets/img1-BIxrCEQW.png" alt="" />
+<div class="indicator"></div>
+<div class="hint">Press &amp; drag to focus &middot; ← / → to switch image</div>
+<div
+  id="fade"
+  style="position:fixed;background:#0a0a0a;opacity:0;pointer-events:none;z-index:10001;transition:opacity 180ms ease-out"
+></div>
+<div id="webcam-overlay"></div>
+
