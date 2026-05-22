@@ -573,9 +573,39 @@
     async init(ctx) {
       this._ctx = ctx;
       for (const spec of IMAGES) {
-        if (spec.live) continue;
+        if (spec.live) {
+          // Pre-install a 1×1 black placeholder so the canvas clears to
+          // black on activation; installLiveSource replaces it later.
+          this._installBlackPlaceholder(spec.id);
+          continue;
+        }
         this._resources.set(spec.id, await this._loadImage(ctx, spec));
       }
+    }
+
+    _installBlackPlaceholder(id) {
+      const c = document.createElement("canvas");
+      c.width = c.height = 1;
+      const cx = c.getContext("2d");
+      cx.fillStyle = "#000";
+      cx.fillRect(0, 0, 1, 1);
+      const colorTex = this._ctx.wrapTexture(c, {
+        filter: "linear",
+        wrap: "clamp",
+        autoUpdate: false,
+      });
+      const depthTex = this._ctx.wrapTexture(c, {
+        filter: "linear",
+        wrap: "clamp",
+        autoUpdate: false,
+      });
+      this._resources.set(id, {
+        colorTex,
+        depthTex,
+        geometry: LIVE_DISK_GEOMETRY,
+        depthCanvas: c,
+        live: true,
+      });
     }
 
     installLiveSource(id, { displayCanvas, depthCanvas }) {
