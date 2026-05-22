@@ -15,6 +15,8 @@ const GHIcon = () => (
 
 type Props = {
     works: Work[];
+    activeId: string;
+    onActivate: (id: string) => void;
     mobile?: boolean;
 };
 
@@ -55,8 +57,12 @@ const FilterBar = ({
     </div>
 );
 
-export const VFinal = ({ works, mobile = false }: Props) => {
-    const [activeId, setActiveId] = useState(works[0].id);
+export const VFinal = ({
+    works,
+    activeId,
+    onActivate,
+    mobile = false,
+}: Props) => {
     const [mobileOpen, setMobileOpen] = useState(mobile);
     const [activeTags, setActiveTags] = useState<string[]>([]);
 
@@ -144,7 +150,7 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                     key={w.id}
                                     className={`vf-mitem ${activeId === w.id ? "vf-active" : ""}`}
                                     onClick={() => {
-                                        setActiveId(w.id);
+                                        onActivate(w.id);
                                         setMobileOpen(false);
                                     }}
                                 >
@@ -205,7 +211,7 @@ export const VFinal = ({ works, mobile = false }: Props) => {
                                 type="button"
                                 key={w.id}
                                 className={`vf-item ${activeId === w.id ? "vf-active" : ""}`}
-                                onClick={() => setActiveId(w.id)}
+                                onClick={() => onActivate(w.id)}
                             >
                                 <div className="vf-idx">{w.index}</div>
                                 <div className="vf-meta">

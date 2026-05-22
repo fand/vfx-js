@@ -6,6 +6,7 @@ import {
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
 import type { Quad } from "./gl/quad.js";
+import type { ProgramCache } from "./program-cache.js";
 import {
     createMargin,
     type ElementRect,
@@ -127,6 +128,7 @@ export class EffectChain {
     #quad: Quad;
     #pixelRatio: number;
     #vfxProps: EffectVFXProps;
+    #programCache: ProgramCache;
     #effects: readonly Effect[];
     #hosts: EffectHost[];
     #renderingIndices: number[];
@@ -165,11 +167,13 @@ export class EffectChain {
         vfxProps: EffectVFXProps,
         capture: EffectTexture,
         isPostEffect: boolean,
+        programCache: ProgramCache,
     ) {
         this.#glCtx = glCtx;
         this.#quad = quad;
         this.#pixelRatio = pixelRatio;
         this.#vfxProps = vfxProps;
+        this.#programCache = programCache;
         this.#effects = effects;
         this.#capture = capture;
         this.#isPostEffect = isPostEffect;
@@ -501,6 +505,7 @@ export class EffectChain {
             this.#pixelRatio,
             this.#capture,
             this.#vfxProps,
+            this.#programCache,
         );
     }
 

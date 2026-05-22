@@ -122,4 +122,15 @@ export const works: Work[] = [
             "Raymarched refractive spheres lensing live editable web-font text. Cheap dispersion and fresnel over a 2D text canvas.",
         url: "./works/web-font-raymarch.html",
     },
+    {
+        id: "halftone",
+        index: "11",
+        title: "Halftone",
+        tags: ["Postprocess", "Print", "CMYK", "html-in-canvas"],
+        year: "2026",
+        author: "AMAGI",
+        description:
+            "Editorial print spread dot-screened by a CMYK halftone post-effect. The rosette grid is fixed in screen space; images parallax through it like ink on a moving press.",
+        url: "./works/halftone.html",
+    },
 ];

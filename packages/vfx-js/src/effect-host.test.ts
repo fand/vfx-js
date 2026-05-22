@@ -300,6 +300,7 @@ vi.mock("./effect-geometry.js", async () => {
 
 // Imports AFTER vi.mock.
 import { EffectHost } from "./effect-host.js";
+import { ProgramCache } from "./program-cache.js";
 
 // ---------------------------------------------------------------------------
 // Test GL stub
@@ -349,6 +350,7 @@ function makeHost() {
     const gl = makeGlStub();
     const { ctx: glCtx } = makeCtxStub(gl);
     const quad = {} as Quad;
+    const programCache = new ProgramCache(glCtx);
     const host = new EffectHost(
         glCtx,
         quad,
@@ -359,6 +361,7 @@ function makeHost() {
             __brand: "EffectTexture";
         },
         { autoCrop: true, glslVersion: "300 es" },
+        programCache,
     );
     host.setFrameDims({
         outputBufferW: 100,
@@ -972,6 +975,7 @@ describe("EffectHost.onContextRestored", () => {
                 __brand: "EffectTexture";
             },
             { autoCrop: true, glslVersion: "300 es" },
+            new ProgramCache(glCtx),
         );
         const returned = host.ctx.onContextRestored(() => {});
         expect(returned).toBe(unsubSpies[0]);
@@ -988,7 +992,7 @@ describe("EffectHost.onContextRestored", () => {
 // ---------------------------------------------------------------------------
 
 describe("EffectHost.dispose", () => {
-    it("releases owned Programs / Framebuffers / Backbuffers / Textures", () => {
+    it("releases owned Framebuffers / Backbuffers / Textures (not Programs — those live on the shared cache)", () => {
         const { host } = makeHost();
         host.setPhase("render");
         host.ctx.draw({ frag: "a" });
@@ -1005,7 +1009,9 @@ describe("EffectHost.dispose", () => {
         expect(textures.length).toBe(1);
 
         host.dispose();
-        expect(programs.every((p) => p.disposed)).toBe(true);
+        // Programs survive host disposal — they're owned by the
+        // VFX-scoped ProgramCache and shared with other hosts.
+        expect(programs.every((p) => !p.disposed)).toBe(true);
         expect(framebuffers.every((f) => f.disposed)).toBe(true);
         expect(backbuffers.every((b) => b.disposed)).toBe(true);
         expect(textures.every((t) => t.disposed)).toBe(true);
