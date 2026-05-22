@@ -752,6 +752,18 @@
     return Math.min(1, Math.max(0, r));
   }
 
+  // Pick model-input dims matching the video aspect, with both dims a
+  // multiple of 14 (depth-anything's patch size). Aim for roughly the
+  // same pixel area as the reference's 504×504 square so inference cost
+  // is comparable across aspects.
+  function pickProcDims(vw, vh, area = 504 * 504, mult = 14) {
+    const aspect = vw / vh;
+    const h0 = Math.sqrt(area / aspect);
+    const h = Math.max(mult, Math.round(h0 / mult) * mult);
+    const w = Math.max(mult, Math.round((h * aspect) / mult) * mult);
+    return { width: w, height: h };
+  }
+
   // Realtime depth from webcam, via Depth-Anything-V2-small on WebGPU.
   // Inference runs on its own rAF, gated by _inferring so the main UI
   // (pane, pointer, keys) stays responsive between inferences.
@@ -764,7 +776,8 @@
       this.video = null;
       this.displayCanvas = null;
       this.depthCanvas = null;
-      this.displaySize = 0;
+      this.displayWidth = 0;
+      this.displayHeight = 0;
       this._displayCtx = null;
       this._depthCtx = null;
       this._readCanvas = null;
@@ -817,25 +830,33 @@
         }
         this.video = video;
 
-        const s = Math.min(video.videoWidth, video.videoHeight, 720);
-        this.displaySize = s;
+        // Display canvas at the native video aspect (cap long edge at
+        // 1280 to bound per-frame upload size).
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const cap = 1280;
+        const scale = Math.min(1, cap / Math.max(vw, vh));
+        this.displayWidth = Math.max(2, Math.round(vw * scale));
+        this.displayHeight = Math.max(2, Math.round(vh * scale));
         this.displayCanvas = document.createElement("canvas");
-        this.displayCanvas.width = s;
-        this.displayCanvas.height = s;
+        this.displayCanvas.width = this.displayWidth;
+        this.displayCanvas.height = this.displayHeight;
         this._displayCtx = this.displayCanvas.getContext("2d");
 
-        // Inference + depth output canvases. depthCanvas may be resized
-        // to model output dims on the first inference.
+        // Inference + depth output canvases sized to match video aspect
+        // at the model's preferred patch grid. depthCanvas is resized to
+        // predicted_depth.dims on the first inference.
+        const proc = pickProcDims(vw, vh);
         this.depthCanvas = document.createElement("canvas");
-        this.depthCanvas.width = 504;
-        this.depthCanvas.height = 504;
+        this.depthCanvas.width = proc.width;
+        this.depthCanvas.height = proc.height;
         this._depthCtx = this.depthCanvas.getContext("2d", {
           willReadFrequently: true,
         });
 
         this._readCanvas = document.createElement("canvas");
-        this._readCanvas.width = 504;
-        this._readCanvas.height = 504;
+        this._readCanvas.width = proc.width;
+        this._readCanvas.height = proc.height;
         this._readCtx = this._readCanvas.getContext("2d", {
           willReadFrequently: true,
         });
@@ -851,6 +872,9 @@
           WEBCAM_MODEL_ID,
           { progress_callback },
         );
+        // Override the default square resize so the model preserves the
+        // video aspect ratio. Both dims are multiples of 14 (patch size).
+        this.processor.size = { width: proc.width, height: proc.height };
 
         this._setState("ready");
         this._onReady();
@@ -916,32 +940,26 @@
       requestAnimationFrame(tick);
     }
 
-    // Center-crop the latest video frame into displayCanvas. Called from
-    // the main render tick so the color texture stays smooth even when
-    // inference is bottlenecked.
+    // Copy the latest video frame into displayCanvas (native aspect).
+    // Called from the main render tick so the color texture stays smooth
+    // even when inference is bottlenecked.
     drawDisplayFrame() {
       const v = this.video;
       if (!v || v.readyState < 2) return;
-      const vw = v.videoWidth;
-      const vh = v.videoHeight;
-      if (!vw || !vh) return;
-      const s = Math.min(vw, vh);
-      const sx = (vw - s) / 2;
-      const sy = (vh - s) / 2;
-      const d = this.displayCanvas.width;
-      this._displayCtx.drawImage(v, sx, sy, s, s, 0, 0, d, d);
+      this._displayCtx.drawImage(
+        v,
+        0,
+        0,
+        this.displayCanvas.width,
+        this.displayCanvas.height,
+      );
     }
 
     async _inferOnce() {
       const v = this.video;
-      const vw = v.videoWidth;
-      const vh = v.videoHeight;
-      const s = Math.min(vw, vh);
-      const sx = (vw - s) / 2;
-      const sy = (vh - s) / 2;
       const rw = this._readCanvas.width;
       const rh = this._readCanvas.height;
-      this._readCtx.drawImage(v, sx, sy, s, s, 0, 0, rw, rh);
+      this._readCtx.drawImage(v, 0, 0, rw, rh);
       const frame = this._readCtx.getImageData(0, 0, rw, rh);
       const image = new RawImage(frame.data, rw, rh, 4);
 
@@ -1078,7 +1096,8 @@
       if (imgParams.image === "webcam") {
         // Re-activate now that the live resource is wired up; also adopt
         // the actual capture size for the host element layout.
-        img.width = img.height = webcam.displaySize;
+        img.width = webcam.displayWidth;
+        img.height = webcam.displayHeight;
         syncFadeBounds();
         effect.setActiveImage("webcam");
       }
@@ -1145,8 +1164,10 @@
       await new Promise((r) => setTimeout(r, 180));
       if (spec.live) {
         img.src = TRANSPARENT_PNG;
-        const dim = webcam.displaySize || 480;
-        img.width = img.height = dim;
+        // Before webcam is ready we don't know the aspect; pick a 16:9
+        // placeholder so the overlay isn't a square box.
+        img.width = webcam.displayWidth || 640;
+        img.height = webcam.displayHeight || 360;
       } else {
         img.removeAttribute("width");
         img.removeAttribute("height");
