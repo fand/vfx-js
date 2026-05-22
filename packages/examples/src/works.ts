@@ -133,4 +133,15 @@ export const works: Work[] = [
             "Editorial print spread dot-screened by a CMYK halftone post-effect. The rosette grid is fixed in screen space; images parallax through it like ink on a moving press.",
         url: "./works/halftone.html",
     },
+    {
+        id: "depth-bokeh",
+        index: "12",
+        title: "Depth Bokeh",
+        tags: ["Postprocess", "Depth", "Bokeh", "WebGPU"],
+        year: "2026",
+        author: "AMAGI",
+        description:
+            "Depth-driven bokeh with swirl-shaped highlights. Click-and-drag to set focal depth; switch between baked depth maps or a live webcam stream paired with realtime depth estimation (Depth-Anything-V2 on WebGPU).",
+        url: "./works/depth-bokeh/",
+    },
 ];

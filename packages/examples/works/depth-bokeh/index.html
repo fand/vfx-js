@@ -1040,7 +1040,7 @@
     await vfx.add(img, { effect });
 
     let focalTarget = effect.focal;
-    const state = { maxAperture: 120, pressed: false };
+    const state = { maxAperture: 120, pressed: false, pointerUv: null };
 
     function imageUv(cx, cy) {
       const r = img.getBoundingClientRect();
@@ -1049,7 +1049,10 @@
       return u >= 0 && u <= 1 && v >= 0 && v <= 1 ? [u, v] : null;
     }
 
-    function setFocal(uv) {
+    // Sample depth at the current pointer UV. Called from the main rAF
+    // so the focal target stays live as the depth map updates (webcam),
+    // not just when the pointer fires move events.
+    function sampleFocal(uv) {
       const dC = effect.activeDepthCanvas();
       if (!dC) return;
       const x = Math.min(dC.width - 1, Math.floor(uv[0] * dC.width));
@@ -1064,7 +1067,7 @@
       const uv = imageUv(e.clientX, e.clientY);
       if (!uv) return;
       state.pressed = true;
-      setFocal(uv);
+      state.pointerUv = uv;
     });
     window.addEventListener("pointermove", (e) => {
       if (!state.pressed) return;
@@ -1073,7 +1076,7 @@
         state.pressed = false;
         return;
       }
-      setFocal(uv);
+      state.pointerUv = uv;
     });
     const release = () => {
       state.pressed = false;
@@ -1258,6 +1261,7 @@
       if (imgParams.image === "webcam" && webcam.state === "ready") {
         webcam.drawDisplayFrame();
       }
+      if (state.pressed && state.pointerUv) sampleFocal(state.pointerUv);
       effect.focal += (focalTarget - effect.focal) * 0.5;
       const apTarget = state.pressed ? state.maxAperture : 0;
       effect.aperture += (apTarget - effect.aperture) * 0.15;
