@@ -1126,16 +1126,30 @@
     webcam._gateActive = () => imgParams.image === "webcam";
     webcam._onStateChange = () => renderStartOverlay();
     webcam._onReady = () => {
+      // Lock layout to the actual capture size before swapping the live
+      // source in, so the first live frame already renders at the
+      // correct aspect (no 1-frame stretched flash).
+      if (imgParams.image === "webcam") {
+        applyWebcamSizing();
+        syncFadeBounds();
+      }
       effect.installLiveSource("webcam", webcam);
       if (imgParams.image === "webcam") {
-        // Re-activate now that the live resource is wired up; also adopt
-        // the actual capture size for the host element layout.
-        img.width = webcam.displayWidth;
-        img.height = webcam.displayHeight;
-        syncFadeBounds();
         effect.setActiveImage("webcam");
       }
     };
+
+    // Authoritative host-img sizing for webcam mode. Sets width/height
+    // attrs (VFX-JS measures these via getBoundingClientRect) and
+    // additionally locks the aspect via CSS so flex/max-* layout can't
+    // drift away from the video's native ratio.
+    function applyWebcamSizing() {
+      const vw = webcam.video?.videoWidth || webcam.displayWidth || 640;
+      const vh = webcam.video?.videoHeight || webcam.displayHeight || 360;
+      img.width = vw;
+      img.height = vh;
+      img.style.aspectRatio = `${vw} / ${vh}`;
+    }
 
     function renderStartOverlay() {
       if (imgParams.image !== "webcam" || webcam.state === "ready") {
@@ -1198,13 +1212,11 @@
       await new Promise((r) => setTimeout(r, 180));
       if (spec.live) {
         img.src = TRANSPARENT_PNG;
-        // Before webcam is ready we don't know the aspect; pick a 16:9
-        // placeholder so the overlay isn't a square box.
-        img.width = webcam.displayWidth || 640;
-        img.height = webcam.displayHeight || 360;
+        applyWebcamSizing();
       } else {
         img.removeAttribute("width");
         img.removeAttribute("height");
+        img.style.aspectRatio = "";
         img.src = spec.color;
       }
       effect.setActiveImage(id);
