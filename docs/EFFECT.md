@@ -6,7 +6,9 @@ passes, persistent feedback buffers, custom geometry, or output that
 grows beyond the element rect. Once you write an effect, you can reuse
 it across your app, or even distribute it as a library.
 
-## Example
+## Examples
+
+### Single pass
 
 ```ts
 import type { Effect, EffectContext } from "@vfx-js/core";
@@ -44,9 +46,106 @@ vfx.add(document.querySelector("#img")!, {
 });
 ```
 
-For richer examples (multi-pass, persistent feedback, custom geometry)
-read `packages/effects/src/` — `pixelate.ts`, `scanline.ts`, and
-`bloom.ts` are good starting points.
+### Multi-pass (separable blur)
+
+Allocate an intermediate render target in `init`, then draw twice:
+horizontal into the intermediate, vertical into the final target.
+
+```ts
+const FRAG_BLUR = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+uniform vec2 dir;
+
+void main() {
+    vec4 c = vec4(0.0);
+    for (int i = -4; i <= 4; i++) {
+        c += texture(src, uvSrc + dir * float(i));
+    }
+    outColor = c / 9.0;
+}
+`;
+
+class BlurEffect implements Effect {
+    #tmp: EffectRenderTarget | null = null;
+
+    init(ctx: EffectContext) {
+        this.#tmp = ctx.createRenderTarget();
+    }
+
+    render(ctx: EffectContext) {
+        if (!this.#tmp) return;
+        const [w, h] = ctx.dims.elementPixel;
+        ctx.draw({
+            frag: FRAG_BLUR,
+            uniforms: { src: ctx.src, dir: [1 / w, 0] },
+            target: this.#tmp,
+        });
+        ctx.draw({
+            frag: FRAG_BLUR,
+            uniforms: { src: this.#tmp, dir: [0, 1 / h] },
+            target: ctx.target,
+        });
+    }
+}
+```
+
+### Persistent RT (feedback trail)
+
+A `persistent: true` render target is ping-pong buffered. When you
+bind it as a `sampler2D` uniform you read last frame; when you draw
+to it, you write the new frame. After the draw the buffers swap.
+
+```ts
+const FRAG_TRAIL = `#version 300 es
+precision highp float;
+in vec2 uv;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+uniform sampler2D prev;
+uniform float decay;
+
+void main() {
+    vec4 cur = texture(src, uvSrc);
+    vec4 old = texture(prev, uv) * decay;
+    outColor = max(cur, old);
+}
+`;
+
+class TrailEffect implements Effect {
+    #buf: EffectRenderTarget | null = null;
+
+    init(ctx: EffectContext) {
+        this.#buf = ctx.createRenderTarget({ persistent: true });
+    }
+
+    render(ctx: EffectContext) {
+        if (!this.#buf) return;
+        ctx.draw({
+            frag: FRAG_TRAIL,
+            uniforms: { src: ctx.src, prev: this.#buf, decay: 0.92 },
+            target: this.#buf,
+        });
+        ctx.draw({
+            frag: `#version 300 es
+                precision highp float;
+                in vec2 uv;
+                out vec4 outColor;
+                uniform sampler2D src;
+                void main() { outColor = texture(src, uv); }`,
+            uniforms: { src: this.#buf },
+            target: ctx.target,
+        });
+    }
+}
+```
+
+For richer examples (custom geometry, instancing, HDR pipelines) see
+`packages/effects/src/` — `pixelate.ts`, `scanline.ts`, and `bloom.ts`
+are good starting points.
 
 ## API
 
