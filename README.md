@@ -32,6 +32,18 @@ const vfx = new VFX();
 vfx.add(img, { shader: "glitch", overflow: 100 });
 ```
 
+Or compose prebuilt effects from [`@vfx-js/effects`](https://www.npmjs.com/package/@vfx-js/effects):
+
+```js
+import { VFX } from '@vfx-js/core';
+import { BloomEffect, PixelateEffect } from '@vfx-js/effects';
+
+const vfx = new VFX();
+vfx.add(img, {
+    effect: [new PixelateEffect({ size: 10 }), new BloomEffect({ intensity: 5 })],
+});
+```
+
 ## Examples
 
 You can find basic examples on the VFX-JS website.

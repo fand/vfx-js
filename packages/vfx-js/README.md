@@ -31,6 +31,22 @@ const vfx = new VFX();
 vfx.add(img, { shader: "glitch", overflow: 100 });
 ```
 
+Or compose prebuilt effects from [`@vfx-js/effects`](https://www.npmjs.com/package/@vfx-js/effects):
+
+```js
+import { VFX } from '@vfx-js/core';
+import { BloomEffect, PixelateEffect } from '@vfx-js/effects';
+
+const vfx = new VFX();
+vfx.add(img, {
+    effect: [new PixelateEffect({ size: 10 }), new BloomEffect({ intensity: 5 })],
+});
+
+// Replace the effect chain in-place (keeps the source texture and any
+// effect instances whose reference is unchanged):
+vfx.updateEffects(img, [new BloomEffect({ intensity: 8 })]);
+```
+
 ## Examples
 
 TBD: See VFX-JS website for now.

@@ -53,6 +53,28 @@ NOTE: `VFXSpan` doesn't work if the content includes child nodes.
 <VFXSpan><a href="https://example.com">Yo</a></VFXSpan>
 ```
 
+### Effect API
+
+Pass a prebuilt `Effect` instance (or array) from [`@vfx-js/effects`](https://www.npmjs.com/package/@vfx-js/effects) via the `effect` prop:
+
+```ts
+import * as VFX from '@vfx-js/react';
+import { BloomEffect, PixelateEffect } from '@vfx-js/effects';
+
+export default () => (
+    <VFX.VFXProvider>
+        <VFX.VFXImg src="cat.png" effect={new BloomEffect({ intensity: 5 })}/>
+
+        <VFX.VFXImg src="doge.gif" effect={[
+            new PixelateEffect({ size: 10 }),
+            new BloomEffect({ intensity: 8 }),
+        ]}/>
+    </VFX.VFXProvider>
+);
+```
+
+When only the `effect` prop changes between renders, the chain is swapped in-place without re-uploading the source texture or re-initializing effects whose reference is unchanged.
+
 ### Custom Shader
 
 ```ts

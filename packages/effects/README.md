@@ -1,6 +1,6 @@
 # @vfx-js/effects
 
-Ready-made WebGL effects for [`@vfx-js/core`](https://www.npmjs.com/package/@vfx-js/core).
+Prebuilt WebGL effects for [`@vfx-js/core`](https://www.npmjs.com/package/@vfx-js/core).
 
 ## Install
 
