@@ -1,11 +1,10 @@
 # Effect API
 
-VFX-JS's Effect API lets you build your own effects on top of VFX-JS.
-Reach for it when the legacy `shader: string` path is not enough —
-multiple passes, persistent feedback buffers, custom geometry, or
-output that grows beyond the element rect. Once written, an effect
-can be reused across your app, or packaged up and distributed as a
-library.
+VFX-JS's Effect API lets you create your own effects on top of VFX-JS.
+Use it when the legacy `shader: string` path is not enough — multiple
+passes, persistent feedback buffers, custom geometry, or output that
+grows beyond the element rect. Once you write an effect, you can reuse
+it across your app, or even distribute it as a library.
 
 ## Example
 
