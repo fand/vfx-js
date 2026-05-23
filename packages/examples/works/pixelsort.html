@@ -207,8 +207,8 @@
     <h2>controls</h2>
 
     <div class="control">
-      <label>sort range N <span class="val" id="v-n">96</span></label>
-      <input type="range" id="c-n" min="2" max="256" value="96">
+      <label>threshold T <span class="val" id="v-t">0.50</span></label>
+      <input type="range" id="c-t" min="0" max="1" step="0.01" value="0.5">
     </div>
 
     <div class="control">
@@ -243,7 +243,7 @@
     <div class="pipeline">
       <ol>
         <li>downsample WxH → W'xH</li>
-        <li>compute rank within block N</li>
+        <li>scan segment where key &gt; T, rank within</li>
         <li>gather &amp; upsample → canvas</li>
       </ol>
     </div>
@@ -293,17 +293,48 @@ float key(vec3 c, int mode) {
 }
 `;
 
+// Segment scan: a pixel is "in sort" if key > threshold. Segments are
+// runs of contiguous in-sort pixels, bounded by below-threshold pixels
+// or row edges. After https://www.shadertoy.com/view/XsBfRG.
+//
+// rank.rg: (rank within segment, segment length) — segment length acts
+// as both inclusion flag (>0 means in sort) and gather fallback marker.
+
+const SEGMENT_SCAN = `
+// scan left/right while neighbours are above threshold. Bounded by W to
+// keep the GLSL loop finite; the early-out covers the common case.
+void scanSegment(sampler2D s, int x, int y, int W, int keyMode, float threshold, out int segStart, out int segEnd) {
+    segStart = x;
+    for (int i = 0; i < 8192; i++) {
+        if (segStart <= 0) break;
+        if (i >= W) break;
+        float k = key(texelFetch(s, ivec2(segStart - 1, y), 0).rgb, keyMode);
+        if (k <= threshold) break;
+        segStart--;
+    }
+    segEnd = x + 1;
+    for (int i = 0; i < 8192; i++) {
+        if (segEnd >= W) break;
+        if (i >= W) break;
+        float k = key(texelFetch(s, ivec2(segEnd, y), 0).rgb, keyMode);
+        if (k <= threshold) break;
+        segEnd++;
+    }
+}
+`;
+
 const FRAG_RANK = `#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
 uniform sampler2D src;
 uniform vec2 srcSize;
-uniform int N;
+uniform float threshold;
 uniform int keyMode;
 uniform int direction;   // 0=ltr (ascending), 1=rtl (descending)
 
 ${KEY_FUNC}
+${SEGMENT_SCAN}
 
 void main() {
     ivec2 p = ivec2(gl_FragCoord.xy);
@@ -311,13 +342,19 @@ void main() {
     int y = p.y;
     int W = int(srcSize.x);
 
-    int blockStart = (x / N) * N;
-    int blockEnd = min(blockStart + N, W);
-
     float myKey = key(texelFetch(src, ivec2(x, y), 0).rgb, keyMode);
 
+    if (myKey <= threshold) {
+        // below threshold: passthrough, mark segLen=0 so gather falls back
+        outColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+
+    int segStart, segEnd;
+    scanSegment(src, x, y, W, keyMode, threshold, segStart, segEnd);
+
     int rank = 0;
-    for (int i = blockStart; i < blockEnd; i++) {
+    for (int i = segStart; i < segEnd; i++) {
         if (i == x) continue;
         float k = key(texelFetch(src, ivec2(i, y), 0).rgb, keyMode);
         if (direction == 0) {
@@ -327,8 +364,7 @@ void main() {
         }
     }
 
-    // store as 16F float directly
-    outColor = vec4(float(rank), 0.0, 0.0, 1.0);
+    outColor = vec4(float(rank), float(segEnd - segStart), 0.0, 1.0);
 }
 `;
 
@@ -339,26 +375,34 @@ out vec4 outColor;
 uniform sampler2D src;       // RT_A (W'xH)
 uniform sampler2D rankTex;   // RT_rank (W'xH)
 uniform vec2 lowSize;        // (W', H)
-uniform int N;
+uniform float threshold;
+uniform int keyMode;
+
+${KEY_FUNC}
+${SEGMENT_SCAN}
 
 void main() {
-    // 出力canvas座標 → 低解像度RT座標
     int lowX = int(uvSrc.x * lowSize.x);
     int y    = int(uvSrc.y * lowSize.y);
-    int W = int(lowSize.x);
+    int W    = int(lowSize.x);
 
-    int blockStart = (lowX / N) * N;
-    int blockEnd = min(blockStart + N, W);
-    int targetRank = lowX - blockStart;
+    float myKey = key(texelFetch(src, ivec2(lowX, y), 0).rgb, keyMode);
+    if (myKey <= threshold) {
+        outColor = texelFetch(src, ivec2(lowX, y), 0);
+        return;
+    }
 
-    for (int i = blockStart; i < blockEnd; i++) {
+    int segStart, segEnd;
+    scanSegment(src, lowX, y, W, keyMode, threshold, segStart, segEnd);
+    int targetRank = lowX - segStart;
+
+    for (int i = segStart; i < segEnd; i++) {
         int r = int(texelFetch(rankTex, ivec2(i, y), 0).r + 0.5);
         if (r == targetRank) {
             outColor = texelFetch(src, ivec2(i, y), 0);
             return;
         }
     }
-    // fallback (should not reach here for valid configs)
     outColor = texelFetch(src, ivec2(lowX, y), 0);
 }
 `;
@@ -431,7 +475,7 @@ class PixelSortEffect {
             uniforms: {
                 src: this._lowRT,
                 srcSize: lowSize,
-                N: this.params.N,
+                threshold: this.params.threshold,
                 keyMode: this.params.keyMode,
                 direction: this.params.direction,
             },
@@ -445,7 +489,8 @@ class PixelSortEffect {
                 src: this._lowRT,
                 rankTex: this._rankRT,
                 lowSize: lowSize,
-                N: this.params.N,
+                threshold: this.params.threshold,
+                keyMode: this.params.keyMode,
             },
             target: ctx.target,
         });
@@ -466,7 +511,7 @@ await new Promise(res => {
 });
 
 const params = {
-    N: 96,
+    threshold: 0.5,
     lowW: 256,
     keyMode: 0,
     direction: 0,
@@ -482,18 +527,18 @@ vfx.add(img, { effect });
 // controls
 // ─────────────────────────────────────────────
 
-const bind = (id, valId, key, parse = Number) => {
+const bind = (id, valId, key, parse = Number, fmt = String) => {
     const el = document.getElementById(id);
     const v = document.getElementById(valId);
     const update = () => {
         params[key] = parse(el.value);
-        if (v) v.textContent = el.value;
+        if (v) v.textContent = fmt(el.value);
     };
     el.addEventListener("input", update);
     update();
 };
 
-bind("c-n", "v-n", "N");
+bind("c-t", "v-t", "threshold", Number, v => Number(v).toFixed(2));
 bind("c-w", "v-w", "lowW");
 
 document.getElementById("c-key").addEventListener("change", e => {
