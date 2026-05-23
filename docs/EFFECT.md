@@ -62,9 +62,9 @@ interface Effect {
 }
 ```
 
-- `init` — allocate render targets, wrap textures. Once per attach.
-- `update` — advance state. `ctx.draw()` is suppressed here.
-- `render` — issue `ctx.draw()` calls. Omit to make the stage transparent.
+- `init` — allocate render targets, wrap textures. Called once when the effect is attached.
+- `update` — advance state. `ctx.draw()` calls are ignored here.
+- `render` — issue `ctx.draw()` calls. Omit to make the stage a passthrough.
 - `dispose` — drop refs; managed RTs are freed for you.
 - `outputRect` — declare the rect this stage writes into, in
   element-local physical px. Omit when output is the same size as input.
@@ -78,7 +78,7 @@ interface Effect {
 | `mouse` / `mouseViewport` | Element-local / canvas-local, bottom-left origin.               |
 | `intersection`   | 0..1 viewport overlap.                                                   |
 | `src` / `target` | Input texture / output RT for this stage. `target: null` = canvas.       |
-| `uniforms`       | User uniforms from `VFXProps.uniforms`, re-evaluated each frame.         |
+| `uniforms`       | User uniforms from `VFXProps.uniforms`. Re-evaluated each frame.         |
 | `dims`           | Per-stage layout snapshot (same shape as `outputRect`'s arg).            |
 | `quad`           | Handle for the default fullscreen quad.                                  |
 | `gl`             | Raw `WebGL2RenderingContext` for low-level work.                         |
@@ -93,7 +93,7 @@ ctx.draw({
     uniforms,          // { name: number | tuple | typed array | texture handle }
     target,            // EffectRenderTarget | null (canvas) | ctx.target
     blend,             // "premultiplied" (canvas default) | "none" (RT default) | "additive" | "normal"
-    swap,              // persistent RT: false to keep writing the same buffer
+    swap,              // persistent RT: pass false to keep writing to the same buffer
 });
 ```
 
@@ -136,10 +136,13 @@ element + N px on every side (glow / blur / shadow), `dims.canvasRect`
 
 ## Gotchas
 
-- `shader` and `effect` are mutually exclusive — `effect` wins, warns.
+- `shader` and `effect` are mutually exclusive — if both are set,
+  `effect` takes precedence and a dev warning is emitted.
 - `overflow` is ignored on effect-path elements; use `outputRect`.
-- Do **not** reuse one Effect across elements — use a factory.
-- Raw `ctx.gl` resources are yours: free in `dispose`, rebuild from
+- Don't share a single Effect instance across elements — use a
+  factory function instead.
+- Resources you allocate through raw `ctx.gl` are yours to manage —
+  free them in `dispose`, and rebuild them from
   `ctx.onContextRestored(cb)`.
 
 ## See also
