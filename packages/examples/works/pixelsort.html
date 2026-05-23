@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>pixelsort / vfx-js</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Fraunces:opsz,wght@9..144,300;9..144,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #efece4;
+    --ink: #1a1a1a;
+    --dim: #6b6b66;
+    --rule: #c8c4b8;
+    --accent: #d83b1a;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --serif: 'Fraunces', 'Times New Roman', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    padding: 24px 32px 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 36px;
+  }
+
+  .title {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-style: italic;
+    font-size: 56px;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+  }
+
+  .title em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .meta {
+    text-align: right;
+    color: var(--dim);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .meta div + div { margin-top: 2px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    gap: 36px;
+    align-items: start;
+  }
+
+  .stage {
+    position: relative;
+    background: #fff;
+    border: 1px solid var(--rule);
+  }
+
+  .stage img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .caption {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--dim);
+    display: flex;
+    justify-content: space-between;
+    letter-spacing: 0.04em;
+  }
+
+  aside {
+    font-size: 12px;
+    border-left: 1px solid var(--rule);
+    padding-left: 20px;
+  }
+
+  aside h2 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-style: italic;
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: var(--ink);
+  }
+
+  .control { margin-bottom: 18px; }
+
+  .control label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--dim);
+    margin-bottom: 6px;
+  }
+
+  .control label .val {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .control input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+    background: transparent;
+  }
+
+  .control select,
+  .control button {
+    width: 100%;
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid var(--rule);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .control button:hover { background: var(--ink); color: var(--bg); }
+
+  .pipeline {
+    margin-top: 28px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    font-size: 10.5px;
+    color: var(--dim);
+  }
+
+  .pipeline ol { list-style: none; counter-reset: p; }
+  .pipeline li {
+    counter-increment: p;
+    padding: 4px 0;
+    display: flex;
+    gap: 10px;
+  }
+  .pipeline li::before {
+    content: "pass." counter(p, decimal-leading-zero);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    font-size: 10px;
+    color: var(--dim);
+    display: flex;
+    justify-content: space-between;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">pixel<em>·</em>sort<br>study<em>—</em>01</div>
+  <div class="meta">
+    <div>vfx-js / effect api</div>
+    <div>rank-based · 3 pass</div>
+    <div>2026</div>
+  </div>
+</header>
+
+<div class="layout">
+  <main>
+    <div class="stage">
+      <img id="src" crossorigin="anonymous" alt="source">
+    </div>
+    <div class="caption">
+      <span>fig.01 — sorted by luminance, ltr</span>
+      <span id="fps">— fps</span>
+    </div>
+  </main>
+
+  <aside>
+    <h2>controls</h2>
+
+    <div class="control">
+      <label>sort range N <span class="val" id="v-n">96</span></label>
+      <input type="range" id="c-n" min="2" max="256" value="96">
+    </div>
+
+    <div class="control">
+      <label>pixelate W' <span class="val" id="v-w">256</span></label>
+      <input type="range" id="c-w" min="32" max="512" value="256" step="2">
+    </div>
+
+    <div class="control">
+      <label>compare key</label>
+      <select id="c-key">
+        <option value="0">luminance</option>
+        <option value="1">red</option>
+        <option value="2">green</option>
+        <option value="3">blue</option>
+        <option value="4">hue</option>
+        <option value="5">saturation</option>
+      </select>
+    </div>
+
+    <div class="control">
+      <label>direction</label>
+      <select id="c-dir">
+        <option value="0">→ right</option>
+        <option value="1">← left</option>
+      </select>
+    </div>
+
+    <div class="control">
+      <button id="c-toggle">bypass effect</button>
+    </div>
+
+    <div class="pipeline">
+      <ol>
+        <li>downsample WxH → W'xH</li>
+        <li>compute rank within block N</li>
+        <li>gather &amp; upsample → canvas</li>
+      </ol>
+    </div>
+  </aside>
+</div>
+
+<footer>
+  <span>moyō / study</span>
+  <span>rank-based pixelsort · 2026.05</span>
+</footer>
+
+<script type="module">
+import { VFX } from "@vfx-js/core";
+
+// ─────────────────────────────────────────────
+// shaders
+// ─────────────────────────────────────────────
+
+const FRAG_DOWNSAMPLE = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+void main() {
+    outColor = texture(src, uvSrc);
+}
+`;
+
+// keyComputeFunctions: 0=lum, 1=R, 2=G, 3=B, 4=hue, 5=sat
+const KEY_FUNC = `
+float key(vec3 c, int mode) {
+    if (mode == 0) return dot(c, vec3(0.299, 0.587, 0.114));
+    if (mode == 1) return c.r;
+    if (mode == 2) return c.g;
+    if (mode == 3) return c.b;
+    float mx = max(max(c.r, c.g), c.b);
+    float mn = min(min(c.r, c.g), c.b);
+    float d  = mx - mn;
+    if (mode == 5) return mx > 0.0 ? d / mx : 0.0;
+    // hue
+    if (d < 1e-5) return 0.0;
+    float h;
+    if (mx == c.r)      h = (c.g - c.b) / d + (c.g < c.b ? 6.0 : 0.0);
+    else if (mx == c.g) h = (c.b - c.r) / d + 2.0;
+    else                h = (c.r - c.g) / d + 4.0;
+    return h / 6.0;
+}
+`;
+
+const FRAG_RANK = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D src;
+uniform vec2 srcSize;
+uniform int N;
+uniform int keyMode;
+uniform int direction;   // 0=ltr (ascending), 1=rtl (descending)
+
+${KEY_FUNC}
+
+void main() {
+    ivec2 p = ivec2(gl_FragCoord.xy);
+    int x = p.x;
+    int y = p.y;
+    int W = int(srcSize.x);
+
+    int blockStart = (x / N) * N;
+    int blockEnd = min(blockStart + N, W);
+
+    float myKey = key(texelFetch(src, ivec2(x, y), 0).rgb, keyMode);
+
+    int rank = 0;
+    for (int i = blockStart; i < blockEnd; i++) {
+        if (i == x) continue;
+        float k = key(texelFetch(src, ivec2(i, y), 0).rgb, keyMode);
+        if (direction == 0) {
+            if (k < myKey || (k == myKey && i < x)) rank++;
+        } else {
+            if (k > myKey || (k == myKey && i < x)) rank++;
+        }
+    }
+
+    // store as 16F float directly
+    outColor = vec4(float(rank), 0.0, 0.0, 1.0);
+}
+`;
+
+const FRAG_GATHER = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;       // RT_A (W'xH)
+uniform sampler2D rankTex;   // RT_rank (W'xH)
+uniform vec2 lowSize;        // (W', H)
+uniform int N;
+
+void main() {
+    // 出力canvas座標 → 低解像度RT座標
+    int lowX = int(uvSrc.x * lowSize.x);
+    int y    = int(uvSrc.y * lowSize.y);
+    int W = int(lowSize.x);
+
+    int blockStart = (lowX / N) * N;
+    int blockEnd = min(blockStart + N, W);
+    int targetRank = lowX - blockStart;
+
+    for (int i = blockStart; i < blockEnd; i++) {
+        int r = int(texelFetch(rankTex, ivec2(i, y), 0).r + 0.5);
+        if (r == targetRank) {
+            outColor = texelFetch(src, ivec2(i, y), 0);
+            return;
+        }
+    }
+    // fallback (should not reach here for valid configs)
+    outColor = texelFetch(src, ivec2(lowX, y), 0);
+}
+`;
+
+// ─────────────────────────────────────────────
+// Effect class
+// ─────────────────────────────────────────────
+
+class PixelSortEffect {
+    constructor(params) {
+        this.params = params;
+        this._lowRT = null;
+        this._rankRT = null;
+        this._lowW = 0;
+        this._h = 0;
+    }
+
+    _ensureSize(ctx) {
+        // init で elementPixel は placeholder [1,1]。
+        // 実寸は render 時点まで分からないので、lowW/h どちらか変わったら作り直す。
+        const [, h] = ctx.dims.elementPixel;
+        const lowW = this.params.lowW;
+        if (this._lowW === lowW && this._h === h) return;
+        this._lowRT?.dispose?.();
+        this._rankRT?.dispose?.();
+        this._lowW = lowW;
+        this._h = h;
+        this._lowRT = ctx.createRenderTarget({
+            size: [lowW, h],
+            filter: "nearest",
+        });
+        this._rankRT = ctx.createRenderTarget({
+            size: [lowW, h],
+            filter: "nearest",
+            float: true,
+        });
+    }
+
+    render(ctx) {
+        this._ensureSize(ctx);
+
+        if (this.params.bypass) {
+            // 単純パススルー
+            ctx.draw({
+                frag: `#version 300 es
+                    precision highp float;
+                    in vec2 uvSrc;
+                    out vec4 outColor;
+                    uniform sampler2D src;
+                    void main() { outColor = texture(src, uvSrc); }`,
+                uniforms: { src: ctx.src },
+                target: ctx.target,
+            });
+            return;
+        }
+
+        const [, h] = ctx.dims.elementPixel;
+        const lowSize = [this._lowW, h];
+
+        // pass0
+        ctx.draw({
+            frag: FRAG_DOWNSAMPLE,
+            uniforms: { src: ctx.src },
+            target: this._lowRT,
+        });
+
+        // pass1
+        ctx.draw({
+            frag: FRAG_RANK,
+            uniforms: {
+                src: this._lowRT,
+                srcSize: lowSize,
+                N: this.params.N,
+                keyMode: this.params.keyMode,
+                direction: this.params.direction,
+            },
+            target: this._rankRT,
+        });
+
+        // pass2
+        ctx.draw({
+            frag: FRAG_GATHER,
+            uniforms: {
+                src: this._lowRT,
+                rankTex: this._rankRT,
+                lowSize: lowSize,
+                N: this.params.N,
+            },
+            target: ctx.target,
+        });
+    }
+}
+
+// ─────────────────────────────────────────────
+// setup
+// ─────────────────────────────────────────────
+
+const img = document.getElementById("src");
+
+img.src = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=900&h=600&fit=crop";
+
+await new Promise(res => {
+    if (img.complete && img.naturalWidth > 0) res();
+    else img.addEventListener("load", res, { once: true });
+});
+
+const params = {
+    N: 96,
+    lowW: 256,
+    keyMode: 0,
+    direction: 0,
+    bypass: false,
+};
+
+const effect = new PixelSortEffect(params);
+
+const vfx = new VFX();
+vfx.add(img, { effect });
+
+// ─────────────────────────────────────────────
+// controls
+// ─────────────────────────────────────────────
+
+const bind = (id, valId, key, parse = Number) => {
+    const el = document.getElementById(id);
+    const v = document.getElementById(valId);
+    const update = () => {
+        params[key] = parse(el.value);
+        if (v) v.textContent = el.value;
+    };
+    el.addEventListener("input", update);
+    update();
+};
+
+bind("c-n", "v-n", "N");
+bind("c-w", "v-w", "lowW");
+
+document.getElementById("c-key").addEventListener("change", e => {
+    params.keyMode = Number(e.target.value);
+});
+document.getElementById("c-dir").addEventListener("change", e => {
+    params.direction = Number(e.target.value);
+});
+
+const toggleBtn = document.getElementById("c-toggle");
+toggleBtn.addEventListener("click", () => {
+    params.bypass = !params.bypass;
+    toggleBtn.textContent = params.bypass ? "enable effect" : "bypass effect";
+});
+
+// ─────────────────────────────────────────────
+// fps meter
+// ─────────────────────────────────────────────
+
+const fpsEl = document.getElementById("fps");
+let frames = 0, last = performance.now();
+function tick() {
+    frames++;
+    const now = performance.now();
+    if (now - last >= 500) {
+        const fps = Math.round((frames * 1000) / (now - last));
+        fpsEl.textContent = `${fps} fps`;
+        frames = 0; last = now;
+    }
+    requestAnimationFrame(tick);
+}
+tick();
+</script>
+
+</body>
+</html>
