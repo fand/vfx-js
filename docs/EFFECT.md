@@ -1,13 +1,11 @@
 # Effect API
 
-An **Effect** is a stateful object that owns its GPU resources and
-issues draw calls each frame. Use it when the legacy `shader: string`
-path is not enough — multiple passes, persistent feedback buffers,
-custom geometry, or output that grows beyond the element rect.
-
-A chain of effects renders in order: each stage reads the previous
-stage's output (`ctx.src`) and writes to its assigned buffer
-(`ctx.target`). The last stage writes to the canvas.
+VFX-JS's Effect API lets you build your own effects on top of VFX-JS.
+Reach for it when the legacy `shader: string` path is not enough —
+multiple passes, persistent feedback buffers, custom geometry, or
+output that grows beyond the element rect. Once written, an effect
+can be reused across your app, or packaged up and distributed as a
+library.
 
 ## Example
 
