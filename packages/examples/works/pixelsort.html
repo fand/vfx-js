@@ -207,13 +207,23 @@
     <h2>controls</h2>
 
     <div class="control">
-      <label>threshold T <span class="val" id="v-t">0.50</span></label>
-      <input type="range" id="c-t" min="0" max="1" step="0.01" value="0.5">
+      <label>threshold T <span class="val" id="v-t">0.40</span></label>
+      <input type="range" id="c-t" min="0" max="1" step="0.01" value="0.4">
     </div>
 
     <div class="control">
       <label>pixelate W' <span class="val" id="v-w">256</span></label>
       <input type="range" id="c-w" min="32" max="512" value="256" step="2">
+    </div>
+
+    <div class="control">
+      <label>swirl <span class="val" id="v-s">0.60</span></label>
+      <input type="range" id="c-s" min="0" max="1" step="0.01" value="0.6">
+    </div>
+
+    <div class="control">
+      <label>flow scale <span class="val" id="v-f">0.030</span></label>
+      <input type="range" id="c-f" min="0.005" max="0.15" step="0.001" value="0.03">
     </div>
 
     <div class="control">
@@ -243,8 +253,8 @@
     <div class="pipeline">
       <ol>
         <li>downsample WxH → W'xH</li>
-        <li>scan segment where key &gt; T, rank within</li>
-        <li>gather &amp; upsample → canvas</li>
+        <li>walk curl streamline ±N, rank within</li>
+        <li>gather along streamline → canvas</li>
       </ol>
     </div>
   </aside>
@@ -293,35 +303,50 @@ float key(vec3 c, int mode) {
 }
 `;
 
-// Segment scan: a pixel is "in sort" if key > threshold. Segments are
-// runs of contiguous in-sort pixels, bounded by below-threshold pixels
-// or row edges. After https://www.shadertoy.com/view/XsBfRG.
+// Stream-function pixelsort.
 //
-// rank.rg: (rank within segment, segment length) — segment length acts
-// as both inclusion flag (>0 means in sort) and gather fallback marker.
+// Build a 2D scalar field psi from value noise; the streamline tangent
+// is perp(grad psi). Each pixel walks ±step along that tangent (blended
+// with horizontal by `swirl`), threshold-bounded, accumulating rank.
+//
+// Not a strict pixelsort: nearby pixels traverse slightly different
+// discretized paths so the segment set isn't perfectly shared. Visually
+// it reads as "sort along curving streams" without visible breakage at
+// moderate scales.
 
-const SEGMENT_SCAN = `
-// scan left/right while neighbours are above threshold. Bounded by W to
-// keep the GLSL loop finite; the early-out covers the common case.
-void scanSegment(sampler2D s, int x, int y, int W, int keyMode, float threshold, out int segStart, out int segEnd) {
-    segStart = x;
-    for (int i = 0; i < 8192; i++) {
-        if (segStart <= 0) break;
-        if (i >= W) break;
-        float k = key(texelFetch(s, ivec2(segStart - 1, y), 0).rgb, keyMode);
-        if (k <= threshold) break;
-        segStart--;
-    }
-    segEnd = x + 1;
-    for (int i = 0; i < 8192; i++) {
-        if (segEnd >= W) break;
-        if (i >= W) break;
-        float k = key(texelFetch(s, ivec2(segEnd, y), 0).rgb, keyMode);
-        if (k <= threshold) break;
-        segEnd++;
-    }
+const FLOW_FUNC = `
+float h21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+float vnoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x),
+               mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+// Numerical gradient of psi; tangent = perp(grad psi) = streamline dir.
+vec2 flowDir(vec2 p, float scale) {
+    const float eps = 0.5;
+    float dx = vnoise((p + vec2(eps, 0.0)) * scale) - vnoise((p - vec2(eps, 0.0)) * scale);
+    float dy = vnoise((p + vec2(0.0, eps)) * scale) - vnoise((p - vec2(0.0, eps)) * scale);
+    vec2 d = vec2(-dy, dx);
+    float l = length(d);
+    return l > 1e-6 ? d / l : vec2(1.0, 0.0);
+}
+vec2 walkDir(vec2 p, float scale, float swirl) {
+    vec2 d = mix(vec2(1.0, 0.0), flowDir(p, scale), swirl);
+    float l = length(d);
+    return l > 1e-6 ? d / l : vec2(1.0, 0.0);
+}
+bool oob(vec2 p, vec2 size) {
+    return p.x < 0.0 || p.x >= size.x || p.y < 0.0 || p.y >= size.y;
 }
 `;
+
+const MAX_WALK_GLSL = "192";
 
 const FRAG_RANK = `#version 300 es
 precision highp float;
@@ -330,41 +355,67 @@ out vec4 outColor;
 uniform sampler2D src;
 uniform vec2 srcSize;
 uniform float threshold;
+uniform float swirl;
+uniform float flowScale;
 uniform int keyMode;
-uniform int direction;   // 0=ltr (ascending), 1=rtl (descending)
+uniform int direction;   // 0=ascending, 1=descending
 
 ${KEY_FUNC}
-${SEGMENT_SCAN}
+${FLOW_FUNC}
+
+const int MAX_WALK = ${MAX_WALK_GLSL};
 
 void main() {
     ivec2 p = ivec2(gl_FragCoord.xy);
-    int x = p.x;
-    int y = p.y;
-    int W = int(srcSize.x);
+    vec2 size = srcSize;
+    vec2 p0 = vec2(p) + 0.5;
 
-    float myKey = key(texelFetch(src, ivec2(x, y), 0).rgb, keyMode);
-
+    float myKey = key(texelFetch(src, p, 0).rgb, keyMode);
     if (myKey <= threshold) {
-        // below threshold: passthrough, mark segLen=0 so gather falls back
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
 
-    int segStart, segEnd;
-    scanSegment(src, x, y, W, keyMode, threshold, segStart, segEnd);
-
+    int myIdx = p.x + p.y * 65536;
     int rank = 0;
-    for (int i = segStart; i < segEnd; i++) {
-        if (i == x) continue;
-        float k = key(texelFetch(src, ivec2(i, y), 0).rgb, keyMode);
+
+    // forward
+    vec2 pos = p0;
+    for (int i = 0; i < MAX_WALK; i++) {
+        vec2 d = walkDir(pos, flowScale, swirl);
+        vec2 next = pos + d;
+        if (oob(next, size)) break;
+        ivec2 ip = ivec2(floor(next));
+        float k = key(texelFetch(src, ip, 0).rgb, keyMode);
+        if (k <= threshold) break;
+        pos = next;
+        int idx = ip.x + ip.y * 65536;
         if (direction == 0) {
-            if (k < myKey || (k == myKey && i < x)) rank++;
+            if (k < myKey || (k == myKey && idx < myIdx)) rank++;
         } else {
-            if (k > myKey || (k == myKey && i < x)) rank++;
+            if (k > myKey || (k == myKey && idx < myIdx)) rank++;
         }
     }
 
-    outColor = vec4(float(rank), float(segEnd - segStart), 0.0, 1.0);
+    // backward
+    pos = p0;
+    for (int i = 0; i < MAX_WALK; i++) {
+        vec2 d = walkDir(pos, flowScale, swirl);
+        vec2 next = pos - d;
+        if (oob(next, size)) break;
+        ivec2 ip = ivec2(floor(next));
+        float k = key(texelFetch(src, ip, 0).rgb, keyMode);
+        if (k <= threshold) break;
+        pos = next;
+        int idx = ip.x + ip.y * 65536;
+        if (direction == 0) {
+            if (k < myKey || (k == myKey && idx < myIdx)) rank++;
+        } else {
+            if (k > myKey || (k == myKey && idx < myIdx)) rank++;
+        }
+    }
+
+    outColor = vec4(float(rank), 0.0, 0.0, 1.0);
 }
 `;
 
@@ -376,34 +427,79 @@ uniform sampler2D src;       // RT_A (W'xH)
 uniform sampler2D rankTex;   // RT_rank (W'xH)
 uniform vec2 lowSize;        // (W', H)
 uniform float threshold;
+uniform float swirl;
+uniform float flowScale;
 uniform int keyMode;
 
 ${KEY_FUNC}
-${SEGMENT_SCAN}
+${FLOW_FUNC}
+
+const int MAX_WALK = ${MAX_WALK_GLSL};
 
 void main() {
-    int lowX = int(uvSrc.x * lowSize.x);
-    int y    = int(uvSrc.y * lowSize.y);
-    int W    = int(lowSize.x);
+    ivec2 myIp = ivec2(uvSrc * lowSize);
+    vec2 size = lowSize;
+    vec2 p0 = vec2(myIp) + 0.5;
 
-    float myKey = key(texelFetch(src, ivec2(lowX, y), 0).rgb, keyMode);
+    float myKey = key(texelFetch(src, myIp, 0).rgb, keyMode);
     if (myKey <= threshold) {
-        outColor = texelFetch(src, ivec2(lowX, y), 0);
+        outColor = texelFetch(src, myIp, 0);
         return;
     }
 
-    int segStart, segEnd;
-    scanSegment(src, lowX, y, W, keyMode, threshold, segStart, segEnd);
-    int targetRank = lowX - segStart;
+    // target rank = backward distance to segment start
+    int targetRank = 0;
+    vec2 pos = p0;
+    for (int i = 0; i < MAX_WALK; i++) {
+        vec2 d = walkDir(pos, flowScale, swirl);
+        vec2 next = pos - d;
+        if (oob(next, size)) break;
+        ivec2 ip = ivec2(floor(next));
+        float k = key(texelFetch(src, ip, 0).rgb, keyMode);
+        if (k <= threshold) break;
+        pos = next;
+        targetRank++;
+    }
 
-    for (int i = segStart; i < segEnd; i++) {
-        int r = int(texelFetch(rankTex, ivec2(i, y), 0).r + 0.5);
+    int myRank = int(texelFetch(rankTex, myIp, 0).r + 0.5);
+    if (myRank == targetRank) {
+        outColor = texelFetch(src, myIp, 0);
+        return;
+    }
+
+    // scan segment looking for the pixel whose stored rank == targetRank
+    pos = p0;
+    for (int i = 0; i < MAX_WALK; i++) {
+        vec2 d = walkDir(pos, flowScale, swirl);
+        vec2 next = pos - d;
+        if (oob(next, size)) break;
+        ivec2 ip = ivec2(floor(next));
+        float k = key(texelFetch(src, ip, 0).rgb, keyMode);
+        if (k <= threshold) break;
+        pos = next;
+        int r = int(texelFetch(rankTex, ip, 0).r + 0.5);
         if (r == targetRank) {
-            outColor = texelFetch(src, ivec2(i, y), 0);
+            outColor = texelFetch(src, ip, 0);
             return;
         }
     }
-    outColor = texelFetch(src, ivec2(lowX, y), 0);
+    pos = p0;
+    for (int i = 0; i < MAX_WALK; i++) {
+        vec2 d = walkDir(pos, flowScale, swirl);
+        vec2 next = pos + d;
+        if (oob(next, size)) break;
+        ivec2 ip = ivec2(floor(next));
+        float k = key(texelFetch(src, ip, 0).rgb, keyMode);
+        if (k <= threshold) break;
+        pos = next;
+        int r = int(texelFetch(rankTex, ip, 0).r + 0.5);
+        if (r == targetRank) {
+            outColor = texelFetch(src, ip, 0);
+            return;
+        }
+    }
+
+    outColor = texelFetch(src, myIp, 0);
 }
 `;
 
@@ -476,6 +572,8 @@ class PixelSortEffect {
                 src: this._lowRT,
                 srcSize: lowSize,
                 threshold: this.params.threshold,
+                swirl: this.params.swirl,
+                flowScale: this.params.flowScale,
                 keyMode: this.params.keyMode,
                 direction: this.params.direction,
             },
@@ -490,6 +588,8 @@ class PixelSortEffect {
                 rankTex: this._rankRT,
                 lowSize: lowSize,
                 threshold: this.params.threshold,
+                swirl: this.params.swirl,
+                flowScale: this.params.flowScale,
                 keyMode: this.params.keyMode,
             },
             target: ctx.target,
@@ -511,8 +611,10 @@ await new Promise(res => {
 });
 
 const params = {
-    threshold: 0.5,
+    threshold: 0.4,
     lowW: 256,
+    swirl: 0.6,
+    flowScale: 0.03,
     keyMode: 0,
     direction: 0,
     bypass: false,
@@ -540,6 +642,8 @@ const bind = (id, valId, key, parse = Number, fmt = String) => {
 
 bind("c-t", "v-t", "threshold", Number, v => Number(v).toFixed(2));
 bind("c-w", "v-w", "lowW");
+bind("c-s", "v-s", "swirl", Number, v => Number(v).toFixed(2));
+bind("c-f", "v-f", "flowScale", Number, v => Number(v).toFixed(3));
 
 document.getElementById("c-key").addEventListener("change", e => {
     params.keyMode = Number(e.target.value);
