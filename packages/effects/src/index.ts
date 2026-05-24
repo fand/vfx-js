@@ -1,4 +1,5 @@
 export { BloomEffect } from "./bloom";
+export { DitherEffect } from "./dither";
 export { FluidEffect } from "./fluid";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
 export { ParticleEffect } from "./particle";
