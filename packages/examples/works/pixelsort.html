@@ -164,6 +164,11 @@
 
   .pxs-fallback h1, .pxs-fallback h2{background:linear-gradient(180deg,transparent 0 38%,rgba(79,108,255,.3) 38% 41%,transparent 41% 60%,rgba(54,224,130,.3) 60% 62%,transparent 62%);}
 
+  /* ───── Fake scroll stage ───── */
+  .scroll-proxy{position:relative;height:600vh;}
+  .stage{position:sticky;top:0;height:100vh;display:grid;grid-template-areas:"stage";overflow:hidden;}
+  .stage > *{grid-area:stage;}
+
 </style>
 </head>
 <body>
@@ -176,6 +181,8 @@
     <div class="stamp">v0.7.2 · sync</div>
   </nav>
 
+  <div class="scroll-proxy">
+    <div class="stage">
   <section class="hero">
     <div class="bg"><img class="pxs" src="https://picsum.photos/seed/subpixel-hero/2400/1600" crossorigin="anonymous" alt=""></div>
     <div class="overlay"></div>
@@ -253,6 +260,8 @@
       </ol>
     </div>
   </section>
+    </div>
+  </div>
 
   <footer>
     <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-foot/2000/1400" crossorigin="anonymous" alt="">
@@ -511,26 +520,94 @@ try {
         effect._anim = requestAnimationFrame(tick);
     };
 
-    const sections = [...document.querySelectorAll(".hero, .section-2, .section-3, .section-4, footer")];
-    const effectsBySection = new Map();
+    const sections = [
+        document.querySelector(".hero"),
+        document.querySelector(".section-2"),
+        document.querySelector(".section-3"),
+        document.querySelector(".section-4"),
+    ];
 
-    await Promise.all(sections.map(async (section) => {
-        const effect = new PixelSortEffect(params, { bypass: true, threshold: 1 });
-        await vfx.addHTML(section, { effect });
-        effectsBySection.set(section, effect);
+    // Preload section-3 sub-state images so the swap is instant.
+    const subImageUrls = [1, 2, 3, 4].map(i =>
+        `https://picsum.photos/seed/subpixel-strip-${i}/2100/900`
+    );
+    await Promise.all(subImageUrls.map(url => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = url;
+        return img.decode().catch(() => {});
     }));
 
-    const io = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-            if (entry.intersectionRatio >= 0.5) {
-                io.unobserve(entry.target);
-                const effect = effectsBySection.get(entry.target);
-                if (effect) animateReveal(effect);
-            }
-        }
-    }, { threshold: [0, 0.5, 1] });
+    const effects = [];
+    const canvases = [];
+    await Promise.all(sections.map(async (section, i) => {
+        const effect = new PixelSortEffect(params, { bypass: true, threshold: 1 });
+        await vfx.addHTML(section, { effect });
+        effects[i] = effect;
+        canvases[i] = section.parentElement;
+        canvases[i].style.opacity = "0";
+        canvases[i].style.pointerEvents = "none";
+    }));
 
-    sections.forEach(s => io.observe(s));
+    const section3VideoImg = sections[2].querySelector(".video img");
+
+    const SCROLL_STATES = [
+        { p: 0.00, idx: 0, img: null },  // hero
+        { p: 0.20, idx: 1, img: null },  // section-2
+        { p: 0.40, idx: 2, img: 0 },     // section-3 / image 1
+        { p: 0.50, idx: 2, img: 1 },
+        { p: 0.60, idx: 2, img: 2 },
+        { p: 0.70, idx: 2, img: 3 },
+        { p: 0.80, idx: 3, img: null },  // section-4
+    ];
+
+    const stateForProgress = (p) => {
+        let s = SCROLL_STATES[0];
+        for (const st of SCROLL_STATES) {
+            if (p >= st.p) s = st;
+            else break;
+        }
+        return s;
+    };
+
+    let currentState = null;
+    const applyState = (state) => {
+        if (state === currentState) return;
+        const prev = currentState;
+
+        if (prev && prev.idx !== state.idx) {
+            if (effects[prev.idx]._anim) cancelAnimationFrame(effects[prev.idx]._anim);
+            effects[prev.idx]._anim = null;
+            effects[prev.idx].localBypass = true;
+            canvases[prev.idx].style.opacity = "0";
+            canvases[prev.idx].style.pointerEvents = "none";
+        }
+        if (!prev || prev.idx !== state.idx) {
+            canvases[state.idx].style.opacity = "1";
+            canvases[state.idx].style.pointerEvents = "auto";
+        }
+        if (state.img !== null) {
+            section3VideoImg.src = subImageUrls[state.img];
+        }
+        animateReveal(effects[state.idx]);
+        currentState = state;
+    };
+
+    let rafPending = false;
+    const onScroll = () => {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(() => {
+            rafPending = false;
+            const scrollMax = document.documentElement.scrollHeight - window.innerHeight;
+            const p = scrollMax > 0 ? window.scrollY / scrollMax : 0;
+            applyState(stateForProgress(p));
+        });
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    onScroll();
 
     applied = true;
 } catch (e) {
