@@ -5,7 +5,7 @@
 <title>SUBPIXEL.SDK / pure sync — editorial</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Jacquard+12&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=UnifrakturMaguntia&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#f4f4f1;
@@ -16,7 +16,7 @@
     --line:rgba(10,13,18,.12);
     --mono:'IBM Plex Mono',ui-monospace,monospace;
     --sans:'Space Grotesk',system-ui,sans-serif;
-    --display:'Jacquard 12','Space Grotesk',system-ui,sans-serif;
+    --display:'UnifrakturMaguntia','Space Grotesk',system-ui,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
@@ -79,9 +79,8 @@
   .section-3 .filmstrip div{flex:1;aspect-ratio:4/3;background:var(--bg2) center/cover;border:1px solid var(--line);}
 
   /* Section 4 — manifest list */
-  .section-4{padding:120px 40px;border-top:1px solid var(--line);}
-  .section-4-inner{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:280px 1fr;gap:64px;}
-  .section-4 h2{font-family:var(--display);font-weight:400;font-size:60px;line-height:.95;letter-spacing:0;color:var(--blue);}
+  .section-4{padding:0;min-height:100vh;display:grid;place-items:center;}
+  .section-4 h2{font-family:var(--display);font-weight:400;font-size:clamp(120px,18vw,280px);line-height:.95;letter-spacing:0;color:var(--blue);text-align:center;width:max-content;max-width:none;white-space:nowrap;position:relative;z-index:2;}
   .section-4 ol{list-style:none;counter-reset:i;}
   .section-4 li{counter-increment:i;display:grid;grid-template-columns:60px 1fr 140px;gap:24px;padding:22px 0;border-top:1px solid var(--line);align-items:baseline;}
   .section-4 li:last-child{border-bottom:1px solid var(--line);}
@@ -116,7 +115,7 @@
   .nav .mark{color:var(--blue);}
   .nav .stamp{color:var(--green);}
   .hero .overlay{background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(8,9,12,.32) 0%,rgba(8,9,12,.74) 55%,rgba(8,9,12,.95) 100%);}
-  .hero .bg img{opacity:.85;}
+  .hero .bg img{opacity:1;}
   .hero h1{color:var(--blue);text-shadow:0 0 70px rgba(79,108,255,.8);}
   .hero h1 .slash{color:var(--ink);opacity:.45;}
   .hero .eyebrow,.hero .corners .tl{color:var(--green);}
@@ -129,7 +128,8 @@
   .section-overlay{position:absolute;inset:0;z-index:1;pointer-events:none;}
   .section-2 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.95),rgba(8,9,12,.78) 50%,rgba(8,9,12,.96));}
   .section-3 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.92),rgba(8,9,12,.7) 50%,rgba(8,9,12,.95));}
-  .section-4 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.96),rgba(8,9,12,.88));}
+  .section-4 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.3),rgba(8,9,12,.5));}
+  .section-4 .section-bg{opacity:1;}
   footer .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.92),rgba(8,9,12,.98));}
   .section-2-grid,.section-3-inner,.section-4-inner,footer .row,footer .base{position:relative;z-index:2;}
 
@@ -166,25 +166,17 @@
 
   /* ───── Fake scroll stage ───── */
   .scroll-proxy{position:relative;height:600vh;}
-  .stage{position:sticky;top:0;height:100vh;display:grid;grid-template-areas:"stage";overflow:hidden;}
+  .stage{position:fixed;top:0;left:0;width:100%;height:100vh;display:grid;grid-template-areas:"stage";overflow:hidden;z-index:0;}
   .stage > *{grid-area:stage;}
 
 </style>
 </head>
 <body>
 <div id="root">
-  <nav class="nav">
-    <div class="mark">SUBPIXEL.SDK</div>
-    <ul>
-      <li>Index</li><li>Build</li><li>Docs</li><li>Releases</li>
-    </ul>
-    <div class="stamp">v0.7.2 · sync</div>
-  </nav>
-
   <div class="scroll-proxy">
     <div class="stage">
   <section class="hero">
-    <div class="bg"><img class="pxs" src="https://picsum.photos/seed/subpixel-hero/2400/1600" crossorigin="anonymous" alt=""></div>
+    <div class="bg"><img class="pxs" src="https://images.unsplash.com/photo-1590725042659-63c8b9f9724d?fm=jpg&amp;q=80&amp;w=2400&amp;auto=format&amp;fit=crop" crossorigin="anonymous" alt=""></div>
     <div class="overlay"></div>
     <div class="corners">
       <span class="tl">// SUBPIXEL · release</span>
@@ -235,45 +227,16 @@
         <div class="play"><span>▶ 02:14</span></div>
         <div class="legend"><span>Clip · Subpixel × Lab/04</span><span>00:00:14:08 — REC</span><span>Color · Rec.709</span></div>
       </div>
-      <div class="filmstrip">
-        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-1/400/300')"></div>
-        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-2/400/300')"></div>
-        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-3/400/300')"></div>
-        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-4/400/300')"></div>
-        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-5/400/300')"></div>
-        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-6/400/300')"></div>
-      </div>
     </div>
   </section>
 
   <section class="section-4">
-    <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-s4/2000/1400" crossorigin="anonymous" alt="">
+    <img class="section-bg pxs" src="https://picsum.photos/seed/octopus/2400/1600" crossorigin="anonymous" alt="">
     <div class="section-overlay"></div>
-    <div class="section-4-inner">
-      <h2 class="pxs">Changelog, in&nbsp;brief.</h2>
-      <ol>
-        <li><span class="t">Re-implemented the column sampler in WGSL.</span><span class="s">May 24</span></li>
-        <li><span class="t">Threshold mode now supports HSL luminance.</span><span class="s">May 17</span></li>
-        <li><span class="t">Dropped legacy WebGL1 path entirely.</span><span class="s">May 09</span></li>
-        <li><span class="t">Frame timer now monotonic across tab focus.</span><span class="s">May 02</span></li>
-        <li><span class="t">SSR-safe initializer for hydration frameworks.</span><span class="s">Apr 26</span></li>
-      </ol>
-    </div>
+    <h2 class="pxs">VFX-JS</h2>
   </section>
     </div>
   </div>
-
-  <footer>
-    <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-foot/2000/1400" crossorigin="anonymous" alt="">
-    <div class="section-overlay"></div>
-    <div class="row">
-      <div class="word pxs">END<br>OF<br>FEED.</div>
-      <div><h4>Channels</h4><ul><li>RSS</li><li>Atom</li><li>JSON Feed</li><li>Mailing list</li></ul></div>
-      <div><h4>Source</h4><ul><li>Repository</li><li>Mirrors</li><li>Issues</li><li>Security</li></ul></div>
-      <div><h4>Studio</h4><ul><li>About</li><li>Imprint</li><li>Privacy</li><li>Press</li></ul></div>
-    </div>
-    <div class="base"><span>SUBPIXEL.SDK · operated as a tiny experiment</span><span>© 2026 — no rights reserved</span></div>
-  </footer>
 </div>
 
 <script type="module">
@@ -497,7 +460,7 @@ const params = {
 
 let applied = false;
 try {
-    const vfx = new VFX();
+    const vfx = new VFX({ scrollPadding: false });
 
     await document.fonts.ready;
 
@@ -550,6 +513,35 @@ try {
     }));
 
     const section3VideoImg = sections[2].querySelector(".video img");
+    section3VideoImg.style.display = "none";
+    // vfx-js caches img texture at add-time and doesn't refresh on src
+    // change — re-add per swap to pick up the new source.
+    let imgEffect = null;
+    let imgReqToken = 0;
+    const showImgWithSrc = async (src) => {
+        const token = ++imgReqToken;
+        if (imgEffect) {
+            if (imgEffect._anim) cancelAnimationFrame(imgEffect._anim);
+            vfx.remove(section3VideoImg);
+            imgEffect = null;
+        }
+        section3VideoImg.src = src;
+        section3VideoImg.style.display = "";
+        const e = new PixelSortEffect(params, { bypass: true, threshold: 1 });
+        await vfx.add(section3VideoImg, { effect: e });
+        if (token !== imgReqToken) return;
+        imgEffect = e;
+        animateReveal(e);
+    };
+    const hideImg = () => {
+        ++imgReqToken;
+        if (imgEffect) {
+            if (imgEffect._anim) cancelAnimationFrame(imgEffect._anim);
+            vfx.remove(section3VideoImg);
+            imgEffect = null;
+        }
+        section3VideoImg.style.display = "none";
+    };
 
     const SCROLL_STATES = [
         { p: 0.00, idx: 0, img: null },  // hero
@@ -574,24 +566,31 @@ try {
     const applyState = (state) => {
         if (state === currentState) return;
         const prev = currentState;
+        const sectionChanged = !prev || prev.idx !== state.idx;
+        const imgChanged = state.img !== null && (sectionChanged || prev.img !== state.img);
 
-        if (prev && prev.idx !== state.idx) {
+        if (sectionChanged && prev) {
             if (effects[prev.idx]._anim) cancelAnimationFrame(effects[prev.idx]._anim);
             effects[prev.idx]._anim = null;
             effects[prev.idx].localBypass = true;
             canvases[prev.idx].style.opacity = "0";
             canvases[prev.idx].style.pointerEvents = "none";
+            if (prev.idx === 2) {
+                hideImg();
+            }
         }
-        if (!prev || prev.idx !== state.idx) {
+        if (sectionChanged) {
             canvases[state.idx].style.opacity = "1";
             canvases[state.idx].style.pointerEvents = "auto";
+            animateReveal(effects[state.idx]);
         }
-        if (state.img !== null) {
-            section3VideoImg.src = subImageUrls[state.img];
+        if (imgChanged) {
+            showImgWithSrc(subImageUrls[state.img]);
         }
-        animateReveal(effects[state.idx]);
         currentState = state;
     };
+
+    const scrollProxy = document.querySelector(".scroll-proxy");
 
     let rafPending = false;
     const onScroll = () => {
@@ -599,8 +598,8 @@ try {
         rafPending = true;
         requestAnimationFrame(() => {
             rafPending = false;
-            const scrollMax = document.documentElement.scrollHeight - window.innerHeight;
-            const p = scrollMax > 0 ? window.scrollY / scrollMax : 0;
+            const proxyRange = scrollProxy.offsetHeight - window.innerHeight;
+            const p = proxyRange > 0 ? Math.max(0, Math.min(1, window.scrollY / proxyRange)) : 0;
             applyState(stateForProgress(p));
         });
     };
