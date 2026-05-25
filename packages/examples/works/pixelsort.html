@@ -490,62 +490,47 @@ let applied = false;
 try {
     const vfx = new VFX();
 
-    const imgReady = el => new Promise(res => {
-        if (el.complete && el.naturalWidth > 0) res();
-        else {
-            el.addEventListener("load", res, { once: true });
-            el.addEventListener("error", res, { once: true });
-        }
-    });
+    await document.fonts.ready;
 
-    const HOVER_IDLE = 1.0;   // threshold value when not hovered (no pixel qualifies)
-    const HOVER_MS = 400;
-
-    const tweenThreshold = (effect, to, onDone) => {
+    const REVEAL_MS = 2000;
+    const animateReveal = (effect) => {
         if (effect._anim) cancelAnimationFrame(effect._anim);
-        const from = effect.localThreshold ?? HOVER_IDLE;
+        effect.localBypass = false;
+        effect.localThreshold = 0;
         const t0 = performance.now();
         const tick = () => {
-            const t = Math.min(1, (performance.now() - t0) / HOVER_MS);
-            const eased = 1 - (1 - t) ** 3;
-            effect.localThreshold = from + (to - from) * eased;
-            if (t < 1) effect._anim = requestAnimationFrame(tick);
-            else { effect._anim = null; onDone?.(); }
+            const t = Math.min(1, (performance.now() - t0) / REVEAL_MS);
+            effect.localThreshold = t;
+            if (t < 1) {
+                effect._anim = requestAnimationFrame(tick);
+            } else {
+                effect._anim = null;
+                effect.localBypass = true;
+            }
         };
         effect._anim = requestAnimationFrame(tick);
     };
 
-    const wireHover = (el, effect) => {
-        // start idle (bypass on, threshold at max)
-        effect.localThreshold = HOVER_IDLE;
-        el.addEventListener("pointerenter", () => {
-            effect.localBypass = false;
-            tweenThreshold(effect, effect.params.threshold);
-        });
-        el.addEventListener("pointerleave", () => {
-            tweenThreshold(effect, HOVER_IDLE, () => { effect.localBypass = true; });
-        });
-    };
+    const sections = [...document.querySelectorAll(".hero, .section-2, .section-3, .section-4, footer")];
+    const effectsBySection = new Map();
 
-    await document.fonts.ready;
-
-    // VFX paints to a single overlay canvas at z:9999. Full-bleed bg
-    // images (.hero .bg, .section-bg) would have that canvas occlude
-    // every other layer in their rect — including the dark .overlay and
-    // the heading text. Skip them; they read fine via the native DOM
-    // path with their CSS overlays intact.
-    const isBgImg = el => el.classList.contains("section-bg") || !!el.closest(".bg");
-    const targets = [...document.querySelectorAll(".pxs")].filter(el => !isBgImg(el));
-    await Promise.all(targets.map(async el => {
-        const effect = new PixelSortEffect(params, { bypass: true });
-        if (el instanceof HTMLImageElement) {
-            await imgReady(el);
-            vfx.add(el, { effect });
-        } else {
-            await vfx.addHTML(el, { effect });
-        }
-        wireHover(el, effect);
+    await Promise.all(sections.map(async (section) => {
+        const effect = new PixelSortEffect(params, { bypass: true, threshold: 1 });
+        await vfx.addHTML(section, { effect });
+        effectsBySection.set(section, effect);
     }));
+
+    const io = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+            if (entry.intersectionRatio >= 0.5) {
+                io.unobserve(entry.target);
+                const effect = effectsBySection.get(entry.target);
+                if (effect) animateReveal(effect);
+            }
+        }
+    }, { threshold: [0, 0.5, 1] });
+
+    sections.forEach(s => io.observe(s));
 
     applied = true;
 } catch (e) {
