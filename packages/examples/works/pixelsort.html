@@ -378,8 +378,9 @@ void main() {
     int W    = int(lowSize.x);
     float myKey = key(texelFetch(src, ivec2(lowX, y), 0).rgb, keyMode);
     if (myKey <= threshold) {
-        // below-threshold pixels skip the low-res buffer entirely
-        outColor = texture(srcHi, uvSrc);
+        // below-threshold pixels skip the low-res buffer entirely.
+        vec4 c = texture(srcHi, uvSrc);
+        outColor = vec4(c.rgb * c.a, c.a);
         return;
     }
     int segStart, segEnd;
@@ -388,20 +389,31 @@ void main() {
     for (int i = segStart; i < segEnd; i++) {
         int r = int(texelFetch(rankTex, ivec2(i, y), 0).r + 0.5);
         if (r == targetRank) {
-            outColor = texelFetch(src, ivec2(i, y), 0);
+            vec4 c = texelFetch(src, ivec2(i, y), 0);
+            outColor = vec4(c.rgb * c.a, c.a);
             return;
         }
     }
-    outColor = texelFetch(src, ivec2(lowX, y), 0);
+    vec4 c = texelFetch(src, ivec2(lowX, y), 0);
+    outColor = vec4(c.rgb * c.a, c.a);
 }
 `;
 
+// VFX-JS writes to a `premultipliedAlpha: true` WebGL canvas, so the
+// browser composites the canvas treating its contents as premultiplied.
+// Captured textures upload with UNPACK_PREMULTIPLY_ALPHA_WEBGL=false →
+// straight alpha. Pre-multiply at output so semi-transparent pixels
+// (text-shadow halo, anti-aliased edges) composite at the intended
+// alpha instead of bleeding through at full RGB intensity.
 const BYPASS_FRAG = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
-void main() { outColor = texture(src, uvSrc); }
+void main() {
+    vec4 c = texture(src, uvSrc);
+    outColor = vec4(c.rgb * c.a, c.a);
+}
 `;
 
 class PixelSortEffect {
