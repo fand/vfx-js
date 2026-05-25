@@ -536,13 +536,17 @@ try {
     // path with their CSS overlays intact.
     const isBgImg = el => el.classList.contains("section-bg") || !!el.closest(".bg");
     const targets = [...document.querySelectorAll(".pxs")].filter(el => !isBgImg(el));
+    // Heading text-shadow blur extends well past the element's bbox
+    // (h1 has 70px, h2 has 50px). Without an overflow margin, the capture
+    // rect is the bbox and the halo gets cropped at the edges. 100px
+    // covers both shadow radii with headroom.
     await Promise.all(targets.map(async el => {
         const effect = new PixelSortEffect(params, { bypass: true });
         if (el instanceof HTMLImageElement) {
             await imgReady(el);
             vfx.add(el, { effect });
         } else {
-            await vfx.addHTML(el, { effect });
+            await vfx.addHTML(el, { effect, overflow: 100 });
         }
         wireHover(el, effect);
     }));
