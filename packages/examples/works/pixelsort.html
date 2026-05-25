@@ -408,6 +408,10 @@ class PixelSortEffect {
     constructor(params, opts = {}) {
         this.params = params;
         this.localBypass = opts.bypass ?? false;
+        // Per-instance threshold override (null → use params.threshold).
+        // Tweened by hover handlers between 1.0 (idle) and params.threshold (active).
+        this.localThreshold = opts.threshold ?? null;
+        this._anim = null;
         this._lowRT = null;
         this._rankRT = null;
         this._lowW = 0;
@@ -437,7 +441,7 @@ class PixelSortEffect {
             frag: FRAG_RANK,
             uniforms: {
                 src: this._lowRT, srcSize: lowSize,
-                threshold: this.params.threshold,
+                threshold: this.localThreshold ?? this.params.threshold,
                 keyMode: this.params.keyMode,
                 direction: this.params.direction,
             },
@@ -448,7 +452,7 @@ class PixelSortEffect {
             uniforms: {
                 src: this._lowRT, srcHi: ctx.src, rankTex: this._rankRT,
                 lowSize: lowSize,
-                threshold: this.params.threshold,
+                threshold: this.localThreshold ?? this.params.threshold,
                 keyMode: this.params.keyMode,
             },
             target: ctx.target,
@@ -482,9 +486,33 @@ try {
         }
     });
 
+    const HOVER_IDLE = 1.0;   // threshold value when not hovered (no pixel qualifies)
+    const HOVER_MS = 400;
+
+    const tweenThreshold = (effect, to, onDone) => {
+        if (effect._anim) cancelAnimationFrame(effect._anim);
+        const from = effect.localThreshold ?? HOVER_IDLE;
+        const t0 = performance.now();
+        const tick = () => {
+            const t = Math.min(1, (performance.now() - t0) / HOVER_MS);
+            const eased = 1 - (1 - t) ** 3;
+            effect.localThreshold = from + (to - from) * eased;
+            if (t < 1) effect._anim = requestAnimationFrame(tick);
+            else { effect._anim = null; onDone?.(); }
+        };
+        effect._anim = requestAnimationFrame(tick);
+    };
+
     const wireHover = (el, effect) => {
-        el.addEventListener("pointerenter", () => { effect.localBypass = false; });
-        el.addEventListener("pointerleave", () => { effect.localBypass = true; });
+        // start idle (bypass on, threshold at max)
+        effect.localThreshold = HOVER_IDLE;
+        el.addEventListener("pointerenter", () => {
+            effect.localBypass = false;
+            tweenThreshold(effect, effect.params.threshold);
+        });
+        el.addEventListener("pointerleave", () => {
+            tweenThreshold(effect, HOVER_IDLE, () => { effect.localBypass = true; });
+        });
     };
 
     await document.fonts.ready;
