@@ -378,10 +378,8 @@ void main() {
     int W    = int(lowSize.x);
     float myKey = key(texelFetch(src, ivec2(lowX, y), 0).rgb, keyMode);
     if (myKey <= threshold) {
-        // below-threshold pixels skip the low-res buffer entirely;
-        // pre-multiply alpha to match the canvas's blend mode.
-        vec4 c = texture(srcHi, uvSrc);
-        outColor = vec4(c.rgb * c.a, c.a);
+        // below-threshold pixels skip the low-res buffer entirely
+        outColor = texture(srcHi, uvSrc);
         return;
     }
     int segStart, segEnd;
@@ -398,19 +396,12 @@ void main() {
 }
 `;
 
-// VFX-JS blends to the canvas with premultiplied alpha. dom-to-canvas
-// gives straight-alpha textures, so we pre-multiply in the shader
-// to avoid washed-out / noisy edges around translucent pixels
-// (text-shadow glow, anti-aliased letterforms).
 const BYPASS_FRAG = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
-void main() {
-    vec4 c = texture(src, uvSrc);
-    outColor = vec4(c.rgb * c.a, c.a);
-}
+void main() { outColor = texture(src, uvSrc); }
 `;
 
 class PixelSortEffect {
