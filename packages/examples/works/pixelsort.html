@@ -1,265 +1,278 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>pixelsort / vfx-js</title>
+<title>SUBPIXEL.SDK / pure sync — editorial</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Fraunces:opsz,wght@9..144,300;9..144,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Jacquard+12&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #efece4;
-    --ink: #1a1a1a;
-    --dim: #6b6b66;
-    --rule: #c8c4b8;
-    --accent: #d83b1a;
-    --mono: 'JetBrains Mono', ui-monospace, monospace;
-    --serif: 'Fraunces', 'Times New Roman', serif;
+  :root{
+    --bg:#f4f4f1;
+    --bg2:#ecede8;
+    --ink:#0a0d12;
+    --blue:#0028ff;
+    --green:#00a847;
+    --line:rgba(10,13,18,.12);
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'Space Grotesk',system-ui,sans-serif;
+    --display:'Jacquard 12','Space Grotesk',system-ui,sans-serif;
   }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
+  body{overflow-x:hidden;line-height:1.35;}
+  a{color:inherit;text-decoration:none;}
+  img{display:block;max-width:100%;}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Top chrome */
+  .nav{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;padding:18px 40px;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;background:var(--bg);border-bottom:1px solid var(--line);}
+  .nav .mark{color:var(--blue);font-weight:600;}
+  .nav ul{display:flex;gap:28px;list-style:none;}
+  .nav .stamp{color:var(--green);}
 
-  html, body {
-    background: var(--bg);
-    color: var(--ink);
-    font-family: var(--mono);
-    font-size: 13px;
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
+  /* Section 1 — title + tagline, image as full-bleed section background */
+  .hero{position:relative;min-height:100vh;display:grid;place-items:center;padding:80px 40px;text-align:center;overflow:hidden;border-bottom:1px solid var(--line);}
+  .hero .bg{position:absolute;inset:0;z-index:0;}
+  .hero .bg img{width:100%;height:100%;object-fit:cover;}
+  .hero .overlay{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(244,244,241,.94) 0%,rgba(244,244,241,.78) 45%,rgba(244,244,241,.55) 80%,rgba(244,244,241,.35) 100%);}
+  .hero .inner{position:relative;z-index:2;max-width:1100px;display:flex;flex-direction:column;align-items:center;}
+  .hero .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:36px;}
+  .hero h1{font-family:var(--display);font-weight:400;font-size:clamp(120px,18vw,280px);line-height:.92;letter-spacing:0;color:var(--blue);margin-bottom:40px;}
+  .hero h1 .slash{color:var(--ink);opacity:.55;}
+  .hero .tagline{font-family:var(--mono);font-size:14px;color:var(--ink);max-width:540px;margin:0 auto;line-height:1.6;}
+  .hero .meta{margin-top:48px;display:flex;justify-content:center;gap:32px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);opacity:.7;}
+  .hero .corners{position:absolute;inset:24px;z-index:2;pointer-events:none;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);opacity:.55;}
+  .hero .corners>span{position:absolute;}
+  .hero .corners .tl{top:0;left:0;color:var(--green);}
+  .hero .corners .tr{top:0;right:0;}
+  .hero .corners .bl{bottom:0;left:0;}
+  .hero .corners .br{bottom:0;right:0;color:var(--blue);}
+
+  /* Section 2 — editorial: image left + columns w/ drop-cap right */
+  .section-2{padding:120px 40px;border-top:1px solid var(--line);}
+  .section-2-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:64px;align-items:start;max-width:1280px;margin:0 auto;}
+  .section-2 .image-col .image{aspect-ratio:4/5;background:var(--bg2);overflow:hidden;border:1px solid var(--line);}
+  .section-2 .image-col .image img{width:100%;height:100%;object-fit:cover;}
+  .section-2 .image-col .caption{margin-top:10px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink);opacity:.6;line-height:1.5;}
+  .section-2 .body .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:18px;}
+  .section-2 h2{font-family:var(--display);font-weight:400;font-size:80px;line-height:.95;letter-spacing:0;color:var(--blue);margin-bottom:32px;}
+  .section-2 h2 em{font-style:normal;color:var(--green);}
+  .section-2 .columns{column-count:2;column-gap:36px;column-rule:1px solid var(--line);font-size:15.5px;line-height:1.65;color:var(--ink);}
+  .section-2 .columns p{margin-bottom:14px;text-align:justify;hyphens:auto;}
+  .section-2 .columns p:first-child::first-letter{font-family:var(--mono);font-weight:400;font-size:64px;float:left;line-height:.85;margin:6px 8px -2px 0;color:var(--blue);}
+  .section-2 .lined{margin-top:36px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);opacity:.7;}
+
+  /* Section 3 — editorial: head row, 21:9 video, filmstrip */
+  .section-3{padding:120px 40px;border-top:1px solid var(--line);}
+  .section-3-inner{max-width:1280px;margin:0 auto;}
+  .section-3 .head{display:grid;grid-template-columns:1fr 1.4fr;gap:48px;align-items:end;margin-bottom:36px;}
+  .section-3 .head .l{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);line-height:1.6;}
+  .section-3 h2{font-family:var(--display);font-weight:400;font-size:140px;line-height:.9;letter-spacing:0;color:var(--blue);}
+  .section-3 h2 em{font-style:normal;color:var(--green);}
+  .section-3 .video{position:relative;aspect-ratio:21/9;overflow:hidden;background:var(--bg2);border:1px solid var(--line);}
+  .section-3 .video img{width:100%;height:100%;object-fit:cover;}
+  .section-3 .video::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,13,18,.05),rgba(10,13,18,.55));pointer-events:none;}
+  .section-3 .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;}
+  .section-3 .play span{width:112px;height:112px;border-radius:50%;border:1.5px solid #fff;background:rgba(0,40,255,.25);color:#fff;font-family:var(--mono);font-size:11px;letter-spacing:.14em;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
+  .section-3 .legend{position:absolute;left:20px;right:20px;bottom:18px;display:flex;justify-content:space-between;color:#fff;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;z-index:2;}
+  .section-3 .filmstrip{display:flex;gap:8px;margin-top:18px;}
+  .section-3 .filmstrip div{flex:1;aspect-ratio:4/3;background:var(--bg2) center/cover;border:1px solid var(--line);}
+
+  /* Section 4 — manifest list */
+  .section-4{padding:120px 40px;border-top:1px solid var(--line);}
+  .section-4-inner{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:280px 1fr;gap:64px;}
+  .section-4 h2{font-family:var(--display);font-weight:400;font-size:60px;line-height:.95;letter-spacing:0;color:var(--blue);}
+  .section-4 ol{list-style:none;counter-reset:i;}
+  .section-4 li{counter-increment:i;display:grid;grid-template-columns:60px 1fr 140px;gap:24px;padding:22px 0;border-top:1px solid var(--line);align-items:baseline;}
+  .section-4 li:last-child{border-bottom:1px solid var(--line);}
+  .section-4 li::before{content:"0" counter(i);font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--green);}
+  .section-4 li .t{font-family:var(--sans);font-size:22px;font-weight:500;letter-spacing:-.01em;}
+  .section-4 li .s{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.5;text-align:right;}
+
+  /* Footer */
+  footer{padding:80px 40px 40px;border-top:1px solid var(--line);background:var(--bg2);}
+  footer .row{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:48px;}
+  footer .word{font-family:var(--sans);font-weight:500;font-size:72px;letter-spacing:-.03em;color:var(--blue);line-height:.9;}
+  footer h4{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:18px;}
+  footer ul{list-style:none;font-family:var(--mono);font-size:12px;line-height:2;}
+  footer .base{max-width:1280px;margin:80px auto 0;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.55;}
+
+  /* Pixelsort CSS fallback (only kicks in if WebGL fails) */
+  .pxs-fallback h1, .pxs-fallback h2{
+    background:linear-gradient(180deg,transparent 0 38%,rgba(0,40,255,.18) 38% 41%,transparent 41% 60%,rgba(0,168,71,.18) 60% 62%,transparent 62%);
+    background-blend-mode:multiply;
   }
+  .pxs-fallback img{filter:contrast(1.05) saturate(1.15);}
 
-  body {
-    padding: 24px 32px 48px;
-    max-width: 1100px;
-    margin: 0 auto;
+
+  /* ───── D1 · DARK ATLAS — theme override ───── */
+  :root{
+    --bg:#08090c; --bg2:#11141a; --ink:#e8eae3;
+    --blue:#4f6cff; --green:#36e082;
+    --line:rgba(255,255,255,.16);
   }
+  body{background:var(--bg);color:var(--ink);}
+  .nav{background:rgba(8,9,12,.78);backdrop-filter:blur(12px);}
+  .nav .mark{color:var(--blue);}
+  .nav .stamp{color:var(--green);}
+  .hero .overlay{background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(8,9,12,.32) 0%,rgba(8,9,12,.74) 55%,rgba(8,9,12,.95) 100%);}
+  .hero .bg img{opacity:.85;}
+  .hero h1{color:var(--blue);text-shadow:0 0 70px rgba(79,108,255,.35);}
+  .hero h1 .slash{color:var(--ink);opacity:.45;}
+  .hero .eyebrow,.hero .corners .tl{color:var(--green);}
+  .hero .corners .br{color:var(--blue);}
+  .hero .corners,.hero .meta,.hero .tagline{color:var(--ink);}
 
-  header {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: end;
-    padding-bottom: 18px;
-    border-bottom: 1px solid var(--ink);
-    margin-bottom: 36px;
-  }
+  /* every body section gets an image bg + dark overlay */
+  .section-2,.section-3,.section-4,footer{position:relative;overflow:hidden;background:var(--bg);}
+  .section-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:.5;}
+  .section-overlay{position:absolute;inset:0;z-index:1;pointer-events:none;}
+  .section-2 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.95),rgba(8,9,12,.78) 50%,rgba(8,9,12,.96));}
+  .section-3 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.92),rgba(8,9,12,.7) 50%,rgba(8,9,12,.95));}
+  .section-4 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.96),rgba(8,9,12,.88));}
+  footer .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.92),rgba(8,9,12,.98));}
+  .section-2-grid,.section-3-inner,.section-4-inner,footer .row,footer .base{position:relative;z-index:2;}
 
-  .title {
-    font-family: var(--serif);
-    font-weight: 300;
-    font-style: italic;
-    font-size: 56px;
-    line-height: 0.95;
-    letter-spacing: -0.02em;
-  }
+  .section-2 .image-col .image{border-color:var(--line);background:#000;}
+  .section-2 .image-col .caption{color:#a0a59c;}
+  .section-2 .kicker{color:var(--green);}
+  .section-2 h2{color:var(--blue);text-shadow:0 0 50px rgba(79,108,255,.3);}
+  .section-2 h2 em{color:var(--green);}
+  .section-2 .columns{color:#cfd2cc;column-rule-color:var(--line);}
+  .section-2 .columns p:first-child::first-letter{color:var(--green);}
+  .section-2 .lined{border-color:var(--line);color:#a0a59c;}
 
-  .title em {
-    font-style: normal;
-    color: var(--accent);
-  }
+  .section-3 h2{color:var(--blue);text-shadow:0 0 50px rgba(79,108,255,.3);}
+  .section-3 h2 em{color:var(--green);}
+  .section-3 .head .l{color:var(--green);}
+  .section-3 .video{border-color:var(--line);background:#000;}
+  .section-3 .play span{border-color:#fff;background:rgba(79,108,255,.4);}
+  .section-3 .filmstrip div{border-color:var(--line);background-color:#11141a;}
 
-  .meta {
-    text-align: right;
-    color: var(--dim);
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
+  .section-4 h2{color:var(--blue);}
+  .section-4 li{border-color:var(--line);}
+  .section-4 li:last-child{border-bottom-color:var(--line);}
+  .section-4 li::before{color:var(--green);}
+  .section-4 li .t{color:var(--ink);}
+  .section-4 li .s{color:#a0a59c;}
 
-  .meta div + div { margin-top: 2px; }
+  footer{background:var(--bg2);}
+  footer .word{color:var(--blue);}
+  footer h4{color:var(--green);}
+  footer ul{color:var(--ink);}
+  footer .base{border-top-color:var(--line);color:#a0a59c;}
 
-  .layout {
-    display: grid;
-    grid-template-columns: 1fr 240px;
-    gap: 36px;
-    align-items: start;
-  }
+  .pxs-fallback h1, .pxs-fallback h2{background:linear-gradient(180deg,transparent 0 38%,rgba(79,108,255,.3) 38% 41%,transparent 41% 60%,rgba(54,224,130,.3) 60% 62%,transparent 62%);}
 
-  .stage {
-    position: relative;
-    background: #fff;
-    border: 1px solid var(--rule);
-  }
-
-  .stage img {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-
-  .caption {
-    margin-top: 8px;
-    font-size: 11px;
-    color: var(--dim);
-    display: flex;
-    justify-content: space-between;
-    letter-spacing: 0.04em;
-  }
-
-  aside {
-    font-size: 12px;
-    border-left: 1px solid var(--rule);
-    padding-left: 20px;
-  }
-
-  aside h2 {
-    font-family: var(--serif);
-    font-weight: 500;
-    font-style: italic;
-    font-size: 18px;
-    margin-bottom: 16px;
-    color: var(--ink);
-  }
-
-  .control { margin-bottom: 18px; }
-
-  .control label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--dim);
-    margin-bottom: 6px;
-  }
-
-  .control label .val {
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  .control input[type="range"] {
-    width: 100%;
-    accent-color: var(--accent);
-    background: transparent;
-  }
-
-  .control select,
-  .control button {
-    width: 100%;
-    padding: 6px 10px;
-    background: transparent;
-    border: 1px solid var(--rule);
-    color: var(--ink);
-    font-family: var(--mono);
-    font-size: 12px;
-    cursor: pointer;
-  }
-
-  .control button:hover { background: var(--ink); color: var(--bg); }
-
-  .pipeline {
-    margin-top: 28px;
-    padding-top: 18px;
-    border-top: 1px solid var(--rule);
-    font-size: 10.5px;
-    color: var(--dim);
-  }
-
-  .pipeline ol { list-style: none; counter-reset: p; }
-  .pipeline li {
-    counter-increment: p;
-    padding: 4px 0;
-    display: flex;
-    gap: 10px;
-  }
-  .pipeline li::before {
-    content: "pass." counter(p, decimal-leading-zero);
-    color: var(--accent);
-    font-weight: 500;
-  }
-
-  footer {
-    margin-top: 48px;
-    padding-top: 18px;
-    border-top: 1px solid var(--rule);
-    font-size: 10px;
-    color: var(--dim);
-    display: flex;
-    justify-content: space-between;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
 </style>
 </head>
 <body>
+<div id="root">
+  <nav class="nav">
+    <div class="mark">SUBPIXEL.SDK</div>
+    <ul>
+      <li>Index</li><li>Build</li><li>Docs</li><li>Releases</li>
+    </ul>
+    <div class="stamp">v0.7.2 · sync</div>
+  </nav>
 
-<header>
-  <div class="title">pixel<em>·</em>sort<br>study<em>—</em>01</div>
-  <div class="meta">
-    <div>vfx-js / effect api</div>
-    <div>rank-based · 3 pass</div>
-    <div>2026</div>
-  </div>
-</header>
-
-<div class="layout">
-  <main>
-    <div class="stage">
-      <img id="src" crossorigin="anonymous" alt="source">
+  <section class="hero">
+    <div class="bg"><img class="pxs" src="https://picsum.photos/seed/subpixel-hero/2400/1600" crossorigin="anonymous" alt=""></div>
+    <div class="overlay"></div>
+    <div class="corners">
+      <span class="tl">// SUBPIXEL · release</span>
+      <span class="tr">v0.7.2</span>
+      <span class="bl">FRAME 0014 · 24FPS</span>
+      <span class="br">05.24.2026</span>
     </div>
-    <div class="caption">
-      <span>fig.01 — sorted by luminance, ltr</span>
-      <span id="fps">— fps</span>
+    <div class="inner">
+      <div class="eyebrow">// Release · 05.24.2026</div>
+      <h1 class="pxs">PURE<span class="slash">/</span>SYNC</h1>
+      <p class="tagline">A subpixel-grade rendering kit for the second decade of the modern web — built for engineers who still care how a single line of light arrives on a panel.</p>
+      <div class="meta"><span>Edition · 002</span><span>Channels · RGB+A</span><span>Format · WebGL2 / WGSL</span></div>
     </div>
-  </main>
+  </section>
 
-  <aside>
-    <h2>controls</h2>
-
-    <div class="control">
-      <label>threshold T <span class="val" id="v-t">0.50</span></label>
-      <input type="range" id="c-t" min="0" max="1" step="0.01" value="0.5">
+  <section class="section-2">
+    <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-s2/2000/1400" crossorigin="anonymous" alt="">
+    <div class="section-overlay"></div>
+    <div class="section-2-grid">
+      <div class="image-col">
+        <div class="image"><img class="pxs" src="https://picsum.photos/seed/subpixel-2/1200/1500" crossorigin="anonymous" alt=""></div>
+        <div class="caption">Fig. 02 — Column-sort probe over a still-life test plate. Threshold = 0.38, mode = luma. Lab/04, 04:14 05.20.26.</div>
+      </div>
+      <div class="body">
+        <div class="kicker">// Feature — folio 02</div>
+        <h2 class="pxs">A toolkit, not a <em>framework</em>.</h2>
+        <div class="columns">
+          <p>There is a particular shape of software that tries very hard to be useful and, in doing so, makes itself difficult to live with. Subpixel is not that shape. It is a set of small primitives that move pixels, and a uniform clock that keeps them honest.</p>
+          <p>The kit ships one bundle, sub-thirty kilobytes gzipped, with no peer dependencies. It binds directly to live DOM nodes — headings, images, video — and asks each one to give up its raster for the length of a frame. The shader does the rest, on the GPU, where it should.</p>
+          <p>Threshold-based column scans, perceptual luminance, brightness intervals, hue intervals, masks. The defaults look like a memory of a CRT; the parameters open onto a quieter, weirder country.</p>
+          <p>Set in IBM Plex Mono and Space Grotesk. Drawn on an M1 at the kitchen table, between the hours when the city has finished one thing and not yet started the next.</p>
+        </div>
+        <div class="lined"><span>// Section 02 · reference §2.1.0</span><span>Continued on §3 →</span></div>
+      </div>
     </div>
+  </section>
 
-    <div class="control">
-      <label>pixelate W' <span class="val" id="v-w">256</span></label>
-      <input type="range" id="c-w" min="32" max="512" value="256" step="2">
+  <section class="section-3">
+    <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-s3/2000/1400" crossorigin="anonymous" alt="">
+    <div class="section-overlay"></div>
+    <div class="section-3-inner">
+      <div class="head">
+        <div class="l">/// motion plate 04<br>Clip 0014 · 02m 14s<br>Aspect · 21:9 · 24 fps</div>
+        <h2 class="pxs">See it <em>move</em>.</h2>
+      </div>
+      <div class="video">
+        <img class="pxs" src="https://picsum.photos/seed/subpixel-vid/2100/900" crossorigin="anonymous" alt="">
+        <div class="play"><span>▶ 02:14</span></div>
+        <div class="legend"><span>Clip · Subpixel × Lab/04</span><span>00:00:14:08 — REC</span><span>Color · Rec.709</span></div>
+      </div>
+      <div class="filmstrip">
+        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-1/400/300')"></div>
+        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-2/400/300')"></div>
+        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-3/400/300')"></div>
+        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-4/400/300')"></div>
+        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-5/400/300')"></div>
+        <div style="background-image:url('https://picsum.photos/seed/subpixel-strip-6/400/300')"></div>
+      </div>
     </div>
+  </section>
 
-    <div class="control">
-      <label>compare key</label>
-      <select id="c-key">
-        <option value="0">luminance</option>
-        <option value="1">red</option>
-        <option value="2">green</option>
-        <option value="3">blue</option>
-        <option value="4">hue</option>
-        <option value="5">saturation</option>
-      </select>
-    </div>
-
-    <div class="control">
-      <label>direction</label>
-      <select id="c-dir">
-        <option value="0">→ right</option>
-        <option value="1">← left</option>
-      </select>
-    </div>
-
-    <div class="control">
-      <button id="c-toggle">bypass effect</button>
-    </div>
-
-    <div class="pipeline">
+  <section class="section-4">
+    <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-s4/2000/1400" crossorigin="anonymous" alt="">
+    <div class="section-overlay"></div>
+    <div class="section-4-inner">
+      <h2 class="pxs">Changelog, in&nbsp;brief.</h2>
       <ol>
-        <li>downsample WxH → W'xH</li>
-        <li>scan segment where key &gt; T, rank within</li>
-        <li>gather &amp; upsample → canvas</li>
+        <li><span class="t">Re-implemented the column sampler in WGSL.</span><span class="s">May 24</span></li>
+        <li><span class="t">Threshold mode now supports HSL luminance.</span><span class="s">May 17</span></li>
+        <li><span class="t">Dropped legacy WebGL1 path entirely.</span><span class="s">May 09</span></li>
+        <li><span class="t">Frame timer now monotonic across tab focus.</span><span class="s">May 02</span></li>
+        <li><span class="t">SSR-safe initializer for hydration frameworks.</span><span class="s">Apr 26</span></li>
       </ol>
     </div>
-  </aside>
-</div>
+  </section>
 
-<footer>
-  <span>moyō / study</span>
-  <span>rank-based pixelsort · 2026.05</span>
-</footer>
+  <footer>
+    <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-foot/2000/1400" crossorigin="anonymous" alt="">
+    <div class="section-overlay"></div>
+    <div class="row">
+      <div class="word pxs">END<br>OF<br>FEED.</div>
+      <div><h4>Channels</h4><ul><li>RSS</li><li>Atom</li><li>JSON Feed</li><li>Mailing list</li></ul></div>
+      <div><h4>Source</h4><ul><li>Repository</li><li>Mirrors</li><li>Issues</li><li>Security</li></ul></div>
+      <div><h4>Studio</h4><ul><li>About</li><li>Imprint</li><li>Privacy</li><li>Press</li></ul></div>
+    </div>
+    <div class="base"><span>SUBPIXEL.SDK · operated as a tiny experiment</span><span>© 2026 — no rights reserved</span></div>
+  </footer>
+</div>
 
 <script type="module">
 import { VFX } from "@vfx-js/core";
 
 // ─────────────────────────────────────────────
-// shaders
+// PixelSort effect (3-pass: downsample → rank → gather)
+// Threshold-based segment scan after https://www.shadertoy.com/view/XsBfRG
 // ─────────────────────────────────────────────
 
 const FRAG_DOWNSAMPLE = `#version 300 es
@@ -267,12 +280,9 @@ precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
-void main() {
-    outColor = texture(src, uvSrc);
-}
+void main() { outColor = texture(src, uvSrc); }
 `;
 
-// keyComputeFunctions: 0=lum, 1=R, 2=G, 3=B, 4=hue, 5=sat
 const KEY_FUNC = `
 float key(vec3 c, int mode) {
     if (mode == 0) return dot(c, vec3(0.299, 0.587, 0.114));
@@ -283,7 +293,6 @@ float key(vec3 c, int mode) {
     float mn = min(min(c.r, c.g), c.b);
     float d  = mx - mn;
     if (mode == 5) return mx > 0.0 ? d / mx : 0.0;
-    // hue
     if (d < 1e-5) return 0.0;
     float h;
     if (mx == c.r)      h = (c.g - c.b) / d + (c.g < c.b ? 6.0 : 0.0);
@@ -293,16 +302,7 @@ float key(vec3 c, int mode) {
 }
 `;
 
-// Segment scan: a pixel is "in sort" if key > threshold. Segments are
-// runs of contiguous in-sort pixels, bounded by below-threshold pixels
-// or row edges. After https://www.shadertoy.com/view/XsBfRG.
-//
-// rank.rg: (rank within segment, segment length) — segment length acts
-// as both inclusion flag (>0 means in sort) and gather fallback marker.
-
 const SEGMENT_SCAN = `
-// scan left/right while neighbours are above threshold. Bounded by W to
-// keep the GLSL loop finite; the early-out covers the common case.
 void scanSegment(sampler2D s, int x, int y, int W, int keyMode, float threshold, out int segStart, out int segEnd) {
     segStart = x;
     for (int i = 0; i < 8192; i++) {
@@ -331,28 +331,21 @@ uniform sampler2D src;
 uniform vec2 srcSize;
 uniform float threshold;
 uniform int keyMode;
-uniform int direction;   // 0=ltr (ascending), 1=rtl (descending)
-
+uniform int direction;
 ${KEY_FUNC}
 ${SEGMENT_SCAN}
-
 void main() {
     ivec2 p = ivec2(gl_FragCoord.xy);
     int x = p.x;
     int y = p.y;
     int W = int(srcSize.x);
-
     float myKey = key(texelFetch(src, ivec2(x, y), 0).rgb, keyMode);
-
     if (myKey <= threshold) {
-        // below threshold: passthrough, mark segLen=0 so gather falls back
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-
     int segStart, segEnd;
     scanSegment(src, x, y, W, keyMode, threshold, segStart, segEnd);
-
     int rank = 0;
     for (int i = segStart; i < segEnd; i++) {
         if (i == x) continue;
@@ -363,7 +356,6 @@ void main() {
             if (k > myKey || (k == myKey && i < x)) rank++;
         }
     }
-
     outColor = vec4(float(rank), float(segEnd - segStart), 0.0, 1.0);
 }
 `;
@@ -372,30 +364,27 @@ const FRAG_GATHER = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
-uniform sampler2D src;       // RT_A (W'xH)
-uniform sampler2D rankTex;   // RT_rank (W'xH)
-uniform vec2 lowSize;        // (W', H)
+uniform sampler2D src;
+uniform sampler2D srcHi;
+uniform sampler2D rankTex;
+uniform vec2 lowSize;
 uniform float threshold;
 uniform int keyMode;
-
 ${KEY_FUNC}
 ${SEGMENT_SCAN}
-
 void main() {
     int lowX = int(uvSrc.x * lowSize.x);
     int y    = int(uvSrc.y * lowSize.y);
     int W    = int(lowSize.x);
-
     float myKey = key(texelFetch(src, ivec2(lowX, y), 0).rgb, keyMode);
     if (myKey <= threshold) {
-        outColor = texelFetch(src, ivec2(lowX, y), 0);
+        // below-threshold pixels skip the low-res buffer entirely
+        outColor = texture(srcHi, uvSrc);
         return;
     }
-
     int segStart, segEnd;
     scanSegment(src, lowX, y, W, keyMode, threshold, segStart, segEnd);
     int targetRank = lowX - segStart;
-
     for (int i = segStart; i < segEnd; i++) {
         int r = int(texelFetch(rankTex, ivec2(i, y), 0).r + 0.5);
         if (r == targetRank) {
@@ -407,22 +396,24 @@ void main() {
 }
 `;
 
-// ─────────────────────────────────────────────
-// Effect class
-// ─────────────────────────────────────────────
+const BYPASS_FRAG = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+void main() { outColor = texture(src, uvSrc); }
+`;
 
 class PixelSortEffect {
-    constructor(params) {
+    constructor(params, opts = {}) {
         this.params = params;
+        this.localBypass = opts.bypass ?? false;
         this._lowRT = null;
         this._rankRT = null;
         this._lowW = 0;
         this._h = 0;
     }
-
     _ensureSize(ctx) {
-        // init で elementPixel は placeholder [1,1]。
-        // 実寸は render 時点まで分からないので、lowW/h どちらか変わったら作り直す。
         const [, h] = ctx.dims.elementPixel;
         const lowW = this.params.lowW;
         if (this._lowW === lowW && this._h === h) return;
@@ -430,64 +421,32 @@ class PixelSortEffect {
         this._rankRT?.dispose?.();
         this._lowW = lowW;
         this._h = h;
-        this._lowRT = ctx.createRenderTarget({
-            size: [lowW, h],
-            filter: "nearest",
-        });
-        this._rankRT = ctx.createRenderTarget({
-            size: [lowW, h],
-            filter: "nearest",
-            float: true,
-        });
+        this._lowRT  = ctx.createRenderTarget({ size: [lowW, h], filter: "nearest" });
+        this._rankRT = ctx.createRenderTarget({ size: [lowW, h], filter: "nearest", float: true });
     }
-
     render(ctx) {
         this._ensureSize(ctx);
-
-        if (this.params.bypass) {
-            // 単純パススルー
-            ctx.draw({
-                frag: `#version 300 es
-                    precision highp float;
-                    in vec2 uvSrc;
-                    out vec4 outColor;
-                    uniform sampler2D src;
-                    void main() { outColor = texture(src, uvSrc); }`,
-                uniforms: { src: ctx.src },
-                target: ctx.target,
-            });
+        if (this.params.bypass || this.localBypass) {
+            ctx.draw({ frag: BYPASS_FRAG, uniforms: { src: ctx.src }, target: ctx.target });
             return;
         }
-
         const [, h] = ctx.dims.elementPixel;
         const lowSize = [this._lowW, h];
-
-        // pass0
-        ctx.draw({
-            frag: FRAG_DOWNSAMPLE,
-            uniforms: { src: ctx.src },
-            target: this._lowRT,
-        });
-
-        // pass1
+        ctx.draw({ frag: FRAG_DOWNSAMPLE, uniforms: { src: ctx.src }, target: this._lowRT });
         ctx.draw({
             frag: FRAG_RANK,
             uniforms: {
-                src: this._lowRT,
-                srcSize: lowSize,
+                src: this._lowRT, srcSize: lowSize,
                 threshold: this.params.threshold,
                 keyMode: this.params.keyMode,
                 direction: this.params.direction,
             },
             target: this._rankRT,
         });
-
-        // pass2
         ctx.draw({
             frag: FRAG_GATHER,
             uniforms: {
-                src: this._lowRT,
-                rankTex: this._rankRT,
+                src: this._lowRT, srcHi: ctx.src, rankTex: this._rankRT,
                 lowSize: lowSize,
                 threshold: this.params.threshold,
                 keyMode: this.params.keyMode,
@@ -498,80 +457,63 @@ class PixelSortEffect {
 }
 
 // ─────────────────────────────────────────────
-// setup
+// Setup
 // ─────────────────────────────────────────────
 
-const img = document.getElementById("src");
-
-img.src = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=900&h=600&fit=crop";
-
-await new Promise(res => {
-    if (img.complete && img.naturalWidth > 0) res();
-    else img.addEventListener("load", res, { once: true });
-});
-
+// Tuned for the dark editorial palette — threshold sits low enough that
+// the sky-bright / bg-image highlights sort visibly on hover.
 const params = {
-    threshold: 0.5,
+    threshold: 0.28,
     lowW: 256,
     keyMode: 0,
     direction: 0,
     bypass: false,
 };
 
-const effect = new PixelSortEffect(params);
+let applied = false;
+try {
+    const vfx = new VFX();
 
-const vfx = new VFX();
-vfx.add(img, { effect });
+    const imgReady = el => new Promise(res => {
+        if (el.complete && el.naturalWidth > 0) res();
+        else {
+            el.addEventListener("load", res, { once: true });
+            el.addEventListener("error", res, { once: true });
+        }
+    });
 
-// ─────────────────────────────────────────────
-// controls
-// ─────────────────────────────────────────────
-
-const bind = (id, valId, key, parse = Number, fmt = String) => {
-    const el = document.getElementById(id);
-    const v = document.getElementById(valId);
-    const update = () => {
-        params[key] = parse(el.value);
-        if (v) v.textContent = fmt(el.value);
+    const wireHover = (el, effect) => {
+        el.addEventListener("pointerenter", () => { effect.localBypass = false; });
+        el.addEventListener("pointerleave", () => { effect.localBypass = true; });
     };
-    el.addEventListener("input", update);
-    update();
-};
 
-bind("c-t", "v-t", "threshold", Number, v => Number(v).toFixed(2));
-bind("c-w", "v-w", "lowW");
+    await document.fonts.ready;
 
-document.getElementById("c-key").addEventListener("change", e => {
-    params.keyMode = Number(e.target.value);
-});
-document.getElementById("c-dir").addEventListener("change", e => {
-    params.direction = Number(e.target.value);
-});
+    // VFX paints to a single overlay canvas at z:9999. Full-bleed bg
+    // images (.hero .bg, .section-bg) would have that canvas occlude
+    // every other layer in their rect — including the dark .overlay and
+    // the heading text. Skip them; they read fine via the native DOM
+    // path with their CSS overlays intact.
+    const isBgImg = el => el.classList.contains("section-bg") || !!el.closest(".bg");
+    const targets = [...document.querySelectorAll(".pxs")].filter(el => !isBgImg(el));
+    await Promise.all(targets.map(async el => {
+        const effect = new PixelSortEffect(params, { bypass: true });
+        if (el instanceof HTMLImageElement) {
+            await imgReady(el);
+            vfx.add(el, { effect });
+        } else {
+            await vfx.addHTML(el, { effect });
+        }
+        wireHover(el, effect);
+    }));
 
-const toggleBtn = document.getElementById("c-toggle");
-toggleBtn.addEventListener("click", () => {
-    params.bypass = !params.bypass;
-    toggleBtn.textContent = params.bypass ? "enable effect" : "bypass effect";
-});
-
-// ─────────────────────────────────────────────
-// fps meter
-// ─────────────────────────────────────────────
-
-const fpsEl = document.getElementById("fps");
-let frames = 0, last = performance.now();
-function tick() {
-    frames++;
-    const now = performance.now();
-    if (now - last >= 500) {
-        const fps = Math.round((frames * 1000) / (now - last));
-        fpsEl.textContent = `${fps} fps`;
-        frames = 0; last = now;
-    }
-    requestAnimationFrame(tick);
+    applied = true;
+} catch (e) {
+    console.warn("vfx-js failed to load, falling back to CSS sim", e);
 }
-tick();
+if (!applied) {
+    document.getElementById("root").classList.add("pxs-fallback");
+}
 </script>
-
 </body>
 </html>
