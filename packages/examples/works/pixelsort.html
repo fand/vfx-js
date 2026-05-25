@@ -284,7 +284,7 @@ void main() { outColor = texture(src, uvSrc); }
 `;
 
 const KEY_FUNC = `
-float key(vec3 c, int mode) {
+float keyRGB(vec3 c, int mode) {
     if (mode == 0) return dot(c, vec3(0.299, 0.587, 0.114));
     if (mode == 1) return c.r;
     if (mode == 2) return c.g;
@@ -300,6 +300,15 @@ float key(vec3 c, int mode) {
     else                h = (c.r - c.g) / d + 4.0;
     return h / 6.0;
 }
+// Alpha-weighted key. For opaque images (alpha=1 everywhere) this is
+// identical to the RGB key. For HTML captures, semi-transparent pixels
+// (text-shadow glow, anti-aliased edges) get a lower effective key, so
+// they fall below threshold and pass through smoothly instead of being
+// shuffled into noise by the segment sort.
+float keyAt(sampler2D s, ivec2 p, int mode) {
+    vec4 t = texelFetch(s, p, 0);
+    return t.a * keyRGB(t.rgb, mode);
+}
 `;
 
 const SEGMENT_SCAN = `
@@ -308,16 +317,14 @@ void scanSegment(sampler2D s, int x, int y, int W, int keyMode, float threshold,
     for (int i = 0; i < 8192; i++) {
         if (segStart <= 0) break;
         if (i >= W) break;
-        float k = key(texelFetch(s, ivec2(segStart - 1, y), 0).rgb, keyMode);
-        if (k <= threshold) break;
+        if (keyAt(s, ivec2(segStart - 1, y), keyMode) <= threshold) break;
         segStart--;
     }
     segEnd = x + 1;
     for (int i = 0; i < 8192; i++) {
         if (segEnd >= W) break;
         if (i >= W) break;
-        float k = key(texelFetch(s, ivec2(segEnd, y), 0).rgb, keyMode);
-        if (k <= threshold) break;
+        if (keyAt(s, ivec2(segEnd, y), keyMode) <= threshold) break;
         segEnd++;
     }
 }
@@ -339,7 +346,7 @@ void main() {
     int x = p.x;
     int y = p.y;
     int W = int(srcSize.x);
-    float myKey = key(texelFetch(src, ivec2(x, y), 0).rgb, keyMode);
+    float myKey = keyAt(src, ivec2(x, y), keyMode);
     if (myKey <= threshold) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
@@ -349,7 +356,7 @@ void main() {
     int rank = 0;
     for (int i = segStart; i < segEnd; i++) {
         if (i == x) continue;
-        float k = key(texelFetch(src, ivec2(i, y), 0).rgb, keyMode);
+        float k = keyAt(src, ivec2(i, y), keyMode);
         if (direction == 0) {
             if (k < myKey || (k == myKey && i < x)) rank++;
         } else {
@@ -376,10 +383,12 @@ void main() {
     int lowX = int(uvSrc.x * lowSize.x);
     int y    = int(uvSrc.y * lowSize.y);
     int W    = int(lowSize.x);
-    float myKey = key(texelFetch(src, ivec2(lowX, y), 0).rgb, keyMode);
+    float myKey = keyAt(src, ivec2(lowX, y), keyMode);
     if (myKey <= threshold) {
-        // below-threshold pixels skip the low-res buffer entirely
-        outColor = texture(srcHi, uvSrc);
+        // below-threshold pixels skip the low-res buffer entirely;
+        // pre-multiply alpha to match the canvas's blend mode.
+        vec4 c = texture(srcHi, uvSrc);
+        outColor = vec4(c.rgb * c.a, c.a);
         return;
     }
     int segStart, segEnd;
@@ -396,12 +405,19 @@ void main() {
 }
 `;
 
+// VFX-JS blends to the canvas with premultiplied alpha. dom-to-canvas
+// gives straight-alpha textures, so we pre-multiply in the shader
+// to avoid washed-out / noisy edges around translucent pixels
+// (text-shadow glow, anti-aliased letterforms).
 const BYPASS_FRAG = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
-void main() { outColor = texture(src, uvSrc); }
+void main() {
+    vec4 c = texture(src, uvSrc);
+    outColor = vec4(c.rgb * c.a, c.a);
+}
 `;
 
 class PixelSortEffect {
