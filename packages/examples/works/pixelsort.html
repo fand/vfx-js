@@ -97,13 +97,6 @@
   footer ul{list-style:none;font-family:var(--mono);font-size:12px;line-height:2;}
   footer .base{max-width:1280px;margin:80px auto 0;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.55;}
 
-  /* dom-to-canvas (SVG foreignObject) renders text-shadow with broken
-     alpha — the blurred shadow comes out as bright opaque blue instead
-     of the intended rgba(_, .3). Since the native element is opacity:0
-     under VFX, the shadow never shows there anyway; drop it for .pxs
-     captures so the rasterised heading reads as clean coloured text. */
-  h1.pxs, h2.pxs, .word.pxs { text-shadow: none; }
-
   /* Pixelsort CSS fallback (only kicks in if WebGL fails) */
   .pxs-fallback h1, .pxs-fallback h2{
     background:linear-gradient(180deg,transparent 0 38%,rgba(0,40,255,.18) 38% 41%,transparent 41% 60%,rgba(0,168,71,.18) 60% 62%,transparent 62%);
@@ -124,7 +117,7 @@
   .nav .stamp{color:var(--green);}
   .hero .overlay{background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(8,9,12,.32) 0%,rgba(8,9,12,.74) 55%,rgba(8,9,12,.95) 100%);}
   .hero .bg img{opacity:.85;}
-  .hero h1{color:var(--blue);text-shadow:0 0 70px rgba(79,108,255,.35);}
+  .hero h1{color:var(--blue);text-shadow:0 0 70px rgba(79,108,255,.8);}
   .hero h1 .slash{color:var(--ink);opacity:.45;}
   .hero .eyebrow,.hero .corners .tl{color:var(--green);}
   .hero .corners .br{color:var(--blue);}
@@ -143,13 +136,13 @@
   .section-2 .image-col .image{border-color:var(--line);background:#000;}
   .section-2 .image-col .caption{color:#a0a59c;}
   .section-2 .kicker{color:var(--green);}
-  .section-2 h2{color:var(--blue);text-shadow:0 0 50px rgba(79,108,255,.3);}
+  .section-2 h2{color:var(--blue);text-shadow:0 0 50px rgba(79,108,255,.8);}
   .section-2 h2 em{color:var(--green);}
   .section-2 .columns{color:#cfd2cc;column-rule-color:var(--line);}
   .section-2 .columns p:first-child::first-letter{color:var(--green);}
   .section-2 .lined{border-color:var(--line);color:#a0a59c;}
 
-  .section-3 h2{color:var(--blue);text-shadow:0 0 50px rgba(79,108,255,.3);}
+  .section-3 h2{color:var(--blue);text-shadow:0 0 50px rgba(79,108,255,.8);}
   .section-3 h2 em{color:var(--green);}
   .section-3 .head .l{color:var(--green);}
   .section-3 .video{border-color:var(--line);background:#000;}
