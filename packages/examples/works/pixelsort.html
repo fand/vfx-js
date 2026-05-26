@@ -113,7 +113,7 @@
   #loader .loader-inner{width:min(440px,72vw);}
   #loader .mark{font-size:clamp(44px,9vw,80px);line-height:.95;text-align:center;color:var(--yellow);text-shadow:0 0 60px var(--glow);margin-bottom:30px;}
   #loader .bar{position:relative;height:2px;background:var(--line);overflow:hidden;}
-  #loader .bar-fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--green);box-shadow:0 0 12px var(--green);transition:width .3s ease;}
+  #loader .bar-fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--green);box-shadow:0 0 12px var(--green);}
   #loader .status{display:flex;justify-content:space-between;margin-top:14px;color:var(--ink);opacity:.7;}
   #loader .status .pct{color:var(--green);opacity:1;}
 </style>
@@ -455,9 +455,8 @@ const subImageUrls = ["./pixelsort/city1.webp", "./pixelsort/tower1.webp"];
 // Loading overlay — held until all <img>, preloaded sub-images, and fonts resolve.
 const loaderEl = document.getElementById("loader");
 const setProgress = (f) => {
-    const v = Math.round(f * 100);
-    loaderEl.querySelector(".bar-fill").style.width = `${v}%`;
-    loaderEl.querySelector(".pct").textContent = `${v}%`;
+    loaderEl.querySelector(".bar-fill").style.width = `${(f * 100).toFixed(1)}%`;
+    loaderEl.querySelector(".pct").textContent = `${Math.round(f * 100)}%`;
 };
 let loaderHidden = false;
 const hideLoader = () => {
@@ -466,11 +465,17 @@ const hideLoader = () => {
     loaderEl.classList.add("done");
     setTimeout(() => loaderEl.remove(), 600);
 };
-const loadAllAssets = async () => {
+
+const MIN_LOADER_MS = 1000; // keep the loader up at least this long
+const loaderStart = performance.now();
+let realProgress = 0;
+let assetsReady = false;
+
+const trackAssets = async () => {
     const imgs = Array.from(document.images);
     const total = imgs.length + subImageUrls.length + 1;
     let done = 0;
-    const tick = () => setProgress(++done / total);
+    const tick = () => { realProgress = ++done / total; };
     const tasks = imgs.map((img) =>
         Promise.resolve(img.decode?.()).catch(() => {}).then(tick),
     );
@@ -482,10 +487,34 @@ const loadAllAssets = async () => {
     tasks.push(document.fonts.ready.then(tick));
     // Safety cap so one stalled asset can't trap the loader forever.
     await Promise.race([Promise.all(tasks), new Promise((r) => setTimeout(r, 8000))]);
+    realProgress = 1;
+    assetsReady = true;
 };
 
+// Fill the bar smoothly toward real progress, ramped over >= MIN_LOADER_MS so a
+// fast (cached) load still animates instead of snapping to 100%. The lerp also
+// absorbs jumps when several assets resolve in the same frame.
+const runLoaderBar = () => new Promise((resolve) => {
+    let shown = 0;
+    const frame = () => {
+        const elapsed = performance.now() - loaderStart;
+        const target = Math.min(realProgress, elapsed / MIN_LOADER_MS);
+        shown += (target - shown) * 0.18;
+        if (target - shown < 0.004) shown = target;
+        setProgress(shown);
+        if (assetsReady && elapsed >= MIN_LOADER_MS && shown > 0.999) {
+            setProgress(1);
+            resolve();
+        } else {
+            requestAnimationFrame(frame);
+        }
+    };
+    requestAnimationFrame(frame);
+});
+
 setTimeout(hideLoader, 12000); // absolute fallback if init stalls
-await loadAllAssets();
+trackAssets();
+await runLoaderBar();
 
 let applied = false;
 try {
