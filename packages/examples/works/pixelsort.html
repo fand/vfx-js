@@ -305,12 +305,18 @@ void main() {
     for (int i = segStart; i < segEnd; i++) {
         int r = int(texelFetch(rankTex, toXY(i, b, axis), 0).r + 0.5);
         if (r == targetRank) {
-            vec4 c = texelFetch(src, toXY(i, b, axis), 0);
-            outColor = vec4(c.rgb * c.a, c.a);
+            // sortで動かないピクセルは元画像、動いたピクセルだけ低解像度のソート色
+            if (i == lowA) {
+                vec4 c = texture(srcHi, uvSrc);
+                outColor = vec4(c.rgb * c.a, c.a);
+            } else {
+                vec4 c = texelFetch(src, toXY(i, b, axis), 0);
+                outColor = vec4(c.rgb * c.a, c.a);
+            }
             return;
         }
     }
-    vec4 c = texelFetch(src, lowP, 0);
+    vec4 c = texture(srcHi, uvSrc);
     outColor = vec4(c.rgb * c.a, c.a);
 }
 `;
