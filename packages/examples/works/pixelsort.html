@@ -212,20 +212,22 @@ float key(vec3 c, int mode) {
 `;
 
 const SEGMENT_SCAN = `
-void scanSegment(sampler2D s, int x, int y, int W, int keyMode, float threshold, out int segStart, out int segEnd) {
-    segStart = x;
+ivec2 toXY(int a, int b, int axis) { return axis == 0 ? ivec2(a, b) : ivec2(b, a); }
+
+void scanSegment(sampler2D s, int a, int b, int L, int keyMode, float threshold, int axis, out int segStart, out int segEnd) {
+    segStart = a;
     for (int i = 0; i < 8192; i++) {
         if (segStart <= 0) break;
-        if (i >= W) break;
-        float k = key(texelFetch(s, ivec2(segStart - 1, y), 0).rgb, keyMode);
+        if (i >= L) break;
+        float k = key(texelFetch(s, toXY(segStart - 1, b, axis), 0).rgb, keyMode);
         if (k <= threshold) break;
         segStart--;
     }
-    segEnd = x + 1;
+    segEnd = a + 1;
     for (int i = 0; i < 8192; i++) {
-        if (segEnd >= W) break;
-        if (i >= W) break;
-        float k = key(texelFetch(s, ivec2(segEnd, y), 0).rgb, keyMode);
+        if (segEnd >= L) break;
+        if (i >= L) break;
+        float k = key(texelFetch(s, toXY(segEnd, b, axis), 0).rgb, keyMode);
         if (k <= threshold) break;
         segEnd++;
     }
@@ -241,28 +243,29 @@ uniform vec2 srcSize;
 uniform float threshold;
 uniform int keyMode;
 uniform int direction;
+uniform int axis;
 ${KEY_FUNC}
 ${SEGMENT_SCAN}
 void main() {
     ivec2 p = ivec2(gl_FragCoord.xy);
-    int x = p.x;
-    int y = p.y;
-    int W = int(srcSize.x);
-    float myKey = key(texelFetch(src, ivec2(x, y), 0).rgb, keyMode);
+    int a = axis == 0 ? p.x : p.y;
+    int b = axis == 0 ? p.y : p.x;
+    int L = int(axis == 0 ? srcSize.x : srcSize.y);
+    float myKey = key(texelFetch(src, p, 0).rgb, keyMode);
     if (myKey <= threshold) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
     int segStart, segEnd;
-    scanSegment(src, x, y, W, keyMode, threshold, segStart, segEnd);
+    scanSegment(src, a, b, L, keyMode, threshold, axis, segStart, segEnd);
     int rank = 0;
     for (int i = segStart; i < segEnd; i++) {
-        if (i == x) continue;
-        float k = key(texelFetch(src, ivec2(i, y), 0).rgb, keyMode);
+        if (i == a) continue;
+        float k = key(texelFetch(src, toXY(i, b, axis), 0).rgb, keyMode);
         if (direction == 0) {
-            if (k < myKey || (k == myKey && i < x)) rank++;
+            if (k < myKey || (k == myKey && i < a)) rank++;
         } else {
-            if (k > myKey || (k == myKey && i < x)) rank++;
+            if (k > myKey || (k == myKey && i < a)) rank++;
         }
     }
     outColor = vec4(float(rank), float(segEnd - segStart), 0.0, 1.0);
@@ -279,13 +282,15 @@ uniform sampler2D rankTex;
 uniform vec2 lowSize;
 uniform float threshold;
 uniform int keyMode;
+uniform int axis;
 ${KEY_FUNC}
 ${SEGMENT_SCAN}
 void main() {
-    int lowX = int(uvSrc.x * lowSize.x);
-    int y    = int(uvSrc.y * lowSize.y);
-    int W    = int(lowSize.x);
-    float myKey = key(texelFetch(src, ivec2(lowX, y), 0).rgb, keyMode);
+    int lowA = axis == 0 ? int(uvSrc.x * lowSize.x) : int(uvSrc.y * lowSize.y);
+    int b    = axis == 0 ? int(uvSrc.y * lowSize.y) : int(uvSrc.x * lowSize.x);
+    int L    = int(axis == 0 ? lowSize.x : lowSize.y);
+    ivec2 lowP = toXY(lowA, b, axis);
+    float myKey = key(texelFetch(src, lowP, 0).rgb, keyMode);
     if (myKey <= threshold) {
         // below-threshold pixels skip the low-res buffer entirely.
         vec4 c = texture(srcHi, uvSrc);
@@ -293,17 +298,17 @@ void main() {
         return;
     }
     int segStart, segEnd;
-    scanSegment(src, lowX, y, W, keyMode, threshold, segStart, segEnd);
-    int targetRank = lowX - segStart;
+    scanSegment(src, lowA, b, L, keyMode, threshold, axis, segStart, segEnd);
+    int targetRank = lowA - segStart;
     for (int i = segStart; i < segEnd; i++) {
-        int r = int(texelFetch(rankTex, ivec2(i, y), 0).r + 0.5);
+        int r = int(texelFetch(rankTex, toXY(i, b, axis), 0).r + 0.5);
         if (r == targetRank) {
-            vec4 c = texelFetch(src, ivec2(i, y), 0);
+            vec4 c = texelFetch(src, toXY(i, b, axis), 0);
             outColor = vec4(c.rgb * c.a, c.a);
             return;
         }
     }
-    vec4 c = texelFetch(src, ivec2(lowX, y), 0);
+    vec4 c = texelFetch(src, lowP, 0);
     outColor = vec4(c.rgb * c.a, c.a);
 }
 `;
@@ -329,25 +334,31 @@ class PixelSortEffect {
     constructor(params, opts = {}) {
         this.params = params;
         this.localBypass = opts.bypass ?? false;
-        // Per-instance threshold override (null → use params.threshold).
-        // Tweened by hover handlers between 1.0 (idle) and params.threshold (active).
         this.localThreshold = opts.threshold ?? null;
-        this._anim = null;
+        this.localAxis = opts.axis ?? null;
         this._lowRT = null;
         this._rankRT = null;
-        this._lowW = 0;
+        this._w = 0;
         this._h = 0;
+        this._lowW = 0;
+        this._lowH = 0;
     }
+    _axis() { return this.localAxis ?? this.params.axis ?? 0; }
     _ensureSize(ctx) {
-        const [, h] = ctx.dims.elementPixel;
-        const lowW = this.params.lowW;
-        if (this._lowW === lowW && this._h === h) return;
+        const [w, h] = ctx.dims.elementPixel;
+        const axis = this._axis();
+        const low = this.params.lowDim;
+        const lowW = axis === 0 ? low : w;
+        const lowH = axis === 0 ? h : low;
+        if (this._w === w && this._h === h && this._lowW === lowW && this._lowH === lowH) return;
         this._lowRT?.dispose?.();
         this._rankRT?.dispose?.();
-        this._lowW = lowW;
+        this._w = w;
         this._h = h;
-        this._lowRT  = ctx.createRenderTarget({ size: [lowW, h], filter: "nearest" });
-        this._rankRT = ctx.createRenderTarget({ size: [lowW, h], filter: "nearest", float: true });
+        this._lowW = lowW;
+        this._lowH = lowH;
+        this._lowRT  = ctx.createRenderTarget({ size: [lowW, lowH], filter: "nearest" });
+        this._rankRT = ctx.createRenderTarget({ size: [lowW, lowH], filter: "nearest", float: true });
     }
     render(ctx) {
         this._ensureSize(ctx);
@@ -355,16 +366,16 @@ class PixelSortEffect {
             ctx.draw({ frag: BYPASS_FRAG, uniforms: { src: ctx.src }, target: ctx.target });
             return;
         }
-        const [, h] = ctx.dims.elementPixel;
-        const lowSize = [this._lowW, h];
+        const axis = this._axis();
+        const lowSize = [this._lowW, this._lowH];
+        const threshold = this.localThreshold ?? this.params.threshold;
         ctx.draw({ frag: FRAG_DOWNSAMPLE, uniforms: { src: ctx.src }, target: this._lowRT });
         ctx.draw({
             frag: FRAG_RANK,
             uniforms: {
                 src: this._lowRT, srcSize: lowSize,
-                threshold: this.localThreshold ?? this.params.threshold,
-                keyMode: this.params.keyMode,
-                direction: this.params.direction,
+                threshold, keyMode: this.params.keyMode,
+                direction: this.params.direction, axis,
             },
             target: this._rankRT,
         });
@@ -372,9 +383,7 @@ class PixelSortEffect {
             frag: FRAG_GATHER,
             uniforms: {
                 src: this._lowRT, srcHi: ctx.src, rankTex: this._rankRT,
-                lowSize: lowSize,
-                threshold: this.localThreshold ?? this.params.threshold,
-                keyMode: this.params.keyMode,
+                lowSize, threshold, keyMode: this.params.keyMode, axis,
             },
             target: ctx.target,
         });
@@ -385,39 +394,41 @@ class PixelSortEffect {
 // Setup
 // ─────────────────────────────────────────────
 
-// Tuned for the dark editorial palette — threshold sits low enough that
-// the sky-bright / bg-image highlights sort visibly on hover.
 const params = {
     threshold: 0.0,
-    lowW: 512,
+    lowDim: 512,
     keyMode: 0,
     direction: 0,
+    axis: 0,
 };
+
+// Scroll-driven timeline. axis: 0=horizontal, 1=vertical.
+// Section visibility switches at the boundary between an "exit" and the next "enter".
+const TIMELINE = [
+    { from: 0.00, to: 0.10, sec: 0, bypass: true },
+    { from: 0.10, to: 0.20, sec: 0, axis: 0, t: [1, 0] },
+    { from: 0.20, to: 0.30, sec: 1, axis: 0, t: [0, 1] },
+    { from: 0.30, to: 0.35, sec: 1, bypass: true },
+    { from: 0.35, to: 0.40, sec: 1, axis: 0, t: [1, 0] },
+    { from: 0.40, to: 0.45, sec: 2, axis: 0, t: [0, 1] },
+    // { from: 0.45, to: 0.45, sec: 2, bypass: true },
+    { from: 0.45, to: 0.55, sec: 2, bypass: true, sub: 0, subT: [0, 1] },
+    { from: 0.55, to: 0.65, sec: 2, bypass: true, sub: 1, subT: [0, 1] },
+    { from: 0.65, to: 0.75, sec: 2, bypass: true, sub: 2, subT: [0, 1] },
+    // { from: 0.75, to: 0.77, sec: 2, bypass: true, sub: 2, subT: [1, 1] },
+    { from: 0.75, to: 0.85, sec: 2, axis: 1, t: [1, 0] },
+    { from: 0.85, to: 0.95, sec: 3, axis: 1, t: [0, 1] },
+    { from: 0.95, to: 1.01, sec: 3, bypass: true },
+];
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
 let applied = false;
 try {
     const vfx = new VFX({ scrollPadding: false });
 
     await document.fonts.ready;
-
-    const REVEAL_MS = 1000;
-    const animateReveal = (effect) => {
-        if (effect._anim) cancelAnimationFrame(effect._anim);
-        effect.localBypass = false;
-        effect.localThreshold = 0;
-        const t0 = performance.now();
-        const tick = () => {
-            const t = Math.min(1, (performance.now() - t0) / REVEAL_MS);
-            effect.localThreshold = t;
-            if (t < 1) {
-                effect._anim = requestAnimationFrame(tick);
-            } else {
-                effect._anim = null;
-                effect.localBypass = true;
-            }
-        };
-        effect._anim = requestAnimationFrame(tick);
-    };
 
     const sections = [
         document.querySelector(".hero"),
@@ -426,8 +437,7 @@ try {
         document.querySelector(".section-4"),
     ];
 
-    // Preload section-3 sub-state images so the swap is instant.
-    const subImageUrls = [1, 2, 3, 4].map(i =>
+    const subImageUrls = [1, 2, 3].map(i =>
         `https://picsum.photos/seed/subpixel-strip-${i}/2100/900`
     );
     await Promise.all(subImageUrls.map(url => {
@@ -450,86 +460,83 @@ try {
 
     const section3VideoImg = sections[2].querySelector(".video img");
     section3VideoImg.style.display = "none";
-    // vfx-js caches img texture at add-time and doesn't refresh on src
-    // change — re-add per swap to pick up the new source.
+
+    // vfx-js caches img texture at add-time; re-add per src swap.
     let imgEffect = null;
     let imgReqToken = 0;
+    let pendingSubT = 0;
+    let pendingSubBypass = false;
     const showImgWithSrc = async (src) => {
         const token = ++imgReqToken;
         if (imgEffect) {
-            if (imgEffect._anim) cancelAnimationFrame(imgEffect._anim);
             vfx.remove(section3VideoImg);
             imgEffect = null;
         }
         section3VideoImg.src = src;
         section3VideoImg.style.display = "";
-        const e = new PixelSortEffect(params, { bypass: false, threshold: 0 });
+        const e = new PixelSortEffect(params, { bypass: false, threshold: pendingSubT });
         await vfx.add(section3VideoImg, { effect: e });
         if (token !== imgReqToken) return;
         imgEffect = e;
-        // section-3 img threshold is scroll-driven (see onScroll)
+        imgEffect.localBypass = pendingSubBypass;
+        imgEffect.localThreshold = pendingSubT;
     };
     const hideImg = () => {
         ++imgReqToken;
         if (imgEffect) {
-            if (imgEffect._anim) cancelAnimationFrame(imgEffect._anim);
             vfx.remove(section3VideoImg);
             imgEffect = null;
         }
         section3VideoImg.style.display = "none";
     };
 
-    const SCROLL_STATES = [
-        { p: 0.00, idx: 0, img: null },  // hero
-        { p: 0.20, idx: 1, img: null },  // section-2
-        { p: 0.40, idx: 2, img: 0 },     // section-3 / image 1
-        { p: 0.50, idx: 2, img: 1 },
-        { p: 0.60, idx: 2, img: 2 },
-        { p: 0.70, idx: 2, img: 3 },
-        { p: 0.80, idx: 3, img: null },  // section-4
-    ];
+    let currentSection = -1;
+    let currentSubImg = null;
 
-    const stateForProgress = (p) => {
-        let s = SCROLL_STATES[0];
-        for (const st of SCROLL_STATES) {
-            if (p >= st.p) s = st;
-            else break;
+    const applySection = (idx, threshold, axis, bypass) => {
+        if (currentSection !== idx) {
+            if (currentSection >= 0) {
+                canvases[currentSection].style.opacity = "0";
+                canvases[currentSection].style.pointerEvents = "none";
+                effects[currentSection].localBypass = true;
+            }
+            canvases[idx].style.opacity = "1";
+            canvases[idx].style.pointerEvents = "auto";
+            currentSection = idx;
         }
-        return s;
+        const eff = effects[idx];
+        eff.localBypass = bypass;
+        if (!bypass) {
+            eff.localThreshold = threshold;
+            eff.localAxis = axis;
+        }
     };
 
-    let currentState = null;
-    const applyState = (state) => {
-        if (state === currentState) return;
-        const prev = currentState;
-        const sectionChanged = !prev || prev.idx !== state.idx;
-        const imgChanged = state.img !== null && (sectionChanged || prev.img !== state.img);
-
-        if (sectionChanged && prev) {
-            if (effects[prev.idx]._anim) cancelAnimationFrame(effects[prev.idx]._anim);
-            effects[prev.idx]._anim = null;
-            effects[prev.idx].localBypass = true;
-            canvases[prev.idx].style.opacity = "0";
-            canvases[prev.idx].style.pointerEvents = "none";
-            if (prev.idx === 2) {
+    const applySubImg = (idx, threshold, bypass) => {
+        pendingSubT = threshold;
+        pendingSubBypass = bypass;
+        if (currentSubImg !== idx) {
+            if (idx === null) {
                 hideImg();
+            } else {
+                showImgWithSrc(subImageUrls[idx]);
             }
+            currentSubImg = idx;
         }
-        if (sectionChanged) {
-            canvases[state.idx].style.opacity = "1";
-            canvases[state.idx].style.pointerEvents = "auto";
-            animateReveal(effects[state.idx]);
+        if (idx !== null && imgEffect) {
+            imgEffect.localBypass = bypass;
+            imgEffect.localThreshold = threshold;
         }
-        if (imgChanged) {
-            showImgWithSrc(subImageUrls[state.img]);
+    };
+
+    const segmentForProgress = (p) => {
+        for (const seg of TIMELINE) {
+            if (p >= seg.from && p < seg.to) return seg;
         }
-        currentState = state;
+        return TIMELINE[TIMELINE.length - 1];
     };
 
     const scrollProxy = document.querySelector(".scroll-proxy");
-
-    const SECTION3_SUB_RANGE = 0.10;
-
     let rafPending = false;
     const onScroll = () => {
         if (rafPending) return;
@@ -537,12 +544,20 @@ try {
         requestAnimationFrame(() => {
             rafPending = false;
             const proxyRange = scrollProxy.offsetHeight - window.innerHeight;
-            const p = proxyRange > 0 ? Math.max(0, Math.min(1, window.scrollY / proxyRange)) : 0;
-            applyState(stateForProgress(p));
-            if (currentState?.idx === 2 && currentState.img !== null && imgEffect) {
-                const tImg = Math.min(1, Math.max(0, (p - currentState.p) / SECTION3_SUB_RANGE));
-                imgEffect.localThreshold = tImg;
-                imgEffect.localBypass = tImg >= 1;
+            const p = proxyRange > 0 ? clamp01(window.scrollY / proxyRange) : 0;
+            const seg = segmentForProgress(p);
+            const lp = clamp01((p - seg.from) / (seg.to - seg.from));
+
+            const secBypass = seg.bypass === true;
+            const secT = secBypass ? 1 : lerp(seg.t[0], seg.t[1], lp);
+            const secAxis = seg.axis ?? 0;
+            applySection(seg.sec, secT, secAxis, secBypass);
+
+            if (seg.sub !== undefined) {
+                const subT = lerp(seg.subT[0], seg.subT[1], lp);
+                applySubImg(seg.sub, subT, subT >= 1);
+            } else {
+                applySubImg(null, 0, false);
             }
         });
     };
@@ -566,7 +581,7 @@ if (!applied) {
   const lenis = new Lenis();
   (function raf(t) { lenis.raf(t); requestAnimationFrame(raf); })();
 
-  // Section ranges align with SCROLL_STATES above.
+  // Section ranges align with TIMELINE section visibility above.
   const parallaxTargets = [
     { el: document.querySelector(".hero .bg img"),                       range: [0.00, 0.20] },
     { el: document.querySelector(".section-2 .image-col .image img"),    range: [0.20, 0.40] },
