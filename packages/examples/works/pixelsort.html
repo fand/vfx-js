@@ -107,8 +107,10 @@
     will-change:transform;
   }
 
-  /* Loading overlay — held until images + fonts resolve */
-  #loader{position:fixed;inset:0;z-index:9999;background:var(--bg);display:grid;place-items:center;transition:opacity .5s ease,visibility .5s ease;}
+  /* Loading overlay — held until images + fonts resolve.
+     z-index must exceed VFX-JS's canvas (9999); it's appended to body later,
+     so an equal z-index would paint it ABOVE the loader and leak section flashes. */
+  #loader{position:fixed;inset:0;z-index:10000;background:var(--bg);display:grid;place-items:center;transition:opacity .5s ease,visibility .5s ease;}
   #loader.done{opacity:0;visibility:hidden;pointer-events:none;}
   #loader .loader-inner{width:min(440px,72vw);}
   #loader .mark{font-size:clamp(44px,9vw,80px);line-height:.95;text-align:center;color:var(--yellow);text-shadow:0 0 60px var(--glow);margin-bottom:30px;}
