@@ -163,7 +163,7 @@
     <div class="section-3-inner">
         <div class="data data-top label">/// motion plate 04 — Clip 0014</div>
         <div class="video">
-          <img class="pxs" src="https://picsum.photos/seed/subpixel-vid/1600/1200" crossorigin="anonymous" alt="">
+          <img class="pxs" src="./pixelsort/city1.webp" alt="">
         </div>
         <div class="data data-bottom label">02m 14s · Aspect 4:3 · 24 fps</div>
     </div>
@@ -447,12 +447,9 @@ try {
         document.querySelector(".section-4"),
     ];
 
-    const subImageUrls = [1, 2, 3].map(i =>
-        `https://picsum.photos/seed/subpixel-strip-${i}/1600/1200`
-    );
+    const subImageUrls = ["./pixelsort/city1.webp", "./pixelsort/tower1.webp"];
     await Promise.all(subImageUrls.map(url => {
         const img = new Image();
-        img.crossOrigin = "anonymous";
         img.src = url;
         return img.decode().catch(() => {});
     }));
