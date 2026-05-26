@@ -57,14 +57,17 @@
   .section-2 .columns p:first-child::first-letter{font-family:var(--mono);font-weight:400;font-size:4em;float:left;line-height:.85;margin:.1em .15em -.05em 0;color:var(--green);}
   .section-2 .lined{margin-top:36px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a0a59c;}
 
-  /* Section 3 — editorial: head row, 21:9 video */
-  .section-3{padding:120px 40px;border-top:1px solid var(--line);position:relative;overflow:hidden;background:var(--bg);}
-  .section-3-inner{max-width:1280px;margin:0 auto;position:relative;z-index:2;}
-  .section-3 .head{display:grid;grid-template-columns:1fr 1.4fr;gap:48px;align-items:end;margin-bottom:36px;}
-  .section-3 .head .l{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);line-height:1.6;}
-  .section-3 h2{font-family:var(--display);font-weight:400;font-size:140px;line-height:.9;letter-spacing:0;color:var(--blue);text-shadow:0 0 50px rgba(79,108,255,.8);}
+  /* Section 3 — editorial: vertical heading + 4:3 image flanked by data */
+  .section-3{padding:120px 40px;border-top:1px solid var(--line);position:relative;overflow:hidden;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;justify-content:center;}
+  .section-3-inner{max-width:1280px;margin:0 auto;width:100%;position:relative;z-index:2;display:grid;grid-template-columns:clamp(150px,15vw,210px) 1fr;gap:48px;align-items:stretch;}
+  .section-3 .heading-col{position:relative;}
+  .section-3 h2{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center;font-family:var(--display);font-weight:400;font-size:clamp(80px,11vw,160px);line-height:.9;letter-spacing:0;color:var(--blue);text-shadow:0 0 50px rgba(79,108,255,.8);white-space:nowrap;}
   .section-3 h2 em{font-style:normal;color:var(--green);}
-  .section-3 .video{position:relative;aspect-ratio:21/9;overflow:hidden;border:1px solid var(--line);background:#000;}
+  .section-3 .image-col{display:flex;flex-direction:column;gap:16px;}
+  .section-3 .data{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--line);padding:11px 16px;line-height:1.5;}
+  .section-3 .data-top{color:var(--green);}
+  .section-3 .data-bottom{text-align:right;color:#a0a59c;}
+  .section-3 .video{position:relative;aspect-ratio:4/3;overflow:hidden;border:1px solid var(--line);background:#000;}
   .section-3 .video img{width:100%;height:100%;object-fit:cover;}
 
   /* Section 4 — wordmark */
@@ -151,12 +154,15 @@
     <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-s3/2000/1400" crossorigin="anonymous" alt="">
     <div class="section-overlay"></div>
     <div class="section-3-inner">
-      <div class="head">
-        <div class="l">/// motion plate 04<br>Clip 0014 · 02m 14s<br>Aspect · 21:9 · 24 fps</div>
+      <div class="heading-col">
         <h2 class="pxs">See it <em>move</em>.</h2>
       </div>
-      <div class="video">
-        <img class="pxs" src="https://picsum.photos/seed/subpixel-vid/2100/900" crossorigin="anonymous" alt="">
+      <div class="image-col">
+        <div class="data data-top">/// motion plate 04 — Clip 0014</div>
+        <div class="video">
+          <img class="pxs" src="https://picsum.photos/seed/subpixel-vid/1600/1200" crossorigin="anonymous" alt="">
+        </div>
+        <div class="data data-bottom">02m 14s · Aspect 4:3 · 24 fps</div>
       </div>
     </div>
   </section>
@@ -434,7 +440,7 @@ try {
     ];
 
     const subImageUrls = [1, 2, 3].map(i =>
-        `https://picsum.photos/seed/subpixel-strip-${i}/2100/900`
+        `https://picsum.photos/seed/subpixel-strip-${i}/1600/1200`
     );
     await Promise.all(subImageUrls.map(url => {
         const img = new Image();
