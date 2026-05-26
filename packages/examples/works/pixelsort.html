@@ -51,9 +51,9 @@
   /* Section 2 — editorial: image left + columns w/ drop-cap right */
   .section-2{padding:120px 40px;border-top:1px solid var(--line);position:relative;overflow:visible;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;isolation:isolate;}
   .section-2-grid{display:grid;grid-template-columns:3fr 7fr;gap:64px;align-items:stretch;width:100%;max-width:1280px;margin:0 auto;flex:1;position:relative;}
-  .section-2 .image-col{position:relative; mix-blend-mode: plus-lighter;}   
+  .section-2 .image-col{position:relative; mix-blend-mode: plus-lighter;}
   .section-2 .image-col .image{position:absolute;top:0;bottom:0;right:0;left:calc(-1 * max(40px, 50vw - 640px));overflow:visible;background:#000;}
-  .section-2 .image-col .image img{width:100%;height:100%;object-fit:cover;}
+  .section-2 .image-col .image img{width:100%;height:150%;margin-top:-70%;object-fit:cover;}
   .section-2 .kicker{letter-spacing:.18em;color:var(--green);margin-bottom:18px;}
   .section-2 h2{font-size:clamp(56px,6.5vw,112px);line-height:.95;color:var(--blue);margin-bottom:clamp(24px,3vw,40px);text-shadow:0 0 50px var(--glow);}
   .section-2 h2 em{font-style:normal;color:var(--green);}
@@ -96,9 +96,11 @@
   .stage{position:fixed;top:0;left:0;width:100%;height:100vh;display:grid;grid-template-areas:"stage";overflow:hidden;z-index:0;}
   .stage > *{grid-area:stage;}
 
-  /* Parallax — Lenis-driven on §1/2/4 images */
+  /* Parallax — Lenis-driven on §1–4 images */
   .hero .bg img,
   .section-2 .image-col .image img,
+  .section-2 .section-bg,
+  .section-3 .section-bg,
   .section-4 .section-bg{
     transform:translate3d(0,var(--parallax-y,0px),0) scale(1.18);
     transform-origin:center;
@@ -128,7 +130,7 @@
   </section>
 
   <section class="section-2">
-    <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-s2/2000/1400" crossorigin="anonymous" alt="">
+    <img class="section-bg pxs" src="https://images.unsplash.com/photo-1630917162749-e5f957f187a2?fm=jpg&amp;q=80&amp;w=2400&amp;auto=format&amp;fit=crop" crossorigin="anonymous" alt="">
     <div class="section-overlay"></div>
     <div class="section-2-grid">
       <div class="image-col">
@@ -153,7 +155,7 @@
   </section>
 
   <section class="section-3">
-    <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-s3/2000/1400" crossorigin="anonymous" alt="">
+    <img class="section-bg pxs" src="https://images.unsplash.com/photo-1597418881091-e62c106f03c3?fm=jpg&amp;q=80&amp;w=2400&amp;auto=format&amp;fit=crop" crossorigin="anonymous" alt="">
     <div class="section-overlay"></div>
     <div class="section-3-heading display">
       <h2 class="pxs">Examples</h2>
@@ -621,6 +623,8 @@ if (!applied) {
   const parallaxTargets = [
     { el: document.querySelector(".hero .bg img"),                       range: [0.00, 0.20] },
     { el: document.querySelector(".section-2 .image-col .image img"),    range: [0.20, 0.40] },
+    { el: document.querySelector(".section-2 .section-bg"),              range: [0.20, 0.40] },
+    { el: document.querySelector(".section-3 .section-bg"),              range: [0.40, 0.80] },
     { el: document.querySelector(".section-4 .section-bg"),              range: [0.80, 1.00] },
   ];
   const AMP = 60; // px each direction; scale(1.18) leaves enough cover headroom
