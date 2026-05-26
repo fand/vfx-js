@@ -106,9 +106,26 @@
     transform-origin:center;
     will-change:transform;
   }
+
+  /* Loading overlay — held until images + fonts resolve */
+  #loader{position:fixed;inset:0;z-index:9999;background:var(--bg);display:grid;place-items:center;transition:opacity .5s ease,visibility .5s ease;}
+  #loader.done{opacity:0;visibility:hidden;pointer-events:none;}
+  #loader .loader-inner{width:min(440px,72vw);}
+  #loader .mark{font-size:clamp(44px,9vw,80px);line-height:.95;text-align:center;color:var(--yellow);text-shadow:0 0 60px var(--glow);margin-bottom:30px;}
+  #loader .bar{position:relative;height:2px;background:var(--line);overflow:hidden;}
+  #loader .bar-fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--green);box-shadow:0 0 12px var(--green);transition:width .3s ease;}
+  #loader .status{display:flex;justify-content:space-between;margin-top:14px;color:var(--ink);opacity:.7;}
+  #loader .status .pct{color:var(--green);opacity:1;}
 </style>
 </head>
 <body>
+<div id="loader">
+  <div class="loader-inner">
+    <div class="mark display">SUBPIXEL</div>
+    <div class="bar"><span class="bar-fill"></span></div>
+    <div class="status label"><span>// LOADING ASSETS</span><span class="pct">0%</span></div>
+  </div>
+</div>
 <div id="root">
   <div class="scroll-proxy">
     <div class="stage">
@@ -434,11 +451,46 @@ const TIMELINE = [
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
+const subImageUrls = ["./pixelsort/city1.webp", "./pixelsort/tower1.webp"];
+
+// Loading overlay — held until all <img>, preloaded sub-images, and fonts resolve.
+const loaderEl = document.getElementById("loader");
+const setProgress = (f) => {
+    const v = Math.round(f * 100);
+    loaderEl.querySelector(".bar-fill").style.width = `${v}%`;
+    loaderEl.querySelector(".pct").textContent = `${v}%`;
+};
+let loaderHidden = false;
+const hideLoader = () => {
+    if (loaderHidden) return;
+    loaderHidden = true;
+    loaderEl.classList.add("done");
+    setTimeout(() => loaderEl.remove(), 600);
+};
+const loadAllAssets = async () => {
+    const imgs = Array.from(document.images);
+    const total = imgs.length + subImageUrls.length + 1;
+    let done = 0;
+    const tick = () => setProgress(++done / total);
+    const tasks = imgs.map((img) =>
+        Promise.resolve(img.decode?.()).catch(() => {}).then(tick),
+    );
+    for (const url of subImageUrls) {
+        const img = new Image();
+        img.src = url;
+        tasks.push(img.decode().catch(() => {}).then(tick));
+    }
+    tasks.push(document.fonts.ready.then(tick));
+    // Safety cap so one stalled asset can't trap the loader forever.
+    await Promise.race([Promise.all(tasks), new Promise((r) => setTimeout(r, 8000))]);
+};
+
+setTimeout(hideLoader, 12000); // absolute fallback if init stalls
+await loadAllAssets();
+
 let applied = false;
 try {
     const vfx = new VFX({ scrollPadding: false });
-
-    await document.fonts.ready;
 
     const sections = [
         document.querySelector(".hero"),
@@ -446,13 +498,6 @@ try {
         document.querySelector(".section-3"),
         document.querySelector(".section-4"),
     ];
-
-    const subImageUrls = ["./pixelsort/city1.webp", "./pixelsort/tower1.webp"];
-    await Promise.all(subImageUrls.map(url => {
-        const img = new Image();
-        img.src = url;
-        return img.decode().catch(() => {});
-    }));
 
     const effects = [];
     const canvases = [];
@@ -614,6 +659,7 @@ try {
 if (!applied) {
     document.getElementById("root").classList.add("pxs-fallback");
 }
+hideLoader();
 </script>
 
 <!-- Lenis smooth scroll + section-image parallax -->
