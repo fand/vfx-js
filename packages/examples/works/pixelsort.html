@@ -12,8 +12,8 @@
     --bg2:#11141a;
     --ink:#e8eae3;
     --yellow:#ffee00;
-    --blue:#4f6cff;
-    --green:#36e082;
+    --blue:#ffee00;
+    --green:#ff12a8;
     --line:rgba(255,255,255,.16);
     --mono:'IBM Plex Mono',ui-monospace,monospace;
     --sans:'Space Grotesk',system-ui,sans-serif;
@@ -25,18 +25,22 @@
   a{color:inherit;text-decoration:none;}
   img{display:block;max-width:100%;}
 
+  /* Shared display heading + mono micro-label */
+  .display{font-family:var(--display);font-weight:400;letter-spacing:0;}
+  .label{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;}
+
   /* Section 1 — title + tagline, image as full-bleed section background */
   .hero{position:relative;min-height:100vh;display:grid;place-items:center;padding:80px 40px;text-align:center;overflow:hidden;border-bottom:1px solid var(--line);}
   .hero .bg{position:absolute;inset:0;z-index:0;}
   .hero .bg img{width:100%;height:100%;object-fit:cover;}
   .hero .overlay{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(8,9,12,0.2) 0%,rgba(8,9,12,0.5) 70%,rgba(8,9,12,.95) 100%);}
   .hero .inner{position:relative;z-index:2;width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;}
-  .hero .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:36px;}
-  .hero h1{font-family:var(--display);font-weight:400;font-size:clamp(80px,12vw,180px);line-height:.92;letter-spacing:0;color:var(--yellow);margin-bottom:40px;width:max-content;max-width:none;white-space:nowrap;text-shadow:0 0 70px rgba(79,108,255,.8);}
+  .hero .eyebrow{font-size:12px;letter-spacing:.18em;color:var(--green);margin-bottom:36px;}
+  .hero h1{font-size:clamp(80px,12vw,180px);line-height:.92;color:var(--yellow);margin-bottom:40px;width:max-content;max-width:none;white-space:nowrap;text-shadow:0 0 70px rgba(79,108,255,.8);}
   .hero h1 .slash{color:var(--ink);opacity:.45;}
   .hero .tagline{font-family:var(--mono);font-size:14px;color:var(--ink);max-width:540px;margin:0 auto;line-height:1.6;}
-  .hero .meta{margin-top:48px;display:flex;justify-content:center;gap:32px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);opacity:.7;}
-  .hero .corners{position:absolute;inset:24px;z-index:2;pointer-events:none;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);opacity:.55;}
+  .hero .meta{margin-top:48px;display:flex;justify-content:center;gap:32px;letter-spacing:.12em;color:var(--ink);opacity:.7;}
+  .hero .corners{position:absolute;inset:24px;z-index:2;pointer-events:none;color:var(--ink);opacity:.55;}
   .hero .corners>span{position:absolute;}
   .hero .corners .tl{top:0;left:0;color:var(--green);}
   .hero .corners .tr{top:0;right:0;}
@@ -49,19 +53,19 @@
   .section-2 .image-col{position:relative;}
   .section-2 .image-col .image{position:absolute;top:0;bottom:0;right:0;left:calc(-1 * max(40px, 50vw - 640px));overflow:hidden;background:#000;}
   .section-2 .image-col .image img{width:100%;height:100%;object-fit:cover;}
-  .section-2 .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:18px;}
-  .section-2 h2{font-family:var(--display);font-weight:400;font-size:clamp(56px,6.5vw,112px);line-height:.95;letter-spacing:0;color:var(--blue);margin-bottom:clamp(24px,3vw,40px);text-shadow:0 0 50px rgba(79,108,255,.8);}
+  .section-2 .kicker{letter-spacing:.18em;color:var(--green);margin-bottom:18px;}
+  .section-2 h2{font-size:clamp(56px,6.5vw,112px);line-height:.95;color:var(--blue);margin-bottom:clamp(24px,3vw,40px);text-shadow:0 0 50px rgba(79,108,255,.8);}
   .section-2 h2 em{font-style:normal;color:var(--green);}
   .section-2 .columns{column-count:2;column-gap:36px;column-rule:1px solid var(--line);font-size:clamp(14px,1.3vw,20px);line-height:1.65;color:#cfd2cc;}
   .section-2 .columns p{margin-bottom:.9em;text-align:justify;hyphens:auto;}
   .section-2 .columns p:first-child::first-letter{font-family:var(--mono);font-weight:400;font-size:4em;float:left;line-height:.85;margin:.1em .15em -.05em 0;color:var(--green);}
-  .section-2 .lined{margin-top:36px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a0a59c;}
+  .section-2 .lined{margin-top:36px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;color:#a0a59c;}
 
   /* Section 3 — editorial: vertical heading + 4:3 image flanked by data */
   .section-3{padding:120px 150px;border-top:1px solid var(--line);position:relative;overflow:hidden;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;justify-content:center;}
   .section-3-inner{max-width:1280px;margin:0 auto;width:100%;position:relative;z-index:2;display:flex;flex-direction:column;gap:16px;}
-  .section-3-heading{position:absolute;top:40%;left:10%;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center;font-family:var(--display);font-weight:400;font-size:clamp(60px,10vw,150px);line-height:.9;letter-spacing:0;color:var(--blue);text-shadow:0 0 50px rgba(79,108,255,.8);white-space:nowrap;}
-  .section-3 .data{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--line);padding:11px 16px;line-height:1.5;}
+  .section-3-heading{position:absolute;top:40%;left:10%;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center;font-size:clamp(60px,10vw,150px);line-height:.9;color:var(--blue);text-shadow:0 0 50px rgba(79,108,255,.8);white-space:nowrap;}
+  .section-3 .data{border:1px solid var(--line);padding:11px 16px;line-height:1.5;}
   .section-3 .data-top{color:var(--green);}
   .section-3 .data-bottom{text-align:right;color:#a0a59c;}
   .section-3 .video{position:relative;aspect-ratio:4/3;overflow:hidden;border:1px solid var(--line);background:#000;}
@@ -69,7 +73,7 @@
 
   /* Section 4 — wordmark */
   .section-4{padding:0;min-height:100vh;display:grid;place-items:center;position:relative;overflow:hidden;background:var(--bg);}
-  .section-4 h2{font-family:var(--display);font-weight:400;font-size:clamp(120px,18vw,280px);line-height:.95;letter-spacing:0;color:var(--yellow);text-align:center;width:max-content;max-width:none;white-space:nowrap;position:relative;z-index:2;}
+  .section-4 h2{font-size:clamp(120px,18vw,280px);line-height:.95;color:var(--yellow);text-align:center;width:max-content;max-width:none;white-space:nowrap;position:relative;z-index:2;}
 
   /* Per-section image bg + dark overlay */
   .section-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:.5;}
@@ -108,17 +112,17 @@
   <section class="hero">
     <div class="bg"><img class="pxs" src="https://images.unsplash.com/photo-1590725042659-63c8b9f9724d?fm=jpg&amp;q=80&amp;w=2400&amp;auto=format&amp;fit=crop" crossorigin="anonymous" alt=""></div>
     <div class="overlay"></div>
-    <div class="corners">
+    <div class="corners label">
       <span class="tl">// SUBPIXEL · release</span>
       <span class="tr">v0.7.2</span>
       <span class="bl">FRAME 0014 · 24FPS</span>
       <span class="br">05.24.2026</span>
     </div>
     <div class="inner">
-      <div class="eyebrow">// Release · 05.24.2026</div>
-      <h1 class="pxs">PURE<span class="slash">/</span>SYNC</h1>
+      <div class="eyebrow label">// Release · 05.24.2026</div>
+      <h1 class="pxs display">PURE<span class="slash">/</span>SYNC</h1>
       <p class="tagline">A subpixel-grade rendering kit for the second decade of the modern web — built for engineers who still care how a single line of light arrives on a panel.</p>
-      <div class="meta"><span>Edition · 002</span><span>Channels · RGB+A</span><span>Format · WebGL2 / WGSL</span></div>
+      <div class="meta label"><span>Edition · 002</span><span>Channels · RGB+A</span><span>Format · WebGL2 / WGSL</span></div>
     </div>
   </section>
 
@@ -130,8 +134,8 @@
         <div class="image"><img class="pxs" src="./pixelsort/sculpt.webp" alt=""></div>
       </div>
       <div class="body">
-        <div class="kicker">// Feature — folio 02</div>
-        <h2 class="pxs">A toolkit, not a <em>framework</em>.</h2>
+        <div class="kicker label">// Feature — folio 02</div>
+        <h2 class="pxs display">A toolkit, not a <em>framework</em>.</h2>
         <div class="columns">
           <p>There is a particular shape of software that tries very hard to be useful and, in doing so, makes itself difficult to live with. Subpixel is not that shape. It is a set of small primitives that move pixels, and a uniform clock that keeps them honest.</p>
           <p>The kit ships one bundle, sub-thirty kilobytes gzipped, with no peer dependencies. It binds directly to live DOM nodes — headings, images, video — and asks each one to give up its raster for the length of a frame. The shader does the rest, on the GPU, where it should.</p>
@@ -142,7 +146,7 @@
           <p>Subpixel does not collect telemetry, does not phone home, does not ask you to sign in to anything. It is a file you include and a class you instantiate. The license is permissive. The defaults are dark. The bundle is small enough to fit, with room to spare, in the gap between two ad-network scripts.</p>
           <p>Set in IBM Plex Mono and Space Grotesk. Drawn on an M1 at the kitchen table, between the hours when the city has finished one thing and not yet started the next.</p>
         </div>
-        <div class="lined"><span>// Section 02 · reference §2.1.0</span><span>Continued on §3 →</span></div>
+        <div class="lined label"><span>// Section 02 · reference §2.1.0</span><span>Continued on §3 →</span></div>
       </div>
     </div>
   </section>
@@ -150,22 +154,22 @@
   <section class="section-3">
     <img class="section-bg pxs" src="https://picsum.photos/seed/d1-atlas-s3/2000/1400" crossorigin="anonymous" alt="">
     <div class="section-overlay"></div>
-    <div class="section-3-heading">
+    <div class="section-3-heading display">
       <h2 class="pxs">Examples</h2>
     </div>
     <div class="section-3-inner">
-        <div class="data data-top">/// motion plate 04 — Clip 0014</div>
+        <div class="data data-top label">/// motion plate 04 — Clip 0014</div>
         <div class="video">
           <img class="pxs" src="https://picsum.photos/seed/subpixel-vid/1600/1200" crossorigin="anonymous" alt="">
         </div>
-        <div class="data data-bottom">02m 14s · Aspect 4:3 · 24 fps</div>
+        <div class="data data-bottom label">02m 14s · Aspect 4:3 · 24 fps</div>
     </div>
   </section>
 
   <section class="section-4">
     <img class="section-bg pxs" src="./pixelsort/octo.webp" alt="">
     <div class="section-overlay"></div>
-    <h2 class="pxs">VFX-JS</h2>
+    <h2 class="pxs display">VFX-JS</h2>
   </section>
     </div>
   </div>
