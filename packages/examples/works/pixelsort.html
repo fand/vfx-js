@@ -11,6 +11,7 @@
     --bg:#08090c;
     --bg2:#11141a;
     --ink:#e8eae3;
+    --yellow:#ffee00;
     --blue:#4f6cff;
     --green:#36e082;
     --line:rgba(255,255,255,.16);
@@ -28,10 +29,10 @@
   .hero{position:relative;min-height:100vh;display:grid;place-items:center;padding:80px 40px;text-align:center;overflow:hidden;border-bottom:1px solid var(--line);}
   .hero .bg{position:absolute;inset:0;z-index:0;}
   .hero .bg img{width:100%;height:100%;object-fit:cover;}
-  .hero .overlay{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(8,9,12,.32) 0%,rgba(8,9,12,.74) 55%,rgba(8,9,12,.95) 100%);}
+  .hero .overlay{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(8,9,12,0.2) 0%,rgba(8,9,12,0.5) 70%,rgba(8,9,12,.95) 100%);}
   .hero .inner{position:relative;z-index:2;width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;}
   .hero .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:36px;}
-  .hero h1{font-family:var(--display);font-weight:400;font-size:clamp(80px,12vw,180px);line-height:.92;letter-spacing:0;color:var(--blue);margin-bottom:40px;width:max-content;max-width:none;white-space:nowrap;text-shadow:0 0 70px rgba(79,108,255,.8);}
+  .hero h1{font-family:var(--display);font-weight:400;font-size:clamp(80px,12vw,180px);line-height:.92;letter-spacing:0;color:var(--yellow);margin-bottom:40px;width:max-content;max-width:none;white-space:nowrap;text-shadow:0 0 70px rgba(79,108,255,.8);}
   .hero h1 .slash{color:var(--ink);opacity:.45;}
   .hero .tagline{font-family:var(--mono);font-size:14px;color:var(--ink);max-width:540px;margin:0 auto;line-height:1.6;}
   .hero .meta{margin-top:48px;display:flex;justify-content:center;gap:32px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);opacity:.7;}
@@ -45,8 +46,8 @@
   /* Section 2 — editorial: image left + columns w/ drop-cap right */
   .section-2{padding:120px 40px;border-top:1px solid var(--line);position:relative;overflow:hidden;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;}
   .section-2-grid{display:grid;grid-template-columns:3fr 7fr;gap:64px;align-items:stretch;width:100%;max-width:1280px;margin:0 auto;flex:1;position:relative;z-index:2;}
-  .section-2 .image-col{display:flex;}
-  .section-2 .image-col .image{flex:1;overflow:hidden;border:1px solid var(--line);background:#000;}
+  .section-2 .image-col{position:relative;}
+  .section-2 .image-col .image{position:absolute;top:0;bottom:0;right:0;left:calc(-1 * max(40px, 50vw - 640px));overflow:hidden;background:#000;}
   .section-2 .image-col .image img{width:100%;height:100%;object-fit:cover;}
   .section-2 .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:18px;}
   .section-2 h2{font-family:var(--display);font-weight:400;font-size:clamp(56px,6.5vw,112px);line-height:.95;letter-spacing:0;color:var(--blue);margin-bottom:clamp(24px,3vw,40px);text-shadow:0 0 50px rgba(79,108,255,.8);}
@@ -72,7 +73,7 @@
 
   /* Section 4 — wordmark */
   .section-4{padding:0;min-height:100vh;display:grid;place-items:center;position:relative;overflow:hidden;background:var(--bg);}
-  .section-4 h2{font-family:var(--display);font-weight:400;font-size:clamp(120px,18vw,280px);line-height:.95;letter-spacing:0;color:var(--blue);text-align:center;width:max-content;max-width:none;white-space:nowrap;position:relative;z-index:2;}
+  .section-4 h2{font-family:var(--display);font-weight:400;font-size:clamp(120px,18vw,280px);line-height:.95;letter-spacing:0;color:var(--yellow);text-align:center;width:max-content;max-width:none;white-space:nowrap;position:relative;z-index:2;}
 
   /* Per-section image bg + dark overlay */
   .section-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:.5;}
@@ -121,7 +122,7 @@
     <div class="section-overlay"></div>
     <div class="section-2-grid">
       <div class="image-col">
-        <div class="image"><img class="pxs" src="https://picsum.photos/seed/subpixel-2/1200/1500" crossorigin="anonymous" alt=""></div>
+        <div class="image"><img class="pxs" src="./pixelsort/sculpt.webp" alt=""></div>
       </div>
       <div class="body">
         <div class="kicker">// Feature — folio 02</div>
@@ -158,7 +159,7 @@
   </section>
 
   <section class="section-4">
-    <img class="section-bg pxs" src="https://picsum.photos/seed/octopus/2400/1600" crossorigin="anonymous" alt="">
+    <img class="section-bg pxs" src="./pixelsort/octo.webp" alt="">
     <div class="section-overlay"></div>
     <h2 class="pxs">VFX-JS</h2>
   </section>
@@ -378,8 +379,8 @@ class PixelSortEffect {
 // Tuned for the dark editorial palette — threshold sits low enough that
 // the sky-bright / bg-image highlights sort visibly on hover.
 const params = {
-    threshold: 0.28,
-    lowW: 256,
+    threshold: 0.0,
+    lowW: 512,
     keyMode: 0,
     direction: 0,
 };
@@ -390,7 +391,7 @@ try {
 
     await document.fonts.ready;
 
-    const REVEAL_MS = 2000;
+    const REVEAL_MS = 1000;
     const animateReveal = (effect) => {
         if (effect._anim) cancelAnimationFrame(effect._anim);
         effect.localBypass = false;
