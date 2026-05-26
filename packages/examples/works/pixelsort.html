@@ -477,6 +477,7 @@ try {
     let imgEffect = null;
     let imgReqToken = 0;
     let imageMode = "hidden";
+    // last shown §3 sub-image; persists across hidden so §4→§3 restores it
     let currentSubImg = null;
     let pendingSubT = 0, pendingSubBypass = false, pendingSubAxis = 0;
 
@@ -489,7 +490,6 @@ try {
         }
         section3VideoImg.style.display = "none";
         imageMode = "hidden";
-        currentSubImg = null;
         vfx.update(sections[2]).catch(() => {});
     };
 
