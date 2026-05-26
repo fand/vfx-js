@@ -454,11 +454,11 @@ try {
         }
         section3VideoImg.src = src;
         section3VideoImg.style.display = "";
-        const e = new PixelSortEffect(params, { bypass: true, threshold: 1 });
+        const e = new PixelSortEffect(params, { bypass: false, threshold: 0 });
         await vfx.add(section3VideoImg, { effect: e });
         if (token !== imgReqToken) return;
         imgEffect = e;
-        animateReveal(e);
+        // section-3 img threshold is scroll-driven (see onScroll)
     };
     const hideImg = () => {
         ++imgReqToken;
@@ -509,7 +509,13 @@ try {
         if (sectionChanged) {
             canvases[state.idx].style.opacity = "1";
             canvases[state.idx].style.pointerEvents = "auto";
-            animateReveal(effects[state.idx]);
+            if (state.idx === 2) {
+                // section-3 bg is scroll-driven, no time-based reveal
+                effects[2].localBypass = false;
+                effects[2].localThreshold = 0;
+            } else {
+                animateReveal(effects[state.idx]);
+            }
         }
         if (imgChanged) {
             showImgWithSrc(subImageUrls[state.img]);
@@ -518,6 +524,9 @@ try {
     };
 
     const scrollProxy = document.querySelector(".scroll-proxy");
+
+    const SECTION3_RANGE = [0.40, 0.80];
+    const SECTION3_SUB_RANGE = 0.10;
 
     let rafPending = false;
     const onScroll = () => {
@@ -528,6 +537,13 @@ try {
             const proxyRange = scrollProxy.offsetHeight - window.innerHeight;
             const p = proxyRange > 0 ? Math.max(0, Math.min(1, window.scrollY / proxyRange)) : 0;
             applyState(stateForProgress(p));
+            if (currentState?.idx === 2) {
+                const [a, b] = SECTION3_RANGE;
+                effects[2].localThreshold = Math.min(1, Math.max(0, (p - a) / (b - a)));
+                if (currentState.img !== null && imgEffect) {
+                    imgEffect.localThreshold = Math.min(1, Math.max(0, (p - currentState.p) / SECTION3_SUB_RANGE));
+                }
+            }
         });
     };
 
@@ -542,6 +558,13 @@ try {
 if (!applied) {
     document.getElementById("root").classList.add("pxs-fallback");
 }
+</script>
+
+<!-- Lenis smooth scroll -->
+<script type="module">
+  import Lenis from "https://esm.sh/lenis";
+  const lenis = new Lenis();
+  (function raf(t) { lenis.raf(t); requestAnimationFrame(raf); })();
 </script>
 </body>
 </html>
