@@ -584,6 +584,7 @@ try {
     };
 
     let currentSection = -1;
+    let introPlaying = true; // suppress scroll updates during the load-in intro
 
     const applySection = (idx, threshold, axis, bypass) => {
         if (currentSection !== idx) {
@@ -622,6 +623,7 @@ try {
         rafPending = true;
         requestAnimationFrame(() => {
             rafPending = false;
+            if (introPlaying) return;
             const proxyRange = scrollProxy.offsetHeight - window.innerHeight;
             const p = proxyRange > 0 ? clamp01(window.scrollY / proxyRange) : 0;
             const seg = segmentForProgress(p);
@@ -651,14 +653,34 @@ try {
     window.addEventListener("resize", onScroll);
     onScroll();
 
+    // Intro: hold black (暗転), then dissolve §1 in from a full pixelsort over 2s.
+    applySection(0, 0, 0, false); // §1 active, fully sorted, behind the black loader
+    const INTRO_MS = 2000;
+    const BLACKOUT_MS = 300;
+    setTimeout(() => {
+        hideLoader(); // fade the black overlay as the sort starts resolving
+        const start = performance.now();
+        const tick = (now) => {
+            const t = clamp01((now - start) / INTRO_MS);
+            effects[0].localThreshold = 1 - Math.pow(1 - t, 3); // ease-out: full sort → clean
+            if (t < 1) {
+                requestAnimationFrame(tick);
+            } else {
+                introPlaying = false;
+                onScroll(); // hand control back to scroll
+            }
+        };
+        requestAnimationFrame(tick);
+    }, BLACKOUT_MS);
+
     applied = true;
 } catch (e) {
     console.warn("vfx-js failed to load, falling back to CSS sim", e);
 }
 if (!applied) {
     document.getElementById("root").classList.add("pxs-fallback");
+    hideLoader();
 }
-hideLoader();
 </script>
 
 <!-- Lenis smooth scroll + section-image parallax -->
