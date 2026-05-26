@@ -66,7 +66,6 @@
   .section-3 h2 em{font-style:normal;color:var(--green);}
   .section-3 .video{position:relative;aspect-ratio:21/9;overflow:hidden;border:1px solid var(--line);background:#000;}
   .section-3 .video img{width:100%;height:100%;object-fit:cover;}
-  .section-3 .video::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,13,18,.05),rgba(10,13,18,.55));pointer-events:none;}
 
   /* Section 4 — wordmark */
   .section-4{padding:0;min-height:100vh;display:grid;place-items:center;position:relative;overflow:hidden;background:var(--bg);}
@@ -391,7 +390,7 @@ class PixelSortEffect {
 
 const params = {
     threshold: 0.0,
-    lowDim: 512,
+    lowDim: 128,
     keyMode: 0,
     direction: 0,
     axis: 0,
@@ -458,37 +457,78 @@ try {
     const section3VideoImg = sections[2].querySelector(".video img");
     section3VideoImg.style.display = "none";
 
-    // vfx-js caches img texture at add-time; re-add per src swap.
+    // Image management:
+    //   "hidden"     — img display:none, no own canvas, not in §3 capture
+    //   "embedded"   — img display:"", no own canvas, §3 capture includes it
+    //                  (during §3 in/out so §3's sort applies to the image too)
+    //   "standalone" — img display:"", own VFX canvas with independent effect
+    //                  (during sub-image sort phases)
     let imgEffect = null;
     let imgReqToken = 0;
-    let pendingSubT = 0;
-    let pendingSubBypass = false;
-    const showImgWithSrc = async (src) => {
-        const token = ++imgReqToken;
-        if (imgEffect) {
-            vfx.remove(section3VideoImg);
-            imgEffect = null;
-        }
-        section3VideoImg.src = src;
-        section3VideoImg.style.display = "";
-        const e = new PixelSortEffect(params, { bypass: false, threshold: pendingSubT });
-        await vfx.add(section3VideoImg, { effect: e });
-        if (token !== imgReqToken) return;
-        imgEffect = e;
-        imgEffect.localBypass = pendingSubBypass;
-        imgEffect.localThreshold = pendingSubT;
-    };
-    const hideImg = () => {
+    let imageMode = "hidden";
+    let currentSubImg = null;
+    let pendingSubT = 0, pendingSubBypass = false, pendingSubAxis = 0;
+
+    const setImageHidden = () => {
+        if (imageMode === "hidden") return;
         ++imgReqToken;
         if (imgEffect) {
             vfx.remove(section3VideoImg);
             imgEffect = null;
         }
         section3VideoImg.style.display = "none";
+        imageMode = "hidden";
+        currentSubImg = null;
+        vfx.update(sections[2]).catch(() => {});
+    };
+
+    const setImageEmbedded = async (idx) => {
+        if (imageMode === "embedded" && currentSubImg === idx) return;
+        const token = ++imgReqToken;
+        if (imgEffect) {
+            vfx.remove(section3VideoImg);
+            imgEffect = null;
+        }
+        section3VideoImg.src = subImageUrls[idx];
+        section3VideoImg.style.display = "";
+        imageMode = "embedded";
+        currentSubImg = idx;
+        await section3VideoImg.decode().catch(() => {});
+        if (token !== imgReqToken) return;
+        vfx.update(sections[2]).catch(() => {});
+    };
+
+    const setImageStandalone = async (idx, threshold, bypass, axis) => {
+        pendingSubT = threshold;
+        pendingSubBypass = bypass;
+        pendingSubAxis = axis;
+        if (imageMode === "standalone" && currentSubImg === idx) {
+            if (imgEffect) {
+                imgEffect.localBypass = bypass;
+                imgEffect.localThreshold = threshold;
+                imgEffect.localAxis = axis;
+            }
+            return;
+        }
+        const token = ++imgReqToken;
+        if (imgEffect) {
+            vfx.remove(section3VideoImg);
+            imgEffect = null;
+        }
+        section3VideoImg.src = subImageUrls[idx];
+        section3VideoImg.style.display = "";
+        imageMode = "standalone";
+        currentSubImg = idx;
+        const e = new PixelSortEffect(params, { bypass: false, threshold: pendingSubT, axis: pendingSubAxis });
+        await vfx.add(section3VideoImg, { effect: e });
+        if (token !== imgReqToken) return;
+        imgEffect = e;
+        imgEffect.localBypass = pendingSubBypass;
+        imgEffect.localThreshold = pendingSubT;
+        imgEffect.localAxis = pendingSubAxis;
     };
 
     let currentSection = -1;
-    let currentSubImg = null;
 
     const applySection = (idx, threshold, axis, bypass) => {
         if (currentSection !== idx) {
@@ -506,23 +546,6 @@ try {
         if (!bypass) {
             eff.localThreshold = threshold;
             eff.localAxis = axis;
-        }
-    };
-
-    const applySubImg = (idx, threshold, bypass) => {
-        pendingSubT = threshold;
-        pendingSubBypass = bypass;
-        if (currentSubImg !== idx) {
-            if (idx === null) {
-                hideImg();
-            } else {
-                showImgWithSrc(subImageUrls[idx]);
-            }
-            currentSubImg = idx;
-        }
-        if (idx !== null && imgEffect) {
-            imgEffect.localBypass = bypass;
-            imgEffect.localThreshold = threshold;
         }
     };
 
@@ -556,9 +579,15 @@ try {
 
             if (seg.sub !== undefined) {
                 const subT = lerp(seg.subT[0], seg.subT[1], lp);
-                applySubImg(seg.sub, subT, subT >= 1);
+                setImageStandalone(seg.sub, subT, subT >= 1, 0);
+            } else if (seg.sec === 2) {
+                // Throughout §3 (incl. bypass): keep the image embedded in §3's
+                // capture. Sort phases process it as one texture; bypass shows it
+                // clean — never hide it, or the .video bg flashes black.
+                const fallback = currentSubImg ?? 0;
+                setImageEmbedded(fallback);
             } else {
-                applySubImg(null, 0, false);
+                setImageHidden();
             }
         });
     };
