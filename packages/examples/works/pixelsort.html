@@ -400,19 +400,21 @@ const params = {
 // Scroll-driven timeline. axis: 0=horizontal, 1=vertical.
 // Section visibility switches at the boundary between an "exit" and the next "enter".
 const TIMELINE = [
+    // section 1
     { from: 0.00, to: 0.10, sec: 0, bypass: true },
     { from: 0.10, to: 0.20, sec: 0, axis: 0, t: [1, 0] },
-    { from: 0.20, to: 0.30, sec: 1, axis: 0, t: [0, 1] },
-    { from: 0.30, to: 0.35, sec: 1, bypass: true },
-    { from: 0.35, to: 0.40, sec: 1, axis: 0, t: [1, 0] },
+    // section 2
+    { from: 0.20, to: 0.25, sec: 1, axis: 0, t: [0, 1] },
+    { from: 0.25, to: 0.30, sec: 1, bypass: true },
+    { from: 0.30, to: 0.40, sec: 1, axis: 0, t: [1, 0] },
+    // section 3
     { from: 0.40, to: 0.45, sec: 2, axis: 0, t: [0, 1] },
-    // { from: 0.45, to: 0.45, sec: 2, bypass: true },
-    { from: 0.45, to: 0.55, sec: 2, bypass: true, sub: 0, subT: [0, 1] },
-    { from: 0.55, to: 0.65, sec: 2, bypass: true, sub: 1, subT: [0, 1] },
-    { from: 0.65, to: 0.75, sec: 2, bypass: true, sub: 2, subT: [0, 1] },
-    // { from: 0.75, to: 0.77, sec: 2, bypass: true, sub: 2, subT: [1, 1] },
-    { from: 0.75, to: 0.85, sec: 2, axis: 1, t: [1, 0] },
-    { from: 0.85, to: 0.95, sec: 3, axis: 1, t: [0, 1] },
+    { from: 0.45, to: 0.50, sec: 2, bypass: true },
+    { from: 0.50, to: 0.60, sec: 2, bypass: true, sub: 0, subT: [1, 0] },
+    { from: 0.60, to: 0.65, sec: 2, bypass: true, sub: 1, subT: [0, 1] },
+    { from: 0.70, to: 0.80, sec: 2, axis: 1, t: [1, 0] },
+    // section 4
+    { from: 0.80, to: 0.95, sec: 3, axis: 1, t: [0, 1] },
     { from: 0.95, to: 1.01, sec: 3, bypass: true },
 ];
 
@@ -524,11 +526,15 @@ try {
         }
     };
 
+    // Find the latest segment with from <= p. Gaps between segments
+    // inherit the previous segment's end state (lp gets clamped to 1).
     const segmentForProgress = (p) => {
+        let s = TIMELINE[0];
         for (const seg of TIMELINE) {
-            if (p >= seg.from && p < seg.to) return seg;
+            if (p >= seg.from) s = seg;
+            else break;
         }
-        return TIMELINE[TIMELINE.length - 1];
+        return s;
     };
 
     const scrollProxy = document.querySelector(".scroll-proxy");
