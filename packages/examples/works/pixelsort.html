@@ -94,6 +94,15 @@
   .scroll-proxy{position:relative;height:600vh;}
   .stage{position:fixed;top:0;left:0;width:100%;height:100vh;display:grid;grid-template-areas:"stage";overflow:hidden;z-index:0;}
   .stage > *{grid-area:stage;}
+
+  /* Parallax — Lenis-driven on §1/2/4 images */
+  .hero .bg img,
+  .section-2 .image-col .image img,
+  .section-4 .section-bg{
+    transform:translate3d(0,var(--parallax-y,0px),0) scale(1.18);
+    transform-origin:center;
+    will-change:transform;
+  }
 </style>
 </head>
 <body>
@@ -560,11 +569,28 @@ if (!applied) {
 }
 </script>
 
-<!-- Lenis smooth scroll -->
+<!-- Lenis smooth scroll + section-image parallax -->
 <script type="module">
   import Lenis from "https://esm.sh/lenis";
   const lenis = new Lenis();
   (function raf(t) { lenis.raf(t); requestAnimationFrame(raf); })();
+
+  // Section ranges align with SCROLL_STATES above.
+  const parallaxTargets = [
+    { el: document.querySelector(".hero .bg img"),                       range: [0.00, 0.20] },
+    { el: document.querySelector(".section-2 .image-col .image img"),    range: [0.20, 0.40] },
+    { el: document.querySelector(".section-4 .section-bg"),              range: [0.80, 1.00] },
+  ];
+  const AMP = 60; // px each direction; scale(1.18) leaves enough cover headroom
+  lenis.on("scroll", ({ progress }) => {
+    for (const t of parallaxTargets) {
+      if (!t.el) continue;
+      const [a, b] = t.range;
+      const lp = Math.max(0, Math.min(1, (progress - a) / (b - a)));
+      const y = (0.5 - lp) * 2 * AMP;
+      t.el.style.setProperty("--parallax-y", `${y.toFixed(2)}px`);
+    }
+  });
 </script>
 </body>
 </html>
