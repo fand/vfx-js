@@ -43,17 +43,17 @@
   .hero .corners .br{bottom:0;right:0;color:var(--blue);}
 
   /* Section 2 — editorial: image left + columns w/ drop-cap right */
-  .section-2{padding:120px 40px;border-top:1px solid var(--line);position:relative;overflow:hidden;background:var(--bg);}
-  .section-2-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:64px;align-items:start;max-width:1280px;margin:0 auto;position:relative;z-index:2;}
-  .section-2 .image-col .image{aspect-ratio:4/5;overflow:hidden;border:1px solid var(--line);background:#000;}
+  .section-2{padding:120px 40px;border-top:1px solid var(--line);position:relative;overflow:hidden;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;}
+  .section-2-grid{display:grid;grid-template-columns:3fr 7fr;gap:64px;align-items:stretch;width:100%;max-width:1280px;margin:0 auto;flex:1;position:relative;z-index:2;}
+  .section-2 .image-col{display:flex;}
+  .section-2 .image-col .image{flex:1;overflow:hidden;border:1px solid var(--line);background:#000;}
   .section-2 .image-col .image img{width:100%;height:100%;object-fit:cover;}
-  .section-2 .image-col .caption{margin-top:10px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:#a0a59c;line-height:1.5;}
   .section-2 .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:18px;}
-  .section-2 h2{font-family:var(--display);font-weight:400;font-size:80px;line-height:.95;letter-spacing:0;color:var(--blue);margin-bottom:32px;text-shadow:0 0 50px rgba(79,108,255,.8);}
+  .section-2 h2{font-family:var(--display);font-weight:400;font-size:clamp(56px,6.5vw,112px);line-height:.95;letter-spacing:0;color:var(--blue);margin-bottom:clamp(24px,3vw,40px);text-shadow:0 0 50px rgba(79,108,255,.8);}
   .section-2 h2 em{font-style:normal;color:var(--green);}
-  .section-2 .columns{column-count:2;column-gap:36px;column-rule:1px solid var(--line);font-size:15.5px;line-height:1.65;color:#cfd2cc;}
-  .section-2 .columns p{margin-bottom:14px;text-align:justify;hyphens:auto;}
-  .section-2 .columns p:first-child::first-letter{font-family:var(--mono);font-weight:400;font-size:64px;float:left;line-height:.85;margin:6px 8px -2px 0;color:var(--green);}
+  .section-2 .columns{column-count:2;column-gap:36px;column-rule:1px solid var(--line);font-size:clamp(14px,1.3vw,20px);line-height:1.65;color:#cfd2cc;}
+  .section-2 .columns p{margin-bottom:.9em;text-align:justify;hyphens:auto;}
+  .section-2 .columns p:first-child::first-letter{font-family:var(--mono);font-weight:400;font-size:4em;float:left;line-height:.85;margin:.1em .15em -.05em 0;color:var(--green);}
   .section-2 .lined{margin-top:36px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a0a59c;}
 
   /* Section 3 — editorial: head row, 21:9 video */
@@ -122,7 +122,6 @@
     <div class="section-2-grid">
       <div class="image-col">
         <div class="image"><img class="pxs" src="https://picsum.photos/seed/subpixel-2/1200/1500" crossorigin="anonymous" alt=""></div>
-        <div class="caption">Fig. 02 — Column-sort probe over a still-life test plate. Threshold = 0.38, mode = luma. Lab/04, 04:14 05.20.26.</div>
       </div>
       <div class="body">
         <div class="kicker">// Feature — folio 02</div>
@@ -130,7 +129,11 @@
         <div class="columns">
           <p>There is a particular shape of software that tries very hard to be useful and, in doing so, makes itself difficult to live with. Subpixel is not that shape. It is a set of small primitives that move pixels, and a uniform clock that keeps them honest.</p>
           <p>The kit ships one bundle, sub-thirty kilobytes gzipped, with no peer dependencies. It binds directly to live DOM nodes — headings, images, video — and asks each one to give up its raster for the length of a frame. The shader does the rest, on the GPU, where it should.</p>
-          <p>Threshold-based column scans, perceptual luminance, brightness intervals, hue intervals, masks. The defaults look like a memory of a CRT; the parameters open onto a quieter, weirder country.</p>
+          <p>Threshold-based column scans, perceptual luminance, brightness intervals, hue intervals, masks. The defaults look like a memory of a CRT; the parameters open onto a quieter, weirder country where the rules of the panel relax just enough to let a familiar image become unfamiliar without leaving the grid.</p>
+          <p>The pipeline is three passes — downsample, rank, gather — but you do not need to think in passes. You think in nouns: threshold, key, direction. The shader keeps the verbs and the bookkeeping; the API hands you a small surface that reads like a print specification rather than a graphics library.</p>
+          <p>It will run on any GL2 surface, which is to say nearly every browser made after the year the iPhone learned to do widgets. Where it cannot run, it falls back to a small CSS approximation that is honest about being one — a static stand-in, never pretending to be the thing it replaces.</p>
+          <p>What it is for, in the end, is the moment when a still image is allowed to break: when a heading dissolves down its column for a second, when a portrait reorders itself by brightness and then settles again as if nothing happened. A glitch, but a polite one. A glitch on time, in service of the page beneath it.</p>
+          <p>Subpixel does not collect telemetry, does not phone home, does not ask you to sign in to anything. It is a file you include and a class you instantiate. The license is permissive. The defaults are dark. The bundle is small enough to fit, with room to spare, in the gap between two ad-network scripts.</p>
           <p>Set in IBM Plex Mono and Space Grotesk. Drawn on an M1 at the kitchen table, between the hours when the city has finished one thing and not yet started the next.</p>
         </div>
         <div class="lined"><span>// Section 02 · reference §2.1.0</span><span>Continued on §3 →</span></div>
