@@ -134,8 +134,19 @@ export const works: Work[] = [
         url: "./works/halftone.html",
     },
     {
-        id: "depth-bokeh",
+        id: "pixelsort",
         index: "12",
+        title: "Pixelsort",
+        tags: ["effect-api", "Glitch"],
+        year: "2026",
+        author: "AMAGI",
+        description:
+            "Rank-based pixel sort as a three-pass effect: downsample, per-block rank, gather. Sort key, range, and direction are tunable in real time.",
+        url: "./works/pixelsort.html",
+    },
+    {
+        id: "depth-bokeh",
+        index: "13",
         title: "Depth Bokeh",
         tags: ["effect-api", "3d"],
         year: "2026",

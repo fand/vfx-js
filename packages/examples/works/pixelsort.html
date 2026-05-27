@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VFX-JS pixelsort example</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#08090c;
+    --bg2:#11141a;
+    --ink:#e8eae3;
+    --primary:#ffee00;
+    --secondary:#ff12a8;
+    --line:rgba(255,255,255,.16);
+    --glow:rgba(255,127,191,.8);
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --display:'UnifrakturMaguntia',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:var(--bg);color:var(--ink);font-family:var(--mono);}
+  body{overflow-x:hidden;line-height:1.35;}
+  a{color:inherit;text-decoration:none;}
+  img{display:block;max-width:100%;}
+
+  /* Shared display heading + mono micro-label */
+  .display{font-family:var(--display);font-weight:400;letter-spacing:0;}
+  .label{font-family:var(--mono);font-size:0.8rem;letter-spacing:.14em;text-transform:uppercase;}
+
+  /* Section 1 — title + tagline, image as full-bleed section background */
+  .hero{position:relative;min-height:100vh;display:grid;place-items:center;padding:80px 40px;text-align:center;overflow:hidden;border-bottom:1px solid var(--line);}
+  .hero .bg{position:absolute;inset:0;z-index:0;}
+  .hero .bg img{width:100%;height:100%;object-fit:cover;}
+  .hero .overlay{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(8,9,12,0.2) 0%,rgba(8,9,12,0.5) 70%,rgba(8,9,12,.95) 100%);}
+  .hero .inner{position:relative;z-index:2;width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;}
+  .hero .eyebrow{font-size:1rem;letter-spacing:.18em;color:var(--secondary);text-shadow:0 0 20px black; margin-bottom:36px;}
+  .hero h1{font-size:clamp(80px,12vw,180px);line-height:.92;color:var(--primary);margin-bottom:40px;width:max-content;max-width:none;white-space:nowrap;text-shadow:0 0 70px var(--glow);}
+  .hero h1 .slash{color:var(--ink);opacity:.45;}
+  .hero .tagline{font-family:var(--mono);font-size:1rem;color:var(--ink);max-width:540px;margin:0 auto;line-height:1.6;}
+  .hero .meta{margin-top:48px;display:flex;justify-content:center;gap:32px;letter-spacing:.12em;color:var(--ink);opacity:.7;}
+  .hero .corners{position:absolute;inset:24px;z-index:2;pointer-events:none;color:var(--ink);opacity:.55;}
+  .hero .corners>span{position:absolute;}
+  .hero .corners .tl{top:0;left:0;color:var(--secondary);}
+  .hero .corners .tr{top:0;right:0;}
+  .hero .corners .bl{bottom:0;left:0;}
+  .hero .corners .br{bottom:0;right:0;color:var(--primary);}
+  .hero .scroll-cue{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);z-index:2;display:flex;flex-direction:column;align-items:center;gap:16px;color:var(--secondary);opacity:1;pointer-events:none;}
+  .hero .scroll-cue .label{font-size:13px;letter-spacing:.22em;text-shadow:0 0 20px var(--glow);}
+  .hero .scroll-cue .line{position:relative;width:2px;height:90px;background:var(--line);overflow:hidden;}
+  .hero .scroll-cue .line::after{content:"";position:absolute;inset:0 0 auto 0;height:45%;background:var(--secondary);box-shadow:0 0 14px var(--secondary);animation:scrollCue 1.6s ease-in-out infinite;}
+  @keyframes scrollCue{0%{transform:translateY(-100%);}100%{transform:translateY(250%);}}
+  /* Short viewports: shrink the cue + reserve bottom room so the centered copy clears it */
+  @media (max-height:760px){
+    .hero{padding-bottom:130px;}
+    .hero h1{font-size:clamp(56px,9vw,110px);margin-bottom:24px;}
+    .hero .eyebrow{margin-bottom:20px;}
+    .hero .meta{margin-top:24px;}
+    .hero .scroll-cue{bottom:24px;gap:10px;}
+    .hero .scroll-cue .line{height:56px;}
+  }
+
+  /* Page indicator — vertical label hugging the right edge of every section */
+  .page-indicator{position:absolute;top:0;bottom:0;right:0;width:64px;display:flex;align-items:center;justify-content:center;z-index:2;pointer-events:none;color:var(--ink);opacity:.6;}
+  .page-indicator span{transform:rotate(-90deg);white-space:nowrap;}
+  .page-indicator b{color:var(--secondary);font-weight:500;}
+
+  /* Section 2 — editorial: image left + columns w/ drop-cap right */
+  .section-2{padding:64px 40px;border-top:1px solid var(--line);position:relative;overflow:visible;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;isolation:isolate;}
+  .section-2-grid{display:grid;grid-template-columns:3fr 7fr;gap:64px;align-items:stretch;width:100%;max-width:1280px;margin:0 auto;flex:1;position:relative;}
+  /* Right column keeps clear of the 64px page-indicator gutter */
+  .section-2 .body{padding-right:48px;}
+  .section-2 .image-col{position:relative; mix-blend-mode: plus-lighter;}
+  .section-2 .image-col .image{position:absolute;top:0;bottom:0;right:0;left:calc(-1 * max(40px, 50vw - 640px));overflow:visible;background:#000;}
+  .section-2 .image-col .image img{width:100%;height:150%;margin-top:-70%;object-fit:cover;}
+  .section-2 .kicker{letter-spacing:.18em;color:var(--secondary);margin-bottom:18px;}
+  .section-2 h2{font-size:clamp(48px,5vw,88px);line-height:.95;color:var(--primary);margin-bottom:24px;text-shadow:0 0 50px var(--glow);}
+  .section-2 h2 em{font-style:normal;color:var(--secondary);}
+  /* Body type scales with viewport height so the column block fills, but never
+     overflows, the fixed 100vh stage across laptop→large-display heights. */
+  .section-2 .columns{column-count:2;column-gap:28px;column-rule:1px solid var(--line);font-size:clamp(12px,1.7vh,18px);line-height:1.55;color:#cfd2cc;}
+  .section-2 .columns p{margin-bottom:.9em;text-align:justify;hyphens:auto;}
+  .section-2 .columns p:first-child::first-letter{font-family:var(--mono);font-weight:400;font-size:4em;float:left;line-height:.85;margin:.1em .15em -.05em 0;color:var(--secondary);}
+  .section-2 .lined{margin-top:36px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;color:#a0a59c;}
+
+  /* Section 3 — editorial: vertical heading + 4:3 image flanked by data */
+  .section-3{padding:64px 150px;border-top:1px solid var(--line);position:relative;overflow:hidden;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;justify-content:center;}
+  /* Cap width by available height so the 4:3 video fits in 100vh; labels track its width. */
+  .section-3-inner{max-width:min(100%, calc((100vh - 240px) * 4 / 3));margin:0 auto;width:100%;position:relative;z-index:2;display:flex;flex-direction:column;gap:16px;}
+  .section-3-heading{
+      position:absolute;
+      top: 40%;
+      left: 0%;
+      transform:translate(-54%,-50%) rotate(-90deg);
+      transform-origin:center;
+      font-size:clamp(60px,12vw,180px);
+      color:transparent;
+      -webkit-text-stroke: 2px var(--primary);
+      text-shadow:0 0 100px black;
+      white-space:nowrap;
+
+  }
+  .section-3 .data{border:1px solid var(--line);padding:11px 16px;line-height:1.5;}
+  .section-3 .data-top{color:var(--secondary);}
+  .section-3 .data-bottom{text-align:right;color:#a0a59c;}
+  .section-3 .video{position:relative;aspect-ratio:4/3;overflow:hidden;border:1px solid var(--line);background:#000;}
+  .section-3 .video img{width:100%;height:100%;object-fit:cover;}
+
+  /* Section 4 — wordmark + credits */
+  .section-4{padding:0;min-height:100vh;display:grid;place-items:center;position:relative;overflow:hidden;background:var(--bg);}
+  .section-4 .s4-inner{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:48px;padding:40px;}
+  .section-4 h2{font-size:clamp(80px,15vw,180px);color:var(--primary);text-align:center;width:max-content;max-width:none;white-space:nowrap;}
+  .section-4 .credit{width:min(680px,86vw);display:grid;grid-template-columns:max-content 1fr;gap:10px 28px;font-size:.78rem;line-height:1.65;color:#a0a59c;}
+  .section-4 .credit dt{color:var(--secondary);white-space:nowrap;text-transform:uppercase;letter-spacing:.14em;text-align:right;}
+  .section-4 .credit dd{display:flex;flex-wrap:wrap;gap:.2em .9em;}
+  .section-4 .credit a{color:var(--ink);border-bottom:1px solid var(--line);transition:color .2s,border-color .2s;}
+  .section-4 .credit a:hover{color:var(--secondary);border-color:var(--secondary);}
+
+  /* Per-section image bg + dark overlay */
+  .section-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:.5;}
+  .section-overlay{position:absolute;inset:0;z-index:1;pointer-events:none;}
+  .section-2 .section-overlay{z-index:auto;background:linear-gradient(180deg,rgba(8,9,12,.2),rgba(8,9,12,.5) 70%,rgba(8,9,12,.96));}
+  .section-3 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.2),rgba(8,9,12,.5) 70%,rgba(8,9,12,.95));}
+  .section-4 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.3),rgba(8,9,12,.5));}
+  .section-4 .section-bg{opacity:1;}
+
+  /* Pixelsort CSS fallback (only kicks in if WebGL fails) */
+  .pxs-fallback h1, .pxs-fallback h2{
+    background:linear-gradient(180deg,transparent 0 38%,rgba(79,108,255,.3) 38% 41%,transparent 41% 60%,rgba(54,224,130,.3) 60% 62%,transparent 62%);
+    background-blend-mode:multiply;
+  }
+  .pxs-fallback img{filter:contrast(1.05) saturate(1.15);}
+
+  /* Fake scroll stage */
+  .scroll-proxy{position:relative;height:1000vh;}
+  .stage{position:fixed;top:0;left:0;width:100%;height:100vh;display:grid;grid-template-areas:"stage";overflow:hidden;z-index:0;}
+  .stage > *{grid-area:stage;}
+
+  /* Parallax — Lenis-driven on §1–4 images */
+  .hero .bg img,
+  .section-2 .image-col .image img,
+  .section-2 .section-bg,
+  .section-3 .section-bg,
+  .section-4 .section-bg{
+    transform:translate3d(0,var(--parallax-y,0px),0) scale(1.18);
+    transform-origin:center;
+    will-change:transform;
+  }
+
+  /* Loading overlay — held until images + fonts resolve.
+     z-index must exceed VFX-JS's canvas (9999); it's appended to body later,
+     so an equal z-index would paint it ABOVE the loader and leak section flashes. */
+  #loader{position:fixed;inset:0;z-index:10000;background:var(--bg);display:grid;place-items:center;transition:opacity .5s ease,visibility .5s ease;}
+  #loader.done{opacity:0;visibility:hidden;pointer-events:none;}
+  #loader .loader-inner{width:min(440px,72vw);}
+  #loader .mark{font-size:clamp(44px,9vw,80px);line-height:.95;text-align:center;color:var(--primary);text-shadow:0 0 60px var(--glow);margin-bottom:30px;}
+  #loader .bar{position:relative;height:2px;background:var(--line);overflow:hidden;}
+  #loader .bar-fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--secondary);box-shadow:0 0 12px var(--secondary);}
+  #loader .status{display:flex;justify-content:space-between;margin-top:14px;color:var(--ink);opacity:.7;}
+  #loader .status .pct{color:var(--secondary);opacity:1;}
+</style>
+</head>
+<body>
+<div id="loader">
+  <div class="loader-inner">
+    <div class="bar"><span class="bar-fill"></span></div>
+    <div class="status label"><span>// LOADING ASSETS</span><span class="pct">0%</span></div>
+  </div>
+</div>
+<div id="root">
+  <div class="scroll-proxy">
+    <div class="stage">
+  <div class="cell"><section class="hero">
+    <div class="bg"><img class="pxs" src="./pixelsort/s1.webp" alt=""></div>
+    <div class="overlay"></div>
+    <div class="corners label">
+      <span class="tl">// VFX-JS DEMO</span>
+      <span class="tr">v1.0.0</span>
+      <span class="bl">HTML-in-Canvas</span>
+      <span class="br">05.26.2026</span>
+    </div>
+    <div class="inner">
+      <div class="eyebrow label">// Release · 05.26.2026</div>
+      <h1 class="pxs display">PIXY<span class="slash">·</span>SORT</h1>
+      <p class="tagline">Pixel-sorting: scan each line of an image for runs brighter than a threshold and reorders them by luminance — a familiar picture breaking along its own light, then resolving again.</p>
+      <div class="meta label"><span>Built with VFX-JS</span><span>HTML-in-Canvas</span></div>
+    </div>
+    <div class="scroll-cue">
+      <span class="label">Scroll</span>
+      <span class="line"></span>
+    </div>
+    <div class="page-indicator label"><span>page <b>1</b> / 4</span></div>
+  </section></div>
+
+  <div class="cell"><section class="section-2">
+    <img class="section-bg pxs" src="./pixelsort/s2.webp" alt="">
+    <div class="section-overlay"></div>
+    <div class="section-2-grid">
+      <div class="image-col">
+        <div class="image"><img class="pxs" src="./pixelsort/sculpt.webp" alt=""></div>
+      </div>
+      <div class="body">
+        <div class="kicker label">// The library — folio 02</div>
+        <h2 class="pxs display">WebGL on ordinary <em>HTML</em>.</h2>
+        <div class="columns">
+          <p>VFX-JS is a small JavaScript library for adding WebGL effects to an ordinary web page. You point it at a DOM node — an image, a video, a line of text — and it lends that element's pixels to a fragment shader for the length of a frame.</p>
+          <p>It builds on Three.js for the GL plumbing, so you write shaders instead of boilerplate. A single vfx.add(element, { shader }) call is most of the surface: the library captures the element as a texture, runs your GLSL over it on the GPU, and paints the result back in place.</p>
+          <p>Nothing is thrown away to do it. The original markup stays live beneath the canvas — text remains selectable, links remain clickable — and the effect is a layer over the page rather than a replacement for it.</p>
+          <p>Effects compose. The @vfx-js/effects package ships ready-made passes — bloom, pixelate, glitch and more — that chain together, while @vfx-js/react wraps the same engine in components for React projects.</p>
+          <p>What you are scrolling through is one such effect, written as a custom shader: a pixel sort. It scans each column for pixels above a brightness threshold and reorders that run by luminance, so a still image breaks along its own light and then resolves again.</p>
+          <p>The threshold is just a uniform. Slide it from one down to zero and the sort dissolves from a fully scrambled frame back to the untouched image — which is exactly the motion the scroll timeline on this page drives, section by section.</p>
+          <p>Set in IBM Plex Mono and UnifrakturMaguntia. Built on Three.js, released under the MIT license, and small enough to drop into any page that wants a little controlled disorder.</p>
+        </div>
+        <div class="lined label"><span>// Section 02 · @vfx-js/core</span><span>Examples on §3 →</span></div>
+      </div>
+    </div>
+    <div class="page-indicator label"><span>page <b>2</b> / 4</span></div>
+  </section></div>
+
+  <div class="cell"><section class="section-3">
+    <img class="section-bg pxs" src="./pixelsort/s3.webp" alt="">
+    <div class="section-overlay"></div>
+    <div class="section-3-inner">
+        <div class="section-3-heading display">
+          <h2 class="pxs">Examples</h2>
+        </div>
+        <div class="data data-top label">/// pixel sort — threshold sweep</div>
+        <div class="video">
+          <img class="pxs" src="./pixelsort/city1.webp" alt="">
+        </div>
+        <div class="data data-bottom label">Live texture · WebGL2 · sorts on the GPU</div>
+    </div>
+    <div class="page-indicator label"><span>page <b>3</b> / 4</span></div>
+  </section></div>
+
+  <div class="cell"><section class="section-4">
+    <img class="section-bg pxs" src="./pixelsort/octo.webp" alt="">
+    <div class="section-overlay"></div>
+    <div class="s4-inner">
+      <h2 class="pxs display">VFX-JS</h2>
+      <dl class="credit">
+        <dt>Author</dt>
+        <dd><a href="https://amagi.dev" target="_blank" rel="noopener">AMAGI</a></dd>
+        <dt>GitHub</dt>
+        <dd><a href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">fand/vfx-js</a></dd>
+        <dt>Pixelsort shader</dt>
+        <dd><a href="https://www.shadertoy.com/view/XsBfRG" target="_blank" rel="noopener">20170723_pixelSorter by FMS_Cat</a></dd>
+        <dt>Fonts</dt>
+        <dd>
+          <a href="https://fonts.google.com/specimen/UnifrakturMaguntia" target="_blank" rel="noopener">UnifrakturMaguntia</a>
+          <a href="https://fonts.google.com/specimen/IBM+Plex+Mono" target="_blank" rel="noopener">IBM Plex Mono</a>
+        </dd>
+        <dt>Photos</dt>
+        <dd>
+          <a href="https://unsplash.com/photos/blue-and-pink-abstract-painting-UVnqERf_Tv4" target="_blank" rel="noopener">CHUTTERSNAP</a>
+          <a href="https://unsplash.com/photos/pink-and-white-abstract-painting--P8XIyZ0-WY" target="_blank" rel="noopener">Diane Picchiottino</a>
+          <a href="https://unsplash.com/photos/blue-and-red-abstract-painting-KTkvnKPiZAI" target="_blank" rel="noopener">Peter Olexa</a>
+          <a href="https://unsplash.com/photos/a-busy-city-street-Rp81fGImRi4" target="_blank" rel="noopener">Alwaez</a>
+          <a href="https://unsplash.com/photos/white-concrete-arch-during-daytime-85J1JQsD6aw" target="_blank" rel="noopener">Alena Vavrdova</a>
+        </dd>
+      </dl>
+    </div>
+    <div class="page-indicator label"><span>page <b>4</b> / 4</span></div>
+  </section></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { VFX } from "@vfx-js/core";
+
+// ─────────────────────────────────────────────
+// PixelSort effect (3-pass: downsample → rank → gather)
+// Threshold-based segment scan after https://www.shadertoy.com/view/XsBfRG
+// ─────────────────────────────────────────────
+
+const FRAG_DOWNSAMPLE = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+void main() { outColor = texture(src, uvSrc); }
+`;
+
+const KEY_FUNC = `
+float key(vec3 c, int mode) {
+    if (mode == 0) return dot(c, vec3(0.299, 0.587, 0.114));
+    if (mode == 1) return c.r;
+    if (mode == 2) return c.g;
+    if (mode == 3) return c.b;
+    float mx = max(max(c.r, c.g), c.b);
+    float mn = min(min(c.r, c.g), c.b);
+    float d  = mx - mn;
+    if (mode == 5) return mx > 0.0 ? d / mx : 0.0;
+    if (d < 1e-5) return 0.0;
+    float h;
+    if (mx == c.r)      h = (c.g - c.b) / d + (c.g < c.b ? 6.0 : 0.0);
+    else if (mx == c.g) h = (c.b - c.r) / d + 2.0;
+    else                h = (c.r - c.g) / d + 4.0;
+    return h / 6.0;
+}
+`;
+
+const SEGMENT_SCAN = `
+ivec2 toXY(int a, int b, int axis) { return axis == 0 ? ivec2(a, b) : ivec2(b, a); }
+
+void scanSegment(sampler2D s, int a, int b, int L, int keyMode, float threshold, int axis, out int segStart, out int segEnd) {
+    segStart = a;
+    for (int i = 0; i < 8192; i++) {
+        if (segStart <= 0) break;
+        if (i >= L) break;
+        float k = key(texelFetch(s, toXY(segStart - 1, b, axis), 0).rgb, keyMode);
+        if (k <= threshold) break;
+        segStart--;
+    }
+    segEnd = a + 1;
+    for (int i = 0; i < 8192; i++) {
+        if (segEnd >= L) break;
+        if (i >= L) break;
+        float k = key(texelFetch(s, toXY(segEnd, b, axis), 0).rgb, keyMode);
+        if (k <= threshold) break;
+        segEnd++;
+    }
+}
+`;
+
+const FRAG_RANK = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D src;
+uniform vec2 srcSize;
+uniform float threshold;
+uniform int keyMode;
+uniform int direction;
+uniform int axis;
+${KEY_FUNC}
+${SEGMENT_SCAN}
+void main() {
+    ivec2 p = ivec2(gl_FragCoord.xy);
+    int a = axis == 0 ? p.x : p.y;
+    int b = axis == 0 ? p.y : p.x;
+    int L = int(axis == 0 ? srcSize.x : srcSize.y);
+    float myKey = key(texelFetch(src, p, 0).rgb, keyMode);
+    if (myKey <= threshold) {
+        outColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+    int segStart, segEnd;
+    scanSegment(src, a, b, L, keyMode, threshold, axis, segStart, segEnd);
+    int rank = 0;
+    for (int i = segStart; i < segEnd; i++) {
+        if (i == a) continue;
+        float k = key(texelFetch(src, toXY(i, b, axis), 0).rgb, keyMode);
+        if (direction == 0) {
+            if (k < myKey || (k == myKey && i < a)) rank++;
+        } else {
+            if (k > myKey || (k == myKey && i < a)) rank++;
+        }
+    }
+    outColor = vec4(float(rank), float(segEnd - segStart), 0.0, 1.0);
+}
+`;
+
+const FRAG_GATHER = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+uniform sampler2D srcHi;
+uniform sampler2D rankTex;
+uniform vec2 lowSize;
+uniform float threshold;
+uniform int keyMode;
+uniform int axis;
+${KEY_FUNC}
+${SEGMENT_SCAN}
+void main() {
+    int lowA = axis == 0 ? int(uvSrc.x * lowSize.x) : int(uvSrc.y * lowSize.y);
+    int b    = axis == 0 ? int(uvSrc.y * lowSize.y) : int(uvSrc.x * lowSize.x);
+    int L    = int(axis == 0 ? lowSize.x : lowSize.y);
+    ivec2 lowP = toXY(lowA, b, axis);
+    float myKey = key(texelFetch(src, lowP, 0).rgb, keyMode);
+    if (myKey <= threshold) {
+        // below-threshold pixels skip the low-res buffer entirely.
+        vec4 c = texture(srcHi, uvSrc);
+        outColor = vec4(c.rgb * c.a, c.a);
+        return;
+    }
+    int segStart, segEnd;
+    scanSegment(src, lowA, b, L, keyMode, threshold, axis, segStart, segEnd);
+    int targetRank = lowA - segStart;
+    for (int i = segStart; i < segEnd; i++) {
+        int r = int(texelFetch(rankTex, toXY(i, b, axis), 0).r + 0.5);
+        if (r == targetRank) {
+            // sortで動かないピクセルは元画像、動いたピクセルだけ低解像度のソート色
+            if (i == lowA) {
+                vec4 c = texture(srcHi, uvSrc);
+                outColor = vec4(c.rgb * c.a, c.a);
+            } else {
+                vec4 c = texelFetch(src, toXY(i, b, axis), 0);
+                outColor = vec4(c.rgb * c.a, c.a);
+            }
+            return;
+        }
+    }
+    vec4 c = texture(srcHi, uvSrc);
+    outColor = vec4(c.rgb * c.a, c.a);
+}
+`;
+
+// VFX-JS writes to a `premultipliedAlpha: true` WebGL canvas, so the
+// browser composites the canvas treating its contents as premultiplied.
+// Captured textures upload with UNPACK_PREMULTIPLY_ALPHA_WEBGL=false →
+// straight alpha. Pre-multiply at output so semi-transparent pixels
+// (text-shadow halo, anti-aliased edges) composite at the intended
+// alpha instead of bleeding through at full RGB intensity.
+const BYPASS_FRAG = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+void main() {
+    vec4 c = texture(src, uvSrc);
+    outColor = vec4(c.rgb * c.a, c.a);
+}
+`;
+
+// Sort direction → shader (axis, direction) uniforms.
+// axis 0 = horizontal scan, 1 = vertical scan; direction picks which end of
+// each segment the bright pixels gather toward.
+const DIRECTIONS = {
+    right: { axis: 0, direction: 0 },
+    left:  { axis: 0, direction: 1 },
+    down:  { axis: 1, direction: 1 },
+    up:    { axis: 1, direction: 0 },
+};
+
+class PixelSortEffect {
+    constructor(params, opts = {}) {
+        this.params = params;
+        this.localBypass = opts.bypass ?? false;
+        this.localThreshold = opts.threshold ?? null;
+        this.localDir = opts.dir ?? null;
+        this._lowRT = null;
+        this._rankRT = null;
+        this._w = 0;
+        this._h = 0;
+        this._lowW = 0;
+        this._lowH = 0;
+    }
+    _dir() { return DIRECTIONS[this.localDir ?? this.params.dir] ?? DIRECTIONS.right; }
+    _axis() { return this._dir().axis; }
+    _ensureSize(ctx) {
+        const [w, h] = ctx.dims.elementPixel;
+        const axis = this._axis();
+        const low = this.params.lowDim;
+        const lowW = axis === 0 ? low : w;
+        const lowH = axis === 0 ? h : low;
+        if (this._w === w && this._h === h && this._lowW === lowW && this._lowH === lowH) return;
+        this._lowRT?.dispose?.();
+        this._rankRT?.dispose?.();
+        this._w = w;
+        this._h = h;
+        this._lowW = lowW;
+        this._lowH = lowH;
+        this._lowRT  = ctx.createRenderTarget({ size: [lowW, lowH], filter: "nearest" });
+        this._rankRT = ctx.createRenderTarget({ size: [lowW, lowH], filter: "nearest", float: true });
+    }
+    render(ctx) {
+        this._ensureSize(ctx);
+        if (this.localBypass) {
+            ctx.draw({ frag: BYPASS_FRAG, uniforms: { src: ctx.src }, target: ctx.target });
+            return;
+        }
+        const { axis, direction } = this._dir();
+        const lowSize = [this._lowW, this._lowH];
+        const threshold = this.localThreshold ?? this.params.threshold;
+        ctx.draw({ frag: FRAG_DOWNSAMPLE, uniforms: { src: ctx.src }, target: this._lowRT });
+        ctx.draw({
+            frag: FRAG_RANK,
+            uniforms: {
+                src: this._lowRT, srcSize: lowSize,
+                threshold, keyMode: this.params.keyMode,
+                direction, axis,
+            },
+            target: this._rankRT,
+        });
+        ctx.draw({
+            frag: FRAG_GATHER,
+            uniforms: {
+                src: this._lowRT, srcHi: ctx.src, rankTex: this._rankRT,
+                lowSize, threshold, keyMode: this.params.keyMode, axis,
+            },
+            target: ctx.target,
+        });
+    }
+}
+
+// ─────────────────────────────────────────────
+// Setup
+// ─────────────────────────────────────────────
+
+const params = {
+    threshold: 0.0,
+    lowDim: 128,
+    keyMode: 0,
+    dir: "up",
+};
+
+// Scroll-driven timeline. dir: "left" | "right" | "up" | "down".
+// Section visibility switches at the boundary between an "exit" and the next "enter".
+const TIMELINE = [
+    // section 1
+    { from: 0.00, to: 0.10, sec: 0, bypass: true },
+    { from: 0.10, to: 0.20, sec: 0, dir: "right", t: [1, 0] },
+    // section 2
+    { from: 0.20, to: 0.25, sec: 1, dir: "left", t: [0, 1] },
+    { from: 0.25, to: 0.30, sec: 1, bypass: true },
+    { from: 0.30, to: 0.40, sec: 1, dir: "right", t: [1, 0] },
+    // section 3
+    { from: 0.40, to: 0.45, sec: 2, dir: "left", t: [0, 1] },
+    { from: 0.45, to: 0.50, sec: 2, bypass: true },
+    { from: 0.50, to: 0.60, sec: 2, bypass: true, sub: 0, subT: [1, 0], subDir: "right" },
+    { from: 0.60, to: 0.65, sec: 2, bypass: true, sub: 1, subT: [0, 1], subDir: "left" },
+    { from: 0.70, to: 0.80, sec: 2, dir: "up", t: [1, 0] },
+    // section 4
+    { from: 0.80, to: 0.95, sec: 3, dir: "down", t: [0, 1] },
+    { from: 0.95, to: 1.01, sec: 3, bypass: true },
+];
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+// Scale §2 body copy so its column block fills the 100vh stage rather than
+// leaving slack. The column-block height is ~linear in font-size (other body
+// chrome is fixed), so a few proportional passes converge on the size that
+// lands the closing rule at the bottom padding edge. Clamped for readability.
+const S2_PAD = 64;       // .section-2 bottom padding (top is already in the measured offset)
+const S2_FONT_MIN = 12, S2_FONT_MAX = 21;
+const fitSection2 = () => {
+    const cols = document.querySelector(".section-2 .columns");
+    const lined = document.querySelector(".section-2 .lined");
+    if (!cols || !lined) return;
+    const limit = window.innerHeight - S2_PAD;
+    let f = parseFloat(getComputedStyle(cols).fontSize);
+    for (let i = 0; i < 4; i++) {
+        const colsH = cols.getBoundingClientRect().height;
+        if (colsH <= 0) break;
+        const gap = limit - lined.getBoundingClientRect().bottom;
+        if (Math.abs(gap) < 1) break;
+        f = clamp(f * (1 + gap / colsH), S2_FONT_MIN, S2_FONT_MAX);
+        cols.style.fontSize = `${f}px`;
+    }
+};
+
+const subImageUrls = ["./pixelsort/city1.webp", "./pixelsort/tower1.webp"];
+
+// Loading overlay — held until all <img>, preloaded sub-images, and fonts resolve.
+const loaderEl = document.getElementById("loader");
+const setProgress = (f) => {
+    loaderEl.querySelector(".bar-fill").style.width = `${(f * 100).toFixed(1)}%`;
+    loaderEl.querySelector(".pct").textContent = `${Math.round(f * 100)}%`;
+};
+let loaderHidden = false;
+const hideLoader = () => {
+    if (loaderHidden) return;
+    loaderHidden = true;
+    loaderEl.classList.add("done");
+    setTimeout(() => loaderEl.remove(), 600);
+};
+
+const MIN_LOADER_MS = 300; // keep the loader up at least this long
+const loaderStart = performance.now();
+let realProgress = 0;
+let assetsReady = false;
+
+const trackAssets = async () => {
+    const imgs = Array.from(document.images);
+    const total = imgs.length + subImageUrls.length + 1;
+    let done = 0;
+    const tick = () => { realProgress = ++done / total; };
+    const tasks = imgs.map((img) =>
+        Promise.resolve(img.decode?.()).catch(() => {}).then(tick),
+    );
+    for (const url of subImageUrls) {
+        const img = new Image();
+        img.src = url;
+        tasks.push(img.decode().catch(() => {}).then(tick));
+    }
+    tasks.push(document.fonts.ready.then(tick));
+    // Safety cap so one stalled asset can't trap the loader forever.
+    await Promise.race([Promise.all(tasks), new Promise((r) => setTimeout(r, 8000))]);
+    realProgress = 1;
+    assetsReady = true;
+};
+
+// Fill the bar smoothly toward real progress, ramped over >= MIN_LOADER_MS so a
+// fast (cached) load still animates instead of snapping to 100%. The lerp also
+// absorbs jumps when several assets resolve in the same frame.
+const runLoaderBar = () => new Promise((resolve) => {
+    let shown = 0;
+    const frame = () => {
+        const elapsed = performance.now() - loaderStart;
+        const target = Math.min(realProgress, elapsed / MIN_LOADER_MS);
+        shown += (target - shown) * 0.18;
+        if (target - shown < 0.004) shown = target;
+        setProgress(shown);
+        if (assetsReady && elapsed >= MIN_LOADER_MS && shown > 0.999) {
+            setProgress(1);
+            resolve();
+        } else {
+            requestAnimationFrame(frame);
+        }
+    };
+    requestAnimationFrame(frame);
+});
+
+setTimeout(hideLoader, 10000); // absolute fallback if init stalls
+trackAssets();
+await runLoaderBar();
+
+let applied = false;
+try {
+    const vfx = new VFX({ scrollPadding: false });
+
+    const sections = [
+        document.querySelector(".hero"),
+        document.querySelector(".section-2"),
+        document.querySelector(".section-3"),
+        document.querySelector(".section-4"),
+    ];
+    // Wrap the padding-free .cell, not the padded section: a wrap target with
+    // horizontal padding freezes the canvas width on resize (only height syncs).
+    const cells = sections.map((s) => s.parentElement);
+
+    fitSection2(); // size §2 copy before its texture is captured
+
+    const effects = [];
+    const canvases = [];
+    await Promise.all(cells.map(async (cell, i) => {
+        const effect = new PixelSortEffect(params, { bypass: true, threshold: 1 });
+        await vfx.addHTML(cell, { effect });
+        effects[i] = effect;
+        canvases[i] = cell.parentElement;
+        canvases[i].style.opacity = "0";
+        canvases[i].style.pointerEvents = "none";
+    }));
+
+    const section3VideoImg = sections[2].querySelector(".video img");
+    section3VideoImg.style.display = "none";
+
+    // Image management:
+    //   "hidden"     — img display:none, no own canvas, not in §3 capture
+    //   "embedded"   — img display:"", no own canvas, §3 capture includes it
+    //                  (during §3 in/out so §3's sort applies to the image too)
+    //   "standalone" — img display:"", own VFX canvas with independent effect
+    //                  (during sub-image sort phases)
+    let imgEffect = null;
+    let imgReqToken = 0;
+    let imageMode = "hidden";
+    // last shown §3 sub-image; persists across hidden so §4→§3 restores it
+    let currentSubImg = null;
+    let pendingSubT = 0, pendingSubBypass = false, pendingSubDir = "right";
+
+    const setImageHidden = () => {
+        if (imageMode === "hidden") return;
+        ++imgReqToken;
+        if (imgEffect) {
+            vfx.remove(section3VideoImg);
+            imgEffect = null;
+        }
+        section3VideoImg.style.display = "none";
+        imageMode = "hidden";
+        vfx.update(cells[2]).catch(() => {});
+    };
+
+    const setImageEmbedded = async (idx) => {
+        if (imageMode === "embedded" && currentSubImg === idx) return;
+        const token = ++imgReqToken;
+        if (imgEffect) {
+            vfx.remove(section3VideoImg);
+            imgEffect = null;
+        }
+        section3VideoImg.src = subImageUrls[idx];
+        section3VideoImg.style.display = "";
+        imageMode = "embedded";
+        currentSubImg = idx;
+        await section3VideoImg.decode().catch(() => {});
+        if (token !== imgReqToken) return;
+        vfx.update(cells[2]).catch(() => {});
+    };
+
+    const setImageStandalone = async (idx, threshold, bypass, dir) => {
+        pendingSubT = threshold;
+        pendingSubBypass = bypass;
+        pendingSubDir = dir;
+        if (imageMode === "standalone" && currentSubImg === idx) {
+            if (imgEffect) {
+                imgEffect.localBypass = bypass;
+                imgEffect.localThreshold = threshold;
+                imgEffect.localDir = dir;
+            }
+            return;
+        }
+        const token = ++imgReqToken;
+        if (imgEffect) {
+            vfx.remove(section3VideoImg);
+            imgEffect = null;
+        }
+        section3VideoImg.src = subImageUrls[idx];
+        section3VideoImg.style.display = "";
+        imageMode = "standalone";
+        currentSubImg = idx;
+        const e = new PixelSortEffect(params, { bypass: false, threshold: pendingSubT, dir: pendingSubDir });
+        await vfx.add(section3VideoImg, { effect: e });
+        if (token !== imgReqToken) return;
+        imgEffect = e;
+        imgEffect.localBypass = pendingSubBypass;
+        imgEffect.localThreshold = pendingSubT;
+        imgEffect.localDir = pendingSubDir;
+    };
+
+    let currentSection = -1;
+    let introPlaying = true; // suppress scroll updates during the load-in intro
+
+    const applySection = (idx, threshold, dir, bypass) => {
+        if (currentSection !== idx) {
+            if (currentSection >= 0) {
+                canvases[currentSection].style.opacity = "0";
+                canvases[currentSection].style.pointerEvents = "none";
+                effects[currentSection].localBypass = true;
+            }
+            canvases[idx].style.opacity = "1";
+            canvases[idx].style.pointerEvents = "auto";
+            currentSection = idx;
+        }
+        const eff = effects[idx];
+        eff.localBypass = bypass;
+        if (!bypass) {
+            eff.localThreshold = threshold;
+            eff.localDir = dir;
+        }
+    };
+
+    // Find the latest segment with from <= p. Gaps between segments
+    // inherit the previous segment's end state (lp gets clamped to 1).
+    const segmentForProgress = (p) => {
+        let s = TIMELINE[0];
+        for (const seg of TIMELINE) {
+            if (p >= seg.from) s = seg;
+            else break;
+        }
+        return s;
+    };
+
+    const scrollProxy = document.querySelector(".scroll-proxy");
+    let rafPending = false;
+    const onScroll = () => {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(() => {
+            rafPending = false;
+            if (introPlaying) return;
+            const proxyRange = scrollProxy.offsetHeight - window.innerHeight;
+            const p = proxyRange > 0 ? clamp01(window.scrollY / proxyRange) : 0;
+            const seg = segmentForProgress(p);
+            const lp = clamp01((p - seg.from) / (seg.to - seg.from));
+
+            const secBypass = seg.bypass === true;
+            const secT = secBypass ? 1 : lerp(seg.t[0], seg.t[1], lp);
+            const secDir = seg.dir ?? "right";
+            applySection(seg.sec, secT, secDir, secBypass);
+
+            if (seg.sub !== undefined) {
+                const subT = lerp(seg.subT[0], seg.subT[1], lp);
+                setImageStandalone(seg.sub, subT, subT >= 1, seg.subDir ?? "right");
+            } else if (seg.sec === 2) {
+                // Throughout §3 (incl. bypass): keep the image embedded in §3's
+                // capture. Sort phases process it as one texture; bypass shows it
+                // clean — never hide it, or the .video bg flashes black.
+                const fallback = currentSubImg ?? 0;
+                setImageEmbedded(fallback);
+            } else {
+                setImageHidden();
+            }
+        });
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+
+    // Re-fit §2 copy to the new height, then re-capture its texture.
+    let refitRAF;
+    window.addEventListener("resize", () => {
+        cancelAnimationFrame(refitRAF);
+        refitRAF = requestAnimationFrame(() => {
+            fitSection2();
+            vfx.update(cells[1]).catch(() => {});
+        });
+    });
+    onScroll();
+
+    // Intro: hold black (暗転), then dissolve §1 in from a full pixelsort over 2s.
+    applySection(0, 0, "up", false); // §1 active, fully sorted, behind the black loader
+    const INTRO_MS = 2000;
+    const BLACKOUT_MS = 300;
+    setTimeout(() => {
+        hideLoader(); // fade the black overlay as the sort starts resolving
+        const start = performance.now();
+        const tick = (now) => {
+            const t = clamp01((now - start) / INTRO_MS);
+            effects[0].localThreshold = t; // linear: full sort → clean
+            if (t < 1) {
+                requestAnimationFrame(tick);
+            } else {
+                introPlaying = false;
+                onScroll(); // hand control back to scroll
+            }
+        };
+        requestAnimationFrame(tick);
+    }, BLACKOUT_MS);
+
+    applied = true;
+} catch (e) {
+    console.warn("vfx-js failed to load, falling back to CSS sim", e);
+}
+if (!applied) {
+    document.getElementById("root").classList.add("pxs-fallback");
+    hideLoader();
+}
+</script>
+
+<!-- Lenis smooth scroll + section-image parallax -->
+<script type="module">
+  import Lenis from "https://esm.sh/lenis";
+  const lenis = new Lenis();
+  (function raf(t) { lenis.raf(t); requestAnimationFrame(raf); })();
+
+  // Section ranges align with TIMELINE section visibility above.
+  const AMP = 60; // default px each direction; scale(1.18) leaves enough cover headroom
+  // §2 img has 150% height (extra headroom) so it can travel faster than the bg.
+  const parallaxTargets = [
+    { el: document.querySelector(".hero .bg img"),                       range: [0.00, 0.20] },
+    { el: document.querySelector(".section-2 .image-col .image img"),    range: [0.20, 0.40], amp: 120 },
+    { el: document.querySelector(".section-2 .section-bg"),              range: [0.20, 0.40], amp: 40 },
+    { el: document.querySelector(".section-3 .section-bg"),              range: [0.40, 0.80] },
+    { el: document.querySelector(".section-4 .section-bg"),              range: [0.80, 1.00] },
+  ];
+  const applyParallax = (progress) => {
+    for (const t of parallaxTargets) {
+      if (!t.el) continue;
+      const [a, b] = t.range;
+      const lp = Math.max(0, Math.min(1, (progress - a) / (b - a)));
+      const y = (0.5 - lp) * 2 * (t.amp ?? AMP);
+      t.el.style.setProperty("--parallax-y", `${y.toFixed(2)}px`);
+    }
+  };
+  lenis.on("scroll", ({ progress }) => applyParallax(progress));
+  // Seed offsets at progress 0 so the first scroll event doesn't snap the
+  // image from the CSS default (0px) to its progress-0 value.
+  applyParallax(0);
+</script>
+</body>
+</html>
