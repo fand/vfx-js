@@ -52,6 +52,15 @@
   .hero .scroll-cue .line{position:relative;width:2px;height:90px;background:var(--line);overflow:hidden;}
   .hero .scroll-cue .line::after{content:"";position:absolute;inset:0 0 auto 0;height:45%;background:var(--green);box-shadow:0 0 14px var(--green);animation:scrollCue 1.6s ease-in-out infinite;}
   @keyframes scrollCue{0%{transform:translateY(-100%);}100%{transform:translateY(250%);}}
+  /* Short viewports: shrink the cue + reserve bottom room so the centered copy clears it */
+  @media (max-height:760px){
+    .hero{padding-bottom:130px;}
+    .hero h1{font-size:clamp(56px,9vw,110px);margin-bottom:24px;}
+    .hero .eyebrow{margin-bottom:20px;}
+    .hero .meta{margin-top:24px;}
+    .hero .scroll-cue{bottom:24px;gap:10px;}
+    .hero .scroll-cue .line{height:56px;}
+  }
 
   /* Page indicator — vertical label hugging the right edge of every section */
   .page-indicator{position:absolute;top:0;bottom:0;right:0;width:64px;display:flex;align-items:center;justify-content:center;z-index:2;pointer-events:none;color:var(--ink);opacity:.6;}
@@ -61,6 +70,8 @@
   /* Section 2 — editorial: image left + columns w/ drop-cap right */
   .section-2{padding:64px 40px;border-top:1px solid var(--line);position:relative;overflow:visible;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;isolation:isolate;}
   .section-2-grid{display:grid;grid-template-columns:3fr 7fr;gap:64px;align-items:stretch;width:100%;max-width:1280px;margin:0 auto;flex:1;position:relative;}
+  /* Right column keeps clear of the 64px page-indicator gutter */
+  .section-2 .body{padding-right:48px;}
   .section-2 .image-col{position:relative; mix-blend-mode: plus-lighter;}
   .section-2 .image-col .image{position:absolute;top:0;bottom:0;right:0;left:calc(-1 * max(40px, 50vw - 640px));overflow:visible;background:#000;}
   .section-2 .image-col .image img{width:100%;height:150%;margin-top:-70%;object-fit:cover;}
@@ -80,12 +91,12 @@
   .section-3-inner{max-width:min(100%, calc((100vh - 240px) * 4 / 3));margin:0 auto;width:100%;position:relative;z-index:2;display:flex;flex-direction:column;gap:16px;}
   .section-3-heading{
       position:absolute;
-      top:40%;
-      left:10%;
-      transform:translate(-50%,-50%) rotate(-90deg);
+      top: 40%;
+      left: 0%;
+      transform:translate(-54%,-50%) rotate(-90deg);
       transform-origin:center;
-      font-size:clamp(60px,10vw,150px);
-      line-height:.9;
+      font-size:clamp(60px,12vw,180px);
+      /*line-height:.9;*/
       color:transparent;
       -webkit-text-stroke: 2px var(--yellow);
       text-shadow:0 0 100px black;
@@ -100,7 +111,7 @@
 
   /* Section 4 — wordmark */
   .section-4{padding:0;min-height:100vh;display:grid;place-items:center;position:relative;overflow:hidden;background:var(--bg);}
-  .section-4 h2{font-size:clamp(120px,18vw,280px);line-height:.95;color:var(--yellow);text-align:center;width:max-content;max-width:none;white-space:nowrap;position:relative;z-index:2;}
+  .section-4 h2{font-size:clamp(80px,15vw,180px);color:var(--yellow);text-align:center;width:max-content;max-width:none;white-space:nowrap;position:relative;z-index:2;}
 
   /* Per-section image bg + dark overlay */
   .section-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:.5;}
@@ -206,10 +217,10 @@
   <section class="section-3">
     <img class="section-bg pxs" src="./pixelsort/s3.webp" alt="">
     <div class="section-overlay"></div>
-    <div class="section-3-heading display">
-      <h2 class="pxs">Examples</h2>
-    </div>
     <div class="section-3-inner">
+        <div class="section-3-heading display">
+          <h2 class="pxs">Examples</h2>
+        </div>
         <div class="data data-top label">/// motion plate 04 — Clip 0014</div>
         <div class="video">
           <img class="pxs" src="./pixelsort/city1.webp" alt="">
