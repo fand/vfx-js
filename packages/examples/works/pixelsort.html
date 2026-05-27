@@ -837,20 +837,21 @@ if (!applied) {
   (function raf(t) { lenis.raf(t); requestAnimationFrame(raf); })();
 
   // Section ranges align with TIMELINE section visibility above.
+  const AMP = 60; // default px each direction; scale(1.18) leaves enough cover headroom
+  // §2 img has 150% height (extra headroom) so it can travel faster than the bg.
   const parallaxTargets = [
     { el: document.querySelector(".hero .bg img"),                       range: [0.00, 0.20] },
-    { el: document.querySelector(".section-2 .image-col .image img"),    range: [0.20, 0.40] },
-    { el: document.querySelector(".section-2 .section-bg"),              range: [0.20, 0.40] },
+    { el: document.querySelector(".section-2 .image-col .image img"),    range: [0.20, 0.40], amp: 120 },
+    { el: document.querySelector(".section-2 .section-bg"),              range: [0.20, 0.40], amp: 40 },
     { el: document.querySelector(".section-3 .section-bg"),              range: [0.40, 0.80] },
     { el: document.querySelector(".section-4 .section-bg"),              range: [0.80, 1.00] },
   ];
-  const AMP = 60; // px each direction; scale(1.18) leaves enough cover headroom
   const applyParallax = (progress) => {
     for (const t of parallaxTargets) {
       if (!t.el) continue;
       const [a, b] = t.range;
       const lp = Math.max(0, Math.min(1, (progress - a) / (b - a)));
-      const y = (0.5 - lp) * 2 * AMP;
+      const y = (0.5 - lp) * 2 * (t.amp ?? AMP);
       t.el.style.setProperty("--parallax-y", `${y.toFixed(2)}px`);
     }
   };
