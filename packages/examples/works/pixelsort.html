@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>VFX-JS pixelsort example</title>s
+<title>VFX-JS pixelsort example</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
@@ -94,7 +94,6 @@
       transform:translate(-54%,-50%) rotate(-90deg);
       transform-origin:center;
       font-size:clamp(60px,12vw,180px);
-      /*line-height:.9;*/
       color:transparent;
       -webkit-text-stroke: 2px var(--primary);
       text-shadow:0 0 100px black;
@@ -538,7 +537,7 @@ const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 // leaving slack. The column-block height is ~linear in font-size (other body
 // chrome is fixed), so a few proportional passes converge on the size that
 // lands the closing rule at the bottom padding edge. Clamped for readability.
-const S2_PAD = 64;       // matches .section-2 vertical padding
+const S2_PAD = 64;       // .section-2 bottom padding (top is already in the measured offset)
 const S2_FONT_MIN = 12, S2_FONT_MAX = 21;
 const fitSection2 = () => {
     const cols = document.querySelector(".section-2 .columns");
@@ -809,7 +808,7 @@ try {
         const start = performance.now();
         const tick = (now) => {
             const t = clamp01((now - start) / INTRO_MS);
-            effects[0].localThreshold = 1 - Math.pow(1 - t, 1); // ease-out: full sort → clean
+            effects[0].localThreshold = t; // linear: full sort → clean
             if (t < 1) {
                 requestAnimationFrame(tick);
             } else {
