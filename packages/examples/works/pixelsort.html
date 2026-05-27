@@ -555,7 +555,11 @@ const fitSection2 = () => {
     }
 };
 
-const subImageUrls = ["./pixelsort/city1.webp", "./pixelsort/tower1.webp"];
+// new URL(...) so Vite emits + hashes these; raw string srcs aren't rewritten and 404 in build.
+const subImageUrls = [
+    new URL("./pixelsort/city1.webp", import.meta.url).href,
+    new URL("./pixelsort/tower1.webp", import.meta.url).href,
+];
 
 // Loading overlay — held until all <img>, preloaded sub-images, and fonts resolve.
 const loaderEl = document.getElementById("loader");
