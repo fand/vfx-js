@@ -133,7 +133,7 @@
   .pxs-fallback img{filter:contrast(1.05) saturate(1.15);}
 
   /* Fake scroll stage */
-  .scroll-proxy{position:relative;height:600vh;}
+  .scroll-proxy{position:relative;height:1000vh;}
   .stage{position:fixed;top:0;left:0;width:100%;height:100vh;display:grid;grid-template-areas:"stage";overflow:hidden;z-index:0;}
   .stage > *{grid-area:stage;}
 
@@ -427,12 +427,22 @@ void main() {
 }
 `;
 
+// Sort direction → shader (axis, direction) uniforms.
+// axis 0 = horizontal scan, 1 = vertical scan; direction picks which end of
+// each segment the bright pixels gather toward.
+const DIRECTIONS = {
+    right: { axis: 0, direction: 0 },
+    left:  { axis: 0, direction: 1 },
+    down:  { axis: 1, direction: 1 },
+    up:    { axis: 1, direction: 0 },
+};
+
 class PixelSortEffect {
     constructor(params, opts = {}) {
         this.params = params;
         this.localBypass = opts.bypass ?? false;
         this.localThreshold = opts.threshold ?? null;
-        this.localAxis = opts.axis ?? null;
+        this.localDir = opts.dir ?? null;
         this._lowRT = null;
         this._rankRT = null;
         this._w = 0;
@@ -440,7 +450,8 @@ class PixelSortEffect {
         this._lowW = 0;
         this._lowH = 0;
     }
-    _axis() { return this.localAxis ?? this.params.axis ?? 0; }
+    _dir() { return DIRECTIONS[this.localDir ?? this.params.dir] ?? DIRECTIONS.right; }
+    _axis() { return this._dir().axis; }
     _ensureSize(ctx) {
         const [w, h] = ctx.dims.elementPixel;
         const axis = this._axis();
@@ -463,7 +474,7 @@ class PixelSortEffect {
             ctx.draw({ frag: BYPASS_FRAG, uniforms: { src: ctx.src }, target: ctx.target });
             return;
         }
-        const axis = this._axis();
+        const { axis, direction } = this._dir();
         const lowSize = [this._lowW, this._lowH];
         const threshold = this.localThreshold ?? this.params.threshold;
         ctx.draw({ frag: FRAG_DOWNSAMPLE, uniforms: { src: ctx.src }, target: this._lowRT });
@@ -472,7 +483,7 @@ class PixelSortEffect {
             uniforms: {
                 src: this._lowRT, srcSize: lowSize,
                 threshold, keyMode: this.params.keyMode,
-                direction: this.params.direction, axis,
+                direction, axis,
             },
             target: this._rankRT,
         });
@@ -495,29 +506,28 @@ const params = {
     threshold: 0.0,
     lowDim: 128,
     keyMode: 0,
-    direction: 0,
-    axis: 0,
+    dir: "up",
 };
 
-// Scroll-driven timeline. axis: 0=horizontal, 1=vertical.
+// Scroll-driven timeline. dir: "left" | "right" | "up" | "down".
 // Section visibility switches at the boundary between an "exit" and the next "enter".
 const TIMELINE = [
     // section 1
     { from: 0.00, to: 0.10, sec: 0, bypass: true },
-    { from: 0.10, to: 0.20, sec: 0, axis: 0, t: [1, 0] },
+    { from: 0.10, to: 0.20, sec: 0, dir: "right", t: [1, 0] },
     // section 2
-    { from: 0.20, to: 0.25, sec: 1, axis: 0, t: [0, 1] },
+    { from: 0.20, to: 0.25, sec: 1, dir: "left", t: [0, 1] },
     { from: 0.25, to: 0.30, sec: 1, bypass: true },
-    { from: 0.30, to: 0.40, sec: 1, axis: 0, t: [1, 0] },
+    { from: 0.30, to: 0.40, sec: 1, dir: "right", t: [1, 0] },
     // section 3
-    { from: 0.40, to: 0.45, sec: 2, axis: 0, t: [0, 1] },
+    { from: 0.40, to: 0.45, sec: 2, dir: "left", t: [0, 1] },
     { from: 0.45, to: 0.50, sec: 2, bypass: true },
-    { from: 0.50, to: 0.60, sec: 2, bypass: true, sub: 0, subT: [1, 0] },
-    { from: 0.60, to: 0.65, sec: 2, bypass: true, sub: 1, subT: [0, 1] },
-    { from: 0.70, to: 0.80, sec: 2, axis: 1, t: [1, 0] },
+    { from: 0.50, to: 0.60, sec: 2, bypass: true, sub: 0, subT: [1, 0], subDir: "right" },
+    { from: 0.60, to: 0.65, sec: 2, bypass: true, sub: 1, subT: [0, 1], subDir: "left" },
+    { from: 0.70, to: 0.80, sec: 2, dir: "up", t: [1, 0] },
     // section 4
-    { from: 0.80, to: 0.99, sec: 3, axis: 1, t: [0, 1] },
-    { from: 0.99, to: 1.01, sec: 3, bypass: true },
+    { from: 0.80, to: 0.95, sec: 3, dir: "down", t: [0, 1] },
+    { from: 0.95, to: 1.01, sec: 3, bypass: true },
 ];
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -650,7 +660,7 @@ try {
     let imageMode = "hidden";
     // last shown §3 sub-image; persists across hidden so §4→§3 restores it
     let currentSubImg = null;
-    let pendingSubT = 0, pendingSubBypass = false, pendingSubAxis = 0;
+    let pendingSubT = 0, pendingSubBypass = false, pendingSubDir = "right";
 
     const setImageHidden = () => {
         if (imageMode === "hidden") return;
@@ -680,15 +690,15 @@ try {
         vfx.update(sections[2]).catch(() => {});
     };
 
-    const setImageStandalone = async (idx, threshold, bypass, axis) => {
+    const setImageStandalone = async (idx, threshold, bypass, dir) => {
         pendingSubT = threshold;
         pendingSubBypass = bypass;
-        pendingSubAxis = axis;
+        pendingSubDir = dir;
         if (imageMode === "standalone" && currentSubImg === idx) {
             if (imgEffect) {
                 imgEffect.localBypass = bypass;
                 imgEffect.localThreshold = threshold;
-                imgEffect.localAxis = axis;
+                imgEffect.localDir = dir;
             }
             return;
         }
@@ -701,19 +711,19 @@ try {
         section3VideoImg.style.display = "";
         imageMode = "standalone";
         currentSubImg = idx;
-        const e = new PixelSortEffect(params, { bypass: false, threshold: pendingSubT, axis: pendingSubAxis });
+        const e = new PixelSortEffect(params, { bypass: false, threshold: pendingSubT, dir: pendingSubDir });
         await vfx.add(section3VideoImg, { effect: e });
         if (token !== imgReqToken) return;
         imgEffect = e;
         imgEffect.localBypass = pendingSubBypass;
         imgEffect.localThreshold = pendingSubT;
-        imgEffect.localAxis = pendingSubAxis;
+        imgEffect.localDir = pendingSubDir;
     };
 
     let currentSection = -1;
     let introPlaying = true; // suppress scroll updates during the load-in intro
 
-    const applySection = (idx, threshold, axis, bypass) => {
+    const applySection = (idx, threshold, dir, bypass) => {
         if (currentSection !== idx) {
             if (currentSection >= 0) {
                 canvases[currentSection].style.opacity = "0";
@@ -728,7 +738,7 @@ try {
         eff.localBypass = bypass;
         if (!bypass) {
             eff.localThreshold = threshold;
-            eff.localAxis = axis;
+            eff.localDir = dir;
         }
     };
 
@@ -758,12 +768,12 @@ try {
 
             const secBypass = seg.bypass === true;
             const secT = secBypass ? 1 : lerp(seg.t[0], seg.t[1], lp);
-            const secAxis = seg.axis ?? 0;
-            applySection(seg.sec, secT, secAxis, secBypass);
+            const secDir = seg.dir ?? "right";
+            applySection(seg.sec, secT, secDir, secBypass);
 
             if (seg.sub !== undefined) {
                 const subT = lerp(seg.subT[0], seg.subT[1], lp);
-                setImageStandalone(seg.sub, subT, subT >= 1, 0);
+                setImageStandalone(seg.sub, subT, subT >= 1, seg.subDir ?? "right");
             } else if (seg.sec === 2) {
                 // Throughout §3 (incl. bypass): keep the image embedded in §3's
                 // capture. Sort phases process it as one texture; bypass shows it
@@ -791,7 +801,7 @@ try {
     onScroll();
 
     // Intro: hold black (暗転), then dissolve §1 in from a full pixelsort over 2s.
-    applySection(0, 0, 0, false); // §1 active, fully sorted, behind the black loader
+    applySection(0, 0, "up", false); // §1 active, fully sorted, behind the black loader
     const INTRO_MS = 2000;
     const BLACKOUT_MS = 300;
     setTimeout(() => {
