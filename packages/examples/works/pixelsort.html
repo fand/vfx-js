@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>SUBPIXEL.SDK / pure sync — editorial</title>
+<title>VFX-JS pixelsort example</title>s
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=UnifrakturMaguntia&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -68,7 +68,20 @@
   .section-3{padding:64px 150px;border-top:1px solid var(--line);position:relative;overflow:hidden;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;justify-content:center;}
   /* Cap width by available height so the 4:3 video fits in 100vh; labels track its width. */
   .section-3-inner{max-width:min(100%, calc((100vh - 240px) * 4 / 3));margin:0 auto;width:100%;position:relative;z-index:2;display:flex;flex-direction:column;gap:16px;}
-  .section-3-heading{position:absolute;top:40%;left:10%;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center;font-size:clamp(60px,10vw,150px);line-height:.9;color:var(--blue);text-shadow:0 0 50px var(--glow);white-space:nowrap;}
+  .section-3-heading{
+      position:absolute;
+      top:40%;
+      left:10%;
+      transform:translate(-50%,-50%) rotate(-90deg);
+      transform-origin:center;
+      font-size:clamp(60px,10vw,150px);
+      line-height:.9;
+      color:transparent;
+      -webkit-text-stroke: 2px var(--yellow);
+      text-shadow:0 0 100px black;
+      white-space:nowrap;
+
+  }
   .section-3 .data{border:1px solid var(--line);padding:11px 16px;line-height:1.5;}
   .section-3 .data-top{color:var(--green);}
   .section-3 .data-bottom{text-align:right;color:#a0a59c;}
@@ -134,7 +147,7 @@
   <div class="scroll-proxy">
     <div class="stage">
   <section class="hero">
-    <div class="bg"><img class="pxs" src="https://images.unsplash.com/photo-1590725042659-63c8b9f9724d?fm=jpg&amp;q=80&amp;w=2400&amp;auto=format&amp;fit=crop" crossorigin="anonymous" alt=""></div>
+    <div class="bg"><img class="pxs" src="./pixelsort/s1.webp" alt=""></div>
     <div class="overlay"></div>
     <div class="corners label">
       <span class="tl">// SUBPIXEL · release</span>
@@ -151,7 +164,7 @@
   </section>
 
   <section class="section-2">
-    <img class="section-bg pxs" src="https://images.unsplash.com/photo-1630917162749-e5f957f187a2?fm=jpg&amp;q=80&amp;w=2400&amp;auto=format&amp;fit=crop" crossorigin="anonymous" alt="">
+    <img class="section-bg pxs" src="./pixelsort/s2.webp" alt="">
     <div class="section-overlay"></div>
     <div class="section-2-grid">
       <div class="image-col">
@@ -175,7 +188,7 @@
   </section>
 
   <section class="section-3">
-    <img class="section-bg pxs" src="https://images.unsplash.com/photo-1597418881091-e62c106f03c3?fm=jpg&amp;q=80&amp;w=2400&amp;auto=format&amp;fit=crop" crossorigin="anonymous" alt="">
+    <img class="section-bg pxs" src="./pixelsort/s3.webp" alt="">
     <div class="section-overlay"></div>
     <div class="section-3-heading display">
       <h2 class="pxs">Examples</h2>
