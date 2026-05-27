@@ -47,6 +47,11 @@
   .hero .corners .tr{top:0;right:0;}
   .hero .corners .bl{bottom:0;left:0;}
   .hero .corners .br{bottom:0;right:0;color:var(--blue);}
+  .hero .scroll-cue{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);z-index:2;display:flex;flex-direction:column;align-items:center;gap:16px;color:var(--green);opacity:1;pointer-events:none;}
+  .hero .scroll-cue .label{font-size:13px;letter-spacing:.22em;text-shadow:0 0 20px var(--glow);}
+  .hero .scroll-cue .line{position:relative;width:2px;height:90px;background:var(--line);overflow:hidden;}
+  .hero .scroll-cue .line::after{content:"";position:absolute;inset:0 0 auto 0;height:45%;background:var(--green);box-shadow:0 0 14px var(--green);animation:scrollCue 1.6s ease-in-out infinite;}
+  @keyframes scrollCue{0%{transform:translateY(-100%);}100%{transform:translateY(250%);}}
 
   /* Section 2 — editorial: image left + columns w/ drop-cap right */
   .section-2{padding:64px 40px;border-top:1px solid var(--line);position:relative;overflow:visible;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;isolation:isolate;}
@@ -160,6 +165,10 @@
       <h1 class="pxs display">PURE<span class="slash">/</span>SYNC</h1>
       <p class="tagline">A subpixel-grade rendering kit for the second decade of the modern web — built for engineers who still care how a single line of light arrives on a panel.</p>
       <div class="meta label"><span>Edition · 002</span><span>Channels · RGB+A</span><span>Format · WebGL2 / WGSL</span></div>
+    </div>
+    <div class="scroll-cue">
+      <span class="label">Scroll</span>
+      <span class="line"></span>
     </div>
   </section>
 
