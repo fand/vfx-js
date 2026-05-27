@@ -28,7 +28,7 @@
 
   /* Shared display heading + mono micro-label */
   .display{font-family:var(--display);font-weight:400;letter-spacing:0;}
-  .label{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;}
+  .label{font-family:var(--mono);font-size:0.8rem;letter-spacing:.14em;text-transform:uppercase;}
 
   /* Section 1 — title + tagline, image as full-bleed section background */
   .hero{position:relative;min-height:100vh;display:grid;place-items:center;padding:80px 40px;text-align:center;overflow:hidden;border-bottom:1px solid var(--line);}
@@ -36,10 +36,10 @@
   .hero .bg img{width:100%;height:100%;object-fit:cover;}
   .hero .overlay{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(8,9,12,0.2) 0%,rgba(8,9,12,0.5) 70%,rgba(8,9,12,.95) 100%);}
   .hero .inner{position:relative;z-index:2;width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;}
-  .hero .eyebrow{font-size:12px;letter-spacing:.18em;color:var(--green);margin-bottom:36px;}
+  .hero .eyebrow{font-size:1rem;letter-spacing:.18em;color:var(--green);margin-bottom:36px;}
   .hero h1{font-size:clamp(80px,12vw,180px);line-height:.92;color:var(--yellow);margin-bottom:40px;width:max-content;max-width:none;white-space:nowrap;text-shadow:0 0 70px var(--glow);}
   .hero h1 .slash{color:var(--ink);opacity:.45;}
-  .hero .tagline{font-family:var(--mono);font-size:14px;color:var(--ink);max-width:540px;margin:0 auto;line-height:1.6;}
+  .hero .tagline{font-family:var(--mono);font-size:1rem;color:var(--ink);max-width:540px;margin:0 auto;line-height:1.6;}
   .hero .meta{margin-top:48px;display:flex;justify-content:center;gap:32px;letter-spacing:.12em;color:var(--ink);opacity:.7;}
   .hero .corners{position:absolute;inset:24px;z-index:2;pointer-events:none;color:var(--ink);opacity:.55;}
   .hero .corners>span{position:absolute;}
@@ -52,6 +52,11 @@
   .hero .scroll-cue .line{position:relative;width:2px;height:90px;background:var(--line);overflow:hidden;}
   .hero .scroll-cue .line::after{content:"";position:absolute;inset:0 0 auto 0;height:45%;background:var(--green);box-shadow:0 0 14px var(--green);animation:scrollCue 1.6s ease-in-out infinite;}
   @keyframes scrollCue{0%{transform:translateY(-100%);}100%{transform:translateY(250%);}}
+
+  /* Page indicator — vertical label hugging the right edge of every section */
+  .page-indicator{position:absolute;top:0;bottom:0;right:0;width:64px;display:flex;align-items:center;justify-content:center;z-index:2;pointer-events:none;color:var(--ink);opacity:.6;}
+  .page-indicator span{transform:rotate(-90deg);white-space:nowrap;}
+  .page-indicator b{color:var(--green);font-weight:500;}
 
   /* Section 2 — editorial: image left + columns w/ drop-cap right */
   .section-2{padding:64px 40px;border-top:1px solid var(--line);position:relative;overflow:visible;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;isolation:isolate;}
@@ -170,6 +175,7 @@
       <span class="label">Scroll</span>
       <span class="line"></span>
     </div>
+    <div class="page-indicator label"><span>page <b>1</b> / 4</span></div>
   </section>
 
   <section class="section-2">
@@ -194,6 +200,7 @@
         <div class="lined label"><span>// Section 02 · reference §2.1.0</span><span>Continued on §3 →</span></div>
       </div>
     </div>
+    <div class="page-indicator label"><span>page <b>2</b> / 4</span></div>
   </section>
 
   <section class="section-3">
@@ -209,12 +216,14 @@
         </div>
         <div class="data data-bottom label">02m 14s · Aspect 4:3 · 24 fps</div>
     </div>
+    <div class="page-indicator label"><span>page <b>3</b> / 4</span></div>
   </section>
 
   <section class="section-4">
     <img class="section-bg pxs" src="./pixelsort/octo.webp" alt="">
     <div class="section-overlay"></div>
     <h2 class="pxs display">VFX-JS</h2>
+    <div class="page-indicator label"><span>page <b>4</b> / 4</span></div>
   </section>
     </div>
   </div>
@@ -469,8 +478,8 @@ const TIMELINE = [
     { from: 0.60, to: 0.65, sec: 2, bypass: true, sub: 1, subT: [0, 1] },
     { from: 0.70, to: 0.80, sec: 2, axis: 1, t: [1, 0] },
     // section 4
-    { from: 0.80, to: 0.95, sec: 3, axis: 1, t: [0, 1] },
-    { from: 0.95, to: 1.01, sec: 3, bypass: true },
+    { from: 0.80, to: 0.99, sec: 3, axis: 1, t: [0, 1] },
+    { from: 0.99, to: 1.01, sec: 3, bypass: true },
 ];
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -515,7 +524,7 @@ const hideLoader = () => {
     setTimeout(() => loaderEl.remove(), 600);
 };
 
-const MIN_LOADER_MS = 1000; // keep the loader up at least this long
+const MIN_LOADER_MS = 300; // keep the loader up at least this long
 const loaderStart = performance.now();
 let realProgress = 0;
 let assetsReady = false;
@@ -561,7 +570,7 @@ const runLoaderBar = () => new Promise((resolve) => {
     requestAnimationFrame(frame);
 });
 
-setTimeout(hideLoader, 12000); // absolute fallback if init stalls
+setTimeout(hideLoader, 10000); // absolute fallback if init stalls
 trackAssets();
 await runLoaderBar();
 
@@ -752,7 +761,7 @@ try {
         const start = performance.now();
         const tick = (now) => {
             const t = clamp01((now - start) / INTRO_MS);
-            effects[0].localThreshold = 1 - Math.pow(1 - t, 3); // ease-out: full sort → clean
+            effects[0].localThreshold = 1 - Math.pow(1 - t, 1); // ease-out: full sort → clean
             if (t < 1) {
                 requestAnimationFrame(tick);
             } else {
