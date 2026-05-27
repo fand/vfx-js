@@ -5,7 +5,7 @@
 <title>VFX-JS pixelsort example</title>s
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=UnifrakturMaguntia&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#08090c;
@@ -17,11 +17,10 @@
     --line:rgba(255,255,255,.16);
     --glow:rgba(79,108,255,.8);
     --mono:'IBM Plex Mono',ui-monospace,monospace;
-    --sans:'Space Grotesk',system-ui,sans-serif;
-    --display:'UnifrakturMaguntia','Space Grotesk',system-ui,sans-serif;
+    --display:'UnifrakturMaguntia',ui-monospace,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
-  html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);}
+  html,body{background:var(--bg);color:var(--ink);font-family:var(--mono);}
   body{overflow-x:hidden;line-height:1.35;}
   a{color:inherit;text-decoration:none;}
   img{display:block;max-width:100%;}
@@ -206,7 +205,7 @@
           <p>The pipeline is three passes — downsample, rank, gather — but you do not need to think in passes. You think in nouns: threshold, key, direction. The shader keeps the verbs and the bookkeeping; the API hands you a small surface that reads like a print specification rather than a graphics library.</p>
           <p>It will run on any GL2 surface, which is to say nearly every browser made after the year the iPhone learned to do widgets. Where it cannot run, it falls back to a small CSS approximation that is honest about being one — a static stand-in, never pretending to be the thing it replaces.</p>
           <p>What it is for, in the end, is the moment when a still image is allowed to break: when a heading dissolves down its column for a second, when a portrait reorders itself by brightness and then settles again as if nothing happened. A glitch, but a polite one. A glitch on time, in service of the page beneath it.</p>
-          <p>Set in IBM Plex Mono and Space Grotesk. Drawn on an M1 at the kitchen table, between the hours when the city has finished one thing and not yet started the next.</p>
+          <p>Set in IBM Plex Mono and UnifrakturMaguntia. Drawn on an M1 at the kitchen table, between the hours when the city has finished one thing and not yet started the next.</p>
         </div>
         <div class="lined label"><span>// Section 02 · reference §2.1.0</span><span>Continued on §3 →</span></div>
       </div>
