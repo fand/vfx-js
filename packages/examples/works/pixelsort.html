@@ -174,16 +174,16 @@
     <div class="bg"><img class="pxs" src="./pixelsort/s1.webp" alt=""></div>
     <div class="overlay"></div>
     <div class="corners label">
-      <span class="tl">// SUBPIXEL · release</span>
-      <span class="tr">v0.7.2</span>
-      <span class="bl">FRAME 0014 · 24FPS</span>
-      <span class="br">05.24.2026</span>
+      <span class="tl">// VFX-JS DEMO</span>
+      <span class="tr">v1.0.0</span>
+      <span class="bl">HTML-in-Canvas</span>
+      <span class="br">05.26.2026</span>
     </div>
     <div class="inner">
-      <div class="eyebrow label">// Release · 05.24.2026</div>
-      <h1 class="pxs display">PURE<span class="slash">/</span>SYNC</h1>
-      <p class="tagline">A subpixel-grade rendering kit for the second decade of the modern web — built for engineers who still care how a single line of light arrives on a panel.</p>
-      <div class="meta label"><span>Edition · 002</span><span>Channels · RGB+A</span><span>Format · WebGL2 / WGSL</span></div>
+      <div class="eyebrow label">// Release · 05.26.2026</div>
+      <h1 class="pxs display">PIXY<span class="slash">·</span>SORT</h1>
+      <p class="tagline">Pixel-sorting: scan each line of an image for runs brighter than a threshold and reorders them by luminance — a familiar picture breaking along its own light, then resolving again.</p>
+      <div class="meta label"><span>Built with VFX-JS</span><span>HTML-in-Canvas</span></div>
     </div>
     <div class="scroll-cue">
       <span class="label">Scroll</span>
@@ -200,18 +200,18 @@
         <div class="image"><img class="pxs" src="./pixelsort/sculpt.webp" alt=""></div>
       </div>
       <div class="body">
-        <div class="kicker label">// Feature — folio 02</div>
-        <h2 class="pxs display">A toolkit, not a <em>framework</em>.</h2>
+        <div class="kicker label">// The library — folio 02</div>
+        <h2 class="pxs display">WebGL on ordinary <em>HTML</em>.</h2>
         <div class="columns">
-          <p>There is a particular shape of software that tries very hard to be useful and, in doing so, makes itself difficult to live with. Subpixel is not that shape. It is a set of small primitives that move pixels, and a uniform clock that keeps them honest.</p>
-          <p>The kit ships one bundle, sub-thirty kilobytes gzipped, with no peer dependencies. It binds directly to live DOM nodes — headings, images, video — and asks each one to give up its raster for the length of a frame. The shader does the rest, on the GPU, where it should.</p>
-          <p>Threshold-based column scans, perceptual luminance, brightness intervals, hue intervals, masks. The defaults look like a memory of a CRT; the parameters open onto a quieter, weirder country where the rules of the panel relax just enough to let a familiar image become unfamiliar without leaving the grid.</p>
-          <p>The pipeline is three passes — downsample, rank, gather — but you do not need to think in passes. You think in nouns: threshold, key, direction. The shader keeps the verbs and the bookkeeping; the API hands you a small surface that reads like a print specification rather than a graphics library.</p>
-          <p>It will run on any GL2 surface, which is to say nearly every browser made after the year the iPhone learned to do widgets. Where it cannot run, it falls back to a small CSS approximation that is honest about being one — a static stand-in, never pretending to be the thing it replaces.</p>
-          <p>What it is for, in the end, is the moment when a still image is allowed to break: when a heading dissolves down its column for a second, when a portrait reorders itself by brightness and then settles again as if nothing happened. A glitch, but a polite one. A glitch on time, in service of the page beneath it.</p>
-          <p>Set in IBM Plex Mono and UnifrakturMaguntia. Drawn on an M1 at the kitchen table, between the hours when the city has finished one thing and not yet started the next.</p>
+          <p>VFX-JS is a small JavaScript library for adding WebGL effects to an ordinary web page. You point it at a DOM node — an image, a video, a line of text — and it lends that element's pixels to a fragment shader for the length of a frame.</p>
+          <p>It builds on Three.js for the GL plumbing, so you write shaders instead of boilerplate. A single vfx.add(element, { shader }) call is most of the surface: the library captures the element as a texture, runs your GLSL over it on the GPU, and paints the result back in place.</p>
+          <p>Nothing is thrown away to do it. The original markup stays live beneath the canvas — text remains selectable, links remain clickable — and the effect is a layer over the page rather than a replacement for it.</p>
+          <p>Effects compose. The @vfx-js/effects package ships ready-made passes — bloom, pixelate, glitch and more — that chain together, while @vfx-js/react wraps the same engine in components for React projects.</p>
+          <p>What you are scrolling through is one such effect, written as a custom shader: a pixel sort. It scans each column for pixels above a brightness threshold and reorders that run by luminance, so a still image breaks along its own light and then resolves again.</p>
+          <p>The threshold is just a uniform. Slide it from one down to zero and the sort dissolves from a fully scrambled frame back to the untouched image — which is exactly the motion the scroll timeline on this page drives, section by section.</p>
+          <p>Set in IBM Plex Mono and UnifrakturMaguntia. Built on Three.js, released under the MIT license, and small enough to drop into any page that wants a little controlled disorder.</p>
         </div>
-        <div class="lined label"><span>// Section 02 · reference §2.1.0</span><span>Continued on §3 →</span></div>
+        <div class="lined label"><span>// Section 02 · @vfx-js/core</span><span>Examples on §3 →</span></div>
       </div>
     </div>
     <div class="page-indicator label"><span>page <b>2</b> / 4</span></div>
@@ -224,11 +224,11 @@
         <div class="section-3-heading display">
           <h2 class="pxs">Examples</h2>
         </div>
-        <div class="data data-top label">/// motion plate 04 — Clip 0014</div>
+        <div class="data data-top label">/// pixel sort — threshold sweep</div>
         <div class="video">
           <img class="pxs" src="./pixelsort/city1.webp" alt="">
         </div>
-        <div class="data data-bottom label">02m 14s · Aspect 4:3 · 24 fps</div>
+        <div class="data data-bottom label">Live texture · WebGL2 · sorts on the GPU</div>
     </div>
     <div class="page-indicator label"><span>page <b>3</b> / 4</span></div>
   </section></div>
