@@ -286,32 +286,16 @@ export async function wrapElement(
         canvas.style.setProperty(prop, cs.getPropertyValue(prop));
     }
 
-    // Padding/border compensation:
-    // Canvas content-box must equal element's border-box.
-    const pf = (v: string) => Number.parseFloat(v);
-    const paddingH =
-        pf(cs.paddingLeft) +
-        pf(cs.paddingRight) +
-        pf(cs.borderLeftWidth) +
-        pf(cs.borderRightWidth);
-    const paddingV =
-        pf(cs.paddingTop) +
-        pf(cs.paddingBottom) +
-        pf(cs.borderTopWidth) +
-        pf(cs.borderBottomWidth);
-
-    if (paddingH > 0) {
-        canvas.style.setProperty("width", `${rect.width}px`);
-    }
-    if (paddingV > 0) {
-        canvas.style.setProperty("height", `${rect.height}px`);
-    }
-
-    // Prevent intrinsic-size feedback loop with ResizeObserver.
+    // Width fills the containing block so it tracks parent resizes. The
+    // wrapped child is forced to width:100% border-box (after the DOM swap
+    // below), so its border-box always equals the canvas content-box — the
+    // element's padding/border needs no width compensation, and a fixed px
+    // here would freeze the canvas width against resize.
     if (!canvas.style.width) {
         canvas.style.setProperty("width", "100%");
     }
-    // Replaced element — height doesn't derive from children.
+    // Replaced element — height doesn't derive from children, so seed an
+    // explicit border-box height. setupCapture's child RO keeps it in sync.
     if (!canvas.style.height) {
         canvas.style.setProperty("height", `${rect.height}px`);
     }
