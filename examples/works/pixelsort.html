@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VFX-JS pixelsort example</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#08090c;
+    --bg2:#11141a;
+    --ink:#e8eae3;
+    --primary:#ffee00;
+    --secondary:#ff12a8;
+    --line:rgba(255,255,255,.16);
+    --glow:rgba(255,127,191,.8);
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --display:'UnifrakturMaguntia',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:var(--bg);color:var(--ink);font-family:var(--mono);}
+  body{overflow-x:hidden;line-height:1.35;}
+  a{color:inherit;text-decoration:none;}
+  img{display:block;max-width:100%;}
+
+  /* Shared display heading + mono micro-label */
+  .display{font-family:var(--display);font-weight:400;letter-spacing:0;}
+  .label{font-family:var(--mono);font-size:0.8rem;letter-spacing:.14em;text-transform:uppercase;}
+
+  /* Section 1 — title + tagline, image as full-bleed section background */
+  .hero{position:relative;min-height:100vh;display:grid;place-items:center;padding:80px 40px;text-align:center;overflow:hidden;border-bottom:1px solid var(--line);}
+  .hero .bg{position:absolute;inset:0;z-index:0;}
+  .hero .bg img{width:100%;height:100%;object-fit:cover;}
+  .hero .overlay{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 80% 70% at 50% 50%,rgba(8,9,12,0.2) 0%,rgba(8,9,12,0.5) 70%,rgba(8,9,12,.95) 100%);}
+  .hero .inner{position:relative;z-index:2;width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;}
+  .hero .eyebrow{font-size:1rem;letter-spacing:.18em;color:var(--secondary);text-shadow:0 0 20px black; margin-bottom:36px;}
+  .hero h1{font-size:clamp(80px,12vw,180px);line-height:.92;color:var(--primary);margin-bottom:40px;width:max-content;max-width:none;white-space:nowrap;text-shadow:0 0 70px var(--glow);}
+  .hero h1 .slash{color:var(--ink);opacity:.45;}
+  .hero .tagline{font-family:var(--mono);font-size:1rem;color:var(--ink);max-width:540px;margin:0 auto;line-height:1.6;}
+  .hero .meta{margin-top:48px;display:flex;justify-content:center;gap:32px;letter-spacing:.12em;color:var(--ink);opacity:.7;}
+  .hero .corners{position:absolute;inset:24px;z-index:2;pointer-events:none;color:var(--ink);opacity:.55;}
+  .hero .corners>span{position:absolute;}
+  .hero .corners .tl{top:0;left:0;color:var(--secondary);}
+  .hero .corners .tr{top:0;right:0;}
+  .hero .corners .bl{bottom:0;left:0;}
+  .hero .corners .br{bottom:0;right:0;color:var(--primary);}
+  .hero .scroll-cue{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);z-index:2;display:flex;flex-direction:column;align-items:center;gap:16px;color:var(--secondary);opacity:1;pointer-events:none;}
+  .hero .scroll-cue .label{font-size:13px;letter-spacing:.22em;text-shadow:0 0 20px var(--glow);}
+  .hero .scroll-cue .line{position:relative;width:2px;height:90px;background:var(--line);overflow:hidden;}
+  .hero .scroll-cue .line::after{content:"";position:absolute;inset:0 0 auto 0;height:45%;background:var(--secondary);box-shadow:0 0 14px var(--secondary);animation:scrollCue 1.6s ease-in-out infinite;}
+  @keyframes scrollCue{0%{transform:translateY(-100%);}100%{transform:translateY(250%);}}
+  /* Short viewports: shrink the cue + reserve bottom room so the centered copy clears it */
+  @media (max-height:760px){
+    .hero{padding-bottom:130px;}
+    .hero h1{font-size:clamp(56px,9vw,110px);margin-bottom:24px;}
+    .hero .eyebrow{margin-bottom:20px;}
+    .hero .meta{margin-top:24px;}
+    .hero .scroll-cue{bottom:24px;gap:10px;}
+    .hero .scroll-cue .line{height:56px;}
+  }
+
+  /* Page indicator — vertical label hugging the right edge of every section */
+  .page-indicator{position:absolute;top:0;bottom:0;right:0;width:64px;display:flex;align-items:center;justify-content:center;z-index:2;pointer-events:none;color:var(--ink);opacity:.6;}
+  .page-indicator span{transform:rotate(-90deg);white-space:nowrap;}
+  .page-indicator b{color:var(--secondary);font-weight:500;}
+
+  /* Section 2 — editorial: image left + columns w/ drop-cap right */
+  .section-2{padding:64px 40px;border-top:1px solid var(--line);position:relative;overflow:visible;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;isolation:isolate;}
+  .section-2-grid{display:grid;grid-template-columns:3fr 7fr;gap:64px;align-items:stretch;width:100%;max-width:1280px;margin:0 auto;flex:1;position:relative;}
+  /* Right column keeps clear of the 64px page-indicator gutter */
+  .section-2 .body{padding-right:48px;}
+  .section-2 .image-col{position:relative; mix-blend-mode: plus-lighter;}
+  .section-2 .image-col .image{position:absolute;top:0;bottom:0;right:0;left:calc(-1 * max(40px, 50vw - 640px));overflow:visible;background:#000;}
+  .section-2 .image-col .image img{width:100%;height:150%;margin-top:-70%;object-fit:cover;}
+  .section-2 .kicker{letter-spacing:.18em;color:var(--secondary);margin-bottom:18px;}
+  .section-2 h2{font-size:clamp(48px,5vw,88px);line-height:.95;color:var(--primary);margin-bottom:24px;text-shadow:0 0 50px var(--glow);}
+  .section-2 h2 em{font-style:normal;color:var(--secondary);}
+  /* Body type scales with viewport height so the column block fills, but never
+     overflows, the fixed 100vh stage across laptop→large-display heights. */
+  .section-2 .columns{column-count:2;column-gap:28px;column-rule:1px solid var(--line);font-size:clamp(12px,1.7vh,18px);line-height:1.55;color:#cfd2cc;}
+  .section-2 .columns p{margin-bottom:.9em;text-align:justify;hyphens:auto;}
+  .section-2 .columns p:first-child::first-letter{font-family:var(--mono);font-weight:400;font-size:4em;float:left;line-height:.85;margin:.1em .15em -.05em 0;color:var(--secondary);}
+  .section-2 .lined{margin-top:36px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;color:#a0a59c;}
+
+  /* Section 3 — editorial: vertical heading + 4:3 image flanked by data */
+  .section-3{padding:64px 150px;border-top:1px solid var(--line);position:relative;overflow:hidden;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;justify-content:center;}
+  /* Cap width by available height so the 4:3 video fits in 100vh; labels track its width. */
+  .section-3-inner{max-width:min(100%, calc((100vh - 240px) * 4 / 3));margin:0 auto;width:100%;position:relative;z-index:2;display:flex;flex-direction:column;gap:16px;}
+  .section-3-heading{
+      position:absolute;
+      top: 40%;
+      left: 0%;
+      transform:translate(-54%,-50%) rotate(-90deg);
+      transform-origin:center;
+      font-size:clamp(60px,12vw,180px);
+      color:transparent;
+      -webkit-text-stroke: 2px var(--primary);
+      text-shadow:0 0 100px black;
+      white-space:nowrap;
+
+  }
+  .section-3 .data{border:1px solid var(--line);padding:11px 16px;line-height:1.5;}
+  .section-3 .data-top{color:var(--secondary);}
+  .section-3 .data-bottom{text-align:right;color:#a0a59c;}
+  .section-3 .video{position:relative;aspect-ratio:4/3;overflow:hidden;border:1px solid var(--line);background:#000;}
+  .section-3 .video img{width:100%;height:100%;object-fit:cover;}
+
+  /* Section 4 — wordmark + credits */
+  .section-4{padding:0;min-height:100vh;display:grid;place-items:center;position:relative;overflow:hidden;background:var(--bg);}
+  .section-4 .s4-inner{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:48px;padding:40px;}
+  .section-4 h2{font-size:clamp(80px,15vw,180px);color:var(--primary);text-align:center;width:max-content;max-width:none;white-space:nowrap;}
+  .section-4 .credit{width:min(680px,86vw);display:grid;grid-template-columns:max-content 1fr;gap:10px 28px;font-size:.78rem;line-height:1.65;color:#a0a59c;}
+  .section-4 .credit dt{color:var(--secondary);white-space:nowrap;text-transform:uppercase;letter-spacing:.14em;text-align:right;}
+  .section-4 .credit dd{display:flex;flex-wrap:wrap;gap:.2em .9em;}
+  .section-4 .credit a{color:var(--ink);border-bottom:1px solid var(--line);transition:color .2s,border-color .2s;}
+  .section-4 .credit a:hover{color:var(--secondary);border-color:var(--secondary);}
+
+  /* Per-section image bg + dark overlay */
+  .section-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:.5;}
+  .section-overlay{position:absolute;inset:0;z-index:1;pointer-events:none;}
+  .section-2 .section-overlay{z-index:auto;background:linear-gradient(180deg,rgba(8,9,12,.2),rgba(8,9,12,.5) 70%,rgba(8,9,12,.96));}
+  .section-3 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.2),rgba(8,9,12,.5) 70%,rgba(8,9,12,.95));}
+  .section-4 .section-overlay{background:linear-gradient(180deg,rgba(8,9,12,.3),rgba(8,9,12,.5));}
+  .section-4 .section-bg{opacity:1;}
+
+  /* Pixelsort CSS fallback (only kicks in if WebGL fails) */
+  .pxs-fallback h1, .pxs-fallback h2{
+    background:linear-gradient(180deg,transparent 0 38%,rgba(79,108,255,.3) 38% 41%,transparent 41% 60%,rgba(54,224,130,.3) 60% 62%,transparent 62%);
+    background-blend-mode:multiply;
+  }
+  .pxs-fallback img{filter:contrast(1.05) saturate(1.15);}
+
+  /* Fake scroll stage */
+  .scroll-proxy{position:relative;height:1000vh;}
+  .stage{position:fixed;top:0;left:0;width:100%;height:100vh;display:grid;grid-template-areas:"stage";overflow:hidden;z-index:0;}
+  .stage > *{grid-area:stage;}
+
+  /* Parallax — Lenis-driven on §1–4 images */
+  .hero .bg img,
+  .section-2 .image-col .image img,
+  .section-2 .section-bg,
+  .section-3 .section-bg,
+  .section-4 .section-bg{
+    transform:translate3d(0,var(--parallax-y,0px),0) scale(1.18);
+    transform-origin:center;
+    will-change:transform;
+  }
+
+  /* Loading overlay — held until images + fonts resolve.
+     z-index must exceed VFX-JS's canvas (9999); it's appended to body later,
+     so an equal z-index would paint it ABOVE the loader and leak section flashes. */
+  #loader{position:fixed;inset:0;z-index:10000;background:var(--bg);display:grid;place-items:center;transition:opacity .5s ease,visibility .5s ease;}
+  #loader.done{opacity:0;visibility:hidden;pointer-events:none;}
+  #loader .loader-inner{width:min(440px,72vw);}
+  #loader .mark{font-size:clamp(44px,9vw,80px);line-height:.95;text-align:center;color:var(--primary);text-shadow:0 0 60px var(--glow);margin-bottom:30px;}
+  #loader .bar{position:relative;height:2px;background:var(--line);overflow:hidden;}
+  #loader .bar-fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--secondary);box-shadow:0 0 12px var(--secondary);}
+  #loader .status{display:flex;justify-content:space-between;margin-top:14px;color:var(--ink);opacity:.7;}
+  #loader .status .pct{color:var(--secondary);opacity:1;}
+</style>
+  <script type="module" crossorigin src="../assets/pixelsort-yN4AM4hz.js"></script>
+  <link rel="modulepreload" crossorigin href="../assets/modulepreload-polyfill-3xzlJT5O.js">
+  <link rel="modulepreload" crossorigin href="../assets/esm-ep-oan_P.js">
+</head>
+<body>
+<div id="loader">
+  <div class="loader-inner">
+    <div class="bar"><span class="bar-fill"></span></div>
+    <div class="status label"><span>// LOADING ASSETS</span><span class="pct">0%</span></div>
+  </div>
+</div>
+<div id="root">
+  <div class="scroll-proxy">
+    <div class="stage">
+  <div class="cell"><section class="hero">
+    <div class="bg"><img class="pxs" src="../assets/s1-Cfxd8-Gb.webp" alt=""></div>
+    <div class="overlay"></div>
+    <div class="corners label">
+      <span class="tl">// VFX-JS DEMO</span>
+      <span class="tr">v1.0.0</span>
+      <span class="bl">HTML-in-Canvas</span>
+      <span class="br">05.26.2026</span>
+    </div>
+    <div class="inner">
+      <div class="eyebrow label">// Release · 05.26.2026</div>
+      <h1 class="pxs display">PIXY<span class="slash">·</span>SORT</h1>
+      <p class="tagline">Pixel-sorting: scan each line of an image for runs brighter than a threshold and reorders them by luminance — a familiar picture breaking along its own light, then resolving again.</p>
+      <div class="meta label"><span>Built with VFX-JS</span><span>HTML-in-Canvas</span></div>
+    </div>
+    <div class="scroll-cue">
+      <span class="label">Scroll</span>
+      <span class="line"></span>
+    </div>
+    <div class="page-indicator label"><span>page <b>1</b> / 4</span></div>
+  </section></div>
+
+  <div class="cell"><section class="section-2">
+    <img class="section-bg pxs" src="../assets/s2-C7WmV1wz.webp" alt="">
+    <div class="section-overlay"></div>
+    <div class="section-2-grid">
+      <div class="image-col">
+        <div class="image"><img class="pxs" src="../assets/sculpt-soiLl86_.webp" alt=""></div>
+      </div>
+      <div class="body">
+        <div class="kicker label">// The library — folio 02</div>
+        <h2 class="pxs display">WebGL on ordinary <em>HTML</em>.</h2>
+        <div class="columns">
+          <p>VFX-JS is a small JavaScript library for adding WebGL effects to an ordinary web page. You point it at a DOM node — an image, a video, a line of text — and it lends that element's pixels to a fragment shader for the length of a frame.</p>
+          <p>It builds on Three.js for the GL plumbing, so you write shaders instead of boilerplate. A single vfx.add(element, { shader }) call is most of the surface: the library captures the element as a texture, runs your GLSL over it on the GPU, and paints the result back in place.</p>
+          <p>Nothing is thrown away to do it. The original markup stays live beneath the canvas — text remains selectable, links remain clickable — and the effect is a layer over the page rather than a replacement for it.</p>
+          <p>Effects compose. The @vfx-js/effects package ships ready-made passes — bloom, pixelate, glitch and more — that chain together, while @vfx-js/react wraps the same engine in components for React projects.</p>
+          <p>What you are scrolling through is one such effect, written as a custom shader: a pixel sort. It scans each column for pixels above a brightness threshold and reorders that run by luminance, so a still image breaks along its own light and then resolves again.</p>
+          <p>The threshold is just a uniform. Slide it from one down to zero and the sort dissolves from a fully scrambled frame back to the untouched image — which is exactly the motion the scroll timeline on this page drives, section by section.</p>
+          <p>Set in IBM Plex Mono and UnifrakturMaguntia. Built on Three.js, released under the MIT license, and small enough to drop into any page that wants a little controlled disorder.</p>
+        </div>
+        <div class="lined label"><span>// Section 02 · @vfx-js/core</span><span>Examples on §3 →</span></div>
+      </div>
+    </div>
+    <div class="page-indicator label"><span>page <b>2</b> / 4</span></div>
+  </section></div>
+
+  <div class="cell"><section class="section-3">
+    <img class="section-bg pxs" src="../assets/s3-DQWbOAIf.webp" alt="">
+    <div class="section-overlay"></div>
+    <div class="section-3-inner">
+        <div class="section-3-heading display">
+          <h2 class="pxs">Examples</h2>
+        </div>
+        <div class="data data-top label">/// pixel sort — threshold sweep</div>
+        <div class="video">
+          <img class="pxs" src="../assets/city1-Coz3EpIx.webp" alt="">
+        </div>
+        <div class="data data-bottom label">Live texture · WebGL2 · sorts on the GPU</div>
+    </div>
+    <div class="page-indicator label"><span>page <b>3</b> / 4</span></div>
+  </section></div>
+
+  <div class="cell"><section class="section-4">
+    <img class="section-bg pxs" src="../assets/octo-DE7N0SjU.webp" alt="">
+    <div class="section-overlay"></div>
+    <div class="s4-inner">
+      <h2 class="pxs display">VFX-JS</h2>
+      <dl class="credit">
+        <dt>Author</dt>
+        <dd><a href="https://amagi.dev" target="_blank" rel="noopener">AMAGI</a></dd>
+        <dt>GitHub</dt>
+        <dd><a href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">fand/vfx-js</a></dd>
+        <dt>Pixelsort shader</dt>
+        <dd><a href="https://www.shadertoy.com/view/XsBfRG" target="_blank" rel="noopener">20170723_pixelSorter by FMS_Cat</a></dd>
+        <dt>Fonts</dt>
+        <dd>
+          <a href="https://fonts.google.com/specimen/UnifrakturMaguntia" target="_blank" rel="noopener">UnifrakturMaguntia</a>
+          <a href="https://fonts.google.com/specimen/IBM+Plex+Mono" target="_blank" rel="noopener">IBM Plex Mono</a>
+        </dd>
+        <dt>Photos</dt>
+        <dd>
+          <a href="https://unsplash.com/photos/blue-and-pink-abstract-painting-UVnqERf_Tv4" target="_blank" rel="noopener">CHUTTERSNAP</a>
+          <a href="https://unsplash.com/photos/pink-and-white-abstract-painting--P8XIyZ0-WY" target="_blank" rel="noopener">Diane Picchiottino</a>
+          <a href="https://unsplash.com/photos/blue-and-red-abstract-painting-KTkvnKPiZAI" target="_blank" rel="noopener">Peter Olexa</a>
+          <a href="https://unsplash.com/photos/a-busy-city-street-Rp81fGImRi4" target="_blank" rel="noopener">Alwaez</a>
+          <a href="https://unsplash.com/photos/white-concrete-arch-during-daytime-85J1JQsD6aw" target="_blank" rel="noopener">Alena Vavrdova</a>
+        </dd>
+      </dl>
+    </div>
+    <div class="page-indicator label"><span>page <b>4</b> / 4</span></div>
+  </section></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Lenis smooth scroll + section-image parallax -->
+</body>
+</html>
