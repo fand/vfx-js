@@ -453,6 +453,29 @@ const TIMELINE = [
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+// Scale §2 body copy so its column block fills the 100vh stage rather than
+// leaving slack. The column-block height is ~linear in font-size (other body
+// chrome is fixed), so a few proportional passes converge on the size that
+// lands the closing rule at the bottom padding edge. Clamped for readability.
+const S2_PAD = 64;       // matches .section-2 vertical padding
+const S2_FONT_MIN = 12, S2_FONT_MAX = 21;
+const fitSection2 = () => {
+    const cols = document.querySelector(".section-2 .columns");
+    const lined = document.querySelector(".section-2 .lined");
+    if (!cols || !lined) return;
+    const limit = window.innerHeight - S2_PAD;
+    let f = parseFloat(getComputedStyle(cols).fontSize);
+    for (let i = 0; i < 4; i++) {
+        const colsH = cols.getBoundingClientRect().height;
+        if (colsH <= 0) break;
+        const gap = limit - lined.getBoundingClientRect().bottom;
+        if (Math.abs(gap) < 1) break;
+        f = clamp(f * (1 + gap / colsH), S2_FONT_MIN, S2_FONT_MAX);
+        cols.style.fontSize = `${f}px`;
+    }
+};
 
 const subImageUrls = ["./pixelsort/city1.webp", "./pixelsort/tower1.webp"];
 
@@ -530,6 +553,8 @@ try {
         document.querySelector(".section-3"),
         document.querySelector(".section-4"),
     ];
+
+    fitSection2(); // size §2 copy before its texture is captured
 
     const effects = [];
     const canvases = [];
@@ -684,6 +709,16 @@ try {
 
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
+
+    // Re-fit §2 copy to the new height, then re-capture its texture.
+    let refitRAF;
+    window.addEventListener("resize", () => {
+        cancelAnimationFrame(refitRAF);
+        refitRAF = requestAnimationFrame(() => {
+            fitSection2();
+            vfx.update(sections[1]).catch(() => {});
+        });
+    });
     onScroll();
 
     // Intro: hold black (暗転), then dissolve §1 in from a full pixelsort over 2s.
