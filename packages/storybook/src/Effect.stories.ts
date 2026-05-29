@@ -10,6 +10,7 @@ import {
     HalftoneEffect,
     ParticleEffect,
     ParticleExplodeEffect,
+    PixelSortEffect,
     VoronoiEffect,
 } from "@vfx-js/effects";
 import "./preset.css";
@@ -19,6 +20,7 @@ import {
     attachHalftonePane,
     attachParticleExplodePane,
     attachParticlePane,
+    attachPixelSortPane,
     disposeAllPanes,
     initVFX,
 } from "./utils";
@@ -93,6 +95,30 @@ crtBloom.play = async ({ canvasElement }) => {
         ],
     });
     attachBloomPane("CRT Bloom", bloom);
+};
+
+// Threshold pixel sort. Excluded from VRT: the sort runs on a downscaled
+// buffer whose rounding differs across the SwiftShader capture env, so a
+// snapshot isn't a stable target.
+export const pixelSort: StoryObj<undefined> = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Jellyfish;
+        return img;
+    },
+    args: undefined,
+    parameters: { chromatic: { disableSnapshot: true } },
+};
+pixelSort.play = async ({ canvasElement }) => {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+
+    const vfx = initVFX();
+    const effect = new PixelSortEffect({ threshold: 0.5, direction: "up" });
+    await vfx.add(img, { effect });
+    attachPixelSortPane("Pixel Sort", effect);
 };
 
 // Stable Fluid as a single Effect. Drives mouse splats off real pointer

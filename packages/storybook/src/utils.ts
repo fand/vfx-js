@@ -6,6 +6,7 @@ import type {
     HalftoneInkPresetName,
     ParticleEffect,
     ParticleExplodeEffect,
+    PixelSortEffect,
 } from "@vfx-js/effects";
 import { Pane } from "tweakpane";
 
@@ -89,6 +90,37 @@ export function attachBloomPane(title: string, effect: BloomEffect): Pane {
         step: 1,
         view: "number",
     });
+    trackPane(pane);
+    return pane;
+}
+
+export function attachPixelSortPane(
+    title: string,
+    effect: PixelSortEffect,
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: false });
+    pane.addBinding(effect.params, "threshold", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect.params, "lowDim", { min: 16, max: 512, step: 16 });
+    pane.addBinding(effect.params, "key", {
+        options: {
+            luminance: "luminance",
+            r: "r",
+            g: "g",
+            b: "b",
+            hue: "hue",
+            saturation: "saturation",
+        },
+    });
+    pane.addBinding(effect.params, "direction", {
+        options: { up: "up", down: "down", left: "left", right: "right" },
+    });
+    pane.addBinding(effect.params, "bypass");
     trackPane(pane);
     return pane;
 }
