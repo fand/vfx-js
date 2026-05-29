@@ -46,7 +46,7 @@ Canvas is a **replaced element**. It does NOT auto-fit height to children, even 
 
 #### Current approach
 
-**Width**: CSS cascade from the copied class/style attributes. Falls back to `width: 100%` for elements without explicit width.
+**Width**: The target is assumed to **fill its containing block** (full-width). The canvas uses `width: 100%` so it tracks parent resizes. An element with an explicit **px** width is the exception: the canvas is pinned to the measured border-box (`rect.width`), which is a constant and therefore reflow-safe. See [Sizing policy](#sizing-policy) for what this rules out.
 
 **Height**: A child ResizeObserver watches the wrapped element and sets the canvas CSS height to match `borderBoxSize.blockSize`. This triggers the canvas ResizeObserver, which syncs the pixel buffer and calls `requestPaint`.
 
@@ -57,6 +57,45 @@ child resizes → child RO → set canvas CSS height
 ```
 
 **Pixel buffer**: Canvas ResizeObserver uses `device-pixel-content-box` to set `canvas.width`/`canvas.height` at device-pixel resolution.
+
+### Sizing policy
+
+The canvas's content-box must equal the wrapped element's border-box. Since the canvas is a replaced element, width can't be derived from its children, so it comes from one of two cases:
+
+| Element width | Canvas width | Responsive? |
+| --- | --- | --- |
+| Fills its containing block (`width: auto` block, or `width: 100%`) | `100%` | ✅ tracks parent |
+| Explicit **px** width (`width: 400px`) | pinned `rect.width` | constant (reflow-safe) |
+| **Content-sized** (`inline`/`inline-block`, `float`, `fit-content`, `max-width`, side `margin: auto`) | — | ❌ **unsupported** |
+
+The litmus test: **does the target's border-box equal its parent's content-box width?** If yes, or if it has a fixed px width, it works. Otherwise it's content-sized and must be wrapped.
+
+#### ✅ OK
+
+```html
+<!-- full-width block (padding is fine) -->
+<section style="padding: 64px 40px">…</section>
+
+<!-- explicit fixed width (inline px) -->
+<article style="width: 600px; padding: 32px">…</article>
+```
+
+Padding/border on the target is fine in both cases — the canvas content-box is sized to the element's border-box.
+
+#### ❌ NG → wrap it
+
+Put the width constraint (fixed width, `max-width`, centering margins) on a **wrapper**, and let the addHTML target fill that wrapper with `width: 100%`. Keep padding/background on the target so the effect still covers them.
+
+```html
+<!-- centered fixed-width card -->
+<div style="display: flex; justify-content: center">
+  <div style="width: 600px">                                     <!-- wrapper: width only -->
+    <article style="width: 100%; padding: 32px; background: #fff">…</article>  <!-- addHTML target -->
+  </div>
+</div>
+```
+
+> Class-declared widths are not detected (only inline `style="width:…px"` is). Declare fixed widths inline, or wrap the element.
 
 ## API
 
@@ -92,6 +131,7 @@ The current approach uses per-element wrapper canvases with `drawElementImage` �
 ## Limitations
 
 - **Chrome Canary only** — requires `requestPaint`/`onpaint` APIs.
+- **Content-sized targets unsupported** — the element must fill its container or have an explicit px width; see [Sizing policy](#sizing-policy).
 - **No overlay mode** — `layoutsubtree` hides children visually; `overlay` option is stripped.
 - **Element-type selectors** (`div.foo`) won't match the canvas wrapper. Class selectors (`.foo`) work.
 - **Structure selectors** (`:nth-child`, `parent > div`) may break since the DOM structure changes.
