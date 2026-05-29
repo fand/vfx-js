@@ -1,14 +1,78 @@
 # HTML-in-Canvas
 
-Captures live HTML elements via the browser's `drawElementImage` API and renders them with WebGL shaders. Alternative to the default dom-to-canvas path (SVG foreignObject serialization).
+`VFX.addHTML()` allows you to apply effects to a raw HTML element.
+It's implemented on the new HTML-in-Canvas API, which is still experimental.
 
-## Browser Support
+**NOTE: It works on Chrome Canary only.** You can also try this feature on Google Chrome by enabling the flag from `chrome://flags/#canvas-draw-element`, but it's not widely available yet.
 
-**Chrome Canary only.** Requires both `drawElementImage` and `requestPaint`/`onpaint`, which are currently behind `chrome://flags/#enable-experimental-web-platform-features` in Canary.
+## API
 
-Regular Chrome (stable/beta) with the same flag provides `drawElementImage` but not `requestPaint`/`onpaint`. A double-rAF fallback (calling `drawElementImage` outside `onpaint`, using the previous frame's snapshot) was considered but rejected — it adds complexity and relies on unspecified behavior. Instead, `supportsHtmlInCanvas()` requires both APIs and falls back to dom-to-canvas when either is missing.
+### Core (`@vfx-js/core`)
+
+```ts
+// Wrap element and apply shader (falls back to dom-to-canvas if unsupported)
+await vfx.addHTML(element, { shader: "rainbow" });
+
+// Feature detection
+if (supportsHtmlInCanvas()) { ... }
+```
+
+### React (`@vfx-js/react`)
+
+```tsx
+<VFXCanvas shader="rainbow">
+  <h1>Hello</h1>
+  <p>This is captured via drawElementImage.</p>
+</VFXCanvas>
+```
+
+`VFXCanvas` renders `<canvas layoutsubtree ...rest>` directly, preserving user-passed HTML attributes. It calls `setupCapture`/`teardownCapture` internally.
+
+Falls back to a `<div>` with dom-to-canvas when html-in-canvas is not supported.
+
+## Sizing policy
+
+The canvas's content-box must equal the wrapped element's border-box. Since the canvas is a replaced element, width can't be derived from its children, so it comes from one of two supported cases — anything else is unsupported:
+
+| Element width | Canvas width | Responsive? |
+| --- | --- | --- |
+| Fills its containing block (`width: auto` block, or `width: 100%`) | `100%` | ✅ tracks parent |
+| Explicit **px** width (`width: 400px`) | pinned `rect.width` | constant (reflow-safe) |
+| **Content-sized** (`inline`/`inline-block`, `float`, `fit-content`, binding `max-width`, or width + centering margins) | — | ❌ **unsupported** |
+
+The litmus test: **does the target's border-box equal its parent's content-box width?** If yes, or if it has a fixed px width, it works. Otherwise it's content-sized and must be wrapped.
+
+### ✅ OK
+
+```html
+<!-- full-width block (padding is fine) -->
+<section style="padding: 64px 40px">…</section>
+
+<!-- explicit fixed width (inline px) -->
+<article style="width: 600px; padding: 32px">…</article>
+```
+
+Padding/border on the target is fine in both cases — the canvas content-box is sized to the element's border-box.
+
+### ❌ NG → wrap it
+
+Put the width constraint (fixed width, `max-width`, centering margins) on a **wrapper**, and let the addHTML target fill that wrapper with `width: 100%`. Keep padding/background on the target so the effect still covers them.
+
+```html
+<!-- centered fixed-width card -->
+<div style="display: flex; justify-content: center">
+  <div style="width: 600px">                                     <!-- wrapper: width only -->
+    <article style="width: 100%; padding: 32px; background: #fff">…</article>  <!-- addHTML target -->
+  </div>
+</div>
+```
+
+> Class-declared widths are not detected (only inline `style="width:…px"` is). Declare fixed widths inline, or wrap the element.
+
 
 ## How It Works
+
+Under the hood, the element is captured via the browser's `drawElementImage` API and rendered with WebGL shaders — an alternative to the default dom-to-canvas path (SVG foreignObject serialization).
 
 ### Wrapping
 
@@ -19,7 +83,7 @@ Before:  <div id="target">...</div>
 After:   <canvas layoutsubtree><div id="target">...</div></canvas>
 ```
 
-The canvas copies the element's CSS identity (class + style attributes) so the browser cascade resolves width naturally. `layoutsubtree` makes children participate in layout (for hit testing, accessibility) but not paint — only the canvas's `onpaint` handler produces visual output.
+The canvas copies the element's CSS identity (class + style attributes) so the cascade resolves its layout box; width follows the [Sizing policy](#sizing-policy). `layoutsubtree` makes children participate in layout (for hit testing, accessibility) but not paint — only the canvas's `onpaint` handler produces visual output.
 
 ### Capture Pipeline
 
@@ -46,7 +110,7 @@ Canvas is a **replaced element**. It does NOT auto-fit height to children, even 
 
 #### Current approach
 
-**Width**: The target is assumed to **fill its containing block** (full-width). The canvas uses `width: 100%` so it tracks parent resizes. An element with an explicit **px** width is the exception: the canvas is pinned to the measured border-box (`rect.width`), which is a constant and therefore reflow-safe. See [Sizing policy](#sizing-policy) for what this rules out.
+**Width**: Set per the [Sizing policy](#sizing-policy) — `width: 100%` for full-width targets (tracks parent resizes), or a pinned `rect.width` for elements with an explicit px width.
 
 **Height**: A child ResizeObserver watches the wrapped element and sets the canvas CSS height to match `borderBoxSize.blockSize`. This triggers the canvas ResizeObserver, which syncs the pixel buffer and calls `requestPaint`.
 
@@ -57,70 +121,6 @@ child resizes → child RO → set canvas CSS height
 ```
 
 **Pixel buffer**: Canvas ResizeObserver uses `device-pixel-content-box` to set `canvas.width`/`canvas.height` at device-pixel resolution.
-
-### Sizing policy
-
-The canvas's content-box must equal the wrapped element's border-box. Since the canvas is a replaced element, width can't be derived from its children, so it comes from one of two cases:
-
-| Element width | Canvas width | Responsive? |
-| --- | --- | --- |
-| Fills its containing block (`width: auto` block, or `width: 100%`) | `100%` | ✅ tracks parent |
-| Explicit **px** width (`width: 400px`) | pinned `rect.width` | constant (reflow-safe) |
-| **Content-sized** (`inline`/`inline-block`, `float`, `fit-content`, `max-width`, side `margin: auto`) | — | ❌ **unsupported** |
-
-The litmus test: **does the target's border-box equal its parent's content-box width?** If yes, or if it has a fixed px width, it works. Otherwise it's content-sized and must be wrapped.
-
-#### ✅ OK
-
-```html
-<!-- full-width block (padding is fine) -->
-<section style="padding: 64px 40px">…</section>
-
-<!-- explicit fixed width (inline px) -->
-<article style="width: 600px; padding: 32px">…</article>
-```
-
-Padding/border on the target is fine in both cases — the canvas content-box is sized to the element's border-box.
-
-#### ❌ NG → wrap it
-
-Put the width constraint (fixed width, `max-width`, centering margins) on a **wrapper**, and let the addHTML target fill that wrapper with `width: 100%`. Keep padding/background on the target so the effect still covers them.
-
-```html
-<!-- centered fixed-width card -->
-<div style="display: flex; justify-content: center">
-  <div style="width: 600px">                                     <!-- wrapper: width only -->
-    <article style="width: 100%; padding: 32px; background: #fff">…</article>  <!-- addHTML target -->
-  </div>
-</div>
-```
-
-> Class-declared widths are not detected (only inline `style="width:…px"` is). Declare fixed widths inline, or wrap the element.
-
-## API
-
-### Core (`@vfx-js/core`)
-
-```ts
-// Wrap element and apply shader (falls back to dom-to-canvas if unsupported)
-await vfx.addHTML(element, { shader: "rainbow" });
-
-// Feature detection
-if (supportsHtmlInCanvas()) { ... }
-```
-
-### React (`@vfx-js/react`)
-
-```tsx
-<VFXCanvas shader="rainbow">
-  <h1>Hello</h1>
-  <p>This is captured via drawElementImage.</p>
-</VFXCanvas>
-```
-
-`VFXCanvas` renders `<canvas layoutsubtree ...rest>` directly, preserving user-passed HTML attributes. It calls `setupCapture`/`teardownCapture` internally.
-
-Falls back to a `<div>` with dom-to-canvas when html-in-canvas is not supported.
 
 ## Why not `texElementImage2D`?
 
