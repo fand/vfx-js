@@ -120,6 +120,7 @@ export function attachPixelSortPane(
     pane.addBinding(effect.params, "direction", {
         options: { up: "up", down: "down", left: "left", right: "right" },
     });
+    pane.addBinding(effect.params, "angle", { min: -180, max: 180, step: 1 });
     pane.addBinding(effect.params, "bypass");
     trackPane(pane);
     return pane;

@@ -1,7 +1,12 @@
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 // Threshold pixel sort: 3-pass (downsample → rank → gather). Scans each
 // row/column for runs brighter than `threshold` and reorders them by `key`.
-import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
+import type {
+    Effect,
+    EffectContext,
+    EffectRenderTarget,
+    EffectTexture,
+} from "@vfx-js/core";
 
 const FRAG_DOWNSAMPLE = `#version 300 es
 precision highp float;
@@ -153,6 +158,57 @@ void main() {
 }
 `;
 
+// Rotate the source into the centre of a bounding-box buffer so the sort
+// axis can run at an arbitrary `angle`. Rotation is done in pixel space
+// (uv × size) so non-square inputs keep their aspect ratio. Pixels outside
+// the source map to 0 (transparent black, key 0 → never sorted), isolating
+// the input run-by-run. `rot` is [cos(angle), sin(angle)].
+const ROTATE_IN = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D src;
+uniform vec4 srcRectUv;
+uniform vec2 srcSize;
+uniform vec2 boxSize;
+uniform vec2 rot;
+void main() {
+    vec2 dBox = uv * boxSize - boxSize * 0.5;
+    vec2 dSrc = vec2(
+        rot.x * dBox.x + rot.y * dBox.y,
+        -rot.y * dBox.x + rot.x * dBox.y
+    );
+    vec2 uvS = (dSrc + srcSize * 0.5) / srcSize;
+    if (uvS.x < 0.0 || uvS.x > 1.0 || uvS.y < 0.0 || uvS.y > 1.0) {
+        outColor = vec4(0.0);
+        return;
+    }
+    outColor = texture(src, srcRectUv.xy + uvS * srcRectUv.zw);
+}
+`;
+
+// Inverse of ROTATE_IN: for each output pixel, sample the sorted bounding-box
+// buffer at the rotated location, restoring the original orientation. `src`
+// is already premultiplied, so it composites as-is.
+const ROTATE_OUT = `#version 300 es
+precision highp float;
+in vec2 uvContent;
+out vec4 outColor;
+uniform sampler2D src;
+uniform vec2 srcSize;
+uniform vec2 boxSize;
+uniform vec2 rot;
+void main() {
+    vec2 dSrc = uvContent * srcSize - srcSize * 0.5;
+    vec2 dBox = vec2(
+        rot.x * dSrc.x - rot.y * dSrc.y,
+        rot.y * dSrc.x + rot.x * dSrc.y
+    );
+    vec2 uvB = (dBox + boxSize * 0.5) / boxSize;
+    outColor = texture(src, uvB);
+}
+`;
+
 // Sort direction → shader (axis, direction) uniforms.
 // axis 0 = horizontal scan, 1 = vertical scan; direction picks which end of
 // each segment the bright pixels gather toward.
@@ -184,6 +240,11 @@ export type PixelSortParams = {
     key: PixelSortKey;
     /** Which end of a run the bright pixels gather toward. */
     direction: PixelSortDirection;
+    /**
+     * Sort axis rotation in degrees. Non-zero wraps the sort in a
+     * rotate-in / rotate-out pass pair so the streaks run at any angle.
+     */
+    angle: number;
     /** Skip the sort and pass the source through (premultiplied). */
     bypass: boolean;
 };
@@ -193,13 +254,15 @@ const DEFAULT_PARAMS: PixelSortParams = {
     lowDim: 128,
     key: "luminance",
     direction: "up",
+    angle: 0,
     bypass: false,
 };
 
 /**
  * Threshold-based pixel sort. Scans each row/column for runs of pixels
- * brighter than `threshold` and reorders the run by `key`. Mutate
- * `params` directly or via `setParams`.
+ * brighter than `threshold` and reorders the run by `key`. Set `angle` to
+ * sort along an arbitrary direction. Mutate `params` directly or via
+ * `setParams`.
  *
  * Ported from "20170723_pixelSorter" by FMS_Cat:
  * https://www.shadertoy.com/view/XsBfRG
@@ -209,8 +272,14 @@ export class PixelSortEffect implements Effect {
 
     #lowRT: EffectRenderTarget | null = null;
     #rankRT: EffectRenderTarget | null = null;
+    // Bounding-box buffers, allocated only while `angle` is non-zero.
+    #rotRT: EffectRenderTarget | null = null;
+    #sortedRT: EffectRenderTarget | null = null;
     #w = 0;
     #h = 0;
+    #angle = 0;
+    #bw = 0;
+    #bh = 0;
     #lowW = 0;
     #lowH = 0;
 
@@ -222,24 +291,49 @@ export class PixelSortEffect implements Effect {
         Object.assign(this.params, partial);
     }
 
+    #disposeTargets(): void {
+        this.#lowRT?.dispose();
+        this.#rankRT?.dispose();
+        this.#rotRT?.dispose();
+        this.#sortedRT?.dispose();
+        this.#lowRT = null;
+        this.#rankRT = null;
+        this.#rotRT = null;
+        this.#sortedRT = null;
+    }
+
     #ensureSize(ctx: EffectContext): void {
         const [w, h] = ctx.dims.elementPixel;
         const { axis } = DIRECTIONS[this.params.direction];
+        const { angle } = this.params;
         const low = this.params.lowDim;
-        const lowW = axis === 0 ? low : w;
-        const lowH = axis === 0 ? h : low;
+        // Bounding box that fully contains the input rotated by `angle`.
+        let bw = w;
+        let bh = h;
+        if (angle !== 0) {
+            const r = (angle * Math.PI) / 180;
+            const c = Math.abs(Math.cos(r));
+            const s = Math.abs(Math.sin(r));
+            bw = Math.ceil(w * c + h * s);
+            bh = Math.ceil(w * s + h * c);
+        }
+        const lowW = axis === 0 ? low : bw;
+        const lowH = axis === 0 ? bh : low;
         if (
             this.#w === w &&
             this.#h === h &&
+            this.#angle === angle &&
             this.#lowW === lowW &&
             this.#lowH === lowH
         ) {
             return;
         }
-        this.#lowRT?.dispose();
-        this.#rankRT?.dispose();
+        this.#disposeTargets();
         this.#w = w;
         this.#h = h;
+        this.#angle = angle;
+        this.#bw = bw;
+        this.#bh = bh;
         this.#lowW = lowW;
         this.#lowH = lowH;
         this.#lowRT = ctx.createRenderTarget({
@@ -251,6 +345,10 @@ export class PixelSortEffect implements Effect {
             filter: "nearest",
             float: true,
         });
+        if (angle !== 0) {
+            this.#rotRT = ctx.createRenderTarget({ size: [bw, bh] });
+            this.#sortedRT = ctx.createRenderTarget({ size: [bw, bh] });
+        }
     }
 
     render(ctx: EffectContext): void {
@@ -267,9 +365,39 @@ export class PixelSortEffect implements Effect {
         const lowSize = [this.#lowW, this.#lowH];
         const { threshold } = this.params;
         const keyMode = KEY_MODE[this.params.key];
+        const [w, h] = ctx.dims.elementPixel;
+
+        // angle != 0 → rotate the input into a bounding-box buffer, sort
+        // there, then rotate the result back. The sort passes are identical
+        // either way; only their source/target buffers change.
+        const rotRT = this.#rotRT;
+        const sortedRT = this.#sortedRT;
+        const rotated =
+            this.params.angle !== 0 && rotRT !== null && sortedRT !== null;
+        let sortSrc: EffectTexture | EffectRenderTarget = ctx.src;
+        let sortHi: EffectTexture | EffectRenderTarget = ctx.src;
+        let sortTarget = ctx.target;
+        let rot = [1, 0];
+        let boxSize = [w, h];
+        if (rotated) {
+            // Negate so positive `angle` tilts the streaks clockwise on
+            // screen: rotate-in maps by -angle, rotate-out by +angle.
+            const r = (-this.params.angle * Math.PI) / 180;
+            rot = [Math.cos(r), Math.sin(r)];
+            boxSize = [this.#bw, this.#bh];
+            ctx.draw({
+                frag: ROTATE_IN,
+                uniforms: { src: ctx.src, srcSize: [w, h], boxSize, rot },
+                target: rotRT,
+            });
+            sortSrc = rotRT;
+            sortHi = rotRT;
+            sortTarget = sortedRT;
+        }
+
         ctx.draw({
             frag: FRAG_DOWNSAMPLE,
-            uniforms: { src: ctx.src },
+            uniforms: { src: sortSrc },
             target: this.#lowRT,
         });
         ctx.draw({
@@ -288,24 +416,32 @@ export class PixelSortEffect implements Effect {
             frag: FRAG_GATHER,
             uniforms: {
                 src: this.#lowRT,
-                srcHi: ctx.src,
+                srcHi: sortHi,
                 rankTex: this.#rankRT,
                 lowSize,
                 threshold,
                 keyMode,
                 axis,
             },
-            target: ctx.target,
+            target: sortTarget,
         });
+
+        if (rotated) {
+            ctx.draw({
+                frag: ROTATE_OUT,
+                uniforms: { src: sortedRT, srcSize: [w, h], boxSize, rot },
+                target: ctx.target,
+            });
+        }
     }
 
     dispose(): void {
-        this.#lowRT?.dispose();
-        this.#rankRT?.dispose();
-        this.#lowRT = null;
-        this.#rankRT = null;
+        this.#disposeTargets();
         this.#w = 0;
         this.#h = 0;
+        this.#angle = 0;
+        this.#bw = 0;
+        this.#bh = 0;
         this.#lowW = 0;
         this.#lowH = 0;
     }
