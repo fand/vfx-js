@@ -38,15 +38,25 @@ float key(vec3 c, int mode) {
 const SEGMENT_SCAN = `
 ivec2 toXY(int a, int b, int axis) { return axis == 0 ? ivec2(a, b) : ivec2(b, a); }
 
-// Rotated path: is the low-res cell (a along axis, b across) inside the source
-// rect? Mapped by coordinate — the same box -> source rotation rotate-in uses —
-// so the run boundary is exact and crisp, never smeared by the bilinear
-// downsample or contaminated by the bled padding colour.
+// Map a box point (centred coords) back into source pixel space — the same
+// box -> source rotation rotate-in uses.
+vec2 boxToSrc(vec2 boxPx, vec2 imgSize, vec2 rot) {
+    vec2 dSrc = vec2(rot.x * boxPx.x + rot.y * boxPx.y, -rot.y * boxPx.x + rot.x * boxPx.y);
+    return dSrc + imgSize * 0.5;
+}
+
+// Rotated path: does the low-res cell (a along axis, b across) overlap the
+// source rect? Run membership is LENIENT — the bound is grown by one cell so a
+// boundary cell straddling the source edge still counts as inside. That keeps
+// every full-res inside pixel backed by a sorted cell; the crisp edge is
+// reimposed per output pixel in the gather (see boxToSrc clip). Without the
+// slack, boundary cells fall out of the run at coarse lowDim and the gather
+// shows the original image in a staircase along the edge.
 bool insideSrc(int a, int b, int axis, vec2 lowSize, vec2 boxSize, vec2 imgSize, vec2 rot) {
     vec2 boxPx = (vec2(toXY(a, b, axis)) + 0.5) / lowSize * boxSize - boxSize * 0.5;
-    vec2 dSrc = vec2(rot.x * boxPx.x + rot.y * boxPx.y, -rot.y * boxPx.x + rot.x * boxPx.y);
-    vec2 sp = dSrc + imgSize * 0.5;
-    return sp.x >= 0.0 && sp.x <= imgSize.x && sp.y >= 0.0 && sp.y <= imgSize.y;
+    vec2 sp = boxToSrc(boxPx, imgSize, rot);
+    float m = axis == 0 ? boxSize.x / lowSize.x : boxSize.y / lowSize.y;
+    return sp.x >= -m && sp.x <= imgSize.x + m && sp.y >= -m && sp.y <= imgSize.y + m;
 }
 
 // A cell belongs to a sort run when it is inside the source AND its key clears
@@ -137,6 +147,17 @@ uniform vec2 rot;
 ${KEY_FUNC}
 ${SEGMENT_SCAN}
 void main() {
+    // Crisp source edge at full output resolution. The lenient low-res run
+    // membership lets sorted content spill up to a cell into the padding;
+    // clip it back to the exact rotated rect here so the boundary is sharp
+    // and never reveals the padding, independent of lowDim.
+    if (masked == 1) {
+        vec2 sp = boxToSrc(uvSrc * boxSize - boxSize * 0.5, imgSize, rot);
+        if (sp.x < 0.0 || sp.x > imgSize.x || sp.y < 0.0 || sp.y > imgSize.y) {
+            outColor = vec4(0.0);
+            return;
+        }
+    }
     int lowA = axis == 0 ? int(uvSrc.x * lowSize.x) : int(uvSrc.y * lowSize.y);
     int b    = axis == 0 ? int(uvSrc.y * lowSize.y) : int(uvSrc.x * lowSize.x);
     int L    = int(axis == 0 ? lowSize.x : lowSize.y);
