@@ -196,6 +196,14 @@ const DEFAULT_PARAMS: PixelSortParams = {
     bypass: false,
 };
 
+/**
+ * Threshold-based pixel sort. Scans each row/column for runs of pixels
+ * brighter than `threshold` and reorders the run by `key`. Mutate
+ * `params` directly or via `setParams`.
+ *
+ * Ported from "20170723_pixelSorter" by FMS_Cat:
+ * https://www.shadertoy.com/view/XsBfRG
+ */
 export class PixelSortEffect implements Effect {
     params: PixelSortParams;
 
