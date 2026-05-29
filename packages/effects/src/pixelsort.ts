@@ -33,26 +33,38 @@ float key(vec3 c, int mode) {
     else                h = (c.r - c.g) / d + 4.0;
     return h / 6.0;
 }
+
+// A pixel takes part in a sort run when it is inside the source AND its key
+// clears the threshold. The compare is >= so threshold == 0 keeps every pixel
+// (key is always >= 0), sorting the whole source instead of dropping pure-black
+// pixels. \`masked\` marks the rotated path, where alpha = 0 padding fills the
+// bounding box outside the source; that padding bounds the run regardless of
+// threshold, which is what lets the >= compare include every source pixel
+// without bleeding the sort into the padding.
+bool isActive(vec4 c, int keyMode, float threshold, int masked) {
+    if (masked == 1 && c.a < 0.5) return false;
+    return key(c.rgb, keyMode) >= threshold;
+}
 `;
 
 const SEGMENT_SCAN = `
 ivec2 toXY(int a, int b, int axis) { return axis == 0 ? ivec2(a, b) : ivec2(b, a); }
 
-void scanSegment(sampler2D s, int a, int b, int L, int keyMode, float threshold, int axis, out int segStart, out int segEnd) {
+void scanSegment(sampler2D s, int a, int b, int L, int keyMode, float threshold, int axis, int masked, out int segStart, out int segEnd) {
     segStart = a;
     for (int i = 0; i < 8192; i++) {
         if (segStart <= 0) break;
         if (i >= L) break;
-        float k = key(texelFetch(s, toXY(segStart - 1, b, axis), 0).rgb, keyMode);
-        if (k <= threshold) break;
+        vec4 c = texelFetch(s, toXY(segStart - 1, b, axis), 0);
+        if (!isActive(c, keyMode, threshold, masked)) break;
         segStart--;
     }
     segEnd = a + 1;
     for (int i = 0; i < 8192; i++) {
         if (segEnd >= L) break;
         if (i >= L) break;
-        float k = key(texelFetch(s, toXY(segEnd, b, axis), 0).rgb, keyMode);
-        if (k <= threshold) break;
+        vec4 c = texelFetch(s, toXY(segEnd, b, axis), 0);
+        if (!isActive(c, keyMode, threshold, masked)) break;
         segEnd++;
     }
 }
@@ -68,6 +80,7 @@ uniform float threshold;
 uniform int keyMode;
 uniform int direction;
 uniform int axis;
+uniform int masked;
 ${KEY_FUNC}
 ${SEGMENT_SCAN}
 void main() {
@@ -75,13 +88,14 @@ void main() {
     int a = axis == 0 ? p.x : p.y;
     int b = axis == 0 ? p.y : p.x;
     int L = int(axis == 0 ? srcSize.x : srcSize.y);
-    float myKey = key(texelFetch(src, p, 0).rgb, keyMode);
-    if (myKey <= threshold) {
+    vec4 self = texelFetch(src, p, 0);
+    float myKey = key(self.rgb, keyMode);
+    if (!isActive(self, keyMode, threshold, masked)) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
     int segStart, segEnd;
-    scanSegment(src, a, b, L, keyMode, threshold, axis, segStart, segEnd);
+    scanSegment(src, a, b, L, keyMode, threshold, axis, masked, segStart, segEnd);
     int rank = 0;
     for (int i = segStart; i < segEnd; i++) {
         if (i == a) continue;
@@ -107,6 +121,7 @@ uniform vec2 lowSize;
 uniform float threshold;
 uniform int keyMode;
 uniform int axis;
+uniform int masked;
 ${KEY_FUNC}
 ${SEGMENT_SCAN}
 void main() {
@@ -114,15 +129,16 @@ void main() {
     int b    = axis == 0 ? int(uvSrc.y * lowSize.y) : int(uvSrc.x * lowSize.x);
     int L    = int(axis == 0 ? lowSize.x : lowSize.y);
     ivec2 lowP = toXY(lowA, b, axis);
-    float myKey = key(texelFetch(src, lowP, 0).rgb, keyMode);
-    if (myKey <= threshold) {
-        // below-threshold pixels skip the low-res buffer entirely.
+    vec4 self = texelFetch(src, lowP, 0);
+    float myKey = key(self.rgb, keyMode);
+    if (!isActive(self, keyMode, threshold, masked)) {
+        // padding / below-threshold pixels skip the low-res buffer entirely.
         vec4 c = texture(srcHi, uvSrc);
         outColor = vec4(c.rgb * c.a, c.a);
         return;
     }
     int segStart, segEnd;
-    scanSegment(src, lowA, b, L, keyMode, threshold, axis, segStart, segEnd);
+    scanSegment(src, lowA, b, L, keyMode, threshold, axis, masked, segStart, segEnd);
     int targetRank = lowA - segStart;
     for (int i = segStart; i < segEnd; i++) {
         int r = int(texelFetch(rankTex, toXY(i, b, axis), 0).r + 0.5);
@@ -400,6 +416,9 @@ export class PixelSortEffect implements Effect {
             uniforms: { src: sortSrc },
             target: this.#lowRT,
         });
+        // Rotated path pads the bounding box with alpha 0; the sort masks it
+        // out so threshold stays decoupled from the padding boundary.
+        const masked = rotated ? 1 : 0;
         ctx.draw({
             frag: FRAG_RANK,
             uniforms: {
@@ -409,6 +428,7 @@ export class PixelSortEffect implements Effect {
                 keyMode,
                 direction,
                 axis,
+                masked,
             },
             target: this.#rankRT,
         });
@@ -422,6 +442,7 @@ export class PixelSortEffect implements Effect {
                 threshold,
                 keyMode,
                 axis,
+                masked,
             },
             target: sortTarget,
         });
