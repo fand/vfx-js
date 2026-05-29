@@ -33,38 +33,45 @@ float key(vec3 c, int mode) {
     else                h = (c.r - c.g) / d + 4.0;
     return h / 6.0;
 }
-
-// A pixel takes part in a sort run when it is inside the source AND its key
-// clears the threshold. The compare is >= so threshold == 0 keeps every pixel
-// (key is always >= 0), sorting the whole source instead of dropping pure-black
-// pixels. \`masked\` marks the rotated path, where alpha = 0 padding fills the
-// bounding box outside the source; that padding bounds the run regardless of
-// threshold, which is what lets the >= compare include every source pixel
-// without bleeding the sort into the padding.
-bool isActive(vec4 c, int keyMode, float threshold, int masked) {
-    if (masked == 1 && c.a < 0.5) return false;
-    return key(c.rgb, keyMode) >= threshold;
-}
 `;
 
 const SEGMENT_SCAN = `
 ivec2 toXY(int a, int b, int axis) { return axis == 0 ? ivec2(a, b) : ivec2(b, a); }
 
-void scanSegment(sampler2D s, int a, int b, int L, int keyMode, float threshold, int axis, int masked, out int segStart, out int segEnd) {
+// Rotated path: is the low-res cell (a along axis, b across) inside the source
+// rect? Mapped by coordinate — the same box -> source rotation rotate-in uses —
+// so the run boundary is exact and crisp, never smeared by the bilinear
+// downsample or contaminated by the bled padding colour.
+bool insideSrc(int a, int b, int axis, vec2 lowSize, vec2 boxSize, vec2 imgSize, vec2 rot) {
+    vec2 boxPx = (vec2(toXY(a, b, axis)) + 0.5) / lowSize * boxSize - boxSize * 0.5;
+    vec2 dSrc = vec2(rot.x * boxPx.x + rot.y * boxPx.y, -rot.y * boxPx.x + rot.x * boxPx.y);
+    vec2 sp = dSrc + imgSize * 0.5;
+    return sp.x >= 0.0 && sp.x <= imgSize.x && sp.y >= 0.0 && sp.y <= imgSize.y;
+}
+
+// A cell belongs to a sort run when it is inside the source AND its key clears
+// the threshold. The compare is >= so threshold == 0 keeps every source pixel
+// (key is always >= 0) instead of dropping pure-black ones. In the rotated
+// path the source bound comes from \`insideSrc\` (coordinate), decoupled from
+// threshold, so the run never extends into the padding.
+bool runActive(sampler2D s, int a, int b, int axis, int keyMode, float threshold, int masked, vec2 lowSize, vec2 boxSize, vec2 imgSize, vec2 rot) {
+    if (masked == 1 && !insideSrc(a, b, axis, lowSize, boxSize, imgSize, rot)) return false;
+    return key(texelFetch(s, toXY(a, b, axis), 0).rgb, keyMode) >= threshold;
+}
+
+void scanSegment(sampler2D s, int a, int b, int L, int keyMode, float threshold, int axis, int masked, vec2 lowSize, vec2 boxSize, vec2 imgSize, vec2 rot, out int segStart, out int segEnd) {
     segStart = a;
     for (int i = 0; i < 8192; i++) {
         if (segStart <= 0) break;
         if (i >= L) break;
-        vec4 c = texelFetch(s, toXY(segStart - 1, b, axis), 0);
-        if (!isActive(c, keyMode, threshold, masked)) break;
+        if (!runActive(s, segStart - 1, b, axis, keyMode, threshold, masked, lowSize, boxSize, imgSize, rot)) break;
         segStart--;
     }
     segEnd = a + 1;
     for (int i = 0; i < 8192; i++) {
         if (segEnd >= L) break;
         if (i >= L) break;
-        vec4 c = texelFetch(s, toXY(segEnd, b, axis), 0);
-        if (!isActive(c, keyMode, threshold, masked)) break;
+        if (!runActive(s, segEnd, b, axis, keyMode, threshold, masked, lowSize, boxSize, imgSize, rot)) break;
         segEnd++;
     }
 }
@@ -81,6 +88,9 @@ uniform int keyMode;
 uniform int direction;
 uniform int axis;
 uniform int masked;
+uniform vec2 boxSize;
+uniform vec2 imgSize;
+uniform vec2 rot;
 ${KEY_FUNC}
 ${SEGMENT_SCAN}
 void main() {
@@ -88,14 +98,13 @@ void main() {
     int a = axis == 0 ? p.x : p.y;
     int b = axis == 0 ? p.y : p.x;
     int L = int(axis == 0 ? srcSize.x : srcSize.y);
-    vec4 self = texelFetch(src, p, 0);
-    float myKey = key(self.rgb, keyMode);
-    if (!isActive(self, keyMode, threshold, masked)) {
+    float myKey = key(texelFetch(src, p, 0).rgb, keyMode);
+    if (!runActive(src, a, b, axis, keyMode, threshold, masked, srcSize, boxSize, imgSize, rot)) {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
     int segStart, segEnd;
-    scanSegment(src, a, b, L, keyMode, threshold, axis, masked, segStart, segEnd);
+    scanSegment(src, a, b, L, keyMode, threshold, axis, masked, srcSize, boxSize, imgSize, rot, segStart, segEnd);
     int rank = 0;
     for (int i = segStart; i < segEnd; i++) {
         if (i == a) continue;
@@ -122,6 +131,9 @@ uniform float threshold;
 uniform int keyMode;
 uniform int axis;
 uniform int masked;
+uniform vec2 boxSize;
+uniform vec2 imgSize;
+uniform vec2 rot;
 ${KEY_FUNC}
 ${SEGMENT_SCAN}
 void main() {
@@ -129,16 +141,15 @@ void main() {
     int b    = axis == 0 ? int(uvSrc.y * lowSize.y) : int(uvSrc.x * lowSize.x);
     int L    = int(axis == 0 ? lowSize.x : lowSize.y);
     ivec2 lowP = toXY(lowA, b, axis);
-    vec4 self = texelFetch(src, lowP, 0);
-    float myKey = key(self.rgb, keyMode);
-    if (!isActive(self, keyMode, threshold, masked)) {
+    float myKey = key(texelFetch(src, lowP, 0).rgb, keyMode);
+    if (!runActive(src, lowA, b, axis, keyMode, threshold, masked, lowSize, boxSize, imgSize, rot)) {
         // padding / below-threshold pixels skip the low-res buffer entirely.
         vec4 c = texture(srcHi, uvSrc);
         outColor = vec4(c.rgb * c.a, c.a);
         return;
     }
     int segStart, segEnd;
-    scanSegment(src, lowA, b, L, keyMode, threshold, axis, masked, segStart, segEnd);
+    scanSegment(src, lowA, b, L, keyMode, threshold, axis, masked, lowSize, boxSize, imgSize, rot, segStart, segEnd);
     int targetRank = lowA - segStart;
     for (int i = segStart; i < segEnd; i++) {
         int r = int(texelFetch(rankTex, toXY(i, b, axis), 0).r + 0.5);
@@ -174,11 +185,12 @@ void main() {
 }
 `;
 
-// Rotate the source into the centre of a bounding-box buffer so the sort
-// axis can run at an arbitrary `angle`. Rotation is done in pixel space
-// (uv × size) so non-square inputs keep their aspect ratio. Pixels outside
-// the source map to 0 (transparent black, key 0 → never sorted), isolating
-// the input run-by-run. `rot` is [cos(angle), sin(angle)].
+// Rotate the source into the centre of a bounding-box buffer so the sort axis
+// can run at an arbitrary `angle`. Rotation is in pixel space (uv × size) so
+// non-square inputs keep their aspect ratio. Pixels outside the source clamp
+// to the nearest edge (bleed) rather than going black, so the bilinear
+// downsample never mixes padding darkness into edge cells — the sort masks the
+// padding out by coordinate, not colour. `rot` is [cos(angle), sin(angle)].
 const ROTATE_IN = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -194,11 +206,7 @@ void main() {
         rot.x * dBox.x + rot.y * dBox.y,
         -rot.y * dBox.x + rot.x * dBox.y
     );
-    vec2 uvS = (dSrc + srcSize * 0.5) / srcSize;
-    if (uvS.x < 0.0 || uvS.x > 1.0 || uvS.y < 0.0 || uvS.y > 1.0) {
-        outColor = vec4(0.0);
-        return;
-    }
+    vec2 uvS = clamp((dSrc + srcSize * 0.5) / srcSize, 0.0, 1.0);
     outColor = texture(src, srcRectUv.xy + uvS * srcRectUv.zw);
 }
 `;
@@ -333,8 +341,16 @@ export class PixelSortEffect implements Effect {
             bw = Math.ceil(w * c + h * s);
             bh = Math.ceil(w * s + h * c);
         }
-        const lowW = axis === 0 ? low : bw;
-        const lowH = axis === 0 ? bh : low;
+        // Sort-axis resolution. `lowDim` is calibrated against the element; the
+        // rotated buffer is the larger bounding box, so scale by box/element to
+        // keep the same cell size in source pixels — otherwise the sort runs
+        // coarser than at angle 0 and the streak boundaries stair-step.
+        const sortLow =
+            axis === 0
+                ? Math.max(1, Math.round((low * bw) / w))
+                : Math.max(1, Math.round((low * bh) / h));
+        const lowW = axis === 0 ? sortLow : bw;
+        const lowH = axis === 0 ? bh : sortLow;
         if (
             this.#w === w &&
             this.#h === h &&
@@ -416,9 +432,11 @@ export class PixelSortEffect implements Effect {
             uniforms: { src: sortSrc },
             target: this.#lowRT,
         });
-        // Rotated path pads the bounding box with alpha 0; the sort masks it
-        // out so threshold stays decoupled from the padding boundary.
+        // Rotated path: the sort masks out the bounding-box padding by
+        // coordinate (insideSrc), keeping the run boundary exact and
+        // decoupled from threshold.
         const masked = rotated ? 1 : 0;
+        const imgSize = [w, h];
         ctx.draw({
             frag: FRAG_RANK,
             uniforms: {
@@ -429,6 +447,9 @@ export class PixelSortEffect implements Effect {
                 direction,
                 axis,
                 masked,
+                boxSize,
+                imgSize,
+                rot,
             },
             target: this.#rankRT,
         });
@@ -443,6 +464,9 @@ export class PixelSortEffect implements Effect {
                 keyMode,
                 axis,
                 masked,
+                boxSize,
+                imgSize,
+                rot,
             },
             target: sortTarget,
         });
