@@ -247,6 +247,10 @@ interface WrapResult {
  * NOT auto-fit height to children, even with `layoutsubtree`. A child RO
  * in `setupCapture` keeps the CSS height in sync with the child.
  *
+ * The element is expected to fill its containing block (full-width) or carry
+ * an explicit px width; content-sized elements are unsupported. See the
+ * sizing policy in docs/html-in-canvas.md.
+ *
  * Delegates onpaint + ROs to `setupCapture`.
  */
 export async function wrapElement(
@@ -286,32 +290,15 @@ export async function wrapElement(
         canvas.style.setProperty(prop, cs.getPropertyValue(prop));
     }
 
-    // Padding/border compensation:
-    // Canvas content-box must equal element's border-box.
-    const pf = (v: string) => Number.parseFloat(v);
-    const paddingH =
-        pf(cs.paddingLeft) +
-        pf(cs.paddingRight) +
-        pf(cs.borderLeftWidth) +
-        pf(cs.borderRightWidth);
-    const paddingV =
-        pf(cs.paddingTop) +
-        pf(cs.paddingBottom) +
-        pf(cs.borderTopWidth) +
-        pf(cs.borderBottomWidth);
-
-    if (paddingH > 0) {
+    // Full-width target → 100% (tracks resizes); explicit px width → pinned
+    // border-box (constant, reflow-safe). Content-sized unsupported (see docs).
+    if (element.style.width.endsWith("px")) {
         canvas.style.setProperty("width", `${rect.width}px`);
-    }
-    if (paddingV > 0) {
-        canvas.style.setProperty("height", `${rect.height}px`);
-    }
-
-    // Prevent intrinsic-size feedback loop with ResizeObserver.
-    if (!canvas.style.width) {
+    } else {
         canvas.style.setProperty("width", "100%");
     }
-    // Replaced element — height doesn't derive from children.
+    // Replaced element — height doesn't derive from children, so seed an
+    // explicit border-box height. setupCapture's child RO keeps it in sync.
     if (!canvas.style.height) {
         canvas.style.setProperty("height", `${rect.height}px`);
     }
