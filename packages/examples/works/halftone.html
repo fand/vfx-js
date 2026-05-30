@@ -362,12 +362,16 @@
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
-  /* Negative margin-left + matching padding extend bbox left so the hanging
-     ::before stays inside VFX's capture rect; text inner-edge still aligns
-     with .src. vw (not em) keeps both aligned across font-sizes. */
+  /* Gutter shift lives on .quote-wrap, NOT the captured .quote-body: VFX
+     reproduces the captured box via width:100%, so that element must stay
+     full-width with no horizontal margin. The wrapper's negative margin
+     extends the bbox left so the hanging ::before is captured; quote-body's
+     left padding keeps the text inner-edge aligned with .src. */
+  .pull .quote-wrap {
+    margin-left: -1.5em;
+  }
   .pull .quote-body {
     position: relative;
-    margin-left: -1.5em;
     padding: 0.15em max(24px, 1.2vw) 0.2em calc(max(24px, 1.2vw) + 1.5em);
   }
   .pull .quote-body::before {
@@ -712,8 +716,10 @@
 
 <section class="pull">
   <blockquote>
-    <div class="quote-body" data-halftone>
-      The grain isn't a flaw in the picture. <em>The grain is the picture.</em> Everything else is just an agreement we made with our own eyes.
+    <div class="quote-wrap">
+      <div class="quote-body" data-halftone>
+        The grain isn't a flaw in the picture. <em>The grain is the picture.</em> Everything else is just an agreement we made with our own eyes.
+      </div>
     </div>
     <span class="src">— <b>K. ARAKAWA</b>, <i>On Printing, &amp; Other Quiet Catastrophes</i> · 1987</span>
   </blockquote>
