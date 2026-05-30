@@ -105,8 +105,20 @@ export function attachPixelSortPane(
     document.body.appendChild(container);
 
     const pane = new Pane({ container, title, expanded: false });
-    pane.addBinding(effect.params, "threshold", { min: 0, max: 1, step: 0.01 });
-    pane.addBinding(effect.params, "lowDim", { min: 16, max: 512, step: 16 });
+    // `range` is a tuple; bind it as a Tweakpane Point2d via an {x,y} proxy
+    // (x = lo, y = hi) and write back into the array in place on change.
+    const proxy = {
+        range: { x: effect.params.range[0], y: effect.params.range[1] },
+    };
+    const rangeBinding = pane.addBinding(proxy, "range", {
+        x: { min: 0, max: 1, step: 0.01 },
+        y: { min: 0, max: 1, step: 0.01 },
+    });
+    rangeBinding.on("change", (ev) => {
+        effect.params.range[0] = ev.value.x;
+        effect.params.range[1] = ev.value.y;
+    });
+    pane.addBinding(effect.params, "sortRes", { min: 16, max: 512, step: 16 });
     pane.addBinding(effect.params, "key", {
         options: {
             luminance: "luminance",

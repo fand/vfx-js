@@ -117,7 +117,7 @@ pixelSort.play = async ({ canvasElement }) => {
 
     const vfx = initVFX();
     const effect = new PixelSortEffect({
-        threshold: 0.5,
+        range: [0.5, 1],
         direction: "up",
         angle: 30,
     });

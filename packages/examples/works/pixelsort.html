@@ -276,8 +276,8 @@ import { PixelSortEffect } from "@vfx-js/effects";
 
 // Default config spread into each per-section PixelSortEffect instance.
 const params = {
-    threshold: 0.0,
-    lowDim: 128,
+    range: [0.0, 1.0],
+    sortRes: 128,
     key: "luminance",
     direction: "up",
 };
@@ -418,7 +418,7 @@ try {
     const effects = [];
     const canvases = [];
     await Promise.all(cells.map(async (cell, i) => {
-        const effect = new PixelSortEffect({ ...params, bypass: true, threshold: 1 });
+        const effect = new PixelSortEffect({ ...params, bypass: true, range: [1, 1] });
         await vfx.addHTML(cell, { effect });
         effects[i] = effect;
         canvases[i] = cell.parentElement;
@@ -477,7 +477,7 @@ try {
         if (imageMode === "standalone" && currentSubImg === idx) {
             if (imgEffect) {
                 imgEffect.params.bypass = bypass;
-                imgEffect.params.threshold = threshold;
+                imgEffect.params.range[0] = threshold;
                 imgEffect.params.direction = dir;
             }
             return;
@@ -491,12 +491,12 @@ try {
         section3VideoImg.style.display = "";
         imageMode = "standalone";
         currentSubImg = idx;
-        const e = new PixelSortEffect({ ...params, bypass: false, threshold: pendingSubT, direction: pendingSubDir });
+        const e = new PixelSortEffect({ ...params, bypass: false, range: [pendingSubT, 1], direction: pendingSubDir });
         await vfx.add(section3VideoImg, { effect: e });
         if (token !== imgReqToken) return;
         imgEffect = e;
         imgEffect.params.bypass = pendingSubBypass;
-        imgEffect.params.threshold = pendingSubT;
+        imgEffect.params.range[0] = pendingSubT;
         imgEffect.params.direction = pendingSubDir;
     };
 
@@ -517,7 +517,7 @@ try {
         const eff = effects[idx];
         eff.params.bypass = bypass;
         if (!bypass) {
-            eff.params.threshold = threshold;
+            eff.params.range[0] = threshold;
             eff.params.direction = dir;
         }
     };
@@ -589,7 +589,7 @@ try {
         const start = performance.now();
         const tick = (now) => {
             const t = clamp01((now - start) / INTRO_MS);
-            effects[0].params.threshold = t; // linear: full sort → clean
+            effects[0].params.range[0] = t; // linear: full sort → clean
             if (t < 1) {
                 requestAnimationFrame(tick);
             } else {
