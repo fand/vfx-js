@@ -1,7 +1,8 @@
 {
     "$schema": "https://typedoc.org/schema.json",
     "name": "VFX-JS",
-    "entryPoints": ["./src/index.ts"],
+    "entryPoints": ["./src/index.ts", "../effects/src/index.ts"],
+    "tsconfig": "./typedoc.tsconfig.json",
     "customCss": "./typedoc.css",
     "sort": ["kind"],
     "kindSortOrder": ["Class", "Function"],

@@ -49,6 +49,7 @@ await vfx.add(img, {
 | `ParticleExplodeEffect`  | One-shot curl-noise burst that shatters the source element      |
 | `VoronoiEffect`          | Voronoi cells shrunken in a halo around the cursor              |
 | `PixelateEffect`         | Nearest-neighbour pixelation                                    |
+| `PixelSortEffect`        | Threshold pixel sort, with optional arbitrary sort angle        |
 | `ScanlineEffect`         | CRT scanline overlay                                            |
 
 See the [Storybook demos](https://amagi.dev/vfx-js/storybook) for live examples.
