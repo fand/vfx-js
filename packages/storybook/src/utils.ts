@@ -6,6 +6,7 @@ import type {
     HalftoneInkPresetName,
     ParticleEffect,
     ParticleExplodeEffect,
+    PixelSortEffect,
 } from "@vfx-js/effects";
 import { Pane } from "tweakpane";
 
@@ -89,6 +90,50 @@ export function attachBloomPane(title: string, effect: BloomEffect): Pane {
         step: 1,
         view: "number",
     });
+    trackPane(pane);
+    return pane;
+}
+
+export function attachPixelSortPane(
+    title: string,
+    effect: PixelSortEffect,
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: false });
+    // `range` is a tuple; bind it as a Tweakpane Point2d via an {x,y} proxy
+    // (x = lo, y = hi) and write back into the array in place on change.
+    const proxy = {
+        range: { x: effect.params.range[0], y: effect.params.range[1] },
+    };
+    const rangeBinding = pane.addBinding(proxy, "range", {
+        x: { min: 0, max: 1, step: 0.01 },
+        y: { min: 0, max: 1, step: 0.01 },
+    });
+    rangeBinding.on("change", (ev) => {
+        effect.params.range[0] = ev.value.x;
+        effect.params.range[1] = ev.value.y;
+    });
+    pane.addBinding(effect.params, "sortRes", { min: 16, max: 512, step: 16 });
+    pane.addBinding(effect.params, "key", {
+        options: {
+            luminance: "luminance",
+            r: "r",
+            g: "g",
+            b: "b",
+            hue: "hue",
+            saturation: "saturation",
+        },
+    });
+    pane.addBinding(effect.params, "direction", {
+        options: { up: "up", down: "down", left: "left", right: "right" },
+    });
+    pane.addBinding(effect.params, "angle", { min: -180, max: 180, step: 1 });
+    pane.addBinding(effect.params, "bypass");
     trackPane(pane);
     return pane;
 }

@@ -268,244 +268,18 @@
 
 <script type="module">
 import { VFX } from "@vfx-js/core";
-
-// ─────────────────────────────────────────────
-// PixelSort effect (3-pass: downsample → rank → gather)
-// Threshold-based segment scan after https://www.shadertoy.com/view/XsBfRG
-// ─────────────────────────────────────────────
-
-const FRAG_DOWNSAMPLE = `#version 300 es
-precision highp float;
-in vec2 uvSrc;
-out vec4 outColor;
-uniform sampler2D src;
-void main() { outColor = texture(src, uvSrc); }
-`;
-
-const KEY_FUNC = `
-float key(vec3 c, int mode) {
-    if (mode == 0) return dot(c, vec3(0.299, 0.587, 0.114));
-    if (mode == 1) return c.r;
-    if (mode == 2) return c.g;
-    if (mode == 3) return c.b;
-    float mx = max(max(c.r, c.g), c.b);
-    float mn = min(min(c.r, c.g), c.b);
-    float d  = mx - mn;
-    if (mode == 5) return mx > 0.0 ? d / mx : 0.0;
-    if (d < 1e-5) return 0.0;
-    float h;
-    if (mx == c.r)      h = (c.g - c.b) / d + (c.g < c.b ? 6.0 : 0.0);
-    else if (mx == c.g) h = (c.b - c.r) / d + 2.0;
-    else                h = (c.r - c.g) / d + 4.0;
-    return h / 6.0;
-}
-`;
-
-const SEGMENT_SCAN = `
-ivec2 toXY(int a, int b, int axis) { return axis == 0 ? ivec2(a, b) : ivec2(b, a); }
-
-void scanSegment(sampler2D s, int a, int b, int L, int keyMode, float threshold, int axis, out int segStart, out int segEnd) {
-    segStart = a;
-    for (int i = 0; i < 8192; i++) {
-        if (segStart <= 0) break;
-        if (i >= L) break;
-        float k = key(texelFetch(s, toXY(segStart - 1, b, axis), 0).rgb, keyMode);
-        if (k <= threshold) break;
-        segStart--;
-    }
-    segEnd = a + 1;
-    for (int i = 0; i < 8192; i++) {
-        if (segEnd >= L) break;
-        if (i >= L) break;
-        float k = key(texelFetch(s, toXY(segEnd, b, axis), 0).rgb, keyMode);
-        if (k <= threshold) break;
-        segEnd++;
-    }
-}
-`;
-
-const FRAG_RANK = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D src;
-uniform vec2 srcSize;
-uniform float threshold;
-uniform int keyMode;
-uniform int direction;
-uniform int axis;
-${KEY_FUNC}
-${SEGMENT_SCAN}
-void main() {
-    ivec2 p = ivec2(gl_FragCoord.xy);
-    int a = axis == 0 ? p.x : p.y;
-    int b = axis == 0 ? p.y : p.x;
-    int L = int(axis == 0 ? srcSize.x : srcSize.y);
-    float myKey = key(texelFetch(src, p, 0).rgb, keyMode);
-    if (myKey <= threshold) {
-        outColor = vec4(0.0, 0.0, 0.0, 1.0);
-        return;
-    }
-    int segStart, segEnd;
-    scanSegment(src, a, b, L, keyMode, threshold, axis, segStart, segEnd);
-    int rank = 0;
-    for (int i = segStart; i < segEnd; i++) {
-        if (i == a) continue;
-        float k = key(texelFetch(src, toXY(i, b, axis), 0).rgb, keyMode);
-        if (direction == 0) {
-            if (k < myKey || (k == myKey && i < a)) rank++;
-        } else {
-            if (k > myKey || (k == myKey && i < a)) rank++;
-        }
-    }
-    outColor = vec4(float(rank), float(segEnd - segStart), 0.0, 1.0);
-}
-`;
-
-const FRAG_GATHER = `#version 300 es
-precision highp float;
-in vec2 uvSrc;
-out vec4 outColor;
-uniform sampler2D src;
-uniform sampler2D srcHi;
-uniform sampler2D rankTex;
-uniform vec2 lowSize;
-uniform float threshold;
-uniform int keyMode;
-uniform int axis;
-${KEY_FUNC}
-${SEGMENT_SCAN}
-void main() {
-    int lowA = axis == 0 ? int(uvSrc.x * lowSize.x) : int(uvSrc.y * lowSize.y);
-    int b    = axis == 0 ? int(uvSrc.y * lowSize.y) : int(uvSrc.x * lowSize.x);
-    int L    = int(axis == 0 ? lowSize.x : lowSize.y);
-    ivec2 lowP = toXY(lowA, b, axis);
-    float myKey = key(texelFetch(src, lowP, 0).rgb, keyMode);
-    if (myKey <= threshold) {
-        // below-threshold pixels skip the low-res buffer entirely.
-        vec4 c = texture(srcHi, uvSrc);
-        outColor = vec4(c.rgb * c.a, c.a);
-        return;
-    }
-    int segStart, segEnd;
-    scanSegment(src, lowA, b, L, keyMode, threshold, axis, segStart, segEnd);
-    int targetRank = lowA - segStart;
-    for (int i = segStart; i < segEnd; i++) {
-        int r = int(texelFetch(rankTex, toXY(i, b, axis), 0).r + 0.5);
-        if (r == targetRank) {
-            // sortで動かないピクセルは元画像、動いたピクセルだけ低解像度のソート色
-            if (i == lowA) {
-                vec4 c = texture(srcHi, uvSrc);
-                outColor = vec4(c.rgb * c.a, c.a);
-            } else {
-                vec4 c = texelFetch(src, toXY(i, b, axis), 0);
-                outColor = vec4(c.rgb * c.a, c.a);
-            }
-            return;
-        }
-    }
-    vec4 c = texture(srcHi, uvSrc);
-    outColor = vec4(c.rgb * c.a, c.a);
-}
-`;
-
-// VFX-JS writes to a `premultipliedAlpha: true` WebGL canvas, so the
-// browser composites the canvas treating its contents as premultiplied.
-// Captured textures upload with UNPACK_PREMULTIPLY_ALPHA_WEBGL=false →
-// straight alpha. Pre-multiply at output so semi-transparent pixels
-// (text-shadow halo, anti-aliased edges) composite at the intended
-// alpha instead of bleeding through at full RGB intensity.
-const BYPASS_FRAG = `#version 300 es
-precision highp float;
-in vec2 uvSrc;
-out vec4 outColor;
-uniform sampler2D src;
-void main() {
-    vec4 c = texture(src, uvSrc);
-    outColor = vec4(c.rgb * c.a, c.a);
-}
-`;
-
-// Sort direction → shader (axis, direction) uniforms.
-// axis 0 = horizontal scan, 1 = vertical scan; direction picks which end of
-// each segment the bright pixels gather toward.
-const DIRECTIONS = {
-    right: { axis: 0, direction: 0 },
-    left:  { axis: 0, direction: 1 },
-    down:  { axis: 1, direction: 1 },
-    up:    { axis: 1, direction: 0 },
-};
-
-class PixelSortEffect {
-    constructor(params, opts = {}) {
-        this.params = params;
-        this.localBypass = opts.bypass ?? false;
-        this.localThreshold = opts.threshold ?? null;
-        this.localDir = opts.dir ?? null;
-        this._lowRT = null;
-        this._rankRT = null;
-        this._w = 0;
-        this._h = 0;
-        this._lowW = 0;
-        this._lowH = 0;
-    }
-    _dir() { return DIRECTIONS[this.localDir ?? this.params.dir] ?? DIRECTIONS.right; }
-    _axis() { return this._dir().axis; }
-    _ensureSize(ctx) {
-        const [w, h] = ctx.dims.elementPixel;
-        const axis = this._axis();
-        const low = this.params.lowDim;
-        const lowW = axis === 0 ? low : w;
-        const lowH = axis === 0 ? h : low;
-        if (this._w === w && this._h === h && this._lowW === lowW && this._lowH === lowH) return;
-        this._lowRT?.dispose?.();
-        this._rankRT?.dispose?.();
-        this._w = w;
-        this._h = h;
-        this._lowW = lowW;
-        this._lowH = lowH;
-        this._lowRT  = ctx.createRenderTarget({ size: [lowW, lowH], filter: "nearest" });
-        this._rankRT = ctx.createRenderTarget({ size: [lowW, lowH], filter: "nearest", float: true });
-    }
-    render(ctx) {
-        this._ensureSize(ctx);
-        if (this.localBypass) {
-            ctx.draw({ frag: BYPASS_FRAG, uniforms: { src: ctx.src }, target: ctx.target });
-            return;
-        }
-        const { axis, direction } = this._dir();
-        const lowSize = [this._lowW, this._lowH];
-        const threshold = this.localThreshold ?? this.params.threshold;
-        ctx.draw({ frag: FRAG_DOWNSAMPLE, uniforms: { src: ctx.src }, target: this._lowRT });
-        ctx.draw({
-            frag: FRAG_RANK,
-            uniforms: {
-                src: this._lowRT, srcSize: lowSize,
-                threshold, keyMode: this.params.keyMode,
-                direction, axis,
-            },
-            target: this._rankRT,
-        });
-        ctx.draw({
-            frag: FRAG_GATHER,
-            uniforms: {
-                src: this._lowRT, srcHi: ctx.src, rankTex: this._rankRT,
-                lowSize, threshold, keyMode: this.params.keyMode, axis,
-            },
-            target: ctx.target,
-        });
-    }
-}
+import { PixelSortEffect } from "@vfx-js/effects";
 
 // ─────────────────────────────────────────────
 // Setup
 // ─────────────────────────────────────────────
 
+// Default config spread into each per-section PixelSortEffect instance.
 const params = {
-    threshold: 0.0,
-    lowDim: 128,
-    keyMode: 0,
-    dir: "up",
+    range: [0.0, 1.0],
+    sortRes: 128,
+    key: "luminance",
+    direction: "up",
 };
 
 // Scroll-driven timeline. dir: "left" | "right" | "up" | "down".
@@ -640,7 +414,7 @@ try {
     const effects = [];
     const canvases = [];
     await Promise.all(sections.map(async (section, i) => {
-        const effect = new PixelSortEffect(params, { bypass: true, threshold: 1 });
+        const effect = new PixelSortEffect({ ...params, bypass: true, range: [1, 1] });
         await vfx.addHTML(section, { effect });
         effects[i] = effect;
         canvases[i] = section.parentElement;
@@ -698,9 +472,9 @@ try {
         pendingSubDir = dir;
         if (imageMode === "standalone" && currentSubImg === idx) {
             if (imgEffect) {
-                imgEffect.localBypass = bypass;
-                imgEffect.localThreshold = threshold;
-                imgEffect.localDir = dir;
+                imgEffect.params.bypass = bypass;
+                imgEffect.params.range[0] = threshold;
+                imgEffect.params.direction = dir;
             }
             return;
         }
@@ -713,13 +487,13 @@ try {
         section3VideoImg.style.display = "";
         imageMode = "standalone";
         currentSubImg = idx;
-        const e = new PixelSortEffect(params, { bypass: false, threshold: pendingSubT, dir: pendingSubDir });
+        const e = new PixelSortEffect({ ...params, bypass: false, range: [pendingSubT, 1], direction: pendingSubDir });
         await vfx.add(section3VideoImg, { effect: e });
         if (token !== imgReqToken) return;
         imgEffect = e;
-        imgEffect.localBypass = pendingSubBypass;
-        imgEffect.localThreshold = pendingSubT;
-        imgEffect.localDir = pendingSubDir;
+        imgEffect.params.bypass = pendingSubBypass;
+        imgEffect.params.range[0] = pendingSubT;
+        imgEffect.params.direction = pendingSubDir;
     };
 
     let currentSection = -1;
@@ -730,17 +504,17 @@ try {
             if (currentSection >= 0) {
                 canvases[currentSection].style.opacity = "0";
                 canvases[currentSection].style.pointerEvents = "none";
-                effects[currentSection].localBypass = true;
+                effects[currentSection].params.bypass = true;
             }
             canvases[idx].style.opacity = "1";
             canvases[idx].style.pointerEvents = "auto";
             currentSection = idx;
         }
         const eff = effects[idx];
-        eff.localBypass = bypass;
+        eff.params.bypass = bypass;
         if (!bypass) {
-            eff.localThreshold = threshold;
-            eff.localDir = dir;
+            eff.params.range[0] = threshold;
+            eff.params.direction = dir;
         }
     };
 
@@ -811,7 +585,7 @@ try {
         const start = performance.now();
         const tick = (now) => {
             const t = clamp01((now - start) / INTRO_MS);
-            effects[0].localThreshold = t; // linear: full sort → clean
+            effects[0].params.range[0] = t; // linear: full sort → clean
             if (t < 1) {
                 requestAnimationFrame(tick);
             } else {

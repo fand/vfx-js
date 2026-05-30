@@ -143,6 +143,7 @@ export type VFXOpts = {
     postEffect?: VFXPostEffect | VFXPass[];
 };
 
+/** @internal */
 export type VFXOptsInner = {
     pixelRatio: number;
     zIndex: number | undefined;
