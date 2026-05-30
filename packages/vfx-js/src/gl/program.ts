@@ -45,6 +45,7 @@ export function detectGlslVersion(src: string): GlslVersion {
     return "300 es";
 }
 
+/** @internal */
 type ActiveUniform = {
     location: WebGLUniformLocation;
     type: number;

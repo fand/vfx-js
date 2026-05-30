@@ -22,6 +22,7 @@ import type {
     EffectVFXProps,
 } from "./types.js";
 
+/** @internal */
 export type ChainFrameInput = {
     time: number;
     deltaTime: number;
@@ -62,6 +63,7 @@ export type ChainFrameInput = {
     isVisible: boolean;
 };
 
+/** @internal */
 type StageLayout = {
     /** Stage's rect in element-local device px (bottom-left). */
     dstRect: ElementRect;
@@ -80,6 +82,7 @@ type StageLayout = {
     outputViewport: { x: number; y: number; w: number; h: number };
 };
 
+/** @internal */
 type IntermediateEntry = {
     fb: Framebuffer;
 

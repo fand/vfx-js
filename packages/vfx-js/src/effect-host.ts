@@ -46,6 +46,7 @@ export type EffectRenderTargetInternal = EffectRenderTarget & {
     readonly [RESOLVE_RT]: RenderTargetResolver;
 };
 
+/** @internal */
 type RenderTargetResolver = {
     /** Current read texture (for sampling the RT as a uniform). */
     getReadTexture(): Texture;
@@ -195,10 +196,13 @@ export type HostFrameDims = {
     srcRectUv: [number, number, number, number];
 };
 
+/** @internal */
 type Phase = "init" | "update" | "render" | "disposed";
 
+/** @internal */
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
+/** @internal */
 type OwnedRT = {
     handle: EffectRenderTargetInternal;
     resolver: RenderTargetResolver;
