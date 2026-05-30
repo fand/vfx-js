@@ -170,7 +170,7 @@
 <div id="root">
   <div class="scroll-proxy">
     <div class="stage">
-  <div class="cell"><section class="hero">
+  <section class="hero">
     <div class="bg"><img class="pxs" src="./pixelsort/s1.webp" alt=""></div>
     <div class="overlay"></div>
     <div class="corners label">
@@ -190,9 +190,9 @@
       <span class="line"></span>
     </div>
     <div class="page-indicator label"><span>page <b>1</b> / 4</span></div>
-  </section></div>
+  </section>
 
-  <div class="cell"><section class="section-2">
+  <section class="section-2">
     <img class="section-bg pxs" src="./pixelsort/s2.webp" alt="">
     <div class="section-overlay"></div>
     <div class="section-2-grid">
@@ -215,9 +215,9 @@
       </div>
     </div>
     <div class="page-indicator label"><span>page <b>2</b> / 4</span></div>
-  </section></div>
+  </section>
 
-  <div class="cell"><section class="section-3">
+  <section class="section-3">
     <img class="section-bg pxs" src="./pixelsort/s3.webp" alt="">
     <div class="section-overlay"></div>
     <div class="section-3-inner">
@@ -231,9 +231,9 @@
         <div class="data data-bottom label">Live texture · WebGL2 · sorts on the GPU</div>
     </div>
     <div class="page-indicator label"><span>page <b>3</b> / 4</span></div>
-  </section></div>
+  </section>
 
-  <div class="cell"><section class="section-4">
+  <section class="section-4">
     <img class="section-bg pxs" src="./pixelsort/octo.webp" alt="">
     <div class="section-overlay"></div>
     <div class="s4-inner">
@@ -261,7 +261,7 @@
       </dl>
     </div>
     <div class="page-indicator label"><span>page <b>4</b> / 4</span></div>
-  </section></div>
+  </section>
     </div>
   </div>
 </div>
@@ -409,19 +409,15 @@ try {
         document.querySelector(".section-3"),
         document.querySelector(".section-4"),
     ];
-    // Wrap the padding-free .cell, not the padded section: a wrap target with
-    // horizontal padding freezes the canvas width on resize (only height syncs).
-    const cells = sections.map((s) => s.parentElement);
-
     fitSection2(); // size §2 copy before its texture is captured
 
     const effects = [];
     const canvases = [];
-    await Promise.all(cells.map(async (cell, i) => {
+    await Promise.all(sections.map(async (section, i) => {
         const effect = new PixelSortEffect({ ...params, bypass: true, range: [1, 1] });
-        await vfx.addHTML(cell, { effect });
+        await vfx.addHTML(section, { effect });
         effects[i] = effect;
-        canvases[i] = cell.parentElement;
+        canvases[i] = section.parentElement;
         canvases[i].style.opacity = "0";
         canvases[i].style.pointerEvents = "none";
     }));
@@ -451,7 +447,7 @@ try {
         }
         section3VideoImg.style.display = "none";
         imageMode = "hidden";
-        vfx.update(cells[2]).catch(() => {});
+        vfx.update(sections[2]).catch(() => {});
     };
 
     const setImageEmbedded = async (idx) => {
@@ -467,7 +463,7 @@ try {
         currentSubImg = idx;
         await section3VideoImg.decode().catch(() => {});
         if (token !== imgReqToken) return;
-        vfx.update(cells[2]).catch(() => {});
+        vfx.update(sections[2]).catch(() => {});
     };
 
     const setImageStandalone = async (idx, threshold, bypass, dir) => {
@@ -575,7 +571,7 @@ try {
         cancelAnimationFrame(refitRAF);
         refitRAF = requestAnimationFrame(() => {
             fitSection2();
-            vfx.update(cells[1]).catch(() => {});
+            vfx.update(sections[1]).catch(() => {});
         });
     });
     onScroll();
