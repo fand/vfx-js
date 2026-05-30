@@ -143,11 +143,14 @@
     mix-blend-mode: multiply;
   }
   .hero h1.bigtitle span { display: block; }
-  /* Shift .l1/.l3 with margin, not transform: foreignObject bakes transforms
-     into the texture and VFX also draws at the post-transform bbox.left.
-     padding + negative margin inflates the bbox so italic overhang is caught. */
+  /* Shift with margin, not transform: foreignObject bakes transforms into the
+     texture and VFX also draws at the post-transform bbox.left. The shift
+     lives on the .title-line wrapper so the captured .l1/.l3 stay full-width
+     (margin:0) for VFX's width:100% box; their padding inflates the bbox to
+     catch the italic overhang. */
+  .hero h1.bigtitle .tl1 { margin-left: calc(-2% - 0.12em); }
+  .hero h1.bigtitle .tl3 { margin-left: 22%; margin-right: -0.12em; }
   .hero h1.bigtitle .l1 {
-    margin-left: calc(-2% - 0.12em);
     padding-left: 0.12em;
     font-weight: 100;
     opacity: 0;
@@ -162,8 +165,6 @@
     margin: 24px 0 14px 8px;
   }
   .hero h1.bigtitle .l3 {
-    margin-left: 22%;
-    margin-right: -0.12em;
     padding-right: 0.12em;
     font-weight: 100;
     opacity: 0;
@@ -362,12 +363,16 @@
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
-  /* Negative margin-left + matching padding extend bbox left so the hanging
-     ::before stays inside VFX's capture rect; text inner-edge still aligns
-     with .src. vw (not em) keeps both aligned across font-sizes. */
+  /* Gutter shift lives on .quote-wrap, NOT the captured .quote-body: VFX
+     reproduces the captured box via width:100%, so that element must stay
+     full-width with no horizontal margin. The wrapper's negative margin
+     extends the bbox left so the hanging ::before is captured; quote-body's
+     left padding keeps the text inner-edge aligned with .src. */
+  .pull .quote-wrap {
+    margin-left: -1.5em;
+  }
   .pull .quote-body {
     position: relative;
-    margin-left: -1.5em;
     padding: 0.15em max(24px, 1.2vw) 0.2em calc(max(24px, 1.2vw) + 1.5em);
   }
   .pull .quote-body::before {
@@ -649,9 +654,9 @@
   <div class="feature-tag">★ COVER STORY</div>
 
   <h1 class="bigtitle">
-    <span class="l1" data-halftone>Portrait</span>
+    <span class="title-line tl1"><span class="l1" data-halftone>Portrait</span></span>
     <span class="l2">— a study in four inks —</span>
-    <span class="l3" data-halftone>in <i>Dots.</i></span>
+    <span class="title-line tl3"><span class="l3" data-halftone>in <i>Dots.</i></span></span>
   </h1>
 
   <p class="standfirst">
@@ -712,8 +717,10 @@
 
 <section class="pull">
   <blockquote>
-    <div class="quote-body" data-halftone>
-      The grain isn't a flaw in the picture. <em>The grain is the picture.</em> Everything else is just an agreement we made with our own eyes.
+    <div class="quote-wrap">
+      <div class="quote-body" data-halftone>
+        The grain isn't a flaw in the picture. <em>The grain is the picture.</em> Everything else is just an agreement we made with our own eyes.
+      </div>
     </div>
     <span class="src">— <b>K. ARAKAWA</b>, <i>On Printing, &amp; Other Quiet Catastrophes</i> · 1987</span>
   </blockquote>
