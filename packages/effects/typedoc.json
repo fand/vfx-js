@@ -1,6 +1,6 @@
 {
     "$schema": "https://typedoc.org/schema.json",
-    "name": "@vfx-js/core",
+    "name": "@vfx-js/effects",
     "entryPoints": ["./src/index.ts"],
     "excludeInternal": true,
     "placeInternalsInOwningModule": true
