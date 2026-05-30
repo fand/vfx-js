@@ -2,6 +2,7 @@
     "$schema": "https://typedoc.org/schema.json",
     "name": "@vfx-js/core",
     "entryPoints": ["./src/index.ts"],
+    "excludeExternals": true,
     "excludeInternal": true,
     "placeInternalsInOwningModule": true
 }
