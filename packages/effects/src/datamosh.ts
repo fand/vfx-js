@@ -66,16 +66,39 @@ void main() {
     vec2 block = floor(gl_FragCoord.xy);
     vec2 base = block * uBlock;     // top-left pixel of this block
 
-    // TODO(datamosh): SAD search.
-    //   for dy in [-uSearch, uSearch]:
-    //     for dx in [-uSearch, uSearch]:
-    //       sad = sum over sample points p in the block of
-    //             |cur(base+p) - ref(base+p + (dx,dy))|
-    //       keep (dx,dy) with the smallest sad
-    //   (optionally bias toward small vectors to regularize)
-    vec2 bestMV = vec2(0.0);
+    vec2 move = vec2(0);
+    float bestSad = 1e9;
 
-    outMV = vec4(bestMV, 0.0, 1.0);
+    // 9-point sample
+    vec3 cs[9];
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        cs[i * 3 + j] = texture(uCur, (base + vec2(1 + i * 2, 1 + j * 2) / 6. * uBlock) / uResolution).rgb;
+      }
+    }
+
+    for (float by = -uSearch; by <= uSearch; by++) {
+      for (float bx = -uSearch; bx <= uSearch; bx++) {
+        vec2 blockOffset = vec2(bx, by);
+        float sad = 0.0;
+
+        // 9-point sample
+        for (int i = 0; i < 3; i++) {
+          for (int j = 0; j < 3; j++) {
+            vec3 cCur = cs[i * 3 + j];
+            vec3 cRef = texture(uRef, (base + vec2(1 + i * 2, 1 + j * 2) / 6. * uBlock + blockOffset) / uResolution).rgb;
+            sad += dot(abs(cCur - cRef), vec3(1));
+          }
+        }
+
+        if (sad < bestSad) {
+          bestSad = sad;
+          move = blockOffset;
+        }
+      }
+    }
+
+    outMV = vec4(move, 0, 1);
 }
 `;
 
