@@ -282,6 +282,16 @@ export function attachDatamoshPane(
     pane.addBinding(effect.params, "searchRange", { min: 1, max: 32, step: 1 });
     pane.addBinding(effect.params, "useResidual");
 
+    pane.addBinding(effect.params, "view", {
+        options: {
+            output: "output",
+            motion: "motion",
+            residual: "residual",
+            current: "current",
+            previous: "previous",
+        },
+    });
+
     trackPane(pane);
     return pane;
 }

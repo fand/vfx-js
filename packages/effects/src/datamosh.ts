@@ -49,12 +49,11 @@ void main() {
 }
 `;
 
-// Motion estimation: one fragment per block, output = best motion
-// vector for that block in source pixels (stored in .rg of a float RT).
-//
-// STUB: returns zero motion. Implement a per-block SAD search of `uRef`
-// against `uCur` over a [-uSearch, +uSearch] window and write the
-// displacement that minimises the block difference.
+// Motion estimation: one fragment per block. SAD block-matching searches
+// the reference over a +/-uSearch px window and writes the displacement
+// (px) that best matches the current block, into .rg of a float RT.
+// A small length bias breaks ties toward (0,0) so flat blocks don't latch
+// onto spurious large vectors.
 const FRAG_ME = `#version 300 es
 precision highp float;
 out vec4 outMV;
@@ -66,39 +65,37 @@ void main() {
     vec2 block = floor(gl_FragCoord.xy);
     vec2 base = block * uBlock;     // top-left pixel of this block
 
-    vec2 move = vec2(0);
-    float bestSad = 1e9;
-
-    // 9-point sample
+    // Cache the current block's 3x3 samples and their (offset, px) within
+    // the block — the offsets are invariant across candidates.
     vec3 cs[9];
+    vec2 off[9];
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 3; j++) {
-        cs[i * 3 + j] = texture(uCur, (base + vec2(1 + i * 2, 1 + j * 2) / 6. * uBlock) / uResolution).rgb;
+        int k = i * 3 + j;
+        off[k] = vec2(1 + i * 2, 1 + j * 2) / 6.0 * uBlock;
+        cs[k] = texture(uCur, (base + off[k] + 0.5) / uResolution).rgb;
       }
     }
 
+    vec2 move = vec2(0.0);
+    float bestSad = 1e9;
     for (float by = -uSearch; by <= uSearch; by++) {
       for (float bx = -uSearch; bx <= uSearch; bx++) {
-        vec2 blockOffset = vec2(bx, by);
+        vec2 cand = vec2(bx, by);   // candidate displacement, px
         float sad = 0.0;
-
-        // 9-point sample
-        for (int i = 0; i < 3; i++) {
-          for (int j = 0; j < 3; j++) {
-            vec3 cCur = cs[i * 3 + j];
-            vec3 cRef = texture(uRef, (base + vec2(1 + i * 2, 1 + j * 2) / 6. * uBlock + blockOffset) / uResolution).rgb;
-            sad += dot(abs(cCur - cRef), vec3(1));
-          }
+        for (int k = 0; k < 9; k++) {
+          vec3 cRef = texture(uRef, (base + off[k] + cand + 0.5) / uResolution).rgb;
+          sad += dot(abs(cs[k] - cRef), vec3(1.0));
         }
-
+        sad += length(cand) * 0.0025;   // prefer small motion on ties
         if (sad < bestSad) {
           bestSad = sad;
-          move = blockOffset;
+          move = cand;
         }
       }
     }
 
-    outMV = vec4(move, 0, 1);
+    outMV = vec4(move, 0.0, 1.0);
 }
 `;
 
@@ -147,7 +144,47 @@ void main() {
 }
 `;
 
+// Debug view: motion field as HSV (hue = direction, value = magnitude).
+const FRAG_VIEW_MOTION = `#version 300 es
+precision highp float;
+in vec2 uvContent;
+out vec4 outColor;
+uniform sampler2D uMV;
+uniform float uMvScale;     // magnitude normalization, px
+vec3 hsv(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+void main() {
+    vec2 mv = texture(uMV, uvContent).rg;
+    float ang = atan(mv.y, mv.x) / 6.28318 + 0.5;
+    float mag = clamp(length(mv) / max(uMvScale, 1.0), 0.0, 1.0);
+    outColor = vec4(hsv(vec3(ang, 0.9, 0.15 + 0.85 * mag)), 1.0);
+}
+`;
+
+// Debug view: signed residual remapped to gray (0.5 = zero).
+const FRAG_VIEW_RESIDUAL = `#version 300 es
+precision highp float;
+in vec2 uvContent;
+out vec4 outColor;
+uniform sampler2D uResidual;
+void main() {
+    vec3 r = texture(uResidual, uvContent).rgb;
+    outColor = vec4(clamp(r * 0.5 + 0.5, 0.0, 1.0), 1.0);
+}
+`;
+
 export type DatamoshColorSpace = "rgb" | "ycbcr";
+
+/** Stage routed to the canvas; non-`output` views are for debugging. */
+export type DatamoshView =
+    | "output"
+    | "motion"
+    | "residual"
+    | "current"
+    | "previous";
 
 export type DatamoshParams = {
     /** Motion-estimation block size in px. */
@@ -158,6 +195,8 @@ export type DatamoshParams = {
     useResidual: boolean;
     /** Color model. `"ycbcr"` is not implemented yet. */
     colorSpace: DatamoshColorSpace;
+    /** Stage shown on the canvas. */
+    view: DatamoshView;
 };
 
 const DEFAULT_PARAMS: DatamoshParams = {
@@ -165,6 +204,7 @@ const DEFAULT_PARAMS: DatamoshParams = {
     searchRange: 12,
     useResidual: true,
     colorSpace: "rgb",
+    view: "output",
 };
 
 /**
@@ -282,66 +322,55 @@ export class DatamoshEffect implements Effect {
             target: cur,
         });
 
-        if (!this.#enabled) {
-            // Passthrough; keep buffers warm for a clean first mosh frame.
+        // ME + residual feed both the decoder and the debug views, so run
+        // them whenever moshing OR inspecting an intermediate stage.
+        const debug = this.params.view !== "output";
+        if (this.#enabled || debug) {
             ctx.draw({
-                frag: FRAG_DISPLAY,
-                uniforms: { tex: cur },
-                target: ctx.target,
+                frag: FRAG_ME,
+                uniforms: {
+                    uCur: cur,
+                    uRef: prev,
+                    uResolution: resolution,
+                    uBlock: this.#block,
+                    uSearch: this.params.searchRange,
+                },
+                target: mv,
             });
             ctx.draw({
-                frag: FRAG_CAPTURE,
-                uniforms: { src: ctx.src },
-                target: prev,
+                frag: FRAG_RESIDUAL,
+                uniforms: {
+                    uCur: cur,
+                    uRef: prev,
+                    uMV: mv,
+                    uResolution: resolution,
+                },
+                target: res,
             });
-            this.#seed = true;
-            return;
         }
 
-        // Encode: motion estimation + residual.
-        ctx.draw({
-            frag: FRAG_ME,
-            uniforms: {
-                uCur: cur,
-                uRef: prev,
-                uResolution: resolution,
-                uBlock: this.#block,
-                uSearch: this.params.searchRange,
-            },
-            target: mv,
-        });
-        ctx.draw({
-            frag: FRAG_RESIDUAL,
-            uniforms: {
-                uCur: cur,
-                uRef: prev,
-                uMV: mv,
-                uResolution: resolution,
-            },
-            target: res,
-        });
+        if (this.#enabled) {
+            // Decode onto the held accumulator. First mosh frame seeds intra.
+            ctx.draw({
+                frag: FRAG_DECODE,
+                uniforms: {
+                    uAccum: acc,
+                    uMV: mv,
+                    uVideo: cur,
+                    uResidual: res,
+                    uResolution: resolution,
+                    uIntra: this.#seed,
+                    uUseResidual: this.params.useResidual,
+                },
+                target: acc,
+            });
+            this.#seed = false;
+        } else {
+            // Never refresh acc while disabled; re-seed on the next mosh frame.
+            this.#seed = true;
+        }
 
-        // Decode onto the held accumulator. First mosh frame seeds intra.
-        ctx.draw({
-            frag: FRAG_DECODE,
-            uniforms: {
-                uAccum: acc,
-                uMV: mv,
-                uVideo: cur,
-                uResidual: res,
-                uResolution: resolution,
-                uIntra: this.#seed,
-                uUseResidual: this.params.useResidual,
-            },
-            target: acc,
-        });
-        this.#seed = false;
-
-        ctx.draw({
-            frag: FRAG_DISPLAY,
-            uniforms: { tex: acc },
-            target: ctx.target,
-        });
+        this.#display(ctx, cur, prev, mv, res, acc);
 
         // Reference for next frame's motion estimation.
         ctx.draw({
@@ -349,6 +378,54 @@ export class DatamoshEffect implements Effect {
             uniforms: { src: ctx.src },
             target: prev,
         });
+    }
+
+    // Route the selected stage to the canvas. "output" shows the decoded
+    // accumulator while moshing, the live frame otherwise.
+    #display(
+        ctx: EffectContext,
+        cur: EffectRenderTarget,
+        prev: EffectRenderTarget,
+        mv: EffectRenderTarget,
+        res: EffectRenderTarget,
+        acc: EffectRenderTarget,
+    ): void {
+        switch (this.params.view) {
+            case "motion":
+                ctx.draw({
+                    frag: FRAG_VIEW_MOTION,
+                    uniforms: { uMV: mv, uMvScale: this.params.searchRange },
+                    target: ctx.target,
+                });
+                return;
+            case "residual":
+                ctx.draw({
+                    frag: FRAG_VIEW_RESIDUAL,
+                    uniforms: { uResidual: res },
+                    target: ctx.target,
+                });
+                return;
+            case "current":
+                ctx.draw({
+                    frag: FRAG_DISPLAY,
+                    uniforms: { tex: cur },
+                    target: ctx.target,
+                });
+                return;
+            case "previous":
+                ctx.draw({
+                    frag: FRAG_DISPLAY,
+                    uniforms: { tex: prev },
+                    target: ctx.target,
+                });
+                return;
+            default:
+                ctx.draw({
+                    frag: FRAG_DISPLAY,
+                    uniforms: { tex: this.#enabled ? acc : cur },
+                    target: ctx.target,
+                });
+        }
     }
 
     dispose(): void {
