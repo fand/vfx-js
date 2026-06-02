@@ -191,6 +191,12 @@ export type DatamoshParams = {
     searchRange: number;
     /** Add the residual during decode (off = pure motion). */
     useResidual: boolean;
+    /**
+     * P-frame duplication: re-apply the frame's motion this many extra
+     * times per frame, dragging the accumulator further along the field
+     * (the bloom/smear amplifier). 0 = one normal application.
+     */
+    dup: number;
     /** Color model. `"ycbcr"` is not implemented yet. */
     colorSpace: DatamoshColorSpace;
     /** Stage shown on the canvas. */
@@ -201,6 +207,7 @@ const DEFAULT_PARAMS: DatamoshParams = {
     blockSize: 16,
     searchRange: 12,
     useResidual: true,
+    dup: 0,
     colorSpace: "rgb",
     view: "output",
 };
@@ -348,20 +355,26 @@ export class DatamoshEffect implements Effect {
         }
 
         if (this.#enabled) {
-            // Decode onto the held accumulator. First mosh frame seeds intra.
-            ctx.draw({
-                frag: FRAG_DECODE,
-                uniforms: {
-                    uAccum: acc,
-                    uMV: mv,
-                    uVideo: cur,
-                    uResidual: res,
-                    uResolution: resolution,
-                    uIntra: this.#seed,
-                    uUseResidual: this.params.useResidual,
-                },
-                target: acc,
-            });
+            // Decode onto the held accumulator. First mosh frame seeds
+            // intra (1 pass); inter re-applies the motion 1 + dup times,
+            // chaining through the persistent RT's ping-pong to compound
+            // the smear. Residual lands on the first pass only.
+            const reps = this.#seed ? 1 : 1 + this.params.dup;
+            for (let r = 0; r < reps; r++) {
+                ctx.draw({
+                    frag: FRAG_DECODE,
+                    uniforms: {
+                        uAccum: acc,
+                        uMV: mv,
+                        uVideo: cur,
+                        uResidual: res,
+                        uResolution: resolution,
+                        uIntra: this.#seed,
+                        uUseResidual: this.params.useResidual && r === 0,
+                    },
+                    target: acc,
+                });
+            }
             this.#seed = false;
         } else {
             // Never refresh acc while disabled; re-seed on the next mosh frame.
