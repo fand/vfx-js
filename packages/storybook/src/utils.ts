@@ -1,6 +1,7 @@
 import { VFX, type VFXOpts } from "@vfx-js/core";
 import type {
     BloomEffect,
+    DatamoshEffect,
     FluidEffect,
     HalftoneEffect,
     HalftoneInkPresetName,
@@ -240,6 +241,46 @@ export function attachHalftonePane(
     });
 
     addInkPaletteBindings(pane, effect);
+
+    trackPane(pane);
+    return pane;
+}
+
+export type DatamoshSource = "video" | "webcam";
+
+export function attachDatamoshPane(
+    title: string,
+    effect: DatamoshEffect,
+    onSourceChange?: (source: DatamoshSource) => void | Promise<void>,
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: true });
+
+    if (onSourceChange) {
+        const state = { source: "video" as DatamoshSource };
+        pane.addBinding(state, "source", {
+            options: { video: "video", webcam: "webcam" },
+        }).on("change", (ev) => onSourceChange(ev.value));
+    }
+
+    // mosh toggle isn't a param — drive enable()/disable() from a mirror.
+    const moshState = { mosh: effect.enabled };
+    pane.addBinding(moshState, "mosh").on("change", (ev) => {
+        if (ev.value) {
+            effect.enable();
+        } else {
+            effect.disable();
+        }
+    });
+
+    pane.addBinding(effect.params, "blockSize", { min: 2, max: 64, step: 1 });
+    pane.addBinding(effect.params, "searchRange", { min: 1, max: 32, step: 1 });
+    pane.addBinding(effect.params, "useResidual");
 
     trackPane(pane);
     return pane;
