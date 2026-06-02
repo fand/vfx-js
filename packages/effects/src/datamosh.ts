@@ -110,10 +110,9 @@ out vec4 outColor;
 uniform sampler2D uCur, uRef, uMV;
 uniform vec2 uResolution;
 void main() {
-    vec2 mv = texture(uMV, uv).rg;          // px
+    vec2 mv = texture(uMV, uv).rg; // px
     vec3 cur = texture(uCur, uv).rgb;
-    // TODO(datamosh): predict from the motion-compensated reference.
-    vec3 pred = texture(uRef, uv).rgb;      // STUB: ignores mv
+    vec3 pred = texture(uRef, uv + mv / uResolution).rgb;
     outColor = vec4(cur - pred, 1.0);
 }
 `;
@@ -136,9 +135,8 @@ void main() {
         outColor = vec4(texture(uVideo, uv).rgb, 1.0);
         return;
     }
-    vec2 mv = texture(uMV, uv).rg;          // px
-    // TODO(datamosh): predict from the motion-compensated accumulator.
-    vec3 pred = texture(uAccum, uv).rgb;    // STUB: ignores mv
+    vec2 mv = texture(uMV, uv).rg; // px
+    vec3 pred = texture(uAccum, uv + mv / uResolution).rgb;
     vec3 res = uUseResidual ? texture(uResidual, uv).rgb : vec3(0.0);
     outColor = vec4(pred + res, 1.0);
 }
