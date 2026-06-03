@@ -261,13 +261,27 @@ vec4 cascadeAt(float idx) {
     return texture(cascade, vec2((cbx + 0.5) / bw, (cby + 0.5) / grid.y));
 }
 
+// Robust 1-D hash (Dave Hoskins, "Hash without Sine"). Well distributed for
+// integer-ish inputs, including small k where fract(sin(...)) degenerates
+// (e.g. sin(0) = 0 pinned the k=0 boundary at a fixed offset).
+float hash11(float p) {
+    p = fract(p * 0.1031);
+    p *= p + 33.33;
+    p *= p + p;
+    return fract(p);
+}
+
 // Scan index of the k-th restart boundary. A regular grid (k * restart)
 // jittered by up to +/-0.5 * restart * restartJitter. Real byte-glitches
 // re-sync at irregular points, not on a fixed lattice, so jitter breaks the
 // tell-tale aligned band edges. Amplitude <= 0.5 * restart keeps the
-// boundaries monotonic in k.
+// boundaries monotonic in k. k <= 0 is the image start — a fixed boundary,
+// never jittered — so the first *internal* boundary (k = 1) jitters fully.
 float boundary(float k) {
-    float j = fract(sin((k * 0.137 + seed) * 43758.5453)) - 0.5;
+    if (k < 0.5) {
+        return 0.0;
+    }
+    float j = hash11(k + seed * 101.7) - 0.5;
     return k * restart + j * restart * restartJitter;
 }
 
