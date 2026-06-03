@@ -137,10 +137,14 @@ void main() {
 `;
 
 // Shared block-impulse model (block-resolution passes). `scan` is the
-// raster block index `by * bw + bx`. Most blocks emit nothing; a sparse
-// few inject a signed DC delta (the corrupted differential) or flag a
-// desync trigger. `floor(time)` makes the corruption re-roll discretely so
-// `speed > 0` animates without smearing.
+// raster block index `by * bw + bx`. A real byte-glitch is a SINGLE event:
+// corrupting one entropy-coded byte both garbles the DC differential (→ the
+// colour cascade) and desyncs the Huffman reader (→ the grid slide). So we
+// model one sparse event stream: `glitch` is the event density, every event
+// emits a DC delta, and a fraction (`corruption`) of those events also flip
+// the decoder into a desync. `glitch = 0` therefore means no events at all —
+// no cascade and no slide. `floor(time)` re-rolls discretely so `speed > 0`
+// animates without smearing.
 const IMPULSE_GLSL = `
 uniform float glitch;
 uniform float corruption;
@@ -152,11 +156,13 @@ float h11(float x) {
     return fract(sin(x * 0.1031 + seed * 17.13) * 43758.5453);
 }
 
-// Signed DC delta injected at this block (zero for most blocks).
-vec3 dcImpulse(float scan, float tt) {
-    if (h11(scan * 1.7 + tt * 131.0) >= glitch * 0.012) {
-        return vec3(0.0);
-    }
+// True when a corruption event occurs at this block (density ~ glitch).
+bool corruptionEvent(float scan, float tt) {
+    return h11(scan * 1.7 + tt * 131.0) < glitch * 0.012;
+}
+
+// Signed DC delta carried by an event.
+vec3 dcDelta(float scan, float tt) {
     vec3 d = vec3(
         h11(scan * 2.3 + tt * 7.0),
         h11(scan * 3.1 + tt * 9.0),
@@ -166,9 +172,10 @@ vec3 dcImpulse(float scan, float tt) {
     return d * shift * 16.0;
 }
 
-// 1.0 when this block flips the decoder into a desync (garbage) run.
-float desyncImpulse(float scan, float tt) {
-    return h11(scan * 5.9 + tt * 53.0 + 99.0) < corruption * 0.010 ? 1.0 : 0.0;
+// Whether an event also desyncs the bitstream (a fraction = corruption of
+// all events). Only meaningful when corruptionEvent() is already true.
+bool eventDesyncs(float scan, float tt) {
+    return h11(scan * 5.9 + tt * 53.0 + 99.0) < corruption;
 }
 `;
 
@@ -193,9 +200,11 @@ void main() {
     for (int i = 0; i < 4096; i++) {
         if (float(i) > bx) break;
         float scan = by * bw + float(i);
-        dc += dcImpulse(scan, tt);
-        if (desyncImpulse(scan, tt) > 0.5) {
-            trig = scan;
+        if (corruptionEvent(scan, tt)) {
+            dc += dcDelta(scan, tt);
+            if (eventDesyncs(scan, tt)) {
+                trig = scan;
+            }
         }
     }
     outColor = vec4(dc, trig);
@@ -466,22 +475,24 @@ export type JPEGGlitchParams = {
     quality: number;
 
     /**
-     * Density of DC corruption events, `0`..`1`. Each event injects a
-     * differential error that — like a real baseline-JPEG DC desync —
-     * accumulates in raster scan order and shifts every following block
-     * until the next restart marker (see `restart`). `0` disables the
-     * cascade.
+     * Master density of corruption events, `0`..`1`. Each event is a single
+     * byte-glitch: it injects a DC differential error (which accumulates in
+     * raster scan order and shifts every following block until the next
+     * restart marker — see `restart`) and may also desync the decoder (see
+     * `corruption`). `0` means no events at all: no cascade and no slide.
      */
     glitch: number;
 
-    /** Magnitude of each DC corruption's colour / brightness shift. */
+    /** Magnitude of each event's DC colour / brightness shift. */
     shift: number;
 
     /**
-     * Entropy-desync corruption, `0`..`1`. Density of triggers that flip the
-     * decoder out of bit-sync. From each trigger the desync persists until
-     * the next restart marker, so everything after it in the segment (across
-     * the rows below, not just a short run) is displaced by `slide`.
+     * Fraction of corruption events that also desync the bitstream, `0`..`1`.
+     * `0` → events only shift DC (colour bands, no slide); `1` → every event
+     * also flips the decoder out of bit-sync. A desync persists until the
+     * next restart marker, so everything after it in the segment (across the
+     * rows below, not just a short run) is displaced by `slide`. Has no
+     * effect when `glitch` is `0`.
      */
     corruption: number;
 
