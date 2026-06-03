@@ -100,8 +100,7 @@ void main() {
 `;
 
 // Residual = cur - motionComp(ref, mv). Signed -> needs a float RT.
-//
-// STUB: zero-motion residual (cur - ref). Sample `uMV` and offset the
+// Zero-motion residual (cur - ref). Sample `uMV` and offset the
 // reference by `mv / uResolution` for the real motion-compensated form.
 const FRAG_RESIDUAL = `#version 300 es
 precision highp float;
@@ -119,9 +118,8 @@ void main() {
 
 // Decode. intra -> seed from the clean source. inter -> motion-comp the
 // held accumulator and add the residual (this is where the mosh lives).
-//
-// STUB: zero-motion prediction. Offset the accumulator read by
-// `mv / uResolution` to drag texture along the motion field.
+// Zero-motion prediction. Offset the accumulator read by `mv / uResolution`
+// to drag texture along the motion field.
 const FRAG_DECODE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -174,6 +172,94 @@ void main() {
 }
 `;
 
+// BT.601 luma / chroma. Both are linear, so the residual planes are
+// derived from the shared RGB residual: luma(res) and chroma(res) - 0.5.
+const Y601 = `
+float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+vec2 chroma(vec3 c) {
+    return vec2(dot(c, vec3(-0.168736, -0.331264, 0.5)),
+                dot(c, vec3(0.5, -0.418688, -0.081312))) + 0.5;
+}
+`;
+
+// Luma decode (full res). Writes Y into .r of the shared accumulator.
+const FRAG_DECODE_Y = `#version 300 es
+precision highp float;
+${Y601}
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D uAccum, uMV, uVideo, uResidual;
+uniform vec2 uResolution;
+uniform bool uIntra;
+uniform bool uUseResidual;
+void main() {
+    // I-frame: passthrough the input
+    if (uIntra) {
+        outColor = vec4(luma(texture(uVideo, uv).rgb), 0.0, 0.0, 1.0);
+        return;
+    }
+
+    // P-frame: compose luma from acc + residual
+    vec2 mv = texture(uMV, uv).rg; // px
+    float pred = texture(uAccum, uv + mv / uResolution).r;
+    float res = uUseResidual ? luma(texture(uResidual, uv).rgb) : 0.0;
+    float Y = pred + res;
+
+    outColor = vec4(Y, 0.0, 0.0, 1.0);
+}
+`;
+
+// Chroma decode (half res). Writes (Cb,Cr) into .rg of the chroma plane.
+// The truncated chroma MV (mvc = floor(mv * 0.5)) is the datamosh color
+// drift: chroma is dragged by half the luma motion, rounded down, so color
+// slides off the luma edges.
+const FRAG_DECODE_C = `#version 300 es
+precision highp float;
+${Y601}
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D uChromaAcc, uMV, uVideo, uResidual;
+uniform vec2 uChromaRes;
+uniform bool uIntra;
+uniform bool uUseResidual;
+void main() {
+    // I-frame: passthrough the input
+    if (uIntra) {
+        outColor = vec4(chroma(texture(uVideo, uv).rgb), 0.0, 1.0);
+        return;
+    }
+
+    // P-frame: compose chroma from acc + residual
+    vec2 mv = texture(uMV, uv).rg; // px (luma units)
+    vec2 mvc = floor(mv * 0.5);
+    vec2 pred = texture(uChromaAcc, uv + mvc / uChromaRes).rg;
+    vec2 res = uUseResidual ? chroma(texture(uResidual, uv).rgb) - 0.5 : vec2(0);
+    vec2 C = pred + res;
+
+    outColor = vec4(C, 0.0, 1.0);
+}
+`;
+
+// YCbCr 4:2:0 -> RGB. Luma full res, chroma upsampled (bilinear) from the
+// half-res plane. Premultiplied for the canvas.
+const FRAG_DISPLAY_YCBCR = `#version 300 es
+precision highp float;
+in vec2 uvContent;
+out vec4 outColor;
+uniform sampler2D uLumaAcc;
+uniform sampler2D uChromaAcc;
+void main() {
+    float Y = texture(uLumaAcc, uvContent).r;
+    vec2 cbcr = texture(uChromaAcc, uvContent).rg - 0.5;
+    vec3 rgb = vec3(
+        Y + 1.402 * cbcr.y,
+        Y - 0.344136 * cbcr.x - 0.714136 * cbcr.y,
+        Y + 1.772 * cbcr.x
+    );
+    outColor = vec4(clamp(rgb, 0.0, 1.0), 1.0);
+}
+`;
+
 export type DatamoshColorSpace = "rgb" | "ycbcr";
 
 /** Stage routed to the canvas; non-`output` views are for debugging. */
@@ -197,7 +283,7 @@ export type DatamoshParams = {
      * (the bloom/smear amplifier). 0 = one normal application.
      */
     dup: number;
-    /** Color model. `"ycbcr"` is not implemented yet. */
+    /** Color model. `"ycbcr"` is 4:2:0 (half-res chroma w/ truncated MV). */
     colorSpace: DatamoshColorSpace;
     /** Stage shown on the canvas. */
     view: DatamoshView;
@@ -230,12 +316,19 @@ export class DatamoshEffect implements Effect {
     #mvRT: EffectRenderTarget | null = null;
     #resRT: EffectRenderTarget | null = null;
     #accRT: EffectRenderTarget | null = null;
+    // Half-res chroma accumulator (YCbCr path). Luma reuses #accRT (.r).
+    #chromaAccRT: EffectRenderTarget | null = null;
     #w = 0;
     #h = 0;
+    #cw = 0;
+    #ch = 0;
     #block = 0;
+    // Re-seed when the color model flips (accumulators change meaning).
+    #lastColorSpace: DatamoshColorSpace;
 
     constructor(initial: Partial<DatamoshParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
+        this.#lastColorSpace = this.params.colorSpace;
     }
 
     setParams(partial: Partial<DatamoshParams>): void {
@@ -261,11 +354,13 @@ export class DatamoshEffect implements Effect {
         this.#mvRT?.dispose();
         this.#resRT?.dispose();
         this.#accRT?.dispose();
+        this.#chromaAccRT?.dispose();
         this.#curRT = null;
         this.#prevRT = null;
         this.#mvRT = null;
         this.#resRT = null;
         this.#accRT = null;
+        this.#chromaAccRT = null;
     }
 
     #ensureSize(ctx: EffectContext): void {
@@ -277,6 +372,8 @@ export class DatamoshEffect implements Effect {
         this.#disposeTargets();
         this.#w = w;
         this.#h = h;
+        this.#cw = Math.ceil(w / 2);
+        this.#ch = Math.ceil(h / 2);
         this.#block = block;
         this.#seed = true;
 
@@ -292,6 +389,12 @@ export class DatamoshEffect implements Effect {
         this.#resRT = ctx.createRenderTarget({ size: [w, h], float: true });
         this.#accRT = ctx.createRenderTarget({
             size: [w, h],
+            float: true,
+            persistent: true,
+        });
+        // Half-res chroma accumulator (4:2:0). RG = (Cb, Cr).
+        this.#chromaAccRT = ctx.createRenderTarget({
+            size: [this.#cw, this.#ch],
             float: true,
             persistent: true,
         });
@@ -311,12 +414,16 @@ export class DatamoshEffect implements Effect {
         const mv = this.#mvRT;
         const res = this.#resRT;
         const acc = this.#accRT;
-        if (!cur || !prev || !mv || !res || !acc) {
+        const chromaAcc = this.#chromaAccRT;
+        if (!cur || !prev || !mv || !res || !acc || !chromaAcc) {
             return;
         }
 
-        // TODO(datamosh): YCbCr 4:2:0 path (truncated chroma MV is what
-        // gives real datamosh its color drift). RGB only for now.
+        // Flipping the color model repurposes the accumulators, so re-seed.
+        if (this.params.colorSpace !== this.#lastColorSpace) {
+            this.#lastColorSpace = this.params.colorSpace;
+            this.#seed = true;
+        }
 
         const resolution: [number, number] = [this.#w, this.#h];
 
@@ -360,20 +467,51 @@ export class DatamoshEffect implements Effect {
             // chaining through the persistent RT's ping-pong to compound
             // the smear. Residual lands on the first pass only.
             const reps = this.#seed ? 1 : 1 + this.params.dup;
+            const chromaRes: [number, number] = [this.#cw, this.#ch];
             for (let r = 0; r < reps; r++) {
-                ctx.draw({
-                    frag: FRAG_DECODE,
-                    uniforms: {
-                        uAccum: acc,
-                        uMV: mv,
-                        uVideo: cur,
-                        uResidual: res,
-                        uResolution: resolution,
-                        uIntra: this.#seed,
-                        uUseResidual: this.params.useResidual && r === 0,
-                    },
-                    target: acc,
-                });
+                const useResidual = this.params.useResidual && r === 0;
+                if (this.params.colorSpace === "ycbcr") {
+                    ctx.draw({
+                        frag: FRAG_DECODE_Y,
+                        uniforms: {
+                            uAccum: acc,
+                            uMV: mv,
+                            uVideo: cur,
+                            uResidual: res,
+                            uResolution: resolution,
+                            uIntra: this.#seed,
+                            uUseResidual: useResidual,
+                        },
+                        target: acc,
+                    });
+                    ctx.draw({
+                        frag: FRAG_DECODE_C,
+                        uniforms: {
+                            uChromaAcc: chromaAcc,
+                            uMV: mv,
+                            uVideo: cur,
+                            uResidual: res,
+                            uChromaRes: chromaRes,
+                            uIntra: this.#seed,
+                            uUseResidual: useResidual,
+                        },
+                        target: chromaAcc,
+                    });
+                } else {
+                    ctx.draw({
+                        frag: FRAG_DECODE,
+                        uniforms: {
+                            uAccum: acc,
+                            uMV: mv,
+                            uVideo: cur,
+                            uResidual: res,
+                            uResolution: resolution,
+                            uIntra: this.#seed,
+                            uUseResidual: useResidual,
+                        },
+                        target: acc,
+                    });
+                }
             }
             this.#seed = false;
         } else {
@@ -381,7 +519,7 @@ export class DatamoshEffect implements Effect {
             this.#seed = true;
         }
 
-        this.#display(ctx, cur, prev, mv, res, acc);
+        this.#display(ctx, cur, prev, mv, res, acc, chromaAcc);
 
         // Reference for next frame's motion estimation.
         ctx.draw({
@@ -400,6 +538,7 @@ export class DatamoshEffect implements Effect {
         mv: EffectRenderTarget,
         res: EffectRenderTarget,
         acc: EffectRenderTarget,
+        chromaAcc: EffectRenderTarget,
     ): void {
         switch (this.params.view) {
             case "motion":
@@ -431,11 +570,20 @@ export class DatamoshEffect implements Effect {
                 });
                 return;
             default:
-                ctx.draw({
-                    frag: FRAG_DISPLAY,
-                    uniforms: { tex: this.#enabled ? acc : cur },
-                    target: ctx.target,
-                });
+                // "output": decoded result while moshing, live frame otherwise.
+                if (this.#enabled && this.params.colorSpace === "ycbcr") {
+                    ctx.draw({
+                        frag: FRAG_DISPLAY_YCBCR,
+                        uniforms: { uLumaAcc: acc, uChromaAcc: chromaAcc },
+                        target: ctx.target,
+                    });
+                } else {
+                    ctx.draw({
+                        frag: FRAG_DISPLAY,
+                        uniforms: { tex: this.#enabled ? acc : cur },
+                        target: ctx.target,
+                    });
+                }
         }
     }
 
@@ -443,6 +591,8 @@ export class DatamoshEffect implements Effect {
         this.#disposeTargets();
         this.#w = 0;
         this.#h = 0;
+        this.#cw = 0;
+        this.#ch = 0;
         this.#block = 0;
         this.#seed = true;
     }
