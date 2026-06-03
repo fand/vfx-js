@@ -14,10 +14,11 @@
 //   6. quantize   per-coefficient quantization + glitch bufA     → bufB
 //   7. idctV      inverse 1-D DCT over each column       bufB     → bufA
 //   8. idctH      inverse 1-D DCT over each row          bufA     → bufB
-//   9. resolve    YCbCr → RGB, premultiply, write        bufB     → canvas
+//   9. displace   entropy-desync MCU grid slide / smear  bufB     → bufA
+//  10. resolve    YCbCr → RGB, premultiply, write        bufA     → canvas
 //
 // The 2-D block DCT is separable, so each transform is two cheap 1-D passes
-// (8 taps each) instead of a 64-tap convolution. Steps 2-8 run in the
+// (8 taps each) instead of a 64-tap convolution. Steps 2-9 run in the
 // effect's own auto-sized render targets where `gl_FragCoord` maps 1:1 to
 // texels (and therefore to the 8x8 block grid). The final `resolve` pass
 // samples by `uv` only, so it is safe to draw into the offset element
@@ -231,20 +232,15 @@ void main() {
 }
 `;
 
-// Pass 6 — quantize each coefficient (heavier for high frequency and for
-// chroma, lighter for DC), then apply the cascade. The buffer holds full
-// per-block DCT coefficients in the natural frequency layout: the texel at
-// the top-left of each 8x8 cell is that block's DC term.
-const FRAG_QUANTIZE = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D src;
+// Shared cascade / restart-segment lookup, used by both the coefficient
+// quantize pass and the spatial displace pass. Declares the block-res
+// cascade sampler and the restart uniforms, and resolves, for a given scan
+// index: the prefix-sum DC offset, the enclosing restart segment, and the
+// desync run.
+const CASCADE_GLSL = `
 uniform sampler2D cascade; // block-res: rgb = prefix-sum DC offset, a = last trigger
-uniform vec2 resolution;
-uniform vec2 grid; // [bw, bh] in blocks
-uniform float quality;
-uniform float restart; // mean restart interval in blocks (MCUs); 0 = none
+uniform vec2 grid;         // [bw, bh] in blocks
+uniform float restart;       // mean restart interval in blocks (MCUs); 0 = none
 uniform float restartJitter; // 0..1: randomness of restart boundary positions
 uniform float seed;
 
@@ -262,9 +258,44 @@ vec4 cascadeAt(float idx) {
 // tell-tale aligned band edges. Amplitude <= 0.5 * restart keeps the
 // boundaries monotonic in k.
 float boundary(float k) {
-    float j = (fract(sin((k * 0.137 + seed) * 43758.5453) * 1.0) - 0.5);
+    float j = fract(sin((k * 0.137 + seed) * 43758.5453)) - 0.5;
     return k * restart + j * restart * restartJitter;
 }
+
+// Largest restart boundary at or before scan (jittered grid → check the
+// few candidates around floor(scan / restart)).
+float segStartFor(float scan) {
+    float s = 0.0;
+    if (restart > 0.5) {
+        float k0 = floor(scan / restart);
+        for (int d = -1; d <= 1; d++) {
+            float bk = floor(boundary(k0 + float(d)));
+            if (bk <= scan) {
+                s = max(s, bk);
+            }
+        }
+    }
+    return s;
+}
+
+// Length (in blocks) of the desync run a trigger starts.
+float runLenFor(float trig) {
+    return 4.0 + 60.0 * fract(sin(trig * 0.137 + seed) * 43758.5453);
+}
+`;
+
+// Pass 6 — quantize each coefficient (heavier for high frequency and for
+// chroma, lighter for DC), then add the restart-bounded DC cascade. The
+// buffer holds full per-block DCT coefficients in the natural frequency
+// layout: the texel at the top-left of each 8x8 cell is the DC term.
+const FRAG_QUANTIZE = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D src;
+uniform vec2 resolution;
+uniform float quality;
+${CASCADE_GLSL}
 
 void main() {
     vec2 fc = gl_FragCoord.xy;
@@ -292,53 +323,25 @@ void main() {
     vec4 q = vec4(lumaStep, chromaStep, chromaStep, lumaStep);
     coef = floor(coef / q + 0.5) * q;
 
-    // --- scan-order cascade, bounded by restart markers ---
-    // The cascade buffer holds the GLOBAL prefix sum. Restart markers (DRI)
-    // reset the DC predictor every \`restart\` blocks, so the visible offset
-    // is the sum over the current segment only:
+    // --- scan-order DC cascade, bounded by restart markers ---
+    // The cascade buffer holds the GLOBAL prefix sum; the visible offset is
+    // the sum over the current restart segment only:
     //   segmentDC(n) = prefix(n) - prefix(segStart - 1)
-    // That localizes damage to the segment an error lands in, instead of
-    // smearing it to the end of the image (a no-restart baseline JPEG).
     float scan = by * grid.x + bx;
-    // Largest restart boundary at or before this block. Boundaries are
-    // jittered, so check the few candidates around floor(scan / restart).
-    float segStart = 0.0;
-    if (restart > 0.5) {
-        float k0 = floor(scan / restart);
-        for (int d = -1; d <= 1; d++) {
-            float bk = floor(boundary(k0 + float(d)));
-            if (bk <= scan) {
-                segStart = max(segStart, bk);
-            }
-        }
-    }
-
-    vec4 casc = cascadeAt(scan);
-    vec3 dcOffset = casc.rgb;
-    float trig = casc.a;
+    float segStart = segStartFor(scan);
+    vec3 dcOffset = cascadeAt(scan).rgb;
     if (segStart > 0.5) {
         dcOffset -= cascadeAt(segStart - 1.0).rgb;
     }
-    // A trigger only counts if it lies within the current restart segment.
-    bool trigValid = trig >= segStart;
-
-    // Desync run: from the trigger block, the next runLen blocks (scan
-    // order) lose entropy sync and collapse to flat DC — solid blocks that
-    // read as the melted / smeared region of a JPEG byte-glitch.
-    float runLen = 4.0 + 60.0 * fract(sin(trig * 0.137 + seed) * 43758.5453);
-    bool desync = trigValid && (scan - trig) >= 0.0 && (scan - trig) < runLen;
-
     if (isDC) {
         coef.xyz += dcOffset;
-    } else if (desync) {
-        coef = vec4(0.0); // drop AC → block flattens to its (shifted) DC
     }
 
     outColor = coef;
 }
 `;
 
-// Pass 5 — inverse DCT along the column.
+// Pass 7 — inverse DCT along the column.
 const FRAG_IDCT_V = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -363,7 +366,7 @@ void main() {
 }
 `;
 
-// Pass 6 — inverse DCT along the row.
+// Pass 8 — inverse DCT along the row.
 const FRAG_IDCT_H = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -388,7 +391,55 @@ void main() {
 }
 `;
 
-// Pass 7 — YCbCr → RGB, clamp, premultiply for the canvas blend.
+// Pass 9 — spatial displace: emulate entropy-stream (Huffman) desync. When
+// the decoder loses bit-sync it also loses count of how many bits each
+// block consumed, so the MCU grid slides: subsequent content is placed at a
+// shifted scan position. Inside a desync run we therefore sample the
+// reconstructed image from a scan-order-lagged block, which slides / stretches
+// content and wraps across rows as the signature diagonal tear.
+const FRAG_DISPLACE = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D src; // reconstructed YCbCr (post-IDCT)
+uniform vec2 resolution;
+uniform float slide; // 0..1 horizontal smear / stretch strength
+${CASCADE_GLSL}
+
+void main() {
+    vec2 fc = gl_FragCoord.xy;
+    float bx = floor(fc.x / 8.0);
+    float by = floor(fc.y / 8.0);
+    float scan = by * grid.x + bx;
+
+    float segStart = segStartFor(scan);
+    float trig = cascadeAt(scan).a;
+    float prog = scan - trig;
+    bool desync = trig >= segStart && prog >= 0.0 && prog < runLenFor(trig);
+
+    vec2 sampleUV = fc / resolution;
+    if (desync && slide > 0.0) {
+        // Content advances at rate (1 - slide): the source scan index lags
+        // output by floor(prog * slide). slide=1 freezes the source at the
+        // trigger block (a hard smear); intermediate values stretch content
+        // horizontally and wrap across rows as a diagonal tear.
+        float m = scan - floor(prog * slide);
+        float bw = grid.x;
+        float sbx = mod(m, bw);
+        float sby = floor(m / bw);
+        // Keep the intra-block pixel offset so block detail is preserved.
+        float intraX = fc.x - bx * 8.0;
+        float intraY = fc.y - by * 8.0;
+        sampleUV = vec2(
+            (sbx * 8.0 + intraX) / resolution.x,
+            (sby * 8.0 + intraY) / resolution.y
+        );
+    }
+    outColor = texture(src, sampleUV);
+}
+`;
+
+// Pass 10 — YCbCr → RGB, clamp, premultiply for the canvas blend.
 const FRAG_RESOLVE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -426,9 +477,19 @@ export type JPEGGlitchParams = {
     /**
      * Entropy-desync corruption, `0`..`1`. Density of triggers that flip the
      * decoder into a garbage run: from each trigger, a run of following
-     * blocks (scan order) collapses to flat DC — the melted / smeared look.
+     * blocks (scan order) is displaced by `slide` — the melted / torn look.
      */
     corruption: number;
+
+    /**
+     * Horizontal smear / stretch of desync runs, `0`..`1`. Emulates the MCU
+     * grid sliding when the Huffman bitstream loses sync: inside a desync run
+     * the source content advances at rate `1 - slide`, so `0` leaves content
+     * in place, mid values stretch it horizontally, and `1` freezes it at the
+     * trigger block (a hard smear that wraps across rows as a diagonal tear).
+     * Only visible where `corruption` has triggered a desync run.
+     */
+    slide: number;
 
     /**
      * Mean restart-marker (DRI) interval in blocks (MCUs). The DC cascade and
@@ -462,6 +523,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     corruption: 0.15,
     restart: 512,
     restartJitter: 0.5,
+    slide: 0.7,
     speed: 1,
     seed: 0,
 };
@@ -509,8 +571,16 @@ export class JPEGGlitchEffect implements Effect {
         }
 
         const resolution: [number, number] = [a.width, a.height];
-        const { quality, glitch, shift, corruption, restart, restartJitter, seed } =
-            this.params;
+        const {
+            quality,
+            glitch,
+            shift,
+            corruption,
+            restart,
+            restartJitter,
+            slide,
+            seed,
+        } = this.params;
         const time = ctx.time * this.params.speed;
 
         const [rowScan, cascade] = this.#ensureBlockBuffers(ctx, a);
@@ -544,19 +614,13 @@ export class JPEGGlitchEffect implements Effect {
             target: cascade,
         });
 
-        // 6. quantize + cascade application
+        // Cascade / restart-segment uniforms shared by quantize + displace.
+        const seg = { cascade, grid, restart, restartJitter, seed };
+
+        // 6. quantize + DC cascade application
         ctx.draw({
             frag: FRAG_QUANTIZE,
-            uniforms: {
-                src: a,
-                cascade,
-                resolution,
-                grid,
-                quality,
-                restart,
-                restartJitter,
-                seed,
-            },
+            uniforms: { src: a, resolution, quality, ...seg },
             target: b,
         });
 
@@ -572,10 +636,17 @@ export class JPEGGlitchEffect implements Effect {
             target: b,
         });
 
-        // 9. YCbCr → RGB → canvas (or this stage's assigned target)
+        // 9. spatial displace (entropy-desync grid slide / smear)
+        ctx.draw({
+            frag: FRAG_DISPLACE,
+            uniforms: { src: b, resolution, slide, ...seg },
+            target: a,
+        });
+
+        // 10. YCbCr → RGB → canvas (or this stage's assigned target)
         ctx.draw({
             frag: FRAG_RESOLVE,
-            uniforms: { src: b },
+            uniforms: { src: a },
             target: ctx.target,
         });
     }
