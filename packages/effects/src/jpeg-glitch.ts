@@ -429,7 +429,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     glitch: 0.5,
     shift: 0.4,
     corruption: 0.15,
-    restart: 40,
+    restart: 512,
     speed: 1,
     seed: 0,
 };
