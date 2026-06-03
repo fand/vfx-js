@@ -6,26 +6,39 @@
 // CPU, this reproduces the visible artifacts of lossy JPEG entirely on the
 // GPU as a multipass pipeline:
 //
-//   1. convert   RGB → YCbCr (+ straight alpha)         src      → bufA
-//   2. dctH      forward 1-D DCT-II over each 8px row    bufA     → bufB
-//   3. dctV      forward 1-D DCT-II over each 8px column bufB     → bufA
-//   4. quantize  per-coefficient quantization + glitch   bufA     → bufB
-//   5. idctV     inverse 1-D DCT over each column         bufB     → bufA
-//   6. idctH     inverse 1-D DCT over each row            bufA     → bufB
-//   7. resolve   YCbCr → RGB, premultiply, write          bufB     → canvas
+//   1. convert    RGB → YCbCr (+ straight alpha)       src      → bufA
+//   2. dctH       forward 1-D DCT-II over each 8px row  bufA     → bufB
+//   3. dctV       forward 1-D DCT-II over each 8px col  bufB     → bufA
+//   4. cascadeRow row-local prefix sum of DC impulses   (proc.)  → rowScan
+//   5. cascade    full scan-order prefix sum + desync   rowScan  → cascade
+//   6. quantize   per-coefficient quantization + glitch bufA     → bufB
+//   7. idctV      inverse 1-D DCT over each column       bufB     → bufA
+//   8. idctH      inverse 1-D DCT over each row          bufA     → bufB
+//   9. resolve    YCbCr → RGB, premultiply, write        bufB     → canvas
 //
 // The 2-D block DCT is separable, so each transform is two cheap 1-D passes
-// (8 taps each) instead of a 64-tap convolution. Steps 2-6 run in the
+// (8 taps each) instead of a 64-tap convolution. Steps 2-8 run in the
 // effect's own auto-sized render targets where `gl_FragCoord` maps 1:1 to
 // texels (and therefore to the 8x8 block grid). The final `resolve` pass
 // samples by `uv` only, so it is safe to draw into the offset element
 // viewport of the last chain stage.
 //
-// Quantization (step 4) produces the classic blocky DCT artifacts. The
-// glitch on top corrupts DC coefficients in horizontal segments — mimicking
-// how a flipped bit in a JPEG entropy stream offsets every block to its
-// right until the next restart — which reads as the familiar coloured
-// horizontal smears.
+// Quantization (step 6) produces the classic blocky DCT artifacts. The
+// glitch on top is the part that makes it read as a *real* JPEG byte-glitch
+// (think `sed`-ing a .jpg). In baseline JPEG the DC coefficient of every
+// block is differentially coded against the previous block in raster scan
+// order — across row boundaries, with no per-row reset — so one corrupted
+// DC delta shifts the brightness/colour of *every* block after it, to the
+// end of the scan. Reproducing that needs a running sum in scan order, not
+// a per-row effect, so the cascade is computed on a small block-resolution
+// buffer (steps 4-5) as a two-pass prefix sum:
+//   - step 4 sums DC impulses left-to-right within each block row, and
+//     tracks the latest "desync" trigger block in that row;
+//   - step 5 folds in all the rows above to get the true scan-order running
+//     sum (the propagating DC offset) and running-max trigger.
+// The desync trigger emulates entropy-stream loss: from a trigger block, a
+// run of following blocks collapses to flat DC (the melted / smeared look)
+// until the decoder would resync.
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 
 // sqrt(1/8) and sqrt(2/8): the orthonormal DCT-II scale factors for the
@@ -122,8 +135,104 @@ void main() {
 }
 `;
 
-// Pass 4 — quantize each coefficient (heavier for high frequency and for
-// chroma, lighter for DC) then inject the glitch. The buffer now holds full
+// Shared block-impulse model (block-resolution passes). `scan` is the
+// raster block index `by * bw + bx`. Most blocks emit nothing; a sparse
+// few inject a signed DC delta (the corrupted differential) or flag a
+// desync trigger. `floor(time)` makes the corruption re-roll discretely so
+// `speed > 0` animates without smearing.
+const IMPULSE_GLSL = `
+uniform float glitch;
+uniform float corruption;
+uniform float shift;
+uniform float time;
+uniform float seed;
+
+float h11(float x) {
+    return fract(sin(x * 0.1031 + seed * 17.13) * 43758.5453);
+}
+
+// Signed DC delta injected at this block (zero for most blocks).
+vec3 dcImpulse(float scan, float tt) {
+    if (h11(scan * 1.7 + tt * 131.0) >= glitch * 0.012) {
+        return vec3(0.0);
+    }
+    vec3 d = vec3(
+        h11(scan * 2.3 + tt * 7.0),
+        h11(scan * 3.1 + tt * 9.0),
+        h11(scan * 4.7 + tt * 11.0)
+    ) - 0.5;
+    // DC of a flat block ~ value x 8; scale the offset into that range.
+    return d * shift * 16.0;
+}
+
+// 1.0 when this block flips the decoder into a desync (garbage) run.
+float desyncImpulse(float scan, float tt) {
+    return h11(scan * 5.9 + tt * 53.0 + 99.0) < corruption * 0.010 ? 1.0 : 0.0;
+}
+`;
+
+// Pass 4 — row-local prefix. For block (bx, by): the inclusive sum of DC
+// impulses from column 0..bx in this row (rgb), and the largest desync
+// trigger scan-index seen so far in this row (a, -1 if none). Reading this
+// buffer at the last column therefore gives each row's full total / max.
+const FRAG_CASCADE_ROW = `#version 300 es
+precision highp float;
+out vec4 outColor;
+uniform vec2 grid; // [bw, bh] in blocks
+${IMPULSE_GLSL}
+
+void main() {
+    float bw = grid.x;
+    float bx = floor(gl_FragCoord.x);
+    float by = floor(gl_FragCoord.y);
+    float tt = floor(time);
+
+    vec3 dc = vec3(0.0);
+    float trig = -1.0;
+    for (int i = 0; i < 4096; i++) {
+        if (float(i) > bx) break;
+        float scan = by * bw + float(i);
+        dc += dcImpulse(scan, tt);
+        if (desyncImpulse(scan, tt) > 0.5) {
+            trig = scan;
+        }
+    }
+    outColor = vec4(dc, trig);
+}
+`;
+
+// Pass 5 — fold in every row above to finish the scan-order prefix sum.
+// finalDC(bx,by) = (sum of all full rows j<by) + rowPrefix(bx,by); the
+// trigger is the running max over the same scan range. The result is the
+// true raster-order running DC offset that floods across row boundaries.
+const FRAG_CASCADE = `#version 300 es
+precision highp float;
+out vec4 outColor;
+uniform sampler2D rowScan;
+uniform vec2 grid; // [bw, bh] in blocks
+
+void main() {
+    float bw = grid.x;
+    float bh = grid.y;
+    float bx = floor(gl_FragCoord.x);
+    float by = floor(gl_FragCoord.y);
+    float lastCol = (bw - 0.5) / bw;
+
+    vec3 dc = vec3(0.0);
+    float trig = -1.0;
+    for (int j = 0; j < 4096; j++) {
+        if (float(j) >= by) break;
+        vec4 row = texture(rowScan, vec2(lastCol, (float(j) + 0.5) / bh));
+        dc += row.rgb;
+        trig = max(trig, row.a);
+    }
+    vec4 here = texture(rowScan, vec2((bx + 0.5) / bw, (by + 0.5) / bh));
+    outColor = vec4(dc + here.rgb, max(trig, here.a));
+}
+`;
+
+// Pass 6 — quantize each coefficient (heavier for high frequency and for
+// chroma, lighter for DC), then apply the cascade. The buffer holds full
 // per-block DCT coefficients in the natural frequency layout: the texel at
 // the top-left of each 8x8 cell is that block's DC term.
 const FRAG_QUANTIZE = `#version 300 es
@@ -131,20 +240,11 @@ precision highp float;
 in vec2 uv;
 out vec4 outColor;
 uniform sampler2D src;
+uniform sampler2D cascade; // block-res: rgb = DC offset, a = last trigger
 uniform vec2 resolution;
+uniform vec2 grid; // [bw, bh] in blocks
 uniform float quality;
-uniform float glitch;
-uniform float shift;
-uniform float corruption;
-uniform float time;
 uniform float seed;
-
-float hash1(float x) {
-    return fract(sin(x * 12.9898 + seed * 78.233) * 43758.5453);
-}
-float hash2(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7)) + seed) * 43758.5453);
-}
 
 void main() {
     vec2 fc = gl_FragCoord.xy;
@@ -165,34 +265,29 @@ void main() {
     float chromaStep = base * (2.0 + freq * 0.6);
     if (isDC) {
         // Protect the DC term so quantization alone does not wash the
-        // image out — the DC glitch below is what should move it.
+        // image out — the cascade below is what should move it.
         lumaStep *= 0.25;
         chromaStep *= 0.25;
     }
     vec4 q = vec4(lumaStep, chromaStep, chromaStep, lumaStep);
     coef = floor(coef / q + 0.5) * q;
 
-    // --- DC band glitch (entropy-stream corruption cascade) ---
-    if (isDC) {
-        // Each block row is "hit" with probability ~ glitch.
-        float hit = step(1.0 - glitch * 0.6, hash1(by * 1.7 + floor(time)));
-        // Constant offset across a run of blocks, restarting at random
-        // segment boundaries — the propagating-error look.
-        float segLen = 2.0 + 30.0 * hash1(by * 3.3);
-        float seg = floor(bx / segLen);
-        // DC of a flat block ~ value * 8, so scale the offset to match.
-        coef.x += hit * (hash2(vec2(seg, by)) - 0.5) * shift * 8.0;
-        coef.y += hit * (hash2(vec2(seg + 11.0, by)) - 0.5) * shift * 8.0;
-        coef.z += hit * (hash2(vec2(seg + 23.0, by)) - 0.5) * shift * 8.0;
-    }
+    // --- scan-order cascade ---
+    vec4 casc = texture(cascade, vec2((bx + 0.5) / grid.x, (by + 0.5) / grid.y));
+    vec3 dcOffset = casc.rgb;
+    float trig = casc.a;
 
-    // --- high-frequency block corruption ---
-    float cflag = step(
-        1.0 - corruption * 0.5,
-        hash2(vec2(bx, by) + floor(time * 0.7))
-    );
-    if (cflag > 0.5 && !isDC) {
-        coef.xyz *= hash2(vec2(px, py)) * 6.0 - 1.0;
+    // Desync run: from the trigger block, the next runLen blocks (scan
+    // order) lose entropy sync and collapse to flat DC — solid blocks that
+    // read as the melted / smeared region of a JPEG byte-glitch.
+    float scan = by * grid.x + bx;
+    float runLen = 4.0 + 60.0 * fract(sin(trig * 0.137 + seed) * 43758.5453);
+    bool desync = trig >= 0.0 && (scan - trig) >= 0.0 && (scan - trig) < runLen;
+
+    if (isDC) {
+        coef.xyz += dcOffset;
+    } else if (desync) {
+        coef = vec4(0.0); // drop AC → block flattens to its (shifted) DC
     }
 
     outColor = coef;
@@ -273,17 +368,20 @@ export type JPEGGlitchParams = {
     quality: number;
 
     /**
-     * Amount of DC-coefficient glitch, `0`..`1`. Drives how many block rows
-     * get hit by the propagating-error cascade. `0` disables it.
+     * Density of DC corruption events, `0`..`1`. Each event injects a
+     * differential error that — like a real baseline-JPEG DC desync —
+     * accumulates in raster scan order and shifts every following block to
+     * the end of the image. `0` disables the cascade.
      */
     glitch: number;
 
-    /** Magnitude of the per-segment colour / brightness shift the glitch adds. */
+    /** Magnitude of each DC corruption's colour / brightness shift. */
     shift: number;
 
     /**
-     * High-frequency block corruption, `0`..`1`. Randomly scrambles the AC
-     * coefficients of some blocks, scattering bright DCT garbage.
+     * Entropy-desync corruption, `0`..`1`. Density of triggers that flip the
+     * decoder into a garbage run: from each trigger, a run of following
+     * blocks (scan order) collapses to flat DC — the melted / smeared look.
      */
     corruption: number;
 
@@ -315,6 +413,12 @@ export class JPEGGlitchEffect implements Effect {
 
     #bufA: EffectRenderTarget | null = null;
     #bufB: EffectRenderTarget | null = null;
+    // Block-resolution buffers for the scan-order DC cascade. Sized to the
+    // 8x8 block grid, so they are reallocated when the element resizes.
+    #rowScan: EffectRenderTarget | null = null;
+    #cascade: EffectRenderTarget | null = null;
+    #blocksW = 0;
+    #blocksH = 0;
 
     constructor(initial: Partial<JPEGGlitchParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
@@ -343,6 +447,9 @@ export class JPEGGlitchEffect implements Effect {
         const { quality, glitch, shift, corruption, seed } = this.params;
         const time = ctx.time * this.params.speed;
 
+        const [rowScan, cascade] = this.#ensureBlockBuffers(ctx, a);
+        const grid: [number, number] = [this.#blocksW, this.#blocksH];
+
         // 1. element capture → YCbCr (+ alpha)
         ctx.draw({ frag: FRAG_CONVERT, uniforms: { src: ctx.src }, target: a });
 
@@ -358,23 +465,27 @@ export class JPEGGlitchEffect implements Effect {
             target: a,
         });
 
-        // 4. quantize + glitch
+        // 4-5. scan-order DC cascade (two-pass prefix sum at block res)
+        const impulse = { glitch, corruption, shift, time, seed };
+        ctx.draw({
+            frag: FRAG_CASCADE_ROW,
+            uniforms: { grid, ...impulse },
+            target: rowScan,
+        });
+        ctx.draw({
+            frag: FRAG_CASCADE,
+            uniforms: { rowScan, grid },
+            target: cascade,
+        });
+
+        // 6. quantize + cascade application
         ctx.draw({
             frag: FRAG_QUANTIZE,
-            uniforms: {
-                src: a,
-                resolution,
-                quality,
-                glitch,
-                shift,
-                corruption,
-                time,
-                seed,
-            },
+            uniforms: { src: a, cascade, resolution, grid, quality, seed },
             target: b,
         });
 
-        // 5-6. inverse separable DCT
+        // 7-8. inverse separable DCT
         ctx.draw({
             frag: FRAG_IDCT_V,
             uniforms: { src: b, resolution },
@@ -386,7 +497,7 @@ export class JPEGGlitchEffect implements Effect {
             target: b,
         });
 
-        // 7. YCbCr → RGB → canvas (or this stage's assigned target)
+        // 9. YCbCr → RGB → canvas (or this stage's assigned target)
         ctx.draw({
             frag: FRAG_RESOLVE,
             uniforms: { src: b },
@@ -397,7 +508,42 @@ export class JPEGGlitchEffect implements Effect {
     dispose(): void {
         this.#bufA?.dispose();
         this.#bufB?.dispose();
+        this.#rowScan?.dispose();
+        this.#cascade?.dispose();
         this.#bufA = null;
         this.#bufB = null;
+        this.#rowScan = null;
+        this.#cascade = null;
+        this.#blocksW = 0;
+        this.#blocksH = 0;
+    }
+
+    // Allocate (or resize) the block-resolution cascade buffers to match the
+    // current coefficient buffer's 8x8 block grid.
+    #ensureBlockBuffers(
+        ctx: EffectContext,
+        coef: EffectRenderTarget,
+    ): [EffectRenderTarget, EffectRenderTarget] {
+        const bw = Math.max(1, Math.ceil(coef.width / 8));
+        const bh = Math.max(1, Math.ceil(coef.height / 8));
+        if (
+            !this.#rowScan ||
+            !this.#cascade ||
+            bw !== this.#blocksW ||
+            bh !== this.#blocksH
+        ) {
+            this.#rowScan?.dispose();
+            this.#cascade?.dispose();
+            const opts = {
+                size: [bw, bh] as const,
+                float: true,
+                filter: "nearest" as const,
+            };
+            this.#rowScan = ctx.createRenderTarget(opts);
+            this.#cascade = ctx.createRenderTarget(opts);
+            this.#blocksW = bw;
+            this.#blocksH = bh;
+        }
+        return [this.#rowScan, this.#cascade];
     }
 }
