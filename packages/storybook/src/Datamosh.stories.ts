@@ -12,7 +12,7 @@ const VIDEO_SRC: Record<"jellyfish" | "bbb", string> = {
 };
 
 export default {
-    title: "Datamosh",
+    title: "Effect/Datamosh",
     parameters: { layout: "fullscreen" },
 } satisfies Meta<undefined>;
 
