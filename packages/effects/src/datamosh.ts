@@ -177,6 +177,23 @@ vec2 chroma(vec3 c) {
 }
 `;
 
+// Chroma residual (half res), zero-centered (Cb,Cr). Built with the SAME
+// truncated chroma MV as the decode prediction, so the two cancel when
+// residual is on — leaving the truncation drift to show only in pure-motion.
+const FRAG_RESIDUAL_C = `#version 300 es
+precision highp float;
+${Y601}
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D uCur, uRef, uMV;
+uniform vec2 uChromaRes;
+void main() {
+    vec2 mvc = floor(texture(uMV, uv).rg * 0.5);
+    vec2 pred = chroma(texture(uRef, uv + mvc / uChromaRes).rgb);
+    outColor = vec4(chroma(texture(uCur, uv).rgb) - pred, 0.0, 1.0);
+}
+`;
+
 // Luma decode (full res). Writes Y into .r of the shared accumulator.
 const FRAG_DECODE_Y = `#version 300 es
 precision highp float;
@@ -213,7 +230,7 @@ precision highp float;
 ${Y601}
 in vec2 uv;
 out vec4 outColor;
-uniform sampler2D uChromaAcc, uMV, uVideo, uResidual;
+uniform sampler2D uChromaAcc, uMV, uVideo, uResidualC;
 uniform vec2 uChromaRes;
 uniform bool uIntra;
 uniform bool uUseResidual;
@@ -224,11 +241,13 @@ void main() {
         return;
     }
 
-    // P-frame: compose chroma from acc + residual
+    // P-frame: compose chroma from acc + residual. uResidualC is the
+    // zero-centered chroma residual (built with the SAME truncated MV as
+    // the prediction below, so they cancel when residual is on).
     vec2 mv = texture(uMV, uv).rg; // px (luma units)
     vec2 mvc = floor(mv * 0.5);
     vec2 pred = texture(uChromaAcc, uv + mvc / uChromaRes).rg;
-    vec2 res = uUseResidual ? chroma(texture(uResidual, uv).rgb) - 0.5 : vec2(0);
+    vec2 res = uUseResidual ? texture(uResidualC, uv).rg : vec2(0);
     vec2 C = clamp(pred + res, 0.0, 1.0);
 
     outColor = vec4(C, 0.0, 1.0);
@@ -318,6 +337,8 @@ export class DatamoshEffect implements Effect {
     #accRT: EffectRenderTarget | null = null;
     // Half-res chroma accumulator (YCbCr path). Luma reuses #accRT (.r).
     #chromaAccRT: EffectRenderTarget | null = null;
+    // Half-res chroma residual (YCbCr path). Luma reuses #resRT (.r).
+    #chromaResRT: EffectRenderTarget | null = null;
     #w = 0;
     #h = 0;
     #cw = 0;
@@ -355,12 +376,14 @@ export class DatamoshEffect implements Effect {
         this.#resRT?.dispose();
         this.#accRT?.dispose();
         this.#chromaAccRT?.dispose();
+        this.#chromaResRT?.dispose();
         this.#curRT = null;
         this.#prevRT = null;
         this.#mvRT = null;
         this.#resRT = null;
         this.#accRT = null;
         this.#chromaAccRT = null;
+        this.#chromaResRT = null;
     }
 
     #ensureSize(ctx: EffectContext): void {
@@ -398,6 +421,11 @@ export class DatamoshEffect implements Effect {
             float: true,
             persistent: true,
         });
+        // Half-res chroma residual (zero-centered, truncated-MV).
+        this.#chromaResRT = ctx.createRenderTarget({
+            size: [this.#cw, this.#ch],
+            float: true,
+        });
         // Motion field: one texel per block, nearest so reads snap to the
         // block's vector.
         this.#mvRT = ctx.createRenderTarget({
@@ -415,7 +443,16 @@ export class DatamoshEffect implements Effect {
         const res = this.#resRT;
         const acc = this.#accRT;
         const chromaAcc = this.#chromaAccRT;
-        if (!cur || !prev || !mv || !res || !acc || !chromaAcc) {
+        const chromaResidual = this.#chromaResRT;
+        if (
+            !cur ||
+            !prev ||
+            !mv ||
+            !res ||
+            !acc ||
+            !chromaAcc ||
+            !chromaResidual
+        ) {
             return;
         }
 
@@ -468,6 +505,20 @@ export class DatamoshEffect implements Effect {
             // the smear. Residual lands on the first pass only.
             const reps = this.#seed ? 1 : 1 + this.params.dup;
             const chromaRes: [number, number] = [this.#cw, this.#ch];
+            if (this.params.colorSpace === "ycbcr") {
+                // Chroma residual with the truncated MV (matches DECC's
+                // prediction so it cancels when residual is on).
+                ctx.draw({
+                    frag: FRAG_RESIDUAL_C,
+                    uniforms: {
+                        uCur: cur,
+                        uRef: prev,
+                        uMV: mv,
+                        uChromaRes: chromaRes,
+                    },
+                    target: chromaResidual,
+                });
+            }
             for (let r = 0; r < reps; r++) {
                 const useResidual = this.params.useResidual && r === 0;
                 if (this.params.colorSpace === "ycbcr") {
@@ -490,7 +541,7 @@ export class DatamoshEffect implements Effect {
                             uChromaAcc: chromaAcc,
                             uMV: mv,
                             uVideo: cur,
-                            uResidual: res,
+                            uResidualC: chromaResidual,
                             uChromaRes: chromaRes,
                             uIntra: this.#seed,
                             uUseResidual: useResidual,
