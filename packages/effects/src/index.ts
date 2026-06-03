@@ -1,4 +1,10 @@
 export { BloomEffect } from "./bloom";
+export {
+    type DatamoshColorSpace,
+    DatamoshEffect,
+    type DatamoshParams,
+    type DatamoshView,
+} from "./datamosh";
 export { FluidEffect } from "./fluid";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
 export { ParticleEffect } from "./particle";

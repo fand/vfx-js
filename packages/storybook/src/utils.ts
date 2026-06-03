@@ -1,6 +1,7 @@
 import { VFX, type VFXOpts } from "@vfx-js/core";
 import type {
     BloomEffect,
+    DatamoshEffect,
     FluidEffect,
     HalftoneEffect,
     HalftoneInkPresetName,
@@ -240,6 +241,62 @@ export function attachHalftonePane(
     });
 
     addInkPaletteBindings(pane, effect);
+
+    trackPane(pane);
+    return pane;
+}
+
+export type DatamoshSource = "jellyfish" | "bbb" | "webcam";
+
+export function attachDatamoshPane(
+    title: string,
+    effect: DatamoshEffect,
+    onSourceChange?: (source: DatamoshSource) => void | Promise<void>,
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: true });
+
+    if (onSourceChange) {
+        const state = { source: "jellyfish" as DatamoshSource };
+        pane.addBinding(state, "source", {
+            options: { jellyfish: "jellyfish", bbb: "bbb", webcam: "webcam" },
+        }).on("change", (ev) => onSourceChange(ev.value));
+    }
+
+    // mosh toggle isn't a param — drive enable()/disable() from a mirror.
+    const moshState = { mosh: effect.enabled };
+    pane.addBinding(moshState, "mosh").on("change", (ev) => {
+        if (ev.value) {
+            effect.enable();
+        } else {
+            effect.disable();
+        }
+    });
+
+    pane.addBinding(effect.params, "blockSize", { min: 2, max: 64, step: 1 });
+    pane.addBinding(effect.params, "searchRange", { min: 1, max: 32, step: 1 });
+    pane.addBinding(effect.params, "searchStep", { min: 1, max: 10, step: 1 });
+    pane.addBinding(effect.params, "useResidual");
+    pane.addBinding(effect.params, "dup", { min: 0, max: 8, step: 1 });
+    pane.addBinding(effect.params, "colorSpace", {
+        options: { rgb: "rgb", ycbcr: "ycbcr" },
+    });
+    pane.addBinding(effect.params, "chromaGain", { min: 0, max: 2, step: 0.1 });
+
+    pane.addBinding(effect.params, "view", {
+        options: {
+            output: "output",
+            motion: "motion",
+            residual: "residual",
+            current: "current",
+            previous: "previous",
+        },
+    });
 
     trackPane(pane);
     return pane;
