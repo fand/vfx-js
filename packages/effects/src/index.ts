@@ -1,6 +1,7 @@
 export { BloomEffect } from "./bloom";
 export { FluidEffect } from "./fluid";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
+export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch";
 export { ParticleEffect } from "./particle";
 export { ParticleExplodeEffect } from "./particle-explode";
 export { PixelateEffect } from "./pixelate";

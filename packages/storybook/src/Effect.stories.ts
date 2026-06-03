@@ -8,6 +8,7 @@ import {
     ScanlineEffect,
     FluidEffect,
     HalftoneEffect,
+    JPEGGlitchEffect,
     ParticleEffect,
     ParticleExplodeEffect,
     PixelSortEffect,
@@ -561,6 +562,56 @@ export const voronoi: StoryObj<VoronoiArgs> = {
             control: { type: "range", min: 10, max: 500, step: 5 },
         },
         bgColor: { control: { type: "color" } },
+    },
+};
+
+// JPEG glitch via on-GPU DCT simulation. Follows the Voronoi pattern:
+// render() does the full setup, and Storybook re-runs it on every arg
+// change (initVFX tears down the previous VFX first). `speed: 0` keeps
+// the glitch static so VRT snapshots are stable.
+type JPEGGlitchSrc = "Jellyfish" | "Logo";
+type JPEGGlitchArgs = {
+    src: JPEGGlitchSrc;
+    quality: number;
+    glitch: number;
+    shift: number;
+    corruption: number;
+    speed: number;
+    seed: number;
+};
+export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
+    render: (args) => {
+        const { src, ...effectArgs } = args;
+        const vfx = initVFX();
+        const img = document.createElement("img");
+        img.src = src === "Logo" ? Logo : Jellyfish;
+        img.style.display = "block";
+        img.style.margin = "40px auto";
+        img.onload = () => {
+            vfx.add(img, { effect: new JPEGGlitchEffect(effectArgs) });
+        };
+        return img;
+    },
+    args: {
+        src: "Jellyfish",
+        quality: 0.3,
+        glitch: 0.5,
+        shift: 0.4,
+        corruption: 0.15,
+        speed: 0,
+        seed: 0,
+    },
+    argTypes: {
+        src: {
+            control: { type: "select" },
+            options: ["Jellyfish", "Logo"],
+        },
+        quality: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        glitch: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        shift: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        corruption: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        seed: { control: { type: "range", min: 0, max: 1000, step: 1 } },
     },
 };
 
