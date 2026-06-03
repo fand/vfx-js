@@ -1,9 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 
 import { DatamoshEffect } from "@vfx-js/effects";
+import BbbWebm from "./assets/bbb.webm";
 import JellyfishMp4 from "./assets/jellyfish.mp4";
 import "./preset.css";
 import { attachDatamoshPane, type DatamoshSource, initVFX } from "./utils";
+
+const VIDEO_SRC: Record<"jellyfish" | "bbb", string> = {
+    jellyfish: JellyfishMp4,
+    bbb: BbbWebm,
+};
 
 export default {
     title: "Datamosh",
@@ -42,17 +48,17 @@ datamosh.play = async ({ canvasElement }) => {
 
     let stream: MediaStream | null = null;
     attachDatamoshPane("Datamosh", effect, async (source: DatamoshSource) => {
+        for (const t of stream?.getTracks() ?? []) {
+            t.stop();
+        }
+        stream = null;
         if (source === "webcam") {
             stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
             video.removeAttribute("src");
         } else {
-            for (const t of stream?.getTracks() ?? []) {
-                t.stop();
-            }
-            stream = null;
             video.srcObject = null;
-            video.src = JellyfishMp4;
+            video.src = VIDEO_SRC[source];
         }
         await video.play();
     });

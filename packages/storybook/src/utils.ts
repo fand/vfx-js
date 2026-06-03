@@ -246,7 +246,7 @@ export function attachHalftonePane(
     return pane;
 }
 
-export type DatamoshSource = "video" | "webcam";
+export type DatamoshSource = "jellyfish" | "bbb" | "webcam";
 
 export function attachDatamoshPane(
     title: string,
@@ -262,9 +262,9 @@ export function attachDatamoshPane(
     const pane = new Pane({ container, title, expanded: true });
 
     if (onSourceChange) {
-        const state = { source: "video" as DatamoshSource };
+        const state = { source: "jellyfish" as DatamoshSource };
         pane.addBinding(state, "source", {
-            options: { video: "video", webcam: "webcam" },
+            options: { jellyfish: "jellyfish", bbb: "bbb", webcam: "webcam" },
         }).on("change", (ev) => onSourceChange(ev.value));
     }
 
