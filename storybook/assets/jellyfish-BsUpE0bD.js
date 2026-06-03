@@ -1,0 +1,1 @@
+import{n as e}from"./chunk-BneVvdWh.js";var t,n=e((()=>{t=``+new URL(`jellyfish-1dlHXQ9J.mp4`,import.meta.url).href}));export{t as n,n as t};
