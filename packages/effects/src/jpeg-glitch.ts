@@ -240,11 +240,20 @@ precision highp float;
 in vec2 uv;
 out vec4 outColor;
 uniform sampler2D src;
-uniform sampler2D cascade; // block-res: rgb = DC offset, a = last trigger
+uniform sampler2D cascade; // block-res: rgb = prefix-sum DC offset, a = last trigger
 uniform vec2 resolution;
 uniform vec2 grid; // [bw, bh] in blocks
 uniform float quality;
+uniform float restart; // restart interval in blocks (MCUs); 0 = none
 uniform float seed;
+
+// Read the inclusive prefix sum stored in the cascade buffer at scan index.
+vec4 cascadeAt(float idx) {
+    float bw = grid.x;
+    float cbx = mod(idx, bw);
+    float cby = floor(idx / bw);
+    return texture(cascade, vec2((cbx + 0.5) / bw, (cby + 0.5) / grid.y));
+}
 
 void main() {
     vec2 fc = gl_FragCoord.xy;
@@ -272,17 +281,30 @@ void main() {
     vec4 q = vec4(lumaStep, chromaStep, chromaStep, lumaStep);
     coef = floor(coef / q + 0.5) * q;
 
-    // --- scan-order cascade ---
-    vec4 casc = texture(cascade, vec2((bx + 0.5) / grid.x, (by + 0.5) / grid.y));
+    // --- scan-order cascade, bounded by restart markers ---
+    // The cascade buffer holds the GLOBAL prefix sum. Restart markers (DRI)
+    // reset the DC predictor every \`restart\` blocks, so the visible offset
+    // is the sum over the current segment only:
+    //   segmentDC(n) = prefix(n) - prefix(segStart - 1)
+    // That localizes damage to the segment an error lands in, instead of
+    // smearing it to the end of the image (a no-restart baseline JPEG).
+    float scan = by * grid.x + bx;
+    float segStart = restart > 0.5 ? floor(scan / restart) * restart : 0.0;
+
+    vec4 casc = cascadeAt(scan);
     vec3 dcOffset = casc.rgb;
     float trig = casc.a;
+    if (segStart > 0.5) {
+        dcOffset -= cascadeAt(segStart - 1.0).rgb;
+    }
+    // A trigger only counts if it lies within the current restart segment.
+    bool trigValid = trig >= segStart;
 
     // Desync run: from the trigger block, the next runLen blocks (scan
     // order) lose entropy sync and collapse to flat DC — solid blocks that
     // read as the melted / smeared region of a JPEG byte-glitch.
-    float scan = by * grid.x + bx;
     float runLen = 4.0 + 60.0 * fract(sin(trig * 0.137 + seed) * 43758.5453);
-    bool desync = trig >= 0.0 && (scan - trig) >= 0.0 && (scan - trig) < runLen;
+    bool desync = trigValid && (scan - trig) >= 0.0 && (scan - trig) < runLen;
 
     if (isDC) {
         coef.xyz += dcOffset;
@@ -370,8 +392,9 @@ export type JPEGGlitchParams = {
     /**
      * Density of DC corruption events, `0`..`1`. Each event injects a
      * differential error that — like a real baseline-JPEG DC desync —
-     * accumulates in raster scan order and shifts every following block to
-     * the end of the image. `0` disables the cascade.
+     * accumulates in raster scan order and shifts every following block
+     * until the next restart marker (see `restart`). `0` disables the
+     * cascade.
      */
     glitch: number;
 
@@ -385,6 +408,15 @@ export type JPEGGlitchParams = {
      */
     corruption: number;
 
+    /**
+     * Restart-marker (DRI) interval in blocks (MCUs). The DC cascade and the
+     * desync run reset at every multiple of this many blocks, so corruption
+     * is confined to the segment it lands in instead of smearing to the end
+     * of the image. Smaller values → more localized damage. `0` disables
+     * restarts (a no-restart baseline JPEG: one error floods to the end).
+     */
+    restart: number;
+
     /** Animation speed of the glitch. `0` freezes it to a static frame. */
     speed: number;
 
@@ -397,6 +429,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     glitch: 0.5,
     shift: 0.4,
     corruption: 0.15,
+    restart: 40,
     speed: 1,
     seed: 0,
 };
@@ -444,7 +477,8 @@ export class JPEGGlitchEffect implements Effect {
         }
 
         const resolution: [number, number] = [a.width, a.height];
-        const { quality, glitch, shift, corruption, seed } = this.params;
+        const { quality, glitch, shift, corruption, restart, seed } =
+            this.params;
         const time = ctx.time * this.params.speed;
 
         const [rowScan, cascade] = this.#ensureBlockBuffers(ctx, a);
@@ -481,7 +515,15 @@ export class JPEGGlitchEffect implements Effect {
         // 6. quantize + cascade application
         ctx.draw({
             frag: FRAG_QUANTIZE,
-            uniforms: { src: a, cascade, resolution, grid, quality, seed },
+            uniforms: {
+                src: a,
+                cascade,
+                resolution,
+                grid,
+                quality,
+                restart,
+                seed,
+            },
             target: b,
         });
 
