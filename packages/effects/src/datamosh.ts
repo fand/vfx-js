@@ -130,7 +130,8 @@ void main() {
     vec2 mv = texture(uMV, uv).rg; // px
     vec3 pred = texture(uAccum, uv + mv / uResolution).rgb;
     vec3 res = uUseResidual ? texture(uResidual, uv).rgb : vec3(0.0);
-    outColor = vec4(pred + res, 1.0);
+    // Clamp like an 8-bit decoder so the feedback can't run away to white.
+    outColor = vec4(clamp(pred + res, 0.0, 1.0), 1.0);
 }
 `;
 
@@ -197,7 +198,7 @@ void main() {
     vec2 mv = texture(uMV, uv).rg; // px
     float pred = texture(uAccum, uv + mv / uResolution).r;
     float res = uUseResidual ? luma(texture(uResidual, uv).rgb) : 0.0;
-    float Y = pred + res;
+    float Y = clamp(pred + res, 0.0, 1.0);
 
     outColor = vec4(Y, 0.0, 0.0, 1.0);
 }
@@ -228,7 +229,7 @@ void main() {
     vec2 mvc = floor(mv * 0.5);
     vec2 pred = texture(uChromaAcc, uv + mvc / uChromaRes).rg;
     vec2 res = uUseResidual ? chroma(texture(uResidual, uv).rgb) - 0.5 : vec2(0);
-    vec2 C = pred + res;
+    vec2 C = clamp(pred + res, 0.0, 1.0);
 
     outColor = vec4(C, 0.0, 1.0);
 }
