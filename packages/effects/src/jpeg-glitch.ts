@@ -262,8 +262,8 @@ vec4 cascadeAt(float idx) {
 }
 
 // Robust 1-D hash (Dave Hoskins, "Hash without Sine"). Well distributed for
-// integer-ish inputs, including small k where fract(sin(...)) degenerates
-// (e.g. sin(0) = 0 pinned the k=0 boundary at a fixed offset).
+// integer-ish inputs, including small values where fract(sin(...))
+// degenerates (e.g. sin(0) = 0).
 float hash11(float p) {
     p = fract(p * 0.1031);
     p *= p + 33.33;
@@ -271,34 +271,27 @@ float hash11(float p) {
     return fract(p);
 }
 
-// Scan index of the k-th restart boundary. A regular grid (k * restart)
-// jittered by up to +/-0.5 * restart * restartJitter. Real byte-glitches
-// re-sync at irregular points, not on a fixed lattice, so jitter breaks the
-// tell-tale aligned band edges. Amplitude <= 0.5 * restart keeps the
-// boundaries monotonic in k. k <= 0 is the image start — a fixed boundary,
-// never jittered — so the first *internal* boundary (k = 1) jitters fully.
-float boundary(float k) {
-    if (k < 0.5) {
-        return 0.0;
-    }
-    float j = hash11(k + seed * 101.7) - 0.5;
-    return k * restart + j * restart * restartJitter;
+// Global phase offset of the restart lattice, in blocks. A real glitched
+// file's restart grid is not aligned to the top of the image; shifting the
+// WHOLE lattice by one seed-random phase moves every reset line together.
+// restartJitter scales the phase from 0 (aligned to the top) up to a full
+// restart interval. Floored so segment starts land on whole blocks.
+float restartPhase() {
+    return floor(restart * restartJitter * hash11(seed * 7.0 + 3.0));
 }
 
-// Largest restart boundary at or before scan (jittered grid → check the
-// few candidates around floor(scan / restart)).
+// Largest restart boundary at or before scan. Boundaries lie on a regular
+// lattice offset by restartPhase(); scan below the first boundary belongs to
+// the image-start segment (0).
 float segStartFor(float scan) {
-    float s = 0.0;
-    if (restart > 0.5) {
-        float k0 = floor(scan / restart);
-        for (int d = -1; d <= 1; d++) {
-            float bk = floor(boundary(k0 + float(d)));
-            if (bk <= scan) {
-                s = max(s, bk);
-            }
-        }
+    if (restart < 0.5) {
+        return 0.0;
     }
-    return s;
+    float phase = restartPhase();
+    if (scan < phase) {
+        return 0.0;
+    }
+    return phase + floor((scan - phase) / restart) * restart;
 }
 `;
 
@@ -531,11 +524,12 @@ export type JPEGGlitchParams = {
     restart: number;
 
     /**
-     * Randomness of restart boundary positions, `0`..`1`. `0` puts boundaries
-     * on a fixed lattice (every `restart` blocks), which leaves tell-tale
-     * aligned band edges; higher values jitter each boundary by up to
-     * ±0.5 × `restart`, so segments vary in length and recover at irregular
-     * points — closer to how a real byte-glitch re-syncs.
+     * Global phase offset of the restart lattice, `0`..`1`. The restart
+     * boundaries form a regular grid every `restart` blocks; this slides the
+     * WHOLE grid (every reset line together) by a seed-random phase of up to
+     * one full `restart` interval. `0` aligns the grid to the top of the
+     * image; higher values offset where every reset lands. Vary `seed` to get
+     * a different phase.
      */
     restartJitter: number;
 
