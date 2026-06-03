@@ -316,7 +316,7 @@ const DEFAULT_PARAMS: DatamoshParams = {
     searchStep: 2,
     useResidual: true,
     dup: 0,
-    colorSpace: "rgb",
+    colorSpace: "ycbcr",
     chromaGain: 1,
     view: "output",
 };
