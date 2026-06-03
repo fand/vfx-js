@@ -244,7 +244,8 @@ uniform sampler2D cascade; // block-res: rgb = prefix-sum DC offset, a = last tr
 uniform vec2 resolution;
 uniform vec2 grid; // [bw, bh] in blocks
 uniform float quality;
-uniform float restart; // restart interval in blocks (MCUs); 0 = none
+uniform float restart; // mean restart interval in blocks (MCUs); 0 = none
+uniform float restartJitter; // 0..1: randomness of restart boundary positions
 uniform float seed;
 
 // Read the inclusive prefix sum stored in the cascade buffer at scan index.
@@ -253,6 +254,16 @@ vec4 cascadeAt(float idx) {
     float cbx = mod(idx, bw);
     float cby = floor(idx / bw);
     return texture(cascade, vec2((cbx + 0.5) / bw, (cby + 0.5) / grid.y));
+}
+
+// Scan index of the k-th restart boundary. A regular grid (k * restart)
+// jittered by up to +/-0.5 * restart * restartJitter. Real byte-glitches
+// re-sync at irregular points, not on a fixed lattice, so jitter breaks the
+// tell-tale aligned band edges. Amplitude <= 0.5 * restart keeps the
+// boundaries monotonic in k.
+float boundary(float k) {
+    float j = (fract(sin((k * 0.137 + seed) * 43758.5453) * 1.0) - 0.5);
+    return k * restart + j * restart * restartJitter;
 }
 
 void main() {
@@ -289,7 +300,18 @@ void main() {
     // That localizes damage to the segment an error lands in, instead of
     // smearing it to the end of the image (a no-restart baseline JPEG).
     float scan = by * grid.x + bx;
-    float segStart = restart > 0.5 ? floor(scan / restart) * restart : 0.0;
+    // Largest restart boundary at or before this block. Boundaries are
+    // jittered, so check the few candidates around floor(scan / restart).
+    float segStart = 0.0;
+    if (restart > 0.5) {
+        float k0 = floor(scan / restart);
+        for (int d = -1; d <= 1; d++) {
+            float bk = floor(boundary(k0 + float(d)));
+            if (bk <= scan) {
+                segStart = max(segStart, bk);
+            }
+        }
+    }
 
     vec4 casc = cascadeAt(scan);
     vec3 dcOffset = casc.rgb;
@@ -409,13 +431,22 @@ export type JPEGGlitchParams = {
     corruption: number;
 
     /**
-     * Restart-marker (DRI) interval in blocks (MCUs). The DC cascade and the
-     * desync run reset at every multiple of this many blocks, so corruption
-     * is confined to the segment it lands in instead of smearing to the end
-     * of the image. Smaller values → more localized damage. `0` disables
-     * restarts (a no-restart baseline JPEG: one error floods to the end).
+     * Mean restart-marker (DRI) interval in blocks (MCUs). The DC cascade and
+     * the desync run reset at restart boundaries, so corruption is confined
+     * to the segment it lands in instead of smearing to the end of the image.
+     * Smaller values → more localized damage. `0` disables restarts (a
+     * no-restart baseline JPEG: one error floods to the end).
      */
     restart: number;
+
+    /**
+     * Randomness of restart boundary positions, `0`..`1`. `0` puts boundaries
+     * on a fixed lattice (every `restart` blocks), which leaves tell-tale
+     * aligned band edges; higher values jitter each boundary by up to
+     * ±0.5 × `restart`, so segments vary in length and recover at irregular
+     * points — closer to how a real byte-glitch re-syncs.
+     */
+    restartJitter: number;
 
     /** Animation speed of the glitch. `0` freezes it to a static frame. */
     speed: number;
@@ -430,6 +461,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     shift: 0.4,
     corruption: 0.15,
     restart: 512,
+    restartJitter: 0.5,
     speed: 1,
     seed: 0,
 };
@@ -477,7 +509,7 @@ export class JPEGGlitchEffect implements Effect {
         }
 
         const resolution: [number, number] = [a.width, a.height];
-        const { quality, glitch, shift, corruption, restart, seed } =
+        const { quality, glitch, shift, corruption, restart, restartJitter, seed } =
             this.params;
         const time = ctx.time * this.params.speed;
 
@@ -522,6 +554,7 @@ export class JPEGGlitchEffect implements Effect {
                 grid,
                 quality,
                 restart,
+                restartJitter,
                 seed,
             },
             target: b,
