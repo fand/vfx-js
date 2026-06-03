@@ -277,11 +277,6 @@ float segStartFor(float scan) {
     }
     return s;
 }
-
-// Length (in blocks) of the desync run a trigger starts.
-float runLenFor(float trig) {
-    return 4.0 + 60.0 * fract(sin(trig * 0.137 + seed) * 43758.5453);
-}
 `;
 
 // Pass 6 — quantize each coefficient (heavier for high frequency and for
@@ -412,17 +407,25 @@ void main() {
     float by = floor(fc.y / 8.0);
     float scan = by * grid.x + bx;
 
+    // Once the bitstream desyncs it stays desynced until the next restart
+    // marker, so the slide persists from the trigger to the end of the
+    // restart segment — i.e. through every following row in that segment,
+    // not just a short run. trig >= segStart means the trigger lies in this
+    // block's own segment, so the whole rest of the segment is affected.
     float segStart = segStartFor(scan);
     float trig = cascadeAt(scan).a;
     float prog = scan - trig;
-    bool desync = trig >= segStart && prog >= 0.0 && prog < runLenFor(trig);
+    bool desync = trig >= segStart && prog >= 0.0;
 
     vec2 sampleUV = fc / resolution;
     if (desync && slide > 0.0) {
         // Content advances at rate (1 - slide): the source scan index lags
-        // output by floor(prog * slide). slide=1 freezes the source at the
+        // output by floor(prog * slide), and that lag grows the further into
+        // the segment we are — so the displacement accumulates down through
+        // the rows below the trigger. slide=1 freezes the source at the
         // trigger block (a hard smear); intermediate values stretch content
-        // horizontally and wrap across rows as a diagonal tear.
+        // and wrap across rows as a diagonal tear. The lag is in scan order,
+        // so it propagates exactly like the DC cascade does.
         float m = scan - floor(prog * slide);
         float bw = grid.x;
         float sbx = mod(m, bw);
@@ -476,18 +479,20 @@ export type JPEGGlitchParams = {
 
     /**
      * Entropy-desync corruption, `0`..`1`. Density of triggers that flip the
-     * decoder into a garbage run: from each trigger, a run of following
-     * blocks (scan order) is displaced by `slide` — the melted / torn look.
+     * decoder out of bit-sync. From each trigger the desync persists until
+     * the next restart marker, so everything after it in the segment (across
+     * the rows below, not just a short run) is displaced by `slide`.
      */
     corruption: number;
 
     /**
-     * Horizontal smear / stretch of desync runs, `0`..`1`. Emulates the MCU
-     * grid sliding when the Huffman bitstream loses sync: inside a desync run
-     * the source content advances at rate `1 - slide`, so `0` leaves content
-     * in place, mid values stretch it horizontally, and `1` freezes it at the
-     * trigger block (a hard smear that wraps across rows as a diagonal tear).
-     * Only visible where `corruption` has triggered a desync run.
+     * Grid-slide smear / stretch of desync regions, `0`..`1`. Emulates the
+     * MCU grid sliding when the Huffman bitstream loses sync: the source
+     * content advances at rate `1 - slide`, and the lag accumulates in scan
+     * order — so it grows down through the rows below the trigger, wrapping
+     * as a diagonal tear (like the DC cascade). `0` leaves content in place,
+     * mid values stretch it, and `1` freezes the source at the trigger block
+     * (a hard smear). Only visible where `corruption` has triggered a desync.
      */
     slide: number;
 
