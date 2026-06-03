@@ -236,16 +236,18 @@ void main() {
 `;
 
 // YCbCr 4:2:0 -> RGB. Luma full res, chroma upsampled (bilinear) from the
-// half-res plane. Premultiplied for the canvas.
+// half-res plane. `uChromaGain` boosts saturation. Premultiplied for the
+// canvas.
 const FRAG_DISPLAY_YCBCR = `#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
 uniform sampler2D uLumaAcc;
 uniform sampler2D uChromaAcc;
+uniform float uChromaGain;
 void main() {
     float Y = texture(uLumaAcc, uvContent).r;
-    vec2 cbcr = texture(uChromaAcc, uvContent).rg - 0.5;
+    vec2 cbcr = (texture(uChromaAcc, uvContent).rg - 0.5) * uChromaGain;
     vec3 rgb = vec3(
         Y + 1.402 * cbcr.y,
         Y - 0.344136 * cbcr.x - 0.714136 * cbcr.y,
@@ -280,6 +282,8 @@ export type DatamoshParams = {
     dup: number;
     /** Color model. `"ycbcr"` is 4:2:0 (half-res chroma w/ truncated MV). */
     colorSpace: DatamoshColorSpace;
+    /** Chroma saturation boost (YCbCr output). 1 = unchanged. */
+    chromaGain: number;
     /** Stage shown on the canvas. */
     view: DatamoshView;
 };
@@ -290,6 +294,7 @@ const DEFAULT_PARAMS: DatamoshParams = {
     useResidual: true,
     dup: 0,
     colorSpace: "rgb",
+    chromaGain: 1,
     view: "output",
 };
 
@@ -569,7 +574,11 @@ export class DatamoshEffect implements Effect {
                 if (this.#enabled && this.params.colorSpace === "ycbcr") {
                     ctx.draw({
                         frag: FRAG_DISPLAY_YCBCR,
-                        uniforms: { uLumaAcc: acc, uChromaAcc: chromaAcc },
+                        uniforms: {
+                            uLumaAcc: acc,
+                            uChromaAcc: chromaAcc,
+                            uChromaGain: this.params.chromaGain,
+                        },
                         target: ctx.target,
                     });
                 } else {

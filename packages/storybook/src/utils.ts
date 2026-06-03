@@ -285,6 +285,7 @@ export function attachDatamoshPane(
     pane.addBinding(effect.params, "colorSpace", {
         options: { rgb: "rgb", ycbcr: "ycbcr" },
     });
+    pane.addBinding(effect.params, "chromaGain", { min: 0, max: 2, step: 0.1 });
 
     pane.addBinding(effect.params, "view", {
         options: {
