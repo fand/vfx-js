@@ -58,7 +58,8 @@ out vec4 outMV;
 uniform sampler2D uCur, uRef;
 uniform vec2 uResolution;   // [w, h] in px
 uniform float uBlock;       // block size in px
-uniform float uSearch;      // search radius in px
+uniform float uSearch;      // search radius, in steps
+uniform float uStep;        // px per step (coverage = uSearch * uStep px)
 void main() {
     vec2 block = floor(gl_FragCoord.xy);
     vec2 base = block * uBlock;     // top-left pixel of this block
@@ -79,7 +80,7 @@ void main() {
     float bestSad = 1e9;
     for (float by = -uSearch; by <= uSearch; by++) {
       for (float bx = -uSearch; bx <= uSearch; bx++) {
-        vec2 cand = vec2(bx, by);   // candidate displacement, px
+        vec2 cand = vec2(bx, by) * uStep;   // candidate displacement, px
         float sad = 0.0;
         for (int k = 0; k < 9; k++) {
           vec3 cRef = texture(uRef, (base + off[k] + cand + 0.5) / uResolution).rgb;
@@ -289,8 +290,10 @@ export type DatamoshView =
 export type DatamoshParams = {
     /** Motion-estimation block size in px. */
     blockSize: number;
-    /** Motion search radius in px. */
+    /** Motion search radius, in steps. Coverage = searchRange * searchStep px. */
     searchRange: number;
+    /** Pixels per search step. Widens coverage at a fixed candidate count. */
+    searchStep: number;
     /** Add the residual during decode (off = pure motion). */
     useResidual: boolean;
     /**
@@ -309,7 +312,8 @@ export type DatamoshParams = {
 
 const DEFAULT_PARAMS: DatamoshParams = {
     blockSize: 16,
-    searchRange: 12,
+    searchRange: 5,
+    searchStep: 2,
     useResidual: true,
     dup: 0,
     colorSpace: "rgb",
@@ -483,6 +487,7 @@ export class DatamoshEffect implements Effect {
                     uResolution: resolution,
                     uBlock: this.#block,
                     uSearch: this.params.searchRange,
+                    uStep: this.params.searchStep,
                 },
                 target: mv,
             });
@@ -595,7 +600,11 @@ export class DatamoshEffect implements Effect {
             case "motion":
                 ctx.draw({
                     frag: FRAG_VIEW_MOTION,
-                    uniforms: { uMV: mv, uMvScale: this.params.searchRange },
+                    uniforms: {
+                        uMV: mv,
+                        uMvScale:
+                            this.params.searchRange * this.params.searchStep,
+                    },
                     target: ctx.target,
                 });
                 return;

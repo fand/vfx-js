@@ -280,6 +280,7 @@ export function attachDatamoshPane(
 
     pane.addBinding(effect.params, "blockSize", { min: 2, max: 64, step: 1 });
     pane.addBinding(effect.params, "searchRange", { min: 1, max: 32, step: 1 });
+    pane.addBinding(effect.params, "searchStep", { min: 1, max: 10, step: 1 });
     pane.addBinding(effect.params, "useResidual");
     pane.addBinding(effect.params, "dup", { min: 0, max: 8, step: 1 });
     pane.addBinding(effect.params, "colorSpace", {
