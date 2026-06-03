@@ -18,14 +18,12 @@
 //   display  accRT          -> ctx.target
 //   blit     cur            -> prevRT (persistent; next frame's reference)
 //
-// SHADER STUBS: the ME / residual / decode shader bodies below are
-// minimal placeholders marked `STUB`. They compile and run (enabling
-// shows a zero-motion feedback smear, proving the wiring), but the real
-// H.264-like math is left to fill in.
+// The YCbCr 4:2:0 path swaps decode for luma (full res) + chroma (half
+// res, truncated MV); the truncation is what makes color drift off edges.
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 
 // Copy ctx.src into curRT. `uvSrc` maps the content into the buffer
-// (= uv when there is no pad). Plumbing — complete as-is.
+// (= uv when there is no pad).
 const FRAG_CAPTURE = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
@@ -37,7 +35,7 @@ void main() {
 `;
 
 // Premultiplied copy of an internal RT to the canvas. `uvContent` maps
-// the content rect into the target buffer. Plumbing — complete as-is.
+// the content rect into the target buffer.
 const FRAG_DISPLAY = `#version 300 es
 precision highp float;
 in vec2 uvContent;
@@ -100,8 +98,6 @@ void main() {
 `;
 
 // Residual = cur - motionComp(ref, mv). Signed -> needs a float RT.
-// Zero-motion residual (cur - ref). Sample `uMV` and offset the
-// reference by `mv / uResolution` for the real motion-compensated form.
 const FRAG_RESIDUAL = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -118,8 +114,6 @@ void main() {
 
 // Decode. intra -> seed from the clean source. inter -> motion-comp the
 // held accumulator and add the residual (this is where the mosh lives).
-// Zero-motion prediction. Offset the accumulator read by `mv / uResolution`
-// to drag texture along the motion field.
 const FRAG_DECODE = `#version 300 es
 precision highp float;
 in vec2 uv;
