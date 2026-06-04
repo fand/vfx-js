@@ -101,6 +101,14 @@ export type JPEGGlitchParams = {
     iterations: number;
 
     /**
+     * Probability (0–1) that each corruption also clobbers the very first
+     * scan byte, which pushes a tear to the top of the image. A corruption
+     * only garbles blocks decoded after it, so without this the top stays
+     * clean. `0` = never, `1` = every corruption. (Default: `0.25`)
+     */
+    firstByte: number;
+
+    /**
      * Re-glitches per second. `0` glitches once and holds a stable frame
      * (re-runs when params change); `> 0` keeps re-corrupting for a live,
      * moving glitch. (Default: `0`)
@@ -112,12 +120,9 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     quality: 0.4,
     seed: 0.25,
     iterations: 24,
+    firstByte: 0.25,
     speed: 0,
 };
-
-// When a corruption's random byte value lands at or above this threshold,
-// the very first scan byte is clobbered too. See glitchBytes for why.
-const TOP_GLITCH_THRESHOLD = 0xc0;
 
 type GlitchCanvas = HTMLCanvasElement | OffscreenCanvas;
 
@@ -219,14 +224,15 @@ function makeRng(seed: number, variant: number): () => number {
 // segment, so the tears cover the whole stream.
 //
 // Top-row fix: a corruption only affects blocks decoded AFTER it, so the
-// top of the image (decoded first) normally stays clean. Whenever a drawn
-// value lands at/above TOP_GLITCH_THRESHOLD we also clobber the very first
-// scan byte, pushing a tear right to the top.
+// top of the image (decoded first) normally stays clean. With probability
+// `firstByte` each corruption also clobbers the very first scan byte,
+// pushing a tear right to the top.
 function glitchBytes(
     bytes: Uint8Array,
     headerLength: number,
     seed: number,
     iterations: number,
+    firstByte: number,
     variant: number,
 ): void {
     const maxIndex = bytes.length - headerLength - 4;
@@ -242,7 +248,7 @@ function glitchBytes(
         const pos = Math.min(maxIndex, min + ((rng() * delta) | 0));
         const value = (rng() * 256) | 0;
         bytes[headerLength + pos] = value;
-        if (value >= TOP_GLITCH_THRESHOLD) {
+        if (rng() < firstByte) {
             bytes[headerLength] = value;
         }
     }
@@ -443,7 +449,7 @@ export class JPEGGlitchEffect implements Effect {
         const variant = this.params.speed > 0 ? this.#glitchCount : 0;
         this.#glitchCount++;
 
-        const { quality, seed, iterations } = this.params;
+        const { quality, seed, iterations, firstByte } = this.params;
         void this.#runGlitch(
             srcCanvas,
             w,
@@ -451,6 +457,7 @@ export class JPEGGlitchEffect implements Effect {
             quality,
             seed,
             iterations,
+            firstByte,
             variant,
             this.#generation,
         );
@@ -463,6 +470,7 @@ export class JPEGGlitchEffect implements Effect {
         quality: number,
         seed: number,
         iterations: number,
+        firstByte: number,
         variant: number,
         generation: number,
     ): Promise<void> {
@@ -470,7 +478,7 @@ export class JPEGGlitchEffect implements Effect {
             const blob = await canvasToJpegBlob(canvas, quality);
             const bytes = new Uint8Array(await blob.arrayBuffer());
             const header = jpegScanStart(bytes);
-            glitchBytes(bytes, header, seed, iterations, variant);
+            glitchBytes(bytes, header, seed, iterations, firstByte, variant);
             const bmp = await createImageBitmap(
                 new Blob([bytes], { type: "image/jpeg" }),
             );
