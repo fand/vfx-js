@@ -487,9 +487,15 @@ void main() {
 
     vec2 sampleUV = fc / resolution;
     if (desync) {
-        // Uniform lag: content advances at rate (1 - slide), growing with
-        // progress into the segment (down through the rows below the trigger).
-        float lag = floor(prog * slide);
+        // Systematic lag: a per-segment mean drift rate (the average
+        // bit-length mismatch after this desync). Randomised and SIGNED per
+        // trigger so different corrupted regions shear differently — some
+        // stretch (rate > 0 → source lags), some compress (rate < 0 → source
+        // runs ahead), some barely move. rate=1 freezes the source at the
+        // trigger (a hard smear). It grows with progress into the segment, so
+        // it shears down through the rows below the trigger.
+        float rate = slide * (2.0 * hash11(trig * 1.13 + seed * 7.3) - 1.0);
+        float lag = floor(prog * rate);
         // Drift lag: the bit-position random walk accumulated since the
         // trigger (prefix(scan) - prefix(trig - 1)), which warps content
         // irregularly. Both lags are in scan order, so they propagate exactly
@@ -560,13 +566,13 @@ export type JPEGGlitchParams = {
     corruption: number;
 
     /**
-     * Grid-slide smear / stretch of desync regions, `0`..`1`. Emulates the
-     * MCU grid sliding when the Huffman bitstream loses sync: the source
-     * content advances at rate `1 - slide`, and the lag accumulates in scan
-     * order — so it grows down through the rows below the trigger, wrapping
-     * as a diagonal tear (like the DC cascade). `0` leaves content in place,
-     * mid values stretch it, and `1` freezes the source at the trigger block
-     * (a hard smear). Only visible where `corruption` has triggered a desync.
+     * Systematic grid-slide of desync regions, `0`..`1`. The mean drift rate
+     * (average bit-length mismatch) after a desync, randomised and signed per
+     * trigger: some corrupted regions stretch (source lags), some compress
+     * (source runs ahead), some barely move — `slide` is the maximum rate.
+     * `1` lets the strongest regions freeze at the trigger block (a hard
+     * smear). Pairs with `drift`, which adds the irregular fluctuation around
+     * this mean. Only visible where `corruption` has triggered a desync.
      */
     slide: number;
 
@@ -613,7 +619,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     corruption: 0.15,
     restart: 512,
     restartJitter: 0.5,
-    slide: 0.7,
+    slide: 1,
     drift: 8,
     speed: 1,
     seed: 0,

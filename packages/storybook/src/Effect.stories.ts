@@ -604,7 +604,7 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
         corruption: 0.15,
         restart: 512,
         restartJitter: 0.5,
-        slide: 0.7,
+        slide: 1,
         drift: 8,
         speed: 0,
         seed: 0,
