@@ -194,7 +194,7 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
         },
         quality: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         seed: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        iterations: { control: { type: "range", min: 1, max: 200, step: 1 } },
+        iterations: { control: { type: "range", min: 1, max: 30, step: 1 } },
         randomFlip: { control: { type: "boolean" } },
         vertical: { control: { type: "boolean" } },
         speed: { control: { type: "range", min: 0, max: 30, step: 0.5 } },
