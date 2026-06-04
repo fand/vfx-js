@@ -109,6 +109,15 @@ export type JPEGGlitchParams = {
     firstByte: number;
 
     /**
+     * Controls how often a glitch is rendered upside-down. Tears propagate
+     * downward (top stays cleaner), so rotating the source 180° before
+     * corrupting — then rotating the output back — flips the bias upward.
+     * Applied when `random() < flipY`, so `0` = never flip, `1` = always
+     * flip, `0.5` = balanced both directions. (Default: `0.5`)
+     */
+    flipY: number;
+
+    /**
      * Re-glitches per second. `0` glitches once and holds a stable frame
      * (re-runs when params change); `> 0` keeps re-corrupting for a live,
      * moving glitch. (Default: `0`)
@@ -121,6 +130,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     seed: 0.25,
     iterations: 24,
     firstByte: 0.25,
+    flipY: 0.5,
     speed: 0,
 };
 
@@ -137,6 +147,10 @@ type Ctx2D = {
         dh: number,
     ): void;
     clearRect(x: number, y: number, w: number, h: number): void;
+    save(): void;
+    restore(): void;
+    translate(x: number, y: number): void;
+    rotate(angle: number): void;
 };
 
 function createCanvas(w: number, h: number): GlitchCanvas {
@@ -217,11 +231,24 @@ function makeRng(seed: number, variant: number): () => number {
     };
 }
 
+// Rotate an upright RGBA buffer 180° in place — i.e. reverse the pixel
+// order, since each pixel is 4 contiguous bytes.
+function rotate180(data: Uint8ClampedArray): void {
+    for (let lo = 0, hi = data.length - 4; lo < hi; lo += 4, hi -= 4) {
+        for (let k = 0; k < 4; k++) {
+            const t = data[lo + k];
+            data[lo + k] = data[hi + k];
+            data[hi + k] = t;
+        }
+    }
+}
+
 // Corrupt the entropy-coded scan data. The byte VALUE written is a
 // seed-derived random number — JPEG desyncs on any change, so the value is
 // effectively arbitrary (there is no meaningful "amount" of it). Positions
 // are spread one per segment (à la glitch-canvas), randomized within each
-// segment, so the tears cover the whole stream.
+// segment, so the tears cover the whole stream. `rng` is the shared seeded
+// sequence, so the result is reproducible from the seed.
 //
 // Top-row fix: a corruption only affects blocks decoded AFTER it, so the
 // top of the image (decoded first) normally stays clean. With probability
@@ -230,17 +257,15 @@ function makeRng(seed: number, variant: number): () => number {
 function glitchBytes(
     bytes: Uint8Array,
     headerLength: number,
-    seed: number,
     iterations: number,
     firstByte: number,
-    variant: number,
+    rng: () => number,
 ): void {
     const maxIndex = bytes.length - headerLength - 4;
     if (maxIndex <= 1) {
         return;
     }
     const iter = Math.max(1, Math.floor(iterations));
-    const rng = makeRng(seed, variant);
     for (let i = 0; i < iter; i++) {
         const min = ((maxIndex / iter) * i) | 0;
         const max = ((maxIndex / iter) * (i + 1)) | 0;
@@ -439,7 +464,6 @@ export class JPEGGlitchEffect implements Effect {
         for (let i = 3; i < data.length; i += 4) {
             data[i] = 255;
         }
-        srcCtx.putImageData(imageData, 0, 0);
 
         this.#busy = true;
         this.#dirty = false;
@@ -449,16 +473,25 @@ export class JPEGGlitchEffect implements Effect {
         const variant = this.params.speed > 0 ? this.#glitchCount : 0;
         this.#glitchCount++;
 
-        const { quality, seed, iterations, firstByte } = this.params;
+        const { quality, seed, iterations, firstByte, flipY } = this.params;
+        // One seeded sequence drives both the flip decision and the byte
+        // corruption, so the whole glitch is reproducible from the seed.
+        const rng = makeRng(seed, variant);
+        const flip = rng() < flipY;
+        if (flip) {
+            rotate180(data);
+        }
+        srcCtx.putImageData(imageData, 0, 0);
+
         void this.#runGlitch(
             srcCanvas,
             w,
             h,
             quality,
-            seed,
             iterations,
             firstByte,
-            variant,
+            flip,
+            rng,
             this.#generation,
         );
     }
@@ -468,24 +501,34 @@ export class JPEGGlitchEffect implements Effect {
         w: number,
         h: number,
         quality: number,
-        seed: number,
         iterations: number,
         firstByte: number,
-        variant: number,
+        flip: boolean,
+        rng: () => number,
         generation: number,
     ): Promise<void> {
         try {
             const blob = await canvasToJpegBlob(canvas, quality);
             const bytes = new Uint8Array(await blob.arrayBuffer());
             const header = jpegScanStart(bytes);
-            glitchBytes(bytes, header, seed, iterations, firstByte, variant);
+            glitchBytes(bytes, header, iterations, firstByte, rng);
             const bmp = await createImageBitmap(
                 new Blob([bytes], { type: "image/jpeg" }),
             );
             // Discard if a resize happened while we were encoding/decoding.
             if (generation === this.#generation && this.#outCtx) {
                 this.#outCtx.clearRect(0, 0, w, h);
-                this.#outCtx.drawImage(bmp, 0, 0, w, h);
+                if (flip) {
+                    // Undo the 180° applied to the source so the image is
+                    // upright again, leaving the glitch bias flipped upward.
+                    this.#outCtx.save();
+                    this.#outCtx.translate(w, h);
+                    this.#outCtx.rotate(Math.PI);
+                    this.#outCtx.drawImage(bmp, 0, 0, w, h);
+                    this.#outCtx.restore();
+                } else {
+                    this.#outCtx.drawImage(bmp, 0, 0, w, h);
+                }
                 this.#hasResult = true;
             }
             bmp.close();
