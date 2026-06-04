@@ -340,6 +340,15 @@ export class JPEGGlitchEffect implements Effect {
     // Drives the animated seed walk when `speed > 0`.
     #glitchCount = 0;
     #hasResult = false;
+    // Number of decoded glitch results produced. Increments once per
+    // completed encode/decode round trip — sample it to measure the real
+    // output rate, which is capped by codec latency below high `speed`.
+    #producedFrames = 0;
+
+    /** Count of decoded glitch results produced so far. */
+    get producedFrames(): number {
+        return this.#producedFrames;
+    }
 
     constructor(initial: Partial<JPEGGlitchParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
@@ -560,6 +569,7 @@ export class JPEGGlitchEffect implements Effect {
                     h,
                 );
                 this.#hasResult = true;
+                this.#producedFrames++;
             }
             bmp.close();
         } catch {

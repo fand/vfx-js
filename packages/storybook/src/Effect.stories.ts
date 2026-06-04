@@ -153,6 +153,7 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
         const { src, ...params } = args;
         const vfx = initVFX();
         const effect = new JPEGGlitchEffect(params);
+        attachOutputFpsMeter(effect);
 
         // bbb is a video; the rest are images.
         if (src === "bbb") {
@@ -640,6 +641,40 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         bgColor: { control: { type: "color" } },
     },
 };
+
+// Overlay the JPEGGlitch effect's real output rate (decoded results per
+// second) in a screen corner. The codec round trip caps this well below
+// high `speed` values. Re-rendering the story removes the previous meter,
+// and the orphaned loop stops itself once its node is disconnected.
+function attachOutputFpsMeter(effect: JPEGGlitchEffect): void {
+    document.getElementById("jpeg-glitch-fps")?.remove();
+    const meter = document.createElement("div");
+    meter.id = "jpeg-glitch-fps";
+    meter.style.cssText =
+        "position:fixed;top:8px;left:8px;z-index:2147483647;" +
+        "font:12px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.6);" +
+        "padding:2px 8px;border-radius:3px;pointer-events:none;";
+    meter.textContent = "-- fps";
+    document.body.appendChild(meter);
+
+    let lastTime = performance.now();
+    let lastCount = effect.producedFrames;
+    const tick = () => {
+        if (!meter.isConnected) {
+            return; // a later render() removed it; stop this loop
+        }
+        const now = performance.now();
+        const elapsed = now - lastTime;
+        if (elapsed >= 500) {
+            const count = effect.producedFrames;
+            meter.textContent = `${(((count - lastCount) * 1000) / elapsed).toFixed(1)} fps`;
+            lastTime = now;
+            lastCount = count;
+        }
+        requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+}
 
 function seedFluidMotion(canvasElement: HTMLElement): void {
     const cx = Math.round(window.innerWidth / 2);
