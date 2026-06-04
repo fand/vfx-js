@@ -87,16 +87,10 @@ export type JPEGGlitchParams = {
     quality: number;
 
     /**
-     * Corruption strength (0–1). Maps to the byte value written into the
-     * scan stream (`floor(amount * 256)`); different values knock the
-     * entropy decoder off in different ways. (Default: `0.35`)
-     */
-    amount: number;
-
-    /**
-     * Position seed (0–1). Selects where within each corrupted segment the
-     * byte is flipped, so it shifts the glitch pattern around without
-     * changing how much is corrupted. (Default: `0.25`)
+     * Random seed for the corruption pattern. Drives both the byte values
+     * written into the scan stream and where they land. The same seed (with
+     * the same other params) always produces the same glitch, so a static
+     * frame is reproducible. (Default: `0.25`)
      */
     seed: number;
 
@@ -116,11 +110,14 @@ export type JPEGGlitchParams = {
 
 const DEFAULT_PARAMS: JPEGGlitchParams = {
     quality: 0.4,
-    amount: 0.35,
     seed: 0.25,
     iterations: 24,
     speed: 0,
 };
+
+// When a corruption's random byte value lands at or above this threshold,
+// the very first scan byte is clobbered too. See glitchBytes for why.
+const TOP_GLITCH_THRESHOLD = 0xc0;
 
 type GlitchCanvas = HTMLCanvasElement | OffscreenCanvas;
 
@@ -199,35 +196,55 @@ function jpegScanStart(bytes: Uint8Array): number {
     return Math.min(bytes.length, 417);
 }
 
-// The glitch-canvas byte corruption: split the scan data into `iterations`
-// segments and overwrite one byte per segment at a seed-selected offset.
-// `phase` walks the seed for animation (0 = the deterministic single-shot
-// result, identical to glitch-canvas for a given seed).
+// mulberry32 PRNG. Hash (seed, variant) into a 32-bit state so the same
+// seed (and variant) always replays the same sequence — a static glitch is
+// reproducible, while `variant` advances the pattern for animation.
+function makeRng(seed: number, variant: number): () => number {
+    let a =
+        (Math.imul(Math.floor(seed * 0x9e3779b1) | 0, 0x85ebca77) +
+            Math.imul(variant + 1, 0xc2b2ae3d)) >>>
+        0;
+    return () => {
+        a = (a + 0x6d2b79f5) >>> 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+// Corrupt the entropy-coded scan data. The byte VALUE written is a
+// seed-derived random number — JPEG desyncs on any change, so the value is
+// effectively arbitrary (there is no meaningful "amount" of it). Positions
+// are spread one per segment (à la glitch-canvas), randomized within each
+// segment, so the tears cover the whole stream.
+//
+// Top-row fix: a corruption only affects blocks decoded AFTER it, so the
+// top of the image (decoded first) normally stays clean. Whenever a drawn
+// value lands at/above TOP_GLITCH_THRESHOLD we also clobber the very first
+// scan byte, pushing a tear right to the top.
 function glitchBytes(
     bytes: Uint8Array,
     headerLength: number,
-    amount: number,
     seed: number,
     iterations: number,
-    phase: number,
+    variant: number,
 ): void {
     const maxIndex = bytes.length - headerLength - 4;
     if (maxIndex <= 1) {
         return;
     }
     const iter = Math.max(1, Math.floor(iterations));
-    const value = Math.max(0, Math.min(255, Math.floor(amount * 256)));
+    const rng = makeRng(seed, variant);
     for (let i = 0; i < iter; i++) {
         const min = ((maxIndex / iter) * i) | 0;
         const max = ((maxIndex / iter) * (i + 1)) | 0;
-        const delta = max - min;
-        let s = seed + phase;
-        s -= Math.floor(s); // wrap into [0, 1)
-        let idx = (min + delta * s) | 0;
-        if (idx > maxIndex) {
-            idx = maxIndex;
+        const delta = Math.max(1, max - min);
+        const pos = Math.min(maxIndex, min + ((rng() * delta) | 0));
+        const value = (rng() * 256) | 0;
+        bytes[headerLength + pos] = value;
+        if (value >= TOP_GLITCH_THRESHOLD) {
+            bytes[headerLength] = value;
         }
-        bytes[headerLength + idx] = value;
     }
 }
 
@@ -421,20 +438,20 @@ export class JPEGGlitchEffect implements Effect {
         this.#busy = true;
         this.#dirty = false;
         this.#lastGlitchTime = ctx.time;
-        const phase =
-            this.params.speed > 0 ? this.#glitchCount * 0.6180339887 : 0;
+        // Static glitch (speed 0) stays on variant 0 so it's reproducible;
+        // animated glitch advances the variant each round.
+        const variant = this.params.speed > 0 ? this.#glitchCount : 0;
         this.#glitchCount++;
 
-        const { quality, amount, seed, iterations } = this.params;
+        const { quality, seed, iterations } = this.params;
         void this.#runGlitch(
             srcCanvas,
             w,
             h,
             quality,
-            amount,
             seed,
             iterations,
-            phase,
+            variant,
             this.#generation,
         );
     }
@@ -444,17 +461,16 @@ export class JPEGGlitchEffect implements Effect {
         w: number,
         h: number,
         quality: number,
-        amount: number,
         seed: number,
         iterations: number,
-        phase: number,
+        variant: number,
         generation: number,
     ): Promise<void> {
         try {
             const blob = await canvasToJpegBlob(canvas, quality);
             const bytes = new Uint8Array(await blob.arrayBuffer());
             const header = jpegScanStart(bytes);
-            glitchBytes(bytes, header, amount, seed, iterations, phase);
+            glitchBytes(bytes, header, seed, iterations, variant);
             const bmp = await createImageBitmap(
                 new Blob([bytes], { type: "image/jpeg" }),
             );

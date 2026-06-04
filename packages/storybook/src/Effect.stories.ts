@@ -135,7 +135,6 @@ type JPEGGlitchSrc = "Jellyfish" | "Logo";
 type JPEGGlitchArgs = {
     src: JPEGGlitchSrc;
     quality: number;
-    amount: number;
     seed: number;
     iterations: number;
     speed: number;
@@ -155,7 +154,6 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
     args: {
         src: "Jellyfish",
         quality: 0.4,
-        amount: 0.35,
         seed: 0.25,
         iterations: 24,
         speed: 0,
@@ -166,7 +164,6 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
             options: ["Jellyfish", "Logo"],
         },
         quality: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        amount: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         seed: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         iterations: { control: { type: "range", min: 1, max: 200, step: 1 } },
         speed: { control: { type: "range", min: 0, max: 30, step: 0.5 } },
