@@ -434,37 +434,36 @@ void main() {
 }
 `;
 
-// Pass 5b — row-local prefix sum of dense, signed per-block drift increments,
-// folded by FRAG_CASCADE (reused) into the global drift prefix sum. The
-// increment approximates a desynced Huffman stream's per-block bit-length
-// error: every block reads slightly too many or too few bits, so the read
-// position random-walks away from the MCU grid.
+// Pass 5b — row-local prefix sums folded by FRAG_CASCADE (reused) into two
+// global drift prefix sums:
+//   .r — a dense, signed per-block random walk: the desynced stream's
+//        per-block bit-length error (every block reads slightly too many or
+//        too few bits), giving irregular warp. Drives `drift`.
+//   .g — a count of desync events: a desynced decoder drops the corrupted
+//        block, so every following block shifts one position earlier. The
+//        running count is how many blocks the content has slid. Drives `skip`.
 const FRAG_DRIFT_ROW = `#version 300 es
 precision highp float;
 out vec4 outColor;
 uniform vec2 grid;
-uniform float time;
-uniform float seed;
-
-float h11(float p) {
-    p = fract(p * 0.1031);
-    p *= p + 33.33;
-    p *= p + p;
-    return fract(p);
-}
+${IMPULSE_GLSL}
 
 void main() {
     float bw = grid.x;
     float bx = floor(gl_FragCoord.x);
     float by = floor(gl_FragCoord.y);
     float tt = floor(time);
-    float sum = 0.0;
+    float walk = 0.0;
+    float skips = 0.0;
     for (int i = 0; i < 4096; i++) {
         if (float(i) > bx) break;
         float scan = by * bw + float(i);
-        sum += h11(scan + tt * 7.0 + seed * 101.0) - 0.5;
+        walk += h11(scan + tt * 7.0 + seed * 101.0) - 0.5;
+        if (corruptionEvent(scan, tt) && eventDesyncs(scan, tt)) {
+            skips += 1.0;
+        }
     }
-    outColor = vec4(sum, 0.0, 0.0, 0.0);
+    outColor = vec4(walk, skips, 0.0, 0.0);
 }
 `;
 
@@ -472,30 +471,32 @@ void main() {
 // the decoder loses bit-sync it also loses count of how many bits each block
 // consumed, so the MCU grid slides: subsequent content is placed at a shifted
 // scan position. Inside a desync run we sample the reconstructed image from a
-// scan-order-lagged block, which slides / stretches content and wraps across
-// rows as the signature diagonal tear. Two lag terms combine:
-//   - slide: a smooth, uniform lag (prog * slide) → even stretch / smear.
-//   - drift: the running drift prefix sum (a data-dependent random walk) →
-//     irregular warp, jagged edges, local compress/stretch — the chaotic
-//     "shape breakdown" of a real byte-glitch.
+// scan-order-shifted block, which slides / stretches content and wraps across
+// rows as the signature diagonal tear. Three lag terms combine:
+//   - slide: a smooth, per-segment signed lag (prog * rate) → even shear.
+//   - drift: the random-walk prefix sum → irregular warp, jagged edges.
+//   - skip:  the desync-event count → each dropped block slides everything
+//     after it one position earlier (a monotonic LEFTWARD staircase that
+//     accumulates by one more block at every corruption point).
 const FRAG_DISPLACE = `#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
 uniform sampler2D src; // reconstructed YCbCr (post-IDCT)
-uniform sampler2D cascadeDrift; // block-res: .r = drift prefix sum
+uniform sampler2D cascadeDrift; // block-res: .r = walk prefix, .g = skip count
 uniform vec2 resolution;
 uniform float slide; // 0..1 uniform smear / stretch strength
 uniform float drift; // magnitude of the irregular data-dependent drift
+uniform float skip;  // blocks shifted left per dropped (desynced) block
 ${CASCADE_GLSL}
 
-// Drift prefix sum at a scan index.
-float driftAt(float idx) {
+// Drift prefix sums at a scan index (.r = random walk, .g = skip count).
+vec2 driftAt(float idx) {
     float bw = grid.x;
     return texture(
         cascadeDrift,
         vec2((mod(idx, bw) + 0.5) / bw, (floor(idx / bw) + 0.5) / grid.y)
-    ).r;
+    ).rg;
 }
 
 void main() {
@@ -525,14 +526,20 @@ void main() {
         // it shears down through the rows below the trigger.
         float rate = slide * (2.0 * hash11(trig * 1.13 + seed * 7.3) - 1.0);
         float lag = floor(prog * rate);
-        // Drift lag: the bit-position random walk accumulated since the
-        // trigger (prefix(scan) - prefix(trig - 1)), which warps content
-        // irregularly. Both lags are in scan order, so they propagate exactly
-        // like the DC cascade does.
+        vec2 here = driftAt(scan);
+        // Drift lag: the bit-position random walk accumulated since the active
+        // trigger (here.x - prefix(trig - 1)), which warps content irregularly.
         if (drift != 0.0) {
-            float base = trig >= 1.0 ? driftAt(trig - 1.0) : 0.0;
-            lag += floor((driftAt(scan) - base) * drift);
+            float wBase = trig >= 1.0 ? driftAt(trig - 1.0).x : 0.0;
+            lag += floor((here.x - wBase) * drift);
         }
+        // Skip: each dropped block in this segment shifts the rest one block
+        // earlier in scan order. The desync-event count since the segment
+        // start gives how many blocks the content has slid; we sample AHEAD
+        // (negative lag) by it — a monotonic LEFTWARD staircase that grows by
+        // one more block at every corruption point, until the restart resyncs.
+        float sBase = segStart >= 1.0 ? driftAt(segStart - 1.0).y : 0.0;
+        lag -= floor((here.y - sBase) * skip);
         float m = max(0.0, scan - lag);
         float bw = grid.x;
         float sbx = mod(m, bw);
@@ -627,6 +634,17 @@ export type JPEGGlitchParams = {
     drift: number;
 
     /**
+     * Leftward block-skip drift, in blocks per dropped block. A desynced
+     * decoder drops the corrupted block, so every following block slides one
+     * position earlier (left, wrapping up a row). The shift accumulates by one
+     * more block at each corruption point and resets at the next restart — a
+     * monotonic leftward staircase. `0` disables it; `1` is the literal
+     * one-block-per-drop behaviour; larger exaggerates it. Only visible inside
+     * a desync run.
+     */
+    skip: number;
+
+    /**
      * Mean restart-marker (DRI) interval in blocks (MCUs). The DC cascade and
      * the desync run reset at restart boundaries, so corruption is confined
      * to the segment it lands in instead of smearing to the end of the image.
@@ -662,6 +680,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     restartJitter: 0.5,
     slide: 1,
     drift: 8,
+    skip: 1,
     speed: 1,
     seed: 0,
 };
@@ -721,6 +740,7 @@ export class JPEGGlitchEffect implements Effect {
             restartJitter,
             slide,
             drift,
+            skip,
             seed,
         } = this.params;
         const time = ctx.time * this.params.speed;
@@ -759,12 +779,12 @@ export class JPEGGlitchEffect implements Effect {
             target: cascade,
         });
 
-        // 5b. bit-position drift: a second scan-order prefix sum of dense,
-        // signed per-block increments (a random walk). Reuses rowScan (the DC
-        // fold is done with it) and the same fold shader.
+        // 5b. drift prefix sums: a second scan-order prefix pair — a dense
+        // random walk (.r, for drift) and a desync-event count (.g, for skip).
+        // Reuses rowScan (the DC fold is done with it) and the same fold shader.
         ctx.draw({
             frag: FRAG_DRIFT_ROW,
-            uniforms: { grid, time, seed },
+            uniforms: { grid, ...impulse },
             target: rowScan,
         });
         ctx.draw({
@@ -804,6 +824,7 @@ export class JPEGGlitchEffect implements Effect {
                 resolution,
                 slide,
                 drift,
+                skip,
                 cascadeDrift,
                 ...seg,
             },
