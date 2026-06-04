@@ -8,6 +8,7 @@ import {
     ScanlineEffect,
     FluidEffect,
     HalftoneEffect,
+    JPEGGlitchEffect,
     ParticleEffect,
     ParticleExplodeEffect,
     PixelSortEffect,
@@ -123,6 +124,54 @@ pixelSort.play = async ({ canvasElement }) => {
     });
     await vfx.add(img, { effect });
     attachPixelSortPane("Pixel Sort", effect);
+};
+
+// Real (codec-level) JPEG glitch — re-encodes the element as a JPEG and
+// corrupts the byte stream, then draws the browser's decode of the broken
+// file. Excluded from VRT: the encode/decode round trip is async (no
+// result at capture time) and the native codec output is environment
+// dependent, so a snapshot isn't a stable target.
+type JPEGGlitchSrc = "Jellyfish" | "Logo";
+type JPEGGlitchArgs = {
+    src: JPEGGlitchSrc;
+    quality: number;
+    amount: number;
+    seed: number;
+    iterations: number;
+    speed: number;
+};
+export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
+    render: (args) => {
+        const { src, ...params } = args;
+        const vfx = initVFX();
+        const effect = new JPEGGlitchEffect(params);
+        const img = document.createElement("img");
+        img.src = src === "Jellyfish" ? Jellyfish : Logo;
+        img.style.display = "block";
+        img.style.margin = "40px auto";
+        vfx.add(img, { effect });
+        return img;
+    },
+    args: {
+        src: "Jellyfish",
+        quality: 0.4,
+        amount: 0.35,
+        seed: 0.25,
+        iterations: 24,
+        speed: 0,
+    },
+    argTypes: {
+        src: {
+            control: { type: "select" },
+            options: ["Jellyfish", "Logo"],
+        },
+        quality: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        amount: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        seed: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        iterations: { control: { type: "range", min: 1, max: 200, step: 1 } },
+        speed: { control: { type: "range", min: 0, max: 30, step: 0.5 } },
+    },
+    parameters: { chromatic: { disableSnapshot: true } },
 };
 
 // Stable Fluid as a single Effect. Drives mouse splats off real pointer
