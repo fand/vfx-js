@@ -310,6 +310,20 @@ export class JPEGGlitchEffect implements Effect {
     #readRT: EffectRenderTarget | null = null;
     #outTex: EffectTexture | null = null;
 
+    // Raw GL handles for the async readback + on-demand upload paths.
+    #gl: WebGL2RenderingContext | null = null;
+    // Pixel-pack buffer: readPixels writes into it asynchronously, decoupling
+    // the GPU→CPU copy from the main thread (no readPixels stall).
+    #pbo: WebGLBuffer | null = null;
+    #pboBytes = 0;
+    #readSync: WebGLSync | null = null;
+    #readPending = false;
+    // Display texture we upload `outCanvas` into only when a new glitch
+    // lands, instead of re-uploading the canvas every frame.
+    #outGLTex: WebGLTexture | null = null;
+    #uploadPending = false;
+    #restoreUnsub: (() => void) | null = null;
+
     #srcCanvas: GlitchCanvas | null = null;
     #srcCtx: Ctx2D | null = null;
     // Holds the (optionally rotated) image that actually gets encoded; its
@@ -374,7 +388,53 @@ export class JPEGGlitchEffect implements Effect {
         this.#outCanvas = createCanvas(1, 1);
         this.#outCtx = get2d(this.#outCanvas);
         this.#readRT = ctx.createRenderTarget();
-        this.#outTex = ctx.wrapTexture(this.#outCanvas, { autoUpdate: true });
+        this.#gl = ctx.gl;
+        this.#pbo = ctx.gl.createBuffer();
+        this.#createOutTexture(ctx);
+        // Raw GL resources die on context loss; rebuild them.
+        this.#restoreUnsub = ctx.onContextRestored(() => {
+            this.#pbo = ctx.gl.createBuffer();
+            this.#pboBytes = 0;
+            this.#readSync = null;
+            this.#readPending = false;
+            this.#busy = false;
+            this.#createOutTexture(ctx);
+            // Re-push the last decoded frame, if any.
+            this.#uploadPending = this.#hasResult;
+        });
+    }
+
+    // Create (or recreate) the display texture and wrap it for sampling.
+    // We own the GL handle and upload into it manually, so context-loss
+    // rebuilds are our responsibility.
+    #createOutTexture(ctx: EffectContext): void {
+        const gl = ctx.gl;
+        const tex = gl.createTexture();
+        if (!tex) {
+            return;
+        }
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        // 1×1 placeholder so the sampler is valid before the first upload.
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            1,
+            1,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            new Uint8Array([0, 0, 0, 0]),
+        );
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        this.#outGLTex = tex;
+        this.#outTex = ctx.wrapTexture(tex, {
+            size: [this.#w || 1, this.#h || 1],
+        });
     }
 
     render(ctx: EffectContext): void {
@@ -398,12 +458,19 @@ export class JPEGGlitchEffect implements Effect {
             if (w !== this.#w || h !== this.#h) {
                 this.#resize(w, h);
             }
-            if (this.#shouldGlitch(ctx)) {
-                this.#startGlitch(ctx);
+            if (this.#readPending) {
+                // A readback is in flight; pick it up once the GPU signals.
+                this.#pollReadback(ctx);
+            } else if (this.#shouldGlitch(ctx)) {
+                this.#beginReadback(ctx);
             }
         }
 
         if (this.#hasResult && this.#outTex) {
+            // Upload the decoded canvas to the GPU only when it changed.
+            if (this.#uploadPending) {
+                this.#uploadOutCanvas(ctx);
+            }
             ctx.draw({
                 frag: FRAG_OUTPUT,
                 uniforms: { tex: this.#outTex },
@@ -449,10 +516,88 @@ export class JPEGGlitchEffect implements Effect {
         this.#hasResult = false;
         this.#dirty = true;
         this.#busy = false;
+        this.#uploadPending = false;
+        // The in-flight readback's PBO contents are now the wrong size.
+        this.#discardReadback();
         this.#generation++;
     }
 
-    #startGlitch(ctx: EffectContext): void {
+    // Issue an asynchronous GPU→PBO readback of the element capture, then
+    // poll a fence on later frames so the readPixels never stalls the main
+    // thread. dispatchGlitch picks up the pixels once they're ready.
+    #beginReadback(ctx: EffectContext): void {
+        const w = this.#w;
+        const h = this.#h;
+        if (!this.#readRT || !this.#pbo) {
+            return;
+        }
+
+        // ctx.draw leaves the readback RT's framebuffer bound, so the
+        // readPixels below sources from it.
+        ctx.draw({
+            frag: FRAG_CAPTURE,
+            uniforms: { src: ctx.src },
+            target: this.#readRT,
+        });
+
+        const gl = ctx.gl;
+        const bytes = w * h * 4;
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.#pbo);
+        if (this.#pboBytes !== bytes) {
+            gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ);
+            this.#pboBytes = bytes;
+        }
+        // Offset (not a CPU pointer) → reads into the PBO, returns at once.
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        this.#readSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+        this.#readPending = true;
+        this.#busy = true;
+        this.#dirty = false;
+        this.#lastGlitchTime = ctx.time;
+    }
+
+    #pollReadback(ctx: EffectContext): void {
+        const gl = ctx.gl;
+        const sync = this.#readSync;
+        if (!sync || !this.#pbo) {
+            this.#readPending = false;
+            this.#busy = false;
+            return;
+        }
+        // SYNC_FLUSH_COMMANDS_BIT guarantees the commands get flushed so the
+        // fence will eventually signal; timeout 0 keeps the poll non-blocking.
+        const status = gl.clientWaitSync(sync, gl.SYNC_FLUSH_COMMANDS_BIT, 0);
+        if (
+            status === gl.ALREADY_SIGNALED ||
+            status === gl.CONDITION_SATISFIED
+        ) {
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.#pbo);
+            // Data is ready, so this copy doesn't stall.
+            gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.#raw);
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+            this.#discardReadback();
+            this.#dispatchGlitch();
+        } else if (status === gl.WAIT_FAILED) {
+            this.#discardReadback();
+            this.#busy = false;
+        }
+        // TIMEOUT_EXPIRED → not ready yet; keep polling next frame.
+    }
+
+    #discardReadback(): void {
+        if (this.#readSync && this.#gl) {
+            this.#gl.deleteSync(this.#readSync);
+        }
+        this.#readSync = null;
+        this.#readPending = false;
+    }
+
+    // The CPU-side work once the readback pixels are in `#raw`: build the
+    // upright source, rotate it, and kick off the async encode/decode.
+    #dispatchGlitch(): void {
         const w = this.#w;
         const h = this.#h;
         const srcCanvas = this.#srcCanvas;
@@ -460,31 +605,13 @@ export class JPEGGlitchEffect implements Effect {
         const encCanvas = this.#encCanvas;
         const encCtx = this.#encCtx;
         const imageData = this.#imageData;
-        if (
-            !srcCanvas ||
-            !srcCtx ||
-            !encCanvas ||
-            !encCtx ||
-            !imageData ||
-            !this.#readRT
-        ) {
+        if (!srcCanvas || !srcCtx || !encCanvas || !encCtx || !imageData) {
+            this.#busy = false;
             return;
         }
 
-        // Read the element capture back to the CPU. ctx.draw leaves the
-        // readback RT's framebuffer bound, so readPixels reads from it.
-        ctx.draw({
-            frag: FRAG_CAPTURE,
-            uniforms: { src: ctx.src },
-            target: this.#readRT,
-        });
-        const gl = ctx.gl;
-        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.#raw);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-        // GL framebuffers are bottom-up; flip rows so the canvas is upright
-        // (the wrapped texture re-flips on upload). Force opaque alpha —
-        // JPEG has no alpha channel.
+        // GL framebuffers are bottom-up; flip rows so the canvas is upright.
+        // Force opaque alpha — JPEG has no alpha channel.
         const data = imageData.data;
         const rowBytes = w * 4;
         for (let y = 0; y < h; y++) {
@@ -498,9 +625,6 @@ export class JPEGGlitchEffect implements Effect {
             data[i] = 255;
         }
 
-        this.#busy = true;
-        this.#dirty = false;
-        this.#lastGlitchTime = ctx.time;
         // Static glitch (speed 0) stays on variant 0 so it's reproducible;
         // animated glitch advances the variant each round.
         const variant = this.params.speed > 0 ? this.#glitchCount : 0;
@@ -534,6 +658,30 @@ export class JPEGGlitchEffect implements Effect {
             rng,
             this.#generation,
         );
+    }
+
+    // Upload the decoded glitch canvas into our display texture. FLIP_Y
+    // matches the framework's canvas-as-image convention so FRAG_OUTPUT
+    // (which samples by uvContent) shows it upright.
+    #uploadOutCanvas(ctx: EffectContext): void {
+        const gl = ctx.gl;
+        if (!this.#outGLTex || !this.#outCanvas) {
+            return;
+        }
+        gl.bindTexture(gl.TEXTURE_2D, this.#outGLTex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            this.#outCanvas,
+        );
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        this.#uploadPending = false;
     }
 
     async #runGlitch(
@@ -570,6 +718,8 @@ export class JPEGGlitchEffect implements Effect {
                 );
                 this.#hasResult = true;
                 this.#producedFrames++;
+                // New pixels — upload to the display texture on the next draw.
+                this.#uploadPending = true;
             }
             bmp.close();
         } catch {
@@ -583,6 +733,22 @@ export class JPEGGlitchEffect implements Effect {
     }
 
     dispose(): void {
+        this.#restoreUnsub?.();
+        this.#restoreUnsub = null;
+        this.#discardReadback();
+        if (this.#gl) {
+            if (this.#pbo) {
+                this.#gl.deleteBuffer(this.#pbo);
+            }
+            if (this.#outGLTex) {
+                this.#gl.deleteTexture(this.#outGLTex);
+            }
+        }
+        this.#pbo = null;
+        this.#pboBytes = 0;
+        this.#outGLTex = null;
+        this.#gl = null;
+        this.#uploadPending = false;
         this.#readRT?.dispose();
         this.#readRT = null;
         this.#outTex = null;
