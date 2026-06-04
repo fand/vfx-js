@@ -110,6 +110,13 @@ export type JPEGGlitchParams = {
     randomFlip: boolean;
 
     /**
+     * Rotate the image a quarter turn (-90°) before corrupting, then rotate
+     * the decoded output back. Tears run top-to-bottom, so this turns them
+     * sideways. Composes with `randomFlip`. (Default: `false`)
+     */
+    vertical: boolean;
+
+    /**
      * Re-glitches per second. `0` glitches once and holds a stable frame
      * (re-runs when params change); `> 0` keeps re-corrupting for a live,
      * moving glitch. (Default: `0`)
@@ -122,6 +129,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     seed: 0.25,
     iterations: 24,
     randomFlip: true,
+    vertical: false,
     speed: 0,
 };
 
@@ -222,16 +230,35 @@ function makeRng(seed: number, variant: number): () => number {
     };
 }
 
-// Rotate an upright RGBA buffer 180° in place — i.e. reverse the pixel
-// order, since each pixel is 4 contiguous bytes.
-function rotate180(data: Uint8ClampedArray): void {
-    for (let lo = 0, hi = data.length - 4; lo < hi; lo += 4, hi -= 4) {
-        for (let k = 0; k < 4; k++) {
-            const t = data[lo + k];
-            data[lo + k] = data[hi + k];
-            data[hi + k] = t;
-        }
+// Draw a `srcW`×`srcH` source into `ctx` rotated by `angleDeg` (a multiple
+// of 90), filling a `destW`×`destH` target. Uses exact integer translates so
+// right-angle turns stay pixel-aligned (no resample blur). A 90°/270° turn
+// expects the dest to have swapped dimensions (destW=srcH, destH=srcW).
+function drawRotated(
+    ctx: Ctx2D,
+    src: CanvasImageSource,
+    srcW: number,
+    srcH: number,
+    angleDeg: number,
+    destW: number,
+    destH: number,
+): void {
+    ctx.save();
+    ctx.clearRect(0, 0, destW, destH);
+    switch (angleDeg) {
+        case 90:
+            ctx.translate(destW, 0);
+            break;
+        case 180:
+            ctx.translate(destW, destH);
+            break;
+        case 270:
+            ctx.translate(0, destH);
+            break;
     }
+    ctx.rotate((angleDeg * Math.PI) / 180);
+    ctx.drawImage(src, 0, 0, srcW, srcH);
+    ctx.restore();
 }
 
 // Corrupt the entropy-coded scan data. The byte VALUE written is a
@@ -285,6 +312,10 @@ export class JPEGGlitchEffect implements Effect {
 
     #srcCanvas: GlitchCanvas | null = null;
     #srcCtx: Ctx2D | null = null;
+    // Holds the (optionally rotated) image that actually gets encoded; its
+    // size is set per-glitch since a quarter turn swaps width and height.
+    #encCanvas: GlitchCanvas | null = null;
+    #encCtx: Ctx2D | null = null;
     #outCanvas: GlitchCanvas | null = null;
     #outCtx: Ctx2D | null = null;
 
@@ -329,6 +360,8 @@ export class JPEGGlitchEffect implements Effect {
         }
         this.#srcCanvas = createCanvas(1, 1);
         this.#srcCtx = get2d(this.#srcCanvas);
+        this.#encCanvas = createCanvas(1, 1);
+        this.#encCtx = get2d(this.#encCanvas);
         this.#outCanvas = createCanvas(1, 1);
         this.#outCtx = get2d(this.#outCanvas);
         this.#readRT = ctx.createRenderTarget();
@@ -415,8 +448,17 @@ export class JPEGGlitchEffect implements Effect {
         const h = this.#h;
         const srcCanvas = this.#srcCanvas;
         const srcCtx = this.#srcCtx;
+        const encCanvas = this.#encCanvas;
+        const encCtx = this.#encCtx;
         const imageData = this.#imageData;
-        if (!srcCanvas || !srcCtx || !imageData || !this.#readRT) {
+        if (
+            !srcCanvas ||
+            !srcCtx ||
+            !encCanvas ||
+            !encCtx ||
+            !imageData ||
+            !this.#readRT
+        ) {
             return;
         }
 
@@ -455,23 +497,31 @@ export class JPEGGlitchEffect implements Effect {
         const variant = this.params.speed > 0 ? this.#glitchCount : 0;
         this.#glitchCount++;
 
-        const { quality, seed, iterations, randomFlip } = this.params;
+        const { quality, seed, iterations, randomFlip, vertical } = this.params;
         // One seeded sequence drives both the flip decision and the byte
         // corruption, so the whole glitch is reproducible from the seed.
         const rng = makeRng(seed, variant);
         const flip = randomFlip && rng() < 0.5;
-        if (flip) {
-            rotate180(data);
-        }
         srcCtx.putImageData(imageData, 0, 0);
 
+        // Rotate the source before corrupting: 180° (flip) balances the tear
+        // direction, -90° (vertical, i.e. 270°) turns the tears sideways.
+        // The angles compose; runGlitch rotates the decoded output back.
+        const srcAngle = ((flip ? 180 : 0) + (vertical ? 270 : 0)) % 360;
+        const swap = vertical; // a quarter turn swaps width and height
+        const encW = swap ? h : w;
+        const encH = swap ? w : h;
+        encCanvas.width = encW;
+        encCanvas.height = encH;
+        drawRotated(encCtx, srcCanvas, w, h, srcAngle, encW, encH);
+
         void this.#runGlitch(
-            srcCanvas,
+            encCanvas,
             w,
             h,
             quality,
             iterations,
-            flip,
+            srcAngle,
             rng,
             this.#generation,
         );
@@ -483,7 +533,7 @@ export class JPEGGlitchEffect implements Effect {
         h: number,
         quality: number,
         iterations: number,
-        flip: boolean,
+        srcAngle: number,
         rng: () => number,
         generation: number,
     ): Promise<void> {
@@ -497,18 +547,18 @@ export class JPEGGlitchEffect implements Effect {
             );
             // Discard if a resize happened while we were encoding/decoding.
             if (generation === this.#generation && this.#outCtx) {
-                this.#outCtx.clearRect(0, 0, w, h);
-                if (flip) {
-                    // Undo the 180° applied to the source so the image is
-                    // upright again, leaving the glitch bias flipped upward.
-                    this.#outCtx.save();
-                    this.#outCtx.translate(w, h);
-                    this.#outCtx.rotate(Math.PI);
-                    this.#outCtx.drawImage(bmp, 0, 0, w, h);
-                    this.#outCtx.restore();
-                } else {
-                    this.#outCtx.drawImage(bmp, 0, 0, w, h);
-                }
+                // Rotate the decoded glitch back upright (inverse of the
+                // source rotation) into the w×h output canvas.
+                const outAngle = (360 - srcAngle) % 360;
+                drawRotated(
+                    this.#outCtx,
+                    bmp,
+                    bmp.width,
+                    bmp.height,
+                    outAngle,
+                    w,
+                    h,
+                );
                 this.#hasResult = true;
             }
             bmp.close();
@@ -528,6 +578,8 @@ export class JPEGGlitchEffect implements Effect {
         this.#outTex = null;
         this.#srcCanvas = null;
         this.#srcCtx = null;
+        this.#encCanvas = null;
+        this.#encCtx = null;
         this.#outCanvas = null;
         this.#outCtx = null;
         this.#imageData = null;
