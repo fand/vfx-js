@@ -1,0 +1,1 @@
+import{n as e}from"./chunk-BneVvdWh.js";var t,n=e((()=>{t=``+new URL(`pigeon-ScEf6bli.webp`,import.meta.url).href}));export{t as n,n as t};
