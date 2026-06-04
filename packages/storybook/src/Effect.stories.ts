@@ -1,13 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 
+import BbbWebm from "./assets/bbb.webm";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
+import Pigeon from "./assets/pigeon.webp";
 import {
     BloomEffect,
     PixelateEffect,
     ScanlineEffect,
     FluidEffect,
     HalftoneEffect,
+    JPEGGlitchEffect,
     ParticleEffect,
     ParticleExplodeEffect,
     PixelSortEffect,
@@ -123,6 +126,86 @@ pixelSort.play = async ({ canvasElement }) => {
     });
     await vfx.add(img, { effect });
     attachPixelSortPane("Pixel Sort", effect);
+};
+
+// Real (codec-level) JPEG glitch — re-encodes the element as a JPEG and
+// corrupts the byte stream, then draws the browser's decode of the broken
+// file. Excluded from VRT: the encode/decode round trip is async (no
+// result at capture time) and the native codec output is environment
+// dependent, so a snapshot isn't a stable target.
+type JPEGGlitchSrc = "Jellyfish" | "Logo" | "Pigeon" | "bbb";
+type JPEGGlitchArgs = {
+    src: JPEGGlitchSrc;
+    quality: number;
+    seed: number;
+    iterations: number;
+    resolutionScale: number;
+    randomFlip: boolean;
+    vertical: boolean;
+    speed: number;
+};
+const JPEG_GLITCH_IMAGES: Record<"Jellyfish" | "Logo" | "Pigeon", string> = {
+    Jellyfish,
+    Logo,
+    Pigeon,
+};
+export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
+    render: (args) => {
+        const { src, ...params } = args;
+        const vfx = initVFX();
+        const effect = new JPEGGlitchEffect(params);
+        attachOutputFpsMeter(effect);
+
+        // bbb is a video; the rest are images.
+        if (src === "bbb") {
+            const video = document.createElement("video");
+            video.src = BbbWebm;
+            video.muted = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.autoplay = true;
+            video.crossOrigin = "anonymous";
+            video.style.display = "block";
+            video.style.margin = "40px auto";
+            video.style.maxWidth = "80vw";
+            void video.play();
+            vfx.add(video, { effect });
+            return video;
+        }
+
+        const img = document.createElement("img");
+        img.src = JPEG_GLITCH_IMAGES[src];
+        img.style.display = "block";
+        img.style.margin = "40px auto";
+        vfx.add(img, { effect });
+        return img;
+    },
+    args: {
+        src: "Jellyfish",
+        quality: 0.4,
+        seed: 0.25,
+        iterations: 24,
+        resolutionScale: 1,
+        randomFlip: true,
+        vertical: false,
+        speed: 0,
+    },
+    argTypes: {
+        src: {
+            control: { type: "select" },
+            options: ["Jellyfish", "Logo", "Pigeon", "bbb"],
+        },
+        quality: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        seed: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        iterations: { control: { type: "range", min: 1, max: 30, step: 1 } },
+        resolutionScale: {
+            control: { type: "range", min: 0, max: 1, step: 0.01 },
+        },
+        randomFlip: { control: { type: "boolean" } },
+        vertical: { control: { type: "boolean" } },
+        speed: { control: { type: "range", min: 0, max: 30, step: 0.5 } },
+    },
+    parameters: { chromatic: { disableSnapshot: true } },
 };
 
 // Stable Fluid as a single Effect. Drives mouse splats off real pointer
@@ -563,6 +646,40 @@ export const voronoi: StoryObj<VoronoiArgs> = {
         bgColor: { control: { type: "color" } },
     },
 };
+
+// Overlay the JPEGGlitch effect's real output rate (decoded results per
+// second) in a screen corner. The codec round trip caps this well below
+// high `speed` values. Re-rendering the story removes the previous meter,
+// and the orphaned loop stops itself once its node is disconnected.
+function attachOutputFpsMeter(effect: JPEGGlitchEffect): void {
+    document.getElementById("jpeg-glitch-fps")?.remove();
+    const meter = document.createElement("div");
+    meter.id = "jpeg-glitch-fps";
+    meter.style.cssText =
+        "position:fixed;top:8px;left:8px;z-index:2147483647;" +
+        "font:12px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.6);" +
+        "padding:2px 8px;border-radius:3px;pointer-events:none;";
+    meter.textContent = "-- fps";
+    document.body.appendChild(meter);
+
+    let lastTime = performance.now();
+    let lastCount = effect.producedFrames;
+    const tick = () => {
+        if (!meter.isConnected) {
+            return; // a later render() removed it; stop this loop
+        }
+        const now = performance.now();
+        const elapsed = now - lastTime;
+        if (elapsed >= 500) {
+            const count = effect.producedFrames;
+            meter.textContent = `${(((count - lastCount) * 1000) / elapsed).toFixed(1)} fps`;
+            lastTime = now;
+            lastCount = count;
+        }
+        requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+}
 
 function seedFluidMotion(canvasElement: HTMLElement): void {
     const cx = Math.round(window.innerWidth / 2);
