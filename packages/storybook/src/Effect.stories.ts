@@ -139,6 +139,7 @@ type JPEGGlitchArgs = {
     quality: number;
     seed: number;
     iterations: number;
+    resolutionScale: number;
     randomFlip: boolean;
     vertical: boolean;
     speed: number;
@@ -184,6 +185,7 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
         quality: 0.4,
         seed: 0.25,
         iterations: 24,
+        resolutionScale: 1,
         randomFlip: true,
         vertical: false,
         speed: 0,
@@ -196,6 +198,9 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
         quality: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         seed: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         iterations: { control: { type: "range", min: 1, max: 30, step: 1 } },
+        resolutionScale: {
+            control: { type: "range", min: 0, max: 1, step: 0.01 },
+        },
         randomFlip: { control: { type: "boolean" } },
         vertical: { control: { type: "boolean" } },
         speed: { control: { type: "range", min: 0, max: 30, step: 0.5 } },

@@ -101,6 +101,14 @@ export type JPEGGlitchParams = {
     iterations: number;
 
     /**
+     * Fraction of the element resolution to process at (0–1). `1` is full
+     * resolution; `0.5` reads back / encodes / decodes at half size (much
+     * cheaper, chunkier blocks) and the result is scaled back up to fit.
+     * `0` clamps to a single pixel. (Default: `1`)
+     */
+    resolutionScale: number;
+
+    /**
      * Randomly render half the glitches upside-down. Tears propagate
      * downward (top stays cleaner), so rotating the source 180° before
      * corrupting — then rotating the output back — flips the bias upward
@@ -128,6 +136,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     quality: 0.4,
     seed: 0.25,
     iterations: 24,
+    resolutionScale: 1,
     randomFlip: true,
     vertical: false,
     speed: 0,
@@ -381,7 +390,8 @@ export class JPEGGlitchEffect implements Effect {
         this.#encCtx = get2d(this.#encCanvas);
         this.#outCanvas = createCanvas(1, 1);
         this.#outCtx = get2d(this.#outCanvas);
-        this.#readRT = ctx.createRenderTarget();
+        // Sized to the processing resolution in #resize; start at 1×1.
+        this.#readRT = ctx.createRenderTarget({ size: [1, 1] });
         this.#gl = ctx.gl;
         this.#createOutTexture(ctx);
         // The display texture dies on context loss; rebuild it.
@@ -440,11 +450,15 @@ export class JPEGGlitchEffect implements Effect {
             this.#dirty = true;
         }
 
-        const w = this.#readRT.width;
-        const h = this.#readRT.height;
-        if (w >= 2 && h >= 2 && srcW > 0 && srcH > 0) {
+        // Process at a fraction of the element resolution. The decoded
+        // output is sampled by uvContent so it scales back up to fit.
+        const [ew, eh] = ctx.dims.elementPixel;
+        const scale = Math.min(1, Math.max(0, this.params.resolutionScale));
+        const w = Math.max(1, Math.round(ew * scale));
+        const h = Math.max(1, Math.round(eh * scale));
+        if (ew >= 2 && eh >= 2 && srcW > 0 && srcH > 0) {
             if (w !== this.#w || h !== this.#h) {
-                this.#resize(w, h);
+                this.#resize(ctx, w, h);
             }
             if (this.#shouldGlitch(ctx)) {
                 this.#startGlitch(ctx);
@@ -485,7 +499,7 @@ export class JPEGGlitchEffect implements Effect {
         return this.#dirty;
     }
 
-    #resize(w: number, h: number): void {
+    #resize(ctx: EffectContext, w: number, h: number): void {
         this.#w = w;
         this.#h = h;
         this.#raw = new Uint8Array(w * h * 4);
@@ -498,6 +512,10 @@ export class JPEGGlitchEffect implements Effect {
             this.#outCanvas.width = w;
             this.#outCanvas.height = h;
         }
+        // The readback RT is sized to the processing resolution, so recreate
+        // it (explicit-size RTs don't auto-track the element).
+        this.#readRT?.dispose();
+        this.#readRT = ctx.createRenderTarget({ size: [w, h] });
         this.#hasResult = false;
         this.#dirty = true;
         this.#busy = false;
