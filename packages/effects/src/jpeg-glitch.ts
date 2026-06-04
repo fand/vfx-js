@@ -11,6 +11,7 @@
 //   3. dctV       forward 1-D DCT-II over each 8px col  bufB     → bufA
 //   4. cascadeRow row-local prefix sum of DC impulses   (proc.)  → rowScan
 //   5. cascade    full scan-order prefix sum + desync   rowScan  → cascade
+//   5b.drift      2nd prefix sum: bit-position drift     (proc.)  → cascadeDrift
 //   6. quantize   per-coefficient quantization + glitch bufA     → bufB
 //   7. idctV      inverse 1-D DCT over each column       bufB     → bufA
 //   8. idctH      inverse 1-D DCT over each row          bufA     → bufB
@@ -404,20 +405,69 @@ void main() {
 }
 `;
 
+// Pass 5b — row-local prefix sum of dense, signed per-block drift increments,
+// folded by FRAG_CASCADE (reused) into the global drift prefix sum. The
+// increment approximates a desynced Huffman stream's per-block bit-length
+// error: every block reads slightly too many or too few bits, so the read
+// position random-walks away from the MCU grid.
+const FRAG_DRIFT_ROW = `#version 300 es
+precision highp float;
+out vec4 outColor;
+uniform vec2 grid;
+uniform float time;
+uniform float seed;
+
+float h11(float p) {
+    p = fract(p * 0.1031);
+    p *= p + 33.33;
+    p *= p + p;
+    return fract(p);
+}
+
+void main() {
+    float bw = grid.x;
+    float bx = floor(gl_FragCoord.x);
+    float by = floor(gl_FragCoord.y);
+    float tt = floor(time);
+    float sum = 0.0;
+    for (int i = 0; i < 4096; i++) {
+        if (float(i) > bx) break;
+        float scan = by * bw + float(i);
+        sum += h11(scan + tt * 7.0 + seed * 101.0) - 0.5;
+    }
+    outColor = vec4(sum, 0.0, 0.0, 0.0);
+}
+`;
+
 // Pass 9 — spatial displace: emulate entropy-stream (Huffman) desync. When
-// the decoder loses bit-sync it also loses count of how many bits each
-// block consumed, so the MCU grid slides: subsequent content is placed at a
-// shifted scan position. Inside a desync run we therefore sample the
-// reconstructed image from a scan-order-lagged block, which slides / stretches
-// content and wraps across rows as the signature diagonal tear.
+// the decoder loses bit-sync it also loses count of how many bits each block
+// consumed, so the MCU grid slides: subsequent content is placed at a shifted
+// scan position. Inside a desync run we sample the reconstructed image from a
+// scan-order-lagged block, which slides / stretches content and wraps across
+// rows as the signature diagonal tear. Two lag terms combine:
+//   - slide: a smooth, uniform lag (prog * slide) → even stretch / smear.
+//   - drift: the running drift prefix sum (a data-dependent random walk) →
+//     irregular warp, jagged edges, local compress/stretch — the chaotic
+//     "shape breakdown" of a real byte-glitch.
 const FRAG_DISPLACE = `#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
 uniform sampler2D src; // reconstructed YCbCr (post-IDCT)
+uniform sampler2D cascadeDrift; // block-res: .r = drift prefix sum
 uniform vec2 resolution;
-uniform float slide; // 0..1 horizontal smear / stretch strength
+uniform float slide; // 0..1 uniform smear / stretch strength
+uniform float drift; // magnitude of the irregular data-dependent drift
 ${CASCADE_GLSL}
+
+// Drift prefix sum at a scan index.
+float driftAt(float idx) {
+    float bw = grid.x;
+    return texture(
+        cascadeDrift,
+        vec2((mod(idx, bw) + 0.5) / bw, (floor(idx / bw) + 0.5) / grid.y)
+    ).r;
+}
 
 void main() {
     vec2 fc = gl_FragCoord.xy;
@@ -426,25 +476,29 @@ void main() {
     float scan = by * grid.x + bx;
 
     // Once the bitstream desyncs it stays desynced until the next restart
-    // marker, so the slide persists from the trigger to the end of the
-    // restart segment — i.e. through every following row in that segment,
-    // not just a short run. trig >= segStart means the trigger lies in this
-    // block's own segment, so the whole rest of the segment is affected.
+    // marker, so the lag persists from the trigger to the end of the restart
+    // segment — i.e. through every following row in that segment, not just a
+    // short run. trig >= segStart means the trigger lies in this block's own
+    // segment, so the whole rest of the segment is affected.
     float segStart = segStartFor(scan);
     float trig = cascadeAt(scan).a;
     float prog = scan - trig;
     bool desync = trig >= segStart && prog >= 0.0;
 
     vec2 sampleUV = fc / resolution;
-    if (desync && slide > 0.0) {
-        // Content advances at rate (1 - slide): the source scan index lags
-        // output by floor(prog * slide), and that lag grows the further into
-        // the segment we are — so the displacement accumulates down through
-        // the rows below the trigger. slide=1 freezes the source at the
-        // trigger block (a hard smear); intermediate values stretch content
-        // and wrap across rows as a diagonal tear. The lag is in scan order,
-        // so it propagates exactly like the DC cascade does.
-        float m = scan - floor(prog * slide);
+    if (desync) {
+        // Uniform lag: content advances at rate (1 - slide), growing with
+        // progress into the segment (down through the rows below the trigger).
+        float lag = floor(prog * slide);
+        // Drift lag: the bit-position random walk accumulated since the
+        // trigger (prefix(scan) - prefix(trig - 1)), which warps content
+        // irregularly. Both lags are in scan order, so they propagate exactly
+        // like the DC cascade does.
+        if (drift != 0.0) {
+            float base = trig >= 1.0 ? driftAt(trig - 1.0) : 0.0;
+            lag += floor((driftAt(scan) - base) * drift);
+        }
+        float m = max(0.0, scan - lag);
         float bw = grid.x;
         float sbx = mod(m, bw);
         float sby = floor(m / bw);
@@ -517,6 +571,16 @@ export type JPEGGlitchParams = {
     slide: number;
 
     /**
+     * Irregular bit-position drift of desync regions, in blocks. Where `slide`
+     * is a smooth uniform lag, this adds a data-dependent random walk that
+     * accumulates from the trigger in scan order — so the displacement warps
+     * unevenly, jagging edges and locally compressing / stretching content
+     * (the chaotic "shape breakdown" of a real Huffman desync). `0` disables
+     * it; larger values warp harder. Only visible inside a desync run.
+     */
+    drift: number;
+
+    /**
      * Mean restart-marker (DRI) interval in blocks (MCUs). The DC cascade and
      * the desync run reset at restart boundaries, so corruption is confined
      * to the segment it lands in instead of smearing to the end of the image.
@@ -550,6 +614,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     restart: 512,
     restartJitter: 0.5,
     slide: 0.7,
+    drift: 8,
     speed: 1,
     seed: 0,
 };
@@ -570,6 +635,8 @@ export class JPEGGlitchEffect implements Effect {
     // 8x8 block grid, so they are reallocated when the element resizes.
     #rowScan: EffectRenderTarget | null = null;
     #cascade: EffectRenderTarget | null = null;
+    // Second prefix-sum buffer: the cumulative bit-position drift (.r).
+    #cascadeDrift: EffectRenderTarget | null = null;
     #blocksW = 0;
     #blocksH = 0;
 
@@ -605,11 +672,15 @@ export class JPEGGlitchEffect implements Effect {
             restart,
             restartJitter,
             slide,
+            drift,
             seed,
         } = this.params;
         const time = ctx.time * this.params.speed;
 
-        const [rowScan, cascade] = this.#ensureBlockBuffers(ctx, a);
+        const [rowScan, cascade, cascadeDrift] = this.#ensureBlockBuffers(
+            ctx,
+            a,
+        );
         const grid: [number, number] = [this.#blocksW, this.#blocksH];
 
         // 1. element capture → YCbCr (+ alpha)
@@ -640,6 +711,20 @@ export class JPEGGlitchEffect implements Effect {
             target: cascade,
         });
 
+        // 5b. bit-position drift: a second scan-order prefix sum of dense,
+        // signed per-block increments (a random walk). Reuses rowScan (the DC
+        // fold is done with it) and the same fold shader.
+        ctx.draw({
+            frag: FRAG_DRIFT_ROW,
+            uniforms: { grid, time, seed },
+            target: rowScan,
+        });
+        ctx.draw({
+            frag: FRAG_CASCADE,
+            uniforms: { rowScan, grid },
+            target: cascadeDrift,
+        });
+
         // Cascade / restart-segment uniforms shared by quantize + displace.
         // time drives restartPhase() so the restart grid animates with speed.
         const seg = { cascade, grid, restart, restartJitter, seed, time };
@@ -663,10 +748,17 @@ export class JPEGGlitchEffect implements Effect {
             target: b,
         });
 
-        // 9. spatial displace (entropy-desync grid slide / smear)
+        // 9. spatial displace (entropy-desync grid slide / smear / drift)
         ctx.draw({
             frag: FRAG_DISPLACE,
-            uniforms: { src: b, resolution, slide, ...seg },
+            uniforms: {
+                src: b,
+                resolution,
+                slide,
+                drift,
+                cascadeDrift,
+                ...seg,
+            },
             target: a,
         });
 
@@ -683,10 +775,12 @@ export class JPEGGlitchEffect implements Effect {
         this.#bufB?.dispose();
         this.#rowScan?.dispose();
         this.#cascade?.dispose();
+        this.#cascadeDrift?.dispose();
         this.#bufA = null;
         this.#bufB = null;
         this.#rowScan = null;
         this.#cascade = null;
+        this.#cascadeDrift = null;
         this.#blocksW = 0;
         this.#blocksH = 0;
     }
@@ -696,17 +790,19 @@ export class JPEGGlitchEffect implements Effect {
     #ensureBlockBuffers(
         ctx: EffectContext,
         coef: EffectRenderTarget,
-    ): [EffectRenderTarget, EffectRenderTarget] {
+    ): [EffectRenderTarget, EffectRenderTarget, EffectRenderTarget] {
         const bw = Math.max(1, Math.ceil(coef.width / 8));
         const bh = Math.max(1, Math.ceil(coef.height / 8));
         if (
             !this.#rowScan ||
             !this.#cascade ||
+            !this.#cascadeDrift ||
             bw !== this.#blocksW ||
             bh !== this.#blocksH
         ) {
             this.#rowScan?.dispose();
             this.#cascade?.dispose();
+            this.#cascadeDrift?.dispose();
             const opts = {
                 size: [bw, bh] as const,
                 float: true,
@@ -714,9 +810,10 @@ export class JPEGGlitchEffect implements Effect {
             };
             this.#rowScan = ctx.createRenderTarget(opts);
             this.#cascade = ctx.createRenderTarget(opts);
+            this.#cascadeDrift = ctx.createRenderTarget(opts);
             this.#blocksW = bw;
             this.#blocksH = bh;
         }
-        return [this.#rowScan, this.#cascade];
+        return [this.#rowScan, this.#cascade, this.#cascadeDrift];
     }
 }
