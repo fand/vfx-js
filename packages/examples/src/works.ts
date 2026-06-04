@@ -145,8 +145,19 @@ export const works: Work[] = [
         url: "./works/pixelsort.html",
     },
     {
-        id: "depth-bokeh",
+        id: "jpeg-glitch",
         index: "13",
+        title: "JPEG Glitch",
+        tags: ["effect-api", "Glitch", "html-in-canvas"],
+        year: "2026",
+        author: "AMAGI",
+        description:
+            "A perfectly ordinary news page, captured live with addHTML — until you touch it. A real codec-level JPEG glitch tears the whole layout into datamosh blocks, then reassembles. The DOM stays interactive the entire time.",
+        url: "./works/jpeg-glitch.html",
+    },
+    {
+        id: "depth-bokeh",
+        index: "14",
         title: "Depth Bokeh",
         tags: ["effect-api", "3d"],
         year: "2026",

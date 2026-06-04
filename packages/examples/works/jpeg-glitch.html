@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VFX-JS jpeg-glitch example</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4f1ea;
+    --paper2:#ece7dc;
+    --ink:#16140f;
+    --muted:#6b665b;
+    --line:rgba(22,20,15,.18);
+    --accent:#b3261e;
+    --serif:'Fraunces',Georgia,'Times New Roman',serif;
+    --sans:'Inter',-apple-system,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{background:#0a0a0a;color:var(--ink);font-family:var(--sans);overflow:hidden;}
+  a{color:inherit;text-decoration:none;}
+  img{display:block;max-width:100%;}
+
+  /* The whole "site" is one captured element — a magazine front fitting 100vh. */
+  #page{
+    position:relative;width:100vw;height:100vh;background:var(--paper);
+    display:grid;grid-template-rows:auto 1fr auto;
+    padding:0;overflow:hidden;
+  }
+
+  /* Masthead */
+  .masthead{display:flex;align-items:center;justify-content:space-between;
+    padding:18px clamp(24px,4vw,64px);border-bottom:2px solid var(--ink);}
+  .masthead .brand{font-family:var(--serif);font-weight:900;font-size:clamp(20px,2.4vw,30px);
+    letter-spacing:.02em;}
+  .masthead nav{display:flex;gap:clamp(14px,2vw,30px);font-size:13px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+  .masthead nav a:hover{color:var(--accent);}
+  .masthead .date{font-size:12px;color:var(--muted);letter-spacing:.06em;}
+
+  /* Article body — headline column + hero image */
+  .article{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(28px,4vw,64px);
+    align-items:center;padding:clamp(20px,3.5vh,52px) clamp(24px,4vw,64px);min-height:0;}
+  .kicker{display:inline-block;font-size:12px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.18em;color:var(--accent);margin-bottom:18px;}
+  .headline{font-family:var(--serif);font-weight:900;line-height:.96;
+    font-size:clamp(40px,5.4vw,78px);letter-spacing:-.015em;margin-bottom:22px;}
+  .standfirst{font-family:var(--serif);font-weight:400;font-size:clamp(17px,1.7vw,23px);
+    line-height:1.5;color:#3a362d;max-width:34ch;margin-bottom:26px;}
+  .byline{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted);
+    border-top:1px solid var(--line);padding-top:16px;max-width:34ch;}
+  .byline .avatar{width:34px;height:34px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#cbb38f,#7c6a4e 70%);flex:none;}
+  .byline b{color:var(--ink);font-weight:600;}
+  .columns{margin-top:22px;column-count:2;column-gap:26px;font-size:13.5px;line-height:1.62;
+    color:#403b32;max-width:60ch;}
+  .columns p{margin-bottom:.8em;}
+  .columns p:first-child::first-letter{font-family:var(--serif);font-weight:900;font-size:3.1em;
+    float:left;line-height:.74;margin:.06em .12em 0 0;color:var(--accent);}
+
+  .figure{position:relative;height:100%;min-height:0;border:1px solid var(--line);
+    overflow:hidden;background:#0a0a0a;align-self:stretch;}
+  .figure svg{width:100%;height:100%;display:block;object-fit:cover;}
+  .figure figcaption{position:absolute;left:0;right:0;bottom:0;padding:10px 14px;
+    font-size:11px;letter-spacing:.04em;color:#e9e4d8;
+    background:linear-gradient(transparent,rgba(0,0,0,.6));}
+
+  /* Newsletter bar — the innocuous call-to-action that triggers the break */
+  .promo{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
+    padding:18px clamp(24px,4vw,64px);background:var(--ink);color:var(--paper);}
+  .promo .pitch{font-family:var(--serif);font-weight:600;font-size:clamp(16px,1.8vw,22px);}
+  .promo .pitch span{color:#e6b3af;}
+  .promo form{display:flex;gap:10px;align-items:center;}
+  .promo input{font-family:var(--sans);font-size:14px;padding:11px 14px;width:min(240px,42vw);
+    border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:var(--paper);
+    border-radius:2px;}
+  .promo input::placeholder{color:rgba(244,241,234,.5);}
+  .promo button{font-family:var(--sans);font-weight:700;font-size:14px;letter-spacing:.02em;
+    padding:11px 22px;border:0;border-radius:2px;cursor:pointer;color:#fff;
+    background:var(--accent);white-space:nowrap;
+    box-shadow:0 0 0 0 rgba(179,38,30,.6);animation:invite 2.4s ease-in-out infinite;}
+  @keyframes invite{0%,100%{box-shadow:0 0 0 0 rgba(179,38,30,.55);}
+    50%{box-shadow:0 0 0 8px rgba(179,38,30,0);}}
+
+  @media (max-width:860px){
+    .article{grid-template-columns:1fr;}
+    .figure{min-height:30vh;}
+    .columns{display:none;}
+  }
+
+  /* Restore hint — appears after the page reassembles */
+  #hint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);
+    z-index:10001;font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:.04em;
+    color:#fff;background:rgba(10,10,10,.82);padding:10px 18px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.14);pointer-events:none;
+    opacity:0;transition:opacity .4s ease,transform .4s ease;backdrop-filter:blur(6px);}
+  #hint.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  #loader{position:fixed;inset:0;z-index:10002;background:#0a0a0a;display:grid;place-items:center;
+    color:#f4f1ea;font-family:var(--serif);font-size:24px;letter-spacing:.04em;
+    transition:opacity .5s ease,visibility .5s ease;}
+  #loader.done{opacity:0;visibility:hidden;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="loader">THE&nbsp;MERIDIAN</div>
+
+<div id="page">
+  <header class="masthead">
+    <div class="brand">The&nbsp;Meridian</div>
+    <nav>
+      <a href="#">World</a><a href="#">Technology</a><a href="#">Culture</a><a href="#">Opinion</a>
+    </nav>
+    <div class="date">Thursday, June 4, 2026</div>
+  </header>
+
+  <main class="article">
+    <div class="lede">
+      <span class="kicker">Technology</span>
+      <h1 class="headline">The web has never felt this&nbsp;solid.</h1>
+      <p class="standfirst">After two decades of broken links and disappearing pages, the
+        internet finally feels permanent — dependable, unbreakable, here to stay.</p>
+      <div class="byline">
+        <span class="avatar"></span>
+        <div>By <b>Eleanor Vance</b> · Senior Technology Correspondent<br>8 min read</div>
+      </div>
+      <div class="columns">
+        <p>For most of its life the web was a fragile thing. A page you read on Monday might be a 404 by Friday; a service you trusted could vanish with a single acquisition. We learned to expect impermanence.</p>
+        <p>That era, observers argue, is quietly ending. Archives are deeper, formats are stabler, and the rendering pipeline that turns markup into pixels has rarely been more dependable. What you load today, the thinking goes, will look the same tomorrow.</p>
+        <p>"There is a new confidence in the medium," one engineer told us this week. "Nothing falls apart anymore. It just works." Whether that confidence is earned — or merely the calm before something gives way — is the question this column keeps returning to.</p>
+      </div>
+    </div>
+
+    <figure class="figure">
+      <svg viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1b2a4a"/>
+            <stop offset=".42" stop-color="#5a4a7a"/>
+            <stop offset=".62" stop-color="#c2683f"/>
+            <stop offset=".8" stop-color="#e8a24c"/>
+            <stop offset="1" stop-color="#f3c98b"/>
+          </linearGradient>
+          <linearGradient id="city" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#141019"/>
+            <stop offset="1" stop-color="#2a2030"/>
+          </linearGradient>
+        </defs>
+        <rect width="800" height="1000" fill="url(#sky)"/>
+        <circle cx="540" cy="430" r="74" fill="#ffe7b0" opacity=".95"/>
+        <circle cx="540" cy="430" r="120" fill="#ffd98a" opacity=".18"/>
+        <g fill="url(#city)">
+          <rect x="20" y="640" width="70" height="360"/>
+          <rect x="96" y="560" width="58" height="440"/>
+          <rect x="160" y="700" width="46" height="300"/>
+          <rect x="214" y="520" width="78" height="480"/>
+          <rect x="300" y="660" width="52" height="340"/>
+          <rect x="360" y="600" width="66" height="400"/>
+          <rect x="434" y="700" width="44" height="300"/>
+          <rect x="486" y="560" width="72" height="440"/>
+          <rect x="566" y="650" width="50" height="350"/>
+          <rect x="624" y="500" width="84" height="500"/>
+          <rect x="716" y="620" width="64" height="380"/>
+        </g>
+        <g fill="#ffd98a" opacity=".85">
+          <rect x="232" y="560" width="8" height="10"/><rect x="252" y="590" width="8" height="10"/>
+          <rect x="232" y="620" width="8" height="10"/><rect x="270" y="560" width="8" height="10"/>
+          <rect x="640" y="540" width="8" height="10"/><rect x="664" y="580" width="8" height="10"/>
+          <rect x="688" y="540" width="8" height="10"/><rect x="640" y="620" width="8" height="10"/>
+          <rect x="110" y="600" width="8" height="10"/><rect x="128" y="640" width="8" height="10"/>
+          <rect x="504" y="600" width="8" height="10"/><rect x="528" y="640" width="8" height="10"/>
+        </g>
+      </svg>
+      <figcaption>The skyline at dusk — a medium that, for now, refuses to fall apart. Photo: The Meridian</figcaption>
+    </figure>
+  </main>
+
+  <section class="promo">
+    <div class="pitch">Get the <span>Stable Web</span> briefing — every Thursday, in your inbox.</div>
+    <form id="signup" onsubmit="return false">
+      <input type="email" placeholder="you@example.com" aria-label="Email">
+      <button type="submit">Subscribe</button>
+    </form>
+  </section>
+</div>
+
+<div id="hint">press &amp; hold anywhere to break it</div>
+
+<script type="module">
+import { VFX } from "@vfx-js/core";
+import { JPEGGlitchEffect } from "@vfx-js/effects";
+
+const page = document.getElementById("page");
+const hint = document.getElementById("hint");
+const loader = document.getElementById("loader");
+
+// Near-clean baseline: a high-quality, zero-corruption pass that reads as the
+// untouched page. Holding the pointer drives these toward heavy, live JPEG
+// corruption; releasing eases them back.
+const CLEAN = { iterations: 0, quality: 1, speed: 0 };
+const BROKEN = { iterations: 10, quality: 0.16, speed: 30 };
+// While held, process at quarter resolution: the readback + JPEG encode/decode
+// round trip is the latency, so a smaller buffer makes the glitch react to the
+// press almost instantly — and the chunkier blocks read more like datamosh.
+const SCALE = 0.25;
+
+await document.fonts.ready;
+loader.classList.add("done");
+
+const vfx = new VFX();
+// One instance stays attached the whole time. addHTML keeps the real page
+// interactive beneath the canvas, so it stays a live, normal-looking site right
+// up until the moment it shatters. Start bypassed so idle passes the input
+// through as-is at its original resolution.
+const effect = new JPEGGlitchEffect({
+    ...CLEAN,
+    resolutionScale: SCALE,
+    bypass: true,
+    seed: 0.42,
+});
+await vfx.addHTML(page, { effect });
+
+// While held, a rAF loop eases the live params from CLEAN up to BROKEN so the
+// glitch ramps in. Release bypasses the effect at once — the page snaps back to
+// the untouched source with no lingering decode. The instance is never
+// detached, so it keeps its glitch buffer and the next press picks up instantly.
+const cur = { ...CLEAN };
+
+const settled = () =>
+    Math.abs(cur.iterations - BROKEN.iterations) < 0.5 &&
+    Math.abs(cur.quality - BROKEN.quality) < 0.002 &&
+    Math.abs(cur.speed - BROKEN.speed) < 0.05;
+
+let raf = null;
+function animate() {
+    const k = 0.2;
+    cur.iterations += (BROKEN.iterations - cur.iterations) * k;
+    cur.quality += (BROKEN.quality - cur.quality) * k;
+    cur.speed += (BROKEN.speed - cur.speed) * k;
+    if (settled()) Object.assign(cur, BROKEN);
+    effect.setParams({
+        iterations: Math.round(cur.iterations),
+        quality: cur.quality,
+        speed: cur.speed,
+    });
+    raf = settled() ? null : requestAnimationFrame(animate);
+}
+
+// The canvas sits over the live DOM, so window-level listeners reliably catch
+// the press whether it lands on the "Subscribe" bait or anywhere else.
+window.addEventListener("pointerdown", () => {
+    hint.classList.remove("show");
+    effect.setParams({ bypass: false }); // enable the glitch for the press
+    if (raf === null) raf = requestAnimationFrame(animate);
+});
+const release = () => {
+    if (raf !== null) {
+        cancelAnimationFrame(raf);
+        raf = null;
+    }
+    Object.assign(cur, CLEAN); // next press ramps from clean again
+    effect.setParams({ ...CLEAN, bypass: true }); // snap back to the source now
+    hint.classList.add("show");
+};
+window.addEventListener("pointerup", release);
+window.addEventListener("pointercancel", release);
+
+hint.classList.add("show");
+</script>
+</body>
+</html>
