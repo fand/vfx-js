@@ -576,6 +576,7 @@ type JPEGGlitchArgs = {
     glitch: number;
     shift: number;
     corruption: number;
+    garbage: number;
     restart: number;
     restartJitter: number;
     slide: number;
@@ -602,6 +603,7 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
         glitch: 0.5,
         shift: 0.4,
         corruption: 0.15,
+        garbage: 0.6,
         restart: 512,
         restartJitter: 0.5,
         slide: 1,
@@ -618,6 +620,7 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
         glitch: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         shift: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
         corruption: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        garbage: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         restart: { control: { type: "range", min: 0, max: 8192, step: 1 } },
         restartJitter: {
             control: { type: "range", min: 0, max: 1, step: 0.01 },

@@ -309,6 +309,7 @@ out vec4 outColor;
 uniform sampler2D src;
 uniform vec2 resolution;
 uniform float quality;
+uniform float garbage; // 0..1 random-coefficient corruption in desync runs
 ${CASCADE_GLSL}
 
 void main() {
@@ -343,12 +344,40 @@ void main() {
     //   segmentDC(n) = prefix(n) - prefix(segStart - 1)
     float scan = by * grid.x + bx;
     float segStart = segStartFor(scan);
+    float trig = cascadeAt(scan).a;
+    bool desync = trig >= segStart && (scan - trig) >= 0.0;
+
     vec3 dcOffset = cascadeAt(scan).rgb;
     if (segStart > 0.5) {
         dcOffset -= cascadeAt(segStart - 1.0).rgb;
     }
     if (isDC) {
         coef.xyz += dcOffset;
+    }
+
+    // --- desync garbage: random coefficients from a desynced decoder ---
+    // A desynced Huffman reader emits random symbols → random coefficients.
+    // In YCbCr space these reconstruct into the murky dark green / brown /
+    // magenta blocks and stray DCT-basis stripes that read as unmistakably
+    // JPEG (and nothing like the source). DC garbage is skewed dark (low Y)
+    // for those characteristic muddy colours; AC garbage is low-frequency
+    // weighted so a few basis functions dominate (clean stripes, not white
+    // noise). Alpha is left intact so transparent areas stay transparent.
+    if (desync && garbage > 0.0) {
+        float k = scan * 0.131 + (u * 8.0 + v) * 1.7 + floor(time) * 37.0;
+        vec3 g;
+        if (isDC) {
+            g = vec3(
+                hash11(k + 1.0) * 3.0, // Y DC in [0,3] → dark
+                hash11(k + 2.0) * 8.0, // Cb DC in [0,8]
+                hash11(k + 3.0) * 8.0  // Cr DC in [0,8]
+            );
+        } else {
+            float fw = 1.0 / (1.0 + (u + v) * 0.4);
+            g = (vec3(hash11(k + 1.0), hash11(k + 2.0), hash11(k + 3.0)) - 0.5)
+                * 16.0 * fw;
+        }
+        coef.xyz = mix(coef.xyz, g, garbage);
     }
 
     outColor = coef;
@@ -566,6 +595,17 @@ export type JPEGGlitchParams = {
     corruption: number;
 
     /**
+     * Random-coefficient garbage in desync regions, `0`..`1`. A desynced
+     * decoder reads random Huffman symbols, so desync blocks fill with random
+     * DCT coefficients — reconstructing as the murky dark green / brown blocks
+     * and stray stripe patterns that look nothing like the source (the most
+     * recognisable "real JPEG" tell). `0` keeps desync blocks as displaced
+     * source content; `1` fully replaces their coefficients with garbage.
+     * Only visible where `corruption` has triggered a desync.
+     */
+    garbage: number;
+
+    /**
      * Systematic grid-slide of desync regions, `0`..`1`. The mean drift rate
      * (average bit-length mismatch) after a desync, randomised and signed per
      * trigger: some corrupted regions stretch (source lags), some compress
@@ -617,6 +657,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     glitch: 0.5,
     shift: 0.4,
     corruption: 0.15,
+    garbage: 0.6,
     restart: 512,
     restartJitter: 0.5,
     slide: 1,
@@ -675,6 +716,7 @@ export class JPEGGlitchEffect implements Effect {
             glitch,
             shift,
             corruption,
+            garbage,
             restart,
             restartJitter,
             slide,
@@ -735,10 +777,10 @@ export class JPEGGlitchEffect implements Effect {
         // time drives restartPhase() so the restart grid animates with speed.
         const seg = { cascade, grid, restart, restartJitter, seed, time };
 
-        // 6. quantize + DC cascade application
+        // 6. quantize + DC cascade + desync garbage
         ctx.draw({
             frag: FRAG_QUANTIZE,
-            uniforms: { src: a, resolution, quality, ...seg },
+            uniforms: { src: a, resolution, quality, garbage, ...seg },
             target: b,
         });
 
