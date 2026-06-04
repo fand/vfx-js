@@ -154,7 +154,6 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
         const vfx = initVFX();
         const effect = new JPEGGlitchEffect(params);
         attachOutputFpsMeter(effect);
-        attachMainThreadProbe();
 
         // bbb is a video; the rest are images.
         if (src === "bbb") {
@@ -672,72 +671,6 @@ function attachOutputFpsMeter(effect: JPEGGlitchEffect): void {
             lastTime = now;
             lastCount = count;
         }
-        requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-}
-
-// A main-thread "health" probe pinned to the right of the image: a spinner
-// plus frame-timing stats, all driven by requestAnimationFrame (NOT a CSS
-// animation, which would run on the compositor thread and hide jank).
-//
-// The spinner is a quick eyeball check, but it only reveals dropped frames.
-// The numbers quantify sub-drop stalls too: `last` is the current rAF gap,
-// `max` the worst since mount, and `long` counts frames over LONG_MS. Watch
-// `max`/`long` while toggling speed (or reverting the PBO change) to see
-// whether the main thread is actually being blocked.
-function attachMainThreadProbe(): void {
-    const LONG_MS = 24; // a frame this long means the ~16.6ms budget slipped
-    const WARMUP = 30; // skip mount / shader-compile jank in the stats
-
-    document.getElementById("jpeg-glitch-probe")?.remove();
-    const box = document.createElement("div");
-    box.id = "jpeg-glitch-probe";
-    box.style.cssText =
-        "position:fixed;top:50%;right:8px;transform:translateY(-50%);" +
-        "z-index:2147483647;display:flex;flex-direction:column;" +
-        "align-items:center;gap:8px;font:12px/1.5 monospace;color:#0f0;" +
-        "background:rgba(0,0,0,0.6);padding:10px;border-radius:4px;" +
-        "pointer-events:none;";
-    const spinner = document.createElement("div");
-    spinner.style.cssText =
-        "width:32px;height:32px;border:4px solid #0f0;" +
-        "border-top-color:transparent;border-radius:50%;";
-    const label = document.createElement("div");
-    label.style.cssText = "white-space:pre;text-align:left;";
-    label.textContent = "warming up…";
-    box.append(spinner, label);
-    document.body.appendChild(box);
-
-    let frames = 0;
-    let angle = 0;
-    let last = performance.now();
-    let maxGap = 0;
-    let longFrames = 0;
-    const tick = (now: number) => {
-        if (!box.isConnected) {
-            return; // a later render() removed it; stop this loop
-        }
-        const gap = now - last;
-        last = now;
-        frames++;
-        if (frames > WARMUP) {
-            if (gap > maxGap) {
-                maxGap = gap;
-            }
-            if (gap > LONG_MS) {
-                longFrames++;
-            }
-        }
-        // Per-frame increment (not time-based), so a stalled main thread
-        // makes the spin slow down / freeze instead of catching up.
-        angle = (angle + 12) % 360;
-        spinner.style.transform = `rotate(${angle}deg)`;
-        label.textContent =
-            `frame ${frames}\n` +
-            `last  ${gap.toFixed(1)}ms\n` +
-            `max   ${maxGap.toFixed(1)}ms\n` +
-            `long  ${longFrames} (>${LONG_MS}ms)`;
         requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);

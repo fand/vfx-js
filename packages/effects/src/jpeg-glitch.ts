@@ -310,14 +310,8 @@ export class JPEGGlitchEffect implements Effect {
     #readRT: EffectRenderTarget | null = null;
     #outTex: EffectTexture | null = null;
 
-    // Raw GL handles for the async readback + on-demand upload paths.
+    // Raw GL handles for the on-demand display-texture upload.
     #gl: WebGL2RenderingContext | null = null;
-    // Pixel-pack buffer: readPixels writes into it asynchronously, decoupling
-    // the GPU→CPU copy from the main thread (no readPixels stall).
-    #pbo: WebGLBuffer | null = null;
-    #pboBytes = 0;
-    #readSync: WebGLSync | null = null;
-    #readPending = false;
     // Display texture we upload `outCanvas` into only when a new glitch
     // lands, instead of re-uploading the canvas every frame.
     #outGLTex: WebGLTexture | null = null;
@@ -389,15 +383,9 @@ export class JPEGGlitchEffect implements Effect {
         this.#outCtx = get2d(this.#outCanvas);
         this.#readRT = ctx.createRenderTarget();
         this.#gl = ctx.gl;
-        this.#pbo = ctx.gl.createBuffer();
         this.#createOutTexture(ctx);
-        // Raw GL resources die on context loss; rebuild them.
+        // The display texture dies on context loss; rebuild it.
         this.#restoreUnsub = ctx.onContextRestored(() => {
-            this.#pbo = ctx.gl.createBuffer();
-            this.#pboBytes = 0;
-            this.#readSync = null;
-            this.#readPending = false;
-            this.#busy = false;
             this.#createOutTexture(ctx);
             // Re-push the last decoded frame, if any.
             this.#uploadPending = this.#hasResult;
@@ -458,11 +446,8 @@ export class JPEGGlitchEffect implements Effect {
             if (w !== this.#w || h !== this.#h) {
                 this.#resize(w, h);
             }
-            if (this.#readPending) {
-                // A readback is in flight; pick it up once the GPU signals.
-                this.#pollReadback(ctx);
-            } else if (this.#shouldGlitch(ctx)) {
-                this.#beginReadback(ctx);
+            if (this.#shouldGlitch(ctx)) {
+                this.#startGlitch(ctx);
             }
         }
 
@@ -517,87 +502,10 @@ export class JPEGGlitchEffect implements Effect {
         this.#dirty = true;
         this.#busy = false;
         this.#uploadPending = false;
-        // The in-flight readback's PBO contents are now the wrong size.
-        this.#discardReadback();
         this.#generation++;
     }
 
-    // Issue an asynchronous GPU→PBO readback of the element capture, then
-    // poll a fence on later frames so the readPixels never stalls the main
-    // thread. dispatchGlitch picks up the pixels once they're ready.
-    #beginReadback(ctx: EffectContext): void {
-        const w = this.#w;
-        const h = this.#h;
-        if (!this.#readRT || !this.#pbo) {
-            return;
-        }
-
-        // ctx.draw leaves the readback RT's framebuffer bound, so the
-        // readPixels below sources from it.
-        ctx.draw({
-            frag: FRAG_CAPTURE,
-            uniforms: { src: ctx.src },
-            target: this.#readRT,
-        });
-
-        const gl = ctx.gl;
-        const bytes = w * h * 4;
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.#pbo);
-        if (this.#pboBytes !== bytes) {
-            gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ);
-            this.#pboBytes = bytes;
-        }
-        // Offset (not a CPU pointer) → reads into the PBO, returns at once.
-        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, 0);
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        this.#readSync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-
-        this.#readPending = true;
-        this.#busy = true;
-        this.#dirty = false;
-        this.#lastGlitchTime = ctx.time;
-    }
-
-    #pollReadback(ctx: EffectContext): void {
-        const gl = ctx.gl;
-        const sync = this.#readSync;
-        if (!sync || !this.#pbo) {
-            this.#readPending = false;
-            this.#busy = false;
-            return;
-        }
-        // SYNC_FLUSH_COMMANDS_BIT guarantees the commands get flushed so the
-        // fence will eventually signal; timeout 0 keeps the poll non-blocking.
-        const status = gl.clientWaitSync(sync, gl.SYNC_FLUSH_COMMANDS_BIT, 0);
-        if (
-            status === gl.ALREADY_SIGNALED ||
-            status === gl.CONDITION_SATISFIED
-        ) {
-            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.#pbo);
-            // Data is ready, so this copy doesn't stall.
-            gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.#raw);
-            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-            this.#discardReadback();
-            this.#dispatchGlitch();
-        } else if (status === gl.WAIT_FAILED) {
-            this.#discardReadback();
-            this.#busy = false;
-        }
-        // TIMEOUT_EXPIRED → not ready yet; keep polling next frame.
-    }
-
-    #discardReadback(): void {
-        if (this.#readSync && this.#gl) {
-            this.#gl.deleteSync(this.#readSync);
-        }
-        this.#readSync = null;
-        this.#readPending = false;
-    }
-
-    // The CPU-side work once the readback pixels are in `#raw`: build the
-    // upright source, rotate it, and kick off the async encode/decode.
-    #dispatchGlitch(): void {
+    #startGlitch(ctx: EffectContext): void {
         const w = this.#w;
         const h = this.#h;
         const srcCanvas = this.#srcCanvas;
@@ -605,10 +513,31 @@ export class JPEGGlitchEffect implements Effect {
         const encCanvas = this.#encCanvas;
         const encCtx = this.#encCtx;
         const imageData = this.#imageData;
-        if (!srcCanvas || !srcCtx || !encCanvas || !encCtx || !imageData) {
-            this.#busy = false;
+        if (
+            !srcCanvas ||
+            !srcCtx ||
+            !encCanvas ||
+            !encCtx ||
+            !imageData ||
+            !this.#readRT
+        ) {
             return;
         }
+
+        // Read the element capture back to the CPU. ctx.draw leaves the
+        // readback RT's framebuffer bound, so readPixels reads from it.
+        ctx.draw({
+            frag: FRAG_CAPTURE,
+            uniforms: { src: ctx.src },
+            target: this.#readRT,
+        });
+        const gl = ctx.gl;
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.#raw);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        this.#busy = true;
+        this.#dirty = false;
+        this.#lastGlitchTime = ctx.time;
 
         // GL framebuffers are bottom-up; flip rows so the canvas is upright.
         // Force opaque alpha — JPEG has no alpha channel.
@@ -735,17 +664,9 @@ export class JPEGGlitchEffect implements Effect {
     dispose(): void {
         this.#restoreUnsub?.();
         this.#restoreUnsub = null;
-        this.#discardReadback();
-        if (this.#gl) {
-            if (this.#pbo) {
-                this.#gl.deleteBuffer(this.#pbo);
-            }
-            if (this.#outGLTex) {
-                this.#gl.deleteTexture(this.#outGLTex);
-            }
+        if (this.#gl && this.#outGLTex) {
+            this.#gl.deleteTexture(this.#outGLTex);
         }
-        this.#pbo = null;
-        this.#pboBytes = 0;
         this.#outGLTex = null;
         this.#gl = null;
         this.#uploadPending = false;
