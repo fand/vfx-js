@@ -154,6 +154,7 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
         const vfx = initVFX();
         const effect = new JPEGGlitchEffect(params);
         attachOutputFpsMeter(effect);
+        attachMainThreadProbe();
 
         // bbb is a video; the rest are images.
         if (src === "bbb") {
@@ -671,6 +672,47 @@ function attachOutputFpsMeter(effect: JPEGGlitchEffect): void {
             lastTime = now;
             lastCount = count;
         }
+        requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+}
+
+// A main-thread "health" probe pinned to the right of the image: a counter
+// and spinner driven by requestAnimationFrame (NOT a CSS animation, which
+// would run on the compositor thread and hide jank). If the main thread
+// stalls — e.g. on a synchronous readback — the count freezes and the
+// spinner visibly stutters.
+function attachMainThreadProbe(): void {
+    document.getElementById("jpeg-glitch-probe")?.remove();
+    const box = document.createElement("div");
+    box.id = "jpeg-glitch-probe";
+    box.style.cssText =
+        "position:fixed;top:50%;right:8px;transform:translateY(-50%);" +
+        "z-index:2147483647;display:flex;flex-direction:column;" +
+        "align-items:center;gap:8px;font:12px monospace;color:#0f0;" +
+        "background:rgba(0,0,0,0.6);padding:10px;border-radius:4px;" +
+        "pointer-events:none;";
+    const spinner = document.createElement("div");
+    spinner.style.cssText =
+        "width:32px;height:32px;border:4px solid #0f0;" +
+        "border-top-color:transparent;border-radius:50%;";
+    const label = document.createElement("div");
+    label.textContent = "0";
+    box.append(spinner, label);
+    document.body.appendChild(box);
+
+    let frames = 0;
+    let angle = 0;
+    const tick = () => {
+        if (!box.isConnected) {
+            return; // a later render() removed it; stop this loop
+        }
+        frames++;
+        angle = (angle + 12) % 360;
+        // Per-frame increment (not time-based), so a stalled main thread
+        // makes the spin slow down / freeze instead of catching up.
+        spinner.style.transform = `rotate(${angle}deg)`;
+        label.textContent = String(frames);
         requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
