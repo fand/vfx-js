@@ -101,21 +101,13 @@ export type JPEGGlitchParams = {
     iterations: number;
 
     /**
-     * Probability (0–1) that each corruption also clobbers the very first
-     * scan byte, which pushes a tear to the top of the image. A corruption
-     * only garbles blocks decoded after it, so without this the top stays
-     * clean. `0` = never, `1` = every corruption. (Default: `0.25`)
-     */
-    firstByte: number;
-
-    /**
-     * Controls how often a glitch is rendered upside-down. Tears propagate
+     * Randomly render half the glitches upside-down. Tears propagate
      * downward (top stays cleaner), so rotating the source 180° before
-     * corrupting — then rotating the output back — flips the bias upward.
-     * Applied when `random() < flipY`, so `0` = never flip, `1` = always
-     * flip, `0.5` = balanced both directions. (Default: `0.5`)
+     * corrupting — then rotating the output back — flips the bias upward
+     * and balances the glitch over both directions. `false` disables it so
+     * tears always trail downward. (Default: `true`)
      */
-    flipY: number;
+    randomFlip: boolean;
 
     /**
      * Re-glitches per second. `0` glitches once and holds a stable frame
@@ -129,8 +121,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     quality: 0.4,
     seed: 0.25,
     iterations: 24,
-    firstByte: 0.25,
-    flipY: 0.5,
+    randomFlip: true,
     speed: 0,
 };
 
@@ -249,16 +240,10 @@ function rotate180(data: Uint8ClampedArray): void {
 // are spread one per segment (à la glitch-canvas), randomized within each
 // segment, so the tears cover the whole stream. `rng` is the shared seeded
 // sequence, so the result is reproducible from the seed.
-//
-// Top-row fix: a corruption only affects blocks decoded AFTER it, so the
-// top of the image (decoded first) normally stays clean. With probability
-// `firstByte` each corruption also clobbers the very first scan byte,
-// pushing a tear right to the top.
 function glitchBytes(
     bytes: Uint8Array,
     headerLength: number,
     iterations: number,
-    firstByte: number,
     rng: () => number,
 ): void {
     const maxIndex = bytes.length - headerLength - 4;
@@ -273,9 +258,6 @@ function glitchBytes(
         const pos = Math.min(maxIndex, min + ((rng() * delta) | 0));
         const value = (rng() * 256) | 0;
         bytes[headerLength + pos] = value;
-        if (rng() < firstByte) {
-            bytes[headerLength] = value;
-        }
     }
 }
 
@@ -473,11 +455,11 @@ export class JPEGGlitchEffect implements Effect {
         const variant = this.params.speed > 0 ? this.#glitchCount : 0;
         this.#glitchCount++;
 
-        const { quality, seed, iterations, firstByte, flipY } = this.params;
+        const { quality, seed, iterations, randomFlip } = this.params;
         // One seeded sequence drives both the flip decision and the byte
         // corruption, so the whole glitch is reproducible from the seed.
         const rng = makeRng(seed, variant);
-        const flip = rng() < flipY;
+        const flip = randomFlip && rng() < 0.5;
         if (flip) {
             rotate180(data);
         }
@@ -489,7 +471,6 @@ export class JPEGGlitchEffect implements Effect {
             h,
             quality,
             iterations,
-            firstByte,
             flip,
             rng,
             this.#generation,
@@ -502,7 +483,6 @@ export class JPEGGlitchEffect implements Effect {
         h: number,
         quality: number,
         iterations: number,
-        firstByte: number,
         flip: boolean,
         rng: () => number,
         generation: number,
@@ -511,7 +491,7 @@ export class JPEGGlitchEffect implements Effect {
             const blob = await canvasToJpegBlob(canvas, quality);
             const bytes = new Uint8Array(await blob.arrayBuffer());
             const header = jpegScanStart(bytes);
-            glitchBytes(bytes, header, iterations, firstByte, rng);
+            glitchBytes(bytes, header, iterations, rng);
             const bmp = await createImageBitmap(
                 new Blob([bytes], { type: "image/jpeg" }),
             );
