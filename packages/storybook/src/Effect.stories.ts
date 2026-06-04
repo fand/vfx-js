@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 
+import BbbWebm from "./assets/bbb.webm";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
+import Pigeon from "./assets/pigeon.webp";
 import {
     BloomEffect,
     PixelateEffect,
@@ -131,7 +133,7 @@ pixelSort.play = async ({ canvasElement }) => {
 // file. Excluded from VRT: the encode/decode round trip is async (no
 // result at capture time) and the native codec output is environment
 // dependent, so a snapshot isn't a stable target.
-type JPEGGlitchSrc = "Jellyfish" | "Logo";
+type JPEGGlitchSrc = "Jellyfish" | "Logo" | "Pigeon" | "bbb";
 type JPEGGlitchArgs = {
     src: JPEGGlitchSrc;
     quality: number;
@@ -141,13 +143,36 @@ type JPEGGlitchArgs = {
     vertical: boolean;
     speed: number;
 };
+const JPEG_GLITCH_IMAGES: Record<"Jellyfish" | "Logo" | "Pigeon", string> = {
+    Jellyfish,
+    Logo,
+    Pigeon,
+};
 export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
     render: (args) => {
         const { src, ...params } = args;
         const vfx = initVFX();
         const effect = new JPEGGlitchEffect(params);
+
+        // bbb is a video; the rest are images.
+        if (src === "bbb") {
+            const video = document.createElement("video");
+            video.src = BbbWebm;
+            video.muted = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.autoplay = true;
+            video.crossOrigin = "anonymous";
+            video.style.display = "block";
+            video.style.margin = "40px auto";
+            video.style.maxWidth = "80vw";
+            void video.play();
+            vfx.add(video, { effect });
+            return video;
+        }
+
         const img = document.createElement("img");
-        img.src = src === "Jellyfish" ? Jellyfish : Logo;
+        img.src = JPEG_GLITCH_IMAGES[src];
         img.style.display = "block";
         img.style.margin = "40px auto";
         vfx.add(img, { effect });
@@ -165,7 +190,7 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
     argTypes: {
         src: {
             control: { type: "select" },
-            options: ["Jellyfish", "Logo"],
+            options: ["Jellyfish", "Logo", "Pigeon", "bbb"],
         },
         quality: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         seed: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
