@@ -249,9 +249,10 @@ void main() {
 const CASCADE_GLSL = `
 uniform sampler2D cascade; // block-res: rgb = prefix-sum DC offset, a = last trigger
 uniform vec2 grid;         // [bw, bh] in blocks
-uniform float restart;       // mean restart interval in blocks (MCUs); 0 = none
-uniform float restartJitter; // 0..1: randomness of restart boundary positions
+uniform float restart;       // restart interval in blocks (MCUs); 0 = none
+uniform float restartJitter; // 0..1: global phase offset of the restart grid
 uniform float seed;
+uniform float time;          // pre-scaled by speed; floor(time) re-rolls per step
 
 // Read the inclusive prefix sum stored in the cascade buffer at scan index.
 vec4 cascadeAt(float idx) {
@@ -273,11 +274,12 @@ float hash11(float p) {
 
 // Global phase offset of the restart lattice, in blocks. A real glitched
 // file's restart grid is not aligned to the top of the image; shifting the
-// WHOLE lattice by one seed-random phase moves every reset line together.
+// WHOLE lattice by one random phase moves every reset line together.
 // restartJitter scales the phase from 0 (aligned to the top) up to a full
-// restart interval. Floored so segment starts land on whole blocks.
+// restart interval. The phase re-rolls each time step (floor(time)) so it
+// animates when speed > 0, like a changing seed. Floored to whole blocks.
 float restartPhase() {
-    return floor(restart * restartJitter * hash11(seed * 7.0 + 3.0));
+    return floor(restart * restartJitter * hash11(seed * 7.0 + 3.0 + floor(time) * 13.0));
 }
 
 // Largest restart boundary at or before scan. Boundaries lie on a regular
@@ -639,7 +641,8 @@ export class JPEGGlitchEffect implements Effect {
         });
 
         // Cascade / restart-segment uniforms shared by quantize + displace.
-        const seg = { cascade, grid, restart, restartJitter, seed };
+        // time drives restartPhase() so the restart grid animates with speed.
+        const seg = { cascade, grid, restart, restartJitter, seed, time };
 
         // 6. quantize + DC cascade application
         ctx.draw({
