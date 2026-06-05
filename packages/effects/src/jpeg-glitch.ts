@@ -130,6 +130,14 @@ export type JPEGGlitchParams = {
      * moving glitch. (Default: `0`)
      */
     speed: number;
+
+    /**
+     * Disable the effect: pass the source straight through at its original
+     * resolution with no encode/decode round trip. Toggling this is the cheap
+     * way to switch the glitch on and off — the instance stays attached, so it
+     * keeps its buffers and pays no re-init cost. (Default: `false`)
+     */
+    bypass: boolean;
 };
 
 const DEFAULT_PARAMS: JPEGGlitchParams = {
@@ -140,6 +148,7 @@ const DEFAULT_PARAMS: JPEGGlitchParams = {
     randomFlip: true,
     vertical: false,
     speed: 0,
+    bypass: false,
 };
 
 type GlitchCanvas = HTMLCanvasElement | OffscreenCanvas;
@@ -384,6 +393,9 @@ export class JPEGGlitchEffect implements Effect {
         if (!this.#supported) {
             return;
         }
+        // The element's time base restarts at 0 on each (re-)attach.
+        this.#lastGlitchTime = -1e9;
+        this.#dirty = true;
         this.#srcCanvas = createCanvas(1, 1);
         this.#srcCtx = get2d(this.#srcCanvas);
         this.#encCanvas = createCanvas(1, 1);
@@ -437,7 +449,10 @@ export class JPEGGlitchEffect implements Effect {
     }
 
     render(ctx: EffectContext): void {
-        if (!this.#supported || !this.#readRT) {
+        if (this.params.bypass || !this.#supported || !this.#readRT) {
+            // Drop any stale decoded frame so re-enabling starts clean rather
+            // than flashing the last glitch.
+            this.#hasResult = false;
             this.#passthrough(ctx);
             return;
         }
@@ -702,6 +717,10 @@ export class JPEGGlitchEffect implements Effect {
         this.#raw = new Uint8Array(0);
         this.#hasResult = false;
         this.#busy = false;
+        // Forget the processed size so a re-init reallocates the readback RT
+        // (which dispose just freed) instead of mistaking it for current.
+        this.#w = 0;
+        this.#h = 0;
         // Invalidate any in-flight round trip.
         this.#generation++;
     }

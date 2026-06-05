@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VFX-JS jpeg-glitch example</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Playfair+Display:wght@400..900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --a-bg:#fff4ee;--a-ink:#3a2e3a;--a-soft:#9a8794;
+    --a-pink:#ff9ec4;--a-pink-deep:#ef5fa0;--a-peach:#ffc7a3;
+    --a-lemon:#ffe89a;--a-mint:#a9e8cf;--a-lilac:#cdb8ff;
+    --a-font:"Fredoka",system-ui,sans-serif;
+    --b-bg:#08070a;--b-ink:#e8e4ee;--b-soft:#6a6172;
+    --b-red:oklch(0.63 0.22 22);--b-red-dim:oklch(0.42 0.14 22);
+    --b-font:"Playfair Display",serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{background:#0a0a0a;color:var(--a-ink);font-family:var(--a-font);overflow:hidden;}
+
+  /* Wrapper pins the addHTML target to the window; the target fills it as a
+     scroll container, so the canvas tracks the window size (per the
+     html-in-canvas sizing policy) while the page scrolls inside. Layout rules
+     live on a class — the wrapper canvas copies class + style, not id. */
+  .stage{position:fixed;inset:0;}
+  .page{position:relative;width:100%;height:100vh;overflow-y:auto;overflow-x:hidden;
+    font-family:var(--a-font);background:var(--a-bg);color:var(--a-ink);
+    -webkit-font-smoothing:antialiased;}
+  .page[data-mode="b"]{font-family:var(--b-font);font-weight:900;
+    background:linear-gradient(180deg,var(--b-bg) 0%,var(--b-bg) 40%,#1a141f 100%);color:var(--b-ink);}
+
+  /* doc spans the full scrollable content so the blobs/backdrop fill the page
+     height. flow-root contains child margins (e.g. .quote's margin-bottom) so
+     doc's height matches the scroll height instead of leaving an unfilled gap. */
+  .doc{position:relative;min-height:100%;display:flow-root;}
+
+  /* Faint flower-field backdrop — page A only, fills the full page height
+     (absolute inside doc), behind the blobs. The img lives in an absolute
+     wrapper so its 100% height resolves against a definite box. */
+  .bg-photo{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.25;pointer-events:none;}
+  .bg-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+  .bg-photo.b{display:none;}
+  .page[data-mode="b"] .bg-photo.a{display:none;}
+  .page[data-mode="b"] .bg-photo.b{display:block;}
+
+  /* blobs — fill the whole page height (absolute inside doc, not viewport-fixed) */
+  .blobs{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+  .blob{position:absolute;border-radius:50%;filter:blur(8px);opacity:.9;will-change:transform;}
+  .blob.b1{width:460px;height:460px;background:var(--a-pink);top:-160px;right:-10%;
+    animation:float1 8s ease-in-out infinite;}
+  .blob.b2{width:360px;height:360px;background:var(--a-mint);top:20%;left:-100px;
+    animation:float2 7s ease-in-out infinite;}
+  .blob.b3{width:240px;height:240px;background:var(--a-lemon);top:30%;left:80%;
+    animation:float3 9s ease-in-out infinite;}
+  .blob.b4{width:200px;height:200px;background:var(--a-lilac);top:12%;left:38%;
+    animation:float4 11s ease-in-out infinite;}
+  .page[data-mode="b"] .blob{background:var(--b-red-dim) !important;opacity:.14;filter:blur(40px);}
+  @keyframes float1{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(120px,-80px) scale(1.3);}}
+  @keyframes float2{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(-80px,120px) scale(1.3);}}
+  @keyframes float3{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(80px,120px) scale(1.3);}}
+  @keyframes float4{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(-120px,-80px) scale(1.3);}}
+
+  .wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:0 clamp(20px,5vw,56px);}
+
+  /* nav */
+  nav{display:flex;align-items:center;gap:28px;padding:26px 0 0;}
+  .logo{font-weight:700;font-size:24px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
+  .page[data-mode="b"] .logo{font-weight:900;}
+  .logo .d{display:inline-flex;align-items:center;font-size:22px;line-height:1;}
+  nav .links{display:flex;gap:22px;margin-left:14px;}
+  nav .links a{font-size:15px;color:var(--a-soft);text-decoration:none;font-weight:500;}
+  .page[data-mode="b"] nav .links a{color:var(--b-soft);}
+  nav .grow{flex:1;}
+  .pill{border:0;cursor:pointer;font:inherit;font-weight:600;font-size:15px;
+    padding:11px 22px;border-radius:999px;background:var(--a-ink);color:#fff;}
+  .page[data-mode="b"] .pill{background:var(--b-red);color:#fff;border-radius:3px;font-weight:700;}
+
+  /* hero */
+  .hero{text-align:center;padding:clamp(48px,9vh,110px) 0 60px;}
+  .eyebrow{display:inline-block;font-size:14px;font-weight:600;letter-spacing:.04em;
+    padding:8px 18px;border-radius:999px;background:#fff;color:var(--a-pink-deep);
+    box-shadow:0 6px 20px -10px rgba(239,95,160,.6);margin-bottom:30px;}
+  .page[data-mode="b"] .eyebrow{background:transparent;border:1px solid var(--b-red-dim);color:var(--b-red);
+    border-radius:3px;letter-spacing:.16em;text-transform:uppercase;box-shadow:none;}
+
+  h1.head{font-size:clamp(44px,9vw,104px);line-height:.96;font-weight:700;
+    letter-spacing:-.03em;max-width:14ch;margin:0 auto 28px;}
+  .page[data-mode="b"] h1.head{font-weight:900;letter-spacing:-.04em;color:#fff;}
+  .w{position:relative;display:inline;}
+  .w.alt{color:var(--a-pink-deep);}
+  .page[data-mode="b"] .w.alt{color:var(--b-red);}
+  .page[data-mode="b"] .w.alt::after{content:"";position:absolute;left:0;right:0;bottom:.06em;height:3px;
+    background:repeating-linear-gradient(90deg,var(--b-red) 0 6px,transparent 6px 10px);}
+  /* Jiggly happy words (page A only): two quick shakes, then ~5s rest, looping */
+  .page[data-mode="a"] .wig{display:inline-block;animation:wiggle 5.5s ease-in-out infinite;}
+  @keyframes wiggle{
+    0%{transform:rotate(0) scale(1);}
+    2.25%{transform:rotate(3deg) scale(1.06);}
+    4.5%{transform:rotate(-3deg) scale(.96);}
+    6.75%{transform:rotate(2deg) scale(1.03);}
+    9%,100%{transform:rotate(0) scale(1);}}
+
+  p.lede{font-size:clamp(17px,2vw,22px);color:var(--a-soft);max-width:46ch;
+    margin:0 auto 38px;line-height:1.5;font-weight:500;}
+  .page[data-mode="b"] p.lede{color:#b6aebe;}
+
+  .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+  .btn{border:0;cursor:pointer;font:inherit;font-weight:600;font-size:17px;padding:16px 30px;border-radius:999px;}
+  .btn.primary{background:var(--a-pink-deep);color:#fff;box-shadow:0 14px 30px -12px rgba(239,95,160,.7);}
+  .btn.ghost{background:#fff;color:var(--a-ink);box-shadow:0 8px 22px -14px rgba(58,46,58,.5);}
+  .page[data-mode="b"] .btn{border-radius:3px;font-weight:700;}
+  .page[data-mode="b"] .btn.primary{background:var(--b-red);box-shadow:none;}
+  .page[data-mode="b"] .btn.ghost{background:transparent;color:var(--b-ink);border:1px solid var(--b-soft);box-shadow:none;}
+
+  /* chips */
+  .chips{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:56px;}
+  .chip{display:inline-flex;align-items:center;gap:9px;background:#fff;padding:13px 20px;
+    border-radius:999px;font-weight:600;font-size:15px;box-shadow:0 8px 22px -16px rgba(58,46,58,.5);}
+  .chip .e{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:14px;}
+  .chip.k1 .e{background:var(--a-lemon);}
+  .chip.k2 .e{background:var(--a-mint);}
+  .chip.k3 .e{background:var(--a-lilac);}
+  .page[data-mode="b"] .chip{background:var(--b-bg);border:1px solid var(--b-red-dim);color:var(--b-ink);border-radius:3px;box-shadow:none;}
+  .page[data-mode="b"] .chip .e{background:transparent !important;color:var(--b-red);border:1px solid var(--b-red-dim);border-radius:2px;}
+
+  /* image strip above the testimonial — part of the page, glitches with it on press */
+  .strip{position:relative;aspect-ratio:16/9;margin:56px 0 0;border-radius:16px;overflow:hidden;
+    box-shadow:0 30px 60px -24px rgba(58,46,58,.45);}
+  .page[data-mode="b"] .strip{border-radius:3px;box-shadow:none;}
+  .strip img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
+  .strip-img.b{display:none;}
+  .page[data-mode="b"] .strip-img.a{display:none;}
+  .page[data-mode="b"] .strip-img.b{display:block;}
+
+  /* testimonial */
+  .quote{margin:24px auto 100px;max-width:760px;text-align:center;}
+  .quote p{font-size:clamp(22px,3.2vw,34px);line-height:1.3;font-weight:600;letter-spacing:-.01em;}
+  .page[data-mode="b"] .quote p{color:#fff;}
+  .quote .by{margin-top:22px;font-size:15px;color:var(--a-soft);font-weight:600;}
+  .page[data-mode="b"] .quote .by{color:var(--b-soft);}
+  .avatar{width:56px;height:56px;border-radius:50%;background:var(--a-peach);margin:0 auto 18px;display:grid;place-items:center;font-size:24px;}
+  .page[data-mode="b"] .avatar{background:transparent;border:1px solid var(--b-red-dim);color:var(--b-red);border-radius:3px;}
+
+  /* per-mode content */
+  .v{display:none;}
+  .page[data-mode="a"] .v.a{display:inline;}
+  .page[data-mode="b"] .v.b{display:inline;}
+
+  @media (max-width:640px){nav .links{display:none;}}
+
+  /* Hint — overlays the canvas (outside the captured page) */
+  #hint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    z-index:10001;font-family:system-ui,sans-serif;font-size:26px;font-weight:700;letter-spacing:.04em;
+    color:#fff;background:rgba(10,10,10,.82);padding:10px 18px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.14);pointer-events:none;
+    opacity:0;transition:opacity .6s ease;backdrop-filter:blur(6px);}
+  #hint.show{opacity:1;}
+
+  /* Simulated overlay scrollbar — track spans the window, thumb is sized/placed
+     from #page's scroll ratios. Fades out when idle, like macOS overlay bars. */
+  #scrollbar{position:fixed;top:2px;right:2px;bottom:2px;width:8px;z-index:10001;
+    pointer-events:none;opacity:0;transition:opacity .4s ease;}
+  #scrollbar.show{opacity:1;}
+  #scrollbar .thumb{position:absolute;right:0;width:6px;border-radius:3px;
+    background:rgba(120,120,130,.6);}
+
+  #loader{position:fixed;inset:0;z-index:10002;background:#fff4ee;display:grid;place-items:center;
+    color:#3a2e3a;font-family:"Fredoka",system-ui,sans-serif;font-weight:700;font-size:28px;letter-spacing:-.02em;
+    transition:opacity .5s ease,visibility .5s ease;}
+  #loader.done{opacity:0;visibility:hidden;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="loader">be.well</div>
+
+<div class="stage">
+<div id="page" class="page" data-mode="a">
+  <div class="doc">
+  <div class="bg-photo a"><img crossorigin="anonymous" alt=""
+    src="https://images.unsplash.com/photo-1548386135-9002f96a0dc4?w=1600&q=70&auto=format&fit=crop"></div>
+  <div class="bg-photo b"><img crossorigin="anonymous" alt=""
+    src="https://images.unsplash.com/photo-1599689018459-fcf807a9eceb?w=1600&q=70&auto=format&fit=crop"></div>
+  <div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div></div>
+
+  <div class="wrap">
+    <nav>
+      <div class="logo"><span class="d"><span class="v a">🌈</span><span class="v b">👁️</span></span>be.well</div>
+      <div class="links">
+        <a href="#"><span class="v a">Habits</span><span class="v b">Protocols</span></a>
+        <a href="#"><span class="v a">Stories</span><span class="v b">Records</span></a>
+        <a href="#"><span class="v a">Pledge</span><span class="v b">Mandate</span></a>
+      </div>
+      <div class="grow"></div>
+      <button class="pill"><span class="v a">Join free</span><span class="v b">Obey</span></button>
+    </nav>
+
+    <section class="hero">
+      <span class="eyebrow"><span class="v a">A national happiness initiative</span><span class="v b">A national happiness mandate</span></span>
+
+      <h1 class="head"><span class="v a"><span class="w alt"><span class="wig">Happiness</span></span> is<br>a <span class="w alt"><span class="wig">Choice</span></span>.</span><span class="v b">Happiness is <span class="w alt">Mandatory</span>.</span></h1>
+
+      <p class="lede">
+        <span class="v a">Happiness is a choice. With a few simple habits, anyone can feel good — all the time.</span>
+        <span class="v b">Happiness is required. Under continuous monitoring, everyone will appear fine — all the time.</span>
+      </p>
+
+      <div class="cta">
+        <button class="btn primary"><span class="v a">Start feeling good</span><span class="v b">Begin compliance</span></button>
+        <button class="btn ghost"><span class="v a">Take the smile pledge</span><span class="v b">Sign the smile decree</span></button>
+      </div>
+
+      <div class="strip">
+        <img class="strip-img a" crossorigin="anonymous" alt="" src="https://images.unsplash.com/photo-1506480704700-d4a381ecd2f8?w=1600&h=900&fit=crop&crop=focalpoint&fp-y=0.35&auto=format&q=70">
+        <img class="strip-img b" crossorigin="anonymous" alt="" src="https://images.unsplash.com/photo-1546450334-5a84ac3a1f0e?w=1600&h=900&fit=crop&auto=format&q=70">
+      </div>
+
+      <div class="chips">
+        <div class="chip k1"><span class="e">☀</span><span class="v a">Think positive</span><span class="v b">Suppress doubt</span></div>
+        <div class="chip k2"><span class="e">☺</span><span class="v a">Smile daily</span><span class="v b">Smile (monitored)</span></div>
+        <div class="chip k3"><span class="e">✿</span><span class="v a">Let it go</span><span class="v b">Report others</span></div>
+      </div>
+    </section>
+
+    <section class="quote">
+      <div class="avatar"><span class="v a">☺</span><span class="v b">👁️</span></div>
+      <p>
+        <span class="v a">“I just <em>decided</em> to be happy — and now I am! It really is that simple.”</span>
+        <span class="v b">“I was <em>made</em> to be happy — and now I comply. It really is that simple.”</span>
+      </p>
+      <div class="by"><span class="v a">— Mara K., Citizen of the Month</span><span class="v b">— Subject 44-12, re-educated · status: pacified</span></div>
+    </section>
+  </div>
+  </div>
+</div>
+</div>
+
+<div id="hint">Click to Glitch!</div>
+
+<!-- Scroll indicator — lives outside .stage so the glitch capture can't reach it.
+     Visual only (pointer-events:none); driven by #page's own scroll. -->
+<div id="scrollbar"><div class="thumb"></div></div>
+
+<script type="module">
+import { VFX } from "@vfx-js/core";
+import { JPEGGlitchEffect } from "@vfx-js/effects";
+
+const page = document.getElementById("page");
+const hint = document.getElementById("hint");
+const loader = document.getElementById("loader");
+
+const CLEAN = { iterations: 0, quality: 1, speed: 0 };
+const BROKEN = { iterations: 10, quality: 0.2, speed: 30 };
+const HOVER = { iterations: 1, quality: 1, speed: 30 };
+const SCALE = 0.25;
+
+await document.fonts.ready;
+loader.classList.add("done");
+
+const vfx = new VFX();
+// One instance stays attached. Start bypassed so idle shows the page as-is at
+// its original resolution; addHTML keeps the real DOM interactive beneath.
+const effect = new JPEGGlitchEffect({ ...CLEAN, resolutionScale: SCALE, bypass: true, seed: 0.42 });
+await page.querySelector(".bg-photo.a img").decode().catch(() => {});
+await page.querySelector(".strip-img").decode().catch(() => {});
+// warm the other world's backdrop + strip images so swaps don't flash.
+// crossOrigin must match the real <img crossorigin> loads, or the warmed
+// (non-CORS) response lands in a separate cache and the swap re-fetches.
+for (const u of [
+    "https://images.unsplash.com/photo-1599689018459-fcf807a9eceb?w=1600&q=70&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1546450334-5a84ac3a1f0e?w=1600&h=900&fit=crop&auto=format&q=70",
+]) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = u;
+}
+await vfx.addHTML(page, { effect });
+
+// Scroll indicator: thumb height/top mirror #page's scroll ratios. The bar
+// can't be native (the real scroller lives inside the capture canvas), so we
+// fake it on a clean overlay. Shown while scrolling, hidden ~1s after idle.
+const scrollbar = document.getElementById("scrollbar");
+const thumb = scrollbar.querySelector(".thumb");
+let hideBarTimer = null;
+function syncBar() {
+    const { scrollTop, scrollHeight, clientHeight } = page;
+    const ratio = clientHeight / scrollHeight;
+    if (ratio >= 1) {
+        scrollbar.classList.remove("show");
+        return;
+    }
+    thumb.style.height = `${ratio * 100}%`;
+    thumb.style.top = `${(scrollTop / scrollHeight) * 100}%`;
+    scrollbar.classList.add("show");
+    if (hideBarTimer !== null) clearTimeout(hideBarTimer);
+    hideBarTimer = setTimeout(() => scrollbar.classList.remove("show"), 1000);
+}
+
+// #page is a viewport-fixed scroll container; re-capture each scroll frame so
+// the texture follows the scrolled content.
+let scrollRAF = null;
+page.addEventListener(
+    "scroll",
+    () => {
+        syncBar();
+        if (scrollRAF !== null) return;
+        scrollRAF = requestAnimationFrame(() => {
+            scrollRAF = null;
+            vfx.update(page).catch(() => {});
+        });
+    },
+    { passive: true },
+);
+// Content/viewport size can change (font load, resize, mode swap) → re-measure.
+new ResizeObserver(syncBar).observe(page.querySelector(".doc"));
+
+// While held, ease the live params from CLEAN up to BROKEN so the glitch ramps in.
+const cur = { ...CLEAN };
+const settled = () =>
+    Math.abs(cur.iterations - BROKEN.iterations) < 0.5 &&
+    Math.abs(cur.quality - BROKEN.quality) < 0.002 &&
+    Math.abs(cur.speed - BROKEN.speed) < 0.05;
+
+let raf = null;
+function animate() {
+    const k = 0.2;
+    cur.iterations += (BROKEN.iterations - cur.iterations) * k;
+    cur.quality += (BROKEN.quality - cur.quality) * k;
+    cur.speed += (BROKEN.speed - cur.speed) * k;
+    if (settled()) Object.assign(cur, BROKEN);
+    effect.setParams({
+        iterations: Math.round(cur.iterations),
+        quality: cur.quality,
+        speed: cur.speed,
+    });
+    raf = settled() ? null : requestAnimationFrame(animate);
+}
+
+// A window-level listener catches the press anywhere on the page.
+window.addEventListener("pointerdown", () => {
+    hint.classList.remove("show");
+    effect.setParams({ bypass: false });
+    if (raf === null) raf = requestAnimationFrame(animate);
+});
+
+// On release, flip between the two realities (data-mode a ⇄ b) under the glitch,
+// then snap to the clean new world.
+let mode = "a";
+const release = () => {
+    if (raf !== null) {
+        cancelAnimationFrame(raf);
+        raf = null;
+    }
+    Object.assign(cur, CLEAN);
+    mode = mode === "a" ? "b" : "a";
+    page.setAttribute("data-mode", mode); // CSS toggles the matching strip img
+    vfx.update(page).catch(() => {}); // re-capture the swapped content
+    // Hold the glitch one more frame so it covers the swap, then snap clean.
+    requestAnimationFrame(() => effect.setParams({ ...CLEAN, bypass: true }));
+};
+window.addEventListener("pointerup", release);
+window.addEventListener("pointercancel", release);
+
+// Moving over the strip fires a 250ms whole-screen glitch; the timer resets on
+// each move so the glitch holds while moving and snaps clean ~250ms after it
+// stops. mousemove is throttled to avoid spamming setParams every frame.
+// The press ramp (raf running) takes priority; this runs only when idle.
+const strip = page.querySelector(".strip");
+let hoverTimer = null;
+let lastMove = 0;
+const MOVE_THROTTLE = 80;
+strip.addEventListener("pointermove", () => {
+    if (raf !== null) return; // pressing — let the press ramp own the glitch
+    const now = performance.now();
+    if (now - lastMove < MOVE_THROTTLE) return;
+    lastMove = now;
+    if (hoverTimer !== null) clearTimeout(hoverTimer);
+    effect.setParams({ ...HOVER, bypass: false });
+    hoverTimer = setTimeout(() => {
+        hoverTimer = null;
+        if (raf === null) effect.setParams({ ...CLEAN, bypass: true });
+    }, 250);
+});
+
+hint.classList.add("show");
+setTimeout(() => hint.classList.remove("show"), 3000); // fade out after 3s
+</script>
+</body>
+</html>
