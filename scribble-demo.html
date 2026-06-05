@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Scribble Fill — minimal demo</title>
+<!--
+  After Effects "Scribble" 風の塗りつぶしを、
+  「1本の連続パス生成（boustrophedon）→ 太線リボンをインスタンス描画」で実装した最小デモ。
+
+  VFX-JS の Effect API への対応:
+    Effect.init()   ≈ buildMask() + buildSegments()  … マスクから線分列を生成し attributes へ
+    Effect.render() ≈ draw()                          … ctx.draw({ vert, frag, geometry, uniforms })
+    geometry        ≈ { mode:"triangles", instanceCount, attributes:{ corner, pA(perInstance), pB(perInstance) } }
+    boil(手描き)    ≈ 頂点シェーダ内の time 量子化 jitter（パスは静的のまま）
+  ここでは依存ゼロで動くよう raw WebGL2 で書いているが、ロジックはそのまま Effect に移植できる。
+-->
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0; background: #e9e5d8; color: #1a1a2e;
+    font: 14px/1.5 system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    padding: 24px;
+  }
+  canvas { background: #f4f1e8; border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.12); width: 900px; max-width: 100%; }
+  .controls { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; max-width: 900px; }
+  .controls label { display: flex; flex-direction: column; font-size: 12px; gap: 2px; }
+  .controls input[type=range] { width: 140px; }
+  h1 { font-size: 16px; margin: 4px 0; font-weight: 700; }
+  .hint { font-size: 12px; opacity: .65; max-width: 900px; }
+  input[type=text] { padding: 4px 8px; font-size: 14px; }
+</style>
+</head>
+<body>
+  <h1>Scribble Fill — boustrophedon path + instanced ribbon</h1>
+  <canvas id="cv"></canvas>
+  <div class="controls">
+    <label>Text <input id="text" type="text" value="Scribble" /></label>
+    <label>spacing <input id="spacing" type="range" min="3" max="16" step="1" value="7" /></label>
+    <label>angle <input id="angle" type="range" min="-90" max="90" step="1" value="-22" /></label>
+    <label>width <input id="width" type="range" min="0.5" max="6" step="0.1" value="2.4" /></label>
+    <label>boil(Hz) <input id="boil" type="range" min="0" max="24" step="1" value="9" /></label>
+    <label>jitter(px) <input id="jitter" type="range" min="0" max="10" step="0.5" value="3" /></label>
+  </div>
+  <div class="hint">
+    spacing / angle はパス再生成（init相当）、width / boil / jitter は uniform 更新（render相当）。
+    boil を上げるとフレームごとに描き直す「手描きの揺れ」が出ます。
+  </div>
+
+<script type="module">
+const cv = document.getElementById("cv");
+const W = 900, H = 300;
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+cv.width = W * dpr; cv.height = H * dpr;
+cv.style.height = (H * (cv.clientWidth / W)) + "px";
+
+const gl = cv.getContext("webgl2", { premultipliedAlpha: false, antialias: true });
+if (!gl) { document.body.innerHTML = "WebGL2 not supported"; throw new Error("no webgl2"); }
+
+// ---------------------------------------------------------------------------
+// 1) マスク生成 (CPU)  —  Effect.init で ctx.src を読み戻す相当。ここではテキストを直接ラスタライズ。
+// ---------------------------------------------------------------------------
+function buildMask(text) {
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = "#000";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  // 収まるようにフォントサイズを調整
+  let size = 240;
+  do {
+    g.font = `900 ${size}px Georgia, "Times New Roman", serif`;
+    if (g.measureText(text).width <= W * 0.9) break;
+    size -= 6;
+  } while (size > 20);
+  g.fillText(text, W / 2, H / 2 + size * 0.02);
+  const data = g.getImageData(0, 0, W, H).data;
+  return { data, W, H };
+}
+
+// ---------------------------------------------------------------------------
+// 2) 連続パス生成 (CPU, boustrophedon)  —  回転走査線で内部スパンを拾い、交互方向で繋ぐ。
+//    線分列 (pA, pB) を作り、形の外を横切る連結だけ中点サンプルで除去（=形内に収める）。
+// ---------------------------------------------------------------------------
+function buildSegments(mask, spacing, angleDeg) {
+  const { data, W, H } = mask;
+  const TH = 96; // alpha threshold
+  const a = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  const cx = W / 2, cy = H / 2;
+  const D = Math.hypot(W, H);
+  const at = (x, y) => {
+    const xi = x | 0, yi = y | 0;
+    if (xi < 0 || xi >= W || yi < 0 || yi >= H) return 0;
+    return data[(yi * W + xi) * 4 + 3];
+  };
+  const toXY = (u, v) => [cx + u * cos - v * sin, cy + u * sin + v * cos];
+
+  const pts = []; // {x,y} 連続パス点列
+  let dir = 1;
+  for (let v = -D / 2; v <= D / 2; v += spacing) {
+    // この走査線上の内部スパン [u0,u1] を収集
+    const spans = [];
+    let inRun = false, u0 = 0;
+    for (let u = -D / 2; u <= D / 2; u += 1) {
+      const [x, y] = toXY(u, v);
+      const on = at(x, y) > TH;
+      if (on && !inRun) { inRun = true; u0 = u; }
+      else if (!on && inRun) { inRun = false; spans.push([u0, u - 1]); }
+    }
+    if (inRun) spans.push([u0, D / 2]);
+    if (!spans.length) continue;
+
+    if (dir < 0) spans.reverse();
+    for (let sp of spans) {
+      let [us, ue] = sp;
+      if (dir < 0) { const t = us; us = ue; ue = t; }
+      const steps = Math.max(1, Math.round(Math.abs(ue - us) / spacing));
+      for (let i = 0; i <= steps; i++) {
+        const u = us + (ue - us) * (i / steps);
+        const [x, y] = toXY(u, v);
+        pts.push(x, y);
+      }
+    }
+    dir *= -1;
+  }
+
+  // 連続点列 → 線分。形の外を横切る連結は中点サンプルで除去。
+  const pA = [], pB = [];
+  for (let i = 0; i + 2 < pts.length; i += 2) {
+    const ax = pts[i], ay = pts[i + 1];
+    const bx = pts[i + 2], by = pts[i + 3];
+    if (at((ax + bx) / 2, (ay + by) / 2) <= TH) continue;
+    pA.push(ax, ay); pB.push(bx, by);
+  }
+  return { pA: new Float32Array(pA), pB: new Float32Array(pB), count: pA.length / 2 };
+}
+
+// ---------------------------------------------------------------------------
+// 3) 描画 (WebGL2)  —  単位クアッドを per-instance の端点で太線リボンに展開。boil は VS 内 jitter。
+// ---------------------------------------------------------------------------
+const VERT = `#version 300 es
+precision highp float;
+in vec2 corner;     // (t:0..1 軸方向, side:-1..1 太さ方向)
+in vec2 pA;         // per-instance: 線分始点 (px, 左上原点)
+in vec2 pB;         // per-instance: 線分終点
+uniform vec2  uRes;
+uniform float uHalf, uTime, uJitter, uBoilHz;
+out float vSide;
+float h21(vec2 p){ p=fract(p*vec2(123.34,345.45)); p+=dot(p,p+34.345); return fract(p.x*p.y); }
+vec2  h22(vec2 p){ return vec2(h21(p), h21(p+19.19)); }
+void main(){
+  // boil: 時間を量子化したシードで端点を揺らす（=フレームごとの描き直し）
+  float ti = floor(uTime * max(uBoilHz, 0.0001));
+  vec2 a = pA + (h22(pA + ti)        - 0.5) * uJitter;
+  vec2 b = pB + (h22(pB + ti + 7.0)  - 0.5) * uJitter;
+  vec2 d = b - a;
+  float len = length(d);
+  vec2 dir = len > 1e-3 ? d / len : vec2(1.0, 0.0);
+  vec2 nor = vec2(-dir.y, dir.x);
+  // キャップ分だけ軸方向に少し延長 → 線分どうしが重なって連続して見える
+  vec2 base = mix(a - dir * uHalf, b + dir * uHalf, corner.x);
+  vec2 pos  = base + nor * uHalf * corner.y;
+  vec2 clip = vec2(pos.x / uRes.x * 2.0 - 1.0, 1.0 - pos.y / uRes.y * 2.0);
+  vSide = corner.y;
+  gl_Position = vec4(clip, 0.0, 1.0);
+}`;
+
+const FRAG = `#version 300 es
+precision highp float;
+in float vSide;
+uniform vec4 uInk;
+out vec4 outColor;
+void main(){
+  float d = abs(vSide);
+  float aa = fwidth(d) + 1e-4;
+  float a = 1.0 - smoothstep(1.0 - aa, 1.0, d); // 端をアンチエイリアス
+  outColor = vec4(uInk.rgb, uInk.a * a);
+}`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+
+const loc = {
+  corner: gl.getAttribLocation(prog, "corner"),
+  pA: gl.getAttribLocation(prog, "pA"),
+  pB: gl.getAttribLocation(prog, "pB"),
+  uRes: gl.getUniformLocation(prog, "uRes"),
+  uHalf: gl.getUniformLocation(prog, "uHalf"),
+  uTime: gl.getUniformLocation(prog, "uTime"),
+  uJitter: gl.getUniformLocation(prog, "uJitter"),
+  uBoilHz: gl.getUniformLocation(prog, "uBoilHz"),
+  uInk: gl.getUniformLocation(prog, "uInk"),
+};
+
+const vao = gl.createVertexArray();
+gl.bindVertexArray(vao);
+
+// 単位クアッド（TRIANGLE_STRIP の4頂点）
+const cornerBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,-1, 0,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(loc.corner);
+gl.vertexAttribPointer(loc.corner, 2, gl.FLOAT, false, 0, 0);
+
+// per-instance 端点バッファ
+const pABuf = gl.createBuffer();
+const pBBuf = gl.createBuffer();
+for (const [b, l] of [[pABuf, loc.pA], [pBBuf, loc.pB]]) {
+  gl.bindBuffer(gl.ARRAY_BUFFER, b);
+  gl.enableVertexAttribArray(l);
+  gl.vertexAttribPointer(l, 2, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(l, 1);
+}
+
+let instanceCount = 0;
+function uploadSegments(seg) {
+  instanceCount = seg.count;
+  gl.bindBuffer(gl.ARRAY_BUFFER, pABuf);
+  gl.bufferData(gl.ARRAY_BUFFER, seg.pA, gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, pBBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, seg.pB, gl.DYNAMIC_DRAW);
+}
+
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+// ---------------------------------------------------------------------------
+// パラメータ & 再生成
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+let mask;
+function rebuild() {
+  mask = buildMask($("text").value || " ");
+  uploadSegments(buildSegments(mask, +$("spacing").value, +$("angle").value));
+}
+["text", "spacing", "angle"].forEach((id) => $(id).addEventListener("input", rebuild));
+rebuild();
+
+// ---------------------------------------------------------------------------
+// レンダーループ
+// ---------------------------------------------------------------------------
+const start = performance.now();
+function frame() {
+  const t = (performance.now() - start) / 1000;
+  gl.viewport(0, 0, cv.width, cv.height);
+  gl.clearColor(0.957, 0.945, 0.910, 1); // paper
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  gl.useProgram(prog);
+  gl.bindVertexArray(vao);
+  gl.uniform2f(loc.uRes, W, H);
+  gl.uniform1f(loc.uHalf, +$("width").value);
+  gl.uniform1f(loc.uTime, t);
+  gl.uniform1f(loc.uJitter, +$("jitter").value);
+  gl.uniform1f(loc.uBoilHz, +$("boil").value);
+  gl.uniform4f(loc.uInk, 0.10, 0.10, 0.18, 1.0); // ink
+
+  if (instanceCount > 0) {
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, instanceCount);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
