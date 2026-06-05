@@ -393,6 +393,9 @@ export class JPEGGlitchEffect implements Effect {
         if (!this.#supported) {
             return;
         }
+        // The element's time base restarts at 0 on each (re-)attach.
+        this.#lastGlitchTime = -1e9;
+        this.#dirty = true;
         this.#srcCanvas = createCanvas(1, 1);
         this.#srcCtx = get2d(this.#srcCanvas);
         this.#encCanvas = createCanvas(1, 1);

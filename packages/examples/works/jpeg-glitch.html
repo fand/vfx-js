@@ -6,7 +6,7 @@
 <title>VFX-JS jpeg-glitch example</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Archivo:wght@500;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Playfair+Display:wght@400..900&display=swap" rel="stylesheet">
 <style>
   :root{
     --a-bg:#fff4ee;--a-ink:#3a2e3a;--a-soft:#9a8794;
@@ -15,7 +15,7 @@
     --a-font:"Fredoka",system-ui,sans-serif;
     --b-bg:#08070a;--b-ink:#e8e4ee;--b-soft:#6a6172;
     --b-red:oklch(0.63 0.22 22);--b-red-dim:oklch(0.42 0.14 22);
-    --b-font:"Archivo",system-ui,sans-serif;
+    --b-font:"Playfair Display",Georgia,serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;}
@@ -29,23 +29,38 @@
   .page{position:relative;width:100%;height:100vh;overflow-y:auto;overflow-x:hidden;
     font-family:var(--a-font);background:var(--a-bg);color:var(--a-ink);
     -webkit-font-smoothing:antialiased;}
-  .page[data-mode="b"]{font-family:var(--b-font);background:var(--b-bg);color:var(--b-ink);}
+  .page[data-mode="b"]{font-family:var(--b-font);font-weight:900;background:var(--b-bg);color:var(--b-ink);}
 
-  /* blobs */
-  .blobs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
-  .blob{position:absolute;border-radius:50%;filter:blur(8px);opacity:.9;}
-  .blob.b1{width:460px;height:460px;background:var(--a-pink);top:-160px;right:-120px;}
-  .blob.b2{width:360px;height:360px;background:var(--a-mint);bottom:-140px;left:-100px;}
-  .blob.b3{width:240px;height:240px;background:var(--a-lemon);top:40%;left:8%;}
-  .blob.b4{width:200px;height:200px;background:var(--a-lilac);top:12%;left:38%;}
+  /* doc spans the full scrollable content so the blobs/backdrop fill the page
+     height. flow-root contains child margins (e.g. .quote's margin-bottom) so
+     doc's height matches the scroll height instead of leaving an unfilled gap. */
+  .doc{position:relative;min-height:100%;display:flow-root;}
+
+  /* Faint flower-field backdrop — page A only, fills the full page height
+     (absolute inside doc), behind the blobs. The img lives in an absolute
+     wrapper so its 100% height resolves against a definite box. */
+  .bg-photo{position:absolute;inset:0;z-index:0;overflow:hidden;opacity:.25;pointer-events:none;}
+  .bg-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+  .bg-photo.b{display:none;}
+  .page[data-mode="b"] .bg-photo.a{display:none;}
+  .page[data-mode="b"] .bg-photo.b{display:block;}
+
+  /* blobs — fill the whole page height (absolute inside doc, not viewport-fixed) */
+  .blobs{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+  .blob{position:absolute;border-radius:50%;filter:blur(8px);opacity:.9;will-change:transform;}
+  .blob.b1{width:460px;height:460px;background:var(--a-pink);top:-160px;right:-120px;
+    animation:float1 15s ease-in-out infinite;}
+  .blob.b2{width:360px;height:360px;background:var(--a-mint);bottom:-140px;left:-100px;
+    animation:float2 19s ease-in-out infinite;}
+  .blob.b3{width:240px;height:240px;background:var(--a-lemon);top:40%;left:8%;
+    animation:float3 12s ease-in-out infinite;}
+  .blob.b4{width:200px;height:200px;background:var(--a-lilac);top:12%;left:38%;
+    animation:float4 17s ease-in-out infinite;}
   .page[data-mode="b"] .blob{background:var(--b-red-dim) !important;opacity:.14;filter:blur(40px);}
-
-  .scan{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:0;
-    background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.22) 2px 3px);mix-blend-mode:multiply;}
-  .page[data-mode="b"] .scan{opacity:1;}
-  .vignette{position:fixed;inset:0;z-index:59;pointer-events:none;opacity:0;
-    box-shadow:inset 0 0 260px 50px rgba(0,0,0,.92);}
-  .page[data-mode="b"] .vignette{opacity:1;}
+  @keyframes float1{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(26px,-34px) scale(1.06);}}
+  @keyframes float2{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(-32px,22px) scale(1.05);}}
+  @keyframes float3{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(20px,30px) scale(1.08);}}
+  @keyframes float4{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(-24px,-20px) scale(1.07);}}
 
   .wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:0 clamp(20px,5vw,56px);}
 
@@ -79,6 +94,14 @@
   .page[data-mode="b"] .w.alt{color:var(--b-red);}
   .page[data-mode="b"] .w.alt::after{content:"";position:absolute;left:0;right:0;bottom:.06em;height:3px;
     background:repeating-linear-gradient(90deg,var(--b-red) 0 6px,transparent 6px 10px);}
+  /* Jiggly happy words (page A only): two quick shakes, then ~5s rest, looping */
+  .page[data-mode="a"] .wig{display:inline-block;animation:wiggle 5.5s ease-in-out infinite;}
+  @keyframes wiggle{
+    0%{transform:rotate(0) scale(1);}
+    2.25%{transform:rotate(3deg) scale(1.06);}
+    4.5%{transform:rotate(-3deg) scale(.96);}
+    6.75%{transform:rotate(2deg) scale(1.03);}
+    9%,100%{transform:rotate(0) scale(1);}}
 
   p.lede{font-size:clamp(17px,2vw,22px);color:var(--a-soft);max-width:46ch;
     margin:0 auto 38px;line-height:1.5;font-weight:500;}
@@ -103,8 +126,16 @@
   .page[data-mode="b"] .chip{background:var(--b-bg);border:1px solid var(--b-red-dim);color:var(--b-ink);border-radius:3px;box-shadow:none;}
   .page[data-mode="b"] .chip .e{background:transparent !important;color:var(--b-red);border:1px solid var(--b-red-dim);border-radius:2px;}
 
+  /* image strip above the testimonial — part of the page, glitches with it on press */
+  .strip{position:relative;aspect-ratio:16/9;margin:56px 0 0;border-radius:16px;overflow:hidden;}
+  .page[data-mode="b"] .strip{border-radius:3px;}
+  .strip img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
+  .strip-img.b{display:none;}
+  .page[data-mode="b"] .strip-img.a{display:none;}
+  .page[data-mode="b"] .strip-img.b{display:block;}
+
   /* testimonial */
-  .quote{margin:78px auto 100px;max-width:760px;text-align:center;}
+  .quote{margin:24px auto 100px;max-width:760px;text-align:center;}
   .quote p{font-size:clamp(22px,3.2vw,34px);line-height:1.3;font-weight:600;letter-spacing:-.01em;}
   .page[data-mode="b"] .quote p{color:#fff;}
   .quote .by{margin-top:22px;font-size:15px;color:var(--a-soft);font-weight:600;}
@@ -120,12 +151,12 @@
   @media (max-width:640px){nav .links{display:none;}}
 
   /* Hint — overlays the canvas (outside the captured page) */
-  #hint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);
-    z-index:10001;font-family:"Archivo",system-ui,sans-serif;font-size:13px;font-weight:700;letter-spacing:.04em;
+  #hint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    z-index:10001;font-family:system-ui,sans-serif;font-size:26px;font-weight:700;letter-spacing:.04em;
     color:#fff;background:rgba(10,10,10,.82);padding:10px 18px;border-radius:999px;
     border:1px solid rgba(255,255,255,.14);pointer-events:none;
-    opacity:0;transition:opacity .4s ease,transform .4s ease;backdrop-filter:blur(6px);}
-  #hint.show{opacity:1;transform:translateX(-50%) translateY(0);}
+    opacity:0;transition:opacity .6s ease;backdrop-filter:blur(6px);}
+  #hint.show{opacity:1;}
 
   #loader{position:fixed;inset:0;z-index:10002;background:#fff4ee;display:grid;place-items:center;
     color:#3a2e3a;font-family:"Fredoka",system-ui,sans-serif;font-weight:700;font-size:28px;letter-spacing:-.02em;
@@ -138,9 +169,12 @@
 
 <div class="stage">
 <div id="page" class="page" data-mode="a">
+  <div class="doc">
+  <div class="bg-photo a"><img crossorigin="anonymous" alt=""
+    src="https://images.unsplash.com/photo-1548386135-9002f96a0dc4?w=1600&q=70&auto=format&fit=crop"></div>
+  <div class="bg-photo b"><img crossorigin="anonymous" alt=""
+    src="https://images.unsplash.com/photo-1599689018459-fcf807a9eceb?w=1600&q=70&auto=format&fit=crop"></div>
   <div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div></div>
-  <div class="scan"></div>
-  <div class="vignette"></div>
 
   <div class="wrap">
     <nav>
@@ -158,8 +192,8 @@
       <span class="eyebrow"><span class="v a">A national happiness initiative</span><span class="v b">A national happiness mandate</span></span>
 
       <h1 class="head">
-        <span class="w alt"><span class="v a">Choose</span><span class="v b">Comply</span></span>
-        to <span class="w alt"><span class="v a">be</span><span class="v b">seem</span></span> happy<span class="w alt"><span class="v a"> today.</span><span class="v b">, always.</span></span>
+        <span class="w alt"><span class="v a"><span class="wig">Choose</span></span><span class="v b">Comply</span></span>
+        to <span class="w alt"><span class="v a">be</span><span class="v b">seem</span></span> happy<span class="w alt"><span class="v a"> <span class="wig">today</span>.</span><span class="v b">, always.</span></span>
       </h1>
 
       <p class="lede">
@@ -170,6 +204,11 @@
       <div class="cta">
         <button class="btn primary"><span class="v a">Start feeling good</span><span class="v b">Begin compliance</span></button>
         <button class="btn ghost"><span class="v a">Take the smile pledge</span><span class="v b">Sign the smile decree</span></button>
+      </div>
+
+      <div class="strip">
+        <img class="strip-img a" crossorigin="anonymous" alt="" src="https://images.unsplash.com/photo-1506480704700-d4a381ecd2f8?w=1600&h=900&fit=crop&crop=focalpoint&fp-y=0.35&auto=format&q=70">
+        <img class="strip-img b" crossorigin="anonymous" alt="" src="https://images.unsplash.com/photo-1546450334-5a84ac3a1f0e?w=1600&h=900&fit=crop&auto=format&q=70">
       </div>
 
       <div class="chips">
@@ -188,10 +227,11 @@
       <div class="by"><span class="v a">— Mara K., Citizen of the Month</span><span class="v b">— Subject 44-12, re-educated · status: pacified</span></div>
     </section>
   </div>
+  </div>
 </div>
 </div>
 
-<div id="hint">press &amp; hold anywhere to break it</div>
+<div id="hint">Click to Glitch!</div>
 
 <script type="module">
 import { VFX } from "@vfx-js/core";
@@ -201,11 +241,9 @@ const page = document.getElementById("page");
 const hint = document.getElementById("hint");
 const loader = document.getElementById("loader");
 
-// Near-clean baseline → heavy live JPEG corruption while the pointer is held.
 const CLEAN = { iterations: 0, quality: 1, speed: 0 };
-const BROKEN = { iterations: 10, quality: 0.16, speed: 30 };
-// Quarter-resolution processing keeps the readback/encode/decode cheap so the
-// glitch reacts to the press instantly (and the blocks read more like datamosh).
+const BROKEN = { iterations: 10, quality: 0.2, speed: 30 };
+const HOVER = { iterations: 1, quality: 1, speed: 30 };
 const SCALE = 0.25;
 
 await document.fonts.ready;
@@ -215,6 +253,19 @@ const vfx = new VFX();
 // One instance stays attached. Start bypassed so idle shows the page as-is at
 // its original resolution; addHTML keeps the real DOM interactive beneath.
 const effect = new JPEGGlitchEffect({ ...CLEAN, resolutionScale: SCALE, bypass: true, seed: 0.42 });
+await page.querySelector(".bg-photo.a img").decode().catch(() => {});
+await page.querySelector(".strip-img").decode().catch(() => {});
+// warm the other world's backdrop + strip images so swaps don't flash.
+// crossOrigin must match the real <img crossorigin> loads, or the warmed
+// (non-CORS) response lands in a separate cache and the swap re-fetches.
+for (const u of [
+    "https://images.unsplash.com/photo-1599689018459-fcf807a9eceb?w=1600&q=70&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1546450334-5a84ac3a1f0e?w=1600&h=900&fit=crop&auto=format&q=70",
+]) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = u;
+}
 await vfx.addHTML(page, { effect });
 
 // #page is a viewport-fixed scroll container; re-capture each scroll frame so
@@ -271,16 +322,37 @@ const release = () => {
     }
     Object.assign(cur, CLEAN);
     mode = mode === "a" ? "b" : "a";
-    page.setAttribute("data-mode", mode);
+    page.setAttribute("data-mode", mode); // CSS toggles the matching strip img
     vfx.update(page).catch(() => {}); // re-capture the swapped content
     // Hold the glitch one more frame so it covers the swap, then snap clean.
     requestAnimationFrame(() => effect.setParams({ ...CLEAN, bypass: true }));
-    hint.classList.add("show");
 };
 window.addEventListener("pointerup", release);
 window.addEventListener("pointercancel", release);
 
+// Moving over the strip fires a 250ms whole-screen glitch; the timer resets on
+// each move so the glitch holds while moving and snaps clean ~250ms after it
+// stops. mousemove is throttled to avoid spamming setParams every frame.
+// The press ramp (raf running) takes priority; this runs only when idle.
+const strip = page.querySelector(".strip");
+let hoverTimer = null;
+let lastMove = 0;
+const MOVE_THROTTLE = 80;
+strip.addEventListener("pointermove", () => {
+    if (raf !== null) return; // pressing — let the press ramp own the glitch
+    const now = performance.now();
+    if (now - lastMove < MOVE_THROTTLE) return;
+    lastMove = now;
+    if (hoverTimer !== null) clearTimeout(hoverTimer);
+    effect.setParams({ ...HOVER, bypass: false });
+    hoverTimer = setTimeout(() => {
+        hoverTimer = null;
+        if (raf === null) effect.setParams({ ...CLEAN, bypass: true });
+    }, 250);
+});
+
 hint.classList.add("show");
+setTimeout(() => hint.classList.remove("show"), 3000); // fade out after 3s
 </script>
 </body>
 </html>
