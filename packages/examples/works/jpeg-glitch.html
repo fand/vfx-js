@@ -31,88 +31,81 @@
      scrolls inside it. Layout rules go on a class, not #id: the wrapper canvas
      copies the target's class + style, but not its id. */
   .stage{position:fixed;inset:0;}
-  .page{width:100%;height:100vh;background:var(--paper);
-    overflow-y:auto;overflow-x:hidden;}
-  /* Variant 2 — the abyss. Overrides the palette on the target subtree, so the
-     whole captured page recolors when the class is toggled on mouseup. */
+  .page{width:100%;height:100vh;overflow-y:auto;overflow-x:hidden;
+    /* Variant A: a bright pastel gradient drifting very slowly over the page */
+    background:linear-gradient(120deg,#ffd1dc,#cdeafe,#d8f5cf,#ffe7b8,#e7d8ff,#ffd8c2);
+    background-size:300% 300%;animation:paperFlow 48s ease-in-out infinite;}
+  @keyframes paperFlow{
+    0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
+  /* Variant 2 — the abyss. Same slow-drifting gradient (size + animation are
+     inherited; only the colours change to embers and soot) plus the dark
+     palette override. */
   .page.theme-hell{
     --paper:#0c0a0b;--paper2:#161012;--ink:#e9e2df;--muted:#9a8f8c;
     --line:rgba(233,226,223,.16);--accent:#ff5a2e;
+    background-image:linear-gradient(120deg,#080405,#241010,#5a1408,#8a2410,#3a1410,#080405);
   }
-
-  /* Masthead — sticky so it stays put while the article scrolls beneath it */
-  .masthead{position:sticky;top:0;z-index:5;background:var(--paper);
-    display:flex;align-items:center;justify-content:space-between;
-    padding:18px clamp(24px,4vw,64px);border-bottom:2px solid var(--ink);}
-  .masthead .brand{font-family:var(--serif);font-weight:900;font-size:clamp(20px,2.4vw,30px);
-    letter-spacing:.02em;}
-  .masthead nav{display:flex;gap:clamp(14px,2vw,30px);font-size:13px;font-weight:600;
-    text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
-  .masthead nav a:hover{color:var(--accent);}
-  .masthead .date{font-size:12px;color:var(--muted);letter-spacing:.06em;}
 
   /* Hero — fills the first view: heading, image, and lead text all above the
      fold. Left column packs the type; right column is a full-height image. */
   .hero{display:grid;grid-template-columns:1.12fr .88fr;gap:clamp(28px,4vw,56px);
     align-items:stretch;padding:clamp(24px,3.4vh,46px) clamp(24px,4vw,64px);
-    min-height:calc(100vh - 70px);}
-  .hero-text{display:flex;flex-direction:column;min-width:0;}
+    min-height:70vh;}
+  .hero-text{display:flex;flex-direction:column;justify-content:center;min-width:0;}
   .kicker{display:inline-block;font-size:12px;font-weight:700;text-transform:uppercase;
     letter-spacing:.18em;color:var(--accent);margin-bottom:16px;}
-  .headline{font-family:var(--serif);font-weight:900;line-height:.96;
+  .headline{font-family:var(--serif);font-weight:900;line-height:.96;color:var(--ink);
     font-size:clamp(34px,4.4vw,62px);letter-spacing:-.015em;margin-bottom:18px;}
   .standfirst{font-family:var(--serif);font-weight:400;font-size:clamp(16px,1.5vw,21px);
-    line-height:1.5;color:var(--ink);opacity:.88;max-width:38ch;margin-bottom:22px;}
-  .byline{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted);
-    border-top:1px solid var(--line);padding-top:16px;max-width:38ch;}
-  .byline .avatar{width:34px;height:34px;border-radius:50%;
-    background:radial-gradient(circle at 35% 30%,#cbb38f,#7c6a4e 70%);flex:none;}
-  .byline b{color:var(--ink);font-weight:600;}
-  /* Lead body, pushed to the bottom of the text column, set in two columns */
-  .intro{margin-top:auto;padding-top:22px;column-count:2;column-gap:26px;
-    font-size:clamp(12px,1.05vw,14.5px);line-height:1.6;color:var(--ink);opacity:.9;}
-  .intro p{margin-bottom:.7em;}
-  .intro p:first-child::first-letter{font-family:var(--serif);font-weight:900;font-size:2.9em;
-    float:left;line-height:.72;margin:.04em .12em 0 0;color:var(--accent);}
+    line-height:1.5;color:var(--ink);opacity:.88;max-width:38ch;margin-bottom:0;}
 
-  .figure{position:relative;align-self:stretch;min-height:320px;border:1px solid var(--line);
-    overflow:hidden;background:#0a0a0a;}
-  .figure svg{width:100%;height:100%;display:block;object-fit:cover;}
-  .figure figcaption{position:absolute;left:0;right:0;bottom:0;padding:10px 14px;
-    font-size:11px;letter-spacing:.04em;color:#e9e4d8;
-    background:linear-gradient(transparent,rgba(0,0,0,.6));}
+  /* Hero image — a bare img that stretches to fill its column */
+  .figure{align-self:stretch;width:100%;height:100%;min-height:320px;
+    display:block;object-fit:cover;background:#0a0a0a;}
 
   /* Body — the continuation below the fold */
   .body{max-width:720px;margin:0 auto;padding:8px clamp(24px,4vw,64px) clamp(48px,7vh,88px);}
   .body p{font-size:16px;line-height:1.72;color:var(--ink);opacity:.92;margin-bottom:1em;}
   .body h2{font-family:var(--serif);font-weight:600;font-size:clamp(22px,2.6vw,32px);
-    line-height:1.15;margin:38px 0 14px;}
+    line-height:1.15;margin:38px 0 14px;color:var(--ink);}
   .body blockquote{font-family:var(--serif);font-style:italic;font-size:clamp(20px,2.4vw,28px);
     line-height:1.42;color:var(--ink);margin:30px 0;padding-left:22px;
     border-left:3px solid var(--accent);}
 
-  /* Newsletter bar — the innocuous call-to-action that triggers the break */
-  .promo{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
-    padding:24px clamp(24px,4vw,64px);background:#15100f;color:#f3efe7;}
-  .promo .pitch{font-family:var(--serif);font-weight:600;font-size:clamp(16px,1.8vw,22px);}
-  .promo .pitch span{color:#e6b3af;}
-  .promo form{display:flex;gap:10px;align-items:center;}
-  .promo input{font-family:var(--sans);font-size:14px;padding:11px 14px;width:min(240px,42vw);
-    border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:var(--paper);
-    border-radius:2px;}
-  .promo input::placeholder{color:rgba(244,241,234,.5);}
-  .promo button{font-family:var(--sans);font-weight:700;font-size:14px;letter-spacing:.02em;
-    padding:11px 22px;border:0;border-radius:2px;cursor:pointer;color:#fff;
-    background:var(--accent);white-space:nowrap;
-    box-shadow:0 0 0 0 rgba(179,38,30,.6);animation:invite 2.4s ease-in-out infinite;}
-  @keyframes invite{0%,100%{box-shadow:0 0 0 0 rgba(179,38,30,.55);}
-    50%{box-shadow:0 0 0 8px rgba(179,38,30,0);}}
-
   @media (max-width:860px){
     .hero{grid-template-columns:1fr;min-height:0;}
-    .intro{column-count:1;}
     .figure{min-height:0;height:clamp(240px,36vh,400px);order:-1;}
   }
+
+  /* Ambient decoration — a viewport-fixed particle layer inside the page, so it
+     is captured and glitches with everything and swaps with the theme. One set
+     of dots, restyled per variant: drifting light motes in bliss, rising embers
+     in the abyss, each over a slow breathing / flickering glow. */
+  .fx{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:2;}
+  /* Bliss: big soft pastel bubbles (≈5× the base size, tinted per particle) */
+  .fx span{position:absolute;bottom:-24px;border-radius:50%;
+    width:calc(var(--sz,8px) * 5);height:calc(var(--sz,8px) * 5);
+    background:radial-gradient(circle at 36% 32%,rgba(255,255,255,.9),var(--c,#ffe9c0) 62%);
+    box-shadow:0 0 16px var(--c,#ffe9c0);opacity:.72;animation:mote linear infinite;}
+  .fx::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(44% 34% at 80% 14%,rgba(255,247,192,.4),transparent 70%);
+    animation:breathe 5s ease-in-out infinite;}
+  /* Abyss: small embers — back to the base size, ignoring the pastel tint */
+  .theme-hell .fx span{width:var(--sz,8px);height:var(--sz,8px);opacity:1;
+    background:radial-gradient(circle,#ffe0a3,#ff5a2e 55%,transparent);
+    box-shadow:0 0 9px #ff6a20;animation-name:ember;}
+  .theme-hell .fx::after{
+    background:radial-gradient(120% 55% at 50% 114%,rgba(255,80,18,.42),transparent 72%);
+    animation:flicker 2.4s ease-in-out infinite;}
+  @keyframes mote{
+    0%{transform:translate(0,0);opacity:0;}12%{opacity:.85;}
+    88%{opacity:.85;}100%{transform:translate(24px,-104vh);opacity:0;}}
+  @keyframes ember{
+    0%{transform:translate(0,0) scale(1);opacity:0;}10%{opacity:1;}
+    55%{transform:translate(26px,-58vh) scale(.9);}
+    100%{transform:translate(-22px,-112vh) scale(.5);opacity:0;}}
+  @keyframes breathe{0%,100%{opacity:.5;}50%{opacity:.95;}}
+  @keyframes flicker{0%,100%{opacity:.55;}25%{opacity:.85;}40%{opacity:.6;}60%{opacity:1;}75%{opacity:.7;}}
 
   /* Restore hint — appears after the page reassembles */
   #hint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);
@@ -133,13 +126,7 @@
 
 <div class="stage">
 <div id="page" class="page">
-  <header class="masthead">
-    <div class="brand">The&nbsp;Meridian</div>
-    <nav>
-      <a href="#">World</a><a href="#">Technology</a><a href="#">Culture</a><a href="#">Opinion</a>
-    </nav>
-    <div class="date">Thursday, June 4, 2026</div>
-  </header>
+  <div class="fx" aria-hidden="true"></div>
 
   <section class="hero">
     <div class="hero-text">
@@ -147,50 +134,10 @@
       <h1 class="headline">Everything is going to be absolutely&nbsp;wonderful.</h1>
       <p class="standfirst">The sun is shining, the birds are singing, and every person you
         will ever meet already loves you completely. Isn't that just lovely? Keep smiling.</p>
-      <div class="byline">
-        <span class="avatar"></span>
-        <div>By <b>Sunny Meadows</b> · Chief Happiness Officer<br>forever to read</div>
-      </div>
-      <div class="intro">
-        <p>Good morning, friend! Today is the very best day that has ever existed, and tomorrow will be better still. There is nothing to worry about — there never was, and there never will be. Keep smiling.</p>
-        <p>The flowers bloom only for you. The water is sweet. Everyone here is so happy, and you will be exactly this happy too, very soon, and then you will never feel anything else again.</p>
-        <p>Isn't that lovely? Go on — say that it's lovely.</p>
-      </div>
     </div>
 
-    <figure class="figure">
-      <svg viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="bsky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#76c6ff"/>
-            <stop offset=".55" stop-color="#cfeeff"/>
-            <stop offset="1" stop-color="#eef9da"/>
-          </linearGradient>
-          <linearGradient id="bhill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#92d36c"/><stop offset="1" stop-color="#57a53d"/>
-          </linearGradient>
-        </defs>
-        <rect width="800" height="1000" fill="url(#bsky)"/>
-        <circle cx="610" cy="230" r="82" fill="#fff7c0"/>
-        <circle cx="610" cy="230" r="135" fill="#fff7c0" opacity=".35"/>
-        <g fill="#ffffff" opacity=".92">
-          <ellipse cx="210" cy="220" rx="92" ry="34"/><ellipse cx="285" cy="200" rx="68" ry="30"/>
-          <ellipse cx="470" cy="330" rx="62" ry="26"/><ellipse cx="520" cy="320" rx="44" ry="20"/>
-        </g>
-        <path d="M0 640 Q200 560 400 640 T800 620 V1000 H0 Z" fill="#c4ea93"/>
-        <path d="M0 740 Q260 660 520 740 T800 720 V1000 H0 Z" fill="url(#bhill)"/>
-        <g>
-          <circle cx="120" cy="868" r="9" fill="#ff7eb6"/><circle cx="300" cy="906" r="9" fill="#ffd23f"/>
-          <circle cx="520" cy="876" r="9" fill="#ffffff"/><circle cx="690" cy="912" r="9" fill="#ff7eb6"/>
-          <circle cx="210" cy="930" r="8" fill="#ffd23f"/><circle cx="610" cy="940" r="8" fill="#fff"/>
-        </g>
-        <g stroke="#3a3a3a" stroke-width="4" fill="none" stroke-linecap="round">
-          <path d="M330 250 q14 -14 28 0 q14 -14 28 0"/>
-          <path d="M420 205 q11 -11 22 0 q11 -11 22 0"/>
-        </g>
-      </svg>
-      <figcaption>A perfect meadow on a perfect day. Stay a while. Stay forever.</figcaption>
-    </figure>
+    <img class="figure" crossorigin="anonymous" alt=""
+      src="https://images.unsplash.com/photo-1506480704700-d4a381ecd2f8?w=1600&q=70&auto=format&fit=crop">
   </section>
 
   <article class="body">
@@ -201,14 +148,6 @@
     <p>We have prepared a place for you, and it is beautiful, and it is yours, and the gate has closed behind you so gently that you didn't even hear it. We thought of everything. We thought of you.</p>
     <p>So smile, friend. Smile wider. Wider than that. There is no sky beyond this sky, and no day beyond this day, and that is the most wonderful news of all. Welcome home. Welcome home. Welcome home.</p>
   </article>
-
-  <section class="promo">
-    <div class="pitch">Subscribe to the <span>Good News</span> — there is only ever good news.</div>
-    <form id="signup" onsubmit="return false">
-      <input type="email" placeholder="you@example.com" aria-label="Email">
-      <button type="submit">Be Happy</button>
-    </form>
-  </section>
 </div>
 </div>
 
@@ -246,6 +185,28 @@ const effect = new JPEGGlitchEffect({
     bypass: true,
     seed: 0.42,
 });
+// Populate the ambient layer with particles; randomized size, tint, lane, speed
+// and phase so the drift never looks tiled. The base size (--sz) and pastel tint
+// (--c) are consumed differently per theme in CSS.
+const PASTELS = ["#ffd1dc", "#cdeafe", "#d8f5cf", "#ffe7b8", "#e7d8ff", "#c8f4e6", "#ffd8c2"];
+const fx = page.querySelector(".fx");
+for (let i = 0; i < 22; i++) {
+    const s = document.createElement("span");
+    const size = 3 + Math.round(Math.random() * 7);
+    s.style.setProperty("--sz", `${size}px`);
+    s.style.setProperty("--c", PASTELS[Math.floor(Math.random() * PASTELS.length)]);
+    s.style.left = `${(Math.random() * 100).toFixed(2)}%`;
+    s.style.animationDuration = `${(6 + Math.random() * 8).toFixed(2)}s`;
+    s.style.animationDelay = `${(-Math.random() * 14).toFixed(2)}s`;
+    fx.appendChild(s);
+}
+
+// Wait for the hero photo before the first capture, and warm the other world's
+// image so the swap doesn't flash an empty frame.
+await page.querySelector("img.figure").decode().catch(() => {});
+new Image().src =
+    "https://images.unsplash.com/photo-1541051595295-e7d4ae8b845f?w=1600&q=70&auto=format&fit=crop";
+
 await vfx.addHTML(page, { effect });
 
 // #page is a viewport-fixed scroll container, so the canvas stays window-sized
@@ -272,15 +233,17 @@ const slots = {
     kicker: page.querySelector(".kicker"),
     headline: page.querySelector(".headline"),
     standfirst: page.querySelector(".standfirst"),
-    byline: page.querySelector(".byline div"),
-    intro: page.querySelector(".intro"),
     figure: page.querySelector(".figure"),
     body: page.querySelector(".body"),
-    pitch: page.querySelector(".promo .pitch"),
-    button: page.querySelector(".promo button"),
+};
+// `figure` is a bare <img>, so its content is the src; everything else is HTML.
+const read = (k, el) => (k === "figure" ? el.getAttribute("src") : el.innerHTML);
+const write = (k, el, v) => {
+    if (k === "figure") el.setAttribute("src", v);
+    else el.innerHTML = v;
 };
 const snapshot = () =>
-    Object.fromEntries(Object.entries(slots).map(([k, el]) => [k, el.innerHTML]));
+    Object.fromEntries(Object.entries(slots).map(([k, el]) => [k, read(k, el)]));
 
 const VARIANTS = [
     { theme: "", ...snapshot() },
@@ -290,46 +253,20 @@ const VARIANTS = [
         headline: "There is no way out, and there never&nbsp;was.",
         standfirst:
             "The fires do not stop. The screaming does not stop. You have always been here, and you always will be, and no one is coming to bring you back.",
-        byline: "By <b>the Unnamed</b> · Keeper of the Pit<br>an eternity to read",
-        figure: `<svg viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="hsky" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#080305"/>
-              <stop offset=".5" stop-color="#3b0d0d"/>
-              <stop offset=".82" stop-color="#7c1d10"/>
-              <stop offset="1" stop-color="#e2581b"/>
-            </linearGradient>
-          </defs>
-          <rect width="800" height="1000" fill="url(#hsky)"/>
-          <circle cx="400" cy="1000" r="280" fill="#ff7a18" opacity=".45"/>
-          <circle cx="400" cy="1030" r="170" fill="#ffd23f" opacity=".5"/>
-          <polygon points="0,1000 90,640 170,830 250,580 330,830 410,660 500,860 590,620 680,840 770,680 800,820 800,1000" fill="#0b0608"/>
-          <polygon points="0,1000 130,780 230,900 340,740 450,900 560,800 690,910 800,790 800,1000" fill="#05080a" opacity=".9"/>
-          <g fill="#ffb347">
-            <circle cx="160" cy="520" r="4"/><circle cx="300" cy="440" r="3"/><circle cx="520" cy="500" r="4"/>
-            <circle cx="640" cy="420" r="3"/><circle cx="420" cy="380" r="3"/><circle cx="240" cy="360" r="4"/>
-            <circle cx="560" cy="350" r="3"/><circle cx="700" cy="540" r="3"/>
-          </g>
-        </svg>
-        <figcaption>The pit, seen from the last ledge before the descent. Do not look down.</figcaption>`,
-        intro: `<p>It is dark here, and it is hot, and the ground is not ground. Something moves far below, and it is patient, and it knows your name. It has always known your name.</p>
-        <p>The walls weep. The air is ash. You reach for where the surface used to be and find only more depth, more heat, more of the endless red.</p>
-        <p>There is no morning here. There never was. You only thought there was.</p>`,
+        figure: "https://images.unsplash.com/photo-1541051595295-e7d4ae8b845f?w=1600&q=70&auto=format&fit=crop",
         body: `<h2>Down, and further down</h2>
         <p>Everyone here was once like you. They smiled, too, in the beginning — shown the same warm meadow, told the same kind words. They do not smile now. Soon enough you will understand exactly why, and then you will stop as well.</p>
         <blockquote>"Abandon every hope. There is nothing left here to hope for."</blockquote>
         <p>There is no breath of lovely air to take, only the smoke that has been waiting for your lungs. Hold it in. You have no choice but to hold it in. Do you feel it now — the weight, the heat, the certainty? You will keep feeling it.</p>
         <p>A place was prepared for you, and it is vast, and it is yours, and the gate closed behind you so long ago that you have forgotten it was ever open. Every torment was considered. Every one of them was meant for you.</p>
         <p>So look down, at last. Look all the way down. There is no sky above this dark, and no end beyond this end, and that is the last truth you will ever be given. You are home. You are home. You are home.</p>`,
-        pitch: 'Subscribe to the <span>Final Word</span> — it is already too late.',
-        button: "Descend",
     },
 ];
 
 let variant = 0;
 const applyVariant = (i) => {
     const v = VARIANTS[i];
-    for (const k of Object.keys(slots)) slots[k].innerHTML = v[k];
+    for (const k of Object.keys(slots)) write(k, slots[k], v[k]);
     page.classList.toggle("theme-hell", v.theme === "theme-hell");
 };
 
@@ -359,8 +296,8 @@ function animate() {
     raf = settled() ? null : requestAnimationFrame(animate);
 }
 
-// The canvas sits over the live DOM, so window-level listeners reliably catch
-// the press whether it lands on the "Subscribe" bait or anywhere else.
+// The canvas sits over the live DOM, so a window-level listener catches the
+// press anywhere on the page.
 window.addEventListener("pointerdown", () => {
     hint.classList.remove("show");
     effect.setParams({ bypass: false }); // enable the glitch for the press
