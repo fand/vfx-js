@@ -29,7 +29,8 @@
   .page{position:relative;width:100%;height:100vh;overflow-y:auto;overflow-x:hidden;
     font-family:var(--a-font);background:var(--a-bg);color:var(--a-ink);
     -webkit-font-smoothing:antialiased;}
-  .page[data-mode="b"]{font-family:var(--b-font);font-weight:900;background:var(--b-bg);color:var(--b-ink);}
+  .page[data-mode="b"]{font-family:var(--b-font);font-weight:900;
+    background:linear-gradient(180deg,var(--b-bg) 0%,var(--b-bg) 40%,#1a141f 100%);color:var(--b-ink);}
 
   /* doc spans the full scrollable content so the blobs/backdrop fill the page
      height. flow-root contains child margins (e.g. .quote's margin-bottom) so
@@ -68,8 +69,7 @@
   nav{display:flex;align-items:center;gap:28px;padding:26px 0 0;}
   .logo{font-weight:700;font-size:24px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;}
   .page[data-mode="b"] .logo{font-weight:900;}
-  .logo .d{width:12px;height:12px;border-radius:50%;background:var(--a-pink-deep);}
-  .page[data-mode="b"] .logo .d{background:var(--b-red);border-radius:2px;}
+  .logo .d{display:inline-flex;align-items:center;font-size:22px;line-height:1;}
   nav .links{display:flex;gap:22px;margin-left:14px;}
   nav .links a{font-size:15px;color:var(--a-soft);text-decoration:none;font-weight:500;}
   .page[data-mode="b"] nav .links a{color:var(--b-soft);}
@@ -127,8 +127,9 @@
   .page[data-mode="b"] .chip .e{background:transparent !important;color:var(--b-red);border:1px solid var(--b-red-dim);border-radius:2px;}
 
   /* image strip above the testimonial — part of the page, glitches with it on press */
-  .strip{position:relative;aspect-ratio:16/9;margin:56px 0 0;border-radius:16px;overflow:hidden;}
-  .page[data-mode="b"] .strip{border-radius:3px;}
+  .strip{position:relative;aspect-ratio:16/9;margin:56px 0 0;border-radius:16px;overflow:hidden;
+    box-shadow:0 30px 60px -24px rgba(58,46,58,.45);}
+  .page[data-mode="b"] .strip{border-radius:3px;box-shadow:none;}
   .strip img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
   .strip-img.b{display:none;}
   .page[data-mode="b"] .strip-img.a{display:none;}
@@ -158,6 +159,14 @@
     opacity:0;transition:opacity .6s ease;backdrop-filter:blur(6px);}
   #hint.show{opacity:1;}
 
+  /* Simulated overlay scrollbar — track spans the window, thumb is sized/placed
+     from #page's scroll ratios. Fades out when idle, like macOS overlay bars. */
+  #scrollbar{position:fixed;top:2px;right:2px;bottom:2px;width:8px;z-index:10001;
+    pointer-events:none;opacity:0;transition:opacity .4s ease;}
+  #scrollbar.show{opacity:1;}
+  #scrollbar .thumb{position:absolute;right:0;width:6px;border-radius:3px;
+    background:rgba(120,120,130,.6);}
+
   #loader{position:fixed;inset:0;z-index:10002;background:#fff4ee;display:grid;place-items:center;
     color:#3a2e3a;font-family:"Fredoka",system-ui,sans-serif;font-weight:700;font-size:28px;letter-spacing:-.02em;
     transition:opacity .5s ease,visibility .5s ease;}
@@ -178,7 +187,7 @@
 
   <div class="wrap">
     <nav>
-      <div class="logo"><span class="d"></span>be.well</div>
+      <div class="logo"><span class="d"><span class="v a">🌈</span><span class="v b">👁️</span></span>be.well</div>
       <div class="links">
         <a href="#"><span class="v a">Habits</span><span class="v b">Protocols</span></a>
         <a href="#"><span class="v a">Stories</span><span class="v b">Records</span></a>
@@ -191,7 +200,7 @@
     <section class="hero">
       <span class="eyebrow"><span class="v a">A national happiness initiative</span><span class="v b">A national happiness mandate</span></span>
 
-      <h1 class="head"><span class="v a"><span class="w alt"><span class="wig">Choose</span></span> to <span class="w alt">be</span> happy<span class="w alt"> <span class="wig">today</span>.</span></span><span class="v b">Happiness is <span class="w alt">Mandatory</span>.</span></h1>
+      <h1 class="head"><span class="v a"><span class="w alt"><span class="wig">Happiness</span></span> is<br>a <span class="w alt"><span class="wig">Choice</span></span>.</span><span class="v b">Happiness is <span class="w alt">Mandatory</span>.</span></h1>
 
       <p class="lede">
         <span class="v a">Happiness is a choice. With a few simple habits, anyone can feel good — all the time.</span>
@@ -230,6 +239,10 @@
 
 <div id="hint">Click to Glitch!</div>
 
+<!-- Scroll indicator — lives outside .stage so the glitch capture can't reach it.
+     Visual only (pointer-events:none); driven by #page's own scroll. -->
+<div id="scrollbar"><div class="thumb"></div></div>
+
 <script type="module">
 import { VFX } from "@vfx-js/core";
 import { JPEGGlitchEffect } from "@vfx-js/effects";
@@ -265,12 +278,33 @@ for (const u of [
 }
 await vfx.addHTML(page, { effect });
 
+// Scroll indicator: thumb height/top mirror #page's scroll ratios. The bar
+// can't be native (the real scroller lives inside the capture canvas), so we
+// fake it on a clean overlay. Shown while scrolling, hidden ~1s after idle.
+const scrollbar = document.getElementById("scrollbar");
+const thumb = scrollbar.querySelector(".thumb");
+let hideBarTimer = null;
+function syncBar() {
+    const { scrollTop, scrollHeight, clientHeight } = page;
+    const ratio = clientHeight / scrollHeight;
+    if (ratio >= 1) {
+        scrollbar.classList.remove("show");
+        return;
+    }
+    thumb.style.height = `${ratio * 100}%`;
+    thumb.style.top = `${(scrollTop / scrollHeight) * 100}%`;
+    scrollbar.classList.add("show");
+    if (hideBarTimer !== null) clearTimeout(hideBarTimer);
+    hideBarTimer = setTimeout(() => scrollbar.classList.remove("show"), 1000);
+}
+
 // #page is a viewport-fixed scroll container; re-capture each scroll frame so
 // the texture follows the scrolled content.
 let scrollRAF = null;
 page.addEventListener(
     "scroll",
     () => {
+        syncBar();
         if (scrollRAF !== null) return;
         scrollRAF = requestAnimationFrame(() => {
             scrollRAF = null;
@@ -279,6 +313,8 @@ page.addEventListener(
     },
     { passive: true },
 );
+// Content/viewport size can change (font load, resize, mode swap) → re-measure.
+new ResizeObserver(syncBar).observe(page.querySelector(".doc"));
 
 // While held, ease the live params from CLEAN up to BROKEN so the glitch ramps in.
 const cur = { ...CLEAN };
