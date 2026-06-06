@@ -13,6 +13,7 @@ import { Texture, type TextureWrap } from "./gl/texture.js";
 import type { ProgramCache } from "./program-cache.js";
 import type {
     Effect,
+    EffectBlitOpts,
     EffectContext,
     EffectDims,
     EffectDrawOpts,
@@ -148,6 +149,28 @@ varying vec2 uv;
 uniform sampler2D src;
 void main() {
     gl_FragColor = texture2D(src, uv);
+}
+`;
+
+// Copy fragment backing `ctx.blit`. Samples `uvSrc` (captured content →
+// dst buffer), unlike PASSTHROUGH_FRAG which samples the full dst buffer
+// (`uv`) for the stageCount=0 identity copy.
+const BLIT_FRAG_300 = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+void main() {
+    outColor = texture(src, uvSrc);
+}
+`;
+
+const BLIT_FRAG_100 = `
+precision highp float;
+varying vec2 uvSrc;
+uniform sampler2D src;
+void main() {
+    gl_FragColor = texture2D(src, uvSrc);
 }
 `;
 
@@ -297,6 +320,7 @@ export class EffectHost {
             createRenderTarget: (opts) => this.#createRenderTarget(opts),
             wrapTexture: (source, opts) => this.#wrapTexture(source, opts),
             draw: (opts) => this.#draw(opts),
+            blit: (source, target, opts) => this.#blit(source, target, opts),
             onContextRestored: (cb) => {
                 const unsub = this.#glCtx.onContextRestored(cb);
                 this.#restoredUnsubs.push(unsub);
@@ -629,6 +653,33 @@ export class EffectHost {
             return;
         }
         this.#doDraw(opts);
+    }
+
+    #blit(
+        source: EffectTexture | EffectRenderTarget,
+        target: EffectRenderTarget | null | undefined,
+        opts: EffectBlitOpts | undefined,
+    ): void {
+        if (this.#phase !== "render") {
+            if (this.#phase === "update" && !this.#warnedDrawInUpdate) {
+                this.#warnedDrawInUpdate = true;
+                console.warn(
+                    "[VFX-JS] ctx.blit() called in update(); ignored. Move draws to render().",
+                );
+            }
+            return;
+        }
+        const frag =
+            this.#mutCtx.vfxProps.glslVersion === "100"
+                ? BLIT_FRAG_100
+                : BLIT_FRAG_300;
+        this.#doDraw({
+            frag,
+            uniforms: { src: source },
+            target,
+            blend: opts?.blend,
+            swap: opts?.swap,
+        });
     }
 
     #doDraw(opts: EffectDrawOpts): void {

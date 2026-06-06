@@ -11,6 +11,7 @@ export type {
     Effect,
     EffectAttributeDescriptor,
     EffectAttributeTypedArray,
+    EffectBlitOpts,
     EffectContext,
     EffectDrawOpts,
     EffectGeometry,

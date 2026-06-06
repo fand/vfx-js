@@ -30,18 +30,6 @@ import type {
     EffectTexture,
 } from "@vfx-js/core";
 
-// Copy ctx.src into the readback RT. `uvSrc` maps the content into the
-// buffer (handles a cropped / prior-stage source correctly).
-const FRAG_CAPTURE = `#version 300 es
-precision highp float;
-in vec2 uvSrc;
-out vec4 outColor;
-uniform sampler2D src;
-void main() {
-    outColor = texture(src, uvSrc);
-}
-`;
-
 // Passthrough of the live source to the canvas (used until the first
 // glitch result is ready). Premultiplied for the canvas blend.
 const FRAG_PASSTHROUGH = `#version 300 es
@@ -568,13 +556,9 @@ export class JPEGGlitchEffect implements Effect {
             return;
         }
 
-        // Read the element capture back to the CPU. ctx.draw leaves the
+        // Read the element capture back to the CPU. ctx.blit leaves the
         // readback RT's framebuffer bound, so readPixels reads from it.
-        ctx.draw({
-            frag: FRAG_CAPTURE,
-            uniforms: { src: ctx.src },
-            target: this.#readRT,
-        });
+        ctx.blit(ctx.src, this.#readRT);
         const gl = ctx.gl;
         gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.#raw);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);

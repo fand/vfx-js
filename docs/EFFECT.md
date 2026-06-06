@@ -206,6 +206,20 @@ Default varyings (all in [0, 1], nested largest→smallest):
 - `uvContent` — over the captured content; outside [0, 1] = pad
 - `uvSrc` — over the source buffer
 
+### `ctx.blit(source, target?, opts?)`
+
+```ts
+ctx.blit(ctx.src, myRT);          // copy capture into an RT
+ctx.blit(ctx.src);                // → ctx.target (stage output / canvas)
+ctx.blit(prevRT, myRT, { blend, swap });
+```
+
+Copies a texture / render target into `target` (the stage output or
+canvas when omitted), sampling through `uvSrc`. Use it instead of a
+hand-written `texture(src, uvSrc)` copy pass — capture, downsample, or a
+source passthrough. `opts` shares `blend` / `swap` semantics with
+`ctx.draw`.
+
 ### `ctx.createRenderTarget(opts?)`
 
 ```ts

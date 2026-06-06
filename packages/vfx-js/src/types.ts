@@ -709,6 +709,20 @@ export type EffectDrawOpts = {
     swap?: boolean;
 };
 
+export type EffectBlitOpts = {
+    /**
+     * Blend mode override. Same default as {@link EffectDrawOpts.blend}:
+     * `"premultiplied"` to the canvas, `"none"` to a render target.
+     */
+    blend?: EffectBlendMode;
+
+    /**
+     * Advance a persistent target's read/write buffers after the copy.
+     * Default: `true`. See {@link EffectDrawOpts.swap}.
+     */
+    swap?: boolean;
+};
+
 /** Subset of `VFXProps` exposed to effects via `ctx.vfxProps`. */
 export type EffectVFXProps = {
     /** Default: `true`. */
@@ -799,6 +813,23 @@ export type EffectContext = {
      * Only valid during `Effect.render()`; other calls are ignored.
      */
     draw(opts: EffectDrawOpts): void;
+
+    /**
+     * Copy a texture / render target into `target` (the stage's assigned
+     * output, or the canvas, when `target` is omitted / `null`).
+     *
+     * Samples through the `uvSrc` varying, so the captured content maps
+     * into the destination buffer exactly like the framework's built-in
+     * passthrough. Use it instead of hand-written `texture(src, uvSrc)`
+     * copy passes (capture, downsample, source passthrough).
+     *
+     * Only valid during `Effect.render()`; other calls are ignored.
+     */
+    blit(
+        source: EffectTexture | EffectRenderTarget,
+        target?: EffectRenderTarget | null,
+        opts?: EffectBlitOpts,
+    ): void;
 
     /**
      * Raw WebGL2 context, for low-level operations
