@@ -324,6 +324,8 @@ function glitchBytes(
 export class JPEGGlitchEffect implements Effect {
     params: JPEGGlitchParams;
 
+    enabled = true;
+
     #supported = false;
     #readRT: EffectRenderTarget | null = null;
     #outTex: EffectTexture | null = null;
@@ -446,6 +448,14 @@ export class JPEGGlitchEffect implements Effect {
         this.#outTex = ctx.wrapTexture(tex, {
             size: [this.#w || 1, this.#h || 1],
         });
+    }
+
+    // update() runs even while disabled (the chain only skips render); drop
+    // the cached glitch so re-enabling starts clean instead of flashing it.
+    update(): void {
+        if (this.enabled === false) {
+            this.#hasResult = false;
+        }
     }
 
     render(ctx: EffectContext): void {

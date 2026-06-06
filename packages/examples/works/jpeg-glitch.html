@@ -260,9 +260,10 @@ await document.fonts.ready;
 loader.classList.add("done");
 
 const vfx = new VFX();
-// One instance stays attached. Start bypassed so idle shows the page as-is at
+// One instance stays attached. Start disabled so idle shows the page as-is at
 // its original resolution; addHTML keeps the real DOM interactive beneath.
-const effect = new JPEGGlitchEffect({ ...CLEAN, resolutionScale: SCALE, bypass: true, seed: 0.42 });
+const effect = new JPEGGlitchEffect({ ...CLEAN, resolutionScale: SCALE, seed: 0.42 });
+effect.enabled = false; // idle: chain skips render → page shown as-is
 await page.querySelector(".bg-photo.a img").decode().catch(() => {});
 await page.querySelector(".strip-img").decode().catch(() => {});
 // warm the other world's backdrop + strip images so swaps don't flash.
@@ -341,7 +342,7 @@ function animate() {
 // A window-level listener catches the press anywhere on the page.
 window.addEventListener("pointerdown", () => {
     hint.classList.remove("show");
-    effect.setParams({ bypass: false });
+    effect.enabled = true;
     if (raf === null) raf = requestAnimationFrame(animate);
 });
 
@@ -358,7 +359,10 @@ const release = () => {
     page.setAttribute("data-mode", mode); // CSS toggles the matching strip img
     vfx.update(page).catch(() => {}); // re-capture the swapped content
     // Hold the glitch one more frame so it covers the swap, then snap clean.
-    requestAnimationFrame(() => effect.setParams({ ...CLEAN, bypass: true }));
+    requestAnimationFrame(() => {
+        effect.setParams({ ...CLEAN });
+        effect.enabled = false;
+    });
 };
 window.addEventListener("pointerup", release);
 window.addEventListener("pointercancel", release);
@@ -377,10 +381,14 @@ strip.addEventListener("pointermove", () => {
     if (now - lastMove < MOVE_THROTTLE) return;
     lastMove = now;
     if (hoverTimer !== null) clearTimeout(hoverTimer);
-    effect.setParams({ ...HOVER, bypass: false });
+    effect.setParams({ ...HOVER });
+    effect.enabled = true;
     hoverTimer = setTimeout(() => {
         hoverTimer = null;
-        if (raf === null) effect.setParams({ ...CLEAN, bypass: true });
+        if (raf === null) {
+            effect.setParams({ ...CLEAN });
+            effect.enabled = false;
+        }
     }, 250);
 });
 

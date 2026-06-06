@@ -414,7 +414,8 @@ try {
     const effects = [];
     const canvases = [];
     await Promise.all(sections.map(async (section, i) => {
-        const effect = new PixelSortEffect({ ...params, bypass: true, range: [1, 1] });
+        const effect = new PixelSortEffect({ ...params, range: [1, 1] });
+        effect.enabled = false; // chain skips render → clean passthrough
         await vfx.addHTML(section, { effect });
         effects[i] = effect;
         canvases[i] = section.parentElement;
@@ -472,7 +473,7 @@ try {
         pendingSubDir = dir;
         if (imageMode === "standalone" && currentSubImg === idx) {
             if (imgEffect) {
-                imgEffect.params.bypass = bypass;
+                imgEffect.enabled = !bypass;
                 imgEffect.params.range[0] = threshold;
                 imgEffect.params.direction = dir;
             }
@@ -487,11 +488,11 @@ try {
         section3VideoImg.style.display = "";
         imageMode = "standalone";
         currentSubImg = idx;
-        const e = new PixelSortEffect({ ...params, bypass: false, range: [pendingSubT, 1], direction: pendingSubDir });
+        const e = new PixelSortEffect({ ...params, range: [pendingSubT, 1], direction: pendingSubDir });
         await vfx.add(section3VideoImg, { effect: e });
         if (token !== imgReqToken) return;
         imgEffect = e;
-        imgEffect.params.bypass = pendingSubBypass;
+        imgEffect.enabled = !pendingSubBypass;
         imgEffect.params.range[0] = pendingSubT;
         imgEffect.params.direction = pendingSubDir;
     };
@@ -504,14 +505,14 @@ try {
             if (currentSection >= 0) {
                 canvases[currentSection].style.opacity = "0";
                 canvases[currentSection].style.pointerEvents = "none";
-                effects[currentSection].params.bypass = true;
+                effects[currentSection].enabled = false;
             }
             canvases[idx].style.opacity = "1";
             canvases[idx].style.pointerEvents = "auto";
             currentSection = idx;
         }
         const eff = effects[idx];
-        eff.params.bypass = bypass;
+        eff.enabled = !bypass;
         if (!bypass) {
             eff.params.range[0] = threshold;
             eff.params.direction = dir;
