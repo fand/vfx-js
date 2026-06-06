@@ -184,8 +184,19 @@ export class EffectChain {
         if (effects.length === 0) {
             this.#ownedPassthroughHost = this.#newHost();
         }
-        this.#renderingIndices = effects
-            .map((e, i) => (typeof e.render === "function" ? i : -1))
+        this.#renderingIndices = this.#computeRenderingIndices();
+    }
+
+    /**
+     * Indices of effects that render this frame: those with a `render()`
+     * that are not disabled (`enabled !== false`). Recomputed each frame
+     * so `effect.enabled` is a live toggle without restructuring the chain.
+     */
+    #computeRenderingIndices(): number[] {
+        return this.#effects
+            .map((e, i) =>
+                typeof e.render === "function" && e.enabled !== false ? i : -1,
+            )
             .filter((i) => i >= 0);
     }
 
@@ -254,6 +265,9 @@ export class EffectChain {
             return;
         }
 
+        // Recompute the active render stages each frame so toggling
+        // `effect.enabled` takes effect immediately (no restructuring).
+        this.#renderingIndices = this.#computeRenderingIndices();
         const stageCount = this.#renderingIndices.length;
 
         // Reflect state + uniforms into each host's ctx.
@@ -322,8 +336,9 @@ export class EffectChain {
             const host = this.#hosts[i];
             const effect = this.#effects[i];
             if (!effect.render) {
-                // renderingIndices filters on render presence — unreachable
-                // unless the Effect mutated its own shape post-construction.
+                // Defensive: renderingIndices filters on render presence +
+                // enabled, so this is unreachable unless the Effect mutated
+                // its own shape post-construction.
                 continue;
             }
             host.setPhase("render");
@@ -493,9 +508,7 @@ export class EffectChain {
 
         this.#effects = newEffects;
         this.#hosts = nextHosts;
-        this.#renderingIndices = newEffects
-            .map((e, i) => (typeof e.render === "function" ? i : -1))
-            .filter((i) => i >= 0);
+        this.#renderingIndices = this.#computeRenderingIndices();
         this.#warnedEffects.clear();
     }
 

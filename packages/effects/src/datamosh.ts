@@ -22,18 +22,6 @@
 // res, truncated MV); the truncation is what makes color drift off edges.
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 
-// Copy ctx.src into curRT. `uvSrc` maps the content into the buffer
-// (= uv when there is no pad).
-const FRAG_CAPTURE = `#version 300 es
-precision highp float;
-in vec2 uvSrc;
-out vec4 outColor;
-uniform sampler2D src;
-void main() {
-    outColor = texture(src, uvSrc);
-}
-`;
-
 // Premultiplied copy of an internal RT to the canvas. `uvContent` maps
 // the content rect into the target buffer.
 const FRAG_DISPLAY = `#version 300 es
@@ -469,11 +457,7 @@ export class DatamoshEffect implements Effect {
         const resolution: [number, number] = [this.#w, this.#h];
 
         // Capture the current frame into uv-space.
-        ctx.draw({
-            frag: FRAG_CAPTURE,
-            uniforms: { src: ctx.src },
-            target: cur,
-        });
+        ctx.blit(ctx.src, cur);
 
         // ME + residual feed both the decoder and the debug views, so run
         // them whenever moshing OR inspecting an intermediate stage.
@@ -578,11 +562,7 @@ export class DatamoshEffect implements Effect {
         this.#display(ctx, cur, prev, mv, res, acc, chromaAcc);
 
         // Reference for next frame's motion estimation.
-        ctx.draw({
-            frag: FRAG_CAPTURE,
-            uniforms: { src: ctx.src },
-            target: prev,
-        });
+        ctx.blit(ctx.src, prev);
     }
 
     // Route the selected stage to the canvas. "output" shows the decoded

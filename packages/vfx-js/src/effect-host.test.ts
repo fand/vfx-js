@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GLContext } from "./gl/context.js";
 import type { Quad } from "./gl/quad.js";
+import type { EffectTexture } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // DOM class stubs — vitest's default env is node, so HTMLVideoElement
@@ -936,6 +937,52 @@ describe("EffectHost.draw", () => {
         host.ctx.draw({ frag: FRAG, target: rt });
         // No backbuffer at all; nothing to assert beyond "did not throw".
         expect(backbuffers).toHaveLength(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// blit — uvSrc copy helper
+// ---------------------------------------------------------------------------
+
+describe("EffectHost.blit", () => {
+    function makeSource(host: EffectHost): EffectTexture {
+        return host.ctx.wrapTexture({
+            naturalWidth: 50,
+            naturalHeight: 50,
+        } as unknown as HTMLImageElement);
+    }
+
+    it("samples uvSrc and binds source as the `src` uniform", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const src = makeSource(host);
+        host.ctx.blit(src);
+        expect(programs).toHaveLength(1);
+        expect(programs[0].frag).toMatch(/texture\(src, uvSrc\)/);
+        expect(programs[0].uploads[0]["src"]).toBeDefined();
+    });
+
+    it("defaults to ctx.target when target is omitted; explicit RT overrides", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const src = makeSource(host);
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        host.ctx.blit(src, rt);
+        expect(backbuffers[0].swaps).toBe(1);
+        host.ctx.blit(src, rt, { swap: false });
+        expect(backbuffers[0].swaps).toBe(1);
+    });
+
+    it("in update() phase is a no-op and warns once", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const { host } = makeHost();
+        host.setPhase("update");
+        const src = makeSource(host);
+        host.ctx.blit(src);
+        host.ctx.blit(src);
+        expect(programs).toHaveLength(0);
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
     });
 });
 

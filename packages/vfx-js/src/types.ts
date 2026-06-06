@@ -709,6 +709,20 @@ export type EffectDrawOpts = {
     swap?: boolean;
 };
 
+export type EffectBlitOpts = {
+    /**
+     * Blend mode override. Same default as {@link EffectDrawOpts.blend}:
+     * `"premultiplied"` to the canvas, `"none"` to a render target.
+     */
+    blend?: EffectBlendMode;
+
+    /**
+     * Advance a persistent target's read/write buffers after the copy.
+     * Default: `true`. See {@link EffectDrawOpts.swap}.
+     */
+    swap?: boolean;
+};
+
 /** Subset of `VFXProps` exposed to effects via `ctx.vfxProps`. */
 export type EffectVFXProps = {
     /** Default: `true`. */
@@ -801,6 +815,23 @@ export type EffectContext = {
     draw(opts: EffectDrawOpts): void;
 
     /**
+     * Copy a texture / render target into `target` (the stage's assigned
+     * output, or the canvas, when `target` is omitted / `null`).
+     *
+     * Samples through the `uvSrc` varying, so the captured content maps
+     * into the destination buffer exactly like the framework's built-in
+     * passthrough. Use it instead of hand-written `texture(src, uvSrc)`
+     * copy passes (capture, downsample, source passthrough).
+     *
+     * Only valid during `Effect.render()`; other calls are ignored.
+     */
+    blit(
+        source: EffectTexture | EffectRenderTarget,
+        target?: EffectRenderTarget | null,
+        opts?: EffectBlitOpts,
+    ): void;
+
+    /**
      * Raw WebGL2 context, for low-level operations
      * (DataTexture upload, extensions, MRT, etc).
      *
@@ -863,6 +894,21 @@ export type EffectDims = {
  * element-local physical px. Defaults to the source rect (no growth).
  */
 export interface Effect {
+    /**
+     * Whether this effect renders. (Default: `true`)
+     *
+     * Set to `false` to skip this effect's `render()`: the chain passes
+     * its input straight through to the next stage (or to the canvas if
+     * it is the last stage), with no draw. Re-checked every frame, so it
+     * is a cheap runtime toggle — the effect stays attached and keeps its
+     * buffers, paying no re-init cost.
+     *
+     * `init` and `update` still run while disabled, so stateful effects
+     * stay warm and re-enable seamlessly. Omitting the field (or
+     * `undefined`) means enabled.
+     */
+    enabled?: boolean;
+
     init?(ctx: EffectContext): void | Promise<void>;
 
     /**

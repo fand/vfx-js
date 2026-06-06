@@ -9,14 +9,6 @@ import type {
     EffectTexture,
 } from "@vfx-js/core";
 
-const FRAG_DOWNSAMPLE = `#version 300 es
-precision highp float;
-in vec2 uvSrc;
-out vec4 outColor;
-uniform sampler2D src;
-void main() { outColor = texture(src, uvSrc); }
-`;
-
 const KEY_FUNC = `
 float key(vec3 c, int mode) {
     if (mode == 0) return dot(c, vec3(0.299, 0.587, 0.114));
@@ -458,11 +450,7 @@ export class PixelSortEffect implements Effect {
             sortTarget = sortedRT;
         }
 
-        ctx.draw({
-            frag: FRAG_DOWNSAMPLE,
-            uniforms: { src: sortSrc },
-            target: this.#lowRT,
-        });
+        ctx.blit(sortSrc, this.#lowRT);
         // Rotated path: the sort masks out the bounding-box padding by
         // coordinate (insideSrc), keeping the run boundary exact and
         // decoupled from threshold.

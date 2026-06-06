@@ -209,16 +209,6 @@ void main() {
 }
 `;
 
-const FRAG_PASSTHROUGH = `#version 300 es
-precision highp float;
-in vec2 uvSrc;
-out vec4 outColor;
-uniform sampler2D src;
-void main() {
-    outColor = texture(src, uvSrc);
-}
-`;
-
 export type ParticleExplodeParams = {
     /** Particle count. Hard-capped by the state texture size² (default 1M). */
     count: number;
@@ -414,11 +404,7 @@ export class ParticleExplodeEffect implements Effect {
         }
 
         if (!this.#triggered) {
-            ctx.draw({
-                frag: FRAG_PASSTHROUGH,
-                uniforms: { src: ctx.src },
-                target: ctx.target,
-            });
+            ctx.blit(ctx.src, ctx.target);
             return;
         }
 

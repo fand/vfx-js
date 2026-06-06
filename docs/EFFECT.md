@@ -153,6 +153,7 @@ are good starting points.
 
 ```ts
 interface Effect {
+    enabled?: boolean;
     init?(ctx: EffectContext): void | Promise<void>;
     update?(ctx: EffectContext): void;
     render?(ctx: EffectContext): void;
@@ -161,6 +162,9 @@ interface Effect {
 }
 ```
 
+- `enabled` — set `false` to skip this effect's `render` (the chain passes
+  its input through). Re-checked every frame, so it's a cheap runtime toggle;
+  `init` / `update` still run while disabled. Default `true`.
 - `init` — allocate render targets, wrap textures. Called once when the effect is attached.
 - `update` — advance state. `ctx.draw()` calls are ignored here.
 - `render` — issue `ctx.draw()` calls. Omit to make the stage a passthrough.
@@ -201,6 +205,20 @@ Default varyings (all in [0, 1], nested largest→smallest):
 - `uv` — over the full destination buffer (content + pad)
 - `uvContent` — over the captured content; outside [0, 1] = pad
 - `uvSrc` — over the source buffer
+
+### `ctx.blit(source, target?, opts?)`
+
+```ts
+ctx.blit(ctx.src, myRT);          // copy capture into an RT
+ctx.blit(ctx.src);                // → ctx.target (stage output / canvas)
+ctx.blit(prevRT, myRT, { blend, swap });
+```
+
+Copies a texture / render target into `target` (the stage output or
+canvas when omitted), sampling through `uvSrc`. Use it instead of a
+hand-written `texture(src, uvSrc)` copy pass — capture, downsample, or a
+source passthrough. `opts` shares `blend` / `swap` semantics with
+`ctx.draw`.
 
 ### `ctx.createRenderTarget(opts?)`
 
