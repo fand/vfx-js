@@ -153,6 +153,7 @@ are good starting points.
 
 ```ts
 interface Effect {
+    enabled?: boolean;
     init?(ctx: EffectContext): void | Promise<void>;
     update?(ctx: EffectContext): void;
     render?(ctx: EffectContext): void;
@@ -161,6 +162,9 @@ interface Effect {
 }
 ```
 
+- `enabled` — set `false` to skip this effect's `render` (the chain passes
+  its input through). Re-checked every frame, so it's a cheap runtime toggle;
+  `init` / `update` still run while disabled. Default `true`.
 - `init` — allocate render targets, wrap textures. Called once when the effect is attached.
 - `update` — advance state. `ctx.draw()` calls are ignored here.
 - `render` — issue `ctx.draw()` calls. Omit to make the stage a passthrough.

@@ -346,6 +346,91 @@ describe("EffectChain: render-less middle", () => {
 });
 
 // ---------------------------------------------------------------------------
+// enabled toggle
+// ---------------------------------------------------------------------------
+
+describe("EffectChain: enabled toggle", () => {
+    it("excludes disabled effects from renderingIndices at construction", () => {
+        const chain = makeChain([
+            { render: () => {} }, // undefined enabled → rendering
+            { enabled: false, render: () => {} }, // disabled → skipped
+            { enabled: true, render: () => {} }, // explicit true → rendering
+        ]);
+        expect(chain.renderingIndices).toEqual([0, 2]);
+    });
+
+    it("skips a disabled effect's render and reduces intermediate count", () => {
+        const log: Array<{ src: unknown; target: unknown }> = [];
+        const effects: Effect[] = [
+            { render: recordingRender(log) },
+            { enabled: false, render: recordingRender(log) },
+            { render: recordingRender(log) },
+        ];
+        const chain = makeChain(effects);
+        chain.run(makeInput());
+        // Only stages 0 and 2 render → 1 intermediate (not 2).
+        expect(log).toHaveLength(2);
+        expect(fbs).toHaveLength(1);
+    });
+
+    it("re-checks enabled each frame (live runtime toggle)", () => {
+        let aCount = 0;
+        let bCount = 0;
+        const a: Effect = {
+            render: () => {
+                aCount++;
+            },
+        };
+        const b: Effect = {
+            enabled: true,
+            render: () => {
+                bCount++;
+            },
+        };
+        const chain = makeChain([a, b]);
+
+        chain.run(makeInput());
+        expect([aCount, bCount]).toEqual([1, 1]);
+
+        b.enabled = false;
+        chain.run(makeInput());
+        expect([aCount, bCount]).toEqual([2, 1]); // b skipped
+
+        b.enabled = true;
+        chain.run(makeInput());
+        expect([aCount, bCount]).toEqual([3, 2]); // b back
+    });
+
+    it("still runs update() for a disabled effect (stays warm)", () => {
+        let updates = 0;
+        const chain = makeChain([
+            { render: () => {} },
+            {
+                enabled: false,
+                render: () => {},
+                update: () => {
+                    updates++;
+                },
+            },
+        ]);
+        chain.run(makeInput());
+        expect(updates).toBe(1);
+    });
+
+    it("all effects disabled → stageCount 0 passthrough copy", () => {
+        const chain = makeChain([
+            { enabled: false, render: () => {} },
+            { enabled: false, render: () => {} },
+        ]);
+        chain.run(makeInput());
+        const passthrough = hosts.some((h) =>
+            h._calls.some((c) => c[0] === "passthroughCopy"),
+        );
+        expect(passthrough).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // outputRect: per-stage rect declaration
 // ---------------------------------------------------------------------------
 

@@ -863,6 +863,21 @@ export type EffectDims = {
  * element-local physical px. Defaults to the source rect (no growth).
  */
 export interface Effect {
+    /**
+     * Whether this effect renders. (Default: `true`)
+     *
+     * Set to `false` to skip this effect's `render()`: the chain passes
+     * its input straight through to the next stage (or to the canvas if
+     * it is the last stage), with no draw. Re-checked every frame, so it
+     * is a cheap runtime toggle — the effect stays attached and keeps its
+     * buffers, paying no re-init cost.
+     *
+     * `init` and `update` still run while disabled, so stateful effects
+     * stay warm and re-enable seamlessly. Omitting the field (or
+     * `undefined`) means enabled.
+     */
+    enabled?: boolean;
+
     init?(ctx: EffectContext): void | Promise<void>;
 
     /**
