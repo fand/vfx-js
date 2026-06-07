@@ -195,10 +195,12 @@ export class VFX {
     /**
      * Update the texture for the given element.
      *
-     * If the element is an HTMLImageElemnt or HTMLVideoElement, VFX-JS does nothing.
-     * Otherwise, VFX-JS captures a new snapshot of the DOM tree under the elemnt and udpate the WebGL texture with it.
+     * For an `HTMLImageElement`, reloads its current `src` — call this
+     * after changing `img.src`. Videos refresh automatically (no-op).
+     * Otherwise re-snapshots the element's DOM subtree.
      *
-     * This is useful to apply effects to eleents whose contents change dynamically (e.g. input, textare etc).
+     * Useful for elements whose contents change (input, textarea, or an
+     * `<img>` whose `src` swaps).
      */
     async update(element: HTMLElement): Promise<void> {
         const wrapper = this.#wrapperCanvases.get(element);
@@ -207,7 +209,9 @@ export class VFX {
             return;
         }
 
-        if (element instanceof HTMLCanvasElement) {
+        if (element instanceof HTMLImageElement) {
+            return this.#player.updateImageElement(element);
+        } else if (element instanceof HTMLCanvasElement) {
             this.#player.updateCanvasElement(element);
             return;
         } else {
