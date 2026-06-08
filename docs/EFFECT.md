@@ -238,6 +238,8 @@ idempotent; otherwise the host frees it on effect disposal.
 
 ### `EffectDims` (`ctx.dims` / `outputRect` arg)
 
+![EffectDims nested rects](./effect-dims.svg)
+
 | Field          | Units            | Meaning                                  |
 | -------------- | ---------------- | ---------------------------------------- |
 | `element` / `elementPixel` | CSS / phys px | Element size                       |

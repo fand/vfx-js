@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 552" font-family="ui-sans-serif, system-ui, sans-serif">
+  <style>
+    .rect { fill: none; stroke-width: 2; }
+    .tag  { font-size: 13px; font-weight: 700; }
+    .lbl  { font-size: 12px; }
+    .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+    .muted{ fill: #6b7280; }
+  </style>
+
+  <rect x="0" y="0" width="760" height="552" fill="#ffffff"/>
+
+  <!-- title -->
+  <text x="30" y="28" font-size="15" font-weight="700">EffectDims — nested rects (element-local physical px, origin bottom-left)</text>
+
+  <!-- canvasRect : whole canvas, element sits inside; origin often negative -->
+  <rect class="rect" x="30" y="48" width="660" height="372" stroke="#9ca3af" stroke-dasharray="6 5"/>
+  <circle cx="46" cy="64" r="10" fill="#9ca3af"/>
+  <text x="46" y="68" class="tag" fill="#fff" text-anchor="middle">a</text>
+  <text x="64" y="68" class="lbl" fill="#374151">canvasRect — whole canvas (viewport + scrollPadding). Element is inside; its origin is usually negative here.</text>
+
+  <!-- outputRect (pad) : current stage destination buffer = content + pad (usually the largest inner) -->
+  <rect class="rect" x="150" y="120" width="430" height="248" stroke="#f59e0b" stroke-dasharray="0"/>
+  <circle cx="166" cy="136" r="10" fill="#f59e0b"/>
+  <text x="166" y="140" class="tag" fill="#fff" text-anchor="middle">c</text>
+  <text x="184" y="140" class="lbl" fill="#92400e">outputRect — this stage's destination buffer (content + pad)</text>
+
+  <!-- srcRect : previous stage's output buffer (what ctx.src reads) -->
+  <rect class="rect" x="200" y="156" width="330" height="180" stroke="#10b981" stroke-dasharray="5 4"/>
+  <circle cx="216" cy="172" r="10" fill="#10b981"/>
+  <text x="216" y="176" class="tag" fill="#fff" text-anchor="middle">b</text>
+  <text x="234" y="176" class="lbl" fill="#065f46">srcRect — previous stage's output (ctx.src samples)</text>
+
+  <!-- contentRect : the element itself [0,0,ew,eh] -->
+  <rect x="262" y="200" width="206" height="96" fill="#3b82f6" fill-opacity="0.12" stroke="#3b82f6" stroke-width="2"/>
+  <circle cx="278" cy="216" r="10" fill="#3b82f6"/>
+  <text x="278" y="220" class="tag" fill="#fff" text-anchor="middle">d</text>
+  <text x="365" y="252" class="lbl" fill="#1e40af" text-anchor="middle" font-weight="600">contentRect</text>
+  <text x="365" y="270" class="mono" fill="#1e40af" text-anchor="middle">[0, 0, ew, eh]</text>
+  <text x="365" y="286" class="lbl muted" text-anchor="middle">= the element</text>
+
+  <!-- pad annotation between content and outputRect -->
+  <text x="365" y="356" class="lbl muted" text-anchor="middle">pad (glow / blur / shadow room)</text>
+
+  <!-- origin marker at element's bottom-left -->
+  <circle cx="262" cy="296" r="4" fill="#111827"/>
+  <line x1="262" y1="296" x2="322" y2="296" stroke="#111827" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="262" y1="296" x2="262" y2="244" stroke="#111827" stroke-width="1.5" marker-end="url(#ah)"/>
+  <text x="328" y="300" class="mono">x</text>
+  <text x="256" y="240" class="mono" text-anchor="end">y</text>
+  <text x="262" y="312" class="lbl muted" text-anchor="middle">(0,0)</text>
+
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#111827"/>
+    </marker>
+  </defs>
+
+  <!-- legend: which varying spans which rect -->
+  <text x="30" y="452" font-size="13" font-weight="700">Default varyings — each spans its rect over [0,1] (largest → smallest):</text>
+
+  <rect x="30" y="466" width="14" height="14" fill="none" stroke="#f59e0b" stroke-width="2"/>
+  <text x="52" y="478" class="mono">uv</text>
+  <text x="86" y="478" class="lbl">→ over <tspan class="tag" fill="#f59e0b">c</tspan> outputRect (full destination buffer: content + pad)</text>
+
+  <rect x="30" y="488" width="14" height="14" fill="#3b82f6" fill-opacity="0.12" stroke="#3b82f6" stroke-width="2"/>
+  <text x="52" y="500" class="mono">uvContent</text>
+  <text x="128" y="500" class="lbl">→ over <tspan class="tag" fill="#3b82f6">d</tspan> contentRect (the element). Outside [0,1] = pad.</text>
+
+  <rect x="470" y="466" width="14" height="14" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="3 2"/>
+  <text x="492" y="478" class="mono">uvSrc</text>
+  <text x="540" y="478" class="lbl">→ over <tspan class="tag" fill="#10b981">b</tspan> srcRect (source ctx.src)</text>
+
+  <text x="30" y="522" class="lbl muted">Containment depends on the chain: outputRect usually grows past srcRect (glow / blur); a shrinking stage reverses it.</text>
+  <text x="30" y="540" class="lbl muted">Stage-0 src = element capture, so b = d. In a post-effect (no element) b / c / d collapse to a.</text>
+</svg>
