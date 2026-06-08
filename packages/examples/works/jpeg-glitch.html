@@ -256,9 +256,6 @@ const BROKEN = { iterations: 10, quality: 0.2, speed: 30 };
 const HOVER = { iterations: 1, quality: 1, speed: 30 };
 const SCALE = 0.25;
 
-await document.fonts.ready;
-loader.classList.add("done");
-
 const vfx = new VFX();
 // One instance stays attached. Start disabled so idle shows the page as-is at
 // its original resolution; addHTML keeps the real DOM interactive beneath.
@@ -391,6 +388,14 @@ strip.addEventListener("pointermove", () => {
         }
     }, 250);
 });
+
+// Hide loader, glitch, and show hint
+await document.fonts.ready;
+loader.classList.add("done");
+effect.setParams({ ...BROKEN });
+effect.enabled = true;
+await new Promise(o => setTimeout(o, 500));
+effect.enabled = false;
 
 hint.classList.add("show");
 setTimeout(() => hint.classList.remove("show"), 3000); // fade out after 3s
