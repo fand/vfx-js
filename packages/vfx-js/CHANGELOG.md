@@ -1,5 +1,11 @@
 # react-vfx
 
+## 1.1.0
+
+### Minor Changes
+
+- Effect API improvements
+
 ## 1.0.0
 
 ### Major Changes

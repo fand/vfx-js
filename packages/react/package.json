@@ -1,7 +1,7 @@
 {
   "name": "@vfx-js/react",
   "description": "WebGL effects for React elements",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "files": [
     "package.json",
     "README.md",

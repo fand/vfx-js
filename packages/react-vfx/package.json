@@ -1,7 +1,7 @@
 {
   "name": "react-vfx",
   "description": "Renamed to @vfx-js/react. This package re-exports @vfx-js/react for backward compatibility.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "files": [
     "package.json",
     "README.md",
