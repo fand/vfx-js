@@ -13,11 +13,11 @@
     "release": "changeset publish"
   },
   "dependencies": {
-    "@changesets/cli": "^2.29.4"
+    "@changesets/cli": "^2.31.0"
   },
   "devDependencies": {
     "husky": "^9.1.7",
-    "turbo": "^2.5.4"
+    "turbo": "^2.9.16"
   },
   "author": "AMAGI <mail@amagi.dev> (https://amagi.dev/)",
   "homepage": "https://github.com/fand/vfx-js#readme",

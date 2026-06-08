@@ -40,9 +40,9 @@
     "@biomejs/biome": "2.4.11",
     "@types/node": "24.12.2",
     "@vfx-js/core": "workspace:*",
-    "lint-staged": "^16.1.0",
+    "lint-staged": "^16.4.0",
     "npm-run-all2": "^8.0.4",
-    "rimraf": "^6.0.1",
+    "rimraf": "^6.1.3",
     "tsconfig-to-dual-package": "^1.2.0",
     "typescript": "6.0.2"
   },
