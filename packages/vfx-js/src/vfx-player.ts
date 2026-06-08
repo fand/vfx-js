@@ -895,6 +895,34 @@ export class VFXPlayer {
         return Promise.resolve();
     }
 
+    /**
+     * Re-capture an `<img>` whose `src` changed since `add()`.
+     *
+     * Image source textures are uploaded once at `add()` time (only
+     * video / GIF refresh per frame), so this reloads the current `src`
+     * and swaps `e.srcTexture`. No-op for GIFs, which refresh already.
+     */
+    async updateImageElement(element: HTMLImageElement): Promise<void> {
+        const e = this.#elements.find((e) => e.element === element);
+        if (!e || e.type !== "img" || e.isGif) {
+            return;
+        }
+
+        const img = await loadImage(element.src);
+        const oldTexture = e.srcTexture;
+        const texture = new Texture(this.#ctx, img);
+        texture.wrapS = oldTexture.wrapS;
+        texture.wrapT = oldTexture.wrapT;
+        texture.needsUpdate = true;
+        // Effect path reads `e.srcTexture` each frame via a resolver, so
+        // the field swap suffices; shader path also needs the src uniform.
+        if (!e.chain && e.passes.length > 0) {
+            e.passes[0].uniforms["src"].value = texture;
+        }
+        e.srcTexture = texture;
+        oldTexture.dispose();
+    }
+
     updateCanvasElement(element: HTMLCanvasElement): void {
         const e = this.#elements.find((e) => e.element === element);
         if (e) {

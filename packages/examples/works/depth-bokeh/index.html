@@ -640,19 +640,12 @@
     }
 
     async _loadImage(ctx, spec) {
-      const [colorImg, depthImg] = await Promise.all(
-        [spec.color, spec.depth].map(async (src) => {
-          const i = new Image();
-          i.crossOrigin = "anonymous";
-          i.src = src;
-          await i.decode();
-          return i;
-        }),
-      );
-      const colorTex = ctx.wrapTexture(colorImg, {
-        filter: "linear",
-        wrap: "clamp",
-      });
+      // Color comes from ctx.src (the host <img>); only the depth map,
+      // which is never in the DOM, is loaded here.
+      const depthImg = new Image();
+      depthImg.crossOrigin = "anonymous";
+      depthImg.src = spec.depth;
+      await depthImg.decode();
       const depthTex = ctx.wrapTexture(depthImg, {
         filter: "linear",
         wrap: "clamp",
@@ -727,7 +720,8 @@
         instanceCount: DISK_COUNT,
       };
 
-      return { colorTex, depthTex, geometry, depthCanvas: dC };
+      // No colorTex: static images use ctx.src; only live sources set one.
+      return { depthTex, geometry, depthCanvas: dC };
     }
 
     setActiveImage(id) {
@@ -741,12 +735,15 @@
     render(ctx) {
       const r = this._resources.get(this._activeId);
       if (!r) return;
+      // Static images use ctx.src; live sources (transparent <img>) carry
+      // their own colorTex.
+      const colorTex = r.colorTex ?? ctx.src;
       const dstSize = [ctx.dims.elementPixel[0], ctx.dims.elementPixel[1]];
       ctx.draw({
         frag: FRAG_BLUR,
         target: ctx.target,
         uniforms: {
-          colorTex: r.colorTex,
+          colorTex,
           depthTex: r.depthTex,
           dstSize,
           focal: this.focal,
@@ -766,7 +763,7 @@
           blend: "premultiplied",
           geometry: r.geometry,
           uniforms: {
-            colorTex: r.colorTex,
+            colorTex,
             depthTex: r.depthTex,
             dstSize,
             focal: this.focal,
@@ -1237,6 +1234,8 @@
         img.style.height = "";
         img.style.aspectRatio = "";
         img.src = spec.color;
+        // Re-capture the new <img> into ctx.src (not auto-refreshed for images).
+        await vfx.update(img);
       }
       effect.setActiveImage(id);
       imgParams.image = id;
