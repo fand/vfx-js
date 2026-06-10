@@ -13,8 +13,8 @@
     "@vfx-js/core": "workspace:*",
     "@vfx-js/effects": "workspace:*",
     "@vfx-js/react": "workspace:*",
-    "react": "19.2.5",
-    "react-dom": "19.2.5"
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "5.1.2",
