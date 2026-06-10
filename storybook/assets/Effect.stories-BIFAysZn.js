@@ -1,4 +1,4 @@
-import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,i as r,l as i,o as a,r as o,s,t as c,u as l}from"./utils-C8nz1GgH.js";import{n as u,t as d}from"./logo-640w-20p-DamX1-bG.js";import{t as f}from"./preset-B7f9t9lo.js";import{a as p,c as m,f as h,i as g,l as _,n as v,o as y,r as b,s as x,t as S,u as C}from"./esm-DRF6_bxT.js";import{n as w,t as T}from"./bbb-aniiCR4j.js";import{n as E,t as D}from"./jellyfish-CbdkhNBT.js";import{n as O,t as k}from"./pigeon-CsBwBuXA.js";function A(){let e=document.createElement(`article`);e.style.cssText=`width: 600px; padding: 32px; background: #fff; color: #202122; font-family: sans-serif; line-height: 1.6; border: 1px solid #a2a9b1;`;let t=`font-family: serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; padding-bottom: 4px; margin-top: 24px;`,n=`margin: 20px 0; text-align: center;`,r=`font-size: 0.85em; color: #54595d; margin-top: 4px;`,i=`width: 100%; height: auto; max-width: 480px; background: #f8f9fa; border: 1px solid #a2a9b1;`;return e.innerHTML=`
+import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,i as r,l as i,o as a,r as o,s,t as c,u as l}from"./utils-C8nz1GgH.js";import{n as u,t as d}from"./logo-640w-20p-DamX1-bG.js";import{t as f}from"./preset-B7f9t9lo.js";import{a as p,c as m,f as h,i as g,l as _,n as v,o as y,p as b,r as x,s as S,t as C,u as w}from"./esm-xcjvixr2.js";import{n as T,t as E}from"./bbb-aniiCR4j.js";import{n as D,t as O}from"./jellyfish-CbdkhNBT.js";import{n as k,t as A}from"./pigeon-CsBwBuXA.js";function j(){let e=document.createElement(`article`);e.style.cssText=`width: 600px; padding: 32px; background: #fff; color: #202122; font-family: sans-serif; line-height: 1.6; border: 1px solid #a2a9b1;`;let t=`font-family: serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; padding-bottom: 4px; margin-top: 24px;`,n=`margin: 20px 0; text-align: center;`,r=`font-size: 0.85em; color: #54595d; margin-top: 4px;`,i=`width: 100%; height: auto; max-width: 480px; background: #f8f9fa; border: 1px solid #a2a9b1;`;return e.innerHTML=`
         <h1 style="font-family: serif; font-weight: normal;
                    border-bottom: 1px solid #a2a9b1;
                    padding-bottom: 4px; margin: 0 0 4px;">
@@ -161,7 +161,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,i as r,l as i,o as 
                 <i>Spatial Tessellations: Concepts and Applications of
                 Voronoi Diagrams</i> (2nd ed.). Wiley.</li>
         </ol>
-    `,e}function j(e){document.getElementById(`jpeg-glitch-fps`)?.remove();let t=document.createElement(`div`);t.id=`jpeg-glitch-fps`,t.style.cssText=`position:fixed;top:8px;left:8px;z-index:2147483647;font:12px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.6);padding:2px 8px;border-radius:3px;pointer-events:none;`,t.textContent=`-- fps`,document.body.appendChild(t);let n=performance.now(),r=e.producedFrames,i=()=>{if(!t.isConnected)return;let a=performance.now(),o=a-n;if(o>=500){let i=e.producedFrames;t.textContent=`${((i-r)*1e3/o).toFixed(1)} fps`,n=a,r=i}requestAnimationFrame(i)};requestAnimationFrame(i)}function M(e){let t=Math.round(window.innerWidth/2),n=Math.round(window.innerHeight/2),r=Math.min(t,n)*.4,i=0,a=window.setInterval(()=>{let o=i/60*Math.PI*2;e.dispatchEvent(new MouseEvent(`pointermove`,{clientX:t+Math.cos(o)*r,clientY:n+Math.sin(o)*r,bubbles:!0})),i++,i>120&&clearInterval(a)},16)}var N,P,F,I,L,R,z,B,V,H,U,W,G;e((()=>{w(),D(),d(),k(),S(),f(),l(),N={title:`Effect`,parameters:{layout:`fullscreen`}},P=()=>typeof navigator<`u`&&/Chromatic/.test(navigator.userAgent),F={render:()=>{let e=document.createElement(`img`);return e.src=u,e.style.display=`block`,e.style.margin=`40px auto`,e},args:void 0},F.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),r=new h({threshold:.2,softness:.1,intensity:5,scatter:1,dither:0,edgeFade:0,pad:50});await n.add(t,{effect:r}),c(`Bloom`,r)},I={render:()=>{let e=document.createElement(`img`);return e.src=E,e},args:void 0},I.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),r=new h({threshold:.01,softness:.2,intensity:10,scatter:1,dither:0,edgeFade:.02,pad:200});await n.add(t,{effect:[new p({size:10}),new b({spacing:5}),r]}),c(`CRT Bloom`,r)},L={render:()=>{let e=document.createElement(`img`);return e.src=E,e},args:void 0,parameters:{chromatic:{disableSnapshot:!0}}},L.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),r=new g({range:[.5,1],direction:`up`,angle:30});await n.add(t,{effect:r}),s(`Pixel Sort`,r)},R={Jellyfish:E,Logo:u,Pigeon:O},z={render:e=>{let{src:t,...n}=e,r=i(),a=new m(n);if(j(a),t===`bbb`){let e=document.createElement(`video`);return e.src=T,e.muted=!0,e.loop=!0,e.playsInline=!0,e.autoplay=!0,e.crossOrigin=`anonymous`,e.style.display=`block`,e.style.margin=`40px auto`,e.style.maxWidth=`80vw`,e.play(),r.add(e,{effect:a}),e}let o=document.createElement(`img`);return o.src=R[t],o.style.display=`block`,o.style.margin=`40px auto`,r.add(o,{effect:a}),o},args:{src:`Jellyfish`,quality:.4,seed:.25,iterations:24,resolutionScale:1,randomFlip:!0,vertical:!1,speed:0},argTypes:{src:{control:{type:`select`},options:[`Jellyfish`,`Logo`,`Pigeon`,`bbb`]},quality:{control:{type:`range`,min:0,max:1,step:.01}},seed:{control:{type:`range`,min:0,max:1,step:.01}},iterations:{control:{type:`range`,min:1,max:30,step:1}},resolutionScale:{control:{type:`range`,min:0,max:1,step:.01}},randomFlip:{control:{type:`boolean`}},vertical:{control:{type:`boolean`}},speed:{control:{type:`range`,min:0,max:30,step:.5}}},parameters:{chromatic:{disableSnapshot:!0}}},B={render:()=>{let e=document.createElement(`img`);return e.src=E,e},args:void 0},B.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),r=new C;await n.add(t,{effect:r}),o(`Fluid`,r),M(e)},V={render:()=>{let e=document.createElement(`img`);return e.src=E,e},args:void 0},V.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let a=i(),o={Jellyfish:E,Logo:u},s=null,c=async()=>{let e=s?{...s.params}:{};s&&(a.remove(t),n()),s=new _(e),await a.add(t,{effect:s}),r(`Halftone`,s,{img:t,sources:o,onSrcChange:async e=>{t.src=o[e],await new Promise(e=>{t.onload=()=>e()}),await c()}})};await c()},H={render:()=>{let e=document.createElement(`img`);return e.src=u,e},args:void 0},H.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=()=>e()});let r=i(),o={Jellyfish:E,Logo:u},s=null,c=async()=>{let e=s?{...s.params}:P()?{count:256*256}:{};s&&(r.remove(t),n()),s=new x(e),await r.add(t,{effect:s}),a(`Particle`,s,{img:t,sources:o,onSrcChange:async e=>{t.src=o[e],await new Promise(e=>{t.onload=()=>e()}),await c()}})};await c(),M(e)},U={render:()=>{let e=document.createElement(`img`);return e.src=u,e},args:void 0},U.play=async({canvasElement:e})=>{let r=e.querySelector(`img`);await new Promise(e=>{r.onload=()=>e()}),await new Promise(e=>requestAnimationFrame(()=>e(void 0)));let a=i(),o={Logo:u,Jellyfish:E},s=null,c=async()=>{let e=s?{...s.params}:{};s&&(a.remove(r),n()),await new Promise(e=>requestAnimationFrame(()=>e(void 0))),s=new y(e),await a.add(r,{effect:s}),t(`Particle Explode`,s,{img:r,sources:o,onSrcChange:async e=>{r.src=o[e],await new Promise(e=>{r.onload=()=>e()}),await c()}})};await c()},W={render:e=>{let{src:t,...n}=e,r=i(),a=new v(n);if(t===`Webpage`){let e=document.getElementById(`storybook-root`);e&&(e.style.height=`auto`,e.style.display=`block`);let t=document.createElement(`div`);t.style.display=`flex`,t.style.justifyContent=`center`;let n=A();return t.appendChild(n),r.addHTML(n,{effect:a}),t}let o=document.createElement(`img`);return o.src=t===`Jellyfish`?E:u,r.add(o,{effect:a}),o},args:{src:`Webpage`,cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},argTypes:{src:{control:{type:`select`},options:[`Logo`,`Jellyfish`,`Webpage`]},cellSize:{control:{type:`range`,min:5,max:200,step:1}},pressRadius:{control:{type:`range`,min:0,max:800,step:10}},press:{control:{type:`range`,min:0,max:1,step:.01}},flatCells:{control:{type:`boolean`}},seed:{control:{type:`range`,min:0,max:1e3,step:1}},speed:{control:{type:`range`,min:0,max:5,step:.05}},breathe:{control:{type:`range`,min:0,max:1,step:.01}},breatheSpeed:{control:{type:`range`,min:0,max:5,step:.05}},breatheScale:{control:{type:`range`,min:10,max:500,step:5}},bgColor:{control:{type:`color`}}}},F.parameters={...F.parameters,docs:{...F.parameters?.docs,source:{originalSource:`{
+    `,e}function M(e){document.getElementById(`jpeg-glitch-fps`)?.remove();let t=document.createElement(`div`);t.id=`jpeg-glitch-fps`,t.style.cssText=`position:fixed;top:8px;left:8px;z-index:2147483647;font:12px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.6);padding:2px 8px;border-radius:3px;pointer-events:none;`,t.textContent=`-- fps`,document.body.appendChild(t);let n=performance.now(),r=e.producedFrames,i=()=>{if(!t.isConnected)return;let a=performance.now(),o=a-n;if(o>=500){let i=e.producedFrames;t.textContent=`${((i-r)*1e3/o).toFixed(1)} fps`,n=a,r=i}requestAnimationFrame(i)};requestAnimationFrame(i)}function N(e){let t=Math.round(window.innerWidth/2),n=Math.round(window.innerHeight/2),r=Math.min(t,n)*.4,i=0,a=window.setInterval(()=>{let o=i/60*Math.PI*2;e.dispatchEvent(new MouseEvent(`pointermove`,{clientX:t+Math.cos(o)*r,clientY:n+Math.sin(o)*r,bubbles:!0})),i++,i>120&&clearInterval(a)},16)}var P,F,I,L,R,z,B,V,H,U,W,G,K,q,J;e((()=>{T(),O(),d(),A(),C(),f(),l(),P={title:`Effect`,parameters:{layout:`fullscreen`}},F=()=>typeof navigator<`u`&&/Chromatic/.test(navigator.userAgent),I={render:()=>{let e=document.createElement(`img`);return e.src=u,e.style.display=`block`,e.style.margin=`40px auto`,e},args:void 0},I.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),r=new h({threshold:.2,softness:.1,intensity:5,scatter:1,dither:0,edgeFade:0,pad:50});await n.add(t,{effect:r}),c(`Bloom`,r)},L={render:()=>{let e=document.createElement(`img`);return e.src=D,e},args:void 0},L.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),r=new h({threshold:.01,softness:.2,intensity:10,scatter:1,dither:0,edgeFade:.02,pad:200});await n.add(t,{effect:[new p({size:10}),new x({spacing:5}),r]}),c(`CRT Bloom`,r)},R={render:()=>{let e=document.createElement(`img`);return e.src=D,e},args:void 0,parameters:{chromatic:{disableSnapshot:!0}}},R.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),r=new g({range:[.5,1],direction:`up`,angle:30});await n.add(t,{effect:r}),s(`Pixel Sort`,r)},z={Jellyfish:D,Logo:u,Pigeon:k},B={render:e=>{let{src:t,...n}=e,r=i(),a=new m(n);if(M(a),t===`bbb`){let e=document.createElement(`video`);return e.src=E,e.muted=!0,e.loop=!0,e.playsInline=!0,e.autoplay=!0,e.crossOrigin=`anonymous`,e.style.display=`block`,e.style.margin=`40px auto`,e.style.maxWidth=`80vw`,e.play(),r.add(e,{effect:a}),e}let o=document.createElement(`img`);return o.src=z[t],o.style.display=`block`,o.style.margin=`40px auto`,r.add(o,{effect:a}),o},args:{src:`Jellyfish`,quality:.4,seed:.25,iterations:24,resolutionScale:1,randomFlip:!0,vertical:!1,speed:0},argTypes:{src:{control:{type:`select`},options:[`Jellyfish`,`Logo`,`Pigeon`,`bbb`]},quality:{control:{type:`range`,min:0,max:1,step:.01}},seed:{control:{type:`range`,min:0,max:1,step:.01}},iterations:{control:{type:`range`,min:1,max:30,step:1}},resolutionScale:{control:{type:`range`,min:0,max:1,step:.01}},randomFlip:{control:{type:`boolean`}},vertical:{control:{type:`boolean`}},speed:{control:{type:`range`,min:0,max:30,step:.5}}},parameters:{chromatic:{disableSnapshot:!0}}},V={Jellyfish:D,Logo:u,Pigeon:k},H={render:e=>{let{src:t,...n}=e,r=i(),a=new b(n);if(t===`bbb`){let e=document.createElement(`video`);return e.src=E,e.muted=!0,e.loop=!0,e.playsInline=!0,e.autoplay=!0,e.crossOrigin=`anonymous`,e.style.display=`block`,e.style.margin=`40px auto`,e.style.maxWidth=`80vw`,e.play(),r.add(e,{effect:a}),e}let o=document.createElement(`img`);return o.src=V[t],o.style.display=`block`,o.style.margin=`40px auto`,r.add(o,{effect:a}),o},args:{src:`Jellyfish`,quality:8,iterations:3,downscale:1},argTypes:{src:{control:{type:`select`},options:[`Jellyfish`,`Logo`,`Pigeon`,`bbb`]},quality:{control:{type:`range`,min:1,max:100,step:1}},iterations:{control:{type:`range`,min:1,max:10,step:1}},downscale:{control:{type:`range`,min:.02,max:1,step:.01}}},parameters:{chromatic:{disableSnapshot:!0}}},U={render:()=>{let e=document.createElement(`img`);return e.src=D,e},args:void 0},U.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=i(),r=new w;await n.add(t,{effect:r}),o(`Fluid`,r),N(e)},W={render:()=>{let e=document.createElement(`img`);return e.src=D,e},args:void 0},W.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let a=i(),o={Jellyfish:D,Logo:u},s=null,c=async()=>{let e=s?{...s.params}:{};s&&(a.remove(t),n()),s=new _(e),await a.add(t,{effect:s}),r(`Halftone`,s,{img:t,sources:o,onSrcChange:async e=>{t.src=o[e],await new Promise(e=>{t.onload=()=>e()}),await c()}})};await c()},G={render:()=>{let e=document.createElement(`img`);return e.src=u,e},args:void 0},G.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=()=>e()});let r=i(),o={Jellyfish:D,Logo:u},s=null,c=async()=>{let e=s?{...s.params}:F()?{count:256*256}:{};s&&(r.remove(t),n()),s=new S(e),await r.add(t,{effect:s}),a(`Particle`,s,{img:t,sources:o,onSrcChange:async e=>{t.src=o[e],await new Promise(e=>{t.onload=()=>e()}),await c()}})};await c(),N(e)},K={render:()=>{let e=document.createElement(`img`);return e.src=u,e},args:void 0},K.play=async({canvasElement:e})=>{let r=e.querySelector(`img`);await new Promise(e=>{r.onload=()=>e()}),await new Promise(e=>requestAnimationFrame(()=>e(void 0)));let a=i(),o={Logo:u,Jellyfish:D},s=null,c=async()=>{let e=s?{...s.params}:{};s&&(a.remove(r),n()),await new Promise(e=>requestAnimationFrame(()=>e(void 0))),s=new y(e),await a.add(r,{effect:s}),t(`Particle Explode`,s,{img:r,sources:o,onSrcChange:async e=>{r.src=o[e],await new Promise(e=>{r.onload=()=>e()}),await c()}})};await c()},q={render:e=>{let{src:t,...n}=e,r=i(),a=new v(n);if(t===`Webpage`){let e=document.getElementById(`storybook-root`);e&&(e.style.height=`auto`,e.style.display=`block`);let t=document.createElement(`div`);t.style.display=`flex`,t.style.justifyContent=`center`;let n=j();return t.appendChild(n),r.addHTML(n,{effect:a}),t}let o=document.createElement(`img`);return o.src=t===`Jellyfish`?D:u,r.add(o,{effect:a}),o},args:{src:`Webpage`,cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},argTypes:{src:{control:{type:`select`},options:[`Logo`,`Jellyfish`,`Webpage`]},cellSize:{control:{type:`range`,min:5,max:200,step:1}},pressRadius:{control:{type:`range`,min:0,max:800,step:10}},press:{control:{type:`range`,min:0,max:1,step:.01}},flatCells:{control:{type:`boolean`}},seed:{control:{type:`range`,min:0,max:1e3,step:1}},speed:{control:{type:`range`,min:0,max:5,step:.05}},breathe:{control:{type:`range`,min:0,max:1,step:.01}},breatheSpeed:{control:{type:`range`,min:0,max:5,step:.05}},breatheScale:{control:{type:`range`,min:10,max:500,step:5}},bgColor:{control:{type:`color`}}}},I.parameters={...I.parameters,docs:{...I.parameters?.docs,source:{originalSource:`{
   render: () => {
     const img = document.createElement("img");
     img.src = Logo;
@@ -170,14 +170,14 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,i as r,l as i,o as 
     return img;
   },
   args: undefined
-}`,...F.parameters?.docs?.source}}},I.parameters={...I.parameters,docs:{...I.parameters?.docs,source:{originalSource:`{
+}`,...I.parameters?.docs?.source}}},L.parameters={...L.parameters,docs:{...L.parameters?.docs,source:{originalSource:`{
   render: () => {
     const img = document.createElement("img");
     img.src = Jellyfish;
     return img;
   },
   args: undefined
-}`,...I.parameters?.docs?.source}}},L.parameters={...L.parameters,docs:{...L.parameters?.docs,source:{originalSource:`{
+}`,...L.parameters?.docs?.source}}},R.parameters={...R.parameters,docs:{...R.parameters?.docs,source:{originalSource:`{
   render: () => {
     const img = document.createElement("img");
     img.src = Jellyfish;
@@ -189,7 +189,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,i as r,l as i,o as 
       disableSnapshot: true
     }
   }
-}`,...L.parameters?.docs?.source}}},z.parameters={...z.parameters,docs:{...z.parameters?.docs,source:{originalSource:`{
+}`,...R.parameters?.docs?.source}}},B.parameters={...B.parameters,docs:{...B.parameters?.docs,source:{originalSource:`{
   render: args => {
     const {
       src,
@@ -299,35 +299,114 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,i as r,l as i,o as 
       disableSnapshot: true
     }
   }
-}`,...z.parameters?.docs?.source}}},B.parameters={...B.parameters,docs:{...B.parameters?.docs,source:{originalSource:`{
-  render: () => {
+}`,...B.parameters?.docs?.source}}},H.parameters={...H.parameters,docs:{...H.parameters?.docs,source:{originalSource:`{
+  render: args => {
+    const {
+      src,
+      ...params
+    } = args;
+    const vfx = initVFX();
+    const effect = new BadJpegEffect(params);
+
+    // bbb is a video; the rest are images.
+    if (src === "bbb") {
+      const video = document.createElement("video");
+      video.src = BbbWebm;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.autoplay = true;
+      video.crossOrigin = "anonymous";
+      video.style.display = "block";
+      video.style.margin = "40px auto";
+      video.style.maxWidth = "80vw";
+      void video.play();
+      vfx.add(video, {
+        effect
+      });
+      return video;
+    }
     const img = document.createElement("img");
-    img.src = Jellyfish;
+    img.src = BAD_JPEG_IMAGES[src];
+    img.style.display = "block";
+    img.style.margin = "40px auto";
+    vfx.add(img, {
+      effect
+    });
     return img;
   },
-  args: undefined
-}`,...B.parameters?.docs?.source}}},V.parameters={...V.parameters,docs:{...V.parameters?.docs,source:{originalSource:`{
-  render: () => {
-    const img = document.createElement("img");
-    img.src = Jellyfish;
-    return img;
+  args: {
+    src: "Jellyfish",
+    quality: 8,
+    iterations: 3,
+    downscale: 1
   },
-  args: undefined
-}`,...V.parameters?.docs?.source}}},H.parameters={...H.parameters,docs:{...H.parameters?.docs,source:{originalSource:`{
-  render: () => {
-    const img = document.createElement("img");
-    img.src = Logo;
-    return img;
+  argTypes: {
+    src: {
+      control: {
+        type: "select"
+      },
+      options: ["Jellyfish", "Logo", "Pigeon", "bbb"]
+    },
+    quality: {
+      control: {
+        type: "range",
+        min: 1,
+        max: 100,
+        step: 1
+      }
+    },
+    iterations: {
+      control: {
+        type: "range",
+        min: 1,
+        max: 10,
+        step: 1
+      }
+    },
+    downscale: {
+      control: {
+        type: "range",
+        min: 0.02,
+        max: 1,
+        step: 0.01
+      }
+    }
   },
-  args: undefined
+  parameters: {
+    chromatic: {
+      disableSnapshot: true
+    }
+  }
 }`,...H.parameters?.docs?.source}}},U.parameters={...U.parameters,docs:{...U.parameters?.docs,source:{originalSource:`{
   render: () => {
     const img = document.createElement("img");
-    img.src = Logo;
+    img.src = Jellyfish;
     return img;
   },
   args: undefined
 }`,...U.parameters?.docs?.source}}},W.parameters={...W.parameters,docs:{...W.parameters?.docs,source:{originalSource:`{
+  render: () => {
+    const img = document.createElement("img");
+    img.src = Jellyfish;
+    return img;
+  },
+  args: undefined
+}`,...W.parameters?.docs?.source}}},G.parameters={...G.parameters,docs:{...G.parameters?.docs,source:{originalSource:`{
+  render: () => {
+    const img = document.createElement("img");
+    img.src = Logo;
+    return img;
+  },
+  args: undefined
+}`,...G.parameters?.docs?.source}}},K.parameters={...K.parameters,docs:{...K.parameters?.docs,source:{originalSource:`{
+  render: () => {
+    const img = document.createElement("img");
+    img.src = Logo;
+    return img;
+  },
+  args: undefined
+}`,...K.parameters?.docs?.source}}},q.parameters={...q.parameters,docs:{...q.parameters?.docs,source:{originalSource:`{
   render: args => {
     const {
       src,
@@ -459,4 +538,4 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,i as r,l as i,o as 
       }
     }
   }
-}`,...W.parameters?.docs?.source}}},G=[`bloom`,`crtBloom`,`pixelSort`,`jpegGlitch`,`fluid`,`halftone`,`particle`,`particleExplode`,`voronoi`]}))();export{G as __namedExportsOrder,F as bloom,I as crtBloom,N as default,B as fluid,V as halftone,z as jpegGlitch,H as particle,U as particleExplode,L as pixelSort,W as voronoi};
+}`,...q.parameters?.docs?.source}}},J=[`bloom`,`crtBloom`,`pixelSort`,`jpegGlitch`,`badJpeg`,`fluid`,`halftone`,`particle`,`particleExplode`,`voronoi`]}))();export{J as __namedExportsOrder,H as badJpeg,I as bloom,L as crtBloom,P as default,U as fluid,W as halftone,B as jpegGlitch,G as particle,K as particleExplode,R as pixelSort,q as voronoi};
