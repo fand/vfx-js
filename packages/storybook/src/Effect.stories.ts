@@ -5,6 +5,7 @@ import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import Pigeon from "./assets/pigeon.webp";
 import {
+    BadJpegEffect,
     BloomEffect,
     PixelateEffect,
     ScanlineEffect,
@@ -204,6 +205,71 @@ export const jpegGlitch: StoryObj<JPEGGlitchArgs> = {
         randomFlip: { control: { type: "boolean" } },
         vertical: { control: { type: "boolean" } },
         speed: { control: { type: "range", min: 0, max: 30, step: 0.5 } },
+    },
+    parameters: { chromatic: { disableSnapshot: true } },
+};
+
+// Shader-only JPEG degradation (DCT + quantize + 4:2:0 chroma subsample),
+// no codec round trip. Excluded from VRT: the quantization round() sits on
+// precision-sensitive boundaries, so SwiftShader output isn't a stable target.
+type BadJpegSrc = "Jellyfish" | "Logo" | "Pigeon" | "bbb";
+type BadJpegArgs = {
+    src: BadJpegSrc;
+    quality: number;
+    iterations: number;
+    downscale: number;
+};
+const BAD_JPEG_IMAGES: Record<"Jellyfish" | "Logo" | "Pigeon", string> = {
+    Jellyfish,
+    Logo,
+    Pigeon,
+};
+export const badJpeg: StoryObj<BadJpegArgs> = {
+    render: (args) => {
+        const { src, ...params } = args;
+        const vfx = initVFX();
+        const effect = new BadJpegEffect(params);
+
+        // bbb is a video; the rest are images.
+        if (src === "bbb") {
+            const video = document.createElement("video");
+            video.src = BbbWebm;
+            video.muted = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.autoplay = true;
+            video.crossOrigin = "anonymous";
+            video.style.display = "block";
+            video.style.margin = "40px auto";
+            video.style.maxWidth = "80vw";
+            void video.play();
+            vfx.add(video, { effect });
+            return video;
+        }
+
+        const img = document.createElement("img");
+        img.src = BAD_JPEG_IMAGES[src];
+        img.style.display = "block";
+        img.style.margin = "40px auto";
+        vfx.add(img, { effect });
+        return img;
+    },
+    args: {
+        src: "Jellyfish",
+        quality: 8,
+        iterations: 3,
+        downscale: 1,
+    },
+    argTypes: {
+        src: {
+            control: { type: "select" },
+            options: ["Jellyfish", "Logo", "Pigeon", "bbb"],
+        },
+        quality: { control: { type: "range", min: 1, max: 100, step: 1 } },
+        iterations: { control: { type: "range", min: 1, max: 10, step: 1 } },
+        downscale: {
+            control: { type: "range", min: 0.02, max: 1, step: 0.01 },
+        },
     },
     parameters: { chromatic: { disableSnapshot: true } },
 };
