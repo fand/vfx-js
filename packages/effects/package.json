@@ -34,7 +34,7 @@
     "lint-staged": "lint-staged"
   },
   "peerDependencies": {
-    "@vfx-js/core": ">=1.0.0"
+    "@vfx-js/core": ">=1.1.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.11",
