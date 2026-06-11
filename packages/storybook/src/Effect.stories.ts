@@ -17,6 +17,7 @@ import {
     RgbShiftEffect,
     ScanlineEffect,
     SinewaveEffect,
+    TritoneEffect,
     VoronoiEffect,
 } from "@vfx-js/effects";
 import BbbWebm from "./assets/bbb.webm";
@@ -894,6 +895,29 @@ export const duotone = presetStory<DuotoneArgs>(
     {
         color1: { control: { type: "color" } },
         color2: { control: { type: "color" } },
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+    },
+);
+
+type TritoneArgs = {
+    color1: string;
+    color2: string;
+    color3: string;
+    speed: number;
+};
+export const tritone = presetStory<TritoneArgs>(
+    (a) =>
+        new TritoneEffect({
+            color1: hexToRgba(a.color1),
+            color2: hexToRgba(a.color2),
+            color3: hexToRgba(a.color3),
+            speed: a.speed,
+        }),
+    { color1: "#ff0000", color2: "#00ff00", color3: "#0000ff", speed: 0.2 },
+    {
+        color1: { control: { type: "color" } },
+        color2: { control: { type: "color" } },
+        color3: { control: { type: "color" } },
         speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
     },
 );
