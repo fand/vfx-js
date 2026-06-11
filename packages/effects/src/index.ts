@@ -19,5 +19,6 @@ export {
     type PixelSortKey,
     type PixelSortParams,
 } from "./pixelsort";
+export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift";
 export { ScanlineEffect } from "./scanline";
 export { VoronoiEffect } from "./voronoi";

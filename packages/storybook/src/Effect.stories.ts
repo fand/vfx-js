@@ -11,6 +11,7 @@ import {
     ParticleExplodeEffect,
     PixelateEffect,
     PixelSortEffect,
+    RgbShiftEffect,
     ScanlineEffect,
     VoronoiEffect,
 } from "@vfx-js/effects";
@@ -805,5 +806,15 @@ export const glitch = presetStory<GlitchArgs>(
     {
         speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
         intensity: { control: { type: "range", min: 0, max: 3, step: 0.05 } },
+    },
+);
+
+type RgbShiftArgs = { speed: number; amount: number };
+export const rgbShift = presetStory<RgbShiftArgs>(
+    (a) => new RgbShiftEffect(a),
+    { speed: 1, amount: 10 },
+    {
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        amount: { control: { type: "range", min: 0, max: 60, step: 1 } },
     },
 );
