@@ -15,6 +15,7 @@ import {
     RgbGlitchEffect,
     RgbShiftEffect,
     ScanlineEffect,
+    SinewaveEffect,
     VoronoiEffect,
 } from "@vfx-js/effects";
 import BbbWebm from "./assets/bbb.webm";
@@ -838,5 +839,22 @@ export const rainbow = presetStory<RainbowArgs>(
     {
         speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
         frequency: { control: { type: "range", min: 0.1, max: 8, step: 0.1 } },
+    },
+);
+
+type SinewaveArgs = {
+    speed: number;
+    amount: number;
+    frequency: number;
+    blur: number;
+};
+export const sinewave = presetStory<SinewaveArgs>(
+    (a) => new SinewaveEffect(a),
+    { speed: 1, amount: 20, frequency: 7, blur: 2 },
+    {
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        amount: { control: { type: "range", min: 0, max: 100, step: 1 } },
+        frequency: { control: { type: "range", min: 1, max: 30, step: 0.5 } },
+        blur: { control: { type: "range", min: 0, max: 20, step: 0.5 } },
     },
 );
