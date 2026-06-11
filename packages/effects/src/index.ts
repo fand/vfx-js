@@ -19,6 +19,7 @@ export {
     type PixelSortKey,
     type PixelSortParams,
 } from "./pixelsort";
+export { RainbowEffect, type RainbowParams } from "./rainbow";
 export { RgbGlitchEffect, type RgbGlitchParams } from "./rgb-glitch";
 export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift";
 export { ScanlineEffect } from "./scanline";

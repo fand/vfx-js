@@ -11,6 +11,7 @@ import {
     ParticleExplodeEffect,
     PixelateEffect,
     PixelSortEffect,
+    RainbowEffect,
     RgbGlitchEffect,
     RgbShiftEffect,
     ScanlineEffect,
@@ -827,5 +828,15 @@ export const rgbGlitch = presetStory<RgbGlitchArgs>(
     {
         speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
         amount: { control: { type: "range", min: 0, max: 0.3, step: 0.005 } },
+    },
+);
+
+type RainbowArgs = { speed: number; frequency: number };
+export const rainbow = presetStory<RainbowArgs>(
+    (a) => new RainbowEffect(a),
+    { speed: 1, frequency: 1 },
+    {
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        frequency: { control: { type: "range", min: 0.1, max: 8, step: 0.1 } },
     },
 );
