@@ -7,6 +7,7 @@ import {
     FluidEffect,
     GlitchEffect,
     HalftoneEffect,
+    HueShiftEffect,
     JPEGGlitchEffect,
     ParticleEffect,
     ParticleExplodeEffect,
@@ -919,5 +920,14 @@ export const tritone = presetStory<TritoneArgs>(
         color2: { control: { type: "color" } },
         color3: { control: { type: "color" } },
         speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+    },
+);
+
+type HueShiftArgs = { shift: number };
+export const hueShift = presetStory<HueShiftArgs>(
+    (a) => new HueShiftEffect(a),
+    { shift: 0.5 },
+    {
+        shift: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
     },
 );
