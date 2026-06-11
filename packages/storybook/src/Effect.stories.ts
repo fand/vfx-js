@@ -30,6 +30,7 @@ import Pigeon from "./assets/pigeon.webp";
 import "./preset.css";
 import {
     attachBloomPane,
+    attachClockPane,
     attachFluidPane,
     attachHalftonePane,
     attachParticleExplodePane,
@@ -65,6 +66,7 @@ function presetStory<A extends Record<string, unknown>>(
             img.style.margin = "40px auto";
             img.style.maxWidth = "80vw";
             vfx.add(img, { effect: makeEffect(a) });
+            attachClockPane(vfx);
             return img;
         },
         args,
