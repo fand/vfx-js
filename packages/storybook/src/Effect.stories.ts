@@ -19,6 +19,7 @@ import {
     ScanlineEffect,
     SinewaveEffect,
     TritoneEffect,
+    VignetteEffect,
     VoronoiEffect,
 } from "@vfx-js/effects";
 import BbbWebm from "./assets/bbb.webm";
@@ -929,5 +930,16 @@ export const hueShift = presetStory<HueShiftArgs>(
     { shift: 0.5 },
     {
         shift: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+    },
+);
+
+type VignetteArgs = { intensity: number; radius: number; power: number };
+export const vignette = presetStory<VignetteArgs>(
+    (a) => new VignetteEffect(a),
+    { intensity: 0.5, radius: 1.0, power: 2.0 },
+    {
+        intensity: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        radius: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        power: { control: { type: "range", min: 0.1, max: 5, step: 0.1 } },
     },
 );

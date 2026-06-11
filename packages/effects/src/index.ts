@@ -27,4 +27,5 @@ export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift";
 export { ScanlineEffect } from "./scanline";
 export { SinewaveEffect, type SinewaveParams } from "./sinewave";
 export { TritoneEffect, type TritoneParams } from "./tritone";
+export { VignetteEffect, type VignetteParams } from "./vignette";
 export { VoronoiEffect } from "./voronoi";
