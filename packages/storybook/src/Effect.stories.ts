@@ -1,22 +1,23 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-
-import BbbWebm from "./assets/bbb.webm";
-import Jellyfish from "./assets/jellyfish.webp";
-import Logo from "./assets/logo-640w-20p.svg";
-import Pigeon from "./assets/pigeon.webp";
+import type { Effect } from "@vfx-js/core";
 import {
     BadJpegEffect,
     BloomEffect,
-    PixelateEffect,
-    ScanlineEffect,
     FluidEffect,
+    GlitchEffect,
     HalftoneEffect,
     JPEGGlitchEffect,
     ParticleEffect,
     ParticleExplodeEffect,
+    PixelateEffect,
     PixelSortEffect,
+    ScanlineEffect,
     VoronoiEffect,
 } from "@vfx-js/effects";
+import BbbWebm from "./assets/bbb.webm";
+import Jellyfish from "./assets/jellyfish.webp";
+import Logo from "./assets/logo-640w-20p.svg";
+import Pigeon from "./assets/pigeon.webp";
 import "./preset.css";
 import {
     attachBloomPane,
@@ -36,6 +37,31 @@ export default {
 
 const isChromatic = (): boolean =>
     typeof navigator !== "undefined" && /Chromatic/.test(navigator.userAgent);
+
+// Shared single-image story factory for the preset-ported effects. Builds
+// the effect fresh on every arg change (Storybook re-runs render) and
+// attaches it to a centred <img>.
+function presetStory<A extends Record<string, unknown>>(
+    makeEffect: (args: A) => Effect,
+    args: A,
+    argTypes: Meta<A>["argTypes"],
+    src: string = Jellyfish,
+): StoryObj<A> {
+    return {
+        render: (a) => {
+            const vfx = initVFX();
+            const img = document.createElement("img");
+            img.src = src;
+            img.style.display = "block";
+            img.style.margin = "40px auto";
+            img.style.maxWidth = "80vw";
+            vfx.add(img, { effect: makeEffect(a) });
+            return img;
+        },
+        args,
+        argTypes,
+    };
+}
 
 export const bloom: StoryObj<undefined> = {
     render: () => {
@@ -767,3 +793,17 @@ function seedFluidMotion(canvasElement: HTMLElement): void {
         }
     }, 16);
 }
+
+// ---------------------------------------------------------------------------
+// Preset-ported effects (originally `shaders` presets in @vfx-js/core).
+// ---------------------------------------------------------------------------
+
+type GlitchArgs = { speed: number; intensity: number };
+export const glitch = presetStory<GlitchArgs>(
+    (a) => new GlitchEffect(a),
+    { speed: 1, intensity: 1 },
+    {
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        intensity: { control: { type: "range", min: 0, max: 3, step: 0.05 } },
+    },
+);

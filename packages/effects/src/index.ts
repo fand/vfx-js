@@ -7,6 +7,7 @@ export {
     type DatamoshView,
 } from "./datamosh";
 export { FluidEffect } from "./fluid";
+export { GlitchEffect, type GlitchParams } from "./glitch";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
 export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch";
 export { ParticleEffect } from "./particle";
