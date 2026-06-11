@@ -6,6 +6,7 @@ export {
     type DatamoshParams,
     type DatamoshView,
 } from "./datamosh";
+export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone";
 export { FluidEffect } from "./fluid";
 export { GlitchEffect, type GlitchParams } from "./glitch";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";

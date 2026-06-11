@@ -3,6 +3,7 @@ import type { Effect } from "@vfx-js/core";
 import {
     BadJpegEffect,
     BloomEffect,
+    DuotoneEffect,
     FluidEffect,
     GlitchEffect,
     HalftoneEffect,
@@ -65,6 +66,28 @@ function presetStory<A extends Record<string, unknown>>(
         args,
         argTypes,
     };
+}
+
+// Parse a `#rgb` / `#rrggbb` hex string (as produced by Storybook's color
+// control) into an RGBA tuple in [0, 1]. Falls back to opaque black.
+function hexToRgba(hex: string): [number, number, number, number] {
+    let h = hex.trim().replace(/^#/, "");
+    if (h.length === 3) {
+        h = h
+            .split("")
+            .map((c) => c + c)
+            .join("");
+    }
+    if (h.length !== 6) {
+        return [0, 0, 0, 1];
+    }
+    const n = Number.parseInt(h, 16);
+    return [
+        ((n >> 16) & 255) / 255,
+        ((n >> 8) & 255) / 255,
+        (n & 255) / 255,
+        1,
+    ];
 }
 
 export const bloom: StoryObj<undefined> = {
@@ -856,5 +879,21 @@ export const sinewave = presetStory<SinewaveArgs>(
         amount: { control: { type: "range", min: 0, max: 100, step: 1 } },
         frequency: { control: { type: "range", min: 1, max: 30, step: 0.5 } },
         blur: { control: { type: "range", min: 0, max: 20, step: 0.5 } },
+    },
+);
+
+type DuotoneArgs = { color1: string; color2: string; speed: number };
+export const duotone = presetStory<DuotoneArgs>(
+    (a) =>
+        new DuotoneEffect({
+            color1: hexToRgba(a.color1),
+            color2: hexToRgba(a.color2),
+            speed: a.speed,
+        }),
+    { color1: "#ff0000", color2: "#0000ff", speed: 0.2 },
+    {
+        color1: { control: { type: "color" } },
+        color2: { control: { type: "color" } },
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
     },
 );
