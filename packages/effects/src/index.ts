@@ -1,5 +1,6 @@
 export { BadJpegEffect, type BadJpegEffectOptions } from "./bad-jpeg";
 export { BloomEffect } from "./bloom";
+export { ChromaticEffect, type ChromaticParams } from "./chromatic";
 export {
     type DatamoshColorSpace,
     DatamoshEffect,

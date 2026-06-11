@@ -3,6 +3,7 @@ import type { Effect } from "@vfx-js/core";
 import {
     BadJpegEffect,
     BloomEffect,
+    ChromaticEffect,
     DuotoneEffect,
     FluidEffect,
     GlitchEffect,
@@ -939,6 +940,17 @@ export const vignette = presetStory<VignetteArgs>(
     { intensity: 0.5, radius: 1.0, power: 2.0 },
     {
         intensity: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        radius: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        power: { control: { type: "range", min: 0.1, max: 5, step: 0.1 } },
+    },
+);
+
+type ChromaticArgs = { intensity: number; radius: number; power: number };
+export const chromatic = presetStory<ChromaticArgs>(
+    (a) => new ChromaticEffect(a),
+    { intensity: 0.3, radius: 0.0, power: 2.0 },
+    {
+        intensity: { control: { type: "range", min: 0, max: 3, step: 0.01 } },
         radius: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
         power: { control: { type: "range", min: 0.1, max: 5, step: 0.1 } },
     },
