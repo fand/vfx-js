@@ -86,7 +86,17 @@ export class VFXPlayer {
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
     #elements: VFXElement[] = [];
-    #initTime = Date.now() / 1000.0;
+    #initTime = 0;
+
+    // Virtual animation clock. `time` exposed to effects is driven by this
+    // (not raw wall time), so playback can be scaled, paused, rewound, or
+    // pinned to a fixed value for deterministic rendering (e.g. VRT).
+    #time = 0;
+    #timeScale = 1;
+    #wallPrev = Date.now() / 1000;
+    // When set via `setTime`, the next `render` uses `#time` verbatim
+    // (no wall-delta advance) so a `setTime(t); render()` pair is exact.
+    #timeOverridden = false;
 
     /** Canvas extent in CSS px (= viewport + scrollPadding on each side). */
     #canvasRect: Rect = createRect(0);
@@ -111,6 +121,8 @@ export class VFXPlayer {
         this.#gl = this.#ctx.gl;
         this.#gl.clearColor(0, 0, 0, 0);
         this.#pixelRatio = opts.pixelRatio;
+        this.#timeScale = opts.timeScale;
+        this.#wallPrev = Date.now() / 1000;
 
         this.#quad = new Quad(this.#ctx);
         this.#programCache = new ProgramCache(this.#ctx);
@@ -575,7 +587,7 @@ export class VFXPlayer {
             });
         }
 
-        const now = Date.now() / 1000;
+        const now = this.#time;
         const elem: VFXElement = {
             type,
             element,
@@ -703,7 +715,7 @@ export class VFXPlayer {
         }
 
         // Effect-path specifics.
-        const now = Date.now() / 1000;
+        const now = this.#time;
         const elem: VFXElement = {
             type,
             element,
@@ -975,8 +987,35 @@ export class VFXPlayer {
 
     play(): void {
         if (!this.isPlaying()) {
+            // Resume from "now" so a long pause doesn't advance the clock
+            // by the whole stopped duration on the first frame.
+            this.#wallPrev = Date.now() / 1000;
             this.#playRequest = requestAnimationFrame(this.#playLoop);
         }
+    }
+
+    /** Current virtual animation time, in seconds. */
+    get time(): number {
+        return this.#time;
+    }
+
+    /**
+     * Pin the virtual clock to an absolute time (seconds). The next
+     * `render` uses it verbatim, so `setTime(t); render()` is exact —
+     * useful for scrubbing and deterministic snapshots.
+     */
+    setTime(time: number): void {
+        this.#time = time;
+        this.#timeOverridden = true;
+    }
+
+    /** Playback rate: `1` = realtime, `0` = paused, negative = rewind. */
+    get timeScale(): number {
+        return this.#timeScale;
+    }
+
+    set timeScale(scale: number) {
+        this.#timeScale = scale;
     }
 
     stop(): void {
@@ -987,7 +1026,17 @@ export class VFXPlayer {
     }
 
     render(): void {
-        const now = Date.now() / 1000;
+        // Advance the virtual clock by the wall time elapsed since the last
+        // frame, scaled by timeScale. A pending `setTime` skips the advance
+        // for one frame so the pinned value renders exactly.
+        const wall = Date.now() / 1000;
+        if (this.#timeOverridden) {
+            this.#timeOverridden = false;
+        } else {
+            this.#time += (wall - this.#wallPrev) * this.#timeScale;
+        }
+        this.#wallPrev = wall;
+        const now = this.#time;
         const gl = this.#gl;
 
         // This must done every frame because iOS Safari doesn't fire
@@ -1761,7 +1810,7 @@ export class VFXPlayer {
         }
 
         this.#postEffectChain = chain;
-        this.#postEffectChainLastTime = Date.now() / 1000;
+        this.#postEffectChainLastTime = this.#time;
 
         chain
             .initAll()
