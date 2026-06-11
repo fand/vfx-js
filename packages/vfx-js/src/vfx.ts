@@ -243,6 +243,46 @@ export class VFX {
     }
 
     /**
+     * Current virtual animation time in seconds (the value behind the
+     * `time` uniform).
+     */
+    get time(): number {
+        return this.#player.time;
+    }
+
+    /**
+     * Pin the animation clock to an absolute time in seconds.
+     *
+     * The next `render()` uses the value verbatim, so `setTime(t); render()`
+     * produces a deterministic frame — handy for scrubbing a timeline or
+     * capturing stable snapshots (e.g. visual regression tests):
+     *
+     * ```ts
+     * const vfx = new VFX({ autoplay: false });
+     * await vfx.add(img, { effect });
+     * vfx.setTime(1.5);
+     * vfx.render();
+     * ```
+     */
+    setTime(time: number): void {
+        this.#player.setTime(time);
+    }
+
+    /**
+     * Playback rate of the animation clock.
+     *
+     * `1` is realtime, `0` pauses (frames still render), and negative
+     * values run time backwards. Can be changed at any time.
+     */
+    get timeScale(): number {
+        return this.#player.timeScale;
+    }
+
+    set timeScale(scale: number) {
+        this.#player.timeScale = scale;
+    }
+
+    /**
      * Destroy VFX and stop rendering.
      */
     destroy(): void {
