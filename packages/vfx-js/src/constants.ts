@@ -63,8 +63,7 @@ export type ShaderPreset =
     | "invert"
     | "grayscale"
     | "vignette"
-    | "chromatic"
-    | "saber";
+    | "chromatic";
 
 const COMMON_HEADER = `precision highp float;
 uniform vec2 resolution;
@@ -748,117 +747,6 @@ export const shaders: Record<ShaderPreset, string> = {
         vec4 cb = mirrorTex(src, uvB);
 
         outColor = vec4(cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 3.0);
-    }
-    `,
-    saber: `
-    // Saber: an "electric energy" effect inspired by Video Copilot's
-    // After Effects Saber plug-in (https://www.videocopilot.net/tutorials/saber_plug-in).
-    // Pipeline: edge detection -> warp the edges with fbm noise -> glow.
-    ${COMMON_HEADER}
-    ${READ_TEX}
-
-    // Glow color. Defaults to an electric blue when left unset (all zero).
-    uniform vec4 color;
-    // Overall glow strength. Defaults to 1.0 when left unset (zero).
-    uniform float intensity;
-    // Flow speed of the electric arcs. Defaults to 1.0 when left unset (zero).
-    uniform float speed;
-
-    float hash(vec2 p) {
-        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-    }
-
-    float noise(vec2 p) {
-        vec2 i = floor(p);
-        vec2 f = fract(p);
-        f = f * f * (3.0 - 2.0 * f);
-        float a = hash(i);
-        float b = hash(i + vec2(1.0, 0.0));
-        float c = hash(i + vec2(0.0, 1.0));
-        float d = hash(i + vec2(1.0, 1.0));
-        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-    }
-
-    float fbm(vec2 p) {
-        float v = 0.0;
-        float a = 0.5;
-        for (int i = 0; i < 4; i++) {
-            v += a * noise(p);
-            p *= 2.0;
-            a *= 0.5;
-        }
-        return v;
-    }
-
-    // Scalar field used as the source shape: luminance masked by alpha.
-    float field(vec2 uv) {
-        vec4 c = readTex(src, uv);
-        return c.a * dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
-    }
-
-    // Sobel-ish edge magnitude of the field.
-    float edge(vec2 uv, vec2 texel) {
-        float l = field(uv - vec2(texel.x, 0.0));
-        float r = field(uv + vec2(texel.x, 0.0));
-        float d = field(uv - vec2(0.0, texel.y));
-        float u = field(uv + vec2(0.0, texel.y));
-        return length(vec2(r - l, u - d));
-    }
-
-    void main (void) {
-        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec2 texel = 1.0 / resolution;
-
-        // Fall back to sensible defaults when uniforms are left unset.
-        vec3 glowColor = dot(color.rgb, vec3(1.0)) > 0.0
-            ? color.rgb
-            : vec3(0.35, 0.65, 1.0);
-        float power = intensity > 0.0 ? intensity : 1.0;
-        float flowSpeed = speed > 0.0 ? speed : 1.0;
-
-        // (2) Warp the sampling position with flowing fbm noise so the
-        // detected edges break up into turbulent, electric arcs.
-        float t = time * flowSpeed;
-        vec2 flow = vec2(
-            fbm(uv * 6.0 + vec2(0.0, t)),
-            fbm(uv * 6.0 + vec2(7.3, -t))
-        ) - 0.5;
-        // Higher-frequency jitter for the crackling fine detail.
-        flow += (vec2(
-            fbm(uv * 18.0 - vec2(t * 1.7, 0.0)),
-            fbm(uv * 18.0 + vec2(0.0, t * 1.7))
-        ) - 0.5) * 0.4;
-        vec2 warp = flow * 0.06;
-
-        // (1) + (3) Edge detection, then accumulate the warped edge in a
-        // radial blur to create the soft glow that radiates from the core.
-        float glow = 0.0;
-        float total = 0.0;
-        for (int ring = 1; ring <= 3; ring++) {
-            float radius = float(ring) * 4.0;
-            float w = exp(-float(ring) * 0.9);
-            for (int i = 0; i < 8; i++) {
-                float a = float(i) * 0.7853981634; // 2pi / 8
-                vec2 dir = vec2(cos(a), sin(a)) * radius * texel;
-                glow += edge(uv + warp + dir, texel) * w;
-                total += w;
-            }
-        }
-        glow /= total;
-
-        // Sharp, white-hot core line sitting on the warped edge itself.
-        float core = edge(uv + warp, texel);
-        core = smoothstep(0.05, 0.25, core);
-
-        glow = pow(glow * 6.0, 1.5) * power;
-
-        // Flicker so the energy feels alive.
-        float flicker = 0.85 + 0.15 * fbm(vec2(t * 4.0, 0.0));
-
-        vec3 col = glowColor * glow * flicker + vec3(1.0) * core;
-        float alpha = clamp(glow * flicker + core, 0.0, 1.0);
-
-        outColor = vec4(col, alpha);
     }
     `,
 };

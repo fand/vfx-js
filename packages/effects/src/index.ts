@@ -18,5 +18,6 @@ export {
     type PixelSortKey,
     type PixelSortParams,
 } from "./pixelsort";
+export { SaberEffect, type SaberParams } from "./saber";
 export { ScanlineEffect } from "./scanline";
 export { VoronoiEffect } from "./voronoi";

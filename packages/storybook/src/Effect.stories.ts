@@ -1,22 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-
-import BbbWebm from "./assets/bbb.webm";
-import Jellyfish from "./assets/jellyfish.webp";
-import Logo from "./assets/logo-640w-20p.svg";
-import Pigeon from "./assets/pigeon.webp";
 import {
     BadJpegEffect,
     BloomEffect,
-    PixelateEffect,
-    ScanlineEffect,
     FluidEffect,
     HalftoneEffect,
     JPEGGlitchEffect,
     ParticleEffect,
     ParticleExplodeEffect,
+    PixelateEffect,
     PixelSortEffect,
+    SaberEffect,
+    ScanlineEffect,
     VoronoiEffect,
 } from "@vfx-js/effects";
+import BbbWebm from "./assets/bbb.webm";
+import Jellyfish from "./assets/jellyfish.webp";
+import Logo from "./assets/logo-640w-20p.svg";
+import Pigeon from "./assets/pigeon.webp";
 import "./preset.css";
 import {
     attachBloomPane,
@@ -710,6 +710,66 @@ export const voronoi: StoryObj<VoronoiArgs> = {
             control: { type: "range", min: 10, max: 500, step: 5 },
         },
         bgColor: { control: { type: "color" } },
+    },
+};
+
+// Electric "Saber" energy. A JFA distance field is built once from the
+// element silhouette, then warped each frame with animated 3D noise and lit
+// with a 1/distance glow.
+type SaberSrc = "Logo" | "Jellyfish";
+type SaberArgs = {
+    src: SaberSrc;
+    color: string;
+    intensity: number;
+    amplitude: number;
+    frequency: number;
+    speed: number;
+    pad: number;
+};
+function hexToRgb(hex: string): [number, number, number] {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m) {
+        return [0.35, 0.65, 1.0];
+    }
+    const n = Number.parseInt(m[1], 16);
+    return [
+        ((n >> 16) & 0xff) / 255,
+        ((n >> 8) & 0xff) / 255,
+        (n & 0xff) / 255,
+    ];
+}
+export const saber: StoryObj<SaberArgs> = {
+    render: (args) => {
+        const { src, color, ...rest } = args;
+        const vfx = initVFX();
+        const effect = new SaberEffect({ color: hexToRgb(color), ...rest });
+
+        const img = document.createElement("img");
+        img.src = src === "Jellyfish" ? Jellyfish : Logo;
+        img.style.display = "block";
+        img.style.margin = "80px auto";
+        vfx.add(img, { effect });
+        return img;
+    },
+    args: {
+        src: "Logo",
+        color: "#59a6ff",
+        intensity: 1.0,
+        amplitude: 0.02,
+        frequency: 4.0,
+        speed: 1.0,
+        pad: 80,
+    },
+    argTypes: {
+        src: { control: { type: "select" }, options: ["Logo", "Jellyfish"] },
+        color: { control: { type: "color" } },
+        intensity: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
+        amplitude: {
+            control: { type: "range", min: 0, max: 0.1, step: 0.002 },
+        },
+        frequency: { control: { type: "range", min: 0.5, max: 12, step: 0.5 } },
+        speed: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
+        pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
     },
 };
 
