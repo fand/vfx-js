@@ -1,5 +1,11 @@
 # @vfx-js/effects
 
+## 1.2.0
+
+### Minor Changes
+
+- Add effect: BadJpegEffect
+
 ## 1.1.0
 
 ### Minor Changes

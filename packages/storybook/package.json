@@ -1,7 +1,7 @@
 {
   "name": "@vfx-js/storybook",
   "private": true,
-  "version": "0.0.22",
+  "version": "0.0.23",
   "type": "module",
   "scripts": {
     "dev": "storybook dev -p 6006 --no-open",
