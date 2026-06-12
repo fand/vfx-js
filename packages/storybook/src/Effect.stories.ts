@@ -48,6 +48,10 @@ export default {
 const isChromatic = (): boolean =>
     typeof navigator !== "undefined" && /Chromatic/.test(navigator.userAgent);
 
+// Fixed clock time (seconds) used for deterministic VRT snapshots of the
+// clock-driven effects — a representative animated frame, not t=0.
+const VRT_TIME = 2;
+
 // Shared single-image story factory for the preset-ported effects. Builds
 // the effect fresh on every arg change (Storybook re-runs render) and
 // attaches it to a centred <img>. `clock` (default true) attaches the
@@ -61,15 +65,27 @@ function presetStory<A extends Record<string, unknown>>(
     const { src = Jellyfish, clock = true } = opts;
     return {
         render: (a) => {
-            const vfx = initVFX();
+            // Under VRT, freeze the clock so snapshots are deterministic.
+            // Start at timeScale 0 so the element's startTime is captured at
+            // t=0 (regardless of image-load timing); once added, pin the
+            // clock to VRT_TIME for ctx.time === VRT_TIME exactly.
+            const vrt = clock && isChromatic();
+            const vfx = initVFX(vrt ? { timeScale: 0 } : undefined);
             const img = document.createElement("img");
             img.src = src;
             img.style.display = "block";
             img.style.margin = "40px auto";
             img.style.maxWidth = "80vw";
-            vfx.add(img, { effect: makeEffect(a) });
+            const added = vfx.add(img, { effect: makeEffect(a) });
             if (clock) {
-                attachClockPane(vfx);
+                if (vrt) {
+                    added.then(() => {
+                        vfx.setTime(VRT_TIME);
+                        vfx.render();
+                    });
+                } else {
+                    attachClockPane(vfx);
+                }
             }
             return img;
         },
