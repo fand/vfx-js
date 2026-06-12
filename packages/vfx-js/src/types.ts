@@ -141,6 +141,20 @@ export type VFXOpts = {
      * You can also pass `VFXPass[]` for a multipass post-effect chain.
      */
     postEffect?: VFXPostEffect | VFXPass[];
+
+    /**
+     * Playback rate of the animation clock that drives the `time` uniform
+     * (Default: `1`).
+     *
+     * `1` is realtime, `0.5` is half speed, `2` is double speed, `0`
+     * pauses the animation (frames still render, so scroll / mouse stay
+     * live), and negative values run time backwards.
+     *
+     * Can be changed at runtime via `VFX.timeScale`, and the clock can be
+     * pinned to an exact value with `VFX.setTime` (useful for scrubbing or
+     * deterministic snapshots).
+     */
+    timeScale?: number;
 };
 
 /** @internal */
@@ -152,6 +166,7 @@ export type VFXOptsInner = {
     scrollPadding: [number, number];
     wrapper: HTMLElement | undefined;
     postEffects: (VFXPostEffect | VFXPass)[];
+    timeScale: number;
 };
 
 /**
@@ -193,6 +208,7 @@ export function getVFXOpts(opts: VFXOpts): VFXOptsInner {
         scrollPadding,
         wrapper: opts.wrapper,
         postEffects,
+        timeScale: opts.timeScale ?? 1,
     };
 }
 
