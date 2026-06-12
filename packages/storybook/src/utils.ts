@@ -625,3 +625,79 @@ export function attachParticleExplodePane(
     trackPane(pane);
     return pane;
 }
+
+/**
+ * Shared playback panel for the core animation clock. Drives
+ * `VFX.timeScale` / `VFX.setTime` / `play` / `stop` so stories can pause,
+ * change speed, rewind, or scrub the `time` uniform.
+ */
+export function attachClockPane(
+    vfx: VFX,
+    opts: { title?: string; range?: [number, number] } = {},
+): Pane {
+    const [min, max] = opts.range ?? [0, 20];
+
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;left:16px;width:260px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title: opts.title ?? "Clock" });
+
+    // Tweakpane binds to object properties, so mirror the clock here and
+    // push edits into the VFX instance via the bindings' change events.
+    const state = { timeScale: vfx.timeScale, time: vfx.time };
+    let playing = true;
+
+    const playBtn = pane.addButton({ title: "Pause" });
+    playBtn.on("click", () => {
+        playing = !playing;
+        if (playing) {
+            vfx.play();
+            playBtn.title = "Pause";
+        } else {
+            vfx.stop();
+            playBtn.title = "Play";
+        }
+    });
+
+    pane.addBinding(state, "timeScale", {
+        label: "speed",
+        min: -3,
+        max: 3,
+        step: 0.1,
+    }).on("change", (ev) => {
+        vfx.timeScale = ev.value;
+    });
+
+    const timeBinding = pane.addBinding(state, "time", {
+        label: "time",
+        min,
+        max,
+        step: 0.01,
+    });
+    timeBinding.on("change", (ev) => {
+        vfx.setTime(ev.value);
+        // Paused: no RAF loop is running, so draw the scrubbed frame now.
+        if (!playing) {
+            vfx.render();
+        }
+    });
+
+    // While playing, follow the advancing clock so the time slider tracks.
+    const tick = () => {
+        if (!container.isConnected) {
+            return; // pane disposed
+        }
+        if (playing) {
+            state.time = vfx.time;
+            timeBinding.refresh();
+        }
+        requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+
+    trackPane(pane);
+    return pane;
+}
