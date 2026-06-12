@@ -50,13 +50,15 @@ const isChromatic = (): boolean =>
 
 // Shared single-image story factory for the preset-ported effects. Builds
 // the effect fresh on every arg change (Storybook re-runs render) and
-// attaches it to a centred <img>.
+// attaches it to a centred <img>. `clock` (default true) attaches the
+// playback pane — turn it off for time-independent effects.
 function presetStory<A extends Record<string, unknown>>(
     makeEffect: (args: A) => Effect,
     args: A,
     argTypes: Meta<A>["argTypes"],
-    src: string = Jellyfish,
+    opts: { src?: string; clock?: boolean } = {},
 ): StoryObj<A> {
+    const { src = Jellyfish, clock = true } = opts;
     return {
         render: (a) => {
             const vfx = initVFX();
@@ -66,7 +68,9 @@ function presetStory<A extends Record<string, unknown>>(
             img.style.margin = "40px auto";
             img.style.maxWidth = "80vw";
             vfx.add(img, { effect: makeEffect(a) });
-            attachClockPane(vfx);
+            if (clock) {
+                attachClockPane(vfx);
+            }
             return img;
         },
         args,
@@ -934,6 +938,7 @@ export const hueShift = presetStory<HueShiftArgs>(
     {
         shift: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
     },
+    { clock: false },
 );
 
 type VignetteArgs = { intensity: number; radius: number; power: number };
@@ -945,6 +950,7 @@ export const vignette = presetStory<VignetteArgs>(
         radius: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
         power: { control: { type: "range", min: 0.1, max: 5, step: 0.1 } },
     },
+    { clock: false },
 );
 
 type ChromaticArgs = { intensity: number; radius: number; power: number };
@@ -956,4 +962,5 @@ export const chromatic = presetStory<ChromaticArgs>(
         radius: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
         power: { control: { type: "range", min: 0.1, max: 5, step: 0.1 } },
     },
+    { clock: false },
 );
