@@ -102,3 +102,13 @@ export const Chromatic = story({
         power: 2.0,
     },
 });
+export const Saber = story({
+    preset: "saber",
+    overflow: 100,
+    defaultTime: 1.0,
+    uniforms: {
+        color: [0.35, 0.65, 1.0, 1.0],
+        intensity: 1.0,
+        speed: 1.0,
+    },
+});
