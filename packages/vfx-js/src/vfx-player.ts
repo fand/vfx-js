@@ -86,7 +86,6 @@ export class VFXPlayer {
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
     #elements: VFXElement[] = [];
-    #initTime = 0;
 
     // Virtual animation clock. `time` exposed to effects is driven by this
     // (not raw wall time), so playback can be scaled, paused, rewound, or
@@ -1869,7 +1868,7 @@ export class VFXPlayer {
         };
 
         chain.run({
-            time: now - this.#initTime,
+            time: now,
             deltaTime,
             mouse: [this.#mouseX * pr, this.#mouseY * pr],
             mouseViewport: [this.#mouseX * pr, this.#mouseY * pr],
@@ -1921,7 +1920,7 @@ export class VFXPlayer {
                 pass.uniforms.src.value = inputTexture;
                 (pass.uniforms.resolution.value as Vec2).set(tw, th);
                 (pass.uniforms.offset.value as Vec2).set(0, 0);
-                pass.uniforms.time.value = now - this.#initTime;
+                pass.uniforms.time.value = now;
                 (pass.uniforms.mouse.value as Vec2).set(
                     (mouseX / viewportGlRect.w) * tw,
                     (mouseY / viewportGlRect.h) * th,
@@ -1931,7 +1930,7 @@ export class VFXPlayer {
                     inputTexture,
                     this.#pixelRatio,
                     viewportGlRect,
-                    now - this.#initTime,
+                    now,
                     mouseX,
                     mouseY,
                 );

@@ -1,25 +1,36 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-
+import type { Effect } from "@vfx-js/core";
+import {
+    BadJpegEffect,
+    BloomEffect,
+    ChromaticEffect,
+    DuotoneEffect,
+    FluidEffect,
+    GlitchEffect,
+    HalftoneEffect,
+    HueShiftEffect,
+    JPEGGlitchEffect,
+    ParticleEffect,
+    ParticleExplodeEffect,
+    PixelateEffect,
+    PixelSortEffect,
+    RainbowEffect,
+    RgbGlitchEffect,
+    RgbShiftEffect,
+    ScanlineEffect,
+    SinewaveEffect,
+    TritoneEffect,
+    VignetteEffect,
+    VoronoiEffect,
+} from "@vfx-js/effects";
 import BbbWebm from "./assets/bbb.webm";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import Pigeon from "./assets/pigeon.webp";
-import {
-    BadJpegEffect,
-    BloomEffect,
-    PixelateEffect,
-    ScanlineEffect,
-    FluidEffect,
-    HalftoneEffect,
-    JPEGGlitchEffect,
-    ParticleEffect,
-    ParticleExplodeEffect,
-    PixelSortEffect,
-    VoronoiEffect,
-} from "@vfx-js/effects";
 import "./preset.css";
 import {
     attachBloomPane,
+    attachClockPane,
     attachFluidPane,
     attachHalftonePane,
     attachParticleExplodePane,
@@ -36,6 +47,74 @@ export default {
 
 const isChromatic = (): boolean =>
     typeof navigator !== "undefined" && /Chromatic/.test(navigator.userAgent);
+
+// Fixed clock time (seconds) used for deterministic VRT snapshots of the
+// clock-driven effects — a representative animated frame, not t=0.
+const VRT_TIME = 2;
+
+// Shared single-image story factory for the preset-ported effects. Builds
+// the effect fresh on every arg change (Storybook re-runs render) and
+// attaches it to a centred <img>. `clock` (default true) attaches the
+// playback pane — turn it off for time-independent effects.
+function presetStory<A extends Record<string, unknown>>(
+    makeEffect: (args: A) => Effect,
+    args: A,
+    argTypes: Meta<A>["argTypes"],
+    opts: { src?: string; clock?: boolean } = {},
+): StoryObj<A> {
+    const { src = Jellyfish, clock = true } = opts;
+    return {
+        render: (a) => {
+            // Under VRT, freeze the clock so snapshots are deterministic.
+            // Start at timeScale 0 so the element's startTime is captured at
+            // t=0 (regardless of image-load timing); once added, pin the
+            // clock to VRT_TIME for ctx.time === VRT_TIME exactly.
+            const vrt = clock && isChromatic();
+            const vfx = initVFX(vrt ? { timeScale: 0 } : undefined);
+            const img = document.createElement("img");
+            img.src = src;
+            img.style.display = "block";
+            img.style.margin = "40px auto";
+            img.style.maxWidth = "80vw";
+            const added = vfx.add(img, { effect: makeEffect(a) });
+            if (clock) {
+                if (vrt) {
+                    added.then(() => {
+                        vfx.setTime(VRT_TIME);
+                        vfx.render();
+                    });
+                } else {
+                    attachClockPane(vfx);
+                }
+            }
+            return img;
+        },
+        args,
+        argTypes,
+    };
+}
+
+// Parse a `#rgb` / `#rrggbb` hex string (as produced by Storybook's color
+// control) into an RGBA tuple in [0, 1]. Falls back to opaque black.
+function hexToRgba(hex: string): [number, number, number, number] {
+    let h = hex.trim().replace(/^#/, "");
+    if (h.length === 3) {
+        h = h
+            .split("")
+            .map((c) => c + c)
+            .join("");
+    }
+    if (h.length !== 6) {
+        return [0, 0, 0, 1];
+    }
+    const n = Number.parseInt(h, 16);
+    return [
+        ((n >> 16) & 255) / 255,
+        ((n >> 8) & 255) / 255,
+        (n & 255) / 255,
+        1,
+    ];
+}
 
 export const bloom: StoryObj<undefined> = {
     render: () => {
@@ -767,3 +846,137 @@ function seedFluidMotion(canvasElement: HTMLElement): void {
         }
     }, 16);
 }
+
+// ---------------------------------------------------------------------------
+// Preset-ported effects (originally `shaders` presets in @vfx-js/core).
+// ---------------------------------------------------------------------------
+
+type GlitchArgs = { speed: number; intensity: number };
+export const glitch = presetStory<GlitchArgs>(
+    (a) => new GlitchEffect(a),
+    { speed: 1, intensity: 1 },
+    {
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        intensity: { control: { type: "range", min: 0, max: 3, step: 0.05 } },
+    },
+);
+
+type RgbShiftArgs = { speed: number; amount: number };
+export const rgbShift = presetStory<RgbShiftArgs>(
+    (a) => new RgbShiftEffect(a),
+    { speed: 1, amount: 10 },
+    {
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        amount: { control: { type: "range", min: 0, max: 60, step: 1 } },
+    },
+);
+
+type RgbGlitchArgs = { speed: number; amount: number };
+export const rgbGlitch = presetStory<RgbGlitchArgs>(
+    (a) => new RgbGlitchEffect(a),
+    { speed: 1, amount: 0.05 },
+    {
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        amount: { control: { type: "range", min: 0, max: 0.3, step: 0.005 } },
+    },
+);
+
+type RainbowArgs = { speed: number; frequency: number };
+export const rainbow = presetStory<RainbowArgs>(
+    (a) => new RainbowEffect(a),
+    { speed: 1, frequency: 1 },
+    {
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        frequency: { control: { type: "range", min: 0.1, max: 8, step: 0.1 } },
+    },
+);
+
+type SinewaveArgs = {
+    speed: number;
+    amount: number;
+    frequency: number;
+    blur: number;
+};
+export const sinewave = presetStory<SinewaveArgs>(
+    (a) => new SinewaveEffect(a),
+    { speed: 1, amount: 20, frequency: 7, blur: 2 },
+    {
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+        amount: { control: { type: "range", min: 0, max: 100, step: 1 } },
+        frequency: { control: { type: "range", min: 1, max: 30, step: 0.5 } },
+        blur: { control: { type: "range", min: 0, max: 20, step: 0.5 } },
+    },
+);
+
+type DuotoneArgs = { color1: string; color2: string; speed: number };
+export const duotone = presetStory<DuotoneArgs>(
+    (a) =>
+        new DuotoneEffect({
+            color1: hexToRgba(a.color1),
+            color2: hexToRgba(a.color2),
+            speed: a.speed,
+        }),
+    { color1: "#ff0000", color2: "#0000ff", speed: 0.2 },
+    {
+        color1: { control: { type: "color" } },
+        color2: { control: { type: "color" } },
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+    },
+);
+
+type TritoneArgs = {
+    color1: string;
+    color2: string;
+    color3: string;
+    speed: number;
+};
+export const tritone = presetStory<TritoneArgs>(
+    (a) =>
+        new TritoneEffect({
+            color1: hexToRgba(a.color1),
+            color2: hexToRgba(a.color2),
+            color3: hexToRgba(a.color3),
+            speed: a.speed,
+        }),
+    { color1: "#ff0000", color2: "#00ff00", color3: "#0000ff", speed: 0.2 },
+    {
+        color1: { control: { type: "color" } },
+        color2: { control: { type: "color" } },
+        color3: { control: { type: "color" } },
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+    },
+);
+
+type HueShiftArgs = { shift: number };
+export const hueShift = presetStory<HueShiftArgs>(
+    (a) => new HueShiftEffect(a),
+    { shift: 0.5 },
+    {
+        shift: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+    },
+    { clock: false },
+);
+
+type VignetteArgs = { intensity: number; radius: number; power: number };
+export const vignette = presetStory<VignetteArgs>(
+    (a) => new VignetteEffect(a),
+    { intensity: 0.5, radius: 1.0, power: 2.0 },
+    {
+        intensity: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        radius: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        power: { control: { type: "range", min: 0.1, max: 5, step: 0.1 } },
+    },
+    { clock: false, src: Pigeon },
+);
+
+type ChromaticArgs = { intensity: number; radius: number; power: number };
+export const chromatic = presetStory<ChromaticArgs>(
+    (a) => new ChromaticEffect(a),
+    { intensity: 0.3, radius: 0.0, power: 2.0 },
+    {
+        intensity: { control: { type: "range", min: 0, max: 3, step: 0.01 } },
+        radius: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        power: { control: { type: "range", min: 0.1, max: 5, step: 0.1 } },
+    },
+    { clock: false, src: Pigeon },
+);

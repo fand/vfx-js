@@ -263,6 +263,11 @@ export class VFX {
      * vfx.setTime(1.5);
      * vfx.render();
      * ```
+     *
+     * Note: this drives `deltaTime` too, so a jump produces one large
+     * `deltaTime` on the next frame. Time-only effects are unaffected, but
+     * effects that integrate motion over `deltaTime` (particles, fluid,
+     * datamosh) may jump — pause first (`timeScale = 0`) when scrubbing them.
      */
     setTime(time: number): void {
         this.#player.setTime(time);
@@ -273,6 +278,11 @@ export class VFX {
      *
      * `1` is realtime, `0` pauses (frames still render), and negative
      * values run time backwards. Can be changed at any time.
+     *
+     * Note: `deltaTime` follows this rate, so it goes negative while
+     * rewinding. Time-only effects handle that fine; effects that integrate
+     * motion over `deltaTime` (particles, fluid, datamosh) are not designed
+     * to run backwards and may behave unexpectedly.
      */
     get timeScale(): number {
         return this.#player.timeScale;
