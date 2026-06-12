@@ -14,7 +14,7 @@
 // sibling effects in this package.
 import type { Effect } from "@vfx-js/core";
 import { BloomEffect } from "./bloom";
-import { EdgeEffect } from "./edge";
+import { EdgeEffect, type EdgeLayer } from "./edge";
 
 export type Saber2Params = {
     /** Glow color (linear RGB, 0..1). */
@@ -23,8 +23,12 @@ export type Saber2Params = {
     intensity: number;
     /** Edge detection threshold. */
     threshold: number;
-    /** Edge line width in source pixels. */
-    thickness: number;
+    /** Noise animation speed. */
+    speed: number;
+    /** Noise warp amount (content-uv units). */
+    amplitude: number;
+    /** Overlaid edge lines, each with its own thickness + noise scale. */
+    layers: EdgeLayer[];
     /** Bloom gain — how strong the glow halo is. */
     glow: number;
     /** Bloom spread, 0..1 — how far the glow reaches. */
@@ -40,7 +44,13 @@ const DEFAULT_PARAMS: Saber2Params = {
     color: [0.35, 0.65, 1.0],
     intensity: 1.0,
     threshold: 0.08,
-    thickness: 1.0,
+    speed: 1.0,
+    amplitude: 0.012,
+    layers: [
+        { thickness: 1.0, noiseScale: 9.0, weight: 1.0 },
+        { thickness: 2.5, noiseScale: 4.0, weight: 0.6 },
+        { thickness: 5.0, noiseScale: 2.0, weight: 0.35 },
+    ],
     glow: 3.0,
     spread: 0.8,
     pad: 80,
@@ -60,7 +70,9 @@ export function saber2(initial: Partial<Saber2Params> = {}): Effect[] {
             color: p.color,
             intensity: p.intensity,
             threshold: p.threshold,
-            thickness: p.thickness,
+            speed: p.speed,
+            amplitude: p.amplitude,
+            layers: p.layers,
         }),
         new BloomEffect({
             threshold: 0.0,

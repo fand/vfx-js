@@ -8,7 +8,7 @@ export {
     type DatamoshView,
 } from "./datamosh";
 export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone";
-export { EdgeEffect, type EdgeParams } from "./edge";
+export { EdgeEffect, type EdgeLayer, type EdgeParams } from "./edge";
 export { FluidEffect } from "./fluid";
 export { GlitchEffect, type GlitchParams } from "./glitch";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";

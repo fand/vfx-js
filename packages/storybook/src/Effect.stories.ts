@@ -862,7 +862,8 @@ type Saber2Args = {
     color: string;
     intensity: number;
     threshold: number;
-    thickness: number;
+    speed: number;
+    amplitude: number;
     glow: number;
     spread: number;
     pad: number;
@@ -886,7 +887,8 @@ export const saber2Story: StoryObj<Saber2Args> = {
         color: "#59a6ff",
         intensity: 1.0,
         threshold: 0.08,
-        thickness: 1.0,
+        speed: 1.0,
+        amplitude: 0.012,
         glow: 3.0,
         spread: 0.8,
         pad: 80,
@@ -896,7 +898,10 @@ export const saber2Story: StoryObj<Saber2Args> = {
         color: { control: { type: "color" } },
         intensity: { control: { type: "range", min: 0, max: 2, step: 0.05 } },
         threshold: { control: { type: "range", min: 0, max: 0.5, step: 0.01 } },
-        thickness: { control: { type: "range", min: 0.5, max: 4, step: 0.1 } },
+        speed: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
+        amplitude: {
+            control: { type: "range", min: 0, max: 0.05, step: 0.002 },
+        },
         glow: { control: { type: "range", min: 0, max: 8, step: 0.1 } },
         spread: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
         pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
