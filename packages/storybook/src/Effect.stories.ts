@@ -966,7 +966,7 @@ export const vignette = presetStory<VignetteArgs>(
         radius: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
         power: { control: { type: "range", min: 0.1, max: 5, step: 0.1 } },
     },
-    { clock: false },
+    { clock: false, src: Pigeon },
 );
 
 type ChromaticArgs = { intensity: number; radius: number; power: number };
@@ -978,5 +978,5 @@ export const chromatic = presetStory<ChromaticArgs>(
         radius: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
         power: { control: { type: "range", min: 0.1, max: 5, step: 0.1 } },
     },
-    { clock: false },
+    { clock: false, src: Pigeon },
 );
