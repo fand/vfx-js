@@ -20,6 +20,7 @@ import {
     SaberEffect,
     ScanlineEffect,
     SinewaveEffect,
+    saber2,
     TritoneEffect,
     VignetteEffect,
     VoronoiEffect,
@@ -849,6 +850,55 @@ export const saber: StoryObj<SaberArgs> = {
         },
         frequency: { control: { type: "range", min: 0.5, max: 12, step: 0.5 } },
         speed: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
+        pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
+    },
+};
+
+// Saber2: a different take on the electric look. Edge detection draws the
+// silhouette as bright lines, then BloomEffect (reused) glows them. No
+// distance field, so no corner "valley" artifacts.
+type Saber2Args = {
+    src: SaberSrc;
+    color: string;
+    intensity: number;
+    threshold: number;
+    thickness: number;
+    glow: number;
+    spread: number;
+    pad: number;
+};
+export const saber2Story: StoryObj<Saber2Args> = {
+    name: "saber2",
+    render: (args) => {
+        const { src, color, ...rest } = args;
+        const vfx = initVFX();
+        const effect = saber2({ color: hexToRgb(color), ...rest });
+
+        const img = document.createElement("img");
+        img.src = src === "Jellyfish" ? Jellyfish : Logo;
+        img.style.display = "block";
+        img.style.margin = "80px auto";
+        vfx.add(img, { effect });
+        return img;
+    },
+    args: {
+        src: "Logo",
+        color: "#59a6ff",
+        intensity: 1.0,
+        threshold: 0.08,
+        thickness: 1.0,
+        glow: 3.0,
+        spread: 0.8,
+        pad: 80,
+    },
+    argTypes: {
+        src: { control: { type: "select" }, options: ["Logo", "Jellyfish"] },
+        color: { control: { type: "color" } },
+        intensity: { control: { type: "range", min: 0, max: 2, step: 0.05 } },
+        threshold: { control: { type: "range", min: 0, max: 0.5, step: 0.01 } },
+        thickness: { control: { type: "range", min: 0.5, max: 4, step: 0.1 } },
+        glow: { control: { type: "range", min: 0, max: 8, step: 0.1 } },
+        spread: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
         pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
     },
 };
