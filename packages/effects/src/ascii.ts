@@ -20,6 +20,8 @@ export type AsciiPresetName =
     | "simple"
     | "minimal"
     | "blocks"
+    | "dots"
+    | "circles"
     | "detailed";
 
 /**
@@ -35,6 +37,10 @@ export const ASCII_PRESETS: Record<AsciiPresetName, string> = {
     minimal: " .#",
     // Unicode shade blocks — smooth, font-independent gradient.
     blocks: " ░▒▓█",
+    // Round symbols growing from a dot to a filled bullet.
+    dots: " .·•●",
+    // Outline → filled circles (the ◯ … ● family).
+    circles: " ◌○◉●",
     // Paul Bourke's 70-level ramp (reversed to dark → light).
     detailed:
         " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
@@ -117,14 +123,20 @@ void main() {
 `;
 
 export type AsciiParams = {
-    /** Cell size in CSS px (square cells). */
-    grid: number;
+    /**
+     * Cell size in CSS px. A single number is a square cell; a
+     * `[width, height]` tuple sets the axes independently — useful to
+     * match a font's character aspect (cells narrower than they are tall)
+     * so glyphs tile tightly instead of leaving wide horizontal gaps.
+     */
+    grid: number | [number, number];
 
     /**
      * Character ramp, ordered dark → light. Overrides {@link preset}.
      *
-     * Baked into the glyph atlas at `init()`; changing it (or `font`)
-     * after the effect is added has no effect until it is re-added.
+     * Baked into the glyph atlas at `init()`; changing it (or `font` /
+     * `fontWeight`) after the effect is added has no effect until it is
+     * re-added.
      */
     chars?: AsciiCharRamp;
 
@@ -137,6 +149,13 @@ export type AsciiParams = {
      * built. Construction-time only (see {@link chars}).
      */
     font: string;
+
+    /**
+     * CSS font weight for the glyph atlas — a keyword (`"normal"`,
+     * `"bold"`) or numeric weight (`100`–`900`). Construction-time only
+     * (see {@link chars}).
+     */
+    fontWeight: string | number;
 
     /** Fixed glyph colour, used when {@link colorFromSource} is `false`. */
     color: AsciiColor;
@@ -155,14 +174,16 @@ const DEFAULT_PARAMS: AsciiParams = {
     grid: 12,
     preset: "standard",
     font: "monospace",
+    fontWeight: "normal",
     color: [1, 1, 1, 1],
     background: [0, 0, 0, 0],
     colorFromSource: false,
     invert: false,
 };
 
-// Atlas glyph resolution (physical px per cell). Fixed and oversized vs.
-// typical on-screen cells so linear minification keeps glyphs crisp.
+// Atlas glyph cell height (physical px). Fixed and oversized vs. typical
+// on-screen cells so linear minification keeps glyphs crisp. Cell width
+// is measured from the font's advance so glyphs sit flush horizontally.
 const GLYPH_PX = 64;
 
 /**
@@ -172,12 +193,20 @@ function resolveChars(ramp: AsciiCharRamp): string[] {
     return Array.isArray(ramp) ? [...ramp] : Array.from(ramp as string);
 }
 
+/** Normalize `grid` to a `[width, height]` pair in CSS px. */
+function resolveGrid(grid: number | [number, number]): [number, number] {
+    return typeof grid === "number" ? [grid, grid] : grid;
+}
+
 /**
  * Best-effort wait for `font` to be ready before rasterising the atlas,
  * so the first build doesn't fall back to a system font. No-op outside
  * the browser / when the Font Loading API is unavailable.
  */
-async function ensureFont(font: string): Promise<void> {
+async function ensureFont(
+    font: string,
+    weight: string | number,
+): Promise<void> {
     const fonts = (
         typeof document !== "undefined"
             ? (document as Document & { fonts?: FontFaceSet }).fonts
@@ -187,7 +216,7 @@ async function ensureFont(font: string): Promise<void> {
         return;
     }
     try {
-        await fonts.load(`${GLYPH_PX}px ${font}`);
+        await fonts.load(`${weight} ${GLYPH_PX}px ${font}`);
         await fonts.ready;
     } catch {
         // Font unavailable — fall through and let canvas pick a fallback.
@@ -196,19 +225,31 @@ async function ensureFont(font: string): Promise<void> {
 
 /**
  * Render the ramp into a single glyph atlas canvas, laid out as a near-
- * square grid of `GLYPH_PX` cells. White glyphs on transparent; the
+ * square grid of cells. Cell height is `GLYPH_PX`; cell width tracks the
+ * font's advance so glyphs sit flush (no baked-in side bearings that
+ * would show as wide gaps on screen). White glyphs on transparent; the
  * shader reads coverage from the alpha channel.
  */
 function buildAtlas(
     chars: string[],
     font: string,
+    weight: string | number,
 ): { canvas: HTMLCanvasElement; cols: number; rows: number } {
     const n = Math.max(1, chars.length);
     const cols = Math.ceil(Math.sqrt(n));
     const rows = Math.ceil(n / cols);
+    const fontStr = `${weight} ${GLYPH_PX}px ${font}`;
 
     const canvas = document.createElement("canvas");
-    canvas.width = cols * GLYPH_PX;
+    // Measure the advance first (resizing the canvas later resets state).
+    let cellW = GLYPH_PX;
+    const probe = canvas.getContext("2d");
+    if (probe) {
+        probe.font = fontStr;
+        cellW = Math.max(1, Math.ceil(probe.measureText("M").width));
+    }
+
+    canvas.width = cols * cellW;
     canvas.height = rows * GLYPH_PX;
 
     const g = canvas.getContext("2d");
@@ -217,10 +258,9 @@ function buildAtlas(
         g.fillStyle = "#fff";
         g.textAlign = "center";
         g.textBaseline = "middle";
-        // Leave headroom inside the cell so ascenders / descenders fit.
-        g.font = `${Math.floor(GLYPH_PX * 0.78)}px ${font}`;
+        g.font = fontStr;
         for (let i = 0; i < chars.length; i++) {
-            const cx = (i % cols) * GLYPH_PX + GLYPH_PX / 2;
+            const cx = (i % cols) * cellW + cellW / 2;
             const cy = Math.floor(i / cols) * GLYPH_PX + GLYPH_PX / 2;
             g.fillText(chars[i], cx, cy);
         }
@@ -266,9 +306,13 @@ export class AsciiEffect implements Effect {
         );
         this.#charCount = Math.max(1, chars.length);
 
-        await ensureFont(this.params.font);
+        await ensureFont(this.params.font, this.params.fontWeight);
 
-        const { canvas, cols, rows } = buildAtlas(chars, this.params.font);
+        const { canvas, cols, rows } = buildAtlas(
+            chars,
+            this.params.font,
+            this.params.fontWeight,
+        );
         this.#cols = cols;
         this.#rows = rows;
         this.#atlas = ctx.wrapTexture(canvas, {
@@ -282,14 +326,18 @@ export class AsciiEffect implements Effect {
             return;
         }
         const [ew, eh] = ctx.dims.elementPixel;
-        const cell = Math.max(1, this.params.grid) * ctx.pixelRatio;
+        const [gx, gy] = resolveGrid(this.params.grid);
+        const cellPx: [number, number] = [
+            Math.max(1, gx) * ctx.pixelRatio,
+            Math.max(1, gy) * ctx.pixelRatio,
+        ];
         ctx.draw({
             frag: FRAG_ASCII,
             uniforms: {
                 src: ctx.src,
                 atlas: this.#atlas,
                 elementPx: [Math.max(1, ew), Math.max(1, eh)],
-                cellPx: [cell, cell],
+                cellPx,
                 cols: this.#cols,
                 rows: this.#rows,
                 charCount: this.#charCount,

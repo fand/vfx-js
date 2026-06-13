@@ -985,7 +985,9 @@ export const chromatic = presetStory<ChromaticArgs>(
 
 type AsciiArgs = {
     preset: AsciiPresetName;
-    grid: number;
+    gridX: number;
+    gridY: number;
+    fontWeight: string;
     color: string;
     background: string;
     colorFromSource: boolean;
@@ -995,7 +997,8 @@ export const ascii = presetStory<AsciiArgs>(
     (a) =>
         new AsciiEffect({
             preset: a.preset,
-            grid: a.grid,
+            grid: [a.gridX, a.gridY],
+            fontWeight: a.fontWeight,
             color: hexToRgba(a.color),
             background: hexToRgba(a.background),
             colorFromSource: a.colorFromSource,
@@ -1003,7 +1006,9 @@ export const ascii = presetStory<AsciiArgs>(
         }),
     {
         preset: "standard",
-        grid: 12,
+        gridX: 8,
+        gridY: 14,
+        fontWeight: "normal",
         color: "#ffffff",
         background: "#000000",
         colorFromSource: false,
@@ -1012,9 +1017,22 @@ export const ascii = presetStory<AsciiArgs>(
     {
         preset: {
             control: { type: "select" },
-            options: ["standard", "simple", "minimal", "blocks", "detailed"],
+            options: [
+                "standard",
+                "simple",
+                "minimal",
+                "blocks",
+                "dots",
+                "circles",
+                "detailed",
+            ],
         },
-        grid: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        gridX: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        gridY: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        fontWeight: {
+            control: { type: "select" },
+            options: ["normal", "bold", "100", "300", "600", "900"],
+        },
         color: { control: { type: "color" } },
         background: { control: { type: "color" } },
         colorFromSource: { control: { type: "boolean" } },
