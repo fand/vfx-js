@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { Effect } from "@vfx-js/core";
 import {
+    AsciiEffect,
+    type AsciiPresetName,
     BadJpegEffect,
     BloomEffect,
     ChromaticEffect,
@@ -977,6 +979,64 @@ export const chromatic = presetStory<ChromaticArgs>(
         intensity: { control: { type: "range", min: 0, max: 3, step: 0.01 } },
         radius: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
         power: { control: { type: "range", min: 0.1, max: 5, step: 0.1 } },
+    },
+    { clock: false, src: Pigeon },
+);
+
+type AsciiArgs = {
+    preset: AsciiPresetName;
+    gridX: number;
+    gridY: number;
+    fontWeight: string;
+    color: string;
+    background: string;
+    colorFromSource: boolean;
+    invert: boolean;
+};
+export const ascii = presetStory<AsciiArgs>(
+    (a) =>
+        new AsciiEffect({
+            preset: a.preset,
+            grid: [a.gridX, a.gridY],
+            fontWeight: a.fontWeight,
+            color: hexToRgba(a.color),
+            background: hexToRgba(a.background),
+            colorFromSource: a.colorFromSource,
+            invert: a.invert,
+        }),
+    {
+        preset: "standard",
+        gridX: 8,
+        gridY: 14,
+        fontWeight: "normal",
+        color: "#ffffff",
+        background: "#000000",
+        colorFromSource: false,
+        invert: false,
+    },
+    {
+        preset: {
+            control: { type: "select" },
+            options: [
+                "standard",
+                "simple",
+                "minimal",
+                "blocks",
+                "dots",
+                "circles",
+                "detailed",
+            ],
+        },
+        gridX: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        gridY: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        fontWeight: {
+            control: { type: "select" },
+            options: ["normal", "bold", "100", "300", "600", "900"],
+        },
+        color: { control: { type: "color" } },
+        background: { control: { type: "color" } },
+        colorFromSource: { control: { type: "boolean" } },
+        invert: { control: { type: "boolean" } },
     },
     { clock: false, src: Pigeon },
 );
