@@ -166,6 +166,18 @@ export type AsciiParams = {
     font: string;
 
     /**
+     * Character box aspect ratio (width / height) used to keep glyphs
+     * undistorted when the cell is non-square.
+     *
+     * Omit (default) to auto-measure it from the font — the glyph advance
+     * (`measureText`) over the em height. That is exact for monospace
+     * fonts; set it explicitly for proportional fonts, non-browser
+     * builds, or to force a specific look (e.g. `0.5` for tall, narrow
+     * characters). Construction-time only (see {@link chars}).
+     */
+    charAspect?: number;
+
+    /**
      * CSS font weight for the glyph atlas — a keyword (`"normal"`,
      * `"bold"`) or numeric weight (`100`–`900`). Construction-time only
      * (see {@link chars}).
@@ -249,6 +261,7 @@ function buildAtlas(
     chars: string[],
     font: string,
     weight: string | number,
+    aspectOverride?: number,
 ): {
     canvas: HTMLCanvasElement;
     cols: number;
@@ -262,12 +275,18 @@ function buildAtlas(
     const fontStr = `${weight} ${GLYPH_PX}px ${font}`;
 
     const canvas = document.createElement("canvas");
-    // Measure the advance first (resizing the canvas later resets state).
-    let cellW = GLYPH_PX;
-    const probe = canvas.getContext("2d");
-    if (probe) {
-        probe.font = fontStr;
-        cellW = Math.max(1, Math.ceil(probe.measureText("M").width));
+    // Cell width = explicit aspect, or the measured advance (measure
+    // first; resizing the canvas later resets context state).
+    let cellW: number;
+    if (aspectOverride && aspectOverride > 0) {
+        cellW = Math.max(1, Math.round(aspectOverride * GLYPH_PX));
+    } else {
+        const probe = canvas.getContext("2d");
+        cellW = GLYPH_PX;
+        if (probe) {
+            probe.font = fontStr;
+            cellW = Math.max(1, Math.ceil(probe.measureText("M").width));
+        }
     }
     const aspect = cellW / GLYPH_PX;
 
@@ -340,6 +359,7 @@ export class AsciiEffect implements Effect {
             chars,
             this.params.font,
             this.params.fontWeight,
+            this.params.charAspect,
         );
         this.#cols = cols;
         this.#rows = rows;
