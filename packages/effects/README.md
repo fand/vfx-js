@@ -42,6 +42,7 @@ await vfx.add(img, {
 
 | Effect                   | Description                                                     |
 | ------------------------ | --------------------------------------------------------------- |
+| `AsciiEffect`            | ASCII / glyph mosaic from a dark→light character ramp           |
 | `BloomEffect`            | COD:AW-style bloom pyramid with soft-knee threshold             |
 | `FluidEffect`            | Stable-Fluids advection driven by pointer events                |
 | `HalftoneEffect`         | RGB / CMYK halftone screen with configurable ink presets        |
