@@ -27,6 +27,7 @@ in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
 uniform vec2 srcTexel;
+uniform float edgeThreshold;
 
 // Grayscale luminance at a src-uv, gated to the valid [0,1] src region.
 float mask(vec2 p) {
@@ -36,11 +37,11 @@ float mask(vec2 p) {
 }
 
 void main() {
-    float c = step(0.5, mask(uvSrc));
-    float l = step(0.5, mask(uvSrc - vec2(srcTexel.x, 0.0)));
-    float r = step(0.5, mask(uvSrc + vec2(srcTexel.x, 0.0)));
-    float d = step(0.5, mask(uvSrc - vec2(0.0, srcTexel.y)));
-    float u = step(0.5, mask(uvSrc + vec2(0.0, srcTexel.y)));
+    float c = step(edgeThreshold, mask(uvSrc));
+    float l = step(edgeThreshold, mask(uvSrc - vec2(srcTexel.x, 0.0)));
+    float r = step(edgeThreshold, mask(uvSrc + vec2(srcTexel.x, 0.0)));
+    float d = step(edgeThreshold, mask(uvSrc - vec2(0.0, srcTexel.y)));
+    float u = step(edgeThreshold, mask(uvSrc + vec2(0.0, srcTexel.y)));
 
     // Boundary texel: differs from at least one 4-neighbour.
     bool edge = c != l || c != r || c != d || c != u;
@@ -205,8 +206,20 @@ export type SaberParams = {
     softness: number;
     /** White-hot core amount — how readily the glow saturates to white. */
     core: number;
+    /**
+     * Grayscale luminance cutoff (0..1) for edge detection: the silhouette
+     * is the iso-line where the source's brightness crosses this value.
+     * Changing it rebuilds the distance field.
+     */
+    edgeThreshold: number;
     /** Overlaid lines, each with its own thickness + noise scale (max 4). */
     layers: SaberLayer[];
+    /**
+     * Rebuild the distance field every frame instead of caching it. Needed
+     * for live sources (video / webcam) whose silhouette changes; leave
+     * `false` for static images and text to avoid the per-frame JFA cost.
+     */
+    dynamic: boolean;
     /**
      * Extra pad around the element in CSS (logical) px so the glow has room
      * to spread. `"fullscreen"` reaches the viewport edges.
@@ -222,11 +235,13 @@ const DEFAULT_PARAMS: SaberParams = {
     speed: 1.0,
     softness: 0.5,
     core: 0.5,
+    edgeThreshold: 0.5,
     layers: [
         { thickness: 1.0, noiseScale: 1.0, weight: 1.0 },
         { thickness: 0.6, noiseScale: 2.2, weight: 0.6 },
         { thickness: 1.8, noiseScale: 0.5, weight: 0.4 },
     ],
+    dynamic: false,
     pad: 80,
 };
 
@@ -251,6 +266,7 @@ export class SaberEffect implements Effect {
     #dirty = true;
     #lastW = 0;
     #lastH = 0;
+    #lastEdgeThreshold = Number.NaN;
 
     constructor(initial: Partial<SaberParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
@@ -292,11 +308,20 @@ export class SaberEffect implements Effect {
         const w = this.#field.width;
         const h = this.#field.height;
 
-        // A resize wipes the cached field — rebuild it.
+        // Live sources rebuild the field every frame.
+        if (this.params.dynamic) {
+            this.#dirty = true;
+        }
+
+        // A resize, or a changed edge threshold, wipes the cached field.
         if (w !== this.#lastW || h !== this.#lastH) {
             this.#dirty = true;
             this.#lastW = w;
             this.#lastH = h;
+        }
+        if (this.params.edgeThreshold !== this.#lastEdgeThreshold) {
+            this.#dirty = true;
+            this.#lastEdgeThreshold = this.params.edgeThreshold;
         }
         if (this.#dirty) {
             this.#buildField(ctx, w, h);
@@ -383,6 +408,7 @@ export class SaberEffect implements Effect {
             uniforms: {
                 src: ctx.src,
                 srcTexel: [1 / ctx.src.width, 1 / ctx.src.height],
+                edgeThreshold: this.params.edgeThreshold,
             },
             target: seedA,
         });

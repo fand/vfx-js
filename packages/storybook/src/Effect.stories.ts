@@ -797,7 +797,7 @@ export const voronoi: StoryObj<VoronoiArgs> = {
 // Electric "Saber" energy. A JFA distance field is built once from the
 // element silhouette, then warped each frame with animated 3D noise and lit
 // with a 1/distance glow.
-type SaberSrc = "Logo" | "Jellyfish";
+type SaberSrc = "Logo" | "Jellyfish" | "Text" | "Webcam";
 type SaberArgs = {
     src: SaberSrc;
     color: string;
@@ -807,6 +807,7 @@ type SaberArgs = {
     speed: number;
     softness: number;
     core: number;
+    edgeThreshold: number;
     pad: number;
 };
 function hexToRgb(hex: string): [number, number, number] {
@@ -821,17 +822,66 @@ function hexToRgb(hex: string): [number, number, number] {
         (n & 0xff) / 255,
     ];
 }
+// Active webcam stream for the saber story, so re-renders can release it.
+let saberStream: MediaStream | null = null;
+function stopSaberStream(): void {
+    for (const t of saberStream?.getTracks() ?? []) {
+        t.stop();
+    }
+    saberStream = null;
+}
 export const saber: StoryObj<SaberArgs> = {
     render: (args) => {
         const { src, color, ...rest } = args;
+        stopSaberStream();
         const vfx = initVFX();
-        const effect = new SaberEffect({ color: hexToRgb(color), ...rest });
+        const effect = () =>
+            new SaberEffect({
+                color: hexToRgb(color),
+                dynamic: src === "Webcam",
+                ...rest,
+            });
+
+        if (src === "Webcam") {
+            const video = document.createElement("video");
+            video.muted = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.autoplay = true;
+            video.style.display = "block";
+            video.style.margin = "80px auto";
+            video.style.maxWidth = "60vw";
+            (async () => {
+                try {
+                    saberStream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                    });
+                    video.srcObject = saberStream;
+                    await video.play();
+                } catch {
+                    // Webcam unavailable / denied — leave the element blank.
+                }
+                vfx.add(video, { effect: effect() });
+            })();
+            return video;
+        }
+
+        if (src === "Text") {
+            const text = document.createElement("div");
+            text.textContent = "SABER";
+            text.style.cssText =
+                "font: 900 200px/1 sans-serif; color: #fff;" +
+                " text-align: center; margin: 80px auto; letter-spacing: 8px;";
+            // Defer until mounted so text layout is measured correctly.
+            requestAnimationFrame(() => vfx.add(text, { effect: effect() }));
+            return text;
+        }
 
         const img = document.createElement("img");
         img.src = src === "Jellyfish" ? Jellyfish : Logo;
         img.style.display = "block";
         img.style.margin = "80px auto";
-        vfx.add(img, { effect });
+        vfx.add(img, { effect: effect() });
         return img;
     },
     args: {
@@ -843,10 +893,14 @@ export const saber: StoryObj<SaberArgs> = {
         speed: 1.0,
         softness: 0.5,
         core: 0.5,
+        edgeThreshold: 0.5,
         pad: 80,
     },
     argTypes: {
-        src: { control: { type: "select" }, options: ["Logo", "Jellyfish"] },
+        src: {
+            control: { type: "select" },
+            options: ["Logo", "Jellyfish", "Text", "Webcam"],
+        },
         color: { control: { type: "color" } },
         intensity: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
         amplitude: {
@@ -856,6 +910,9 @@ export const saber: StoryObj<SaberArgs> = {
         speed: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
         softness: { control: { type: "range", min: 0.1, max: 2, step: 0.05 } },
         core: { control: { type: "range", min: 0, max: 2, step: 0.05 } },
+        edgeThreshold: {
+            control: { type: "range", min: 0, max: 1, step: 0.02 },
+        },
         pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
     },
 };
