@@ -64,6 +64,7 @@ uniform vec4 color;         // fixed glyph colour (when colorFromSource == 0)
 uniform vec4 background;     // cell backdrop, non-premultiplied
 uniform int colorFromSource; // 1 = tint glyph with the cell's avg colour
 uniform int invert;          // 1 = flip the luminance → glyph mapping
+uniform float glyphAspect;   // font's character box aspect (advance / em)
 
 // Box-average TAPS x TAPS samples per cell. A single centre tap throws
 // away most of the cell; this keeps the glyph choice representative.
@@ -106,10 +107,21 @@ void main() {
     float col = mod(idx, cols);
     float rowTop = floor(idx / cols);
 
+    // Fit the glyph's character box into the cell with its native
+    // aspect preserved (contain): scale by the limiting axis and centre,
+    // so a wide cell letterboxes left/right and a tall cell top/bottom
+    // instead of stretching the glyph to the cell's aspect.
     vec2 local = fract(fragPx / cellPx);
-    float u = (col + local.x) / cols;
-    float v = 1.0 - (rowTop + 1.0 - local.y) / rows;
-    float glyph = texture(atlas, vec2(u, v)).a;
+    float cellAspect = cellPx.x / cellPx.y;
+    vec2 frac = min(vec2(1.0), vec2(glyphAspect / cellAspect, cellAspect / glyphAspect));
+    vec2 gloc = (local - 0.5) / frac + 0.5;
+
+    float glyph = 0.0;
+    if (gloc.x >= 0.0 && gloc.x <= 1.0 && gloc.y >= 0.0 && gloc.y <= 1.0) {
+        float u = (col + gloc.x) / cols;
+        float v = 1.0 - (rowTop + 1.0 - gloc.y) / rows;
+        glyph = texture(atlas, vec2(u, v)).a;
+    }
 
     vec3 fg = colorFromSource == 1 ? acc.rgb : color.rgb;
     // Fade glyph coverage by the cell's source alpha so transparent
@@ -125,9 +137,12 @@ void main() {
 export type AsciiParams = {
     /**
      * Cell size in CSS px. A single number is a square cell; a
-     * `[width, height]` tuple sets the axes independently — useful to
-     * match a font's character aspect (cells narrower than they are tall)
-     * so glyphs tile tightly instead of leaving wide horizontal gaps.
+     * `[width, height]` tuple sets the axes independently.
+     *
+     * Glyphs always keep their native aspect ratio — a cell wider/taller
+     * than the character box letterboxes the glyph rather than stretching
+     * it. Set the cell to the font's character aspect (≈ advance : em, so
+     * cells narrower than they are tall) for gap-free tiling.
      */
     grid: number | [number, number];
 
@@ -234,7 +249,13 @@ function buildAtlas(
     chars: string[],
     font: string,
     weight: string | number,
-): { canvas: HTMLCanvasElement; cols: number; rows: number } {
+): {
+    canvas: HTMLCanvasElement;
+    cols: number;
+    rows: number;
+    /** Character box aspect (cell advance / em height). */
+    aspect: number;
+} {
     const n = Math.max(1, chars.length);
     const cols = Math.ceil(Math.sqrt(n));
     const rows = Math.ceil(n / cols);
@@ -248,6 +269,7 @@ function buildAtlas(
         probe.font = fontStr;
         cellW = Math.max(1, Math.ceil(probe.measureText("M").width));
     }
+    const aspect = cellW / GLYPH_PX;
 
     canvas.width = cols * cellW;
     canvas.height = rows * GLYPH_PX;
@@ -265,7 +287,7 @@ function buildAtlas(
             g.fillText(chars[i], cx, cy);
         }
     }
-    return { canvas, cols, rows };
+    return { canvas, cols, rows, aspect };
 }
 
 /**
@@ -277,9 +299,14 @@ function buildAtlas(
  * vfx.add(el, { effect: new AsciiEffect({ chars: [" ", ".", "+", "#"] }) });
  * ```
  *
+ * Glyphs keep their native aspect ratio regardless of the `grid` ratio:
+ * each is fitted (contain) into its cell, so a non-square cell letterboxes
+ * rather than stretching the character. Match `grid` to the font's
+ * character box (≈ advance : em) for gap-free tiling.
+ *
  * `grid`, `color`, `background`, `colorFromSource`, and `invert` are live
- * (read every frame). `chars` / `font` are baked into the glyph atlas at
- * `init()` — change them by re-adding the effect.
+ * (read every frame). `chars` / `font` / `fontWeight` are baked into the
+ * glyph atlas at `init()` — change them by re-adding the effect.
  */
 export class AsciiEffect implements Effect {
     params: AsciiParams;
@@ -288,6 +315,7 @@ export class AsciiEffect implements Effect {
     #cols = 1;
     #rows = 1;
     #charCount = 1;
+    #glyphAspect = 1;
 
     constructor(initial: Partial<AsciiParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
@@ -308,13 +336,14 @@ export class AsciiEffect implements Effect {
 
         await ensureFont(this.params.font, this.params.fontWeight);
 
-        const { canvas, cols, rows } = buildAtlas(
+        const { canvas, cols, rows, aspect } = buildAtlas(
             chars,
             this.params.font,
             this.params.fontWeight,
         );
         this.#cols = cols;
         this.#rows = rows;
+        this.#glyphAspect = aspect;
         this.#atlas = ctx.wrapTexture(canvas, {
             autoUpdate: false,
             filter: "linear",
@@ -341,6 +370,7 @@ export class AsciiEffect implements Effect {
                 cols: this.#cols,
                 rows: this.#rows,
                 charCount: this.#charCount,
+                glyphAspect: this.#glyphAspect,
                 color: this.params.color,
                 background: this.params.background,
                 colorFromSource: this.params.colorFromSource ? 1 : 0,
