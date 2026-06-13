@@ -805,6 +805,8 @@ type SaberArgs = {
     amplitude: number;
     frequency: number;
     speed: number;
+    softness: number;
+    core: number;
     pad: number;
 };
 function hexToRgb(hex: string): [number, number, number] {
@@ -839,6 +841,8 @@ export const saber: StoryObj<SaberArgs> = {
         amplitude: 0.02,
         frequency: 4.0,
         speed: 1.0,
+        softness: 0.5,
+        core: 0.5,
         pad: 80,
     },
     argTypes: {
@@ -850,6 +854,8 @@ export const saber: StoryObj<SaberArgs> = {
         },
         frequency: { control: { type: "range", min: 0.5, max: 12, step: 0.5 } },
         speed: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
+        softness: { control: { type: "range", min: 0.1, max: 2, step: 0.05 } },
+        core: { control: { type: "range", min: 0, max: 2, step: 0.05 } },
         pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
     },
 };

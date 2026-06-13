@@ -26,7 +26,7 @@ export {
 export { RainbowEffect, type RainbowParams } from "./rainbow";
 export { RgbGlitchEffect, type RgbGlitchParams } from "./rgb-glitch";
 export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift";
-export { SaberEffect, type SaberParams } from "./saber";
+export { SaberEffect, type SaberLayer, type SaberParams } from "./saber";
 export { type Saber2Params, saber2 } from "./saber2";
 export { ScanlineEffect } from "./scanline";
 export { SinewaveEffect, type SinewaveParams } from "./sinewave";
