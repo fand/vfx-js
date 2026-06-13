@@ -136,15 +136,16 @@ void main() {
 
     // The Saber glow: brightness is the reciprocal of distance to the edge.
     float eps = 0.5 / res.y;
-    float glow = (0.1 * intensity) / max(dist, eps);
+    float glow = (0.03 * intensity) / max(dist, eps);
+    glow = pow(glow, 0.5); // TODO: make 0.5 tweakable ("softness")
 
     // White-hot core where the glow saturates.
-    float core = smoothstep(1.0, 3.0, glow);
-    vec3 col = color * glow + vec3(1.0) * core;
+    float core = smoothstep(.9, 1., glow * 0.5); // TODO: make 0.5 tweakable ("core")
+    vec3 col = color * glow + core;
 
     // Premultiplied output for the runtime's (ONE, 1-SRC_ALPHA) blend.
     float a = clamp(glow + core, 0.0, 1.0);
-    outColor = vec4(col * a, a);
+    outColor = vec4(col, a);
 }
 `;
 
