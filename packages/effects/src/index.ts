@@ -3,6 +3,7 @@ export {
     type AsciiCharRamp,
     type AsciiColor,
     AsciiEffect,
+    type AsciiImageSource,
     type AsciiParams,
     type AsciiPresetName,
 } from "./ascii";

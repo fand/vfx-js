@@ -14,6 +14,16 @@ export type AsciiColor = [number, number, number, number];
  */
 export type AsciiCharRamp = string | readonly string[];
 
+/**
+ * An image tile source. Strings are treated as URLs (loaded and decoded
+ * in `init()`); the rest are used directly.
+ */
+export type AsciiImageSource =
+    | HTMLImageElement
+    | HTMLCanvasElement
+    | ImageBitmap
+    | string;
+
 /** Name of a built-in {@link ASCII_PRESETS} ramp. */
 export type AsciiPresetName =
     | "standard"
@@ -65,6 +75,7 @@ uniform vec4 background;     // cell backdrop, non-premultiplied
 uniform int colorFromSource; // 1 = tint glyph with the cell's avg colour
 uniform int invert;          // 1 = flip the luminance → glyph mapping
 uniform float glyphAspect;   // font's character box aspect (advance / em)
+uniform int tileColor;       // 1 = use the atlas tile's own RGBA (image tiles)
 
 // Box-average TAPS x TAPS samples per cell. A single centre tap throws
 // away most of the cell; this keeps the glyph choice representative.
@@ -116,17 +127,26 @@ void main() {
     vec2 frac = min(vec2(1.0), vec2(glyphAspect / cellAspect, cellAspect / glyphAspect));
     vec2 gloc = (local - 0.5) / frac + 0.5;
 
-    float glyph = 0.0;
+    vec4 tile = vec4(0.0);
     if (gloc.x >= 0.0 && gloc.x <= 1.0 && gloc.y >= 0.0 && gloc.y <= 1.0) {
         float u = (col + gloc.x) / cols;
         float v = 1.0 - (rowTop + 1.0 - gloc.y) / rows;
-        glyph = texture(atlas, vec2(u, v)).a;
+        tile = texture(atlas, vec2(u, v));
     }
 
-    vec3 fg = colorFromSource == 1 ? acc.rgb : color.rgb;
-    // Fade glyph coverage by the cell's source alpha so transparent
-    // regions (e.g. text captures) fall back to the background.
-    float fgA = color.a * glyph * acc.a;
+    // Image tiles keep their own RGBA; glyph tiles are a coverage mask in
+    // .a, tinted by color (or the cell's average colour). Both fade by
+    // the cell's source alpha so transparent regions (e.g. text captures)
+    // fall back to the background.
+    vec3 fg;
+    float fgA;
+    if (tileColor == 1) {
+        fg = tile.rgb;
+        fgA = tile.a * color.a * acc.a;
+    } else {
+        fg = colorFromSource == 1 ? acc.rgb : color.rgb;
+        fgA = color.a * tile.a * acc.a;
+    }
 
     float outA = fgA + background.a * (1.0 - fgA);
     vec3 premul = fg * fgA + background.rgb * background.a * (1.0 - fgA);
@@ -157,6 +177,18 @@ export type AsciiParams = {
 
     /** Built-in ramp to use when {@link chars} is omitted. */
     preset: AsciiPresetName;
+
+    /**
+     * Image tiles, ordered dark → light — an alternative to character
+     * glyphs. Takes precedence over {@link chars} / {@link preset} when
+     * non-empty. Each tile keeps its own colour (the `color` /
+     * `colorFromSource` tint is bypassed), is contain-fitted into the
+     * cell at a shared aspect (taken from the first tile), and the atlas
+     * is auto-downscaled to stay within GPU texture limits.
+     *
+     * Baked into the atlas at `init()`; change by re-adding the effect.
+     */
+    tiles?: readonly AsciiImageSource[];
 
     /**
      * CSS font family used to render the glyph atlas (e.g. `"monospace"`,
@@ -309,6 +341,93 @@ function buildAtlas(
     return { canvas, cols, rows, aspect };
 }
 
+// Upper bound on a single atlas axis (px). The image atlas is scaled to
+// fit so it stays within common GPU max-texture-size limits.
+const MAX_ATLAS_PX = 2048;
+// Upper bound on a single tile cell (px) before the atlas-fit scale.
+const MAX_TILE_PX = 256;
+
+/** Intrinsic pixel size of an image source. */
+function imageSize(src: CanvasImageSource): [number, number] {
+    if (
+        typeof HTMLImageElement !== "undefined" &&
+        src instanceof HTMLImageElement
+    ) {
+        return [src.naturalWidth || src.width, src.naturalHeight || src.height];
+    }
+    const s = src as { width: number; height: number };
+    return [s.width || 1, s.height || 1];
+}
+
+/** Load a tile source: decode URL strings, pass through ready images. */
+async function resolveImage(src: AsciiImageSource): Promise<CanvasImageSource> {
+    if (typeof src !== "string") {
+        return src;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = src;
+    try {
+        await img.decode();
+    } catch {
+        // Broken / tainted source — drawImage will just paint nothing.
+    }
+    return img;
+}
+
+/**
+ * Render image tiles (dark → light order) into one atlas. All tiles share
+ * a single cell aspect (from the first tile) and are contain-fitted so
+ * odd sizes letterbox instead of distorting. The cell size is derived
+ * from the tallest tile, capped, then the whole atlas is scaled down to
+ * fit {@link MAX_ATLAS_PX}.
+ */
+function buildImageAtlas(images: CanvasImageSource[]): {
+    canvas: HTMLCanvasElement;
+    cols: number;
+    rows: number;
+    aspect: number;
+} {
+    const n = Math.max(1, images.length);
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+
+    const sizes = images.map(imageSize);
+    const [w0, h0] = sizes[0] ?? [1, 1];
+    const aspect = w0 / Math.max(1, h0);
+    const tallest = Math.max(1, ...sizes.map((s) => s[1]));
+
+    let cellH = Math.min(MAX_TILE_PX, Math.max(8, Math.round(tallest)));
+    let cellW = Math.max(1, Math.round(cellH * aspect));
+    // Shrink uniformly so neither atlas axis exceeds the cap.
+    const fit = Math.min(
+        1,
+        MAX_ATLAS_PX / (cols * cellW),
+        MAX_ATLAS_PX / (rows * cellH),
+    );
+    cellW = Math.max(1, Math.floor(cellW * fit));
+    cellH = Math.max(1, Math.floor(cellH * fit));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = cols * cellW;
+    canvas.height = rows * cellH;
+
+    const g = canvas.getContext("2d");
+    if (g) {
+        g.clearRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < images.length; i++) {
+            const [iw, ih] = sizes[i];
+            const s = Math.min(cellW / iw, cellH / ih);
+            const dw = iw * s;
+            const dh = ih * s;
+            const dx = (i % cols) * cellW + (cellW - dw) / 2;
+            const dy = Math.floor(i / cols) * cellH + (cellH - dh) / 2;
+            g.drawImage(images[i], dx, dy, dw, dh);
+        }
+    }
+    return { canvas, cols, rows, aspect: cellW / cellH };
+}
+
 /**
  * ASCII / glyph-mosaic effect.
  *
@@ -316,6 +435,8 @@ function buildAtlas(
  * ```ts
  * vfx.add(el, { effect: new AsciiEffect({ font: "Helvetica", grid: 16 }) });
  * vfx.add(el, { effect: new AsciiEffect({ chars: [" ", ".", "+", "#"] }) });
+ * // Image tiles (dark → light), each keeping its own colour:
+ * vfx.add(el, { effect: new AsciiEffect({ tiles: ["/0.png", "/1.png"] }) });
  * ```
  *
  * Glyphs keep their native aspect ratio regardless of the `grid` ratio:
@@ -335,6 +456,7 @@ export class AsciiEffect implements Effect {
     #rows = 1;
     #charCount = 1;
     #glyphAspect = 1;
+    #tileColor = false;
 
     constructor(initial: Partial<AsciiParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
@@ -348,23 +470,38 @@ export class AsciiEffect implements Effect {
         if (typeof document === "undefined") {
             return;
         }
-        const chars = resolveChars(
-            this.params.chars ?? ASCII_PRESETS[this.params.preset],
-        );
-        this.#charCount = Math.max(1, chars.length);
 
-        await ensureFont(this.params.font, this.params.fontWeight);
+        const tiles = this.params.tiles;
+        let built: {
+            canvas: HTMLCanvasElement;
+            cols: number;
+            rows: number;
+            aspect: number;
+        };
+        if (tiles && tiles.length > 0) {
+            const images = await Promise.all(tiles.map(resolveImage));
+            this.#charCount = images.length;
+            this.#tileColor = true;
+            built = buildImageAtlas(images);
+        } else {
+            const chars = resolveChars(
+                this.params.chars ?? ASCII_PRESETS[this.params.preset],
+            );
+            this.#charCount = Math.max(1, chars.length);
+            this.#tileColor = false;
+            await ensureFont(this.params.font, this.params.fontWeight);
+            built = buildAtlas(
+                chars,
+                this.params.font,
+                this.params.fontWeight,
+                this.params.charAspect,
+            );
+        }
 
-        const { canvas, cols, rows, aspect } = buildAtlas(
-            chars,
-            this.params.font,
-            this.params.fontWeight,
-            this.params.charAspect,
-        );
-        this.#cols = cols;
-        this.#rows = rows;
-        this.#glyphAspect = aspect;
-        this.#atlas = ctx.wrapTexture(canvas, {
+        this.#cols = built.cols;
+        this.#rows = built.rows;
+        this.#glyphAspect = built.aspect;
+        this.#atlas = ctx.wrapTexture(built.canvas, {
             autoUpdate: false,
             filter: "linear",
         });
@@ -391,6 +528,7 @@ export class AsciiEffect implements Effect {
                 rows: this.#rows,
                 charCount: this.#charCount,
                 glyphAspect: this.#glyphAspect,
+                tileColor: this.#tileColor ? 1 : 0,
                 color: this.params.color,
                 background: this.params.background,
                 colorFromSource: this.params.colorFromSource ? 1 : 0,

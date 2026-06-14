@@ -1040,3 +1040,46 @@ export const ascii = presetStory<AsciiArgs>(
     },
     { clock: false, src: Pigeon },
 );
+
+// Build a coloured-dot tile (dark → light by `level`) as a canvas, to
+// demo AsciiEffect's image-tile path without bundling image assets.
+function makeTileCanvas(level: number, count: number): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 64;
+    const g = c.getContext("2d");
+    if (g) {
+        const t = count > 1 ? level / (count - 1) : 1;
+        g.fillStyle = `hsl(${40 + t * 80}, 90%, ${15 + t * 65}%)`;
+        g.beginPath();
+        g.arc(32, 32, 3 + t * 27, 0, Math.PI * 2);
+        g.fill();
+    }
+    return c;
+}
+
+// Image-tile path: each cell stamps a coloured dot (its own RGB) sized by
+// the cell's brightness, instead of a font glyph.
+export const asciiTiles: StoryObj<undefined> = {
+    render: () => {
+        const vfx = initVFX();
+        const img = document.createElement("img");
+        img.src = Pigeon;
+        img.style.display = "block";
+        img.style.margin = "40px auto";
+        img.style.maxWidth = "80vw";
+        const count = 6;
+        const tiles = Array.from({ length: count }, (_, i) =>
+            makeTileCanvas(i, count),
+        );
+        vfx.add(img, {
+            effect: new AsciiEffect({
+                tiles,
+                grid: 14,
+                background: [0, 0, 0, 1],
+            }),
+        });
+        return img;
+    },
+    args: undefined,
+};
