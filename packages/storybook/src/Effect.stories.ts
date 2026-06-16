@@ -1082,6 +1082,7 @@ type AsciiArgs = {
     background: string;
     colorFromSource: boolean;
     invert: boolean;
+    dither: number;
 };
 export const ascii: StoryObj<AsciiArgs> = {
     render: (a) => {
@@ -1095,6 +1096,7 @@ export const ascii: StoryObj<AsciiArgs> = {
             background: hexToRgba(a.background),
             colorFromSource: a.colorFromSource,
             invert: a.invert,
+            dither: a.dither,
         });
         return addAsciiSource(vfx, a.src, effect);
     },
@@ -1109,6 +1111,7 @@ export const ascii: StoryObj<AsciiArgs> = {
         background: "#000000",
         colorFromSource: false,
         invert: false,
+        dither: 0,
     },
     argTypes: {
         src: { control: { type: "select" }, options: ASCII_SRCS },
@@ -1135,6 +1138,7 @@ export const ascii: StoryObj<AsciiArgs> = {
         background: { control: { type: "color" } },
         colorFromSource: { control: { type: "boolean" } },
         invert: { control: { type: "boolean" } },
+        dither: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
     },
 };
 

@@ -76,6 +76,7 @@ uniform int colorFromSource; // 1 = tint glyph with the cell's avg colour
 uniform int invert;          // 1 = flip the luminance → glyph mapping
 uniform float glyphAspect;   // font's character box aspect (advance / em)
 uniform int tileColor;       // 1 = use the atlas tile's own RGBA (image tiles)
+uniform float dither;        // ordered-dither amount in index units (0 = off)
 
 // Box-average TAPS x TAPS samples per cell. A single centre tap throws
 // away most of the cell; this keeps the glyph choice representative.
@@ -84,6 +85,20 @@ const int TAPS = 4;
 vec4 readSrc(vec2 contentUv) {
     vec2 p = clamp(contentUv, 0.0, 1.0);
     return texture(src, srcRectUv.xy + p * srcRectUv.zw);
+}
+
+// 4x4 ordered (Bayer) dither threshold in (0, 1), keyed by cell index so
+// the offset is constant across a cell (one character per cell).
+float bayer4x4(vec2 cell) {
+    int x = int(mod(cell.x, 4.0));
+    int y = int(mod(cell.y, 4.0));
+    float m[16] = float[16](
+        0.0, 8.0, 2.0, 10.0,
+        12.0, 4.0, 14.0, 6.0,
+        3.0, 11.0, 1.0, 9.0,
+        15.0, 7.0, 13.0, 5.0
+    );
+    return (m[y * 4 + x] + 0.5) / 16.0;
 }
 
 void main() {
@@ -119,7 +134,14 @@ void main() {
 
     // Pick the glyph and its cell in the atlas (top-row origin in canvas
     // space; the texture is uploaded Y-flipped, hence the 1.0 - ... on v).
-    float idx = clamp(floor(lum * charCount), 0.0, charCount - 1.0);
+    // Ordered dither perturbs the continuous index by up to ±0.5 cell
+    // (at dither == 1), so neighbouring cells round to different glyphs
+    // and short ramps gain apparent tonal steps without banding.
+    float li = lum * charCount;
+    if (dither > 0.0) {
+        li += (bayer4x4(cellIdx) - 0.5) * dither;
+    }
+    float idx = clamp(floor(li), 0.0, charCount - 1.0);
     float col = mod(idx, cols);
     float rowTop = floor(idx / cols);
 
@@ -232,6 +254,14 @@ export type AsciiParams = {
 
     /** Flip the luminance → glyph mapping (for dark-on-light output). */
     invert: boolean;
+
+    /**
+     * Ordered (Bayer 4×4) dithering amount, [0, 1]. `0` disables it; `1`
+     * spreads each quantisation step across a full ramp level so short
+     * ramps (e.g. `minimal`, `dots`) render smooth gradients instead of
+     * hard bands. Applied per cell, so each character stays consistent.
+     */
+    dither: number;
 };
 
 const DEFAULT_PARAMS: AsciiParams = {
@@ -243,6 +273,7 @@ const DEFAULT_PARAMS: AsciiParams = {
     background: [0, 0, 0, 0],
     colorFromSource: false,
     invert: false,
+    dither: 0,
 };
 
 // Atlas glyph cell height (physical px). Fixed and oversized vs. typical
@@ -538,6 +569,7 @@ export class AsciiEffect implements Effect {
                 background: this.params.background,
                 colorFromSource: this.params.colorFromSource ? 1 : 0,
                 invert: this.params.invert ? 1 : 0,
+                dither: Math.max(0, this.params.dither),
             },
             target: ctx.target,
         });
