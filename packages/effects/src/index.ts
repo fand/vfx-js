@@ -8,7 +8,6 @@ export {
     type DatamoshView,
 } from "./datamosh";
 export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone";
-export { EdgeEffect, type EdgeLayer, type EdgeParams } from "./edge";
 export { FluidEffect } from "./fluid";
 export { GlitchEffect, type GlitchParams } from "./glitch";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
@@ -27,7 +26,6 @@ export { RainbowEffect, type RainbowParams } from "./rainbow";
 export { RgbGlitchEffect, type RgbGlitchParams } from "./rgb-glitch";
 export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift";
 export { SaberEffect, type SaberLayer, type SaberParams } from "./saber";
-export { type Saber2Params, saber2 } from "./saber2";
 export { ScanlineEffect } from "./scanline";
 export { SinewaveEffect, type SinewaveParams } from "./sinewave";
 export { TritoneEffect, type TritoneParams } from "./tritone";
