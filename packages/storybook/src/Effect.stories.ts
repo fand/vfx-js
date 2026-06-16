@@ -983,7 +983,42 @@ export const chromatic = presetStory<ChromaticArgs>(
     { clock: false, src: Pigeon },
 );
 
+type AsciiSrcName = "Pigeon" | "Jellyfish" | "WebCam";
+const ASCII_SRCS: AsciiSrcName[] = ["Pigeon", "Jellyfish", "WebCam"];
+
+// Build the source element for the ASCII stories. Webcam streams via
+// getUserMedia (falls back silently when denied / unavailable); the rest
+// load bundled image assets.
+function makeAsciiSource(src: AsciiSrcName): HTMLElement {
+    const center = (el: HTMLElement) => {
+        el.style.display = "block";
+        el.style.margin = "40px auto";
+        el.style.maxWidth = "80vw";
+    };
+    if (src === "WebCam") {
+        const video = document.createElement("video");
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.autoplay = true;
+        center(video);
+        navigator.mediaDevices
+            ?.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+                void video.play();
+            })
+            .catch((e) => console.warn("[ascii story] webcam unavailable:", e));
+        return video;
+    }
+    const img = document.createElement("img");
+    img.src = src === "Jellyfish" ? Jellyfish : Pigeon;
+    center(img);
+    return img;
+}
+
 type AsciiArgs = {
+    src: AsciiSrcName;
     preset: AsciiPresetName;
     gridX: number;
     gridY: number;
@@ -994,19 +1029,26 @@ type AsciiArgs = {
     colorFromSource: boolean;
     invert: boolean;
 };
-export const ascii = presetStory<AsciiArgs>(
-    (a) =>
-        new AsciiEffect({
-            preset: a.preset,
-            grid: [a.gridX, a.gridY],
-            font: a.font,
-            fontWeight: a.fontWeight,
-            color: hexToRgba(a.color),
-            background: hexToRgba(a.background),
-            colorFromSource: a.colorFromSource,
-            invert: a.invert,
-        }),
-    {
+export const ascii: StoryObj<AsciiArgs> = {
+    render: (a) => {
+        const vfx = initVFX();
+        const el = makeAsciiSource(a.src);
+        vfx.add(el, {
+            effect: new AsciiEffect({
+                preset: a.preset,
+                grid: [a.gridX, a.gridY],
+                font: a.font,
+                fontWeight: a.fontWeight,
+                color: hexToRgba(a.color),
+                background: hexToRgba(a.background),
+                colorFromSource: a.colorFromSource,
+                invert: a.invert,
+            }),
+        });
+        return el;
+    },
+    args: {
+        src: "Pigeon",
         preset: "standard",
         gridX: 8,
         gridY: 14,
@@ -1017,7 +1059,8 @@ export const ascii = presetStory<AsciiArgs>(
         colorFromSource: false,
         invert: false,
     },
-    {
+    argTypes: {
+        src: { control: { type: "select" }, options: ASCII_SRCS },
         preset: {
             control: { type: "select" },
             options: [
@@ -1042,11 +1085,11 @@ export const ascii = presetStory<AsciiArgs>(
         colorFromSource: { control: { type: "boolean" } },
         invert: { control: { type: "boolean" } },
     },
-    { clock: false, src: Pigeon },
-);
+};
 
-// Build a coloured-dot tile (dark → light by `level`) as a canvas, to
-// demo AsciiEffect's image-tile path without bundling image assets.
+// Build a coloured-dot tile as a canvas. The dot grows with `level` (so
+// the brightness ramp still reads), and each tile gets a distinct hue so
+// the demo shows tiles keeping their own colour.
 function makeTileCanvas(level: number, count: number): HTMLCanvasElement {
     const c = document.createElement("canvas");
     c.width = 64;
@@ -1054,7 +1097,8 @@ function makeTileCanvas(level: number, count: number): HTMLCanvasElement {
     const g = c.getContext("2d");
     if (g) {
         const t = count > 1 ? level / (count - 1) : 1;
-        g.fillStyle = `hsl(${40 + t * 80}, 90%, ${15 + t * 65}%)`;
+        const hue = (level / Math.max(1, count)) * 360;
+        g.fillStyle = `hsl(${hue}, 85%, 55%)`;
         g.beginPath();
         g.arc(32, 32, 3 + t * 27, 0, Math.PI * 2);
         g.fill();
@@ -1064,26 +1108,25 @@ function makeTileCanvas(level: number, count: number): HTMLCanvasElement {
 
 // Image-tile path: each cell stamps a coloured dot (its own RGB) sized by
 // the cell's brightness, instead of a font glyph.
-export const asciiTiles: StoryObj<undefined> = {
-    render: () => {
+export const asciiTiles: StoryObj<{ src: AsciiSrcName }> = {
+    render: (a) => {
         const vfx = initVFX();
-        const img = document.createElement("img");
-        img.src = Pigeon;
-        img.style.display = "block";
-        img.style.margin = "40px auto";
-        img.style.maxWidth = "80vw";
+        const el = makeAsciiSource(a.src);
         const count = 6;
         const tiles = Array.from({ length: count }, (_, i) =>
             makeTileCanvas(i, count),
         );
-        vfx.add(img, {
+        vfx.add(el, {
             effect: new AsciiEffect({
                 tiles,
                 grid: 14,
                 background: [0, 0, 0, 1],
             }),
         });
-        return img;
+        return el;
     },
-    args: undefined,
+    args: { src: "Pigeon" },
+    argTypes: {
+        src: { control: { type: "select" }, options: ASCII_SRCS },
+    },
 };
