@@ -987,6 +987,7 @@ type AsciiArgs = {
     preset: AsciiPresetName;
     gridX: number;
     gridY: number;
+    font: string;
     fontWeight: string;
     color: string;
     background: string;
@@ -998,6 +999,7 @@ export const ascii = presetStory<AsciiArgs>(
         new AsciiEffect({
             preset: a.preset,
             grid: [a.gridX, a.gridY],
+            font: a.font,
             fontWeight: a.fontWeight,
             color: hexToRgba(a.color),
             background: hexToRgba(a.background),
@@ -1008,6 +1010,7 @@ export const ascii = presetStory<AsciiArgs>(
         preset: "standard",
         gridX: 8,
         gridY: 14,
+        font: "monospace",
         fontWeight: "normal",
         color: "#ffffff",
         background: "#000000",
@@ -1029,6 +1032,7 @@ export const ascii = presetStory<AsciiArgs>(
         },
         gridX: { control: { type: "range", min: 4, max: 48, step: 1 } },
         gridY: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        font: { control: { type: "text" } },
         fontWeight: {
             control: { type: "select" },
             options: ["normal", "bold", "100", "300", "600", "900"],
