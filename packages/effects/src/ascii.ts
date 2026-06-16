@@ -76,6 +76,7 @@ uniform int invert;          // 1 = flip the luminance → glyph mapping
 uniform float glyphAspect;   // font's character box aspect (advance / em)
 uniform int tileColor;       // 1 = use the atlas tile's own RGBA (image tiles)
 uniform float dither;        // ordered-dither amount in index units (0 = off)
+uniform vec2 atlasCellPx;    // atlas cell size in texels (for edge inset)
 
 // Box-average TAPS x TAPS samples per cell. A single centre tap throws
 // away most of the cell; this keeps the glyph choice representative.
@@ -155,8 +156,13 @@ void main() {
 
     vec4 tile = vec4(0.0);
     if (gloc.x >= 0.0 && gloc.x <= 1.0 && gloc.y >= 0.0 && gloc.y <= 1.0) {
-        float u = (col + gloc.x) / cols;
-        float v = 1.0 - (rowTop + 1.0 - gloc.y) / rows;
+        // Inset by half a texel so linear filtering never reaches across
+        // the cell border into a neighbouring glyph / tile (keeps the
+        // crisp downscale that nearest would lose to aliasing).
+        vec2 inset = 0.5 / atlasCellPx;
+        vec2 g2 = mix(inset, 1.0 - inset, gloc);
+        float u = (col + g2.x) / cols;
+        float v = 1.0 - (rowTop + 1.0 - g2.y) / rows;
         tile = texture(atlas, vec2(u, v));
     }
 
@@ -317,6 +323,16 @@ async function ensureFont(
     }
 }
 
+/** Result of building an atlas: the canvas plus its grid + cell metrics. */
+type AtlasBuild = {
+    canvas: HTMLCanvasElement;
+    cols: number;
+    rows: number;
+    /** Cell size in atlas px (width / height gives the character aspect). */
+    cellW: number;
+    cellH: number;
+};
+
 /**
  * Render the ramp into a single glyph atlas canvas, laid out as a near-
  * square grid of cells. Cell height is `GLYPH_PX`; cell width tracks the
@@ -329,13 +345,7 @@ function buildAtlas(
     font: string,
     weight: string | number,
     aspectOverride?: number,
-): {
-    canvas: HTMLCanvasElement;
-    cols: number;
-    rows: number;
-    /** Character box aspect (cell advance / em height). */
-    aspect: number;
-} {
+): AtlasBuild {
     const n = Math.max(1, chars.length);
     const cols = Math.ceil(Math.sqrt(n));
     const rows = Math.ceil(n / cols);
@@ -355,7 +365,6 @@ function buildAtlas(
             cellW = Math.max(1, Math.ceil(probe.measureText("M").width));
         }
     }
-    const aspect = cellW / GLYPH_PX;
 
     canvas.width = cols * cellW;
     canvas.height = rows * GLYPH_PX;
@@ -373,7 +382,7 @@ function buildAtlas(
             g.fillText(chars[i], cx, cy);
         }
     }
-    return { canvas, cols, rows, aspect };
+    return { canvas, cols, rows, cellW, cellH: GLYPH_PX };
 }
 
 // Upper bound on a single atlas axis (px). The image atlas is scaled to
@@ -417,12 +426,7 @@ async function resolveImage(src: AsciiImageSource): Promise<CanvasImageSource> {
  * from the tallest tile, capped, then the whole atlas is scaled down to
  * fit {@link MAX_ATLAS_PX}.
  */
-function buildImageAtlas(images: CanvasImageSource[]): {
-    canvas: HTMLCanvasElement;
-    cols: number;
-    rows: number;
-    aspect: number;
-} {
+function buildImageAtlas(images: CanvasImageSource[]): AtlasBuild {
     const n = Math.max(1, images.length);
     const cols = Math.ceil(Math.sqrt(n));
     const rows = Math.ceil(n / cols);
@@ -460,7 +464,7 @@ function buildImageAtlas(images: CanvasImageSource[]): {
             g.drawImage(images[i], dx, dy, dw, dh);
         }
     }
-    return { canvas, cols, rows, aspect: cellW / cellH };
+    return { canvas, cols, rows, cellW, cellH };
 }
 
 /**
@@ -481,8 +485,9 @@ function buildImageAtlas(images: CanvasImageSource[]): {
  *
  * `grid`, `color`, `background`, `colorFromSource`, `invert`, and `dither`
  * are live (read every frame). `chars` / `tiles` / `font` / `fontWeight` /
- * `charAspect` are baked into the atlas at `init()` — change them by
- * re-adding the effect.
+ * `charAspect` are baked into the atlas at `init()` — after changing them
+ * via `setParams`, call {@link AsciiEffect.regenerate} (or re-add the
+ * effect) to rebuild.
  */
 export class AsciiEffect implements Effect {
     params: AsciiParams;
@@ -492,7 +497,9 @@ export class AsciiEffect implements Effect {
     #rows = 1;
     #charCount = 1;
     #glyphAspect = 1;
+    #atlasCellPx: [number, number] = [1, 1];
     #tileColor = false;
+    #ctx: EffectContext | null = null;
 
     constructor(initial: Partial<AsciiParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
@@ -506,23 +513,49 @@ export class AsciiEffect implements Effect {
         if (typeof document === "undefined") {
             return;
         }
+        this.#ctx = ctx;
+        await this.#build(ctx);
+    }
 
+    /**
+     * Rebuild the atlas from the current params, applying changes to the
+     * baked fields (`chars` / `tiles` / `font` / `fontWeight` /
+     * `charAspect`) without removing and re-adding the effect. Async — it
+     * may load fonts or decode image tiles. No-op before `init()`.
+     *
+     * Allocates a fresh atlas texture; the previous one is released when
+     * the effect is removed, so prefer occasional calls (e.g. on a
+     * settings change) over per-frame use.
+     */
+    async regenerate(): Promise<void> {
+        if (!this.#ctx) {
+            return;
+        }
+        await this.#build(this.#ctx);
+    }
+
+    async #build(ctx: EffectContext): Promise<void> {
         const tiles = this.params.tiles;
-        let built: {
-            canvas: HTMLCanvasElement;
-            cols: number;
-            rows: number;
-            aspect: number;
-        };
+        let built: AtlasBuild;
         if (tiles && tiles.length > 0) {
             const images = await Promise.all(tiles.map(resolveImage));
             this.#charCount = images.length;
             this.#tileColor = true;
             built = buildImageAtlas(images);
         } else {
+            if (tiles && tiles.length === 0) {
+                console.warn(
+                    "[VFX-JS] AsciiEffect: `tiles` is empty; falling back to characters.",
+                );
+            }
             const chars = resolveChars(
                 this.params.chars ?? ASCII_PRESETS[this.params.preset],
             );
+            if (chars.length === 0) {
+                console.warn(
+                    "[VFX-JS] AsciiEffect: empty character ramp; nothing will be rendered.",
+                );
+            }
             this.#charCount = Math.max(1, chars.length);
             this.#tileColor = false;
             await ensureFont(this.params.font, this.params.fontWeight);
@@ -536,7 +569,8 @@ export class AsciiEffect implements Effect {
 
         this.#cols = built.cols;
         this.#rows = built.rows;
-        this.#glyphAspect = built.aspect;
+        this.#glyphAspect = built.cellW / built.cellH;
+        this.#atlasCellPx = [built.cellW, built.cellH];
         this.#atlas = ctx.wrapTexture(built.canvas, {
             autoUpdate: false,
             filter: "linear",
@@ -564,6 +598,7 @@ export class AsciiEffect implements Effect {
                 rows: this.#rows,
                 charCount: this.#charCount,
                 glyphAspect: this.#glyphAspect,
+                atlasCellPx: this.#atlasCellPx,
                 tileColor: this.#tileColor ? 1 : 0,
                 color: this.params.color,
                 background: this.params.background,
@@ -577,5 +612,6 @@ export class AsciiEffect implements Effect {
 
     dispose(): void {
         this.#atlas = null;
+        this.#ctx = null;
     }
 }
