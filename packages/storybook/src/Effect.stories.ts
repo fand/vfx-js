@@ -1144,7 +1144,16 @@ export const ascii: StoryObj<AsciiArgs> = {
 // Build a coloured-dot tile as a canvas. The dot grows with `level` (so
 // the brightness ramp still reads), and each tile gets a distinct hue so
 // the demo shows tiles keeping their own colour.
-function makeTileCanvas(level: number, count: number): HTMLCanvasElement {
+// Tile shape presets for the image-tile demo. Each builds a `count`-step
+// dark → light ramp; the shape grows with brightness.
+type AsciiTileShape = "dots" | "rings" | "squares";
+const ASCII_TILE_SHAPES: AsciiTileShape[] = ["dots", "rings", "squares"];
+
+function makeTileCanvas(
+    level: number,
+    count: number,
+    shape: AsciiTileShape,
+): HTMLCanvasElement {
     const c = document.createElement("canvas");
     c.width = 64;
     c.height = 64;
@@ -1152,32 +1161,50 @@ function makeTileCanvas(level: number, count: number): HTMLCanvasElement {
     if (g) {
         const t = count > 1 ? level / (count - 1) : 1;
         const hue = (level / Math.max(1, count)) * 360;
-        g.fillStyle = `hsl(${hue}, 85%, 55%)`;
-        g.beginPath();
-        g.arc(32, 32, 3 + t * 27, 0, Math.PI * 2);
-        g.fill();
+        const color = `hsl(${hue}, 85%, 55%)`;
+        g.fillStyle = color;
+        g.strokeStyle = color;
+        if (shape === "squares") {
+            const s = 6 + t * 50;
+            g.fillRect(32 - s / 2, 32 - s / 2, s, s);
+        } else if (shape === "rings") {
+            g.lineWidth = 2 + t * 9;
+            g.beginPath();
+            g.arc(32, 32, 6 + t * 22, 0, Math.PI * 2);
+            g.stroke();
+        } else {
+            g.beginPath();
+            g.arc(32, 32, 3 + t * 27, 0, Math.PI * 2);
+            g.fill();
+        }
     }
     return c;
 }
 
-// Image-tile path: each cell stamps a coloured dot (its own RGB) sized by
-// the cell's brightness, instead of a font glyph.
-export const asciiTiles: StoryObj<{ src: AsciiSrcName }> = {
+// Image-tile path: each cell stamps a coloured shape (its own RGB) sized
+// by the cell's brightness, instead of a font glyph.
+export const asciiTiles: StoryObj<{
+    src: AsciiSrcName;
+    preset: AsciiTileShape;
+    grid: number;
+}> = {
     render: (a) => {
         const vfx = initVFX();
         const count = 6;
         const tiles = Array.from({ length: count }, (_, i) =>
-            makeTileCanvas(i, count),
+            makeTileCanvas(i, count, a.preset),
         );
         const effect = new AsciiEffect({
             tiles,
-            grid: 14,
+            grid: a.grid,
             background: [0, 0, 0, 1],
         });
         return addAsciiSource(vfx, a.src, effect);
     },
-    args: { src: "Pigeon" },
+    args: { src: "Pigeon", preset: "dots", grid: 14 },
     argTypes: {
         src: { control: { type: "select" }, options: ASCII_SRCS },
+        preset: { control: { type: "select" }, options: ASCII_TILE_SHAPES },
+        grid: { control: { type: "range", min: 4, max: 48, step: 1 } },
     },
 };
