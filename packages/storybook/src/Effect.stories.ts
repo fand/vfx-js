@@ -1038,8 +1038,8 @@ function addAsciiSource(
         wrapper.style.margin = "40px auto";
 
         const sizer = document.createElement("div");
-        sizer.style.width = "480px";
-        sizer.style.maxWidth = "80vw";
+        sizer.style.width = "900px";
+        sizer.style.maxWidth = "90vw";
 
         const block = makeAsciiHtmlSample();
         sizer.appendChild(block);
