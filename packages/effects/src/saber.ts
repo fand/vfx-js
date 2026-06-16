@@ -268,40 +268,8 @@ export class SaberEffect implements Effect {
     #lastH = 0;
     #lastEdgeThreshold = Number.NaN;
 
-    // Resolves once the distance field has been built. The JFA can only run
-    // in `render()` (draws are ignored in `init`), so `await vfx.add(...)`
-    // alone does not guarantee the SDF exists yet — `await effect.ready`
-    // does. `invalidate()` arms a fresh promise for the next rebuild.
-    #ready!: Promise<void>;
-    #resolveReady!: () => void;
-
     constructor(initial: Partial<SaberParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
-        this.#armReady();
-    }
-
-    /**
-     * Resolves when the distance field has finished building (after the
-     * first `render()` that builds it, since the JFA cannot run during
-     * `init`). Re-armed by {@link invalidate}.
-     *
-     * ```ts
-     * const saber = new SaberEffect();
-     * await vfx.add(el, { effect: saber });
-     * await saber.ready; // distance field is now ready
-     * ```
-     *
-     * Note: it only resolves once the effect actually renders, so it stays
-     * pending while the element is off-screen / not visible.
-     */
-    get ready(): Promise<void> {
-        return this.#ready;
-    }
-
-    #armReady(): void {
-        this.#ready = new Promise<void>((resolve) => {
-            this.#resolveReady = resolve;
-        });
     }
 
     setParams(updates: Partial<SaberParams>): void {
@@ -311,7 +279,6 @@ export class SaberEffect implements Effect {
     /** Force the distance field to be rebuilt on the next frame. */
     invalidate(): void {
         this.#dirty = true;
-        this.#armReady();
     }
 
     init(ctx: EffectContext): void {
@@ -471,8 +438,5 @@ export class SaberEffect implements Effect {
             uniforms: { seed: read, res },
             target: field,
         });
-
-        // The field is now built — let `await effect.ready` proceed.
-        this.#resolveReady();
     }
 }
