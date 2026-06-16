@@ -161,18 +161,17 @@ void main() {
     }
 
     // Image tiles keep their own RGBA; glyph tiles are a coverage mask in
-    // .a, tinted by color (or the cell's average colour). Both fade by
-    // the cell's source alpha so transparent regions (e.g. text captures)
+    // .a, tinted by color (or the cell's average colour). The alpha is the
+    // same either way: tile coverage x color.a (global opacity) x the
+    // cell's source alpha, so transparent regions (e.g. text captures)
     // fall back to the background.
     vec3 fg;
-    float fgA;
     if (tileColor == 1) {
         fg = tile.rgb;
-        fgA = tile.a * color.a * acc.a;
     } else {
         fg = colorFromSource == 1 ? acc.rgb : color.rgb;
-        fgA = color.a * tile.a * acc.a;
     }
+    float fgA = tile.a * color.a * acc.a;
 
     float outA = fgA + background.a * (1.0 - fgA);
     vec3 premul = fg * fgA + background.rgb * background.a * (1.0 - fgA);
@@ -207,10 +206,11 @@ export type AsciiParams = {
     /**
      * Image tiles, ordered dark → light — an alternative to character
      * glyphs. Takes precedence over {@link chars} / {@link preset} when
-     * non-empty. Each tile keeps its own colour (the `color` /
-     * `colorFromSource` tint is bypassed), is contain-fitted into the
-     * cell at a shared aspect (taken from the first tile), and the atlas
-     * is auto-downscaled to stay within GPU texture limits.
+     * non-empty. Each tile keeps its own colour (the `color` RGB /
+     * `colorFromSource` tint is bypassed, though `color`'s alpha still
+     * scales opacity), is contain-fitted into the cell at a shared aspect
+     * (taken from the first tile), and the atlas is auto-downscaled to
+     * stay within GPU texture limits.
      *
      * Baked into the atlas at `init()`; change by re-adding the effect.
      */
@@ -479,9 +479,10 @@ function buildImageAtlas(images: CanvasImageSource[]): {
  * rather than stretching the character. Match `grid` to the font's
  * character box (≈ advance : em) for gap-free tiling.
  *
- * `grid`, `color`, `background`, `colorFromSource`, and `invert` are live
- * (read every frame). `chars` / `font` / `fontWeight` are baked into the
- * glyph atlas at `init()` — change them by re-adding the effect.
+ * `grid`, `color`, `background`, `colorFromSource`, `invert`, and `dither`
+ * are live (read every frame). `chars` / `tiles` / `font` / `fontWeight` /
+ * `charAspect` are baked into the atlas at `init()` — change them by
+ * re-adding the effect.
  */
 export class AsciiEffect implements Effect {
     params: AsciiParams;
@@ -568,7 +569,7 @@ export class AsciiEffect implements Effect {
                 background: this.params.background,
                 colorFromSource: this.params.colorFromSource ? 1 : 0,
                 invert: this.params.invert ? 1 : 0,
-                dither: Math.max(0, this.params.dither),
+                dither: Math.min(1, Math.max(0, this.params.dither)),
             },
             target: ctx.target,
         });
