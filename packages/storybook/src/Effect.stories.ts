@@ -807,6 +807,9 @@ type SaberArgs = {
     softness: number;
     core: number;
     edgeThreshold: number;
+    thickness: number;
+    lineCount: number;
+    noiseScaleStep: number;
     pad: number;
 };
 function hexToRgb(hex: string): [number, number, number] {
@@ -893,6 +896,9 @@ export const saber: StoryObj<SaberArgs> = {
         softness: 0.5,
         core: 0.5,
         edgeThreshold: 0.5,
+        thickness: 1.0,
+        lineCount: 3,
+        noiseScaleStep: 1.8,
         pad: 80,
     },
     argTypes: {
@@ -901,7 +907,7 @@ export const saber: StoryObj<SaberArgs> = {
             options: ["Logo", "Jellyfish", "Text", "Webcam"],
         },
         color: { control: { type: "color" } },
-        intensity: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
+        intensity: { control: { type: "range", min: 0, max: 2, step: 0.02 } },
         amplitude: {
             control: { type: "range", min: 0, max: 0.1, step: 0.002 },
         },
@@ -911,6 +917,11 @@ export const saber: StoryObj<SaberArgs> = {
         core: { control: { type: "range", min: 0, max: 2, step: 0.05 } },
         edgeThreshold: {
             control: { type: "range", min: 0, max: 1, step: 0.02 },
+        },
+        thickness: { control: { type: "range", min: 0.5, max: 5, step: 0.1 } },
+        lineCount: { control: { type: "range", min: 1, max: 5, step: 1 } },
+        noiseScaleStep: {
+            control: { type: "range", min: 1, max: 3, step: 0.1 },
         },
         pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
     },

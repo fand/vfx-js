@@ -16,6 +16,9 @@
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 import { SNOISE3D } from "./_noise";
 
+/** Max number of overlaid lines (caps the per-frame render loop). */
+const MAX_LINES = 5;
+
 // (1a) Seed pass. Detect the silhouette edge from the element's grayscale
 // luminance and write each edge texel's own buffer-uv as a JFA seed.
 // Non-edge texels get an invalid seed (b = 0) sitting far away so they
@@ -105,9 +108,10 @@ void main() {
 }
 `;
 
-// (2) + (3) Per-frame render. Several glowing lines are overlaid: each
-// layer warps the distance lookup with its own animated 3D noise (scale +
-// seed) and line width, then lights it up with the `k / distance` falloff.
+// (2) + (3) Per-frame render. `lineCount` glowing lines are overlaid: each
+// successive line uses a `noiseScaleStep`-times larger noise scale (finer
+// crackle) and a lower weight, all warping the same distance field, then
+// lit with the `k / distance` falloff.
 const FRAG_RENDER = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -122,16 +126,19 @@ uniform float frequency;
 uniform float speed;
 uniform float softness;
 uniform float core;
-uniform int layerCount;
-uniform vec4 layerThickness;
-uniform vec4 layerNoiseScale;
-uniform vec4 layerWeight;
+uniform float thickness;
+uniform int lineCount;
+uniform float noiseScaleStep;
+
+// Each overlaid line contributes this much less than the previous one.
+const float WEIGHT_FALLOFF = 0.6;
 
 ${SNOISE3D}
 
-// One warped, lit line. freq scales the noise, seed decorrelates layers,
-// thickness widens the glow (shrinks the effective distance).
-float lineGlow(float t, float freq, float thickness, float seed, float eps) {
+// One warped, lit line. freq scales the noise, seed decorrelates lines,
+// thickness widens the glow (shrinks the effective distance). The base
+// brightness is tuned so intensity = 1 is a gentle, usable glow.
+float lineGlow(float t, float freq, float seed, float eps) {
     // Two octaves of 3D noise; z animated by time so the arcs flow.
     vec2 warp = vec2(
         snoise(vec3(uv * freq + seed, t)),
@@ -143,29 +150,24 @@ float lineGlow(float t, float freq, float thickness, float seed, float eps) {
     ) * amplitude * 0.5;
 
     float dist = texture(distField, uv + warp).r;
-    float glow = (0.03 * intensity) / max(dist / thickness, eps);
+    float glow = (0.0015 * intensity) / max(dist / thickness, eps);
     return pow(glow, softness);
 }
 
 void main() {
-    float ths[4] = float[4](
-        layerThickness.x, layerThickness.y, layerThickness.z, layerThickness.w);
-    float nss[4] = float[4](
-        layerNoiseScale.x, layerNoiseScale.y,
-        layerNoiseScale.z, layerNoiseScale.w);
-    float wts[4] = float[4](
-        layerWeight.x, layerWeight.y, layerWeight.z, layerWeight.w);
-
     float t = time * speed;
     float eps = 0.5 / res.y;
 
     float glow = 0.0;
-    for (int i = 0; i < 4; i++) {
-        if (i >= layerCount) {
+    float freq = frequency;
+    float weight = 1.0;
+    for (int i = 0; i < ${MAX_LINES}; i++) {
+        if (i >= lineCount) {
             break;
         }
-        glow += lineGlow(
-            t, frequency * nss[i], ths[i], float(i) * 31.7, eps) * wts[i];
+        glow += lineGlow(t, freq, float(i) * 31.7, eps) * weight;
+        freq *= noiseScaleStep;
+        weight *= WEIGHT_FALLOFF;
     }
 
     // White-hot core where the glow saturates.
@@ -178,24 +180,14 @@ void main() {
 }
 `;
 
-/** One overlaid glowing line. */
-export type SaberLayer = {
-    /** Line width — widens the glow by shrinking the effective distance. */
-    thickness: number;
-    /** Multiplies the base `frequency` for this layer's noise warp. */
-    noiseScale: number;
-    /** Contribution weight when the layers are summed. */
-    weight: number;
-};
-
 export type SaberParams = {
     /** Glow color (linear RGB, 0..1). Default electric blue. */
     color: [number, number, number];
-    /** Overall glow strength, scales the `k / distance` numerator. */
+    /** Overall glow strength. `1` is a gentle, usable glow. */
     intensity: number;
     /** Noise warp amount, in buffer-uv units. */
     amplitude: number;
-    /** Spatial frequency of the warp noise (base; scaled per layer). */
+    /** Spatial frequency of the warp noise (base, for the first line). */
     frequency: number;
     /** Flow speed of the electric arcs (animates the noise z axis). */
     speed: number;
@@ -209,11 +201,20 @@ export type SaberParams = {
     /**
      * Grayscale luminance cutoff (0..1) for edge detection: the silhouette
      * is the iso-line where the source's brightness crosses this value.
+     * Mostly visible on sources with midtones (photos / video); a flat
+     * black-and-white logo has no midtones so the outline barely moves.
      * Changing it rebuilds the distance field.
      */
     edgeThreshold: number;
-    /** Overlaid lines, each with its own thickness + noise scale (max 4). */
-    layers: SaberLayer[];
+    /** Line width — widens the glow by shrinking the effective distance. */
+    thickness: number;
+    /** How many lines to overlay (1..5). */
+    lineCount: number;
+    /**
+     * Noise-scale growth per line: each successive line's warp frequency is
+     * this many times the previous one's, adding finer crackle on top.
+     */
+    noiseScaleStep: number;
     /**
      * Rebuild the distance field every frame instead of caching it. Needed
      * for live sources (video / webcam) whose silhouette changes; leave
@@ -236,16 +237,12 @@ const DEFAULT_PARAMS: SaberParams = {
     softness: 0.5,
     core: 0.5,
     edgeThreshold: 0.5,
-    layers: [
-        { thickness: 1.0, noiseScale: 1.0, weight: 1.0 },
-        { thickness: 0.6, noiseScale: 2.2, weight: 0.6 },
-        { thickness: 1.8, noiseScale: 0.5, weight: 0.4 },
-    ],
+    thickness: 1.0,
+    lineCount: 3,
+    noiseScaleStep: 1.8,
     dynamic: false,
     pad: 80,
 };
-
-const MAX_LAYERS = 4;
 
 /**
  * Electric "Saber" energy around an element's silhouette.
@@ -336,18 +333,13 @@ export class SaberEffect implements Effect {
             speed,
             softness,
             core,
+            thickness,
+            noiseScaleStep,
         } = this.params;
-        const layers = this.params.layers.slice(0, MAX_LAYERS);
-
-        // Pack per-layer params into vec4s (unused slots stay zero).
-        const thickness = [0, 0, 0, 0];
-        const noiseScale = [0, 0, 0, 0];
-        const weight = [0, 0, 0, 0];
-        layers.forEach((layer, i) => {
-            thickness[i] = layer.thickness;
-            noiseScale[i] = layer.noiseScale;
-            weight[i] = layer.weight;
-        });
+        const lineCount = Math.max(
+            1,
+            Math.min(MAX_LINES, this.params.lineCount),
+        );
 
         ctx.draw({
             frag: FRAG_RENDER,
@@ -362,10 +354,9 @@ export class SaberEffect implements Effect {
                 speed,
                 softness,
                 core,
-                layerCount: layers.length,
-                layerThickness: thickness,
-                layerNoiseScale: noiseScale,
-                layerWeight: weight,
+                thickness,
+                lineCount,
+                noiseScaleStep,
             },
             target: ctx.target,
         });
