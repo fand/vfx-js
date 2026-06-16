@@ -93,9 +93,14 @@ void main() {
         return;
     }
 
+    // Anchor the grid at the element (srcRect) centre so cells are
+    // symmetric about the middle instead of growing from the bottom-left
+    // corner — any partial cells split evenly between opposite edges.
     vec2 fragPx = uvContent * elementPx;
-    vec2 cellIdx = floor(fragPx / cellPx);
-    vec2 cellOriginPx = cellIdx * cellPx;
+    vec2 gridOrigin = elementPx * 0.5;
+    vec2 rel = fragPx - gridOrigin;
+    vec2 cellIdx = floor(rel / cellPx);
+    vec2 cellOriginPx = gridOrigin + cellIdx * cellPx;
 
     vec4 acc = vec4(0.0);
     for (int y = 0; y < TAPS; ++y) {
@@ -122,7 +127,7 @@ void main() {
     // aspect preserved (contain): scale by the limiting axis and centre,
     // so a wide cell letterboxes left/right and a tall cell top/bottom
     // instead of stretching the glyph to the cell's aspect.
-    vec2 local = fract(fragPx / cellPx);
+    vec2 local = fract(rel / cellPx);
     float cellAspect = cellPx.x / cellPx.y;
     vec2 frac = min(vec2(1.0), vec2(glyphAspect / cellAspect, cellAspect / glyphAspect));
     vec2 gloc = (local - 0.5) / frac + 0.5;
