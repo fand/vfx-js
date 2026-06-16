@@ -810,6 +810,9 @@ type SaberArgs = {
     thickness: number;
     lineCount: number;
     noiseScaleStep: number;
+    ridged: number;
+    sharpness: number;
+    spikiness: number;
     pad: number;
 };
 function hexToRgb(hex: string): [number, number, number] {
@@ -899,6 +902,9 @@ export const saber: StoryObj<SaberArgs> = {
         thickness: 1.0,
         lineCount: 3,
         noiseScaleStep: 1.8,
+        ridged: 0.0,
+        sharpness: 1.0,
+        spikiness: 0.0,
         pad: 80,
     },
     argTypes: {
@@ -923,6 +929,9 @@ export const saber: StoryObj<SaberArgs> = {
         noiseScaleStep: {
             control: { type: "range", min: 1, max: 3, step: 0.1 },
         },
+        ridged: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
+        sharpness: { control: { type: "range", min: 0.3, max: 4, step: 0.1 } },
+        spikiness: { control: { type: "range", min: 0, max: 2, step: 0.05 } },
         pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
     },
 };
