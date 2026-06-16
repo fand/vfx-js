@@ -129,27 +129,20 @@ uniform float core;
 uniform float thickness;
 uniform int lineCount;
 uniform float noiseScaleStep;
-uniform float ridged;
 uniform float sharpness;
-uniform float spikiness;
 
 // Each overlaid line contributes this much less than the previous one.
 const float WEIGHT_FALLOFF = 0.6;
 
 ${SNOISE3D}
 
-// Displacement-shaping noise:
-//   A (ridged):   fold smooth noise at zero into sharp V-creases.
-//   B (sharpness): push small values toward 0 so only big jolts remain.
+// Signed-power sharpening of the displacement noise. sharpness = 1 is a
+// no-op; higher values suppress small wiggles while keeping the big jolts
+// at full amplitude, for a spikier / zappier warp. The exponent is held
+// >= 1 so the noise is never amplified into blocky saturation.
 float shapeNoise(vec3 p) {
     float n = snoise(p);
-    // A: blend smooth simplex with a ridged (creased) version. The
-    // ridge maps |n| back to [-1, 1] with a sharp corner at n = 0.
-    float r = 1.0 - 2.0 * abs(n);
-    n = mix(n, r, ridged);
-    // B: signed power sharpening (sharpness = 1 is a no-op).
-    n = sign(n) * pow(abs(n), sharpness);
-    return n;
+    return sign(n) * pow(abs(n), max(sharpness, 1.0));
 }
 
 // One warped, lit line. freq scales the noise, seed decorrelates lines,
@@ -165,21 +158,6 @@ float lineGlow(float t, float freq, float seed, float eps) {
         shapeNoise(vec3(uv * freq * 2.3 + seed - 5.0, t * 1.7)),
         shapeNoise(vec3(uv * freq * 2.3 + seed + 5.0, t * 1.7))
     ) * amplitude * 0.5;
-
-    // C: spikes along the edge normal. Push the lookup toward the edge by
-    // a sharp positive noise so the bright line juts outward in spikes.
-    if (spikiness > 0.0) {
-        vec2 e = 1.0 / res;
-        vec2 g = vec2(
-            texture(distField, uv + vec2(e.x, 0.0)).r
-                - texture(distField, uv - vec2(e.x, 0.0)).r,
-            texture(distField, uv + vec2(0.0, e.y)).r
-                - texture(distField, uv - vec2(0.0, e.y)).r
-        );
-        vec2 nrm = normalize(g + 1e-5);
-        float spike = pow(abs(snoise(vec3(uv * freq * 2.0 + seed, t))), 0.4);
-        warp -= nrm * spike * amplitude * spikiness;
-    }
 
     float dist = texture(distField, uv + warp).r;
     float glow = (0.0015 * intensity) / max(dist / thickness, eps);
@@ -248,20 +226,11 @@ export type SaberParams = {
      */
     noiseScaleStep: number;
     /**
-     * (A) Ridge the displacement noise: 0 = smooth wobble, 1 = sharp
-     * V-creases. Pushes the look toward jagged / electric.
-     */
-    ridged: number;
-    /**
-     * (B) Signed-power sharpening of the displacement noise. 1 = no-op;
-     * >1 flattens small motion and keeps sudden jolts (zappy / crackly).
+     * Sharpens the displacement noise (>= 1; 1 = no-op). Higher values
+     * suppress small wiggles and keep only the big jolts, for a spikier,
+     * zappier warp.
      */
     sharpness: number;
-    /**
-     * (C) Spikes along the edge normal: 0 = none, higher juts the bright
-     * line outward in spikes (costs 4 extra texture taps when > 0).
-     */
-    spikiness: number;
     /**
      * Rebuild the distance field every frame instead of caching it. Needed
      * for live sources (video / webcam) whose silhouette changes; leave
@@ -287,9 +256,7 @@ const DEFAULT_PARAMS: SaberParams = {
     thickness: 1.0,
     lineCount: 3,
     noiseScaleStep: 1.8,
-    ridged: 0.0,
     sharpness: 1.0,
-    spikiness: 0.0,
     dynamic: false,
     pad: 80,
 };
@@ -385,9 +352,7 @@ export class SaberEffect implements Effect {
             core,
             thickness,
             noiseScaleStep,
-            ridged,
             sharpness,
-            spikiness,
         } = this.params;
         const lineCount = Math.max(
             1,
@@ -410,9 +375,7 @@ export class SaberEffect implements Effect {
                 thickness,
                 lineCount,
                 noiseScaleStep,
-                ridged,
                 sharpness,
-                spikiness,
             },
             target: ctx.target,
         });
