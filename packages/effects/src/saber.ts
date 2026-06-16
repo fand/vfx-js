@@ -149,15 +149,24 @@ float shapeNoise(vec3 p) {
 // thickness widens the glow (shrinks the effective distance). The base
 // brightness is tuned so intensity = 1 is a gentle, usable glow.
 float lineGlow(float t, float freq, float seed, float eps) {
+    // Sample noise in an aspect-corrected (square) space so cells stay
+    // round on non-square buffers instead of stretching horizontally.
+    vec2 ar = vec2(res.x / res.y, 1.0);
+    vec2 sp = uv * ar;
+
     // Two octaves of shaped 3D noise; z animated by time so the arcs flow.
     vec2 warp = vec2(
-        shapeNoise(vec3(uv * freq + seed, t)),
-        shapeNoise(vec3(uv * freq + seed + 19.7, t))
+        shapeNoise(vec3(sp * freq + seed, t)),
+        shapeNoise(vec3(sp * freq + seed + 19.7, t))
     ) * amplitude;
     warp += vec2(
-        shapeNoise(vec3(uv * freq * 2.3 + seed - 5.0, t * 1.7)),
-        shapeNoise(vec3(uv * freq * 2.3 + seed + 5.0, t * 1.7))
+        shapeNoise(vec3(sp * freq * 2.3 + seed - 5.0, t * 1.7)),
+        shapeNoise(vec3(sp * freq * 2.3 + seed + 5.0, t * 1.7))
     ) * amplitude * 0.5;
+
+    // Displacement is in square space; map x back to uv so the physical
+    // wiggle is isotropic too.
+    warp.x /= ar.x;
 
     float dist = texture(distField, uv + warp).r;
     float glow = (0.0015 * intensity) / max(dist / thickness, eps);
