@@ -1119,7 +1119,6 @@ export const ascii: StoryObj<AsciiArgs> = {
             control: { type: "select" },
             options: [
                 "standard",
-                "simple",
                 "minimal",
                 "blocks",
                 "dots",

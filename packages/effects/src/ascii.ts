@@ -27,7 +27,6 @@ export type AsciiImageSource =
 /** Name of a built-in {@link ASCII_PRESETS} ramp. */
 export type AsciiPresetName =
     | "standard"
-    | "simple"
     | "minimal"
     | "blocks"
     | "dots"
@@ -40,10 +39,9 @@ export type AsciiPresetName =
  * `invert: true` for dark-on-light.
  */
 export const ASCII_PRESETS: Record<AsciiPresetName, string> = {
-    // Paul Bourke's classic 10-level ramp.
+    // Paul Bourke's short 10-step grey-scale ramp, reversed to dark → light.
+    // ref. https://paulbourke.net/dataformats/asciiart/
     standard: " .:-=+*#%@",
-    // Compact ramp close to a typical hand-picked set.
-    simple: " .:-=+$#",
     minimal: " .#",
     // Unicode shade blocks — smooth, font-independent gradient.
     blocks: " ░▒▓█",
@@ -51,7 +49,8 @@ export const ASCII_PRESETS: Record<AsciiPresetName, string> = {
     dots: " .·•●",
     // Outline → filled circles (the ◯ … ● family).
     circles: " ◌○◉●",
-    // Paul Bourke's 70-level ramp (reversed to dark → light).
+    // Paul Bourke's 70-step grey-scale ramp, reversed to dark → light.
+    // ref. https://paulbourke.net/dataformats/asciiart/
     detailed:
         " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
 };
