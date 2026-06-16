@@ -987,10 +987,13 @@ type AsciiSrcName = "Pigeon" | "Jellyfish" | "WebCam" | "HTML";
 const ASCII_SRCS: AsciiSrcName[] = ["Pigeon", "Jellyfish", "WebCam", "HTML"];
 
 // A plain HTML block used as a capture source (text + form controls).
+// This is the `addHTML` target: it fills its wrapper (`width: 100%`) and
+// keeps its padding / white background so the effect covers them. The
+// fixed width lives on the wrapper instead (see addAsciiSource) — per the
+// html-in-canvas sizing policy, a content-sized target breaks capture.
 function makeAsciiHtmlSample(): HTMLElement {
     const el = document.createElement("div");
-    el.style.width = "480px";
-    el.style.maxWidth = "80vw";
+    el.style.width = "100%";
     el.style.boxSizing = "border-box";
     el.style.padding = "24px";
     el.style.background = "#ffffff";
@@ -1024,12 +1027,22 @@ function addAsciiSource(
         el.style.maxWidth = "80vw";
     };
     if (src === "HTML") {
+        // Three layers per the html-in-canvas sizing policy: a flex
+        // centring wrapper, a width-only sizer (the fixed px width lives
+        // here), and the addHTML target that fills the sizer with
+        // `width: 100%`.
         const wrapper = document.createElement("div");
         wrapper.style.display = "flex";
         wrapper.style.justifyContent = "center";
         wrapper.style.margin = "40px auto";
+
+        const sizer = document.createElement("div");
+        sizer.style.width = "480px";
+        sizer.style.maxWidth = "80vw";
+
         const block = makeAsciiHtmlSample();
-        wrapper.appendChild(block);
+        sizer.appendChild(block);
+        wrapper.appendChild(sizer);
         vfx.addHTML(block, { effect });
         return wrapper;
     }
