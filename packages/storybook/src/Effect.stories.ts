@@ -983,18 +983,56 @@ export const chromatic = presetStory<ChromaticArgs>(
     { clock: false, src: Pigeon },
 );
 
-type AsciiSrcName = "Pigeon" | "Jellyfish" | "WebCam";
-const ASCII_SRCS: AsciiSrcName[] = ["Pigeon", "Jellyfish", "WebCam"];
+type AsciiSrcName = "Pigeon" | "Jellyfish" | "WebCam" | "HTML";
+const ASCII_SRCS: AsciiSrcName[] = ["Pigeon", "Jellyfish", "WebCam", "HTML"];
 
-// Build the source element for the ASCII stories. Webcam streams via
-// getUserMedia (falls back silently when denied / unavailable); the rest
-// load bundled image assets.
-function makeAsciiSource(src: AsciiSrcName): HTMLElement {
+// A plain HTML block used as a capture source (text + form controls).
+function makeAsciiHtmlSample(): HTMLElement {
+    const el = document.createElement("div");
+    el.style.width = "480px";
+    el.style.maxWidth = "80vw";
+    el.style.boxSizing = "border-box";
+    el.style.padding = "24px";
+    el.style.background = "#ffffff";
+    el.style.color = "#111111";
+    el.style.fontFamily = "sans-serif";
+    el.innerHTML = `
+        <h1 style="margin: 0 0 12px;">HTML input sample</h1>
+        <p style="margin: 0 0 16px; line-height: 1.5;">
+            A plain HTML block captured by VFX-JS and turned into ASCII.
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+        </p>
+        <input type="text" value="Type here"
+               style="font-size: 16px; padding: 6px 8px; margin-right: 8px;" />
+        <button style="font-size: 16px; padding: 6px 14px;">Submit</button>
+    `;
+    return el;
+}
+
+// Build the ASCII source, attach `effect`, and return the element to
+// render. Images use `vfx.add`; the HTML block uses `vfx.addHTML` (it
+// needs a parent at add time). Webcam streams via getUserMedia (falls
+// back silently when denied / unavailable).
+function addAsciiSource(
+    vfx: ReturnType<typeof initVFX>,
+    src: AsciiSrcName,
+    effect: Effect,
+): HTMLElement {
     const center = (el: HTMLElement) => {
         el.style.display = "block";
         el.style.margin = "40px auto";
         el.style.maxWidth = "80vw";
     };
+    if (src === "HTML") {
+        const wrapper = document.createElement("div");
+        wrapper.style.display = "flex";
+        wrapper.style.justifyContent = "center";
+        wrapper.style.margin = "40px auto";
+        const block = makeAsciiHtmlSample();
+        wrapper.appendChild(block);
+        vfx.addHTML(block, { effect });
+        return wrapper;
+    }
     if (src === "WebCam") {
         const video = document.createElement("video");
         video.muted = true;
@@ -1009,11 +1047,13 @@ function makeAsciiSource(src: AsciiSrcName): HTMLElement {
                 void video.play();
             })
             .catch((e) => console.warn("[ascii story] webcam unavailable:", e));
+        vfx.add(video, { effect });
         return video;
     }
     const img = document.createElement("img");
     img.src = src === "Jellyfish" ? Jellyfish : Pigeon;
     center(img);
+    vfx.add(img, { effect });
     return img;
 }
 
@@ -1032,20 +1072,17 @@ type AsciiArgs = {
 export const ascii: StoryObj<AsciiArgs> = {
     render: (a) => {
         const vfx = initVFX();
-        const el = makeAsciiSource(a.src);
-        vfx.add(el, {
-            effect: new AsciiEffect({
-                preset: a.preset,
-                grid: [a.gridX, a.gridY],
-                font: a.font,
-                fontWeight: a.fontWeight,
-                color: hexToRgba(a.color),
-                background: hexToRgba(a.background),
-                colorFromSource: a.colorFromSource,
-                invert: a.invert,
-            }),
+        const effect = new AsciiEffect({
+            preset: a.preset,
+            grid: [a.gridX, a.gridY],
+            font: a.font,
+            fontWeight: a.fontWeight,
+            color: hexToRgba(a.color),
+            background: hexToRgba(a.background),
+            colorFromSource: a.colorFromSource,
+            invert: a.invert,
         });
-        return el;
+        return addAsciiSource(vfx, a.src, effect);
     },
     args: {
         src: "Pigeon",
@@ -1111,19 +1148,16 @@ function makeTileCanvas(level: number, count: number): HTMLCanvasElement {
 export const asciiTiles: StoryObj<{ src: AsciiSrcName }> = {
     render: (a) => {
         const vfx = initVFX();
-        const el = makeAsciiSource(a.src);
         const count = 6;
         const tiles = Array.from({ length: count }, (_, i) =>
             makeTileCanvas(i, count),
         );
-        vfx.add(el, {
-            effect: new AsciiEffect({
-                tiles,
-                grid: 14,
-                background: [0, 0, 0, 1],
-            }),
+        const effect = new AsciiEffect({
+            tiles,
+            grid: 14,
+            background: [0, 0, 0, 1],
         });
-        return el;
+        return addAsciiSource(vfx, a.src, effect);
     },
     args: { src: "Pigeon" },
     argTypes: {
