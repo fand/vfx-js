@@ -999,6 +999,7 @@ function makeAsciiHtmlSample(): HTMLElement {
     el.style.background = "#ffffff";
     el.style.color = "#111111";
     el.style.fontFamily = "sans-serif";
+    el.style.fontSize = "2.5rem";
     el.innerHTML = `
         <h1 style="margin: 0 0 12px;">HTML input sample</h1>
         <p style="margin: 0 0 16px; line-height: 1.5;">
@@ -1006,8 +1007,8 @@ function makeAsciiHtmlSample(): HTMLElement {
             Lorem ipsum dolor sit amet, consectetur adipiscing elit.
         </p>
         <input type="text" value="Type here"
-               style="font-size: 16px; padding: 6px 8px; margin-right: 8px;" />
-        <button style="font-size: 16px; padding: 6px 14px;">Submit</button>
+               style="font-size: inherit; padding: 6px 8px; margin-right: 8px;" />
+        <button style="font-size: inherit; padding: 6px 14px;">Submit</button>
     `;
     return el;
 }
