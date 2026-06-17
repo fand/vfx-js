@@ -47,6 +47,7 @@ await vfx.add(img, {
 | `FluidEffect`            | Stable-Fluids advection driven by pointer events                |
 | `HalftoneEffect`         | RGB / CMYK halftone screen with configurable ink presets        |
 | `JPEGGlitchEffect`       | Real codec-level JPEG glitch — corrupts the encoded byte stream  |
+| `MatrixEffect`           | Matrix-movie digital rain — random glyphs over the source grayscale |
 | `ParticleEffect`         | Mouse-emitter GPU particles, skips transparent source regions   |
 | `ParticleExplodeEffect`  | One-shot curl-noise burst that shatters the source element      |
 | `VoronoiEffect`          | Voronoi cells shrunken in a halo around the cursor              |

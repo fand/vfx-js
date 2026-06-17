@@ -12,6 +12,7 @@ import {
     HalftoneEffect,
     HueShiftEffect,
     JPEGGlitchEffect,
+    MatrixEffect,
     ParticleEffect,
     ParticleExplodeEffect,
     PixelateEffect,
@@ -1138,6 +1139,76 @@ export const ascii: StoryObj<AsciiArgs> = {
         colorFromSource: { control: { type: "boolean" } },
         invert: { control: { type: "boolean" } },
         dither: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
+    },
+};
+
+type MatrixArgs = {
+    src: AsciiSrcName;
+    gridX: number;
+    gridY: number;
+    glyphs: string;
+    font: string;
+    color: string;
+    headColor: string;
+    background: string;
+    speed: number;
+    tail: number;
+    glyphSpeed: number;
+    brightness: number;
+    invert: boolean;
+};
+// Matrix-movie "digital rain": random glyphs fall down each column with a
+// bright tip and fading green trail, modulated by the source grayscale so
+// the picture emerges from the rain.
+export const matrix: StoryObj<MatrixArgs> = {
+    render: (a) => {
+        const vfx = initVFX();
+        const effect = new MatrixEffect({
+            grid: [a.gridX, a.gridY],
+            glyphs: a.glyphs || undefined,
+            font: a.font,
+            color: hexToRgba(a.color),
+            headColor: hexToRgba(a.headColor),
+            background: hexToRgba(a.background),
+            speed: a.speed,
+            tail: a.tail,
+            glyphSpeed: a.glyphSpeed,
+            brightness: a.brightness,
+            invert: a.invert,
+        });
+        const el = addAsciiSource(vfx, a.src, effect);
+        attachClockPane(vfx);
+        return el;
+    },
+    args: {
+        src: "Pigeon",
+        gridX: 12,
+        gridY: 16,
+        glyphs: "",
+        font: "monospace",
+        color: "#2dff5c",
+        headColor: "#d9ffe6",
+        background: "#000000",
+        speed: 10,
+        tail: 18,
+        glyphSpeed: 8,
+        brightness: 1,
+        invert: false,
+    },
+    argTypes: {
+        src: { control: { type: "select" }, options: ASCII_SRCS },
+        gridX: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        gridY: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        glyphs: { control: { type: "text" } },
+        font: { control: { type: "text" } },
+        color: { control: { type: "color" } },
+        headColor: { control: { type: "color" } },
+        background: { control: { type: "color" } },
+        speed: { control: { type: "range", min: 1, max: 40, step: 1 } },
+        tail: { control: { type: "range", min: 2, max: 48, step: 1 } },
+        glyphSpeed: { control: { type: "range", min: 0, max: 30, step: 1 } },
+        brightness: { control: { type: "range", min: 0.2, max: 3, step: 0.1 } },
+        invert: { control: { type: "boolean" } },
     },
 };
 
