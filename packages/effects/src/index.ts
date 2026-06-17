@@ -1,3 +1,12 @@
+export {
+    ASCII_PRESETS,
+    type AsciiCharRamp,
+    type AsciiColor,
+    AsciiEffect,
+    type AsciiImageSource,
+    type AsciiParams,
+    type AsciiPresetName,
+} from "./ascii";
 export { BadJpegEffect, type BadJpegEffectOptions } from "./bad-jpeg";
 export { BloomEffect } from "./bloom";
 export { ChromaticEffect, type ChromaticParams } from "./chromatic";

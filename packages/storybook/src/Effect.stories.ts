@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { Effect } from "@vfx-js/core";
 import {
+    AsciiEffect,
+    type AsciiPresetName,
     BadJpegEffect,
     BloomEffect,
     ChromaticEffect,
@@ -980,3 +982,229 @@ export const chromatic = presetStory<ChromaticArgs>(
     },
     { clock: false, src: Pigeon },
 );
+
+type AsciiSrcName = "Pigeon" | "Jellyfish" | "WebCam" | "HTML";
+const ASCII_SRCS: AsciiSrcName[] = ["Pigeon", "Jellyfish", "WebCam", "HTML"];
+
+// A plain HTML block used as a capture source (text + form controls).
+// This is the `addHTML` target: it fills its wrapper (`width: 100%`) and
+// keeps its padding / white background so the effect covers them. The
+// fixed width lives on the wrapper instead (see addAsciiSource) — per the
+// html-in-canvas sizing policy, a content-sized target breaks capture.
+function makeAsciiHtmlSample(): HTMLElement {
+    const el = document.createElement("div");
+    el.style.width = "100%";
+    el.style.boxSizing = "border-box";
+    el.style.padding = "24px";
+    el.style.background = "#ffffff";
+    el.style.color = "#111111";
+    el.style.fontFamily = "sans-serif";
+    el.style.fontSize = "2.5rem";
+    el.innerHTML = `
+        <h1 style="margin: 0 0 12px;">HTML input sample</h1>
+        <p style="margin: 0 0 16px; line-height: 1.5;">
+            A plain HTML block captured by VFX-JS and turned into ASCII.
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+        </p>
+        <input type="text" value="Type here"
+               style="font-size: inherit; padding: 6px 8px; margin-right: 8px;" />
+        <button style="font-size: inherit; padding: 6px 14px;">Submit</button>
+    `;
+    return el;
+}
+
+// Build the ASCII source, attach `effect`, and return the element to
+// render. Images use `vfx.add`; the HTML block uses `vfx.addHTML` (it
+// needs a parent at add time). Webcam streams via getUserMedia (falls
+// back silently when denied / unavailable).
+function addAsciiSource(
+    vfx: ReturnType<typeof initVFX>,
+    src: AsciiSrcName,
+    effect: Effect,
+): HTMLElement {
+    const center = (el: HTMLElement) => {
+        el.style.display = "block";
+        el.style.margin = "40px auto";
+        el.style.maxWidth = "80vw";
+    };
+    if (src === "HTML") {
+        // Three layers per the html-in-canvas sizing policy: a flex
+        // centring wrapper, a width-only sizer (the fixed px width lives
+        // here), and the addHTML target that fills the sizer with
+        // `width: 100%`.
+        const wrapper = document.createElement("div");
+        wrapper.style.display = "flex";
+        wrapper.style.justifyContent = "center";
+        wrapper.style.margin = "40px auto";
+
+        const sizer = document.createElement("div");
+        sizer.style.width = "900px";
+        sizer.style.maxWidth = "90vw";
+
+        const block = makeAsciiHtmlSample();
+        sizer.appendChild(block);
+        wrapper.appendChild(sizer);
+        vfx.addHTML(block, { effect });
+        return wrapper;
+    }
+    if (src === "WebCam") {
+        const video = document.createElement("video");
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.autoplay = true;
+        center(video);
+        navigator.mediaDevices
+            ?.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+                void video.play();
+            })
+            .catch((e) => console.warn("[ascii story] webcam unavailable:", e));
+        vfx.add(video, { effect });
+        return video;
+    }
+    const img = document.createElement("img");
+    img.src = src === "Jellyfish" ? Jellyfish : Pigeon;
+    center(img);
+    vfx.add(img, { effect });
+    return img;
+}
+
+type AsciiArgs = {
+    src: AsciiSrcName;
+    preset: AsciiPresetName;
+    gridX: number;
+    gridY: number;
+    font: string;
+    fontWeight: string;
+    color: string;
+    background: string;
+    colorFromSource: boolean;
+    invert: boolean;
+    dither: number;
+};
+export const ascii: StoryObj<AsciiArgs> = {
+    render: (a) => {
+        const vfx = initVFX();
+        const effect = new AsciiEffect({
+            preset: a.preset,
+            grid: [a.gridX, a.gridY],
+            font: a.font,
+            fontWeight: a.fontWeight,
+            color: hexToRgba(a.color),
+            background: hexToRgba(a.background),
+            colorFromSource: a.colorFromSource,
+            invert: a.invert,
+            dither: a.dither,
+        });
+        return addAsciiSource(vfx, a.src, effect);
+    },
+    args: {
+        src: "Pigeon",
+        preset: "standard",
+        gridX: 8,
+        gridY: 14,
+        font: "monospace",
+        fontWeight: "normal",
+        color: "#ffffff",
+        background: "#000000",
+        colorFromSource: false,
+        invert: false,
+        dither: 0,
+    },
+    argTypes: {
+        src: { control: { type: "select" }, options: ASCII_SRCS },
+        preset: {
+            control: { type: "select" },
+            options: [
+                "standard",
+                "minimal",
+                "blocks",
+                "dots",
+                "circles",
+                "detailed",
+            ],
+        },
+        gridX: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        gridY: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        font: { control: { type: "text" } },
+        fontWeight: {
+            control: { type: "select" },
+            options: ["normal", "bold", "100", "300", "600", "900"],
+        },
+        color: { control: { type: "color" } },
+        background: { control: { type: "color" } },
+        colorFromSource: { control: { type: "boolean" } },
+        invert: { control: { type: "boolean" } },
+        dither: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
+    },
+};
+
+// Build a coloured-dot tile as a canvas. The dot grows with `level` (so
+// the brightness ramp still reads), and each tile gets a distinct hue so
+// the demo shows tiles keeping their own colour.
+// Tile shape presets for the image-tile demo. Each builds a `count`-step
+// dark → light ramp; the shape grows with brightness.
+type AsciiTileShape = "dots" | "rings" | "squares";
+const ASCII_TILE_SHAPES: AsciiTileShape[] = ["dots", "rings", "squares"];
+
+function makeTileCanvas(
+    level: number,
+    count: number,
+    shape: AsciiTileShape,
+): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 64;
+    const g = c.getContext("2d");
+    if (g) {
+        const t = count > 1 ? level / (count - 1) : 1;
+        const hue = (level / Math.max(1, count)) * 360;
+        const color = `hsl(${hue}, 85%, 55%)`;
+        g.fillStyle = color;
+        g.strokeStyle = color;
+        if (shape === "squares") {
+            const s = 6 + t * 50;
+            g.fillRect(32 - s / 2, 32 - s / 2, s, s);
+        } else if (shape === "rings") {
+            g.lineWidth = 2 + t * 9;
+            g.beginPath();
+            g.arc(32, 32, 6 + t * 22, 0, Math.PI * 2);
+            g.stroke();
+        } else {
+            g.beginPath();
+            g.arc(32, 32, 3 + t * 27, 0, Math.PI * 2);
+            g.fill();
+        }
+    }
+    return c;
+}
+
+// Image-tile path: each cell stamps a coloured shape (its own RGB) sized
+// by the cell's brightness, instead of a font glyph.
+export const asciiTiles: StoryObj<{
+    src: AsciiSrcName;
+    preset: AsciiTileShape;
+    grid: number;
+}> = {
+    render: (a) => {
+        const vfx = initVFX();
+        const count = 6;
+        const tiles = Array.from({ length: count }, (_, i) =>
+            makeTileCanvas(i, count, a.preset),
+        );
+        const effect = new AsciiEffect({
+            tiles,
+            grid: a.grid,
+            background: [0, 0, 0, 1],
+        });
+        return addAsciiSource(vfx, a.src, effect);
+    },
+    args: { src: "Pigeon", preset: "dots", grid: 14 },
+    argTypes: {
+        src: { control: { type: "select" }, options: ASCII_SRCS },
+        preset: { control: { type: "select" }, options: ASCII_TILE_SHAPES },
+        grid: { control: { type: "range", min: 4, max: 48, step: 1 } },
+    },
+};
