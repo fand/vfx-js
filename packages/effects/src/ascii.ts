@@ -156,10 +156,11 @@ void main() {
 
     vec4 tile = vec4(0.0);
     if (gloc.x >= 0.0 && gloc.x <= 1.0 && gloc.y >= 0.0 && gloc.y <= 1.0) {
-        // Inset by half a texel so linear filtering never reaches across
-        // the cell border into a neighbouring glyph / tile (keeps the
-        // crisp downscale that nearest would lose to aliasing).
-        vec2 inset = 0.5 / atlasCellPx;
+        // Image tiles can fill the cell edge-to-edge, so linear filtering
+        // would bleed a neighbouring tile's colour across the shared
+        // border — inset the sample by half a texel to stop it. Glyphs
+        // have transparent side bearings, so they need no inset.
+        vec2 inset = tileColor == 1 ? 0.5 / atlasCellPx : vec2(0.0);
         vec2 g2 = mix(inset, 1.0 - inset, gloc);
         float u = (col + g2.x) / cols;
         float v = 1.0 - (rowTop + 1.0 - g2.y) / rows;
@@ -486,7 +487,7 @@ function buildImageAtlas(images: CanvasImageSource[]): AtlasBuild {
  * `grid`, `color`, `background`, `colorFromSource`, `invert`, and `dither`
  * are live (read every frame). `chars` / `tiles` / `font` / `fontWeight` /
  * `charAspect` are baked into the atlas at `init()` — after changing them
- * via `setParams`, call {@link AsciiEffect.regenerate} (or re-add the
+ * via `setParams`, call {@link AsciiEffect.updateAtlas} (or re-add the
  * effect) to rebuild.
  */
 export class AsciiEffect implements Effect {
@@ -527,7 +528,7 @@ export class AsciiEffect implements Effect {
      * the effect is removed, so prefer occasional calls (e.g. on a
      * settings change) over per-frame use.
      */
-    async regenerate(): Promise<void> {
+    async updateAtlas(): Promise<void> {
         if (!this.#ctx) {
             return;
         }
