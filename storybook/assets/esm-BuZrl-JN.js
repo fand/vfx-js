@@ -1,12 +1,141 @@
-import{n as e}from"./chunk-BneVvdWh.js";var t,n,r,i,a,o,s,c,l,u,d,f,p=e((()=>{t=`#version 300 es
+import{n as e}from"./chunk-BneVvdWh.js";function t(e){return Array.isArray(e)?[...e]:Array.from(e)}function n(e){return typeof e==`number`?[e,e]:e}async function r(e,t){let n=typeof document<`u`?document.fonts:void 0;if(n?.load)try{await n.load(`${t} ${y}px ${e}`),await n.ready}catch{}}function i(e,t,n,r){let i=Math.max(1,e.length),a=Math.ceil(Math.sqrt(i)),o=Math.ceil(i/a),s=`${n} ${y}px ${t}`,c=document.createElement(`canvas`),l;if(r&&r>0)l=Math.max(1,Math.round(r*y));else{let e=c.getContext(`2d`);l=y,e&&(e.font=s,l=Math.max(1,Math.ceil(e.measureText(`M`).width)))}c.width=a*l,c.height=o*y;let u=c.getContext(`2d`);if(u){u.clearRect(0,0,c.width,c.height),u.fillStyle=`#fff`,u.textAlign=`center`,u.textBaseline=`middle`,u.font=s;for(let t=0;t<e.length;t++){let n=t%a*l+l/2,r=Math.floor(t/a)*y+y/2;u.fillText(e[t],n,r)}}return{canvas:c,cols:a,rows:o,cellW:l,cellH:y}}function a(e){if(typeof HTMLImageElement<`u`&&e instanceof HTMLImageElement)return[e.naturalWidth||e.width,e.naturalHeight||e.height];let t=e;return[t.width||1,t.height||1]}async function o(e){if(typeof e!=`string`)return e;let t=new Image;t.crossOrigin=`anonymous`,t.src=e;try{await t.decode()}catch{}return t}function s(e){let t=Math.max(1,e.length),n=Math.ceil(Math.sqrt(t)),r=Math.ceil(t/n),i=e.map(a),[o,s]=i[0]??[1,1],c=o/Math.max(1,s),l=Math.max(1,...i.map(e=>e[1])),u=Math.min(ae,Math.max(8,Math.round(l))),d=Math.max(1,Math.round(u*c)),f=Math.min(1,ie/(n*d),ie/(r*u));d=Math.max(1,Math.floor(d*f)),u=Math.max(1,Math.floor(u*f));let p=document.createElement(`canvas`);p.width=n*d,p.height=r*u;let m=p.getContext(`2d`);if(m){m.clearRect(0,0,p.width,p.height);for(let t=0;t<e.length;t++){let[r,a]=i[t],o=Math.min(d/r,u/a),s=r*o,c=a*o,l=t%n*d+(d-s)/2,f=Math.floor(t/n)*u+(u-c)/2;m.drawImage(e[t],l,f,s,c)}}return{canvas:p,cols:n,rows:r,cellW:d,cellH:u}}var c,l,u,d,f,p,m,h,g,_,v,ee,te,ne,re,y,ie,ae,oe,se=e((()=>{c=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},l=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},te={standard:` .:-=+*#%@`,minimal:` .#`,blocks:` ░▒▓█`,dots:` .·•●`,circles:` ◌○◉●`,detailed:` .'\`^",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$`},ne=`#version 300 es
+precision highp float;
+
+in vec2 uvContent;
+out vec4 outColor;
+
+uniform sampler2D src;
+uniform sampler2D atlas;
+uniform vec4 srcRectUv;
+uniform vec2 elementPx;     // element size, physical px
+uniform vec2 cellPx;        // cell size, physical px
+uniform float cols;         // atlas columns
+uniform float rows;         // atlas rows
+uniform float charCount;    // number of glyphs in the ramp
+uniform vec4 color;         // fixed glyph colour (when colorFromSource == 0)
+uniform vec4 background;     // cell backdrop, non-premultiplied
+uniform int colorFromSource; // 1 = tint glyph with the cell's avg colour
+uniform int invert;          // 1 = flip the luminance → glyph mapping
+uniform float glyphAspect;   // font's character box aspect (advance / em)
+uniform int tileColor;       // 1 = use the atlas tile's own RGBA (image tiles)
+uniform float dither;        // ordered-dither amount in index units (0 = off)
+uniform vec2 atlasCellPx;    // atlas cell size in texels (for edge inset)
+
+// Box-average TAPS x TAPS samples per cell. A single centre tap throws
+// away most of the cell; this keeps the glyph choice representative.
+const int TAPS = 4;
+
+vec4 readSrc(vec2 contentUv) {
+    vec2 p = clamp(contentUv, 0.0, 1.0);
+    return texture(src, srcRectUv.xy + p * srcRectUv.zw);
+}
+
+// 4x4 ordered (Bayer) dither threshold in (0, 1), keyed by cell index so
+// the offset is constant across a cell (one character per cell).
+float bayer4x4(vec2 cell) {
+    int x = int(mod(cell.x, 4.0));
+    int y = int(mod(cell.y, 4.0));
+    float m[16] = float[16](
+        0.0, 8.0, 2.0, 10.0,
+        12.0, 4.0, 14.0, 6.0,
+        3.0, 11.0, 1.0, 9.0,
+        15.0, 7.0, 13.0, 5.0
+    );
+    return (m[y * 4 + x] + 0.5) / 16.0;
+}
+
+void main() {
+    if (uvContent.x < 0.0 || uvContent.x > 1.0 ||
+        uvContent.y < 0.0 || uvContent.y > 1.0) {
+        outColor = vec4(0.0);
+        return;
+    }
+
+    // Anchor the grid at the element (srcRect) centre so cells are
+    // symmetric about the middle instead of growing from the bottom-left
+    // corner — any partial cells split evenly between opposite edges.
+    vec2 fragPx = uvContent * elementPx;
+    vec2 gridOrigin = elementPx * 0.5;
+    vec2 rel = fragPx - gridOrigin;
+    vec2 cellIdx = floor(rel / cellPx);
+    vec2 cellOriginPx = gridOrigin + cellIdx * cellPx;
+
+    vec4 acc = vec4(0.0);
+    for (int y = 0; y < TAPS; ++y) {
+        for (int x = 0; x < TAPS; ++x) {
+            vec2 o = (vec2(float(x), float(y)) + 0.5) / float(TAPS);
+            vec2 samplePx = cellOriginPx + o * cellPx;
+            acc += readSrc(samplePx / elementPx);
+        }
+    }
+    acc /= float(TAPS * TAPS);
+
+    float lum = dot(acc.rgb, vec3(0.299, 0.587, 0.114));
+    if (invert == 1) {
+        lum = 1.0 - lum;
+    }
+
+    // Pick the glyph and its cell in the atlas (top-row origin in canvas
+    // space; the texture is uploaded Y-flipped, hence the 1.0 - ... on v).
+    // Ordered dither perturbs the continuous index by up to ±0.5 cell
+    // (at dither == 1), so neighbouring cells round to different glyphs
+    // and short ramps gain apparent tonal steps without banding.
+    float li = lum * charCount;
+    if (dither > 0.0) {
+        li += (bayer4x4(cellIdx) - 0.5) * dither;
+    }
+    float idx = clamp(floor(li), 0.0, charCount - 1.0);
+    float col = mod(idx, cols);
+    float rowTop = floor(idx / cols);
+
+    // Fit the glyph's character box into the cell with its native
+    // aspect preserved (contain): scale by the limiting axis and centre,
+    // so a wide cell letterboxes left/right and a tall cell top/bottom
+    // instead of stretching the glyph to the cell's aspect.
+    vec2 local = fract(rel / cellPx);
+    float cellAspect = cellPx.x / cellPx.y;
+    vec2 frac = min(vec2(1.0), vec2(glyphAspect / cellAspect, cellAspect / glyphAspect));
+    vec2 gloc = (local - 0.5) / frac + 0.5;
+
+    vec4 tile = vec4(0.0);
+    if (gloc.x >= 0.0 && gloc.x <= 1.0 && gloc.y >= 0.0 && gloc.y <= 1.0) {
+        // Image tiles can fill the cell edge-to-edge, so linear filtering
+        // would bleed a neighbouring tile's colour across the shared
+        // border — inset the sample by half a texel to stop it. Glyphs
+        // have transparent side bearings, so they need no inset.
+        vec2 inset = tileColor == 1 ? 0.5 / atlasCellPx : vec2(0.0);
+        vec2 g2 = mix(inset, 1.0 - inset, gloc);
+        float u = (col + g2.x) / cols;
+        float v = 1.0 - (rowTop + 1.0 - g2.y) / rows;
+        tile = texture(atlas, vec2(u, v));
+    }
+
+    // Image tiles keep their own RGBA; glyph tiles are a coverage mask in
+    // .a, tinted by color (or the cell's average colour). The alpha is the
+    // same either way: tile coverage x color.a (global opacity) x the
+    // cell's source alpha, so transparent regions (e.g. text captures)
+    // fall back to the background.
+    vec3 fg;
+    if (tileColor == 1) {
+        fg = tile.rgb;
+    } else {
+        fg = colorFromSource == 1 ? acc.rgb : color.rgb;
+    }
+    float fgA = tile.a * color.a * acc.a;
+
+    float outA = fgA + background.a * (1.0 - fgA);
+    vec3 premul = fg * fgA + background.rgb * background.a * (1.0 - fgA);
+    outColor = vec4(premul, outA);
+}
+`,re={grid:12,preset:`standard`,font:`monospace`,fontWeight:`normal`,color:[1,1,1,1],background:[0,0,0,0],colorFromSource:!1,invert:!1,dither:0},y=64,ie=2048,ae=256,oe=class{constructor(e={}){u.add(this),d.set(this,null),f.set(this,1),p.set(this,1),m.set(this,1),h.set(this,1),g.set(this,[1,1]),_.set(this,!1),v.set(this,null),this.params={...re,...e}}setParams(e){Object.assign(this.params,e)}async init(e){typeof document>`u`||(c(this,v,e,`f`),await l(this,u,`m`,ee).call(this,e))}async updateAtlas(){l(this,v,`f`)&&await l(this,u,`m`,ee).call(this,l(this,v,`f`))}render(e){if(!l(this,d,`f`))return;let[t,r]=e.dims.elementPixel,[i,a]=n(this.params.grid),o=[Math.max(1,i)*e.pixelRatio,Math.max(1,a)*e.pixelRatio];e.draw({frag:ne,uniforms:{src:e.src,atlas:l(this,d,`f`),elementPx:[Math.max(1,t),Math.max(1,r)],cellPx:o,cols:l(this,f,`f`),rows:l(this,p,`f`),charCount:l(this,m,`f`),glyphAspect:l(this,h,`f`),atlasCellPx:l(this,g,`f`),tileColor:+!!l(this,_,`f`),color:this.params.color,background:this.params.background,colorFromSource:+!!this.params.colorFromSource,invert:+!!this.params.invert,dither:Math.min(1,Math.max(0,this.params.dither))},target:e.target})}dispose(){c(this,d,null,`f`),c(this,v,null,`f`)}},d=new WeakMap,f=new WeakMap,p=new WeakMap,m=new WeakMap,h=new WeakMap,g=new WeakMap,_=new WeakMap,v=new WeakMap,u=new WeakSet,ee=async function(e){let n=this.params.tiles,a;if(n&&n.length>0){let e=await Promise.all(n.map(o));c(this,m,e.length,`f`),c(this,_,!0,`f`),a=s(e)}else{n&&n.length===0&&console.warn("[VFX-JS] AsciiEffect: `tiles` is empty; falling back to characters.");let e=t(this.params.chars??te[this.params.preset]);e.length===0&&console.warn(`[VFX-JS] AsciiEffect: empty character ramp; nothing will be rendered.`),c(this,m,Math.max(1,e.length),`f`),c(this,_,!1,`f`),await r(this.params.font,this.params.fontWeight),a=i(e,this.params.font,this.params.fontWeight,this.params.charAspect)}c(this,f,a.cols,`f`),c(this,p,a.rows,`f`),c(this,h,a.cellW/a.cellH,`f`),c(this,g,[a.cellW,a.cellH],`f`),c(this,d,e.wrapTexture(a.canvas,{autoUpdate:!1,filter:`linear`}),`f`)}})),ce,le,ue,de,fe,pe,me,he,ge,_e,ve,ye,be=e((()=>{ce=`#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
-`,n=`
+`,le=`
 const float PI = 3.141592653589793;
 float cc(int k){ return k == 0 ? 0.7071067811865476 : 1.0; }
-`,r=`
+`,ue=`
 vec3 rgb2ycc(vec3 c){
   return vec3(
      0.299*c.r + 0.587*c.g + 0.114*c.b,
@@ -19,18 +148,18 @@ vec3 ycc2rgb(vec3 y){
     y.x - 0.344136* y.y - 0.714136 * y.z,
     y.x + 1.772   * y.y);
 }
-`,i=`
+`,de=`
   ivec2 res = textureSize(src, 0);
   ivec2 p   = ivec2(uvSrc * vec2(res));
   ivec2 b   = (p / 8) * 8;
   ivec2 l   = p - b;
-`,a=`${t}
+`,fe=`${ce}
 void main(){
   vec4 c = texture(src, uvSrc);
   outColor = vec4(c.rgb * c.a, c.a);
-}`,o=`${t}${n}${r}
+}`,pe=`${ce}${le}${ue}
 void main(){
-${i}
+${de}
   vec4 sum = vec4(0.0);
   for (int x = 0; x < 8; x++) {
     vec4 t = texelFetch(src, clamp(b + ivec2(x, l.y), ivec2(0), res - 1), 0);
@@ -38,15 +167,15 @@ ${i}
     sum += f * cos(float(2*x+1) * float(l.x) * PI / 16.0);
   }
   outColor = sum * 0.5 * cc(l.x);
-}`,s=`${t}${n}
+}`,me=`${ce}${le}
 void main(){
-${i}
+${de}
   vec4 sum = vec4(0.0);
   for (int y = 0; y < 8; y++)
     sum += texelFetch(src, clamp(b + ivec2(l.x, y), ivec2(0), res - 1), 0)
          * cos(float(2*y+1) * float(l.y) * PI / 16.0);
   outColor = sum * 0.5 * cc(l.y);
-}`,c=`${t}${n}
+}`,he=`${ce}${le}
 uniform float uS;                              // libjpeg quality scale
 const float LQ[64] = float[64](
   16.,11.,10.,16.,24.,40.,51.,61., 12.,12.,14.,19.,26.,58.,60.,55.,
@@ -60,7 +189,7 @@ const float CQ[64] = float[64](
   99.,99.,99.,99.,99.,99.,99.,99., 99.,99.,99.,99.,99.,99.,99.,99.);
 float qstep(float base){ return clamp(floor((base * uS + 50.0) / 100.0), 1.0, 255.0); }
 void main(){
-${i}
+${de}
   vec4 sum = vec4(0.0);
   for (int v = 0; v < 8; v++) {
     int idx = v * 8 + l.x;
@@ -69,16 +198,16 @@ ${i}
     sum += cc(v) * round(F / q) * q * cos(float(2*l.y+1) * float(v) * PI / 16.0);
   }
   outColor = sum * 0.5;
-}`,l=`${t}${n}${r}
+}`,ge=`${ce}${le}${ue}
 void main(){
-${i}
+${de}
   vec4 sum = vec4(0.0);
   for (int u = 0; u < 8; u++)
     sum += cc(u) * texelFetch(src, clamp(b + ivec2(u, l.y), ivec2(0), res - 1), 0)
          * cos(float(2*l.x+1) * float(u) * PI / 16.0);
   sum = sum * 0.5 / 255.0 + vec4(0.5, 0.0, 0.0, 0.5);
   outColor = clamp(vec4(ycc2rgb(sum.xyz), sum.w), 0.0, 1.0);
-}`,u=`${t}${r}
+}`,_e=`${ce}${ue}
 vec2 cellChroma(ivec2 res, ivec2 cell){
   vec2 s = vec2(0.0);
   for (int j = 0; j < 2; j++)
@@ -101,7 +230,7 @@ void main(){
     mix(cellChroma(res, c + ivec2(0,0)), cellChroma(res, c + ivec2(1,0)), f.x),
     mix(cellChroma(res, c + ivec2(0,1)), cellChroma(res, c + ivec2(1,1)), f.x), f.y);
   outColor = vec4(clamp(ycc2rgb(vec3(Y, cb)), 0.0, 1.0), c0.a);
-}`,d=[`coeff`,`tmp`,`sub`,`a`,`b`],f=class{constructor({quality:e=8,iterations:t=3,downscale:n=1}={}){this.lowRes=null,this.quality=e,this.iterations=t,this.downscale=n}ensureLowRes(e,t,n){if(this.lowRes&&this.lowRes.w===t&&this.lowRes.h===n)return this.lowRes;this.disposeLowRes();let r=[t,n];return this.lowRes={w:t,h:n,coeff:e.createRenderTarget({float:!0,size:r}),tmp:e.createRenderTarget({float:!0,size:r}),sub:e.createRenderTarget({size:r}),a:e.createRenderTarget({size:r}),b:e.createRenderTarget({size:r})},this.lowRes}disposeLowRes(){if(this.lowRes){for(let e of d)this.lowRes[e].dispose();this.lowRes=null}}render(e){let t=Math.max(1,Math.min(10,this.iterations|0)),n=Math.max(1,Math.min(100,this.quality)),r=n<50?5e3/n:200-2*n,i=Math.max(.02,Math.min(1,this.downscale)),[d,f]=e.dims.element,p=Math.max(1,Math.floor(d*i)),m=Math.max(1,Math.floor(f*i)),h=this.ensureLowRes(e,p,m);e.draw({frag:a,uniforms:{src:e.src},target:h.a});let g=h.a;for(let n=0;n<t;n++){e.draw({frag:u,uniforms:{src:g},target:h.sub}),e.draw({frag:o,uniforms:{src:h.sub},target:h.tmp}),e.draw({frag:s,uniforms:{src:h.tmp},target:h.coeff}),e.draw({frag:c,uniforms:{src:h.coeff,uS:r},target:h.tmp});let t=n%2==0?h.b:h.a;e.draw({frag:l,uniforms:{src:h.tmp},target:t}),g=t}e.blit(g,e.target)}dispose(){this.disposeLowRes()}}})),m,h,g,_,v,ee,te,ne,re,ie,ae,oe,se,ce,le,ue,de,fe=e((()=>{m=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},h=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},ae=`#version 300 es
+}`,ve=[`coeff`,`tmp`,`sub`,`a`,`b`],ye=class{constructor({quality:e=8,iterations:t=3,downscale:n=1}={}){this.lowRes=null,this.quality=e,this.iterations=t,this.downscale=n}ensureLowRes(e,t,n){if(this.lowRes&&this.lowRes.w===t&&this.lowRes.h===n)return this.lowRes;this.disposeLowRes();let r=[t,n];return this.lowRes={w:t,h:n,coeff:e.createRenderTarget({float:!0,size:r}),tmp:e.createRenderTarget({float:!0,size:r}),sub:e.createRenderTarget({size:r}),a:e.createRenderTarget({size:r}),b:e.createRenderTarget({size:r})},this.lowRes}disposeLowRes(){if(this.lowRes){for(let e of ve)this.lowRes[e].dispose();this.lowRes=null}}render(e){let t=Math.max(1,Math.min(10,this.iterations|0)),n=Math.max(1,Math.min(100,this.quality)),r=n<50?5e3/n:200-2*n,i=Math.max(.02,Math.min(1,this.downscale)),[a,o]=e.dims.element,s=Math.max(1,Math.floor(a*i)),c=Math.max(1,Math.floor(o*i)),l=this.ensureLowRes(e,s,c);e.draw({frag:fe,uniforms:{src:e.src},target:l.a});let u=l.a;for(let n=0;n<t;n++){e.draw({frag:_e,uniforms:{src:u},target:l.sub}),e.draw({frag:pe,uniforms:{src:l.sub},target:l.tmp}),e.draw({frag:me,uniforms:{src:l.tmp},target:l.coeff}),e.draw({frag:he,uniforms:{src:l.coeff,uS:r},target:l.tmp});let t=n%2==0?l.b:l.a;e.draw({frag:ge,uniforms:{src:l.tmp},target:t}),u=t}e.blit(u,e.target)}dispose(){this.disposeLowRes()}}})),b,x,xe,S,C,Se,Ce,we,Te,Ee,De,Oe,ke,Ae,je,Me,Ne,Pe=e((()=>{b=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},x=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},De=`#version 300 es
 precision highp float;
 in vec2 uvSrc;
 in vec2 uvContent;
@@ -146,7 +275,7 @@ void main() {
 
     outColor = vec4(lin * f, f);
 }
-`,oe=`#version 300 es
+`,Oe=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -194,7 +323,7 @@ void main() {
     }
     outColor = color;
 }
-`,se=`#version 300 es
+`,ke=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -219,7 +348,7 @@ void main() {
     sum *= (1.0 / 16.0);
     outColor = texture(srcLarge, uv) * weightLarge + sum * weightSmall;
 }
-`,ce=`#version 300 es
+`,Ae=`#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvSrc;
@@ -298,7 +427,7 @@ void main() {
     float a = clamp(max(baseColor.a, b.a * intensity), 0.0, 1.0);
     outColor = vec4(rgb * a, a);
 }
-`,le={threshold:.7,softness:.1,intensity:1.2,scatter:.7,pad:50,dither:0,edgeFade:.02},ue=.5,de=class{constructor(e={}){g.add(this),_.set(this,null),v.set(this,[]),ee.set(this,[]),te.set(this,!1),ne.set(this,0),re.set(this,0),this.params={...le,...e}}setParams(e){Object.assign(this.params,e)}init(e){m(this,_,e.createRenderTarget({float:!0}),`f`)}render(e){if(!h(this,_,`f`))return;let{threshold:t,softness:n,intensity:r}=this.params,i=Math.min(Math.max(this.params.scatter,0),1),a=Math.max(0,this.params.dither),o=Math.max(1e-6,this.params.edgeFade);(h(this,_,`f`).width!==h(this,ne,`f`)||h(this,_,`f`).height!==h(this,re,`f`))&&(h(this,v,`f`).length=0,h(this,ee,`f`).length=0,m(this,te,!1,`f`),m(this,ne,h(this,_,`f`).width,`f`),m(this,re,h(this,_,`f`).height,`f`)),h(this,g,`m`,ie).call(this,e,h(this,_,`f`).width,h(this,_,`f`).height);let s=h(this,v,`f`).length;if(s===0)return;e.draw({frag:ae,uniforms:{src:e.src,threshold:t,softness:n,edgeFade:o},target:h(this,_,`f`)}),e.draw({frag:oe,uniforms:{src:h(this,_,`f`),texelSize:[1/h(this,_,`f`).width,1/h(this,_,`f`).height],karis:1},target:h(this,v,`f`)[0]});for(let t=1;t<s;t++){let n=h(this,v,`f`)[t-1];e.draw({frag:oe,uniforms:{src:n,texelSize:[1/n.width,1/n.height],karis:0},target:h(this,v,`f`)[t]})}let c=h(this,_,`f`).width,l=h(this,_,`f`).height,u=1+i*Math.max(0,s-1),d=e=>Math.min(1,Math.max(0,u-e));for(let t=s-2;t>=0;t--){let n=t===s-2?h(this,v,`f`)[s-1]:h(this,ee,`f`)[t+1],r=2**(t+2),i=t===s-2?d(s-1):1;e.draw({frag:se,uniforms:{srcSmall:n,srcLarge:h(this,v,`f`)[t],texelSize:[ue*r/c,ue*r/l],weightLarge:d(t),weightSmall:i},target:h(this,ee,`f`)[t]})}let f=s>=2?h(this,ee,`f`)[0]:h(this,v,`f`)[0],p=r/Math.max(1,u);e.draw({frag:ce,uniforms:{src:e.src,bloom:f,texelSize:[ue*2/c,ue*2/l],intensity:p,dither:a,edgeFade:o},target:e.target})}outputRect(e){let{pad:t}=this.params;if(t===`fullscreen`)return e.canvasRect;let n=t*e.pixelRatio,[,,r,i]=e.contentRect;return[-n,-n,r+2*n,i+2*n]}dispose(){m(this,_,null,`f`),h(this,v,`f`).length=0,h(this,ee,`f`).length=0,m(this,te,!1,`f`),m(this,ne,0,`f`),m(this,re,0,`f`)}},_=new WeakMap,v=new WeakMap,ee=new WeakMap,te=new WeakMap,ne=new WeakMap,re=new WeakMap,g=new WeakSet,ie=function(e,t,n){if(h(this,te,`f`))return;let r=Math.max(1,Math.floor(t/2)),i=Math.max(1,Math.floor(n/2));for(let t=0;t<8;t++){h(this,v,`f`).push(e.createRenderTarget({size:[r,i],float:!0}));let t=Math.max(1,Math.floor(r/2)),n=Math.max(1,Math.floor(i/2));if(t===r&&n===i)break;r=t,i=n}for(let t=0;t<h(this,v,`f`).length-1;t++)h(this,ee,`f`).push(e.createRenderTarget({size:[h(this,v,`f`)[t].width,h(this,v,`f`)[t].height],float:!0}));m(this,te,!0,`f`)}})),pe,me,he,ge=e((()=>{pe=`#version 300 es
+`,je={threshold:.7,softness:.1,intensity:1.2,scatter:.7,pad:50,dither:0,edgeFade:.02},Me=.5,Ne=class{constructor(e={}){xe.add(this),S.set(this,null),C.set(this,[]),Se.set(this,[]),Ce.set(this,!1),we.set(this,0),Te.set(this,0),this.params={...je,...e}}setParams(e){Object.assign(this.params,e)}init(e){b(this,S,e.createRenderTarget({float:!0}),`f`)}render(e){if(!x(this,S,`f`))return;let{threshold:t,softness:n,intensity:r}=this.params,i=Math.min(Math.max(this.params.scatter,0),1),a=Math.max(0,this.params.dither),o=Math.max(1e-6,this.params.edgeFade);(x(this,S,`f`).width!==x(this,we,`f`)||x(this,S,`f`).height!==x(this,Te,`f`))&&(x(this,C,`f`).length=0,x(this,Se,`f`).length=0,b(this,Ce,!1,`f`),b(this,we,x(this,S,`f`).width,`f`),b(this,Te,x(this,S,`f`).height,`f`)),x(this,xe,`m`,Ee).call(this,e,x(this,S,`f`).width,x(this,S,`f`).height);let s=x(this,C,`f`).length;if(s===0)return;e.draw({frag:De,uniforms:{src:e.src,threshold:t,softness:n,edgeFade:o},target:x(this,S,`f`)}),e.draw({frag:Oe,uniforms:{src:x(this,S,`f`),texelSize:[1/x(this,S,`f`).width,1/x(this,S,`f`).height],karis:1},target:x(this,C,`f`)[0]});for(let t=1;t<s;t++){let n=x(this,C,`f`)[t-1];e.draw({frag:Oe,uniforms:{src:n,texelSize:[1/n.width,1/n.height],karis:0},target:x(this,C,`f`)[t]})}let c=x(this,S,`f`).width,l=x(this,S,`f`).height,u=1+i*Math.max(0,s-1),d=e=>Math.min(1,Math.max(0,u-e));for(let t=s-2;t>=0;t--){let n=t===s-2?x(this,C,`f`)[s-1]:x(this,Se,`f`)[t+1],r=2**(t+2),i=t===s-2?d(s-1):1;e.draw({frag:ke,uniforms:{srcSmall:n,srcLarge:x(this,C,`f`)[t],texelSize:[Me*r/c,Me*r/l],weightLarge:d(t),weightSmall:i},target:x(this,Se,`f`)[t]})}let f=s>=2?x(this,Se,`f`)[0]:x(this,C,`f`)[0],p=r/Math.max(1,u);e.draw({frag:Ae,uniforms:{src:e.src,bloom:f,texelSize:[Me*2/c,Me*2/l],intensity:p,dither:a,edgeFade:o},target:e.target})}outputRect(e){let{pad:t}=this.params;if(t===`fullscreen`)return e.canvasRect;let n=t*e.pixelRatio,[,,r,i]=e.contentRect;return[-n,-n,r+2*n,i+2*n]}dispose(){b(this,S,null,`f`),x(this,C,`f`).length=0,x(this,Se,`f`).length=0,b(this,Ce,!1,`f`),b(this,we,0,`f`),b(this,Te,0,`f`)}},S=new WeakMap,C=new WeakMap,Se=new WeakMap,Ce=new WeakMap,we=new WeakMap,Te=new WeakMap,xe=new WeakSet,Ee=function(e,t,n){if(x(this,Ce,`f`))return;let r=Math.max(1,Math.floor(t/2)),i=Math.max(1,Math.floor(n/2));for(let t=0;t<8;t++){x(this,C,`f`).push(e.createRenderTarget({size:[r,i],float:!0}));let t=Math.max(1,Math.floor(r/2)),n=Math.max(1,Math.floor(i/2));if(t===r&&n===i)break;r=t,i=n}for(let t=0;t<x(this,C,`f`).length-1;t++)x(this,Se,`f`).push(e.createRenderTarget({size:[x(this,C,`f`)[t].width,x(this,C,`f`)[t].height],float:!0}));b(this,Ce,!0,`f`)}})),Fe,Ie,Le,Re=e((()=>{Fe=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -335,7 +464,7 @@ void main() {
 
     outColor = vec4(cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 3.0);
 }
-`,me={intensity:.3,radius:0,power:2},he=class{constructor(e={}){this.params={...me,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.element;e.draw({frag:pe,uniforms:{src:e.src,aspect:(t||1)/(n||1),intensity:this.params.intensity,radius:this.params.radius,power:this.params.power},target:e.target})}}})),y,b,_e,ve,x,ye,be,xe,Se,Ce,we,Te,Ee,De,Oe,ke,Ae,je,Me,Ne,Pe,Fe,Ie,Le,Re,ze,Be,Ve,He,Ue,We,Ge,Ke,qe,Je=e((()=>{y=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},b=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},Fe=`#version 300 es
+`,Ie={intensity:.3,radius:0,power:2},Le=class{constructor(e={}){this.params={...Ie,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.element;e.draw({frag:Fe,uniforms:{src:e.src,aspect:(t||1)/(n||1),intensity:this.params.intensity,radius:this.params.radius,power:this.params.power},target:e.target})}}})),w,T,ze,E,D,Be,Ve,He,Ue,We,Ge,Ke,qe,Je,Ye,Xe,Ze,Qe,$e,et,tt,nt,rt,it,at,ot,st,ct,lt,ut,dt,ft,pt,mt,ht=e((()=>{w=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},T=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},nt=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -344,7 +473,7 @@ void main() {
     vec4 c = texture(tex, uvContent);
     outColor = vec4(c.rgb * c.a, c.a);
 }
-`,Ie=`#version 300 es
+`,rt=`#version 300 es
 precision highp float;
 out vec4 outMV;
 uniform sampler2D uCur, uRef;
@@ -388,7 +517,7 @@ void main() {
 
     outMV = vec4(move, 0.0, 1.0);
 }
-`,Le=`#version 300 es
+`,it=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -400,7 +529,7 @@ void main() {
     vec3 pred = texture(uRef, uv + mv / uResolution).rgb;
     outColor = vec4(cur - pred, 1.0);
 }
-`,Re=`#version 300 es
+`,at=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -419,7 +548,7 @@ void main() {
     // Clamp like an 8-bit decoder so the feedback can't run away to white.
     outColor = vec4(clamp(pred + res, 0.0, 1.0), 1.0);
 }
-`,ze=`#version 300 es
+`,ot=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -436,7 +565,7 @@ void main() {
     float mag = clamp(length(mv) / max(uMvScale, 1.0), 0.0, 1.0);
     outColor = vec4(hsv(vec3(ang, 0.9, 0.15 + 0.85 * mag)), 1.0);
 }
-`,Be=`#version 300 es
+`,st=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -445,15 +574,15 @@ void main() {
     vec3 r = texture(uResidual, uvContent).rgb;
     outColor = vec4(clamp(r * 0.5 + 0.5, 0.0, 1.0), 1.0);
 }
-`,Ve=`
+`,ct=`
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 vec2 chroma(vec3 c) {
     return vec2(dot(c, vec3(-0.168736, -0.331264, 0.5)),
                 dot(c, vec3(0.5, -0.418688, -0.081312))) + 0.5;
 }
-`,He=`#version 300 es
+`,lt=`#version 300 es
 precision highp float;
-${Ve}
+${ct}
 in vec2 uv;
 out vec4 outColor;
 uniform sampler2D uCur, uRef, uMV;
@@ -463,9 +592,9 @@ void main() {
     vec2 pred = chroma(texture(uRef, uv + mvc / uChromaRes).rgb);
     outColor = vec4(chroma(texture(uCur, uv).rgb) - pred, 0.0, 1.0);
 }
-`,Ue=`#version 300 es
+`,ut=`#version 300 es
 precision highp float;
-${Ve}
+${ct}
 in vec2 uv;
 out vec4 outColor;
 uniform sampler2D uAccum, uMV, uVideo, uResidual;
@@ -487,9 +616,9 @@ void main() {
 
     outColor = vec4(Y, 0.0, 0.0, 1.0);
 }
-`,We=`#version 300 es
+`,dt=`#version 300 es
 precision highp float;
-${Ve}
+${ct}
 in vec2 uv;
 out vec4 outColor;
 uniform sampler2D uChromaAcc, uMV, uVideo, uResidualC;
@@ -514,7 +643,7 @@ void main() {
 
     outColor = vec4(C, 0.0, 1.0);
 }
-`,Ge=`#version 300 es
+`,ft=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -531,7 +660,7 @@ void main() {
     );
     outColor = vec4(clamp(rgb, 0.0, 1.0), 1.0);
 }
-`,Ke={blockSize:16,searchRange:5,searchStep:2,useResidual:!0,dup:0,colorSpace:`ycbcr`,chromaGain:1,view:`output`},qe=class{constructor(e={}){_e.add(this),ve.set(this,!1),x.set(this,!0),ye.set(this,null),be.set(this,null),xe.set(this,null),Se.set(this,null),Ce.set(this,null),we.set(this,null),Te.set(this,null),Ee.set(this,0),De.set(this,0),Oe.set(this,0),ke.set(this,0),Ae.set(this,0),je.set(this,void 0),this.params={...Ke,...e},y(this,je,this.params.colorSpace,`f`)}setParams(e){Object.assign(this.params,e)}enable(){y(this,ve,!0,`f`)}disable(){y(this,ve,!1,`f`),y(this,x,!0,`f`)}get enabled(){return b(this,ve,`f`)}render(e){b(this,_e,`m`,Ne).call(this,e);let t=b(this,ye,`f`),n=b(this,be,`f`),r=b(this,xe,`f`),i=b(this,Se,`f`),a=b(this,Ce,`f`),o=b(this,we,`f`),s=b(this,Te,`f`);if(!t||!n||!r||!i||!a||!o||!s)return;this.params.colorSpace!==b(this,je,`f`)&&(y(this,je,this.params.colorSpace,`f`),y(this,x,!0,`f`));let c=[b(this,Ee,`f`),b(this,De,`f`)];e.blit(e.src,t);let l=this.params.view!==`output`;if((b(this,ve,`f`)||l)&&(e.draw({frag:Ie,uniforms:{uCur:t,uRef:n,uResolution:c,uBlock:b(this,Ae,`f`),uSearch:this.params.searchRange,uStep:this.params.searchStep},target:r}),e.draw({frag:Le,uniforms:{uCur:t,uRef:n,uMV:r,uResolution:c},target:i})),b(this,ve,`f`)){let l=b(this,x,`f`)?1:1+this.params.dup,u=[b(this,Oe,`f`),b(this,ke,`f`)];this.params.colorSpace===`ycbcr`&&e.draw({frag:He,uniforms:{uCur:t,uRef:n,uMV:r,uChromaRes:u},target:s});for(let n=0;n<l;n++){let l=this.params.useResidual&&n===0;this.params.colorSpace===`ycbcr`?(e.draw({frag:Ue,uniforms:{uAccum:a,uMV:r,uVideo:t,uResidual:i,uResolution:c,uIntra:b(this,x,`f`),uUseResidual:l},target:a}),e.draw({frag:We,uniforms:{uChromaAcc:o,uMV:r,uVideo:t,uResidualC:s,uChromaRes:u,uIntra:b(this,x,`f`),uUseResidual:l},target:o})):e.draw({frag:Re,uniforms:{uAccum:a,uMV:r,uVideo:t,uResidual:i,uResolution:c,uIntra:b(this,x,`f`),uUseResidual:l},target:a})}y(this,x,!1,`f`)}else y(this,x,!0,`f`);b(this,_e,`m`,Pe).call(this,e,t,n,r,i,a,o),e.blit(e.src,n)}dispose(){b(this,_e,`m`,Me).call(this),y(this,Ee,0,`f`),y(this,De,0,`f`),y(this,Oe,0,`f`),y(this,ke,0,`f`),y(this,Ae,0,`f`),y(this,x,!0,`f`)}},ve=new WeakMap,x=new WeakMap,ye=new WeakMap,be=new WeakMap,xe=new WeakMap,Se=new WeakMap,Ce=new WeakMap,we=new WeakMap,Te=new WeakMap,Ee=new WeakMap,De=new WeakMap,Oe=new WeakMap,ke=new WeakMap,Ae=new WeakMap,je=new WeakMap,_e=new WeakSet,Me=function(){b(this,ye,`f`)?.dispose(),b(this,be,`f`)?.dispose(),b(this,xe,`f`)?.dispose(),b(this,Se,`f`)?.dispose(),b(this,Ce,`f`)?.dispose(),b(this,we,`f`)?.dispose(),b(this,Te,`f`)?.dispose(),y(this,ye,null,`f`),y(this,be,null,`f`),y(this,xe,null,`f`),y(this,Se,null,`f`),y(this,Ce,null,`f`),y(this,we,null,`f`),y(this,Te,null,`f`)},Ne=function(e){let[t,n]=e.dims.elementPixel,r=Math.max(2,this.params.blockSize);if(b(this,Ee,`f`)===t&&b(this,De,`f`)===n&&b(this,Ae,`f`)===r)return;b(this,_e,`m`,Me).call(this),y(this,Ee,t,`f`),y(this,De,n,`f`),y(this,Oe,Math.ceil(t/2),`f`),y(this,ke,Math.ceil(n/2),`f`),y(this,Ae,r,`f`),y(this,x,!0,`f`);let i=Math.ceil(t/r),a=Math.ceil(n/r);y(this,ye,e.createRenderTarget({size:[t,n]}),`f`),y(this,be,e.createRenderTarget({size:[t,n],persistent:!0}),`f`),y(this,Se,e.createRenderTarget({size:[t,n],float:!0}),`f`),y(this,Ce,e.createRenderTarget({size:[t,n],float:!0,persistent:!0}),`f`),y(this,we,e.createRenderTarget({size:[b(this,Oe,`f`),b(this,ke,`f`)],float:!0,persistent:!0}),`f`),y(this,Te,e.createRenderTarget({size:[b(this,Oe,`f`),b(this,ke,`f`)],float:!0}),`f`),y(this,xe,e.createRenderTarget({size:[i,a],float:!0,filter:`nearest`}),`f`)},Pe=function(e,t,n,r,i,a,o){switch(this.params.view){case`motion`:e.draw({frag:ze,uniforms:{uMV:r,uMvScale:this.params.searchRange*this.params.searchStep},target:e.target});return;case`residual`:e.draw({frag:Be,uniforms:{uResidual:i},target:e.target});return;case`current`:e.draw({frag:Fe,uniforms:{tex:t},target:e.target});return;case`previous`:e.draw({frag:Fe,uniforms:{tex:n},target:e.target});return;default:b(this,ve,`f`)&&this.params.colorSpace===`ycbcr`?e.draw({frag:Ge,uniforms:{uLumaAcc:a,uChromaAcc:o,uChromaGain:this.params.chromaGain},target:e.target}):e.draw({frag:Fe,uniforms:{tex:b(this,ve,`f`)?a:t},target:e.target})}}})),Ye,Xe,Ze,Qe=e((()=>{Ye=`#version 300 es
+`,pt={blockSize:16,searchRange:5,searchStep:2,useResidual:!0,dup:0,colorSpace:`ycbcr`,chromaGain:1,view:`output`},mt=class{constructor(e={}){ze.add(this),E.set(this,!1),D.set(this,!0),Be.set(this,null),Ve.set(this,null),He.set(this,null),Ue.set(this,null),We.set(this,null),Ge.set(this,null),Ke.set(this,null),qe.set(this,0),Je.set(this,0),Ye.set(this,0),Xe.set(this,0),Ze.set(this,0),Qe.set(this,void 0),this.params={...pt,...e},w(this,Qe,this.params.colorSpace,`f`)}setParams(e){Object.assign(this.params,e)}enable(){w(this,E,!0,`f`)}disable(){w(this,E,!1,`f`),w(this,D,!0,`f`)}get enabled(){return T(this,E,`f`)}render(e){T(this,ze,`m`,et).call(this,e);let t=T(this,Be,`f`),n=T(this,Ve,`f`),r=T(this,He,`f`),i=T(this,Ue,`f`),a=T(this,We,`f`),o=T(this,Ge,`f`),s=T(this,Ke,`f`);if(!t||!n||!r||!i||!a||!o||!s)return;this.params.colorSpace!==T(this,Qe,`f`)&&(w(this,Qe,this.params.colorSpace,`f`),w(this,D,!0,`f`));let c=[T(this,qe,`f`),T(this,Je,`f`)];e.blit(e.src,t);let l=this.params.view!==`output`;if((T(this,E,`f`)||l)&&(e.draw({frag:rt,uniforms:{uCur:t,uRef:n,uResolution:c,uBlock:T(this,Ze,`f`),uSearch:this.params.searchRange,uStep:this.params.searchStep},target:r}),e.draw({frag:it,uniforms:{uCur:t,uRef:n,uMV:r,uResolution:c},target:i})),T(this,E,`f`)){let l=T(this,D,`f`)?1:1+this.params.dup,u=[T(this,Ye,`f`),T(this,Xe,`f`)];this.params.colorSpace===`ycbcr`&&e.draw({frag:lt,uniforms:{uCur:t,uRef:n,uMV:r,uChromaRes:u},target:s});for(let n=0;n<l;n++){let l=this.params.useResidual&&n===0;this.params.colorSpace===`ycbcr`?(e.draw({frag:ut,uniforms:{uAccum:a,uMV:r,uVideo:t,uResidual:i,uResolution:c,uIntra:T(this,D,`f`),uUseResidual:l},target:a}),e.draw({frag:dt,uniforms:{uChromaAcc:o,uMV:r,uVideo:t,uResidualC:s,uChromaRes:u,uIntra:T(this,D,`f`),uUseResidual:l},target:o})):e.draw({frag:at,uniforms:{uAccum:a,uMV:r,uVideo:t,uResidual:i,uResolution:c,uIntra:T(this,D,`f`),uUseResidual:l},target:a})}w(this,D,!1,`f`)}else w(this,D,!0,`f`);T(this,ze,`m`,tt).call(this,e,t,n,r,i,a,o),e.blit(e.src,n)}dispose(){T(this,ze,`m`,$e).call(this),w(this,qe,0,`f`),w(this,Je,0,`f`),w(this,Ye,0,`f`),w(this,Xe,0,`f`),w(this,Ze,0,`f`),w(this,D,!0,`f`)}},E=new WeakMap,D=new WeakMap,Be=new WeakMap,Ve=new WeakMap,He=new WeakMap,Ue=new WeakMap,We=new WeakMap,Ge=new WeakMap,Ke=new WeakMap,qe=new WeakMap,Je=new WeakMap,Ye=new WeakMap,Xe=new WeakMap,Ze=new WeakMap,Qe=new WeakMap,ze=new WeakSet,$e=function(){T(this,Be,`f`)?.dispose(),T(this,Ve,`f`)?.dispose(),T(this,He,`f`)?.dispose(),T(this,Ue,`f`)?.dispose(),T(this,We,`f`)?.dispose(),T(this,Ge,`f`)?.dispose(),T(this,Ke,`f`)?.dispose(),w(this,Be,null,`f`),w(this,Ve,null,`f`),w(this,He,null,`f`),w(this,Ue,null,`f`),w(this,We,null,`f`),w(this,Ge,null,`f`),w(this,Ke,null,`f`)},et=function(e){let[t,n]=e.dims.elementPixel,r=Math.max(2,this.params.blockSize);if(T(this,qe,`f`)===t&&T(this,Je,`f`)===n&&T(this,Ze,`f`)===r)return;T(this,ze,`m`,$e).call(this),w(this,qe,t,`f`),w(this,Je,n,`f`),w(this,Ye,Math.ceil(t/2),`f`),w(this,Xe,Math.ceil(n/2),`f`),w(this,Ze,r,`f`),w(this,D,!0,`f`);let i=Math.ceil(t/r),a=Math.ceil(n/r);w(this,Be,e.createRenderTarget({size:[t,n]}),`f`),w(this,Ve,e.createRenderTarget({size:[t,n],persistent:!0}),`f`),w(this,Ue,e.createRenderTarget({size:[t,n],float:!0}),`f`),w(this,We,e.createRenderTarget({size:[t,n],float:!0,persistent:!0}),`f`),w(this,Ge,e.createRenderTarget({size:[T(this,Ye,`f`),T(this,Xe,`f`)],float:!0,persistent:!0}),`f`),w(this,Ke,e.createRenderTarget({size:[T(this,Ye,`f`),T(this,Xe,`f`)],float:!0}),`f`),w(this,He,e.createRenderTarget({size:[i,a],float:!0,filter:`nearest`}),`f`)},tt=function(e,t,n,r,i,a,o){switch(this.params.view){case`motion`:e.draw({frag:ot,uniforms:{uMV:r,uMvScale:this.params.searchRange*this.params.searchStep},target:e.target});return;case`residual`:e.draw({frag:st,uniforms:{uResidual:i},target:e.target});return;case`current`:e.draw({frag:nt,uniforms:{tex:t},target:e.target});return;case`previous`:e.draw({frag:nt,uniforms:{tex:n},target:e.target});return;default:T(this,E,`f`)&&this.params.colorSpace===`ycbcr`?e.draw({frag:ft,uniforms:{uLumaAcc:a,uChromaAcc:o,uChromaGain:this.params.chromaGain},target:e.target}):e.draw({frag:nt,uniforms:{tex:T(this,E,`f`)?a:t},target:e.target})}}})),gt,_t,vt,yt=e((()=>{gt=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -561,7 +690,7 @@ void main (void) {
 
     outColor.a *= color.a;
 }
-`,Xe={color1:[1,0,0,1],color2:[0,0,1,1],speed:.2},Ze=class{constructor(e={}){this.params={...Xe,...e}}setParams(e){Object.assign(this.params,e)}render(e){e.draw({frag:Ye,uniforms:{src:e.src,time:e.time,color1:this.params.color1,color2:this.params.color2,speed:this.params.speed},target:e.target})}}})),S,C,$e,et,tt,nt,rt,it,w,at,ot,st,ct,lt,ut,dt,ft,pt,mt,ht,gt,_t,vt,yt=e((()=>{S=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},C=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},ct=`#version 300 es
+`,_t={color1:[1,0,0,1],color2:[0,0,1,1],speed:.2},vt=class{constructor(e={}){this.params={..._t,...e}}setParams(e){Object.assign(this.params,e)}render(e){e.draw({frag:gt,uniforms:{src:e.src,time:e.time,color1:this.params.color1,color2:this.params.color2,speed:this.params.speed},target:e.target})}}})),O,k,bt,xt,St,Ct,wt,Tt,A,Et,Dt,Ot,kt,At,jt,Mt,Nt,Pt,Ft,It,Lt,Rt,zt,Bt=e((()=>{O=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},k=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},kt=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -575,7 +704,7 @@ void main() {
     float B = texture(velocity, uv - vec2(0.0, simTexel.y)).x;
     outColor = vec4(0.5 * (R - L - T + B), 0.0, 0.0, 1.0);
 }
-`,lt=`#version 300 es
+`,At=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -615,7 +744,7 @@ void main() {
 
     outColor = vec4(vel, 0.0, 1.0);
 }
-`,ut=`#version 300 es
+`,jt=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -635,11 +764,11 @@ void main() {
     if (uv.y - simTexel.y < 0.0) B = -C.y;
     outColor = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
 }
-`,dt=`#version 300 es
+`,Mt=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() { outColor = vec4(0.0); }
-`,ft=`#version 300 es
+`,Nt=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -655,7 +784,7 @@ void main() {
     float div = texture(divergence, uv).x;
     outColor = vec4((L + R + B + T - div) * 0.25, 0.0, 0.0, 1.0);
 }
-`,pt=`#version 300 es
+`,Pt=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -672,7 +801,7 @@ void main() {
     vel -= vec2(R - L, T - B);
     outColor = vec4(vel, 0.0, 1.0);
 }
-`,mt=`#version 300 es
+`,Ft=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -687,7 +816,7 @@ void main() {
     advected /= 1.0 + velocityDissipation * 0.016;
     outColor = vec4(advected, 0.0, 1.0);
 }
-`,ht=`#version 300 es
+`,It=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -727,7 +856,7 @@ void main() {
 
     outColor = vec4(max(d, vec3(0.0)), 1.0);
 }
-`,gt=`#version 300 es
+`,Lt=`#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvSrc;
@@ -763,7 +892,7 @@ void main() {
                   * smoothstep(.2, .8, v) * 0.2;
     }
 }
-`,_t={simSize:[256,256],pressureIterations:1,curlStrength:13,velocityDissipation:.6,densityDissipation:.65,splatForce:6e3,splatRadius:.002,dyeSplatRadius:.001,dyeSplatIntensity:.005,showDye:!1},vt=class{constructor(e={}){$e.set(this,null),et.set(this,null),tt.set(this,null),nt.set(this,null),rt.set(this,null),it.set(this,null),w.set(this,null),at.set(this,null),ot.set(this,[0,0]),st.set(this,!1),this.params={..._t,...e}}init(e){let t=this.params.simSize,n={size:t,float:!0};S(this,$e,e.createRenderTarget(n),`f`),S(this,et,e.createRenderTarget(n),`f`),S(this,tt,e.createRenderTarget(n),`f`),S(this,nt,e.createRenderTarget(n),`f`),S(this,rt,e.createRenderTarget(n),`f`),S(this,it,e.createRenderTarget(n),`f`),S(this,w,e.createRenderTarget({size:t,float:!0,persistent:!0}),`f`),S(this,at,e.createRenderTarget({float:!0,persistent:!0}),`f`)}render(e){if(!C(this,$e,`f`)||!C(this,et,`f`)||!C(this,tt,`f`)||!C(this,nt,`f`)||!C(this,rt,`f`)||!C(this,it,`f`)||!C(this,w,`f`)||!C(this,at,`f`))return;let{simSize:t,pressureIterations:n,curlStrength:r,velocityDissipation:i,densityDissipation:a,splatForce:o,splatRadius:s,dyeSplatRadius:c,dyeSplatIntensity:l,showDye:u}=this.params,d=[1/t[0],1/t[1]],[f,p]=e.dims.elementPixel,m=f/p,h=[e.mouse[0]/f,e.mouse[1]/p],g=C(this,st,`f`)?[h[0]-C(this,ot,`f`)[0],h[1]-C(this,ot,`f`)[1]]:[0,0];S(this,ot,h,`f`),S(this,st,!0,`f`),e.draw({frag:ct,uniforms:{velocity:C(this,w,`f`),simTexel:d},target:C(this,$e,`f`)}),e.draw({frag:lt,uniforms:{velocity:C(this,w,`f`),curl:C(this,$e,`f`),simTexel:d,aspect:m,mouseUv:h,mouseDeltaUv:g,curlStrength:r,splatForce:o,splatRadius:s},target:C(this,et,`f`)}),e.draw({frag:ut,uniforms:{vortVel:C(this,et,`f`),simTexel:d},target:C(this,tt,`f`)}),e.draw({frag:dt,target:C(this,nt,`f`)});let _=C(this,nt,`f`),v=C(this,rt,`f`);for(let t=0;t<n;t++){e.draw({frag:ft,uniforms:{pressure:_,divergence:C(this,tt,`f`),simTexel:d},target:v});let t=_;_=v,v=t}e.draw({frag:pt,uniforms:{vortVel:C(this,et,`f`),pressure:_,simTexel:d},target:C(this,it,`f`)}),e.draw({frag:mt,uniforms:{projVel:C(this,it,`f`),simTexel:d,velocityDissipation:i},target:C(this,w,`f`)}),e.draw({frag:ht,uniforms:{velocity:C(this,w,`f`),dye:C(this,at,`f`),time:e.time,aspect:m,mouseUv:h,mouseDeltaUv:g,simSize:t,densityDissipation:a,dyeSplatRadius:c,dyeSplatIntensity:l},target:C(this,at,`f`)}),e.draw({frag:gt,uniforms:{src:e.src,dye:C(this,at,`f`),velocity:C(this,w,`f`),simSize:t,showDye:+!!u,time:e.time},target:e.target})}dispose(){S(this,$e,null,`f`),S(this,et,null,`f`),S(this,tt,null,`f`),S(this,nt,null,`f`),S(this,rt,null,`f`),S(this,it,null,`f`),S(this,w,null,`f`),S(this,at,null,`f`),S(this,st,!1,`f`)}},$e=new WeakMap,et=new WeakMap,tt=new WeakMap,nt=new WeakMap,rt=new WeakMap,it=new WeakMap,w=new WeakMap,at=new WeakMap,ot=new WeakMap,st=new WeakMap})),bt,xt,St,Ct=e((()=>{bt=`#version 300 es
+`,Rt={simSize:[256,256],pressureIterations:1,curlStrength:13,velocityDissipation:.6,densityDissipation:.65,splatForce:6e3,splatRadius:.002,dyeSplatRadius:.001,dyeSplatIntensity:.005,showDye:!1},zt=class{constructor(e={}){bt.set(this,null),xt.set(this,null),St.set(this,null),Ct.set(this,null),wt.set(this,null),Tt.set(this,null),A.set(this,null),Et.set(this,null),Dt.set(this,[0,0]),Ot.set(this,!1),this.params={...Rt,...e}}init(e){let t=this.params.simSize,n={size:t,float:!0};O(this,bt,e.createRenderTarget(n),`f`),O(this,xt,e.createRenderTarget(n),`f`),O(this,St,e.createRenderTarget(n),`f`),O(this,Ct,e.createRenderTarget(n),`f`),O(this,wt,e.createRenderTarget(n),`f`),O(this,Tt,e.createRenderTarget(n),`f`),O(this,A,e.createRenderTarget({size:t,float:!0,persistent:!0}),`f`),O(this,Et,e.createRenderTarget({float:!0,persistent:!0}),`f`)}render(e){if(!k(this,bt,`f`)||!k(this,xt,`f`)||!k(this,St,`f`)||!k(this,Ct,`f`)||!k(this,wt,`f`)||!k(this,Tt,`f`)||!k(this,A,`f`)||!k(this,Et,`f`))return;let{simSize:t,pressureIterations:n,curlStrength:r,velocityDissipation:i,densityDissipation:a,splatForce:o,splatRadius:s,dyeSplatRadius:c,dyeSplatIntensity:l,showDye:u}=this.params,d=[1/t[0],1/t[1]],[f,p]=e.dims.elementPixel,m=f/p,h=[e.mouse[0]/f,e.mouse[1]/p],g=k(this,Ot,`f`)?[h[0]-k(this,Dt,`f`)[0],h[1]-k(this,Dt,`f`)[1]]:[0,0];O(this,Dt,h,`f`),O(this,Ot,!0,`f`),e.draw({frag:kt,uniforms:{velocity:k(this,A,`f`),simTexel:d},target:k(this,bt,`f`)}),e.draw({frag:At,uniforms:{velocity:k(this,A,`f`),curl:k(this,bt,`f`),simTexel:d,aspect:m,mouseUv:h,mouseDeltaUv:g,curlStrength:r,splatForce:o,splatRadius:s},target:k(this,xt,`f`)}),e.draw({frag:jt,uniforms:{vortVel:k(this,xt,`f`),simTexel:d},target:k(this,St,`f`)}),e.draw({frag:Mt,target:k(this,Ct,`f`)});let _=k(this,Ct,`f`),v=k(this,wt,`f`);for(let t=0;t<n;t++){e.draw({frag:Nt,uniforms:{pressure:_,divergence:k(this,St,`f`),simTexel:d},target:v});let t=_;_=v,v=t}e.draw({frag:Pt,uniforms:{vortVel:k(this,xt,`f`),pressure:_,simTexel:d},target:k(this,Tt,`f`)}),e.draw({frag:Ft,uniforms:{projVel:k(this,Tt,`f`),simTexel:d,velocityDissipation:i},target:k(this,A,`f`)}),e.draw({frag:It,uniforms:{velocity:k(this,A,`f`),dye:k(this,Et,`f`),time:e.time,aspect:m,mouseUv:h,mouseDeltaUv:g,simSize:t,densityDissipation:a,dyeSplatRadius:c,dyeSplatIntensity:l},target:k(this,Et,`f`)}),e.draw({frag:Lt,uniforms:{src:e.src,dye:k(this,Et,`f`),velocity:k(this,A,`f`),simSize:t,showDye:+!!u,time:e.time},target:e.target})}dispose(){O(this,bt,null,`f`),O(this,xt,null,`f`),O(this,St,null,`f`),O(this,Ct,null,`f`),O(this,wt,null,`f`),O(this,Tt,null,`f`),O(this,A,null,`f`),O(this,Et,null,`f`),O(this,Ot,!1,`f`)}},bt=new WeakMap,xt=new WeakMap,St=new WeakMap,Ct=new WeakMap,wt=new WeakMap,Tt=new WeakMap,A=new WeakMap,Et=new WeakMap,Dt=new WeakMap,Ot=new WeakMap})),Vt,Ht,Ut,Wt=e((()=>{Vt=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -845,7 +974,7 @@ void main (void) {
     outColor = color;
     outColor.a = smoothstep(0.0, 0.8, max(color.r, max(color.g, color.b)));
 }
-`,xt={speed:1,intensity:1},St=class{constructor(e={}){this.params={...xt,...e}}setParams(e){Object.assign(this.params,e)}render(e){e.draw({frag:bt,uniforms:{src:e.src,time:e.time*this.params.speed,intensity:this.params.intensity},target:e.target})}}})),wt,Tt,Et,Dt,Ot,kt=e((()=>{wt={pure:{cyan:[0,1,1,1],magenta:[1,0,1,1],yellow:[1,1,0,1],black:[0,0,0,1],red:[1,0,0,1],green:[0,1,0,1],blue:[0,0,1,1]},newsprint:{cyan:[.15,.73,.88,1],magenta:[.88,.12,.55,1],yellow:[.97,.93,.08,1],black:[.1,.1,.1,1]},fogra51:{cyan:[0,.525,.765,1],magenta:[.827,0,.486,1],yellow:[.984,.91,0,1],black:[.145,.145,.145,1]},swop:{cyan:[0,.557,.769,1],magenta:[.827,.02,.478,1],yellow:[.984,.902,.027,1],black:[.169,.169,.169,1]}},Tt=`#version 300 es
+`,Ht={speed:1,intensity:1},Ut=class{constructor(e={}){this.params={...Ht,...e}}setParams(e){Object.assign(this.params,e)}render(e){e.draw({frag:Vt,uniforms:{src:e.src,time:e.time*this.params.speed,intensity:this.params.intensity},target:e.target})}}})),Gt,Kt,qt,Jt,Yt,Xt=e((()=>{Gt={pure:{cyan:[0,1,1,1],magenta:[1,0,1,1],yellow:[1,1,0,1],black:[0,0,0,1],red:[1,0,0,1],green:[0,1,0,1],blue:[0,0,1,1]},newsprint:{cyan:[.15,.73,.88,1],magenta:[.88,.12,.55,1],yellow:[.97,.93,.08,1],black:[.1,.1,.1,1]},fogra51:{cyan:[0,.525,.765,1],magenta:[.827,0,.486,1],yellow:[.984,.91,0,1],black:[.145,.145,.145,1]},swop:{cyan:[0,.557,.769,1],magenta:[.827,.02,.478,1],yellow:[.984,.902,.027,1],black:[.169,.169,.169,1]}},Kt=`#version 300 es
 precision highp float;
 
 in vec2 uvContent;
@@ -1005,7 +1134,7 @@ void main() {
 
     outColor = vec4(outRgbPremul, outA);
 }
-`,Et={...wt.pure,...wt.newsprint},Dt={gridSize:10,dotSize:1,smoothing:.15,angle:0,mode:`rgb`,blackAmount:1,trimEdge:!0,background:[0,0,0,0],inkPalette:Et},Ot=class{constructor(e={}){this.params={...Dt,...e,inkPalette:{...Et,...e.inkPalette??{}}}}setParams(e){Object.assign(this.params,e)}setInkPreset(e){Object.assign(this.params.inkPalette,wt[e])}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params,o=a.inkPalette;e.draw({frag:Tt,uniforms:{src:e.src,srcSizePx:[e.src.width||1,e.src.height||1],elementPx:[r,i],gridSize:Math.max(1,a.gridSize),dotSize:Math.max(0,a.dotSize),smoothing:Math.max(0,Math.min(1,a.smoothing)),angle:a.angle,blackAmount:Math.max(0,Math.min(1,a.blackAmount)),ymck:+(a.mode===`cmyk`),trimEdge:+!!a.trimEdge,background:a.background,cInk:o.cyan,mInk:o.magenta,yInk:o.yellow,kInk:o.black,rInk:o.red,gInk:o.green,bInk:o.blue},target:e.target})}}})),At,jt,Mt,Nt=e((()=>{At=`#version 300 es
+`,qt={...Gt.pure,...Gt.newsprint},Jt={gridSize:10,dotSize:1,smoothing:.15,angle:0,mode:`rgb`,blackAmount:1,trimEdge:!0,background:[0,0,0,0],inkPalette:qt},Yt=class{constructor(e={}){this.params={...Jt,...e,inkPalette:{...qt,...e.inkPalette??{}}}}setParams(e){Object.assign(this.params,e)}setInkPreset(e){Object.assign(this.params.inkPalette,Gt[e])}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params,o=a.inkPalette;e.draw({frag:Kt,uniforms:{src:e.src,srcSizePx:[e.src.width||1,e.src.height||1],elementPx:[r,i],gridSize:Math.max(1,a.gridSize),dotSize:Math.max(0,a.dotSize),smoothing:Math.max(0,Math.min(1,a.smoothing)),angle:a.angle,blackAmount:Math.max(0,Math.min(1,a.blackAmount)),ymck:+(a.mode===`cmyk`),trimEdge:+!!a.trimEdge,background:a.background,cInk:o.cyan,mInk:o.magenta,yInk:o.yellow,kInk:o.black,rInk:o.red,gInk:o.green,bInk:o.blue},target:e.target})}}})),Zt,Qt,$t,en=e((()=>{Zt=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -1045,7 +1174,7 @@ void main (void) {
     color.rgb = hueShift(color.rgb, shift);
     outColor = color;
 }
-`,jt={shift:.5},Mt=class{constructor(e={}){this.params={...jt,...e}}setParams(e){Object.assign(this.params,e)}render(e){e.draw({frag:At,uniforms:{src:e.src,shift:this.params.shift},target:e.target})}}}));function Pt(e,t){if(typeof OffscreenCanvas<`u`)return new OffscreenCanvas(e,t);let n=document.createElement(`canvas`);return n.width=e,n.height=t,n}function Ft(e){let t=e.getContext(`2d`);if(!t)throw Error(`[VFX-JS] JPEGGlitchEffect: 2D canvas context unavailable`);return t}function It(e,t){if(typeof OffscreenCanvas<`u`&&e instanceof OffscreenCanvas)return e.convertToBlob({type:`image/jpeg`,quality:t});let n=e;return new Promise((e,r)=>{n.toBlob(t=>t?e(t):r(Error(`[VFX-JS] JPEGGlitchEffect: toBlob failed`)),`image/jpeg`,t)})}function Lt(e){for(let t=2;t+3<e.length;t++)if(e[t]===255&&e[t+1]===218){let n=e[t+2]<<8|e[t+3];return Math.min(e.length,t+2+n)}return Math.min(e.length,417)}function Rt(e,t){let n=Math.imul(Math.floor(e*2654435761)|0,2246822519)+Math.imul(t+1,3266489917)>>>0;return()=>{n=n+1831565813>>>0;let e=Math.imul(n^n>>>15,1|n);return e=e+Math.imul(e^e>>>7,61|e)^e,((e^e>>>14)>>>0)/4294967296}}function zt(e,t,n,r,i,a,o){switch(e.save(),e.clearRect(0,0,a,o),i){case 90:e.translate(a,0);break;case 180:e.translate(a,o);break;case 270:e.translate(0,o);break}e.rotate(i*Math.PI/180),e.drawImage(t,0,0,n,r),e.restore()}function Bt(e,t,n,r){let i=e.length-t-4;if(i<=1)return;let a=Math.max(1,Math.floor(n));for(let n=0;n<a;n++){let o=i/a*n|0,s=i/a*(n+1)|0,c=Math.max(1,s-o),l=Math.min(i,o+(r()*c|0)),u=r()*256|0;e[t+l]=u}}var T,E,D,Vt,O,Ht,Ut,Wt,Gt,Kt,k,qt,Jt,Yt,A,Xt,Zt,Qt,$t,en,tn,nn,rn,an,on,j,sn,M,cn,ln,un,dn,fn,pn,mn,hn,gn,_n,vn,yn,bn=e((()=>{T=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},E=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},gn=`#version 300 es
+`,Qt={shift:.5},$t=class{constructor(e={}){this.params={...Qt,...e}}setParams(e){Object.assign(this.params,e)}render(e){e.draw({frag:Zt,uniforms:{src:e.src,shift:this.params.shift},target:e.target})}}}));function tn(e,t){if(typeof OffscreenCanvas<`u`)return new OffscreenCanvas(e,t);let n=document.createElement(`canvas`);return n.width=e,n.height=t,n}function nn(e){let t=e.getContext(`2d`);if(!t)throw Error(`[VFX-JS] JPEGGlitchEffect: 2D canvas context unavailable`);return t}function rn(e,t){if(typeof OffscreenCanvas<`u`&&e instanceof OffscreenCanvas)return e.convertToBlob({type:`image/jpeg`,quality:t});let n=e;return new Promise((e,r)=>{n.toBlob(t=>t?e(t):r(Error(`[VFX-JS] JPEGGlitchEffect: toBlob failed`)),`image/jpeg`,t)})}function an(e){for(let t=2;t+3<e.length;t++)if(e[t]===255&&e[t+1]===218){let n=e[t+2]<<8|e[t+3];return Math.min(e.length,t+2+n)}return Math.min(e.length,417)}function on(e,t){let n=Math.imul(Math.floor(e*2654435761)|0,2246822519)+Math.imul(t+1,3266489917)>>>0;return()=>{n=n+1831565813>>>0;let e=Math.imul(n^n>>>15,1|n);return e=e+Math.imul(e^e>>>7,61|e)^e,((e^e>>>14)>>>0)/4294967296}}function sn(e,t,n,r,i,a,o){switch(e.save(),e.clearRect(0,0,a,o),i){case 90:e.translate(a,0);break;case 180:e.translate(a,o);break;case 270:e.translate(0,o);break}e.rotate(i*Math.PI/180),e.drawImage(t,0,0,n,r),e.restore()}function cn(e,t,n,r){let i=e.length-t-4;if(i<=1)return;let a=Math.max(1,Math.floor(n));for(let n=0;n<a;n++){let o=i/a*n|0,s=i/a*(n+1)|0,c=Math.max(1,s-o),l=Math.min(i,o+(r()*c|0)),u=r()*256|0;e[t+l]=u}}var j,M,N,ln,P,un,dn,fn,pn,mn,hn,gn,_n,vn,F,yn,bn,xn,Sn,Cn,wn,Tn,En,Dn,On,kn,An,I,jn,Mn,Nn,Pn,Fn,In,Ln,Rn,zn,Bn,Vn,Hn,Un=e((()=>{j=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},M=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},zn=`#version 300 es
 precision highp float;
 in vec2 uvSrc;
 in vec2 uvContent;
@@ -1060,7 +1189,7 @@ void main() {
     vec4 c = texture(src, uvSrc);
     outColor = vec4(c.rgb * c.a, c.a);
 }
-`,_n=`#version 300 es
+`,Bn=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -1074,7 +1203,7 @@ void main() {
     vec4 c = texture(tex, uvContent);
     outColor = vec4(c.rgb * c.a, c.a);
 }
-`,vn={quality:.4,seed:.25,iterations:24,resolutionScale:1,randomFlip:!0,vertical:!1,speed:0,bypass:!1},yn=class{get producedFrames(){return T(this,cn,`f`)}constructor(e={}){D.add(this),this.enabled=!0,Vt.set(this,!1),O.set(this,null),Ht.set(this,null),Ut.set(this,null),Wt.set(this,null),Gt.set(this,!1),Kt.set(this,null),k.set(this,null),qt.set(this,null),Jt.set(this,null),Yt.set(this,null),A.set(this,null),Xt.set(this,null),Zt.set(this,new Uint8Array),Qt.set(this,null),$t.set(this,0),en.set(this,0),tn.set(this,0),nn.set(this,0),rn.set(this,!0),an.set(this,!1),on.set(this,-1e9),j.set(this,0),sn.set(this,0),M.set(this,!1),cn.set(this,0),this.params={...vn,...e}}setParams(e){Object.assign(this.params,e),E(this,rn,!0,`f`)}init(e){E(this,Vt,typeof createImageBitmap==`function`&&(typeof OffscreenCanvas<`u`||typeof document<`u`),`f`),T(this,Vt,`f`)&&(E(this,on,-1e9,`f`),E(this,rn,!0,`f`),E(this,k,Pt(1,1),`f`),E(this,qt,Ft(T(this,k,`f`)),`f`),E(this,Jt,Pt(1,1),`f`),E(this,Yt,Ft(T(this,Jt,`f`)),`f`),E(this,A,Pt(1,1),`f`),E(this,Xt,Ft(T(this,A,`f`)),`f`),E(this,O,e.createRenderTarget({size:[1,1]}),`f`),E(this,Ut,e.gl,`f`),T(this,D,`m`,ln).call(this,e),E(this,Kt,e.onContextRestored(()=>{T(this,D,`m`,ln).call(this,e),E(this,Gt,T(this,M,`f`),`f`)}),`f`))}update(){this.enabled===!1&&E(this,M,!1,`f`)}render(e){if(this.params.bypass||!T(this,Vt,`f`)||!T(this,O,`f`)){E(this,M,!1,`f`),T(this,D,`m`,un).call(this,e);return}let t=e.src.width,n=e.src.height;(t!==T(this,tn,`f`)||n!==T(this,nn,`f`))&&(E(this,tn,t,`f`),E(this,nn,n,`f`),E(this,rn,!0,`f`));let[r,i]=e.dims.elementPixel,a=Math.min(1,Math.max(0,this.params.resolutionScale)),o=Math.max(1,Math.round(r*a)),s=Math.max(1,Math.round(i*a));r>=2&&i>=2&&t>0&&n>0&&((o!==T(this,$t,`f`)||s!==T(this,en,`f`))&&T(this,D,`m`,fn).call(this,e,o,s),T(this,D,`m`,dn).call(this,e)&&T(this,D,`m`,pn).call(this,e)),T(this,M,`f`)&&T(this,Ht,`f`)?(T(this,Gt,`f`)&&T(this,D,`m`,mn).call(this,e),e.draw({frag:_n,uniforms:{tex:T(this,Ht,`f`)},target:e.target})):T(this,D,`m`,un).call(this,e)}dispose(){var e;T(this,Kt,`f`)?.call(this),E(this,Kt,null,`f`),T(this,Ut,`f`)&&T(this,Wt,`f`)&&T(this,Ut,`f`).deleteTexture(T(this,Wt,`f`)),E(this,Wt,null,`f`),E(this,Ut,null,`f`),E(this,Gt,!1,`f`),T(this,O,`f`)?.dispose(),E(this,O,null,`f`),E(this,Ht,null,`f`),E(this,k,null,`f`),E(this,qt,null,`f`),E(this,Jt,null,`f`),E(this,Yt,null,`f`),E(this,A,null,`f`),E(this,Xt,null,`f`),E(this,Qt,null,`f`),E(this,Zt,new Uint8Array,`f`),E(this,M,!1,`f`),E(this,an,!1,`f`),E(this,$t,0,`f`),E(this,en,0,`f`),E(this,j,(e=T(this,j,`f`),e++,e),`f`)}},Vt=new WeakMap,O=new WeakMap,Ht=new WeakMap,Ut=new WeakMap,Wt=new WeakMap,Gt=new WeakMap,Kt=new WeakMap,k=new WeakMap,qt=new WeakMap,Jt=new WeakMap,Yt=new WeakMap,A=new WeakMap,Xt=new WeakMap,Zt=new WeakMap,Qt=new WeakMap,$t=new WeakMap,en=new WeakMap,tn=new WeakMap,nn=new WeakMap,rn=new WeakMap,an=new WeakMap,on=new WeakMap,j=new WeakMap,sn=new WeakMap,M=new WeakMap,cn=new WeakMap,D=new WeakSet,ln=function(e){let t=e.gl,n=t.createTexture();n&&(t.bindTexture(t.TEXTURE_2D,n),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_S,t.CLAMP_TO_EDGE),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_T,t.CLAMP_TO_EDGE),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MIN_FILTER,t.LINEAR),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MAG_FILTER,t.NEAREST),t.texImage2D(t.TEXTURE_2D,0,t.RGBA,1,1,0,t.RGBA,t.UNSIGNED_BYTE,new Uint8Array([0,0,0,0])),t.bindTexture(t.TEXTURE_2D,null),E(this,Wt,n,`f`),E(this,Ht,e.wrapTexture(n,{size:[T(this,$t,`f`)||1,T(this,en,`f`)||1]}),`f`))},un=function(e){e.draw({frag:gn,uniforms:{src:e.src},target:e.target})},dn=function(e){if(T(this,an,`f`))return!1;let t=this.params.speed;return t>0?e.time-T(this,on,`f`)>=1/t:T(this,rn,`f`)},fn=function(e,t,n){var r;E(this,$t,t,`f`),E(this,en,n,`f`),E(this,Zt,new Uint8Array(t*n*4),`f`),E(this,Qt,new ImageData(t,n),`f`),T(this,k,`f`)&&(T(this,k,`f`).width=t,T(this,k,`f`).height=n),T(this,A,`f`)&&(T(this,A,`f`).width=t,T(this,A,`f`).height=n),T(this,O,`f`)?.dispose(),E(this,O,e.createRenderTarget({size:[t,n]}),`f`),E(this,M,!1,`f`),E(this,rn,!0,`f`),E(this,an,!1,`f`),E(this,Gt,!1,`f`),E(this,j,(r=T(this,j,`f`),r++,r),`f`)},pn=function(e){var t;let n=T(this,$t,`f`),r=T(this,en,`f`),i=T(this,k,`f`),a=T(this,qt,`f`),o=T(this,Jt,`f`),s=T(this,Yt,`f`),c=T(this,Qt,`f`);if(!i||!a||!o||!s||!c||!T(this,O,`f`))return;e.blit(e.src,T(this,O,`f`));let l=e.gl;l.readPixels(0,0,n,r,l.RGBA,l.UNSIGNED_BYTE,T(this,Zt,`f`)),l.bindFramebuffer(l.FRAMEBUFFER,null),E(this,an,!0,`f`),E(this,rn,!1,`f`),E(this,on,e.time,`f`);let u=c.data,d=n*4;for(let e=0;e<r;e++){let t=(r-1-e)*d;u.set(T(this,Zt,`f`).subarray(t,t+d),e*d)}for(let e=3;e<u.length;e+=4)u[e]=255;let f=this.params.speed>0?T(this,sn,`f`):0;E(this,sn,(t=T(this,sn,`f`),t++,t),`f`);let{quality:p,seed:m,iterations:h,randomFlip:g,vertical:_}=this.params,v=Rt(m,f),ee=g&&v()<.5;a.putImageData(c,0,0);let te=((ee?180:0)+(_?270:0))%360,ne=_,re=ne?r:n,ie=ne?n:r;o.width=re,o.height=ie,zt(s,i,n,r,te,re,ie),T(this,D,`m`,hn).call(this,o,n,r,p,h,te,v,T(this,j,`f`))},mn=function(e){let t=e.gl;!T(this,Wt,`f`)||!T(this,A,`f`)||(t.bindTexture(t.TEXTURE_2D,T(this,Wt,`f`)),t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!0),t.pixelStorei(t.UNPACK_PREMULTIPLY_ALPHA_WEBGL,!1),t.texImage2D(t.TEXTURE_2D,0,t.RGBA,t.RGBA,t.UNSIGNED_BYTE,T(this,A,`f`)),t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.bindTexture(t.TEXTURE_2D,null),E(this,Gt,!1,`f`))},hn=async function(e,t,n,r,i,a,o,s){var c;try{let l=await It(e,r),u=new Uint8Array(await l.arrayBuffer());Bt(u,Lt(u),i,o);let d=await createImageBitmap(new Blob([u],{type:`image/jpeg`}));if(s===T(this,j,`f`)&&T(this,Xt,`f`)){let e=(360-a)%360;zt(T(this,Xt,`f`),d,d.width,d.height,e,t,n),E(this,M,!0,`f`),E(this,cn,(c=T(this,cn,`f`),c++,c),`f`),E(this,Gt,!0,`f`)}d.close()}catch{}finally{s===T(this,j,`f`)&&E(this,an,!1,`f`)}}})),xn,Sn,Cn,wn=e((()=>{xn=.7,Sn=1.3,Cn=`
+`,Vn={quality:.4,seed:.25,iterations:24,resolutionScale:1,randomFlip:!0,vertical:!1,speed:0,bypass:!1},Hn=class{get producedFrames(){return j(this,jn,`f`)}constructor(e={}){N.add(this),this.enabled=!0,ln.set(this,!1),P.set(this,null),un.set(this,null),dn.set(this,null),fn.set(this,null),pn.set(this,!1),mn.set(this,null),hn.set(this,null),gn.set(this,null),_n.set(this,null),vn.set(this,null),F.set(this,null),yn.set(this,null),bn.set(this,new Uint8Array),xn.set(this,null),Sn.set(this,0),Cn.set(this,0),wn.set(this,0),Tn.set(this,0),En.set(this,!0),Dn.set(this,!1),On.set(this,-1e9),kn.set(this,0),An.set(this,0),I.set(this,!1),jn.set(this,0),this.params={...Vn,...e}}setParams(e){Object.assign(this.params,e),M(this,En,!0,`f`)}init(e){M(this,ln,typeof createImageBitmap==`function`&&(typeof OffscreenCanvas<`u`||typeof document<`u`),`f`),j(this,ln,`f`)&&(M(this,On,-1e9,`f`),M(this,En,!0,`f`),M(this,hn,tn(1,1),`f`),M(this,gn,nn(j(this,hn,`f`)),`f`),M(this,_n,tn(1,1),`f`),M(this,vn,nn(j(this,_n,`f`)),`f`),M(this,F,tn(1,1),`f`),M(this,yn,nn(j(this,F,`f`)),`f`),M(this,P,e.createRenderTarget({size:[1,1]}),`f`),M(this,dn,e.gl,`f`),j(this,N,`m`,Mn).call(this,e),M(this,mn,e.onContextRestored(()=>{j(this,N,`m`,Mn).call(this,e),M(this,pn,j(this,I,`f`),`f`)}),`f`))}update(){this.enabled===!1&&M(this,I,!1,`f`)}render(e){if(this.params.bypass||!j(this,ln,`f`)||!j(this,P,`f`)){M(this,I,!1,`f`),j(this,N,`m`,Nn).call(this,e);return}let t=e.src.width,n=e.src.height;(t!==j(this,wn,`f`)||n!==j(this,Tn,`f`))&&(M(this,wn,t,`f`),M(this,Tn,n,`f`),M(this,En,!0,`f`));let[r,i]=e.dims.elementPixel,a=Math.min(1,Math.max(0,this.params.resolutionScale)),o=Math.max(1,Math.round(r*a)),s=Math.max(1,Math.round(i*a));r>=2&&i>=2&&t>0&&n>0&&((o!==j(this,Sn,`f`)||s!==j(this,Cn,`f`))&&j(this,N,`m`,Fn).call(this,e,o,s),j(this,N,`m`,Pn).call(this,e)&&j(this,N,`m`,In).call(this,e)),j(this,I,`f`)&&j(this,un,`f`)?(j(this,pn,`f`)&&j(this,N,`m`,Ln).call(this,e),e.draw({frag:Bn,uniforms:{tex:j(this,un,`f`)},target:e.target})):j(this,N,`m`,Nn).call(this,e)}dispose(){var e;j(this,mn,`f`)?.call(this),M(this,mn,null,`f`),j(this,dn,`f`)&&j(this,fn,`f`)&&j(this,dn,`f`).deleteTexture(j(this,fn,`f`)),M(this,fn,null,`f`),M(this,dn,null,`f`),M(this,pn,!1,`f`),j(this,P,`f`)?.dispose(),M(this,P,null,`f`),M(this,un,null,`f`),M(this,hn,null,`f`),M(this,gn,null,`f`),M(this,_n,null,`f`),M(this,vn,null,`f`),M(this,F,null,`f`),M(this,yn,null,`f`),M(this,xn,null,`f`),M(this,bn,new Uint8Array,`f`),M(this,I,!1,`f`),M(this,Dn,!1,`f`),M(this,Sn,0,`f`),M(this,Cn,0,`f`),M(this,kn,(e=j(this,kn,`f`),e++,e),`f`)}},ln=new WeakMap,P=new WeakMap,un=new WeakMap,dn=new WeakMap,fn=new WeakMap,pn=new WeakMap,mn=new WeakMap,hn=new WeakMap,gn=new WeakMap,_n=new WeakMap,vn=new WeakMap,F=new WeakMap,yn=new WeakMap,bn=new WeakMap,xn=new WeakMap,Sn=new WeakMap,Cn=new WeakMap,wn=new WeakMap,Tn=new WeakMap,En=new WeakMap,Dn=new WeakMap,On=new WeakMap,kn=new WeakMap,An=new WeakMap,I=new WeakMap,jn=new WeakMap,N=new WeakSet,Mn=function(e){let t=e.gl,n=t.createTexture();n&&(t.bindTexture(t.TEXTURE_2D,n),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_S,t.CLAMP_TO_EDGE),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_T,t.CLAMP_TO_EDGE),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MIN_FILTER,t.LINEAR),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MAG_FILTER,t.NEAREST),t.texImage2D(t.TEXTURE_2D,0,t.RGBA,1,1,0,t.RGBA,t.UNSIGNED_BYTE,new Uint8Array([0,0,0,0])),t.bindTexture(t.TEXTURE_2D,null),M(this,fn,n,`f`),M(this,un,e.wrapTexture(n,{size:[j(this,Sn,`f`)||1,j(this,Cn,`f`)||1]}),`f`))},Nn=function(e){e.draw({frag:zn,uniforms:{src:e.src},target:e.target})},Pn=function(e){if(j(this,Dn,`f`))return!1;let t=this.params.speed;return t>0?e.time-j(this,On,`f`)>=1/t:j(this,En,`f`)},Fn=function(e,t,n){var r;M(this,Sn,t,`f`),M(this,Cn,n,`f`),M(this,bn,new Uint8Array(t*n*4),`f`),M(this,xn,new ImageData(t,n),`f`),j(this,hn,`f`)&&(j(this,hn,`f`).width=t,j(this,hn,`f`).height=n),j(this,F,`f`)&&(j(this,F,`f`).width=t,j(this,F,`f`).height=n),j(this,P,`f`)?.dispose(),M(this,P,e.createRenderTarget({size:[t,n]}),`f`),M(this,I,!1,`f`),M(this,En,!0,`f`),M(this,Dn,!1,`f`),M(this,pn,!1,`f`),M(this,kn,(r=j(this,kn,`f`),r++,r),`f`)},In=function(e){var t;let n=j(this,Sn,`f`),r=j(this,Cn,`f`),i=j(this,hn,`f`),a=j(this,gn,`f`),o=j(this,_n,`f`),s=j(this,vn,`f`),c=j(this,xn,`f`);if(!i||!a||!o||!s||!c||!j(this,P,`f`))return;e.blit(e.src,j(this,P,`f`));let l=e.gl;l.readPixels(0,0,n,r,l.RGBA,l.UNSIGNED_BYTE,j(this,bn,`f`)),l.bindFramebuffer(l.FRAMEBUFFER,null),M(this,Dn,!0,`f`),M(this,En,!1,`f`),M(this,On,e.time,`f`);let u=c.data,d=n*4;for(let e=0;e<r;e++){let t=(r-1-e)*d;u.set(j(this,bn,`f`).subarray(t,t+d),e*d)}for(let e=3;e<u.length;e+=4)u[e]=255;let f=this.params.speed>0?j(this,An,`f`):0;M(this,An,(t=j(this,An,`f`),t++,t),`f`);let{quality:p,seed:m,iterations:h,randomFlip:g,vertical:_}=this.params,v=on(m,f),ee=g&&v()<.5;a.putImageData(c,0,0);let te=((ee?180:0)+(_?270:0))%360,ne=_,re=ne?r:n,y=ne?n:r;o.width=re,o.height=y,sn(s,i,n,r,te,re,y),j(this,N,`m`,Rn).call(this,o,n,r,p,h,te,v,j(this,kn,`f`))},Ln=function(e){let t=e.gl;!j(this,fn,`f`)||!j(this,F,`f`)||(t.bindTexture(t.TEXTURE_2D,j(this,fn,`f`)),t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!0),t.pixelStorei(t.UNPACK_PREMULTIPLY_ALPHA_WEBGL,!1),t.texImage2D(t.TEXTURE_2D,0,t.RGBA,t.RGBA,t.UNSIGNED_BYTE,j(this,F,`f`)),t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.bindTexture(t.TEXTURE_2D,null),M(this,pn,!1,`f`))},Rn=async function(e,t,n,r,i,a,o,s){var c;try{let l=await rn(e,r),u=new Uint8Array(await l.arrayBuffer());cn(u,an(u),i,o);let d=await createImageBitmap(new Blob([u],{type:`image/jpeg`}));if(s===j(this,kn,`f`)&&j(this,yn,`f`)){let e=(360-a)%360;sn(j(this,yn,`f`),d,d.width,d.height,e,t,n),M(this,I,!0,`f`),M(this,jn,(c=j(this,jn,`f`),c++,c),`f`),M(this,pn,!0,`f`)}d.close()}catch{}finally{s===j(this,kn,`f`)&&M(this,Dn,!1,`f`)}}})),Wn,Gn,Kn,qn=e((()=>{Wn=.7,Gn=1.3,Kn=`
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 float mod289(float x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
@@ -1177,15 +1306,15 @@ vec3 sampleCurl(vec3 pos, vec2 elementPixel, float scale, float animTime) {
     vec3 noiseInput = pos * stretch / max(scale, 1e-4);
     return curl3D(noiseInput, animTime) / stretch;
 }
-`}));function Tn(e){let t=En(e);return 2**Math.ceil(Math.log2(Math.sqrt(t)))}function En(e){return Number.isFinite(e)?Math.max(1,Math.floor(e)):1}function Dn(e){let t=e|0;return[(t>>16&255)/255,(t>>8&255)/255,(t&255)/255]}function On(e){return Math.min(Pn,Math.max(0,e))}var kn,An,jn,Mn,Nn,Pn,Fn=e((()=>{kn=new Float32Array([-.5,-.5,.5,-.5,.5,.5,-.5,-.5,.5,.5,-.5,.5]),An=`
+`}));function Jn(e){let t=Yn(e);return 2**Math.ceil(Math.log2(Math.sqrt(t)))}function Yn(e){return Number.isFinite(e)?Math.max(1,Math.floor(e)):1}function Xn(e){let t=e|0;return[(t>>16&255)/255,(t>>8&255)/255,(t&255)/255]}function Zn(e){return Math.min(rr,Math.max(0,e))}var Qn,$n,er,tr,nr,rr,ir=e((()=>{Qn=new Float32Array([-.5,-.5,.5,-.5,.5,.5,-.5,-.5,.5,.5,-.5,.5]),$n=`
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
-`,jn=`#version 300 es
+`,er=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() { outColor = vec4(0.0); }
-`,Mn=`#version 300 es
+`,tr=`#version 300 es
 precision highp float;
 in vec2 vCorner;
 in vec4 vColor;
@@ -1198,7 +1327,7 @@ void main() {
     float a = vColor.a * fall;
     outColor = vec4(vColor.rgb * a, a);
 }
-`,Nn=`#version 300 es
+`,nr=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -1224,19 +1353,19 @@ void main() {
         );
     }
 }
-`,Pn=.1})),N,P,F,In,I,L,R,z,B,Ln,V,Rn,zn,H,Bn,Vn,Hn,Un,Wn,U,Gn,Kn,qn,Jn,Yn,Xn,Zn,Qn,$n,er,tr,W,nr,rr,ir,ar,or,sr,cr,lr,ur,dr,fr,pr,mr,hr,gr,_r=e((()=>{wn(),Fn(),N=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},P=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},W=64,nr=W*W,rr=.1,ir=[W,W],ar=new Float32Array(nr);for(let e=0;e<nr;e++)ar[e]=e;or=`#version 300 es
+`,rr=.1})),L,R,z,ar,B,V,H,U,W,or,G,sr,cr,lr,ur,dr,fr,pr,mr,hr,gr,_r,vr,yr,br,xr,Sr,Cr,wr,Tr,Er,K,Dr,Or,kr,Ar,jr,Mr,Nr,Pr,Fr,Ir,Lr,Rr,zr,Br,Vr,Hr=e((()=>{qn(),ir(),L=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},R=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},K=64,Dr=K*K,Or=.1,kr=[K,K],Ar=new Float32Array(Dr);for(let e=0;e<Dr;e++)Ar[e]=e;jr=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() {
     outColor = vec4(0.0, 0.0, 0.0, 2.0);
 }
-`,sr=`#version 300 es
+`,Mr=`#version 300 es
 precision highp float;
 out vec4 outColor;
 void main() {
     outColor = vec4(0.0);
 }
-`,cr=`#version 300 es
+`,Nr=`#version 300 es
 precision highp float;
 in vec2 position;
 
@@ -1297,7 +1426,7 @@ void main() {
     vCorner = position;
     vColor = vec4(c.rgb, lifeAlpha * alpha * fogFactor);
 }
-`,lr=`#version 300 es
+`,Pr=`#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvSrc;
@@ -1317,7 +1446,7 @@ void main() {
     vec4 t = texture(trail, uv);
     outColor = vec4(base.rgb * (1.0 - t.a) + t.rgb, max(base.a, t.a));
 }
-`,ur=`#version 300 es
+`,Fr=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -1335,7 +1464,7 @@ uniform float noiseScale;
 uniform float noiseAnimation;
 uniform float speedDecay;
 uniform float life;
-${Cn}
+${Kn}
 
 void main() {
     vec4 s = texture(posTex, uv);
@@ -1370,7 +1499,7 @@ void main() {
 
     outColor = vec4(pos, age);
 }
-`,dr=`#version 300 es
+`,Ir=`#version 300 es
 precision highp float;
 in float position;
 
@@ -1400,7 +1529,7 @@ void main() {
     gl_PointSize = 1.0;
     vSpawn = s;
 }
-`,fr=`#version 300 es
+`,Lr=`#version 300 es
 precision highp float;
 in vec4 vSpawn;
 out vec4 outColor;
@@ -1419,7 +1548,7 @@ void main() {
     }
     outColor = vec4(spawnUv, 0.0, 0.0);
 }
-`,pr=`#version 300 es
+`,Rr=`#version 300 es
 precision highp float;
 in vec4 vSpawn;
 out vec4 outColor;
@@ -1428,7 +1557,7 @@ uniform sampler2D src;
 uniform vec3 color;
 uniform float colorMix;
 uniform vec2 lifeJitterRange;
-${An}
+${$n}
 
 void main() {
     vec4 c = texture(src, clamp(vSpawn.yz, 0.0, 1.0));
@@ -1436,7 +1565,7 @@ void main() {
     float lifeJitter = mix(lifeJitterRange.x, lifeJitterRange.y, h);
     outColor = vec4(mix(c.rgb, color, colorMix), lifeJitter);
 }
-`,mr=`#version 300 es
+`,zr=`#version 300 es
 precision highp float;
 in vec4 vSpawn;
 out vec4 outColor;
@@ -1445,7 +1574,7 @@ void main() {
     vec2 dir = theta >= 0.0 ? vec2(cos(theta), sin(theta)) : vec2(0.0);
     outColor = vec4(dir, 0.0, 0.0);
 }
-`,hr={count:1024*1024,birthRate:3e4,screenBirthRate:1e4,life:1,noiseSpeed:.3,emitSpeed:1,noiseDelay:.15,noiseScale:1,noiseAnimation:.3,pointSize:10,alpha:1,radius:300,speedDecay:1,alphaDecay:5,fadeIn:.05,alphaThreshold:.05,spawnOnIdle:!0,srcOpacity:0,trailFade:.75,fog:.5,color:16777215,colorMix:0,blend:`add`},gr=class{get params(){return N(this,In,`f`)}constructor(e={}){F.add(this),In.set(this,void 0),I.set(this,null),L.set(this,null),R.set(this,null),z.set(this,null),B.set(this,null),Ln.set(this,!1),V.set(this,void 0),Rn.set(this,void 0),zn.set(this,new Float32Array(nr*4)),H.set(this,null),Bn.set(this,null),Vn.set(this,null),Hn.set(this,null),Un.set(this,null),Wn.set(this,null),U.set(this,0),Gn.set(this,0),Kn.set(this,0),qn.set(this,null),Jn.set(this,-1/0),P(this,In,{...hr,...e},`f`),N(this,In,`f`).count=En(N(this,In,`f`).count),P(this,V,Tn(N(this,In,`f`).count),`f`),P(this,Rn,N(this,V,`f`)*N(this,V,`f`),`f`)}get maxCount(){return N(this,Rn,`f`)}setParam(e){let t=N(this,In,`f`);for(let[n,r]of Object.entries(e))r!==void 0&&(t[n]=n===`count`?En(r):r)}init(e){N(this,F,`m`,Yn).call(this,e),P(this,z,e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),`f`),P(this,B,e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),`f`),P(this,Hn,{attributes:{position:kn}},`f`),P(this,Vn,{mode:`points`,attributes:{position:{data:ar,itemSize:1}}},`f`),P(this,Un,e.gl,`f`),N(this,F,`m`,Qn).call(this,e),P(this,Wn,e.onContextRestored(()=>{P(this,Un,e.gl,`f`),N(this,F,`m`,Qn).call(this,e),P(this,Ln,!1,`f`)}),`f`)}render(e){if(!N(this,I,`f`)||!N(this,L,`f`)||!N(this,R,`f`)||!N(this,z,`f`)||!N(this,B,`f`)||!N(this,Hn,`f`)||!N(this,Vn,`f`)||!N(this,Bn,`f`)||!N(this,H,`f`))return;let t=Tn(this.params.count);t!==N(this,V,`f`)&&(N(this,F,`m`,Xn).call(this),P(this,V,t,`f`),P(this,Rn,t*t,`f`),N(this,F,`m`,Yn).call(this,e),P(this,U,0,`f`),P(this,Ln,!1,`f`)),N(this,Ln,`f`)||(e.draw({frag:or,target:N(this,I,`f`)}),e.draw({frag:sr,target:N(this,L,`f`)}),e.draw({frag:sr,target:N(this,R,`f`)}),P(this,Ln,!0,`f`));let n=On(e.deltaTime),r=[e.dims.elementPixel[0],e.dims.elementPixel[1]],i=[N(this,V,`f`),N(this,V,`f`)],a=N(this,F,`m`,er).call(this,e,n,r);a>0&&N(this,F,`m`,$n).call(this,e);let o=a===0;if(e.draw({frag:ur,uniforms:{posTex:N(this,I,`f`),colorTex:N(this,L,`f`),velTex:N(this,R,`f`),elementPixel:r,time:e.time,dt:n,noiseSpeed:this.params.noiseSpeed,emitSpeed:this.params.emitSpeed,noiseDelay:this.params.noiseDelay,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,life:this.params.life},target:N(this,I,`f`),swap:o}),a>0){let t={uSpawnTex:N(this,Bn,`f`),uSpawnTexSize:ir,uSpawnCount:a,stateSize:i};e.draw({vert:dr,frag:fr,geometry:N(this,Vn,`f`),uniforms:{...t,src:e.src,alphaThreshold:this.params.alphaThreshold},target:N(this,I,`f`),blend:`none`}),e.draw({vert:dr,frag:pr,geometry:N(this,Vn,`f`),uniforms:{...t,src:e.src,color:Dn(this.params.color),colorMix:this.params.colorMix,lifeJitterRange:[xn,Sn]},target:N(this,L,`f`),blend:`none`}),e.draw({vert:dr,frag:mr,geometry:N(this,Vn,`f`),uniforms:t,target:N(this,R,`f`),blend:`none`})}let s=N(this,F,`m`,tr).call(this);N(this,Hn,`f`).instanceCount=s,e.draw({frag:jn,target:N(this,z,`f`)}),e.draw({vert:cr,frag:Mn,uniforms:{posTex:N(this,I,`f`),colorTex:N(this,L,`f`),stateSize:i,pointSize:this.params.pointSize,elementPixel:r,particleCount:s,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fadeIn:this.params.fadeIn,fog:this.params.fog},geometry:N(this,Hn,`f`),target:N(this,z,`f`),blend:this.params.blend===`normal`?`premultiplied`:`additive`}),e.draw({frag:Nn,uniforms:{trailPrev:N(this,B,`f`),particleStamp:N(this,z,`f`),trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:N(this,B,`f`)}),e.draw({frag:lr,uniforms:{src:e.src,trail:N(this,B,`f`),srcOpacity:this.params.srcOpacity},target:e.target})}dispose(){N(this,Wn,`f`)?.call(this),P(this,Wn,null,`f`),N(this,Un,`f`)&&N(this,H,`f`)&&N(this,Un,`f`).deleteTexture(N(this,H,`f`)),P(this,H,null,`f`),P(this,Bn,null,`f`),P(this,Vn,null,`f`),P(this,Un,null,`f`),N(this,F,`m`,Xn).call(this),N(this,z,`f`)?.dispose(),N(this,B,`f`)?.dispose(),P(this,z,null,`f`),P(this,B,null,`f`),P(this,Hn,null,`f`),P(this,Ln,!1,`f`)}outputRect(e){return e.canvasRect}},In=new WeakMap,I=new WeakMap,L=new WeakMap,R=new WeakMap,z=new WeakMap,B=new WeakMap,Ln=new WeakMap,V=new WeakMap,Rn=new WeakMap,zn=new WeakMap,H=new WeakMap,Bn=new WeakMap,Vn=new WeakMap,Hn=new WeakMap,Un=new WeakMap,Wn=new WeakMap,U=new WeakMap,Gn=new WeakMap,Kn=new WeakMap,qn=new WeakMap,Jn=new WeakMap,F=new WeakSet,Yn=function(e){let t={size:[N(this,V,`f`),N(this,V,`f`)],float:!0,wrap:`clamp`,filter:`nearest`};P(this,I,e.createRenderTarget({...t,persistent:!0}),`f`),P(this,L,e.createRenderTarget(t),`f`),P(this,R,e.createRenderTarget(t),`f`)},Xn=function(){N(this,I,`f`)?.dispose(),N(this,L,`f`)?.dispose(),N(this,R,`f`)?.dispose(),P(this,I,null,`f`),P(this,L,null,`f`),P(this,R,null,`f`)},Zn=function(e){let t=e.gl,n=t.createTexture();if(!n)throw Error(`[ParticleEffect] Failed to create spawn texture`);return t.bindTexture(t.TEXTURE_2D,n),t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.texImage2D(t.TEXTURE_2D,0,t.RGBA32F,W,W,0,t.RGBA,t.FLOAT,null),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MIN_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MAG_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_S,t.CLAMP_TO_EDGE),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_T,t.CLAMP_TO_EDGE),t.bindTexture(t.TEXTURE_2D,null),{raw:n,handle:e.wrapTexture(n,{size:[W,W],filter:`nearest`,wrap:`clamp`})}},Qn=function(e){let t=N(this,F,`m`,Zn).call(this,e);P(this,H,t.raw,`f`),P(this,Bn,t.handle,`f`)},$n=function(e){if(!N(this,H,`f`))return;let t=e.gl;t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.bindTexture(t.TEXTURE_2D,N(this,H,`f`)),t.texSubImage2D(t.TEXTURE_2D,0,0,0,W,W,t.RGBA,t.FLOAT,N(this,zn,`f`)),t.bindTexture(t.TEXTURE_2D,null)},er=function(e,t,n){let r=[e.mouse[0]/Math.max(1,n[0]),e.mouse[1]/Math.max(1,n[1])];(!N(this,qn,`f`)||Math.abs(r[0]-N(this,qn,`f`)[0])>1e-6||Math.abs(r[1]-N(this,qn,`f`)[1])>1e-6)&&P(this,Jn,e.time,`f`),P(this,qn,r,`f`);let i=e.intersection>0,a=e.time-N(this,Jn,`f`)<rr;i&&(a||this.params.spawnOnIdle)?P(this,Gn,Math.min(N(this,Gn,`f`)+this.params.birthRate*t,nr),`f`):P(this,Gn,0,`f`),i?P(this,Kn,Math.min(N(this,Kn,`f`)+this.params.screenBirthRate*t,nr),`f`):P(this,Kn,0,`f`);let o=Math.min(nr,Math.floor(N(this,Gn,`f`))),s=Math.min(nr-o,Math.floor(N(this,Kn,`f`)));P(this,Gn,N(this,Gn,`f`)-o,`f`),P(this,Kn,N(this,Kn,`f`)-s,`f`);let c=o+s;if(c===0)return 0;let l=N(this,F,`m`,tr).call(this),u=Math.max(1,n[0]),d=Math.max(1,n[1]),f=N(this,zn,`f`),p=0;for(;p<o;p++){let e=Math.sqrt(Math.random())*this.params.radius,t=Math.random()*Math.PI*2,n=Math.cos(t)*e,i=Math.sin(t)*e,a=p*4;f[a+0]=N(this,U,`f`),f[a+1]=r[0]+n/u,f[a+2]=r[1]+i/d,f[a+3]=t,P(this,U,(N(this,U,`f`)+1)%l,`f`)}for(let e=0;e<s;e++,p++){let e=p*4;f[e+0]=N(this,U,`f`),f[e+1]=Math.random(),f[e+2]=Math.random(),f[e+3]=-1,P(this,U,(N(this,U,`f`)+1)%l,`f`)}return c},tr=function(){return Math.max(1,Math.min(N(this,Rn,`f`),Math.floor(this.params.count)))}})),G,K,q,vr,J,yr,Y,X,br,Z,xr,Sr,Cr,wr,Tr,Er,Dr,Or,kr,Ar,jr,Mr,Nr,Pr,Fr,Ir=e((()=>{wn(),Fn(),G=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},K=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},Ar=`#version 300 es
+`,Br={count:1024*1024,birthRate:3e4,screenBirthRate:1e4,life:1,noiseSpeed:.3,emitSpeed:1,noiseDelay:.15,noiseScale:1,noiseAnimation:.3,pointSize:10,alpha:1,radius:300,speedDecay:1,alphaDecay:5,fadeIn:.05,alphaThreshold:.05,spawnOnIdle:!0,srcOpacity:0,trailFade:.75,fog:.5,color:16777215,colorMix:0,blend:`add`},Vr=class{get params(){return L(this,ar,`f`)}constructor(e={}){z.add(this),ar.set(this,void 0),B.set(this,null),V.set(this,null),H.set(this,null),U.set(this,null),W.set(this,null),or.set(this,!1),G.set(this,void 0),sr.set(this,void 0),cr.set(this,new Float32Array(Dr*4)),lr.set(this,null),ur.set(this,null),dr.set(this,null),fr.set(this,null),pr.set(this,null),mr.set(this,null),hr.set(this,0),gr.set(this,0),_r.set(this,0),vr.set(this,null),yr.set(this,-1/0),R(this,ar,{...Br,...e},`f`),L(this,ar,`f`).count=Yn(L(this,ar,`f`).count),R(this,G,Jn(L(this,ar,`f`).count),`f`),R(this,sr,L(this,G,`f`)*L(this,G,`f`),`f`)}get maxCount(){return L(this,sr,`f`)}setParam(e){let t=L(this,ar,`f`);for(let[n,r]of Object.entries(e))r!==void 0&&(t[n]=n===`count`?Yn(r):r)}init(e){L(this,z,`m`,br).call(this,e),R(this,U,e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),`f`),R(this,W,e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),`f`),R(this,fr,{attributes:{position:Qn}},`f`),R(this,dr,{mode:`points`,attributes:{position:{data:Ar,itemSize:1}}},`f`),R(this,pr,e.gl,`f`),L(this,z,`m`,Cr).call(this,e),R(this,mr,e.onContextRestored(()=>{R(this,pr,e.gl,`f`),L(this,z,`m`,Cr).call(this,e),R(this,or,!1,`f`)}),`f`)}render(e){if(!L(this,B,`f`)||!L(this,V,`f`)||!L(this,H,`f`)||!L(this,U,`f`)||!L(this,W,`f`)||!L(this,fr,`f`)||!L(this,dr,`f`)||!L(this,ur,`f`)||!L(this,lr,`f`))return;let t=Jn(this.params.count);t!==L(this,G,`f`)&&(L(this,z,`m`,xr).call(this),R(this,G,t,`f`),R(this,sr,t*t,`f`),L(this,z,`m`,br).call(this,e),R(this,hr,0,`f`),R(this,or,!1,`f`)),L(this,or,`f`)||(e.draw({frag:jr,target:L(this,B,`f`)}),e.draw({frag:Mr,target:L(this,V,`f`)}),e.draw({frag:Mr,target:L(this,H,`f`)}),R(this,or,!0,`f`));let n=Zn(e.deltaTime),r=[e.dims.elementPixel[0],e.dims.elementPixel[1]],i=[L(this,G,`f`),L(this,G,`f`)],a=L(this,z,`m`,Tr).call(this,e,n,r);a>0&&L(this,z,`m`,wr).call(this,e);let o=a===0;if(e.draw({frag:Fr,uniforms:{posTex:L(this,B,`f`),colorTex:L(this,V,`f`),velTex:L(this,H,`f`),elementPixel:r,time:e.time,dt:n,noiseSpeed:this.params.noiseSpeed,emitSpeed:this.params.emitSpeed,noiseDelay:this.params.noiseDelay,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,life:this.params.life},target:L(this,B,`f`),swap:o}),a>0){let t={uSpawnTex:L(this,ur,`f`),uSpawnTexSize:kr,uSpawnCount:a,stateSize:i};e.draw({vert:Ir,frag:Lr,geometry:L(this,dr,`f`),uniforms:{...t,src:e.src,alphaThreshold:this.params.alphaThreshold},target:L(this,B,`f`),blend:`none`}),e.draw({vert:Ir,frag:Rr,geometry:L(this,dr,`f`),uniforms:{...t,src:e.src,color:Xn(this.params.color),colorMix:this.params.colorMix,lifeJitterRange:[Wn,Gn]},target:L(this,V,`f`),blend:`none`}),e.draw({vert:Ir,frag:zr,geometry:L(this,dr,`f`),uniforms:t,target:L(this,H,`f`),blend:`none`})}let s=L(this,z,`m`,Er).call(this);L(this,fr,`f`).instanceCount=s,e.draw({frag:er,target:L(this,U,`f`)}),e.draw({vert:Nr,frag:tr,uniforms:{posTex:L(this,B,`f`),colorTex:L(this,V,`f`),stateSize:i,pointSize:this.params.pointSize,elementPixel:r,particleCount:s,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fadeIn:this.params.fadeIn,fog:this.params.fog},geometry:L(this,fr,`f`),target:L(this,U,`f`),blend:this.params.blend===`normal`?`premultiplied`:`additive`}),e.draw({frag:nr,uniforms:{trailPrev:L(this,W,`f`),particleStamp:L(this,U,`f`),trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:L(this,W,`f`)}),e.draw({frag:Pr,uniforms:{src:e.src,trail:L(this,W,`f`),srcOpacity:this.params.srcOpacity},target:e.target})}dispose(){L(this,mr,`f`)?.call(this),R(this,mr,null,`f`),L(this,pr,`f`)&&L(this,lr,`f`)&&L(this,pr,`f`).deleteTexture(L(this,lr,`f`)),R(this,lr,null,`f`),R(this,ur,null,`f`),R(this,dr,null,`f`),R(this,pr,null,`f`),L(this,z,`m`,xr).call(this),L(this,U,`f`)?.dispose(),L(this,W,`f`)?.dispose(),R(this,U,null,`f`),R(this,W,null,`f`),R(this,fr,null,`f`),R(this,or,!1,`f`)}outputRect(e){return e.canvasRect}},ar=new WeakMap,B=new WeakMap,V=new WeakMap,H=new WeakMap,U=new WeakMap,W=new WeakMap,or=new WeakMap,G=new WeakMap,sr=new WeakMap,cr=new WeakMap,lr=new WeakMap,ur=new WeakMap,dr=new WeakMap,fr=new WeakMap,pr=new WeakMap,mr=new WeakMap,hr=new WeakMap,gr=new WeakMap,_r=new WeakMap,vr=new WeakMap,yr=new WeakMap,z=new WeakSet,br=function(e){let t={size:[L(this,G,`f`),L(this,G,`f`)],float:!0,wrap:`clamp`,filter:`nearest`};R(this,B,e.createRenderTarget({...t,persistent:!0}),`f`),R(this,V,e.createRenderTarget(t),`f`),R(this,H,e.createRenderTarget(t),`f`)},xr=function(){L(this,B,`f`)?.dispose(),L(this,V,`f`)?.dispose(),L(this,H,`f`)?.dispose(),R(this,B,null,`f`),R(this,V,null,`f`),R(this,H,null,`f`)},Sr=function(e){let t=e.gl,n=t.createTexture();if(!n)throw Error(`[ParticleEffect] Failed to create spawn texture`);return t.bindTexture(t.TEXTURE_2D,n),t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.texImage2D(t.TEXTURE_2D,0,t.RGBA32F,K,K,0,t.RGBA,t.FLOAT,null),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MIN_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_MAG_FILTER,t.NEAREST),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_S,t.CLAMP_TO_EDGE),t.texParameteri(t.TEXTURE_2D,t.TEXTURE_WRAP_T,t.CLAMP_TO_EDGE),t.bindTexture(t.TEXTURE_2D,null),{raw:n,handle:e.wrapTexture(n,{size:[K,K],filter:`nearest`,wrap:`clamp`})}},Cr=function(e){let t=L(this,z,`m`,Sr).call(this,e);R(this,lr,t.raw,`f`),R(this,ur,t.handle,`f`)},wr=function(e){if(!L(this,lr,`f`))return;let t=e.gl;t.pixelStorei(t.UNPACK_FLIP_Y_WEBGL,!1),t.bindTexture(t.TEXTURE_2D,L(this,lr,`f`)),t.texSubImage2D(t.TEXTURE_2D,0,0,0,K,K,t.RGBA,t.FLOAT,L(this,cr,`f`)),t.bindTexture(t.TEXTURE_2D,null)},Tr=function(e,t,n){let r=[e.mouse[0]/Math.max(1,n[0]),e.mouse[1]/Math.max(1,n[1])];(!L(this,vr,`f`)||Math.abs(r[0]-L(this,vr,`f`)[0])>1e-6||Math.abs(r[1]-L(this,vr,`f`)[1])>1e-6)&&R(this,yr,e.time,`f`),R(this,vr,r,`f`);let i=e.intersection>0,a=e.time-L(this,yr,`f`)<Or;i&&(a||this.params.spawnOnIdle)?R(this,gr,Math.min(L(this,gr,`f`)+this.params.birthRate*t,Dr),`f`):R(this,gr,0,`f`),i?R(this,_r,Math.min(L(this,_r,`f`)+this.params.screenBirthRate*t,Dr),`f`):R(this,_r,0,`f`);let o=Math.min(Dr,Math.floor(L(this,gr,`f`))),s=Math.min(Dr-o,Math.floor(L(this,_r,`f`)));R(this,gr,L(this,gr,`f`)-o,`f`),R(this,_r,L(this,_r,`f`)-s,`f`);let c=o+s;if(c===0)return 0;let l=L(this,z,`m`,Er).call(this),u=Math.max(1,n[0]),d=Math.max(1,n[1]),f=L(this,cr,`f`),p=0;for(;p<o;p++){let e=Math.sqrt(Math.random())*this.params.radius,t=Math.random()*Math.PI*2,n=Math.cos(t)*e,i=Math.sin(t)*e,a=p*4;f[a+0]=L(this,hr,`f`),f[a+1]=r[0]+n/u,f[a+2]=r[1]+i/d,f[a+3]=t,R(this,hr,(L(this,hr,`f`)+1)%l,`f`)}for(let e=0;e<s;e++,p++){let e=p*4;f[e+0]=L(this,hr,`f`),f[e+1]=Math.random(),f[e+2]=Math.random(),f[e+3]=-1,R(this,hr,(L(this,hr,`f`)+1)%l,`f`)}return c},Er=function(){return Math.max(1,Math.min(L(this,sr,`f`),Math.floor(this.params.count)))}})),q,J,Ur,Wr,Gr,Kr,Y,X,qr,Z,Jr,Yr,Xr,Zr,Qr,$r,ei,ti,ni,ri,ii,ai,oi,si,ci,li=e((()=>{qn(),ir(),q=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},J=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},ri=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -1463,8 +1592,8 @@ uniform float outwardBias;
 uniform float duration;
 uniform float count;
 uniform int uBurst;
-${An}
-${Cn}
+${$n}
+${Kn}
 
 void main() {
     if (uBurst == 1) {
@@ -1497,15 +1626,15 @@ void main() {
     vec3 pos = s.xyz + (vNoise + outward) * noiseSpeed * dt * taper;
 
     float lifespanScale = mix(
-        ${xn.toFixed(4)},
-        ${Sn.toFixed(4)},
+        ${Wn.toFixed(4)},
+        ${Gn.toFixed(4)},
         hash21(uv * 91.7 + 1.234)
     );
     age += dt / max(duration * lifespanScale, 1e-3);
 
     outColor = vec4(pos, age);
 }
-`,jr=`#version 300 es
+`,ii=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -1516,7 +1645,7 @@ uniform vec2 stateSize;
 uniform float count;
 uniform vec3 color;
 uniform float colorMix;
-${An}
+${$n}
 
 void main() {
     ivec2 pix = ivec2(floor(uv * stateSize));
@@ -1533,7 +1662,7 @@ void main() {
     vec4 c = texture(src, sampleUv);
     outColor = vec4(mix(c.rgb, color, colorMix), c.a);
 }
-`,Mr=`#version 300 es
+`,ai=`#version 300 es
 precision highp float;
 in vec2 position;
 
@@ -1592,7 +1721,7 @@ void main() {
     vCorner = position;
     vColor = vec4(c.rgb, c.a * lifeAlpha * alpha * fogFactor);
 }
-`,Nr=`#version 300 es
+`,oi=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -1602,7 +1731,7 @@ uniform sampler2D trail;
 void main() {
     outColor = texture(trail, uv);
 }
-`,Pr={count:1e5,duration:1,noiseSpeed:1.5,noiseScale:1,noiseAnimation:1,outwardBias:1,pointSize:3,alpha:1,alphaDecay:5,speedDecay:2,fog:0,trailFade:.5,color:16777215,colorMix:0,blend:`add`},Fr=class{get params(){return G(this,vr,`f`)}constructor(e={}){q.add(this),vr.set(this,void 0),J.set(this,null),yr.set(this,null),Y.set(this,null),X.set(this,null),br.set(this,null),Z.set(this,void 0),xr.set(this,!1),Sr.set(this,!1),Cr.set(this,-1),wr.set(this,0),Tr.set(this,0),K(this,vr,{...Pr,...e},`f`),G(this,vr,`f`).count=En(G(this,vr,`f`).count);let t=Tn(G(this,vr,`f`).count);K(this,Z,[t,t],`f`)}trigger(){K(this,xr,!0,`f`),K(this,Sr,!0,`f`),K(this,Cr,-1,`f`),K(this,wr,0,`f`),K(this,Tr,0,`f`)}reset(){K(this,xr,!1,`f`),K(this,Sr,!1,`f`),K(this,Cr,-1,`f`),K(this,wr,0,`f`),K(this,Tr,0,`f`)}isDone(){return!G(this,xr,`f`)||G(this,wr,`f`)<this.params.duration?!1:G(this,Tr,`f`)>=G(this,q,`m`,Er).call(this)}init(e){G(this,q,`m`,Dr).call(this,e),K(this,Y,e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),`f`),K(this,X,e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),`f`),K(this,br,{attributes:{position:kn}},`f`)}render(e){var t;if(!G(this,J,`f`)||!G(this,yr,`f`)||!G(this,Y,`f`)||!G(this,X,`f`)||!G(this,br,`f`)||e.intersection<=0)return;let n=Tn(this.params.count),r=!G(this,xr,`f`)||this.isDone();if(n!==G(this,Z,`f`)[0]&&r&&(G(this,q,`m`,Or).call(this),K(this,Z,[n,n],`f`),G(this,q,`m`,Dr).call(this,e)),!G(this,xr,`f`)){e.blit(e.src,e.target);return}G(this,Cr,`f`)<0&&K(this,Cr,e.time,`f`);let i=e.time-G(this,Cr,`f`);K(this,wr,i,`f`);let a=i>=this.params.duration;if(a&&G(this,Tr,`f`)>=G(this,q,`m`,Er).call(this)){e.draw({frag:jn,target:e.target});return}let o=On(e.deltaTime),s=[e.dims.elementPixel[0],e.dims.elementPixel[1]];if(a)e.draw({frag:jn,target:G(this,Y,`f`)}),K(this,Tr,(t=G(this,Tr,`f`),t++,t),`f`);else{let t=+!!G(this,Sr,`f`);K(this,Sr,!1,`f`);let n=G(this,q,`m`,kr).call(this);e.draw({frag:Ar,uniforms:{posTex:G(this,J,`f`),stateSize:G(this,Z,`f`),elementPixel:s,time:e.time,dt:o,noiseSpeed:this.params.noiseSpeed,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,outwardBias:this.params.outwardBias,duration:this.params.duration,count:n,uBurst:t},target:G(this,J,`f`)}),t===1&&(e.draw({frag:jr,uniforms:{src:e.src,stateSize:G(this,Z,`f`),count:n,color:Dn(this.params.color),colorMix:this.params.colorMix},target:G(this,yr,`f`)}),e.draw({frag:jn,target:G(this,X,`f`)})),G(this,br,`f`).instanceCount=n,e.draw({frag:jn,target:G(this,Y,`f`)}),e.draw({vert:Mr,frag:Mn,uniforms:{posTex:G(this,J,`f`),colorTex:G(this,yr,`f`),stateSize:G(this,Z,`f`),pointSize:this.params.pointSize,elementPixel:s,particleCount:n,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fog:this.params.fog},geometry:G(this,br,`f`),target:G(this,Y,`f`),blend:this.params.blend===`normal`?`premultiplied`:`additive`})}e.draw({frag:Nn,uniforms:{trailPrev:G(this,X,`f`),particleStamp:G(this,Y,`f`),trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:G(this,X,`f`)}),e.draw({frag:Nr,uniforms:{trail:G(this,X,`f`)},target:e.target})}dispose(){G(this,q,`m`,Or).call(this),G(this,Y,`f`)?.dispose(),G(this,X,`f`)?.dispose(),K(this,Y,null,`f`),K(this,X,null,`f`),K(this,br,null,`f`)}outputRect(e){return e.canvasRect}},vr=new WeakMap,J=new WeakMap,yr=new WeakMap,Y=new WeakMap,X=new WeakMap,br=new WeakMap,Z=new WeakMap,xr=new WeakMap,Sr=new WeakMap,Cr=new WeakMap,wr=new WeakMap,Tr=new WeakMap,q=new WeakSet,Er=function(){let e=this.params.trailFade;return e<=0?1:e>=.999?600:Math.ceil(-Math.log(255)/Math.log(e))},Dr=function(e){let t={size:G(this,Z,`f`),float:!0,wrap:`clamp`,filter:`nearest`};K(this,J,e.createRenderTarget({...t,persistent:!0}),`f`),K(this,yr,e.createRenderTarget(t),`f`)},Or=function(){G(this,J,`f`)?.dispose(),G(this,yr,`f`)?.dispose(),K(this,J,null,`f`),K(this,yr,null,`f`)},kr=function(){let e=G(this,Z,`f`)[0]*G(this,Z,`f`)[1];return Math.max(1,Math.min(e,Math.floor(this.params.count)))}})),Lr,Rr,zr,Br=e((()=>{Lr=`#version 300 es
+`,si={count:1e5,duration:1,noiseSpeed:1.5,noiseScale:1,noiseAnimation:1,outwardBias:1,pointSize:3,alpha:1,alphaDecay:5,speedDecay:2,fog:0,trailFade:.5,color:16777215,colorMix:0,blend:`add`},ci=class{get params(){return q(this,Wr,`f`)}constructor(e={}){Ur.add(this),Wr.set(this,void 0),Gr.set(this,null),Kr.set(this,null),Y.set(this,null),X.set(this,null),qr.set(this,null),Z.set(this,void 0),Jr.set(this,!1),Yr.set(this,!1),Xr.set(this,-1),Zr.set(this,0),Qr.set(this,0),J(this,Wr,{...si,...e},`f`),q(this,Wr,`f`).count=Yn(q(this,Wr,`f`).count);let t=Jn(q(this,Wr,`f`).count);J(this,Z,[t,t],`f`)}trigger(){J(this,Jr,!0,`f`),J(this,Yr,!0,`f`),J(this,Xr,-1,`f`),J(this,Zr,0,`f`),J(this,Qr,0,`f`)}reset(){J(this,Jr,!1,`f`),J(this,Yr,!1,`f`),J(this,Xr,-1,`f`),J(this,Zr,0,`f`),J(this,Qr,0,`f`)}isDone(){return!q(this,Jr,`f`)||q(this,Zr,`f`)<this.params.duration?!1:q(this,Qr,`f`)>=q(this,Ur,`m`,$r).call(this)}init(e){q(this,Ur,`m`,ei).call(this,e),J(this,Y,e.createRenderTarget({float:!1,wrap:`clamp`,filter:`linear`}),`f`),J(this,X,e.createRenderTarget({float:!1,persistent:!0,wrap:`clamp`,filter:`linear`}),`f`),J(this,qr,{attributes:{position:Qn}},`f`)}render(e){var t;if(!q(this,Gr,`f`)||!q(this,Kr,`f`)||!q(this,Y,`f`)||!q(this,X,`f`)||!q(this,qr,`f`)||e.intersection<=0)return;let n=Jn(this.params.count),r=!q(this,Jr,`f`)||this.isDone();if(n!==q(this,Z,`f`)[0]&&r&&(q(this,Ur,`m`,ti).call(this),J(this,Z,[n,n],`f`),q(this,Ur,`m`,ei).call(this,e)),!q(this,Jr,`f`)){e.blit(e.src,e.target);return}q(this,Xr,`f`)<0&&J(this,Xr,e.time,`f`);let i=e.time-q(this,Xr,`f`);J(this,Zr,i,`f`);let a=i>=this.params.duration;if(a&&q(this,Qr,`f`)>=q(this,Ur,`m`,$r).call(this)){e.draw({frag:er,target:e.target});return}let o=Zn(e.deltaTime),s=[e.dims.elementPixel[0],e.dims.elementPixel[1]];if(a)e.draw({frag:er,target:q(this,Y,`f`)}),J(this,Qr,(t=q(this,Qr,`f`),t++,t),`f`);else{let t=+!!q(this,Yr,`f`);J(this,Yr,!1,`f`);let n=q(this,Ur,`m`,ni).call(this);e.draw({frag:ri,uniforms:{posTex:q(this,Gr,`f`),stateSize:q(this,Z,`f`),elementPixel:s,time:e.time,dt:o,noiseSpeed:this.params.noiseSpeed,noiseScale:this.params.noiseScale,noiseAnimation:this.params.noiseAnimation,speedDecay:this.params.speedDecay,outwardBias:this.params.outwardBias,duration:this.params.duration,count:n,uBurst:t},target:q(this,Gr,`f`)}),t===1&&(e.draw({frag:ii,uniforms:{src:e.src,stateSize:q(this,Z,`f`),count:n,color:Xn(this.params.color),colorMix:this.params.colorMix},target:q(this,Kr,`f`)}),e.draw({frag:er,target:q(this,X,`f`)})),q(this,qr,`f`).instanceCount=n,e.draw({frag:er,target:q(this,Y,`f`)}),e.draw({vert:ai,frag:tr,uniforms:{posTex:q(this,Gr,`f`),colorTex:q(this,Kr,`f`),stateSize:q(this,Z,`f`),pointSize:this.params.pointSize,elementPixel:s,particleCount:n,alpha:this.params.alpha,alphaDecay:this.params.alphaDecay,fog:this.params.fog},geometry:q(this,qr,`f`),target:q(this,Y,`f`),blend:this.params.blend===`normal`?`premultiplied`:`additive`})}e.draw({frag:nr,uniforms:{trailPrev:q(this,X,`f`),particleStamp:q(this,Y,`f`),trailFade:this.params.trailFade,blendMode:+(this.params.blend===`normal`)},target:q(this,X,`f`)}),e.draw({frag:oi,uniforms:{trail:q(this,X,`f`)},target:e.target})}dispose(){q(this,Ur,`m`,ti).call(this),q(this,Y,`f`)?.dispose(),q(this,X,`f`)?.dispose(),J(this,Y,null,`f`),J(this,X,null,`f`),J(this,qr,null,`f`)}outputRect(e){return e.canvasRect}},Wr=new WeakMap,Gr=new WeakMap,Kr=new WeakMap,Y=new WeakMap,X=new WeakMap,qr=new WeakMap,Z=new WeakMap,Jr=new WeakMap,Yr=new WeakMap,Xr=new WeakMap,Zr=new WeakMap,Qr=new WeakMap,Ur=new WeakSet,$r=function(){let e=this.params.trailFade;return e<=0?1:e>=.999?600:Math.ceil(-Math.log(255)/Math.log(e))},ei=function(e){let t={size:q(this,Z,`f`),float:!0,wrap:`clamp`,filter:`nearest`};J(this,Gr,e.createRenderTarget({...t,persistent:!0}),`f`),J(this,Kr,e.createRenderTarget(t),`f`)},ti=function(){q(this,Gr,`f`)?.dispose(),q(this,Kr,`f`)?.dispose(),J(this,Gr,null,`f`),J(this,Kr,null,`f`)},ni=function(){let e=q(this,Z,`f`)[0]*q(this,Z,`f`)[1];return Math.max(1,Math.min(e,Math.floor(this.params.count)))}})),ui,di,fi,pi=e((()=>{ui=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -1623,7 +1752,7 @@ void main() {
     }
     outColor = c;
 }
-`,Rr={size:10},zr=class{constructor(e={}){this.params={...Rr,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.element,{size:r}=this.params;e.draw({frag:Lr,uniforms:{src:e.src,cellUv:[r/(t||1),r/(n||1)]},target:e.target})}}})),Q,$,Vr,Hr,Ur,Wr,Gr,Kr,qr,Jr,Yr,Xr,Zr,Qr,$r,ei,ti,ni,ri,ii,ai,oi,si,ci,li,ui,di,fi=e((()=>{Q=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},$=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},ti=`
+`,di={size:10},fi=class{constructor(e={}){this.params={...di,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.element,{size:r}=this.params;e.draw({frag:ui,uniforms:{src:e.src,cellUv:[r/(t||1),r/(n||1)]},target:e.target})}}})),Q,$,mi,hi,gi,_i,vi,yi,bi,xi,Si,Ci,wi,Ti,Ei,Di,Oi,ki,Ai,ji,Mi,Ni,Pi,Fi,Ii,Li,Ri,zi=e((()=>{Q=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},$=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},Oi=`
 float key(vec3 c, int mode) {
     if (mode == 0) return dot(c, vec3(0.299, 0.587, 0.114));
     if (mode == 1) return c.r;
@@ -1640,7 +1769,7 @@ float key(vec3 c, int mode) {
     else                h = (c.r - c.g) / d + 4.0;
     return h / 6.0;
 }
-`,ni=`
+`,ki=`
 ivec2 toXY(int a, int b, int axis) { return axis == 0 ? ivec2(a, b) : ivec2(b, a); }
 
 // Map a box point (centred coords) back into source pixel space — the same
@@ -1691,7 +1820,7 @@ void scanSegment(sampler2D s, int a, int b, int L, int keyMode, float lo, float 
         segEnd++;
     }
 }
-`,ri=`#version 300 es
+`,Ai=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -1706,8 +1835,8 @@ uniform int masked;
 uniform vec2 boxSize;
 uniform vec2 imgSize;
 uniform vec2 rot;
-${ti}
-${ni}
+${Oi}
+${ki}
 void main() {
     ivec2 p = ivec2(gl_FragCoord.xy);
     int a = axis == 0 ? p.x : p.y;
@@ -1732,7 +1861,7 @@ void main() {
     }
     outColor = vec4(float(rank), float(segEnd - segStart), 0.0, 1.0);
 }
-`,ii=`#version 300 es
+`,ji=`#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
@@ -1748,8 +1877,8 @@ uniform int masked;
 uniform vec2 boxSize;
 uniform vec2 imgSize;
 uniform vec2 rot;
-${ti}
-${ni}
+${Oi}
+${ki}
 void main() {
     // Crisp source edge at full output resolution. The lenient low-res run
     // membership lets sorted content spill up to a cell into the padding;
@@ -1793,7 +1922,7 @@ void main() {
     vec4 c = texture(srcHi, uvSrc);
     outColor = vec4(c.rgb * c.a, c.a);
 }
-`,ai=`#version 300 es
+`,Mi=`#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
@@ -1802,7 +1931,7 @@ void main() {
     vec4 c = texture(src, uvSrc);
     outColor = vec4(c.rgb * c.a, c.a);
 }
-`,oi=`#version 300 es
+`,Ni=`#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
@@ -1820,7 +1949,7 @@ void main() {
     vec2 uvS = clamp((dSrc + srcSize * 0.5) / srcSize, 0.0, 1.0);
     outColor = texture(src, srcRectUv.xy + uvS * srcRectUv.zw);
 }
-`,si=`#version 300 es
+`,Pi=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -1837,7 +1966,7 @@ void main() {
     vec2 uvB = (dBox + boxSize * 0.5) / boxSize;
     outColor = texture(src, uvB);
 }
-`,ci={right:{axis:0,direction:0},left:{axis:0,direction:1},down:{axis:1,direction:1},up:{axis:1,direction:0}},li={luminance:0,r:1,g:2,b:3,hue:4,saturation:5},ui={range:[0,1],sortRes:128,key:`luminance`,direction:`up`,angle:0,bypass:!1},di=class{constructor(e={}){Vr.add(this),Hr.set(this,null),Ur.set(this,null),Wr.set(this,null),Gr.set(this,null),Kr.set(this,0),qr.set(this,0),Jr.set(this,0),Yr.set(this,0),Xr.set(this,0),Zr.set(this,0),Qr.set(this,0),this.params={...ui,...e},this.params.range=[...this.params.range]}setParams(e){Object.assign(this.params,e),e.range&&(this.params.range=[...e.range])}render(e){if(Q(this,Vr,`m`,ei).call(this,e),this.params.bypass||!Q(this,Hr,`f`)||!Q(this,Ur,`f`)){e.draw({frag:ai,uniforms:{src:e.src},target:e.target});return}let{axis:t,direction:n}=ci[this.params.direction],r=[Q(this,Zr,`f`),Q(this,Qr,`f`)],[i,a]=this.params.range,o=li[this.params.key],[s,c]=e.dims.elementPixel,l=Q(this,Wr,`f`),u=Q(this,Gr,`f`),d=this.params.angle!==0&&l!==null&&u!==null,f=e.src,p=e.src,m=e.target,h=[1,0],g=[s,c];if(d){let t=-this.params.angle*Math.PI/180;h=[Math.cos(t),Math.sin(t)],g=[Q(this,Yr,`f`),Q(this,Xr,`f`)],e.draw({frag:oi,uniforms:{src:e.src,srcSize:[s,c],boxSize:g,rot:h},target:l}),f=l,p=l,m=u}e.blit(f,Q(this,Hr,`f`));let _=+!!d,v=[s,c];e.draw({frag:ri,uniforms:{src:Q(this,Hr,`f`),srcSize:r,threshold:i,thresholdHigh:a,keyMode:o,direction:n,axis:t,masked:_,boxSize:g,imgSize:v,rot:h},target:Q(this,Ur,`f`)}),e.draw({frag:ii,uniforms:{src:Q(this,Hr,`f`),srcHi:p,rankTex:Q(this,Ur,`f`),lowSize:r,threshold:i,thresholdHigh:a,keyMode:o,axis:t,masked:_,boxSize:g,imgSize:v,rot:h},target:m}),d&&e.draw({frag:si,uniforms:{src:u,srcSize:[s,c],boxSize:g,rot:h},target:e.target})}dispose(){Q(this,Vr,`m`,$r).call(this),$(this,Kr,0,`f`),$(this,qr,0,`f`),$(this,Jr,0,`f`),$(this,Yr,0,`f`),$(this,Xr,0,`f`),$(this,Zr,0,`f`),$(this,Qr,0,`f`)}},Hr=new WeakMap,Ur=new WeakMap,Wr=new WeakMap,Gr=new WeakMap,Kr=new WeakMap,qr=new WeakMap,Jr=new WeakMap,Yr=new WeakMap,Xr=new WeakMap,Zr=new WeakMap,Qr=new WeakMap,Vr=new WeakSet,$r=function(){Q(this,Hr,`f`)?.dispose(),Q(this,Ur,`f`)?.dispose(),Q(this,Wr,`f`)?.dispose(),Q(this,Gr,`f`)?.dispose(),$(this,Hr,null,`f`),$(this,Ur,null,`f`),$(this,Wr,null,`f`),$(this,Gr,null,`f`)},ei=function(e){let[t,n]=e.dims.elementPixel,{axis:r}=ci[this.params.direction],{angle:i}=this.params,a=this.params.sortRes,o=t,s=n;if(i!==0){let e=i*Math.PI/180,r=Math.abs(Math.cos(e)),a=Math.abs(Math.sin(e));o=Math.ceil(t*r+n*a),s=Math.ceil(t*a+n*r)}let c=r===0?Math.max(1,Math.round(a*o/t)):Math.max(1,Math.round(a*s/n)),l=r===0?c:o,u=r===0?s:c;Q(this,Kr,`f`)===t&&Q(this,qr,`f`)===n&&Q(this,Jr,`f`)===i&&Q(this,Zr,`f`)===l&&Q(this,Qr,`f`)===u||(Q(this,Vr,`m`,$r).call(this),$(this,Kr,t,`f`),$(this,qr,n,`f`),$(this,Jr,i,`f`),$(this,Yr,o,`f`),$(this,Xr,s,`f`),$(this,Zr,l,`f`),$(this,Qr,u,`f`),$(this,Hr,e.createRenderTarget({size:[l,u],filter:`nearest`}),`f`),$(this,Ur,e.createRenderTarget({size:[l,u],filter:`nearest`,float:!0}),`f`),i!==0&&($(this,Wr,e.createRenderTarget({size:[o,s]}),`f`),$(this,Gr,e.createRenderTarget({size:[o,s]}),`f`)))}})),pi,mi,hi,gi=e((()=>{pi=`#version 300 es
+`,Fi={right:{axis:0,direction:0},left:{axis:0,direction:1},down:{axis:1,direction:1},up:{axis:1,direction:0}},Ii={luminance:0,r:1,g:2,b:3,hue:4,saturation:5},Li={range:[0,1],sortRes:128,key:`luminance`,direction:`up`,angle:0,bypass:!1},Ri=class{constructor(e={}){mi.add(this),hi.set(this,null),gi.set(this,null),_i.set(this,null),vi.set(this,null),yi.set(this,0),bi.set(this,0),xi.set(this,0),Si.set(this,0),Ci.set(this,0),wi.set(this,0),Ti.set(this,0),this.params={...Li,...e},this.params.range=[...this.params.range]}setParams(e){Object.assign(this.params,e),e.range&&(this.params.range=[...e.range])}render(e){if(Q(this,mi,`m`,Di).call(this,e),this.params.bypass||!Q(this,hi,`f`)||!Q(this,gi,`f`)){e.draw({frag:Mi,uniforms:{src:e.src},target:e.target});return}let{axis:t,direction:n}=Fi[this.params.direction],r=[Q(this,wi,`f`),Q(this,Ti,`f`)],[i,a]=this.params.range,o=Ii[this.params.key],[s,c]=e.dims.elementPixel,l=Q(this,_i,`f`),u=Q(this,vi,`f`),d=this.params.angle!==0&&l!==null&&u!==null,f=e.src,p=e.src,m=e.target,h=[1,0],g=[s,c];if(d){let t=-this.params.angle*Math.PI/180;h=[Math.cos(t),Math.sin(t)],g=[Q(this,Si,`f`),Q(this,Ci,`f`)],e.draw({frag:Ni,uniforms:{src:e.src,srcSize:[s,c],boxSize:g,rot:h},target:l}),f=l,p=l,m=u}e.blit(f,Q(this,hi,`f`));let _=+!!d,v=[s,c];e.draw({frag:Ai,uniforms:{src:Q(this,hi,`f`),srcSize:r,threshold:i,thresholdHigh:a,keyMode:o,direction:n,axis:t,masked:_,boxSize:g,imgSize:v,rot:h},target:Q(this,gi,`f`)}),e.draw({frag:ji,uniforms:{src:Q(this,hi,`f`),srcHi:p,rankTex:Q(this,gi,`f`),lowSize:r,threshold:i,thresholdHigh:a,keyMode:o,axis:t,masked:_,boxSize:g,imgSize:v,rot:h},target:m}),d&&e.draw({frag:Pi,uniforms:{src:u,srcSize:[s,c],boxSize:g,rot:h},target:e.target})}dispose(){Q(this,mi,`m`,Ei).call(this),$(this,yi,0,`f`),$(this,bi,0,`f`),$(this,xi,0,`f`),$(this,Si,0,`f`),$(this,Ci,0,`f`),$(this,wi,0,`f`),$(this,Ti,0,`f`)}},hi=new WeakMap,gi=new WeakMap,_i=new WeakMap,vi=new WeakMap,yi=new WeakMap,bi=new WeakMap,xi=new WeakMap,Si=new WeakMap,Ci=new WeakMap,wi=new WeakMap,Ti=new WeakMap,mi=new WeakSet,Ei=function(){Q(this,hi,`f`)?.dispose(),Q(this,gi,`f`)?.dispose(),Q(this,_i,`f`)?.dispose(),Q(this,vi,`f`)?.dispose(),$(this,hi,null,`f`),$(this,gi,null,`f`),$(this,_i,null,`f`),$(this,vi,null,`f`)},Di=function(e){let[t,n]=e.dims.elementPixel,{axis:r}=Fi[this.params.direction],{angle:i}=this.params,a=this.params.sortRes,o=t,s=n;if(i!==0){let e=i*Math.PI/180,r=Math.abs(Math.cos(e)),a=Math.abs(Math.sin(e));o=Math.ceil(t*r+n*a),s=Math.ceil(t*a+n*r)}let c=r===0?Math.max(1,Math.round(a*o/t)):Math.max(1,Math.round(a*s/n)),l=r===0?c:o,u=r===0?s:c;Q(this,yi,`f`)===t&&Q(this,bi,`f`)===n&&Q(this,xi,`f`)===i&&Q(this,wi,`f`)===l&&Q(this,Ti,`f`)===u||(Q(this,mi,`m`,Ei).call(this),$(this,yi,t,`f`),$(this,bi,n,`f`),$(this,xi,i,`f`),$(this,Si,o,`f`),$(this,Ci,s,`f`),$(this,wi,l,`f`),$(this,Ti,u,`f`),$(this,hi,e.createRenderTarget({size:[l,u],filter:`nearest`}),`f`),$(this,gi,e.createRenderTarget({size:[l,u],filter:`nearest`,float:!0}),`f`),i!==0&&($(this,_i,e.createRenderTarget({size:[o,s]}),`f`),$(this,vi,e.createRenderTarget({size:[o,s]}),`f`)))}})),Bi,Vi,Hi,Ui=e((()=>{Bi=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -1888,7 +2017,7 @@ void main() {
 
     outColor = img;
 }
-`,mi={speed:1,frequency:1},hi=class{constructor(e={}){this.params={...mi,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.element;e.draw({frag:pi,uniforms:{src:e.src,time:e.time*this.params.speed,aspect:(t||1)/(n||1),frequency:this.params.frequency},target:e.target})}}})),_i,vi,yi,bi=e((()=>{_i=`#version 300 es
+`,Vi={speed:1,frequency:1},Hi=class{constructor(e={}){this.params={...Vi,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.element;e.draw({frag:Bi,uniforms:{src:e.src,time:e.time*this.params.speed,aspect:(t||1)/(n||1),frequency:this.params.frequency},target:e.target})}}})),Wi,Gi,Ki,qi=e((()=>{Wi=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -1941,7 +2070,7 @@ void main (void) {
         step(.1, cr.a + cg.a + cb.a)
     );
 }
-`,vi={speed:1,amount:.05},yi=class{constructor(e={}){this.params={...vi,...e}}setParams(e){Object.assign(this.params,e)}render(e){e.draw({frag:_i,uniforms:{src:e.src,time:e.time*this.params.speed,amount:this.params.amount},target:e.target})}}})),xi,Si,Ci,wi=e((()=>{xi=`#version 300 es
+`,Gi={speed:1,amount:.05},Ki=class{constructor(e={}){this.params={...Gi,...e}}setParams(e){Object.assign(this.params,e)}render(e){e.draw({frag:Wi,uniforms:{src:e.src,time:e.time*this.params.speed,amount:this.params.amount},target:e.target})}}})),Ji,Yi,Xi,Zi=e((()=>{Ji=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -1990,7 +2119,7 @@ void main (void) {
         smoothstep(.0, 1., cr.a + cg.a + cb.a)
     );
 }
-`,Si={speed:1,amount:10},Ci=class{constructor(e={}){this.params={...Si,...e}}setParams(e){Object.assign(this.params,e)}render(e){let t=e.dims.element[0]||1;e.draw({frag:xi,uniforms:{src:e.src,time:e.time*this.params.speed,amp:this.params.amount/t},target:e.target})}}})),Ti,Ei,Di,Oi=e((()=>{Ti=`#version 300 es
+`,Yi={speed:1,amount:10},Xi=class{constructor(e={}){this.params={...Yi,...e}}setParams(e){Object.assign(this.params,e)}render(e){let t=e.dims.element[0]||1;e.draw({frag:Ji,uniforms:{src:e.src,time:e.time*this.params.speed,amp:this.params.amount/t},target:e.target})}}})),Qi,$i,ea,ta=e((()=>{Qi=`#version 300 es
 precision highp float;
 in vec2 uvSrc;
 in vec2 uvContent;
@@ -2011,7 +2140,7 @@ void main() {
     }
     outColor = c;
 }
-`,Ei={spacing:4},Di=class{constructor(e={}){this.params={...Ei,...e}}setParams(e){Object.assign(this.params,e)}render(e){let{spacing:t}=this.params;e.draw({frag:Ti,uniforms:{src:e.src,innerHeight:e.dims.element[1]||1,spacing:t},target:e.target})}}})),ki,Ai,ji,Mi=e((()=>{ki=`#version 300 es
+`,$i={spacing:4},ea=class{constructor(e={}){this.params={...$i,...e}}setParams(e){Object.assign(this.params,e)}render(e){let{spacing:t}=this.params;e.draw({frag:Qi,uniforms:{src:e.src,innerHeight:e.dims.element[1]||1,spacing:t},target:e.target})}}})),na,ra,ia,aa=e((()=>{na=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -2053,7 +2182,7 @@ void main (void) {
     vec2 dx = vec2(blurDx, 0.0);
     outColor = (draw(uv) * 2. + draw(uv + dx) + draw(uv - dx)) / 4.;
 }
-`,Ai={speed:1,amount:20,frequency:7,blur:2},ji=class{constructor(e={}){this.params={...Ai,...e}}setParams(e){Object.assign(this.params,e)}render(e){let t=e.dims.element[0]||1;e.draw({frag:ki,uniforms:{src:e.src,time:e.time*this.params.speed,amp:this.params.amount/t,frequency:this.params.frequency,blurDx:this.params.blur/t},target:e.target})}}})),Ni,Pi,Fi,Ii=e((()=>{Ni=`#version 300 es
+`,ra={speed:1,amount:20,frequency:7,blur:2},ia=class{constructor(e={}){this.params={...ra,...e}}setParams(e){Object.assign(this.params,e)}render(e){let t=e.dims.element[0]||1;e.draw({frag:na,uniforms:{src:e.src,time:e.time*this.params.speed,amp:this.params.amount/t,frequency:this.params.frequency,blurDx:this.params.blur/t},target:e.target})}}})),oa,sa,ca,la=e((()=>{oa=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -2086,7 +2215,7 @@ void main (void) {
 
     outColor.a *= color.a;
 }
-`,Pi={color1:[1,0,0,1],color2:[0,1,0,1],color3:[0,0,1,1],speed:.2},Fi=class{constructor(e={}){this.params={...Pi,...e}}setParams(e){Object.assign(this.params,e)}render(e){e.draw({frag:Ni,uniforms:{src:e.src,time:e.time,color1:this.params.color1,color2:this.params.color2,color3:this.params.color3,speed:this.params.speed},target:e.target})}}})),Li,Ri,zi,Bi=e((()=>{Li=`#version 300 es
+`,sa={color1:[1,0,0,1],color2:[0,1,0,1],color3:[0,0,1,1],speed:.2},ca=class{constructor(e={}){this.params={...sa,...e}}setParams(e){Object.assign(this.params,e)}render(e){e.draw({frag:oa,uniforms:{src:e.src,time:e.time,color1:this.params.color1,color2:this.params.color2,color3:this.params.color3,speed:this.params.speed},target:e.target})}}})),ua,da,fa,pa=e((()=>{ua=`#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
@@ -2112,7 +2241,7 @@ void main() {
     float l = max(length(p) - radius, 0.);
     outColor *= 1. - pow(l, power) * intensity;
 }
-`,Ri={intensity:.5,radius:1,power:2},zi=class{constructor(e={}){this.params={...Ri,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.element;e.draw({frag:Li,uniforms:{src:e.src,aspect:(t||1)/(n||1),intensity:this.params.intensity,radius:this.params.radius,power:this.params.power},target:e.target})}}}));function Vi(e){let t=e.startsWith(`#`)?e.slice(1):e;return(t.length===3||t.length===4)&&(t=t.split(``).map(e=>e+e).join(``)),t.length===6&&(t+=`ff`),t.length===8?[Number.parseInt(t.slice(0,2),16)/255,Number.parseInt(t.slice(2,4),16)/255,Number.parseInt(t.slice(4,6),16)/255,Number.parseInt(t.slice(6,8),16)/255]:[0,0,0,0]}var Hi,Ui,Wi,Gi=e((()=>{Hi=`#version 300 es
+`,da={intensity:.5,radius:1,power:2},fa=class{constructor(e={}){this.params={...da,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.element;e.draw({frag:ua,uniforms:{src:e.src,aspect:(t||1)/(n||1),intensity:this.params.intensity,radius:this.params.radius,power:this.params.power},target:e.target})}}}));function ma(e){let t=e.startsWith(`#`)?e.slice(1):e;return(t.length===3||t.length===4)&&(t=t.split(``).map(e=>e+e).join(``)),t.length===6&&(t+=`ff`),t.length===8?[Number.parseInt(t.slice(0,2),16)/255,Number.parseInt(t.slice(2,4),16)/255,Number.parseInt(t.slice(4,6),16)/255,Number.parseInt(t.slice(6,8),16)/255]:[0,0,0,0]}var ha,ga,_a,va=e((()=>{ha=`#version 300 es
 precision highp float;
 
 in vec2 uvContent;
@@ -2306,4 +2435,4 @@ void main() {
 
     outColor = mix(bgColor, base, visibleMask);
 }
-`,Ui={cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},Wi=class{constructor(e={}){this.params={...Ui,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params;e.draw({frag:Hi,uniforms:{src:e.src,mouseUv:[e.mouse[0]/r,e.mouse[1]/i],elementPx:[r,i],cellSize:a.cellSize,pressRadius:a.pressRadius,press:a.press,flatCells:+!!a.flatCells,seed:a.seed,time:e.time,speed:Math.max(0,a.speed),breathe:Math.max(0,a.breathe),breatheSpeed:Math.max(0,a.breatheSpeed),breatheScale:Math.max(1,a.breatheScale),bgColor:Vi(a.bgColor)},target:e.target})}}})),Ki=e((()=>{p(),fe(),ge(),Je(),Qe(),yt(),Ct(),kt(),Nt(),bn(),_r(),Ir(),Br(),fi(),gi(),bi(),wi(),Oi(),Mi(),Ii(),Bi(),Gi()}));export{f as C,de as S,St as _,ji as a,qe as b,yi as c,zr as d,Fr as f,Ot as g,Mt as h,Fi as i,hi as l,yn as m,Wi as n,Di as o,gr as p,zi as r,Ci as s,Ki as t,di as u,vt as v,he as x,Ze as y};
+`,ga={cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},_a=class{constructor(e={}){this.params={...ga,...e}}setParams(e){Object.assign(this.params,e)}render(e){let[t,n]=e.dims.elementPixel,r=Math.max(1,t),i=Math.max(1,n),a=this.params;e.draw({frag:ha,uniforms:{src:e.src,mouseUv:[e.mouse[0]/r,e.mouse[1]/i],elementPx:[r,i],cellSize:a.cellSize,pressRadius:a.pressRadius,press:a.press,flatCells:+!!a.flatCells,seed:a.seed,time:e.time,speed:Math.max(0,a.speed),breathe:Math.max(0,a.breathe),breatheSpeed:Math.max(0,a.breatheSpeed),breatheScale:Math.max(1,a.breatheScale),bgColor:ma(a.bgColor)},target:e.target})}}})),ya=e((()=>{se(),be(),Pe(),Re(),ht(),yt(),Bt(),Wt(),Xt(),en(),Un(),Hr(),li(),pi(),zi(),Ui(),qi(),Zi(),ta(),aa(),la(),pa(),va()}));export{ye as C,Ne as S,Ut as _,ia as a,mt as b,Ki as c,fi as d,ci as f,Yt as g,$t as h,ca as i,Hi as l,Hn as m,_a as n,ea as o,Vr as p,fa as r,Xi as s,ya as t,Ri as u,zt as v,oe as w,Le as x,vt as y};
