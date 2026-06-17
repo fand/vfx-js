@@ -984,8 +984,19 @@ export const chromatic = presetStory<ChromaticArgs>(
     { clock: false, src: Pigeon },
 );
 
-type AsciiSrcName = "Pigeon" | "Jellyfish" | "WebCam" | "HTML";
-const ASCII_SRCS: AsciiSrcName[] = ["Pigeon", "Jellyfish", "WebCam", "HTML"];
+type AsciiSrcName = "Pigeon" | "Jellyfish" | "Logo" | "WebCam" | "HTML";
+const ASCII_SRCS: AsciiSrcName[] = [
+    "Pigeon",
+    "Jellyfish",
+    "Logo",
+    "WebCam",
+    "HTML",
+];
+const ASCII_IMAGE_SRCS: Record<"Pigeon" | "Jellyfish" | "Logo", string> = {
+    Pigeon,
+    Jellyfish,
+    Logo,
+};
 
 // A plain HTML block used as a capture source (text + form controls).
 // This is the `addHTML` target: it fills its wrapper (`width: 100%`) and
@@ -1021,7 +1032,7 @@ function makeAsciiHtmlSample(): HTMLElement {
 function addAsciiSource(
     vfx: ReturnType<typeof initVFX>,
     src: AsciiSrcName,
-    effect: Effect,
+    effect: Effect | readonly Effect[],
 ): HTMLElement {
     const center = (el: HTMLElement) => {
         el.style.display = "block";
@@ -1066,7 +1077,7 @@ function addAsciiSource(
         return video;
     }
     const img = document.createElement("img");
-    img.src = src === "Jellyfish" ? Jellyfish : Pigeon;
+    img.src = ASCII_IMAGE_SRCS[src] ?? Pigeon;
     center(img);
     vfx.add(img, { effect });
     return img;
@@ -1158,10 +1169,12 @@ type MatrixArgs = {
     brightness: number;
     contrast: number;
     invert: boolean;
+    bloom: number;
 };
 // Matrix-movie "digital rain": random glyphs fall down each column with a
 // bright tip and fading green trail, modulated by the source grayscale so
-// the picture emerges from the rain.
+// the picture emerges from the rain. An optional BloomEffect adds the
+// phosphor glow around the bright glyphs (bypassed when bloom = 0).
 export const matrix: StoryObj<MatrixArgs> = {
     render: (a) => {
         const vfx = initVFX();
@@ -1180,7 +1193,25 @@ export const matrix: StoryObj<MatrixArgs> = {
             contrast: a.contrast,
             invert: a.invert,
         });
-        const el = addAsciiSource(vfx, a.src, effect);
+        // bloom = 0 → bypass (rain only); otherwise chain a low-threshold
+        // BloomEffect whose intensity is the slider value, so the green
+        // glyphs glow like the film's phosphor CRT.
+        const effects =
+            a.bloom > 0
+                ? [
+                      effect,
+                      new BloomEffect({
+                          threshold: 0.1,
+                          softness: 0.2,
+                          intensity: a.bloom,
+                          scatter: 0.8,
+                          dither: 0,
+                          edgeFade: 0.02,
+                          pad: 60,
+                      }),
+                  ]
+                : effect;
+        const el = addAsciiSource(vfx, a.src, effects);
         attachClockPane(vfx);
         return el;
     },
@@ -1200,6 +1231,7 @@ export const matrix: StoryObj<MatrixArgs> = {
         brightness: 1,
         contrast: 1,
         invert: false,
+        bloom: 1.5,
     },
     argTypes: {
         src: { control: { type: "select" }, options: ASCII_SRCS },
@@ -1219,6 +1251,7 @@ export const matrix: StoryObj<MatrixArgs> = {
         brightness: { control: { type: "range", min: 0.2, max: 3, step: 0.1 } },
         contrast: { control: { type: "range", min: 0, max: 4, step: 0.1 } },
         invert: { control: { type: "boolean" } },
+        bloom: { control: { type: "range", min: 0, max: 8, step: 0.1 } },
     },
 };
 
