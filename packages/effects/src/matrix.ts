@@ -50,6 +50,7 @@ uniform float tail;          // trail length, cells
 uniform float birthRate;     // new drops per second, per column
 uniform float glyphSpeed;    // glyph reshuffle rate, changes / second
 uniform float brightness;    // overall gain on the rain
+uniform float contrast;      // source-luminance contrast about 0.5 (1 = off)
 uniform int invert;          // 1 = flip source luminance
 
 // Box-average TAPS x TAPS source samples per cell so the luminance is
@@ -92,18 +93,23 @@ void main() {
 
     // Per-column drop train. Each column gets its own fall speed and phase,
     // and births a new falling stream roughly every 1 / birthRate seconds
-    // (jittered so they don't tick in lockstep). We scan the few most-recent
-    // births and keep the brightest contribution at this cell, so overlapping
-    // drops (high birthRate or slow speed) blend into a continuous stream.
-    float colSpeed = speed * mix(0.5, 1.5, hash11(colId * 1.37 + 3.1));
+    // (jittered so they don't tick in lockstep).
+    float colSpeed = max(0.0001, speed * mix(0.5, 1.5, hash11(colId * 1.37 + 3.1)));
     float colPhase = hash11(colId * 0.71 + 7.3);
     float spawnInterval = 1.0 / max(birthRate, 0.0001);
 
+    // A drop lights this cell while its head is within tail cells below it,
+    // i.e. it was born around (time - rowTopId / colSpeed) seconds ago.
+    // Centre the (small, fixed) scan on the drop whose head is at this cell
+    // — NOT on the newest drop — so deep cells still find the older drops
+    // that have reached them. Otherwise a high birthRate floods the window
+    // with young drops and the rain appears to die before hitting the bottom.
     float trail = 0.0;
     float headMix = 0.0;
-    float kNow = floor((time / spawnInterval) - colPhase) + 1.0;
+    float headSlot = (time - rowTopId / colSpeed) / spawnInterval - colPhase;
+    float kStart = floor(headSlot) + 1.0;
     for (int i = 0; i < 5; i++) {
-        float kk = kNow - float(i);
+        float kk = kStart - float(i);
         // Birth time of drop kk, jittered within ±0.3 of its slot.
         float jit = (hash11(kk * 3.7 + colId * 1.9) - 0.5) * 0.6;
         float tb = (kk + colPhase + jit) * spawnInterval;
@@ -167,6 +173,9 @@ void main() {
     }
     acc /= float(TAPS * TAPS);
     float lum = dot(acc.rgb, vec3(0.299, 0.587, 0.114));
+    // Contrast about the 0.5 mid-grey: < 1 flattens, > 1 deepens the
+    // separation between dark and bright source regions.
+    lum = clamp((lum - 0.5) * contrast + 0.5, 0.0, 1.0);
     if (invert == 1) {
         lum = 1.0 - lum;
     }
@@ -241,6 +250,14 @@ export type MatrixParams = {
     /** Overall gain on the rain brightness. */
     brightness: number;
 
+    /**
+     * Contrast of the source luminance, pivoting around mid-grey (0.5).
+     * `1` leaves the input unchanged; `< 1` flattens it toward grey; `> 1`
+     * deepens the split between dark and bright regions, so the picture
+     * reads more sharply through the rain.
+     */
+    contrast: number;
+
     /** Flip the source luminance (rain shows through dark areas instead). */
     invert: boolean;
 };
@@ -257,6 +274,7 @@ const DEFAULT_PARAMS: MatrixParams = {
     birthRate: 0.6,
     glyphSpeed: 8,
     brightness: 1,
+    contrast: 1,
     invert: false,
 };
 
@@ -373,8 +391,8 @@ function buildAtlas(
  * falling characters.
  *
  * `grid`, `color`, `headColor`, `background`, `speed`, `tail`, `birthRate`,
- * `glyphSpeed`, `brightness`, and `invert` are live (read every frame).
- * `glyphs` / `font`
+ * `glyphSpeed`, `brightness`, `contrast`, and `invert` are live (read every
+ * frame). `glyphs` / `font`
  * / `fontWeight` / `charAspect` are baked into the atlas at `init()` — after
  * changing them via `setParams`, call {@link MatrixEffect.updateAtlas} (or
  * re-add the effect) to rebuild.
@@ -473,6 +491,7 @@ export class MatrixEffect implements Effect {
                 birthRate: Math.max(0, this.params.birthRate),
                 glyphSpeed: Math.max(0, this.params.glyphSpeed),
                 brightness: Math.max(0, this.params.brightness),
+                contrast: Math.max(0, this.params.contrast),
                 invert: this.params.invert ? 1 : 0,
             },
             target: ctx.target,

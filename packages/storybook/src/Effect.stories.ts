@@ -1156,6 +1156,7 @@ type MatrixArgs = {
     birthRate: number;
     glyphSpeed: number;
     brightness: number;
+    contrast: number;
     invert: boolean;
 };
 // Matrix-movie "digital rain": random glyphs fall down each column with a
@@ -1176,6 +1177,7 @@ export const matrix: StoryObj<MatrixArgs> = {
             birthRate: a.birthRate,
             glyphSpeed: a.glyphSpeed,
             brightness: a.brightness,
+            contrast: a.contrast,
             invert: a.invert,
         });
         const el = addAsciiSource(vfx, a.src, effect);
@@ -1196,6 +1198,7 @@ export const matrix: StoryObj<MatrixArgs> = {
         birthRate: 0.6,
         glyphSpeed: 8,
         brightness: 1,
+        contrast: 1,
         invert: false,
     },
     argTypes: {
@@ -1214,6 +1217,7 @@ export const matrix: StoryObj<MatrixArgs> = {
         },
         glyphSpeed: { control: { type: "range", min: 0, max: 30, step: 1 } },
         brightness: { control: { type: "range", min: 0.2, max: 3, step: 0.1 } },
+        contrast: { control: { type: "range", min: 0, max: 4, step: 0.1 } },
         invert: { control: { type: "boolean" } },
     },
 };
