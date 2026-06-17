@@ -337,9 +337,10 @@ type AtlasBuild = {
 /**
  * Render the ramp into a single glyph atlas canvas, laid out as a near-
  * square grid of cells. Cell height is `GLYPH_PX`; cell width tracks the
- * font's advance so glyphs sit flush (no baked-in side bearings that
- * would show as wide gaps on screen). White glyphs on transparent; the
- * shader reads coverage from the alpha channel.
+ * widest glyph's advance so glyphs sit flush (no baked-in side bearings
+ * that would show as wide gaps on screen) yet wide glyphs (e.g. full-width
+ * CJK) stay within their cell. White glyphs on transparent; the shader
+ * reads coverage from the alpha channel.
  */
 function buildAtlas(
     chars: string[],
@@ -353,7 +354,7 @@ function buildAtlas(
     const fontStr = `${weight} ${GLYPH_PX}px ${font}`;
 
     const canvas = document.createElement("canvas");
-    // Cell width = explicit aspect, or the measured advance (measure
+    // Cell width = explicit aspect, or the widest glyph's advance (measure
     // first; resizing the canvas later resets context state).
     let cellW: number;
     if (aspectOverride && aspectOverride > 0) {
@@ -363,7 +364,16 @@ function buildAtlas(
         cellW = GLYPH_PX;
         if (probe) {
             probe.font = fontStr;
-            cellW = Math.max(1, Math.ceil(probe.measureText("M").width));
+            // Size the cell to the widest glyph in the ramp — not a fixed
+            // probe char — so wide glyphs (e.g. full-width CJK) don't spill
+            // into the neighbouring cell in the atlas.
+            let maxAdvance = 0;
+            for (const ch of chars) {
+                maxAdvance = Math.max(maxAdvance, probe.measureText(ch).width);
+            }
+            if (maxAdvance > 0) {
+                cellW = Math.max(1, Math.ceil(maxAdvance));
+            }
         }
     }
 
@@ -378,9 +388,19 @@ function buildAtlas(
         g.textBaseline = "middle";
         g.font = fontStr;
         for (let i = 0; i < chars.length; i++) {
-            const cx = (i % cols) * cellW + cellW / 2;
-            const cy = Math.floor(i / cols) * GLYPH_PX + GLYPH_PX / 2;
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const cx = col * cellW + cellW / 2;
+            const cy = row * GLYPH_PX + GLYPH_PX / 2;
+            // Clip to the cell so any ink that overshoots the advance can't
+            // bleed into adjacent cells (belt-and-braces over the max-advance
+            // cell width above).
+            g.save();
+            g.beginPath();
+            g.rect(col * cellW, row * GLYPH_PX, cellW, GLYPH_PX);
+            g.clip();
             g.fillText(chars[i], cx, cy);
+            g.restore();
         }
     }
     return { canvas, cols, rows, cellW, cellH: GLYPH_PX };
