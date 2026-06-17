@@ -1085,7 +1085,6 @@ function addAsciiSource(
 
 // Shared font-atlas control presets for the glyph-based effects.
 const FONT_WEIGHTS = ["normal", "bold", "100", "300", "600", "900"];
-const FONT_STYLES = ["normal", "italic", "oblique 12deg"];
 
 type AsciiArgs = {
     src: AsciiSrcName;
@@ -1094,7 +1093,6 @@ type AsciiArgs = {
     gridY: number;
     font: string;
     fontWeight: string;
-    fontStyle: string;
     color: string;
     background: string;
     colorFromSource: boolean;
@@ -1109,7 +1107,6 @@ export const ascii: StoryObj<AsciiArgs> = {
             grid: [a.gridX, a.gridY],
             font: a.font,
             fontWeight: a.fontWeight,
-            fontStyle: a.fontStyle,
             color: hexToRgba(a.color),
             background: hexToRgba(a.background),
             colorFromSource: a.colorFromSource,
@@ -1125,7 +1122,6 @@ export const ascii: StoryObj<AsciiArgs> = {
         gridY: 14,
         font: "monospace",
         fontWeight: "normal",
-        fontStyle: "normal",
         color: "#ffffff",
         background: "#000000",
         colorFromSource: false,
@@ -1152,7 +1148,6 @@ export const ascii: StoryObj<AsciiArgs> = {
             control: { type: "select" },
             options: FONT_WEIGHTS,
         },
-        fontStyle: { control: { type: "select" }, options: FONT_STYLES },
         color: { control: { type: "color" } },
         background: { control: { type: "color" } },
         colorFromSource: { control: { type: "boolean" } },
@@ -1168,7 +1163,6 @@ type MatrixArgs = {
     glyphs: string;
     font: string;
     fontWeight: string;
-    fontStyle: string;
     color: string;
     headColor: string;
     background: string;
@@ -1193,7 +1187,6 @@ export const matrix: StoryObj<MatrixArgs> = {
             glyphs: a.glyphs || undefined,
             font: a.font,
             fontWeight: a.fontWeight,
-            fontStyle: a.fontStyle,
             color: hexToRgba(a.color),
             headColor: hexToRgba(a.headColor),
             background: hexToRgba(a.background),
@@ -1234,7 +1227,6 @@ export const matrix: StoryObj<MatrixArgs> = {
         glyphs: "",
         font: "monospace",
         fontWeight: "normal",
-        fontStyle: "normal",
         color: "#2dff5c",
         headColor: "#d9ffe6",
         background: "#000000",
@@ -1254,7 +1246,6 @@ export const matrix: StoryObj<MatrixArgs> = {
         glyphs: { control: { type: "text" } },
         font: { control: { type: "text" } },
         fontWeight: { control: { type: "select" }, options: FONT_WEIGHTS },
-        fontStyle: { control: { type: "select" }, options: FONT_STYLES },
         color: { control: { type: "color" } },
         headColor: { control: { type: "color" } },
         background: { control: { type: "color" } },

@@ -202,8 +202,8 @@ export type AsciiParams = {
      * Character ramp, ordered dark → light. Overrides {@link preset}.
      *
      * Baked into the glyph atlas at `init()`; changing it (or `font` /
-     * `fontWeight` / `fontStyle`) after the effect is added has no effect
-     * until it is re-added.
+     * `fontWeight`) after the effect is added has no effect until it is
+     * re-added.
      */
     chars?: AsciiCharRamp;
 
@@ -249,13 +249,6 @@ export type AsciiParams = {
      */
     fontWeight: string | number;
 
-    /**
-     * CSS font style for the glyph atlas — `"normal"`, `"italic"`, or
-     * `"oblique <angle>"` (e.g. `"oblique 12deg"`). Construction-time only
-     * (see {@link chars}).
-     */
-    fontStyle: string;
-
     /** Fixed glyph colour, used when {@link colorFromSource} is `false`. */
     color: AsciiColor;
 
@@ -282,7 +275,6 @@ const DEFAULT_PARAMS: AsciiParams = {
     preset: "standard",
     font: "monospace",
     fontWeight: "normal",
-    fontStyle: "normal",
     color: [1, 1, 1, 1],
     background: [0, 0, 0, 0],
     colorFromSource: false,
@@ -315,7 +307,6 @@ function resolveGrid(grid: number | [number, number]): [number, number] {
 async function ensureFont(
     font: string,
     weight: string | number,
-    style: string,
 ): Promise<void> {
     const fonts = (
         typeof document !== "undefined"
@@ -326,7 +317,7 @@ async function ensureFont(
         return;
     }
     try {
-        await fonts.load(`${style} ${weight} ${GLYPH_PX}px ${font}`);
+        await fonts.load(`${weight} ${GLYPH_PX}px ${font}`);
         await fonts.ready;
     } catch {
         // Font unavailable — fall through and let canvas pick a fallback.
@@ -354,14 +345,12 @@ function buildAtlas(
     chars: string[],
     font: string,
     weight: string | number,
-    style: string,
     aspectOverride?: number,
 ): AtlasBuild {
     const n = Math.max(1, chars.length);
     const cols = Math.ceil(Math.sqrt(n));
     const rows = Math.ceil(n / cols);
-    // CSS font shorthand order: style → weight → size → family.
-    const fontStr = `${style} ${weight} ${GLYPH_PX}px ${font}`;
+    const fontStr = `${weight} ${GLYPH_PX}px ${font}`;
 
     const canvas = document.createElement("canvas");
     // Cell width = explicit aspect, or the measured advance (measure
@@ -497,8 +486,8 @@ function buildImageAtlas(images: CanvasImageSource[]): AtlasBuild {
  *
  * `grid`, `color`, `background`, `colorFromSource`, `invert`, and `dither`
  * are live (read every frame). `chars` / `tiles` / `font` / `fontWeight` /
- * `fontStyle` / `charAspect` are baked into the atlas at `init()` — after
- * changing them via `setParams`, call {@link AsciiEffect.updateAtlas} (or re-add the
+ * `charAspect` are baked into the atlas at `init()` — after changing them
+ * via `setParams`, call {@link AsciiEffect.updateAtlas} (or re-add the
  * effect) to rebuild.
  */
 export class AsciiEffect implements Effect {
@@ -531,8 +520,8 @@ export class AsciiEffect implements Effect {
 
     /**
      * Rebuild the atlas from the current params, applying changes to the
-     * baked fields (`chars` / `tiles` / `font` / `fontWeight` / `fontStyle`
-     * / `charAspect`) without removing and re-adding the effect. Async — it
+     * baked fields (`chars` / `tiles` / `font` / `fontWeight` /
+     * `charAspect`) without removing and re-adding the effect. Async — it
      * may load fonts or decode image tiles. No-op before `init()`.
      *
      * Allocates a fresh atlas texture; the previous one is released when
@@ -570,16 +559,11 @@ export class AsciiEffect implements Effect {
             }
             this.#charCount = Math.max(1, chars.length);
             this.#tileColor = false;
-            await ensureFont(
-                this.params.font,
-                this.params.fontWeight,
-                this.params.fontStyle,
-            );
+            await ensureFont(this.params.font, this.params.fontWeight);
             built = buildAtlas(
                 chars,
                 this.params.font,
                 this.params.fontWeight,
-                this.params.fontStyle,
                 this.params.charAspect,
             );
         }

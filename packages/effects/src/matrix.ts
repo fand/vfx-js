@@ -216,13 +216,6 @@ export type MatrixParams = {
     fontWeight: string | number;
 
     /**
-     * CSS font style for the glyph atlas (`"normal"`, `"italic"`, or
-     * `"oblique <angle>"` e.g. `"oblique 12deg"`). Baked into the atlas at
-     * `init()` like `font` / `fontWeight`.
-     */
-    fontStyle: string;
-
-    /**
      * Character box aspect ratio (width / height). Omit to auto-measure it
      * from the font (advance over em height).
      */
@@ -273,7 +266,6 @@ const DEFAULT_PARAMS: MatrixParams = {
     grid: [12, 16],
     font: "monospace",
     fontWeight: "normal",
-    fontStyle: "normal",
     color: [0.18, 1, 0.36, 1],
     headColor: [0.85, 1, 0.9, 1],
     background: [0, 0, 0, 1],
@@ -308,7 +300,6 @@ function resolveGrid(grid: number | [number, number]): [number, number] {
 async function ensureFont(
     font: string,
     weight: string | number,
-    style: string,
 ): Promise<void> {
     const fonts = (
         typeof document !== "undefined"
@@ -319,7 +310,7 @@ async function ensureFont(
         return;
     }
     try {
-        await fonts.load(`${style} ${weight} ${GLYPH_PX}px ${font}`);
+        await fonts.load(`${weight} ${GLYPH_PX}px ${font}`);
         await fonts.ready;
     } catch {
         // Font unavailable — fall through and let canvas pick a fallback.
@@ -345,14 +336,12 @@ function buildAtlas(
     chars: string[],
     font: string,
     weight: string | number,
-    style: string,
     aspectOverride?: number,
 ): AtlasBuild {
     const n = Math.max(1, chars.length);
     const cols = Math.ceil(Math.sqrt(n));
     const rows = Math.ceil(n / cols);
-    // CSS font shorthand order: style → weight → size → family.
-    const fontStr = `${style} ${weight} ${GLYPH_PX}px ${font}`;
+    const fontStr = `${weight} ${GLYPH_PX}px ${font}`;
 
     const canvas = document.createElement("canvas");
     // Measure cell width before resizing (resizing resets context state).
@@ -403,9 +392,9 @@ function buildAtlas(
  *
  * `grid`, `color`, `headColor`, `background`, `speed`, `tail`, `birthRate`,
  * `glyphSpeed`, `brightness`, `contrast`, and `invert` are live (read every
- * frame). `glyphs` / `font` / `fontWeight` / `fontStyle` / `charAspect` are
- * baked into the atlas at `init()` — after changing them via `setParams`,
- * call {@link MatrixEffect.updateAtlas} (or re-add the effect) to rebuild.
+ * frame). `glyphs` / `font` / `fontWeight` / `charAspect` are baked into the
+ * atlas at `init()` — after changing them via `setParams`, call
+ * {@link MatrixEffect.updateAtlas} (or re-add the effect) to rebuild.
  */
 export class MatrixEffect implements Effect {
     params: MatrixParams;
@@ -435,9 +424,9 @@ export class MatrixEffect implements Effect {
 
     /**
      * Rebuild the atlas from the current params, applying changes to the
-     * baked fields (`glyphs` / `font` / `fontWeight` / `fontStyle` /
-     * `charAspect`) without removing and re-adding the effect. Async — it
-     * may load fonts. No-op before `init()`.
+     * baked fields (`glyphs` / `font` / `fontWeight` / `charAspect`) without
+     * removing and re-adding the effect. Async — it may load fonts. No-op
+     * before `init()`.
      */
     async updateAtlas(): Promise<void> {
         if (!this.#ctx) {
@@ -454,16 +443,11 @@ export class MatrixEffect implements Effect {
             );
         }
         this.#glyphCount = Math.max(1, chars.length);
-        await ensureFont(
-            this.params.font,
-            this.params.fontWeight,
-            this.params.fontStyle,
-        );
+        await ensureFont(this.params.font, this.params.fontWeight);
         const built = buildAtlas(
             chars,
             this.params.font,
             this.params.fontWeight,
-            this.params.fontStyle,
             this.params.charAspect,
         );
 
