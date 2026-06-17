@@ -47,6 +47,7 @@ uniform vec4 headColor;      // leading-glyph colour, non-premultiplied
 uniform vec4 background;     // cell backdrop, non-premultiplied
 uniform float speed;         // base fall speed, cells / second
 uniform float tail;          // trail length, cells
+uniform float birthRate;     // new drops per second, per column
 uniform float glyphSpeed;    // glyph reshuffle rate, changes / second
 uniform float brightness;    // overall gain on the rain
 uniform int invert;          // 1 = flip source luminance
@@ -85,28 +86,46 @@ void main() {
     // edge (uvContent.y == 1 is the top; flip it to measure downward).
     vec2 fragPx = uvContent * elementPx;
     vec2 topPx = vec2(fragPx.x, elementPx.y - fragPx.y);
-    float nrows = max(1.0, floor(elementPx.y / cellPx.y));
     vec2 cellIdx = floor(topPx / cellPx);   // .x = column, .y = row from top
     float colId = cellIdx.x;
     float rowTopId = cellIdx.y;
 
-    // Per-column falling head. Each column gets its own speed and phase so
-    // the streams don't move in lockstep. The period is nrows + tail, so a
-    // stream fully clears the bottom before re-entering at the top.
-    float period = nrows + tail;
+    // Per-column drop train. Each column gets its own fall speed and phase,
+    // and births a new falling stream roughly every 1 / birthRate seconds
+    // (jittered so they don't tick in lockstep). We scan the few most-recent
+    // births and keep the brightest contribution at this cell, so overlapping
+    // drops (high birthRate or slow speed) blend into a continuous stream.
     float colSpeed = speed * mix(0.5, 1.5, hash11(colId * 1.37 + 3.1));
-    float phase = hash11(colId * 0.71 + 7.3) * period;
-    float head = mod(time * colSpeed + phase, period);
+    float colPhase = hash11(colId * 0.71 + 7.3);
+    float spawnInterval = 1.0 / max(birthRate, 0.0001);
 
-    // Distance behind the head, in cells. Cells the head has passed (above
-    // it) form the fading trail; cells below it are dark.
-    float d = head - rowTopId;
-    float trail = (d >= 0.0 && d <= tail) ? (1.0 - d / tail) : 0.0;
-    // Sharpen the falloff so the head reads as a bright tip with a long,
-    // dim tail rather than a flat gradient.
-    trail = pow(trail, 1.5);
-    // Leading glyph: blend toward headColor over the first ~2 cells.
-    float headMix = clamp(1.0 - d * 0.6, 0.0, 1.0) * step(0.0, d);
+    float trail = 0.0;
+    float headMix = 0.0;
+    float kNow = floor((time / spawnInterval) - colPhase) + 1.0;
+    for (int i = 0; i < 5; i++) {
+        float kk = kNow - float(i);
+        // Birth time of drop kk, jittered within ±0.3 of its slot.
+        float jit = (hash11(kk * 3.7 + colId * 1.9) - 0.5) * 0.6;
+        float tb = (kk + colPhase + jit) * spawnInterval;
+        float elapsed = time - tb;
+        if (elapsed < 0.0) {
+            continue;   // not born yet
+        }
+        // Cells behind this drop's head: the head has passed cells above it
+        // (d >= 0), which form the fading trail; cells below it are dark.
+        float d = elapsed * colSpeed - rowTopId;
+        if (d < 0.0 || d > tail) {
+            continue;
+        }
+        // Sharpen the falloff so the head reads as a bright tip with a long,
+        // dim tail rather than a flat gradient.
+        float tr = pow(1.0 - d / tail, 1.5);
+        if (tr > trail) {
+            trail = tr;
+            // Leading glyph: blend toward headColor over the first ~2 cells.
+            headMix = clamp(1.0 - d * 0.6, 0.0, 1.0);
+        }
+    }
 
     // Random glyph for this cell, reshuffled over time in discrete steps. A
     // per-column phase keeps neighbouring columns out of sync.
@@ -208,6 +227,14 @@ export type MatrixParams = {
     /** Trail length in cells (how far the fade extends behind the head). */
     tail: number;
 
+    /**
+     * Drop spawn rate: how many new falling streams are born per second in
+     * each column. Higher values spawn drops frequently (a busy, dense
+     * downpour — drops overlap into near-continuous streams); lower values
+     * leave long gaps between drops (sparse, intermittent rain).
+     */
+    birthRate: number;
+
     /** Glyph reshuffle rate in changes per second (`0` = static glyphs). */
     glyphSpeed: number;
 
@@ -227,6 +254,7 @@ const DEFAULT_PARAMS: MatrixParams = {
     background: [0, 0, 0, 1],
     speed: 10,
     tail: 18,
+    birthRate: 0.6,
     glyphSpeed: 8,
     brightness: 1,
     invert: false,
@@ -344,8 +372,9 @@ function buildAtlas(
  * grayscale is multiplied into the rain, so the picture emerges from the
  * falling characters.
  *
- * `grid`, `color`, `headColor`, `background`, `speed`, `tail`, `glyphSpeed`,
- * `brightness`, and `invert` are live (read every frame). `glyphs` / `font`
+ * `grid`, `color`, `headColor`, `background`, `speed`, `tail`, `birthRate`,
+ * `glyphSpeed`, `brightness`, and `invert` are live (read every frame).
+ * `glyphs` / `font`
  * / `fontWeight` / `charAspect` are baked into the atlas at `init()` — after
  * changing them via `setParams`, call {@link MatrixEffect.updateAtlas} (or
  * re-add the effect) to rebuild.
@@ -441,6 +470,7 @@ export class MatrixEffect implements Effect {
                 background: this.params.background,
                 speed: this.params.speed,
                 tail: Math.max(1, this.params.tail),
+                birthRate: Math.max(0, this.params.birthRate),
                 glyphSpeed: Math.max(0, this.params.glyphSpeed),
                 brightness: Math.max(0, this.params.brightness),
                 invert: this.params.invert ? 1 : 0,
