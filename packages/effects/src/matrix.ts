@@ -12,6 +12,13 @@ import type { Effect, EffectContext, EffectTexture } from "@vfx-js/core";
 export type MatrixColor = [number, number, number, number];
 
 /**
+ * Trail colour: a single {@link MatrixColor}, or an array of two or more
+ * colour stops forming a vertical gradient (first stop at the top of the
+ * element, last at the bottom). Stops are interpolated in OKLCH.
+ */
+export type MatrixTrailColor = MatrixColor | MatrixColor[];
+
+/**
  * The pool of glyphs rained down the columns. Pass a string (split per
  * Unicode code point) or an array of single chars. The order is irrelevant
  * — a random glyph is picked for every cell.
@@ -25,6 +32,12 @@ export type MatrixGlyphs = string | readonly string[];
  */
 export const MATRIX_GLYPHS =
     'ﾊﾋﾌﾍﾎｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ0123456789Z:."=*+-<>|';
+
+// Number of samples in the precomputed trail-colour ramp. The gradient is
+// interpolated in OKLCH on the CPU into this many RGBA stops; the shader does
+// a cheap linear lookup between them. 32 is dense enough that the residual
+// linear-RGB interpolation between samples is visually indistinguishable.
+const RAMP_SIZE = 32;
 
 const FRAG_MATRIX = `#version 300 es
 precision highp float;
@@ -42,7 +55,7 @@ uniform float rows;          // atlas rows
 uniform float glyphCount;    // number of glyphs in the pool
 uniform float glyphAspect;   // font's character box aspect (advance / em)
 uniform float time;          // seconds since VFX start
-uniform vec4 color;          // trail colour, non-premultiplied
+uniform vec4 colorRamp[${RAMP_SIZE}]; // trail-colour gradient, top→bottom
 uniform vec4 headColor;      // leading-glyph colour, non-premultiplied
 uniform vec4 background;     // cell backdrop, non-premultiplied
 uniform float speed;         // base fall speed, cells / second
@@ -56,6 +69,15 @@ uniform int invert;          // 1 = flip source luminance
 // Box-average TAPS x TAPS source samples per cell so the luminance is
 // representative of the whole cell, not a single point.
 const int TAPS = 4;
+
+// Sample the trail-colour ramp at t in [0, 1] (0 = top of the element).
+vec4 sampleColorRamp(float t) {
+    float f = clamp(t, 0.0, 1.0) * float(${RAMP_SIZE} - 1);
+    float i0 = floor(f);
+    int idx = int(i0);
+    int idx1 = min(idx + 1, ${RAMP_SIZE} - 1);
+    return mix(colorRamp[idx], colorRamp[idx1], f - i0);
+}
 
 vec4 readSrc(vec2 contentUv) {
     vec2 p = clamp(contentUv, 0.0, 1.0);
@@ -195,13 +217,16 @@ void main() {
         lum = 1.0 - lum;
     }
 
+    // Trail colour from the vertical gradient ramp (0 at the top edge).
+    vec4 trailColor = sampleColorRamp(topPx.y / elementPx.y);
+
     // Glyph coverage x trail x source grayscale: the rain only lights up
     // where the picture is bright. Transparent source (e.g. text captures)
     // falls back to the background via acc.a.
-    vec3 hue = mix(color.rgb, headColor.rgb, headMix);
+    vec3 hue = mix(trailColor.rgb, headColor.rgb, headMix);
     // Blend the opacity toward headColor's alpha over the head, mirroring the
     // hue blend, so headColor's alpha isn't silently dropped.
-    float colA = mix(color.a, headColor.a, headMix);
+    float colA = mix(trailColor.a, headColor.a, headMix);
     float fgA = clamp(cover * trail * lum * acc.a * colA * brightness, 0.0, 1.0);
 
     float outA = fgA + background.a * (1.0 - fgA);
@@ -239,8 +264,12 @@ export type MatrixParams = {
      */
     charAspect?: number;
 
-    /** Trail colour — the classic phosphor green. */
-    color: MatrixColor;
+    /**
+     * Trail colour — the classic phosphor green. Pass an array of two or
+     * more {@link MatrixColor} stops for a vertical gradient (first at the
+     * top, last at the bottom), interpolated in OKLCH.
+     */
+    color: MatrixTrailColor;
 
     /** Leading-glyph colour at the head of each stream (usually near-white). */
     headColor: MatrixColor;
@@ -414,6 +443,133 @@ function buildAtlas(
     return { canvas, cols, rows, cellW, cellH: GLYPH_PX };
 }
 
+// --- Trail-colour gradient (OKLCH) -----------------------------------------
+//
+// The trail colour can be a single colour or a list of stops. We interpolate
+// the stops in OKLCH (perceptually uniform, with hue taking the shortest path
+// around the wheel) and bake the result into a small RGBA ramp the shader can
+// sample cheaply. sRGB <-> OKLab uses Björn Ottosson's coefficients.
+
+/** Is the value a list of colour stops (vs. a single RGBA colour)? */
+function isColorStops(c: MatrixTrailColor): c is MatrixColor[] {
+    return Array.isArray(c[0]);
+}
+
+/** Normalize the trail-colour param to a non-empty stop list. */
+function resolveColorStops(c: MatrixTrailColor): MatrixColor[] {
+    if (isColorStops(c)) {
+        return c.length > 0 ? c : [DEFAULT_PARAMS.color as MatrixColor];
+    }
+    return [c as MatrixColor];
+}
+
+function srgbToLinear(c: number): number {
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+function linearToSrgb(c: number): number {
+    const v = c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+    return Math.min(1, Math.max(0, v));
+}
+
+/** sRGB RGBA → OKLCH `[L, C, hueRadians, alpha]`. */
+function rgbaToOklch([r, g, b, a]: MatrixColor): [
+    number,
+    number,
+    number,
+    number,
+] {
+    const lr = srgbToLinear(r);
+    const lg = srgbToLinear(g);
+    const lb = srgbToLinear(b);
+    const l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
+    const m = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb;
+    const s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
+    const l_ = Math.cbrt(l);
+    const m_ = Math.cbrt(m);
+    const s_ = Math.cbrt(s);
+    const L = 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_;
+    const A = 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_;
+    const B = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_;
+    return [L, Math.hypot(A, B), Math.atan2(B, A), a];
+}
+
+/** OKLCH `[L, C, hueRadians, alpha]` → sRGB RGBA (clamped). */
+function oklchToRgba([L, C, H, a]: [
+    number,
+    number,
+    number,
+    number,
+]): MatrixColor {
+    const A = C * Math.cos(H);
+    const B = C * Math.sin(H);
+    const l_ = L + 0.3963377774 * A + 0.2158037573 * B;
+    const m_ = L - 0.1055613458 * A - 0.0638541728 * B;
+    const s_ = L - 0.0894841775 * A - 1.291485548 * B;
+    const l = l_ * l_ * l_;
+    const m = m_ * m_ * m_;
+    const s = s_ * s_ * s_;
+    const r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+    const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+    const b = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s;
+    return [linearToSrgb(r), linearToSrgb(g), linearToSrgb(b), a];
+}
+
+/** Interpolate two OKLCH colours at `t`, hue via the shortest path. */
+function mixOklch(
+    c0: [number, number, number, number],
+    c1: [number, number, number, number],
+    t: number,
+): [number, number, number, number] {
+    // Achromatic endpoints have a "powerless" hue: borrow the other's so the
+    // gradient doesn't swing through unrelated hues (matches CSS oklch).
+    let h0 = c0[2];
+    let h1 = c1[2];
+    if (c0[1] < 1e-4) {
+        h0 = h1;
+    }
+    if (c1[1] < 1e-4) {
+        h1 = h0;
+    }
+    let dh = h1 - h0;
+    while (dh > Math.PI) {
+        dh -= 2 * Math.PI;
+    }
+    while (dh < -Math.PI) {
+        dh += 2 * Math.PI;
+    }
+    return [
+        c0[0] + (c1[0] - c0[0]) * t,
+        c0[1] + (c1[1] - c0[1]) * t,
+        h0 + dh * t,
+        c0[3] + (c1[3] - c0[3]) * t,
+    ];
+}
+
+/**
+ * Bake colour stops into a flat `RAMP_SIZE`×RGBA `Float32Array`, interpolated
+ * in OKLCH. Stops are spaced evenly across [0, 1].
+ */
+function buildColorRamp(stops: MatrixColor[]): Float32Array {
+    const out = new Float32Array(RAMP_SIZE * 4);
+    if (stops.length === 1) {
+        const [r, g, b, a] = stops[0];
+        for (let i = 0; i < RAMP_SIZE; i++) {
+            out.set([r, g, b, a], i * 4);
+        }
+        return out;
+    }
+    const lch = stops.map(rgbaToOklch);
+    const segs = stops.length - 1;
+    for (let i = 0; i < RAMP_SIZE; i++) {
+        const f = (i / (RAMP_SIZE - 1)) * segs;
+        const si = Math.min(Math.floor(f), segs - 1);
+        const rgba = oklchToRgba(mixOklch(lch[si], lch[si + 1], f - si));
+        out.set(rgba, i * 4);
+    }
+    return out;
+}
+
 /**
  * "Digital rain" / Matrix-movie effect.
  *
@@ -443,6 +599,12 @@ export class MatrixEffect implements Effect {
     #glyphCount = 1;
     #glyphAspect = 1;
     #ctx: EffectContext | null = null;
+
+    // Cached trail-colour ramp, rebuilt only when `color` changes.
+    #colorRamp: Float32Array = buildColorRamp(
+        resolveColorStops(DEFAULT_PARAMS.color),
+    );
+    #colorKey = "";
 
     constructor(initial: Partial<MatrixParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
@@ -518,6 +680,14 @@ export class MatrixEffect implements Effect {
             Math.max(1, gx) * ctx.pixelRatio,
             Math.max(1, gy) * ctx.pixelRatio,
         ];
+        // Rebuild the OKLCH colour ramp only when `color` actually changes.
+        const colorKey = JSON.stringify(this.params.color);
+        if (colorKey !== this.#colorKey) {
+            this.#colorRamp = buildColorRamp(
+                resolveColorStops(this.params.color),
+            );
+            this.#colorKey = colorKey;
+        }
         ctx.draw({
             frag: FRAG_MATRIX,
             uniforms: {
@@ -530,7 +700,7 @@ export class MatrixEffect implements Effect {
                 glyphCount: this.#glyphCount,
                 glyphAspect: this.#glyphAspect,
                 time: ctx.time,
-                color: this.params.color,
+                colorRamp: this.#colorRamp,
                 headColor: this.params.headColor,
                 background: this.params.background,
                 speed: this.params.speed,

@@ -1164,6 +1164,8 @@ type MatrixArgs = {
     font: string;
     fontWeight: string;
     color: string;
+    gradient: boolean;
+    color2: string;
     headColor: string;
     background: string;
     speed: number;
@@ -1187,7 +1189,11 @@ export const matrix: StoryObj<MatrixArgs> = {
             glyphs: a.glyphs || undefined,
             font: a.font,
             fontWeight: a.fontWeight,
-            color: hexToRgba(a.color),
+            // gradient on → two-stop vertical gradient (top → bottom),
+            // interpolated in OKLCH; off → a single flat colour.
+            color: a.gradient
+                ? [hexToRgba(a.color), hexToRgba(a.color2)]
+                : hexToRgba(a.color),
             headColor: hexToRgba(a.headColor),
             background: hexToRgba(a.background),
             speed: a.speed,
@@ -1228,6 +1234,8 @@ export const matrix: StoryObj<MatrixArgs> = {
         font: "monospace",
         fontWeight: "normal",
         color: "#2dff5c",
+        gradient: false,
+        color2: "#00b3ff",
         headColor: "#d9ffe6",
         background: "#000000",
         speed: 10,
@@ -1247,6 +1255,8 @@ export const matrix: StoryObj<MatrixArgs> = {
         font: { control: { type: "text" } },
         fontWeight: { control: { type: "select" }, options: FONT_WEIGHTS },
         color: { control: { type: "color" } },
+        gradient: { control: { type: "boolean" } },
+        color2: { control: { type: "color" } },
         headColor: { control: { type: "color" } },
         background: { control: { type: "color" } },
         speed: { control: { type: "range", min: 1, max: 40, step: 1 } },
