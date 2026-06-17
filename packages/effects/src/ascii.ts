@@ -73,7 +73,6 @@ uniform vec4 color;         // fixed glyph colour (when colorFromSource == 0)
 uniform vec4 background;     // cell backdrop, non-premultiplied
 uniform int colorFromSource; // 1 = tint glyph with the cell's avg colour
 uniform int invert;          // 1 = flip the luminance → glyph mapping
-uniform float levelOffset;   // added to the level before lookup, wrapped (fract)
 uniform float glyphAspect;   // font's character box aspect (advance / em)
 uniform int tileColor;       // 1 = use the atlas tile's own RGBA (image tiles)
 uniform float dither;        // ordered-dither amount in index units (0 = off)
@@ -132,9 +131,6 @@ void main() {
     if (invert == 1) {
         lum = 1.0 - lum;
     }
-    // Shift the level around the ramp, wrapping so it cycles (fract
-    // handles negative offsets too).
-    lum = fract(lum + levelOffset);
 
     // Pick the glyph and its cell in the atlas (top-row origin in canvas
     // space; the texture is uploaded Y-flipped, hence the 1.0 - ... on v).
@@ -266,13 +262,6 @@ export type AsciiParams = {
     invert: boolean;
 
     /**
-     * Offset added to the input level (0..1) before the ramp lookup,
-     * wrapped with `fract` so it cycles through the ramp. Useful to scrub
-     * or animate which glyph each tone maps to. `0` is the identity.
-     */
-    levelOffset: number;
-
-    /**
      * Ordered (Bayer 4×4) dithering amount, [0, 1]. `0` disables it; `1`
      * spreads each quantisation step across a full ramp level so short
      * ramps (e.g. `minimal`, `dots`) render smooth gradients instead of
@@ -290,7 +279,6 @@ const DEFAULT_PARAMS: AsciiParams = {
     background: [0, 0, 0, 0],
     colorFromSource: false,
     invert: false,
-    levelOffset: 0,
     dither: 0,
 };
 
@@ -496,11 +484,11 @@ function buildImageAtlas(images: CanvasImageSource[]): AtlasBuild {
  * rather than stretching the character. Match `grid` to the font's
  * character box (≈ advance : em) for gap-free tiling.
  *
- * `grid`, `color`, `background`, `colorFromSource`, `invert`, `levelOffset`,
- * and `dither` are live (read every frame). `chars` / `tiles` / `font` /
- * `fontWeight` / `charAspect` are baked into the atlas at `init()` — after
- * changing them via `setParams`, call {@link AsciiEffect.updateAtlas} (or
- * re-add the effect) to rebuild.
+ * `grid`, `color`, `background`, `colorFromSource`, `invert`, and `dither`
+ * are live (read every frame). `chars` / `tiles` / `font` / `fontWeight` /
+ * `charAspect` are baked into the atlas at `init()` — after changing them
+ * via `setParams`, call {@link AsciiEffect.updateAtlas} (or re-add the
+ * effect) to rebuild.
  */
 export class AsciiEffect implements Effect {
     params: AsciiParams;
@@ -617,7 +605,6 @@ export class AsciiEffect implements Effect {
                 background: this.params.background,
                 colorFromSource: this.params.colorFromSource ? 1 : 0,
                 invert: this.params.invert ? 1 : 0,
-                levelOffset: this.params.levelOffset,
                 dither: Math.min(1, Math.max(0, this.params.dither)),
             },
             target: ctx.target,
