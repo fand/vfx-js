@@ -87,9 +87,18 @@ void main() {
     // edge (uvContent.y == 1 is the top; flip it to measure downward).
     vec2 fragPx = uvContent * elementPx;
     vec2 topPx = vec2(fragPx.x, elementPx.y - fragPx.y);
-    vec2 cellIdx = floor(topPx / cellPx);   // .x = column, .y = row from top
+
+    // Anchor the grid at the element (srcRect) centre so cells are symmetric
+    // about the middle and any partial cells split evenly between opposite
+    // edges (matching AsciiEffect), instead of growing from a corner.
+    vec2 gridOrigin = elementPx * 0.5;
+    vec2 cellIdx = floor((topPx - gridOrigin) / cellPx);
+    vec2 cellOriginTop = gridOrigin + cellIdx * cellPx;
     float colId = cellIdx.x;
-    float rowTopId = cellIdx.y;
+    // Row distance from the top edge (topmost cell == 0, growing downward) so
+    // drops are still born at the top wherever the centred grid lands.
+    float topRow = floor(-gridOrigin.y / cellPx.y);
+    float rowTopId = cellIdx.y - topRow;
 
     // Per-column drop train. Each column gets its own fall speed and phase,
     // and births a new falling stream roughly every 1 / birthRate seconds
@@ -104,6 +113,13 @@ void main() {
     // — NOT on the newest drop — so deep cells still find the older drops
     // that have reached them. Otherwise a high birthRate floods the window
     // with young drops and the rain appears to die before hitting the bottom.
+    //
+    // The window is a fixed 5 drops back from the head. When drops overlap
+    // more densely than that — roughly when tail / (spawnInterval * colSpeed)
+    // exceeds 5, e.g. a high birthRate with a long tail — the dim end of the
+    // trail falls outside the window and the tail reads shorter than the
+    // tail length. Cosmetic only (no flicker/popping); widen the loop if
+    // longer tails are needed at extreme densities.
     float trail = 0.0;
     float headMix = 0.0;
     float headSlot = (time - rowTopId / colSpeed) / spawnInterval - colPhase;
@@ -146,8 +162,8 @@ void main() {
 
     // Contain-fit the glyph into the cell, preserving its native aspect, so
     // a non-square cell letterboxes the glyph instead of stretching it.
-    vec2 local = fract(topPx / cellPx);       // 0 at the cell's top-left
-    vec2 luv = vec2(local.x, 1.0 - local.y);  // bottom-up for upright glyphs
+    vec2 local = (topPx - cellOriginTop) / cellPx;  // 0..1 within the cell
+    vec2 luv = vec2(local.x, 1.0 - local.y);        // bottom-up for upright glyphs
     float cellAspect = cellPx.x / cellPx.y;
     vec2 frac = min(vec2(1.0), vec2(glyphAspect / cellAspect, cellAspect / glyphAspect));
     vec2 gloc = (luv - 0.5) / frac + 0.5;
@@ -162,7 +178,6 @@ void main() {
     // Source luminance for this cell (box-averaged), multiplied into the
     // rain so the picture shows through the falling glyphs.
     vec4 acc = vec4(0.0);
-    vec2 cellOriginTop = cellIdx * cellPx;
     for (int y = 0; y < TAPS; ++y) {
         for (int x = 0; x < TAPS; ++x) {
             vec2 o = (vec2(float(x), float(y)) + 0.5) / float(TAPS);
@@ -184,7 +199,10 @@ void main() {
     // where the picture is bright. Transparent source (e.g. text captures)
     // falls back to the background via acc.a.
     vec3 hue = mix(color.rgb, headColor.rgb, headMix);
-    float fgA = clamp(cover * trail * lum * acc.a * color.a * brightness, 0.0, 1.0);
+    // Blend the opacity toward headColor's alpha over the head, mirroring the
+    // hue blend, so headColor's alpha isn't silently dropped.
+    float colA = mix(color.a, headColor.a, headMix);
+    float fgA = clamp(cover * trail * lum * acc.a * colA * brightness, 0.0, 1.0);
 
     float outA = fgA + background.a * (1.0 - fgA);
     vec3 premul = hue * fgA + background.rgb * background.a * (1.0 - fgA);
@@ -427,6 +445,11 @@ export class MatrixEffect implements Effect {
      * baked fields (`glyphs` / `font` / `fontWeight` / `charAspect`) without
      * removing and re-adding the effect. Async — it may load fonts. No-op
      * before `init()`.
+     *
+     * Allocates a fresh atlas texture and disposes the previous one once the
+     * swap is live, so repeated calls don't leak. Still rasterises the
+     * atlas, so prefer occasional calls (e.g. on a settings change) over
+     * per-frame use.
      */
     async updateAtlas(): Promise<void> {
         if (!this.#ctx) {
@@ -451,6 +474,10 @@ export class MatrixEffect implements Effect {
             this.params.charAspect,
         );
 
+        // Swap in the new atlas, then free the old one. Disposing after the
+        // swap means any render() that ran between the awaits above still
+        // sampled the previous, valid texture. No-op on the first build.
+        const previous = this.#atlas;
         this.#cols = built.cols;
         this.#rows = built.rows;
         this.#glyphAspect = built.cellW / built.cellH;
@@ -458,6 +485,7 @@ export class MatrixEffect implements Effect {
             autoUpdate: false,
             filter: "linear",
         });
+        previous?.dispose();
     }
 
     render(ctx: EffectContext): void {
@@ -498,6 +526,7 @@ export class MatrixEffect implements Effect {
     }
 
     dispose(): void {
+        this.#atlas?.dispose();
         this.#atlas = null;
         this.#ctx = null;
     }

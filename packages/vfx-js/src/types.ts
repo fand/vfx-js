@@ -524,11 +524,19 @@ export type VFXPostEffect = {
  *
  * `width` / `height` are physical pixels of the source's native size
  * (`0` for images / videos that haven't loaded yet).
+ *
+ * Call `dispose()` to release the underlying GL texture eagerly. Idempotent.
+ * Only textures you created via {@link EffectContext.wrapTexture} are freed;
+ * framework-owned textures (e.g. `ctx.src`) ignore the call. Do not use the
+ * handle after disposing it. Effects that rebuild a wrapped texture (e.g. a
+ * regenerated atlas) should dispose the previous handle to avoid leaking it
+ * until the effect is removed.
  */
 export type EffectTexture = {
     readonly width: number;
     readonly height: number;
     readonly __brand: "EffectTexture";
+    dispose(): void;
 };
 
 /**

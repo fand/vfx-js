@@ -524,8 +524,9 @@ export class AsciiEffect implements Effect {
      * `charAspect`) without removing and re-adding the effect. Async — it
      * may load fonts or decode image tiles. No-op before `init()`.
      *
-     * Allocates a fresh atlas texture; the previous one is released when
-     * the effect is removed, so prefer occasional calls (e.g. on a
+     * Allocates a fresh atlas texture and disposes the previous one once the
+     * swap is live, so repeated calls don't leak. Still does real work
+     * (rasterising / decoding), so prefer occasional calls (e.g. on a
      * settings change) over per-frame use.
      */
     async updateAtlas(): Promise<void> {
@@ -568,6 +569,10 @@ export class AsciiEffect implements Effect {
             );
         }
 
+        // Swap in the new atlas, then free the old one. Disposing after the
+        // swap means any render() that ran between the awaits above still
+        // sampled the previous, valid texture. No-op on the first build.
+        const previous = this.#atlas;
         this.#cols = built.cols;
         this.#rows = built.rows;
         this.#glyphAspect = built.cellW / built.cellH;
@@ -576,6 +581,7 @@ export class AsciiEffect implements Effect {
             autoUpdate: false,
             filter: "linear",
         });
+        previous?.dispose();
     }
 
     render(ctx: EffectContext): void {
@@ -612,6 +618,7 @@ export class AsciiEffect implements Effect {
     }
 
     dispose(): void {
+        this.#atlas?.dispose();
         this.#atlas = null;
         this.#ctx = null;
     }

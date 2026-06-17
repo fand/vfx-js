@@ -356,11 +356,11 @@ function makeHost() {
         glCtx,
         quad,
         2,
-        { __brand: "EffectTexture", width: 100, height: 100 } as unknown as {
-            width: number;
-            height: number;
-            __brand: "EffectTexture";
-        },
+        {
+            __brand: "EffectTexture",
+            width: 100,
+            height: 100,
+        } as unknown as EffectTexture,
         { autoCrop: true, glslVersion: "300 es" },
         programCache,
     );
@@ -512,6 +512,52 @@ describe("EffectHost.wrapTexture", () => {
         const t = textures[textures.length - 1];
         expect(t.wrapS).toBe("repeat");
         expect(t.wrapT).toBe("mirror");
+    });
+
+    it("handle.dispose() frees the underlying texture", () => {
+        const { host } = makeHost();
+        const img = Object.assign(new HTMLImageElementStub(), {
+            naturalWidth: 10,
+            naturalHeight: 10,
+        });
+        const handle = host.ctx.wrapTexture(img as unknown as HTMLImageElement);
+        const t = textures[textures.length - 1];
+        expect(t.disposed).toBe(false);
+        handle.dispose();
+        expect(t.disposed).toBe(true);
+    });
+
+    it("handle.dispose() is idempotent and host.dispose() won't double-free", () => {
+        const { host } = makeHost();
+        const img = Object.assign(new HTMLImageElementStub(), {
+            naturalWidth: 10,
+            naturalHeight: 10,
+        });
+        const handle = host.ctx.wrapTexture(img as unknown as HTMLImageElement);
+        const t = textures[textures.length - 1];
+        let disposeCount = 0;
+        const original = t.dispose;
+        t.dispose = () => {
+            disposeCount++;
+            original.call(t);
+        };
+        handle.dispose();
+        handle.dispose(); // second call is a no-op
+        host.dispose(); // host teardown must not re-dispose it
+        expect(disposeCount).toBe(1);
+    });
+
+    it("host.dispose() still frees textures that were never hand-disposed", () => {
+        const { host } = makeHost();
+        const img = Object.assign(new HTMLImageElementStub(), {
+            naturalWidth: 10,
+            naturalHeight: 10,
+        });
+        host.ctx.wrapTexture(img as unknown as HTMLImageElement);
+        const t = textures[textures.length - 1];
+        expect(t.disposed).toBe(false);
+        host.dispose();
+        expect(t.disposed).toBe(true);
     });
 });
 
@@ -1016,11 +1062,7 @@ describe("EffectHost.onContextRestored", () => {
                 __brand: "EffectTexture",
                 width: 1,
                 height: 1,
-            } as unknown as {
-                width: number;
-                height: number;
-                __brand: "EffectTexture";
-            },
+            } as unknown as EffectTexture,
             { autoCrop: true, glslVersion: "300 es" },
             new ProgramCache(glCtx),
         );
