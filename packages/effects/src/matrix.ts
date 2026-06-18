@@ -1,11 +1,7 @@
-// "Digital rain" — the Matrix-movie effect. Splits the element into a grid
-// of cells and rains random glyphs down each column, with a bright leading
-// tip and a fading trail. Unlike AsciiEffect, the glyph in each cell is
-// chosen at random (not looked up from luminance); the source image's
-// grayscale is simply multiplied into the rain, so the picture emerges from
-// the falling characters. Glyphs are rendered from a real font into an
-// atlas at init.
-// Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
+// The "code rain" effect from the movie "Matrix".
+// Generate rain drops on a grid, and show random text glyphs with colors.
+// The output color is multiplied with the input source image's grayscale value.
+
 import type { Effect, EffectContext, EffectTexture } from "@vfx-js/core";
 
 /** RGBA colour, each channel in [0, 1]. */
@@ -33,10 +29,9 @@ export type MatrixGlyphs = string | readonly string[];
 export const MATRIX_GLYPHS =
     'ﾊﾋﾌﾍﾎｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ0123456789Z:."=*+-<>|';
 
-// Number of samples in the precomputed trail-colour ramp. The gradient is
-// interpolated in OKLCH on the CPU into this many RGBA stops; the shader does
-// a cheap linear lookup between them. 32 is dense enough that the residual
-// linear-RGB interpolation between samples is visually indistinguishable.
+// Samples in the precomputed trail-colour ramp. The gradient is interpolated
+// in OKLCH on the CPU into this many RGBA stops; the shader does a cheap
+// linear lookup between them. 32 is dense enough to look smooth.
 const RAMP_SIZE = 32;
 
 const FRAG_MATRIX = `#version 300 es
@@ -68,11 +63,10 @@ uniform float brightness;    // overall gain on the rain
 uniform float contrast;      // source-luminance contrast about 0.5 (1 = off)
 uniform int invert;          // 1 = flip source luminance
 
-// Box-average TAPS x TAPS source samples per cell so the luminance is
-// representative of the whole cell, not a single point.
+// Box-average a TAPS x TAPS grid per cell for the source luminance.
 const int TAPS = 4;
 
-// Sample the trail-colour ramp at t in [0, 1] (0 = drop head, 1 = tail end).
+// Sample the trail-colour ramp; t = 0 at the head, 1 at the tail end.
 vec4 sampleColorRamp(float t) {
     float f = clamp(t, 0.0, 1.0) * float(${RAMP_SIZE} - 1);
     float i0 = floor(f);
@@ -86,8 +80,7 @@ vec4 readSrc(vec2 contentUv) {
     return texture(src, srcRectUv.xy + p * srcRectUv.zw);
 }
 
-// Hash without sine (Dave Hoskins). Stable across GPUs, unlike sin-based
-// hashes that drift with precision.
+// Sine-free hashes (Dave Hoskins) — stable across GPUs.
 float hash11(float p) {
     p = fract(p * 0.1031);
     p *= p + 33.33;
@@ -107,61 +100,43 @@ void main() {
         return;
     }
 
-    // Work in a top-down pixel frame so columns fall cleanly from the top
-    // edge (uvContent.y == 1 is the top; flip it to measure downward).
+    // Flip Y to a top-down pixel frame so columns fall from the top edge.
     vec2 fragPx = uvContent * elementPx;
     vec2 topPx = vec2(fragPx.x, elementPx.y - fragPx.y);
 
-    // Anchor the grid at the element (srcRect) centre so cells are symmetric
-    // about the middle and any partial cells split evenly between opposite
-    // edges (matching AsciiEffect), instead of growing from a corner.
+    // Center the grid on the element so partial cells split evenly between
+    // edges (matches AsciiEffect).
     vec2 gridOrigin = elementPx * 0.5;
     vec2 cellIdx = floor((topPx - gridOrigin) / cellPx);
     vec2 cellOriginTop = gridOrigin + cellIdx * cellPx;
     float colId = cellIdx.x;
-    // Row distance from the top edge (topmost cell == 0, growing downward) so
-    // drops are still born at the top wherever the centred grid lands.
+    // Row from the top edge, so drops start at the top wherever the grid lands.
     float topRow = floor(-gridOrigin.y / cellPx.y);
     float rowTopId = cellIdx.y - topRow;
 
-    // Per-column drop train. Each column gets its own fall speed and phase,
-    // and births a new falling stream roughly every 1 / birthRate seconds
-    // (jittered so they don't tick in lockstep). The seed uniform shifts
-    // every hash input so a different seed gives a different — but fully
-    // reproducible — pattern (seed 0 is the default look).
+    // Per-column drop train: each column has its own speed and phase and births
+    // a stream ~every 1/birthRate s (jittered). seed shifts the pattern.
     float colSpeed = max(0.0001, speed * mix(0.5, 1.5, hash11(colId * 1.37 + 3.1 + seed)));
     float colPhase = hash11(colId * 0.71 + 7.3 + seed * 7.77);
     float spawnInterval = 1.0 / max(birthRate, 0.0001);
 
-    // A drop lights this cell while its head is within tail cells below it,
-    // i.e. it was born around (time - rowTopId / colSpeed) seconds ago.
-    // Centre the (small, fixed) scan on the drop whose head is at this cell
-    // — NOT on the newest drop — so deep cells still find the older drops
-    // that have reached them. Otherwise a high birthRate floods the window
-    // with young drops and the rain appears to die before hitting the bottom.
-    //
-    // The window is a fixed 5 drops back from the head. When drops overlap
-    // more densely than that — roughly when tail / (spawnInterval * colSpeed)
-    // exceeds 5, e.g. a high birthRate with a long tail — the dim end of the
-    // trail falls outside the window and the tail reads shorter than the
-    // tail length. Cosmetic only (no flicker/popping); widen the loop if
-    // longer tails are needed at extreme densities.
-    // Find the front-most drop covering this cell — the one whose head is
-    // closest above (smallest d). bestD < 0 means no drop reaches here.
+    // Scan recent drops and keep the one whose head is closest above this cell
+    // (smallest d); bestD < 0 means none reach here. Centring the scan on the
+    // drop at THIS cell lets deep cells catch older drops. The fixed 5-drop
+    // window can clip a long dim tail — cosmetic; widen the loop if needed.
     float bestD = -1.0;
     float headSlot = (time - rowTopId / colSpeed) / spawnInterval - colPhase;
     float kStart = floor(headSlot) + 1.0;
     for (int i = 0; i < 5; i++) {
         float kk = kStart - float(i);
-        // Birth time of drop kk, jittered within ±0.3 of its slot.
+        // Birth time, jittered within ±0.3 of its slot.
         float jit = (hash11(kk * 3.7 + colId * 1.9 + seed * 11.13) - 0.5) * 0.6;
         float tb = (kk + colPhase + jit) * spawnInterval;
         float elapsed = time - tb;
         if (elapsed < 0.0) {
             continue;   // not born yet
         }
-        // Cells behind this drop's head: the head has passed cells above it
-        // (d >= 0), which form the trail; cells below it are dark.
+        // Cells above the head (d >= 0) form the trail; below it is dark.
         float d = elapsed * colSpeed - rowTopId;
         if (d < 0.0 || d > tail) {
             continue;
@@ -175,30 +150,26 @@ void main() {
     float headMix = 0.0;   // blend toward headColor at the tip
     float gradT = 0.0;     // colour-ramp position: 0 at head, 1 at tail end
     if (bestD >= 0.0) {
-        // Sharpened falloff toward the tail. tailFade scales it in, so
-        // tailFade = 0 keeps the trail at full brightness and the user fades
-        // it via the colour gradient instead; tailFade = 1 is the classic
-        // bright-head / dim-tail look.
+        // tailFade scales the dim-toward-tail falloff: 0 = flat trail (fade via
+        // gradient), 1 = classic bright head / dim tail.
         float fade = pow(1.0 - bestD / tail, 1.5);
         trail = mix(1.0, fade, tailFade);
-        // Leading glyph: blend toward headColor over the first ~2 cells.
+        // Blend toward headColor over the first ~2 cells.
         headMix = clamp(1.0 - bestD * 0.6, 0.0, 1.0);
         gradT = clamp(bestD / tail, 0.0, 1.0);
     }
 
-    // Random glyph for this cell, reshuffled over time in discrete steps. A
-    // per-column phase keeps neighbouring columns out of sync.
+    // Random glyph per cell, reshuffled in steps; per-column phase desyncs
+    // neighbours.
     float gstep = floor(time * glyphSpeed + hash11(colId + seed * 3.3) * 17.0);
     float gi = hash13(vec3(colId + seed * 13.0, rowTopId, gstep));
     float idx = clamp(floor(gi * glyphCount), 0.0, glyphCount - 1.0);
 
-    // Atlas cell for this glyph (top-row origin; texture is uploaded
-    // Y-flipped, hence the 1.0 - ... on v below).
+    // Atlas cell for this glyph (texture is Y-flipped, hence 1.0 - ... on v).
     float acol = mod(idx, cols);
     float arowTop = floor(idx / cols);
 
-    // Contain-fit the glyph into the cell, preserving its native aspect, so
-    // a non-square cell letterboxes the glyph instead of stretching it.
+    // Contain-fit the glyph so non-square cells letterbox instead of stretching.
     vec2 local = (topPx - cellOriginTop) / cellPx;  // 0..1 within the cell
     vec2 luv = vec2(local.x, 1.0 - local.y);        // bottom-up for upright glyphs
     float cellAspect = cellPx.x / cellPx.y;
@@ -212,8 +183,8 @@ void main() {
         cover = texture(atlas, vec2(u, v)).a;
     }
 
-    // Source luminance for this cell (box-averaged), multiplied into the
-    // rain so the picture shows through the falling glyphs.
+    // Box-averaged source luminance, multiplied into the rain so the picture
+    // shows through.
     vec4 acc = vec4(0.0);
     for (int y = 0; y < TAPS; ++y) {
         for (int x = 0; x < TAPS; ++x) {
@@ -225,23 +196,18 @@ void main() {
     }
     acc /= float(TAPS * TAPS);
     float lum = dot(acc.rgb, vec3(0.299, 0.587, 0.114));
-    // Contrast about the 0.5 mid-grey: < 1 flattens, > 1 deepens the
-    // separation between dark and bright source regions.
+    // Contrast about mid-grey: < 1 flattens, > 1 deepens.
     lum = clamp((lum - 0.5) * contrast + 0.5, 0.0, 1.0);
     if (invert == 1) {
         lum = 1.0 - lum;
     }
 
-    // Trail colour from the gradient ramp, mapped along the drop's trail
-    // (0 at the head, 1 at the tail end).
+    // Trail colour from the ramp along the drop.
     vec4 trailColor = sampleColorRamp(gradT);
 
-    // Glyph coverage x trail x source grayscale: the rain only lights up
-    // where the picture is bright. Transparent source (e.g. text captures)
-    // falls back to the background via acc.a.
+    // Rain lights up only where the picture is bright; blend hue and alpha
+    // toward headColor at the tip. Transparent source falls back to background.
     vec3 hue = mix(trailColor.rgb, headColor.rgb, headMix);
-    // Blend the opacity toward headColor's alpha over the head, mirroring the
-    // hue blend, so headColor's alpha isn't silently dropped.
     float colA = mix(trailColor.a, headColor.a, headMix);
     float fgA = clamp(cover * trail * lum * acc.a * colA * brightness, 0.0, 1.0);
 
@@ -464,9 +430,8 @@ function buildAtlas(
             const row = Math.floor(i / cols);
             const cx = col * cellW + cellW / 2;
             const cy = row * GLYPH_PX + GLYPH_PX / 2;
-            // Clip to the cell so any ink that overshoots the advance can't
-            // bleed into adjacent cells (belt-and-braces over the max-advance
-            // cell width above).
+            // Clip to the cell so ink that overshoots the advance can't bleed
+            // into the next cell (extra guard on top of the max-advance width).
             g.save();
             g.beginPath();
             g.rect(col * cellW, row * GLYPH_PX, cellW, GLYPH_PX);

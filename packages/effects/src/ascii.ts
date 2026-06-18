@@ -392,9 +392,8 @@ function buildAtlas(
             const row = Math.floor(i / cols);
             const cx = col * cellW + cellW / 2;
             const cy = row * GLYPH_PX + GLYPH_PX / 2;
-            // Clip to the cell so any ink that overshoots the advance can't
-            // bleed into adjacent cells (belt-and-braces over the max-advance
-            // cell width above).
+            // Clip to the cell so ink that overshoots the advance can't bleed
+            // into the next cell (extra guard on top of the max-advance width).
             g.save();
             g.beginPath();
             g.rect(col * cellW, row * GLYPH_PX, cellW, GLYPH_PX);
