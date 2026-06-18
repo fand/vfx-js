@@ -1170,6 +1170,7 @@ type MatrixArgs = {
     background: string;
     speed: number;
     tail: number;
+    tailFade: number;
     birthRate: number;
     glyphSpeed: number;
     brightness: number;
@@ -1198,6 +1199,7 @@ export const matrix: StoryObj<MatrixArgs> = {
             background: hexToRgba(a.background),
             speed: a.speed,
             tail: a.tail,
+            tailFade: a.tailFade,
             birthRate: a.birthRate,
             glyphSpeed: a.glyphSpeed,
             brightness: a.brightness,
@@ -1240,6 +1242,7 @@ export const matrix: StoryObj<MatrixArgs> = {
         background: "#000000",
         speed: 10,
         tail: 18,
+        tailFade: 1,
         birthRate: 0.6,
         glyphSpeed: 8,
         brightness: 1,
@@ -1261,6 +1264,7 @@ export const matrix: StoryObj<MatrixArgs> = {
         background: { control: { type: "color" } },
         speed: { control: { type: "range", min: 1, max: 40, step: 1 } },
         tail: { control: { type: "range", min: 2, max: 48, step: 1 } },
+        tailFade: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
         birthRate: {
             control: { type: "range", min: 0.05, max: 5, step: 0.05 },
         },

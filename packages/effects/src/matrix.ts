@@ -13,8 +13,8 @@ export type MatrixColor = [number, number, number, number];
 
 /**
  * Trail colour: a single {@link MatrixColor}, or an array of two or more
- * colour stops forming a vertical gradient (first stop at the top of the
- * element, last at the bottom). Stops are interpolated in OKLCH.
+ * colour stops forming a gradient along each drop's trail (first stop at the
+ * head, last at the tail end). Stops are interpolated in OKLCH.
  */
 export type MatrixTrailColor = MatrixColor | MatrixColor[];
 
@@ -60,6 +60,7 @@ uniform vec4 headColor;      // leading-glyph colour, non-premultiplied
 uniform vec4 background;     // cell backdrop, non-premultiplied
 uniform float speed;         // base fall speed, cells / second
 uniform float tail;          // trail length, cells
+uniform float tailFade;      // 1 = fade to the tail, 0 = no fade (gradient only)
 uniform float birthRate;     // new drops per second, per column
 uniform float glyphSpeed;    // glyph reshuffle rate, changes / second
 uniform float brightness;    // overall gain on the rain
@@ -70,7 +71,7 @@ uniform int invert;          // 1 = flip source luminance
 // representative of the whole cell, not a single point.
 const int TAPS = 4;
 
-// Sample the trail-colour ramp at t in [0, 1] (0 = top of the element).
+// Sample the trail-colour ramp at t in [0, 1] (0 = drop head, 1 = tail end).
 vec4 sampleColorRamp(float t) {
     float f = clamp(t, 0.0, 1.0) * float(${RAMP_SIZE} - 1);
     float i0 = floor(f);
@@ -142,8 +143,9 @@ void main() {
     // trail falls outside the window and the tail reads shorter than the
     // tail length. Cosmetic only (no flicker/popping); widen the loop if
     // longer tails are needed at extreme densities.
-    float trail = 0.0;
-    float headMix = 0.0;
+    // Find the front-most drop covering this cell — the one whose head is
+    // closest above (smallest d). bestD < 0 means no drop reaches here.
+    float bestD = -1.0;
     float headSlot = (time - rowTopId / colSpeed) / spawnInterval - colPhase;
     float kStart = floor(headSlot) + 1.0;
     for (int i = 0; i < 5; i++) {
@@ -156,19 +158,29 @@ void main() {
             continue;   // not born yet
         }
         // Cells behind this drop's head: the head has passed cells above it
-        // (d >= 0), which form the fading trail; cells below it are dark.
+        // (d >= 0), which form the trail; cells below it are dark.
         float d = elapsed * colSpeed - rowTopId;
         if (d < 0.0 || d > tail) {
             continue;
         }
-        // Sharpen the falloff so the head reads as a bright tip with a long,
-        // dim tail rather than a flat gradient.
-        float tr = pow(1.0 - d / tail, 1.5);
-        if (tr > trail) {
-            trail = tr;
-            // Leading glyph: blend toward headColor over the first ~2 cells.
-            headMix = clamp(1.0 - d * 0.6, 0.0, 1.0);
+        if (bestD < 0.0 || d < bestD) {
+            bestD = d;
         }
+    }
+
+    float trail = 0.0;     // brightness along the trail (head = 1)
+    float headMix = 0.0;   // blend toward headColor at the tip
+    float gradT = 0.0;     // colour-ramp position: 0 at head, 1 at tail end
+    if (bestD >= 0.0) {
+        // Sharpened falloff toward the tail. tailFade scales it in, so
+        // tailFade = 0 keeps the trail at full brightness and the user fades
+        // it via the colour gradient instead; tailFade = 1 is the classic
+        // bright-head / dim-tail look.
+        float fade = pow(1.0 - bestD / tail, 1.5);
+        trail = mix(1.0, fade, tailFade);
+        // Leading glyph: blend toward headColor over the first ~2 cells.
+        headMix = clamp(1.0 - bestD * 0.6, 0.0, 1.0);
+        gradT = clamp(bestD / tail, 0.0, 1.0);
     }
 
     // Random glyph for this cell, reshuffled over time in discrete steps. A
@@ -217,8 +229,9 @@ void main() {
         lum = 1.0 - lum;
     }
 
-    // Trail colour from the vertical gradient ramp (0 at the top edge).
-    vec4 trailColor = sampleColorRamp(topPx.y / elementPx.y);
+    // Trail colour from the gradient ramp, mapped along the drop's trail
+    // (0 at the head, 1 at the tail end).
+    vec4 trailColor = sampleColorRamp(gradT);
 
     // Glyph coverage x trail x source grayscale: the rain only lights up
     // where the picture is bright. Transparent source (e.g. text captures)
@@ -266,8 +279,9 @@ export type MatrixParams = {
 
     /**
      * Trail colour — the classic phosphor green. Pass an array of two or
-     * more {@link MatrixColor} stops for a vertical gradient (first at the
-     * top, last at the bottom), interpolated in OKLCH.
+     * more {@link MatrixColor} stops for a gradient along each drop's trail
+     * (first at the head, last at the tail end), interpolated in OKLCH. Pair
+     * with `tailFade: 0` to fade purely via the gradient.
      */
     color: MatrixTrailColor;
 
@@ -280,8 +294,16 @@ export type MatrixParams = {
     /** Base fall speed in cells per second. Per-column randomised ±50%. */
     speed: number;
 
-    /** Trail length in cells (how far the fade extends behind the head). */
+    /** Trail length in cells (how far the trail extends behind the head). */
     tail: number;
+
+    /**
+     * How much the trail dims toward its tail, in `[0, 1]`. `1` is the
+     * classic bright-head / dim-tail falloff; `0` keeps the whole trail at
+     * full brightness so you control the fade yourself via the colour
+     * gradient (e.g. a `color` stop fading to transparent or black).
+     */
+    tailFade: number;
 
     /**
      * Drop spawn rate: how many new falling streams are born per second in
@@ -318,6 +340,7 @@ const DEFAULT_PARAMS: MatrixParams = {
     background: [0, 0, 0, 1],
     speed: 10,
     tail: 18,
+    tailFade: 1,
     birthRate: 0.6,
     glyphSpeed: 8,
     brightness: 1,
@@ -584,11 +607,11 @@ function buildColorRamp(stops: MatrixColor[]): Float32Array {
  * grayscale is multiplied into the rain, so the picture emerges from the
  * falling characters.
  *
- * `grid`, `color`, `headColor`, `background`, `speed`, `tail`, `birthRate`,
- * `glyphSpeed`, `brightness`, `contrast`, and `invert` are live (read every
- * frame). `glyphs` / `font` / `fontWeight` / `charAspect` are baked into the
- * atlas at `init()` — after changing them via `setParams`, call
- * {@link MatrixEffect.updateAtlas} (or re-add the effect) to rebuild.
+ * `grid`, `color`, `headColor`, `background`, `speed`, `tail`, `tailFade`,
+ * `birthRate`, `glyphSpeed`, `brightness`, `contrast`, and `invert` are live
+ * (read every frame). `glyphs` / `font` / `fontWeight` / `charAspect` are
+ * baked into the atlas at `init()` — after changing them via `setParams`,
+ * call {@link MatrixEffect.updateAtlas} (or re-add the effect) to rebuild.
  */
 export class MatrixEffect implements Effect {
     params: MatrixParams;
@@ -705,6 +728,7 @@ export class MatrixEffect implements Effect {
                 background: this.params.background,
                 speed: this.params.speed,
                 tail: Math.max(1, this.params.tail),
+                tailFade: Math.min(1, Math.max(0, this.params.tailFade)),
                 birthRate: Math.max(0, this.params.birthRate),
                 glyphSpeed: Math.max(0, this.params.glyphSpeed),
                 brightness: Math.max(0, this.params.brightness),
