@@ -55,7 +55,8 @@ uniform float rows;          // atlas rows
 uniform float glyphCount;    // number of glyphs in the pool
 uniform float glyphAspect;   // font's character box aspect (advance / em)
 uniform float time;          // seconds since VFX start
-uniform vec4 colorRamp[${RAMP_SIZE}]; // trail-colour gradient, top→bottom
+uniform float seed;          // shifts the random pattern (columns + glyphs)
+uniform vec4 colorRamp[${RAMP_SIZE}]; // trail-colour gradient, head→tail
 uniform vec4 headColor;      // leading-glyph colour, non-premultiplied
 uniform vec4 background;     // cell backdrop, non-premultiplied
 uniform float speed;         // base fall speed, cells / second
@@ -125,9 +126,11 @@ void main() {
 
     // Per-column drop train. Each column gets its own fall speed and phase,
     // and births a new falling stream roughly every 1 / birthRate seconds
-    // (jittered so they don't tick in lockstep).
-    float colSpeed = max(0.0001, speed * mix(0.5, 1.5, hash11(colId * 1.37 + 3.1)));
-    float colPhase = hash11(colId * 0.71 + 7.3);
+    // (jittered so they don't tick in lockstep). The seed uniform shifts
+    // every hash input so a different seed gives a different — but fully
+    // reproducible — pattern (seed 0 is the default look).
+    float colSpeed = max(0.0001, speed * mix(0.5, 1.5, hash11(colId * 1.37 + 3.1 + seed)));
+    float colPhase = hash11(colId * 0.71 + 7.3 + seed * 7.77);
     float spawnInterval = 1.0 / max(birthRate, 0.0001);
 
     // A drop lights this cell while its head is within tail cells below it,
@@ -151,7 +154,7 @@ void main() {
     for (int i = 0; i < 5; i++) {
         float kk = kStart - float(i);
         // Birth time of drop kk, jittered within ±0.3 of its slot.
-        float jit = (hash11(kk * 3.7 + colId * 1.9) - 0.5) * 0.6;
+        float jit = (hash11(kk * 3.7 + colId * 1.9 + seed * 11.13) - 0.5) * 0.6;
         float tb = (kk + colPhase + jit) * spawnInterval;
         float elapsed = time - tb;
         if (elapsed < 0.0) {
@@ -185,8 +188,8 @@ void main() {
 
     // Random glyph for this cell, reshuffled over time in discrete steps. A
     // per-column phase keeps neighbouring columns out of sync.
-    float gstep = floor(time * glyphSpeed + hash11(colId) * 17.0);
-    float gi = hash13(vec3(colId, rowTopId, gstep));
+    float gstep = floor(time * glyphSpeed + hash11(colId + seed * 3.3) * 17.0);
+    float gi = hash13(vec3(colId + seed * 13.0, rowTopId, gstep));
     float idx = clamp(floor(gi * glyphCount), 0.0, glyphCount - 1.0);
 
     // Atlas cell for this glyph (top-row origin; texture is uploaded
@@ -329,6 +332,14 @@ export type MatrixParams = {
 
     /** Flip the source luminance (rain shows through dark areas instead). */
     invert: boolean;
+
+    /**
+     * Random seed for the rain pattern (per-column speed/phase and the glyph
+     * sequence). Any number; the same seed always reproduces the same
+     * pattern, so pin it (with {@link VFX.setTime}) for deterministic
+     * snapshots / visual regression tests. `0` is the default look.
+     */
+    seed: number;
 };
 
 const DEFAULT_PARAMS: MatrixParams = {
@@ -346,6 +357,7 @@ const DEFAULT_PARAMS: MatrixParams = {
     brightness: 1,
     contrast: 1,
     invert: false,
+    seed: 0,
 };
 
 // Atlas glyph cell height (physical px). Oversized vs. typical on-screen
@@ -608,8 +620,8 @@ function buildColorRamp(stops: MatrixColor[]): Float32Array {
  * falling characters.
  *
  * `grid`, `color`, `headColor`, `background`, `speed`, `tail`, `tailFade`,
- * `birthRate`, `glyphSpeed`, `brightness`, `contrast`, and `invert` are live
- * (read every frame). `glyphs` / `font` / `fontWeight` / `charAspect` are
+ * `birthRate`, `glyphSpeed`, `brightness`, `contrast`, `invert`, and `seed`
+ * are live (read every frame). `glyphs` / `font` / `fontWeight` / `charAspect` are
  * baked into the atlas at `init()` — after changing them via `setParams`,
  * call {@link MatrixEffect.updateAtlas} (or re-add the effect) to rebuild.
  */
@@ -734,6 +746,7 @@ export class MatrixEffect implements Effect {
                 brightness: Math.max(0, this.params.brightness),
                 contrast: Math.max(0, this.params.contrast),
                 invert: this.params.invert ? 1 : 0,
+                seed: this.params.seed,
             },
             target: ctx.target,
         });

@@ -1176,6 +1176,7 @@ type MatrixArgs = {
     brightness: number;
     contrast: number;
     invert: boolean;
+    seed: number;
     bloom: number;
 };
 // Matrix-movie "digital rain": random glyphs fall down each column with a
@@ -1205,6 +1206,7 @@ export const matrix: StoryObj<MatrixArgs> = {
             brightness: a.brightness,
             contrast: a.contrast,
             invert: a.invert,
+            seed: a.seed,
         });
         // bloom = 0 → bypass (rain only); otherwise chain a low-threshold
         // BloomEffect whose intensity is the slider value, so the green
@@ -1248,6 +1250,7 @@ export const matrix: StoryObj<MatrixArgs> = {
         brightness: 1,
         contrast: 1,
         invert: false,
+        seed: 0,
         bloom: 1.5,
     },
     argTypes: {
@@ -1272,6 +1275,7 @@ export const matrix: StoryObj<MatrixArgs> = {
         brightness: { control: { type: "range", min: 0.2, max: 3, step: 0.1 } },
         contrast: { control: { type: "range", min: 0, max: 4, step: 0.1 } },
         invert: { control: { type: "boolean" } },
+        seed: { control: { type: "range", min: 0, max: 100, step: 1 } },
         bloom: { control: { type: "range", min: 0, max: 8, step: 0.1 } },
     },
 };
