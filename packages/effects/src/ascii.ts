@@ -79,8 +79,10 @@ uniform float dither;        // ordered-dither amount in index units (0 = off)
 uniform vec2 atlasCellPx;    // atlas cell size in texels (for edge inset)
 
 // Box-average TAPS x TAPS samples per cell. A single centre tap throws
-// away most of the cell; this keeps the glyph choice representative.
-const int TAPS = 4;
+// away most of the cell; this keeps the glyph choice representative. 3x3
+// keeps the luminance stable enough for the discrete glyph mapping while
+// costing far fewer fetches than a 4x4 grid.
+const int TAPS = 3;
 
 vec4 readSrc(vec2 contentUv) {
     vec2 p = clamp(contentUv, 0.0, 1.0);
@@ -337,9 +339,10 @@ type AtlasBuild = {
 /**
  * Render the ramp into a single glyph atlas canvas, laid out as a near-
  * square grid of cells. Cell height is `GLYPH_PX`; cell width tracks the
- * font's advance so glyphs sit flush (no baked-in side bearings that
- * would show as wide gaps on screen). White glyphs on transparent; the
- * shader reads coverage from the alpha channel.
+ * widest glyph's advance so glyphs sit flush (no baked-in side bearings
+ * that would show as wide gaps on screen) yet wide glyphs (e.g. full-width
+ * CJK) stay within their cell. White glyphs on transparent; the shader
+ * reads coverage from the alpha channel.
  */
 function buildAtlas(
     chars: string[],
@@ -353,7 +356,7 @@ function buildAtlas(
     const fontStr = `${weight} ${GLYPH_PX}px ${font}`;
 
     const canvas = document.createElement("canvas");
-    // Cell width = explicit aspect, or the measured advance (measure
+    // Cell width = explicit aspect, or the widest glyph's advance (measure
     // first; resizing the canvas later resets context state).
     let cellW: number;
     if (aspectOverride && aspectOverride > 0) {
@@ -363,7 +366,16 @@ function buildAtlas(
         cellW = GLYPH_PX;
         if (probe) {
             probe.font = fontStr;
-            cellW = Math.max(1, Math.ceil(probe.measureText("M").width));
+            // Size the cell to the widest glyph in the ramp — not a fixed
+            // probe char — so wide glyphs (e.g. full-width CJK) don't spill
+            // into the neighbouring cell in the atlas.
+            let maxAdvance = 0;
+            for (const ch of chars) {
+                maxAdvance = Math.max(maxAdvance, probe.measureText(ch).width);
+            }
+            if (maxAdvance > 0) {
+                cellW = Math.max(1, Math.ceil(maxAdvance));
+            }
         }
     }
 
@@ -378,9 +390,18 @@ function buildAtlas(
         g.textBaseline = "middle";
         g.font = fontStr;
         for (let i = 0; i < chars.length; i++) {
-            const cx = (i % cols) * cellW + cellW / 2;
-            const cy = Math.floor(i / cols) * GLYPH_PX + GLYPH_PX / 2;
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const cx = col * cellW + cellW / 2;
+            const cy = row * GLYPH_PX + GLYPH_PX / 2;
+            // Clip to the cell so ink that overshoots the advance can't bleed
+            // into the next cell (extra guard on top of the max-advance width).
+            g.save();
+            g.beginPath();
+            g.rect(col * cellW, row * GLYPH_PX, cellW, GLYPH_PX);
+            g.clip();
             g.fillText(chars[i], cx, cy);
+            g.restore();
         }
     }
     return { canvas, cols, rows, cellW, cellH: GLYPH_PX };
@@ -524,8 +545,9 @@ export class AsciiEffect implements Effect {
      * `charAspect`) without removing and re-adding the effect. Async — it
      * may load fonts or decode image tiles. No-op before `init()`.
      *
-     * Allocates a fresh atlas texture; the previous one is released when
-     * the effect is removed, so prefer occasional calls (e.g. on a
+     * Allocates a fresh atlas texture and disposes the previous one once the
+     * swap is live, so repeated calls don't leak. Still does real work
+     * (rasterising / decoding), so prefer occasional calls (e.g. on a
      * settings change) over per-frame use.
      */
     async updateAtlas(): Promise<void> {
@@ -568,6 +590,10 @@ export class AsciiEffect implements Effect {
             );
         }
 
+        // Swap in the new atlas, then free the old one. Disposing after the
+        // swap means any render() that ran between the awaits above still
+        // sampled the previous, valid texture. No-op on the first build.
+        const previous = this.#atlas;
         this.#cols = built.cols;
         this.#rows = built.rows;
         this.#glyphAspect = built.cellW / built.cellH;
@@ -576,6 +602,7 @@ export class AsciiEffect implements Effect {
             autoUpdate: false,
             filter: "linear",
         });
+        previous?.dispose();
     }
 
     render(ctx: EffectContext): void {
@@ -612,6 +639,7 @@ export class AsciiEffect implements Effect {
     }
 
     dispose(): void {
+        this.#atlas?.dispose();
         this.#atlas = null;
         this.#ctx = null;
     }

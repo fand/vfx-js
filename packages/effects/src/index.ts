@@ -22,6 +22,13 @@ export { GlitchEffect, type GlitchParams } from "./glitch";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
 export { HueShiftEffect, type HueShiftParams } from "./hue-shift";
 export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch";
+export {
+    MATRIX_GLYPHS,
+    type MatrixColor,
+    MatrixEffect,
+    type MatrixGlyphs,
+    type MatrixParams,
+} from "./matrix";
 export { ParticleEffect } from "./particle";
 export { ParticleExplodeEffect } from "./particle-explode";
 export { PixelateEffect } from "./pixelate";

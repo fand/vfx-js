@@ -628,7 +628,29 @@ export class EffectHost {
             this.#perFrameAutoUpdate.push(autoUpdateFn);
         }
 
-        return makeEffectTexture(() => texture, getW, getH);
+        // Per-handle disposal: drop the texture (and any auto-update hook)
+        // from the host's tracking and free its GL storage. Idempotent, so a
+        // later host teardown won't double-free it.
+        let disposed = false;
+        const dispose = () => {
+            if (disposed) {
+                return;
+            }
+            disposed = true;
+            const ti = this.#ownedTextures.indexOf(texture);
+            if (ti !== -1) {
+                this.#ownedTextures.splice(ti, 1);
+            }
+            if (autoUpdateFn) {
+                const ai = this.#perFrameAutoUpdate.indexOf(autoUpdateFn);
+                if (ai !== -1) {
+                    this.#perFrameAutoUpdate.splice(ai, 1);
+                }
+            }
+            texture.dispose();
+        };
+
+        return makeEffectTexture(() => texture, getW, getH, dispose);
     }
 
     #perFrameAutoUpdate: (() => void)[] = [];
@@ -876,6 +898,7 @@ export function makeEffectTexture(
     resolve: () => Texture,
     width: () => number,
     height: () => number,
+    dispose?: () => void,
 ): EffectTextureInternal {
     const handle = {
         __brand: "EffectTexture",
@@ -884,6 +907,10 @@ export function makeEffectTexture(
         },
         get height() {
             return height();
+        },
+        // Framework-owned handles pass no disposer and ignore the call.
+        dispose() {
+            dispose?.();
         },
     } as EffectTextureInternal;
     Object.defineProperty(handle, RESOLVE_TEXTURE, { value: resolve });

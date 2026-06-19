@@ -12,6 +12,7 @@ import {
     HalftoneEffect,
     HueShiftEffect,
     JPEGGlitchEffect,
+    MatrixEffect,
     ParticleEffect,
     ParticleExplodeEffect,
     PixelateEffect,
@@ -983,8 +984,19 @@ export const chromatic = presetStory<ChromaticArgs>(
     { clock: false, src: Pigeon },
 );
 
-type AsciiSrcName = "Pigeon" | "Jellyfish" | "WebCam" | "HTML";
-const ASCII_SRCS: AsciiSrcName[] = ["Pigeon", "Jellyfish", "WebCam", "HTML"];
+type AsciiSrcName = "Pigeon" | "Jellyfish" | "Logo" | "WebCam" | "HTML";
+const ASCII_SRCS: AsciiSrcName[] = [
+    "Pigeon",
+    "Jellyfish",
+    "Logo",
+    "WebCam",
+    "HTML",
+];
+const ASCII_IMAGE_SRCS: Record<"Pigeon" | "Jellyfish" | "Logo", string> = {
+    Pigeon,
+    Jellyfish,
+    Logo,
+};
 
 // A plain HTML block used as a capture source (text + form controls).
 // This is the `addHTML` target: it fills its wrapper (`width: 100%`) and
@@ -1020,7 +1032,7 @@ function makeAsciiHtmlSample(): HTMLElement {
 function addAsciiSource(
     vfx: ReturnType<typeof initVFX>,
     src: AsciiSrcName,
-    effect: Effect,
+    effect: Effect | readonly Effect[],
 ): HTMLElement {
     const center = (el: HTMLElement) => {
         el.style.display = "block";
@@ -1065,11 +1077,14 @@ function addAsciiSource(
         return video;
     }
     const img = document.createElement("img");
-    img.src = src === "Jellyfish" ? Jellyfish : Pigeon;
+    img.src = ASCII_IMAGE_SRCS[src] ?? Pigeon;
     center(img);
     vfx.add(img, { effect });
     return img;
 }
+
+// Shared font-atlas control presets for the glyph-based effects.
+const FONT_WEIGHTS = ["normal", "bold", "100", "300", "600", "900"];
 
 type AsciiArgs = {
     src: AsciiSrcName;
@@ -1131,13 +1146,137 @@ export const ascii: StoryObj<AsciiArgs> = {
         font: { control: { type: "text" } },
         fontWeight: {
             control: { type: "select" },
-            options: ["normal", "bold", "100", "300", "600", "900"],
+            options: FONT_WEIGHTS,
         },
         color: { control: { type: "color" } },
         background: { control: { type: "color" } },
         colorFromSource: { control: { type: "boolean" } },
         invert: { control: { type: "boolean" } },
         dither: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
+    },
+};
+
+type MatrixArgs = {
+    src: AsciiSrcName;
+    gridX: number;
+    gridY: number;
+    glyphs: string;
+    font: string;
+    fontWeight: string;
+    color: string;
+    gradient: boolean;
+    color2: string;
+    headColor: string;
+    background: string;
+    speed: number;
+    tail: number;
+    tailFade: number;
+    birthRate: number;
+    glyphSpeed: number;
+    brightness: number;
+    contrast: number;
+    invert: boolean;
+    seed: number;
+    bloom: number;
+};
+// Matrix-movie "digital rain": random glyphs fall down each column with a
+// bright tip and fading green trail, modulated by the source grayscale so
+// the picture emerges from the rain. An optional BloomEffect adds the
+// phosphor glow around the bright glyphs (bypassed when bloom = 0).
+export const matrix: StoryObj<MatrixArgs> = {
+    render: (a) => {
+        const vfx = initVFX();
+        const effect = new MatrixEffect({
+            grid: [a.gridX, a.gridY],
+            glyphs: a.glyphs || undefined,
+            font: a.font,
+            fontWeight: a.fontWeight,
+            // gradient on → two-stop vertical gradient (top → bottom),
+            // interpolated in OKLCH; off → a single flat colour.
+            color: a.gradient
+                ? [hexToRgba(a.color), hexToRgba(a.color2)]
+                : hexToRgba(a.color),
+            headColor: hexToRgba(a.headColor),
+            background: hexToRgba(a.background),
+            speed: a.speed,
+            tail: a.tail,
+            tailFade: a.tailFade,
+            birthRate: a.birthRate,
+            glyphSpeed: a.glyphSpeed,
+            brightness: a.brightness,
+            contrast: a.contrast,
+            invert: a.invert,
+            seed: a.seed,
+        });
+        // bloom = 0 → bypass (rain only); otherwise chain a low-threshold
+        // BloomEffect whose intensity is the slider value, so the green
+        // glyphs glow like the film's phosphor CRT.
+        const effects =
+            a.bloom > 0
+                ? [
+                      effect,
+                      new BloomEffect({
+                          threshold: 0.1,
+                          softness: 0.2,
+                          intensity: a.bloom,
+                          scatter: 0.8,
+                          dither: 0,
+                          edgeFade: 0.02,
+                          pad: 60,
+                      }),
+                  ]
+                : effect;
+        const el = addAsciiSource(vfx, a.src, effects);
+        attachClockPane(vfx);
+        return el;
+    },
+    args: {
+        src: "Logo",
+        gridX: 8,
+        gridY: 8,
+        glyphs: "",
+        font: "monospace",
+        fontWeight: "normal",
+        color: "#2dff5c",
+        gradient: false,
+        color2: "#00b3ff",
+        headColor: "#d9ffe6",
+        background: "#000000",
+        speed: 10,
+        tail: 18,
+        tailFade: 1,
+        birthRate: 0.6,
+        glyphSpeed: 8,
+        brightness: 1,
+        contrast: 1,
+        invert: false,
+        seed: 0,
+        bloom: 1.0,
+    },
+    argTypes: {
+        src: { control: { type: "select" }, options: ASCII_SRCS },
+        gridX: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        gridY: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        glyphs: { control: { type: "text" } },
+        font: { control: { type: "text" } },
+        fontWeight: { control: { type: "select" }, options: FONT_WEIGHTS },
+        color: { control: { type: "color" } },
+        gradient: { control: { type: "boolean" } },
+        color2: { control: { type: "color" } },
+        headColor: { control: { type: "color" } },
+        background: { control: { type: "color" } },
+        speed: { control: { type: "range", min: 1, max: 40, step: 1 } },
+        tail: { control: { type: "range", min: 2, max: 48, step: 1 } },
+        tailFade: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
+        birthRate: {
+            control: { type: "range", min: 0.05, max: 5, step: 0.05 },
+        },
+        glyphSpeed: { control: { type: "range", min: 0, max: 30, step: 1 } },
+        brightness: { control: { type: "range", min: 0.2, max: 3, step: 0.1 } },
+        contrast: { control: { type: "range", min: 0, max: 4, step: 0.1 } },
+        invert: { control: { type: "boolean" } },
+        seed: { control: { type: "range", min: 0, max: 100, step: 1 } },
+        bloom: { control: { type: "range", min: 0, max: 8, step: 0.1 } },
     },
 };
 
