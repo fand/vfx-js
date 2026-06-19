@@ -1231,9 +1231,9 @@ export const matrix: StoryObj<MatrixArgs> = {
         return el;
     },
     args: {
-        src: "Pigeon",
-        gridX: 12,
-        gridY: 16,
+        src: "Logo",
+        gridX: 8,
+        gridY: 8,
         glyphs: "",
         font: "monospace",
         fontWeight: "normal",
@@ -1251,7 +1251,7 @@ export const matrix: StoryObj<MatrixArgs> = {
         contrast: 1,
         invert: false,
         seed: 0,
-        bloom: 1.5,
+        bloom: 1.0,
     },
     argTypes: {
         src: { control: { type: "select" }, options: ASCII_SRCS },
