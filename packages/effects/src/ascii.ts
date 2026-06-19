@@ -79,8 +79,10 @@ uniform float dither;        // ordered-dither amount in index units (0 = off)
 uniform vec2 atlasCellPx;    // atlas cell size in texels (for edge inset)
 
 // Box-average TAPS x TAPS samples per cell. A single centre tap throws
-// away most of the cell; this keeps the glyph choice representative.
-const int TAPS = 4;
+// away most of the cell; this keeps the glyph choice representative. 3x3
+// keeps the luminance stable enough for the discrete glyph mapping while
+// costing far fewer fetches than a 4x4 grid.
+const int TAPS = 3;
 
 vec4 readSrc(vec2 contentUv) {
     vec2 p = clamp(contentUv, 0.0, 1.0);
