@@ -536,6 +536,98 @@ function buildStops(c: MatrixTrailColor): {
 }
 
 /**
+ * Params in the form the shader and atlas builder consume: grid and the
+ * scalar knobs sanitized, the trail colour packed into gradient stops. Built
+ * once in the constructor and patched in `setParams`, so `render` reads it
+ * straight without re-sanitizing each frame.
+ */
+type MatrixInternalParams = {
+    grid: [number, number];
+    glyphs?: MatrixGlyphs;
+    font: string;
+    fontWeight: string | number;
+    charAspect?: number;
+    stops: ReturnType<typeof buildStops>;
+    headColor: MatrixColor;
+    background: MatrixColor;
+    speed: number;
+    tail: number;
+    tailFade: number;
+    birthRate: number;
+    glyphSpeed: number;
+    brightness: number;
+    contrast: number;
+    invert: number;
+    seed: number;
+};
+
+/** Sanitize the given params and patch the set keys into `target`. */
+function applyParams(
+    target: MatrixInternalParams,
+    p: Partial<MatrixParams>,
+): void {
+    if (p.grid !== undefined) {
+        const [gx, gy] = resolveGrid(p.grid);
+        target.grid = [Math.max(1, gx), Math.max(1, gy)];
+    }
+    if (p.glyphs !== undefined) {
+        target.glyphs = p.glyphs;
+    }
+    if (p.font !== undefined) {
+        target.font = p.font;
+    }
+    if (p.fontWeight !== undefined) {
+        target.fontWeight = p.fontWeight;
+    }
+    if (p.charAspect !== undefined) {
+        target.charAspect = p.charAspect;
+    }
+    if (p.color !== undefined) {
+        target.stops = buildStops(p.color);
+    }
+    if (p.headColor !== undefined) {
+        target.headColor = p.headColor;
+    }
+    if (p.background !== undefined) {
+        target.background = p.background;
+    }
+    if (p.speed !== undefined) {
+        target.speed = p.speed;
+    }
+    if (p.tail !== undefined) {
+        target.tail = Math.max(1, p.tail);
+    }
+    if (p.tailFade !== undefined) {
+        target.tailFade = Math.min(1, Math.max(0, p.tailFade));
+    }
+    if (p.birthRate !== undefined) {
+        target.birthRate = Math.max(0, p.birthRate);
+    }
+    if (p.glyphSpeed !== undefined) {
+        target.glyphSpeed = Math.max(0, p.glyphSpeed);
+    }
+    if (p.brightness !== undefined) {
+        target.brightness = Math.max(0, p.brightness);
+    }
+    if (p.contrast !== undefined) {
+        target.contrast = Math.max(0, p.contrast);
+    }
+    if (p.invert !== undefined) {
+        target.invert = p.invert ? 1 : 0;
+    }
+    if (p.seed !== undefined) {
+        target.seed = p.seed;
+    }
+}
+
+/** Build a full internal-params set from a complete {@link MatrixParams}. */
+function toInternalParams(p: MatrixParams): MatrixInternalParams {
+    const target = {} as MatrixInternalParams;
+    applyParams(target, p);
+    return target;
+}
+
+/**
  * "Digital rain" / Matrix-movie effect.
  *
  * @example
@@ -556,7 +648,8 @@ function buildStops(c: MatrixTrailColor): {
  * call {@link MatrixEffect.updateAtlas} (or re-add the effect) to rebuild.
  */
 export class MatrixEffect implements Effect {
-    params: MatrixParams;
+    // Sanitized / pre-packed params; the raw MatrixParams is never kept.
+    #params: MatrixInternalParams;
 
     #atlas: EffectTexture | null = null;
     #cols = 1;
@@ -565,16 +658,12 @@ export class MatrixEffect implements Effect {
     #glyphAspect = 1;
     #ctx: EffectContext | null = null;
 
-    // Cached packed gradient stops, rebuilt only when `color` changes.
-    #stops = buildStops(DEFAULT_PARAMS.color);
-    #colorKey = "";
-
     constructor(initial: Partial<MatrixParams> = {}) {
-        this.params = { ...DEFAULT_PARAMS, ...initial };
+        this.#params = toInternalParams({ ...DEFAULT_PARAMS, ...initial });
     }
 
     setParams(updates: Partial<MatrixParams>): void {
-        Object.assign(this.params, updates);
+        applyParams(this.#params, updates);
     }
 
     async init(ctx: EffectContext): Promise<void> {
@@ -604,19 +693,19 @@ export class MatrixEffect implements Effect {
     }
 
     async #build(ctx: EffectContext): Promise<void> {
-        const chars = resolveGlyphs(this.params.glyphs ?? MATRIX_GLYPHS);
+        const chars = resolveGlyphs(this.#params.glyphs ?? MATRIX_GLYPHS);
         if (chars.length === 0) {
             console.warn(
                 "[VFX-JS] MatrixEffect: empty glyph pool; nothing will be rendered.",
             );
         }
         this.#glyphCount = Math.max(1, chars.length);
-        await ensureFont(this.params.font, this.params.fontWeight);
+        await ensureFont(this.#params.font, this.#params.fontWeight);
         const built = buildAtlas(
             chars,
-            this.params.font,
-            this.params.fontWeight,
-            this.params.charAspect,
+            this.#params.font,
+            this.#params.fontWeight,
+            this.#params.charAspect,
         );
 
         // Swap in the new atlas, then free the old one. Disposing after the
@@ -637,18 +726,12 @@ export class MatrixEffect implements Effect {
         if (!this.#atlas) {
             return;
         }
+        const p = this.#params;
         const [ew, eh] = ctx.dims.elementPixel;
-        const [gx, gy] = resolveGrid(this.params.grid);
         const cellPx: [number, number] = [
-            Math.max(1, gx) * ctx.pixelRatio,
-            Math.max(1, gy) * ctx.pixelRatio,
+            p.grid[0] * ctx.pixelRatio,
+            p.grid[1] * ctx.pixelRatio,
         ];
-        // Re-pack the gradient stops only when `color` actually changes.
-        const colorKey = JSON.stringify(this.params.color);
-        if (colorKey !== this.#colorKey) {
-            this.#stops = buildStops(this.params.color);
-            this.#colorKey = colorKey;
-        }
         ctx.draw({
             frag: FRAG_MATRIX,
             uniforms: {
@@ -661,19 +744,19 @@ export class MatrixEffect implements Effect {
                 glyphCount: this.#glyphCount,
                 glyphAspect: this.#glyphAspect,
                 time: ctx.time,
-                colorStops: this.#stops.data,
-                colorStopCount: this.#stops.count,
-                headColor: this.params.headColor,
-                background: this.params.background,
-                speed: this.params.speed,
-                tail: Math.max(1, this.params.tail),
-                tailFade: Math.min(1, Math.max(0, this.params.tailFade)),
-                birthRate: Math.max(0, this.params.birthRate),
-                glyphSpeed: Math.max(0, this.params.glyphSpeed),
-                brightness: Math.max(0, this.params.brightness),
-                contrast: Math.max(0, this.params.contrast),
-                invert: this.params.invert ? 1 : 0,
-                seed: this.params.seed,
+                colorStops: p.stops.data,
+                colorStopCount: p.stops.count,
+                headColor: p.headColor,
+                background: p.background,
+                speed: p.speed,
+                tail: p.tail,
+                tailFade: p.tailFade,
+                birthRate: p.birthRate,
+                glyphSpeed: p.glyphSpeed,
+                brightness: p.brightness,
+                contrast: p.contrast,
+                invert: p.invert,
+                seed: p.seed,
             },
             target: ctx.target,
         });
