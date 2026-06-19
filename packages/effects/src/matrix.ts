@@ -64,8 +64,10 @@ uniform float brightness;    // overall gain on the rain
 uniform float contrast;      // source-luminance contrast about 0.5 (1 = off)
 uniform int invert;          // 1 = flip source luminance
 
-// Box-average a TAPS x TAPS grid per cell for the source luminance.
-const int TAPS = 4;
+// Box-average a TAPS x TAPS grid per cell for the source luminance. 2x2 is
+// plenty here: the luminance only scales the rain's brightness (a small
+// error is invisible) and the moving glyphs mask any residual aliasing.
+const int TAPS = 2;
 
 // --- OKLCH gradient (Björn Ottosson's sRGB <-> OKLab) --------------------
 vec3 srgbToLinear(vec3 c) {
