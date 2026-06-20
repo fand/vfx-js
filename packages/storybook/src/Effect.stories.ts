@@ -372,14 +372,25 @@ function makeSeededRandom(seed: number): () => number {
 // Steps to drive and fixed per-step clock delta for VRT capture.
 const VRT_STEPS = 90;
 const VRT_DT = 1 / 60;
+// Stop the one-shot Explode mid-burst (elapsed ≈ 0.48s of the 1s
+// duration) so the captured frame shows scattered particles, not the
+// faded-out end state.
+const EXPLODE_STEPS = 30;
 
-// Deterministic VRT driver for the stateful sims (Fluid, Particle).
-// Advances the virtual clock by a fixed dt and sweeps the pointer in a
-// circle, rendering one frame per step. The VFX must be created with
-// `autoplay: false` so no RAF loop runs after this returns — Chromatic
-// then captures exactly the final frame, identical every run. Math.random
-// is seeded for the duration so particle spawns are reproducible.
-async function driveVrt(vfx: VFX, element: HTMLElement): Promise<void> {
+// Deterministic VRT driver for the stateful sims (Fluid, Particle,
+// Particle Explode). Advances the virtual clock by a fixed dt and sweeps
+// the pointer in a circle, rendering one frame per step. The VFX must be
+// created with `autoplay: false` so no RAF loop runs after this returns —
+// Chromatic then captures exactly the final frame, identical every run.
+// Math.random is seeded for the duration so particle spawns are
+// reproducible. `onReady` fires once before the first render — used to
+// trigger the one-shot Explode burst on a deterministic frame.
+async function driveVrt(
+    vfx: VFX,
+    element: HTMLElement,
+    opts: { steps?: number; onReady?: () => void } = {},
+): Promise<void> {
+    const steps = opts.steps ?? VRT_STEPS;
     const rect = element.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
@@ -388,9 +399,10 @@ async function driveVrt(vfx: VFX, element: HTMLElement): Promise<void> {
     const realRandom = Math.random;
     Math.random = makeSeededRandom(0x9e3779b9);
     try {
+        opts.onReady?.();
         let time = 0;
-        for (let i = 0; i < VRT_STEPS; i++) {
-            const angle = (i / VRT_STEPS) * Math.PI * 2;
+        for (let i = 0; i < steps; i++) {
+            const angle = (i / steps) * Math.PI * 2;
             window.dispatchEvent(
                 new MouseEvent("pointermove", {
                     clientX: cx + Math.cos(angle) * radius,
@@ -556,6 +568,22 @@ particleExplode.play = async ({ canvasElement }) => {
         img.onload = () => o();
     });
     await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    if (isChromatic()) {
+        // Deterministic capture: trigger the burst, then drive the clock
+        // to a fixed mid-burst frame so Chromatic snapshots the scattered
+        // particles (the effect has no Math.random — GPU-hashed spawns —
+        // so the burst is reproducible). Cap count for the SwiftShader
+        // load budget, matching the Particle story.
+        const vfx = initVFX({ autoplay: false });
+        const explode = new ParticleExplodeEffect({ count: 256 * 256 });
+        await vfx.add(img, { effect: explode });
+        await driveVrt(vfx, img, {
+            steps: EXPLODE_STEPS,
+            onReady: () => explode.trigger(),
+        });
+        return;
+    }
 
     const vfx = initVFX();
     const sources = { Logo, Jellyfish };
