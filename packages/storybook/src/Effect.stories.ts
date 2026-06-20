@@ -372,10 +372,15 @@ function makeSeededRandom(seed: number): () => number {
 // Steps to drive and fixed per-step clock delta for VRT capture.
 const VRT_STEPS = 60;
 const VRT_DT = 1 / 60;
-// Stop the one-shot Explode mid-burst (elapsed ≈ 0.48s of the 1s
-// duration) so the captured frame shows scattered particles, not the
-// faded-out end state.
-const EXPLODE_STEPS = 30;
+// Fewer steps for the particle sims — each step is a heavy GPU frame
+// under SwiftShader (the Chromatic capture renderer), and the full
+// count drives it past the capture time budget.
+const PARTICLE_VRT_STEPS = 40;
+const EXPLODE_STEPS = 24;
+// Capture-only particle count. Far below the interactive default so the
+// SwiftShader fill/advect cost stays well within Chromatic's budget; a
+// 128x128 grid still fills a rich, recognizable frame.
+const VRT_PARTICLE_COUNT = 128 * 128;
 
 // Deterministic VRT driver for the stateful sims (Fluid, Particle,
 // Particle Explode). Advances the virtual clock by a fixed dt and sweeps
@@ -523,8 +528,10 @@ particle.play = async ({ canvasElement }) => {
         // SwiftShader (Chromatic capture env) can't allocate the default
         // 1M-particle state RTs within the 30s load budget, so cap count.
         const vfx = initVFX({ autoplay: false });
-        await vfx.add(img, { effect: new ParticleEffect({ count: 256 * 256 }) });
-        await driveVrt(vfx, img);
+        await vfx.add(img, {
+            effect: new ParticleEffect({ count: VRT_PARTICLE_COUNT }),
+        });
+        await driveVrt(vfx, img, { steps: PARTICLE_VRT_STEPS });
         return;
     }
 
@@ -584,7 +591,7 @@ particleExplode.play = async ({ canvasElement }) => {
         // so the burst is reproducible). Cap count for the SwiftShader
         // load budget, matching the Particle story.
         const vfx = initVFX({ autoplay: false });
-        const explode = new ParticleExplodeEffect({ count: 256 * 256 });
+        const explode = new ParticleExplodeEffect({ count: VRT_PARTICLE_COUNT });
         await vfx.add(img, { effect: explode });
         await driveVrt(vfx, img, {
             steps: EXPLODE_STEPS,
