@@ -1,4 +1,4 @@
-import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n as o,o as s,s as c,t as l,u}from"./utils-Cw42DJk4.js";import{n as d,t as ee}from"./logo-640w-20p-DamX1-bG.js";import{t as te}from"./preset-B7f9t9lo.js";import{C as f,S as ne,T as p,_ as re,a as ie,b as ae,c as oe,d as se,f as ce,g as le,h as ue,i as de,l as fe,m as pe,n as me,o as he,p as ge,r as _e,s as ve,t as ye,u as be,v as xe,w as Se,y as Ce}from"./esm-CqoqALv-.js";import{n as we,t as m}from"./bbb-aniiCR4j.js";import{n as h,t as Te}from"./jellyfish-CbdkhNBT.js";import{n as g,t as Ee}from"./pigeon-CsBwBuXA.js";function _(e,t,n,r={}){let{src:i=h,clock:a=!0}=r;return{render:t=>{let n=a&&S(),r=u(n?{timeScale:0}:void 0),s=document.createElement(`img`);s.src=i,s.style.display=`block`,s.style.margin=`40px auto`,s.style.maxWidth=`80vw`;let c=r.add(s,{effect:e(t)});return a&&(n?c.then(()=>{r.setTime(C),r.render()}):o(r)),s},args:t,argTypes:n}}function v(e){let t=e.trim().replace(/^#/,``);if(t.length===3&&(t=t.split(``).map(e=>e+e).join(``)),t.length!==6)return[0,0,0,1];let n=Number.parseInt(t,16);return[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255,1]}function De(){let e=document.createElement(`article`);e.style.cssText=`width: 600px; padding: 32px; background: #fff; color: #202122; font-family: sans-serif; line-height: 1.6; border: 1px solid #a2a9b1;`;let t=`font-family: serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; padding-bottom: 4px; margin-top: 24px;`,n=`margin: 20px 0; text-align: center;`,r=`font-size: 0.85em; color: #54595d; margin-top: 4px;`,i=`width: 100%; height: auto; max-width: 480px; background: #f8f9fa; border: 1px solid #a2a9b1;`;return e.innerHTML=`
+import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n as o,o as s,s as c,t as ee,u as l}from"./utils-Cw42DJk4.js";import{n as u,t as te}from"./logo-640w-20p-DamX1-bG.js";import{t as ne}from"./preset-B7f9t9lo.js";import{C as d,S as re,T as ie,_ as ae,a as oe,b as se,c as ce,d as le,f,g as ue,h as de,i as fe,l as pe,m as me,n as he,o as ge,p,r as _e,s as ve,t as ye,u as be,v as xe,w as Se,y as Ce}from"./esm-CqoqALv-.js";import{n as we,t as m}from"./bbb-aniiCR4j.js";import{n as h,t as Te}from"./jellyfish-CbdkhNBT.js";import{n as g,t as Ee}from"./pigeon-CsBwBuXA.js";function _(e,t,n,r={}){let{src:i=h,clock:a=!0}=r;return{render:t=>{let n=a&&S(),r=l(n?{timeScale:0}:void 0),s=document.createElement(`img`);s.src=i,s.style.display=`block`,s.style.margin=`40px auto`,s.style.maxWidth=`80vw`;let c=r.add(s,{effect:e(t)});return a&&(n?c.then(()=>{r.setTime(C),r.render()}):o(r)),s},args:t,argTypes:n}}function v(e){let t=e.trim().replace(/^#/,``);if(t.length===3&&(t=t.split(``).map(e=>e+e).join(``)),t.length!==6)return[0,0,0,1];let n=Number.parseInt(t,16);return[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255,1]}function De(e){let t=e>>>0;return()=>{t=t+1831565813|0;let e=Math.imul(t^t>>>15,1|t);return e=e+Math.imul(e^e>>>7,61|e)^e,((e^e>>>14)>>>0)/4294967296}}async function y(e,t,n={}){let r=n.steps??k,i=t.getBoundingClientRect(),a=i.left+i.width/2,o=i.top+i.height/2,s=Math.min(i.width,i.height)*.3,c=Math.random;Math.random=De(2654435769);try{n.onReady?.();let t=0;for(let n=0;n<r;n++){await new Promise(e=>setTimeout(e,0));let i=n/r*Math.PI*2;window.dispatchEvent(new MouseEvent(`pointermove`,{clientX:a+Math.cos(i)*s,clientY:o+Math.sin(i)*s,bubbles:!0})),t+=A,e.setTime(t),e.render()}}finally{Math.random=c}}function Oe(){let e=document.createElement(`article`);e.style.cssText=`width: 600px; padding: 32px; background: #fff; color: #202122; font-family: sans-serif; line-height: 1.6; border: 1px solid #a2a9b1;`;let t=`font-family: serif; font-weight: normal; border-bottom: 1px solid #a2a9b1; padding-bottom: 4px; margin-top: 24px;`,n=`margin: 20px 0; text-align: center;`,r=`font-size: 0.85em; color: #54595d; margin-top: 4px;`,i=`width: 100%; height: auto; max-width: 480px; background: #f8f9fa; border: 1px solid #a2a9b1;`;return e.innerHTML=`
         <h1 style="font-family: serif; font-weight: normal;
                    border-bottom: 1px solid #a2a9b1;
                    padding-bottom: 4px; margin: 0 0 4px;">
@@ -161,7 +161,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
                 <i>Spatial Tessellations: Concepts and Applications of
                 Voronoi Diagrams</i> (2nd ed.). Wiley.</li>
         </ol>
-    `,e}function Oe(e){document.getElementById(`jpeg-glitch-fps`)?.remove();let t=document.createElement(`div`);t.id=`jpeg-glitch-fps`,t.style.cssText=`position:fixed;top:8px;left:8px;z-index:2147483647;font:12px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.6);padding:2px 8px;border-radius:3px;pointer-events:none;`,t.textContent=`-- fps`,document.body.appendChild(t);let n=performance.now(),r=e.producedFrames,i=()=>{if(!t.isConnected)return;let a=performance.now(),o=a-n;if(o>=500){let i=e.producedFrames;t.textContent=`${((i-r)*1e3/o).toFixed(1)} fps`,n=a,r=i}requestAnimationFrame(i)};requestAnimationFrame(i)}function y(e){let t=Math.round(window.innerWidth/2),n=Math.round(window.innerHeight/2),r=Math.min(t,n)*.4,i=0,a=window.setInterval(()=>{let o=i/60*Math.PI*2;e.dispatchEvent(new MouseEvent(`pointermove`,{clientX:t+Math.cos(o)*r,clientY:n+Math.sin(o)*r,bubbles:!0})),i++,i>120&&clearInterval(a)},16)}function ke(){let e=document.createElement(`div`);return e.style.width=`100%`,e.style.boxSizing=`border-box`,e.style.padding=`24px`,e.style.background=`#ffffff`,e.style.color=`#111111`,e.style.fontFamily=`sans-serif`,e.style.fontSize=`2.5rem`,e.innerHTML=`
+    `,e}function ke(e){document.getElementById(`jpeg-glitch-fps`)?.remove();let t=document.createElement(`div`);t.id=`jpeg-glitch-fps`,t.style.cssText=`position:fixed;top:8px;left:8px;z-index:2147483647;font:12px/1.4 monospace;color:#0f0;background:rgba(0,0,0,0.6);padding:2px 8px;border-radius:3px;pointer-events:none;`,t.textContent=`-- fps`,document.body.appendChild(t);let n=performance.now(),r=e.producedFrames,i=()=>{if(!t.isConnected)return;let a=performance.now(),o=a-n;if(o>=500){let i=e.producedFrames;t.textContent=`${((i-r)*1e3/o).toFixed(1)} fps`,n=a,r=i}requestAnimationFrame(i)};requestAnimationFrame(i)}function b(e){let t=Math.round(window.innerWidth/2),n=Math.round(window.innerHeight/2),r=Math.min(t,n)*.4,i=0,a=window.setInterval(()=>{let o=i/60*Math.PI*2;e.dispatchEvent(new MouseEvent(`pointermove`,{clientX:t+Math.cos(o)*r,clientY:n+Math.sin(o)*r,bubbles:!0})),i++,i>120&&clearInterval(a)},16)}function Ae(){let e=document.createElement(`div`);return e.style.width=`100%`,e.style.boxSizing=`border-box`,e.style.padding=`24px`,e.style.background=`#ffffff`,e.style.color=`#111111`,e.style.fontFamily=`sans-serif`,e.style.fontSize=`2.5rem`,e.innerHTML=`
         <h1 style="margin: 0 0 12px;">HTML input sample</h1>
         <p style="margin: 0 0 16px; line-height: 1.5;">
             A plain HTML block captured by VFX-JS and turned into ASCII.
@@ -170,7 +170,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
         <input type="text" value="Type here"
                style="font-size: inherit; padding: 6px 8px; margin-right: 8px;" />
         <button style="font-size: inherit; padding: 6px 14px;">Submit</button>
-    `,e}function b(e,t,n){let r=e=>{e.style.display=`block`,e.style.margin=`40px auto`,e.style.maxWidth=`80vw`};if(t===`HTML`){let t=document.createElement(`div`);t.style.display=`flex`,t.style.justifyContent=`center`,t.style.margin=`40px auto`;let r=document.createElement(`div`);r.style.width=`900px`,r.style.maxWidth=`90vw`;let i=ke();return r.appendChild(i),t.appendChild(r),e.addHTML(i,{effect:n}),t}if(t===`WebCam`){let t=document.createElement(`video`);return t.muted=!0,t.loop=!0,t.playsInline=!0,t.autoplay=!0,r(t),navigator.mediaDevices?.getUserMedia({video:!0}).then(e=>{t.srcObject=e,t.play()}).catch(e=>console.warn(`[ascii story] webcam unavailable:`,e)),e.add(t,{effect:n}),t}let i=document.createElement(`img`);return i.src=q[t]??``+new URL(`pigeon-ScEf6bli.webp`,import.meta.url).href,r(i),e.add(i,{effect:n}),i}function Ae(e,t,n){let r=document.createElement(`canvas`);r.width=64,r.height=64;let i=r.getContext(`2d`);if(i){let r=t>1?e/(t-1):1,a=`hsl(${e/Math.max(1,t)*360}, 85%, 55%)`;if(i.fillStyle=a,i.strokeStyle=a,n===`squares`){let e=6+r*50;i.fillRect(32-e/2,32-e/2,e,e)}else n===`rings`?(i.lineWidth=2+r*9,i.beginPath(),i.arc(32,32,6+r*22,0,Math.PI*2),i.stroke()):(i.beginPath(),i.arc(32,32,3+r*27,0,Math.PI*2),i.fill())}return r}var x,S,C,w,T,E,D,O,k,A,j,M,N,P,F,I,L,R,z,B,V,H,U,W,G,K,q,J,Y,X,Z,Q,$;e((()=>{ye(),we(),Te(),ee(),Ee(),te(),r(),x={title:`Effect`,parameters:{layout:`fullscreen`}},S=()=>typeof navigator<`u`&&/Chromatic/.test(navigator.userAgent),C=2,w={render:()=>{let e=document.createElement(`img`);return e.src=d,e.style.display=`block`,e.style.margin=`40px auto`,e},args:void 0},w.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=u(),r=new f({threshold:.2,softness:.1,intensity:5,scatter:1,dither:0,edgeFade:0,pad:50});await n.add(t,{effect:r}),l(`Bloom`,r)},T={render:()=>{let e=document.createElement(`img`);return e.src=h,e},args:void 0},T.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=u(),r=new f({threshold:.01,softness:.2,intensity:10,scatter:1,dither:0,edgeFade:.02,pad:200});await n.add(t,{effect:[new se({size:10}),new he({spacing:5}),r]}),l(`CRT Bloom`,r)},E={render:()=>{let e=document.createElement(`img`);return e.src=h,e},args:void 0,parameters:{chromatic:{disableSnapshot:!0}}},E.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let r=u(),i=new be({range:[.5,1],direction:`up`,angle:30});await r.add(t,{effect:i}),n(`Pixel Sort`,i)},D={Jellyfish:h,Logo:d,Pigeon:g},O={render:e=>{let{src:t,...n}=e,r=u(),i=new ue(n);if(Oe(i),t===`bbb`){let e=document.createElement(`video`);return e.src=m,e.muted=!0,e.loop=!0,e.playsInline=!0,e.autoplay=!0,e.crossOrigin=`anonymous`,e.style.display=`block`,e.style.margin=`40px auto`,e.style.maxWidth=`80vw`,e.play(),r.add(e,{effect:i}),e}let a=document.createElement(`img`);return a.src=D[t],a.style.display=`block`,a.style.margin=`40px auto`,r.add(a,{effect:i}),a},args:{src:`Jellyfish`,quality:.4,seed:.25,iterations:24,resolutionScale:1,randomFlip:!0,vertical:!1,speed:0},argTypes:{src:{control:{type:`select`},options:[`Jellyfish`,`Logo`,`Pigeon`,`bbb`]},quality:{control:{type:`range`,min:0,max:1,step:.01}},seed:{control:{type:`range`,min:0,max:1,step:.01}},iterations:{control:{type:`range`,min:1,max:30,step:1}},resolutionScale:{control:{type:`range`,min:0,max:1,step:.01}},randomFlip:{control:{type:`boolean`}},vertical:{control:{type:`boolean`}},speed:{control:{type:`range`,min:0,max:30,step:.5}}},parameters:{chromatic:{disableSnapshot:!0}}},k={Jellyfish:h,Logo:d,Pigeon:g},A={render:e=>{let{src:t,...n}=e,r=u(),i=new Se(n);if(t===`bbb`){let e=document.createElement(`video`);return e.src=m,e.muted=!0,e.loop=!0,e.playsInline=!0,e.autoplay=!0,e.crossOrigin=`anonymous`,e.style.display=`block`,e.style.margin=`40px auto`,e.style.maxWidth=`80vw`,e.play(),r.add(e,{effect:i}),e}let a=document.createElement(`img`);return a.src=k[t],a.style.display=`block`,a.style.margin=`40px auto`,r.add(a,{effect:i}),a},args:{src:`Jellyfish`,quality:8,iterations:3,downscale:1},argTypes:{src:{control:{type:`select`},options:[`Jellyfish`,`Logo`,`Pigeon`,`bbb`]},quality:{control:{type:`range`,min:1,max:100,step:1}},iterations:{control:{type:`range`,min:1,max:10,step:1}},downscale:{control:{type:`range`,min:.02,max:1,step:.01}}},parameters:{chromatic:{disableSnapshot:!0}}},j={render:()=>{let e=document.createElement(`img`);return e.src=h,e},args:void 0},j.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=u(),r=new Ce;await n.add(t,{effect:r}),i(`Fluid`,r),y(e)},M={render:()=>{let e=document.createElement(`img`);return e.src=h,e},args:void 0},M.play=async({canvasElement:e})=>{let n=e.querySelector(`img`);await new Promise(e=>{n.onload=e});let r=u(),i={Jellyfish:h,Logo:d},o=null,s=async()=>{let e=o?{...o.params}:{};o&&(r.remove(n),a()),o=new re(e),await r.add(n,{effect:o}),t(`Halftone`,o,{img:n,sources:i,onSrcChange:async e=>{n.src=i[e],await new Promise(e=>{n.onload=()=>e()}),await s()}})};await s()},N={render:()=>{let e=document.createElement(`img`);return e.src=d,e},args:void 0},N.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=()=>e()});let n=u(),r={Jellyfish:h,Logo:d},i=null,o=async()=>{let e=i?{...i.params}:S()?{count:256*256}:{};i&&(n.remove(t),a()),i=new ge(e),await n.add(t,{effect:i}),c(`Particle`,i,{img:t,sources:r,onSrcChange:async e=>{t.src=r[e],await new Promise(e=>{t.onload=()=>e()}),await o()}})};await o(),y(e)},P={render:()=>{let e=document.createElement(`img`);return e.src=d,e},args:void 0},P.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=()=>e()}),await new Promise(e=>requestAnimationFrame(()=>e(void 0)));let n=u(),r={Logo:d,Jellyfish:h},i=null,o=async()=>{let e=i?{...i.params}:{};i&&(n.remove(t),a()),await new Promise(e=>requestAnimationFrame(()=>e(void 0))),i=new ce(e),await n.add(t,{effect:i}),s(`Particle Explode`,i,{img:t,sources:r,onSrcChange:async e=>{t.src=r[e],await new Promise(e=>{t.onload=()=>e()}),await o()}})};await o()},F={render:e=>{let{src:t,...n}=e,r=u(),i=new me(n);if(t===`Webpage`){let e=document.getElementById(`storybook-root`);e&&(e.style.height=`auto`,e.style.display=`block`);let t=document.createElement(`div`);t.style.display=`flex`,t.style.justifyContent=`center`;let n=De();return t.appendChild(n),r.addHTML(n,{effect:i}),t}let a=document.createElement(`img`);return a.src=t===`Jellyfish`?h:d,r.add(a,{effect:i}),a},args:{src:`Webpage`,cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},argTypes:{src:{control:{type:`select`},options:[`Logo`,`Jellyfish`,`Webpage`]},cellSize:{control:{type:`range`,min:5,max:200,step:1}},pressRadius:{control:{type:`range`,min:0,max:800,step:10}},press:{control:{type:`range`,min:0,max:1,step:.01}},flatCells:{control:{type:`boolean`}},seed:{control:{type:`range`,min:0,max:1e3,step:1}},speed:{control:{type:`range`,min:0,max:5,step:.05}},breathe:{control:{type:`range`,min:0,max:1,step:.01}},breatheSpeed:{control:{type:`range`,min:0,max:5,step:.05}},breatheScale:{control:{type:`range`,min:10,max:500,step:5}},bgColor:{control:{type:`color`}}}},I=_(e=>new xe(e),{speed:1,intensity:1},{speed:{control:{type:`range`,min:0,max:5,step:.05}},intensity:{control:{type:`range`,min:0,max:3,step:.05}}}),L=_(e=>new ve(e),{speed:1,amount:10},{speed:{control:{type:`range`,min:0,max:5,step:.05}},amount:{control:{type:`range`,min:0,max:60,step:1}}}),R=_(e=>new oe(e),{speed:1,amount:.05},{speed:{control:{type:`range`,min:0,max:5,step:.05}},amount:{control:{type:`range`,min:0,max:.3,step:.005}}}),z=_(e=>new fe(e),{speed:1,frequency:1},{speed:{control:{type:`range`,min:0,max:5,step:.05}},frequency:{control:{type:`range`,min:.1,max:8,step:.1}}}),B=_(e=>new ie(e),{speed:1,amount:20,frequency:7,blur:2},{speed:{control:{type:`range`,min:0,max:5,step:.05}},amount:{control:{type:`range`,min:0,max:100,step:1}},frequency:{control:{type:`range`,min:1,max:30,step:.5}},blur:{control:{type:`range`,min:0,max:20,step:.5}}}),V=_(e=>new ae({color1:v(e.color1),color2:v(e.color2),speed:e.speed}),{color1:`#ff0000`,color2:`#0000ff`,speed:.2},{color1:{control:{type:`color`}},color2:{control:{type:`color`}},speed:{control:{type:`range`,min:0,max:5,step:.05}}}),H=_(e=>new de({color1:v(e.color1),color2:v(e.color2),color3:v(e.color3),speed:e.speed}),{color1:`#ff0000`,color2:`#00ff00`,color3:`#0000ff`,speed:.2},{color1:{control:{type:`color`}},color2:{control:{type:`color`}},color3:{control:{type:`color`}},speed:{control:{type:`range`,min:0,max:5,step:.05}}}),U=_(e=>new le(e),{shift:.5},{shift:{control:{type:`range`,min:0,max:1,step:.01}}},{clock:!1}),W=_(e=>new _e(e),{intensity:.5,radius:1,power:2},{intensity:{control:{type:`range`,min:0,max:2,step:.01}},radius:{control:{type:`range`,min:0,max:2,step:.01}},power:{control:{type:`range`,min:.1,max:5,step:.1}}},{clock:!1,src:g}),G=_(e=>new ne(e),{intensity:.3,radius:0,power:2},{intensity:{control:{type:`range`,min:0,max:3,step:.01}},radius:{control:{type:`range`,min:0,max:2,step:.01}},power:{control:{type:`range`,min:.1,max:5,step:.1}}},{clock:!1,src:g}),K=[`Pigeon`,`Jellyfish`,`Logo`,`WebCam`,`HTML`],q={Pigeon:g,Jellyfish:h,Logo:d},J=[`normal`,`bold`,`100`,`300`,`600`,`900`],Y={render:e=>{let t=u(),n=new p({preset:e.preset,grid:[e.gridX,e.gridY],font:e.font,fontWeight:e.fontWeight,color:v(e.color),background:v(e.background),colorFromSource:e.colorFromSource,invert:e.invert,dither:e.dither});return b(t,e.src,n)},args:{src:`Pigeon`,preset:`standard`,gridX:8,gridY:14,font:`monospace`,fontWeight:`normal`,color:`#ffffff`,background:`#000000`,colorFromSource:!1,invert:!1,dither:0},argTypes:{src:{control:{type:`select`},options:K},preset:{control:{type:`select`},options:[`standard`,`minimal`,`blocks`,`dots`,`circles`,`detailed`]},gridX:{control:{type:`range`,min:4,max:48,step:1}},gridY:{control:{type:`range`,min:4,max:48,step:1}},font:{control:{type:`text`}},fontWeight:{control:{type:`select`},options:J},color:{control:{type:`color`}},background:{control:{type:`color`}},colorFromSource:{control:{type:`boolean`}},invert:{control:{type:`boolean`}},dither:{control:{type:`range`,min:0,max:1,step:.05}}}},X={render:e=>{let t=u(),n=new pe({grid:[e.gridX,e.gridY],glyphs:e.glyphs||void 0,font:e.font,fontWeight:e.fontWeight,color:e.gradient?[v(e.color),v(e.color2)]:v(e.color),headColor:v(e.headColor),background:v(e.background),speed:e.speed,tail:e.tail,tailFade:e.tailFade,birthRate:e.birthRate,glyphSpeed:e.glyphSpeed,brightness:e.brightness,contrast:e.contrast,invert:e.invert,seed:e.seed}),r=e.bloom>0?[n,new f({threshold:.1,softness:.2,intensity:e.bloom,scatter:.8,dither:0,edgeFade:.02,pad:60})]:n,i=b(t,e.src,r);return o(t),i},args:{src:`Logo`,gridX:8,gridY:8,glyphs:``,font:`monospace`,fontWeight:`normal`,color:`#2dff5c`,gradient:!1,color2:`#00b3ff`,headColor:`#d9ffe6`,background:`#000000`,speed:10,tail:18,tailFade:1,birthRate:.6,glyphSpeed:8,brightness:1,contrast:1,invert:!1,seed:0,bloom:1},argTypes:{src:{control:{type:`select`},options:K},gridX:{control:{type:`range`,min:4,max:48,step:1}},gridY:{control:{type:`range`,min:4,max:48,step:1}},glyphs:{control:{type:`text`}},font:{control:{type:`text`}},fontWeight:{control:{type:`select`},options:J},color:{control:{type:`color`}},gradient:{control:{type:`boolean`}},color2:{control:{type:`color`}},headColor:{control:{type:`color`}},background:{control:{type:`color`}},speed:{control:{type:`range`,min:1,max:40,step:1}},tail:{control:{type:`range`,min:2,max:48,step:1}},tailFade:{control:{type:`range`,min:0,max:1,step:.05}},birthRate:{control:{type:`range`,min:.05,max:5,step:.05}},glyphSpeed:{control:{type:`range`,min:0,max:30,step:1}},brightness:{control:{type:`range`,min:.2,max:3,step:.1}},contrast:{control:{type:`range`,min:0,max:4,step:.1}},invert:{control:{type:`boolean`}},seed:{control:{type:`range`,min:0,max:100,step:1}},bloom:{control:{type:`range`,min:0,max:8,step:.1}}}},Z=[`dots`,`rings`,`squares`],Q={render:e=>{let t=u(),n=new p({tiles:Array.from({length:6},(t,n)=>Ae(n,6,e.preset)),grid:e.grid,background:[0,0,0,1]});return b(t,e.src,n)},args:{src:`Pigeon`,preset:`dots`,grid:14},argTypes:{src:{control:{type:`select`},options:K},preset:{control:{type:`select`},options:Z},grid:{control:{type:`range`,min:4,max:48,step:1}}}},w.parameters={...w.parameters,docs:{...w.parameters?.docs,source:{originalSource:`{
+    `,e}function x(e,t,n,r){let i=e=>{r&&Promise.resolve(e).then(r)},a=e=>{e.style.display=`block`,e.style.margin=`40px auto`,e.style.maxWidth=`80vw`};if(t===`HTML`){let t=document.createElement(`div`);t.style.display=`flex`,t.style.justifyContent=`center`,t.style.margin=`40px auto`;let r=document.createElement(`div`);r.style.width=`900px`,r.style.maxWidth=`90vw`;let a=Ae();return r.appendChild(a),t.appendChild(r),i(e.addHTML(a,{effect:n})),t}if(t===`WebCam`){let t=document.createElement(`video`);return t.muted=!0,t.loop=!0,t.playsInline=!0,t.autoplay=!0,a(t),navigator.mediaDevices?.getUserMedia({video:!0}).then(e=>{t.srcObject=e,t.play()}).catch(e=>console.warn(`[ascii story] webcam unavailable:`,e)),i(e.add(t,{effect:n})),t}let o=document.createElement(`img`);return o.src=Fe[t]??``+new URL(`pigeon-ScEf6bli.webp`,import.meta.url).href,a(o),i(e.add(o,{effect:n})),o}function je(e,t,n){let r=document.createElement(`canvas`);r.width=64,r.height=64;let i=r.getContext(`2d`);if(i){let r=t>1?e/(t-1):1,a=`hsl(${e/Math.max(1,t)*360}, 85%, 55%)`;if(i.fillStyle=a,i.strokeStyle=a,n===`squares`){let e=6+r*50;i.fillRect(32-e/2,32-e/2,e,e)}else n===`rings`?(i.lineWidth=2+r*9,i.beginPath(),i.arc(32,32,6+r*22,0,Math.PI*2),i.stroke()):(i.beginPath(),i.arc(32,32,3+r*27,0,Math.PI*2),i.fill())}return r}var Me,S,C,w,T,E,Ne,D,Pe,O,k,A,j,M,N,P,F,I,L,R,z,B,V,H,U,W,G,K,q,J,Y,Fe,X,Z,Q,Ie,$,Le;e((()=>{ye(),we(),Te(),te(),Ee(),ne(),r(),Me={title:`Effect`,parameters:{layout:`fullscreen`}},S=()=>typeof navigator<`u`&&/Chromatic/.test(navigator.userAgent),C=2,w={render:()=>{let e=document.createElement(`img`);return e.src=u,e.style.display=`block`,e.style.margin=`40px auto`,e},args:void 0},w.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=l(),r=new d({threshold:.2,softness:.1,intensity:5,scatter:1,dither:0,edgeFade:0,pad:50});await n.add(t,{effect:r}),ee(`Bloom`,r)},T={render:()=>{let e=document.createElement(`img`);return e.src=h,e},args:void 0},T.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=l(),r=new d({threshold:.01,softness:.2,intensity:10,scatter:1,dither:0,edgeFade:.02,pad:200});await n.add(t,{effect:[new le({size:10}),new ge({spacing:5}),r]}),ee(`CRT Bloom`,r)},E={render:()=>{let e=document.createElement(`img`);return e.src=h,e},args:void 0,parameters:{chromatic:{disableSnapshot:!0}}},E.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let r=l(),i=new be({range:[.5,1],direction:`up`,angle:30});await r.add(t,{effect:i}),n(`Pixel Sort`,i)},Ne={Jellyfish:h,Logo:u,Pigeon:g},D={render:e=>{let{src:t,...n}=e,r=l(),i=new de(n);if(ke(i),t===`bbb`){let e=document.createElement(`video`);return e.src=m,e.muted=!0,e.loop=!0,e.playsInline=!0,e.autoplay=!0,e.crossOrigin=`anonymous`,e.style.display=`block`,e.style.margin=`40px auto`,e.style.maxWidth=`80vw`,e.play(),r.add(e,{effect:i}),e}let a=document.createElement(`img`);return a.src=Ne[t],a.style.display=`block`,a.style.margin=`40px auto`,r.add(a,{effect:i}),a},args:{src:`Jellyfish`,quality:.4,seed:.25,iterations:24,resolutionScale:1,randomFlip:!0,vertical:!1,speed:0},argTypes:{src:{control:{type:`select`},options:[`Jellyfish`,`Logo`,`Pigeon`,`bbb`]},quality:{control:{type:`range`,min:0,max:1,step:.01}},seed:{control:{type:`range`,min:0,max:1,step:.01}},iterations:{control:{type:`range`,min:1,max:30,step:1}},resolutionScale:{control:{type:`range`,min:0,max:1,step:.01}},randomFlip:{control:{type:`boolean`}},vertical:{control:{type:`boolean`}},speed:{control:{type:`range`,min:0,max:30,step:.5}}},parameters:{chromatic:{disableSnapshot:!0}}},Pe={Jellyfish:h,Logo:u,Pigeon:g},O={render:e=>{let{src:t,...n}=e,r=l(),i=new Se(n);if(t===`bbb`){let e=document.createElement(`video`);return e.src=m,e.muted=!0,e.loop=!0,e.playsInline=!0,e.autoplay=!0,e.crossOrigin=`anonymous`,e.style.display=`block`,e.style.margin=`40px auto`,e.style.maxWidth=`80vw`,e.play(),r.add(e,{effect:i}),e}let a=document.createElement(`img`);return a.src=Pe[t],a.style.display=`block`,a.style.margin=`40px auto`,r.add(a,{effect:i}),a},args:{src:`Jellyfish`,quality:8,iterations:3,downscale:1},argTypes:{src:{control:{type:`select`},options:[`Jellyfish`,`Logo`,`Pigeon`,`bbb`]},quality:{control:{type:`range`,min:1,max:100,step:1}},iterations:{control:{type:`range`,min:1,max:10,step:1}},downscale:{control:{type:`range`,min:.02,max:1,step:.01}}},parameters:{chromatic:{disableSnapshot:!0}}},k=60,A=1/60,j=40,M=24,N=16384,P={render:()=>{let e=document.createElement(`img`);return e.src=h,e},args:void 0},P.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);await new Promise(e=>{t.onload=e});let n=S(),r=l(n?{autoplay:!1}:void 0),a=new Ce;if(await r.add(t,{effect:a}),n){await y(r,t);return}i(`Fluid`,a),b(e)},F={render:()=>{let e=document.createElement(`img`);return e.src=h,e},args:void 0},F.play=async({canvasElement:e})=>{let n=e.querySelector(`img`);await new Promise(e=>{n.onload=e});let r=l(),i={Jellyfish:h,Logo:u},o=null,s=async()=>{let e=o?{...o.params}:{};o&&(r.remove(n),a()),o=new ae(e),await r.add(n,{effect:o}),t(`Halftone`,o,{img:n,sources:i,onSrcChange:async e=>{n.src=i[e],await new Promise(e=>{n.onload=()=>e()}),await s()}})};await s()},I={render:()=>{let e=document.createElement(`img`);return e.src=u,e},args:void 0},I.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);if(await new Promise(e=>{t.onload=()=>e()}),S()){let e=l({autoplay:!1});await e.add(t,{effect:new p({count:N})}),await y(e,t,{steps:j});return}let n=l(),r={Jellyfish:h,Logo:u},i=null,o=async()=>{let e=i?{...i.params}:{};i&&(n.remove(t),a()),i=new p(e),await n.add(t,{effect:i}),c(`Particle`,i,{img:t,sources:r,onSrcChange:async e=>{t.src=r[e],await new Promise(e=>{t.onload=()=>e()}),await o()}})};await o(),b(e)},L={render:()=>{let e=document.createElement(`img`);return e.src=u,e},args:void 0},L.play=async({canvasElement:e})=>{let t=e.querySelector(`img`);if(await new Promise(e=>{t.onload=()=>e()}),await new Promise(e=>requestAnimationFrame(()=>e(void 0))),S()){let e=l({autoplay:!1}),n=new f({count:N});await e.add(t,{effect:n}),await y(e,t,{steps:M,onReady:()=>n.trigger()});return}let n=l(),r={Logo:u,Jellyfish:h},i=null,o=async()=>{let e=i?{...i.params}:{};i&&(n.remove(t),a()),await new Promise(e=>requestAnimationFrame(()=>e(void 0))),i=new f(e),await n.add(t,{effect:i}),s(`Particle Explode`,i,{img:t,sources:r,onSrcChange:async e=>{t.src=r[e],await new Promise(e=>{t.onload=()=>e()}),await o()}})};await o()},R={render:e=>{let{src:t,...n}=e,r=l(),i=new he(n);if(t===`Webpage`){let e=document.getElementById(`storybook-root`);e&&(e.style.height=`auto`,e.style.display=`block`);let t=document.createElement(`div`);t.style.display=`flex`,t.style.justifyContent=`center`;let n=Oe();return t.appendChild(n),r.addHTML(n,{effect:i}),t}let a=document.createElement(`img`);return a.src=t===`Jellyfish`?h:u,r.add(a,{effect:i}),a},args:{src:`Webpage`,cellSize:40,pressRadius:200,press:1,flatCells:!1,seed:0,speed:0,breathe:0,breatheSpeed:0,breatheScale:40,bgColor:`#00000000`},argTypes:{src:{control:{type:`select`},options:[`Logo`,`Jellyfish`,`Webpage`]},cellSize:{control:{type:`range`,min:5,max:200,step:1}},pressRadius:{control:{type:`range`,min:0,max:800,step:10}},press:{control:{type:`range`,min:0,max:1,step:.01}},flatCells:{control:{type:`boolean`}},seed:{control:{type:`range`,min:0,max:1e3,step:1}},speed:{control:{type:`range`,min:0,max:5,step:.05}},breathe:{control:{type:`range`,min:0,max:1,step:.01}},breatheSpeed:{control:{type:`range`,min:0,max:5,step:.05}},breatheScale:{control:{type:`range`,min:10,max:500,step:5}},bgColor:{control:{type:`color`}}}},z=_(e=>new xe(e),{speed:1,intensity:1},{speed:{control:{type:`range`,min:0,max:5,step:.05}},intensity:{control:{type:`range`,min:0,max:3,step:.05}}}),B=_(e=>new ve(e),{speed:1,amount:10},{speed:{control:{type:`range`,min:0,max:5,step:.05}},amount:{control:{type:`range`,min:0,max:60,step:1}}}),V=_(e=>new ce(e),{speed:1,amount:.05},{speed:{control:{type:`range`,min:0,max:5,step:.05}},amount:{control:{type:`range`,min:0,max:.3,step:.005}}}),H=_(e=>new pe(e),{speed:1,frequency:1},{speed:{control:{type:`range`,min:0,max:5,step:.05}},frequency:{control:{type:`range`,min:.1,max:8,step:.1}}}),U=_(e=>new oe(e),{speed:1,amount:20,frequency:7,blur:2},{speed:{control:{type:`range`,min:0,max:5,step:.05}},amount:{control:{type:`range`,min:0,max:100,step:1}},frequency:{control:{type:`range`,min:1,max:30,step:.5}},blur:{control:{type:`range`,min:0,max:20,step:.5}}}),W=_(e=>new se({color1:v(e.color1),color2:v(e.color2),speed:e.speed}),{color1:`#ff0000`,color2:`#0000ff`,speed:.2},{color1:{control:{type:`color`}},color2:{control:{type:`color`}},speed:{control:{type:`range`,min:0,max:5,step:.05}}}),G=_(e=>new fe({color1:v(e.color1),color2:v(e.color2),color3:v(e.color3),speed:e.speed}),{color1:`#ff0000`,color2:`#00ff00`,color3:`#0000ff`,speed:.2},{color1:{control:{type:`color`}},color2:{control:{type:`color`}},color3:{control:{type:`color`}},speed:{control:{type:`range`,min:0,max:5,step:.05}}}),K=_(e=>new ue(e),{shift:.5},{shift:{control:{type:`range`,min:0,max:1,step:.01}}},{clock:!1}),q=_(e=>new _e(e),{intensity:.5,radius:1,power:2},{intensity:{control:{type:`range`,min:0,max:2,step:.01}},radius:{control:{type:`range`,min:0,max:2,step:.01}},power:{control:{type:`range`,min:.1,max:5,step:.1}}},{clock:!1,src:g}),J=_(e=>new re(e),{intensity:.3,radius:0,power:2},{intensity:{control:{type:`range`,min:0,max:3,step:.01}},radius:{control:{type:`range`,min:0,max:2,step:.01}},power:{control:{type:`range`,min:.1,max:5,step:.1}}},{clock:!1,src:g}),Y=[`Pigeon`,`Jellyfish`,`Logo`,`WebCam`,`HTML`],Fe={Pigeon:g,Jellyfish:h,Logo:u},X=[`normal`,`bold`,`100`,`300`,`600`,`900`],Z={render:e=>{let t=l(),n=new ie({preset:e.preset,grid:[e.gridX,e.gridY],font:e.font,fontWeight:e.fontWeight,color:v(e.color),background:v(e.background),colorFromSource:e.colorFromSource,invert:e.invert,dither:e.dither});return x(t,e.src,n)},args:{src:`Pigeon`,preset:`standard`,gridX:8,gridY:14,font:`monospace`,fontWeight:`normal`,color:`#ffffff`,background:`#000000`,colorFromSource:!1,invert:!1,dither:0},argTypes:{src:{control:{type:`select`},options:Y},preset:{control:{type:`select`},options:[`standard`,`minimal`,`blocks`,`dots`,`circles`,`detailed`]},gridX:{control:{type:`range`,min:4,max:48,step:1}},gridY:{control:{type:`range`,min:4,max:48,step:1}},font:{control:{type:`text`}},fontWeight:{control:{type:`select`},options:X},color:{control:{type:`color`}},background:{control:{type:`color`}},colorFromSource:{control:{type:`boolean`}},invert:{control:{type:`boolean`}},dither:{control:{type:`range`,min:0,max:1,step:.05}}}},Q={render:e=>{let t=S(),n=l(t?{timeScale:0}:void 0),r=new me({grid:[e.gridX,e.gridY],glyphs:e.glyphs||void 0,font:e.font,fontWeight:e.fontWeight,color:e.gradient?[v(e.color),v(e.color2)]:v(e.color),headColor:v(e.headColor),background:v(e.background),speed:e.speed,tail:e.tail,tailFade:e.tailFade,birthRate:e.birthRate,glyphSpeed:e.glyphSpeed,brightness:e.brightness,contrast:e.contrast,invert:e.invert,seed:e.seed}),i=e.bloom>0?[r,new d({threshold:.1,softness:.2,intensity:e.bloom,scatter:.8,dither:0,edgeFade:.02,pad:60})]:r,a=x(n,e.src,i,t?()=>{n.setTime(C),n.render()}:void 0);return t||o(n),a},args:{src:`Logo`,gridX:8,gridY:8,glyphs:``,font:`monospace`,fontWeight:`normal`,color:`#2dff5c`,gradient:!1,color2:`#00b3ff`,headColor:`#d9ffe6`,background:`#000000`,speed:10,tail:18,tailFade:1,birthRate:.6,glyphSpeed:8,brightness:1,contrast:1,invert:!1,seed:0,bloom:1},argTypes:{src:{control:{type:`select`},options:Y},gridX:{control:{type:`range`,min:4,max:48,step:1}},gridY:{control:{type:`range`,min:4,max:48,step:1}},glyphs:{control:{type:`text`}},font:{control:{type:`text`}},fontWeight:{control:{type:`select`},options:X},color:{control:{type:`color`}},gradient:{control:{type:`boolean`}},color2:{control:{type:`color`}},headColor:{control:{type:`color`}},background:{control:{type:`color`}},speed:{control:{type:`range`,min:1,max:40,step:1}},tail:{control:{type:`range`,min:2,max:48,step:1}},tailFade:{control:{type:`range`,min:0,max:1,step:.05}},birthRate:{control:{type:`range`,min:.05,max:5,step:.05}},glyphSpeed:{control:{type:`range`,min:0,max:30,step:1}},brightness:{control:{type:`range`,min:.2,max:3,step:.1}},contrast:{control:{type:`range`,min:0,max:4,step:.1}},invert:{control:{type:`boolean`}},seed:{control:{type:`range`,min:0,max:100,step:1}},bloom:{control:{type:`range`,min:0,max:8,step:.1}}}},Ie=[`dots`,`rings`,`squares`],$={render:e=>{let t=l(),n=new ie({tiles:Array.from({length:6},(t,n)=>je(n,6,e.preset)),grid:e.grid,background:[0,0,0,1]});return x(t,e.src,n)},args:{src:`Pigeon`,preset:`dots`,grid:14},argTypes:{src:{control:{type:`select`},options:Y},preset:{control:{type:`select`},options:Ie},grid:{control:{type:`range`,min:4,max:48,step:1}}}},w.parameters={...w.parameters,docs:{...w.parameters?.docs,source:{originalSource:`{
   render: () => {
     const img = document.createElement("img");
     img.src = Logo;
@@ -198,7 +198,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       disableSnapshot: true
     }
   }
-}`,...E.parameters?.docs?.source}}},O.parameters={...O.parameters,docs:{...O.parameters?.docs,source:{originalSource:`{
+}`,...E.parameters?.docs?.source}}},D.parameters={...D.parameters,docs:{...D.parameters?.docs,source:{originalSource:`{
   render: args => {
     const {
       src,
@@ -308,7 +308,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       disableSnapshot: true
     }
   }
-}`,...O.parameters?.docs?.source}}},A.parameters={...A.parameters,docs:{...A.parameters?.docs,source:{originalSource:`{
+}`,...D.parameters?.docs?.source}}},O.parameters={...O.parameters,docs:{...O.parameters?.docs,source:{originalSource:`{
   render: args => {
     const {
       src,
@@ -387,35 +387,35 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       disableSnapshot: true
     }
   }
-}`,...A.parameters?.docs?.source}}},j.parameters={...j.parameters,docs:{...j.parameters?.docs,source:{originalSource:`{
+}`,...O.parameters?.docs?.source}}},P.parameters={...P.parameters,docs:{...P.parameters?.docs,source:{originalSource:`{
   render: () => {
     const img = document.createElement("img");
     img.src = Jellyfish;
-    return img;
-  },
-  args: undefined
-}`,...j.parameters?.docs?.source}}},M.parameters={...M.parameters,docs:{...M.parameters?.docs,source:{originalSource:`{
-  render: () => {
-    const img = document.createElement("img");
-    img.src = Jellyfish;
-    return img;
-  },
-  args: undefined
-}`,...M.parameters?.docs?.source}}},N.parameters={...N.parameters,docs:{...N.parameters?.docs,source:{originalSource:`{
-  render: () => {
-    const img = document.createElement("img");
-    img.src = Logo;
-    return img;
-  },
-  args: undefined
-}`,...N.parameters?.docs?.source}}},P.parameters={...P.parameters,docs:{...P.parameters?.docs,source:{originalSource:`{
-  render: () => {
-    const img = document.createElement("img");
-    img.src = Logo;
     return img;
   },
   args: undefined
 }`,...P.parameters?.docs?.source}}},F.parameters={...F.parameters,docs:{...F.parameters?.docs,source:{originalSource:`{
+  render: () => {
+    const img = document.createElement("img");
+    img.src = Jellyfish;
+    return img;
+  },
+  args: undefined
+}`,...F.parameters?.docs?.source}}},I.parameters={...I.parameters,docs:{...I.parameters?.docs,source:{originalSource:`{
+  render: () => {
+    const img = document.createElement("img");
+    img.src = Logo;
+    return img;
+  },
+  args: undefined
+}`,...I.parameters?.docs?.source}}},L.parameters={...L.parameters,docs:{...L.parameters?.docs,source:{originalSource:`{
+  render: () => {
+    const img = document.createElement("img");
+    img.src = Logo;
+    return img;
+  },
+  args: undefined
+}`,...L.parameters?.docs?.source}}},R.parameters={...R.parameters,docs:{...R.parameters?.docs,source:{originalSource:`{
   render: args => {
     const {
       src,
@@ -547,7 +547,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       }
     }
   }
-}`,...F.parameters?.docs?.source}}},I.parameters={...I.parameters,docs:{...I.parameters?.docs,source:{originalSource:`presetStory<GlitchArgs>(a => new GlitchEffect(a), {
+}`,...R.parameters?.docs?.source}}},z.parameters={...z.parameters,docs:{...z.parameters?.docs,source:{originalSource:`presetStory<GlitchArgs>(a => new GlitchEffect(a), {
   speed: 1,
   intensity: 1
 }, {
@@ -567,7 +567,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       step: 0.05
     }
   }
-})`,...I.parameters?.docs?.source}}},L.parameters={...L.parameters,docs:{...L.parameters?.docs,source:{originalSource:`presetStory<RgbShiftArgs>(a => new RgbShiftEffect(a), {
+})`,...z.parameters?.docs?.source}}},B.parameters={...B.parameters,docs:{...B.parameters?.docs,source:{originalSource:`presetStory<RgbShiftArgs>(a => new RgbShiftEffect(a), {
   speed: 1,
   amount: 10
 }, {
@@ -587,7 +587,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       step: 1
     }
   }
-})`,...L.parameters?.docs?.source}}},R.parameters={...R.parameters,docs:{...R.parameters?.docs,source:{originalSource:`presetStory<RgbGlitchArgs>(a => new RgbGlitchEffect(a), {
+})`,...B.parameters?.docs?.source}}},V.parameters={...V.parameters,docs:{...V.parameters?.docs,source:{originalSource:`presetStory<RgbGlitchArgs>(a => new RgbGlitchEffect(a), {
   speed: 1,
   amount: 0.05
 }, {
@@ -607,7 +607,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       step: 0.005
     }
   }
-})`,...R.parameters?.docs?.source}}},z.parameters={...z.parameters,docs:{...z.parameters?.docs,source:{originalSource:`presetStory<RainbowArgs>(a => new RainbowEffect(a), {
+})`,...V.parameters?.docs?.source}}},H.parameters={...H.parameters,docs:{...H.parameters?.docs,source:{originalSource:`presetStory<RainbowArgs>(a => new RainbowEffect(a), {
   speed: 1,
   frequency: 1
 }, {
@@ -627,7 +627,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       step: 0.1
     }
   }
-})`,...z.parameters?.docs?.source}}},B.parameters={...B.parameters,docs:{...B.parameters?.docs,source:{originalSource:`presetStory<SinewaveArgs>(a => new SinewaveEffect(a), {
+})`,...H.parameters?.docs?.source}}},U.parameters={...U.parameters,docs:{...U.parameters?.docs,source:{originalSource:`presetStory<SinewaveArgs>(a => new SinewaveEffect(a), {
   speed: 1,
   amount: 20,
   frequency: 7,
@@ -665,7 +665,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       step: 0.5
     }
   }
-})`,...B.parameters?.docs?.source}}},V.parameters={...V.parameters,docs:{...V.parameters?.docs,source:{originalSource:`presetStory<DuotoneArgs>(a => new DuotoneEffect({
+})`,...U.parameters?.docs?.source}}},W.parameters={...W.parameters,docs:{...W.parameters?.docs,source:{originalSource:`presetStory<DuotoneArgs>(a => new DuotoneEffect({
   color1: hexToRgba(a.color1),
   color2: hexToRgba(a.color2),
   speed: a.speed
@@ -692,7 +692,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       step: 0.05
     }
   }
-})`,...V.parameters?.docs?.source}}},H.parameters={...H.parameters,docs:{...H.parameters?.docs,source:{originalSource:`presetStory<TritoneArgs>(a => new TritoneEffect({
+})`,...W.parameters?.docs?.source}}},G.parameters={...G.parameters,docs:{...G.parameters?.docs,source:{originalSource:`presetStory<TritoneArgs>(a => new TritoneEffect({
   color1: hexToRgba(a.color1),
   color2: hexToRgba(a.color2),
   color3: hexToRgba(a.color3),
@@ -726,7 +726,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       step: 0.05
     }
   }
-})`,...H.parameters?.docs?.source}}},U.parameters={...U.parameters,docs:{...U.parameters?.docs,source:{originalSource:`presetStory<HueShiftArgs>(a => new HueShiftEffect(a), {
+})`,...G.parameters?.docs?.source}}},K.parameters={...K.parameters,docs:{...K.parameters?.docs,source:{originalSource:`presetStory<HueShiftArgs>(a => new HueShiftEffect(a), {
   shift: 0.5
 }, {
   shift: {
@@ -739,7 +739,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
   }
 }, {
   clock: false
-})`,...U.parameters?.docs?.source}}},W.parameters={...W.parameters,docs:{...W.parameters?.docs,source:{originalSource:`presetStory<VignetteArgs>(a => new VignetteEffect(a), {
+})`,...K.parameters?.docs?.source}}},q.parameters={...q.parameters,docs:{...q.parameters?.docs,source:{originalSource:`presetStory<VignetteArgs>(a => new VignetteEffect(a), {
   intensity: 0.5,
   radius: 1.0,
   power: 2.0
@@ -771,7 +771,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
 }, {
   clock: false,
   src: Pigeon
-})`,...W.parameters?.docs?.source}}},G.parameters={...G.parameters,docs:{...G.parameters?.docs,source:{originalSource:`presetStory<ChromaticArgs>(a => new ChromaticEffect(a), {
+})`,...q.parameters?.docs?.source}}},J.parameters={...J.parameters,docs:{...J.parameters?.docs,source:{originalSource:`presetStory<ChromaticArgs>(a => new ChromaticEffect(a), {
   intensity: 0.3,
   radius: 0.0,
   power: 2.0
@@ -803,7 +803,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
 }, {
   clock: false,
   src: Pigeon
-})`,...G.parameters?.docs?.source}}},Y.parameters={...Y.parameters,docs:{...Y.parameters?.docs,source:{originalSource:`{
+})`,...J.parameters?.docs?.source}}},Z.parameters={...Z.parameters,docs:{...Z.parameters?.docs,source:{originalSource:`{
   render: a => {
     const vfx = initVFX();
     const effect = new AsciiEffect({
@@ -901,9 +901,16 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       }
     }
   }
-}`,...Y.parameters?.docs?.source}}},X.parameters={...X.parameters,docs:{...X.parameters?.docs,source:{originalSource:`{
+}`,...Z.parameters?.docs?.source}}},Q.parameters={...Q.parameters,docs:{...Q.parameters?.docs,source:{originalSource:`{
   render: a => {
-    const vfx = initVFX();
+    // The rain is a pure function of the clock + seed (no Math.random),
+    // so under VRT freeze the clock (timeScale 0) and pin it to a fixed
+    // frame once added — Chromatic then captures the same pattern every
+    // run.
+    const vrt = isChromatic();
+    const vfx = initVFX(vrt ? {
+      timeScale: 0
+    } : undefined);
     const effect = new MatrixEffect({
       grid: [a.gridX, a.gridY],
       glyphs: a.glyphs || undefined,
@@ -936,8 +943,13 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       edgeFade: 0.02,
       pad: 60
     })] : effect;
-    const el = addAsciiSource(vfx, a.src, effects);
-    attachClockPane(vfx);
+    const el = addAsciiSource(vfx, a.src, effects, vrt ? () => {
+      vfx.setTime(VRT_TIME);
+      vfx.render();
+    } : undefined);
+    if (!vrt) {
+      attachClockPane(vfx);
+    }
     return el;
   },
   args: {
@@ -1105,7 +1117,7 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       }
     }
   }
-}`,...X.parameters?.docs?.source}}},Q.parameters={...Q.parameters,docs:{...Q.parameters?.docs,source:{originalSource:`{
+}`,...Q.parameters?.docs?.source}}},$.parameters={...$.parameters,docs:{...$.parameters?.docs,source:{originalSource:`{
   render: a => {
     const vfx = initVFX();
     const count = 6;
@@ -1146,4 +1158,4 @@ import{n as e}from"./chunk-BneVvdWh.js";import{a as t,c as n,d as r,i,l as a,n a
       }
     }
   }
-}`,...Q.parameters?.docs?.source}}},$=[`bloom`,`crtBloom`,`pixelSort`,`jpegGlitch`,`badJpeg`,`fluid`,`halftone`,`particle`,`particleExplode`,`voronoi`,`glitch`,`rgbShift`,`rgbGlitch`,`rainbow`,`sinewave`,`duotone`,`tritone`,`hueShift`,`vignette`,`chromatic`,`ascii`,`matrix`,`asciiTiles`]}))();export{$ as __namedExportsOrder,Y as ascii,Q as asciiTiles,A as badJpeg,w as bloom,G as chromatic,T as crtBloom,x as default,V as duotone,j as fluid,I as glitch,M as halftone,U as hueShift,O as jpegGlitch,X as matrix,N as particle,P as particleExplode,E as pixelSort,z as rainbow,R as rgbGlitch,L as rgbShift,B as sinewave,H as tritone,W as vignette,F as voronoi};
+}`,...$.parameters?.docs?.source}}},Le=[`bloom`,`crtBloom`,`pixelSort`,`jpegGlitch`,`badJpeg`,`fluid`,`halftone`,`particle`,`particleExplode`,`voronoi`,`glitch`,`rgbShift`,`rgbGlitch`,`rainbow`,`sinewave`,`duotone`,`tritone`,`hueShift`,`vignette`,`chromatic`,`ascii`,`matrix`,`asciiTiles`]}))();export{Le as __namedExportsOrder,Z as ascii,$ as asciiTiles,O as badJpeg,w as bloom,J as chromatic,T as crtBloom,Me as default,W as duotone,P as fluid,z as glitch,F as halftone,K as hueShift,D as jpegGlitch,Q as matrix,I as particle,L as particleExplode,E as pixelSort,H as rainbow,V as rgbGlitch,B as rgbShift,U as sinewave,G as tritone,q as vignette,R as voronoi};
