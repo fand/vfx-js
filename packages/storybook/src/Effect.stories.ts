@@ -370,7 +370,7 @@ function makeSeededRandom(seed: number): () => number {
 }
 
 // Steps to drive and fixed per-step clock delta for VRT capture.
-const VRT_STEPS = 90;
+const VRT_STEPS = 60;
 const VRT_DT = 1 / 60;
 // Stop the one-shot Explode mid-burst (elapsed ≈ 0.48s of the 1s
 // duration) so the captured frame shows scattered particles, not the
@@ -382,6 +382,13 @@ const EXPLODE_STEPS = 30;
 // the pointer in a circle, rendering one frame per step. The VFX must be
 // created with `autoplay: false` so no RAF loop runs after this returns —
 // Chromatic then captures exactly the final frame, identical every run.
+//
+// Each step yields to the event loop before rendering. The frozen clock
+// (setTime pins ctx.time, so the sim's dt comes from the fixed step, not
+// wall time) keeps the result identical no matter how long each yield
+// takes — while sidestepping the long synchronous GPU burst that trips
+// SwiftShader's renderer-hang watchdog in the Chromatic capture env.
+//
 // Math.random is seeded for the duration so particle spawns are
 // reproducible. `onReady` fires once before the first render — used to
 // trigger the one-shot Explode burst on a deterministic frame.
@@ -402,6 +409,7 @@ async function driveVrt(
         opts.onReady?.();
         let time = 0;
         for (let i = 0; i < steps; i++) {
+            await new Promise<void>((r) => setTimeout(r, 0));
             const angle = (i / steps) * Math.PI * 2;
             window.dispatchEvent(
                 new MouseEvent("pointermove", {
