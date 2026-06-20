@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-import type { Effect } from "@vfx-js/core";
+import type { Effect, VFX } from "@vfx-js/core";
 import {
     AsciiEffect,
     type AsciiPresetName,
@@ -356,6 +356,82 @@ export const badJpeg: StoryObj<BadJpegArgs> = {
     parameters: { chromatic: { disableSnapshot: true } },
 };
 
+// Deterministic PRNG (mulberry32). The particle effect spawns from
+// Math.random(); seeding it makes spawn positions identical across VRT
+// runs.
+function makeSeededRandom(seed: number): () => number {
+    let a = seed >>> 0;
+    return () => {
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+// Steps to drive and fixed per-step clock delta for VRT capture.
+const VRT_STEPS = 60;
+const VRT_DT = 1 / 60;
+// Fewer steps for the particle sims — each step is a heavy GPU frame
+// under SwiftShader (the Chromatic capture renderer), and the full
+// count drives it past the capture time budget.
+const PARTICLE_VRT_STEPS = 40;
+const EXPLODE_STEPS = 24;
+// Capture-only particle count. Far below the interactive default so the
+// SwiftShader fill/advect cost stays well within Chromatic's budget; a
+// 128x128 grid still fills a rich, recognizable frame.
+const VRT_PARTICLE_COUNT = 128 * 128;
+
+// Deterministic VRT driver for the stateful sims (Fluid, Particle,
+// Particle Explode). Advances the virtual clock by a fixed dt and sweeps
+// the pointer in a circle, rendering one frame per step. The VFX must be
+// created with `autoplay: false` so no RAF loop runs after this returns —
+// Chromatic then captures exactly the final frame, identical every run.
+//
+// Each step yields to the event loop before rendering. The frozen clock
+// (setTime pins ctx.time, so the sim's dt comes from the fixed step, not
+// wall time) keeps the result identical no matter how long each yield
+// takes — while sidestepping the long synchronous GPU burst that trips
+// SwiftShader's renderer-hang watchdog in the Chromatic capture env.
+//
+// Math.random is seeded for the duration so particle spawns are
+// reproducible. `onReady` fires once before the first render — used to
+// trigger the one-shot Explode burst on a deterministic frame.
+async function driveVrt(
+    vfx: VFX,
+    element: HTMLElement,
+    opts: { steps?: number; onReady?: () => void } = {},
+): Promise<void> {
+    const steps = opts.steps ?? VRT_STEPS;
+    const rect = element.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const radius = Math.min(rect.width, rect.height) * 0.3;
+
+    const realRandom = Math.random;
+    Math.random = makeSeededRandom(0x9e3779b9);
+    try {
+        opts.onReady?.();
+        let time = 0;
+        for (let i = 0; i < steps; i++) {
+            await new Promise<void>((r) => setTimeout(r, 0));
+            const angle = (i / steps) * Math.PI * 2;
+            window.dispatchEvent(
+                new MouseEvent("pointermove", {
+                    clientX: cx + Math.cos(angle) * radius,
+                    clientY: cy + Math.sin(angle) * radius,
+                    bubbles: true,
+                }),
+            );
+            time += VRT_DT;
+            vfx.setTime(time);
+            vfx.render();
+        }
+    } finally {
+        Math.random = realRandom;
+    }
+}
+
 // Stable Fluid as a single Effect. Drives mouse splats off real pointer
 // events; the play() call seeds a circular sweep so the story renders a
 // non-empty frame on first capture.
@@ -373,11 +449,17 @@ fluid.play = async ({ canvasElement }) => {
         img.onload = o;
     });
 
-    const vfx = initVFX();
+    const vrt = isChromatic();
+    const vfx = initVFX(vrt ? { autoplay: false } : undefined);
     const effect = new FluidEffect();
     await vfx.add(img, { effect });
-    attachFluidPane("Fluid", effect);
 
+    if (vrt) {
+        await driveVrt(vfx, img);
+        return;
+    }
+
+    attachFluidPane("Fluid", effect);
     seedFluidMotion(canvasElement);
 };
 
@@ -440,6 +522,19 @@ particle.play = async ({ canvasElement }) => {
         img.onload = () => o();
     });
 
+    if (isChromatic()) {
+        // Deterministic capture: fixed count, no pane, hand-driven clock
+        // + pointer sweep so spawns and motion are identical every run.
+        // SwiftShader (Chromatic capture env) can't allocate the default
+        // 1M-particle state RTs within the 30s load budget, so cap count.
+        const vfx = initVFX({ autoplay: false });
+        await vfx.add(img, {
+            effect: new ParticleEffect({ count: VRT_PARTICLE_COUNT }),
+        });
+        await driveVrt(vfx, img, { steps: PARTICLE_VRT_STEPS });
+        return;
+    }
+
     const vfx = initVFX();
     const sources = { Jellyfish, Logo };
     // The framework loads img.src once at vfx.add and never observes
@@ -447,13 +542,7 @@ particle.play = async ({ canvasElement }) => {
     // preserved params) + add + reattach pane.
     let effect: ParticleEffect | null = null;
     const setup = async () => {
-        // SwiftShader (Chromatic capture env) can't allocate the
-        // default 1M-particle state RTs within the 30s load budget.
-        const initialParams = effect
-            ? { ...effect.params }
-            : isChromatic()
-              ? { count: 256 * 256 }
-              : {};
+        const initialParams = effect ? { ...effect.params } : {};
         if (effect) {
             vfx.remove(img);
             disposeAllPanes();
@@ -494,6 +583,22 @@ particleExplode.play = async ({ canvasElement }) => {
         img.onload = () => o();
     });
     await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    if (isChromatic()) {
+        // Deterministic capture: trigger the burst, then drive the clock
+        // to a fixed mid-burst frame so Chromatic snapshots the scattered
+        // particles (the effect has no Math.random — GPU-hashed spawns —
+        // so the burst is reproducible). Cap count for the SwiftShader
+        // load budget, matching the Particle story.
+        const vfx = initVFX({ autoplay: false });
+        const explode = new ParticleExplodeEffect({ count: VRT_PARTICLE_COUNT });
+        await vfx.add(img, { effect: explode });
+        await driveVrt(vfx, img, {
+            steps: EXPLODE_STEPS,
+            onReady: () => explode.trigger(),
+        });
+        return;
+    }
 
     const vfx = initVFX();
     const sources = { Logo, Jellyfish };
@@ -1033,7 +1138,15 @@ function addAsciiSource(
     vfx: ReturnType<typeof initVFX>,
     src: AsciiSrcName,
     effect: Effect | readonly Effect[],
+    onReady?: () => void,
 ): HTMLElement {
+    // Fire onReady once the source is added (atlas built, texture uploaded).
+    // VRT pins the clock here so the captured frame is deterministic.
+    const ready = (p: unknown) => {
+        if (onReady) {
+            void Promise.resolve(p).then(onReady);
+        }
+    };
     const center = (el: HTMLElement) => {
         el.style.display = "block";
         el.style.margin = "40px auto";
@@ -1056,7 +1169,7 @@ function addAsciiSource(
         const block = makeAsciiHtmlSample();
         sizer.appendChild(block);
         wrapper.appendChild(sizer);
-        vfx.addHTML(block, { effect });
+        ready(vfx.addHTML(block, { effect }));
         return wrapper;
     }
     if (src === "WebCam") {
@@ -1073,13 +1186,13 @@ function addAsciiSource(
                 void video.play();
             })
             .catch((e) => console.warn("[ascii story] webcam unavailable:", e));
-        vfx.add(video, { effect });
+        ready(vfx.add(video, { effect }));
         return video;
     }
     const img = document.createElement("img");
     img.src = ASCII_IMAGE_SRCS[src] ?? Pigeon;
     center(img);
-    vfx.add(img, { effect });
+    ready(vfx.add(img, { effect }));
     return img;
 }
 
@@ -1185,7 +1298,12 @@ type MatrixArgs = {
 // phosphor glow around the bright glyphs (bypassed when bloom = 0).
 export const matrix: StoryObj<MatrixArgs> = {
     render: (a) => {
-        const vfx = initVFX();
+        // The rain is a pure function of the clock + seed (no Math.random),
+        // so under VRT freeze the clock (timeScale 0) and pin it to a fixed
+        // frame once added — Chromatic then captures the same pattern every
+        // run.
+        const vrt = isChromatic();
+        const vfx = initVFX(vrt ? { timeScale: 0 } : undefined);
         const effect = new MatrixEffect({
             grid: [a.gridX, a.gridY],
             glyphs: a.glyphs || undefined,
@@ -1226,8 +1344,20 @@ export const matrix: StoryObj<MatrixArgs> = {
                       }),
                   ]
                 : effect;
-        const el = addAsciiSource(vfx, a.src, effects);
-        attachClockPane(vfx);
+        const el = addAsciiSource(
+            vfx,
+            a.src,
+            effects,
+            vrt
+                ? () => {
+                      vfx.setTime(VRT_TIME);
+                      vfx.render();
+                  }
+                : undefined,
+        );
+        if (!vrt) {
+            attachClockPane(vfx);
+        }
         return el;
     },
     args: {
