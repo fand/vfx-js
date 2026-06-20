@@ -20,6 +20,7 @@ import {
     RainbowEffect,
     RgbGlitchEffect,
     RgbShiftEffect,
+    SaberEffect,
     ScanlineEffect,
     SinewaveEffect,
     TritoneEffect,
@@ -897,6 +898,152 @@ export const voronoi: StoryObj<VoronoiArgs> = {
             control: { type: "range", min: 10, max: 500, step: 5 },
         },
         bgColor: { control: { type: "color" } },
+    },
+};
+
+// Electric "Saber" energy. A JFA distance field is built once from the
+// element silhouette, then warped each frame with animated 3D noise and lit
+// with a 1/distance glow.
+type SaberSrc = "Logo" | "Jellyfish" | "Text" | "Webcam";
+type SaberArgs = {
+    src: SaberSrc;
+    color: string;
+    intensity: number;
+    amplitude: number;
+    frequency: number;
+    speed: number;
+    softness: number;
+    core: number;
+    edgeThreshold: number;
+    thickness: number;
+    lineCount: number;
+    noiseScaleStep: number;
+    sharpness: number;
+    jitterSpeed: number;
+    jitterPower: number;
+    animSpeed: number;
+    pad: number;
+};
+function hexToRgb(hex: string): [number, number, number] {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m) {
+        return [0.35, 0.65, 1.0];
+    }
+    const n = Number.parseInt(m[1], 16);
+    return [
+        ((n >> 16) & 0xff) / 255,
+        ((n >> 8) & 0xff) / 255,
+        (n & 0xff) / 255,
+    ];
+}
+// Active webcam stream for the saber story, so re-renders can release it.
+let saberStream: MediaStream | null = null;
+function stopSaberStream(): void {
+    for (const t of saberStream?.getTracks() ?? []) {
+        t.stop();
+    }
+    saberStream = null;
+}
+export const saber: StoryObj<SaberArgs> = {
+    render: (args) => {
+        const { src, color, ...rest } = args;
+        stopSaberStream();
+        const vfx = initVFX();
+        const effect = () =>
+            new SaberEffect({
+                color: hexToRgb(color),
+                dynamic: src === "Webcam",
+                ...rest,
+            });
+
+        if (src === "Webcam") {
+            const video = document.createElement("video");
+            video.muted = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.autoplay = true;
+            video.style.display = "block";
+            video.style.margin = "80px auto";
+            video.style.maxWidth = "60vw";
+            (async () => {
+                try {
+                    saberStream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                    });
+                    video.srcObject = saberStream;
+                    await video.play();
+                } catch {
+                    // Webcam unavailable / denied — leave the element blank.
+                }
+                vfx.add(video, { effect: effect() });
+            })();
+            return video;
+        }
+
+        if (src === "Text") {
+            const text = document.createElement("div");
+            text.textContent = "SABER";
+            text.style.cssText =
+                "font: 900 200px/1 sans-serif; color: #fff;" +
+                " text-align: center; margin: 80px auto; letter-spacing: 8px;";
+            // Defer until mounted so text layout is measured correctly.
+            requestAnimationFrame(() => vfx.add(text, { effect: effect() }));
+            return text;
+        }
+
+        const img = document.createElement("img");
+        img.src = src === "Jellyfish" ? Jellyfish : Logo;
+        img.style.display = "block";
+        img.style.margin = "80px auto";
+        vfx.add(img, { effect: effect() });
+        return img;
+    },
+    args: {
+        src: "Logo",
+        color: "#59a6ff",
+        intensity: 1.0,
+        amplitude: 0.02,
+        frequency: 4.0,
+        speed: 1.0,
+        softness: 0.5,
+        core: 0.5,
+        edgeThreshold: 0.5,
+        thickness: 1.0,
+        lineCount: 3,
+        noiseScaleStep: 1.8,
+        sharpness: 1.0,
+        jitterSpeed: 1.0,
+        jitterPower: 0.0,
+        animSpeed: 3.0,
+        pad: 80,
+    },
+    argTypes: {
+        src: {
+            control: { type: "select" },
+            options: ["Logo", "Jellyfish", "Text", "Webcam"],
+        },
+        color: { control: { type: "color" } },
+        intensity: { control: { type: "range", min: 0, max: 2, step: 0.02 } },
+        amplitude: {
+            control: { type: "range", min: 0, max: 0.1, step: 0.002 },
+        },
+        frequency: { control: { type: "range", min: 0.5, max: 12, step: 0.5 } },
+        speed: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
+        softness: { control: { type: "range", min: 0.1, max: 2, step: 0.05 } },
+        core: { control: { type: "range", min: 0, max: 2, step: 0.05 } },
+        edgeThreshold: {
+            control: { type: "range", min: 0, max: 1, step: 0.02 },
+        },
+        thickness: { control: { type: "range", min: 0.5, max: 5, step: 0.1 } },
+        lineCount: { control: { type: "range", min: 1, max: 5, step: 1 } },
+        noiseScaleStep: {
+            control: { type: "range", min: 1, max: 3, step: 0.1 },
+        },
+        sharpness: { control: { type: "range", min: 1, max: 6, step: 0.1 } },
+        jitterSpeed: { control: { type: "range", min: 0, max: 8, step: 0.1 } },
+        jitterPower: { control: { type: "range", min: 0, max: 6, step: 0.1 } },
+        animSpeed: { control: { type: "range", min: -10, max: 10, step: 0.5 } },
+        pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
     },
 };
 
