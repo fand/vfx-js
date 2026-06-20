@@ -1138,7 +1138,15 @@ function addAsciiSource(
     vfx: ReturnType<typeof initVFX>,
     src: AsciiSrcName,
     effect: Effect | readonly Effect[],
+    onReady?: () => void,
 ): HTMLElement {
+    // Fire onReady once the source is added (atlas built, texture uploaded).
+    // VRT pins the clock here so the captured frame is deterministic.
+    const ready = (p: unknown) => {
+        if (onReady) {
+            void Promise.resolve(p).then(onReady);
+        }
+    };
     const center = (el: HTMLElement) => {
         el.style.display = "block";
         el.style.margin = "40px auto";
@@ -1161,7 +1169,7 @@ function addAsciiSource(
         const block = makeAsciiHtmlSample();
         sizer.appendChild(block);
         wrapper.appendChild(sizer);
-        vfx.addHTML(block, { effect });
+        ready(vfx.addHTML(block, { effect }));
         return wrapper;
     }
     if (src === "WebCam") {
@@ -1178,13 +1186,13 @@ function addAsciiSource(
                 void video.play();
             })
             .catch((e) => console.warn("[ascii story] webcam unavailable:", e));
-        vfx.add(video, { effect });
+        ready(vfx.add(video, { effect }));
         return video;
     }
     const img = document.createElement("img");
     img.src = ASCII_IMAGE_SRCS[src] ?? Pigeon;
     center(img);
-    vfx.add(img, { effect });
+    ready(vfx.add(img, { effect }));
     return img;
 }
 
@@ -1290,7 +1298,12 @@ type MatrixArgs = {
 // phosphor glow around the bright glyphs (bypassed when bloom = 0).
 export const matrix: StoryObj<MatrixArgs> = {
     render: (a) => {
-        const vfx = initVFX();
+        // The rain is a pure function of the clock + seed (no Math.random),
+        // so under VRT freeze the clock (timeScale 0) and pin it to a fixed
+        // frame once added — Chromatic then captures the same pattern every
+        // run.
+        const vrt = isChromatic();
+        const vfx = initVFX(vrt ? { timeScale: 0 } : undefined);
         const effect = new MatrixEffect({
             grid: [a.gridX, a.gridY],
             glyphs: a.glyphs || undefined,
@@ -1331,8 +1344,20 @@ export const matrix: StoryObj<MatrixArgs> = {
                       }),
                   ]
                 : effect;
-        const el = addAsciiSource(vfx, a.src, effects);
-        attachClockPane(vfx);
+        const el = addAsciiSource(
+            vfx,
+            a.src,
+            effects,
+            vrt
+                ? () => {
+                      vfx.setTime(VRT_TIME);
+                      vfx.render();
+                  }
+                : undefined,
+        );
+        if (!vrt) {
+            attachClockPane(vfx);
+        }
         return el;
     },
     args: {
