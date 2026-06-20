@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-import type { Effect } from "@vfx-js/core";
+import type { Effect, VFX } from "@vfx-js/core";
 import {
     AsciiEffect,
     type AsciiPresetName,
@@ -356,6 +356,57 @@ export const badJpeg: StoryObj<BadJpegArgs> = {
     parameters: { chromatic: { disableSnapshot: true } },
 };
 
+// Deterministic PRNG (mulberry32). The particle effect spawns from
+// Math.random(); seeding it makes spawn positions identical across VRT
+// runs.
+function makeSeededRandom(seed: number): () => number {
+    let a = seed >>> 0;
+    return () => {
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+// Steps to drive and fixed per-step clock delta for VRT capture.
+const VRT_STEPS = 90;
+const VRT_DT = 1 / 60;
+
+// Deterministic VRT driver for the stateful sims (Fluid, Particle).
+// Advances the virtual clock by a fixed dt and sweeps the pointer in a
+// circle, rendering one frame per step. The VFX must be created with
+// `autoplay: false` so no RAF loop runs after this returns — Chromatic
+// then captures exactly the final frame, identical every run. Math.random
+// is seeded for the duration so particle spawns are reproducible.
+async function driveVrt(vfx: VFX, element: HTMLElement): Promise<void> {
+    const rect = element.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const radius = Math.min(rect.width, rect.height) * 0.3;
+
+    const realRandom = Math.random;
+    Math.random = makeSeededRandom(0x9e3779b9);
+    try {
+        let time = 0;
+        for (let i = 0; i < VRT_STEPS; i++) {
+            const angle = (i / VRT_STEPS) * Math.PI * 2;
+            window.dispatchEvent(
+                new MouseEvent("pointermove", {
+                    clientX: cx + Math.cos(angle) * radius,
+                    clientY: cy + Math.sin(angle) * radius,
+                    bubbles: true,
+                }),
+            );
+            time += VRT_DT;
+            vfx.setTime(time);
+            vfx.render();
+        }
+    } finally {
+        Math.random = realRandom;
+    }
+}
+
 // Stable Fluid as a single Effect. Drives mouse splats off real pointer
 // events; the play() call seeds a circular sweep so the story renders a
 // non-empty frame on first capture.
@@ -373,11 +424,17 @@ fluid.play = async ({ canvasElement }) => {
         img.onload = o;
     });
 
-    const vfx = initVFX();
+    const vrt = isChromatic();
+    const vfx = initVFX(vrt ? { autoplay: false } : undefined);
     const effect = new FluidEffect();
     await vfx.add(img, { effect });
-    attachFluidPane("Fluid", effect);
 
+    if (vrt) {
+        await driveVrt(vfx, img);
+        return;
+    }
+
+    attachFluidPane("Fluid", effect);
     seedFluidMotion(canvasElement);
 };
 
@@ -440,6 +497,17 @@ particle.play = async ({ canvasElement }) => {
         img.onload = () => o();
     });
 
+    if (isChromatic()) {
+        // Deterministic capture: fixed count, no pane, hand-driven clock
+        // + pointer sweep so spawns and motion are identical every run.
+        // SwiftShader (Chromatic capture env) can't allocate the default
+        // 1M-particle state RTs within the 30s load budget, so cap count.
+        const vfx = initVFX({ autoplay: false });
+        await vfx.add(img, { effect: new ParticleEffect({ count: 256 * 256 }) });
+        await driveVrt(vfx, img);
+        return;
+    }
+
     const vfx = initVFX();
     const sources = { Jellyfish, Logo };
     // The framework loads img.src once at vfx.add and never observes
@@ -447,13 +515,7 @@ particle.play = async ({ canvasElement }) => {
     // preserved params) + add + reattach pane.
     let effect: ParticleEffect | null = null;
     const setup = async () => {
-        // SwiftShader (Chromatic capture env) can't allocate the
-        // default 1M-particle state RTs within the 30s load budget.
-        const initialParams = effect
-            ? { ...effect.params }
-            : isChromatic()
-              ? { count: 256 * 256 }
-              : {};
+        const initialParams = effect ? { ...effect.params } : {};
         if (effect) {
             vfx.remove(img);
             disposeAllPanes();
