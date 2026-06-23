@@ -49,7 +49,9 @@ jobs:
 
                       | Page | URL |
                       | --- | --- |
-                      | Top | ${{ steps.deploy.outputs.deployment-url }} |
-                      | Examples | ${{ steps.deploy.outputs.deployment-url }}/examples/ |
-                      | Storybook | ${{ steps.deploy.outputs.deployment-url }}/storybook/ |
-                      | Docs | ${{ steps.deploy.outputs.deployment-url }}/docs/ |
+                      | Top | ${{ steps.deploy.outputs.pages-deployment-alias-url }} |
+                      | Examples | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/examples/ |
+                      | Storybook | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/storybook/ |
+                      | Docs | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/docs/ |
+
+                      <sub>This branch URL stays the same across pushes. Latest deploy: ${{ steps.deploy.outputs.deployment-url }}</sub>
