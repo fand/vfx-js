@@ -47,6 +47,8 @@ void main() {
 // One Kawase streak pass: 4 one-sided taps along `dir`, spaced `stride`
 // px apart, weighted by a per-pixel attenuation. Normalised by the weight
 // sum so brightness stays bounded as the tail lengthens across passes.
+// Out-of-buffer taps are masked to zero (not clamped) so the source's
+// edge texels don't streak/replicate across the pad ("bleed").
 const FRAG_STREAK = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -63,27 +65,47 @@ void main() {
     for (int b = 0; b < 4; b++) {
         float distPx = float(b) * stride;
         float w = pow(attenuation, distPx);
-        c += texture(src, uv + dir * distPx * texelSize) * w;
+        vec2 suv = uv + dir * distPx * texelSize;
+        vec2 inb = step(vec2(0.0), suv) * step(suv, vec2(1.0));
+        c += texture(src, suv) * (w * inb.x * inb.y);
         wsum += w;
     }
-    outColor = c / wsum;
+    outColor = c / max(wsum, 1e-5);
 }
 `;
 
-// Add the accumulated streaks over the (already blitted) source. Additive
-// blend, so this only ever brightens.
-const FRAG_EMIT = `#version 300 es
+// Composite the source and the accumulated streaks in one premultiplied
+// pass. The base is hard-masked to the inner rect (uvSrc/uvContent in
+// [0,1]) so the capture's edge texels never clamp-replicate across the
+// pad — sampling the source via ctx.blit, which has no such mask, is what
+// made the image "bleed" into the padded region as `length`/`pad` grew.
+const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
+in vec2 uvSrc;
+in vec2 uvContent;
 out vec4 outColor;
+uniform sampler2D src;
 uniform sampler2D streak;
 uniform vec3 tint;
 uniform float intensity;
 
 void main() {
-    vec3 s = texture(streak, uv).rgb * tint * intensity;
-    float a = clamp(dot(s, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
-    outColor = vec4(s, a);
+    vec2 inS = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
+    vec2 inC = step(vec2(0.0), uvContent) * step(uvContent, vec2(1.0));
+    float m = inS.x * inS.y * inC.x * inC.y;
+
+    vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0)) * m;
+    vec3 glow = texture(streak, uv).rgb * tint * intensity;
+
+    // Premultiplied: base contributes rgb*a, the streak adds light on top.
+    vec3 rgb = base.rgb * base.a + glow;
+    float a = clamp(
+        max(base.a, dot(glow, vec3(0.2126, 0.7152, 0.0722))),
+        0.0,
+        1.0
+    );
+    outColor = vec4(rgb, a);
 }
 `;
 
@@ -99,8 +121,10 @@ export type LightStreakBlurParams = {
     /** Streak reach in CSS (logical) px. */
     length: number;
     /**
-     * Directional blur iterations (base-4 doublings). More = longer,
-     * smoother tail at a few extra fullscreen passes each.
+     * Maximum directional-blur passes (quality/reach cap). The first pass
+     * is a fine ~1 px blur and each later pass triples its reach; the
+     * actual count used is derived from `length` and capped here. Raise to
+     * allow longer streaks, lower to bound cost.
      */
     passes: number;
     /** Per-pixel brightness falloff along the streak, in (0,1). */
@@ -124,8 +148,8 @@ const DEFAULT_PARAMS: LightStreakBlurParams = {
     streaks: 2,
     angle: 0,
     length: 220,
-    passes: 4,
-    attenuation: 0.96,
+    passes: 6,
+    attenuation: 0.97,
     threshold: 0.75,
     gamma: 2.0,
     intensity: 1.0,
@@ -133,7 +157,10 @@ const DEFAULT_PARAMS: LightStreakBlurParams = {
     pad: 220,
 };
 
-const STREAK_BASE = 4;
+// 4 one-sided taps span 3 intervals; base 3 makes consecutive passes tile
+// edge-to-edge with no gaps (base 4 would leave a 1-interval hole each
+// pass, which reads as a dashed/jagged streak).
+const STREAK_BASE = 3;
 
 /**
  * Light-streak effect (anamorphic flare / aperture starburst) built from a
@@ -186,11 +213,22 @@ export class LightStreakBlurEffect implements Effect {
         });
 
         const rays = Math.max(1, Math.round(this.params.streaks));
-        const passes = Math.max(1, Math.round(this.params.passes));
-        const lengthPx = this.params.length * ctx.dims.pixelRatio;
-        // Scale strides so the far tap of the last pass lands at lengthPx.
-        const maxUnit = 3 * STREAK_BASE ** (passes - 1);
-        const stepScale = maxUnit > 0 ? lengthPx / maxUnit : lengthPx;
+        const pr = ctx.dims.pixelRatio;
+        const lengthPx = Math.max(0, this.params.length) * pr;
+        // The first pass is a fine ~1 CSS px blur (smooth, gap-free); each
+        // later pass triples its reach. Derive how many passes are needed
+        // to span `length`, capped by `passes` so cost stays bounded.
+        // Keeping pass 0 fine — instead of scaling it to `length` — is what
+        // stops long streaks from breaking into discrete, jagged copies.
+        const stride0 = Math.max(1, pr);
+        const cap = Math.max(1, Math.round(this.params.passes));
+        let passes = 1;
+        while (
+            passes < cap &&
+            3 * stride0 * STREAK_BASE ** (passes - 1) < lengthPx
+        ) {
+            passes++;
+        }
         const texelSize: [number, number] = [
             1 / bright.width,
             1 / bright.height,
@@ -215,7 +253,7 @@ export class LightStreakBlurEffect implements Effect {
                         src: input,
                         dir,
                         texelSize,
-                        stride: STREAK_BASE ** p * stepScale,
+                        stride: stride0 * STREAK_BASE ** p,
                         attenuation: this.params.attenuation,
                     },
                 });
@@ -223,13 +261,12 @@ export class LightStreakBlurEffect implements Effect {
             }
         }
 
-        // Source image, then streaks added over it.
-        ctx.blit(ctx.src, ctx.target);
+        // Single premultiplied composite of source + streaks.
         ctx.draw({
-            frag: FRAG_EMIT,
-            blend: "additive",
+            frag: FRAG_COMPOSITE,
             target: ctx.target,
             uniforms: {
+                src: ctx.src,
                 streak: accum,
                 tint: [
                     this.params.tint[0],

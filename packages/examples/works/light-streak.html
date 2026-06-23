@@ -137,8 +137,8 @@
     length: 220,
     thickness: 2,
     falloff: 1.5,
-    passes: 4,
-    attenuation: 0.96,
+    passes: 6,
+    attenuation: 0.97,
     threshold: 0.78,
     gamma: 2.2,
     intensity: 1.1,
@@ -236,7 +236,7 @@
   pane.addBinding(params, "thickness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
   pane.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
   // blur-only
-  pane.addBinding(params, "passes", { min: 1, max: 6, step: 1 }).on("change", sync);
+  pane.addBinding(params, "passes", { min: 1, max: 8, step: 1 }).on("change", sync);
   pane.addBinding(params, "attenuation", { min: 0.8, max: 0.999, step: 0.001 }).on("change", sync);
   pane.addBinding(params, "threshold", { min: 0, max: 1, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "gamma", { min: 0.5, max: 5, step: 0.05 }).on("change", sync);

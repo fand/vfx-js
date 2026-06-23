@@ -20,6 +20,25 @@
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 import type { Effect, EffectContext, EffectGeometry } from "@vfx-js/core";
 
+// Premultiplied base copy, hard-masked to the inner rect. Used instead of
+// ctx.blit (which has no bounds check and would clamp-replicate the
+// capture's edge texels across the padded region as `pad` grows).
+const FRAG_BASE = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+in vec2 uvContent;
+out vec4 outColor;
+uniform sampler2D src;
+
+void main() {
+    vec2 inS = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
+    vec2 inC = step(vec2(0.0), uvContent) * step(uvContent, vec2(1.0));
+    float m = inS.x * inS.y * inC.x * inC.y;
+    vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0)) * m;
+    outColor = vec4(base.rgb * base.a, base.a);
+}
+`;
+
 // Per-instance streak quad. `position.x` runs 0→1 from the source point
 // to the tip; `position.y` runs -1→1 across the (thin) width. The VS
 // samples the source at `instanceUv`, derives a luminance gate, and lays
@@ -205,8 +224,13 @@ export class LightStreakEffect implements Effect {
         const src = ctx.dims.srcRect;
         const pr = ctx.dims.pixelRatio;
 
-        // Base image first, then streaks additively over it.
-        ctx.blit(ctx.src, ctx.target);
+        // Base image first (masked copy, not ctx.blit), then streaks
+        // additively over it.
+        ctx.draw({
+            frag: FRAG_BASE,
+            target: ctx.target,
+            uniforms: { src: ctx.src },
+        });
 
         const rays = Math.max(1, Math.round(this.params.streaks));
         const lengthPx = this.params.length * pr;
