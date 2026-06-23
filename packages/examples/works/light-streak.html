@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Light Streak · Anamorphic & Aperture Flare</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Sora:wght@200;600;800&display=swap"
+/>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #050608;
+    color: #eef2ff;
+    font-family: "Sora", system-ui, sans-serif;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+  }
+
+  .stage {
+    position: relative;
+    width: min(92vw, 1100px);
+    aspect-ratio: 16 / 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* The night-city photo: lots of small specular highlights for the
+     streaks to grab onto. */
+  #photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  .headline {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+  .headline .kicker {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    color: #cfe0ff;
+    margin-bottom: 18px;
+  }
+  /* Pure-white glyphs sit above the threshold, so the type itself throws
+     streaks too. */
+  .headline h1 {
+    font-weight: 800;
+    font-size: clamp(40px, 8vw, 104px);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+    text-shadow: 0 0 18px rgba(180, 210, 255, 0.6);
+  }
+  .headline h1 em { font-weight: 200; font-style: normal; color: #9fc1ff; }
+
+  .hint {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(207, 224, 255, 0.6);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <img
+    id="photo"
+    crossorigin="anonymous"
+    src="https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1280&amp;h=720&amp;fit=crop"
+    alt="city lights at night"
+    data-streak
+  />
+  <div class="headline" data-streak>
+    <div class="kicker">VFX-JS · Effect API</div>
+    <h1>LIGHT <em>STREAK</em></h1>
+  </div>
+</div>
+
+<div class="hint">Drag the panel to switch anamorphic ↔ aperture starburst</div>
+
+<script type="module">
+  import { VFX } from "@vfx-js/core";
+  import { LightStreakEffect } from "@vfx-js/effects";
+  import { Pane } from "https://esm.sh/tweakpane@4.0.5";
+
+  const photo = document.getElementById("photo");
+  if (!photo.complete) {
+    await new Promise((r) => {
+      photo.onload = r;
+      photo.onerror = r;
+    });
+  }
+
+  const vfx = new VFX({ pixelRatio: Math.min(window.devicePixelRatio || 1, 2) });
+
+  // Shared, mutable params so a single pane drives every target. Effect
+  // instances aren't reusable across elements, so mint one per target but
+  // point them all at this same object via setParams.
+  const params = {
+    preset: "anamorphic",
+    blades: 6,
+    angle: 0,
+    length: 220,
+    thickness: 2,
+    falloff: 1.5,
+    threshold: 0.78,
+    gamma: 2.2,
+    intensity: 1.1,
+    dispersion: 0.6,
+    tintR: 0.6,
+    tintG: 0.8,
+    tintB: 1.0,
+  };
+
+  // A physical aperture's spike count is blades (even) or 2×blades (odd);
+  // anamorphic is just a single horizontal axis = 2 opposing rays.
+  function streakCount() {
+    if (params.preset === "anamorphic") return 2;
+    return params.blades % 2 === 0 ? params.blades : params.blades * 2;
+  }
+
+  function liveParams() {
+    return {
+      streaks: streakCount(),
+      angle: params.angle,
+      length: params.length,
+      thickness: params.thickness,
+      falloff: params.falloff,
+      threshold: params.threshold,
+      gamma: params.gamma,
+      intensity: params.intensity,
+      dispersion: params.dispersion,
+      tint: [params.tintR, params.tintG, params.tintB],
+      // Anamorphic streaks reach far horizontally; pad generously.
+      pad: Math.ceil(params.length * 1.2),
+    };
+  }
+
+  const effects = [];
+  async function attach(el) {
+    const effect = new LightStreakEffect(liveParams());
+    effects.push(effect);
+    if (el instanceof HTMLImageElement) {
+      await vfx.add(el, { effect });
+    } else {
+      await vfx.addHTML(el, { effect, zIndex: 1 });
+    }
+  }
+
+  for (const el of document.querySelectorAll("[data-streak]")) {
+    await attach(el);
+  }
+
+  function sync() {
+    const p = liveParams();
+    for (const e of effects) e.setParams(p);
+  }
+
+  // --- Tweakpane ----------------------------------------------------------
+  const paneContainer = document.createElement("div");
+  paneContainer.style.cssText =
+    "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+  document.body.appendChild(paneContainer);
+  const pane = new Pane({ container: paneContainer, title: "Light Streak" });
+
+  pane
+    .addBinding(params, "preset", {
+      options: { anamorphic: "anamorphic", "aperture star": "aperture" },
+    })
+    .on("change", sync);
+  pane.addBinding(params, "blades", { min: 3, max: 12, step: 1 }).on("change", sync);
+  pane.addBinding(params, "angle", { min: 0, max: 6.283, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "length", { min: 0, max: 480, step: 1 }).on("change", sync);
+  pane.addBinding(params, "thickness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
+  pane.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
+  pane.addBinding(params, "threshold", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "gamma", { min: 0.5, max: 5, step: 0.05 }).on("change", sync);
+  pane.addBinding(params, "intensity", { min: 0, max: 3, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "dispersion", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  const tint = pane.addFolder({ title: "Tint" });
+  tint.addBinding(params, "tintR", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  tint.addBinding(params, "tintG", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  tint.addBinding(params, "tintB", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+</script>
+
+</body>
+</html>
