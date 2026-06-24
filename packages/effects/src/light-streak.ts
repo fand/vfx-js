@@ -71,6 +71,7 @@ uniform float lengthPx;    // max streak length (physical px)
 uniform float thicknessPx; // streak width (physical px)
 uniform float threshold;   // luminance gate
 uniform float gamma;       // gate response curve
+uniform float maxBrightness; // upper clamp on source brightness
 
 out float v_along;
 out float v_cross;
@@ -79,6 +80,12 @@ out float v_gate;
 
 void main() {
     vec3 c = texture(src, instanceUv).rgb;
+    // Clamp source brightness (Blender highlights "Maximum") so very
+    // bright sources don't dominate the accumulation, hue preserved.
+    float vmax = max(max(c.r, c.g), c.b);
+    if (vmax > maxBrightness) {
+        c *= maxBrightness / vmax;
+    }
     float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
     float gate = pow(smoothstep(threshold, 1.0, lum), gamma);
 
@@ -133,21 +140,24 @@ uniform float dispersion;  // chromatic shift toward blue at the tip
 out vec4 outColor;
 
 void main() {
-    // Exponential-ish fade to the tip × (soft) gaussian cross-section.
-    // The cross falloff is deliberately gentle so neighbouring sprites
-    // overlap into a continuous sheet instead of discrete stripes.
-    float lineFall = pow(max(1.0 - v_along, 0.0), falloff);
+    float t = max(1.0 - v_along, 0.0);
+    // Per-channel length falloff (Blender-style chromatic dispersion):
+    // red dims fastest and blue persists, so the streak fringes through
+    // colour toward its tip. dispersion widens the channel spread; 0
+    // collapses to a single uniform falloff.
+    vec3 perChannel = vec3(
+        pow(t, falloff + dispersion * 3.0),
+        pow(t, falloff + dispersion * 1.5),
+        pow(t, falloff)
+    );
+    // Soft gaussian cross-section so neighbouring sprites overlap into a
+    // continuous sheet instead of discrete stripes.
     float crossFall = exp(-v_cross * v_cross * 2.0);
-    float a = lineFall * crossFall * v_gate;
-    if (a < 1e-4) {
+    vec3 rgb = v_color * perChannel * (crossFall * v_gate);
+    if (max(max(rgb.r, rgb.g), rgb.b) < 1e-4) {
         discard;
     }
-
-    // Cheap dispersion: drift toward blue along the streak, the way real
-    // anamorphic flares fringe toward their tips.
-    vec3 col = mix(v_color, v_color * vec3(0.5, 0.7, 1.0),
-                   clamp(v_along * dispersion, 0.0, 1.0));
-    outColor = vec4(col * a, a);
+    outColor = vec4(rgb, 1.0);
 }
 `;
 
@@ -202,6 +212,11 @@ export type LightStreakParams = {
     /** Gate response curve. Higher = sharper highlight selection. */
     gamma: number;
     /**
+     * Upper clamp on source brightness (per Blender's highlight
+     * "Maximum"), so blown-out sources don't dominate the accumulation.
+     */
+    maxBrightness: number;
+    /**
      * Streak brightness. Drives a soft-saturating tone map
      * (`1 - exp(-acc * intensity)`), so raising it brightens without
      * clipping accumulated highlights to white.
@@ -209,7 +224,11 @@ export type LightStreakParams = {
     intensity: number;
     /** Per-channel multiplier on the streak colour. */
     tint: readonly [number, number, number];
-    /** Chromatic shift toward blue at the tip, 0..1. */
+    /**
+     * Chromatic dispersion, 0..1. Spreads the per-channel length falloff
+     * (red dims fastest, blue persists) so the streak fringes through
+     * colour toward its tip; 0 disables it.
+     */
     dispersion: number;
     /**
      * Source sampling grid dimension (instance count = `density²`).
@@ -234,6 +253,7 @@ const DEFAULT_PARAMS: LightStreakParams = {
     falloff: 1.5,
     threshold: 0.75,
     gamma: 2.0,
+    maxBrightness: 1.0,
     intensity: 1.0,
     tint: [0.6, 0.8, 1.0],
     dispersion: 0.5,
@@ -320,6 +340,7 @@ export class LightStreakEffect implements Effect {
                     thicknessPx,
                     threshold: this.params.threshold,
                     gamma: this.params.gamma,
+                    maxBrightness: this.params.maxBrightness,
                     falloff: this.params.falloff,
                     dispersion: this.params.dispersion,
                 },
