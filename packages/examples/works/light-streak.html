@@ -151,6 +151,7 @@
     gamma: 2.2,
     intensity: 1.1,
     dispersion: 0.6,
+    density: 256,
     tintR: 0.6,
     tintG: 0.8,
     tintB: 1.0,
@@ -174,6 +175,7 @@
       gamma: params.gamma,
       intensity: params.intensity,
       dispersion: params.dispersion,
+      density: params.density,
       tint: [params.tintR, params.tintG, params.tintB],
       // Anamorphic streaks reach far horizontally; pad generously.
       pad: Math.ceil(params.length * 1.2),
@@ -238,6 +240,7 @@
   pane.addBinding(params, "gamma", { min: 0.5, max: 5, step: 0.05 }).on("change", sync);
   pane.addBinding(params, "intensity", { min: 0, max: 3, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "dispersion", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "density", { min: 64, max: 512, step: 32 }).on("change", sync);
   const tint = pane.addFolder({ title: "Tint" });
   tint.addBinding(params, "tintR", { min: 0, max: 1, step: 0.01 }).on("change", sync);
   tint.addBinding(params, "tintG", { min: 0, max: 1, step: 0.01 }).on("change", sync);
