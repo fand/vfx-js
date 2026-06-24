@@ -176,7 +176,7 @@ export const works: Work[] = [
         year: "2026",
         author: "AMAGI",
         description:
-            "Anamorphic and aperture-diffraction light streaks from instanced sprite splatting. Each highlight throws a stretched streak quad; one knob morphs between a horizontal anamorphic flare and an n-bladed aperture starburst, over a choice of night-time backdrops.",
+            "Anamorphic and aperture-diffraction light streaks, switchable between two implementations: a Blender-style fullscreen glare and instanced sprite splatting. One knob morphs between a horizontal anamorphic flare and an n-bladed aperture starburst, over a choice of night-time backdrops.",
         url: "./works/light-streak.html",
     },
 ];

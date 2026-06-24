@@ -24,6 +24,10 @@ export { HueShiftEffect, type HueShiftParams } from "./hue-shift";
 export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch";
 export { LightStreakEffect, type LightStreakParams } from "./light-streak";
 export {
+    LightStreakGlareEffect,
+    type LightStreakGlareParams,
+} from "./light-streak-glare";
+export {
     MATRIX_GLYPHS,
     type MatrixColor,
     MatrixEffect,
