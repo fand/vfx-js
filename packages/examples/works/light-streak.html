@@ -74,7 +74,11 @@
 
 <script type="module">
   import { VFX } from "@vfx-js/core";
-  import { LightStreakEffect, LightStreakGlareEffect } from "@vfx-js/effects";
+  import {
+    AnamorphicStreakEffect,
+    LightStreakEffect,
+    LightStreakGlareEffect,
+  } from "@vfx-js/effects";
   import { Pane } from "https://esm.sh/tweakpane@4.0.5";
 
   const photo = document.getElementById("photo");
@@ -109,8 +113,9 @@
   // instances aren't reusable across elements, so mint one per target but
   // point them all at this same object via setParams.
   const params = {
-    // "instance" = stretched-sprite splat (LightStreakEffect)
-    // "glare"    = Blender-style fullscreen streaks (LightStreakGlareEffect)
+    // "instance"   = stretched-sprite splat (LightStreakEffect)
+    // "glare"      = Blender-style fullscreen streaks (LightStreakGlareEffect)
+    // "anamorphic" = KinoStreak horizontal pyramid (AnamorphicStreakEffect)
     strategy: "glare",
     preset: "anamorphic",
     blades: 6,
@@ -118,6 +123,8 @@
     threshold: 0.78,
     maxBrightness: 1.0,
     intensity: 1.1,
+    dispersion: 0.6,
+    resolution: 0.5,
     tintR: 0.6,
     tintG: 0.8,
     tintB: 1.0,
@@ -126,7 +133,6 @@
     thickness: 2,
     falloff: 1.5,
     gamma: 2.2,
-    dispersion: 0.6,
     density: 256,
     // glare-only
     iterations: 3,
@@ -134,7 +140,8 @@
     colorModulation: 0.25,
     streakSoftness: 1.5,
     smoothness: 0.1,
-    resolution: 0.5,
+    // anamorphic-only
+    stretch: 0.78,
   };
 
   // A physical aperture's spike count is blades (even) or 2×blades (odd);
@@ -146,8 +153,6 @@
 
   function liveParams() {
     const shared = {
-      streaks: streakCount(),
-      angle: params.angle,
       threshold: params.threshold,
       maxBrightness: params.maxBrightness,
       intensity: params.intensity,
@@ -156,6 +161,8 @@
     if (params.strategy === "instance") {
       return {
         ...shared,
+        streaks: streakCount(),
+        angle: params.angle,
         length: params.length,
         thickness: params.thickness,
         falloff: params.falloff,
@@ -165,8 +172,20 @@
         pad: Math.ceil(params.length * 1.2),
       };
     }
+    if (params.strategy === "anamorphic") {
+      return {
+        ...shared,
+        stretch: params.stretch,
+        dispersion: params.dispersion,
+        resolution: params.resolution,
+        intensity: params.intensity * 2, // pyramid streak values run low
+        pad: 240,
+      };
+    }
     return {
       ...shared,
+      streaks: streakCount(),
+      angle: params.angle,
       iterations: params.iterations,
       fade: params.fade,
       colorModulation: params.colorModulation,
@@ -179,7 +198,11 @@
 
   function makeEffect() {
     const Ctor =
-      params.strategy === "instance" ? LightStreakEffect : LightStreakGlareEffect;
+      params.strategy === "instance"
+        ? LightStreakEffect
+        : params.strategy === "anamorphic"
+          ? AnamorphicStreakEffect
+          : LightStreakGlareEffect;
     return new Ctor(liveParams());
   }
 
@@ -240,7 +263,11 @@
     .on("change", (e) => switchImage(e.value));
   pane
     .addBinding(params, "strategy", {
-      options: { "glare (Blender)": "glare", "instance (sprite)": "instance" },
+      options: {
+        "glare (Blender)": "glare",
+        "anamorphic (Kino)": "anamorphic",
+        "instance (sprite)": "instance",
+      },
     })
     .on("change", rebuild);
   pane
@@ -253,6 +280,9 @@
   pane.addBinding(params, "threshold", { min: 0, max: 1, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "maxBrightness", { min: 0.1, max: 1, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "intensity", { min: 0, max: 3, step: 0.01 }).on("change", sync);
+  // shared by instance + anamorphic (dispersion) and glare + anamorphic (resolution)
+  pane.addBinding(params, "dispersion", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "resolution", { min: 0.25, max: 1, step: 0.05 }).on("change", sync);
 
   // instance-only
   const inst = pane.addFolder({ title: "Instance" });
@@ -260,7 +290,6 @@
   inst.addBinding(params, "thickness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
   inst.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
   inst.addBinding(params, "gamma", { min: 0.5, max: 5, step: 0.05 }).on("change", sync);
-  inst.addBinding(params, "dispersion", { min: 0, max: 1, step: 0.01 }).on("change", sync);
   inst.addBinding(params, "density", { min: 64, max: 512, step: 32 }).on("change", sync);
 
   // glare-only
@@ -270,7 +299,10 @@
   glare.addBinding(params, "colorModulation", { min: 0, max: 1, step: 0.01 }).on("change", sync);
   glare.addBinding(params, "streakSoftness", { min: 0, max: 5, step: 0.1 }).on("change", sync);
   glare.addBinding(params, "smoothness", { min: 0, max: 0.5, step: 0.01 }).on("change", sync);
-  glare.addBinding(params, "resolution", { min: 0.25, max: 1, step: 0.05 }).on("change", sync);
+
+  // anamorphic-only
+  const anam = pane.addFolder({ title: "Anamorphic" });
+  anam.addBinding(params, "stretch", { min: 0, max: 0.95, step: 0.01 }).on("change", sync);
 
   const tint = pane.addFolder({ title: "Tint" });
   tint.addBinding(params, "tintR", { min: 0, max: 1, step: 0.01 }).on("change", sync);
