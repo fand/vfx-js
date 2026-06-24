@@ -97,8 +97,8 @@
   <img
     id="photo"
     crossorigin="anonymous"
-    src="https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1280&amp;h=720&amp;fit=crop"
-    alt="city lights at night"
+    src="https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1280&amp;h=720&amp;fit=crop&amp;crop=entropy"
+    alt="night scene with bright light sources"
     data-streak
   />
   <div class="headline" data-streak>
@@ -107,7 +107,7 @@
   </div>
 </div>
 
-<div class="hint">Drag the panel to switch anamorphic ↔ aperture starburst</div>
+<div class="hint">Pick a backdrop and switch anamorphic ↔ aperture starburst in the panel</div>
 
 <script type="module">
   import { VFX } from "@vfx-js/core";
@@ -123,6 +123,19 @@
   }
 
   const vfx = new VFX({ pixelRatio: Math.min(window.devicePixelRatio || 1, 2) });
+
+  // Selectable backdrops. Night scenes with bright specular highlights
+  // (headlights, street lamps) give the streaks plenty to grab onto.
+  const IMG_SUFFIX = "?w=1280&h=720&fit=crop&crop=entropy";
+  const IMAGES = [
+    { id: "city", label: "City lights", url: "photo-1514565131-fce0801e5785" },
+    { id: "mercedes", label: "Mercedes", url: "photo-1624085568108-36410cfe4d24" },
+    { id: "motorcycle", label: "Motorcycle", url: "photo-1567516365182-1498ada52f85" },
+    { id: "blackcar", label: "Black car", url: "photo-1564890379653-0eb3a6b4eaad" },
+  ];
+  const imgUrl = (spec) =>
+    `https://images.unsplash.com/${spec.url}${IMG_SUFFIX}`;
+  const imageParams = { image: IMAGES[0].id };
 
   // Shared, mutable params so a single pane drives every target. Effect
   // instances aren't reusable across elements, so mint one per target but
@@ -185,6 +198,20 @@
     for (const e of effects) e.setParams(p);
   }
 
+  // Swap the backdrop and re-capture it (images aren't auto-refreshed).
+  let switching = false;
+  async function switchImage(id) {
+    const spec = IMAGES.find((i) => i.id === id);
+    if (!spec || switching) return;
+    switching = true;
+    photo.src = imgUrl(spec);
+    try {
+      await photo.decode();
+    } catch {}
+    await vfx.update(photo);
+    switching = false;
+  }
+
   // --- Tweakpane ----------------------------------------------------------
   const paneContainer = document.createElement("div");
   paneContainer.style.cssText =
@@ -192,6 +219,11 @@
   document.body.appendChild(paneContainer);
   const pane = new Pane({ container: paneContainer, title: "Light Streak" });
 
+  pane
+    .addBinding(imageParams, "image", {
+      options: Object.fromEntries(IMAGES.map((i) => [i.label, i.id])),
+    })
+    .on("change", (e) => switchImage(e.value));
   pane
     .addBinding(params, "preset", {
       options: { anamorphic: "anamorphic", "aperture star": "aperture" },
