@@ -131,7 +131,7 @@
     iterations: 3,
     fade: 0.9,
     colorModulation: 0.25,
-    maxBrightness: 1.0,
+    streakSoftness: 1.5,
     smoothness: 0.1,
     resolution: 0.5,
   };
@@ -169,6 +169,7 @@
       iterations: params.iterations,
       fade: params.fade,
       colorModulation: params.colorModulation,
+      streakSoftness: params.streakSoftness,
       smoothness: params.smoothness,
       resolution: params.resolution,
       pad: 240,
@@ -266,6 +267,7 @@
   glare.addBinding(params, "iterations", { min: 1, max: 5, step: 1 }).on("change", sync);
   glare.addBinding(params, "fade", { min: 0.5, max: 0.99, step: 0.01 }).on("change", sync);
   glare.addBinding(params, "colorModulation", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  glare.addBinding(params, "streakSoftness", { min: 0, max: 5, step: 0.1 }).on("change", sync);
   glare.addBinding(params, "smoothness", { min: 0, max: 0.5, step: 0.01 }).on("change", sync);
   glare.addBinding(params, "resolution", { min: 0.25, max: 1, step: 0.05 }).on("change", sync);
 

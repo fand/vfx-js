@@ -79,11 +79,23 @@ void main() {
     vec4 n0 = texture(src, uv + streakUv);
     vec4 n1 = texture(src, uv + streakUv * 2.0);
     vec4 n2 = texture(src, uv + streakUv * 3.0);
+
+    // Unmodulated weighted sum — the brightness reference.
+    vec4 mono = fadeFactors.x * n0 + fadeFactors.y * n1 + fadeFactors.z * n2;
+
+    // Per-channel modulation spreads the channels into dispersion.
     n0.gb *= colorModulator;
     n1.rg *= colorModulator;
     n2.rb *= colorModulator;
-
     vec4 sum = fadeFactors.x * n0 + fadeFactors.y * n1 + fadeFactors.z * n2;
+
+    // Rescale to the unmodulated luminance so colorModulation shifts
+    // *colour* only, not overall brightness.
+    const vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+    float lm = dot(mono.rgb, luma);
+    float ls = dot(sum.rgb, luma);
+    sum.rgb *= ls > 1e-6 ? lm / ls : 1.0;
+
     vec4 center = texture(src, uv);
     outColor = (center + sum) / 2.0;
 }
@@ -117,6 +129,26 @@ uniform sampler2D src;
 uniform sampler2D glare;
 uniform vec3 tint;
 uniform float intensity;
+uniform vec2 glareTexel;   // 1/size of the glare buffer (uv)
+uniform float softness;    // isotropic blur radius (glare texels)
+
+// 3x3 tent-blurred glare sample. The directional filter only blurs along
+// the streak, leaving razor-sharp cross-sections (very visible on crisp
+// sources like a logo); this softens them perpendicular without washing
+// out the long streak.
+vec3 sampleGlare(vec2 uv) {
+    vec2 t = glareTexel * softness;
+    vec3 s = texture(glare, uv).rgb * 4.0;
+    s += texture(glare, uv + vec2(t.x, 0.0)).rgb * 2.0;
+    s += texture(glare, uv + vec2(-t.x, 0.0)).rgb * 2.0;
+    s += texture(glare, uv + vec2(0.0, t.y)).rgb * 2.0;
+    s += texture(glare, uv + vec2(0.0, -t.y)).rgb * 2.0;
+    s += texture(glare, uv + t).rgb;
+    s += texture(glare, uv - t).rgb;
+    s += texture(glare, uv + vec2(t.x, -t.y)).rgb;
+    s += texture(glare, uv + vec2(-t.x, t.y)).rgb;
+    return s / 16.0;
+}
 
 void main() {
     vec2 inS = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
@@ -124,7 +156,7 @@ void main() {
     float m = inS.x * inS.y * inC.x * inC.y;
 
     vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0)) * m;
-    vec3 g = texture(glare, uv).rgb * tint * intensity;
+    vec3 g = sampleGlare(uv) * tint * intensity;
 
     vec3 rgb = base.rgb * base.a + g;
     float a = clamp(max(base.a, dot(g, vec3(0.2126, 0.7152, 0.0722))), 0.0, 1.0);
@@ -158,6 +190,12 @@ export type LightStreakGlareParams = {
     smoothness: number;
     /** Chromatic dispersion along the streak, 0..1 (Blender color modulation). */
     colorModulation: number;
+    /**
+     * Perpendicular softening of the streaks (in glare-buffer texels). The
+     * directional filter is razor-sharp across the streak; raise this to
+     * soften the cross-section on crisp sources. 0 disables it.
+     */
+    streakSoftness: number;
     /** Glare gain in the composite. */
     intensity: number;
     /** Per-channel multiplier on the glare colour. */
@@ -183,6 +221,7 @@ const DEFAULT_PARAMS: LightStreakGlareParams = {
     maxBrightness: 1.0,
     smoothness: 0.1,
     colorModulation: 0.25,
+    streakSoftness: 1.5,
     intensity: 1.0,
     tint: [0.6, 0.8, 1.0],
     resolution: 0.5,
@@ -306,6 +345,8 @@ export class LightStreakGlareEffect implements Effect {
                 src: ctx.src,
                 glare: accum,
                 intensity: this.params.intensity,
+                glareTexel: [1 / accum.width, 1 / accum.height],
+                softness: Math.max(0, this.params.streakSoftness),
                 tint: [
                     this.params.tint[0],
                     this.params.tint[1],
