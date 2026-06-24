@@ -109,6 +109,45 @@
     await photo.decode();
   } catch {}
 
+  // Source exposure/gamma adjustment, chained BEFORE the streak effect so
+  // the streak sees (and the page shows) the adjusted image. Handy to make
+  // the effect easier to read — push the source down and the highlights up.
+  const FRAG_EXPOSURE = `#version 300 es
+  precision highp float;
+  in vec2 uvSrc;
+  in vec2 uvContent;
+  out vec4 outColor;
+  uniform sampler2D src;
+  uniform float exposure;
+  uniform float gamma;
+  void main() {
+    vec2 inS = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
+    vec2 inC = step(vec2(0.0), uvContent) * step(uvContent, vec2(1.0));
+    float m = inS.x * inS.y * inC.x * inC.y;
+    vec4 c = texture(src, clamp(uvSrc, 0.0, 1.0));
+    vec3 adj = pow(max(c.rgb, 0.0) * exp2(exposure), vec3(1.0 / gamma));
+    outColor = vec4(adj, c.a) * m;
+  }`;
+  class ExposureEffect {
+    constructor(p = {}) {
+      this.params = { exposure: 0, gamma: 1, ...p };
+    }
+    setParams(u) {
+      Object.assign(this.params, u);
+    }
+    render(ctx) {
+      ctx.draw({
+        frag: FRAG_EXPOSURE,
+        target: ctx.target,
+        uniforms: {
+          src: ctx.src,
+          exposure: this.params.exposure,
+          gamma: this.params.gamma,
+        },
+      });
+    }
+  }
+
   // Shared, mutable params so a single pane drives every target. Effect
   // instances aren't reusable across elements, so mint one per target but
   // point them all at this same object via setParams.
@@ -120,6 +159,9 @@
     preset: "anamorphic",
     blades: 6,
     angle: 0,
+    // source adjustment (chained before the streak)
+    exposure: 0,
+    srcGamma: 1,
     threshold: 0.78,
     maxBrightness: 1.0,
     intensity: 1.1,
@@ -208,16 +250,26 @@
 
   const targets = [...document.querySelectorAll("[data-streak]")];
   let effects = [];
+  let exposures = [];
+
+  function exposureParams() {
+    return { exposure: params.exposure, gamma: params.srcGamma };
+  }
 
   async function attachAll() {
     effects = [];
+    exposures = [];
     for (const el of targets) {
+      const exposure = new ExposureEffect(exposureParams());
       const effect = makeEffect();
+      exposures.push(exposure);
       effects.push(effect);
+      // Chain: exposure adjusts the source, then the streak runs on it.
+      const chain = [exposure, effect];
       if (el instanceof HTMLImageElement) {
-        await vfx.add(el, { effect });
+        await vfx.add(el, { effect: chain });
       } else {
-        await vfx.addHTML(el, { effect, zIndex: 1 });
+        await vfx.addHTML(el, { effect: chain, zIndex: 1 });
       }
     }
   }
@@ -226,6 +278,8 @@
   function sync() {
     const p = liveParams();
     for (const e of effects) e.setParams(p);
+    const ep = exposureParams();
+    for (const e of exposures) e.setParams(ep);
   }
 
   // Effect instances can't change type in place; rebuild on strategy swap.
@@ -277,6 +331,12 @@
     .on("change", sync);
   pane.addBinding(params, "blades", { min: 3, max: 12, step: 1 }).on("change", sync);
   pane.addBinding(params, "angle", { min: 0, max: 6.283, step: 0.01 }).on("change", sync);
+
+  // Source adjustment — darken the image / lift highlights to read the effect.
+  const srcFolder = pane.addFolder({ title: "Source" });
+  srcFolder.addBinding(params, "exposure", { min: -4, max: 4, step: 0.01 }).on("change", sync);
+  srcFolder.addBinding(params, "srcGamma", { min: 0.2, max: 3, step: 0.01 }).on("change", sync);
+
   pane.addBinding(params, "threshold", { min: 0, max: 1, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "maxBrightness", { min: 0.1, max: 1, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "intensity", { min: 0, max: 3, step: 0.01 }).on("change", sync);
