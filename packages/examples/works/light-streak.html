@@ -111,7 +111,7 @@
 
 <script type="module">
   import { VFX } from "@vfx-js/core";
-  import { LightStreakEffect, LightStreakBlurEffect } from "@vfx-js/effects";
+  import { LightStreakEffect } from "@vfx-js/effects";
   import { Pane } from "https://esm.sh/tweakpane@4.0.5";
 
   const photo = document.getElementById("photo");
@@ -128,17 +128,12 @@
   // instances aren't reusable across elements, so mint one per target but
   // point them all at this same object via setParams.
   const params = {
-    // "instance" = stretched-sprite splat (LightStreakEffect)
-    // "blur"     = Kawase directional blur (LightStreakBlurEffect)
-    strategy: "blur",
     preset: "anamorphic",
     blades: 6,
     angle: 0,
     length: 220,
     thickness: 2,
     falloff: 1.5,
-    passes: 6,
-    attenuation: 0.97,
     threshold: 0.78,
     gamma: 2.2,
     intensity: 1.1,
@@ -156,60 +151,38 @@
   }
 
   function liveParams() {
-    const shared = {
+    return {
       streaks: streakCount(),
       angle: params.angle,
       length: params.length,
+      thickness: params.thickness,
+      falloff: params.falloff,
       threshold: params.threshold,
       gamma: params.gamma,
       intensity: params.intensity,
+      dispersion: params.dispersion,
       tint: [params.tintR, params.tintG, params.tintB],
       // Anamorphic streaks reach far horizontally; pad generously.
       pad: Math.ceil(params.length * 1.2),
     };
-    if (params.strategy === "instance") {
-      return {
-        ...shared,
-        thickness: params.thickness,
-        falloff: params.falloff,
-        dispersion: params.dispersion,
-      };
-    }
-    return { ...shared, passes: params.passes, attenuation: params.attenuation };
-  }
-
-  function makeEffect() {
-    const Ctor =
-      params.strategy === "instance" ? LightStreakEffect : LightStreakBlurEffect;
-    return new Ctor(liveParams());
   }
 
   const targets = [...document.querySelectorAll("[data-streak]")];
-  let effects = [];
+  const effects = [];
 
-  async function attachAll() {
-    effects = [];
-    for (const el of targets) {
-      const effect = makeEffect();
-      effects.push(effect);
-      if (el instanceof HTMLImageElement) {
-        await vfx.add(el, { effect });
-      } else {
-        await vfx.addHTML(el, { effect, zIndex: 1 });
-      }
+  for (const el of targets) {
+    const effect = new LightStreakEffect(liveParams());
+    effects.push(effect);
+    if (el instanceof HTMLImageElement) {
+      await vfx.add(el, { effect });
+    } else {
+      await vfx.addHTML(el, { effect, zIndex: 1 });
     }
   }
-  await attachAll();
 
   function sync() {
     const p = liveParams();
     for (const e of effects) e.setParams(p);
-  }
-
-  // Effect instances can't change type in place; rebuild on strategy swap.
-  async function rebuild() {
-    for (const el of targets) vfx.remove(el);
-    await attachAll();
   }
 
   // --- Tweakpane ----------------------------------------------------------
@@ -220,11 +193,6 @@
   const pane = new Pane({ container: paneContainer, title: "Light Streak" });
 
   pane
-    .addBinding(params, "strategy", {
-      options: { "blur (Kawase)": "blur", "instance (sprite)": "instance" },
-    })
-    .on("change", rebuild);
-  pane
     .addBinding(params, "preset", {
       options: { anamorphic: "anamorphic", "aperture star": "aperture" },
     })
@@ -232,12 +200,8 @@
   pane.addBinding(params, "blades", { min: 3, max: 12, step: 1 }).on("change", sync);
   pane.addBinding(params, "angle", { min: 0, max: 6.283, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "length", { min: 0, max: 480, step: 1 }).on("change", sync);
-  // instance-only
   pane.addBinding(params, "thickness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
   pane.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
-  // blur-only
-  pane.addBinding(params, "passes", { min: 1, max: 8, step: 1 }).on("change", sync);
-  pane.addBinding(params, "attenuation", { min: 0.8, max: 0.999, step: 0.001 }).on("change", sync);
   pane.addBinding(params, "threshold", { min: 0, max: 1, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "gamma", { min: 0.5, max: 5, step: 0.05 }).on("change", sync);
   pane.addBinding(params, "intensity", { min: 0, max: 3, step: 0.01 }).on("change", sync);
