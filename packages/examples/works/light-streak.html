@@ -192,6 +192,7 @@
     length: 220,
     softness: 2,
     falloff: 1.5,
+    falloffCurve: 0.5,
     density: 256,
   };
 
@@ -213,6 +214,7 @@
       length: params.length,
       softness: params.softness,
       falloff: params.falloff,
+      falloffCurve: params.falloffCurve,
       dispersion: params.dispersion,
       colorModulation: params.colorModulation,
       density: params.density,
@@ -302,6 +304,7 @@
   shape.addBinding(params, "length", { min: 0, max: 2000, step: 1 }).on("change", sync);
   shape.addBinding(params, "softness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
   shape.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
+  shape.addBinding(params, "falloffCurve", { min: 0, max: 1, step: 0.01, label: "falloff curve" }).on("change", sync);
   shape.addBinding(params, "density", { min: 64, max: 512, step: 32 }).on("change", sync);
 
   const tint = pane.addFolder({ title: "Tint" });

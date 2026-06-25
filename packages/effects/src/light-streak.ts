@@ -134,29 +134,34 @@ in float v_cross;
 in vec3 v_color;
 in float v_gate;
 
-uniform float falloff;          // tip fade exponent
+uniform float falloff;          // length fade exponent / decay rate
 uniform float dispersion;       // chromatic shift toward blue at the tip
 uniform float colorModulation;  // cyclic spectral hue shift along the streak
+uniform float falloffCurve;     // 0 = polynomial tail, 1 = exponential
 
 out vec4 outColor;
 
 void main() {
-    // Per-channel exponential length falloff. Real light streaks fade
-    // roughly exponentially from the source — a bright core with a long,
-    // faint tail — rather than the polynomial ramp pow(1-d, n) gives,
-    // whose tail dies too uniformly to read as natural. falloff is the
-    // decay rate (higher = tighter core, longer faint tail). The
-    // (exp(-k*d) - exp(-k)) / (1 - exp(-k)) normalisation pins the profile
-    // to 1 at the source and exactly 0 at the tip, so the finite quad shows
-    // no hard cut-off edge. Dispersion raises the rate for red (dies first)
-    // and lowers it for blue (persists), fringing the tip through colour.
+    // Per-channel length falloff, a blend of two profiles (both pinned to 1
+    // at the source and exactly 0 at the tip, so the core brightness — and
+    // thus the norm calibration — is unchanged and the finite quad shows no
+    // hard edge):
+    //   polynomial  pow(1-d, k): a fuller mid-section, so the streak reads
+    //               longer.
+    //   exponential (exp(-kd) - e^-k)/(1 - e^-k): a tighter, brighter core
+    //               with a faint tail — more physical, but visually shorter.
+    // falloffCurve mixes between them. falloff is the shared exponent /
+    // decay rate. Dispersion raises it for red (dies first) and lowers it
+    // for blue (persists), fringing the tip through colour.
     vec3 k = vec3(
         falloff + dispersion * 3.0,
         falloff + dispersion * 1.5,
         falloff
     );
+    vec3 poly = pow(vec3(max(1.0 - v_along, 0.0)), k);
     vec3 eEnd = exp(-k);
-    vec3 perChannel = max((exp(-k * v_along) - eEnd) / max(1.0 - eEnd, 1e-4), 0.0);
+    vec3 expo = max((exp(-k * v_along) - eEnd) / max(1.0 - eEnd, 1e-4), 0.0);
+    vec3 perChannel = mix(poly, expo, falloffCurve);
     // Soft gaussian cross-section so neighbouring sprites overlap into a
     // continuous sheet instead of discrete stripes.
     float crossFall = exp(-v_cross * v_cross * 2.0);
@@ -238,11 +243,19 @@ export type LightStreakParams = {
      */
     softness: number;
     /**
-     * Exponential decay rate along the streak. Higher concentrates the
-     * brightness into a tighter core near the source and trails a longer,
-     * fainter tail; lower flattens toward an even streak.
+     * Length fade exponent / decay rate. Higher concentrates the brightness
+     * into a tighter core near the source and trails a fainter tail; lower
+     * flattens toward an even streak.
      */
     falloff: number;
+    /**
+     * Shape of the length falloff, 0..1. `0` is a polynomial profile
+     * (`pow(1-d, falloff)`) with a fuller mid-section, so the streak reads
+     * longer; `1` is a normalised exponential with a tighter core and a
+     * faint tail (more physical, visually shorter). Intermediate values
+     * blend the two.
+     */
+    falloffCurve: number;
     /** Highlight cutoff in [0,1]. Only highlights above this throw streaks. */
     threshold: number;
     /**
@@ -300,6 +313,7 @@ const DEFAULT_PARAMS: LightStreakParams = {
     tint: [0.6, 0.8, 1.0],
     dispersion: 0.5,
     colorModulation: 0.0,
+    falloffCurve: 0.5,
     density: 256,
     pad: 160,
 };
@@ -394,6 +408,7 @@ export class LightStreakEffect implements Effect {
                     falloff: this.params.falloff,
                     dispersion: this.params.dispersion,
                     colorModulation: this.params.colorModulation,
+                    falloffCurve: this.params.falloffCurve,
                 },
             });
         }
