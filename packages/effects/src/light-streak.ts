@@ -141,16 +141,22 @@ uniform float colorModulation;  // cyclic spectral hue shift along the streak
 out vec4 outColor;
 
 void main() {
-    float t = max(1.0 - v_along, 0.0);
-    // Per-channel length falloff (Blender-style chromatic dispersion):
-    // red dims fastest and blue persists, so the streak fringes through
-    // colour toward its tip. dispersion widens the channel spread; 0
-    // collapses to a single uniform falloff.
-    vec3 perChannel = vec3(
-        pow(t, falloff + dispersion * 3.0),
-        pow(t, falloff + dispersion * 1.5),
-        pow(t, falloff)
+    // Per-channel exponential length falloff. Real light streaks fade
+    // roughly exponentially from the source — a bright core with a long,
+    // faint tail — rather than the polynomial ramp pow(1-d, n) gives,
+    // whose tail dies too uniformly to read as natural. falloff is the
+    // decay rate (higher = tighter core, longer faint tail). The
+    // (exp(-k*d) - exp(-k)) / (1 - exp(-k)) normalisation pins the profile
+    // to 1 at the source and exactly 0 at the tip, so the finite quad shows
+    // no hard cut-off edge. Dispersion raises the rate for red (dies first)
+    // and lowers it for blue (persists), fringing the tip through colour.
+    vec3 k = vec3(
+        falloff + dispersion * 3.0,
+        falloff + dispersion * 1.5,
+        falloff
     );
+    vec3 eEnd = exp(-k);
+    vec3 perChannel = max((exp(-k * v_along) - eEnd) / max(1.0 - eEnd, 1e-4), 0.0);
     // Soft gaussian cross-section so neighbouring sprites overlap into a
     // continuous sheet instead of discrete stripes.
     float crossFall = exp(-v_cross * v_cross * 2.0);
@@ -231,7 +237,11 @@ export type LightStreakParams = {
      * `density` for genuinely thin-yet-continuous streaks.
      */
     softness: number;
-    /** Tip fade exponent. Higher = shorter visible tail. */
+    /**
+     * Exponential decay rate along the streak. Higher concentrates the
+     * brightness into a tighter core near the source and trails a longer,
+     * fainter tail; lower flattens toward an even streak.
+     */
     falloff: number;
     /** Highlight cutoff in [0,1]. Only highlights above this throw streaks. */
     threshold: number;
