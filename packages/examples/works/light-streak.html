@@ -37,9 +37,9 @@
     justify-content: center;
   }
 
-  /* The source image: photos cover the frame, the logo is letterboxed
-     (object-fit set per-source in JS). */
-  #photo {
+  /* The source media: photos/video cover the frame, the logo is letterboxed
+     (object-fit set per-source in JS). Only the active element is shown. */
+  #photo, #video {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -49,6 +49,7 @@
     user-select: none;
     -webkit-user-drag: none;
   }
+  #video[hidden], #photo[hidden] { display: none; }
 
   .hint {
     position: fixed;
@@ -67,7 +68,8 @@
 <body>
 
 <div class="stage">
-  <img id="photo" crossorigin="anonymous" alt="streak source" data-streak />
+  <img id="photo" crossorigin="anonymous" alt="streak source" />
+  <video id="video" crossorigin="anonymous" muted loop playsinline hidden></video>
 </div>
 
 <div class="hint">Pick a source and switch anamorphic ↔ aperture starburst in the panel</div>
@@ -82,32 +84,58 @@
   import { Pane } from "https://esm.sh/tweakpane@4.0.5";
 
   const photo = document.getElementById("photo");
+  const video = document.getElementById("video");
 
   const vfx = new VFX({ pixelRatio: Math.min(window.devicePixelRatio || 1, 2) });
 
-  // Selectable sources. The white logo (letterboxed) and night scenes with
-  // bright specular highlights (headlights, lamps) all give the streaks
-  // plenty to grab onto. `new URL(..., import.meta.url)` so Vite bundles
-  // the local SVG.
+  // Selectable sources. The white logo (letterboxed), night scenes with
+  // bright specular highlights (headlights, lamps), and a moving car video
+  // all give the streaks plenty to grab onto. `new URL(..., import.meta.url)`
+  // so Vite bundles the local assets.
   const UNSPLASH = "https://images.unsplash.com/";
   const IMG_SUFFIX = "?w=1280&h=720&fit=crop&crop=entropy";
   const LOGO_URL = new URL("./light-streak-logo.svg", import.meta.url).href;
-  const IMAGES = [
-    { id: "logo", label: "VFX-JS logo", src: LOGO_URL, fit: "contain" },
-    { id: "city", label: "City lights", src: `${UNSPLASH}photo-1514565131-fce0801e5785${IMG_SUFFIX}`, fit: "cover" },
-    { id: "mercedes", label: "Mercedes", src: `${UNSPLASH}photo-1624085568108-36410cfe4d24${IMG_SUFFIX}`, fit: "cover" },
-    { id: "motorcycle", label: "Motorcycle", src: `${UNSPLASH}photo-1567516365182-1498ada52f85${IMG_SUFFIX}`, fit: "cover" },
-    { id: "blackcar", label: "Black car", src: `${UNSPLASH}photo-1564890379653-0eb3a6b4eaad${IMG_SUFFIX}`, fit: "cover" },
+  const CAR_URL = new URL("./light-streak-car.mp4", import.meta.url).href;
+  const SOURCES = [
+    { id: "logo", label: "VFX-JS logo", type: "image", src: LOGO_URL, fit: "contain" },
+    { id: "city", label: "City lights", type: "image", src: `${UNSPLASH}photo-1514565131-fce0801e5785${IMG_SUFFIX}`, fit: "cover" },
+    { id: "mercedes", label: "Mercedes", type: "image", src: `${UNSPLASH}photo-1624085568108-36410cfe4d24${IMG_SUFFIX}`, fit: "cover" },
+    { id: "motorcycle", label: "Motorcycle", type: "image", src: `${UNSPLASH}photo-1567516365182-1498ada52f85${IMG_SUFFIX}`, fit: "cover" },
+    { id: "blackcar", label: "Black car", type: "image", src: `${UNSPLASH}photo-1564890379653-0eb3a6b4eaad${IMG_SUFFIX}`, fit: "cover" },
+    { id: "carvideo", label: "Car (video)", type: "video", src: CAR_URL, fit: "cover" },
   ];
-  const imageParams = { image: IMAGES[0].id };
+  const imageParams = { image: SOURCES[0].id };
+
+  // The element currently feeding the effect (img or video). Switching
+  // between an image and a video re-attaches the effect to the other element.
+  let activeEl = photo;
+
+  // Load a source into its element and make it the active streak target.
+  async function loadSource(spec) {
+    if (spec.type === "video") {
+      video.src = spec.src;
+      video.style.objectFit = spec.fit;
+      photo.hidden = true;
+      video.hidden = false;
+      try {
+        await video.play();
+      } catch {}
+      activeEl = video;
+    } else {
+      photo.src = spec.src;
+      photo.style.objectFit = spec.fit;
+      video.hidden = true;
+      video.pause();
+      photo.hidden = false;
+      try {
+        await photo.decode();
+      } catch {}
+      activeEl = photo;
+    }
+  }
 
   // Load the initial source before attaching the effect.
-  const initialImage = IMAGES[0];
-  photo.src = initialImage.src;
-  photo.style.objectFit = initialImage.fit;
-  try {
-    await photo.decode();
-  } catch {}
+  await loadSource(SOURCES[0]);
 
   // Source exposure/gamma adjustment, chained BEFORE the streak effect so
   // the streak sees (and the page shows) the adjusted image. Handy to make
@@ -155,7 +183,7 @@
     // "instance"   = stretched-sprite splat (LightStreakEffect)
     // "glare"      = Blender-style fullscreen streaks (LightStreakGlareEffect)
     // "anamorphic" = KinoStreak horizontal pyramid (AnamorphicStreakEffect)
-    strategy: "glare",
+    strategy: "instance",
     preset: "anamorphic",
     blades: 6,
     angle: 0,
@@ -172,13 +200,9 @@
     tintB: 1.0,
     // instance-only
     length: 220,
-    thickness: 2,
+    softness: 2,
     falloff: 1.5,
     density: 256,
-    instGlow: true, // (A) bloom the accumulation
-    glowStrength: 0.6,
-    glowRadius: 2,
-    instLowRes: true, // (B) low-res accumulation (uses shared `resolution`)
     // glare-only
     iterations: 3,
     fade: 0.9,
@@ -209,14 +233,11 @@
         streaks: streakCount(),
         angle: params.angle,
         length: params.length,
-        thickness: params.thickness,
+        softness: params.softness,
         falloff: params.falloff,
         dispersion: params.dispersion,
         colorModulation: params.colorModulation,
         density: params.density,
-        glowStrength: params.instGlow ? params.glowStrength : 0,
-        glowRadius: params.glowRadius,
-        resolution: params.instLowRes ? params.resolution : 1,
         // Long streaks need a big reach; "fullscreen" bounds the buffer to
         // the canvas instead of growing pad past the GPU texture limit.
         pad: params.length > 400 ? "fullscreen" : Math.ceil(params.length * 1.2),
@@ -255,58 +276,50 @@
     return new Ctor(liveParams());
   }
 
-  const targets = [...document.querySelectorAll("[data-streak]")];
-  let effects = [];
-  let exposures = [];
+  let effect = null;
+  let exposure = null;
+  let attachedEl = null;
 
   function exposureParams() {
     return { exposure: params.exposure, gamma: params.srcGamma };
   }
 
+  // Attach the exposure→streak chain to the currently active element.
   async function attachAll() {
-    effects = [];
-    exposures = [];
-    for (const el of targets) {
-      const exposure = new ExposureEffect(exposureParams());
-      const effect = makeEffect();
-      exposures.push(exposure);
-      effects.push(effect);
-      // Chain: exposure adjusts the source, then the streak runs on it.
-      const chain = [exposure, effect];
-      if (el instanceof HTMLImageElement) {
-        await vfx.add(el, { effect: chain });
-      } else {
-        await vfx.addHTML(el, { effect: chain, zIndex: 1 });
-      }
-    }
+    exposure = new ExposureEffect(exposureParams());
+    effect = makeEffect();
+    attachedEl = activeEl;
+    // Chain: exposure adjusts the source, then the streak runs on it.
+    await vfx.add(attachedEl, { effect: [exposure, effect] });
   }
   await attachAll();
 
   function sync() {
-    const p = liveParams();
-    for (const e of effects) e.setParams(p);
-    const ep = exposureParams();
-    for (const e of exposures) e.setParams(ep);
+    effect?.setParams(liveParams());
+    exposure?.setParams(exposureParams());
   }
 
   // Effect instances can't change type in place; rebuild on strategy swap.
   async function rebuild() {
-    for (const el of targets) vfx.remove(el);
+    if (attachedEl) vfx.remove(attachedEl);
     await attachAll();
   }
 
-  // Swap the backdrop and re-capture it (images aren't auto-refreshed).
+  // Swap the source. A still image just needs re-capturing; switching to or
+  // from the video changes which element feeds the effect, so re-attach.
   let switching = false;
   async function switchImage(id) {
-    const spec = IMAGES.find((i) => i.id === id);
+    const spec = SOURCES.find((i) => i.id === id);
     if (!spec || switching) return;
     switching = true;
-    photo.src = spec.src;
-    photo.style.objectFit = spec.fit;
-    try {
-      await photo.decode();
-    } catch {}
-    await vfx.update(photo);
+    const prevEl = activeEl;
+    await loadSource(spec);
+    if (activeEl !== prevEl) {
+      if (attachedEl) vfx.remove(attachedEl);
+      await attachAll();
+    } else {
+      await vfx.update(activeEl);
+    }
     switching = false;
   }
 
@@ -319,7 +332,7 @@
 
   pane
     .addBinding(imageParams, "image", {
-      options: Object.fromEntries(IMAGES.map((i) => [i.label, i.id])),
+      options: Object.fromEntries(SOURCES.map((i) => [i.label, i.id])),
     })
     .on("change", (e) => switchImage(e.value));
   pane
@@ -356,13 +369,9 @@
   // instance-only
   const inst = pane.addFolder({ title: "Instance" });
   inst.addBinding(params, "length", { min: 0, max: 2000, step: 1 }).on("change", sync);
-  inst.addBinding(params, "thickness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
+  inst.addBinding(params, "softness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
   inst.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
   inst.addBinding(params, "density", { min: 64, max: 512, step: 32 }).on("change", sync);
-  inst.addBinding(params, "instGlow", { label: "A: glow" }).on("change", sync);
-  inst.addBinding(params, "glowStrength", { min: 0, max: 1.5, step: 0.01 }).on("change", sync);
-  inst.addBinding(params, "glowRadius", { min: 0.5, max: 6, step: 0.1 }).on("change", sync);
-  inst.addBinding(params, "instLowRes", { label: "B: low-res" }).on("change", sync);
 
   // glare-only
   const glare = pane.addFolder({ title: "Glare" });

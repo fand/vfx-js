@@ -68,7 +68,7 @@ uniform vec4 srcRect;
 uniform vec4 dstRect;
 uniform float angle;       // streak direction (rad)
 uniform float lengthPx;    // max streak length (physical px)
-uniform float thicknessPx; // streak width (physical px)
+uniform float softnessPx;  // streak cross-section width (physical px)
 uniform float threshold;   // highlight cutoff
 uniform float maxBrightness; // upper clamp on source brightness
 
@@ -108,7 +108,7 @@ void main() {
     // Brighter highlights throw longer streaks.
     float len = lengthPx * gate;
     vec2 offPx = dir * (position.x * len)
-               + perp * (position.y * thicknessPx * 0.5);
+               + perp * (position.y * softnessPx * 0.5);
 
     // px → NDC delta. The asymmetric divide by w/h is undone when NDC is
     // mapped back onto the viewport, so on-screen the streak stays true
@@ -192,45 +192,22 @@ out vec4 outColor;
 void main() { outColor = vec4(0.0); }
 `;
 
-// Separable 9-tap Gaussian. `dir` is the per-tap step (axis × radius / size)
-// in uv; run once horizontally then once vertically for an isotropic blur.
-const FRAG_BLUR = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D src;
-uniform vec2 dir;
-
-void main() {
-    vec3 c = texture(src, uv).rgb * 0.2270270270;
-    c += texture(src, uv + dir * 1.3846153846).rgb * 0.3162162162;
-    c += texture(src, uv - dir * 1.3846153846).rgb * 0.3162162162;
-    c += texture(src, uv + dir * 3.2307692308).rgb * 0.0702702703;
-    c += texture(src, uv - dir * 3.2307692308).rgb * 0.0702702703;
-    outColor = vec4(c, 1.0);
-}
-`;
-
 // Tone-mapped composite of the accumulated streaks over the source.
 // `1 - exp(-streak * intensity)` softly saturates: dense, overlapping
 // streaks (e.g. off bright text) approach `tint` instead of clipping to
-// white. `glow` is the optional bloomed accumulation (A) blended in for a
-// broad soft halo. Added over the already-drawn base.
+// white. Added over the already-drawn base.
 const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
 out vec4 outColor;
 uniform sampler2D accum;
-uniform sampler2D glow;
 uniform vec3 tint;
 uniform float intensity;
 uniform float norm;        // core-gain normalisation (cross-method calibration)
-uniform float glowStrength;
 
 void main() {
     vec3 acc = max(texture(accum, uv).rgb, vec3(0.0));
-    vec3 streak = acc + max(texture(glow, uv).rgb, vec3(0.0)) * glowStrength;
-    vec3 s = (1.0 - exp(-streak * norm * intensity)) * tint;
+    vec3 s = (1.0 - exp(-acc * norm * intensity)) * tint;
     float a = clamp(dot(s, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
     outColor = vec4(s, a);
 }
@@ -248,11 +225,12 @@ export type LightStreakParams = {
     /** Max streak length in CSS (logical) px. Brighter cells reach further. */
     length: number;
     /**
-     * Streak width in CSS (logical) px. Raised to at least ~one grid cell
-     * so neighbouring streaks merge (see `density`); increase `density`
-     * for genuinely thin-yet-continuous streaks.
+     * Streak cross-section width ("softness") in CSS (logical) px — how
+     * wide/soft each streak's gaussian profile is. Raised to at least ~one
+     * grid cell so neighbouring streaks merge (see `density`); increase
+     * `density` for genuinely thin-yet-continuous streaks.
      */
-    thickness: number;
+    softness: number;
     /** Tip fade exponent. Higher = shorter visible tail. */
     falloff: number;
     /** Highlight cutoff in [0,1]. Only highlights above this throw streaks. */
@@ -293,20 +271,6 @@ export type LightStreakParams = {
      */
     density: number;
     /**
-     * (B) Accumulation resolution scale, 0.25..1. Below 1 the streaks are
-     * accumulated into a smaller buffer and bilinearly upsampled, which
-     * smooths the discrete-sprite micro-structure (and is faster). 1 = off.
-     */
-    resolution: number;
-    /**
-     * (A) Bloom on the accumulation, 0..~1. A separable Gaussian adds the
-     * broad soft halo real flares have and dissolves residual sprite
-     * structure. 0 disables it (no blur passes run).
-     */
-    glowStrength: number;
-    /** (A) Bloom blur radius, in accumulation-buffer texels. */
-    glowRadius: number;
-    /**
      * Extra pad around the element in CSS px so streaks aren't clipped at
      * the element edge. Should be ≥ `length`. `"fullscreen"` reaches the
      * viewport edges.
@@ -318,7 +282,7 @@ const DEFAULT_PARAMS: LightStreakParams = {
     streaks: 2,
     angle: 0,
     length: 160,
-    thickness: 2,
+    softness: 2,
     falloff: 1.5,
     threshold: 0.75,
     maxBrightness: 1.0,
@@ -327,9 +291,6 @@ const DEFAULT_PARAMS: LightStreakParams = {
     dispersion: 0.5,
     colorModulation: 0.0,
     density: 256,
-    resolution: 0.5,
-    glowStrength: 0.6,
-    glowRadius: 2.0,
     pad: 160,
 };
 
@@ -345,8 +306,6 @@ export class LightStreakEffect implements Effect {
     #geometry: EffectGeometry | null = null;
     #geometryDensity = 0;
     #accum: EffectRenderTarget | null = null;
-    #blurA: EffectRenderTarget | null = null;
-    #blurB: EffectRenderTarget | null = null;
     #lastW = 0;
     #lastH = 0;
 
@@ -369,28 +328,21 @@ export class LightStreakEffect implements Effect {
         const src = ctx.dims.srcRect;
         const pr = ctx.dims.pixelRatio;
 
-        // (B) Accumulation resolution. 1 = full-res; lower pre-smooths the
-        // discrete sprites (and is cheaper) via the bilinear upsample at
-        // composite. Buffers are float so streaks accumulate past 1.0.
-        const scale = Math.min(1, Math.max(0.1, this.params.resolution));
-        const aw = Math.max(2, Math.round(dst[2] * scale));
-        const ah = Math.max(2, Math.round(dst[3] * scale));
+        // Full-resolution float accumulation buffer (streaks accumulate
+        // past 1.0, tone-mapped at composite).
+        const aw = Math.max(2, Math.round(dst[2]));
+        const ah = Math.max(2, Math.round(dst[3]));
         if (aw !== this.#lastW || ah !== this.#lastH) {
-            const opts = {
+            this.#accum = ctx.createRenderTarget({
                 size: [aw, ah] as [number, number],
                 float: true,
                 filter: "linear" as const,
-            };
-            this.#accum = ctx.createRenderTarget(opts);
-            this.#blurA = ctx.createRenderTarget(opts);
-            this.#blurB = ctx.createRenderTarget(opts);
+            });
             this.#lastW = aw;
             this.#lastH = ah;
         }
         const accum = this.#accum;
-        const blurA = this.#blurA;
-        const blurB = this.#blurB;
-        if (!accum || !blurA || !blurB) {
+        if (!accum) {
             return;
         }
 
@@ -410,7 +362,7 @@ export class LightStreakEffect implements Effect {
         // into a continuous sheet rather than a row of discrete stripes.
         const [ew, eh] = ctx.dims.elementPixel;
         const cellPx = Math.max(ew, eh) / dim;
-        const thicknessPx = Math.max(this.params.thickness * pr, cellPx * 1.8);
+        const softnessPx = Math.max(this.params.softness * pr, cellPx * 1.8);
 
         for (let k = 0; k < rays; k++) {
             const angle = this.params.angle + (k * Math.PI * 2) / rays;
@@ -426,7 +378,7 @@ export class LightStreakEffect implements Effect {
                     dstRect: [dst[0], dst[1], dst[2], dst[3]],
                     angle,
                     lengthPx,
-                    thicknessPx,
+                    softnessPx,
                     threshold: this.params.threshold,
                     maxBrightness: this.params.maxBrightness,
                     falloff: this.params.falloff,
@@ -434,26 +386,6 @@ export class LightStreakEffect implements Effect {
                     colorModulation: this.params.colorModulation,
                 },
             });
-        }
-
-        // (A) Optional bloom of the accumulation: a separable Gaussian
-        // adds the broad soft halo real flares have and smooths the
-        // discrete-sprite micro-structure. `glowStrength` 0 disables it.
-        const glowStrength = Math.max(0, this.params.glowStrength);
-        let glow = accum;
-        if (glowStrength > 0) {
-            const r = Math.max(0.5, this.params.glowRadius);
-            ctx.draw({
-                frag: FRAG_BLUR,
-                target: blurA,
-                uniforms: { src: accum, dir: [r / aw, 0] },
-            });
-            ctx.draw({
-                frag: FRAG_BLUR,
-                target: blurB,
-                uniforms: { src: blurA, dir: [0, r / ah] },
-            });
-            glow = blurB;
         }
 
         // Tone-mapped, tinted composite of the accumulation over the base.
@@ -465,8 +397,6 @@ export class LightStreakEffect implements Effect {
             blend: "additive",
             uniforms: {
                 accum,
-                glow,
-                glowStrength,
                 intensity: this.params.intensity,
                 norm: 1 / (rays * 0.9),
                 tint: [
@@ -493,8 +423,6 @@ export class LightStreakEffect implements Effect {
         this.#geometry = null;
         this.#geometryDensity = 0;
         this.#accum = null;
-        this.#blurA = null;
-        this.#blurB = null;
         this.#lastW = 0;
         this.#lastH = 0;
     }
