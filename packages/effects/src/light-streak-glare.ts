@@ -129,6 +129,7 @@ uniform sampler2D src;
 uniform sampler2D glare;
 uniform vec3 tint;
 uniform float intensity;
+uniform float norm;        // core-gain normalisation (cross-method calibration)
 uniform vec2 glareTexel;   // 1/size of the glare buffer (uv)
 uniform float softness;    // isotropic blur radius (glare texels)
 
@@ -156,7 +157,7 @@ void main() {
     float m = inS.x * inS.y * inC.x * inC.y;
 
     vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0)) * m;
-    vec3 g = sampleGlare(uv) * tint * intensity;
+    vec3 g = (1.0 - exp(-sampleGlare(uv) * norm * intensity)) * tint;
 
     vec3 rgb = base.rgb * base.a + g;
     float a = clamp(max(base.a, dot(g, vec3(0.2126, 0.7152, 0.0722))), 0.0, 1.0);
@@ -222,7 +223,7 @@ const DEFAULT_PARAMS: LightStreakGlareParams = {
     smoothness: 0.1,
     colorModulation: 0.25,
     streakSoftness: 1.5,
-    intensity: 1.0,
+    intensity: 3.0,
     tint: [0.6, 0.8, 1.0],
     resolution: 0.5,
     pad: 200,
@@ -337,7 +338,11 @@ export class LightStreakGlareEffect implements Effect {
             });
         }
 
-        // 3. Composite over the source.
+        // 3. Composite over the source. `norm` cancels the filter's core
+        // gain (≈ rays × 0.5^iters / (MAX+1-iters)) so the streak core
+        // matches the other strategies at the same intensity.
+        const coreGain =
+            (rays * 0.5 ** iterations) / (MAX_ITERATIONS + 1 - iterations);
         ctx.draw({
             frag: FRAG_COMPOSITE,
             target: ctx.target,
@@ -345,6 +350,7 @@ export class LightStreakGlareEffect implements Effect {
                 src: ctx.src,
                 glare: accum,
                 intensity: this.params.intensity,
+                norm: 1 / coreGain,
                 glareTexel: [1 / accum.width, 1 / accum.height],
                 softness: Math.max(0, this.params.streakSoftness),
                 tint: [

@@ -107,6 +107,7 @@ uniform sampler2D src;
 uniform sampler2D streak;
 uniform vec3 tint;
 uniform float intensity;
+uniform float norm;   // core-gain normalisation (cross-method calibration)
 
 void main() {
     vec2 inS = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
@@ -114,7 +115,7 @@ void main() {
     float m = inS.x * inS.y * inC.x * inC.y;
 
     vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0)) * m;
-    vec3 g = texture(streak, uv).rgb * tint * intensity;
+    vec3 g = (1.0 - exp(-max(texture(streak, uv).rgb, 0.0) * norm * intensity)) * tint;
 
     vec3 rgb = base.rgb * base.a + g;
     float a = clamp(max(base.a, dot(g, vec3(0.2126, 0.7152, 0.0722))), 0.0, 1.0);
@@ -161,7 +162,7 @@ const DEFAULT_PARAMS: AnamorphicStreakParams = {
     maxBrightness: 1.0,
     stretch: 0.78,
     dispersion: 0.3,
-    intensity: 2.0,
+    intensity: 3.0,
     tint: [0.7, 0.85, 1.0],
     resolution: 0.5,
     pad: 240,
@@ -275,7 +276,9 @@ export class AnamorphicStreakEffect implements Effect {
             low = up[i];
         }
 
-        // Composite the top-level streak over the source.
+        // Composite the top-level streak over the source. `norm` cancels
+        // the pyramid's core gain (≈ 1 - stretch) so the streak core
+        // matches the other strategies at the same intensity.
         ctx.draw({
             frag: FRAG_COMPOSITE,
             target: ctx.target,
@@ -283,6 +286,7 @@ export class AnamorphicStreakEffect implements Effect {
                 src: ctx.src,
                 streak: low,
                 intensity: this.params.intensity,
+                norm: 1 / Math.max(0.05, 1 - s),
                 tint: [
                     this.params.tint[0],
                     this.params.tint[1],

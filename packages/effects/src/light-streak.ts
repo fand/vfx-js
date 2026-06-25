@@ -69,8 +69,7 @@ uniform vec4 dstRect;
 uniform float angle;       // streak direction (rad)
 uniform float lengthPx;    // max streak length (physical px)
 uniform float thicknessPx; // streak width (physical px)
-uniform float threshold;   // luminance gate
-uniform float gamma;       // gate response curve
+uniform float threshold;   // highlight cutoff
 uniform float maxBrightness; // upper clamp on source brightness
 
 out float v_along;
@@ -80,14 +79,15 @@ out float v_gate;
 
 void main() {
     vec3 c = texture(src, instanceUv).rgb;
-    // Clamp source brightness (Blender highlights "Maximum") so very
-    // bright sources don't dominate the accumulation, hue preserved.
+    // Shared highlight extraction (max-channel knee, hue preserved), with
+    // an upper clamp so blown-out sources don't dominate. gate is the
+    // highlight factor in [0,1]; the emitted highlight is c * gate.
     float vmax = max(max(c.r, c.g), c.b);
     if (vmax > maxBrightness) {
         c *= maxBrightness / vmax;
+        vmax = maxBrightness;
     }
-    float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
-    float gate = pow(smoothstep(threshold, 1.0, lum), gamma);
+    float gate = max(0.0, vmax - threshold) / max(vmax, 1e-5);
 
     // Cull dim cells: collapse the quad to a single off-screen point.
     if (gate < 0.003) {
@@ -179,10 +179,11 @@ out vec4 outColor;
 uniform sampler2D accum;
 uniform vec3 tint;
 uniform float intensity;
+uniform float norm;   // core-gain normalisation (cross-method calibration)
 
 void main() {
     vec3 acc = max(texture(accum, uv).rgb, vec3(0.0));
-    vec3 s = (1.0 - exp(-acc * intensity)) * tint;
+    vec3 s = (1.0 - exp(-acc * norm * intensity)) * tint;
     float a = clamp(dot(s, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
     outColor = vec4(s, a);
 }
@@ -207,10 +208,8 @@ export type LightStreakParams = {
     thickness: number;
     /** Tip fade exponent. Higher = shorter visible tail. */
     falloff: number;
-    /** Luminance gate in [0,1]. Only highlights above this throw streaks. */
+    /** Highlight cutoff in [0,1]. Only highlights above this throw streaks. */
     threshold: number;
-    /** Gate response curve. Higher = sharper highlight selection. */
-    gamma: number;
     /**
      * Upper clamp on source brightness (per Blender's highlight
      * "Maximum"), so blown-out sources don't dominate the accumulation.
@@ -252,9 +251,8 @@ const DEFAULT_PARAMS: LightStreakParams = {
     thickness: 2,
     falloff: 1.5,
     threshold: 0.75,
-    gamma: 2.0,
     maxBrightness: 1.0,
-    intensity: 1.0,
+    intensity: 3.0,
     tint: [0.6, 0.8, 1.0],
     dispersion: 0.5,
     density: 256,
@@ -339,7 +337,6 @@ export class LightStreakEffect implements Effect {
                     lengthPx,
                     thicknessPx,
                     threshold: this.params.threshold,
-                    gamma: this.params.gamma,
                     maxBrightness: this.params.maxBrightness,
                     falloff: this.params.falloff,
                     dispersion: this.params.dispersion,
@@ -348,6 +345,8 @@ export class LightStreakEffect implements Effect {
         }
 
         // Tone-mapped, tinted composite of the accumulation over the base.
+        // `norm` cancels the method's core gain (≈ rays × overlap) so the
+        // streak core matches the other strategies at the same intensity.
         ctx.draw({
             frag: FRAG_COMPOSITE,
             target: ctx.target,
@@ -355,6 +354,7 @@ export class LightStreakEffect implements Effect {
             uniforms: {
                 accum,
                 intensity: this.params.intensity,
+                norm: 1 / (rays * 0.9),
                 tint: [
                     this.params.tint[0],
                     this.params.tint[1],

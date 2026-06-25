@@ -164,7 +164,7 @@
     srcGamma: 1,
     threshold: 0.78,
     maxBrightness: 1.0,
-    intensity: 1.1,
+    intensity: 3.0,
     dispersion: 0.6,
     resolution: 0.5,
     tintR: 0.6,
@@ -174,7 +174,6 @@
     length: 220,
     thickness: 2,
     falloff: 1.5,
-    gamma: 2.2,
     density: 256,
     // glare-only
     iterations: 3,
@@ -208,7 +207,6 @@
         length: params.length,
         thickness: params.thickness,
         falloff: params.falloff,
-        gamma: params.gamma,
         dispersion: params.dispersion,
         density: params.density,
         pad: Math.ceil(params.length * 1.2),
@@ -220,7 +218,6 @@
         stretch: params.stretch,
         dispersion: params.dispersion,
         resolution: params.resolution,
-        intensity: params.intensity * 2, // pyramid streak values run low
         pad: 240,
       };
     }
@@ -339,7 +336,7 @@
 
   pane.addBinding(params, "threshold", { min: 0, max: 1, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "maxBrightness", { min: 0.1, max: 1, step: 0.01 }).on("change", sync);
-  pane.addBinding(params, "intensity", { min: 0, max: 3, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "intensity", { min: 0, max: 8, step: 0.01 }).on("change", sync);
   // shared by instance + anamorphic (dispersion) and glare + anamorphic (resolution)
   pane.addBinding(params, "dispersion", { min: 0, max: 1, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "resolution", { min: 0.25, max: 1, step: 0.05 }).on("change", sync);
@@ -349,7 +346,6 @@
   inst.addBinding(params, "length", { min: 0, max: 480, step: 1 }).on("change", sync);
   inst.addBinding(params, "thickness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
   inst.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
-  inst.addBinding(params, "gamma", { min: 0.5, max: 5, step: 0.05 }).on("change", sync);
   inst.addBinding(params, "density", { min: 64, max: 512, step: 32 }).on("change", sync);
 
   // glare-only
