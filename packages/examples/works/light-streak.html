@@ -216,7 +216,9 @@
         glowStrength: params.instGlow ? params.glowStrength : 0,
         glowRadius: params.glowRadius,
         resolution: params.instLowRes ? params.resolution : 1,
-        pad: Math.ceil(params.length * 1.2),
+        // Long streaks need a big reach; "fullscreen" bounds the buffer to
+        // the canvas instead of growing pad past the GPU texture limit.
+        pad: params.length > 400 ? "fullscreen" : Math.ceil(params.length * 1.2),
       };
     }
     if (params.strategy === "anamorphic") {
@@ -350,7 +352,7 @@
 
   // instance-only
   const inst = pane.addFolder({ title: "Instance" });
-  inst.addBinding(params, "length", { min: 0, max: 480, step: 1 }).on("change", sync);
+  inst.addBinding(params, "length", { min: 0, max: 2000, step: 1 }).on("change", sync);
   inst.addBinding(params, "thickness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
   inst.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
   inst.addBinding(params, "density", { min: 64, max: 512, step: 32 }).on("change", sync);
