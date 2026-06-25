@@ -1,0 +1,16 @@
+{
+    "name": "@vfx-js/example-figma-code-layer",
+    "private": true,
+    "version": "0.0.0",
+    "description": "Run @vfx-js/effects live inside a Figma Code Layer",
+    "type": "module",
+    "peerDependencies": {
+        "react": ">=18",
+        "react-dom": ">=18"
+    },
+    "dependencies": {
+        "@vfx-js/core": "^1.1.0",
+        "@vfx-js/effects": "^1.2.0",
+        "@vfx-js/react": "^1.1.0"
+    }
+}
