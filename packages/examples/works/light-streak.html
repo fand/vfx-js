@@ -175,6 +175,10 @@
     thickness: 2,
     falloff: 1.5,
     density: 256,
+    instGlow: true, // (A) bloom the accumulation
+    glowStrength: 0.6,
+    glowRadius: 2,
+    instLowRes: true, // (B) low-res accumulation (uses shared `resolution`)
     // glare-only
     iterations: 3,
     fade: 0.9,
@@ -209,6 +213,9 @@
         falloff: params.falloff,
         dispersion: params.dispersion,
         density: params.density,
+        glowStrength: params.instGlow ? params.glowStrength : 0,
+        glowRadius: params.glowRadius,
+        resolution: params.instLowRes ? params.resolution : 1,
         pad: Math.ceil(params.length * 1.2),
       };
     }
@@ -347,6 +354,10 @@
   inst.addBinding(params, "thickness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
   inst.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
   inst.addBinding(params, "density", { min: 64, max: 512, step: 32 }).on("change", sync);
+  inst.addBinding(params, "instGlow", { label: "A: glow" }).on("change", sync);
+  inst.addBinding(params, "glowStrength", { min: 0, max: 1.5, step: 0.01 }).on("change", sync);
+  inst.addBinding(params, "glowRadius", { min: 0.5, max: 6, step: 0.1 }).on("change", sync);
+  inst.addBinding(params, "instLowRes", { label: "B: low-res" }).on("change", sync);
 
   // glare-only
   const glare = pane.addFolder({ title: "Glare" });
