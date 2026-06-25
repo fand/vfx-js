@@ -71,6 +71,7 @@ uniform float lengthPx;    // max streak length (physical px)
 uniform float softnessPx;  // streak cross-section width (physical px)
 uniform float threshold;   // highlight cutoff
 uniform float maxBrightness; // upper clamp on source brightness
+uniform float lengthBrightness; // 0 = uniform length, 1 = length ∝ brightness
 
 out float v_along;
 out float v_cross;
@@ -105,8 +106,12 @@ void main() {
     vec2 dir = vec2(cos(angle), sin(angle));
     vec2 perp = vec2(-dir.y, dir.x);
 
-    // Brighter highlights throw longer streaks.
-    float len = lengthPx * gate;
+    // Streak length. Physically the lens PSF reach is the same for every
+    // source — brightness only scales amplitude, and the exponential tail +
+    // tone map make brighter highlights *read* longer (as in Blender Glare /
+    // KinoStreak). lengthBrightness blends between that uniform length (0)
+    // and the stylised "brighter throws a geometrically longer streak" (1).
+    float len = lengthPx * mix(1.0, gate, lengthBrightness);
     vec2 offPx = dir * (position.x * len)
                + perp * (position.y * softnessPx * 0.5);
 
@@ -233,8 +238,17 @@ export type LightStreakParams = {
     streaks: number;
     /** Base rotation of the ray fan, in radians. */
     angle: number;
-    /** Max streak length in CSS (logical) px. Brighter cells reach further. */
+    /** Max streak length in CSS (logical) px. */
     length: number;
+    /**
+     * How much a highlight's brightness scales its streak *length*, 0..1.
+     * `0` gives every source the same geometric length — the physically
+     * faithful "lens PSF reach is constant" behaviour (as in Blender Glare /
+     * KinoStreak), where brighter highlights only read longer because their
+     * brighter exponential tail survives the tone map further out. `1`
+     * additionally stretches the geometry by brightness (a stylised look).
+     */
+    lengthBrightness: number;
     /**
      * Streak cross-section width ("softness") in CSS (logical) px — how
      * wide/soft each streak's gaussian profile is. Raised to at least ~one
@@ -305,6 +319,7 @@ const DEFAULT_PARAMS: LightStreakParams = {
     streaks: 2,
     angle: 0,
     length: 160,
+    lengthBrightness: 0,
     softness: 2,
     falloff: 1.5,
     threshold: 0.75,
@@ -403,6 +418,7 @@ export class LightStreakEffect implements Effect {
                     angle,
                     lengthPx,
                     softnessPx,
+                    lengthBrightness: this.params.lengthBrightness,
                     threshold: this.params.threshold,
                     maxBrightness: this.params.maxBrightness,
                     falloff: this.params.falloff,

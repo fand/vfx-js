@@ -190,6 +190,7 @@
     tintG: 0.8,
     tintB: 1.0,
     length: 220,
+    lengthBrightness: 0,
     softness: 2,
     falloff: 1.5,
     falloffCurve: 0.5,
@@ -212,6 +213,7 @@
       streaks: streakCount(),
       angle: params.angle,
       length: params.length,
+      lengthBrightness: params.lengthBrightness,
       softness: params.softness,
       falloff: params.falloff,
       falloffCurve: params.falloffCurve,
@@ -302,6 +304,7 @@
 
   const shape = pane.addFolder({ title: "Shape" });
   shape.addBinding(params, "length", { min: 0, max: 2000, step: 1 }).on("change", sync);
+  shape.addBinding(params, "lengthBrightness", { min: 0, max: 1, step: 0.01, label: "length←bright" }).on("change", sync);
   shape.addBinding(params, "softness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
   shape.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
   shape.addBinding(params, "falloffCurve", { min: 0, max: 1, step: 0.01, label: "falloff curve" }).on("change", sync);
