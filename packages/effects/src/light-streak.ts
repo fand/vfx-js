@@ -162,13 +162,17 @@ void main() {
     // brightness. The amplitude ramps in from the core so the bright base
     // (the light itself) stays neutral and the rainbow fringes the body.
     // Where dispersion is a monotone tip-ward shift, this adds the cyclic
-    // multi-hue fringing the iterative Glare filter produces.
+    // multi-hue fringing the iterative Glare filter produces. Stronger
+    // modulation rotates the hue faster — like Blender accumulating a bigger
+    // per-iteration shift — so the slider drives *both* the band count
+    // (1→~5 cycles) and the saturation, not just saturation.
     if (colorModulation > 1e-4) {
         const vec3 luma = vec3(0.2126, 0.7152, 0.0722);
         float lo = dot(rgb, luma);
         vec3 phase = vec3(0.0, 2.0944, 4.1888);
         float amp = colorModulation * smoothstep(0.0, 0.1, v_along);
-        vec3 spec = vec3(1.0) + amp * cos(6.2831853 * v_along + phase);
+        float cycles = 1.0 + colorModulation * 4.0;
+        vec3 spec = vec3(1.0) + amp * cos(6.2831853 * v_along * cycles + phase);
         vec3 modded = max(rgb * spec, 0.0);
         float lm = dot(modded, luma);
         rgb = modded * (lm > 1e-6 ? lo / lm : 1.0);
@@ -276,7 +280,9 @@ export type LightStreakParams = {
      * Spectral colour modulation, 0..1 (Blender's "color modulation"). A
      * cyclic hue shift along the streak — rainbow fringing layered over the
      * base colour, luminance-preserving so it tints rather than brightens.
-     * Distinct from `dispersion` (a monotone tip-ward shift); 0 disables it.
+     * Higher values rotate the hue faster (1→~5 cycles along the streak) as
+     * well as more saturated. Distinct from `dispersion` (a monotone
+     * tip-ward shift); 0 disables it.
      */
     colorModulation: number;
     /**
