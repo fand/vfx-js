@@ -390,7 +390,7 @@ export class LightStreakEffect implements Effect {
 
         // Tone-mapped, tinted composite of the accumulation over the base.
         // `norm` cancels the method's core gain (≈ rays × overlap) so the
-        // streak core matches the other strategies at the same intensity.
+        // streak core brightness stays stable as the ray count changes.
         ctx.draw({
             frag: FRAG_COMPOSITE,
             target: ctx.target,
