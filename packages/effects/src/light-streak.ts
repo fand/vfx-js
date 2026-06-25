@@ -134,8 +134,9 @@ in float v_cross;
 in vec3 v_color;
 in float v_gate;
 
-uniform float falloff;     // tip fade exponent
-uniform float dispersion;  // chromatic shift toward blue at the tip
+uniform float falloff;          // tip fade exponent
+uniform float dispersion;       // chromatic shift toward blue at the tip
+uniform float colorModulation;  // cyclic spectral hue shift along the streak
 
 out vec4 outColor;
 
@@ -154,6 +155,25 @@ void main() {
     // continuous sheet instead of discrete stripes.
     float crossFall = exp(-v_cross * v_cross * 2.0);
     vec3 rgb = v_color * perChannel * (crossFall * v_gate);
+
+    // Spectral colour modulation (Blender "color modulation"): a 120°-offset
+    // cosine palette cycles the hue with distance along the streak, then is
+    // rescaled to the original luminance so it shifts *colour*, not
+    // brightness. The amplitude ramps in from the core so the bright base
+    // (the light itself) stays neutral and the rainbow fringes the body.
+    // Where dispersion is a monotone tip-ward shift, this adds the cyclic
+    // multi-hue fringing the iterative Glare filter produces.
+    if (colorModulation > 1e-4) {
+        const vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+        float lo = dot(rgb, luma);
+        vec3 phase = vec3(0.0, 2.0944, 4.1888);
+        float amp = colorModulation * smoothstep(0.0, 0.1, v_along);
+        vec3 spec = vec3(1.0) + amp * cos(6.2831853 * v_along + phase);
+        vec3 modded = max(rgb * spec, 0.0);
+        float lm = dot(modded, luma);
+        rgb = modded * (lm > 1e-6 ? lo / lm : 1.0);
+    }
+
     if (max(max(rgb.r, rgb.g), rgb.b) < 1e-4) {
         discard;
     }
@@ -253,6 +273,13 @@ export type LightStreakParams = {
      */
     dispersion: number;
     /**
+     * Spectral colour modulation, 0..1 (Blender's "color modulation"). A
+     * cyclic hue shift along the streak — rainbow fringing layered over the
+     * base colour, luminance-preserving so it tints rather than brightens.
+     * Distinct from `dispersion` (a monotone tip-ward shift); 0 disables it.
+     */
+    colorModulation: number;
+    /**
      * Source sampling grid dimension (instance count = `density²`).
      * Higher resolves finer highlights, lets streaks be thinner without
      * banding, and costs more vertex work (most instances are culled, so
@@ -292,6 +319,7 @@ const DEFAULT_PARAMS: LightStreakParams = {
     intensity: 3.0,
     tint: [0.6, 0.8, 1.0],
     dispersion: 0.5,
+    colorModulation: 0.0,
     density: 256,
     resolution: 0.5,
     glowStrength: 0.6,
@@ -397,6 +425,7 @@ export class LightStreakEffect implements Effect {
                     maxBrightness: this.params.maxBrightness,
                     falloff: this.params.falloff,
                     dispersion: this.params.dispersion,
+                    colorModulation: this.params.colorModulation,
                 },
             });
         }
