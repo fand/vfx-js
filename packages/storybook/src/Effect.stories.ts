@@ -17,6 +17,7 @@ import {
     ParticleExplodeEffect,
     PixelateEffect,
     PixelSortEffect,
+    PixelStretchEffect,
     RainbowEffect,
     RgbGlitchEffect,
     RgbShiftEffect,
@@ -1048,6 +1049,38 @@ export const sliceShift = presetStory<SliceShiftArgs>(
         centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         sliceCount: { control: { type: "range", min: 1, max: 300, step: 1 } },
+        angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
+    },
+    { clock: false },
+);
+
+type PixelStretchArgs = {
+    offset: number;
+    smoothness: number;
+    falloff: number;
+    reach: number;
+    centerX: number;
+    centerY: number;
+    angle: number;
+};
+export const pixelStretch = presetStory<PixelStretchArgs>(
+    (a) => new PixelStretchEffect(a),
+    {
+        offset: -1,
+        smoothness: 0,
+        falloff: 0,
+        reach: 1,
+        centerX: 0.5,
+        centerY: 0.5,
+        angle: 0,
+    },
+    {
+        offset: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
+        smoothness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        falloff: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        reach: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
     },
     { clock: false },

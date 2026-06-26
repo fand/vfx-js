@@ -31,6 +31,10 @@ export {
 } from "./matrix";
 export { ParticleEffect } from "./particle";
 export { ParticleExplodeEffect } from "./particle-explode";
+export {
+    PixelStretchEffect,
+    type PixelStretchParams,
+} from "./pixel-stretch";
 export { PixelateEffect } from "./pixelate";
 export {
     type PixelSortDirection,
