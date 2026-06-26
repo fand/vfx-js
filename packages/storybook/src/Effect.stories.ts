@@ -22,6 +22,7 @@ import {
     RgbShiftEffect,
     ScanlineEffect,
     SinewaveEffect,
+    SliceShiftEffect,
     TritoneEffect,
     VignetteEffect,
     VoronoiEffect,
@@ -1014,6 +1015,42 @@ export const sinewave = presetStory<SinewaveArgs>(
         frequency: { control: { type: "range", min: 1, max: 30, step: 0.5 } },
         blur: { control: { type: "range", min: 0, max: 20, step: 0.5 } },
     },
+);
+
+// ---------------------------------------------------------------------------
+// Figma Shader effect ports.
+// ---------------------------------------------------------------------------
+
+type SliceShiftArgs = {
+    shift: number;
+    softness: number;
+    random: number;
+    centerX: number;
+    centerY: number;
+    sliceCount: number;
+    angle: number;
+};
+export const sliceShift = presetStory<SliceShiftArgs>(
+    (a) => new SliceShiftEffect(a),
+    {
+        shift: 0.5,
+        softness: 0,
+        random: 0,
+        centerX: 0.5,
+        centerY: 0.5,
+        sliceCount: 100,
+        angle: 0,
+    },
+    {
+        shift: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
+        softness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        random: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        sliceCount: { control: { type: "range", min: 1, max: 300, step: 1 } },
+        angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
+    },
+    { clock: false },
 );
 
 type DuotoneArgs = { color1: string; color2: string; speed: number };
