@@ -12,8 +12,10 @@
     "dependencies": {
         "@vfx-js/core": "workspace:*",
         "@vfx-js/effects": "workspace:*",
+        "@vfx-js/figma-shader": "workspace:*",
         "react": "19.2.5",
-        "react-dom": "19.2.5"
+        "react-dom": "19.2.5",
+        "tweakpane": "4.0.5"
     },
     "devDependencies": {
         "@biomejs/biome": "2.4.11",

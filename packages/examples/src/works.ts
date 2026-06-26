@@ -168,4 +168,15 @@ export const works: Work[] = [
         sourceUrl:
             "https://github.com/fand/vfx-js/blob/main/packages/examples/works/depth-bokeh/index.html",
     },
+    {
+        id: "figma-shaders",
+        index: "15",
+        title: "Figma Shaders",
+        tags: ["effect-api", "Postprocess", "Playground"],
+        year: "2026",
+        author: "AMAGI",
+        description:
+            "The shaders from shaders.figma.com, ported to VFX-JS. Halftone, dither, bloom, pixelate, hatching, gradient map, channel mixer, liquid metal, fractal noise, waves, holographic foil, glass, and color filters — pick a source image and tweak every parameter live with Tweakpane.",
+        url: "./works/figma-shaders.html",
+    },
 ];

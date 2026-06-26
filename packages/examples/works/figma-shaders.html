@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Figma Shaders · VFX-JS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+/>
+<style>
+  :root {
+    --bg: #0b0b0e;
+    --panel: #141419;
+    --ink: #e8e8ee;
+    --muted: #8a8a99;
+    --accent: #7c5cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background:
+      radial-gradient(1200px 800px at 70% -10%, #1c1830, transparent),
+      var(--bg);
+    color: var(--ink);
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    overflow: hidden;
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 4vmin;
+  }
+  /* The image VFX-JS captures. Sized in CSS px; the canvas overlays it. */
+  #target {
+    width: min(72vmin, 720px);
+    height: min(72vmin, 720px);
+    object-fit: cover;
+    border-radius: 8px;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  .topbar {
+    position: fixed;
+    top: 18px;
+    left: 20px;
+    z-index: 50;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .topbar .logo {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    font-size: 15px;
+  }
+  .topbar .sub {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .topbar a { color: var(--accent); text-decoration: none; }
+
+  .caption {
+    position: fixed;
+    left: 20px;
+    bottom: 18px;
+    z-index: 50;
+    max-width: 42ch;
+  }
+  .caption .name {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+  .caption .desc {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  /* Tweakpane lives on the right; bump it above the VFX canvas (z 9999). */
+  .pane-host {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 300px;
+    z-index: 10000;
+  }
+
+  .loader {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: grid;
+    place-items: center;
+    background: var(--bg);
+    transition: opacity 0.5s;
+    font-family: "JetBrains Mono", monospace;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .loader.done { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="logo">Figma Shaders</span>
+    <span class="sub">ported to VFX-JS · <a href="https://shaders.figma.com/" target="_blank" rel="noopener">shaders.figma.com</a></span>
+  </div>
+
+  <div class="stage">
+    <img id="target" alt="shader source" />
+  </div>
+
+  <div class="caption">
+    <div class="name" id="cap-name">—</div>
+    <div class="desc" id="cap-desc"></div>
+  </div>
+
+  <div class="loader" id="loader">loading…</div>
+
+<script type="module">
+import { VFX } from "@vfx-js/core";
+import {
+    BloomEffect,
+    ChannelMixerEffect,
+    ColorFilterEffect,
+    DitherEffect,
+    FractalNoiseEffect,
+    GlassEffect,
+    GradientMapEffect,
+    HalftoneEffect,
+    HatchingEffect,
+    HolographicFoilEffect,
+    LiquidMetalEffect,
+    PixelateEffect,
+    WavesEffect,
+} from "@vfx-js/figma-shader";
+import { Pane } from "tweakpane";
+
+// new URL(...) so Vite fingerprints + serves these assets correctly.
+const IMAGES = {
+    Sculpt: new URL("./pixelsort/sculpt.webp", import.meta.url).href,
+    Octopus: new URL("./pixelsort/octo.webp", import.meta.url).href,
+    City: new URL("./pixelsort/city1.webp", import.meta.url).href,
+    Tower: new URL("./pixelsort/tower1.webp", import.meta.url).href,
+    Portrait: new URL("./pixelsort/s1.webp", import.meta.url).href,
+};
+
+// Control schema → drives both the effect defaults and the Tweakpane UI.
+// type: number (min/max/step) | bool | option | color3 | color4 | vec3.
+const num = (key, min, max, step) => ({ key, type: "number", min, max, step });
+const opt = (key, options) => ({ key, type: "option", options });
+const bool = (key) => ({ key, type: "bool" });
+const col3 = (key) => ({ key, type: "color3" });
+const col4 = (key) => ({ key, type: "color4" });
+const vec3 = (key, min, max, step) => ({ key, type: "vec3", min, max, step });
+
+const EFFECTS = {
+    halftone: {
+        label: "Halftone",
+        desc: "Rotated ink screen of dots, squares, or lines. Mono, additive RGB, or subtractive CMYK separations — newsprint by default.",
+        create: (o) => new HalftoneEffect(o),
+        controls: [
+            num("gridSize", 2, 40, 0.5),
+            num("angle", -180, 180, 1),
+            num("dotScale", 0.5, 2, 0.01),
+            opt("shape", ["dot", "square", "line"]),
+            opt("colorMode", ["mono", "rgb", "cmyk"]),
+            col3("ink"),
+            col4("background"),
+            bool("invert"),
+        ],
+    },
+    dither: {
+        label: "Dither",
+        desc: "Quantizes to a tiny palette through a Bayer or blue-noise threshold map. Drop the levels to 2 for classic 1-bit dithering.",
+        create: (o) => new DitherEffect(o),
+        controls: [
+            opt("mode", ["bayer4", "bayer8", "noise"]),
+            num("pixelSize", 1, 12, 1),
+            num("levels", 2, 8, 1),
+            bool("mono"),
+            col3("tint"),
+        ],
+    },
+    bloom: {
+        label: "Bloom",
+        desc: "Cinematic glow that blooms the bright regions of the image. Tune the threshold, radius, intensity, and tint.",
+        create: (o) => new BloomEffect(o),
+        controls: [
+            num("threshold", 0, 1, 0.01),
+            num("softness", 0, 1, 0.01),
+            num("intensity", 0, 4, 0.01),
+            num("radius", 1, 80, 1),
+            col3("tint"),
+        ],
+    },
+    pixelate: {
+        label: "Pixelate",
+        desc: "Scatters the image into a grid of tiled shapes with optional color reduction and a dissolve that drops random tiles.",
+        create: (o) => new PixelateEffect(o),
+        controls: [
+            num("size", 4, 64, 1),
+            opt("shape", ["square", "circle", "diamond"]),
+            num("colorLevels", 0, 8, 1),
+            num("dissolve", 0, 1, 0.01),
+            col4("background"),
+        ],
+    },
+    hatching: {
+        label: "Hatching",
+        desc: "Pen-and-ink cross-hatching whose line density follows the tonal value, layering new angles into the shadows.",
+        create: (o) => new HatchingEffect(o),
+        controls: [
+            num("spacing", 2, 24, 0.5),
+            num("angle", -180, 180, 1),
+            num("thickness", 0.05, 0.9, 0.01),
+            col3("inkColor"),
+            col4("paper"),
+        ],
+    },
+    gradientMap: {
+        label: "Gradient Map",
+        desc: "Remaps luminance through a four-stop color ramp — duotones, thermal palettes, and cinematic grades.",
+        create: (o) => new GradientMapEffect(o),
+        controls: [
+            col3("c0"),
+            col3("c1"),
+            col3("c2"),
+            col3("c3"),
+            num("mixAmount", 0, 1, 0.01),
+            num("contrast", 0.2, 3, 0.01),
+        ],
+    },
+    channelMixer: {
+        label: "Channel Mixer",
+        desc: "Recombines the R/G/B channels through a 3×3 matrix for false-color, infrared looks, and creative grading.",
+        create: (o) => new ChannelMixerEffect(o),
+        controls: [
+            vec3("red", -2, 2, 0.01),
+            vec3("green", -2, 2, 0.01),
+            vec3("blue", -2, 2, 0.01),
+            bool("mono"),
+        ],
+    },
+    liquidMetal: {
+        label: "Liquid Metal",
+        desc: "Turns the image into flowing chrome, warping it with animated fractal noise and re-shading with a metallic ramp.",
+        create: (o) => new LiquidMetalEffect(o),
+        controls: [
+            num("scale", 0.5, 8, 0.1),
+            num("speed", 0, 2, 0.01),
+            num("distortion", 0, 0.15, 0.001),
+            num("bands", 1, 12, 0.5),
+            col3("tintA"),
+            col3("tintB"),
+        ],
+    },
+    fractalNoise: {
+        label: "Fractal Noise",
+        desc: "Overlays animated fractal-Brownian-motion noise with a choice of blend modes — clouds, grain, and turbulence.",
+        create: (o) => new FractalNoiseEffect(o),
+        controls: [
+            num("scale", 0.5, 16, 0.1),
+            num("speed", 0, 2, 0.01),
+            num("amount", 0, 1, 0.01),
+            num("contrast", 0.2, 4, 0.01),
+            opt("mode", ["replace", "multiply", "screen", "add"]),
+            bool("colored"),
+        ],
+    },
+    waves: {
+        label: "Waves",
+        desc: "Refraction-style distortion: smooth sine waves, sharp zigzags, or a lenticular lens that fans the image into strips.",
+        create: (o) => new WavesEffect(o),
+        controls: [
+            opt("type", ["wave", "zigzag", "lens"]),
+            num("amplitude", 0, 60, 0.5),
+            num("frequency", 0.5, 30, 0.5),
+            num("speed", 0, 6, 0.05),
+            num("angle", -180, 180, 1),
+        ],
+    },
+    holographicFoil: {
+        label: "Holographic Foil",
+        desc: "Iridescent thin-film sheen that shifts hue across the surface as it animates — sticker and trading-card foil.",
+        create: (o) => new HolographicFoilEffect(o),
+        controls: [
+            num("scale", 0.5, 8, 0.1),
+            num("speed", 0, 2, 0.01),
+            num("shift", 0, 1, 0.01),
+            num("intensity", 0, 2, 0.01),
+            num("mixAmount", 0, 1, 0.01),
+        ],
+    },
+    glass: {
+        label: "Glass",
+        desc: "Frosted glass: a noise-jittered blur with low-frequency refraction and a tint, as if the image sat behind textured glass.",
+        create: (o) => new GlassEffect(o),
+        controls: [
+            num("blur", 0, 24, 0.5),
+            num("frost", 1, 12, 0.1),
+            num("refraction", 0, 0.15, 0.001),
+            col3("tint"),
+            num("tintAmount", 0, 1, 0.01),
+        ],
+    },
+    colorFilter: {
+        label: "Color Filter",
+        desc: "Classic color treatments — grayscale, sepia, vintage, warm, cool, and high-contrast noir.",
+        create: (o) => new ColorFilterEffect(o),
+        controls: [
+            opt("preset", ["grayscale", "sepia", "vintage", "warm", "cool", "noir"]),
+            num("amount", 0, 1, 0.01),
+        ],
+    },
+};
+
+// ── Tweakpane helpers ────────────────────────────────────────────────
+const toObj3 = ([r, g, b]) => ({ r, g, b });
+const toObj4 = ([r, g, b, a]) => ({ r, g, b, a });
+const toXyz = ([x, y, z]) => ({ x, y, z });
+
+function addControl(folder, params, ctrl) {
+    const { key, type } = ctrl;
+    if (type === "bool" || type === "number" || type === "option") {
+        const opts = {};
+        if (type === "number") {
+            opts.min = ctrl.min;
+            opts.max = ctrl.max;
+            opts.step = ctrl.step;
+        } else if (type === "option") {
+            opts.options = Object.fromEntries(ctrl.options.map((o) => [o, o]));
+        }
+        folder.addBinding(params, key, opts);
+        return;
+    }
+    if (type === "color3") {
+        const mirror = { v: toObj3(params[key]) };
+        folder
+            .addBinding(mirror, "v", { label: key, color: { type: "float" } })
+            .on("change", (ev) => {
+                params[key] = [ev.value.r, ev.value.g, ev.value.b];
+            });
+        return;
+    }
+    if (type === "color4") {
+        const mirror = { v: toObj4(params[key]) };
+        folder
+            .addBinding(mirror, "v", {
+                label: key,
+                color: { type: "float", alpha: true },
+            })
+            .on("change", (ev) => {
+                params[key] = [ev.value.r, ev.value.g, ev.value.b, ev.value.a];
+            });
+        return;
+    }
+    if (type === "vec3") {
+        const mirror = { v: toXyz(params[key]) };
+        const range = { min: ctrl.min, max: ctrl.max, step: ctrl.step };
+        folder
+            .addBinding(mirror, "v", { label: key, x: range, y: range, z: range })
+            .on("change", (ev) => {
+                params[key] = [ev.value.x, ev.value.y, ev.value.z];
+            });
+        return;
+    }
+}
+
+// ── App state ────────────────────────────────────────────────────────
+const img = document.getElementById("target");
+const capName = document.getElementById("cap-name");
+const capDesc = document.getElementById("cap-desc");
+const loader = document.getElementById("loader");
+
+const state = { image: "Sculpt", effect: "halftone" };
+
+const vfx = new VFX();
+let currentEffect = null;
+let attached = false;
+
+const paneHost = document.createElement("div");
+paneHost.className = "pane-host";
+document.body.appendChild(paneHost);
+let pane = null;
+let controlsFolder = null;
+
+async function loadImage(key) {
+    img.src = IMAGES[key];
+    await img.decode().catch(() => {});
+}
+
+async function applyEffect(key) {
+    const def = EFFECTS[key];
+    capName.textContent = def.label;
+    capDesc.textContent = def.desc;
+
+    if (attached) {
+        vfx.remove(img);
+        attached = false;
+    }
+    // Effects are stateful — always construct a fresh instance per attach.
+    currentEffect = def.create();
+    await vfx.add(img, { effect: currentEffect });
+    attached = true;
+}
+
+function rebuildControls() {
+    if (controlsFolder) {
+        controlsFolder.dispose();
+    }
+    controlsFolder = pane.addFolder({ title: "Parameters", expanded: true });
+    for (const ctrl of EFFECTS[state.effect].controls) {
+        addControl(controlsFolder, currentEffect.params, ctrl);
+    }
+}
+
+function buildPane() {
+    pane = new Pane({ container: paneHost, title: "Figma Shaders" });
+
+    pane.addBinding(state, "effect", {
+        label: "effect",
+        options: Object.fromEntries(
+            Object.entries(EFFECTS).map(([k, v]) => [v.label, k]),
+        ),
+    }).on("change", async (ev) => {
+        await applyEffect(ev.value);
+        rebuildControls();
+    });
+
+    pane.addBinding(state, "image", {
+        label: "source",
+        options: Object.fromEntries(Object.keys(IMAGES).map((k) => [k, k])),
+    }).on("change", async (ev) => {
+        await loadImage(ev.value);
+        if (attached) {
+            await vfx.update(img);
+        }
+    });
+
+    controlsFolder = null;
+    rebuildControls();
+}
+
+async function main() {
+    await loadImage(state.image);
+    await applyEffect(state.effect);
+    buildPane();
+    loader.classList.add("done");
+    setTimeout(() => loader.remove(), 600);
+}
+
+// Expose the VFX instance + a switcher for debugging / inspection,
+// mirroring the convention used elsewhere in the repo (window.vfx).
+window.vfx = vfx;
+window.figmaShaders = {
+    effects: Object.keys(EFFECTS),
+    select: async (key) => {
+        state.effect = key;
+        await applyEffect(key);
+        pane?.refresh();
+    },
+};
+
+main();
+</script>
+</body>
+</html>

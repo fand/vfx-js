@@ -164,12 +164,18 @@ importers:
       '@vfx-js/effects':
         specifier: workspace:*
         version: link:../effects
+      '@vfx-js/figma-shader':
+        specifier: workspace:*
+        version: link:../figma-shader
       react:
         specifier: 19.2.5
         version: 19.2.5
       react-dom:
         specifier: 19.2.5
         version: 19.2.5(react@19.2.5)
+      tweakpane:
+        specifier: 4.0.5
+        version: 4.0.5
     devDependencies:
       '@biomejs/biome':
         specifier: 2.4.11
@@ -192,6 +198,33 @@ importers:
       vite:
         specifier: 8.0.8
         version: 8.0.8(@types/node@24.12.2)(esbuild@0.27.7)(yaml@2.9.0)
+
+  packages/figma-shader:
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.4.11
+        version: 2.4.11
+      '@types/node':
+        specifier: 24.12.2
+        version: 24.12.2
+      '@vfx-js/core':
+        specifier: workspace:*
+        version: link:../vfx-js
+      lint-staged:
+        specifier: ^16.4.0
+        version: 16.4.0
+      npm-run-all2:
+        specifier: ^8.0.4
+        version: 8.0.4
+      rimraf:
+        specifier: ^6.1.3
+        version: 6.1.3
+      tsconfig-to-dual-package:
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@6.0.2)
+      typescript:
+        specifier: 6.0.2
+        version: 6.0.2
 
   packages/react:
     dependencies:
