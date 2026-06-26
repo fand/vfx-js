@@ -6,6 +6,7 @@ import {
     BadJpegEffect,
     BloomEffect,
     ChromaticEffect,
+    ColoredEdgesEffect,
     type DitherStyle,
     DitherEffect,
     DuotoneEffect,
@@ -1030,6 +1031,38 @@ export const sinewave = presetStory<SinewaveArgs>(
 // ---------------------------------------------------------------------------
 // Figma Shader effect ports.
 // ---------------------------------------------------------------------------
+
+type ColoredEdgesArgs = {
+    threshold: number;
+    thickness: number;
+    intensity: number;
+    opacity: number;
+    color1: string;
+    color2: string;
+    background: string;
+};
+export const coloredEdges = presetStory<ColoredEdgesArgs>(
+    (a) => new ColoredEdgesEffect(a),
+    {
+        threshold: 0.2,
+        thickness: 3,
+        intensity: 4,
+        opacity: 0,
+        color1: "#ff0000",
+        color2: "#0000ff",
+        background: "#000000",
+    },
+    {
+        threshold: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        thickness: { control: { type: "range", min: 0.5, max: 10, step: 0.5 } },
+        intensity: { control: { type: "range", min: 0, max: 20, step: 0.1 } },
+        opacity: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        color1: { control: { type: "color" } },
+        color2: { control: { type: "color" } },
+        background: { control: { type: "color" } },
+    },
+    { clock: false, src: Pigeon },
+);
 
 type SliceShiftArgs = {
     shift: number;
