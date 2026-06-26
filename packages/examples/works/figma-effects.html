@@ -5,21 +5,32 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VFX-JS Figma Effects</title>
 <style>
-  :root{ --bg:#0c0d10; --panel:#16181d; --ink:#e8eae3; --line:rgba(255,255,255,.12); }
+  :root{ --bg:#0c0d10; --panel:#16181d; --ink:#e8eae3; --line:rgba(255,255,255,.12); --accent:#5b8cff; }
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;background:var(--bg);color:var(--ink);
     font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
-  .stage{position:fixed;inset:0;display:grid;place-items:center;padding:48px;}
-  .stage img{display:block;max-width:80vw;max-height:80vh;}
+  .stage{position:fixed;inset:0;display:grid;place-items:center;padding:48px 340px;}
+  .stage img{display:block;max-width:70vw;max-height:84vh;}
   /* VFX-JS's canvas defaults to z-index 9999, so the UI sits above it. */
+  .sidebar{position:fixed;top:0;left:0;bottom:0;width:208px;z-index:10000;
+    background:var(--panel);border-right:1px solid var(--line);padding:16px 12px;
+    overflow:auto;}
+  .side-title{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+    opacity:.55;margin:4px 4px 12px;}
+  .side-btn{display:flex;justify-content:space-between;align-items:center;width:100%;
+    padding:9px 10px;margin-bottom:6px;border:1px solid var(--line);border-radius:6px;
+    background:transparent;color:var(--ink);font:inherit;font-size:.82rem;
+    text-align:left;cursor:pointer;}
+  .side-btn:hover{border-color:var(--accent);background:rgba(91,140,255,.08);}
+  .side-btn .plus{opacity:.4;font-size:1rem;line-height:1;}
+  .side-hint{font-size:.68rem;opacity:.4;margin:14px 4px 0;line-height:1.5;}
   .pane{position:fixed;top:16px;right:16px;width:300px;z-index:10000;}
-  header{position:fixed;top:16px;left:16px;z-index:10000;font-size:.8rem;
-    letter-spacing:.14em;text-transform:uppercase;opacity:.7;}
-  header b{font-weight:600;letter-spacing:.04em;}
 </style>
 </head>
 <body>
-<header><b>VFX-JS</b> · Figma Effects</header>
+<aside class="sidebar" id="sidebar">
+  <div class="side-title">VFX-JS · Figma Effects</div>
+</aside>
 <div class="stage"><img id="target" alt="effect target"></div>
 <div class="pane" id="pane"></div>
 
@@ -142,8 +153,10 @@ const EFFECTS = {
 const img = document.getElementById("target");
 const vfx = new VFX();
 
-const state = { Image: "Sculpt", Effect: "Warp" };
-let effect = null;
+const state = { Image: "Sculpt" };
+// The active effect stack, applied in array order (last = on top).
+const stack = [];
+let nextUid = 1;
 let added = false;
 let pane = null;
 
@@ -162,48 +175,83 @@ function loadImage(src) {
   });
 }
 
+function bindControl(folder, params, key, cfg) {
+  if (cfg.options) {
+    folder.addBinding(params, key, { options: tpOptions(cfg.options) });
+  } else if (typeof cfg.min === "number") {
+    folder.addBinding(params, key, cfg);
+  } else {
+    // Colors (hex strings), booleans, and plain values bind as-is.
+    folder.addBinding(params, key);
+  }
+}
+
 function buildPane() {
   pane?.dispose();
-  pane = new Pane({ container: document.getElementById("pane"), title: "Figma Effects" });
+  pane = new Pane({ container: document.getElementById("pane"), title: "Parameters" });
 
   pane.addBinding(state, "Image", { options: tpOptions(Object.keys(IMAGES)) })
     .on("change", async (ev) => {
       await loadImage(IMAGES[ev.value]);
-      await setup();
+      await mount();
     });
-  pane.addBinding(state, "Effect", { options: tpOptions(Object.keys(EFFECTS)) })
-    .on("change", () => setup());
-
-  // Upload a local image.
-  const file = pane.addButton({ title: "Upload image…" });
-  file.on("click", () => fileInput.click());
-
+  pane.addButton({ title: "Upload image…" }).on("click", () => fileInput.click());
   pane.addBlade({ view: "separator" });
 
-  const { controls } = EFFECTS[state.Effect];
-  for (const [key, cfg] of Object.entries(controls)) {
-    if (cfg.options) {
-      pane.addBinding(effect.params, key, { options: tpOptions(cfg.options) });
-    } else if (cfg.color) {
-      pane.addBinding(effect.params, key);
-    } else if (typeof cfg.min === "number") {
-      pane.addBinding(effect.params, key, cfg);
-    } else {
-      pane.addBinding(effect.params, key);
+  // One folder per applied effect, with a Remove button.
+  stack.forEach((entry, i) => {
+    const folder = pane.addFolder({ title: `${i + 1} · ${entry.key}`, expanded: true });
+    for (const [key, cfg] of Object.entries(EFFECTS[entry.key].controls)) {
+      bindControl(folder, entry.effect.params, key, cfg);
     }
-  }
+    folder.addButton({ title: "Remove" }).on("click", () => removeEffect(entry.uid));
+  });
 }
 
-async function setup() {
+// Rebuild the VFX pipeline from the current stack, then the pane.
+// Serialized: a remove + re-add must finish before the next runs, or VFX
+// rejects the re-attached effect instances ("already attached").
+let mountChain = Promise.resolve();
+function mount() {
+  mountChain = mountChain.then(doMount);
+  return mountChain;
+}
+async function doMount() {
   if (added) {
     vfx.remove(img);
     added = false;
   }
-  effect = EFFECTS[state.Effect].make();
-  await vfx.add(img, { effect });
-  added = true;
+  if (stack.length > 0) {
+    await vfx.add(img, { effect: stack.map((s) => s.effect) });
+    added = true;
+  }
   buildPane();
 }
+
+function addEffect(key) {
+  stack.push({ key, uid: nextUid++, effect: EFFECTS[key].make() });
+  mount();
+}
+
+function removeEffect(uid) {
+  const i = stack.findIndex((s) => s.uid === uid);
+  if (i >= 0) stack.splice(i, 1);
+  mount();
+}
+
+// Build the left sidebar: one button per effect, click to append it.
+const sidebar = document.getElementById("sidebar");
+for (const key of Object.keys(EFFECTS)) {
+  const btn = document.createElement("button");
+  btn.className = "side-btn";
+  btn.innerHTML = `<span>${key}</span><span class="plus">+</span>`;
+  btn.addEventListener("click", () => addEffect(key));
+  sidebar.appendChild(btn);
+}
+const hint = document.createElement("div");
+hint.className = "side-hint";
+hint.textContent = "Click to stack effects. Tune each in the panel on the right.";
+sidebar.appendChild(hint);
 
 // Hidden input for local file uploads.
 const fileInput = document.createElement("input");
@@ -215,11 +263,11 @@ fileInput.addEventListener("change", async () => {
   const f = fileInput.files?.[0];
   if (!f) return;
   await loadImage(URL.createObjectURL(f));
-  await setup();
+  await mount();
 });
 
 await loadImage(IMAGES[state.Image]);
-await setup();
+addEffect("Warp");
 </script>
 </body>
 </html>
