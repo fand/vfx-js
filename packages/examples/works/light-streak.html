@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Light Streak · Anamorphic & Aperture Flare</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Sora:wght@200;600;800&display=swap"
+/>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #050608;
+    color: #eef2ff;
+    font-family: "Sora", system-ui, sans-serif;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+  }
+
+  .stage {
+    position: relative;
+    width: min(92vw, 1100px);
+    aspect-ratio: 16 / 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* The source media: photos/video cover the frame, the logo is letterboxed
+     (object-fit set per-source in JS). Only the active element is shown. */
+  #photo, #video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  #video[hidden], #photo[hidden] { display: none; }
+
+  .hint {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(207, 224, 255, 0.6);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <img id="photo" crossorigin="anonymous" alt="streak source" />
+  <video id="video" crossorigin="anonymous" muted loop playsinline hidden></video>
+</div>
+
+<div class="hint">Pick a source and switch anamorphic ↔ aperture starburst in the panel</div>
+
+<script type="module">
+  import { VFX } from "@vfx-js/core";
+  import { LightStreakEffect } from "@vfx-js/effects";
+  import { Pane } from "https://esm.sh/tweakpane@4.0.5";
+
+  const photo = document.getElementById("photo");
+  const video = document.getElementById("video");
+
+  const vfx = new VFX({ pixelRatio: Math.min(window.devicePixelRatio || 1, 2) });
+
+  // Selectable sources. The white logo (letterboxed), night scenes with
+  // bright specular highlights (headlights, lamps), and a moving car video
+  // all give the streaks plenty to grab onto. `new URL(..., import.meta.url)`
+  // so Vite bundles the local assets.
+  const UNSPLASH = "https://images.unsplash.com/";
+  const IMG_SUFFIX = "?w=1280&h=720&fit=crop&crop=entropy";
+  const LOGO_URL = new URL("./light-streak-logo.svg", import.meta.url).href;
+  const CAR_URL = new URL("./light-streak-car.mp4", import.meta.url).href;
+  const SOURCES = [
+    { id: "logo", label: "VFX-JS logo", type: "image", src: LOGO_URL, fit: "contain" },
+    { id: "city", label: "City lights", type: "image", src: `${UNSPLASH}photo-1514565131-fce0801e5785${IMG_SUFFIX}`, fit: "cover" },
+    { id: "mercedes", label: "Mercedes", type: "image", src: `${UNSPLASH}photo-1624085568108-36410cfe4d24${IMG_SUFFIX}`, fit: "cover" },
+    { id: "motorcycle", label: "Motorcycle", type: "image", src: `${UNSPLASH}photo-1567516365182-1498ada52f85${IMG_SUFFIX}`, fit: "cover" },
+    { id: "blackcar", label: "Black car", type: "image", src: `${UNSPLASH}photo-1564890379653-0eb3a6b4eaad${IMG_SUFFIX}`, fit: "cover" },
+    { id: "carvideo", label: "Car (video)", type: "video", src: CAR_URL, fit: "cover" },
+  ];
+  const imageParams = { image: SOURCES[0].id };
+
+  // The element currently feeding the effect (img or video). Switching
+  // between an image and a video re-attaches the effect to the other element.
+  let activeEl = photo;
+
+  // Load a source into its element and make it the active streak target.
+  async function loadSource(spec) {
+    if (spec.type === "video") {
+      video.src = spec.src;
+      video.style.objectFit = spec.fit;
+      photo.hidden = true;
+      video.hidden = false;
+      try {
+        await video.play();
+      } catch {}
+      activeEl = video;
+    } else {
+      photo.src = spec.src;
+      photo.style.objectFit = spec.fit;
+      video.hidden = true;
+      video.pause();
+      photo.hidden = false;
+      try {
+        await photo.decode();
+      } catch {}
+      activeEl = photo;
+    }
+  }
+
+  // Load the initial source before attaching the effect.
+  await loadSource(SOURCES[0]);
+
+  // Source exposure/gamma adjustment, chained BEFORE the streak effect so
+  // the streak sees (and the page shows) the adjusted image. Handy to make
+  // the effect easier to read — push the source down and the highlights up.
+  const FRAG_EXPOSURE = `#version 300 es
+  precision highp float;
+  in vec2 uvSrc;
+  in vec2 uvContent;
+  out vec4 outColor;
+  uniform sampler2D src;
+  uniform float exposure;
+  uniform float gamma;
+  void main() {
+    vec2 inS = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
+    vec2 inC = step(vec2(0.0), uvContent) * step(uvContent, vec2(1.0));
+    float m = inS.x * inS.y * inC.x * inC.y;
+    vec4 c = texture(src, clamp(uvSrc, 0.0, 1.0));
+    vec3 adj = pow(max(c.rgb, 0.0) * exp2(exposure), vec3(1.0 / gamma));
+    outColor = vec4(adj, c.a) * m;
+  }`;
+  class ExposureEffect {
+    constructor(p = {}) {
+      this.params = { exposure: 0, gamma: 1, ...p };
+    }
+    setParams(u) {
+      Object.assign(this.params, u);
+    }
+    render(ctx) {
+      ctx.draw({
+        frag: FRAG_EXPOSURE,
+        target: ctx.target,
+        uniforms: {
+          src: ctx.src,
+          exposure: this.params.exposure,
+          gamma: this.params.gamma,
+        },
+      });
+    }
+  }
+
+  // Mutable params driving the effect. One `preset` morphs between a single
+  // horizontal axis (anamorphic flare) and an n-bladed aperture starburst.
+  const params = {
+    preset: "anamorphic",
+    blades: 6,
+    angle: 0,
+    // source adjustment (chained before the streak)
+    exposure: 0,
+    srcGamma: 1,
+    threshold: 0.78,
+    maxBrightness: 1.0,
+    intensity: 3.0,
+    dispersion: -0.6,
+    colorModulation: 0.25,
+    tintR: 0.6,
+    tintG: 0.8,
+    tintB: 1.0,
+    length: 220,
+    lengthBrightness: 0,
+    softness: 2,
+    falloff: 1.5,
+    falloffCurve: 0.5,
+    density: 256,
+  };
+
+  // A physical aperture's spike count is blades (even) or 2×blades (odd);
+  // anamorphic is just a single horizontal axis = 2 opposing rays.
+  function streakCount() {
+    if (params.preset === "anamorphic") return 2;
+    return params.blades % 2 === 0 ? params.blades : params.blades * 2;
+  }
+
+  function liveParams() {
+    return {
+      threshold: params.threshold,
+      maxBrightness: params.maxBrightness,
+      intensity: params.intensity,
+      tint: [params.tintR, params.tintG, params.tintB],
+      streaks: streakCount(),
+      angle: params.angle,
+      length: params.length,
+      lengthBrightness: params.lengthBrightness,
+      softness: params.softness,
+      falloff: params.falloff,
+      falloffCurve: params.falloffCurve,
+      dispersion: params.dispersion,
+      colorModulation: params.colorModulation,
+      density: params.density,
+      // Long streaks need a big reach; "fullscreen" bounds the buffer to
+      // the canvas instead of growing pad past the GPU texture limit.
+      pad: params.length > 400 ? "fullscreen" : Math.ceil(params.length * 1.2),
+    };
+  }
+
+  function makeEffect() {
+    return new LightStreakEffect(liveParams());
+  }
+
+  let effect = null;
+  let exposure = null;
+  let attachedEl = null;
+
+  function exposureParams() {
+    return { exposure: params.exposure, gamma: params.srcGamma };
+  }
+
+  // Attach the exposure→streak chain to the currently active element.
+  async function attachAll() {
+    exposure = new ExposureEffect(exposureParams());
+    effect = makeEffect();
+    attachedEl = activeEl;
+    // Chain: exposure adjusts the source, then the streak runs on it.
+    await vfx.add(attachedEl, { effect: [exposure, effect] });
+  }
+  await attachAll();
+
+  function sync() {
+    effect?.setParams(liveParams());
+    exposure?.setParams(exposureParams());
+  }
+
+  // Swap the source. A still image just needs re-capturing; switching to or
+  // from the video changes which element feeds the effect, so re-attach.
+  let switching = false;
+  async function switchImage(id) {
+    const spec = SOURCES.find((i) => i.id === id);
+    if (!spec || switching) return;
+    switching = true;
+    const prevEl = activeEl;
+    await loadSource(spec);
+    if (activeEl !== prevEl) {
+      if (attachedEl) vfx.remove(attachedEl);
+      await attachAll();
+    } else {
+      await vfx.update(activeEl);
+    }
+    switching = false;
+  }
+
+  // --- Tweakpane ----------------------------------------------------------
+  const paneContainer = document.createElement("div");
+  paneContainer.style.cssText =
+    "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+  document.body.appendChild(paneContainer);
+  const pane = new Pane({ container: paneContainer, title: "Light Streak" });
+
+  pane
+    .addBinding(imageParams, "image", {
+      options: Object.fromEntries(SOURCES.map((i) => [i.label, i.id])),
+    })
+    .on("change", (e) => switchImage(e.value));
+  pane
+    .addBinding(params, "preset", {
+      options: { anamorphic: "anamorphic", "aperture star": "aperture" },
+    })
+    .on("change", sync);
+  pane.addBinding(params, "blades", { min: 3, max: 12, step: 1 }).on("change", sync);
+  pane.addBinding(params, "angle", { min: 0, max: 6.283, step: 0.01 }).on("change", sync);
+
+  // Source adjustment — darken the image / lift highlights to read the effect.
+  const srcFolder = pane.addFolder({ title: "Source" });
+  srcFolder.addBinding(params, "exposure", { min: -4, max: 4, step: 0.01 }).on("change", sync);
+  srcFolder.addBinding(params, "srcGamma", { min: 0.2, max: 3, step: 0.01 }).on("change", sync);
+
+  pane.addBinding(params, "threshold", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "maxBrightness", { min: 0.1, max: 1, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "intensity", { min: 0, max: 8, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "dispersion", { min: -1, max: 1, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "colorModulation", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+
+  const shape = pane.addFolder({ title: "Shape" });
+  shape.addBinding(params, "length", { min: 0, max: 2000, step: 1 }).on("change", sync);
+  shape.addBinding(params, "lengthBrightness", { min: 0, max: 1, step: 0.01, label: "length←bright" }).on("change", sync);
+  shape.addBinding(params, "softness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
+  shape.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
+  shape.addBinding(params, "falloffCurve", { min: 0, max: 1, step: 0.01, label: "falloff curve" }).on("change", sync);
+  shape.addBinding(params, "density", { min: 64, max: 512, step: 32 }).on("change", sync);
+
+  const tint = pane.addFolder({ title: "Tint" });
+  tint.addBinding(params, "tintR", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  tint.addBinding(params, "tintG", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  tint.addBinding(params, "tintB", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+</script>
+
+</body>
+</html>
