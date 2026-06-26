@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VFX-JS Figma Effects</title>
+<style>
+  :root{ --bg:#0c0d10; --panel:#16181d; --ink:#e8eae3; --line:rgba(255,255,255,.12); }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;background:var(--bg);color:var(--ink);
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  .stage{position:fixed;inset:0;display:grid;place-items:center;padding:48px;}
+  .stage img{display:block;max-width:80vw;max-height:80vh;}
+  .pane{position:fixed;top:16px;right:16px;width:300px;z-index:10;}
+  header{position:fixed;top:16px;left:16px;z-index:10;font-size:.8rem;
+    letter-spacing:.14em;text-transform:uppercase;opacity:.7;}
+  header b{font-weight:600;letter-spacing:.04em;}
+</style>
+</head>
+<body>
+<header><b>VFX-JS</b> · Figma Effects</header>
+<div class="stage"><img id="target" alt="effect target"></div>
+<div class="pane" id="pane"></div>
+
+<script type="module">
+import { VFX } from "@vfx-js/core";
+import {
+  ColoredEdgesEffect,
+  DitherEffect,
+  FigmaPixelateEffect,
+  PatternRefractionEffect,
+  PixelStretchEffect,
+  SliceShiftEffect,
+  WarpEffect,
+} from "@vfx-js/effects";
+import { Pane } from "tweakpane";
+
+// Bundled sample images. The first one loads on start.
+const IMAGES = {
+  Sculpt: new URL("./pixelsort/sculpt.webp", import.meta.url).href,
+  Tower: new URL("./pixelsort/tower1.webp", import.meta.url).href,
+  City: new URL("./pixelsort/city1.webp", import.meta.url).href,
+  Octopus: new URL("./pixelsort/octo.webp", import.meta.url).href,
+};
+
+// A control descriptor drives one Tweakpane binding. `options` makes a
+// list, `color` a color picker, `min/max` a slider; booleans bind as-is.
+const slider = (min, max, step) => ({ min, max, step });
+
+const EFFECTS = {
+  Warp: {
+    make: () => new WarpEffect(),
+    controls: {
+      type: { options: ["sine", "twist", "bulge", "pinch", "ripple", "flag", "squeeze", "swirl"] },
+      amplitude: slider(-10, 10, 0.1),
+      frequency: slider(0.1, 10, 0.1),
+      centerX: slider(0, 1, 0.01),
+      centerY: slider(0, 1, 0.01),
+      speed: slider(0, 5, 0.05),
+    },
+  },
+  "Slice shift": {
+    make: () => new SliceShiftEffect(),
+    controls: {
+      shift: slider(-1, 1, 0.01),
+      softness: slider(0, 1, 0.01),
+      random: slider(0, 1, 0.01),
+      centerX: slider(0, 1, 0.01),
+      centerY: slider(0, 1, 0.01),
+      sliceCount: slider(1, 300, 1),
+      angle: slider(-180, 180, 1),
+    },
+  },
+  "Pixel stretch": {
+    make: () => new PixelStretchEffect(),
+    controls: {
+      offset: slider(-1, 1, 0.01),
+      smoothness: slider(0, 1, 0.01),
+      falloff: slider(0, 2, 0.01),
+      reach: slider(0, 2, 0.01),
+      centerX: slider(0, 1, 0.01),
+      centerY: slider(0, 1, 0.01),
+      angle: slider(-180, 180, 1),
+    },
+  },
+  "Pattern refraction": {
+    make: () => new PatternRefractionEffect(),
+    controls: {
+      pattern: { options: ["lenticular", "waves", "circular"] },
+      strength: slider(0, 2, 0.01),
+      smoothness: slider(0, 1, 0.01),
+      frost: slider(0, 2, 0.01),
+      dispersion: slider(0, 1, 0.01),
+      edgeWrap: { options: ["zero", "clamp", "repeat", "mirror"] },
+      centerX: slider(0, 1, 0.01),
+      centerY: slider(0, 1, 0.01),
+      count: slider(1, 100, 1),
+      angle: slider(-180, 180, 1),
+    },
+  },
+  Pixelate: {
+    make: () => new FigmaPixelateEffect(),
+    controls: {
+      shape: { options: ["rectangle", "ellipse", "hexagon", "triangle"] },
+      size: slider(2, 80, 1),
+      stretch: slider(0.2, 4, 0.1),
+      gap: slider(0, 1, 0.01),
+      colorTrim: slider(0, 8, 1),
+      averageColor: slider(0, 1, 0.01),
+      dissolve: slider(0, 1, 0.01),
+      falloff: slider(0, 1, 0.01),
+      knockout: {},
+    },
+  },
+  Dither: {
+    make: () => new DitherEffect(),
+    controls: {
+      style: { options: ["bayer2", "bayer4", "bayer8", "bayer16", "blueNoise", "threshold"] },
+      size: slider(1, 16, 1),
+      levels: slider(2, 16, 1),
+      brightness: slider(0, 2, 0.01),
+      contrast: slider(0, 4, 0.05),
+      mono: {},
+      monoColor: { color: true },
+    },
+  },
+  "Colored edges": {
+    make: () => new ColoredEdgesEffect(),
+    controls: {
+      threshold: slider(0, 1, 0.01),
+      thickness: slider(0.5, 10, 0.5),
+      intensity: slider(0, 20, 0.1),
+      opacity: slider(0, 1, 0.01),
+      color1: { color: true },
+      color2: { color: true },
+      background: { color: true },
+    },
+  },
+};
+
+const img = document.getElementById("target");
+const vfx = new VFX();
+
+const state = { Image: "Sculpt", Effect: "Warp" };
+let effect = null;
+let added = false;
+let pane = null;
+
+// Tweakpane turns a string key like "edgeWrap" into "Edge wrap"; a list
+// option label maps to itself.
+function tpOptions(values) {
+  const o = {};
+  for (const v of values) o[v] = v;
+  return o;
+}
+
+function loadImage(src) {
+  return new Promise((resolve) => {
+    img.onload = () => resolve();
+    img.src = src;
+  });
+}
+
+function buildPane() {
+  pane?.dispose();
+  pane = new Pane({ container: document.getElementById("pane"), title: "Figma Effects" });
+
+  pane.addBinding(state, "Image", { options: tpOptions(Object.keys(IMAGES)) })
+    .on("change", async (ev) => {
+      await loadImage(IMAGES[ev.value]);
+      await setup();
+    });
+  pane.addBinding(state, "Effect", { options: tpOptions(Object.keys(EFFECTS)) })
+    .on("change", () => setup());
+
+  // Upload a local image.
+  const file = pane.addButton({ title: "Upload image…" });
+  file.on("click", () => fileInput.click());
+
+  pane.addBlade({ view: "separator" });
+
+  const { controls } = EFFECTS[state.Effect];
+  for (const [key, cfg] of Object.entries(controls)) {
+    if (cfg.options) {
+      pane.addBinding(effect.params, key, { options: tpOptions(cfg.options) });
+    } else if (cfg.color) {
+      pane.addBinding(effect.params, key);
+    } else if (typeof cfg.min === "number") {
+      pane.addBinding(effect.params, key, cfg);
+    } else {
+      pane.addBinding(effect.params, key);
+    }
+  }
+}
+
+async function setup() {
+  if (added) {
+    vfx.remove(img);
+    added = false;
+  }
+  effect = EFFECTS[state.Effect].make();
+  await vfx.add(img, { effect });
+  added = true;
+  buildPane();
+}
+
+// Hidden input for local file uploads.
+const fileInput = document.createElement("input");
+fileInput.type = "file";
+fileInput.accept = "image/*";
+fileInput.style.display = "none";
+document.body.appendChild(fileInput);
+fileInput.addEventListener("change", async () => {
+  const f = fileInput.files?.[0];
+  if (!f) return;
+  await loadImage(URL.createObjectURL(f));
+  await setup();
+});
+
+await loadImage(IMAGES[state.Image]);
+await setup();
+</script>
+</body>
+</html>

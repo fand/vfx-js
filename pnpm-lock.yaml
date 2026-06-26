@@ -170,6 +170,9 @@ importers:
       react-dom:
         specifier: 19.2.5
         version: 19.2.5(react@19.2.5)
+      tweakpane:
+        specifier: 4.0.5
+        version: 4.0.5
     devDependencies:
       '@biomejs/biome':
         specifier: 2.4.11

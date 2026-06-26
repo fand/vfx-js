@@ -168,4 +168,15 @@ export const works: Work[] = [
         sourceUrl:
             "https://github.com/fand/vfx-js/blob/main/packages/examples/works/depth-bokeh/index.html",
     },
+    {
+        id: "figma-effects",
+        index: "15",
+        title: "Figma Effects",
+        tags: ["effect-api", "Playground"],
+        year: "2026",
+        author: "AMAGI",
+        description:
+            "A playground for the Figma shader effect ports: warp, slice shift, pixel stretch, pattern refraction, pixelate, dither, and colored edges. Pick an image and tweak every parameter live with Tweakpane.",
+        url: "./works/figma-effects.html",
+    },
 ];
