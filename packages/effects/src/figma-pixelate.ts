@@ -31,29 +31,66 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
-// Per-cell coverage for the chosen shape. lc is the local position in
-// [-0.5, 0.5]; th is the half-extent after the gap is subtracted.
-float shapeMask(vec2 lc, float th) {
-    if (shape == 0) {
-        return max(abs(lc.x), abs(lc.y)) < th ? 1.0 : 0.0; // rectangle
-    } else if (shape == 1) {
-        return length(lc) < th ? 1.0 : 0.0; // ellipse
-    } else if (shape == 2) {
-        vec2 a = abs(lc); // hexagon
-        return max(a.x * 0.866025 + a.y * 0.5, a.y) < th ? 1.0 : 0.0;
-    }
-    // triangle pointing up
-    float w = (th - lc.y) * 0.5;
-    return (lc.y > -th && abs(lc.x) < w) ? 1.0 : 0.0;
+// Distance to a regular hexagon's edge; the cell boundary is at 0.5.
+float hexDist(vec2 p) {
+    p = abs(p);
+    return max(dot(p, vec2(0.866025, 0.5)), p.y);
+}
+
+// Nearest hexagon in a honeycomb tiling: returns the local position
+// (xy) and the cell center (zw), in grid units.
+vec4 hexCoords(vec2 g) {
+    vec2 r = vec2(1.0, 1.7320508);
+    vec2 h = r * 0.5;
+    vec2 a = mod(g, r) - h;
+    vec2 b = mod(g - h, r) - h;
+    vec2 gv = dot(a, a) < dot(b, b) ? a : b;
+    return vec4(gv, g - gv);
 }
 
 void main(void) {
     vec2 px = uvContent * resolution;
-    vec2 cellId = floor(px / cellPx);
-    vec2 cellCenter = (cellId + 0.5) * cellPx;
-    vec2 lc = (px - cellCenter) / cellPx; // [-0.5, 0.5]
+    vec2 g = px / cellPx; // grid units (1 = one cell)
+    float gapHalf = gap * 0.5;
 
-    vec2 centerUv = cellCenter / resolution;
+    // Per shape: the cell center (grid units) and the coverage mask.
+    vec2 centerCell;
+    float mask;
+    if (shape == 0 || shape == 1) {
+        // Rectangle / ellipse on a square grid.
+        vec2 id = floor(g);
+        centerCell = id + 0.5;
+        vec2 lc = g - centerCell;
+        float th = 0.5 - gapHalf;
+        mask = shape == 0
+            ? (max(abs(lc.x), abs(lc.y)) < th ? 1.0 : 0.0)
+            : (length(lc) < th ? 1.0 : 0.0);
+    } else if (shape == 2) {
+        // Hexagons in a honeycomb tiling. The Voronoi cell boundary of
+        // this lattice sits at hexDist = sqrt(3)/4, so cells fill with no
+        // gaps when gap = 0.
+        vec4 hc = hexCoords(g);
+        centerCell = hc.zw;
+        mask = hexDist(hc.xy) < 0.4330127 * (1.0 - gap) ? 1.0 : 0.0;
+    } else {
+        // Right triangles: each square cell is split by a diagonal whose
+        // direction flips per cell, tiling the plane with 45° triangles.
+        vec2 id = floor(g);
+        vec2 lc = g - (id + 0.5);
+        float diag = mod(id.x + id.y, 2.0);
+        float s = diag < 0.5 ? (lc.x + lc.y) : (lc.x - lc.y);
+        float tri = step(0.0, s);
+        // Centroid of the selected triangle, for a distinct per-cell color.
+        vec2 cen = diag < 0.5
+            ? (tri > 0.5 ? vec2(1.0) : vec2(-1.0)) / 6.0
+            : (tri > 0.5 ? vec2(1.0, -1.0) : vec2(-1.0, 1.0)) / 6.0;
+        centerCell = id + 0.5 + cen;
+        float dEdge = 0.5 - max(abs(lc.x), abs(lc.y));
+        float dDiag = abs(s) / 1.4142136;
+        mask = min(dEdge, dDiag) > gapHalf ? 1.0 : 0.0;
+    }
+
+    vec2 centerUv = centerCell * cellPx / resolution;
     vec4 centerCol = sampleSrc(centerUv);
 
     // Average color: blend the center tap with a 3x3 in-cell average.
@@ -71,12 +108,9 @@ void main(void) {
     float steps = max(1.0, 256.0 / exp2(colorTrim));
     col.rgb = floor(col.rgb * steps) / steps;
 
-    float th = max(0.0, 0.5 - gap * 0.5);
-    float mask = shapeMask(lc, th);
-
     // Dissolve: drop cells by hash, with falloff biasing toward the top.
     float bias = mix(1.0, smoothstep(0.0, 1.0, centerUv.y), falloff);
-    if (hash12(cellId) < dissolve * bias) {
+    if (hash12(centerCell) < dissolve * bias) {
         mask = 0.0;
     }
 
