@@ -25,11 +25,28 @@
   .side-btn .plus{opacity:.4;font-size:1rem;line-height:1;}
   .side-hint{font-size:.68rem;opacity:.4;margin:14px 4px 0;line-height:1.5;}
   .pane{position:fixed;top:16px;right:16px;width:300px;z-index:10000;}
+  /* Active effect stack — drag items to reorder the apply order. */
+  .stack-item{display:flex;align-items:center;gap:8px;padding:8px 10px;
+    margin-bottom:6px;border:1px solid var(--line);border-radius:6px;
+    background:rgba(255,255,255,.03);font-size:.8rem;cursor:grab;}
+  .stack-item.dragging{opacity:.4;}
+  .stack-item.drop-before{border-top-color:var(--accent);}
+  .stack-item.drop-after{border-bottom-color:var(--accent);}
+  .stack-item .grip{opacity:.35;cursor:grab;}
+  .stack-item .si-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .stack-item .si-rm{border:none;background:transparent;color:var(--ink);opacity:.45;
+    font:inherit;font-size:1rem;line-height:1;cursor:pointer;padding:0 2px;}
+  .stack-item .si-rm:hover{opacity:1;color:#ff6b6b;}
+  .stack-empty{font-size:.68rem;opacity:.35;margin:2px 4px;}
 </style>
 </head>
 <body>
 <aside class="sidebar" id="sidebar">
   <div class="side-title">VFX-JS · Figma Effects</div>
+  <div class="side-title" style="margin-top:8px">Add effect</div>
+  <div id="palette"></div>
+  <div class="side-title" style="margin-top:18px">Order · drag to sort</div>
+  <div id="stack-list"></div>
 </aside>
 <div class="stage"><img id="target" alt="effect target"></div>
 <div class="pane" id="pane"></div>
@@ -198,14 +215,78 @@ function buildPane() {
   pane.addButton({ title: "Upload image…" }).on("click", () => fileInput.click());
   pane.addBlade({ view: "separator" });
 
-  // One folder per applied effect, with a Remove button.
+  // One folder of params per applied effect (order/remove live in the
+  // sidebar stack list).
   stack.forEach((entry, i) => {
     const folder = pane.addFolder({ title: `${i + 1} · ${entry.key}`, expanded: true });
     for (const [key, cfg] of Object.entries(EFFECTS[entry.key].controls)) {
       bindControl(folder, entry.effect.params, key, cfg);
     }
-    folder.addButton({ title: "Remove" }).on("click", () => removeEffect(entry.uid));
   });
+}
+
+// The sidebar stack list: the applied effects in apply order, draggable
+// to reorder, each with a remove button.
+let dragUid = null;
+function buildStackList() {
+  stackListEl.innerHTML = "";
+  if (stack.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "stack-empty";
+    empty.textContent = "No effects yet.";
+    stackListEl.appendChild(empty);
+    return;
+  }
+  stack.forEach((entry, i) => {
+    const item = document.createElement("div");
+    item.className = "stack-item";
+    item.draggable = true;
+    item.innerHTML =
+      `<span class="grip">⠿</span>` +
+      `<span class="si-name">${i + 1} · ${entry.key}</span>` +
+      `<button class="si-rm" title="Remove">×</button>`;
+
+    item.addEventListener("dragstart", (e) => {
+      dragUid = entry.uid;
+      e.dataTransfer.effectAllowed = "move";
+      item.classList.add("dragging");
+    });
+    item.addEventListener("dragend", () => item.classList.remove("dragging"));
+    item.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      const r = item.getBoundingClientRect();
+      const after = e.clientY - r.top > r.height / 2;
+      item.classList.toggle("drop-after", after);
+      item.classList.toggle("drop-before", !after);
+    });
+    item.addEventListener("dragleave", () =>
+      item.classList.remove("drop-before", "drop-after"),
+    );
+    item.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const r = item.getBoundingClientRect();
+      const after = e.clientY - r.top > r.height / 2;
+      item.classList.remove("drop-before", "drop-after");
+      reorderEffect(dragUid, entry.uid, after);
+    });
+
+    item.querySelector(".si-rm").addEventListener("click", () =>
+      removeEffect(entry.uid),
+    );
+    stackListEl.appendChild(item);
+  });
+}
+
+// Move the dragged effect to just before/after the drop target.
+function reorderEffect(fromUid, toUid, after) {
+  if (fromUid == null || fromUid === toUid) return;
+  const from = stack.findIndex((s) => s.uid === fromUid);
+  if (from < 0) return;
+  const [moved] = stack.splice(from, 1);
+  let to = stack.findIndex((s) => s.uid === toUid);
+  if (after) to += 1;
+  stack.splice(to, 0, moved);
+  mount();
 }
 
 // Rebuild the VFX pipeline from the current stack, then the pane.
@@ -225,6 +306,7 @@ async function doMount() {
     await vfx.add(img, { effect: stack.map((s) => s.effect) });
     added = true;
   }
+  buildStackList();
   buildPane();
 }
 
@@ -239,19 +321,16 @@ function removeEffect(uid) {
   mount();
 }
 
-// Build the left sidebar: one button per effect, click to append it.
-const sidebar = document.getElementById("sidebar");
+// Build the left sidebar palette: one button per effect, click to append.
+const paletteEl = document.getElementById("palette");
+const stackListEl = document.getElementById("stack-list");
 for (const key of Object.keys(EFFECTS)) {
   const btn = document.createElement("button");
   btn.className = "side-btn";
   btn.innerHTML = `<span>${key}</span><span class="plus">+</span>`;
   btn.addEventListener("click", () => addEffect(key));
-  sidebar.appendChild(btn);
+  paletteEl.appendChild(btn);
 }
-const hint = document.createElement("div");
-hint.className = "side-hint";
-hint.textContent = "Click to stack effects. Tune each in the panel on the right.";
-sidebar.appendChild(hint);
 
 // Hidden input for local file uploads.
 const fileInput = document.createElement("input");
