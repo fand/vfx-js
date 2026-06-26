@@ -19,6 +19,9 @@ import {
     MatrixEffect,
     ParticleEffect,
     ParticleExplodeEffect,
+    PatternRefractionEffect,
+    type RefractionEdgeWrap,
+    type RefractionPattern,
     PixelateEffect,
     PixelSortEffect,
     PixelStretchEffect,
@@ -1213,6 +1216,61 @@ export const figmaPixelate = presetStory<FigmaPixelateArgs>(
         dissolve: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         falloff: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         knockout: { control: { type: "boolean" } },
+    },
+    { clock: false },
+);
+
+const REFRACTION_PATTERNS: RefractionPattern[] = [
+    "lenticular",
+    "waves",
+    "circular",
+];
+const REFRACTION_EDGE_WRAPS: RefractionEdgeWrap[] = [
+    "zero",
+    "clamp",
+    "repeat",
+    "mirror",
+];
+type PatternRefractionArgs = {
+    pattern: RefractionPattern;
+    strength: number;
+    smoothness: number;
+    frost: number;
+    dispersion: number;
+    edgeWrap: RefractionEdgeWrap;
+    centerX: number;
+    centerY: number;
+    count: number;
+    angle: number;
+};
+export const patternRefraction = presetStory<PatternRefractionArgs>(
+    (a) => new PatternRefractionEffect(a),
+    {
+        pattern: "lenticular",
+        strength: 0.5,
+        smoothness: 0,
+        frost: 0,
+        dispersion: 0.04,
+        edgeWrap: "zero",
+        centerX: 0.5,
+        centerY: 0.5,
+        count: 20,
+        angle: 0,
+    },
+    {
+        pattern: { control: { type: "select" }, options: REFRACTION_PATTERNS },
+        strength: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        smoothness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        frost: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        dispersion: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        edgeWrap: {
+            control: { type: "select" },
+            options: REFRACTION_EDGE_WRAPS,
+        },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        count: { control: { type: "range", min: 1, max: 100, step: 1 } },
+        angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
     },
     { clock: false },
 );

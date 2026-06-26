@@ -38,6 +38,12 @@ export {
 export { ParticleEffect } from "./particle";
 export { ParticleExplodeEffect } from "./particle-explode";
 export {
+    PatternRefractionEffect,
+    type PatternRefractionParams,
+    type RefractionEdgeWrap,
+    type RefractionPattern,
+} from "./pattern-refraction";
+export {
     PixelStretchEffect,
     type PixelStretchParams,
 } from "./pixel-stretch";
