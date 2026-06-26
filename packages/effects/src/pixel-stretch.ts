@@ -1,5 +1,7 @@
-// Smears the pixels along a line across the image, like a stretched
-// scan line. Ported from Figma's "Pixel stretch" shader effect.
+// Stretches a single scan line across a band of the image. Below the
+// offset line the image is untouched; across `reach` above it the line's
+// pixels are smeared; past that the rest of the image is shifted up by
+// `reach`. Ported (and reshaped) from Figma's "Pixel stretch" effect.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 import type { Effect, EffectContext } from "@vfx-js/core";
 import { GLSL_COMMON } from "./_figma-common";
@@ -13,9 +15,8 @@ uniform vec4 srcRectUv;
 uniform vec2 center;
 uniform float angle;
 uniform float offset;
-uniform float smoothness;
-uniform float falloff;
 uniform float reach;
+uniform float smoothness;
 ${GLSL_COMMON}
 
 vec4 readTex(vec2 c) {
@@ -23,45 +24,37 @@ vec4 readTex(vec2 c) {
     return texture(src, srcRectUv.xy + c * srcRectUv.zw);
 }
 
+// Quadratic smooth min/max (Inigo Quilez) to round the band corners.
+float smin(float a, float b, float k) {
+    k = max(k, 1e-4);
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
+}
+float smax(float a, float b, float k) { return -smin(-a, -b, k); }
+
 void main(void) {
-    vec2 p = uvContent - center;
-    vec2 pr = rot2d(-radians(angle)) * p;
+    vec2 pr = rot2d(-radians(angle)) * (uvContent - center);
 
-    // Stretch line position along the rotated y axis.
-    float boundary = offset * 0.5;
+    // Line position along the rotated y axis (offset 0 = center).
+    float line = offset * 0.5;
+    float k = min(smoothness, max(reach, 0.0) * 0.49);
 
-    // Above the line, clamp the sample y to the line so its pixels smear
-    // outward. smoothness softens the boundary into a band.
-    float t = smoothness > 0.0
-        ? smoothstep(boundary, boundary + smoothness, pr.y)
-        : step(boundary, pr.y);
-    float sampleY = mix(pr.y, boundary, t);
+    // Source displacement: 0 below the line, ramps to reach across the
+    // band, then holds at reach (shifting the rest of the image up).
+    float disp = smin(smax(pr.y - line, 0.0, k), reach, k);
 
-    vec2 uv = rot2d(radians(angle)) * vec2(pr.x, sampleY) + center;
-    vec4 col = readTex(uv);
-
-    // Distance into the smear region drives reach (hard cutoff) and
-    // falloff (gradual fade to transparent).
-    float d = max(0.0, pr.y - boundary);
-    if (d > reach) {
-        col = vec4(0.0);
-    } else if (falloff > 0.0) {
-        col *= clamp(1.0 - d / falloff, 0.0, 1.0);
-    }
-
-    outColor = col;
+    vec2 uv = rot2d(radians(angle)) * vec2(pr.x, pr.y - disp) + center;
+    outColor = readTex(uv);
 }
 `;
 
 export type PixelStretchParams = {
     /** Stretch line position along the axis, in [-1, 1] (0 = center). */
     offset: number;
-    /** Soft boundary band width, in [0, 1]. */
-    smoothness: number;
-    /** Distance over which the smear fades to transparent (0 = no fade). */
-    falloff: number;
-    /** Hard cutoff distance for the smear, as a fraction of the element. */
+    /** Height of the stretch band, as a fraction of the element. */
     reach: number;
+    /** Soften the band's edges, in [0, 1]. */
+    smoothness: number;
     /** Effect center X, in [0, 1]. */
     centerX: number;
     /** Effect center Y, in [0, 1]. */
@@ -71,10 +64,9 @@ export type PixelStretchParams = {
 };
 
 const DEFAULT_PARAMS: PixelStretchParams = {
-    offset: -1,
+    offset: 0,
+    reach: 0.2,
     smoothness: 0,
-    falloff: 0,
-    reach: 1,
     centerX: 0.5,
     centerY: 0.5,
     angle: 0,
@@ -100,9 +92,8 @@ export class PixelStretchEffect implements Effect {
                 center: [p.centerX, p.centerY],
                 angle: p.angle,
                 offset: p.offset,
-                smoothness: Math.max(0, p.smoothness),
-                falloff: Math.max(0, p.falloff),
                 reach: Math.max(0, p.reach),
+                smoothness: Math.max(0, p.smoothness),
             },
             target: ctx.target,
         });

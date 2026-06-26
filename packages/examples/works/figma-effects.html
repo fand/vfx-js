@@ -104,9 +104,8 @@ const EFFECTS = {
     make: () => new PixelStretchEffect(),
     controls: {
       offset: slider(-1, 1, 0.01),
+      reach: slider(0, 1, 0.01),
       smoothness: slider(0, 1, 0.01),
-      falloff: slider(0, 2, 0.01),
-      reach: slider(0, 2, 0.01),
       centerX: slider(0, 1, 0.01),
       centerY: slider(0, 1, 0.01),
       angle: slider(-180, 180, 1),
