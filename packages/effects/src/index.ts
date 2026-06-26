@@ -51,3 +51,4 @@ export { SliceShiftEffect, type SliceShiftParams } from "./slice-shift";
 export { TritoneEffect, type TritoneParams } from "./tritone";
 export { VignetteEffect, type VignetteParams } from "./vignette";
 export { VoronoiEffect } from "./voronoi";
+export { WarpEffect, type WarpParams, type WarpType } from "./warp";

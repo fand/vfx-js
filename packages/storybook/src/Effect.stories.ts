@@ -27,6 +27,8 @@ import {
     TritoneEffect,
     VignetteEffect,
     VoronoiEffect,
+    type WarpType,
+    WarpEffect,
 } from "@vfx-js/effects";
 import BbbWebm from "./assets/bbb.webm";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -1084,6 +1086,44 @@ export const pixelStretch = presetStory<PixelStretchArgs>(
         angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
     },
     { clock: false },
+);
+
+const WARP_TYPES: WarpType[] = [
+    "sine",
+    "twist",
+    "bulge",
+    "pinch",
+    "ripple",
+    "flag",
+    "squeeze",
+    "swirl",
+];
+type WarpArgs = {
+    type: WarpType;
+    amplitude: number;
+    frequency: number;
+    centerX: number;
+    centerY: number;
+    speed: number;
+};
+export const warp = presetStory<WarpArgs>(
+    (a) => new WarpEffect(a),
+    {
+        type: "swirl",
+        amplitude: 3,
+        frequency: 1,
+        centerX: 0.5,
+        centerY: 0.5,
+        speed: 0,
+    },
+    {
+        type: { control: { type: "select" }, options: WARP_TYPES },
+        amplitude: { control: { type: "range", min: -10, max: 10, step: 0.1 } },
+        frequency: { control: { type: "range", min: 0.1, max: 10, step: 0.1 } },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+    },
 );
 
 type DuotoneArgs = { color1: string; color2: string; speed: number };
