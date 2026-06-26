@@ -16,6 +16,7 @@ export {
     type DatamoshParams,
     type DatamoshView,
 } from "./datamosh";
+export { DitherEffect, type DitherParams, type DitherStyle } from "./dither";
 export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone";
 export { FluidEffect } from "./fluid";
 export { GlitchEffect, type GlitchParams } from "./glitch";

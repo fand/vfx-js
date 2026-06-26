@@ -6,6 +6,8 @@ import {
     BadJpegEffect,
     BloomEffect,
     ChromaticEffect,
+    type DitherStyle,
+    DitherEffect,
     DuotoneEffect,
     FluidEffect,
     GlitchEffect,
@@ -1125,6 +1127,49 @@ export const warp = presetStory<WarpArgs>(
         speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
     },
 );
+
+const DITHER_STYLES: DitherStyle[] = [
+    "bayer2",
+    "bayer4",
+    "bayer8",
+    "bayer16",
+    "blueNoise",
+    "threshold",
+];
+type DitherArgs = {
+    style: DitherStyle;
+    size: number;
+    levels: number;
+    brightness: number;
+    contrast: number;
+    mono: boolean;
+    monoColor: string;
+};
+// Excluded from VRT: the quantization round() sits on precision-sensitive
+// boundaries, so SwiftShader output isn't a stable snapshot target.
+export const dither = presetStory<DitherArgs>(
+    (a) => new DitherEffect(a),
+    {
+        style: "threshold",
+        size: 2,
+        levels: 3,
+        brightness: 1,
+        contrast: 1,
+        mono: false,
+        monoColor: "#ffffff",
+    },
+    {
+        style: { control: { type: "select" }, options: DITHER_STYLES },
+        size: { control: { type: "range", min: 1, max: 16, step: 1 } },
+        levels: { control: { type: "range", min: 2, max: 16, step: 1 } },
+        brightness: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        contrast: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
+        mono: { control: { type: "boolean" } },
+        monoColor: { control: { type: "color" } },
+    },
+    { clock: false },
+);
+dither.parameters = { chromatic: { disableSnapshot: true } };
 
 type DuotoneArgs = { color1: string; color2: string; speed: number };
 export const duotone = presetStory<DuotoneArgs>(
