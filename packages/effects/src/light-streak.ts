@@ -140,7 +140,7 @@ in vec3 v_color;
 in float v_gate;
 
 uniform float falloff;          // length fade exponent / decay rate
-uniform float dispersion;       // chromatic shift toward blue at the tip
+uniform float dispersion;       // -1 = blue tip, +1 = red tip
 uniform float colorModulation;  // cyclic spectral hue shift along the streak
 uniform float falloffCurve;     // 0 = polynomial tail, 1 = exponential
 
@@ -156,13 +156,13 @@ void main() {
     //   exponential (exp(-kd) - e^-k)/(1 - e^-k): a tighter, brighter core
     //               with a faint tail — more physical, but visually shorter.
     // falloffCurve mixes between them. falloff is the shared exponent /
-    // decay rate. Dispersion raises it for red (dies first) and lowers it
-    // for blue (persists), fringing the tip through colour.
-    vec3 k = vec3(
-        falloff + dispersion * 3.0,
-        falloff + dispersion * 1.5,
-        falloff
-    );
+    // decay rate. Dispersion fringes the tip through colour by giving each
+    // channel a different reach, pivoting on green: +1 lets red persist
+    // furthest (warm tip, like aperture diffraction where longer wavelengths
+    // diffract more); -1 lets blue persist (cool tip, refractive look); 0 is
+    // achromatic. Multiplicative so every channel rate stays positive.
+    float spread = dispersion * 0.8;
+    vec3 k = falloff * vec3(1.0 - spread, 1.0, 1.0 + spread);
     vec3 poly = pow(vec3(max(1.0 - v_along, 0.0)), k);
     vec3 eEnd = exp(-k);
     vec3 expo = max((exp(-k * v_along) - eEnd) / max(1.0 - eEnd, 1e-4), 0.0);
@@ -286,9 +286,10 @@ export type LightStreakParams = {
     /** Per-channel multiplier on the streak colour. */
     tint: readonly [number, number, number];
     /**
-     * Chromatic dispersion, 0..1. Spreads the per-channel length falloff
-     * (red dims fastest, blue persists) so the streak fringes through
-     * colour toward its tip; 0 disables it.
+     * Chromatic dispersion, -1..1. Gives each channel a different reach so
+     * the streak fringes through colour toward its tip. `+1` lets red
+     * persist furthest (warm tip, like aperture diffraction); `-1` lets blue
+     * persist (cool tip, refractive look); `0` is achromatic.
      */
     dispersion: number;
     /**
@@ -326,7 +327,7 @@ const DEFAULT_PARAMS: LightStreakParams = {
     maxBrightness: 1.0,
     intensity: 3.0,
     tint: [0.6, 0.8, 1.0],
-    dispersion: 0.5,
+    dispersion: -0.5,
     colorModulation: 0.0,
     falloffCurve: 0.5,
     density: 256,
