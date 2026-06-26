@@ -18,6 +18,11 @@ export {
 } from "./datamosh";
 export { DitherEffect, type DitherParams, type DitherStyle } from "./dither";
 export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone";
+export {
+    FigmaPixelateEffect,
+    type FigmaPixelateParams,
+    type FigmaPixelateShape,
+} from "./figma-pixelate";
 export { FluidEffect } from "./fluid";
 export { GlitchEffect, type GlitchParams } from "./glitch";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";

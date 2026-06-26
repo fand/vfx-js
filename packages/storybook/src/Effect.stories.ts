@@ -9,6 +9,8 @@ import {
     type DitherStyle,
     DitherEffect,
     DuotoneEffect,
+    FigmaPixelateEffect,
+    type FigmaPixelateShape,
     FluidEffect,
     GlitchEffect,
     HalftoneEffect,
@@ -1170,6 +1172,50 @@ export const dither = presetStory<DitherArgs>(
     { clock: false },
 );
 dither.parameters = { chromatic: { disableSnapshot: true } };
+
+const PIXELATE_SHAPES: FigmaPixelateShape[] = [
+    "rectangle",
+    "ellipse",
+    "hexagon",
+    "triangle",
+];
+type FigmaPixelateArgs = {
+    shape: FigmaPixelateShape;
+    size: number;
+    stretch: number;
+    gap: number;
+    colorTrim: number;
+    averageColor: number;
+    dissolve: number;
+    falloff: number;
+    knockout: boolean;
+};
+export const figmaPixelate = presetStory<FigmaPixelateArgs>(
+    (a) => new FigmaPixelateEffect(a),
+    {
+        shape: "triangle",
+        size: 10,
+        stretch: 1,
+        gap: 0,
+        colorTrim: 2,
+        averageColor: 0.8,
+        dissolve: 0,
+        falloff: 0,
+        knockout: true,
+    },
+    {
+        shape: { control: { type: "select" }, options: PIXELATE_SHAPES },
+        size: { control: { type: "range", min: 2, max: 80, step: 1 } },
+        stretch: { control: { type: "range", min: 0.2, max: 4, step: 0.1 } },
+        gap: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        colorTrim: { control: { type: "range", min: 0, max: 8, step: 1 } },
+        averageColor: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        dissolve: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        falloff: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        knockout: { control: { type: "boolean" } },
+    },
+    { clock: false },
+);
 
 type DuotoneArgs = { color1: string; color2: string; speed: number };
 export const duotone = presetStory<DuotoneArgs>(
