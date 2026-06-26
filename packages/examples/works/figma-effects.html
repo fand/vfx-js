@@ -11,8 +11,9 @@
     font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
   .stage{position:fixed;inset:0;display:grid;place-items:center;padding:48px;}
   .stage img{display:block;max-width:80vw;max-height:80vh;}
-  .pane{position:fixed;top:16px;right:16px;width:300px;z-index:10;}
-  header{position:fixed;top:16px;left:16px;z-index:10;font-size:.8rem;
+  /* VFX-JS's canvas defaults to z-index 9999, so the UI sits above it. */
+  .pane{position:fixed;top:16px;right:16px;width:300px;z-index:10000;}
+  header{position:fixed;top:16px;left:16px;z-index:10000;font-size:.8rem;
     letter-spacing:.14em;text-transform:uppercase;opacity:.7;}
   header b{font-weight:600;letter-spacing:.04em;}
 </style>
