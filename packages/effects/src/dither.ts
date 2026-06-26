@@ -45,12 +45,16 @@ float threshold(vec2 cell) {
 }
 
 void main(void) {
-    vec4 tex = texture(src, srcRectUv.xy + uvContent * srcRectUv.zw);
+    // Sample once per dither cell so each cell is a single flat color
+    // (no source detail bleeding through within a cell).
+    float cellSize = max(1.0, size);
+    vec2 cell = floor(uvContent * resolution / cellSize);
+    vec2 cellUv = (cell + 0.5) * cellSize / resolution;
+    vec4 tex = texture(src, srcRectUv.xy + cellUv * srcRectUv.zw);
     vec3 c = tex.rgb;
     c = (c - 0.5) * contrast + 0.5;
     c *= brightness;
 
-    vec2 cell = floor(uvContent * resolution / max(1.0, size));
     float th = threshold(cell);
     float steps = max(1.0, levels - 1.0);
 
