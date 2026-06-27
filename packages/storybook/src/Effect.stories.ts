@@ -1078,6 +1078,7 @@ type GradientMapArgs = {
     repeat: GradientMapRepeat;
     frequency: number;
     mixSpace: GradientMapMixSpace;
+    speed: number;
 };
 export const gradientMap = presetStory<GradientMapArgs>(
     (a) =>
@@ -1088,6 +1089,7 @@ export const gradientMap = presetStory<GradientMapArgs>(
             repeat: a.repeat,
             frequency: a.frequency,
             mixSpace: a.mixSpace,
+            speed: a.speed,
         }),
     {
         color1: "#ffffff",
@@ -1098,6 +1100,7 @@ export const gradientMap = presetStory<GradientMapArgs>(
         repeat: "none",
         frequency: 1,
         mixSpace: "srgb",
+        speed: 0,
     },
     {
         color1: { control: { type: "color" } },
@@ -1108,8 +1111,8 @@ export const gradientMap = presetStory<GradientMapArgs>(
         repeat: { control: { type: "select" }, options: GRADIENT_REPEATS },
         frequency: { control: { type: "range", min: 1, max: 8, step: 1 } },
         mixSpace: { control: { type: "select" }, options: GRADIENT_MIX_SPACES },
+        speed: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
     },
-    { clock: false },
 );
 
 type SliceShiftArgs = {

@@ -19,6 +19,7 @@ uniform float offset;
 uniform int repeatType;
 uniform float frequency;
 uniform int mixSpace;
+uniform float time;
 
 float hash12(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -85,7 +86,9 @@ void main(void) {
     float l = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
     l += scatter * (hash12(uvContent) - 0.5);
 
-    float t = applyRepeat(l * frequency + offset);
+    // offset (and time drift) advance one full cycle per unit, so a 0->1
+    // offset sweep runs (frequency) cycles.
+    float t = applyRepeat((l + offset + time) * frequency);
     outColor = vec4(sampleGradient(t), tex.a);
 }
 `;
@@ -117,6 +120,8 @@ export type GradientMapParams = {
     frequency: number;
     /** Color space used to interpolate the gradient. */
     mixSpace: GradientMapMixSpace;
+    /** Animate the offset over time, in [-1, 1] (0 = static). */
+    speed: number;
 };
 
 const DEFAULT_PARAMS: GradientMapParams = {
@@ -126,6 +131,7 @@ const DEFAULT_PARAMS: GradientMapParams = {
     repeat: "none",
     frequency: 1,
     mixSpace: "srgb",
+    speed: 0,
 };
 
 export class GradientMapEffect implements Effect {
@@ -164,6 +170,7 @@ export class GradientMapEffect implements Effect {
                 repeatType: REPEAT_TYPES[p.repeat] ?? 0,
                 frequency: p.frequency,
                 mixSpace: MIX_SPACES[p.mixSpace] ?? 0,
+                time: ctx.time * p.speed,
             },
             target: ctx.target,
         });
