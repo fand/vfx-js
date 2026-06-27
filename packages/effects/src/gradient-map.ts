@@ -93,7 +93,9 @@ void main(void) {
     // offset (and time drift) advance one full cycle per unit, so a 0->1
     // offset sweep runs (frequency) cycles.
     float t = applyRepeat((l + offset + time) * frequency);
-    outColor = vec4(sampleGradient(t), tex.a);
+    // Premultiply: the final blit is premultiplied, so non-zero rgb in
+    // transparent areas would add to the background as stray color.
+    outColor = vec4(sampleGradient(t) * tex.a, tex.a);
 }
 `;
 
