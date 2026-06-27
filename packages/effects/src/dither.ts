@@ -45,11 +45,14 @@ float threshold(vec2 cell) {
 }
 
 void main(void) {
-    // Sample once per dither cell so each cell is a single flat color
-    // (no source detail bleeding through within a cell).
+    // Bucket on the true integer pixel grid (gl_FragCoord), not the
+    // fractional uvContent*resolution, whose phase drift makes a row of
+    // cells off by one pixel (non-square artifact).
     float cellSize = max(1.0, size);
-    vec2 cell = floor(uvContent * resolution / cellSize);
-    vec2 cellUv = (cell + 0.5) * cellSize / resolution;
+    vec2 fragPx = floor(gl_FragCoord.xy);
+    vec2 cell = floor(fragPx / cellSize);
+    // Sample once per cell so each cell is a single flat color.
+    vec2 cellUv = uvContent + ((cell + 0.5) * cellSize - gl_FragCoord.xy) / resolution;
     vec4 tex = texture(src, srcRectUv.xy + cellUv * srcRectUv.zw);
     vec3 c = tex.rgb;
     c = (c - 0.5) * contrast + 0.5;
