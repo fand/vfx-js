@@ -63,12 +63,16 @@
     --tp-monitor-background-color:#f0f0f0;--tp-monitor-foreground-color:#333333;}
 
   /* Active effect stack — drag items to reorder the apply order. */
-  .stack-item{display:flex;align-items:center;gap:8px;padding:9px 10px;
+  .stack-item{position:relative;display:flex;align-items:center;gap:8px;padding:9px 10px;
     margin-bottom:6px;border:1px solid var(--line);border-radius:8px;
     background:var(--panel);font-size:.82rem;cursor:grab;}
   .stack-item.dragging{opacity:.4;}
-  .stack-item.drop-before{border-top-color:var(--accent);}
-  .stack-item.drop-after{border-bottom-color:var(--accent);}
+  /* Accent bar in the gap showing where the dragged item will drop. */
+  .stack-item.drop-before::after,.stack-item.drop-after::after{content:"";
+    position:absolute;left:0;right:0;height:3px;border-radius:999px;
+    background:var(--accent);box-shadow:0 0 0 2px var(--accent-tint);}
+  .stack-item.drop-before::after{top:-5px;}
+  .stack-item.drop-after::after{bottom:-5px;}
   .stack-item .grip{color:var(--muted);cursor:grab;}
   .stack-item .si-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .stack-item .si-rm{border:none;background:transparent;color:var(--muted);
