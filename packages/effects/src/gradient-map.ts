@@ -83,8 +83,9 @@ vec3 sampleGradient(float t) {
 
 void main(void) {
     vec4 tex = texture(src, srcRectUv.xy + uvContent * srcRectUv.zw);
-    float l = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
-    l += scatter * (hash12(uvContent) - 0.5);
+    float gray = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+    // Scatter blends the luminance toward pure per-pixel noise.
+    float l = mix(gray, hash12(uvContent), scatter);
 
     // offset (and time drift) advance one full cycle per unit, so a 0->1
     // offset sweep runs (frequency) cycles.
@@ -110,7 +111,7 @@ const MIX_SPACES: Record<GradientMapMixSpace, number> = {
 export type GradientMapParams = {
     /** Gradient color stops (2–8), evenly spaced over the luminance range. */
     colors: string[];
-    /** Random luminance jitter before the lookup, in [0, 1]. */
+    /** Blend the luminance toward per-pixel noise before the lookup, in [0, 1]. */
     scatter: number;
     /** Shift the lookup position along the gradient, in [0, 1]. */
     offset: number;
@@ -165,7 +166,7 @@ export class GradientMapEffect implements Effect {
                 src: ctx.src,
                 colors: flat,
                 colorCount: count,
-                scatter: Math.max(0, p.scatter),
+                scatter: Math.min(1, Math.max(0, p.scatter)),
                 offset: p.offset,
                 repeatType: REPEAT_TYPES[p.repeat] ?? 0,
                 frequency: p.frequency,
