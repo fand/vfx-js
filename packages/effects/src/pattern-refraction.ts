@@ -71,8 +71,9 @@ vec2 patternSample(vec2 uv, float st) {
     // is a sine: zero at the boundary, smooth wave that folds at the edges.
     float gx = q.x;
     if (pattern == 1) {
-        // Waves: bend the lens grid along y, so the strips themselves wave.
-        gx += sin(q.y * count * TAU) * st * 0.05;
+        // Waves: bend the lens grid along y. Wave frequency scales with
+        // stripWidth (0.25 -> cos(y*PI), 0.125 -> cos(y*PI*0.5)).
+        gx += cos(q.y * 2.0 * TAU * stripWidth) * st * 0.05;
     }
     float n = fract(gx * count) * 2.0 - 1.0;
     float sharp = sign(n) * pow(abs(n), 8.0);
