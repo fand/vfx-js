@@ -27,8 +27,10 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
-vec3 srgb2lin(vec3 c) { return pow(c, vec3(2.2)); }
-vec3 lin2srgb(vec3 c) { return pow(c, vec3(1.0 / 2.2)); }
+vec3 srgb2lin(vec3 c) { return pow(max(c, 0.0), vec3(2.2)); }
+// Clamp first: OKLab interpolation can leave the gamut, and pow() of a
+// negative value is NaN (renders as garbage/magenta).
+vec3 lin2srgb(vec3 c) { return pow(max(c, 0.0), vec3(1.0 / 2.2)); }
 
 vec3 lin2oklab(vec3 c) {
     float l = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
@@ -78,7 +80,7 @@ vec3 sampleGradient(float t) {
     int i = int(floor(f));
     i = clamp(i, 0, colorCount - 2);
     float frac = clamp(f - float(i), 0.0, 1.0);
-    return mixColor(colors[i], colors[i + 1], frac);
+    return clamp(mixColor(colors[i], colors[i + 1], frac), 0.0, 1.0);
 }
 
 void main(void) {
