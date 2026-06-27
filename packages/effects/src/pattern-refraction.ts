@@ -69,15 +69,16 @@ vec2 patternSample(vec2 uv, float st) {
     // strip. n runs -1..1 across the strip. smoothness=0 keeps the interior
     // flat and spikes at the boundary (a jump, drawn as a tail); smoothness=1
     // is a sine: zero at the boundary, smooth wave that folds at the edges.
-    float n = fract(q.x * count) * 2.0 - 1.0;
+    float gx = q.x;
+    if (pattern == 1) {
+        // Waves: bend the lens grid along y, so the strips themselves wave.
+        gx += sin(q.y * count * TAU) * st * 0.05;
+    }
+    float n = fract(gx * count) * 2.0 - 1.0;
     float sharp = sign(n) * pow(abs(n), 8.0);
     float soft = sin(n * TAU * 0.5);
     float shape = mix(sharp, soft, smoothness);
     q.x += 0.3 * stripWidth * st * shape;
-    if (pattern == 1) {
-        // Waves: add a horizontal ripple driven by the y coordinate.
-        q.x += sin(q.y * count * TAU) * st * 0.05;
-    }
     return rot2d(radians(angle)) * q + center;
 }
 
