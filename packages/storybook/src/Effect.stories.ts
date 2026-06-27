@@ -1321,7 +1321,7 @@ type PatternRefractionArgs = {
     edgeWrap: RefractionEdgeWrap;
     centerX: number;
     centerY: number;
-    count: number;
+    stripWidth: number;
     angle: number;
 };
 export const patternRefraction = presetStory<PatternRefractionArgs>(
@@ -1335,7 +1335,7 @@ export const patternRefraction = presetStory<PatternRefractionArgs>(
         edgeWrap: "zero",
         centerX: 0.5,
         centerY: 0.5,
-        count: 20,
+        stripWidth: 0.05,
         angle: 0,
     },
     {
@@ -1350,7 +1350,7 @@ export const patternRefraction = presetStory<PatternRefractionArgs>(
         },
         centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        count: { control: { type: "range", min: 1, max: 100, step: 1 } },
+        stripWidth: { control: { type: "range", min: 0.02, max: 1, step: 0.01 } },
         angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
     },
     { clock: false },

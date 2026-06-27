@@ -19,7 +19,7 @@ uniform float strength;
 uniform float smoothness;
 uniform float frost;
 uniform float dispersion;
-uniform float count;
+uniform float stripWidth;
 uniform float angle;
 ${GLSL_COMMON}
 
@@ -49,6 +49,7 @@ vec4 readTexWrap(vec2 uv) {
 // (varied per channel to get dispersion).
 vec2 patternSample(vec2 uv, float st) {
     vec2 q = rot2d(-radians(angle)) * (uv - center);
+    float count = 1.0 / stripWidth;
 
     if (pattern == 2) {
         // Circular: inside each grid circle, pull the sample toward the
@@ -64,17 +65,18 @@ vec2 patternSample(vec2 uv, float st) {
         return mix(uv, vec2(0.5), st * 0.5 * mask);
     }
 
-    // Lenticular: magnify each vertical strip away from its center line.
-    float sx = q.x * count;
-    float local = (fract(sx) - 0.5) / count;
-    float edge = abs(fract(sx) - 0.5) * 2.0;
-    float taper = smoothness > 0.0
-        ? smoothstep(1.0, 1.0 - smoothness, edge)
-        : 1.0;
-    q.x += local * st * 8.0 * taper;
+    // Lenticular: displace each strip's sample by its position within the
+    // strip. n runs -1..1 across the strip. smoothness=0 keeps the interior
+    // flat and spikes at the boundary (a jump, drawn as a tail); smoothness=1
+    // is a sine: zero at the boundary, smooth wave that folds at the edges.
+    float n = fract(q.x * count) * 2.0 - 1.0;
+    float sharp = sign(n) * pow(abs(n), 8.0);
+    float soft = sin(n * TAU * 0.5);
+    float shape = mix(sharp, soft, smoothness);
+    q.x += 0.3 * stripWidth * st * shape;
     if (pattern == 1) {
         // Waves: add a vertical ripple on top of the lenticular strips.
-        q.y += sin(q.x * count * TAU) * st * 0.05 * taper;
+        q.y += sin(q.x * count * TAU) * st * 0.05;
     }
     return rot2d(radians(angle)) * q + center;
 }
@@ -139,8 +141,8 @@ export type PatternRefractionParams = {
     centerX: number;
     /** Pattern center Y, in [0, 1]. */
     centerY: number;
-    /** Pattern repeat count across the element. */
-    count: number;
+    /** Width of one strip/cell, as a fraction of the element, in (0, 1]. */
+    stripWidth: number;
     /** Pattern rotation, in degrees. */
     angle: number;
 };
@@ -154,7 +156,7 @@ const DEFAULT_PARAMS: PatternRefractionParams = {
     edgeWrap: "zero",
     centerX: 0.5,
     centerY: 0.5,
-    count: 20,
+    stripWidth: 0.05,
     angle: 0,
 };
 
@@ -182,7 +184,7 @@ export class PatternRefractionEffect implements Effect {
                 smoothness: Math.min(1, Math.max(0, p.smoothness)),
                 frost: Math.max(0, p.frost),
                 dispersion: Math.max(0, p.dispersion),
-                count: Math.max(1, p.count),
+                stripWidth: Math.min(1, Math.max(0.001, p.stripWidth)),
                 angle: p.angle,
             },
             target: ctx.target,
