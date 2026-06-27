@@ -8,7 +8,7 @@
   :root{
     --bg:#ffffff; --stage:#f4f4f5; --panel:#ffffff; --ink:#111111;
     --muted:#6b7280; --line:#e6e6e6; --accent:#0fd969; --accent-tint:rgba(15,217,105,.12);
-    --topbar-h:52px; --side-w:220px;
+    --topbar-h:52px; --side-w:220px; --footer-h:200px; --pane-w:332px;
     --sans:"Inter","Figma Sans VF",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -41,7 +41,7 @@
   .side-btn .plus{color:var(--muted);font-size:1.05rem;line-height:1;}
   .side-btn:hover .plus{color:var(--accent);}
 
-  .stage{position:fixed;top:var(--topbar-h);left:var(--side-w);right:0;bottom:0;
+  .stage{position:fixed;top:var(--topbar-h);left:var(--side-w);right:0;bottom:var(--footer-h);
     display:grid;place-items:center;padding:40px 40px 40px 40px;background:var(--stage);}
   .frame{background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px;
     line-height:0;}
@@ -75,6 +75,20 @@
     font:inherit;font-size:1rem;line-height:1;cursor:pointer;padding:0 2px;}
   .stack-item .si-rm:hover{color:#e5484d;}
   .stack-empty{font-size:.7rem;color:var(--muted);margin:2px 2px;}
+
+  /* Footer: live VFX-JS code snippet for the current effect stack. */
+  .footer{position:fixed;left:var(--side-w);right:var(--pane-w);bottom:0;height:var(--footer-h);
+    z-index:10001;display:flex;flex-direction:column;
+    background:var(--bg);border-top:1px solid var(--line);padding:12px 16px;}
+  .footer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .copy-btn{height:28px;padding:0 12px;border:1px solid var(--line);border-radius:999px;
+    background:var(--panel);color:var(--ink);font:inherit;font-size:.74rem;font-weight:600;
+    cursor:pointer;transition:border-color .12s,background .12s;}
+  .copy-btn:hover{border-color:var(--accent);background:var(--accent-tint);}
+  .code{flex:1;overflow:auto;margin:0;background:#f6f6f6;border:1px solid var(--line);
+    border-radius:8px;padding:12px 14px;}
+  .code code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.78rem;line-height:1.5;color:#111;white-space:pre;}
 </style>
 </head>
 <body>
@@ -90,6 +104,13 @@
 </aside>
 <main class="stage"><div class="frame"><img id="target" alt="effect target"></div></main>
 <div class="pane" id="pane"></div>
+<footer class="footer">
+  <div class="footer-head">
+    <span class="side-title" style="margin:0">Code</span>
+    <button class="copy-btn" id="copy-btn">Copy</button>
+  </div>
+  <pre class="code"><code id="snippet"></code></pre>
+</footer>
 
 <script type="module">
 import { VFX } from "@vfx-js/core";
@@ -278,6 +299,58 @@ function buildPane() {
       bindControl(folder, entry.effect.params, key, cfg);
     }
   });
+
+  // Any param edit refreshes the generated snippet.
+  pane.on("change", updateSnippet);
+}
+
+// Format a JS literal for a param value.
+function formatValue(v) {
+  if (Array.isArray(v)) return `[${v.map(formatValue).join(", ")}]`;
+  return JSON.stringify(v);
+}
+
+// Params that differ from the effect's defaults, so the snippet only
+// shows what the user actually changed.
+function changedParams(effect) {
+  const cur = effect.params;
+  const def = new effect.constructor().params;
+  const out = {};
+  for (const k of Object.keys(cur)) {
+    if (JSON.stringify(cur[k]) !== JSON.stringify(def[k])) out[k] = cur[k];
+  }
+  return out;
+}
+
+// Build a copy-pasteable VFX-JS snippet from the active stack.
+function genSnippet() {
+  if (stack.length === 0) return "// Add an effect to generate code.";
+  const names = [...new Set(stack.map((s) => s.effect.constructor.name))];
+  const lines = stack.map((s) => {
+    const cls = s.effect.constructor.name;
+    const diff = changedParams(s.effect);
+    const keys = Object.keys(diff);
+    if (keys.length === 0) return `    new ${cls}(),`;
+    const args = keys.map((k) => `${k}: ${formatValue(diff[k])}`).join(", ");
+    return `    new ${cls}({ ${args} }),`;
+  });
+  return [
+    `import { VFX } from "@vfx-js/core";`,
+    `import { ${names.join(", ")} } from "@vfx-js/effects";`,
+    ``,
+    `const vfx = new VFX();`,
+    `vfx.add(img, {`,
+    `  effect: [`,
+    ...lines,
+    `  ],`,
+    `});`,
+  ].join("\n");
+}
+
+let snippetText = "";
+function updateSnippet() {
+  snippetText = genSnippet();
+  document.getElementById("snippet").textContent = snippetText;
 }
 
 // Add N color pickers for a gradient effect, writing back to params.colors.
@@ -377,6 +450,7 @@ async function doMount() {
   }
   buildStackList();
   buildPane();
+  updateSnippet();
 }
 
 function addEffect(key) {
@@ -412,6 +486,13 @@ fileInput.addEventListener("change", async () => {
   if (!f) return;
   await loadImage(URL.createObjectURL(f));
   await mount();
+});
+
+const copyBtn = document.getElementById("copy-btn");
+copyBtn.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(snippetText);
+  copyBtn.textContent = "Copied";
+  setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
 });
 
 await loadImage(IMAGES[state.Image]);
