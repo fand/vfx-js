@@ -85,10 +85,18 @@
     background:var(--panel);color:var(--ink);font:inherit;font-size:.74rem;font-weight:600;
     cursor:pointer;transition:border-color .12s,background .12s;}
   .copy-btn:hover{border-color:var(--accent);background:var(--accent-tint);}
-  .code{flex:1;overflow-y:scroll;overflow-x:auto;margin:0;background:#f6f6f6;border:1px solid var(--line);
-    border-radius:8px;padding:12px 14px;}
+  .code{flex:1;overflow-y:scroll;overflow-x:auto;margin:0;background:#1c1c22;
+    border:1px solid #2a2a32;border-radius:8px;padding:12px 14px;}
+  /* Force an always-visible scrollbar (macOS overlay bars hide otherwise). */
+  .code::-webkit-scrollbar{width:10px;height:10px;}
+  .code::-webkit-scrollbar-track{background:transparent;}
+  .code::-webkit-scrollbar-thumb{background:#45454f;border-radius:999px;
+    border:2px solid #1c1c22;}
+  .code::-webkit-scrollbar-thumb:hover{background:#5a5a66;}
   .code code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    font-size:.78rem;line-height:1.5;color:#111;white-space:pre;}
+    font-size:.78rem;line-height:1.5;color:#e6e6e6;white-space:pre;}
+  .t-com{color:#6a9955;}.t-str{color:#ce9178;}.t-kw{color:#569cd6;}
+  .t-num{color:#b5cea8;}.t-cls{color:#4ec9b0;}.t-prop{color:#9cdcfe;}
 </style>
 </head>
 <body>
@@ -360,10 +368,32 @@ function genSnippet() {
   ].join("\n");
 }
 
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Minimal JS highlighter for the generated snippet (known small grammar).
+const TOKEN =
+  /(\/\/[^\n]*)|("(?:[^"\\]|\\.)*")|\b(import|from|const|new)\b|\b(\d+(?:\.\d+)?)\b|([A-Z][A-Za-z0-9]*)|([A-Za-z_]\w*)(?=\s*:)/g;
+function highlight(code) {
+  return escapeHtml(code).replace(
+    TOKEN,
+    (m, com, str, kw, num, cls, prop) => {
+      if (com) return `<span class="t-com">${com}</span>`;
+      if (str) return `<span class="t-str">${str}</span>`;
+      if (kw) return `<span class="t-kw">${kw}</span>`;
+      if (num) return `<span class="t-num">${num}</span>`;
+      if (cls) return `<span class="t-cls">${cls}</span>`;
+      if (prop) return `<span class="t-prop">${prop}</span>`;
+      return m;
+    },
+  );
+}
+
 let snippetText = "";
 function updateSnippet() {
   snippetText = genSnippet();
-  document.getElementById("snippet").textContent = snippetText;
+  document.getElementById("snippet").innerHTML = highlight(snippetText);
 }
 
 // Add N color pickers for a gradient effect, writing back to params.colors.
