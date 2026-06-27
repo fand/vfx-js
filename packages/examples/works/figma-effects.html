@@ -8,7 +8,7 @@
   :root{
     --bg:#ffffff; --stage:#f4f4f5; --panel:#ffffff; --ink:#111111;
     --muted:#6b7280; --line:#e6e6e6; --accent:#0fd969; --accent-tint:rgba(15,217,105,.12);
-    --topbar-h:52px; --side-w:220px; --footer-h:200px;
+    --topbar-h:52px; --side-w:220px; --footer-h:320px;
     --sans:"Inter","Figma Sans VF",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -85,7 +85,7 @@
     background:var(--panel);color:var(--ink);font:inherit;font-size:.74rem;font-weight:600;
     cursor:pointer;transition:border-color .12s,background .12s;}
   .copy-btn:hover{border-color:var(--accent);background:var(--accent-tint);}
-  .code{flex:1;overflow:auto;margin:0;background:#f6f6f6;border:1px solid var(--line);
+  .code{flex:1;overflow-y:scroll;overflow-x:auto;margin:0;background:#f6f6f6;border:1px solid var(--line);
     border-radius:8px;padding:12px 14px;}
   .code code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     font-size:.78rem;line-height:1.5;color:#111;white-space:pre;}
