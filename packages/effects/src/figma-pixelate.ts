@@ -31,16 +31,16 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
-// Distance to a regular hexagon's edge; the cell boundary is at 0.5.
+// Distance to a flat-top hexagon's edge.
 float hexDist(vec2 p) {
     p = abs(p);
-    return max(dot(p, vec2(0.866025, 0.5)), p.y);
+    return max(dot(p, vec2(0.5, 0.866025)), p.x);
 }
 
-// Nearest hexagon in a honeycomb tiling: returns the local position
-// (xy) and the cell center (zw), in grid units.
+// Nearest hexagon in a flat-top honeycomb: local position (xy) and cell
+// center (zw), in grid units.
 vec4 hexCoords(vec2 g) {
-    vec2 r = vec2(1.0, 1.7320508);
+    vec2 r = vec2(1.7320508, 1.0);
     vec2 h = r * 0.5;
     vec2 a = mod(g, r) - h;
     vec2 b = mod(g - h, r) - h;
@@ -66,9 +66,9 @@ void main(void) {
             ? (max(abs(lc.x), abs(lc.y)) < th ? 1.0 : 0.0)
             : (length(lc) < th ? 1.0 : 0.0);
     } else if (shape == 2) {
-        // Flat-top honeycomb: rotate coord 90 CW, cell center back 90 CCW.
-        vec4 hc = hexCoords(vec2(g.y, -g.x));
-        centerCell = vec2(-hc.w, hc.z);
+        // Flat-top honeycomb; Voronoi boundary sits at sqrt(3)/4.
+        vec4 hc = hexCoords(g);
+        centerCell = hc.zw;
         mask = hexDist(hc.xy) < 0.4330127 * (1.0 - gap) ? 1.0 : 0.0;
     } else {
         // Right triangles: each square cell is split by a diagonal whose
