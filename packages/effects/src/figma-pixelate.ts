@@ -34,7 +34,7 @@ float hash12(vec2 p) {
 // Distance to a flat-top hexagon's edge.
 float hexDist(vec2 p) {
     p = abs(p);
-    return max(dot(p, vec2(0.5, 0.866025)), p.x);
+    return max(dot(p, vec2(0.866025, 0.5)), p.y);
 }
 
 // Nearest hexagon in a flat-top honeycomb: local position (xy) and cell
@@ -66,10 +66,10 @@ void main(void) {
             ? (max(abs(lc.x), abs(lc.y)) < th ? 1.0 : 0.0)
             : (length(lc) < th ? 1.0 : 0.0);
     } else if (shape == 2) {
-        // Flat-top honeycomb; Voronoi boundary sits at sqrt(3)/4.
+        // Flat-top honeycomb; Voronoi boundary sits at 0.5 for this lattice.
         vec4 hc = hexCoords(g);
         centerCell = hc.zw;
-        mask = hexDist(hc.xy) < 0.4330127 * (1.0 - gap) ? 1.0 : 0.0;
+        mask = hexDist(hc.xy) < 0.5 * (1.0 - gap) ? 1.0 : 0.0;
     } else {
         // Right triangles: each square cell is split by a diagonal whose
         // direction flips per cell, tiling the plane with 45° triangles.
