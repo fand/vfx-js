@@ -66,10 +66,7 @@ void main(void) {
             ? (max(abs(lc.x), abs(lc.y)) < th ? 1.0 : 0.0)
             : (length(lc) < th ? 1.0 : 0.0);
     } else if (shape == 2) {
-        // Hexagons in a honeycomb tiling, rotated 90 CCW (flat-top). The
-        // Voronoi cell boundary of this lattice sits at hexDist = sqrt(3)/4,
-        // so cells fill with no gaps when gap = 0. Rotate the grid coord
-        // into hex space (CW) and the cell center back to display (CCW).
+        // Flat-top honeycomb: rotate coord 90 CW, cell center back 90 CCW.
         vec4 hc = hexCoords(vec2(g.y, -g.x));
         centerCell = vec2(-hc.w, hc.z);
         mask = hexDist(hc.xy) < 0.4330127 * (1.0 - gap) ? 1.0 : 0.0;
