@@ -33,13 +33,23 @@
     padding:18px 14px;overflow:auto;}
   .side-title{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;
     color:var(--muted);margin:0 2px 10px;}
-  .side-btn{display:flex;justify-content:space-between;align-items:center;width:100%;
+  /* Effect toggles — click to enable/disable, drag to reorder apply order. */
+  .side-btn{position:relative;display:flex;align-items:center;gap:8px;width:100%;
     padding:10px 12px;margin-bottom:6px;border:1px solid var(--line);border-radius:8px;
     background:var(--panel);color:var(--ink);font:inherit;font-size:.85rem;font-weight:500;
-    text-align:left;cursor:pointer;transition:border-color .12s,background .12s;}
-  .side-btn:hover{border-color:var(--accent);background:var(--accent-tint);}
-  .side-btn .plus{color:var(--muted);font-size:1.05rem;line-height:1;}
-  .side-btn:hover .plus{color:var(--accent);}
+    text-align:left;cursor:grab;transition:border-color .12s,background .12s;}
+  .side-btn:hover{border-color:var(--accent);}
+  .side-btn .grip{color:var(--muted);font-size:.9rem;}
+  .side-btn .label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .side-btn .mark{width:1em;text-align:center;color:var(--muted);font-size:1.05rem;line-height:1;}
+  .side-btn.active{border-color:var(--accent);background:var(--accent-tint);}
+  .side-btn.active .mark{color:var(--accent);}
+  .side-btn.dragging{opacity:.4;}
+  .side-btn.drop-before::after,.side-btn.drop-after::after{content:"";
+    position:absolute;left:0;right:0;height:3px;border-radius:999px;
+    background:var(--accent);box-shadow:0 0 0 2px var(--accent-tint);}
+  .side-btn.drop-before::after{top:-5px;}
+  .side-btn.drop-after::after{bottom:-5px;}
 
   .stage{position:fixed;top:var(--topbar-h);left:var(--side-w);right:0;bottom:var(--footer-h);
     display:grid;place-items:center;padding:40px 40px 40px 40px;background:var(--stage);}
@@ -63,23 +73,6 @@
     --tp-input-foreground-color:#111111;--tp-label-foreground-color:#555555;
     --tp-monitor-background-color:#f0f0f0;--tp-monitor-foreground-color:#333333;}
 
-  /* Active effect stack — drag items to reorder the apply order. */
-  .stack-item{position:relative;display:flex;align-items:center;gap:8px;padding:9px 10px;
-    margin-bottom:6px;border:1px solid var(--line);border-radius:8px;
-    background:var(--panel);font-size:.82rem;cursor:grab;}
-  .stack-item.dragging{opacity:.4;}
-  /* Accent bar in the gap showing where the dragged item will drop. */
-  .stack-item.drop-before::after,.stack-item.drop-after::after{content:"";
-    position:absolute;left:0;right:0;height:3px;border-radius:999px;
-    background:var(--accent);box-shadow:0 0 0 2px var(--accent-tint);}
-  .stack-item.drop-before::after{top:-5px;}
-  .stack-item.drop-after::after{bottom:-5px;}
-  .stack-item .grip{color:var(--muted);cursor:grab;}
-  .stack-item .si-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .stack-item .si-rm{border:none;background:transparent;color:var(--muted);
-    font:inherit;font-size:1rem;line-height:1;cursor:pointer;padding:0 2px;}
-  .stack-item .si-rm:hover{color:#e5484d;}
-  .stack-empty{font-size:.7rem;color:var(--muted);margin:2px 2px;}
 
   /* Footer: live VFX-JS code snippet for the current effect stack. */
   .footer{position:fixed;left:var(--side-w);right:0;bottom:0;height:var(--footer-h);
@@ -110,10 +103,8 @@
   <a class="cta" href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">GitHub ↗</a>
 </header>
 <aside class="sidebar" id="sidebar">
-  <div class="side-title">Add effect</div>
-  <div id="palette"></div>
-  <div class="side-title" style="margin-top:22px">Order · drag to sort</div>
-  <div id="stack-list"></div>
+  <div class="side-title">Effects · click to toggle, drag to sort</div>
+  <div id="effect-list"></div>
 </aside>
 <main class="stage"><div class="frame">
   <img id="target" alt="effect target">
@@ -278,9 +269,15 @@ const video = document.getElementById("targetVideo");
 const vfx = new VFX();
 
 const state = { Source: "Sculpt" };
-// The active effect stack, applied in array order (last = on top).
-const stack = [];
-let nextUid = 1;
+// All effects as an ordered list. `active` toggles inclusion; the list
+// order is the apply order (last = on top). Instances are lazy.
+const items = Object.keys(EFFECTS).map((key, i) => ({
+  key,
+  uid: i + 1,
+  active: false,
+  effect: null,
+}));
+const activeItems = () => items.filter((it) => it.active);
 // The element currently registered with VFX (img or video), or null.
 let addedEl = null;
 // The element the next mount should use.
@@ -380,7 +377,7 @@ function buildPane() {
 
   // One folder of params per applied effect (order/remove live in the
   // sidebar stack list).
-  stack.forEach((entry, i) => {
+  activeItems().forEach((entry, i) => {
     const def = EFFECTS[entry.key];
     const folder = pane.addFolder({ title: `${i + 1} · ${entry.key}`, expanded: true });
     if (def.colorStops) bindGradientStops(folder, entry.effect, def.colorStops);
@@ -413,9 +410,10 @@ function changedParams(effect) {
 
 // Build a copy-pasteable VFX-JS snippet from the active stack.
 function genSnippet() {
-  if (stack.length === 0) return "// Add an effect to generate code.";
-  const names = [...new Set(stack.map((s) => s.effect.constructor.name))];
-  const lines = stack.map((s) => {
+  const active = activeItems();
+  if (active.length === 0) return "// Enable an effect to generate code.";
+  const names = [...new Set(active.map((s) => s.effect.constructor.name))];
+  const lines = active.map((s) => {
     const cls = s.effect.constructor.name;
     const diff = changedParams(s.effect);
     const keys = Object.keys(diff);
@@ -478,67 +476,68 @@ function bindGradientStops(folder, effect, n) {
   }
 }
 
-// The sidebar stack list: the applied effects in apply order, draggable
-// to reorder, each with a remove button.
+// The sidebar effect list: every effect as a toggle, in apply order,
+// draggable to reorder. Active items show their position number.
 let dragUid = null;
-function buildStackList() {
-  stackListEl.innerHTML = "";
-  if (stack.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "stack-empty";
-    empty.textContent = "No effects yet.";
-    stackListEl.appendChild(empty);
-    return;
-  }
-  stack.forEach((entry, i) => {
-    const item = document.createElement("div");
-    item.className = "stack-item";
-    item.draggable = true;
-    item.innerHTML =
+function buildEffectList() {
+  listEl.innerHTML = "";
+  let order = 0;
+  for (const it of items) {
+    const num = it.active ? `${++order} · ` : "";
+    const btn = document.createElement("div");
+    btn.className = "side-btn" + (it.active ? " active" : "");
+    btn.draggable = true;
+    btn.innerHTML =
       `<span class="grip">⠿</span>` +
-      `<span class="si-name">${i + 1} · ${entry.key}</span>` +
-      `<button class="si-rm" title="Remove">×</button>`;
+      `<span class="label">${num}${it.key}</span>` +
+      `<span class="mark">${it.active ? "✓" : "+"}</span>`;
 
-    item.addEventListener("dragstart", (e) => {
-      dragUid = entry.uid;
+    btn.addEventListener("click", () => toggleEffect(it.uid));
+    btn.addEventListener("dragstart", (e) => {
+      dragUid = it.uid;
       e.dataTransfer.effectAllowed = "move";
-      item.classList.add("dragging");
+      btn.classList.add("dragging");
     });
-    item.addEventListener("dragend", () => item.classList.remove("dragging"));
-    item.addEventListener("dragover", (e) => {
+    btn.addEventListener("dragend", () => btn.classList.remove("dragging"));
+    btn.addEventListener("dragover", (e) => {
       e.preventDefault();
-      const r = item.getBoundingClientRect();
+      const r = btn.getBoundingClientRect();
       const after = e.clientY - r.top > r.height / 2;
-      item.classList.toggle("drop-after", after);
-      item.classList.toggle("drop-before", !after);
+      btn.classList.toggle("drop-after", after);
+      btn.classList.toggle("drop-before", !after);
     });
-    item.addEventListener("dragleave", () =>
-      item.classList.remove("drop-before", "drop-after"),
+    btn.addEventListener("dragleave", () =>
+      btn.classList.remove("drop-before", "drop-after"),
     );
-    item.addEventListener("drop", (e) => {
+    btn.addEventListener("drop", (e) => {
       e.preventDefault();
-      const r = item.getBoundingClientRect();
+      const r = btn.getBoundingClientRect();
       const after = e.clientY - r.top > r.height / 2;
-      item.classList.remove("drop-before", "drop-after");
-      reorderEffect(dragUid, entry.uid, after);
+      btn.classList.remove("drop-before", "drop-after");
+      reorderEffect(dragUid, it.uid, after);
     });
+    listEl.appendChild(btn);
+  }
+}
 
-    item.querySelector(".si-rm").addEventListener("click", () =>
-      removeEffect(entry.uid),
-    );
-    stackListEl.appendChild(item);
-  });
+// Enable/disable an effect (instance kept so params persist on re-toggle).
+function toggleEffect(uid) {
+  const it = items.find((i) => i.uid === uid);
+  if (!it) return;
+  it.active = !it.active;
+  if (it.active && !it.effect) it.effect = EFFECTS[it.key].make();
+  mount();
 }
 
 // Move the dragged effect to just before/after the drop target.
 function reorderEffect(fromUid, toUid, after) {
   if (fromUid == null || fromUid === toUid) return;
-  const from = stack.findIndex((s) => s.uid === fromUid);
+  const from = items.findIndex((i) => i.uid === fromUid);
   if (from < 0) return;
-  const [moved] = stack.splice(from, 1);
-  let to = stack.findIndex((s) => s.uid === toUid);
+  const [moved] = items.splice(from, 1);
+  let to = items.findIndex((i) => i.uid === toUid);
   if (after) to += 1;
-  stack.splice(to, 0, moved);
+  items.splice(to, 0, moved);
   mount();
 }
 
@@ -555,36 +554,17 @@ async function doMount() {
     vfx.remove(addedEl);
     addedEl = null;
   }
-  if (stack.length > 0) {
-    await vfx.add(activeEl, { effect: stack.map((s) => s.effect) });
+  const active = activeItems();
+  if (active.length > 0) {
+    await vfx.add(activeEl, { effect: active.map((s) => s.effect) });
     addedEl = activeEl;
   }
-  buildStackList();
+  buildEffectList();
   buildPane();
   updateSnippet();
 }
 
-function addEffect(key) {
-  stack.push({ key, uid: nextUid++, effect: EFFECTS[key].make() });
-  mount();
-}
-
-function removeEffect(uid) {
-  const i = stack.findIndex((s) => s.uid === uid);
-  if (i >= 0) stack.splice(i, 1);
-  mount();
-}
-
-// Build the left sidebar palette: one button per effect, click to append.
-const paletteEl = document.getElementById("palette");
-const stackListEl = document.getElementById("stack-list");
-for (const key of Object.keys(EFFECTS)) {
-  const btn = document.createElement("button");
-  btn.className = "side-btn";
-  btn.innerHTML = `<span>${key}</span><span class="plus">+</span>`;
-  btn.addEventListener("click", () => addEffect(key));
-  paletteEl.appendChild(btn);
-}
+const listEl = document.getElementById("effect-list");
 
 // Hidden input for local file uploads.
 const fileInput = document.createElement("input");
@@ -607,7 +587,7 @@ copyBtn.addEventListener("click", async () => {
 });
 
 await loadSource(state.Source);
-addEffect("Warp");
+toggleEffect(items.find((i) => i.key === "Warp").uid);
 </script>
 </body>
 </html>
