@@ -20,7 +20,7 @@
     display:flex;align-items:center;justify-content:space-between;
     padding:0 20px;background:#DDFF22;border-bottom:1px solid rgba(0,0,0,.12);}
   .brand{display:flex;align-items:center;gap:10px;font-size:.92rem;letter-spacing:.02em;}
-  .brand .logo{height:22px;display:block;}
+  .brand .logo{height:40px;display:block;}
   .brand span{color:var(--muted);font-weight:500;margin-left:6px;
     text-transform:uppercase;letter-spacing:.14em;font-size:.74rem;}
   .cta{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;
@@ -45,7 +45,8 @@
     display:grid;place-items:center;padding:40px 40px 40px 40px;background:var(--stage);}
   .frame{background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px;
     line-height:0;}
-  .frame img{display:block;max-width:62vw;max-height:78vh;border-radius:4px;}
+  .frame img,.frame video{display:block;max-width:62vw;max-height:78vh;border-radius:4px;}
+  .frame [hidden]{display:none;}
 
   .pane{position:fixed;top:calc(var(--topbar-h) + 16px);right:16px;width:300px;z-index:10000;
     max-height:calc(100vh - var(--topbar-h) - var(--footer-h) - 32px);overflow:auto;
@@ -114,7 +115,10 @@
   <div class="side-title" style="margin-top:22px">Order · drag to sort</div>
   <div id="stack-list"></div>
 </aside>
-<main class="stage"><div class="frame"><img id="target" alt="effect target"></div></main>
+<main class="stage"><div class="frame">
+  <img id="target" alt="effect target">
+  <video id="targetVideo" muted loop playsinline hidden></video>
+</div></main>
 <div class="pane" id="pane"></div>
 <footer class="footer">
   <div class="footer-head">
@@ -139,12 +143,15 @@ import {
 } from "@vfx-js/effects";
 import { Pane } from "tweakpane";
 
-// Bundled sample images. The first one loads on start.
-const IMAGES = {
-  Sculpt: new URL("./pixelsort/sculpt.webp", import.meta.url).href,
-  Tower: new URL("./pixelsort/tower1.webp", import.meta.url).href,
-  City: new URL("./pixelsort/city1.webp", import.meta.url).href,
-  Octopus: new URL("./pixelsort/octo.webp", import.meta.url).href,
+// Source media. Images load into <img>; video/webcam into <video>. The
+// first one loads on start.
+const MEDIA = {
+  Sculpt: { type: "image", src: new URL("./pixelsort/sculpt.webp", import.meta.url).href },
+  Tower: { type: "image", src: new URL("./pixelsort/tower1.webp", import.meta.url).href },
+  City: { type: "image", src: new URL("./pixelsort/city1.webp", import.meta.url).href },
+  Octopus: { type: "image", src: new URL("./pixelsort/octo.webp", import.meta.url).href },
+  "jellyfish (video)": { type: "video", src: new URL("./jellyfish.mp4", import.meta.url).href },
+  Webcam: { type: "webcam" },
 };
 
 // A control descriptor drives one Tweakpane binding. `options` makes a
@@ -267,13 +274,18 @@ const EFFECTS = {
 };
 
 const img = document.getElementById("target");
+const video = document.getElementById("targetVideo");
 const vfx = new VFX();
 
-const state = { Image: "Sculpt" };
+const state = { Source: "Sculpt" };
 // The active effect stack, applied in array order (last = on top).
 const stack = [];
 let nextUid = 1;
-let added = false;
+// The element currently registered with VFX (img or video), or null.
+let addedEl = null;
+// The element the next mount should use.
+let activeEl = img;
+let webcamStream = null;
 let pane = null;
 
 // Tweakpane turns a string key like "edgeWrap" into "Edge wrap"; a list
@@ -284,11 +296,59 @@ function tpOptions(values) {
   return o;
 }
 
+function stopWebcam() {
+  if (webcamStream) {
+    for (const t of webcamStream.getTracks()) t.stop();
+    webcamStream = null;
+  }
+}
+
+// Show <img>, hide <video>, and load an image source.
 function loadImage(src) {
+  stopWebcam();
+  video.hidden = true;
+  video.removeAttribute("src");
+  img.hidden = false;
+  activeEl = img;
   return new Promise((resolve) => {
     img.onload = () => resolve();
     img.src = src;
   });
+}
+
+// Show <video>, hide <img>, and play a file or the webcam stream.
+async function loadVideo(srcOrStream, isStream) {
+  img.hidden = true;
+  video.hidden = false;
+  activeEl = video;
+  if (isStream) {
+    video.srcObject = srcOrStream;
+    video.removeAttribute("src");
+  } else {
+    stopWebcam();
+    video.srcObject = null;
+    video.src = srcOrStream;
+  }
+  await new Promise((resolve) => {
+    video.onloadeddata = () => resolve();
+    video.load();
+  });
+  await video.play().catch(() => {});
+}
+
+// Load a named source from MEDIA (image / video / webcam).
+async function loadSource(name) {
+  const m = MEDIA[name];
+  if (!m) return;
+  if (m.type === "image") {
+    await loadImage(m.src);
+  } else if (m.type === "video") {
+    await loadVideo(m.src, false);
+  } else if (m.type === "webcam") {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    webcamStream = stream;
+    await loadVideo(stream, true);
+  }
 }
 
 function bindControl(folder, params, key, cfg) {
@@ -306,9 +366,13 @@ function buildPane() {
   pane?.dispose();
   pane = new Pane({ container: document.getElementById("pane"), title: "Parameters" });
 
-  pane.addBinding(state, "Image", { options: tpOptions(Object.keys(IMAGES)) })
+  pane.addBinding(state, "Source", { options: tpOptions(Object.keys(MEDIA)) })
     .on("change", async (ev) => {
-      await loadImage(IMAGES[ev.value]);
+      try {
+        await loadSource(ev.value);
+      } catch (err) {
+        console.error("Failed to load source:", err);
+      }
       await mount();
     });
   pane.addButton({ title: "Upload image…" }).on("click", () => fileInput.click());
@@ -487,13 +551,13 @@ function mount() {
   return mountChain;
 }
 async function doMount() {
-  if (added) {
-    vfx.remove(img);
-    added = false;
+  if (addedEl) {
+    vfx.remove(addedEl);
+    addedEl = null;
   }
   if (stack.length > 0) {
-    await vfx.add(img, { effect: stack.map((s) => s.effect) });
-    added = true;
+    await vfx.add(activeEl, { effect: stack.map((s) => s.effect) });
+    addedEl = activeEl;
   }
   buildStackList();
   buildPane();
@@ -542,7 +606,7 @@ copyBtn.addEventListener("click", async () => {
   setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
 });
 
-await loadImage(IMAGES[state.Image]);
+await loadSource(state.Source);
 addEffect("Warp");
 </script>
 </body>
