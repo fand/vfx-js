@@ -75,8 +75,8 @@ vec2 patternSample(vec2 uv, float st) {
     float shape = mix(sharp, soft, smoothness);
     q.x += 0.3 * stripWidth * st * shape;
     if (pattern == 1) {
-        // Waves: add a vertical ripple on top of the lenticular strips.
-        q.y += sin(q.x * count * TAU) * st * 0.05;
+        // Waves: add a horizontal ripple driven by the y coordinate.
+        q.x += sin(q.y * count * TAU) * st * 0.05;
     }
     return rot2d(radians(angle)) * q + center;
 }
