@@ -84,7 +84,9 @@ vec3 sampleGradient(float t) {
 void main(void) {
     vec4 tex = texture(src, srcRectUv.xy + uvContent * srcRectUv.zw);
     float l = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
-    l += scatter * (hash12(uvContent) - 0.5);
+    // Hash in pixel space (gl_FragCoord); hash12 degenerates on tiny
+    // [0,1] uv inputs.
+    l += scatter * (hash12(gl_FragCoord.xy) - 0.5);
 
     // offset (and time drift) advance one full cycle per unit, so a 0->1
     // offset sweep runs (frequency) cycles.
