@@ -18,9 +18,9 @@
   /* VFX-JS's canvas defaults to z-index 9999, so all UI sits above it. */
   .topbar{position:fixed;top:0;left:0;right:0;height:var(--topbar-h);z-index:10002;
     display:flex;align-items:center;justify-content:space-between;
-    padding:0 20px;background:var(--bg);border-bottom:1px solid var(--line);}
-  .brand{font-size:.92rem;letter-spacing:.02em;}
-  .brand b{font-weight:700;}
+    padding:0 20px;background:#DDFF22;border-bottom:1px solid rgba(0,0,0,.12);}
+  .brand{display:flex;align-items:center;gap:10px;font-size:.92rem;letter-spacing:.02em;}
+  .brand .logo{height:22px;display:block;}
   .brand span{color:var(--muted);font-weight:500;margin-left:6px;
     text-transform:uppercase;letter-spacing:.14em;font-size:.74rem;}
   .cta{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;
@@ -105,7 +105,7 @@
 </head>
 <body>
 <header class="topbar">
-  <div class="brand"><b>VFX-JS</b><span>Shader Effects</span></div>
+  <div class="brand"><img class="logo" src="./vfx-js-logo.svg" alt="VFX-JS"><span>Shader Effects</span></div>
   <a class="cta" href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">GitHub ↗</a>
 </header>
 <aside class="sidebar" id="sidebar">
