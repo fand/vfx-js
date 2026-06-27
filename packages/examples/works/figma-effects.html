@@ -5,50 +5,90 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VFX-JS Figma Effects</title>
 <style>
-  :root{ --bg:#0c0d10; --panel:#16181d; --ink:#e8eae3; --line:rgba(255,255,255,.12); --accent:#5b8cff; }
+  :root{
+    --bg:#ffffff; --stage:#f4f4f5; --panel:#ffffff; --ink:#111111;
+    --muted:#6b7280; --line:#e6e6e6; --accent:#0fd969; --accent-tint:rgba(15,217,105,.12);
+    --topbar-h:52px; --side-w:220px;
+    --sans:"Inter","Figma Sans VF",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
   *{box-sizing:border-box;margin:0;padding:0;}
-  html,body{height:100%;background:var(--bg);color:var(--ink);
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
-  .stage{position:fixed;inset:0;display:grid;place-items:center;padding:48px 340px;}
-  .stage img{display:block;max-width:70vw;max-height:84vh;}
-  /* VFX-JS's canvas defaults to z-index 9999, so the UI sits above it. */
-  .sidebar{position:fixed;top:0;left:0;bottom:0;width:208px;z-index:10000;
-    background:var(--panel);border-right:1px solid var(--line);padding:16px 12px;
-    overflow:auto;}
-  .side-title{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
-    opacity:.55;margin:4px 4px 12px;}
+  html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;}
+
+  /* VFX-JS's canvas defaults to z-index 9999, so all UI sits above it. */
+  .topbar{position:fixed;top:0;left:0;right:0;height:var(--topbar-h);z-index:10002;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 20px;background:var(--bg);border-bottom:1px solid var(--line);}
+  .brand{font-size:.92rem;letter-spacing:.02em;}
+  .brand b{font-weight:700;}
+  .brand span{color:var(--muted);font-weight:500;margin-left:6px;
+    text-transform:uppercase;letter-spacing:.14em;font-size:.74rem;}
+  .cta{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;
+    border-radius:999px;background:var(--ink);color:#fff;text-decoration:none;
+    font-size:.78rem;font-weight:600;letter-spacing:.02em;}
+  .cta:hover{background:#000;}
+
+  .sidebar{position:fixed;top:var(--topbar-h);left:0;bottom:0;width:var(--side-w);
+    z-index:10000;background:var(--panel);border-right:1px solid var(--line);
+    padding:18px 14px;overflow:auto;}
+  .side-title{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);margin:0 2px 10px;}
   .side-btn{display:flex;justify-content:space-between;align-items:center;width:100%;
-    padding:9px 10px;margin-bottom:6px;border:1px solid var(--line);border-radius:6px;
-    background:transparent;color:var(--ink);font:inherit;font-size:.82rem;
-    text-align:left;cursor:pointer;}
-  .side-btn:hover{border-color:var(--accent);background:rgba(91,140,255,.08);}
-  .side-btn .plus{opacity:.4;font-size:1rem;line-height:1;}
-  .side-hint{font-size:.68rem;opacity:.4;margin:14px 4px 0;line-height:1.5;}
-  .pane{position:fixed;top:16px;right:16px;width:300px;z-index:10000;}
+    padding:10px 12px;margin-bottom:6px;border:1px solid var(--line);border-radius:8px;
+    background:var(--panel);color:var(--ink);font:inherit;font-size:.85rem;font-weight:500;
+    text-align:left;cursor:pointer;transition:border-color .12s,background .12s;}
+  .side-btn:hover{border-color:var(--accent);background:var(--accent-tint);}
+  .side-btn .plus{color:var(--muted);font-size:1.05rem;line-height:1;}
+  .side-btn:hover .plus{color:var(--accent);}
+
+  .stage{position:fixed;top:var(--topbar-h);left:var(--side-w);right:0;bottom:0;
+    display:grid;place-items:center;padding:40px 40px 40px 40px;background:var(--stage);}
+  .frame{background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px;
+    line-height:0;}
+  .frame img{display:block;max-width:62vw;max-height:78vh;border-radius:4px;}
+
+  .pane{position:fixed;top:calc(var(--topbar-h) + 16px);right:16px;width:300px;z-index:10000;
+    max-height:calc(100vh - var(--topbar-h) - 32px);overflow:auto;
+    /* Tweakpane light theme */
+    --tp-base-background-color:#ffffff;--tp-base-shadow-color:rgba(0,0,0,.1);
+    --tp-button-background-color:#f0f0f0;--tp-button-background-color-active:#d8d8d8;
+    --tp-button-background-color-focus:#e4e4e4;--tp-button-background-color-hover:#e8e8e8;
+    --tp-button-foreground-color:#111111;
+    --tp-container-background-color:#f6f6f6;--tp-container-background-color-active:#e2e2e2;
+    --tp-container-background-color-focus:#ececec;--tp-container-background-color-hover:#efefef;
+    --tp-container-foreground-color:#333333;--tp-groove-foreground-color:#e2e2e2;
+    --tp-input-background-color:#f0f0f0;--tp-input-background-color-active:#e2e2e2;
+    --tp-input-background-color-focus:#e8e8e8;--tp-input-background-color-hover:#ececec;
+    --tp-input-foreground-color:#111111;--tp-label-foreground-color:#555555;
+    --tp-monitor-background-color:#f0f0f0;--tp-monitor-foreground-color:#333333;}
+
   /* Active effect stack — drag items to reorder the apply order. */
-  .stack-item{display:flex;align-items:center;gap:8px;padding:8px 10px;
-    margin-bottom:6px;border:1px solid var(--line);border-radius:6px;
-    background:rgba(255,255,255,.03);font-size:.8rem;cursor:grab;}
+  .stack-item{display:flex;align-items:center;gap:8px;padding:9px 10px;
+    margin-bottom:6px;border:1px solid var(--line);border-radius:8px;
+    background:var(--panel);font-size:.82rem;cursor:grab;}
   .stack-item.dragging{opacity:.4;}
   .stack-item.drop-before{border-top-color:var(--accent);}
   .stack-item.drop-after{border-bottom-color:var(--accent);}
-  .stack-item .grip{opacity:.35;cursor:grab;}
+  .stack-item .grip{color:var(--muted);cursor:grab;}
   .stack-item .si-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .stack-item .si-rm{border:none;background:transparent;color:var(--ink);opacity:.45;
+  .stack-item .si-rm{border:none;background:transparent;color:var(--muted);
     font:inherit;font-size:1rem;line-height:1;cursor:pointer;padding:0 2px;}
-  .stack-item .si-rm:hover{opacity:1;color:#ff6b6b;}
-  .stack-empty{font-size:.68rem;opacity:.35;margin:2px 4px;}
+  .stack-item .si-rm:hover{color:#e5484d;}
+  .stack-empty{font-size:.7rem;color:var(--muted);margin:2px 2px;}
 </style>
 </head>
 <body>
+<header class="topbar">
+  <div class="brand"><b>VFX-JS</b><span>Shader Effects</span></div>
+  <a class="cta" href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">GitHub ↗</a>
+</header>
 <aside class="sidebar" id="sidebar">
-  <div class="side-title">VFX-JS · Figma Effects</div>
-  <div class="side-title" style="margin-top:8px">Add effect</div>
+  <div class="side-title">Add effect</div>
   <div id="palette"></div>
-  <div class="side-title" style="margin-top:18px">Order · drag to sort</div>
+  <div class="side-title" style="margin-top:22px">Order · drag to sort</div>
   <div id="stack-list"></div>
 </aside>
-<div class="stage"><img id="target" alt="effect target"></div>
+<main class="stage"><div class="frame"><img id="target" alt="effect target"></div></main>
 <div class="pane" id="pane"></div>
 
 <script type="module">
