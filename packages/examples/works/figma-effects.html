@@ -119,6 +119,7 @@ import {
   DitherEffect,
   FigmaPixelateEffect,
   GradientMapEffect,
+  HalftoneEffect,
   PatternRefractionEffect,
   PixelStretchEffect,
   SliceShiftEffect,
@@ -212,6 +213,18 @@ const EFFECTS = {
       contrast: slider(0, 4, 0.05),
       mono: {},
       monoColor: { color: true },
+    },
+  },
+  Halftone: {
+    make: () => new HalftoneEffect(),
+    controls: {
+      gridSize: slider(2, 80, 1),
+      dotSize: slider(0, 2, 0.05),
+      smoothing: slider(0, 1, 0.01),
+      angle: slider(-180, 180, 1),
+      mode: { options: ["rgb", "cmyk"] },
+      blackAmount: slider(0, 1, 0.01),
+      trimEdge: {},
     },
   },
   "Colored edges": {
