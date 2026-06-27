@@ -29,6 +29,12 @@ export {
 } from "./figma-pixelate";
 export { FluidEffect } from "./fluid";
 export { GlitchEffect, type GlitchParams } from "./glitch";
+export {
+    GradientMapEffect,
+    type GradientMapMixSpace,
+    type GradientMapParams,
+    type GradientMapRepeat,
+} from "./gradient-map";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
 export { HueShiftEffect, type HueShiftParams } from "./hue-shift";
 export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch";

@@ -12,6 +12,9 @@ import {
     DuotoneEffect,
     FigmaPixelateEffect,
     type FigmaPixelateShape,
+    GradientMapEffect,
+    type GradientMapMixSpace,
+    type GradientMapRepeat,
     FluidEffect,
     GlitchEffect,
     HalftoneEffect,
@@ -1062,6 +1065,51 @@ export const coloredEdges = presetStory<ColoredEdgesArgs>(
         background: { control: { type: "color" } },
     },
     { clock: false, src: Pigeon },
+);
+
+const GRADIENT_REPEATS: GradientMapRepeat[] = ["none", "repeat", "mirror"];
+const GRADIENT_MIX_SPACES: GradientMapMixSpace[] = ["srgb", "linear", "oklab"];
+type GradientMapArgs = {
+    color1: string;
+    color2: string;
+    color3: string;
+    scatter: number;
+    offset: number;
+    repeat: GradientMapRepeat;
+    frequency: number;
+    mixSpace: GradientMapMixSpace;
+};
+export const gradientMap = presetStory<GradientMapArgs>(
+    (a) =>
+        new GradientMapEffect({
+            colors: [a.color1, a.color2, a.color3],
+            scatter: a.scatter,
+            offset: a.offset,
+            repeat: a.repeat,
+            frequency: a.frequency,
+            mixSpace: a.mixSpace,
+        }),
+    {
+        color1: "#ffffff",
+        color2: "#3aa0ff",
+        color3: "#000000",
+        scatter: 0,
+        offset: 0,
+        repeat: "none",
+        frequency: 1,
+        mixSpace: "srgb",
+    },
+    {
+        color1: { control: { type: "color" } },
+        color2: { control: { type: "color" } },
+        color3: { control: { type: "color" } },
+        scatter: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        offset: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        repeat: { control: { type: "select" }, options: GRADIENT_REPEATS },
+        frequency: { control: { type: "range", min: 1, max: 8, step: 1 } },
+        mixSpace: { control: { type: "select" }, options: GRADIENT_MIX_SPACES },
+    },
+    { clock: false },
 );
 
 type SliceShiftArgs = {

@@ -57,6 +57,7 @@ import {
   ColoredEdgesEffect,
   DitherEffect,
   FigmaPixelateEffect,
+  GradientMapEffect,
   PatternRefractionEffect,
   PixelStretchEffect,
   SliceShiftEffect,
@@ -164,6 +165,18 @@ const EFFECTS = {
       background: { color: true },
     },
   },
+  "Gradient map": {
+    make: () => new GradientMapEffect(),
+    // `colorStops` adds N gradient color pickers bound to params.colors.
+    colorStops: 3,
+    controls: {
+      scatter: slider(0, 1, 0.01),
+      offset: slider(0, 1, 0.01),
+      repeat: { options: ["none", "repeat", "mirror"] },
+      frequency: slider(1, 8, 1),
+      mixSpace: { options: ["srgb", "linear", "oklab"] },
+    },
+  },
 };
 
 const img = document.getElementById("target");
@@ -217,11 +230,27 @@ function buildPane() {
   // One folder of params per applied effect (order/remove live in the
   // sidebar stack list).
   stack.forEach((entry, i) => {
+    const def = EFFECTS[entry.key];
     const folder = pane.addFolder({ title: `${i + 1} · ${entry.key}`, expanded: true });
-    for (const [key, cfg] of Object.entries(EFFECTS[entry.key].controls)) {
+    if (def.colorStops) bindGradientStops(folder, entry.effect, def.colorStops);
+    for (const [key, cfg] of Object.entries(def.controls)) {
       bindControl(folder, entry.effect.params, key, cfg);
     }
   });
+}
+
+// Add N color pickers for a gradient effect, writing back to params.colors.
+function bindGradientStops(folder, effect, n) {
+  const proxy = {};
+  for (let i = 0; i < n; i++) {
+    proxy[`stop${i}`] = effect.params.colors[i] ?? "#ffffff";
+  }
+  const sync = () => {
+    effect.params.colors = Array.from({ length: n }, (_, i) => proxy[`stop${i}`]);
+  };
+  for (let i = 0; i < n; i++) {
+    folder.addBinding(proxy, `stop${i}`, { label: `color ${i + 1}` }).on("change", sync);
+  }
 }
 
 // The sidebar stack list: the applied effects in apply order, draggable
