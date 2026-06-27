@@ -481,15 +481,13 @@ function bindGradientStops(folder, effect, n) {
 let dragUid = null;
 function buildEffectList() {
   listEl.innerHTML = "";
-  let order = 0;
   for (const it of items) {
-    const num = it.active ? `${++order} · ` : "";
     const btn = document.createElement("div");
     btn.className = "side-btn" + (it.active ? " active" : "");
     btn.draggable = true;
     btn.innerHTML =
       `<span class="grip">⠿</span>` +
-      `<span class="label">${num}${it.key}</span>` +
+      `<span class="label">${it.key}</span>` +
       `<span class="mark">${it.active ? "✓" : "+"}</span>`;
 
     btn.addEventListener("click", () => toggleEffect(it.uid));
@@ -511,6 +509,7 @@ function buildEffectList() {
     );
     btn.addEventListener("drop", (e) => {
       e.preventDefault();
+      e.stopPropagation(); // handled here, not by the sidebar end-drop
       const r = btn.getBoundingClientRect();
       const after = e.clientY - r.top > r.height / 2;
       btn.classList.remove("drop-before", "drop-after");
@@ -541,6 +540,16 @@ function reorderEffect(fromUid, toUid, after) {
   mount();
 }
 
+// Move the dragged effect to the end (drop in the empty area below).
+function moveToEnd(uid) {
+  if (uid == null) return;
+  const from = items.findIndex((i) => i.uid === uid);
+  if (from < 0 || from === items.length - 1) return;
+  const [moved] = items.splice(from, 1);
+  items.push(moved);
+  mount();
+}
+
 // Rebuild the VFX pipeline from the current stack, then the pane.
 // Serialized: a remove + re-add must finish before the next runs, or VFX
 // rejects the re-attached effect instances ("already attached").
@@ -565,6 +574,23 @@ async function doMount() {
 }
 
 const listEl = document.getElementById("effect-list");
+
+// Dropping in the sidebar's empty area (below the list) moves to the end.
+const sidebarEl = document.getElementById("sidebar");
+sidebarEl.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  if (e.target.closest(".side-btn")) return;
+  listEl.lastElementChild?.classList.add("drop-after");
+});
+sidebarEl.addEventListener("dragleave", (e) => {
+  if (e.target.closest(".side-btn")) return;
+  listEl.lastElementChild?.classList.remove("drop-after");
+});
+sidebarEl.addEventListener("drop", (e) => {
+  e.preventDefault();
+  listEl.lastElementChild?.classList.remove("drop-after");
+  moveToEnd(dragUid);
+});
 
 // Hidden input for local file uploads.
 const fileInput = document.createElement("input");
