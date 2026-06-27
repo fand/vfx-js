@@ -65,11 +65,11 @@ export type PixelStretchParams = {
 
 const DEFAULT_PARAMS: PixelStretchParams = {
     offset: 0,
-    reach: 0.2,
+    reach: 0.1,
     smoothness: 0,
     centerX: 0.5,
     centerY: 0.5,
-    angle: 0,
+    angle: 45,
 };
 
 export class PixelStretchEffect implements Effect {

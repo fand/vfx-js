@@ -104,7 +104,7 @@ export type DitherParams = {
 };
 
 const DEFAULT_PARAMS: DitherParams = {
-    style: "threshold",
+    style: "bayer16",
     size: 2,
     levels: 3,
     brightness: 1,

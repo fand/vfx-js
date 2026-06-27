@@ -127,10 +127,10 @@ export type GradientMapParams = {
 };
 
 const DEFAULT_PARAMS: GradientMapParams = {
-    colors: ["#ffffff", "#3aa0ff", "#000000"],
+    colors: ["#bbee00", "#3aa0ff", "#000000"],
     scatter: 0,
     offset: 0,
-    repeat: "none",
+    repeat: "mirror",
     frequency: 1,
     mixSpace: "srgb",
     speed: 0,
