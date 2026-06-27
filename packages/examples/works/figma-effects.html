@@ -8,7 +8,7 @@
   :root{
     --bg:#ffffff; --stage:#f4f4f5; --panel:#ffffff; --ink:#111111;
     --muted:#6b7280; --line:#e6e6e6; --accent:#0fd969; --accent-tint:rgba(15,217,105,.12);
-    --topbar-h:52px; --side-w:220px; --footer-h:200px; --pane-w:332px;
+    --topbar-h:52px; --side-w:220px; --footer-h:200px;
     --sans:"Inter","Figma Sans VF",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -48,7 +48,7 @@
   .frame img{display:block;max-width:62vw;max-height:78vh;border-radius:4px;}
 
   .pane{position:fixed;top:calc(var(--topbar-h) + 16px);right:16px;width:300px;z-index:10000;
-    max-height:calc(100vh - var(--topbar-h) - 32px);overflow:auto;
+    max-height:calc(100vh - var(--topbar-h) - var(--footer-h) - 32px);overflow:auto;
     /* Tweakpane light theme */
     --tp-base-background-color:#ffffff;--tp-base-shadow-color:rgba(0,0,0,.1);
     --tp-button-background-color:#f0f0f0;--tp-button-background-color-active:#d8d8d8;
@@ -77,7 +77,7 @@
   .stack-empty{font-size:.7rem;color:var(--muted);margin:2px 2px;}
 
   /* Footer: live VFX-JS code snippet for the current effect stack. */
-  .footer{position:fixed;left:var(--side-w);right:var(--pane-w);bottom:0;height:var(--footer-h);
+  .footer{position:fixed;left:var(--side-w);right:0;bottom:0;height:var(--footer-h);
     z-index:10001;display:flex;flex-direction:column;
     background:var(--bg);border-top:1px solid var(--line);padding:12px 16px;}
   .footer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
