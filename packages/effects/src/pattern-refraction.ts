@@ -30,6 +30,18 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
+// Smooth value noise: bilinear-interpolated lattice hash.
+float valueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x),
+        mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x),
+        u.y
+    );
+}
+
 // Edge sampling for out-of-range coordinates.
 vec4 readTexWrap(vec2 uv) {
     if (edgeWrap == 0) {
@@ -106,11 +118,11 @@ void main(void) {
     vec2 uvB = patternSample(uvContent, strength, strength * (1.0 - dispersion));
 
     if (frost > 0.0) {
-        // Frost: jitter the sample for a frosted-glass blur.
-        vec2 j = vec2(
-            hash12(uvContent * 511.0) - 0.5,
-            hash12(uvContent * 727.0 + 5.0) - 0.5
-        ) * frost * 0.05;
+        // Frost: jitter the sample with value noise for a frosted-glass blur.
+        vec2 j = (vec2(
+            valueNoise(uvContent * 1024.0),
+            valueNoise(uvContent * 1024.0 + 19.0)
+        ) - 0.5) * frost * 0.05;
         uvR += j;
         uvG += j;
         uvB += j;
