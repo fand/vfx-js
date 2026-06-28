@@ -21,6 +21,7 @@ uniform float frost;
 uniform float dispersion;
 uniform float stripWidth;
 uniform float angle;
+uniform float aspect;
 ${GLSL_COMMON}
 
 float hash12(vec2 p) {
@@ -45,16 +46,20 @@ vec4 readTexWrap(vec2 uv) {
     return texture(src, srcRectUv.xy + uv * srcRectUv.zw);
 }
 
-// Sample coordinate after the pattern displacement, for a given strength
-// (varied per channel to get dispersion).
-vec2 patternSample(vec2 uv, float st) {
+// Sample coordinate after the pattern displacement. stGrid fixes the pattern
+// geometry (same for every channel); stDisp scales the displacement and is
+// varied per channel to get dispersion, so RGB shifts within a strip while the
+// strip boundaries stay aligned.
+vec2 patternSample(vec2 uv, float stGrid, float stDisp) {
     vec2 q = rot2d(-radians(angle)) * (uv - center);
     float count = 1.0 / stripWidth;
 
     if (pattern == 2) {
-        // Circular: inside each grid circle, pull the sample toward the
-        // image center so the cell magnifies the middle of the picture.
-        vec2 g = q * count;
+        // Circular: shrink the content inside each grid circle toward the
+        // circle's own center. aspect keeps the cells square so circles stay
+        // round on any element shape.
+        vec2 qa = vec2(q.x * aspect, q.y);
+        vec2 g = qa * count;
         vec2 cl = fract(g) - 0.5;
         float r = length(cl);
         float edge = r * 2.0;
@@ -62,7 +67,10 @@ vec2 patternSample(vec2 uv, float st) {
             ? smoothstep(1.0, 1.0 - smoothness, edge)
             : step(edge, 1.0);
         float mask = r < 0.5 ? taper : 0.0;
-        return mix(uv, vec2(0.5), st * 0.5 * mask);
+        // Push the sample out from the circle center so a wider area maps in.
+        vec2 offset = vec2(cl.x / aspect, cl.y) / count;
+        q += offset * stDisp * mask;
+        return rot2d(radians(angle)) * q + center;
     }
 
     // Lenticular: displace each strip's sample by its position within the
@@ -70,25 +78,32 @@ vec2 patternSample(vec2 uv, float st) {
     // flat and spikes at the boundary (a jump, drawn as a tail); smoothness=1
     // is a sine: zero at the boundary, smooth wave that folds at the edges.
     float gx = q.x;
+    float bendPhase = (q.y + 0.5) * TAU / (5.0 * stripWidth);
     if (pattern == 1) {
-        // Waves: bend the lens grid along y. Shift the rotated q.y to [0,1] so
-        // it follows the angle yet stays monotonic (cos is even on centered
-        // q.y, which doubles the period). Frequency scales with 1/stripWidth
-        // (0.25 -> cos(y*PI), 0.125 -> cos(y*2PI)).
-        gx += sin((q.y + 0.5) * TAU / (5.0 * stripWidth)) * st * 0.5 * stripWidth;
+        // Waves: bend the lens grid along y. Frequency scales with 1/stripWidth.
+        gx += sin(bendPhase) * stGrid * 0.5 * stripWidth;
     }
     float n = fract(gx * count) * 2.0 - 1.0;
     float sharp = sign(n) * pow(abs(n), 8.0);
     float soft = sin(n * TAU * 0.5);
+    // Waves: keep the bend near the strip boundary so the interior stays flat
+    // and adjacent strips join up; raising smoothness widens the connection.
+    if (pattern == 1) soft *= n * n;
     float shape = mix(sharp, soft, smoothness);
-    q.x += 0.3 * stripWidth * st * shape;
+    float disp = 0.3 * stripWidth * stDisp * shape;
+    q.x += disp;
+    if (pattern == 1) {
+        // Refraction follows the bent grid: y shift = x shift times the grid's
+        // slope along y, so where the bend rises the sample tilts up-right.
+        q.y += disp * cos(bendPhase) * stGrid * 0.5 * TAU / 5.0;
+    }
     return rot2d(radians(angle)) * q + center;
 }
 
 void main(void) {
-    vec2 uvR = patternSample(uvContent, strength * (1.0 + dispersion));
-    vec2 uvG = patternSample(uvContent, strength);
-    vec2 uvB = patternSample(uvContent, strength * (1.0 - dispersion));
+    vec2 uvR = patternSample(uvContent, strength, strength * (1.0 + dispersion));
+    vec2 uvG = patternSample(uvContent, strength, strength);
+    vec2 uvB = patternSample(uvContent, strength, strength * (1.0 - dispersion));
 
     if (frost > 0.0) {
         // Frost: jitter the sample for a frosted-glass blur.
@@ -177,6 +192,7 @@ export class PatternRefractionEffect implements Effect {
 
     render(ctx: EffectContext): void {
         const p = this.params;
+        const [w, h] = ctx.dims.element;
         ctx.draw({
             frag: FRAG_PATTERN_REFRACTION,
             uniforms: {
@@ -190,6 +206,7 @@ export class PatternRefractionEffect implements Effect {
                 dispersion: Math.max(0, p.dispersion),
                 stripWidth: Math.min(1, Math.max(0.001, p.stripWidth)),
                 angle: p.angle,
+                aspect: (w || 1) / (h || 1),
             },
             target: ctx.target,
         });
