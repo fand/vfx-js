@@ -269,7 +269,7 @@ const img = document.getElementById("target");
 const video = document.getElementById("targetVideo");
 const vfx = new VFX();
 
-const state = { Source: "Sculpt" };
+const state = { Source: "Tower" };
 // All effects as an ordered list. `active` toggles inclusion; the list
 // order is the apply order (last = on top). Instances are lazy.
 const items = Object.keys(EFFECTS).map((key, i) => ({
@@ -614,7 +614,8 @@ copyBtn.addEventListener("click", async () => {
 });
 
 await loadSource(state.Source);
-toggleEffect(items.find((i) => i.key === "Warp").uid);
+// toggleEffect(items.find((i) => i.key === "Warp").uid);
+toggleEffect(items.find((i) => i.key === "Pattern refraction").uid);
 </script>
 </body>
 </html>

@@ -75,7 +75,7 @@ vec2 patternSample(vec2 uv, float st) {
         // it follows the angle yet stays monotonic (cos is even on centered
         // q.y, which doubles the period). Frequency scales with 1/stripWidth
         // (0.25 -> cos(y*PI), 0.125 -> cos(y*2PI)).
-        gx += cos((q.y + 0.5) * TAU / (8.0 * stripWidth)) * st * 0.2;
+        gx += sin((q.y + 0.5) * TAU / (5.0 * stripWidth)) * st * 0.5 * stripWidth;
     }
     float n = fract(gx * count) * 2.0 - 1.0;
     float sharp = sign(n) * pow(abs(n), 8.0);
