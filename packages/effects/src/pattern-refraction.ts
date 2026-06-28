@@ -71,10 +71,11 @@ vec2 patternSample(vec2 uv, float st) {
     // is a sine: zero at the boundary, smooth wave that folds at the edges.
     float gx = q.x;
     if (pattern == 1) {
-        // Waves: bend the lens grid along y. Use the [0,1] y (uv.y), not the
-        // centered q.y (cos is even there, which doubles the period). Frequency
-        // scales with 1/stripWidth (0.25 -> cos(y*PI), 0.125 -> cos(y*2PI)).
-        gx += cos(uv.y * TAU / (8.0 * stripWidth)) * st * 0.05;
+        // Waves: bend the lens grid along y. Shift the rotated q.y to [0,1] so
+        // it follows the angle yet stays monotonic (cos is even on centered
+        // q.y, which doubles the period). Frequency scales with 1/stripWidth
+        // (0.25 -> cos(y*PI), 0.125 -> cos(y*2PI)).
+        gx += cos((q.y + 0.5) * TAU / (8.0 * stripWidth)) * st * 0.05;
     }
     float n = fract(gx * count) * 2.0 - 1.0;
     float sharp = sign(n) * pow(abs(n), 8.0);
