@@ -51,6 +51,17 @@
   .side-btn.drop-before::after{top:-5px;}
   .side-btn.drop-after::after{bottom:-5px;}
 
+  /* Full-screen loader shown until every frame source has loaded. */
+  .loader{position:fixed;inset:0;z-index:10050;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;background:var(--bg);
+    color:var(--muted);font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;
+    transition:opacity .3s;}
+  .loader.done{opacity:0;pointer-events:none;}
+  .loader .spinner{width:34px;height:34px;border-radius:50%;
+    border:3px solid var(--line);border-top-color:var(--accent);
+    animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
   /* Horizontal gallery: frames scroll left/right and snap to center. */
   .stage{position:fixed;top:var(--topbar-h);left:var(--side-w);right:0;bottom:var(--footer-h);
     display:flex;align-items:center;gap:40px;overflow-x:auto;overflow-y:hidden;
@@ -127,6 +138,7 @@
 </style>
 </head>
 <body>
+<div class="loader" id="loader"><div class="spinner"></div><span>Loading</span></div>
 <header class="topbar">
   <div class="brand"><img class="logo" src="./vfx-js-logo.svg" alt="VFX-JS"><span>Shader Effects</span></div>
   <a class="cta" href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">GitHub ↗</a>
@@ -826,6 +838,7 @@ await Promise.all(
 await Promise.all(frames.map((f) => f.mount()));
 frames[0].root.classList.add("selected");
 refreshControls();
+document.getElementById("loader").classList.add("done");
 </script>
 </body>
 </html>
