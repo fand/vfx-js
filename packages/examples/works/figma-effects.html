@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VFX-JS Figma Effects</title>
+<title>Figma Shaders port on VFX-JS</title>
 <style>
   :root{
     --bg:#ffffff; --stage:#f4f4f5; --panel:#ffffff; --ink:#111111;
-    --muted:#6b7280; --line:#e6e6e6; --accent:#0fd969; --accent-tint:rgba(15,217,105,.12);
-    --topbar-h:52px; --side-w:220px; --footer-h:320px;
+    --muted:#6b7280; --line:#e6e6e6; --accent:#0d99ff; --accent-tint:rgba(13,153,255,.12);
+    --topbar-h:64px; --side-w:220px; --footer-h:320px;
     /* Shared frame content height: stage minus its padding, the name row,
        and the frame padding/border. Every frame scales to fill this. */
     --frame-h:calc(100vh - var(--topbar-h) - var(--footer-h) - 130px);
@@ -23,9 +23,10 @@
     display:flex;align-items:center;justify-content:space-between;
     padding:0 20px;background:#DDFF22;border-bottom:1px solid rgba(0,0,0,.12);}
   .brand{display:flex;align-items:center;gap:10px;font-size:.92rem;letter-spacing:.02em;}
-  .brand .logo{height:40px;display:block;}
-  .brand span{color:var(--muted);font-weight:500;margin-left:6px;
-    text-transform:uppercase;letter-spacing:.14em;font-size:.74rem;}
+  .brand .logo{height:56px;display:block; margin-top: 4px;}
+  .brand strong{font-weight:700;font-size:1.3rem;}
+  .brand span{color:var(--muted);font-weight:500;margin-left:2px;
+    letter-spacing:.02em;font-size:.78rem;}
   .cta{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;
     border-radius:999px;background:var(--ink);color:#fff;text-decoration:none;
     font-size:.78rem;font-weight:600;letter-spacing:.02em;}
@@ -68,6 +69,7 @@
   /* Horizontal gallery: frames scroll left/right and snap to center. */
   .stage{position:fixed;top:var(--topbar-h);left:var(--side-w);right:0;bottom:var(--footer-h);
     display:flex;align-items:center;gap:40px;overflow-x:auto;overflow-y:hidden;
+    overscroll-behavior:none;
     padding:40px;background:var(--stage);scroll-snap-type:x mandatory;scroll-padding-inline:40px;}
   /* One gallery cell: a name label above its frame. */
   .frame-cell{flex:0 0 auto;scroll-snap-align:center;cursor:pointer;
@@ -95,13 +97,14 @@
   .frame-webcam{box-sizing:border-box;display:grid;place-items:center;
     width:min(40vw,480px);height:var(--frame-h);background:#111;border-radius:4px;}
   .frame-webcam-btn{padding:14px 28px;border:none;border-radius:999px;
-    background:var(--accent);color:#062b16;font:inherit;font-weight:700;font-size:1rem;
+    background:var(--accent);color:#fff;font:inherit;font-weight:700;font-size:1rem;
     letter-spacing:.02em;cursor:pointer;}
   .frame-webcam-btn:hover{filter:brightness(1.05);}
   .frame [hidden]{display:none;}
 
   .pane{position:fixed;top:calc(var(--topbar-h) + 16px);right:16px;width:300px;z-index:10000;
     max-height:calc(100vh - var(--topbar-h) - var(--footer-h) - 32px);overflow:auto;
+    border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.10);
     /* Tweakpane light theme */
     --tp-base-background-color:#ffffff;--tp-base-shadow-color:rgba(0,0,0,.1);
     --tp-button-background-color:#f0f0f0;--tp-button-background-color-active:#d8d8d8;
@@ -142,7 +145,10 @@
 <body>
 <div class="loader" id="loader"><div class="spinner"></div><span>Loading</span></div>
 <header class="topbar">
-  <div class="brand"><img class="logo" src="./vfx-js-logo.svg" alt="VFX-JS"><span>Shader Effects</span></div>
+  <div class="brand"><img class="logo" src="./vfx-js-logo.svg" alt="VFX-JS">
+  <strong>Figma Shaders</strong>
+  <span>-</span>
+  <span class="detail">Figma's Shader effects ported to VFX-JS. Available on npm now.</span></div>
   <a class="cta" href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">GitHub ↗</a>
 </header>
 <aside class="sidebar" id="sidebar">
