@@ -329,7 +329,16 @@ const FRAME_PRESETS = [
     source: "Sculpt",
     effects: ["Pixel stretch", "Gradient map", "Dither"],
   },
-  { name: "Warp", source: "Tower", effects: ["Warp"] },
+  {
+    name: "Pattern Refraction",
+    source: "Tower",
+    effects: [
+      {
+        key: "Pattern refraction",
+        params: { pattern: "lenticular", angle: 30, strength: 1.5, dispersion: 0.3, stripWidth: 0.1 },
+      },
+    ],
+  },
   { name: "Slice Shift + Halftone", source: "City", effects: ["Slice shift", "Halftone"] },
   { name: "Pattern Refraction + Gradient Map", source: "Octopus", effects: ["Pattern refraction", "Gradient map"] },
   { name: "SliceShift on Video", source: "jellyfish (video)", effects: ["Slice shift"] },
