@@ -182,7 +182,7 @@ import { Pane } from "tweakpane";
 // Source media. Images load into <img>; video/webcam into <video>. The
 // first one loads on start.
 const MEDIA = {
-  Sculpt: { type: "image", src: new URL("./pixelsort/sculpt.webp", import.meta.url).href },
+  Sculpt: { type: "image", src: new URL("./figma-effects/sculpt2.webp", import.meta.url).href },
   Tower: { type: "image", src: new URL("./pixelsort/tower1.webp", import.meta.url).href },
   City: { type: "image", src: new URL("./pixelsort/city1.webp", import.meta.url).href },
   Octopus: { type: "image", src: new URL("./pixelsort/octo.webp", import.meta.url).href },
@@ -332,7 +332,11 @@ const FRAME_PRESETS = [
   {
     name: "Pixel Stretch + Gradient Map + Dither",
     source: "Sculpt",
-    effects: ["Pixel stretch", "Gradient map", "Dither"],
+    effects: [
+      "Pixel stretch",
+      { key: "Gradient map", params: { frequency: 2, speed: 0.12 } },
+      { key: "Dither", params: { contrast: 1.5 } },
+    ],
   },
   {
     name: "Pattern Refraction",
