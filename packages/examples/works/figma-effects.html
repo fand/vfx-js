@@ -75,8 +75,8 @@
   /* Text source: a real DOM block VFX renders to a texture. */
   .frame-text{box-sizing:border-box;width:min(46vw,560px);padding:48px 44px;
     line-height:1.32;color:var(--ink);background:#fff;border-radius:4px;text-align:left;}
-  .frame-text h1{font-size:2rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px;}
-  .frame-text p{font-size:1rem;font-weight:450;color:#374151;margin-bottom:12px;}
+  .frame-text h1{font-size:4rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px;}
+  .frame-text p{font-size:2rem;font-weight:450;color:#374151;margin-bottom:12px;}
   .frame-text p:last-child{margin-bottom:0;}
   .frame [hidden]{display:none;}
 
@@ -305,8 +305,16 @@ const FRAME_PRESETS = [
   { name: "Slice Shift + Halftone", source: "City", effects: ["Slice shift", "Halftone"] },
   { name: "Pattern Refraction + Gradient Map", source: "Octopus", effects: ["Pattern refraction", "Gradient map"] },
   { name: "SliceShift on Video", source: "jellyfish (video)", effects: ["Slice shift"] },
-  { name: "Dither on Text", source: "Text", effects: ["Dither"] },
-  { name: "Gradient Map on WebCam", source: "Webcam", effects: ["Gradient map"] },
+  {
+    name: "Halftone on Text",
+    source: "Text",
+    effects: [{ key: "Halftone", params: { mode: "cmyk", gridSize: 5, blackAmount: 0 } }],
+  },
+  {
+    name: "Dither on WebCam",
+    source: "Webcam",
+    effects: [{ key: "Dither", params: { size: 5, contrast: 1.5 } }],
+  },
 ];
 
 // One editable frame: its own media element + effect stack, mounted on
@@ -352,18 +360,22 @@ class FrameView {
     this.mountChain = Promise.resolve();
   }
 
-  // Enable the preset effects and move them to the front in preset order.
-  applyPreset(keys) {
+  // Enable the preset effects (each a key or {key, params}) and move them
+  // to the front in preset order.
+  applyPreset(presets) {
+    const norm = presets.map((p) => (typeof p === "string" ? { key: p } : p));
+    const keys = norm.map((p) => p.key);
     const order = [
       ...keys,
       ...this.items.map((i) => i.key).filter((k) => !keys.includes(k)),
     ];
     this.items.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
-    for (const it of this.items) {
-      if (keys.includes(it.key)) {
-        it.active = true;
-        it.effect = EFFECTS[it.key].make();
-      }
+    for (const p of norm) {
+      const it = this.items.find((i) => i.key === p.key);
+      if (!it) continue;
+      it.active = true;
+      it.effect = EFFECTS[p.key].make();
+      if (p.params) Object.assign(it.effect.params, p.params);
     }
   }
 
