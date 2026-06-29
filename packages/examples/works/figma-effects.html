@@ -9,6 +9,9 @@
     --bg:#ffffff; --stage:#f4f4f5; --panel:#ffffff; --ink:#111111;
     --muted:#6b7280; --line:#e6e6e6; --accent:#0fd969; --accent-tint:rgba(15,217,105,.12);
     --topbar-h:52px; --side-w:220px; --footer-h:320px;
+    /* Shared frame content height: stage minus its padding, the name row,
+       and the frame padding/border. Every frame scales to fill this. */
+    --frame-h:calc(100vh - var(--topbar-h) - var(--footer-h) - 130px);
     --sans:"Inter","Figma Sans VF",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -78,20 +81,19 @@
     outline:2px solid transparent;outline-offset:3px;transition:outline-color .15s;}
   /* The frame currently driven by the sidebar/pane. */
   .frame-cell.selected .frame{outline-color:var(--accent);}
-  /* Fit within the stage: subtract stage padding (40*2), frame padding+border
-     (8*2+1*2), and the name row (label + gap ≈ 32). */
+  /* Every frame scales to the shared stage height; width follows aspect. */
   .frame img,.frame video{display:block;border-radius:4px;
-    max-width:calc(100vw - var(--side-w) - 98px);
-    max-height:calc(100vh - var(--topbar-h) - var(--footer-h) - 130px);}
+    height:var(--frame-h);width:auto;}
   /* Text source: a real DOM block VFX renders to a texture. */
-  .frame-text{box-sizing:border-box;width:min(46vw,560px);padding:48px 44px;
+  .frame-text{box-sizing:border-box;width:min(46vw,560px);height:var(--frame-h);
+    padding:48px 44px;overflow:hidden;display:flex;flex-direction:column;justify-content:center;
     line-height:1.32;color:var(--ink);background:#fff;border-radius:4px;text-align:left;}
   .frame-text h1{font-size:5rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px;}
   .frame-text p{font-size:2.5rem;font-weight:450;color:#374151;margin-bottom:12px;}
   .frame-text p:last-child{margin-bottom:0;}
   /* Webcam placeholder shown until the user starts the camera. */
   .frame-webcam{box-sizing:border-box;display:grid;place-items:center;
-    width:min(40vw,480px);height:min(50vh,360px);background:#111;border-radius:4px;}
+    width:min(40vw,480px);height:var(--frame-h);background:#111;border-radius:4px;}
   .frame-webcam-btn{padding:14px 28px;border:none;border-radius:999px;
     background:var(--accent);color:#062b16;font:inherit;font-weight:700;font-size:1rem;
     letter-spacing:.02em;cursor:pointer;}
@@ -317,8 +319,16 @@ function tpOptions(values) {
   return o;
 }
 
+// "Slice shift" -> "Slice Shift" for display labels.
+const titleCase = (s) => s.replace(/\b\w/g, (c) => c.toUpperCase());
+
 // Each gallery frame seeds its own source and a preset effect stack.
 const FRAME_PRESETS = [
+  {
+    name: "Pixel Stretch + Gradient Map + Dither",
+    source: "Sculpt",
+    effects: ["Pixel stretch", "Gradient map", "Dither"],
+  },
   { name: "Warp", source: "Tower", effects: ["Warp"] },
   { name: "Slice Shift + Halftone", source: "City", effects: ["Slice shift", "Halftone"] },
   { name: "Pattern Refraction + Gradient Map", source: "Octopus", effects: ["Pattern refraction", "Gradient map"] },
@@ -671,7 +681,7 @@ function buildEffectList() {
     btn.draggable = true;
     btn.innerHTML =
       `<span class="grip">⠿</span>` +
-      `<span class="label">${it.key}</span>` +
+      `<span class="label">${titleCase(it.key)}</span>` +
       `<span class="mark">${it.active ? "✓" : "+"}</span>`;
 
     btn.addEventListener("click", () => toggleEffect(it.uid));
