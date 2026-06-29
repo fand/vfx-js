@@ -339,9 +339,19 @@ const FRAME_PRESETS = [
       },
     ],
   },
-  { name: "Slice Shift + Halftone", source: "City", effects: ["Slice shift", "Halftone"] },
-  { name: "Pattern Refraction + Gradient Map", source: "Octopus", effects: ["Pattern refraction", "Gradient map"] },
-  { name: "SliceShift on Video", source: "jellyfish (video)", effects: ["Slice shift"] },
+  {
+    name: "Pixel Stretch",
+    source: "City",
+    effects: [{ key: "Pixel stretch", params: { reach: 1, angle: 0 } }],
+  },
+  {
+    name: "Gradient Map + Halftone on Video",
+    source: "jellyfish (video)",
+    effects: [
+      { key: "Gradient map", params: { colors: ["#ff5500", "#33ddff", "#000000"] } },
+      { key: "Halftone", params: { smoothing: 0, mode: "cmyk", blackAmount: 0 } },
+    ],
+  },
   {
     name: "Warp + Pixelate on Text",
     source: "Text",
