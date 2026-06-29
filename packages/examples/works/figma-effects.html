@@ -8,7 +8,7 @@
   :root{
     --bg:#ffffff; --stage:#f4f4f5; --panel:#ffffff; --ink:#111111;
     --muted:#6b7280; --line:#e6e6e6; --accent:#0d99ff; --accent-tint:rgba(13,153,255,.12);
-    --topbar-h:64px; --side-w:220px; --footer-h:320px;
+    --topbar-h:64px; --side-w:220px; --footer-h:320px; --tabs-h:52px;
     /* Shared frame content height: stage minus its padding, the name row,
        and the frame padding/border. Every frame scales to fill this. */
     --frame-h:calc(100vh - var(--topbar-h) - var(--footer-h) - 130px);
@@ -140,6 +140,58 @@
     font-size:.78rem;line-height:1.5;color:#e6e6e6;white-space:pre;}
   .t-com{color:#6a9955;}.t-str{color:#ce9178;}.t-kw{color:#569cd6;}
   .t-num{color:#b5cea8;}.t-cls{color:#4ec9b0;}.t-prop{color:#9cdcfe;}
+
+  /* Bottom tab bar to open the panels as sheets — narrow screens only. */
+  .mobile-tabs{display:none;}
+
+  /* Narrow screens: the three fixed panels become bottom sheets the user
+     opens one at a time; the gallery fills the rest of the screen. */
+  @media (max-width:720px){
+    .brand span{display:none;}
+    .brand .logo{height:40px;margin-top:0;}
+    .brand strong{font-size:1.05rem;}
+
+    /* Gallery takes the full area above the tab bar. */
+    .stage{left:0;right:0;bottom:var(--tabs-h);gap:20px;padding:20px;
+      scroll-snap-type:none;
+      --frame-h:calc(100vh - var(--topbar-h) - var(--tabs-h) - 80px);}
+    .frame-cell:last-child{margin-right:20px;}
+    /* Webcam needs a permission prompt; skip it on mobile. */
+    .frame-cell[data-source="Webcam"]{display:none;}
+    /* Fit each frame to one screen width; height follows aspect, capped to
+       the stage so the whole frame stays visible and vertically centered. */
+    .frame img,.frame video{height:auto;width:auto;
+      max-width:calc(100vw - 56px);max-height:var(--frame-h);}
+    .frame-text{width:calc(100vw - 56px);height:auto;max-height:var(--frame-h);
+      padding:28px 26px;}
+    .frame-text h1{font-size:2rem;margin-bottom:10px;}
+    .frame-text p{font-size:1rem;}
+    .frame-webcam{width:calc(100vw - 56px);
+      height:min(var(--frame-h),calc(100vw - 56px));}
+
+    /* Shared bottom-sheet frame: slides up from behind the tab bar. */
+    .sidebar,.pane,.footer{position:fixed;left:0;right:0;top:auto;
+      bottom:var(--tabs-h);width:auto;height:min(36vh,360px);max-height:none;
+      border:none;border-top:1px solid var(--line);border-radius:14px 14px 0 0;
+      box-shadow:0 -8px 24px rgba(0,0,0,.18);overflow:auto;z-index:10003;
+      transform:translateY(115%);transition:transform .25s ease;}
+    body.sheet-effects .sidebar{transform:none;}
+    body.sheet-controls .pane{transform:none;}
+    body.sheet-code .footer{transform:none;}
+
+    /* Bottom tab bar. */
+    .mobile-tabs{display:flex;position:fixed;left:0;right:0;bottom:0;
+      height:var(--tabs-h);z-index:10004;background:var(--panel);
+      border-top:1px solid var(--line);}
+    .mobile-tabs button{flex:1;border:none;background:none;font:inherit;
+      font-size:.8rem;font-weight:600;color:var(--muted);cursor:pointer;
+      border-top:2px solid transparent;}
+    body.sheet-effects .mobile-tabs [data-sheet="effects"],
+    body.sheet-controls .mobile-tabs [data-sheet="controls"],
+    body.sheet-code .mobile-tabs [data-sheet="code"]{
+      color:var(--accent);border-top-color:var(--accent);
+      background:var(--accent-tint);}
+  }
 </style>
 </head>
 <body>
@@ -164,6 +216,11 @@
   </div>
   <pre class="code"><code id="snippet"></code></pre>
 </footer>
+<nav class="mobile-tabs" id="mobile-tabs">
+  <button data-sheet="effects">Effects</button>
+  <button data-sheet="controls">Controls</button>
+  <button data-sheet="code">Code</button>
+</nav>
 
 <script type="module">
 import { VFX } from "@vfx-js/core";
@@ -395,6 +452,7 @@ class FrameView {
 
     this.root = document.createElement("div");
     this.root.className = "frame-cell";
+    this.root.dataset.source = cfg.source;
     const name = document.createElement("div");
     name.className = "frame-name";
     name.textContent = cfg.name;
@@ -832,6 +890,23 @@ stageEl.addEventListener("scroll", () => {
     if (best !== selected) selectFrame(best, false);
   });
 });
+
+// Mobile: each tab opens its panel as a bottom sheet; tapping the open
+// tab or the gallery closes it. Only one sheet is open at a time.
+const SHEET_CLASS = { effects: "sheet-effects", controls: "sheet-controls", code: "sheet-code" };
+function openSheet(name) {
+  const cls = SHEET_CLASS[name];
+  const isOpen = document.body.classList.contains(cls);
+  document.body.classList.remove(...Object.values(SHEET_CLASS));
+  if (!isOpen && cls) document.body.classList.add(cls);
+}
+document.getElementById("mobile-tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-sheet]");
+  if (btn) openSheet(btn.dataset.sheet);
+});
+stageEl.addEventListener("pointerdown", () =>
+  document.body.classList.remove(...Object.values(SHEET_CLASS)),
+);
 
 // Dropping in the sidebar's empty area (below the list) moves to the end.
 const sidebarEl = document.getElementById("sidebar");
