@@ -1184,7 +1184,6 @@ const WARP_TYPES: WarpType[] = [
     "ripple",
     "flag",
     "squeeze",
-    "swirl",
 ];
 type WarpArgs = {
     type: WarpType;
@@ -1197,7 +1196,7 @@ type WarpArgs = {
 export const warp = presetStory<WarpArgs>(
     (a) => new WarpEffect(a),
     {
-        type: "swirl",
+        type: "twist",
         amplitude: 3,
         frequency: 1,
         centerX: 0.5,

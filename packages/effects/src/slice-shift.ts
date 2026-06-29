@@ -1,5 +1,5 @@
-// Slices the image into parallel bands and shifts each band along its
-// length. Ported from Figma's "Slice shift" shader effect.
+// Splits the image into fixed-size strips around the center and shifts each
+// strip's sample toward the center. Ported from Figma's "Slice shift" effect.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 import type { Effect, EffectContext } from "@vfx-js/core";
 import { GLSL_COMMON } from "./_figma-common";
@@ -11,73 +11,57 @@ out vec4 outColor;
 uniform sampler2D src;
 uniform vec4 srcRectUv;
 uniform vec2 center;
+uniform vec2 resolution;
 uniform float angle;
-uniform float sliceCount;
+uniform float size;
 uniform float shift;
-uniform float softness;
 uniform float random;
 ${GLSL_COMMON}
 
 vec4 readTex(vec2 c) {
-    if (c.x < 0.0 || c.x > 1.0 || c.y < 0.0 || c.y > 1.0) return vec4(0.0);
-    return texture(src, srcRectUv.xy + c * srcRectUv.zw);
+    return texture(src, srcRectUv.xy + fract(c) * srcRectUv.zw);
 }
 
-// Per-slice horizontal offset. random = 0 alternates the sign by slice
-// (a clean interlaced tear); random = 1 picks a per-slice random offset.
-float sliceOffset(float idx) {
-    float alt = mod(idx, 2.0) < 1.0 ? 1.0 : -1.0;
-    float rnd = hash11(idx) * 2.0 - 1.0;
-    return shift * mix(alt, rnd, random);
+// Per-strip sample offset, in strip-size units, along the division axis.
+// Strip n samples toward the center strip by n * shift, so shift = 1 makes
+// every strip show the center strip. random adds a per-strip jitter.
+float stripShift(float n) {
+    float jitter = (hash11(n) * 2.0 - 1.0) * random;
+    return n * shift + jitter;
 }
 
 void main(void) {
-    vec2 p = uvContent - center;
-    vec2 pr = rot2d(-radians(angle)) * p;
+    // Division axis in element-pixel space; strips stack along it.
+    vec2 dir = vec2(cos(radians(angle)), sin(radians(angle)));
+    float t = dot((uvContent - center) * resolution, dir);
+    float n = floor(t / size + 0.5);
 
-    float s = pr.y * sliceCount;
-    float idx = floor(s);
-    float f = fract(s);
-
-    float off = sliceOffset(idx);
-    if (softness > 0.0) {
-        // Blend toward the neighbouring slice across the band boundary.
-        float wNext = smoothstep(1.0 - softness, 1.0, f);
-        float wPrev = smoothstep(softness, 0.0, f);
-        off = mix(off, sliceOffset(idx + 1.0), wNext);
-        off = mix(off, sliceOffset(idx - 1.0), wPrev);
-    }
-
-    pr.x += off;
-    vec2 uv = rot2d(radians(angle)) * pr + center;
+    vec2 uv = uvContent - stripShift(n) * size * dir / resolution;
     outColor = readTex(uv);
 }
 `;
 
 export type SliceShiftParams = {
-    /** Band shift amount, as a fraction of the element (0.5 = half width). */
+    /** Per-strip shift toward the center, in strip-size units. 1 = every strip shows the center strip. */
     shift: number;
-    /** Soft blend across band boundaries, in [0, 1]. */
-    softness: number;
-    /** Randomize per-band offset, in [0, 1]. 0 = alternating, 1 = random. */
+    /** Per-strip random shift, in [0, 1]. */
     random: number;
     /** Effect center X, in [0, 1]. */
     centerX: number;
     /** Effect center Y, in [0, 1]. */
     centerY: number;
-    /** Number of bands. */
-    sliceCount: number;
-    /** Band orientation, in degrees. 0 = horizontal bands. */
+    /** Strip size in pixels. */
+    size: number;
+    /** Strip orientation, in degrees. 0 = strips stack horizontally. */
     angle: number;
 };
 
 const DEFAULT_PARAMS: SliceShiftParams = {
     shift: 0.5,
-    softness: 0,
     random: 0,
     centerX: 0.5,
     centerY: 0.5,
-    sliceCount: 100,
+    size: 100,
     angle: 0,
 };
 
@@ -94,15 +78,16 @@ export class SliceShiftEffect implements Effect {
 
     render(ctx: EffectContext): void {
         const p = this.params;
+        const [w, h] = ctx.dims.element;
         ctx.draw({
             frag: FRAG_SLICE_SHIFT,
             uniforms: {
                 src: ctx.src,
                 center: [p.centerX, p.centerY],
+                resolution: [w || 1, h || 1],
                 angle: p.angle,
-                sliceCount: Math.max(1, p.sliceCount),
+                size: Math.max(1, p.size),
                 shift: p.shift,
-                softness: Math.min(1, Math.max(0, p.softness)),
                 random: Math.min(1, Math.max(0, p.random)),
             },
             target: ctx.target,

@@ -154,8 +154,8 @@ const EFFECTS = {
   Warp: {
     make: () => new WarpEffect(),
     controls: {
-      type: { options: ["sine", "twist", "bulge", "pinch", "ripple", "flag", "squeeze", "swirl"] },
-      amplitude: slider(-10, 10, 0.1),
+      type: { options: ["sine", "twist", "bulge", "pinch", "ripple", "flag", "squeeze"] },
+      amplitude: slider(-20, 20, 0.1),
       frequency: slider(0.1, 10, 0.1),
       centerX: slider(0, 1, 0.01),
       centerY: slider(0, 1, 0.01),
@@ -165,12 +165,11 @@ const EFFECTS = {
   "Slice shift": {
     make: () => new SliceShiftEffect(),
     controls: {
-      shift: slider(-1, 1, 0.01),
-      softness: slider(0, 1, 0.01),
+      shift: slider(-2, 2, 0.01),
       random: slider(0, 1, 0.01),
       centerX: slider(0, 1, 0.01),
       centerY: slider(0, 1, 0.01),
-      sliceCount: slider(1, 300, 1),
+      size: slider(4, 400, 1),
       angle: slider(-180, 180, 1),
     },
   },

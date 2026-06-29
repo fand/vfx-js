@@ -13,6 +13,7 @@ out vec4 outColor;
 uniform sampler2D src;
 uniform vec4 srcRectUv;
 uniform vec2 center;
+uniform vec2 resolution;
 uniform int mode;
 uniform float amp;
 uniform float freq;
@@ -20,7 +21,7 @@ uniform float time;
 ${GLSL_COMMON}
 
 vec4 readTex(vec2 c) {
-    if (c.x < 0.0 || c.x > 1.0 || c.y < 0.0 || c.y > 1.0) return vec4(0.0);
+    c = clamp(c, 0.0, 1.0);
     return texture(src, srcRectUv.xy + c * srcRectUv.zw);
 }
 
@@ -31,12 +32,17 @@ void main(void) {
     vec2 dir = r > 1e-5 ? p / r : vec2(0.0);
 
     if (mode == 0) {
-        // Sine wave: independent ripples on each axis.
-        uv.x += sin(uv.y * freq * TAU + time) * amp * 0.05;
-        uv.y += sin(uv.x * freq * TAU + time) * amp * 0.05;
+        // Sine wave: ripples per axis, centered so both diagonals stay straight.
+        uv.x -= sin(p.y * freq * TAU + time) * amp * 0.05;
+        uv.y -= sin(p.x * freq * TAU + time) * amp * 0.05;
     } else if (mode == 1) {
-        // Twist: rotation growing linearly with radius.
-        uv = rot2d(amp * 0.5 * r) * p + center;
+        // Twist: swirl that rotates most at the center and unwinds to the edge.
+        // aspect scale keeps the field circular and contained in the element.
+        vec2 s = resolution / max(resolution.x, resolution.y);
+        vec2 tp = (uv - center) * 2.0 * s;
+        float t = length(tp) / 1.41421356;
+        tp = rot2d(amp * freq * (1.0 - t)) * tp;
+        uv = tp / s * 0.5 + center;
     } else if (mode == 2) {
         // Bulge: magnify the center.
         uv = center + dir * pow(r, 1.0 - amp * 0.2);
@@ -44,8 +50,9 @@ void main(void) {
         // Pinch: pull toward the center.
         uv = center + dir * pow(r, 1.0 + amp * 0.2);
     } else if (mode == 4) {
-        // Ripple: radial sine pushing along the radius.
-        uv += dir * sin(r * freq * TAU - time) * amp * 0.03;
+        // Ripple: scale the radius by a cosine of the distance from center.
+        p *= 1.0 - cos((r-.5) * freq * 10.0 + time) * amp * 0.2;
+        uv = p + center;
     } else if (mode == 5) {
         // Flag: horizontal wave whose amplitude grows toward the right.
         uv.y += sin(uv.x * freq * TAU + time) * amp * 0.05 * uv.x;
@@ -53,9 +60,6 @@ void main(void) {
         // Squeeze: anisotropic horizontal compression around the center.
         p.x *= 1.0 + amp * 0.2 * (1.0 - abs(p.y) * 2.0);
         uv = p + center;
-    } else if (mode == 7) {
-        // Swirl: rotation that decays away from the center (a whirlpool).
-        uv = rot2d(amp * 0.6 * exp(-r * 4.0)) * p + center;
     }
 
     outColor = readTex(uv);
@@ -69,8 +73,7 @@ export type WarpType =
     | "pinch"
     | "ripple"
     | "flag"
-    | "squeeze"
-    | "swirl";
+    | "squeeze";
 
 const WARP_MODES: Record<WarpType, number> = {
     sine: 0,
@@ -80,7 +83,6 @@ const WARP_MODES: Record<WarpType, number> = {
     ripple: 4,
     flag: 5,
     squeeze: 6,
-    swirl: 7,
 };
 
 export type WarpParams = {
@@ -99,7 +101,7 @@ export type WarpParams = {
 };
 
 const DEFAULT_PARAMS: WarpParams = {
-    type: "swirl",
+    type: "twist",
     amplitude: 3,
     frequency: 1,
     centerX: 0.5,
@@ -125,6 +127,10 @@ export class WarpEffect implements Effect {
             uniforms: {
                 src: ctx.src,
                 center: [p.centerX, p.centerY],
+                resolution: [
+                    ctx.dims.element[0] || 1,
+                    ctx.dims.element[1] || 1,
+                ],
                 mode: WARP_MODES[p.type] ?? 0,
                 amp: p.amplitude,
                 freq: p.frequency,
