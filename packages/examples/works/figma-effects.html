@@ -72,6 +72,12 @@
   .frame img,.frame video{display:block;border-radius:4px;
     max-width:calc(100vw - var(--side-w) - 98px);
     max-height:calc(100vh - var(--topbar-h) - var(--footer-h) - 130px);}
+  /* Text source: a real DOM block VFX renders to a texture. */
+  .frame-text{box-sizing:border-box;width:min(46vw,560px);padding:48px 44px;
+    line-height:1.32;color:var(--ink);background:#fff;border-radius:4px;text-align:left;}
+  .frame-text h1{font-size:2rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px;}
+  .frame-text p{font-size:1rem;font-weight:450;color:#374151;margin-bottom:12px;}
+  .frame-text p:last-child{margin-bottom:0;}
   .frame [hidden]{display:none;}
 
   .pane{position:fixed;top:calc(var(--topbar-h) + 16px);right:16px;width:300px;z-index:10000;
@@ -156,6 +162,12 @@ const MEDIA = {
   Octopus: { type: "image", src: new URL("./pixelsort/octo.webp", import.meta.url).href },
   Debug: { type: "image", src: new URL("./debug.png", import.meta.url).href },
   "jellyfish (video)": { type: "video", src: new URL("./jellyfish.mp4", import.meta.url).href },
+  Text: {
+    type: "text",
+    html: `<h1>Effects on Text</h1>
+<p>VFX-JS applies WebGL shaders straight to live HTML — text included.</p>
+<p>The element keeps flowing and stays selectable; the effect renders on top.</p>`,
+  },
   Webcam: { type: "webcam" },
 };
 
@@ -292,6 +304,9 @@ const FRAME_PRESETS = [
   { name: "Warp", source: "Tower", effects: ["Warp"] },
   { name: "Slice Shift + Halftone", source: "City", effects: ["Slice shift", "Halftone"] },
   { name: "Pattern Refraction + Gradient Map", source: "Octopus", effects: ["Pattern refraction", "Gradient map"] },
+  { name: "SliceShift on Video", source: "jellyfish (video)", effects: ["Slice shift"] },
+  { name: "Dither on Text", source: "Text", effects: ["Dither"] },
+  { name: "Gradient Map on WebCam", source: "Webcam", effects: ["Gradient map"] },
 ];
 
 // One editable frame: its own media element + effect stack, mounted on
@@ -324,7 +339,10 @@ class FrameView {
     this.video.loop = true;
     this.video.playsInline = true;
     this.video.hidden = true;
-    frame.append(this.img, this.video);
+    this.text = document.createElement("div");
+    this.text.className = "frame-text";
+    this.text.hidden = true;
+    frame.append(this.img, this.video, this.text);
     this.root.append(name, frame);
     this.root.addEventListener("click", () => selectFrame(this.index, true));
 
@@ -360,11 +378,12 @@ class FrameView {
     }
   }
 
-  // Show <img>, hide <video>, and load an image source.
+  // Show <img>, hide the rest, and load an image source.
   loadImage(src) {
     this.stopWebcam();
     this.video.hidden = true;
     this.video.removeAttribute("src");
+    this.text.hidden = true;
     this.img.hidden = false;
     this.activeEl = this.img;
     return new Promise((resolve) => {
@@ -373,9 +392,22 @@ class FrameView {
     });
   }
 
-  // Show <video>, hide <img>, and play a file or the webcam stream.
+  // Show the text block, hide the rest.
+  loadText(html) {
+    this.stopWebcam();
+    this.img.hidden = true;
+    this.video.hidden = true;
+    this.video.removeAttribute("src");
+    this.text.innerHTML = html;
+    this.text.hidden = false;
+    this.activeEl = this.text;
+    return Promise.resolve();
+  }
+
+  // Show <video>, hide the rest, and play a file or the webcam stream.
   async loadVideo(srcOrStream, isStream) {
     this.img.hidden = true;
+    this.text.hidden = true;
     this.video.hidden = false;
     this.activeEl = this.video;
     if (isStream) {
@@ -400,6 +432,8 @@ class FrameView {
     this.source = name;
     if (m.type === "image") {
       await this.loadImage(m.src);
+    } else if (m.type === "text") {
+      await this.loadText(m.html);
     } else if (m.type === "video") {
       await this.loadVideo(m.src, false);
     } else if (m.type === "webcam") {
@@ -726,7 +760,13 @@ copyBtn.addEventListener("click", async () => {
 // Build the gallery, load each source, mount each preset, then select frame 1.
 frames = FRAME_PRESETS.map((cfg, i) => new FrameView(cfg, i));
 for (const f of frames) stageEl.appendChild(f.root);
-await Promise.all(frames.map((f) => f.loadSource(f.source)));
+await Promise.all(
+  frames.map((f) =>
+    f.loadSource(f.source).catch((err) =>
+      console.error(`Failed to load source "${f.source}":`, err),
+    ),
+  ),
+);
 await Promise.all(frames.map((f) => f.mount()));
 frames[0].root.classList.add("selected");
 refreshControls();
