@@ -75,9 +75,16 @@
   /* Text source: a real DOM block VFX renders to a texture. */
   .frame-text{box-sizing:border-box;width:min(46vw,560px);padding:48px 44px;
     line-height:1.32;color:var(--ink);background:#fff;border-radius:4px;text-align:left;}
-  .frame-text h1{font-size:4rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px;}
-  .frame-text p{font-size:2rem;font-weight:450;color:#374151;margin-bottom:12px;}
+  .frame-text h1{font-size:5rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px;}
+  .frame-text p{font-size:2.5rem;font-weight:450;color:#374151;margin-bottom:12px;}
   .frame-text p:last-child{margin-bottom:0;}
+  /* Webcam placeholder shown until the user starts the camera. */
+  .frame-webcam{box-sizing:border-box;display:grid;place-items:center;
+    width:min(40vw,480px);height:min(50vh,360px);background:#111;border-radius:4px;}
+  .frame-webcam-btn{padding:14px 28px;border:none;border-radius:999px;
+    background:var(--accent);color:#062b16;font:inherit;font-weight:700;font-size:1rem;
+    letter-spacing:.02em;cursor:pointer;}
+  .frame-webcam-btn:hover{filter:brightness(1.05);}
   .frame [hidden]{display:none;}
 
   .pane{position:fixed;top:calc(var(--topbar-h) + 16px);right:16px;width:300px;z-index:10000;
@@ -165,8 +172,7 @@ const MEDIA = {
   Text: {
     type: "text",
     html: `<h1>Effects on Text</h1>
-<p>VFX-JS applies WebGL shaders straight to live HTML — text included.</p>
-<p>The element keeps flowing and stays selectable; the effect renders on top.</p>`,
+<p>VFX-JS applies WebGL shaders straight to live HTML — text included.</p>`,
   },
   Webcam: { type: "webcam" },
 };
@@ -306,9 +312,12 @@ const FRAME_PRESETS = [
   { name: "Pattern Refraction + Gradient Map", source: "Octopus", effects: ["Pattern refraction", "Gradient map"] },
   { name: "SliceShift on Video", source: "jellyfish (video)", effects: ["Slice shift"] },
   {
-    name: "Halftone on Text",
+    name: "Warp + Pixelate on Text",
     source: "Text",
-    effects: [{ key: "Halftone", params: { mode: "cmyk", gridSize: 5, blackAmount: 0 } }],
+    effects: [
+      { key: "Warp", params: { type: "ripple", amplitude: 0.5, speed: 2.5 } },
+      { key: "Pixelate", params: { shape: "hexagon", size: 8 } },
+    ],
   },
   {
     name: "Dither on WebCam",
@@ -350,7 +359,18 @@ class FrameView {
     this.text = document.createElement("div");
     this.text.className = "frame-text";
     this.text.hidden = true;
-    frame.append(this.img, this.video, this.text);
+    this.webcam = document.createElement("div");
+    this.webcam.className = "frame-webcam";
+    this.webcam.hidden = true;
+    const startBtn = document.createElement("button");
+    startBtn.className = "frame-webcam-btn";
+    startBtn.textContent = "Start WebCam";
+    startBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.startWebcam();
+    });
+    this.webcam.appendChild(startBtn);
+    frame.append(this.img, this.video, this.text, this.webcam);
     this.root.append(name, frame);
     this.root.addEventListener("click", () => selectFrame(this.index, true));
 
@@ -396,6 +416,7 @@ class FrameView {
     this.video.hidden = true;
     this.video.removeAttribute("src");
     this.text.hidden = true;
+    this.webcam.hidden = true;
     this.img.hidden = false;
     this.activeEl = this.img;
     return new Promise((resolve) => {
@@ -410,16 +431,41 @@ class FrameView {
     this.img.hidden = true;
     this.video.hidden = true;
     this.video.removeAttribute("src");
+    this.webcam.hidden = true;
     this.text.innerHTML = html;
     this.text.hidden = false;
     this.activeEl = this.text;
     return Promise.resolve();
   }
 
+  // Show the Start WebCam button; nothing renders until the user clicks it.
+  showWebcam() {
+    this.stopWebcam();
+    this.img.hidden = true;
+    this.video.hidden = true;
+    this.text.hidden = true;
+    this.webcam.hidden = false;
+    this.activeEl = null;
+    return Promise.resolve();
+  }
+
+  // Ask for the camera, then play it as this frame's source.
+  async startWebcam() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      this.webcamStream = stream;
+      await this.loadVideo(stream, true);
+      await this.mount();
+    } catch (err) {
+      console.error("Webcam failed:", err);
+    }
+  }
+
   // Show <video>, hide the rest, and play a file or the webcam stream.
   async loadVideo(srcOrStream, isStream) {
     this.img.hidden = true;
     this.text.hidden = true;
+    this.webcam.hidden = true;
     this.video.hidden = false;
     this.activeEl = this.video;
     if (isStream) {
@@ -449,9 +495,7 @@ class FrameView {
     } else if (m.type === "video") {
       await this.loadVideo(m.src, false);
     } else if (m.type === "webcam") {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      this.webcamStream = stream;
-      await this.loadVideo(stream, true);
+      await this.showWebcam();
     }
   }
 
@@ -467,7 +511,7 @@ class FrameView {
       this.addedEl = null;
     }
     const active = this.activeItems();
-    if (active.length > 0) {
+    if (active.length > 0 && this.activeEl) {
       await vfx.add(this.activeEl, { effect: active.map((s) => s.effect) });
       this.addedEl = this.activeEl;
     }
