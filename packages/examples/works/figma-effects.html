@@ -51,11 +51,27 @@
   .side-btn.drop-before::after{top:-5px;}
   .side-btn.drop-after::after{bottom:-5px;}
 
+  /* Horizontal gallery: frames scroll left/right and snap to center. */
   .stage{position:fixed;top:var(--topbar-h);left:var(--side-w);right:0;bottom:var(--footer-h);
-    display:grid;place-items:center;padding:40px 40px 40px 40px;background:var(--stage);}
-  .frame{background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px;
-    line-height:0;}
-  .frame img,.frame video{display:block;max-width:62vw;max-height:78vh;border-radius:4px;}
+    display:flex;align-items:center;gap:40px;overflow-x:auto;overflow-y:hidden;
+    padding:40px;background:var(--stage);scroll-snap-type:x mandatory;scroll-padding-inline:40px;}
+  /* One gallery cell: a name label above its frame. */
+  .frame-cell{flex:0 0 auto;scroll-snap-align:center;cursor:pointer;
+    display:flex;flex-direction:column;align-items:flex-start;gap:10px;}
+  /* Trailing room so the last frame can scroll out from under the pane (300 + 16). */
+  .frame-cell:last-child{margin-right:316px;}
+  .frame-name{font-size:.82rem;font-weight:600;letter-spacing:.02em;color:var(--muted);
+    white-space:nowrap;transition:color .15s;}
+  .frame-cell.selected .frame-name{color:var(--ink);}
+  .frame{background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px;line-height:0;
+    outline:2px solid transparent;outline-offset:3px;transition:outline-color .15s;}
+  /* The frame currently driven by the sidebar/pane. */
+  .frame-cell.selected .frame{outline-color:var(--accent);}
+  /* Fit within the stage: subtract stage padding (40*2), frame padding+border
+     (8*2+1*2), and the name row (label + gap ≈ 32). */
+  .frame img,.frame video{display:block;border-radius:4px;
+    max-width:calc(100vw - var(--side-w) - 98px);
+    max-height:calc(100vh - var(--topbar-h) - var(--footer-h) - 130px);}
   .frame [hidden]{display:none;}
 
   .pane{position:fixed;top:calc(var(--topbar-h) + 16px);right:16px;width:300px;z-index:10000;
@@ -106,10 +122,7 @@
   <div class="side-title">Effects · click to toggle, drag to sort</div>
   <div id="effect-list"></div>
 </aside>
-<main class="stage"><div class="frame">
-  <img id="target" alt="effect target">
-  <video id="targetVideo" muted loop playsinline hidden></video>
-</div></main>
+<main class="stage" id="stage"></main>
 <div class="pane" id="pane"></div>
 <footer class="footer">
   <div class="footer-head">
@@ -264,26 +277,7 @@ const EFFECTS = {
   },
 };
 
-const img = document.getElementById("target");
-const video = document.getElementById("targetVideo");
 const vfx = new VFX();
-
-const state = { Source: "Tower" };
-// All effects as an ordered list. `active` toggles inclusion; the list
-// order is the apply order (last = on top). Instances are lazy.
-const items = Object.keys(EFFECTS).map((key, i) => ({
-  key,
-  uid: i + 1,
-  active: false,
-  effect: null,
-}));
-const activeItems = () => items.filter((it) => it.active);
-// The element currently registered with VFX (img or video), or null.
-let addedEl = null;
-// The element the next mount should use.
-let activeEl = img;
-let webcamStream = null;
-let pane = null;
 
 // Tweakpane turns a string key like "edgeWrap" into "Edge wrap"; a list
 // option label maps to itself.
@@ -293,58 +287,144 @@ function tpOptions(values) {
   return o;
 }
 
-function stopWebcam() {
-  if (webcamStream) {
-    for (const t of webcamStream.getTracks()) t.stop();
-    webcamStream = null;
+// Each gallery frame seeds its own source and a preset effect stack.
+const FRAME_PRESETS = [
+  { name: "Warp", source: "Tower", effects: ["Warp"] },
+  { name: "Slice Shift + Halftone", source: "City", effects: ["Slice shift", "Halftone"] },
+  { name: "Pattern Refraction + Gradient Map", source: "Octopus", effects: ["Pattern refraction", "Gradient map"] },
+];
+
+// One editable frame: its own media element + effect stack, mounted on
+// the shared VFX instance. The selected frame drives the sidebar/pane.
+class FrameView {
+  constructor(cfg, index) {
+    this.index = index;
+    this.source = cfg.source;
+    // Per-frame effect stack. `active` toggles inclusion; list order is
+    // the apply order (last = on top). Instances are lazy.
+    this.items = Object.keys(EFFECTS).map((key, i) => ({
+      key,
+      uid: i + 1,
+      active: false,
+      effect: null,
+    }));
+    this.applyPreset(cfg.effects);
+
+    this.root = document.createElement("div");
+    this.root.className = "frame-cell";
+    const name = document.createElement("div");
+    name.className = "frame-name";
+    name.textContent = cfg.name;
+    const frame = document.createElement("div");
+    frame.className = "frame";
+    this.img = document.createElement("img");
+    this.img.alt = "effect target";
+    this.video = document.createElement("video");
+    this.video.muted = true;
+    this.video.loop = true;
+    this.video.playsInline = true;
+    this.video.hidden = true;
+    frame.append(this.img, this.video);
+    this.root.append(name, frame);
+    this.root.addEventListener("click", () => selectFrame(this.index, true));
+
+    this.activeEl = this.img; // element the next mount uses
+    this.addedEl = null; // element currently registered with VFX
+    this.webcamStream = null;
+    this.mountChain = Promise.resolve();
   }
-}
 
-// Show <img>, hide <video>, and load an image source.
-function loadImage(src) {
-  stopWebcam();
-  video.hidden = true;
-  video.removeAttribute("src");
-  img.hidden = false;
-  activeEl = img;
-  return new Promise((resolve) => {
-    img.onload = () => resolve();
-    img.src = src;
-  });
-}
-
-// Show <video>, hide <img>, and play a file or the webcam stream.
-async function loadVideo(srcOrStream, isStream) {
-  img.hidden = true;
-  video.hidden = false;
-  activeEl = video;
-  if (isStream) {
-    video.srcObject = srcOrStream;
-    video.removeAttribute("src");
-  } else {
-    stopWebcam();
-    video.srcObject = null;
-    video.src = srcOrStream;
+  // Enable the preset effects and move them to the front in preset order.
+  applyPreset(keys) {
+    const order = [
+      ...keys,
+      ...this.items.map((i) => i.key).filter((k) => !keys.includes(k)),
+    ];
+    this.items.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+    for (const it of this.items) {
+      if (keys.includes(it.key)) {
+        it.active = true;
+        it.effect = EFFECTS[it.key].make();
+      }
+    }
   }
-  await new Promise((resolve) => {
-    video.onloadeddata = () => resolve();
-    video.load();
-  });
-  await video.play().catch(() => {});
-}
 
-// Load a named source from MEDIA (image / video / webcam).
-async function loadSource(name) {
-  const m = MEDIA[name];
-  if (!m) return;
-  if (m.type === "image") {
-    await loadImage(m.src);
-  } else if (m.type === "video") {
-    await loadVideo(m.src, false);
-  } else if (m.type === "webcam") {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    webcamStream = stream;
-    await loadVideo(stream, true);
+  activeItems() {
+    return this.items.filter((it) => it.active);
+  }
+
+  stopWebcam() {
+    if (this.webcamStream) {
+      for (const t of this.webcamStream.getTracks()) t.stop();
+      this.webcamStream = null;
+    }
+  }
+
+  // Show <img>, hide <video>, and load an image source.
+  loadImage(src) {
+    this.stopWebcam();
+    this.video.hidden = true;
+    this.video.removeAttribute("src");
+    this.img.hidden = false;
+    this.activeEl = this.img;
+    return new Promise((resolve) => {
+      this.img.onload = () => resolve();
+      this.img.src = src;
+    });
+  }
+
+  // Show <video>, hide <img>, and play a file or the webcam stream.
+  async loadVideo(srcOrStream, isStream) {
+    this.img.hidden = true;
+    this.video.hidden = false;
+    this.activeEl = this.video;
+    if (isStream) {
+      this.video.srcObject = srcOrStream;
+      this.video.removeAttribute("src");
+    } else {
+      this.stopWebcam();
+      this.video.srcObject = null;
+      this.video.src = srcOrStream;
+    }
+    await new Promise((resolve) => {
+      this.video.onloadeddata = () => resolve();
+      this.video.load();
+    });
+    await this.video.play().catch(() => {});
+  }
+
+  // Load a named source from MEDIA (image / video / webcam).
+  async loadSource(name) {
+    const m = MEDIA[name];
+    if (!m) return;
+    this.source = name;
+    if (m.type === "image") {
+      await this.loadImage(m.src);
+    } else if (m.type === "video") {
+      await this.loadVideo(m.src, false);
+    } else if (m.type === "webcam") {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      this.webcamStream = stream;
+      await this.loadVideo(stream, true);
+    }
+  }
+
+  // Rebuild this frame's VFX pipeline. Serialized: a remove + re-add must
+  // finish before the next runs, or VFX rejects the re-attached instances.
+  mount() {
+    this.mountChain = this.mountChain.then(() => this.doMount());
+    return this.mountChain;
+  }
+  async doMount() {
+    if (this.addedEl) {
+      vfx.remove(this.addedEl);
+      this.addedEl = null;
+    }
+    const active = this.activeItems();
+    if (active.length > 0) {
+      await vfx.add(this.activeEl, { effect: active.map((s) => s.effect) });
+      this.addedEl = this.activeEl;
+    }
   }
 }
 
@@ -361,23 +441,25 @@ function bindControl(folder, params, key, cfg) {
 
 function buildPane() {
   pane?.dispose();
-  pane = new Pane({ container: document.getElementById("pane"), title: "Parameters" });
+  pane = new Pane({ container: document.getElementById("pane"), title: `Frame ${selected + 1}` });
+  const frame = cur();
 
-  pane.addBinding(state, "Source", { options: tpOptions(Object.keys(MEDIA)) })
+  const srcProxy = { Source: frame.source };
+  pane.addBinding(srcProxy, "Source", { options: tpOptions(Object.keys(MEDIA)) })
     .on("change", async (ev) => {
       try {
-        await loadSource(ev.value);
+        await frame.loadSource(ev.value);
       } catch (err) {
         console.error("Failed to load source:", err);
       }
-      await mount();
+      await frame.mount();
     });
   pane.addButton({ title: "Upload image…" }).on("click", () => fileInput.click());
   pane.addBlade({ view: "separator" });
 
   // One folder of params per applied effect (order/remove live in the
   // sidebar stack list).
-  activeItems().forEach((entry, i) => {
+  frame.activeItems().forEach((entry, i) => {
     const def = EFFECTS[entry.key];
     const folder = pane.addFolder({ title: `${i + 1} · ${entry.key}`, expanded: true });
     if (def.colorStops) bindGradientStops(folder, entry.effect, def.colorStops);
@@ -410,7 +492,7 @@ function changedParams(effect) {
 
 // Build a copy-pasteable VFX-JS snippet from the active stack.
 function genSnippet() {
-  const active = activeItems();
+  const active = cur().activeItems();
   if (active.length === 0) return "// Enable an effect to generate code.";
   const names = [...new Set(active.map((s) => s.effect.constructor.name))];
   const lines = active.map((s) => {
@@ -476,12 +558,12 @@ function bindGradientStops(folder, effect, n) {
   }
 }
 
-// The sidebar effect list: every effect as a toggle, in apply order,
-// draggable to reorder. Active items show their position number.
+// The sidebar effect list: the selected frame's effects as toggles, in
+// apply order, draggable to reorder. Active items show their position.
 let dragUid = null;
 function buildEffectList() {
   listEl.innerHTML = "";
-  for (const it of items) {
+  for (const it of cur().items) {
     const btn = document.createElement("div");
     btn.className = "side-btn" + (it.active ? " active" : "");
     btn.draggable = true;
@@ -521,59 +603,88 @@ function buildEffectList() {
 
 // Enable/disable an effect (instance kept so params persist on re-toggle).
 function toggleEffect(uid) {
-  const it = items.find((i) => i.uid === uid);
+  const it = cur().items.find((i) => i.uid === uid);
   if (!it) return;
   it.active = !it.active;
   if (it.active && !it.effect) it.effect = EFFECTS[it.key].make();
-  mount();
+  cur().mount();
+  refreshControls();
 }
 
 // Move the dragged effect to just before/after the drop target.
 function reorderEffect(fromUid, toUid, after) {
   if (fromUid == null || fromUid === toUid) return;
-  const from = items.findIndex((i) => i.uid === fromUid);
+  const list = cur().items;
+  const from = list.findIndex((i) => i.uid === fromUid);
   if (from < 0) return;
-  const [moved] = items.splice(from, 1);
-  let to = items.findIndex((i) => i.uid === toUid);
+  const [moved] = list.splice(from, 1);
+  let to = list.findIndex((i) => i.uid === toUid);
   if (after) to += 1;
-  items.splice(to, 0, moved);
-  mount();
+  list.splice(to, 0, moved);
+  cur().mount();
+  refreshControls();
 }
 
 // Move the dragged effect to the end (drop in the empty area below).
 function moveToEnd(uid) {
   if (uid == null) return;
-  const from = items.findIndex((i) => i.uid === uid);
-  if (from < 0 || from === items.length - 1) return;
-  const [moved] = items.splice(from, 1);
-  items.push(moved);
-  mount();
+  const list = cur().items;
+  const from = list.findIndex((i) => i.uid === uid);
+  if (from < 0 || from === list.length - 1) return;
+  const [moved] = list.splice(from, 1);
+  list.push(moved);
+  cur().mount();
+  refreshControls();
 }
 
-// Rebuild the VFX pipeline from the current stack, then the pane.
-// Serialized: a remove + re-add must finish before the next runs, or VFX
-// rejects the re-attached effect instances ("already attached").
-let mountChain = Promise.resolve();
-function mount() {
-  mountChain = mountChain.then(doMount);
-  return mountChain;
-}
-async function doMount() {
-  if (addedEl) {
-    vfx.remove(addedEl);
-    addedEl = null;
-  }
-  const active = activeItems();
-  if (active.length > 0) {
-    await vfx.add(activeEl, { effect: active.map((s) => s.effect) });
-    addedEl = activeEl;
-  }
+// Gallery frames and the one currently being edited.
+let frames = [];
+let selected = 0;
+let pane = null;
+const cur = () => frames[selected];
+
+// Rebuild the sidebar, pane, and snippet for the selected frame.
+function refreshControls() {
   buildEffectList();
   buildPane();
   updateSnippet();
 }
 
+// Make frame `i` the edit target; optionally scroll it into view.
+function selectFrame(i, doScroll) {
+  if (i < 0 || i >= frames.length) return;
+  const changed = i !== selected;
+  selected = i;
+  frames.forEach((f, idx) => f.root.classList.toggle("selected", idx === selected));
+  if (doScroll) {
+    cur().root.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }
+  if (changed) refreshControls();
+}
+
 const listEl = document.getElementById("effect-list");
+const stageEl = document.getElementById("stage");
+
+// Scrolling the stage selects whichever frame is nearest the center.
+let scrollRaf = 0;
+stageEl.addEventListener("scroll", () => {
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0;
+    const mid = stageEl.scrollLeft + stageEl.clientWidth / 2;
+    let best = 0;
+    let bestD = Infinity;
+    frames.forEach((f, idx) => {
+      const c = f.root.offsetLeft + f.root.offsetWidth / 2;
+      const d = Math.abs(c - mid);
+      if (d < bestD) {
+        bestD = d;
+        best = idx;
+      }
+    });
+    if (best !== selected) selectFrame(best, false);
+  });
+});
 
 // Dropping in the sidebar's empty area (below the list) moves to the end.
 const sidebarEl = document.getElementById("sidebar");
@@ -601,8 +712,8 @@ document.body.appendChild(fileInput);
 fileInput.addEventListener("change", async () => {
   const f = fileInput.files?.[0];
   if (!f) return;
-  await loadImage(URL.createObjectURL(f));
-  await mount();
+  await cur().loadImage(URL.createObjectURL(f));
+  await cur().mount();
 });
 
 const copyBtn = document.getElementById("copy-btn");
@@ -612,9 +723,13 @@ copyBtn.addEventListener("click", async () => {
   setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
 });
 
-await loadSource(state.Source);
-// toggleEffect(items.find((i) => i.key === "Warp").uid);
-toggleEffect(items.find((i) => i.key === "Pattern refraction").uid);
+// Build the gallery, load each source, mount each preset, then select frame 1.
+frames = FRAME_PRESETS.map((cfg, i) => new FrameView(cfg, i));
+for (const f of frames) stageEl.appendChild(f.root);
+await Promise.all(frames.map((f) => f.loadSource(f.source)));
+await Promise.all(frames.map((f) => f.mount()));
+frames[0].root.classList.add("selected");
+refreshControls();
 </script>
 </body>
 </html>
