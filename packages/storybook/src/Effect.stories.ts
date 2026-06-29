@@ -1176,15 +1176,7 @@ export const pixelStretch = presetStory<PixelStretchArgs>(
     { clock: false },
 );
 
-const WARP_TYPES: WarpType[] = [
-    "sine",
-    "twist",
-    "bulge",
-    "pinch",
-    "ripple",
-    "flag",
-    "squeeze",
-];
+const WARP_TYPES: WarpType[] = ["sine wave", "twist", "ripple"];
 type WarpArgs = {
     type: WarpType;
     amplitude: number;

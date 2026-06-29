@@ -154,7 +154,7 @@ const EFFECTS = {
   Warp: {
     make: () => new WarpEffect(),
     controls: {
-      type: { options: ["sine", "twist", "bulge", "pinch", "ripple", "flag", "squeeze"] },
+      type: { options: ["sine wave", "twist", "ripple"] },
       amplitude: slider(-20, 20, 0.1),
       frequency: slider(0.1, 10, 0.1),
       centerX: slider(0, 1, 0.01),

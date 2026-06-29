@@ -29,7 +29,6 @@ void main(void) {
     vec2 uv = uvContent;
     vec2 p = uv - center;
     float r = length(p);
-    vec2 dir = r > 1e-5 ? p / r : vec2(0.0);
 
     if (mode == 0) {
         // Sine wave: ripples per axis, centered so both diagonals stay straight.
@@ -44,21 +43,8 @@ void main(void) {
         tp = rot2d(amp * freq * (1.0 - t)) * tp;
         uv = tp / s * 0.5 + center;
     } else if (mode == 2) {
-        // Bulge: magnify the center.
-        uv = center + dir * pow(r, 1.0 - amp * 0.2);
-    } else if (mode == 3) {
-        // Pinch: pull toward the center.
-        uv = center + dir * pow(r, 1.0 + amp * 0.2);
-    } else if (mode == 4) {
         // Ripple: scale the radius by a cosine of the distance from center.
         p *= 1.0 - cos((r-.5) * freq * 10.0 + time) * amp * 0.2;
-        uv = p + center;
-    } else if (mode == 5) {
-        // Flag: horizontal wave whose amplitude grows toward the right.
-        uv.y += sin(uv.x * freq * TAU + time) * amp * 0.05 * uv.x;
-    } else if (mode == 6) {
-        // Squeeze: anisotropic horizontal compression around the center.
-        p.x *= 1.0 + amp * 0.2 * (1.0 - abs(p.y) * 2.0);
         uv = p + center;
     }
 
@@ -66,23 +52,12 @@ void main(void) {
 }
 `;
 
-export type WarpType =
-    | "sine"
-    | "twist"
-    | "bulge"
-    | "pinch"
-    | "ripple"
-    | "flag"
-    | "squeeze";
+export type WarpType = "sine wave" | "twist" | "ripple";
 
 const WARP_MODES: Record<WarpType, number> = {
-    sine: 0,
+    "sine wave": 0,
     twist: 1,
-    bulge: 2,
-    pinch: 3,
-    ripple: 4,
-    flag: 5,
-    squeeze: 6,
+    ripple: 2,
 };
 
 export type WarpParams = {
