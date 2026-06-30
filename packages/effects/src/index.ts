@@ -11,14 +11,25 @@ export { BadJpegEffect, type BadJpegEffectOptions } from "./bad-jpeg";
 export { BloomEffect } from "./bloom";
 export { ChromaticEffect, type ChromaticParams } from "./chromatic";
 export {
+    ColoredEdgesEffect,
+    type ColoredEdgesParams,
+} from "./colored-edges";
+export {
     type DatamoshColorSpace,
     DatamoshEffect,
     type DatamoshParams,
     type DatamoshView,
 } from "./datamosh";
+export { DitherEffect, type DitherParams, type DitherStyle } from "./dither";
 export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone";
 export { FluidEffect } from "./fluid";
 export { GlitchEffect, type GlitchParams } from "./glitch";
+export {
+    GradientMapEffect,
+    type GradientMapMixSpace,
+    type GradientMapParams,
+    type GradientMapRepeat,
+} from "./gradient-map";
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
 export { HueShiftEffect, type HueShiftParams } from "./hue-shift";
 export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch";
@@ -31,6 +42,16 @@ export {
 } from "./matrix";
 export { ParticleEffect } from "./particle";
 export { ParticleExplodeEffect } from "./particle-explode";
+export {
+    PatternRefractionEffect,
+    type PatternRefractionParams,
+    type RefractionEdgeWrap,
+    type RefractionPattern,
+} from "./pattern-refraction";
+export {
+    PixelStretchEffect,
+    type PixelStretchParams,
+} from "./pixel-stretch";
 export { PixelateEffect } from "./pixelate";
 export {
     type PixelSortDirection,
@@ -43,6 +64,13 @@ export { RgbGlitchEffect, type RgbGlitchParams } from "./rgb-glitch";
 export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift";
 export { ScanlineEffect } from "./scanline";
 export { SinewaveEffect, type SinewaveParams } from "./sinewave";
+export { SliceShiftEffect, type SliceShiftParams } from "./slice-shift";
+export {
+    TilePixelateEffect,
+    type TilePixelateParams,
+    type TilePixelateShape,
+} from "./tile-pixelate";
 export { TritoneEffect, type TritoneParams } from "./tritone";
 export { VignetteEffect, type VignetteParams } from "./vignette";
 export { VoronoiEffect } from "./voronoi";
+export { WarpEffect, type WarpParams, type WarpType } from "./warp";
