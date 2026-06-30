@@ -124,6 +124,19 @@ export class VFX {
     }
 
     /**
+     * The WebGL canvas VFX renders to.
+     *
+     * Use it as a `drawImage` source to composite the output elsewhere.
+     * Read it within the same frame as `render()`; by default the drawing
+     * buffer is not kept across frames.
+     *
+     * @experimental
+     */
+    get canvas(): HTMLCanvasElement {
+        return this.#canvas;
+    }
+
+    /**
      * Register an element using html-in-canvas API.
      * Wraps the element in a `<canvas layoutsubtree>` and captures via drawElementImage.
      * Falls back to `add()` if html-in-canvas is not supported.
