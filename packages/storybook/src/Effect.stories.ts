@@ -1117,31 +1117,28 @@ export const gradientMap = presetStory<GradientMapArgs>(
 
 type SliceShiftArgs = {
     shift: number;
-    softness: number;
     random: number;
     centerX: number;
     centerY: number;
-    sliceCount: number;
+    size: number;
     angle: number;
 };
 export const sliceShift = presetStory<SliceShiftArgs>(
     (a) => new SliceShiftEffect(a),
     {
         shift: 0.5,
-        softness: 0,
         random: 0,
         centerX: 0.5,
         centerY: 0.5,
-        sliceCount: 100,
+        size: 100,
         angle: 0,
     },
     {
         shift: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
-        softness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         random: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        sliceCount: { control: { type: "range", min: 1, max: 300, step: 1 } },
+        size: { control: { type: "range", min: 1, max: 300, step: 1 } },
         angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
     },
     { clock: false },
