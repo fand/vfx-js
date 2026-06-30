@@ -22,11 +22,6 @@ export {
 } from "./datamosh";
 export { DitherEffect, type DitherParams, type DitherStyle } from "./dither";
 export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone";
-export {
-    FigmaPixelateEffect,
-    type FigmaPixelateParams,
-    type FigmaPixelateShape,
-} from "./figma-pixelate";
 export { FluidEffect } from "./fluid";
 export { GlitchEffect, type GlitchParams } from "./glitch";
 export {
@@ -70,6 +65,11 @@ export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift";
 export { ScanlineEffect } from "./scanline";
 export { SinewaveEffect, type SinewaveParams } from "./sinewave";
 export { SliceShiftEffect, type SliceShiftParams } from "./slice-shift";
+export {
+    TilePixelateEffect,
+    type TilePixelateParams,
+    type TilePixelateShape,
+} from "./tile-pixelate";
 export { TritoneEffect, type TritoneParams } from "./tritone";
 export { VignetteEffect, type VignetteParams } from "./vignette";
 export { VoronoiEffect } from "./voronoi";

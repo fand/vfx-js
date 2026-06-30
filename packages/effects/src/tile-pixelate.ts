@@ -1,5 +1,5 @@
 // Shaped-cell mosaic with color trim and dissolve. Ported from Figma's
-// "Pixelate" shader effect. Named FigmaPixelate to avoid colliding with
+// "Pixelate" shader effect. Named TilePixelate to avoid colliding with
 // the existing square PixelateEffect.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 import type { Effect, EffectContext } from "@vfx-js/core";
@@ -122,22 +122,22 @@ void main(void) {
 }
 `;
 
-export type FigmaPixelateShape =
+export type TilePixelateShape =
     | "rectangle"
     | "ellipse"
     | "hexagon"
     | "triangle";
 
-const PIXELATE_SHAPES: Record<FigmaPixelateShape, number> = {
+const PIXELATE_SHAPES: Record<TilePixelateShape, number> = {
     rectangle: 0,
     ellipse: 1,
     hexagon: 2,
     triangle: 3,
 };
 
-export type FigmaPixelateParams = {
+export type TilePixelateParams = {
     /** Cell shape. */
-    shape: FigmaPixelateShape;
+    shape: TilePixelateShape;
     /** Cell size, in px. */
     size: number;
     /** Cell width factor (1 = square; >1 wider). */
@@ -156,7 +156,7 @@ export type FigmaPixelateParams = {
     knockout: boolean;
 };
 
-const DEFAULT_PARAMS: FigmaPixelateParams = {
+const DEFAULT_PARAMS: TilePixelateParams = {
     shape: "rectangle",
     size: 10,
     stretch: 1,
@@ -168,14 +168,14 @@ const DEFAULT_PARAMS: FigmaPixelateParams = {
     knockout: true,
 };
 
-export class FigmaPixelateEffect implements Effect {
-    params: FigmaPixelateParams;
+export class TilePixelateEffect implements Effect {
+    params: TilePixelateParams;
 
-    constructor(initial: Partial<FigmaPixelateParams> = {}) {
+    constructor(initial: Partial<TilePixelateParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
     }
 
-    setParams(updates: Partial<FigmaPixelateParams>): void {
+    setParams(updates: Partial<TilePixelateParams>): void {
         Object.assign(this.params, updates);
     }
 

@@ -10,8 +10,8 @@ import {
     type DitherStyle,
     DitherEffect,
     DuotoneEffect,
-    FigmaPixelateEffect,
-    type FigmaPixelateShape,
+    TilePixelateEffect,
+    type TilePixelateShape,
     GradientMapEffect,
     type GradientMapMixSpace,
     type GradientMapRepeat,
@@ -1248,14 +1248,14 @@ export const dither = presetStory<DitherArgs>(
 );
 dither.parameters = { chromatic: { disableSnapshot: true } };
 
-const PIXELATE_SHAPES: FigmaPixelateShape[] = [
+const PIXELATE_SHAPES: TilePixelateShape[] = [
     "rectangle",
     "ellipse",
     "hexagon",
     "triangle",
 ];
-type FigmaPixelateArgs = {
-    shape: FigmaPixelateShape;
+type TilePixelateArgs = {
+    shape: TilePixelateShape;
     size: number;
     stretch: number;
     gap: number;
@@ -1265,8 +1265,8 @@ type FigmaPixelateArgs = {
     falloff: number;
     knockout: boolean;
 };
-export const figmaPixelate = presetStory<FigmaPixelateArgs>(
-    (a) => new FigmaPixelateEffect(a),
+export const tilePixelate = presetStory<TilePixelateArgs>(
+    (a) => new TilePixelateEffect(a),
     {
         shape: "triangle",
         size: 10,

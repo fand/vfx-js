@@ -227,7 +227,7 @@ import { VFX } from "@vfx-js/core";
 import {
   ColoredEdgesEffect,
   DitherEffect,
-  FigmaPixelateEffect,
+  TilePixelateEffect,
   GradientMapEffect,
   HalftoneEffect,
   PatternRefractionEffect,
@@ -308,7 +308,7 @@ const EFFECTS = {
     },
   },
   Pixelate: {
-    make: () => new FigmaPixelateEffect(),
+    make: () => new TilePixelateEffect(),
     controls: {
       shape: { options: ["rectangle", "ellipse", "hexagon", "triangle"] },
       size: slider(2, 80, 1),
