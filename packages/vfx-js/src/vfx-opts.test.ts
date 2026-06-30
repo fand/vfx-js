@@ -12,3 +12,15 @@ describe("getVFXOpts: timeScale", () => {
         expect(getVFXOpts({ timeScale: -1 }).timeScale).toBe(-1);
     });
 });
+
+describe("getVFXOpts: preserveDrawingBuffer", () => {
+    test("defaults to false", () => {
+        expect(getVFXOpts({}).preserveDrawingBuffer).toBe(false);
+    });
+
+    test("passes through explicit value", () => {
+        expect(
+            getVFXOpts({ preserveDrawingBuffer: true }).preserveDrawingBuffer,
+        ).toBe(true);
+    });
+});

@@ -116,7 +116,7 @@ export class VFXPlayer {
         this.#opts = opts;
 
         this.#canvas = canvas;
-        this.#ctx = new GLContext(canvas);
+        this.#ctx = new GLContext(canvas, opts.preserveDrawingBuffer);
         this.#gl = this.#ctx.gl;
         this.#gl.clearColor(0, 0, 0, 0);
         this.#pixelRatio = opts.pixelRatio;

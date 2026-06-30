@@ -143,6 +143,19 @@ export type VFXOpts = {
     postEffect?: VFXPostEffect | VFXPass[];
 
     /**
+     * Keep the WebGL drawing buffer across frames (Default: `false`).
+     *
+     * Enable this to read the canvas (via `VFX.canvas`) outside the frame
+     * it was rendered in — e.g. to composite the output into another
+     * canvas. It can slightly raise memory and GPU cost, so leave it off
+     * unless you need it.
+     *
+     * This is a context-creation flag, so it is fixed for the life of the
+     * VFX instance and cannot be changed at runtime.
+     */
+    preserveDrawingBuffer?: boolean;
+
+    /**
      * Playback rate of the animation clock that drives the `time` uniform
      * (Default: `1`).
      *
@@ -166,6 +179,7 @@ export type VFXOptsInner = {
     scrollPadding: [number, number];
     wrapper: HTMLElement | undefined;
     postEffects: (VFXPostEffect | VFXPass)[];
+    preserveDrawingBuffer: boolean;
     timeScale: number;
 };
 
@@ -208,6 +222,7 @@ export function getVFXOpts(opts: VFXOpts): VFXOptsInner {
         scrollPadding,
         wrapper: opts.wrapper,
         postEffects,
+        preserveDrawingBuffer: opts.preserveDrawingBuffer ?? false,
         timeScale: opts.timeScale ?? 1,
     };
 }
