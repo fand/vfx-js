@@ -223,7 +223,7 @@ export type LightStreakParams = {
      * `n` → an n-pointed aperture starburst.
      */
     streaks: number;
-    /** Base rotation of the ray fan, in radians. */
+    /** Base rotation of the ray fan, in degrees. */
     angle: number;
     /** Max streak length in CSS (logical) px. */
     length: number;
@@ -409,8 +409,9 @@ export class LightStreakEffect implements Effect {
         const cellPx = Math.max(src[2], src[3]) / dim;
         const softnessPx = Math.max(this.params.softness * pr, cellPx * 1.8);
 
+        const baseAngle = (this.params.angle * Math.PI) / 180;
         for (let k = 0; k < rays; k++) {
-            const angle = this.params.angle + (k * Math.PI * 2) / rays;
+            const angle = baseAngle + (k * Math.PI * 2) / rays;
             ctx.draw({
                 vert: VERT_STREAK,
                 frag: FRAG_STREAK,
