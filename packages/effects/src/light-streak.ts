@@ -362,6 +362,9 @@ export class LightStreakEffect implements Effect {
     render(ctx: EffectContext): void {
         const dim = Math.max(2, Math.floor(this.params.density));
         if (!this.#geometry || this.#geometryDensity !== dim) {
+            if (this.#geometry) {
+                ctx.releaseGeometry(this.#geometry);
+            }
             this.#geometry = buildGeometry(dim);
             this.#geometryDensity = dim;
         }

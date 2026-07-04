@@ -340,6 +340,19 @@ export class EffectGeometryCache {
         return compiled;
     }
 
+    /** Free the compiled entries for one geometry (all programs). */
+    release(geo: EffectGeometry): void {
+        const byProgram = this.#map.get(geo);
+        if (!byProgram) {
+            return;
+        }
+        for (const c of byProgram.values()) {
+            c.dispose();
+            this.#all.delete(c);
+        }
+        this.#map.delete(geo);
+    }
+
     dispose(): void {
         for (const c of this.#all) {
             c.dispose();
