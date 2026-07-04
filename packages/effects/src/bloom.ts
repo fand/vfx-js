@@ -5,6 +5,7 @@
 // Drastically cheaper than full-res separable Gaussian: fragment work is
 // dominated by the pyramid (≈ output × 4/3 total), not N full-res passes.
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
+import { padOutputRect } from "./_pad.js";
 
 // Threshold + sRGB→linear decode. Bloom math runs in linear space so
 // downsample averages reflect light intensity (not perceptual levels)
@@ -451,13 +452,7 @@ export class BloomEffect implements Effect {
     outputRect(
         dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
     ): readonly [number, number, number, number] {
-        const { pad } = this.params;
-        if (pad === "fullscreen") {
-            return dims.canvasRect;
-        }
-        const px = pad * dims.pixelRatio;
-        const [, , ew, eh] = dims.contentRect;
-        return [-px, -px, ew + 2 * px, eh + 2 * px];
+        return padOutputRect(this.params.pad, dims);
     }
 
     dispose(): void {

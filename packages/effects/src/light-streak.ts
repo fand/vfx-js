@@ -30,6 +30,7 @@ import type {
     EffectGeometry,
     EffectRenderTarget,
 } from "@vfx-js/core";
+import { padOutputRect } from "./_pad.js";
 
 // Premultiplied base copy, hard-masked to the inner rect. Used instead of
 // ctx.blit (which has no bounds check and would clamp-replicate the
@@ -520,12 +521,7 @@ export class LightStreakEffect implements Effect {
     outputRect(
         dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
     ): readonly [number, number, number, number] {
-        if (this.params.pad === "fullscreen") {
-            return dims.canvasRect;
-        }
-        const px = this.params.pad * dims.pixelRatio;
-        const [, , ew, eh] = dims.contentRect;
-        return [-px, -px, ew + 2 * px, eh + 2 * px];
+        return padOutputRect(this.params.pad, dims);
     }
 
     dispose(): void {
