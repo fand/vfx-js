@@ -1,27 +1,7 @@
-// Anamorphic / aperture-diffraction light streaks via instanced sprite
-// splatting (same technique as the depth-bokeh example's disk scatter).
-//
-// Instead of a fullscreen separable blur, every cell of a fixed source
-// grid becomes one *instance*. The vertex shader samples the source at
-// the instance's UV, gates it by luminance, and — for the bright cells —
-// stretches a thin quad outward along the streak direction. The fragment
-// shader shapes that quad into a streak profile (exponential length
-// falloff + gaussian cross-section). Dim cells are culled in the VS by
-// pushing the quad off-screen, so fragment work scales with the number of
-// *highlights*, not the framebuffer area.
-//
-// Streaks accumulate into a float buffer and are then tone-mapped
-// (1 - exp(-x)) over the source, so dense overlaps saturate toward `tint`
-// instead of clipping to white. The sample grid is jittered and each
-// sprite is at least ~one cell wide, so adjacent streaks merge into a
-// continuous sheet rather than a row of stripes.
-//
-// One `streaks` value drives both looks:
-//   - streaks = 2          → a single horizontal axis = anamorphic flare
-//   - streaks = n (blades) → an n-ray aperture starburst
-// A real aperture's diffraction spikes count is `blades` for an even
-// blade count and `2 * blades` for an odd one; map that at the call site
-// (e.g. `streaks: blades % 2 ? blades * 2 : blades`).
+// Anamorphic flare / aperture starburst light streaks.
+// A pre-pass extracts highlights on a jittered grid; bright cells become
+// instanced quads stretched along each ray, accumulated into a float
+// buffer and tone-mapped over the source.
 //
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 import type {
@@ -33,9 +13,8 @@ import type {
 } from "@vfx-js/core";
 import { padOutputRect } from "./_pad.js";
 
-// Premultiplied base copy, hard-masked to the inner rect. Used instead of
-// ctx.blit (which has no bounds check and would clamp-replicate the
-// capture's edge texels across the padded region as `pad` grows).
+// Premultiplied base copy, hard-masked to the inner rect so the pad
+// region doesn't clamp-replicate the capture's edge texels.
 const FRAG_BASE = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
@@ -109,9 +88,8 @@ in vec2 position;
 
 uniform sampler2D highlight; // dim×dim pre-pass output
 uniform int dim;
-// Source buffer rect and this stage's output rect, both in element-local
-// physical px. The host viewport already equals dstRect, so mapping a
-// source point into [-1,1] NDC is (srcPx - dstRect.xy) / dstRect.zw.
+// Source buffer rect and this stage's output rect, in element-local
+// physical px. The host viewport equals dstRect.
 uniform vec4 srcRect;
 uniform vec4 dstRect;
 uniform float angle;       // streak direction (rad)
@@ -146,18 +124,12 @@ void main() {
     vec2 dir = vec2(cos(angle), sin(angle));
     vec2 perp = vec2(-dir.y, dir.x);
 
-    // Streak length. Physically the lens PSF reach is the same for every
-    // source — brightness only scales amplitude, and the exponential tail +
-    // tone map make brighter highlights *read* longer (as in Blender Glare /
-    // KinoStreak). lengthBrightness blends between that uniform length (0)
-    // and the stylised "brighter throws a geometrically longer streak" (1).
+    // lengthBrightness blends uniform length (0) toward brightness-scaled length (1).
     float len = lengthPx * mix(1.0, gate, lengthBrightness);
     vec2 offPx = dir * (position.x * len)
                + perp * (position.y * softnessPx * 0.5);
 
-    // px → NDC delta. The asymmetric divide by w/h is undone when NDC is
-    // mapped back onto the viewport, so on-screen the streak stays true
-    // to its px direction.
+    // px → NDC delta; the divide by w/h is undone by the viewport mapping.
     vec2 ndc = centerNdc + offPx * 2.0 / dstRect.zw;
     gl_Position = vec4(ndc, 0.0, 1.0);
 
@@ -168,10 +140,8 @@ void main() {
 }
 `;
 
-// Streak profile. Emits the *raw* (un-tinted, un-scaled) streak colour,
-// premultiplied, into a float accumulation buffer with additive blend.
-// Tinting and brightness control happen later in the composite so the
-// accumulation can be tone-mapped before it clips.
+// Streak profile. Emits raw premultiplied color into the float
+// accumulation buffer; tint and tone map happen in the composite.
 const FRAG_STREAK = `#version 300 es
 precision highp float;
 in float v_along;
@@ -187,20 +157,9 @@ uniform float falloffCurve;     // 0 = polynomial tail, 1 = exponential
 out vec4 outColor;
 
 void main() {
-    // Per-channel length falloff, a blend of two profiles (both pinned to 1
-    // at the source and exactly 0 at the tip, so the core brightness — and
-    // thus the norm calibration — is unchanged and the finite quad shows no
-    // hard edge):
-    //   polynomial  pow(1-d, k): a fuller mid-section, so the streak reads
-    //               longer.
-    //   exponential (exp(-kd) - e^-k)/(1 - e^-k): a tighter, brighter core
-    //               with a faint tail — more physical, but visually shorter.
-    // falloffCurve mixes between them. falloff is the shared exponent /
-    // decay rate. Dispersion fringes the tip through colour by giving each
-    // channel a different reach, pivoting on green: +1 lets red persist
-    // furthest (warm tip, like aperture diffraction where longer wavelengths
-    // diffract more); -1 lets blue persist (cool tip, refractive look); 0 is
-    // achromatic. Multiplicative so every channel rate stays positive.
+    // Per-channel length falloff: falloffCurve mixes a polynomial and a
+    // normalized exponential profile, both pinned to 1 at the source and
+    // 0 at the tip. Dispersion fringes the tip by varying channel reach.
     float spread = dispersion * 0.8;
     // Floor k so falloff -> 0 approaches the flat/linear limit instead of
     // degenerating to zero output.
@@ -214,16 +173,8 @@ void main() {
     float crossFall = exp(-v_cross * v_cross * 2.0);
     vec3 rgb = v_color * perChannel * (crossFall * v_gate);
 
-    // Spectral colour modulation (Blender "color modulation"): a 120°-offset
-    // cosine palette cycles the hue with distance along the streak, then is
-    // rescaled to the original luminance so it shifts *colour*, not
-    // brightness. The amplitude ramps in from the core so the bright base
-    // (the light itself) stays neutral and the rainbow fringes the body.
-    // Where dispersion is a monotone tip-ward shift, this adds the cyclic
-    // multi-hue fringing the iterative Glare filter produces. Stronger
-    // modulation rotates the hue faster — like Blender accumulating a bigger
-    // per-iteration shift — so the slider drives *both* the band count
-    // (1→~5 cycles) and the saturation, not just saturation.
+    // Cyclic, luminance-preserving hue shift along the streak; the slider
+    // drives both cycle count and saturation.
     if (colorModulation > 1e-4) {
         const vec3 luma = vec3(0.2126, 0.7152, 0.0722);
         float lo = dot(rgb, luma);
@@ -251,9 +202,7 @@ void main() { outColor = vec4(0.0); }
 `;
 
 // Tone-mapped composite of the accumulated streaks over the source.
-// `1 - exp(-streak * intensity)` softly saturates: dense, overlapping
-// streaks (e.g. off bright text) approach `tint` instead of clipping to
-// white. Added over the already-drawn base.
+// `1 - exp(-x)` softly saturates dense overlaps toward `tint`.
 const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
