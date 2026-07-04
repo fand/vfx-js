@@ -260,15 +260,18 @@
     const spec = SOURCES.find((i) => i.id === id);
     if (!spec || switching) return;
     switching = true;
-    const prevEl = activeEl;
-    await loadSource(spec);
-    if (activeEl !== prevEl) {
-      if (attachedEl) vfx.remove(attachedEl);
-      await attachAll();
-    } else {
-      await vfx.update(activeEl);
+    try {
+      const prevEl = activeEl;
+      await loadSource(spec);
+      if (activeEl !== prevEl) {
+        if (attachedEl) vfx.remove(attachedEl);
+        await attachAll();
+      } else {
+        await vfx.update(activeEl);
+      }
+    } finally {
+      switching = false;
     }
-    switching = false;
   }
 
   // --- Tweakpane ----------------------------------------------------------
