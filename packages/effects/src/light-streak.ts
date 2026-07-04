@@ -373,6 +373,7 @@ export class LightStreakEffect implements Effect {
         const aw = Math.max(2, Math.round(dst[2]));
         const ah = Math.max(2, Math.round(dst[3]));
         if (aw !== this.#lastW || ah !== this.#lastH) {
+            this.#accum?.dispose();
             this.#accum = ctx.createRenderTarget({
                 size: [aw, ah] as [number, number],
                 float: true,
@@ -464,6 +465,7 @@ export class LightStreakEffect implements Effect {
     dispose(): void {
         this.#geometry = null;
         this.#geometryDensity = 0;
+        this.#accum?.dispose();
         this.#accum = null;
         this.#lastW = 0;
         this.#lastH = 0;
