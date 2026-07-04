@@ -21,6 +21,9 @@ export class GLContext {
     /** True if `OES_texture_float_linear` is available. */
     floatLinearFilter: boolean;
 
+    /** True if `EXT_float_blend` is available (blending into RGBA32F). */
+    floatBlend: boolean;
+
     /** True between `webglcontextlost` and `webglcontextrestored`. */
     isContextLost = false;
 
@@ -44,12 +47,8 @@ export class GLContext {
         this.canvas = canvas;
         gl.getExtension("EXT_color_buffer_float");
         gl.getExtension("EXT_color_buffer_half_float");
-        // Required to blend into 32-bit float color attachments (e.g. the
-        // additive accumulation buffer in LightStreakEffect). Without it,
-        // blending against an RGBA32F target is an INVALID_OPERATION on
-        // conformant WebGL2 and the draw is dropped — additive accumulation
-        // silently stops working.
-        gl.getExtension("EXT_float_blend");
+        // Required to blend into RGBA32F targets.
+        this.floatBlend = !!gl.getExtension("EXT_float_blend");
         this.floatLinearFilter = !!gl.getExtension("OES_texture_float_linear");
         this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
 
@@ -105,7 +104,7 @@ export class GLContext {
         const gl = this.gl;
         gl.getExtension("EXT_color_buffer_float");
         gl.getExtension("EXT_color_buffer_half_float");
-        gl.getExtension("EXT_float_blend");
+        this.floatBlend = !!gl.getExtension("EXT_float_blend");
         for (const r of this.#resources) {
             r.restore();
         }
