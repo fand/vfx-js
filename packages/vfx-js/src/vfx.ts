@@ -123,15 +123,7 @@ export class VFX {
         return this.#player.maxTextureSize;
     }
 
-    /**
-     * The WebGL canvas VFX renders to.
-     *
-     * Use it as a `drawImage` source to composite the output elsewhere.
-     * Read it within the same frame as `render()`; by default the drawing
-     * buffer is not kept across frames.
-     *
-     * @experimental
-     */
+    /** The output canvas VFX renders into. */
     get canvas(): HTMLCanvasElement {
         return this.#canvas;
     }
