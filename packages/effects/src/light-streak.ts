@@ -95,7 +95,6 @@ uniform vec4 dstRect;
 uniform float angle;       // streak direction (rad)
 uniform float lengthPx;    // max streak length (physical px)
 uniform float softnessPx;  // streak cross-section width (physical px)
-uniform float lengthBrightness; // 0 = uniform length, 1 = length ∝ brightness
 
 out float v_along;
 out float v_cross;
@@ -124,9 +123,7 @@ void main() {
     vec2 dir = vec2(cos(angle), sin(angle));
     vec2 perp = vec2(-dir.y, dir.x);
 
-    // lengthBrightness blends uniform length (0) toward brightness-scaled length (1).
-    float len = lengthPx * mix(1.0, gate, lengthBrightness);
-    vec2 offPx = dir * (position.x * len)
+    vec2 offPx = dir * (position.x * lengthPx)
                + perp * (position.y * softnessPx * 0.5);
 
     // px → NDC delta; the divide by w/h is undone by the viewport mapping.
@@ -232,15 +229,6 @@ export type LightStreakParams = {
     /** Max streak length in CSS (logical) px. */
     length: number;
     /**
-     * How much a highlight's brightness scales its streak *length*, 0..1.
-     * `0` gives every source the same geometric length — the physically
-     * faithful "lens PSF reach is constant" behaviour (as in Blender Glare /
-     * KinoStreak), where brighter highlights only read longer because their
-     * brighter exponential tail survives the tone map further out. `1`
-     * additionally stretches the geometry by brightness (a stylised look).
-     */
-    lengthBrightness: number;
-    /**
      * Streak cross-section width ("softness") in CSS (logical) px — how
      * wide/soft each streak's gaussian profile is. Raised to at least ~one
      * grid cell so neighbouring streaks merge (see `density`); increase
@@ -311,7 +299,6 @@ const DEFAULT_PARAMS: LightStreakParams = {
     streaks: 2,
     angle: 0,
     length: 160,
-    lengthBrightness: 0,
     softness: 2,
     falloff: 1.5,
     threshold: 0.75,
@@ -439,7 +426,6 @@ export class LightStreakEffect implements Effect {
                     angle,
                     lengthPx,
                     softnessPx,
-                    lengthBrightness: this.params.lengthBrightness,
                     falloff: this.params.falloff,
                     dispersion: this.params.dispersion,
                     colorModulation: this.params.colorModulation,
