@@ -13,6 +13,7 @@ export type {
     EffectAttributeTypedArray,
     EffectBlitOpts,
     EffectContext,
+    EffectDims,
     EffectDrawOpts,
     EffectGeometry,
     EffectQuad,

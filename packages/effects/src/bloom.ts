@@ -4,7 +4,12 @@
 //   → composite with tent-upsample.
 // Drastically cheaper than full-res separable Gaussian: fragment work is
 // dominated by the pyramid (≈ output × 4/3 total), not N full-res passes.
-import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
+import type {
+    Effect,
+    EffectContext,
+    EffectDims,
+    EffectRenderTarget,
+} from "@vfx-js/core";
 import { padOutputRect } from "./_pad.js";
 
 // Threshold + sRGB→linear decode. Bloom math runs in linear space so
@@ -450,7 +455,7 @@ export class BloomEffect implements Effect {
     }
 
     outputRect(
-        dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
+        dims: EffectDims,
     ): readonly [number, number, number, number] {
         return padOutputRect(this.params.pad, dims);
     }

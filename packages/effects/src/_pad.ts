@@ -1,9 +1,9 @@
 // Pad-to-outputRect mapping shared by padded effects.
-import type { Effect } from "@vfx-js/core";
+import type { EffectDims } from "@vfx-js/core";
 
 export function padOutputRect(
     pad: number | "fullscreen",
-    dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
+    dims: EffectDims,
 ): readonly [number, number, number, number] {
     if (pad === "fullscreen") {
         return dims.canvasRect;

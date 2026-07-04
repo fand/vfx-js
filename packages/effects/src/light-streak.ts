@@ -27,6 +27,7 @@
 import type {
     Effect,
     EffectContext,
+    EffectDims,
     EffectGeometry,
     EffectRenderTarget,
 } from "@vfx-js/core";
@@ -519,7 +520,7 @@ export class LightStreakEffect implements Effect {
     }
 
     outputRect(
-        dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
+        dims: EffectDims,
     ): readonly [number, number, number, number] {
         return padOutputRect(this.params.pad, dims);
     }

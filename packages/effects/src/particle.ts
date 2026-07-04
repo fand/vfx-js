@@ -11,6 +11,7 @@
 import type {
     Effect,
     EffectContext,
+    EffectDims,
     EffectGeometry,
     EffectRenderTarget,
     EffectTexture,
@@ -875,7 +876,7 @@ export class ParticleEffect implements Effect {
     }
 
     outputRect(
-        dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
+        dims: EffectDims,
     ): readonly [number, number, number, number] {
         return dims.canvasRect;
     }
