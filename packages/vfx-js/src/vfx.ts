@@ -123,6 +123,11 @@ export class VFX {
         return this.#player.maxTextureSize;
     }
 
+    /** The output canvas VFX renders into. */
+    get canvas(): HTMLCanvasElement {
+        return this.#canvas;
+    }
+
     /**
      * Register an element using html-in-canvas API.
      * Wraps the element in a `<canvas layoutsubtree>` and captures via drawElementImage.
