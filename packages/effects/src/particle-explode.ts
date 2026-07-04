@@ -533,9 +533,7 @@ export class ParticleExplodeEffect implements Effect {
     }
 
     // Particles can scatter past the element bounds.
-    outputRect(
-        dims: EffectDims,
-    ): readonly [number, number, number, number] {
+    outputRect(dims: EffectDims): readonly [number, number, number, number] {
         return dims.canvasRect;
     }
 }

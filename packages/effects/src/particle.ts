@@ -875,9 +875,7 @@ export class ParticleEffect implements Effect {
         this.#initialized = false;
     }
 
-    outputRect(
-        dims: EffectDims,
-    ): readonly [number, number, number, number] {
+    outputRect(dims: EffectDims): readonly [number, number, number, number] {
         return dims.canvasRect;
     }
 }

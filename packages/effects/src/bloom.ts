@@ -454,9 +454,7 @@ export class BloomEffect implements Effect {
         });
     }
 
-    outputRect(
-        dims: EffectDims,
-    ): readonly [number, number, number, number] {
+    outputRect(dims: EffectDims): readonly [number, number, number, number] {
         return padOutputRect(this.params.pad, dims);
     }
 
