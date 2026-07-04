@@ -403,8 +403,8 @@ export class LightStreakEffect implements Effect {
         const lengthPx = this.params.length * pr;
         // Floor the width to ~one grid cell so adjacent streaks overlap
         // into a continuous sheet rather than a row of discrete stripes.
-        const [ew, eh] = ctx.dims.elementPixel;
-        const cellPx = Math.max(ew, eh) / dim;
+        // The grid spans the src buffer, so a cell is srcRect-sized.
+        const cellPx = Math.max(src[2], src[3]) / dim;
         const softnessPx = Math.max(this.params.softness * pr, cellPx * 1.8);
 
         for (let k = 0; k < rays; k++) {
