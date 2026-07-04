@@ -162,7 +162,9 @@ void main() {
     // diffract more); -1 lets blue persist (cool tip, refractive look); 0 is
     // achromatic. Multiplicative so every channel rate stays positive.
     float spread = dispersion * 0.8;
-    vec3 k = falloff * vec3(1.0 - spread, 1.0, 1.0 + spread);
+    // Floor k so falloff -> 0 approaches the flat/linear limit instead of
+    // degenerating to zero output.
+    vec3 k = max(falloff * vec3(1.0 - spread, 1.0, 1.0 + spread), 1e-3);
     vec3 poly = pow(vec3(max(1.0 - v_along, 0.0)), k);
     vec3 eEnd = exp(-k);
     vec3 expo = max((exp(-k * v_along) - eEnd) / max(1.0 - eEnd, 1e-4), 0.0);
