@@ -220,8 +220,7 @@ void main() {
 export type LightStreakParams = {
     /**
      * Number of rays. `2` → a single horizontal axis (anamorphic flare);
-     * `n` → an n-pointed aperture starburst. For a physical aperture map
-     * blade count to spikes: `blades` if even, `2 * blades` if odd.
+     * `n` → an n-pointed aperture starburst.
      */
     streaks: number;
     /** Base rotation of the ray fan, in radians. */

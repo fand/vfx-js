@@ -176,7 +176,7 @@
   // horizontal axis (anamorphic flare) and an n-bladed aperture starburst.
   const params = {
     preset: "anamorphic",
-    blades: 6,
+    streaks: 6,
     angle: 0,
     // source adjustment (chained before the streak)
     exposure: 0,
@@ -196,20 +196,14 @@
     density: 256,
   };
 
-  // A physical aperture's spike count is blades (even) or 2×blades (odd);
-  // anamorphic is just a single horizontal axis = 2 opposing rays.
-  function streakCount() {
-    if (params.preset === "anamorphic") return 2;
-    return params.blades % 2 === 0 ? params.blades : params.blades * 2;
-  }
-
   function liveParams() {
     return {
       threshold: params.threshold,
       maxBrightness: params.maxBrightness,
       intensity: params.intensity,
       tint: [params.tintR, params.tintG, params.tintB],
-      streaks: streakCount(),
+      // Anamorphic is a single horizontal axis = 2 opposing rays.
+      streaks: params.preset === "anamorphic" ? 2 : params.streaks,
       angle: params.angle,
       length: params.length,
       softness: params.softness,
@@ -289,7 +283,7 @@
       options: { anamorphic: "anamorphic", "aperture star": "aperture" },
     })
     .on("change", sync);
-  pane.addBinding(params, "blades", { min: 3, max: 12, step: 1 }).on("change", sync);
+  pane.addBinding(params, "streaks", { min: 2, max: 24, step: 1 }).on("change", sync);
   pane.addBinding(params, "angle", { min: 0, max: 6.283, step: 0.01 }).on("change", sync);
 
   // Source adjustment — darken the image / lift highlights to read the effect.
