@@ -50,17 +50,63 @@ void main() {
 }
 `;
 
+// Integer hash and the jittered sample point of a grid cell (src uv
+// space). Shared by the highlight pre-pass and the streak VS so anchor
+// positions and sampled colors agree.
+const GLSL_CELL = `
+float hash(uint n) {
+    n = (n ^ 61u) ^ (n >> 16u);
+    n *= 9u;
+    n = n ^ (n >> 4u);
+    n *= 0x27d4eb2du;
+    n = n ^ (n >> 15u);
+    return float(n & 0x00ffffffu) / 16777216.0;
+}
+
+vec2 cellUv(ivec2 cell, int dim) {
+    uint i = uint(cell.y * dim + cell.x);
+    vec2 j = vec2(hash(i * 2u + 1u), hash(i * 2u + 2u)) - 0.5;
+    return (vec2(cell) + 0.5 + j * 0.8) / float(dim);
+}
+`;
+
+// Highlight pre-pass into a dim×dim buffer: rgb = clamped highlight
+// color, a = gate. Runs once per frame so the per-ray streak VS reads a
+// tiny texture instead of re-extracting from the full-res source.
+const FRAG_HIGHLIGHT = `#version 300 es
+precision highp float;
+out vec4 outColor;
+uniform sampler2D src;
+uniform float threshold;   // highlight cutoff
+uniform float maxBrightness; // upper clamp on source brightness
+uniform int dim;
+${GLSL_CELL}
+void main() {
+    ivec2 cell = ivec2(gl_FragCoord.xy);
+    vec3 c = texture(src, cellUv(cell, dim)).rgb;
+    // Max-channel knee, hue preserved, clamped so blown-out sources
+    // don't dominate. gate is the highlight factor in [0,1].
+    float vmax = max(max(c.r, c.g), c.b);
+    if (vmax > maxBrightness) {
+        c *= maxBrightness / vmax;
+        vmax = maxBrightness;
+    }
+    float gate = max(0.0, vmax - threshold) / max(vmax, 1e-5);
+    outColor = vec4(c, gate);
+}
+`;
+
 // Per-instance streak quad. `position.x` runs 0→1 from the source point
 // to the tip; `position.y` runs -1→1 across the (thin) width. The VS
-// samples the source at `instanceUv`, derives a luminance gate, and lays
-// the quad down in the target's NDC. Cells below threshold collapse to a
-// degenerate off-screen triangle so the rasteriser skips them entirely.
+// reads the pre-extracted highlight for its cell and lays the quad down
+// in the target's NDC. Cells below threshold collapse to a degenerate
+// off-screen point so the rasteriser skips them entirely.
 const VERT_STREAK = `#version 300 es
 precision highp float;
 in vec2 position;
-in vec2 instanceUv;
 
-uniform sampler2D src;
+uniform sampler2D highlight; // dim×dim pre-pass output
+uniform int dim;
 // Source buffer rect and this stage's output rect, both in element-local
 // physical px. The host viewport already equals dstRect, so mapping a
 // source point into [-1,1] NDC is (srcPx - dstRect.xy) / dstRect.zw.
@@ -69,26 +115,18 @@ uniform vec4 dstRect;
 uniform float angle;       // streak direction (rad)
 uniform float lengthPx;    // max streak length (physical px)
 uniform float softnessPx;  // streak cross-section width (physical px)
-uniform float threshold;   // highlight cutoff
-uniform float maxBrightness; // upper clamp on source brightness
 uniform float lengthBrightness; // 0 = uniform length, 1 = length ∝ brightness
 
 out float v_along;
 out float v_cross;
 out vec3 v_color;
 out float v_gate;
-
+${GLSL_CELL}
 void main() {
-    vec3 c = texture(src, instanceUv).rgb;
-    // Shared highlight extraction (max-channel knee, hue preserved), with
-    // an upper clamp so blown-out sources don't dominate. gate is the
-    // highlight factor in [0,1]; the emitted highlight is c * gate.
-    float vmax = max(max(c.r, c.g), c.b);
-    if (vmax > maxBrightness) {
-        c *= maxBrightness / vmax;
-        vmax = maxBrightness;
-    }
-    float gate = max(0.0, vmax - threshold) / max(vmax, 1e-5);
+    ivec2 cell = ivec2(gl_InstanceID % dim, gl_InstanceID / dim);
+    vec4 hl = texelFetch(highlight, cell, 0);
+    vec3 c = hl.rgb;
+    float gate = hl.a;
 
     // Cull dim cells: collapse the quad to a single off-screen point.
     if (gate < 0.003) {
@@ -100,7 +138,7 @@ void main() {
         return;
     }
 
-    vec2 srcPx = srcRect.xy + instanceUv * srcRect.zw;
+    vec2 srcPx = srcRect.xy + cellUv(cell, dim) * srcRect.zw;
     vec2 centerNdc = (srcPx - dstRect.xy) / dstRect.zw * 2.0 - 1.0;
 
     vec2 dir = vec2(cos(angle), sin(angle));
@@ -348,6 +386,7 @@ export class LightStreakEffect implements Effect {
     #geometry: EffectGeometry | null = null;
     #geometryDensity = 0;
     #accum: EffectRenderTarget | null = null;
+    #highlight: EffectRenderTarget | null = null;
     #lastW = 0;
     #lastH = 0;
 
@@ -367,6 +406,16 @@ export class LightStreakEffect implements Effect {
             }
             this.#geometry = buildGeometry(dim);
             this.#geometryDensity = dim;
+            this.#highlight?.dispose();
+            this.#highlight = ctx.createRenderTarget({
+                size: [dim, dim] as [number, number],
+                float: true,
+                filter: "nearest" as const,
+            });
+        }
+        const highlight = this.#highlight;
+        if (!highlight) {
+            return;
         }
 
         const dst = this.outputRect(ctx.dims);
@@ -399,6 +448,19 @@ export class LightStreakEffect implements Effect {
             uniforms: { src: ctx.src },
         });
 
+        // Extract highlights once; every ray reads this small buffer.
+        ctx.draw({
+            frag: FRAG_HIGHLIGHT,
+            target: highlight,
+            blend: "none",
+            uniforms: {
+                src: ctx.src,
+                threshold: this.params.threshold,
+                maxBrightness: this.params.maxBrightness,
+                dim,
+            },
+        });
+
         // Accumulate every ray's streaks into the float buffer.
         ctx.draw({ frag: FRAG_CLEAR, target: accum, blend: "none" });
 
@@ -419,15 +481,14 @@ export class LightStreakEffect implements Effect {
                 blend: "additive",
                 target: accum,
                 uniforms: {
-                    src: ctx.src,
+                    highlight,
+                    dim,
                     srcRect: [src[0], src[1], src[2], src[3]],
                     dstRect: [dst[0], dst[1], dst[2], dst[3]],
                     angle,
                     lengthPx,
                     softnessPx,
                     lengthBrightness: this.params.lengthBrightness,
-                    threshold: this.params.threshold,
-                    maxBrightness: this.params.maxBrightness,
                     falloff: this.params.falloff,
                     dispersion: this.params.dispersion,
                     colorModulation: this.params.colorModulation,
@@ -472,49 +533,24 @@ export class LightStreakEffect implements Effect {
         this.#geometryDensity = 0;
         this.#accum?.dispose();
         this.#accum = null;
+        this.#highlight?.dispose();
+        this.#highlight = null;
         this.#lastW = 0;
         this.#lastH = 0;
     }
 }
 
-// Deterministic per-instance hash in [0,1). Stable across rebuilds so the
-// jitter pattern doesn't shimmer when density changes.
-function hash(n: number): number {
-    const s = Math.sin(n * 127.1) * 43758.5453;
-    return s - Math.floor(s);
-}
-
-// Source-sample grid, one streak instance per cell. Cells are centred and
-// jittered within their cell so a continuous bright region (a text stroke,
-// a headlight) doesn't sample on a regular lattice — which would re-emit
-// as evenly-spaced stripes. The quad spans length×width in a local frame
-// the VS rotates.
+// One thin quad, instanced per grid cell. The VS derives each cell (and
+// its jittered sample point) from gl_InstanceID.
 function buildGeometry(dim: number): EffectGeometry {
-    const count = dim * dim;
-    const instanceUv = new Float32Array(count * 2);
-    let i = 0;
-    for (let y = 0; y < dim; y++) {
-        for (let x = 0; x < dim; x++) {
-            const jx = (hash(i * 2 + 1) - 0.5) * 0.8;
-            const jy = (hash(i * 2 + 2) - 0.5) * 0.8;
-            instanceUv[i * 2] = (x + 0.5 + jx) / dim;
-            instanceUv[i * 2 + 1] = (y + 0.5 + jy) / dim;
-            i++;
-        }
-    }
     return {
         attributes: {
             position: {
                 data: new Float32Array([0, -1, 1, -1, 1, 1, 0, 1]),
                 itemSize: 2,
             },
-            instanceUv: {
-                data: instanceUv,
-                itemSize: 2,
-                perInstance: true,
-            },
         },
         indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
-        instanceCount: count,
+        instanceCount: dim * dim,
     };
 }
