@@ -162,8 +162,13 @@ void main() {
     // degenerating to zero output.
     vec3 k = max(falloff * vec3(1.0 - spread, 1.0, 1.0 + spread), 1e-3);
     vec3 poly = pow(vec3(max(1.0 - v_along, 0.0)), k);
-    vec3 eEnd = exp(-k);
-    vec3 expo = max((exp(-k * v_along) - eEnd) / max(1.0 - eEnd, 1e-4), 0.0);
+    // Per-channel normalization would pin every channel to 0 at the tip
+    // and erase the reach difference, so apply dispersion as a pure
+    // exponential ratio over the green-normalized profile.
+    float kG = max(falloff, 1e-3);
+    float eEnd = exp(-kG);
+    float base = max((exp(-kG * v_along) - eEnd) / max(1.0 - eEnd, 1e-4), 0.0);
+    vec3 expo = base * exp((vec3(kG) - k) * v_along);
     vec3 perChannel = mix(poly, expo, falloffCurve);
     // Soft gaussian cross-section so neighbouring sprites overlap into a
     // continuous sheet instead of discrete stripes.
