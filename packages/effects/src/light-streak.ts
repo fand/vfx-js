@@ -146,30 +146,23 @@ in float v_cross;
 in vec3 v_color;
 in float v_gate;
 
-uniform float falloff;          // length fade exponent / decay rate
+uniform float falloff;          // length fade decay rate
 uniform float dispersion;       // -1 = blue tip, +1 = red tip
 uniform float colorModulation;  // cyclic spectral hue shift along the streak
-uniform float falloffCurve;     // 0 = polynomial tail, 1 = exponential
 
 out vec4 outColor;
 
 void main() {
-    // Per-channel length falloff: falloffCurve mixes a polynomial and a
-    // normalized exponential profile, both pinned to 1 at the source and
-    // 0 at the tip. Dispersion fringes the tip by varying channel reach.
+    // Normalized exponential length falloff, pinned to 1 at the source
+    // and 0 at the tip. Floor k so falloff -> 0 approaches the linear
+    // limit instead of degenerating to zero output.
+    float k = max(falloff, 1e-3);
+    float eEnd = exp(-k);
+    float base = max((exp(-k * v_along) - eEnd) / max(1.0 - eEnd, 1e-4), 0.0);
+    // Dispersion: per-channel exponential reach ratio pivoting on green,
+    // applied over the normalized profile so the tip fringe survives.
     float spread = dispersion * 0.8;
-    // Floor k so falloff -> 0 approaches the flat/linear limit instead of
-    // degenerating to zero output.
-    vec3 k = max(falloff * vec3(1.0 - spread, 1.0, 1.0 + spread), 1e-3);
-    vec3 poly = pow(vec3(max(1.0 - v_along, 0.0)), k);
-    // Per-channel normalization would pin every channel to 0 at the tip
-    // and erase the reach difference, so apply dispersion as a pure
-    // exponential ratio over the green-normalized profile.
-    float kG = max(falloff, 1e-3);
-    float eEnd = exp(-kG);
-    float base = max((exp(-kG * v_along) - eEnd) / max(1.0 - eEnd, 1e-4), 0.0);
-    vec3 expo = base * exp((vec3(kG) - k) * v_along);
-    vec3 perChannel = mix(poly, expo, falloffCurve);
+    vec3 perChannel = base * exp(k * spread * vec3(1.0, 0.0, -1.0) * v_along);
     // Soft gaussian cross-section so neighbouring sprites overlap into a
     // continuous sheet instead of discrete stripes.
     float crossFall = exp(-v_cross * v_cross * 2.0);
@@ -240,19 +233,11 @@ export type LightStreakParams = {
      */
     softness: number;
     /**
-     * Length fade exponent / decay rate. Higher concentrates the brightness
-     * into a tighter core near the source and trails a fainter tail; lower
-     * flattens toward an even streak.
+     * Exponential length fade decay rate. Higher concentrates the
+     * brightness into a tighter core near the source and trails a fainter
+     * tail; lower flattens toward an even streak.
      */
     falloff: number;
-    /**
-     * Shape of the length falloff, 0..1. `0` is a polynomial profile
-     * (`pow(1-d, falloff)`) with a fuller mid-section, so the streak reads
-     * longer; `1` is a normalised exponential with a tighter core and a
-     * faint tail (more physical, visually shorter). Intermediate values
-     * blend the two.
-     */
-    falloffCurve: number;
     /** Highlight cutoff in [0,1]. Only highlights above this throw streaks. */
     threshold: number;
     /**
@@ -311,7 +296,6 @@ const DEFAULT_PARAMS: LightStreakParams = {
     tint: [0.6, 0.8, 1.0],
     dispersion: -0.5,
     colorModulation: 0.0,
-    falloffCurve: 0.5,
     density: 256,
     pad: 160,
 };
@@ -434,7 +418,6 @@ export class LightStreakEffect implements Effect {
                     falloff: this.params.falloff,
                     dispersion: this.params.dispersion,
                     colorModulation: this.params.colorModulation,
-                    falloffCurve: this.params.falloffCurve,
                 },
             });
         }
