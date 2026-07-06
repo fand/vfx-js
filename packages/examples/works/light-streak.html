@@ -300,7 +300,7 @@
   const shape = pane.addFolder({ title: "Shape" });
   shape.addBinding(params, "length", { min: 0, max: 2000, step: 1 }).on("change", sync);
   shape.addBinding(params, "softness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
-  shape.addBinding(params, "falloff", { min: 0.5, max: 4, step: 0.05 }).on("change", sync);
+  shape.addBinding(params, "falloff", { min: 0.5, max: 10, step: 0.05 }).on("change", sync);
   shape.addBinding(params, "falloffCurve", { min: 0, max: 1, step: 0.01, label: "falloff curve" }).on("change", sync);
   shape.addBinding(params, "density", { min: 64, max: 512, step: 32 }).on("change", sync);
 
