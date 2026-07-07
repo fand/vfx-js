@@ -149,6 +149,8 @@ in float v_gate;
 uniform float falloff;          // length fade decay rate
 uniform float dispersion;       // -1 = blue tip, +1 = red tip
 uniform float colorModulation;  // cyclic spectral hue shift along the streak
+uniform float fringe;           // diffraction fringe contrast
+uniform float fringeCount;      // fringes along the streak (green reference)
 
 out vec4 outColor;
 
@@ -167,6 +169,15 @@ void main() {
     // continuous sheet instead of discrete stripes.
     float crossFall = exp(-v_cross * v_cross * 2.0);
     vec3 rgb = v_color * perChannel * (crossFall * v_gate);
+
+    // Diffraction fringes: per-channel intensity modulation whose period
+    // scales with wavelength (630/530/465 nm), so all channels peak at the
+    // source (white core) and separate into rainbow bands further out.
+    if (fringe > 1e-4) {
+        vec3 freq = fringeCount * vec3(0.8413, 1.0, 1.1398);
+        vec3 m = 0.5 + 0.5 * cos(6.2831853 * freq * v_along);
+        rgb *= mix(vec3(1.0), m, fringe);
+    }
 
     // Cyclic, luminance-preserving hue shift along the streak; the slider
     // drives both cycle count and saturation.
@@ -270,6 +281,15 @@ export type LightStreakParams = {
      */
     colorModulation: number;
     /**
+     * Diffraction fringe contrast, 0..1. Periodic brightness modulation
+     * along the streak whose period scales with wavelength, so bands
+     * converge to white at the source and separate into rainbow further
+     * out. `0` disables it.
+     */
+    fringe: number;
+    /** Number of fringes along the streak (green channel reference). */
+    fringeCount: number;
+    /**
      * Source sampling grid dimension (instance count = `density²`).
      * Higher resolves finer highlights, lets streaks be thinner without
      * banding, and costs more vertex work (most instances are culled, so
@@ -296,6 +316,8 @@ const DEFAULT_PARAMS: LightStreakParams = {
     tint: [0.6, 0.8, 1.0],
     dispersion: -0.5,
     colorModulation: 0.0,
+    fringe: 0.0,
+    fringeCount: 8,
     density: 256,
     pad: 160,
 };
@@ -418,6 +440,8 @@ export class LightStreakEffect implements Effect {
                     falloff: this.params.falloff,
                     dispersion: this.params.dispersion,
                     colorModulation: this.params.colorModulation,
+                    fringe: this.params.fringe,
+                    fringeCount: this.params.fringeCount,
                 },
             });
         }

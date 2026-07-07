@@ -186,6 +186,8 @@
     intensity: 3.0,
     dispersion: -0.6,
     colorModulation: 0.25,
+    fringe: 0,
+    fringeCount: 8,
     tintR: 0.6,
     tintG: 0.8,
     tintB: 1.0,
@@ -209,6 +211,8 @@
       falloff: params.falloff,
       dispersion: params.dispersion,
       colorModulation: params.colorModulation,
+      fringe: params.fringe,
+      fringeCount: params.fringeCount,
       density: params.density,
       // Long streaks need a big reach; "fullscreen" bounds the buffer to
       // the canvas instead of growing pad past the GPU texture limit.
@@ -294,6 +298,8 @@
   pane.addBinding(params, "intensity", { min: 0, max: 8, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "dispersion", { min: -1, max: 1, step: 0.01 }).on("change", sync);
   pane.addBinding(params, "colorModulation", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "fringe", { min: 0, max: 1, step: 0.01 }).on("change", sync);
+  pane.addBinding(params, "fringeCount", { min: 1, max: 32, step: 1 }).on("change", sync);
 
   const shape = pane.addFolder({ title: "Shape" });
   shape.addBinding(params, "length", { min: 0, max: 2000, step: 1 }).on("change", sync);
