@@ -281,6 +281,9 @@ export type LightStreakParams = {
     pad: number | "fullscreen";
 };
 
+// Density the brightness calibration is anchored to.
+const REF_DENSITY = 256;
+
 const DEFAULT_PARAMS: LightStreakParams = {
     streaks: 2,
     angle: 0,
@@ -421,6 +424,18 @@ export class LightStreakEffect implements Effect {
             });
         }
 
+        // Sprite overlap per pixel scales with softnessPx / cellPx²;
+        // divide it out relative to a reference density so brightness
+        // stays constant as density changes.
+        const refCellPx = Math.max(src[2], src[3]) / REF_DENSITY;
+        const refSoftnessPx = Math.max(
+            this.params.softness * pr,
+            refCellPx * 1.8,
+        );
+        const densityNorm =
+            (refSoftnessPx / (refCellPx * refCellPx)) /
+            (softnessPx / (cellPx * cellPx));
+
         // Tone-mapped, tinted composite of the accumulation over the base.
         // `norm` cancels the method's core gain (≈ rays × overlap) so the
         // streak core brightness stays stable as the ray count changes.
@@ -431,7 +446,7 @@ export class LightStreakEffect implements Effect {
             uniforms: {
                 accum,
                 intensity: this.params.intensity,
-                norm: 1 / (rays * 0.9),
+                norm: densityNorm / (rays * 0.9),
                 tint: [
                     this.params.tint[0],
                     this.params.tint[1],
