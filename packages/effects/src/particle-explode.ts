@@ -17,7 +17,6 @@ import {
 } from "./_curl-noise";
 import {
     clampDt,
-    FRAG_CLEAR,
     FRAG_PARTICLE,
     FRAG_TRAIL_COMPOSITE,
     GLSL_HASH,
@@ -418,7 +417,7 @@ export class ParticleExplodeEffect implements Effect {
         const inFadeOut = elapsed >= this.params.duration;
         // Particles done AND trail decayed to invisible — stop drawing.
         if (inFadeOut && this.#fadeOutFrames >= this.#estimatedFadeFrames()) {
-            ctx.draw({ frag: FRAG_CLEAR, target: ctx.target });
+            ctx.clear(ctx.target);
             return;
         }
 
@@ -467,11 +466,11 @@ export class ParticleExplodeEffect implements Effect {
                 });
                 // Drop residual trail from a previous burst so the new
                 // burst doesn't composite the old image on top of itself.
-                ctx.draw({ frag: FRAG_CLEAR, target: this.#trail });
+                ctx.clear(this.#trail);
             }
 
             this.#particleGeometry.instanceCount = cap;
-            ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
+            ctx.clear(this.#stampTex);
             ctx.draw({
                 vert: VERT_PARTICLE,
                 frag: FRAG_PARTICLE,
@@ -496,7 +495,7 @@ export class ParticleExplodeEffect implements Effect {
         } else {
             // Particles done; keep decaying the trail with an empty stamp
             // so trailFade can fade out gracefully instead of cutting.
-            ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
+            ctx.clear(this.#stampTex);
             this.#fadeOutFrames++;
         }
 

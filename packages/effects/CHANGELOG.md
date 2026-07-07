@@ -1,5 +1,11 @@
 # @vfx-js/effects
 
+## 1.3.0
+
+### Minor Changes
+
+- Add new effect: SliceShiftEffect, PixelStretchEffect, WarpEffect, DitherEffect, TilePixelateEffect, PatternRefractionEffect, ColoredEdgesEffects
+
 ## 1.2.0
 
 ### Minor Changes

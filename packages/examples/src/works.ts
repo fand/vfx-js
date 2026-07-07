@@ -179,4 +179,15 @@ export const works: Work[] = [
             "Anamorphic and aperture-diffraction light streaks via instanced sprite splatting: each highlight stretches a thin quad outward, accumulated and tone-mapped into the flare. One knob morphs between a horizontal anamorphic flare and an n-bladed aperture starburst, over the VFX-JS logo, night-time backdrops, or a live video.",
         url: "./works/light-streak.html",
     },
+    {
+        id: "figma-effects",
+        index: "16",
+        title: "Figma Effects",
+        tags: ["effect-api", "Playground"],
+        year: "2026",
+        author: "AMAGI",
+        description:
+            "A playground for the Figma shader effect ports: warp, slice shift, pixel stretch, pattern refraction, pixelate, dither, and colored edges. Pick an image and tweak every parameter live with Tweakpane.",
+        url: "./works/figma-effects.html",
+    },
 ];

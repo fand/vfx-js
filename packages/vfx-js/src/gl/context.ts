@@ -31,14 +31,14 @@ export class GLContext {
     #onLost = new Set<() => void>();
     #onRestored = new Set<() => void>();
 
-    constructor(canvas: HTMLCanvasElement) {
+    constructor(canvas: HTMLCanvasElement, preserveDrawingBuffer = false) {
         const gl = canvas.getContext("webgl2", {
             alpha: true,
             premultipliedAlpha: true,
             antialias: false,
             depth: false,
             stencil: false,
-            preserveDrawingBuffer: false,
+            preserveDrawingBuffer,
         });
         if (!gl) {
             throw new Error("[VFX-JS] WebGL2 is not available.");

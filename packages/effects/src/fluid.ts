@@ -89,12 +89,6 @@ void main() {
 }
 `;
 
-const FRAG_PRESSURE_INIT = `#version 300 es
-precision highp float;
-out vec4 outColor;
-void main() { outColor = vec4(0.0); }
-`;
-
 const FRAG_PRESSURE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -379,7 +373,7 @@ export class FluidEffect implements Effect {
             target: this.#divergence,
         });
 
-        ctx.draw({ frag: FRAG_PRESSURE_INIT, target: this.#pA });
+        ctx.clear(this.#pA);
 
         // Jacobi: ping-pong pA ↔ pB; pCurr holds the latest pressure.
         let pCurr = this.#pA;

@@ -6,7 +6,15 @@ import {
     BadJpegEffect,
     BloomEffect,
     ChromaticEffect,
+    ColoredEdgesEffect,
+    type DitherStyle,
+    DitherEffect,
     DuotoneEffect,
+    TilePixelateEffect,
+    type TilePixelateShape,
+    GradientMapEffect,
+    type GradientMapMixSpace,
+    type GradientMapRepeat,
     FluidEffect,
     GlitchEffect,
     HalftoneEffect,
@@ -15,16 +23,23 @@ import {
     MatrixEffect,
     ParticleEffect,
     ParticleExplodeEffect,
+    PatternRefractionEffect,
+    type RefractionEdgeWrap,
+    type RefractionPattern,
     PixelateEffect,
     PixelSortEffect,
+    PixelStretchEffect,
     RainbowEffect,
     RgbGlitchEffect,
     RgbShiftEffect,
     ScanlineEffect,
     SinewaveEffect,
+    SliceShiftEffect,
     TritoneEffect,
     VignetteEffect,
     VoronoiEffect,
+    type WarpType,
+    WarpEffect,
 } from "@vfx-js/effects";
 import BbbWebm from "./assets/bbb.webm";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -1014,6 +1029,319 @@ export const sinewave = presetStory<SinewaveArgs>(
         frequency: { control: { type: "range", min: 1, max: 30, step: 0.5 } },
         blur: { control: { type: "range", min: 0, max: 20, step: 0.5 } },
     },
+);
+
+// ---------------------------------------------------------------------------
+// Figma Shader effect ports.
+// ---------------------------------------------------------------------------
+
+type ColoredEdgesArgs = {
+    threshold: number;
+    thickness: number;
+    intensity: number;
+    opacity: number;
+    color1: string;
+    color2: string;
+    background: string;
+};
+export const coloredEdges = presetStory<ColoredEdgesArgs>(
+    (a) => new ColoredEdgesEffect(a),
+    {
+        threshold: 0.2,
+        thickness: 3,
+        intensity: 4,
+        opacity: 0,
+        color1: "#ff0000",
+        color2: "#0000ff",
+        background: "#000000",
+    },
+    {
+        threshold: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        thickness: { control: { type: "range", min: 0.5, max: 10, step: 0.5 } },
+        intensity: { control: { type: "range", min: 0, max: 20, step: 0.1 } },
+        opacity: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        color1: { control: { type: "color" } },
+        color2: { control: { type: "color" } },
+        background: { control: { type: "color" } },
+    },
+    { clock: false, src: Pigeon },
+);
+
+const GRADIENT_REPEATS: GradientMapRepeat[] = ["none", "repeat", "mirror"];
+const GRADIENT_MIX_SPACES: GradientMapMixSpace[] = ["srgb", "linear", "oklab"];
+type GradientMapArgs = {
+    color1: string;
+    color2: string;
+    color3: string;
+    scatter: number;
+    offset: number;
+    repeat: GradientMapRepeat;
+    frequency: number;
+    mixSpace: GradientMapMixSpace;
+    speed: number;
+};
+export const gradientMap = presetStory<GradientMapArgs>(
+    (a) =>
+        new GradientMapEffect({
+            colors: [a.color1, a.color2, a.color3],
+            scatter: a.scatter,
+            offset: a.offset,
+            repeat: a.repeat,
+            frequency: a.frequency,
+            mixSpace: a.mixSpace,
+            speed: a.speed,
+        }),
+    {
+        color1: "#ffffff",
+        color2: "#3aa0ff",
+        color3: "#000000",
+        scatter: 0,
+        offset: 0,
+        repeat: "none",
+        frequency: 1,
+        mixSpace: "srgb",
+        speed: 0,
+    },
+    {
+        color1: { control: { type: "color" } },
+        color2: { control: { type: "color" } },
+        color3: { control: { type: "color" } },
+        scatter: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        offset: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        repeat: { control: { type: "select" }, options: GRADIENT_REPEATS },
+        frequency: { control: { type: "range", min: 1, max: 8, step: 1 } },
+        mixSpace: { control: { type: "select" }, options: GRADIENT_MIX_SPACES },
+        speed: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
+    },
+);
+
+type SliceShiftArgs = {
+    shift: number;
+    random: number;
+    centerX: number;
+    centerY: number;
+    size: number;
+    angle: number;
+};
+export const sliceShift = presetStory<SliceShiftArgs>(
+    (a) => new SliceShiftEffect(a),
+    {
+        shift: 0.5,
+        random: 0,
+        centerX: 0.5,
+        centerY: 0.5,
+        size: 100,
+        angle: 0,
+    },
+    {
+        shift: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
+        random: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        size: { control: { type: "range", min: 1, max: 300, step: 1 } },
+        angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
+    },
+    { clock: false },
+);
+
+type PixelStretchArgs = {
+    offset: number;
+    reach: number;
+    smoothness: number;
+    centerX: number;
+    centerY: number;
+    angle: number;
+};
+export const pixelStretch = presetStory<PixelStretchArgs>(
+    (a) => new PixelStretchEffect(a),
+    {
+        offset: 0,
+        reach: 0.2,
+        smoothness: 0,
+        centerX: 0.5,
+        centerY: 0.5,
+        angle: 0,
+    },
+    {
+        offset: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
+        reach: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        smoothness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
+    },
+    { clock: false },
+);
+
+const WARP_TYPES: WarpType[] = ["sine wave", "twist", "ripple"];
+type WarpArgs = {
+    type: WarpType;
+    amplitude: number;
+    frequency: number;
+    centerX: number;
+    centerY: number;
+    speed: number;
+};
+export const warp = presetStory<WarpArgs>(
+    (a) => new WarpEffect(a),
+    {
+        type: "twist",
+        amplitude: 3,
+        frequency: 1,
+        centerX: 0.5,
+        centerY: 0.5,
+        speed: 0,
+    },
+    {
+        type: { control: { type: "select" }, options: WARP_TYPES },
+        amplitude: { control: { type: "range", min: -10, max: 10, step: 0.1 } },
+        frequency: { control: { type: "range", min: 0.1, max: 10, step: 0.1 } },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+    },
+);
+
+const DITHER_STYLES: DitherStyle[] = [
+    "bayer2",
+    "bayer4",
+    "bayer8",
+    "bayer16",
+    "blueNoise",
+    "threshold",
+];
+type DitherArgs = {
+    style: DitherStyle;
+    size: number;
+    levels: number;
+    brightness: number;
+    contrast: number;
+    mono: boolean;
+    monoColor: string;
+};
+// Excluded from VRT: the quantization round() sits on precision-sensitive
+// boundaries, so SwiftShader output isn't a stable snapshot target.
+export const dither = presetStory<DitherArgs>(
+    (a) => new DitherEffect(a),
+    {
+        style: "threshold",
+        size: 2,
+        levels: 3,
+        brightness: 1,
+        contrast: 1,
+        mono: false,
+        monoColor: "#ffffff",
+    },
+    {
+        style: { control: { type: "select" }, options: DITHER_STYLES },
+        size: { control: { type: "range", min: 1, max: 16, step: 1 } },
+        levels: { control: { type: "range", min: 2, max: 16, step: 1 } },
+        brightness: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        contrast: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
+        mono: { control: { type: "boolean" } },
+        monoColor: { control: { type: "color" } },
+    },
+    { clock: false },
+);
+dither.parameters = { chromatic: { disableSnapshot: true } };
+
+const PIXELATE_SHAPES: TilePixelateShape[] = [
+    "rectangle",
+    "ellipse",
+    "hexagon",
+    "triangle",
+];
+type TilePixelateArgs = {
+    shape: TilePixelateShape;
+    size: number;
+    stretch: number;
+    gap: number;
+    colorTrim: number;
+    averageColor: number;
+    dissolve: number;
+    falloff: number;
+    knockout: boolean;
+};
+export const tilePixelate = presetStory<TilePixelateArgs>(
+    (a) => new TilePixelateEffect(a),
+    {
+        shape: "triangle",
+        size: 10,
+        stretch: 1,
+        gap: 0,
+        colorTrim: 2,
+        averageColor: 0.8,
+        dissolve: 0,
+        falloff: 0,
+        knockout: true,
+    },
+    {
+        shape: { control: { type: "select" }, options: PIXELATE_SHAPES },
+        size: { control: { type: "range", min: 2, max: 80, step: 1 } },
+        stretch: { control: { type: "range", min: 0.2, max: 4, step: 0.1 } },
+        gap: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        colorTrim: { control: { type: "range", min: 0, max: 8, step: 1 } },
+        averageColor: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        dissolve: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        falloff: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        knockout: { control: { type: "boolean" } },
+    },
+    { clock: false },
+);
+
+const REFRACTION_PATTERNS: RefractionPattern[] = [
+    "lenticular",
+    "waves",
+    "circular",
+];
+const REFRACTION_EDGE_WRAPS: RefractionEdgeWrap[] = [
+    "zero",
+    "clamp",
+    "repeat",
+    "mirror",
+];
+type PatternRefractionArgs = {
+    pattern: RefractionPattern;
+    strength: number;
+    smoothness: number;
+    frost: number;
+    dispersion: number;
+    edgeWrap: RefractionEdgeWrap;
+    centerX: number;
+    centerY: number;
+    stripWidth: number;
+    angle: number;
+};
+export const patternRefraction = presetStory<PatternRefractionArgs>(
+    (a) => new PatternRefractionEffect(a),
+    {
+        pattern: "lenticular",
+        strength: 0.5,
+        smoothness: 0,
+        frost: 0,
+        dispersion: 0.04,
+        edgeWrap: "zero",
+        centerX: 0.5,
+        centerY: 0.5,
+        stripWidth: 0.05,
+        angle: 0,
+    },
+    {
+        pattern: { control: { type: "select" }, options: REFRACTION_PATTERNS },
+        strength: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        smoothness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        frost: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        dispersion: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        edgeWrap: {
+            control: { type: "select" },
+            options: REFRACTION_EDGE_WRAPS,
+        },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        stripWidth: { control: { type: "range", min: 0.02, max: 1, step: 0.01 } },
+        angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
+    },
+    { clock: false },
 );
 
 type DuotoneArgs = { color1: string; color2: string; speed: number };

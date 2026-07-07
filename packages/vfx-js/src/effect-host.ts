@@ -322,6 +322,7 @@ export class EffectHost {
             wrapTexture: (source, opts) => this.#wrapTexture(source, opts),
             draw: (opts) => this.#draw(opts),
             blit: (source, target, opts) => this.#blit(source, target, opts),
+            clear: (target) => this.#clear(target),
             onContextRestored: (cb) => {
                 const unsub = this.#glCtx.onContextRestored(cb);
                 this.#restoredUnsubs.push(unsub);
@@ -703,6 +704,59 @@ export class EffectHost {
             blend: opts?.blend,
             swap: opts?.swap,
         });
+    }
+
+    #clear(target: EffectRenderTarget | null | undefined): void {
+        if (this.#phase !== "render") {
+            if (this.#phase === "update" && !this.#warnedDrawInUpdate) {
+                this.#warnedDrawInUpdate = true;
+                console.warn(
+                    "[VFX-JS] ctx.clear() called in update(); ignored. Move draws to render().",
+                );
+            }
+            return;
+        }
+
+        const gl = this.#gl;
+        const ctxOutput = this.#mutCtx.target;
+        const rawTarget =
+            target === undefined || target === null ? ctxOutput : target;
+        const isStageOutput = rawTarget === null || rawTarget === ctxOutput;
+
+        gl.clearColor(0, 0, 0, 0);
+
+        if (isStageOutput) {
+            // Stage output (canvas or intermediate RT). Scissor to this
+            // stage's viewport so we don't wipe neighbors sharing the FB.
+            const fbo =
+                rawTarget === null
+                    ? null
+                    : resolveRt(rawTarget).getWriteFbo().fbo;
+            const vp = this.#dims.outputViewport;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            gl.enable(gl.SCISSOR_TEST);
+            gl.scissor(vp.x, vp.y, vp.w, vp.h);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.disable(gl.SCISSOR_TEST);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return;
+        }
+
+        // User RT: clear the whole buffer. Zero both sides of a ping-pong
+        // so the next read side is cleared too.
+        const resolver = resolveRt(rawTarget);
+        gl.disable(gl.SCISSOR_TEST);
+        const clearWrite = () => {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, resolver.getWriteFbo().fbo);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+        };
+        clearWrite();
+        if (resolver.swap) {
+            resolver.swap();
+            clearWrite();
+            resolver.swap();
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
 
     #doDraw(opts: EffectDrawOpts): void {

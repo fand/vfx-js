@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Figma Shaders port on VFX-JS</title>
+<style>
+  :root{
+    --bg:#ffffff; --stage:#f4f4f5; --panel:#ffffff; --ink:#111111;
+    --muted:#6b7280; --line:#e6e6e6; --accent:#0d99ff; --accent-tint:rgba(13,153,255,.12);
+    --topbar-h:64px; --side-w:220px; --footer-h:320px; --tabs-h:52px;
+    /* Shared frame content height: stage minus its padding, the name row,
+       and the frame padding/border. Every frame scales to fill this. */
+    --frame-h:calc(100vh - var(--topbar-h) - var(--footer-h) - 130px);
+    --sans:"Inter","Figma Sans VF",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;}
+
+  /* VFX-JS's canvas defaults to z-index 9999, so all UI sits above it. */
+  .topbar{position:fixed;top:0;left:0;right:0;height:var(--topbar-h);z-index:10002;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 20px;background:#DDFF22;border-bottom:1px solid rgba(0,0,0,.12);}
+  .brand{display:flex;align-items:center;gap:10px;font-size:.92rem;letter-spacing:.02em;}
+  .brand .logo{height:56px;display:block; margin-top: 4px;}
+  .brand strong{font-weight:700;font-size:1.3rem;}
+  .brand span{color:var(--muted);font-weight:500;margin-left:2px;
+    letter-spacing:.02em;font-size:.78rem;}
+  .cta{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;
+    border-radius:999px;background:var(--ink);color:#fff;text-decoration:none;
+    font-size:.78rem;font-weight:600;letter-spacing:.02em;}
+  .cta:hover{background:#000;}
+
+  .sidebar{position:fixed;top:var(--topbar-h);left:0;bottom:0;width:var(--side-w);
+    z-index:10000;background:var(--panel);border-right:1px solid var(--line);
+    padding:18px 14px;overflow:auto;}
+  .side-title{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);margin:0 2px 10px;}
+  /* Effect toggles — click to enable/disable, drag to reorder apply order. */
+  .side-btn{position:relative;display:flex;align-items:center;gap:8px;width:100%;
+    padding:10px 12px;margin-bottom:6px;border:1px solid var(--line);border-radius:8px;
+    background:var(--panel);color:var(--ink);font:inherit;font-size:.85rem;font-weight:500;
+    text-align:left;cursor:grab;transition:border-color .12s,background .12s;}
+  .side-btn:hover{border-color:var(--accent);}
+  .side-btn .grip{color:var(--muted);font-size:.9rem;}
+  .side-btn .label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .side-btn .mark{width:1em;text-align:center;color:var(--muted);font-size:1.05rem;line-height:1;}
+  .side-btn.active{border-color:var(--accent);background:var(--accent-tint);}
+  .side-btn.active .mark{color:var(--accent);}
+  .side-btn.dragging{opacity:.4;}
+  .side-btn.drop-before::after,.side-btn.drop-after::after{content:"";
+    position:absolute;left:0;right:0;height:3px;border-radius:999px;
+    background:var(--accent);box-shadow:0 0 0 2px var(--accent-tint);}
+  .side-btn.drop-before::after{top:-5px;}
+  .side-btn.drop-after::after{bottom:-5px;}
+
+  /* Full-screen loader shown until every frame source has loaded. */
+  .loader{position:fixed;inset:0;z-index:10050;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;background:var(--bg);
+    color:var(--muted);font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;
+    transition:opacity .3s;}
+  .loader.done{opacity:0;pointer-events:none;}
+  .loader .spinner{width:34px;height:34px;border-radius:50%;
+    border:3px solid var(--line);border-top-color:var(--accent);
+    animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* Horizontal gallery: frames scroll left/right and snap to center. */
+  .stage{position:fixed;top:var(--topbar-h);left:var(--side-w);right:0;bottom:var(--footer-h);
+    display:flex;align-items:center;gap:40px;overflow-x:auto;overflow-y:hidden;
+    overscroll-behavior:none;
+    padding:40px;background:var(--stage);scroll-snap-type:x mandatory;scroll-padding-inline:40px;}
+  /* One gallery cell: a name label above its frame. */
+  .frame-cell{flex:0 0 auto;scroll-snap-align:center;cursor:pointer;
+    display:flex;flex-direction:column;align-items:flex-start;gap:10px;}
+  /* Trailing room so the last frame can scroll out from under the pane (300 + 16). */
+  .frame-cell:last-child{margin-right:316px;}
+  .frame-name{font-size:.82rem;font-weight:600;letter-spacing:.02em;color:var(--muted);
+    white-space:nowrap;transition:color .15s;}
+  .frame-cell.selected .frame-name{color:var(--ink);}
+  .frame{background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px;line-height:0;
+    outline:2px solid transparent;outline-offset:3px;transition:outline-color .15s;}
+  /* The frame currently driven by the sidebar/pane. */
+  .frame-cell.selected .frame{outline-color:var(--accent);}
+  /* Every frame scales to the shared stage height; width follows aspect. */
+  .frame img,.frame video{display:block;border-radius:4px;
+    height:var(--frame-h);width:auto;}
+  /* Text source: a real DOM block VFX renders to a texture. */
+  .frame-text{box-sizing:border-box;width:min(46vw,560px);height:var(--frame-h);
+    padding:48px 44px;overflow:hidden;display:flex;flex-direction:column;justify-content:center;
+    line-height:1.32;color:var(--ink);background:#fff;border-radius:4px;text-align:left;}
+  .frame-text h1{font-size:5rem;font-weight:800;letter-spacing:-.01em;margin-bottom:18px;}
+  .frame-text p{font-size:2.5rem;font-weight:450;color:#374151;margin-bottom:12px;}
+  .frame-text p:last-child{margin-bottom:0;}
+  /* Webcam placeholder shown until the user starts the camera. */
+  .frame-webcam{box-sizing:border-box;display:grid;place-items:center;
+    width:min(40vw,480px);height:var(--frame-h);background:#111;border-radius:4px;}
+  .frame-webcam-btn{padding:14px 28px;border:none;border-radius:999px;
+    background:var(--accent);color:#fff;font:inherit;font-weight:700;font-size:1rem;
+    letter-spacing:.02em;cursor:pointer;}
+  .frame-webcam-btn:hover{filter:brightness(1.05);}
+  .frame [hidden]{display:none;}
+
+  .pane{position:fixed;top:calc(var(--topbar-h) + 16px);right:16px;width:300px;z-index:10000;
+    max-height:calc(100vh - var(--topbar-h) - var(--footer-h) - 32px);overflow:auto;
+    border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.10);
+    /* Tweakpane light theme */
+    --tp-base-background-color:#ffffff;--tp-base-shadow-color:rgba(0,0,0,.1);
+    --tp-button-background-color:#f0f0f0;--tp-button-background-color-active:#d8d8d8;
+    --tp-button-background-color-focus:#e4e4e4;--tp-button-background-color-hover:#e8e8e8;
+    --tp-button-foreground-color:#111111;
+    --tp-container-background-color:#f6f6f6;--tp-container-background-color-active:#e2e2e2;
+    --tp-container-background-color-focus:#ececec;--tp-container-background-color-hover:#efefef;
+    --tp-container-foreground-color:#333333;--tp-groove-foreground-color:#e2e2e2;
+    --tp-input-background-color:#f0f0f0;--tp-input-background-color-active:#e2e2e2;
+    --tp-input-background-color-focus:#e8e8e8;--tp-input-background-color-hover:#ececec;
+    --tp-input-foreground-color:#111111;--tp-label-foreground-color:#555555;
+    --tp-monitor-background-color:#f0f0f0;--tp-monitor-foreground-color:#333333;}
+
+
+  /* Footer: live VFX-JS code snippet for the current effect stack. */
+  .footer{position:fixed;left:var(--side-w);right:0;bottom:0;height:var(--footer-h);
+    z-index:10001;display:flex;flex-direction:column;
+    background:var(--bg);border-top:1px solid var(--line);padding:12px 16px;}
+  .footer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .copy-btn{height:28px;padding:0 12px;border:1px solid var(--line);border-radius:999px;
+    background:var(--panel);color:var(--ink);font:inherit;font-size:.74rem;font-weight:600;
+    cursor:pointer;transition:border-color .12s,background .12s;}
+  .copy-btn:hover{border-color:var(--accent);background:var(--accent-tint);}
+  .code{flex:1;overflow-y:scroll;overflow-x:auto;margin:0;background:#1c1c22;
+    border:1px solid #2a2a32;border-radius:8px;padding:12px 14px;}
+  /* Force an always-visible scrollbar (macOS overlay bars hide otherwise). */
+  .code::-webkit-scrollbar{width:10px;height:10px;}
+  .code::-webkit-scrollbar-track{background:transparent;}
+  .code::-webkit-scrollbar-thumb{background:#45454f;border-radius:999px;
+    border:2px solid #1c1c22;}
+  .code::-webkit-scrollbar-thumb:hover{background:#5a5a66;}
+  .code code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.78rem;line-height:1.5;color:#e6e6e6;white-space:pre;}
+  .t-com{color:#6a9955;}.t-str{color:#ce9178;}.t-kw{color:#569cd6;}
+  .t-num{color:#b5cea8;}.t-cls{color:#4ec9b0;}.t-prop{color:#9cdcfe;}
+
+  /* Bottom tab bar to open the panels as sheets — narrow screens only. */
+  .mobile-tabs{display:none;}
+
+  /* Narrow screens: the three fixed panels become bottom sheets the user
+     opens one at a time; the gallery fills the rest of the screen. */
+  @media (max-width:720px){
+    .brand span{display:none;}
+    .brand .logo{height:40px;margin-top:0;}
+    .brand strong{font-size:1.05rem;}
+
+    /* Gallery takes the full area above the tab bar. */
+    .stage{left:0;right:0;bottom:var(--tabs-h);gap:20px;padding:20px;
+      scroll-snap-type:none;
+      --frame-h:calc(100vh - var(--topbar-h) - var(--tabs-h) - 80px);}
+    .frame-cell:last-child{margin-right:20px;}
+    /* Webcam needs a permission prompt; skip it on mobile. */
+    .frame-cell[data-source="Webcam"]{display:none;}
+    /* Fit each frame to one screen width; height follows aspect, capped to
+       the stage so the whole frame stays visible and vertically centered. */
+    .frame img,.frame video{height:auto;width:auto;
+      max-width:calc(100vw - 56px);max-height:var(--frame-h);}
+    .frame-text{width:calc(100vw - 56px);height:auto;max-height:var(--frame-h);
+      padding:28px 26px;}
+    .frame-text h1{font-size:2rem;margin-bottom:10px;}
+    .frame-text p{font-size:1rem;}
+    .frame-webcam{width:calc(100vw - 56px);
+      height:min(var(--frame-h),calc(100vw - 56px));}
+
+    /* Shared bottom-sheet frame: slides up from behind the tab bar. */
+    .sidebar,.pane,.footer{position:fixed;left:0;right:0;top:auto;
+      bottom:var(--tabs-h);width:auto;height:min(36vh,360px);max-height:none;
+      border:none;border-top:1px solid var(--line);border-radius:14px 14px 0 0;
+      box-shadow:0 -8px 24px rgba(0,0,0,.18);overflow:auto;z-index:10003;
+      transform:translateY(115%);transition:transform .25s ease;}
+    body.sheet-effects .sidebar{transform:none;}
+    body.sheet-controls .pane{transform:none;}
+    body.sheet-code .footer{transform:none;}
+
+    /* Bottom tab bar. */
+    .mobile-tabs{display:flex;position:fixed;left:0;right:0;bottom:0;
+      height:var(--tabs-h);z-index:10004;background:var(--panel);
+      border-top:1px solid var(--line);}
+    .mobile-tabs button{flex:1;border:none;background:none;font:inherit;
+      font-size:.8rem;font-weight:600;color:var(--muted);cursor:pointer;
+      border-top:2px solid transparent;}
+    body.sheet-effects .mobile-tabs [data-sheet="effects"],
+    body.sheet-controls .mobile-tabs [data-sheet="controls"],
+    body.sheet-code .mobile-tabs [data-sheet="code"]{
+      color:var(--accent);border-top-color:var(--accent);
+      background:var(--accent-tint);}
+  }
+</style>
+</head>
+<body>
+<div class="loader" id="loader"><div class="spinner"></div><span>Loading</span></div>
+<header class="topbar">
+  <div class="brand"><img class="logo" src="./vfx-js-logo.svg" alt="VFX-JS">
+  <strong>Figma Shaders</strong>
+  <span>-</span>
+  <span class="detail">Figma's Shader effects ported to VFX-JS. Available on npm now.</span></div>
+  <a class="cta" href="https://github.com/fand/vfx-js" target="_blank" rel="noopener">GitHub ↗</a>
+</header>
+<aside class="sidebar" id="sidebar">
+  <div class="side-title">Effects · click to toggle, drag to sort</div>
+  <div id="effect-list"></div>
+</aside>
+<main class="stage" id="stage"></main>
+<div class="pane" id="pane"></div>
+<footer class="footer">
+  <div class="footer-head">
+    <span class="side-title" style="margin:0">Code</span>
+    <button class="copy-btn" id="copy-btn">Copy</button>
+  </div>
+  <pre class="code"><code id="snippet"></code></pre>
+</footer>
+<nav class="mobile-tabs" id="mobile-tabs">
+  <button data-sheet="effects">Effects</button>
+  <button data-sheet="controls">Controls</button>
+  <button data-sheet="code">Code</button>
+</nav>
+
+<script type="module">
+import { VFX } from "@vfx-js/core";
+import {
+  ColoredEdgesEffect,
+  DitherEffect,
+  TilePixelateEffect,
+  GradientMapEffect,
+  HalftoneEffect,
+  PatternRefractionEffect,
+  PixelStretchEffect,
+  SliceShiftEffect,
+  WarpEffect,
+} from "@vfx-js/effects";
+import { Pane } from "tweakpane";
+
+// Source media. Images load into <img>; video/webcam into <video>. The
+// first one loads on start.
+const MEDIA = {
+  Sculpt: { type: "image", src: new URL("./figma-effects/sculpt2.webp", import.meta.url).href },
+  Tower: { type: "image", src: new URL("./pixelsort/tower1.webp", import.meta.url).href },
+  City: { type: "image", src: new URL("./pixelsort/city1.webp", import.meta.url).href },
+  Octopus: { type: "image", src: new URL("./pixelsort/octo.webp", import.meta.url).href },
+  Debug: { type: "image", src: new URL("./debug.png", import.meta.url).href },
+  "jellyfish (video)": { type: "video", src: new URL("./jellyfish.mp4", import.meta.url).href },
+  Text: {
+    type: "text",
+    html: `<h1>Effects on Text</h1>
+<p>VFX-JS applies WebGL shaders straight to live HTML — text included.</p>`,
+  },
+  Webcam: { type: "webcam" },
+};
+
+// A control descriptor drives one Tweakpane binding. `options` makes a
+// list, `color` a color picker, `min/max` a slider; booleans bind as-is.
+const slider = (min, max, step) => ({ min, max, step });
+
+const EFFECTS = {
+  Warp: {
+    make: () => new WarpEffect(),
+    controls: {
+      type: { options: ["sine wave", "twist", "ripple"] },
+      amplitude: slider(-20, 20, 0.1),
+      frequency: slider(0.1, 10, 0.1),
+      centerX: slider(0, 1, 0.01),
+      centerY: slider(0, 1, 0.01),
+      speed: slider(0, 5, 0.05),
+    },
+  },
+  "Slice shift": {
+    make: () => new SliceShiftEffect(),
+    controls: {
+      shift: slider(-2, 2, 0.01),
+      random: slider(0, 1, 0.01),
+      centerX: slider(0, 1, 0.01),
+      centerY: slider(0, 1, 0.01),
+      size: slider(4, 400, 1),
+      angle: slider(-180, 180, 1),
+    },
+  },
+  "Pixel stretch": {
+    make: () => new PixelStretchEffect(),
+    controls: {
+      offset: slider(-1, 1, 0.01),
+      reach: slider(0, 1, 0.01),
+      smoothness: slider(0, 1, 0.01),
+      centerX: slider(0, 1, 0.01),
+      centerY: slider(0, 1, 0.01),
+      angle: slider(-180, 180, 1),
+    },
+  },
+  "Pattern refraction": {
+    make: () => new PatternRefractionEffect(),
+    controls: {
+      pattern: { options: ["lenticular", "waves", "circular"] },
+      strength: slider(0, 2, 0.01),
+      smoothness: slider(0, 1, 0.01),
+      frost: slider(0, 2, 0.01),
+      dispersion: slider(0, 1, 0.01),
+      edgeWrap: { options: ["zero", "clamp", "repeat", "mirror"] },
+      centerX: slider(0, 1, 0.01),
+      centerY: slider(0, 1, 0.01),
+      stripWidth: slider(0.02, 1, 0.01),
+      angle: slider(-180, 180, 1),
+    },
+  },
+  Pixelate: {
+    make: () => new TilePixelateEffect(),
+    controls: {
+      shape: { options: ["rectangle", "ellipse", "hexagon", "triangle"] },
+      size: slider(2, 80, 1),
+      stretch: slider(0.2, 4, 0.1),
+      gap: slider(0, 1, 0.01),
+      colorTrim: slider(0, 8, 1),
+      averageColor: slider(0, 1, 0.01),
+      dissolve: slider(0, 1, 0.01),
+      falloff: slider(0, 1, 0.01),
+      knockout: {},
+    },
+  },
+  Dither: {
+    make: () => new DitherEffect(),
+    controls: {
+      style: { options: ["bayer2", "bayer4", "bayer8", "bayer16", "blueNoise", "threshold"] },
+      size: slider(1, 16, 1),
+      levels: slider(2, 16, 1),
+      brightness: slider(0, 2, 0.01),
+      contrast: slider(0, 4, 0.05),
+      mono: {},
+      monoColor: { color: true },
+    },
+  },
+  Halftone: {
+    make: () => new HalftoneEffect(),
+    controls: {
+      gridSize: slider(2, 80, 1),
+      dotSize: slider(0, 2, 0.05),
+      smoothing: slider(0, 1, 0.01),
+      angle: slider(-180, 180, 1),
+      mode: { options: ["rgb", "cmyk"] },
+      blackAmount: slider(0, 1, 0.01),
+      trimEdge: {},
+    },
+  },
+  "Colored edges": {
+    make: () => new ColoredEdgesEffect(),
+    controls: {
+      threshold: slider(0, 1, 0.01),
+      thickness: slider(0.5, 10, 0.5),
+      intensity: slider(0, 20, 0.1),
+      opacity: slider(0, 1, 0.01),
+      color1: { color: true },
+      color2: { color: true },
+      background: { color: true },
+    },
+  },
+  "Gradient map": {
+    make: () => new GradientMapEffect(),
+    // `colorStops` adds N gradient color pickers bound to params.colors.
+    colorStops: 3,
+    controls: {
+      scatter: slider(0, 1, 0.01),
+      offset: slider(0, 1, 0.01),
+      repeat: { options: ["none", "repeat", "mirror"] },
+      frequency: slider(1, 8, 1),
+      mixSpace: { options: ["srgb", "linear", "oklab"] },
+      speed: slider(-1, 1, 0.01),
+    },
+  },
+};
+
+const vfx = new VFX();
+
+// Tweakpane turns a string key like "edgeWrap" into "Edge wrap"; a list
+// option label maps to itself.
+function tpOptions(values) {
+  const o = {};
+  for (const v of values) o[v] = v;
+  return o;
+}
+
+// "Slice shift" -> "Slice Shift" for display labels.
+const titleCase = (s) => s.replace(/\b\w/g, (c) => c.toUpperCase());
+
+// Each gallery frame seeds its own source and a preset effect stack.
+const FRAME_PRESETS = [
+  {
+    name: "Pixel Stretch + Gradient Map + Dither",
+    source: "Sculpt",
+    effects: [
+      "Pixel stretch",
+      { key: "Gradient map", params: { frequency: 2, speed: 0.12 } },
+      { key: "Dither", params: { contrast: 1.5 } },
+    ],
+  },
+  {
+    name: "Pattern Refraction",
+    source: "Tower",
+    effects: [
+      {
+        key: "Pattern refraction",
+        params: { pattern: "lenticular", angle: 30, strength: 1.5, dispersion: 0.3, stripWidth: 0.1 },
+      },
+    ],
+  },
+  {
+    name: "Pixel Stretch",
+    source: "City",
+    effects: [{ key: "Pixel stretch", params: { reach: 1, angle: 0 } }],
+  },
+  {
+    name: "Gradient Map + Halftone on Video",
+    source: "jellyfish (video)",
+    effects: [
+      { key: "Gradient map", params: { colors: ["#ff5500", "#33ddff", "#000000"] } },
+      { key: "Halftone", params: { smoothing: 0, mode: "cmyk", blackAmount: 0 } },
+    ],
+  },
+  {
+    name: "Warp + Pixelate on Text",
+    source: "Text",
+    effects: [
+      { key: "Warp", params: { type: "ripple", amplitude: 0.5, speed: 2.5 } },
+      { key: "Pixelate", params: { shape: "hexagon", size: 8 } },
+    ],
+  },
+  {
+    name: "Dither on WebCam",
+    source: "Webcam",
+    effects: [{ key: "Dither", params: { size: 5, contrast: 1.5 } }],
+  },
+];
+
+// One editable frame: its own media element + effect stack, mounted on
+// the shared VFX instance. The selected frame drives the sidebar/pane.
+class FrameView {
+  constructor(cfg, index) {
+    this.index = index;
+    this.source = cfg.source;
+    // Per-frame effect stack. `active` toggles inclusion; list order is
+    // the apply order (last = on top). Instances are lazy.
+    this.items = Object.keys(EFFECTS).map((key, i) => ({
+      key,
+      uid: i + 1,
+      active: false,
+      effect: null,
+    }));
+    this.applyPreset(cfg.effects);
+
+    this.root = document.createElement("div");
+    this.root.className = "frame-cell";
+    this.root.dataset.source = cfg.source;
+    const name = document.createElement("div");
+    name.className = "frame-name";
+    name.textContent = cfg.name;
+    const frame = document.createElement("div");
+    frame.className = "frame";
+    this.img = document.createElement("img");
+    this.img.alt = "effect target";
+    this.video = document.createElement("video");
+    this.video.muted = true;
+    this.video.loop = true;
+    this.video.playsInline = true;
+    this.video.hidden = true;
+    this.text = document.createElement("div");
+    this.text.className = "frame-text";
+    this.text.hidden = true;
+    this.webcam = document.createElement("div");
+    this.webcam.className = "frame-webcam";
+    this.webcam.hidden = true;
+    const startBtn = document.createElement("button");
+    startBtn.className = "frame-webcam-btn";
+    startBtn.textContent = "Start WebCam";
+    startBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.startWebcam();
+    });
+    this.webcam.appendChild(startBtn);
+    frame.append(this.img, this.video, this.text, this.webcam);
+    this.root.append(name, frame);
+    this.root.addEventListener("click", () => selectFrame(this.index, true));
+
+    this.activeEl = this.img; // element the next mount uses
+    this.addedEl = null; // element currently registered with VFX
+    this.webcamStream = null;
+    this.mountChain = Promise.resolve();
+  }
+
+  // Enable the preset effects (each a key or {key, params}) and move them
+  // to the front in preset order.
+  applyPreset(presets) {
+    const norm = presets.map((p) => (typeof p === "string" ? { key: p } : p));
+    const keys = norm.map((p) => p.key);
+    const order = [
+      ...keys,
+      ...this.items.map((i) => i.key).filter((k) => !keys.includes(k)),
+    ];
+    this.items.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+    for (const p of norm) {
+      const it = this.items.find((i) => i.key === p.key);
+      if (!it) continue;
+      it.active = true;
+      it.effect = EFFECTS[p.key].make();
+      if (p.params) Object.assign(it.effect.params, p.params);
+    }
+  }
+
+  activeItems() {
+    return this.items.filter((it) => it.active);
+  }
+
+  stopWebcam() {
+    if (this.webcamStream) {
+      for (const t of this.webcamStream.getTracks()) t.stop();
+      this.webcamStream = null;
+    }
+  }
+
+  // Show <img>, hide the rest, and load an image source.
+  loadImage(src) {
+    this.stopWebcam();
+    this.video.hidden = true;
+    this.video.removeAttribute("src");
+    this.text.hidden = true;
+    this.webcam.hidden = true;
+    this.img.hidden = false;
+    this.activeEl = this.img;
+    return new Promise((resolve) => {
+      this.img.onload = () => resolve();
+      this.img.src = src;
+    });
+  }
+
+  // Show the text block, hide the rest.
+  loadText(html) {
+    this.stopWebcam();
+    this.img.hidden = true;
+    this.video.hidden = true;
+    this.video.removeAttribute("src");
+    this.webcam.hidden = true;
+    this.text.innerHTML = html;
+    this.text.hidden = false;
+    this.activeEl = this.text;
+    return Promise.resolve();
+  }
+
+  // Show the Start WebCam button; nothing renders until the user clicks it.
+  showWebcam() {
+    this.stopWebcam();
+    this.img.hidden = true;
+    this.video.hidden = true;
+    this.text.hidden = true;
+    this.webcam.hidden = false;
+    this.activeEl = null;
+    return Promise.resolve();
+  }
+
+  // Ask for the camera, then play it as this frame's source.
+  async startWebcam() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      this.webcamStream = stream;
+      await this.loadVideo(stream, true);
+      await this.mount();
+    } catch (err) {
+      console.error("Webcam failed:", err);
+    }
+  }
+
+  // Show <video>, hide the rest, and play a file or the webcam stream.
+  async loadVideo(srcOrStream, isStream) {
+    this.img.hidden = true;
+    this.text.hidden = true;
+    this.webcam.hidden = true;
+    this.video.hidden = false;
+    this.activeEl = this.video;
+    if (isStream) {
+      this.video.srcObject = srcOrStream;
+      this.video.removeAttribute("src");
+    } else {
+      this.stopWebcam();
+      this.video.srcObject = null;
+      this.video.src = srcOrStream;
+    }
+    await new Promise((resolve) => {
+      this.video.onloadeddata = () => resolve();
+      this.video.load();
+    });
+    await this.video.play().catch(() => {});
+  }
+
+  // Load a named source from MEDIA (image / video / webcam).
+  async loadSource(name) {
+    const m = MEDIA[name];
+    if (!m) return;
+    this.source = name;
+    if (m.type === "image") {
+      await this.loadImage(m.src);
+    } else if (m.type === "text") {
+      await this.loadText(m.html);
+    } else if (m.type === "video") {
+      await this.loadVideo(m.src, false);
+    } else if (m.type === "webcam") {
+      await this.showWebcam();
+    }
+  }
+
+  // Rebuild this frame's VFX pipeline. Serialized: a remove + re-add must
+  // finish before the next runs, or VFX rejects the re-attached instances.
+  mount() {
+    this.mountChain = this.mountChain.then(() => this.doMount());
+    return this.mountChain;
+  }
+  async doMount() {
+    if (this.addedEl) {
+      vfx.remove(this.addedEl);
+      this.addedEl = null;
+    }
+    const active = this.activeItems();
+    if (active.length > 0 && this.activeEl) {
+      await vfx.add(this.activeEl, { effect: active.map((s) => s.effect) });
+      this.addedEl = this.activeEl;
+    }
+  }
+}
+
+function bindControl(folder, params, key, cfg) {
+  if (cfg.options) {
+    folder.addBinding(params, key, { options: tpOptions(cfg.options) });
+  } else if (typeof cfg.min === "number") {
+    folder.addBinding(params, key, cfg);
+  } else if (cfg.color) {
+    // Inline picker expands in the scroll flow, so the pane can scroll to
+    // it instead of an absolute popup getting clipped by overflow.
+    folder.addBinding(params, key, { picker: "inline" });
+  } else {
+    // Booleans and plain values bind as-is.
+    folder.addBinding(params, key);
+  }
+}
+
+function buildPane() {
+  pane?.dispose();
+  pane = new Pane({ container: document.getElementById("pane"), title: `Frame ${selected + 1}` });
+  const frame = cur();
+
+  const srcProxy = { Source: frame.source };
+  pane.addBinding(srcProxy, "Source", { options: tpOptions(Object.keys(MEDIA)) })
+    .on("change", async (ev) => {
+      try {
+        await frame.loadSource(ev.value);
+      } catch (err) {
+        console.error("Failed to load source:", err);
+      }
+      await frame.mount();
+    });
+  pane.addButton({ title: "Upload image…" }).on("click", () => fileInput.click());
+  pane.addBlade({ view: "separator" });
+
+  // One folder of params per applied effect (order/remove live in the
+  // sidebar stack list).
+  frame.activeItems().forEach((entry, i) => {
+    const def = EFFECTS[entry.key];
+    const folder = pane.addFolder({ title: `${i + 1} · ${entry.key}`, expanded: true });
+    if (def.colorStops) bindGradientStops(folder, entry.effect, def.colorStops);
+    for (const [key, cfg] of Object.entries(def.controls)) {
+      bindControl(folder, entry.effect.params, key, cfg);
+    }
+  });
+
+  // Any param edit refreshes the generated snippet.
+  pane.on("change", updateSnippet);
+}
+
+// Format a JS literal for a param value.
+function formatValue(v) {
+  if (Array.isArray(v)) return `[${v.map(formatValue).join(", ")}]`;
+  return JSON.stringify(v);
+}
+
+// Params that differ from the effect's defaults, so the snippet only
+// shows what the user actually changed.
+function changedParams(effect) {
+  const cur = effect.params;
+  const def = new effect.constructor().params;
+  const out = {};
+  for (const k of Object.keys(cur)) {
+    if (JSON.stringify(cur[k]) !== JSON.stringify(def[k])) out[k] = cur[k];
+  }
+  return out;
+}
+
+// Build a copy-pasteable VFX-JS snippet from the active stack.
+function genSnippet() {
+  const active = cur().activeItems();
+  if (active.length === 0) return "// Enable an effect to generate code.";
+  const names = [...new Set(active.map((s) => s.effect.constructor.name))];
+  const lines = active.map((s) => {
+    const cls = s.effect.constructor.name;
+    const diff = changedParams(s.effect);
+    const keys = Object.keys(diff);
+    if (keys.length === 0) return `    new ${cls}(),`;
+    const args = keys.map((k) => `${k}: ${formatValue(diff[k])}`).join(", ");
+    return `    new ${cls}({ ${args} }),`;
+  });
+  return [
+    `import { VFX } from "@vfx-js/core";`,
+    `import { ${names.join(", ")} } from "@vfx-js/effects";`,
+    ``,
+    `const vfx = new VFX();`,
+    `vfx.add(element, {`,
+    `  effect: [`,
+    ...lines,
+    `  ],`,
+    `});`,
+  ].join("\n");
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Minimal JS highlighter for the generated snippet (known small grammar).
+const TOKEN =
+  /(\/\/[^\n]*)|("(?:[^"\\]|\\.)*")|\b(import|from|const|new)\b|\b(\d+(?:\.\d+)?)\b|([A-Z][A-Za-z0-9]*)|([A-Za-z_]\w*)(?=\s*:)/g;
+function highlight(code) {
+  return escapeHtml(code).replace(
+    TOKEN,
+    (m, com, str, kw, num, cls, prop) => {
+      if (com) return `<span class="t-com">${com}</span>`;
+      if (str) return `<span class="t-str">${str}</span>`;
+      if (kw) return `<span class="t-kw">${kw}</span>`;
+      if (num) return `<span class="t-num">${num}</span>`;
+      if (cls) return `<span class="t-cls">${cls}</span>`;
+      if (prop) return `<span class="t-prop">${prop}</span>`;
+      return m;
+    },
+  );
+}
+
+let snippetText = "";
+function updateSnippet() {
+  snippetText = genSnippet();
+  document.getElementById("snippet").innerHTML = highlight(snippetText);
+}
+
+// Add N color pickers for a gradient effect, writing back to params.colors.
+function bindGradientStops(folder, effect, n) {
+  const proxy = {};
+  for (let i = 0; i < n; i++) {
+    proxy[`stop${i}`] = effect.params.colors[i] ?? "#ffffff";
+  }
+  const sync = () => {
+    effect.params.colors = Array.from({ length: n }, (_, i) => proxy[`stop${i}`]);
+  };
+  for (let i = 0; i < n; i++) {
+    folder
+      .addBinding(proxy, `stop${i}`, { label: `color ${i + 1}`, picker: "inline" })
+      .on("change", sync);
+  }
+}
+
+// The sidebar effect list: the selected frame's effects as toggles, in
+// apply order, draggable to reorder. Active items show their position.
+let dragUid = null;
+function buildEffectList() {
+  listEl.innerHTML = "";
+  for (const it of cur().items) {
+    const btn = document.createElement("div");
+    btn.className = "side-btn" + (it.active ? " active" : "");
+    btn.draggable = true;
+    btn.innerHTML =
+      `<span class="grip">⠿</span>` +
+      `<span class="label">${titleCase(it.key)}</span>` +
+      `<span class="mark">${it.active ? "✓" : "+"}</span>`;
+
+    btn.addEventListener("click", () => toggleEffect(it.uid));
+    btn.addEventListener("dragstart", (e) => {
+      dragUid = it.uid;
+      e.dataTransfer.effectAllowed = "move";
+      btn.classList.add("dragging");
+    });
+    btn.addEventListener("dragend", () => btn.classList.remove("dragging"));
+    btn.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      const r = btn.getBoundingClientRect();
+      const after = e.clientY - r.top > r.height / 2;
+      btn.classList.toggle("drop-after", after);
+      btn.classList.toggle("drop-before", !after);
+    });
+    btn.addEventListener("dragleave", () =>
+      btn.classList.remove("drop-before", "drop-after"),
+    );
+    btn.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation(); // handled here, not by the sidebar end-drop
+      const r = btn.getBoundingClientRect();
+      const after = e.clientY - r.top > r.height / 2;
+      btn.classList.remove("drop-before", "drop-after");
+      reorderEffect(dragUid, it.uid, after);
+    });
+    listEl.appendChild(btn);
+  }
+}
+
+// Enable/disable an effect (instance kept so params persist on re-toggle).
+function toggleEffect(uid) {
+  const it = cur().items.find((i) => i.uid === uid);
+  if (!it) return;
+  it.active = !it.active;
+  if (it.active && !it.effect) it.effect = EFFECTS[it.key].make();
+  cur().mount();
+  refreshControls();
+}
+
+// Move the dragged effect to just before/after the drop target.
+function reorderEffect(fromUid, toUid, after) {
+  if (fromUid == null || fromUid === toUid) return;
+  const list = cur().items;
+  const from = list.findIndex((i) => i.uid === fromUid);
+  if (from < 0) return;
+  const [moved] = list.splice(from, 1);
+  let to = list.findIndex((i) => i.uid === toUid);
+  if (after) to += 1;
+  list.splice(to, 0, moved);
+  cur().mount();
+  refreshControls();
+}
+
+// Move the dragged effect to the end (drop in the empty area below).
+function moveToEnd(uid) {
+  if (uid == null) return;
+  const list = cur().items;
+  const from = list.findIndex((i) => i.uid === uid);
+  if (from < 0 || from === list.length - 1) return;
+  const [moved] = list.splice(from, 1);
+  list.push(moved);
+  cur().mount();
+  refreshControls();
+}
+
+// Gallery frames and the one currently being edited.
+let frames = [];
+let selected = 0;
+let pane = null;
+const cur = () => frames[selected];
+
+// Rebuild the sidebar, pane, and snippet for the selected frame.
+function refreshControls() {
+  buildEffectList();
+  buildPane();
+  updateSnippet();
+}
+
+// Make frame `i` the edit target; optionally scroll it into view.
+function selectFrame(i, doScroll) {
+  if (i < 0 || i >= frames.length) return;
+  const changed = i !== selected;
+  selected = i;
+  frames.forEach((f, idx) => f.root.classList.toggle("selected", idx === selected));
+  if (doScroll) {
+    cur().root.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }
+  if (changed) refreshControls();
+}
+
+const listEl = document.getElementById("effect-list");
+const stageEl = document.getElementById("stage");
+
+// Scrolling the stage selects whichever frame is nearest the center.
+let scrollRaf = 0;
+stageEl.addEventListener("scroll", () => {
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0;
+    const mid = stageEl.scrollLeft + stageEl.clientWidth / 2;
+    let best = 0;
+    let bestD = Infinity;
+    frames.forEach((f, idx) => {
+      const c = f.root.offsetLeft + f.root.offsetWidth / 2;
+      const d = Math.abs(c - mid);
+      if (d < bestD) {
+        bestD = d;
+        best = idx;
+      }
+    });
+    if (best !== selected) selectFrame(best, false);
+  });
+});
+
+// Mobile: each tab opens its panel as a bottom sheet; tapping the open
+// tab or the gallery closes it. Only one sheet is open at a time.
+const SHEET_CLASS = { effects: "sheet-effects", controls: "sheet-controls", code: "sheet-code" };
+function openSheet(name) {
+  const cls = SHEET_CLASS[name];
+  const isOpen = document.body.classList.contains(cls);
+  document.body.classList.remove(...Object.values(SHEET_CLASS));
+  if (!isOpen && cls) document.body.classList.add(cls);
+}
+document.getElementById("mobile-tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-sheet]");
+  if (btn) openSheet(btn.dataset.sheet);
+});
+stageEl.addEventListener("pointerdown", () =>
+  document.body.classList.remove(...Object.values(SHEET_CLASS)),
+);
+
+// Dropping in the sidebar's empty area (below the list) moves to the end.
+const sidebarEl = document.getElementById("sidebar");
+sidebarEl.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  if (e.target.closest(".side-btn")) return;
+  listEl.lastElementChild?.classList.add("drop-after");
+});
+sidebarEl.addEventListener("dragleave", (e) => {
+  if (e.target.closest(".side-btn")) return;
+  listEl.lastElementChild?.classList.remove("drop-after");
+});
+sidebarEl.addEventListener("drop", (e) => {
+  e.preventDefault();
+  listEl.lastElementChild?.classList.remove("drop-after");
+  moveToEnd(dragUid);
+});
+
+// Hidden input for local file uploads.
+const fileInput = document.createElement("input");
+fileInput.type = "file";
+fileInput.accept = "image/*";
+fileInput.style.display = "none";
+document.body.appendChild(fileInput);
+fileInput.addEventListener("change", async () => {
+  const f = fileInput.files?.[0];
+  if (!f) return;
+  await cur().loadImage(URL.createObjectURL(f));
+  await cur().mount();
+});
+
+const copyBtn = document.getElementById("copy-btn");
+copyBtn.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(snippetText);
+  copyBtn.textContent = "Copied";
+  setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
+});
+
+// Build the gallery, load each source, mount each preset, then select frame 1.
+frames = FRAME_PRESETS.map((cfg, i) => new FrameView(cfg, i));
+for (const f of frames) stageEl.appendChild(f.root);
+await Promise.all(
+  frames.map((f) =>
+    f.loadSource(f.source).catch((err) =>
+      console.error(`Failed to load source "${f.source}":`, err),
+    ),
+  ),
+);
+await Promise.all(frames.map((f) => f.mount()));
+frames[0].root.classList.add("selected");
+refreshControls();
+document.getElementById("loader").classList.add("done");
+</script>
+</body>
+</html>
