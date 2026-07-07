@@ -59,7 +59,7 @@ precision highp float;
 out vec4 outColor;
 uniform sampler2D src;
 uniform float threshold;   // highlight cutoff
-uniform float maxBrightness; // upper clamp on source brightness
+uniform float highlightClamp; // upper clamp on source highlight brightness
 uniform int dim;
 ${GLSL_CELL}
 void main() {
@@ -68,9 +68,9 @@ void main() {
     // Max-channel knee, hue preserved, clamped so blown-out sources
     // don't dominate. gate is the highlight factor in [0,1].
     float vmax = max(max(c.r, c.g), c.b);
-    if (vmax > maxBrightness) {
-        c *= maxBrightness / vmax;
-        vmax = maxBrightness;
+    if (vmax > highlightClamp) {
+        c *= highlightClamp / vmax;
+        vmax = highlightClamp;
     }
     float gate = max(0.0, vmax - threshold) / max(vmax, 1e-5);
     outColor = vec4(c, gate);
@@ -230,10 +230,11 @@ export type LightStreakParams = {
     /** Highlight cutoff in [0,1]. Only highlights above this throw streaks. */
     threshold: number;
     /**
-     * Upper clamp on source brightness (per Blender's highlight
+     * Upper clamp on source highlight brightness (Blender's highlight
      * "Maximum"), so blown-out sources don't dominate the accumulation.
+     * Floored to just above `threshold`; lower values have no extra effect.
      */
-    maxBrightness: number;
+    highlightClamp: number;
     /**
      * Streak brightness. Drives a soft-saturating tone map
      * (`1 - exp(-acc * intensity)`), so raising it brightens without
@@ -290,7 +291,7 @@ const DEFAULT_PARAMS: LightStreakParams = {
     softness: 2,
     falloff: 1.5,
     threshold: 0.75,
-    maxBrightness: 1.0,
+    highlightClamp: 1.0,
     intensity: 3.0,
     tint: [0.6, 0.8, 1.0],
     dispersion: -0.5,
@@ -384,7 +385,12 @@ export class LightStreakEffect implements Effect {
             uniforms: {
                 src: ctx.src,
                 threshold: this.params.threshold,
-                maxBrightness: this.params.maxBrightness,
+                // Keep the clamp above threshold; below it the knee would
+                // zero every highlight and the effect would vanish.
+                highlightClamp: Math.max(
+                    this.params.threshold + 1e-3,
+                    this.params.highlightClamp,
+                ),
                 dim,
             },
         });
