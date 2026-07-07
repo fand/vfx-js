@@ -15,6 +15,8 @@ class HTMLVideoElementStub {
     videoHeight = 0;
 }
 class HTMLImageElementStub {
+    src = "";
+    currentSrc = "";
     naturalWidth = 0;
     naturalHeight = 0;
 }

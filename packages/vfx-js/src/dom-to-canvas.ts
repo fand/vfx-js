@@ -1,3 +1,5 @@
+import { getImageSourceUrl } from "./image-source.js";
+
 /**
  * Convert HTML string to valid XML.
  * @internal
@@ -141,7 +143,7 @@ async function syncStylesOfTree(
     } else if (el2.tagName === "IMG") {
         try {
             (el2 as HTMLImageElement).src = await toObjectUrl(
-                (el1 as HTMLImageElement).src,
+                getImageSourceUrl(el1 as HTMLImageElement),
             );
         } catch {
             // Cross-origin fetch failed; keep original src

@@ -16,6 +16,7 @@ import { Quad } from "./gl/quad.js";
 import { loadImage, Texture, type TextureWrap } from "./gl/texture.js";
 import { Vec2, Vec4 } from "./gl/vec.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
+import { getImageSourceUrl } from "./image-source.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import { ProgramCache } from "./program-cache.js";
 import {
@@ -369,14 +370,15 @@ export class VFXPlayer {
         let isGif = false;
         if (element instanceof HTMLImageElement) {
             type = "img" as VFXElementType;
-            isGif = !!element.src.match(/\.gif/i);
+            const imageUrl = getImageSourceUrl(element);
+            isGif = !!imageUrl.match(/\.gif/i);
 
             if (isGif) {
-                const gif = await GIFData.create(element.src, this.#pixelRatio);
+                const gif = await GIFData.create(imageUrl, this.#pixelRatio);
                 gifFor.set(element, gif);
                 texture = new Texture(this.#ctx, gif.getCanvas());
             } else {
-                const img = await loadImage(element.src);
+                const img = await loadImage(imageUrl);
                 texture = new Texture(this.#ctx, img);
             }
         } else if (element instanceof HTMLVideoElement) {
@@ -663,14 +665,15 @@ export class VFXPlayer {
         let isGif = false;
         if (element instanceof HTMLImageElement) {
             type = "img" as VFXElementType;
-            isGif = !!element.src.match(/\.gif/i);
+            const imageUrl = getImageSourceUrl(element);
+            isGif = !!imageUrl.match(/\.gif/i);
 
             if (isGif) {
-                const gif = await GIFData.create(element.src, this.#pixelRatio);
+                const gif = await GIFData.create(imageUrl, this.#pixelRatio);
                 gifFor.set(element, gif);
                 texture = new Texture(this.#ctx, gif.getCanvas());
             } else {
-                const img = await loadImage(element.src);
+                const img = await loadImage(imageUrl);
                 texture = new Texture(this.#ctx, img);
             }
         } else if (element instanceof HTMLVideoElement) {
@@ -919,7 +922,7 @@ export class VFXPlayer {
             return;
         }
 
-        const img = await loadImage(element.src);
+        const img = await loadImage(getImageSourceUrl(element));
         const oldTexture = e.srcTexture;
         const texture = new Texture(this.#ctx, img);
         texture.wrapS = oldTexture.wrapS;
