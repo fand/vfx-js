@@ -871,6 +871,17 @@ export type EffectContext = {
     ): void;
 
     /**
+     * Zero a render target with a fast GPU clear, instead of a full-screen
+     * draw. Use it to reset accumulation / trail buffers each frame.
+     *
+     * Omit `target` (or pass `null`) to clear the stage's assigned output.
+     * Clears both sides of a ping-pong (`persistent: true`) RT.
+     *
+     * Only valid during `Effect.render()`; other calls are ignored.
+     */
+    clear(target?: EffectRenderTarget | null): void;
+
+    /**
      * Raw WebGL2 context, for low-level operations
      * (DataTexture upload, extensions, MRT, etc).
      *
