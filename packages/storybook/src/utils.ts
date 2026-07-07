@@ -5,6 +5,7 @@ import type {
     FluidEffect,
     HalftoneEffect,
     HalftoneInkPresetName,
+    LightStreakEffect,
     ParticleEffect,
     ParticleExplodeEffect,
     PixelSortEffect,
@@ -91,6 +92,81 @@ export function attachBloomPane(title: string, effect: BloomEffect): Pane {
         step: 1,
         view: "number",
     });
+    trackPane(pane);
+    return pane;
+}
+
+export function attachLightStreakPane(
+    title: string,
+    effect: LightStreakEffect,
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: false });
+    pane.addBinding(effect.params, "streaks", { min: 1, max: 24, step: 1 });
+    pane.addBinding(effect.params, "angle", { min: 0, max: 360, step: 1 });
+    pane.addBinding(effect.params, "threshold", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect.params, "highlightClamp", {
+        min: 0.1,
+        max: 1,
+        step: 0.01,
+    });
+    pane.addBinding(effect.params, "intensity", { min: 0, max: 8, step: 0.01 });
+    pane.addBinding(effect.params, "dispersion", {
+        min: -1,
+        max: 1,
+        step: 0.01,
+    });
+    pane.addBinding(effect.params, "fringe", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect.params, "fringeCount", { min: 1, max: 32, step: 1 });
+
+    // `tint` is a tuple; Tweakpane's float color picker needs {r,g,b}, so
+    // mirror it and write the tuple back on change.
+    const [tr, tg, tb] = effect.params.tint;
+    const tintState = { tint: { r: tr, g: tg, b: tb } };
+    pane.addBinding(tintState, "tint", { color: { type: "float" } }).on(
+        "change",
+        (ev) => {
+            effect.params.tint = [ev.value.r, ev.value.g, ev.value.b];
+        },
+    );
+
+    const shape = pane.addFolder({ title: "Shape", expanded: false });
+    shape.addBinding(effect.params, "length", { min: 0, max: 2000, step: 1 });
+    shape.addBinding(effect.params, "softness", {
+        min: 0.5,
+        max: 8,
+        step: 0.1,
+    });
+    shape.addBinding(effect.params, "falloff", {
+        min: 0.5,
+        max: 10,
+        step: 0.05,
+    });
+    shape.addBinding(effect.params, "density", {
+        min: 64,
+        max: 512,
+        step: 32,
+    });
+    shape.addBinding(effect.params, "resolution", {
+        min: 0.1,
+        max: 1,
+        step: 0.05,
+    });
+
+    // `pad` is `number | "fullscreen"` — bind just the numeric path (see
+    // attachBloomPane).
+    pane.addBinding(effect.params, "pad", {
+        min: 0,
+        max: 800,
+        step: 1,
+        view: "number",
+    });
+
     trackPane(pane);
     return pane;
 }

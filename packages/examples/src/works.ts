@@ -169,19 +169,8 @@ export const works: Work[] = [
             "https://github.com/fand/vfx-js/blob/main/packages/examples/works/depth-bokeh/index.html",
     },
     {
-        id: "light-streak",
-        index: "15",
-        title: "Light Streak",
-        tags: ["effect-api", "Postprocess"],
-        year: "2026",
-        author: "AMAGI",
-        description:
-            "Anamorphic and aperture-diffraction light streaks via instanced sprite splatting: each highlight stretches a thin quad outward, accumulated and tone-mapped into the flare. One knob morphs between a horizontal anamorphic flare and an n-bladed aperture starburst, over the VFX-JS logo, night-time backdrops, or a live video.",
-        url: "./works/light-streak.html",
-    },
-    {
         id: "figma-effects",
-        index: "16",
+        index: "15",
         title: "Figma Effects",
         tags: ["effect-api", "Playground"],
         year: "2026",
