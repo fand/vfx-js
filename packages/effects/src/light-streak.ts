@@ -185,13 +185,6 @@ void main() {
 }
 `;
 
-// Zero the accumulation buffer at the start of each frame.
-const FRAG_CLEAR = `#version 300 es
-precision highp float;
-out vec4 outColor;
-void main() { outColor = vec4(0.0); }
-`;
-
 // Tone-mapped composite of the accumulated streaks over the source.
 // `1 - exp(-x)` softly saturates dense overlaps toward `tint`.
 const FRAG_COMPOSITE = `#version 300 es
@@ -397,7 +390,7 @@ export class LightStreakEffect implements Effect {
         });
 
         // Accumulate every ray's streaks into the float buffer.
-        ctx.draw({ frag: FRAG_CLEAR, target: accum, blend: "none" });
+        ctx.clear(accum);
 
         const rays = Math.max(1, Math.round(this.params.streaks));
         const lengthPx = this.params.length * pr;
@@ -441,7 +434,8 @@ export class LightStreakEffect implements Effect {
             refCellPx * 1.8,
         );
         const densityNorm =
-            (refSoftnessPx / (refCellPx * refCellPx)) /
+            refSoftnessPx /
+            (refCellPx * refCellPx) /
             (softnessPx / (cellPx * cellPx));
 
         // Tone-mapped, tinted composite of the accumulation over the base.
