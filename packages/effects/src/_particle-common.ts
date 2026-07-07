@@ -14,12 +14,6 @@ float hash21(vec2 p) {
 }
 `;
 
-export const FRAG_CLEAR = `#version 300 es
-precision highp float;
-out vec4 outColor;
-void main() { outColor = vec4(0.0); }
-`;
-
 // Disc sprite with smooth falloff. Premultiplied output: additive
 // blend lets overlapping particles brighten naturally.
 export const FRAG_PARTICLE = `#version 300 es
