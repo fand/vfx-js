@@ -72,7 +72,7 @@
   <video id="video" crossorigin="anonymous" muted loop playsinline hidden></video>
 </div>
 
-<div class="hint">Pick a source and switch anamorphic ↔ aperture starburst in the panel</div>
+<div class="hint">Pick a source and tune the streaks in the panel</div>
 
 <script type="module">
   import { VFX } from "@vfx-js/core";
@@ -172,10 +172,9 @@
     }
   }
 
-  // Mutable params driving the effect. One `preset` morphs between a single
-  // horizontal axis (anamorphic flare) and an n-bladed aperture starburst.
+  // Mutable params driving the effect. `streaks: 2` is a single horizontal
+  // axis (anamorphic flare); higher counts are an aperture starburst.
   const params = {
-    preset: "anamorphic",
     streaks: 6,
     angle: 0,
     // source adjustment (chained before the streak)
@@ -203,8 +202,7 @@
       maxBrightness: params.maxBrightness,
       intensity: params.intensity,
       tint: [params.tintR, params.tintG, params.tintB],
-      // Anamorphic is a single horizontal axis = 2 opposing rays.
-      streaks: params.preset === "anamorphic" ? 2 : params.streaks,
+      streaks: params.streaks,
       angle: params.angle,
       length: params.length,
       softness: params.softness,
@@ -280,11 +278,6 @@
       options: Object.fromEntries(SOURCES.map((i) => [i.label, i.id])),
     })
     .on("change", (e) => switchImage(e.value));
-  pane
-    .addBinding(params, "preset", {
-      options: { anamorphic: "anamorphic", "aperture star": "aperture" },
-    })
-    .on("change", sync);
   pane.addBinding(params, "streaks", { min: 1, max: 24, step: 1 }).on("change", sync);
   pane.addBinding(params, "angle", { min: 0, max: 360, step: 1 }).on("change", sync);
 
