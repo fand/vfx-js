@@ -321,6 +321,7 @@ function makeGlStub() {
         enable: vi.fn(),
         clearColor: vi.fn(),
         clear: vi.fn(),
+        scissor: vi.fn(),
         blendFunc: vi.fn(),
     } as unknown as WebGL2RenderingContext;
 }
@@ -985,6 +986,63 @@ describe("EffectHost.draw", () => {
         host.ctx.draw({ frag: FRAG, target: rt });
         // No backbuffer at all; nothing to assert beyond "did not throw".
         expect(backbuffers).toHaveLength(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// clear — fast GPU clear (no draw)
+// ---------------------------------------------------------------------------
+
+describe("EffectHost.clear", () => {
+    it("clears a user RT with no draw", () => {
+        const { host, gl } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget();
+        host.ctx.clear(rt);
+        expect(programs).toHaveLength(0);
+        expect(gl.clear).toHaveBeenCalled();
+        expect(gl.clearColor).toHaveBeenCalledWith(0, 0, 0, 0);
+    });
+
+    it("persistent RT: zeroes both sides, leaving read/write orientation", () => {
+        const { host, gl } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        host.ctx.clear(rt);
+        // Two clears (one per buffer), two swaps that net to identity.
+        expect(gl.clear).toHaveBeenCalledTimes(2);
+        expect(backbuffers[0].swaps).toBe(2);
+    });
+
+    it("stage output (null target): scissors to the stage viewport", () => {
+        const { host, gl } = makeHost();
+        host.setFrameDims({
+            outputBufferW: 100,
+            outputBufferH: 100,
+            canvasBufferSize: [200, 200],
+            outputViewport: { x: 10, y: 20, w: 30, h: 40 },
+            elementBufferW: 100,
+            elementBufferH: 100,
+            contentRectUv: [0, 0, 1, 1],
+            srcRectUv: [0, 0, 1, 1],
+        });
+        host.setPhase("render");
+        host.ctx.clear();
+        expect(gl.enable).toHaveBeenCalledWith(gl.SCISSOR_TEST);
+        expect(gl.scissor).toHaveBeenCalledWith(10, 20, 30, 40);
+        expect(gl.bindFramebuffer).toHaveBeenCalledWith(gl.FRAMEBUFFER, null);
+    });
+
+    it("in update() phase is a no-op and warns once", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const { host, gl } = makeHost();
+        host.setPhase("update");
+        const rt = host.ctx.createRenderTarget();
+        host.ctx.clear(rt);
+        host.ctx.clear(rt);
+        expect(gl.clear).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
     });
 });
 

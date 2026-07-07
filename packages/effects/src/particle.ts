@@ -22,7 +22,6 @@ import {
 } from "./_curl-noise";
 import {
     clampDt,
-    FRAG_CLEAR,
     FRAG_PARTICLE,
     FRAG_TRAIL_COMPOSITE,
     GLSL_HASH,
@@ -710,7 +709,7 @@ export class ParticleEffect implements Effect {
 
         const cap = this.#cap();
         this.#particleGeometry.instanceCount = cap;
-        ctx.draw({ frag: FRAG_CLEAR, target: this.#stampTex });
+        ctx.clear(this.#stampTex);
         ctx.draw({
             vert: VERT_PARTICLE,
             frag: FRAG_PARTICLE,
