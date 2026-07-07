@@ -194,6 +194,7 @@
     softness: 2,
     falloff: 1.5,
     density: 256,
+    resolution: 0.5,
   };
 
   function liveParams() {
@@ -212,6 +213,7 @@
       fringe: params.fringe,
       fringeCount: params.fringeCount,
       density: params.density,
+      resolution: params.resolution,
       // Long streaks need a big reach; "fullscreen" bounds the buffer to
       // the canvas instead of growing pad past the GPU texture limit.
       pad: params.length > 400 ? "fullscreen" : Math.ceil(params.length * 1.2),
@@ -303,6 +305,7 @@
   shape.addBinding(params, "softness", { min: 0.5, max: 8, step: 0.1 }).on("change", sync);
   shape.addBinding(params, "falloff", { min: 0.5, max: 10, step: 0.05 }).on("change", sync);
   shape.addBinding(params, "density", { min: 64, max: 512, step: 32 }).on("change", sync);
+  shape.addBinding(params, "resolution", { min: 0.1, max: 1, step: 0.05 }).on("change", sync);
 
   const tint = pane.addFolder({ title: "Tint" });
   tint.addBinding(params, "tintR", { min: 0, max: 1, step: 0.01 }).on("change", sync);

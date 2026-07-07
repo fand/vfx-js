@@ -274,6 +274,12 @@ export type LightStreakParams = {
      */
     density: number;
     /**
+     * Accumulation buffer resolution relative to the output, 0..1.
+     * Streaks are soft, so `0.5` looks nearly identical and cuts GPU
+     * bandwidth to a quarter. `1` accumulates at full resolution.
+     */
+    resolution: number;
+    /**
      * Extra pad around the element in CSS px so streaks aren't clipped at
      * the element edge. Should be ≥ `length`. `"fullscreen"` reaches the
      * viewport edges.
@@ -298,6 +304,7 @@ const DEFAULT_PARAMS: LightStreakParams = {
     fringe: 0.0,
     fringeCount: 8,
     density: 256,
+    resolution: 0.5,
     pad: 160,
 };
 
@@ -349,10 +356,11 @@ export class LightStreakEffect implements Effect {
         const src = ctx.dims.srcRect;
         const pr = ctx.dims.pixelRatio;
 
-        // Full-resolution float accumulation buffer (streaks accumulate
-        // past 1.0, tone-mapped at composite).
-        const aw = Math.max(2, Math.round(dst[2]));
-        const ah = Math.max(2, Math.round(dst[3]));
+        // Float accumulation buffer, scaled by `resolution` (streaks
+        // accumulate past 1.0, tone-mapped at composite).
+        const res = Math.min(Math.max(this.params.resolution, 0.1), 1);
+        const aw = Math.max(2, Math.round(dst[2] * res));
+        const ah = Math.max(2, Math.round(dst[3] * res));
         if (aw !== this.#lastW || ah !== this.#lastH) {
             this.#accum?.dispose();
             this.#accum = ctx.createRenderTarget({
