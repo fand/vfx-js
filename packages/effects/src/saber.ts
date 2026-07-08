@@ -132,7 +132,6 @@ uniform float noiseScaleStep;
 uniform float sharpness;
 uniform float jitterSpeed;
 uniform float jitterPower;
-uniform float animSpeed;
 
 // Each overlaid line contributes this much less than the previous one.
 const float WEIGHT_FALLOFF = 0.6;
@@ -199,24 +198,6 @@ void main() {
         weight *= WEIGHT_FALLOFF;
     }
 
-    // Current flowing along the edge. The distance-field gradient is the
-    // edge normal; its angle acts as a pseudo arc-length around the
-    // silhouette, so animating bright bands by that angle reads as current
-    // travelling along the outline. (Convex shapes flow cleanly; concave
-    // ones break where the normal angle is non-monotonic.)
-    if (animSpeed != 0.0) {
-        vec2 e = 1.0 / res;
-        vec2 g = vec2(
-            texture(distField, uv + vec2(e.x, 0.0)).r
-                - texture(distField, uv - vec2(e.x, 0.0)).r,
-            texture(distField, uv + vec2(0.0, e.y)).r
-                - texture(distField, uv - vec2(0.0, e.y)).r
-        );
-        float ang = atan(g.y, g.x);
-        float flow = 0.5 + 0.5 * sin(ang * 4.0 - time * animSpeed);
-        glow *= 0.35 + 0.65 * flow;
-    }
-
     // White-hot core where the glow saturates.
     float coreV = smoothstep(0.9, 1.0, glow * core);
     vec3 col = color * glow + coreV;
@@ -277,11 +258,6 @@ export type SaberParams = {
      */
     jitterPower: number;
     /**
-     * Speed of "current" flowing along the edge, driven by the SDF
-     * gradient angle. 0 = off. Sign controls direction.
-     */
-    animSpeed: number;
-    /**
      * Rebuild the distance field every frame instead of caching it. Needed
      * for live sources (video / webcam) whose silhouette changes; leave
      * `false` for static images and text to avoid the per-frame JFA cost.
@@ -309,7 +285,6 @@ const DEFAULT_PARAMS: SaberParams = {
     sharpness: 1.0,
     jitterSpeed: 1.0,
     jitterPower: 0.0,
-    animSpeed: 0.0,
     dynamic: false,
     pad: 80,
 };
@@ -408,7 +383,6 @@ export class SaberEffect implements Effect {
             sharpness,
             jitterSpeed,
             jitterPower,
-            animSpeed,
         } = this.params;
         const lineCount = Math.max(
             1,
@@ -434,7 +408,6 @@ export class SaberEffect implements Effect {
                 sharpness,
                 jitterSpeed,
                 jitterPower,
-                animSpeed,
             },
             target: ctx.target,
         });
