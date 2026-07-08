@@ -28,7 +28,7 @@ lightStreak.play = async ({ canvasElement }) => {
     });
 
     const vfx = initVFX();
-    const effect = new LightStreakEffect({ length: 220, pad: 280 });
+    const effect = new LightStreakEffect();
     await vfx.add(img, { effect });
 
     const sources = { Logo, Live, Robot };

@@ -284,21 +284,21 @@ export type LightStreakParams = {
 const REF_DENSITY = 256;
 
 const DEFAULT_PARAMS: LightStreakParams = {
-    streaks: 4,
+    streaks: 2,
     angle: 0,
-    length: 160,
-    width: 2,
+    length: 300,
+    width: 3,
     falloff: 2.0,
     threshold: 0.9,
     highlightClamp: 1.0,
     intensity: 0.5,
     tint: [1.0, 1.0, 1.0],
-    dispersion: -0.2,
-    fringe: 0.2,
+    dispersion: -0.3,
+    fringe: 0.5,
     fringeCount: 1.5,
     density: 256,
-    resolution: 0.5,
-    pad: 160,
+    resolution: 0.2,
+    pad: 300,
 };
 
 /**
