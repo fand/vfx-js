@@ -115,7 +115,7 @@ export function attachLightStreakPane(
         max: 1,
         step: 0.01,
     });
-    pane.addBinding(effect.params, "intensity", { min: 0, max: 8, step: 0.01 });
+    pane.addBinding(effect.params, "intensity", { min: 0, max: 2, step: 0.01 });
     pane.addBinding(effect.params, "dispersion", {
         min: -1,
         max: 1,
@@ -141,7 +141,7 @@ export function attachLightStreakPane(
 
     const shape = pane.addFolder({ title: "Shape", expanded: false });
     shape.addBinding(effect.params, "length", { min: 0, max: 2000, step: 1 });
-    shape.addBinding(effect.params, "softness", {
+    shape.addBinding(effect.params, "width", {
         min: 1,
         max: 100,
         step: 1,

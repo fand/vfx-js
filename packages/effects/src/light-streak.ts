@@ -94,7 +94,7 @@ uniform vec4 srcRect;
 uniform vec4 dstRect;
 uniform float angle;       // streak direction (rad)
 uniform float lengthPx;    // max streak length (physical px)
-uniform float softnessPx;  // streak cross-section width (physical px)
+uniform float widthPx;     // streak cross-section width (physical px)
 
 out float v_along;
 out float v_cross;
@@ -124,7 +124,7 @@ void main() {
     vec2 perp = vec2(-dir.y, dir.x);
 
     vec2 offPx = dir * (position.x * lengthPx)
-               + perp * (position.y * softnessPx * 0.5);
+               + perp * (position.y * widthPx * 0.5);
 
     // px → NDC delta; the divide by w/h is undone by the viewport mapping.
     vec2 ndc = centerNdc + offPx * 2.0 / dstRect.zw;
@@ -219,7 +219,7 @@ export type LightStreakParams = {
      * each streak. Thinner than the sampling grid cell and the streak
      * breaks into stripes; raise `density` for thin-yet-continuous streaks.
      */
-    softness: number;
+    width: number;
     /**
      * Exponential length fade decay rate. Higher concentrates the
      * brightness into a tighter core near the source and trails a fainter
@@ -287,7 +287,7 @@ const DEFAULT_PARAMS: LightStreakParams = {
     streaks: 4,
     angle: 0,
     length: 160,
-    softness: 2,
+    width: 2,
     falloff: 2.0,
     threshold: 0.9,
     highlightClamp: 1.0,
@@ -401,7 +401,7 @@ export class LightStreakEffect implements Effect {
         const lengthPx = this.params.length * pr;
         // Streak width, taken straight as a pixel value. Thinner than the
         // sampling grid cell and streaks break into stripes; raise density.
-        const softnessPx = this.params.softness * pr;
+        const widthPx = this.params.width * pr;
 
         const baseAngle = (this.params.angle * Math.PI) / 180;
         for (let k = 0; k < rays; k++) {
@@ -419,7 +419,7 @@ export class LightStreakEffect implements Effect {
                     dstRect: [dst[0], dst[1], dst[2], dst[3]],
                     angle,
                     lengthPx,
-                    softnessPx,
+                    widthPx,
                     falloff: this.params.falloff,
                     dispersion: this.params.dispersion,
                     fringe: this.params.fringe,
@@ -428,9 +428,9 @@ export class LightStreakEffect implements Effect {
             });
         }
 
-        // Sprite overlap per pixel scales with density² (softness is a
-        // fixed pixel width, so it cancels); divide it out against a
-        // reference density so brightness holds as density changes.
+        // Sprite overlap per pixel scales with density² (width is a fixed
+        // pixel value, so it cancels); divide it out against a reference
+        // density so brightness holds as density changes.
         const densityNorm = (REF_DENSITY / dim) ** 2;
 
         // Tone-mapped, tinted composite of the accumulation over the base.
