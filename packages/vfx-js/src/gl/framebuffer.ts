@@ -114,6 +114,11 @@ export class Framebuffer implements Restorable {
         // RGBA16F as a fallback if linear filtering on RGBA32F is not
         // supported by the GPU.
         const floatLinear = this.#ctx.floatLinearFilter;
+        if (this.float && floatLinear && !this.#ctx.floatBlend) {
+            // Blending into RGBA32F needs EXT_float_blend; fail fast
+            // instead of letting blended draws drop silently.
+            throw new Error("[VFX-JS] EXT_float_blend is not supported.");
+        }
         const internalFormat = this.float
             ? floatLinear
                 ? gl.RGBA32F

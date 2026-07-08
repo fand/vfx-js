@@ -143,6 +143,19 @@ export type VFXOpts = {
     postEffect?: VFXPostEffect | VFXPass[];
 
     /**
+     * Keep the WebGL drawing buffer across frames (Default: `false`).
+     *
+     * Enable this to read the canvas (via `VFX.canvas`) outside the frame
+     * it was rendered in — e.g. to composite the output into another
+     * canvas. It can slightly raise memory and GPU cost, so leave it off
+     * unless you need it.
+     *
+     * This is a context-creation flag, so it is fixed for the life of the
+     * VFX instance and cannot be changed at runtime.
+     */
+    preserveDrawingBuffer?: boolean;
+
+    /**
      * Playback rate of the animation clock that drives the `time` uniform
      * (Default: `1`).
      *
@@ -166,6 +179,7 @@ export type VFXOptsInner = {
     scrollPadding: [number, number];
     wrapper: HTMLElement | undefined;
     postEffects: (VFXPostEffect | VFXPass)[];
+    preserveDrawingBuffer: boolean;
     timeScale: number;
 };
 
@@ -208,6 +222,7 @@ export function getVFXOpts(opts: VFXOpts): VFXOptsInner {
         scrollPadding,
         wrapper: opts.wrapper,
         postEffects,
+        preserveDrawingBuffer: opts.preserveDrawingBuffer ?? false,
         timeScale: opts.timeScale ?? 1,
     };
 }
@@ -524,11 +539,19 @@ export type VFXPostEffect = {
  *
  * `width` / `height` are physical pixels of the source's native size
  * (`0` for images / videos that haven't loaded yet).
+ *
+ * Call `dispose()` to release the underlying GL texture eagerly. Idempotent.
+ * Only textures you created via {@link EffectContext.wrapTexture} are freed;
+ * framework-owned textures (e.g. `ctx.src`) ignore the call. Do not use the
+ * handle after disposing it. Effects that rebuild a wrapped texture (e.g. a
+ * regenerated atlas) should dispose the previous handle to avoid leaking it
+ * until the effect is removed.
  */
 export type EffectTexture = {
     readonly width: number;
     readonly height: number;
     readonly __brand: "EffectTexture";
+    dispose(): void;
 };
 
 /**
@@ -798,6 +821,15 @@ export type EffectContext = {
     createRenderTarget(opts?: EffectRenderTargetOpts): EffectRenderTarget;
 
     /**
+     * Free the GPU buffers compiled for a geometry.
+     *
+     * Call before dropping or replacing an `EffectGeometry` (e.g. on a
+     * density change); otherwise its buffers live until the effect
+     * chain is disposed.
+     */
+    releaseGeometry(geometry: EffectGeometry): void;
+
+    /**
      * Wrap an externally-produced texture for use as a uniform.
      *
      * Each call allocates a new GPU texture (no caching), so call this
@@ -846,6 +878,17 @@ export type EffectContext = {
         target?: EffectRenderTarget | null,
         opts?: EffectBlitOpts,
     ): void;
+
+    /**
+     * Zero a render target with a fast GPU clear, instead of a full-screen
+     * draw. Use it to reset accumulation / trail buffers each frame.
+     *
+     * Omit `target` (or pass `null`) to clear the stage's assigned output.
+     * Clears both sides of a ping-pong (`persistent: true`) RT.
+     *
+     * Only valid during `Effect.render()`; other calls are ignored.
+     */
+    clear(target?: EffectRenderTarget | null): void;
 
     /**
      * Raw WebGL2 context, for low-level operations

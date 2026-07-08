@@ -1,28 +1,46 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-import type { Effect } from "@vfx-js/core";
+import type { Effect, VFX } from "@vfx-js/core";
 import {
+    AsciiEffect,
+    type AsciiPresetName,
     BadJpegEffect,
     BloomEffect,
     ChromaticEffect,
+    ColoredEdgesEffect,
+    type DitherStyle,
+    DitherEffect,
     DuotoneEffect,
+    TilePixelateEffect,
+    type TilePixelateShape,
+    GradientMapEffect,
+    type GradientMapMixSpace,
+    type GradientMapRepeat,
     FluidEffect,
     GlitchEffect,
     HalftoneEffect,
     HueShiftEffect,
     JPEGGlitchEffect,
+    MatrixEffect,
     ParticleEffect,
     ParticleExplodeEffect,
+    PatternRefractionEffect,
+    type RefractionEdgeWrap,
+    type RefractionPattern,
     PixelateEffect,
     PixelSortEffect,
+    PixelStretchEffect,
     RainbowEffect,
     RgbGlitchEffect,
     RgbShiftEffect,
     SaberEffect,
     ScanlineEffect,
     SinewaveEffect,
+    SliceShiftEffect,
     TritoneEffect,
     VignetteEffect,
     VoronoiEffect,
+    type WarpType,
+    WarpEffect,
 } from "@vfx-js/effects";
 import BbbWebm from "./assets/bbb.webm";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -354,6 +372,82 @@ export const badJpeg: StoryObj<BadJpegArgs> = {
     parameters: { chromatic: { disableSnapshot: true } },
 };
 
+// Deterministic PRNG (mulberry32). The particle effect spawns from
+// Math.random(); seeding it makes spawn positions identical across VRT
+// runs.
+function makeSeededRandom(seed: number): () => number {
+    let a = seed >>> 0;
+    return () => {
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+// Steps to drive and fixed per-step clock delta for VRT capture.
+const VRT_STEPS = 60;
+const VRT_DT = 1 / 60;
+// Fewer steps for the particle sims — each step is a heavy GPU frame
+// under SwiftShader (the Chromatic capture renderer), and the full
+// count drives it past the capture time budget.
+const PARTICLE_VRT_STEPS = 40;
+const EXPLODE_STEPS = 24;
+// Capture-only particle count. Far below the interactive default so the
+// SwiftShader fill/advect cost stays well within Chromatic's budget; a
+// 128x128 grid still fills a rich, recognizable frame.
+const VRT_PARTICLE_COUNT = 128 * 128;
+
+// Deterministic VRT driver for the stateful sims (Fluid, Particle,
+// Particle Explode). Advances the virtual clock by a fixed dt and sweeps
+// the pointer in a circle, rendering one frame per step. The VFX must be
+// created with `autoplay: false` so no RAF loop runs after this returns —
+// Chromatic then captures exactly the final frame, identical every run.
+//
+// Each step yields to the event loop before rendering. The frozen clock
+// (setTime pins ctx.time, so the sim's dt comes from the fixed step, not
+// wall time) keeps the result identical no matter how long each yield
+// takes — while sidestepping the long synchronous GPU burst that trips
+// SwiftShader's renderer-hang watchdog in the Chromatic capture env.
+//
+// Math.random is seeded for the duration so particle spawns are
+// reproducible. `onReady` fires once before the first render — used to
+// trigger the one-shot Explode burst on a deterministic frame.
+async function driveVrt(
+    vfx: VFX,
+    element: HTMLElement,
+    opts: { steps?: number; onReady?: () => void } = {},
+): Promise<void> {
+    const steps = opts.steps ?? VRT_STEPS;
+    const rect = element.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const radius = Math.min(rect.width, rect.height) * 0.3;
+
+    const realRandom = Math.random;
+    Math.random = makeSeededRandom(0x9e3779b9);
+    try {
+        opts.onReady?.();
+        let time = 0;
+        for (let i = 0; i < steps; i++) {
+            await new Promise<void>((r) => setTimeout(r, 0));
+            const angle = (i / steps) * Math.PI * 2;
+            window.dispatchEvent(
+                new MouseEvent("pointermove", {
+                    clientX: cx + Math.cos(angle) * radius,
+                    clientY: cy + Math.sin(angle) * radius,
+                    bubbles: true,
+                }),
+            );
+            time += VRT_DT;
+            vfx.setTime(time);
+            vfx.render();
+        }
+    } finally {
+        Math.random = realRandom;
+    }
+}
+
 // Stable Fluid as a single Effect. Drives mouse splats off real pointer
 // events; the play() call seeds a circular sweep so the story renders a
 // non-empty frame on first capture.
@@ -371,11 +465,17 @@ fluid.play = async ({ canvasElement }) => {
         img.onload = o;
     });
 
-    const vfx = initVFX();
+    const vrt = isChromatic();
+    const vfx = initVFX(vrt ? { autoplay: false } : undefined);
     const effect = new FluidEffect();
     await vfx.add(img, { effect });
-    attachFluidPane("Fluid", effect);
 
+    if (vrt) {
+        await driveVrt(vfx, img);
+        return;
+    }
+
+    attachFluidPane("Fluid", effect);
     seedFluidMotion(canvasElement);
 };
 
@@ -438,6 +538,19 @@ particle.play = async ({ canvasElement }) => {
         img.onload = () => o();
     });
 
+    if (isChromatic()) {
+        // Deterministic capture: fixed count, no pane, hand-driven clock
+        // + pointer sweep so spawns and motion are identical every run.
+        // SwiftShader (Chromatic capture env) can't allocate the default
+        // 1M-particle state RTs within the 30s load budget, so cap count.
+        const vfx = initVFX({ autoplay: false });
+        await vfx.add(img, {
+            effect: new ParticleEffect({ count: VRT_PARTICLE_COUNT }),
+        });
+        await driveVrt(vfx, img, { steps: PARTICLE_VRT_STEPS });
+        return;
+    }
+
     const vfx = initVFX();
     const sources = { Jellyfish, Logo };
     // The framework loads img.src once at vfx.add and never observes
@@ -445,13 +558,7 @@ particle.play = async ({ canvasElement }) => {
     // preserved params) + add + reattach pane.
     let effect: ParticleEffect | null = null;
     const setup = async () => {
-        // SwiftShader (Chromatic capture env) can't allocate the
-        // default 1M-particle state RTs within the 30s load budget.
-        const initialParams = effect
-            ? { ...effect.params }
-            : isChromatic()
-              ? { count: 256 * 256 }
-              : {};
+        const initialParams = effect ? { ...effect.params } : {};
         if (effect) {
             vfx.remove(img);
             disposeAllPanes();
@@ -492,6 +599,22 @@ particleExplode.play = async ({ canvasElement }) => {
         img.onload = () => o();
     });
     await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    if (isChromatic()) {
+        // Deterministic capture: trigger the burst, then drive the clock
+        // to a fixed mid-burst frame so Chromatic snapshots the scattered
+        // particles (the effect has no Math.random — GPU-hashed spawns —
+        // so the burst is reproducible). Cap count for the SwiftShader
+        // load budget, matching the Particle story.
+        const vfx = initVFX({ autoplay: false });
+        const explode = new ParticleExplodeEffect({ count: VRT_PARTICLE_COUNT });
+        await vfx.add(img, { effect: explode });
+        await driveVrt(vfx, img, {
+            steps: EXPLODE_STEPS,
+            onReady: () => explode.trigger(),
+        });
+        return;
+    }
 
     const vfx = initVFX();
     const sources = { Logo, Jellyfish };
@@ -1055,6 +1178,319 @@ export const sinewave = presetStory<SinewaveArgs>(
     },
 );
 
+// ---------------------------------------------------------------------------
+// Figma Shader effect ports.
+// ---------------------------------------------------------------------------
+
+type ColoredEdgesArgs = {
+    threshold: number;
+    thickness: number;
+    intensity: number;
+    opacity: number;
+    color1: string;
+    color2: string;
+    background: string;
+};
+export const coloredEdges = presetStory<ColoredEdgesArgs>(
+    (a) => new ColoredEdgesEffect(a),
+    {
+        threshold: 0.2,
+        thickness: 3,
+        intensity: 4,
+        opacity: 0,
+        color1: "#ff0000",
+        color2: "#0000ff",
+        background: "#000000",
+    },
+    {
+        threshold: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        thickness: { control: { type: "range", min: 0.5, max: 10, step: 0.5 } },
+        intensity: { control: { type: "range", min: 0, max: 20, step: 0.1 } },
+        opacity: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        color1: { control: { type: "color" } },
+        color2: { control: { type: "color" } },
+        background: { control: { type: "color" } },
+    },
+    { clock: false, src: Pigeon },
+);
+
+const GRADIENT_REPEATS: GradientMapRepeat[] = ["none", "repeat", "mirror"];
+const GRADIENT_MIX_SPACES: GradientMapMixSpace[] = ["srgb", "linear", "oklab"];
+type GradientMapArgs = {
+    color1: string;
+    color2: string;
+    color3: string;
+    scatter: number;
+    offset: number;
+    repeat: GradientMapRepeat;
+    frequency: number;
+    mixSpace: GradientMapMixSpace;
+    speed: number;
+};
+export const gradientMap = presetStory<GradientMapArgs>(
+    (a) =>
+        new GradientMapEffect({
+            colors: [a.color1, a.color2, a.color3],
+            scatter: a.scatter,
+            offset: a.offset,
+            repeat: a.repeat,
+            frequency: a.frequency,
+            mixSpace: a.mixSpace,
+            speed: a.speed,
+        }),
+    {
+        color1: "#ffffff",
+        color2: "#3aa0ff",
+        color3: "#000000",
+        scatter: 0,
+        offset: 0,
+        repeat: "none",
+        frequency: 1,
+        mixSpace: "srgb",
+        speed: 0,
+    },
+    {
+        color1: { control: { type: "color" } },
+        color2: { control: { type: "color" } },
+        color3: { control: { type: "color" } },
+        scatter: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        offset: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        repeat: { control: { type: "select" }, options: GRADIENT_REPEATS },
+        frequency: { control: { type: "range", min: 1, max: 8, step: 1 } },
+        mixSpace: { control: { type: "select" }, options: GRADIENT_MIX_SPACES },
+        speed: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
+    },
+);
+
+type SliceShiftArgs = {
+    shift: number;
+    random: number;
+    centerX: number;
+    centerY: number;
+    size: number;
+    angle: number;
+};
+export const sliceShift = presetStory<SliceShiftArgs>(
+    (a) => new SliceShiftEffect(a),
+    {
+        shift: 0.5,
+        random: 0,
+        centerX: 0.5,
+        centerY: 0.5,
+        size: 100,
+        angle: 0,
+    },
+    {
+        shift: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
+        random: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        size: { control: { type: "range", min: 1, max: 300, step: 1 } },
+        angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
+    },
+    { clock: false },
+);
+
+type PixelStretchArgs = {
+    offset: number;
+    reach: number;
+    smoothness: number;
+    centerX: number;
+    centerY: number;
+    angle: number;
+};
+export const pixelStretch = presetStory<PixelStretchArgs>(
+    (a) => new PixelStretchEffect(a),
+    {
+        offset: 0,
+        reach: 0.2,
+        smoothness: 0,
+        centerX: 0.5,
+        centerY: 0.5,
+        angle: 0,
+    },
+    {
+        offset: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
+        reach: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        smoothness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
+    },
+    { clock: false },
+);
+
+const WARP_TYPES: WarpType[] = ["sine wave", "twist", "ripple"];
+type WarpArgs = {
+    type: WarpType;
+    amplitude: number;
+    frequency: number;
+    centerX: number;
+    centerY: number;
+    speed: number;
+};
+export const warp = presetStory<WarpArgs>(
+    (a) => new WarpEffect(a),
+    {
+        type: "twist",
+        amplitude: 3,
+        frequency: 1,
+        centerX: 0.5,
+        centerY: 0.5,
+        speed: 0,
+    },
+    {
+        type: { control: { type: "select" }, options: WARP_TYPES },
+        amplitude: { control: { type: "range", min: -10, max: 10, step: 0.1 } },
+        frequency: { control: { type: "range", min: 0.1, max: 10, step: 0.1 } },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        speed: { control: { type: "range", min: 0, max: 5, step: 0.05 } },
+    },
+);
+
+const DITHER_STYLES: DitherStyle[] = [
+    "bayer2",
+    "bayer4",
+    "bayer8",
+    "bayer16",
+    "blueNoise",
+    "threshold",
+];
+type DitherArgs = {
+    style: DitherStyle;
+    size: number;
+    levels: number;
+    brightness: number;
+    contrast: number;
+    mono: boolean;
+    monoColor: string;
+};
+// Excluded from VRT: the quantization round() sits on precision-sensitive
+// boundaries, so SwiftShader output isn't a stable snapshot target.
+export const dither = presetStory<DitherArgs>(
+    (a) => new DitherEffect(a),
+    {
+        style: "threshold",
+        size: 2,
+        levels: 3,
+        brightness: 1,
+        contrast: 1,
+        mono: false,
+        monoColor: "#ffffff",
+    },
+    {
+        style: { control: { type: "select" }, options: DITHER_STYLES },
+        size: { control: { type: "range", min: 1, max: 16, step: 1 } },
+        levels: { control: { type: "range", min: 2, max: 16, step: 1 } },
+        brightness: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        contrast: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
+        mono: { control: { type: "boolean" } },
+        monoColor: { control: { type: "color" } },
+    },
+    { clock: false },
+);
+dither.parameters = { chromatic: { disableSnapshot: true } };
+
+const PIXELATE_SHAPES: TilePixelateShape[] = [
+    "rectangle",
+    "ellipse",
+    "hexagon",
+    "triangle",
+];
+type TilePixelateArgs = {
+    shape: TilePixelateShape;
+    size: number;
+    stretch: number;
+    gap: number;
+    colorTrim: number;
+    averageColor: number;
+    dissolve: number;
+    falloff: number;
+    knockout: boolean;
+};
+export const tilePixelate = presetStory<TilePixelateArgs>(
+    (a) => new TilePixelateEffect(a),
+    {
+        shape: "triangle",
+        size: 10,
+        stretch: 1,
+        gap: 0,
+        colorTrim: 2,
+        averageColor: 0.8,
+        dissolve: 0,
+        falloff: 0,
+        knockout: true,
+    },
+    {
+        shape: { control: { type: "select" }, options: PIXELATE_SHAPES },
+        size: { control: { type: "range", min: 2, max: 80, step: 1 } },
+        stretch: { control: { type: "range", min: 0.2, max: 4, step: 0.1 } },
+        gap: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        colorTrim: { control: { type: "range", min: 0, max: 8, step: 1 } },
+        averageColor: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        dissolve: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        falloff: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        knockout: { control: { type: "boolean" } },
+    },
+    { clock: false },
+);
+
+const REFRACTION_PATTERNS: RefractionPattern[] = [
+    "lenticular",
+    "waves",
+    "circular",
+];
+const REFRACTION_EDGE_WRAPS: RefractionEdgeWrap[] = [
+    "zero",
+    "clamp",
+    "repeat",
+    "mirror",
+];
+type PatternRefractionArgs = {
+    pattern: RefractionPattern;
+    strength: number;
+    smoothness: number;
+    frost: number;
+    dispersion: number;
+    edgeWrap: RefractionEdgeWrap;
+    centerX: number;
+    centerY: number;
+    stripWidth: number;
+    angle: number;
+};
+export const patternRefraction = presetStory<PatternRefractionArgs>(
+    (a) => new PatternRefractionEffect(a),
+    {
+        pattern: "lenticular",
+        strength: 0.5,
+        smoothness: 0,
+        frost: 0,
+        dispersion: 0.04,
+        edgeWrap: "zero",
+        centerX: 0.5,
+        centerY: 0.5,
+        stripWidth: 0.05,
+        angle: 0,
+    },
+    {
+        pattern: { control: { type: "select" }, options: REFRACTION_PATTERNS },
+        strength: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        smoothness: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        frost: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+        dispersion: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        edgeWrap: {
+            control: { type: "select" },
+            options: REFRACTION_EDGE_WRAPS,
+        },
+        centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        stripWidth: { control: { type: "range", min: 0.02, max: 1, step: 0.01 } },
+        angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
+    },
+    { clock: false },
+);
+
 type DuotoneArgs = { color1: string; color2: string; speed: number };
 export const duotone = presetStory<DuotoneArgs>(
     (a) =>
@@ -1127,3 +1563,392 @@ export const chromatic = presetStory<ChromaticArgs>(
     },
     { clock: false, src: Pigeon },
 );
+
+type AsciiSrcName = "Pigeon" | "Jellyfish" | "Logo" | "WebCam" | "HTML";
+const ASCII_SRCS: AsciiSrcName[] = [
+    "Pigeon",
+    "Jellyfish",
+    "Logo",
+    "WebCam",
+    "HTML",
+];
+const ASCII_IMAGE_SRCS: Record<"Pigeon" | "Jellyfish" | "Logo", string> = {
+    Pigeon,
+    Jellyfish,
+    Logo,
+};
+
+// A plain HTML block used as a capture source (text + form controls).
+// This is the `addHTML` target: it fills its wrapper (`width: 100%`) and
+// keeps its padding / white background so the effect covers them. The
+// fixed width lives on the wrapper instead (see addAsciiSource) — per the
+// html-in-canvas sizing policy, a content-sized target breaks capture.
+function makeAsciiHtmlSample(): HTMLElement {
+    const el = document.createElement("div");
+    el.style.width = "100%";
+    el.style.boxSizing = "border-box";
+    el.style.padding = "24px";
+    el.style.background = "#ffffff";
+    el.style.color = "#111111";
+    el.style.fontFamily = "sans-serif";
+    el.style.fontSize = "2.5rem";
+    el.innerHTML = `
+        <h1 style="margin: 0 0 12px;">HTML input sample</h1>
+        <p style="margin: 0 0 16px; line-height: 1.5;">
+            A plain HTML block captured by VFX-JS and turned into ASCII.
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+        </p>
+        <input type="text" value="Type here"
+               style="font-size: inherit; padding: 6px 8px; margin-right: 8px;" />
+        <button style="font-size: inherit; padding: 6px 14px;">Submit</button>
+    `;
+    return el;
+}
+
+// Build the ASCII source, attach `effect`, and return the element to
+// render. Images use `vfx.add`; the HTML block uses `vfx.addHTML` (it
+// needs a parent at add time). Webcam streams via getUserMedia (falls
+// back silently when denied / unavailable).
+function addAsciiSource(
+    vfx: ReturnType<typeof initVFX>,
+    src: AsciiSrcName,
+    effect: Effect | readonly Effect[],
+    onReady?: () => void,
+): HTMLElement {
+    // Fire onReady once the source is added (atlas built, texture uploaded).
+    // VRT pins the clock here so the captured frame is deterministic.
+    const ready = (p: unknown) => {
+        if (onReady) {
+            void Promise.resolve(p).then(onReady);
+        }
+    };
+    const center = (el: HTMLElement) => {
+        el.style.display = "block";
+        el.style.margin = "40px auto";
+        el.style.maxWidth = "80vw";
+    };
+    if (src === "HTML") {
+        // Three layers per the html-in-canvas sizing policy: a flex
+        // centring wrapper, a width-only sizer (the fixed px width lives
+        // here), and the addHTML target that fills the sizer with
+        // `width: 100%`.
+        const wrapper = document.createElement("div");
+        wrapper.style.display = "flex";
+        wrapper.style.justifyContent = "center";
+        wrapper.style.margin = "40px auto";
+
+        const sizer = document.createElement("div");
+        sizer.style.width = "900px";
+        sizer.style.maxWidth = "90vw";
+
+        const block = makeAsciiHtmlSample();
+        sizer.appendChild(block);
+        wrapper.appendChild(sizer);
+        ready(vfx.addHTML(block, { effect }));
+        return wrapper;
+    }
+    if (src === "WebCam") {
+        const video = document.createElement("video");
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.autoplay = true;
+        center(video);
+        navigator.mediaDevices
+            ?.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+                void video.play();
+            })
+            .catch((e) => console.warn("[ascii story] webcam unavailable:", e));
+        ready(vfx.add(video, { effect }));
+        return video;
+    }
+    const img = document.createElement("img");
+    img.src = ASCII_IMAGE_SRCS[src] ?? Pigeon;
+    center(img);
+    ready(vfx.add(img, { effect }));
+    return img;
+}
+
+// Shared font-atlas control presets for the glyph-based effects.
+const FONT_WEIGHTS = ["normal", "bold", "100", "300", "600", "900"];
+
+type AsciiArgs = {
+    src: AsciiSrcName;
+    preset: AsciiPresetName;
+    gridX: number;
+    gridY: number;
+    font: string;
+    fontWeight: string;
+    color: string;
+    background: string;
+    colorFromSource: boolean;
+    invert: boolean;
+    dither: number;
+};
+export const ascii: StoryObj<AsciiArgs> = {
+    render: (a) => {
+        const vfx = initVFX();
+        const effect = new AsciiEffect({
+            preset: a.preset,
+            grid: [a.gridX, a.gridY],
+            font: a.font,
+            fontWeight: a.fontWeight,
+            color: hexToRgba(a.color),
+            background: hexToRgba(a.background),
+            colorFromSource: a.colorFromSource,
+            invert: a.invert,
+            dither: a.dither,
+        });
+        return addAsciiSource(vfx, a.src, effect);
+    },
+    args: {
+        src: "Pigeon",
+        preset: "standard",
+        gridX: 8,
+        gridY: 14,
+        font: "monospace",
+        fontWeight: "normal",
+        color: "#ffffff",
+        background: "#000000",
+        colorFromSource: false,
+        invert: false,
+        dither: 0,
+    },
+    argTypes: {
+        src: { control: { type: "select" }, options: ASCII_SRCS },
+        preset: {
+            control: { type: "select" },
+            options: [
+                "standard",
+                "minimal",
+                "blocks",
+                "dots",
+                "circles",
+                "detailed",
+            ],
+        },
+        gridX: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        gridY: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        font: { control: { type: "text" } },
+        fontWeight: {
+            control: { type: "select" },
+            options: FONT_WEIGHTS,
+        },
+        color: { control: { type: "color" } },
+        background: { control: { type: "color" } },
+        colorFromSource: { control: { type: "boolean" } },
+        invert: { control: { type: "boolean" } },
+        dither: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
+    },
+};
+
+type MatrixArgs = {
+    src: AsciiSrcName;
+    gridX: number;
+    gridY: number;
+    glyphs: string;
+    font: string;
+    fontWeight: string;
+    color: string;
+    gradient: boolean;
+    color2: string;
+    headColor: string;
+    background: string;
+    speed: number;
+    tail: number;
+    tailFade: number;
+    birthRate: number;
+    glyphSpeed: number;
+    brightness: number;
+    contrast: number;
+    invert: boolean;
+    seed: number;
+    bloom: number;
+};
+// Matrix-movie "digital rain": random glyphs fall down each column with a
+// bright tip and fading green trail, modulated by the source grayscale so
+// the picture emerges from the rain. An optional BloomEffect adds the
+// phosphor glow around the bright glyphs (bypassed when bloom = 0).
+export const matrix: StoryObj<MatrixArgs> = {
+    render: (a) => {
+        // The rain is a pure function of the clock + seed (no Math.random),
+        // so under VRT freeze the clock (timeScale 0) and pin it to a fixed
+        // frame once added — Chromatic then captures the same pattern every
+        // run.
+        const vrt = isChromatic();
+        const vfx = initVFX(vrt ? { timeScale: 0 } : undefined);
+        const effect = new MatrixEffect({
+            grid: [a.gridX, a.gridY],
+            glyphs: a.glyphs || undefined,
+            font: a.font,
+            fontWeight: a.fontWeight,
+            // gradient on → two-stop vertical gradient (top → bottom),
+            // interpolated in OKLCH; off → a single flat colour.
+            color: a.gradient
+                ? [hexToRgba(a.color), hexToRgba(a.color2)]
+                : hexToRgba(a.color),
+            headColor: hexToRgba(a.headColor),
+            background: hexToRgba(a.background),
+            speed: a.speed,
+            tail: a.tail,
+            tailFade: a.tailFade,
+            birthRate: a.birthRate,
+            glyphSpeed: a.glyphSpeed,
+            brightness: a.brightness,
+            contrast: a.contrast,
+            invert: a.invert,
+            seed: a.seed,
+        });
+        // bloom = 0 → bypass (rain only); otherwise chain a low-threshold
+        // BloomEffect whose intensity is the slider value, so the green
+        // glyphs glow like the film's phosphor CRT.
+        const effects =
+            a.bloom > 0
+                ? [
+                      effect,
+                      new BloomEffect({
+                          threshold: 0.1,
+                          softness: 0.2,
+                          intensity: a.bloom,
+                          scatter: 0.8,
+                          dither: 0,
+                          edgeFade: 0.02,
+                          pad: 60,
+                      }),
+                  ]
+                : effect;
+        const el = addAsciiSource(
+            vfx,
+            a.src,
+            effects,
+            vrt
+                ? () => {
+                      vfx.setTime(VRT_TIME);
+                      vfx.render();
+                  }
+                : undefined,
+        );
+        if (!vrt) {
+            attachClockPane(vfx);
+        }
+        return el;
+    },
+    args: {
+        src: "Logo",
+        gridX: 8,
+        gridY: 8,
+        glyphs: "",
+        font: "monospace",
+        fontWeight: "normal",
+        color: "#2dff5c",
+        gradient: false,
+        color2: "#00b3ff",
+        headColor: "#d9ffe6",
+        background: "#000000",
+        speed: 10,
+        tail: 18,
+        tailFade: 1,
+        birthRate: 0.6,
+        glyphSpeed: 8,
+        brightness: 1,
+        contrast: 1,
+        invert: false,
+        seed: 0,
+        bloom: 1.0,
+    },
+    argTypes: {
+        src: { control: { type: "select" }, options: ASCII_SRCS },
+        gridX: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        gridY: { control: { type: "range", min: 4, max: 48, step: 1 } },
+        glyphs: { control: { type: "text" } },
+        font: { control: { type: "text" } },
+        fontWeight: { control: { type: "select" }, options: FONT_WEIGHTS },
+        color: { control: { type: "color" } },
+        gradient: { control: { type: "boolean" } },
+        color2: { control: { type: "color" } },
+        headColor: { control: { type: "color" } },
+        background: { control: { type: "color" } },
+        speed: { control: { type: "range", min: 1, max: 40, step: 1 } },
+        tail: { control: { type: "range", min: 2, max: 48, step: 1 } },
+        tailFade: { control: { type: "range", min: 0, max: 1, step: 0.05 } },
+        birthRate: {
+            control: { type: "range", min: 0.05, max: 5, step: 0.05 },
+        },
+        glyphSpeed: { control: { type: "range", min: 0, max: 30, step: 1 } },
+        brightness: { control: { type: "range", min: 0.2, max: 3, step: 0.1 } },
+        contrast: { control: { type: "range", min: 0, max: 4, step: 0.1 } },
+        invert: { control: { type: "boolean" } },
+        seed: { control: { type: "range", min: 0, max: 100, step: 1 } },
+        bloom: { control: { type: "range", min: 0, max: 8, step: 0.1 } },
+    },
+};
+
+// Build a coloured-dot tile as a canvas. The dot grows with `level` (so
+// the brightness ramp still reads), and each tile gets a distinct hue so
+// the demo shows tiles keeping their own colour.
+// Tile shape presets for the image-tile demo. Each builds a `count`-step
+// dark → light ramp; the shape grows with brightness.
+type AsciiTileShape = "dots" | "rings" | "squares";
+const ASCII_TILE_SHAPES: AsciiTileShape[] = ["dots", "rings", "squares"];
+
+function makeTileCanvas(
+    level: number,
+    count: number,
+    shape: AsciiTileShape,
+): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 64;
+    const g = c.getContext("2d");
+    if (g) {
+        const t = count > 1 ? level / (count - 1) : 1;
+        const hue = (level / Math.max(1, count)) * 360;
+        const color = `hsl(${hue}, 85%, 55%)`;
+        g.fillStyle = color;
+        g.strokeStyle = color;
+        if (shape === "squares") {
+            const s = 6 + t * 50;
+            g.fillRect(32 - s / 2, 32 - s / 2, s, s);
+        } else if (shape === "rings") {
+            g.lineWidth = 2 + t * 9;
+            g.beginPath();
+            g.arc(32, 32, 6 + t * 22, 0, Math.PI * 2);
+            g.stroke();
+        } else {
+            g.beginPath();
+            g.arc(32, 32, 3 + t * 27, 0, Math.PI * 2);
+            g.fill();
+        }
+    }
+    return c;
+}
+
+// Image-tile path: each cell stamps a coloured shape (its own RGB) sized
+// by the cell's brightness, instead of a font glyph.
+export const asciiTiles: StoryObj<{
+    src: AsciiSrcName;
+    preset: AsciiTileShape;
+    grid: number;
+}> = {
+    render: (a) => {
+        const vfx = initVFX();
+        const count = 6;
+        const tiles = Array.from({ length: count }, (_, i) =>
+            makeTileCanvas(i, count, a.preset),
+        );
+        const effect = new AsciiEffect({
+            tiles,
+            grid: a.grid,
+            background: [0, 0, 0, 1],
+        });
+        return addAsciiSource(vfx, a.src, effect);
+    },
+    args: { src: "Pigeon", preset: "dots", grid: 14 },
+    argTypes: {
+        src: { control: { type: "select" }, options: ASCII_SRCS },
+        preset: { control: { type: "select" }, options: ASCII_TILE_SHAPES },
+        grid: { control: { type: "range", min: 4, max: 48, step: 1 } },
+    },
+};

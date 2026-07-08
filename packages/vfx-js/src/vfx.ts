@@ -123,6 +123,11 @@ export class VFX {
         return this.#player.maxTextureSize;
     }
 
+    /** The output canvas VFX renders into. */
+    get canvas(): HTMLCanvasElement {
+        return this.#canvas;
+    }
+
     /**
      * Register an element using html-in-canvas API.
      * Wraps the element in a `<canvas layoutsubtree>` and captures via drawElementImage.
@@ -195,12 +200,13 @@ export class VFX {
     /**
      * Update the texture for the given element.
      *
-     * For an `HTMLImageElement`, reloads its current `src` — call this
-     * after changing `img.src`. Videos refresh automatically (no-op).
+     * For an `HTMLImageElement`, reloads its currently selected image URL
+     * — call this after changing `img.src` or when responsive image
+     * selection changes. Videos refresh automatically (no-op).
      * Otherwise re-snapshots the element's DOM subtree.
      *
      * Useful for elements whose contents change (input, textarea, or an
-     * `<img>` whose `src` swaps).
+     * `<img>` whose selected source swaps).
      */
     async update(element: HTMLElement): Promise<void> {
         const wrapper = this.#wrapperCanvases.get(element);

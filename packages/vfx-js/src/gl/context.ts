@@ -21,6 +21,9 @@ export class GLContext {
     /** True if `OES_texture_float_linear` is available. */
     floatLinearFilter: boolean;
 
+    /** True if `EXT_float_blend` is available (blending into RGBA32F). */
+    floatBlend: boolean;
+
     /** True between `webglcontextlost` and `webglcontextrestored`. */
     isContextLost = false;
 
@@ -28,14 +31,14 @@ export class GLContext {
     #onLost = new Set<() => void>();
     #onRestored = new Set<() => void>();
 
-    constructor(canvas: HTMLCanvasElement) {
+    constructor(canvas: HTMLCanvasElement, preserveDrawingBuffer = false) {
         const gl = canvas.getContext("webgl2", {
             alpha: true,
             premultipliedAlpha: true,
             antialias: false,
             depth: false,
             stencil: false,
-            preserveDrawingBuffer: false,
+            preserveDrawingBuffer,
         });
         if (!gl) {
             throw new Error("[VFX-JS] WebGL2 is not available.");
@@ -44,6 +47,8 @@ export class GLContext {
         this.canvas = canvas;
         gl.getExtension("EXT_color_buffer_float");
         gl.getExtension("EXT_color_buffer_half_float");
+        // Required to blend into RGBA32F targets.
+        this.floatBlend = !!gl.getExtension("EXT_float_blend");
         this.floatLinearFilter = !!gl.getExtension("OES_texture_float_linear");
         this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
 
@@ -99,6 +104,7 @@ export class GLContext {
         const gl = this.gl;
         gl.getExtension("EXT_color_buffer_float");
         gl.getExtension("EXT_color_buffer_half_float");
+        this.floatBlend = !!gl.getExtension("EXT_float_blend");
         for (const r of this.#resources) {
             r.restore();
         }

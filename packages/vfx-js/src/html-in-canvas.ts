@@ -1,14 +1,16 @@
 /// <reference path="./html-in-canvas.d.ts" />
+import { getImageSourceUrl } from "./image-source.js";
 
 /**
  * Check if an image is cross-origin.
  */
 function isCrossOrigin(img: HTMLImageElement): boolean {
-    if (!img.src || img.src.startsWith("data:")) {
+    const imageUrl = getImageSourceUrl(img);
+    if (!imageUrl || imageUrl.startsWith("data:")) {
         return false;
     }
     try {
-        const imgUrl = new URL(img.src, location.href);
+        const imgUrl = new URL(imageUrl, location.href);
         return imgUrl.origin !== location.origin;
     } catch {
         return false;
@@ -45,8 +47,9 @@ async function inlineCrossOriginImages(root: Element): Promise<() => void> {
     await Promise.all(
         crossOriginImgs.map(async (img) => {
             try {
-                const blobUrl = await toBlobUrl(img.src);
-                originals.set(img, img.src);
+                const imageUrl = getImageSourceUrl(img);
+                const blobUrl = await toBlobUrl(imageUrl);
+                originals.set(img, imageUrl);
                 blobUrls.push(blobUrl);
 
                 // Wait for the image to reload with the blob URL

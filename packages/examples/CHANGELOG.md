@@ -1,5 +1,12 @@
 # @vfx-js/examples
 
+## 0.0.24
+
+### Patch Changes
+
+- Updated dependencies
+  - @vfx-js/effects@1.3.0
+
 ## 0.0.23
 
 ### Patch Changes

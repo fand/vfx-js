@@ -15,6 +15,8 @@ class HTMLVideoElementStub {
     videoHeight = 0;
 }
 class HTMLImageElementStub {
+    src = "";
+    currentSrc = "";
     naturalWidth = 0;
     naturalHeight = 0;
 }
@@ -319,6 +321,7 @@ function makeGlStub() {
         enable: vi.fn(),
         clearColor: vi.fn(),
         clear: vi.fn(),
+        scissor: vi.fn(),
         blendFunc: vi.fn(),
     } as unknown as WebGL2RenderingContext;
 }
@@ -356,11 +359,11 @@ function makeHost() {
         glCtx,
         quad,
         2,
-        { __brand: "EffectTexture", width: 100, height: 100 } as unknown as {
-            width: number;
-            height: number;
-            __brand: "EffectTexture";
-        },
+        {
+            __brand: "EffectTexture",
+            width: 100,
+            height: 100,
+        } as unknown as EffectTexture,
         { autoCrop: true, glslVersion: "300 es" },
         programCache,
     );
@@ -512,6 +515,52 @@ describe("EffectHost.wrapTexture", () => {
         const t = textures[textures.length - 1];
         expect(t.wrapS).toBe("repeat");
         expect(t.wrapT).toBe("mirror");
+    });
+
+    it("handle.dispose() frees the underlying texture", () => {
+        const { host } = makeHost();
+        const img = Object.assign(new HTMLImageElementStub(), {
+            naturalWidth: 10,
+            naturalHeight: 10,
+        });
+        const handle = host.ctx.wrapTexture(img as unknown as HTMLImageElement);
+        const t = textures[textures.length - 1];
+        expect(t.disposed).toBe(false);
+        handle.dispose();
+        expect(t.disposed).toBe(true);
+    });
+
+    it("handle.dispose() is idempotent and host.dispose() won't double-free", () => {
+        const { host } = makeHost();
+        const img = Object.assign(new HTMLImageElementStub(), {
+            naturalWidth: 10,
+            naturalHeight: 10,
+        });
+        const handle = host.ctx.wrapTexture(img as unknown as HTMLImageElement);
+        const t = textures[textures.length - 1];
+        let disposeCount = 0;
+        const original = t.dispose;
+        t.dispose = () => {
+            disposeCount++;
+            original.call(t);
+        };
+        handle.dispose();
+        handle.dispose(); // second call is a no-op
+        host.dispose(); // host teardown must not re-dispose it
+        expect(disposeCount).toBe(1);
+    });
+
+    it("host.dispose() still frees textures that were never hand-disposed", () => {
+        const { host } = makeHost();
+        const img = Object.assign(new HTMLImageElementStub(), {
+            naturalWidth: 10,
+            naturalHeight: 10,
+        });
+        host.ctx.wrapTexture(img as unknown as HTMLImageElement);
+        const t = textures[textures.length - 1];
+        expect(t.disposed).toBe(false);
+        host.dispose();
+        expect(t.disposed).toBe(true);
     });
 });
 
@@ -941,6 +990,63 @@ describe("EffectHost.draw", () => {
 });
 
 // ---------------------------------------------------------------------------
+// clear — fast GPU clear (no draw)
+// ---------------------------------------------------------------------------
+
+describe("EffectHost.clear", () => {
+    it("clears a user RT with no draw", () => {
+        const { host, gl } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget();
+        host.ctx.clear(rt);
+        expect(programs).toHaveLength(0);
+        expect(gl.clear).toHaveBeenCalled();
+        expect(gl.clearColor).toHaveBeenCalledWith(0, 0, 0, 0);
+    });
+
+    it("persistent RT: zeroes both sides, leaving read/write orientation", () => {
+        const { host, gl } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        host.ctx.clear(rt);
+        // Two clears (one per buffer), two swaps that net to identity.
+        expect(gl.clear).toHaveBeenCalledTimes(2);
+        expect(backbuffers[0].swaps).toBe(2);
+    });
+
+    it("stage output (null target): scissors to the stage viewport", () => {
+        const { host, gl } = makeHost();
+        host.setFrameDims({
+            outputBufferW: 100,
+            outputBufferH: 100,
+            canvasBufferSize: [200, 200],
+            outputViewport: { x: 10, y: 20, w: 30, h: 40 },
+            elementBufferW: 100,
+            elementBufferH: 100,
+            contentRectUv: [0, 0, 1, 1],
+            srcRectUv: [0, 0, 1, 1],
+        });
+        host.setPhase("render");
+        host.ctx.clear();
+        expect(gl.enable).toHaveBeenCalledWith(gl.SCISSOR_TEST);
+        expect(gl.scissor).toHaveBeenCalledWith(10, 20, 30, 40);
+        expect(gl.bindFramebuffer).toHaveBeenCalledWith(gl.FRAMEBUFFER, null);
+    });
+
+    it("in update() phase is a no-op and warns once", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const { host, gl } = makeHost();
+        host.setPhase("update");
+        const rt = host.ctx.createRenderTarget();
+        host.ctx.clear(rt);
+        host.ctx.clear(rt);
+        expect(gl.clear).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
+    });
+});
+
+// ---------------------------------------------------------------------------
 // blit — uvSrc copy helper
 // ---------------------------------------------------------------------------
 
@@ -1016,11 +1122,7 @@ describe("EffectHost.onContextRestored", () => {
                 __brand: "EffectTexture",
                 width: 1,
                 height: 1,
-            } as unknown as {
-                width: number;
-                height: number;
-                __brand: "EffectTexture";
-            },
+            } as unknown as EffectTexture,
             { autoCrop: true, glslVersion: "300 es" },
             new ProgramCache(glCtx),
         );
