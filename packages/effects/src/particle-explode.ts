@@ -6,6 +6,7 @@
 import type {
     Effect,
     EffectContext,
+    EffectDims,
     EffectGeometry,
     EffectRenderTarget,
 } from "@vfx-js/core";
@@ -531,9 +532,7 @@ export class ParticleExplodeEffect implements Effect {
     }
 
     // Particles can scatter past the element bounds.
-    outputRect(
-        dims: Parameters<NonNullable<Effect["outputRect"]>>[0],
-    ): readonly [number, number, number, number] {
+    outputRect(dims: EffectDims): readonly [number, number, number, number] {
         return dims.canvasRect;
     }
 }

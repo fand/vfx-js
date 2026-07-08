@@ -318,6 +318,7 @@ export class EffectHost {
             quad: EFFECT_QUAD_TOKEN,
             gl: this.#gl,
             createRenderTarget: (opts) => this.#createRenderTarget(opts),
+            releaseGeometry: (geo) => this.#geometries.release(geo),
             wrapTexture: (source, opts) => this.#wrapTexture(source, opts),
             draw: (opts) => this.#draw(opts),
             blit: (source, target, opts) => this.#blit(source, target, opts),

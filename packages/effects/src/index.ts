@@ -33,6 +33,7 @@ export {
 export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
 export { HueShiftEffect, type HueShiftParams } from "./hue-shift";
 export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch";
+export { LightStreakEffect, type LightStreakParams } from "./light-streak";
 export {
     MATRIX_GLYPHS,
     type MatrixColor,

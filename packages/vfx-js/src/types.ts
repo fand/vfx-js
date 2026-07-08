@@ -821,6 +821,15 @@ export type EffectContext = {
     createRenderTarget(opts?: EffectRenderTargetOpts): EffectRenderTarget;
 
     /**
+     * Free the GPU buffers compiled for a geometry.
+     *
+     * Call before dropping or replacing an `EffectGeometry` (e.g. on a
+     * density change); otherwise its buffers live until the effect
+     * chain is disposed.
+     */
+    releaseGeometry(geometry: EffectGeometry): void;
+
+    /**
      * Wrap an externally-produced texture for use as a uniform.
      *
      * Each call allocates a new GPU texture (no caching), so call this
