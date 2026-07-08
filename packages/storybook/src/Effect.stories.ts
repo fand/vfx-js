@@ -936,6 +936,10 @@ type SaberArgs = {
     sharpness: number;
     jitterSpeed: number;
     jitterPower: number;
+    progress: number;
+    pulseIntensity: number;
+    pulseSpeed: number;
+    pulseWidth: number;
     pad: number;
 };
 function hexToRgb(hex: string): [number, number, number] {
@@ -1028,6 +1032,10 @@ export const saber: StoryObj<SaberArgs> = {
         sharpness: 1.0,
         jitterSpeed: 1.0,
         jitterPower: 0.0,
+        progress: 1.0,
+        pulseIntensity: 0.0,
+        pulseSpeed: 0.5,
+        pulseWidth: 0.05,
         pad: 80,
     },
     argTypes: {
@@ -1055,6 +1063,14 @@ export const saber: StoryObj<SaberArgs> = {
         sharpness: { control: { type: "range", min: 1, max: 6, step: 0.1 } },
         jitterSpeed: { control: { type: "range", min: 0, max: 8, step: 0.1 } },
         jitterPower: { control: { type: "range", min: 0, max: 6, step: 0.1 } },
+        progress: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        pulseIntensity: {
+            control: { type: "range", min: 0, max: 10, step: 0.1 },
+        },
+        pulseSpeed: { control: { type: "range", min: 0, max: 2, step: 0.02 } },
+        pulseWidth: {
+            control: { type: "range", min: 0.005, max: 0.2, step: 0.005 },
+        },
         pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
     },
 };

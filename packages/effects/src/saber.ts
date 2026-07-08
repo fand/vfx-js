@@ -4,57 +4,80 @@
 // Effects Saber plug-in (https://www.videocopilot.net/tutorials/saber_plug-in).
 //
 // Pipeline:
-//   1. Build a signed-distance-ish field from the element's silhouette with
-//      the Jump Flooding Algorithm (JFA). This is the expensive part, so it
-//      runs ONCE — on the first frame and whenever the buffer is resized —
-//      and the resulting distance texture is cached (see `#buildField`).
-//   2. Every frame, warp the lookup into that distance field with animated
-//      3D simplex noise (z = time) so the glowing outline wobbles and
+//   1. Rasterize the element's silhouette into a binary mask, read it back
+//      asynchronously (no GPU stall), and trace its boundary loops on the
+//      CPU (marching squares). Every boundary point carries a normalized
+//      arc-length parameter.
+//   2. Splat the points as seeds and flood with the Jump Flooding Algorithm
+//      (JFA): each texel learns its distance to the silhouette AND the
+//      arc-length position of its nearest boundary point. This is the
+//      expensive part, so it runs ONCE — on the first frame and whenever
+//      the buffer is resized — and the result is cached (see `#buildField`).
+//   3. Every frame, warp the lookup into that field with animated 3D
+//      simplex noise (z = time) so the glowing outline wobbles and
 //      crackles like electricity.
-//   3. Turn distance into light with the classic `color = k / distance`
-//      falloff, giving a bright core that bleeds into a soft glow.
-import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
+//   4. Turn distance into light with the classic `color = k / distance`
+//      falloff. Arc length drives the path-reveal (`progress`) and the
+//      traveling `pulse`.
+import type {
+    Effect,
+    EffectContext,
+    EffectGeometry,
+    EffectRenderTarget,
+} from "@vfx-js/core";
+import { traceContours } from "./_contour";
 import { SNOISE3D } from "./_noise";
 
 /** Max number of overlaid lines (caps the per-frame render loop). */
 const MAX_LINES = 5;
 
-// (1a) Seed pass. Detect the silhouette edge from the element's grayscale
-// luminance and write each edge texel's own buffer-uv as a JFA seed.
-// Non-edge texels get an invalid seed (b = 0) sitting far away so they
-// contribute no distance.
-const FRAG_SEED = `#version 300 es
+// (1a) Mask pass. Rasterize the silhouette as a binary mask at buffer
+// resolution; the CPU reads it back and traces the boundary loops.
+const FRAG_MASK = `#version 300 es
 precision highp float;
-in vec2 uv;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
-uniform vec2 srcTexel;
 uniform float edgeThreshold;
 
-// Grayscale luminance at a src-uv, gated to the valid [0,1] src region.
-float mask(vec2 p) {
-    vec2 inside = step(vec2(0.0), p) * step(p, vec2(1.0));
-    vec4 c = texture(src, clamp(p, 0.0, 1.0));
-    return dot(c.rgb, vec3(0.299, 0.587, 0.114)) * inside.x * inside.y;
-}
-
 void main() {
-    float c = step(edgeThreshold, mask(uvSrc));
-    float l = step(edgeThreshold, mask(uvSrc - vec2(srcTexel.x, 0.0)));
-    float r = step(edgeThreshold, mask(uvSrc + vec2(srcTexel.x, 0.0)));
-    float d = step(edgeThreshold, mask(uvSrc - vec2(0.0, srcTexel.y)));
-    float u = step(edgeThreshold, mask(uvSrc + vec2(0.0, srcTexel.y)));
-
-    // Boundary texel: differs from at least one 4-neighbour.
-    bool edge = c != l || c != r || c != d || c != u;
-
-    outColor = edge ? vec4(uv, 1.0, 1.0) : vec4(-10.0, -10.0, 0.0, 0.0);
+    // Grayscale luminance, gated to the valid [0,1] src region.
+    vec2 inside = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
+    vec4 c = texture(src, clamp(uvSrc, 0.0, 1.0));
+    float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114)) * inside.x * inside.y;
+    outColor = vec4(step(edgeThreshold, lum), 0.0, 0.0, 1.0);
 }
 `;
 
-// (1b) One JFA step. Look at the 8 neighbours (plus self) at the current
+// (1b) Seed splat. Each traced boundary point is drawn as a 1px point
+// carrying its own buffer-uv and arc-length t. Texels without a seed stay
+// at the cleared value (a = 0 marks "invalid").
+const VERT_SEED = `#version 300 es
+precision highp float;
+in vec3 position; // xy = buffer uv, z = arc-length t
+out vec2 vUv;
+out float vT;
+void main() {
+    vUv = position.xy;
+    vT = position.z;
+    gl_Position = vec4(position.xy * 2.0 - 1.0, 0.0, 1.0);
+    gl_PointSize = 1.0;
+}
+`;
+
+const FRAG_SEED = `#version 300 es
+precision highp float;
+in vec2 vUv;
+in float vT;
+out vec4 outColor;
+void main() {
+    outColor = vec4(vUv, vT, 1.0);
+}
+`;
+
+// (1c) One JFA step. Look at the 8 neighbours (plus self) at the current
 // step distance and keep whichever carries the nearest valid seed.
+// The payload (seed uv + arc-length t) rides along untouched.
 const FRAG_JFA = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -67,14 +90,14 @@ void main() {
     vec2 texel = 1.0 / res;
     vec2 here = uv * res;
 
-    vec4 best = vec4(-10.0, -10.0, 0.0, 0.0);
+    vec4 best = vec4(0.0);
     float bestD = 1e20;
 
     for (int y = -1; y <= 1; y++) {
         for (int x = -1; x <= 1; x++) {
             vec2 o = vec2(float(x), float(y)) * stepSize * texel;
             vec4 s = texture(seed, uv + o);
-            if (s.b > 0.5) {
+            if (s.a > 0.5) {
                 float dd = distance(s.rg * res, here);
                 if (dd < bestD) {
                     bestD = dd;
@@ -88,10 +111,10 @@ void main() {
 }
 `;
 
-// (1c) Resolve pass. Convert "nearest seed coord" into an aspect-correct
+// (1d) Resolve pass. Convert "nearest seed coord" into an aspect-correct
 // distance, normalised so 1.0 ≈ one buffer-height away.
-// The sharp distance lands in .r; a blurred copy is packed into .g by the
-// two blur passes below (1d).
+// The sharp distance lands in .r and the nearest point's arc-length t in
+// .b; a blurred distance is packed into .g by the two blur passes below.
 const FRAG_RESOLVE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -102,18 +125,21 @@ uniform vec2 res;
 void main() {
     vec4 s = texture(seed, uv);
     float dist = 1.0;
-    if (s.b > 0.5) {
+    float t = 0.0;
+    if (s.a > 0.5) {
         vec2 d = (uv - s.rg) * vec2(res.x / res.y, 1.0);
         dist = length(d);
+        t = s.b;
     }
-    outColor = vec4(dist, 0.0, 0.0, 1.0);
+    outColor = vec4(dist, 0.0, t, 1.0);
 }
 `;
 
-// (1d) Separable gaussian blur, run twice (dir = horizontal then vertical).
-// Passes the sharp distance through in .r and writes the blurred distance
-// to .g: the render pass reads the crisp edge and the crease-free glow
-// field from one fetch. The first pass blurs .r, the second re-blurs .g.
+// (1e) Separable gaussian blur, run twice (dir = horizontal then vertical).
+// Passes the sharp distance (.r) and arc-length t (.b) through and writes
+// the blurred distance to .g: the render pass reads the crisp edge and the
+// crease-free glow field from one fetch. The first pass blurs .r, the
+// second re-blurs .g.
 const FRAG_BLUR = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -140,7 +166,7 @@ void main() {
         sum += (dir.y > 0.5 ? s.g : s.r) * w;
         wsum += w;
     }
-    outColor = vec4(c.r, sum / wsum, 0.0, 1.0);
+    outColor = vec4(c.r, sum / wsum, c.b, 1.0);
 }
 `;
 
@@ -164,6 +190,10 @@ uniform float noiseScaleStep;
 uniform float sharpness;
 uniform float jitterSpeed;
 uniform float jitterPower;
+uniform float progress;
+uniform float pulseIntensity;
+uniform float pulseSpeed;
+uniform float pulseWidth;
 
 // Each overlaid line contributes this much less than the previous one.
 const float WEIGHT_FALLOFF = 0.6;
@@ -179,9 +209,55 @@ float shapeNoise(vec3 p) {
     return sign(n) * pow(abs(n), max(sharpness, 1.0));
 }
 
-// Distance-field value at a noise-warped lookup for one line. freq scales
-// the noise, seed decorrelates lines.
-float warpedDist(float t, float freq, float seed) {
+// Arc-length modulation shared by all lines: path reveal by progress,
+// plus a gaussian pulse traveling along the contour (loops seamlessly).
+// d is the distance from the path: both effects fade wider with d so
+// they stay continuous out in the glow tails (the t field jumps at
+// Voronoi cell boundaries; a hard cut would band there) while keeping
+// a sharp head on the line itself.
+float arcMod(float arc, float d) {
+    float m = 1.0;
+    if (progress < 1.0) {
+        float fade = 0.03 + d * 0.35;
+        m = smoothstep(progress, progress - fade, arc);
+    }
+    if (pulseIntensity > 0.0) {
+        float pd = abs(fract(arc - time * pulseSpeed + 0.5) - 0.5);
+        // Widen the pulse with d, conserving its energy, so it diffuses
+        // into the tails instead of cutting cell-shaped highlights.
+        float w = pulseWidth * (1.0 + d * 4.0);
+        float gain = pulseIntensity * (pulseWidth / w);
+        m *= 1.0 + gain * exp(-pd * pd / (w * w));
+    }
+    return m;
+}
+
+// Arc modulation at p, averaged over a disc that widens with the
+// distance d from the path. The t field is piecewise constant (nearest
+// boundary point), so a single tap cuts hard Voronoi seams into the
+// glow tails. The tap pattern is rotated per pixel with interleaved
+// gradient noise, dissolving the discrete tap levels into grain
+// instead of visible bands. m0 is the already-fetched center tap.
+float arcModCone(float m0, vec2 p, float d) {
+    float r = max(d, 0.0) * 0.8;
+    float base = 6.2831853 * fract(52.9829189 *
+        fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+    vec2 ar = vec2(res.y / res.x, 1.0);
+    float m = m0;
+    for (int i = 0; i < 8; i++) {
+        float a = base + float(i) * 0.7853982;
+        // Alternate radii so taps cover the disc, not a single ring.
+        float rr = r * (i % 2 == 0 ? 1.0 : 0.55);
+        vec2 o = vec2(cos(a), sin(a)) * rr * ar;
+        m += arcMod(texture(distField, p + o).b, d);
+    }
+    return m / 9.0;
+}
+
+// Distance-field lookup at a noise-warped uv for one line: x = distance,
+// y = arc-length t of the nearest boundary point, zw = the warped uv.
+// freq scales the noise, seed decorrelates lines.
+vec4 warpedDist(float t, float freq, float seed) {
     // Sample noise in an aspect-corrected (square) space so cells stay
     // round on non-square buffers instead of stretching horizontally.
     vec2 ar = vec2(res.x / res.y, 1.0);
@@ -208,7 +284,8 @@ float warpedDist(float t, float freq, float seed) {
     // wiggle is isotropic too.
     warp.x /= ar.x;
 
-    return texture(distField, uv + warp).r;
+    vec4 f = texture(distField, uv + warp);
+    return vec4(f.r, f.b, uv + warp);
 }
 `;
 
@@ -224,6 +301,7 @@ ${SABER_WARP}
 void main() {
     float t = time * speed;
     float eps = 0.5 / res.y;
+    bool arcActive = progress < 1.0 || pulseIntensity > 0.0;
 
     float glow = 0.0;
     float freq = frequency;
@@ -232,9 +310,12 @@ void main() {
         if (i >= lineCount) {
             break;
         }
-        float dist = warpedDist(t, freq, float(i) * 31.7);
-        float g = (0.0015 * intensity) / max(dist / thickness, eps);
-        glow += pow(g, 1. / (1. + softness)) * weight;
+        vec4 df = warpedDist(t, freq, float(i) * 31.7);
+        float g = (0.0015 * intensity) / max(df.x / thickness, eps);
+        float m = arcActive
+            ? arcModCone(arcMod(df.y, df.x), df.zw, df.x)
+            : 1.0;
+        glow += pow(g, 1. / (1. + softness)) * m * weight;
 
         freq *= noiseScaleStep;
         weight *= WEIGHT_FALLOFF;
@@ -245,9 +326,10 @@ void main() {
 
     // Sub glow from the pre-blurred distance (g channel): a rounded field
     // with no medial-axis creases, mixed in by softness.
-    float dist2 = texture(distField, uv).g;
-    float g2 = 0.01 / max(dist2 / thickness, eps);
-    float glow2 = pow(g2, 1. / (1. + softness));
+    vec4 f2 = texture(distField, uv);
+    float g2 = 0.01 / max(f2.g / thickness, eps);
+    float m2 = arcActive ? arcModCone(arcMod(f2.b, f2.g), uv, f2.g) : 1.0;
+    float glow2 = pow(g2, 1. / (1. + softness)) * m2;
 
     glow = mix(glow, glow2, softness * 0.5);
 
@@ -309,9 +391,27 @@ export type SaberParams = {
      */
     jitterPower: number;
     /**
-     * Rebuild the distance field every frame instead of caching it. Needed
-     * for live sources (video / webcam) whose silhouette changes; leave
-     * `false` for static images and text to avoid the per-frame JFA cost.
+     * Path-reveal progress (0..1) along each contour: the outline draws
+     * on from its start point up to this fraction of its length. `1`
+     * shows the full outline (no reveal cost).
+     */
+    progress: number;
+    /**
+     * Brightness of a pulse of light traveling along each contour.
+     * `0` disables the pulse.
+     */
+    pulseIntensity: number;
+    /** Pulse travel speed, in loops per second. */
+    pulseSpeed: number;
+    /** Pulse width, as a fraction of the contour length. */
+    pulseWidth: number;
+    /**
+     * Rebuild the distance field continuously instead of caching it.
+     * Needed for live sources (video / webcam) whose silhouette changes;
+     * leave `false` for static images and text. Rebuilds are pipelined
+     * through an async readback, so they don't stall the GPU, but the
+     * outline lags the source by a couple of frames and each rebuild
+     * costs a CPU contour trace.
      */
     dynamic: boolean;
     /**
@@ -336,6 +436,10 @@ const DEFAULT_PARAMS: SaberParams = {
     sharpness: 1.0,
     jitterSpeed: 1.0,
     jitterPower: 0.0,
+    progress: 1.0,
+    pulseIntensity: 0.0,
+    pulseSpeed: 0.5,
+    pulseWidth: 0.05,
     dynamic: false,
     pad: 80,
 };
@@ -343,9 +447,11 @@ const DEFAULT_PARAMS: SaberParams = {
 /**
  * Electric "Saber" energy around an element's silhouette.
  *
- * The distance field is built with the Jump Flooding Algorithm and cached;
- * it is rebuilt only when the buffer resizes. Call {@link invalidate} to
- * force a rebuild (e.g. after the source content changes).
+ * The silhouette is contour-traced on the CPU, then flooded into a
+ * distance + arc-length field with the Jump Flooding Algorithm and
+ * cached; it is rebuilt only when the buffer resizes. Call
+ * {@link invalidate} to force a rebuild (e.g. after the source content
+ * changes).
  *
  * Mutate `params` directly or via {@link setParams} — the render uniforms
  * read live each frame, so a reactive UI can bind straight to `params`.
@@ -353,9 +459,20 @@ const DEFAULT_PARAMS: SaberParams = {
 export class SaberEffect implements Effect {
     params: SaberParams;
 
+    #mask: EffectRenderTarget | null = null;
     #seedA: EffectRenderTarget | null = null;
     #seedB: EffectRenderTarget | null = null;
     #field: EffectRenderTarget | null = null;
+    #seedGeometry: EffectGeometry | null = null;
+    #maskPixels: Uint8Array | null = null;
+
+    /** True while a mask readback is in flight (one at a time). */
+    #pendingTrace = false;
+
+    /** Traced seed points (uv + t triples) waiting to be flooded. */
+    #seedPositions: Float32Array | null = null;
+
+    #disposed = false;
     #dirty = true;
     #lastW = 0;
     #lastH = 0;
@@ -384,6 +501,10 @@ export class SaberEffect implements Effect {
             filter: "nearest" as const,
             wrap: "clamp" as const,
         };
+        this.#mask = ctx.createRenderTarget({
+            filter: "nearest",
+            wrap: "clamp",
+        });
         this.#seedA = ctx.createRenderTarget(seedOpts);
         this.#seedB = ctx.createRenderTarget(seedOpts);
         this.#field = ctx.createRenderTarget({
@@ -416,9 +537,18 @@ export class SaberEffect implements Effect {
             this.#dirty = true;
             this.#lastEdgeThreshold = this.params.edgeThreshold;
         }
-        if (this.#dirty) {
-            this.#buildField(ctx, w, h);
+
+        // Rebuilds are pipelined: kick a mask readback now, trace it when
+        // the async read resolves, and fold the traced contours into the
+        // field on a later frame. The old field keeps rendering meanwhile,
+        // so the GPU never stalls. One readback in flight at a time.
+        if (this.#dirty && !this.#pendingTrace) {
             this.#dirty = false;
+            this.#kickTrace(ctx, w, h);
+        }
+        if (this.#seedPositions) {
+            this.#buildField(ctx, w, h, this.#seedPositions);
+            this.#seedPositions = null;
         }
 
         const {
@@ -434,6 +564,10 @@ export class SaberEffect implements Effect {
             sharpness,
             jitterSpeed,
             jitterPower,
+            progress,
+            pulseIntensity,
+            pulseSpeed,
+            pulseWidth,
         } = this.params;
         const lineCount = Math.max(
             1,
@@ -456,6 +590,10 @@ export class SaberEffect implements Effect {
             sharpness,
             jitterSpeed,
             jitterPower,
+            progress,
+            pulseIntensity,
+            pulseSpeed,
+            pulseWidth,
         };
 
         ctx.draw({
@@ -478,17 +616,79 @@ export class SaberEffect implements Effect {
     }
 
     dispose(): void {
+        this.#disposed = true;
+        this.#mask = null;
         this.#seedA = null;
         this.#seedB = null;
         this.#field = null;
+        this.#seedGeometry = null;
+        this.#maskPixels = null;
+        this.#seedPositions = null;
         this.#dirty = true;
         this.#lastW = 0;
         this.#lastH = 0;
     }
 
-    // (1) Build the distance field once via JFA: seed → log2(N) flood
-    // passes → resolve → blur (packs .g). Ping-pongs the two seed buffers.
-    #buildField(ctx: EffectContext, w: number, h: number): void {
+    // (1) Draw the silhouette mask and start its async readback. On
+    // resolve, trace the contours; `render` folds them into the field on
+    // a later frame. On failure (context loss), re-mark dirty to retry.
+    #kickTrace(ctx: EffectContext, w: number, h: number): void {
+        const mask = this.#mask;
+        if (!mask) {
+            return;
+        }
+        ctx.draw({
+            frag: FRAG_MASK,
+            uniforms: {
+                src: ctx.src,
+                edgeThreshold: this.params.edgeThreshold,
+            },
+            target: mask,
+        });
+        if (!this.#maskPixels || this.#maskPixels.length !== w * h * 4) {
+            this.#maskPixels = new Uint8Array(w * h * 4);
+        }
+        this.#pendingTrace = true;
+        ctx.readPixels(mask, this.#maskPixels).then(
+            (pixels) => {
+                this.#pendingTrace = false;
+                if (this.#disposed) {
+                    return;
+                }
+                // One seed vertex per boundary point: buffer uv (in the
+                // dims the mask was traced at) + arc-length t.
+                const contours = traceContours(pixels, w, h);
+                let total = 0;
+                for (const c of contours) {
+                    total += c.t.length;
+                }
+                const position = new Float32Array(total * 3);
+                let o = 0;
+                for (const c of contours) {
+                    for (let i = 0; i < c.t.length; i++) {
+                        position[o++] = (c.points[i * 2] + 0.5) / w;
+                        position[o++] = (c.points[i * 2 + 1] + 0.5) / h;
+                        position[o++] = c.t[i];
+                    }
+                }
+                this.#seedPositions = position;
+            },
+            () => {
+                this.#pendingTrace = false;
+                this.#dirty = true;
+            },
+        );
+    }
+
+    // (2) Build the field from the traced seed points: splat → log2(N) JFA
+    // flood passes → resolve → blur (packs .g). Ping-pongs the two seed
+    // buffers.
+    #buildField(
+        ctx: EffectContext,
+        w: number,
+        h: number,
+        position: Float32Array,
+    ): void {
         const seedA = this.#seedA;
         const seedB = this.#seedB;
         const field = this.#field;
@@ -496,16 +696,25 @@ export class SaberEffect implements Effect {
             return;
         }
         const res: [number, number] = [w, h];
+        const total = position.length / 3;
 
-        ctx.draw({
-            frag: FRAG_SEED,
-            uniforms: {
-                src: ctx.src,
-                srcTexel: [1 / ctx.src.width, 1 / ctx.src.height],
-                edgeThreshold: this.params.edgeThreshold,
-            },
-            target: seedA,
-        });
+        if (this.#seedGeometry) {
+            ctx.releaseGeometry(this.#seedGeometry);
+            this.#seedGeometry = null;
+        }
+        ctx.clear(seedA);
+        if (total > 0) {
+            this.#seedGeometry = {
+                mode: "points",
+                attributes: { position: { data: position, itemSize: 3 } },
+            };
+            ctx.draw({
+                frag: FRAG_SEED,
+                vert: VERT_SEED,
+                geometry: this.#seedGeometry,
+                target: seedA,
+            });
+        }
 
         // Step sizes: largest power of two below max dimension, down to 1.
         const maxDim = Math.max(w, h);

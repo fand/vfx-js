@@ -891,6 +891,26 @@ export type EffectContext = {
     clear(target?: EffectRenderTarget | null): void;
 
     /**
+     * Read a render target's content back to the CPU as RGBA bytes
+     * (bottom-left origin, tightly packed).
+     *
+     * Non-blocking: the copy goes through a pixel-pack buffer and the
+     * promise resolves on a later frame, once the GPU has caught up —
+     * the pipeline is never stalled. Resolution is polled per frame,
+     * so it needs the effect to keep rendering.
+     *
+     * Pass `out` to reuse a buffer; it must hold `width * height * 4`
+     * bytes. Float render targets are not supported.
+     *
+     * Rejects on host disposal or WebGL context loss. Only valid
+     * during `Effect.render()`; other calls reject immediately.
+     */
+    readPixels(
+        source: EffectRenderTarget,
+        out?: Uint8Array,
+    ): Promise<Uint8Array>;
+
+    /**
      * Raw WebGL2 context, for low-level operations
      * (DataTexture upload, extensions, MRT, etc).
      *
