@@ -215,10 +215,9 @@ export type LightStreakParams = {
     /** Max streak length in CSS (logical) px. */
     length: number;
     /**
-     * Streak cross-section width ("softness") in CSS (logical) px — how
-     * wide/soft each streak's gaussian profile is. Raised to at least ~one
-     * grid cell so neighbouring streaks merge (see `density`); increase
-     * `density` for genuinely thin-yet-continuous streaks.
+     * Streak width in CSS (logical) px — the gaussian cross-section of
+     * each streak. Thinner than the sampling grid cell and the streak
+     * breaks into stripes; raise `density` for thin-yet-continuous streaks.
      */
     softness: number;
     /**
@@ -400,11 +399,9 @@ export class LightStreakEffect implements Effect {
 
         const rays = Math.max(1, Math.round(this.params.streaks));
         const lengthPx = this.params.length * pr;
-        // Floor the width to ~one grid cell so adjacent streaks overlap
-        // into a continuous sheet rather than a row of discrete stripes.
-        // The grid spans the src buffer, so a cell is srcRect-sized.
-        const cellPx = Math.max(src[2], src[3]) / dim;
-        const softnessPx = Math.max(this.params.softness * pr, cellPx * 1.8);
+        // Streak width, taken straight as a pixel value. Thinner than the
+        // sampling grid cell and streaks break into stripes; raise density.
+        const softnessPx = this.params.softness * pr;
 
         const baseAngle = (this.params.angle * Math.PI) / 180;
         for (let k = 0; k < rays; k++) {
@@ -431,18 +428,10 @@ export class LightStreakEffect implements Effect {
             });
         }
 
-        // Sprite overlap per pixel scales with softnessPx / cellPx²;
-        // divide it out relative to a reference density so brightness
-        // stays constant as density changes.
-        const refCellPx = Math.max(src[2], src[3]) / REF_DENSITY;
-        const refSoftnessPx = Math.max(
-            this.params.softness * pr,
-            refCellPx * 1.8,
-        );
-        const densityNorm =
-            refSoftnessPx /
-            (refCellPx * refCellPx) /
-            (softnessPx / (cellPx * cellPx));
+        // Sprite overlap per pixel scales with density² (softness is a
+        // fixed pixel width, so it cancels); divide it out against a
+        // reference density so brightness holds as density changes.
+        const densityNorm = (REF_DENSITY / dim) ** 2;
 
         // Tone-mapped, tinted composite of the accumulation over the base.
         // `norm` cancels the method's core gain (≈ rays × overlap) so the

@@ -142,9 +142,9 @@ export function attachLightStreakPane(
     const shape = pane.addFolder({ title: "Shape", expanded: false });
     shape.addBinding(effect.params, "length", { min: 0, max: 2000, step: 1 });
     shape.addBinding(effect.params, "softness", {
-        min: 0.5,
-        max: 8,
-        step: 0.1,
+        min: 1,
+        max: 100,
+        step: 1,
     });
     shape.addBinding(effect.params, "falloff", {
         min: 0.5,
