@@ -26,15 +26,7 @@ lightStreak.play = async ({ canvasElement }) => {
     });
 
     const vfx = initVFX();
-    const effect = new LightStreakEffect({
-        streaks: 6,
-        threshold: 0.4,
-        intensity: 3.0,
-        dispersion: -0.6,
-        fringe: 0.25,
-        length: 220,
-        pad: 280,
-    });
+    const effect = new LightStreakEffect({ length: 220, pad: 280 });
     await vfx.add(img, { effect });
     attachLightStreakPane("Light Streak", effect);
 };

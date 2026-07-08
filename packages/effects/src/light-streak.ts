@@ -258,7 +258,7 @@ export type LightStreakParams = {
      * disables it.
      */
     fringe: number;
-    /** Number of fringes along the streak (green channel reference). */
+    /** Fringes along the streak (green channel reference); fractional. */
     fringeCount: number;
     /**
      * Source sampling grid dimension (instance count = `density²`).
@@ -285,18 +285,18 @@ export type LightStreakParams = {
 const REF_DENSITY = 256;
 
 const DEFAULT_PARAMS: LightStreakParams = {
-    streaks: 2,
+    streaks: 4,
     angle: 0,
     length: 160,
     softness: 2,
     falloff: 1.5,
-    threshold: 0.75,
+    threshold: 0.8,
     highlightClamp: 1.0,
-    intensity: 3.0,
-    tint: [0.6, 0.8, 1.0],
-    dispersion: -0.5,
-    fringe: 0.0,
-    fringeCount: 8,
+    intensity: 1.0,
+    tint: [1.0, 1.0, 1.0],
+    dispersion: -0.2,
+    fringe: 0.2,
+    fringeCount: 1.5,
     density: 256,
     resolution: 0.5,
     pad: 160,

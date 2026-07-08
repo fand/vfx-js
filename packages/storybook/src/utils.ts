@@ -122,7 +122,11 @@ export function attachLightStreakPane(
         step: 0.01,
     });
     pane.addBinding(effect.params, "fringe", { min: 0, max: 1, step: 0.01 });
-    pane.addBinding(effect.params, "fringeCount", { min: 1, max: 32, step: 1 });
+    pane.addBinding(effect.params, "fringeCount", {
+        min: 0,
+        max: 10,
+        step: 0.1,
+    });
 
     // `tint` is a tuple; Tweakpane's float color picker needs {r,g,b}, so
     // mirror it and write the tuple back on change.
