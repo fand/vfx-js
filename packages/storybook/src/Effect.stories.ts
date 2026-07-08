@@ -938,6 +938,7 @@ type SaberArgs = {
     jitterPower: number;
     mode: "sdf" | "bloom";
     bloomScatter: number;
+    bloomIntensity: number;
     pad: number;
 };
 function hexToRgb(hex: string): [number, number, number] {
@@ -1032,6 +1033,7 @@ export const saber: StoryObj<SaberArgs> = {
         jitterPower: 0.0,
         mode: "sdf",
         bloomScatter: 0.7,
+        bloomIntensity: 3.0,
         pad: 80,
     },
     argTypes: {
@@ -1045,6 +1047,9 @@ export const saber: StoryObj<SaberArgs> = {
         },
         bloomScatter: {
             control: { type: "range", min: 0, max: 1, step: 0.02 },
+        },
+        bloomIntensity: {
+            control: { type: "range", min: 0, max: 10, step: 0.1 },
         },
         color: { control: { type: "color" } },
         intensity: { control: { type: "range", min: 0, max: 2, step: 0.02 } },

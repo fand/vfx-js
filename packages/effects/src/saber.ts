@@ -434,6 +434,11 @@ export type SaberParams = {
      */
     bloomScatter: number;
     /**
+     * Bloom-mode halo gain. Higher makes the glow around the line brighter.
+     * Ignored in `"sdf"` mode.
+     */
+    bloomIntensity: number;
+    /**
      * Rebuild the distance field every frame instead of caching it. Needed
      * for live sources (video / webcam) whose silhouette changes; leave
      * `false` for static images and text to avoid the per-frame JFA cost.
@@ -463,6 +468,7 @@ const DEFAULT_PARAMS: SaberParams = {
     jitterPower: 0.0,
     mode: "sdf",
     bloomScatter: 0.7,
+    bloomIntensity: 3.0,
     dynamic: false,
     pad: 80,
 };
@@ -705,9 +711,11 @@ export class SaberEffect implements Effect {
         }
 
         const bloomTex = n >= 2 ? this.#mipsUp[0] : this.#mipsDown[0];
-        // Normalise by active depth so glow brightness stays roughly constant
-        // across scatter (the additive pyramid sums N levels otherwise).
-        const bloomIntensity = 1 / Math.max(1, activeDepth);
+        // No depth normalisation here (unlike BloomEffect): the thin edge
+        // line carries little energy, so dividing by the active-level count
+        // made the halo vanish at high scatter. Let brightness grow with
+        // spread and expose a direct gain knob instead.
+        const bloomIntensity = this.params.bloomIntensity;
         ctx.draw({
             frag: FRAG_COMPOSITE,
             uniforms: {
