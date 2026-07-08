@@ -290,7 +290,7 @@ const DEFAULT_PARAMS: LightStreakParams = {
     length: 160,
     softness: 2,
     falloff: 2.0,
-    threshold: 0.8,
+    threshold: 0.9,
     highlightClamp: 1.0,
     intensity: 0.5,
     tint: [1.0, 1.0, 1.0],
