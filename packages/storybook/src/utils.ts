@@ -147,7 +147,7 @@ export function attachLightStreakPane(
     shape.addBinding(effect.params, "length", { min: 0, max: 2000, step: 1 });
     shape.addBinding(effect.params, "width", {
         min: 1,
-        max: 100,
+        max: 10,
         step: 1,
     });
     shape.addBinding(effect.params, "falloff", {
