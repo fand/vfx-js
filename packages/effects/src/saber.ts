@@ -190,6 +190,10 @@ out vec4 outColor;
 uniform float softness;
 ${SABER_WARP}
 
+float hash(vec2 p) {
+  return fract(sin(dot(p + time, vec2(428., 193.))) * 48020.) * 2. - 1.;
+}
+
 void main() {
     float t = time * speed;
     float eps = 0.5 / res.y;
@@ -203,13 +207,36 @@ void main() {
         }
         float dist = warpedDist(t, freq, float(i) * 31.7);
         float g = (0.0015 * intensity) / max(dist / thickness, eps);
-        glow += pow(g, softness) * weight;
+        glow += pow(g, 1. / (1. + softness)) * weight;
+
         freq *= noiseScaleStep;
         weight *= WEIGHT_FALLOFF;
     }
 
-    // White-hot core where the glow saturates.
+    // White-hot core where the glow saturates (uses the raw HDR glow).
     float coreV = smoothstep(0.9, 1.0, glow * core);
+
+    // Soft-saturate the glow so high intensity clips smoothly instead of
+    // exposing the distance field's medial-axis creases as dark seams.
+    // The quadratic term pulls the shoulder in so mid glow saturates
+    // sooner, while the faint low end keeps its near-linear response.
+    // glow = 1.0 - exp(-glow - glow * glow);
+
+    // Sub glow
+    float dist2 = 0.;
+    float s = 0.1;
+    for (int i = 0; i < 8; i++) {
+      float fi = float(i) * 10.;
+      dist2 += texture(distField, uv + vec2(hash(uv + fi), hash(uv + fi + 1.)) * s).r;
+      s *= 0.9;
+    }
+    dist2 /= 8.0;
+
+    float g2 = 0.01 / max(dist2 / thickness, eps);
+    float glow2 = pow(g2, 1. / (1. + softness));
+
+    glow = mix(glow, glow2, softness * 0.5);
+
     vec3 col = color * glow + coreV;
 
     // Premultiplied output for the runtime's (ONE, 1-SRC_ALPHA) blend.
