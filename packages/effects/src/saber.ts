@@ -13,12 +13,7 @@
 //      crackles like electricity.
 //   3. Turn distance into light with the classic `color = k / distance`
 //      falloff, giving a bright core that bleeds into a soft glow.
-import type {
-    Effect,
-    EffectContext,
-    EffectRenderTarget,
-    EffectUniforms,
-} from "@vfx-js/core";
+import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 import { SNOISE3D } from "./_noise";
 
 /** Max number of overlaid lines (caps the per-frame render loop). */
@@ -95,6 +90,8 @@ void main() {
 
 // (1c) Resolve pass. Convert "nearest seed coord" into an aspect-correct
 // distance, normalised so 1.0 ≈ one buffer-height away.
+// The sharp distance lands in .r; a blurred copy is packed into .g by the
+// two blur passes below (1d).
 const FRAG_RESOLVE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -113,7 +110,41 @@ void main() {
 }
 `;
 
-// Shared warp code for both render modes. Declares the warp uniforms plus
+// (1d) Separable gaussian blur, run twice (dir = horizontal then vertical).
+// Passes the sharp distance through in .r and writes the blurred distance
+// to .g: the render pass reads the crisp edge and the crease-free glow
+// field from one fetch. The first pass blurs .r, the second re-blurs .g.
+const FRAG_BLUR = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D src;
+uniform vec2 res;
+uniform vec2 dir;
+
+// Kernel half-width (≈ 3σ) in distance units (1.0 ≈ one buffer height).
+const float RADIUS = 0.1;
+const int TAPS = 6;
+
+void main() {
+    vec4 c = texture(src, uv);
+    // Scale x steps by 1/aspect so the blur is isotropic on screen.
+    vec2 ar = vec2(res.y / res.x, 1.0);
+
+    float sum = 0.0;
+    float wsum = 0.0;
+    for (int i = -TAPS; i <= TAPS; i++) {
+        float x = float(i) / float(TAPS);
+        float w = exp(-x * x * 4.5);
+        vec4 s = texture(src, uv + dir * ar * (x * RADIUS));
+        sum += (dir.y > 0.5 ? s.g : s.r) * w;
+        wsum += w;
+    }
+    outColor = vec4(c.r, sum / wsum, 0.0, 1.0);
+}
+`;
+
+// Shared warp code for the render pass. Declares the warp uniforms plus
 // `warpedDist(freq, seed, t)`, which samples the cached distance field at a
 // noise-displaced lookup. Each shader below declares `in vec2 uv;` before
 // including this, so the warp reads the current fragment's uv.
@@ -181,7 +212,7 @@ float warpedDist(float t, float freq, float seed) {
 }
 `;
 
-// SDF mode: light each warped line with the classic `k / distance` falloff,
+// Render pass: light each warped line with the classic `k / distance` falloff,
 // which produces both the bright core and the surrounding glow in one pass.
 const FRAG_RENDER = `#version 300 es
 precision highp float;
@@ -189,10 +220,6 @@ in vec2 uv;
 out vec4 outColor;
 uniform float softness;
 ${SABER_WARP}
-
-float hash(vec2 p) {
-  return fract(sin(dot(p + time, vec2(428., 193.))) * 48020.) * 2. - 1.;
-}
 
 void main() {
     float t = time * speed;
@@ -216,22 +243,9 @@ void main() {
     // White-hot core where the glow saturates (uses the raw HDR glow).
     float coreV = smoothstep(0.9, 1.0, glow * core);
 
-    // Soft-saturate the glow so high intensity clips smoothly instead of
-    // exposing the distance field's medial-axis creases as dark seams.
-    // The quadratic term pulls the shoulder in so mid glow saturates
-    // sooner, while the faint low end keeps its near-linear response.
-    // glow = 1.0 - exp(-glow - glow * glow);
-
-    // Sub glow
-    float dist2 = 0.;
-    float s = 0.1;
-    for (int i = 0; i < 8; i++) {
-      float fi = float(i) * 10.;
-      dist2 += texture(distField, uv + vec2(hash(uv + fi), hash(uv + fi + 1.)) * s).r;
-      s *= 0.9;
-    }
-    dist2 /= 8.0;
-
+    // Sub glow from the pre-blurred distance (g channel): a rounded field
+    // with no medial-axis creases, mixed in by softness.
+    float dist2 = texture(distField, uv).g;
     float g2 = 0.01 / max(dist2 / thickness, eps);
     float glow2 = pow(g2, 1. / (1. + softness));
 
@@ -244,160 +258,6 @@ void main() {
     outColor = vec4(col, a);
 }
 `;
-
-// Bloom mode, pass 1: draw ONLY the warped edge as a thin bright line into
-// an HDR buffer. The surrounding glow is added later by blooming this line,
-// so here we want a crisp band around distance 0, not a falloff.
-const FRAG_LINE = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-${SABER_WARP}
-
-void main() {
-    float t = time * speed;
-    // Line half-width in normalised distance-field units; thickness widens it.
-    float halfW = 0.004 * thickness;
-
-    float line = 0.0;
-    float freq = frequency;
-    float weight = 1.0;
-    for (int i = 0; i < ${MAX_LINES}; i++) {
-        if (i >= lineCount) {
-            break;
-        }
-        float dist = warpedDist(t, freq, float(i) * 31.7);
-        line += (1.0 - smoothstep(0.0, halfW, dist)) * weight;
-        freq *= noiseScaleStep;
-        weight *= WEIGHT_FALLOFF;
-    }
-
-    // Bright HDR line so the bloom pyramid reads it as a light source.
-    float b = line * intensity;
-    float coreV = smoothstep(0.7, 1.0, line * core);
-    vec3 col = color * b + coreV;
-    // Straight (non-premultiplied) color; alpha carries coverage so the
-    // pyramid blurs the color and its footprint together.
-    float a = clamp(b + coreV, 0.0, 1.0);
-    outColor = vec4(col, a);
-}
-`;
-
-// Bloom mode, pass 2: 13-tap Karis downsample (Jimenez 2014). karis=1 on the
-// first step suppresses fireflies from the thin bright line.
-const FRAG_DOWNSAMPLE = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D src;
-uniform vec2 texelSize;
-uniform int karis;
-
-vec4 s(vec2 o) { return texture(src, uv + o); }
-float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
-
-void main() {
-    vec2 t = texelSize;
-    vec4 a = s(vec2(-2.0 * t.x, -2.0 * t.y));
-    vec4 b = s(vec2( 0.0,       -2.0 * t.y));
-    vec4 c = s(vec2( 2.0 * t.x, -2.0 * t.y));
-    vec4 d = s(vec2(-2.0 * t.x,  0.0));
-    vec4 e = s(vec2( 0.0,        0.0));
-    vec4 f = s(vec2( 2.0 * t.x,  0.0));
-    vec4 g = s(vec2(-2.0 * t.x,  2.0 * t.y));
-    vec4 h = s(vec2( 0.0,        2.0 * t.y));
-    vec4 i = s(vec2( 2.0 * t.x,  2.0 * t.y));
-    vec4 j = s(vec2(-1.0 * t.x, -1.0 * t.y));
-    vec4 k = s(vec2( 1.0 * t.x, -1.0 * t.y));
-    vec4 l = s(vec2(-1.0 * t.x,  1.0 * t.y));
-    vec4 m = s(vec2( 1.0 * t.x,  1.0 * t.y));
-
-    vec4 box1 = (a + b + d + e) * 0.25;
-    vec4 box2 = (b + c + e + f) * 0.25;
-    vec4 box3 = (d + e + g + h) * 0.25;
-    vec4 box4 = (e + f + h + i) * 0.25;
-    vec4 box5 = (j + k + l + m) * 0.25;
-
-    vec4 color;
-    if (karis == 1) {
-        float w1 = 1.0 / (1.0 + luma(box1.rgb));
-        float w2 = 1.0 / (1.0 + luma(box2.rgb));
-        float w3 = 1.0 / (1.0 + luma(box3.rgb));
-        float w4 = 1.0 / (1.0 + luma(box4.rgb));
-        float w5 = 1.0 / (1.0 + luma(box5.rgb));
-        color = (box1 * w1 + box2 * w2 + box3 * w3 + box4 * w4 + box5 * w5)
-              / (w1 + w2 + w3 + w4 + w5);
-    } else {
-        color = box1 * 0.125 + box2 * 0.125 + box3 * 0.125 + box4 * 0.125
-              + box5 * 0.5;
-    }
-    outColor = color;
-}
-`;
-
-// Bloom mode, pass 3: 3x3 tent upsample, additive pyramid. Each level adds
-// `mipsDown[i] * weightLarge + tent(deeper) * weightSmall`.
-const FRAG_UPSAMPLE = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D srcSmall;
-uniform sampler2D srcLarge;
-uniform vec2 texelSize;
-uniform float weightLarge;
-uniform float weightSmall;
-
-void main() {
-    vec2 t = texelSize;
-    vec4 sum = vec4(0.0);
-    sum += texture(srcSmall, uv + vec2(-t.x, -t.y)) * 1.0;
-    sum += texture(srcSmall, uv + vec2( 0.0, -t.y)) * 2.0;
-    sum += texture(srcSmall, uv + vec2( t.x, -t.y)) * 1.0;
-    sum += texture(srcSmall, uv + vec2(-t.x,  0.0)) * 2.0;
-    sum += texture(srcSmall, uv                  ) * 4.0;
-    sum += texture(srcSmall, uv + vec2( t.x,  0.0)) * 2.0;
-    sum += texture(srcSmall, uv + vec2(-t.x,  t.y)) * 1.0;
-    sum += texture(srcSmall, uv + vec2( 0.0,  t.y)) * 2.0;
-    sum += texture(srcSmall, uv + vec2( t.x,  t.y)) * 1.0;
-    sum *= (1.0 / 16.0);
-    outColor = texture(srcLarge, uv) * weightLarge + sum * weightSmall;
-}
-`;
-
-// Bloom mode, pass 4: 5x5 gaussian upsample of the half-res bloom, added to
-// the sharp line. Premultiplied output for the runtime's blend.
-const FRAG_COMPOSITE = `#version 300 es
-precision highp float;
-in vec2 uv;
-out vec4 outColor;
-uniform sampler2D lineTex;
-uniform sampler2D bloomTex;
-uniform vec2 texelSize;
-uniform float bloomIntensity;
-
-void main() {
-    vec2 t = texelSize * 1.2;
-    vec4 b = vec4(0.0);
-    b += texture(bloomTex, uv + vec2(-t.x, -t.y)) * 25.0;
-    b += texture(bloomTex, uv + vec2( 0.0, -t.y)) * 30.0;
-    b += texture(bloomTex, uv + vec2( t.x, -t.y)) * 25.0;
-    b += texture(bloomTex, uv + vec2(-t.x,  0.0)) * 30.0;
-    b += texture(bloomTex, uv                  ) * 36.0;
-    b += texture(bloomTex, uv + vec2( t.x,  0.0)) * 30.0;
-    b += texture(bloomTex, uv + vec2(-t.x,  t.y)) * 25.0;
-    b += texture(bloomTex, uv + vec2( 0.0,  t.y)) * 30.0;
-    b += texture(bloomTex, uv + vec2( t.x,  t.y)) * 25.0;
-    b *= (1.0 / 256.0);
-
-    vec4 ln = texture(lineTex, uv);
-    vec3 rgb = ln.rgb + max(b.rgb, vec3(0.0)) * bloomIntensity;
-    float a = clamp(max(ln.a, b.a * bloomIntensity), 0.0, 1.0);
-    outColor = vec4(rgb * a, a);
-}
-`;
-
-// Tent offset in mip-texel units — the classic HDRP reconstruction kernel.
-const TENT_FILTER = 0.5;
 
 export type SaberParams = {
     /** Glow color (linear RGB, 0..1). Default electric blue. */
@@ -449,23 +309,6 @@ export type SaberParams = {
      */
     jitterPower: number;
     /**
-     * How the glow is produced.
-     * - `"sdf"`: light the distance field with a `k / distance` falloff
-     *   (line and glow in one pass).
-     * - `"bloom"`: draw only a thin edge line, then bloom it into the glow.
-     */
-    mode: "sdf" | "bloom";
-    /**
-     * Bloom-mode halo spread, 0..1. Higher reaches more pyramid levels for a
-     * wider glow. Ignored in `"sdf"` mode.
-     */
-    bloomScatter: number;
-    /**
-     * Bloom-mode halo gain. Higher makes the glow around the line brighter.
-     * Ignored in `"sdf"` mode.
-     */
-    bloomIntensity: number;
-    /**
      * Rebuild the distance field every frame instead of caching it. Needed
      * for live sources (video / webcam) whose silhouette changes; leave
      * `false` for static images and text to avoid the per-frame JFA cost.
@@ -493,9 +336,6 @@ const DEFAULT_PARAMS: SaberParams = {
     sharpness: 1.0,
     jitterSpeed: 1.0,
     jitterPower: 0.0,
-    mode: "sdf",
-    bloomScatter: 0.7,
-    bloomIntensity: 3.0,
     dynamic: false,
     pad: 80,
 };
@@ -520,15 +360,6 @@ export class SaberEffect implements Effect {
     #lastW = 0;
     #lastH = 0;
     #lastEdgeThreshold = Number.NaN;
-
-    // Bloom-mode buffers: the thin edge line plus its downsample/upsample
-    // pyramid. Allocated lazily on first bloom-mode frame.
-    #lineBuf: EffectRenderTarget | null = null;
-    #mipsDown: EffectRenderTarget[] = [];
-    #mipsUp: EffectRenderTarget[] = [];
-    #mipsAllocated = false;
-    #lastLineW = 0;
-    #lastLineH = 0;
 
     constructor(initial: Partial<SaberParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
@@ -556,12 +387,6 @@ export class SaberEffect implements Effect {
         this.#seedA = ctx.createRenderTarget(seedOpts);
         this.#seedB = ctx.createRenderTarget(seedOpts);
         this.#field = ctx.createRenderTarget({
-            float: true,
-            filter: "linear",
-            wrap: "clamp",
-        });
-        // HDR line buffer for bloom mode; blurred by the pyramid.
-        this.#lineBuf = ctx.createRenderTarget({
             float: true,
             filter: "linear",
             wrap: "clamp",
@@ -609,14 +434,12 @@ export class SaberEffect implements Effect {
             sharpness,
             jitterSpeed,
             jitterPower,
-            mode,
         } = this.params;
         const lineCount = Math.max(
             1,
             Math.min(MAX_LINES, this.params.lineCount),
         );
 
-        // Uniforms shared by both the SDF shader and the bloom line shader.
         const warpUniforms = {
             distField: this.#field,
             res: [w, h] as [number, number],
@@ -635,154 +458,11 @@ export class SaberEffect implements Effect {
             jitterPower,
         };
 
-        if (mode === "bloom") {
-            this.#renderBloom(ctx, w, h, warpUniforms);
-            return;
-        }
-
         ctx.draw({
             frag: FRAG_RENDER,
             uniforms: { ...warpUniforms, softness },
             target: ctx.target,
         });
-    }
-
-    // Bloom mode: draw the thin edge line, run a downsample/upsample pyramid,
-    // then composite the sharp line with its blurred bloom.
-    #renderBloom(
-        ctx: EffectContext,
-        w: number,
-        h: number,
-        warpUniforms: EffectUniforms,
-    ): void {
-        const line = this.#lineBuf;
-        if (!line) {
-            return;
-        }
-
-        ctx.draw({ frag: FRAG_LINE, uniforms: warpUniforms, target: line });
-
-        // Rebuild the pyramid whenever the line buffer resizes.
-        if (line.width !== this.#lastLineW || line.height !== this.#lastLineH) {
-            this.#mipsDown.length = 0;
-            this.#mipsUp.length = 0;
-            this.#mipsAllocated = false;
-            this.#lastLineW = line.width;
-            this.#lastLineH = line.height;
-        }
-        this.#allocateMips(ctx, line.width, line.height);
-        const n = this.#mipsDown.length;
-        if (n === 0) {
-            // No room for a pyramid — show the bare line.
-            ctx.draw({
-                frag: FRAG_COMPOSITE,
-                uniforms: {
-                    lineTex: line,
-                    bloomTex: line,
-                    texelSize: [1 / line.width, 1 / line.height],
-                    bloomIntensity: 0,
-                },
-                target: ctx.target,
-            });
-            return;
-        }
-
-        // Downsample: line → mipsDown[0] (Karis) → ... → mipsDown[n-1].
-        ctx.draw({
-            frag: FRAG_DOWNSAMPLE,
-            uniforms: {
-                src: line,
-                texelSize: [1 / line.width, 1 / line.height],
-                karis: 1,
-            },
-            target: this.#mipsDown[0],
-        });
-        for (let i = 1; i < n; i++) {
-            const prev = this.#mipsDown[i - 1];
-            ctx.draw({
-                frag: FRAG_DOWNSAMPLE,
-                uniforms: {
-                    src: prev,
-                    texelSize: [1 / prev.width, 1 / prev.height],
-                    karis: 0,
-                },
-                target: this.#mipsDown[i],
-            });
-        }
-
-        // Additive upsample. weight[i] = clamp(activeDepth − i, 0, 1);
-        // activeDepth is linear in scatter so the halo grows evenly.
-        const scatter = Math.min(Math.max(this.params.bloomScatter, 0), 1);
-        const activeDepth = 1 + scatter * Math.max(0, n - 1);
-        const weightFor = (i: number) =>
-            Math.min(1, Math.max(0, activeDepth - i));
-        for (let i = n - 2; i >= 0; i--) {
-            const small =
-                i === n - 2 ? this.#mipsDown[n - 1] : this.#mipsUp[i + 1];
-            const levelScale = 2 ** (i + 2);
-            const wSmall = i === n - 2 ? weightFor(n - 1) : 1.0;
-            ctx.draw({
-                frag: FRAG_UPSAMPLE,
-                uniforms: {
-                    srcSmall: small,
-                    srcLarge: this.#mipsDown[i],
-                    texelSize: [
-                        (TENT_FILTER * levelScale) / w,
-                        (TENT_FILTER * levelScale) / h,
-                    ],
-                    weightLarge: weightFor(i),
-                    weightSmall: wSmall,
-                },
-                target: this.#mipsUp[i],
-            });
-        }
-
-        const bloomTex = n >= 2 ? this.#mipsUp[0] : this.#mipsDown[0];
-        // No depth normalisation here (unlike BloomEffect): the thin edge
-        // line carries little energy, so dividing by the active-level count
-        // made the halo vanish at high scatter. Let brightness grow with
-        // spread and expose a direct gain knob instead.
-        const bloomIntensity = this.params.bloomIntensity;
-        ctx.draw({
-            frag: FRAG_COMPOSITE,
-            uniforms: {
-                lineTex: line,
-                bloomTex,
-                texelSize: [(TENT_FILTER * 2) / w, (TENT_FILTER * 2) / h],
-                bloomIntensity,
-            },
-            target: ctx.target,
-        });
-    }
-
-    #allocateMips(ctx: EffectContext, baseW: number, baseH: number): void {
-        if (this.#mipsAllocated) {
-            return;
-        }
-        // Halve until both axes hit 1 px, capped at 8 levels.
-        let w = Math.max(1, Math.floor(baseW / 2));
-        let h = Math.max(1, Math.floor(baseH / 2));
-        for (let i = 0; i < 8; i++) {
-            this.#mipsDown.push(
-                ctx.createRenderTarget({ size: [w, h], float: true }),
-            );
-            const nw = Math.max(1, Math.floor(w / 2));
-            const nh = Math.max(1, Math.floor(h / 2));
-            if (nw === w && nh === h) {
-                break;
-            }
-            w = nw;
-            h = nh;
-        }
-        for (let i = 0; i < this.#mipsDown.length - 1; i++) {
-            this.#mipsUp.push(
-                ctx.createRenderTarget({
-                    size: [this.#mipsDown[i].width, this.#mipsDown[i].height],
-                    float: true,
-                }),
-            );
-        }
-        this.#mipsAllocated = true;
     }
 
     outputRect(
@@ -801,19 +481,13 @@ export class SaberEffect implements Effect {
         this.#seedA = null;
         this.#seedB = null;
         this.#field = null;
-        this.#lineBuf = null;
-        this.#mipsDown.length = 0;
-        this.#mipsUp.length = 0;
-        this.#mipsAllocated = false;
         this.#dirty = true;
         this.#lastW = 0;
         this.#lastH = 0;
-        this.#lastLineW = 0;
-        this.#lastLineH = 0;
     }
 
     // (1) Build the distance field once via JFA: seed → log2(N) flood
-    // passes → resolve. Ping-pongs between the two seed buffers.
+    // passes → resolve → blur (packs .g). Ping-pongs the two seed buffers.
     #buildField(ctx: EffectContext, w: number, h: number): void {
         const seedA = this.#seedA;
         const seedB = this.#seedB;
@@ -853,9 +527,21 @@ export class SaberEffect implements Effect {
             write = tmp;
         }
 
+        // Resolve into the free seed buffer, then pack a blurred copy into
+        // .g with two separable passes, reusing the other seed buffer.
         ctx.draw({
             frag: FRAG_RESOLVE,
             uniforms: { seed: read, res },
+            target: write,
+        });
+        ctx.draw({
+            frag: FRAG_BLUR,
+            uniforms: { src: write, res, dir: [1, 0] },
+            target: read,
+        });
+        ctx.draw({
+            frag: FRAG_BLUR,
+            uniforms: { src: read, res, dir: [0, 1] },
             target: field,
         });
     }
