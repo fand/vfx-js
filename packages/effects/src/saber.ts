@@ -10,15 +10,16 @@
 //      arc-length parameter.
 //   2. Splat the points as seeds and flood with the Jump Flooding Algorithm
 //      (JFA): each texel learns its distance to the silhouette AND the
-//      arc-length position of its nearest boundary point. This is the
-//      expensive part, so it runs ONCE — on the first frame and whenever
-//      the buffer is resized — and the result is cached (see `#buildField`).
+//      arc-length position of its nearest boundary point. The path reveal
+//      (`progress`) happens here: seeds past the head are dropped, so the
+//      flooded field is exact for the partial path — hidden parts simply
+//      don't exist. The field is cached; it rebuilds only when the buffer
+//      resizes or `progress` changes (see `#buildField`).
 //   3. Every frame, warp the lookup into that field with animated 3D
 //      simplex noise (z = time) so the glowing outline wobbles and
 //      crackles like electricity.
 //   4. Turn distance into light with the classic `color = k / distance`
-//      falloff. Arc length drives the path-reveal (`progress`) and the
-//      traveling `pulse`.
+//      falloff. Arc length drives the traveling `pulse`.
 import type {
     Effect,
     EffectContext,
@@ -55,12 +56,18 @@ void main() {
 const VERT_SEED = `#version 300 es
 precision highp float;
 in vec3 position; // xy = buffer uv, z = arc-length t
+uniform float progress;
 out vec2 vUv;
 out float vT;
 void main() {
     vUv = position.xy;
     vT = position.z;
-    gl_Position = vec4(position.xy * 2.0 - 1.0, 0.0, 1.0);
+    // Path reveal: seeds past the head are moved out of clip space, so
+    // the flooded field is exact for the partial path.
+    vec2 clip = position.z <= progress
+        ? position.xy * 2.0 - 1.0
+        : vec2(-10.0);
+    gl_Position = vec4(clip, 0.0, 1.0);
     gl_PointSize = 1.0;
 }
 `;
@@ -190,7 +197,6 @@ uniform float noiseScaleStep;
 uniform float sharpness;
 uniform float jitterSpeed;
 uniform float jitterPower;
-uniform float progress;
 uniform float pulseIntensity;
 uniform float pulseSpeed;
 uniform float pulseWidth;
@@ -209,27 +215,16 @@ float shapeNoise(vec3 p) {
     return sign(n) * pow(abs(n), max(sharpness, 1.0));
 }
 
-// Arc-length modulation shared by all lines: path reveal by progress,
-// plus a gaussian pulse traveling along the contour (loops seamlessly).
-// d is the distance from the path: both effects fade wider with d so
-// they stay continuous out in the glow tails (the t field jumps at
-// Voronoi cell boundaries; a hard cut would band there) while keeping
-// a sharp head on the line itself.
+// Traveling-pulse modulation along the contour (loops seamlessly).
+// d is the distance from the path: the pulse widens with d (conserving
+// energy) so it diffuses into the glow tails instead of cutting
+// cell-shaped highlights where the t field jumps at Voronoi cell
+// boundaries.
 float arcMod(float arc, float d) {
-    float m = 1.0;
-    if (progress < 1.0) {
-        float fade = 0.03 + d * 0.35;
-        m = smoothstep(progress, progress - fade, arc);
-    }
-    if (pulseIntensity > 0.0) {
-        float pd = abs(fract(arc - time * pulseSpeed + 0.5) - 0.5);
-        // Widen the pulse with d, conserving its energy, so it diffuses
-        // into the tails instead of cutting cell-shaped highlights.
-        float w = pulseWidth * (1.0 + d * 4.0);
-        float gain = pulseIntensity * (pulseWidth / w);
-        m *= 1.0 + gain * exp(-pd * pd / (w * w));
-    }
-    return m;
+    float pd = abs(fract(arc - time * pulseSpeed + 0.5) - 0.5);
+    float w = pulseWidth * (1.0 + d * 4.0);
+    float gain = pulseIntensity * (pulseWidth / w);
+    return 1.0 + gain * exp(-pd * pd / (w * w));
 }
 
 // Arc modulation at p, averaged over a disc that widens with the
@@ -301,7 +296,7 @@ ${SABER_WARP}
 void main() {
     float t = time * speed;
     float eps = 0.5 / res.y;
-    bool arcActive = progress < 1.0 || pulseIntensity > 0.0;
+    bool arcActive = pulseIntensity > 0.0;
 
     float glow = 0.0;
     float freq = frequency;
@@ -392,8 +387,10 @@ export type SaberParams = {
     jitterPower: number;
     /**
      * Path-reveal progress (0..1) along each contour: the outline draws
-     * on from its start point up to this fraction of its length. `1`
-     * shows the full outline (no reveal cost).
+     * on from its start point up to this fraction of its length. The
+     * reveal is applied to the distance field itself (hidden parts don't
+     * exist), so a change rebuilds the field — animating it costs a few
+     * GPU passes per frame, like `dynamic` mode.
      */
     progress: number;
     /**
@@ -469,8 +466,14 @@ export class SaberEffect implements Effect {
     /** True while a mask readback is in flight (one at a time). */
     #pendingTrace = false;
 
-    /** Traced seed points (uv + t triples) waiting to be flooded. */
+    /** Latest traced seed points (uv + t triples). Kept for re-floods. */
     #seedPositions: Float32Array | null = null;
+
+    /** New seed points arrived; the geometry must be rebuilt. */
+    #seedsFresh = false;
+
+    /** Progress the field was last flooded with. */
+    #lastBuiltProgress = Number.NaN;
 
     #disposed = false;
     #dirty = true;
@@ -546,9 +549,16 @@ export class SaberEffect implements Effect {
             this.#dirty = false;
             this.#kickTrace(ctx, w, h);
         }
-        if (this.#seedPositions) {
-            this.#buildField(ctx, w, h, this.#seedPositions);
-            this.#seedPositions = null;
+
+        // Flood when new seeds arrived or the reveal head moved. The
+        // seeds are kept, so a progress change re-floods without a new
+        // trace.
+        const progress = Math.min(Math.max(this.params.progress, 0), 1);
+        if (
+            this.#seedPositions &&
+            (this.#seedsFresh || progress !== this.#lastBuiltProgress)
+        ) {
+            this.#buildField(ctx, w, h, progress);
         }
 
         const {
@@ -564,7 +574,6 @@ export class SaberEffect implements Effect {
             sharpness,
             jitterSpeed,
             jitterPower,
-            progress,
             pulseIntensity,
             pulseSpeed,
             pulseWidth,
@@ -590,7 +599,6 @@ export class SaberEffect implements Effect {
             sharpness,
             jitterSpeed,
             jitterPower,
-            progress,
             pulseIntensity,
             pulseSpeed,
             pulseWidth,
@@ -624,6 +632,8 @@ export class SaberEffect implements Effect {
         this.#seedGeometry = null;
         this.#maskPixels = null;
         this.#seedPositions = null;
+        this.#seedsFresh = false;
+        this.#lastBuiltProgress = Number.NaN;
         this.#dirty = true;
         this.#lastW = 0;
         this.#lastH = 0;
@@ -672,6 +682,7 @@ export class SaberEffect implements Effect {
                     }
                 }
                 this.#seedPositions = position;
+                this.#seedsFresh = true;
             },
             () => {
                 this.#pendingTrace = false;
@@ -680,38 +691,48 @@ export class SaberEffect implements Effect {
         );
     }
 
-    // (2) Build the field from the traced seed points: splat → log2(N) JFA
-    // flood passes → resolve → blur (packs .g). Ping-pongs the two seed
-    // buffers.
+    // (2) Build the field from the traced seed points: splat (dropping
+    // seeds past the reveal head) → log2(N) JFA flood passes → resolve →
+    // blur (packs .g). Ping-pongs the two seed buffers.
     #buildField(
         ctx: EffectContext,
         w: number,
         h: number,
-        position: Float32Array,
+        progress: number,
     ): void {
         const seedA = this.#seedA;
         const seedB = this.#seedB;
         const field = this.#field;
-        if (!seedA || !seedB || !field) {
+        const position = this.#seedPositions;
+        if (!seedA || !seedB || !field || !position) {
             return;
         }
         const res: [number, number] = [w, h];
-        const total = position.length / 3;
 
-        if (this.#seedGeometry) {
-            ctx.releaseGeometry(this.#seedGeometry);
-            this.#seedGeometry = null;
+        // The geometry is reused across re-floods (progress changes);
+        // it is rebuilt only when a new trace arrived.
+        if (this.#seedsFresh || !this.#seedGeometry) {
+            if (this.#seedGeometry) {
+                ctx.releaseGeometry(this.#seedGeometry);
+                this.#seedGeometry = null;
+            }
+            if (position.length > 0) {
+                this.#seedGeometry = {
+                    mode: "points",
+                    attributes: { position: { data: position, itemSize: 3 } },
+                };
+            }
         }
+        this.#seedsFresh = false;
+        this.#lastBuiltProgress = progress;
+
         ctx.clear(seedA);
-        if (total > 0) {
-            this.#seedGeometry = {
-                mode: "points",
-                attributes: { position: { data: position, itemSize: 3 } },
-            };
+        if (this.#seedGeometry) {
             ctx.draw({
                 frag: FRAG_SEED,
                 vert: VERT_SEED,
                 geometry: this.#seedGeometry,
+                uniforms: { progress },
                 target: seedA,
             });
         }
