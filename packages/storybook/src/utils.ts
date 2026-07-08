@@ -99,6 +99,7 @@ export function attachBloomPane(title: string, effect: BloomEffect): Pane {
 export function attachLightStreakPane(
     title: string,
     effect: LightStreakEffect,
+    srcSelector?: SrcSelector,
 ): Pane {
     const container = document.createElement("div");
     container.className = PANE_CLASS;
@@ -107,6 +108,9 @@ export function attachLightStreakPane(
     document.body.appendChild(container);
 
     const pane = new Pane({ container, title, expanded: false });
+    if (srcSelector) {
+        addSrcBinding(pane, srcSelector);
+    }
     pane.addBinding(effect.params, "streaks", { min: 1, max: 24, step: 1 });
     pane.addBinding(effect.params, "angle", { min: 0, max: 360, step: 1 });
     pane.addBinding(effect.params, "threshold", { min: 0, max: 1, step: 0.01 });

@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 
 import { LightStreakEffect } from "@vfx-js/effects";
+import Live from "./assets/live.webp";
 import Logo from "./assets/logo-640w-20p.svg";
+import Robot from "./assets/robot.webp";
 import "./preset.css";
 import { attachLightStreakPane, initVFX } from "./utils";
 
@@ -28,5 +30,17 @@ lightStreak.play = async ({ canvasElement }) => {
     const vfx = initVFX();
     const effect = new LightStreakEffect({ length: 220, pad: 280 });
     await vfx.add(img, { effect });
-    attachLightStreakPane("Light Streak", effect);
+
+    const sources = { Logo, Live, Robot };
+    attachLightStreakPane("Light Streak", effect, {
+        img,
+        sources,
+        onSrcChange: async (key) => {
+            img.src = sources[key as keyof typeof sources];
+            await new Promise<void>((o) => {
+                img.onload = () => o();
+            });
+            await vfx.update(img);
+        },
+    });
 };
