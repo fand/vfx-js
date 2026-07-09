@@ -934,8 +934,6 @@ type SaberArgs = {
     lineCount: number;
     noiseScaleStep: number;
     sharpness: number;
-    jitterSpeed: number;
-    jitterPower: number;
     progress: number;
     pulseIntensity: number;
     pulseSpeed: number;
@@ -1031,8 +1029,6 @@ export const saber: StoryObj<SaberArgs> = {
         lineCount: 3,
         noiseScaleStep: 1.8,
         sharpness: 1.0,
-        jitterSpeed: 1.0,
-        jitterPower: 0.0,
         progress: 1.0,
         pulseIntensity: 0.0,
         pulseSpeed: 0.5,
@@ -1063,8 +1059,6 @@ export const saber: StoryObj<SaberArgs> = {
             control: { type: "range", min: 1, max: 3, step: 0.1 },
         },
         sharpness: { control: { type: "range", min: 1, max: 6, step: 0.1 } },
-        jitterSpeed: { control: { type: "range", min: 0, max: 8, step: 0.1 } },
-        jitterPower: { control: { type: "range", min: 0, max: 6, step: 0.1 } },
         progress: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         pulseIntensity: {
             control: { type: "range", min: 0, max: 10, step: 0.1 },

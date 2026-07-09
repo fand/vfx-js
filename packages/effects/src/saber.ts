@@ -203,8 +203,6 @@ uniform float thickness;
 uniform int lineCount;
 uniform float noiseScaleStep;
 uniform float sharpness;
-uniform float jitterSpeed;
-uniform float jitterPower;
 uniform float pulseIntensity;
 uniform float pulseSpeed;
 uniform float pulseWidth;
@@ -275,22 +273,15 @@ vec2 warpUv(float t, float freq, float seed) {
     vec2 ar = vec2(res.x / res.y, 1.0);
     vec2 sp = uv * ar;
 
-    // Temporal amplitude jitter: modulate the warp strength with a slow
-    // noise so the arcs intermittently crackle (electric flicker). Each
-    // line (seed) jitters on its own clock. jitterPower = 0 disables it.
-    float jn = smoothstep(
-        -0.5, 0.5, snoise(vec3(seed * 3.1, 0.0, time * jitterSpeed)));
-    float amp = amplitude * (jitterPower > 0.0 ? pow(jn, jitterPower) : 1.0);
-
     // Two octaves of shaped 3D noise; z animated by time so the arcs flow.
     vec2 warp = vec2(
         shapeNoise(vec3(sp * freq + seed, t)),
         shapeNoise(vec3(sp * freq + seed + 19.7, t))
-    ) * amp;
+    ) * amplitude;
     warp += vec2(
         shapeNoise(vec3(sp * freq * 2.3 + seed - 5.0, t * 1.7)),
         shapeNoise(vec3(sp * freq * 2.3 + seed + 5.0, t * 1.7))
-    ) * amp * 0.5;
+    ) * amplitude * 0.5;
 
     // Displacement is in square space; map x back to uv so the physical
     // wiggle is isotropic too.
@@ -396,14 +387,6 @@ export type SaberParams = {
      * zappier warp.
      */
     sharpness: number;
-    /** Speed of the temporal amplitude jitter (electric crackle). */
-    jitterSpeed: number;
-    /**
-     * Strength of the temporal amplitude jitter: 0 = off (steady warp),
-     * higher makes the warp burst intermittently (more crackle, lower
-     * average displacement).
-     */
-    jitterPower: number;
     /**
      * Path-reveal progress (0..1) along each contour: the outline draws
      * on from its start point up to this fraction of its length. The
@@ -463,8 +446,6 @@ const DEFAULT_PARAMS: SaberParams = {
     lineCount: 3,
     noiseScaleStep: 1.8,
     sharpness: 1.0,
-    jitterSpeed: 1.0,
-    jitterPower: 0.0,
     progress: 1.0,
     pulseIntensity: 0.0,
     pulseSpeed: 0.5,
@@ -611,8 +592,6 @@ export class SaberEffect implements Effect {
             thickness,
             noiseScaleStep,
             sharpness,
-            jitterSpeed,
-            jitterPower,
             pulseIntensity,
             pulseSpeed,
             pulseWidth,
@@ -636,8 +615,6 @@ export class SaberEffect implements Effect {
             lineCount,
             noiseScaleStep,
             sharpness,
-            jitterSpeed,
-            jitterPower,
             pulseIntensity,
             pulseSpeed,
             pulseWidth,
