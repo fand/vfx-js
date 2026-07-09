@@ -9,6 +9,11 @@ export type Contour = {
     t: Float32Array;
     /** Total loop length in texels. */
     length: number;
+    /**
+     * Signed loop area in texels²: positive for a filled region's
+     * outline, negative for a hole's.
+     */
+    area: number;
 };
 
 // Directed segments per marching-squares case, oriented so the inside
@@ -130,15 +135,19 @@ export function traceContours(
             points[i * 2 + 1] = (Math.floor(loop[i] / strideX2) - 2) / 2;
         }
 
-        // Cumulative arc length, normalized over the closed loop (the
-        // segment back to the start counts toward the total).
+        // Cumulative arc length (normalized over the closed loop; the
+        // segment back to the start counts) and signed area (shoelace).
         let acc = 0;
+        let area2 = 0;
         for (let i = 0; i < n; i++) {
             t[i] = acc;
             const j = (i + 1) % n;
             const dx = points[j * 2] - points[i * 2];
             const dy = points[j * 2 + 1] - points[i * 2 + 1];
             acc += Math.hypot(dx, dy);
+            area2 +=
+                points[i * 2] * points[j * 2 + 1] -
+                points[j * 2] * points[i * 2 + 1];
         }
         if (acc <= 0) {
             continue;
@@ -147,7 +156,7 @@ export function traceContours(
             t[i] /= acc;
         }
 
-        contours.push({ points, t, length: acc });
+        contours.push({ points, t, length: acc, area: area2 / 2 });
     }
 
     return contours;

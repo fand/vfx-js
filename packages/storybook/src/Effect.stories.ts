@@ -940,6 +940,7 @@ type SaberArgs = {
     pulseIntensity: number;
     pulseSpeed: number;
     pulseWidth: number;
+    pulseMinLength: number;
     pad: number;
 };
 function hexToRgb(hex: string): [number, number, number] {
@@ -1036,6 +1037,7 @@ export const saber: StoryObj<SaberArgs> = {
         pulseIntensity: 0.0,
         pulseSpeed: 0.5,
         pulseWidth: 0.05,
+        pulseMinLength: 0.0,
         pad: 80,
     },
     argTypes: {
@@ -1067,9 +1069,12 @@ export const saber: StoryObj<SaberArgs> = {
         pulseIntensity: {
             control: { type: "range", min: 0, max: 10, step: 0.1 },
         },
-        pulseSpeed: { control: { type: "range", min: 0, max: 2, step: 0.02 } },
+        pulseSpeed: { control: { type: "range", min: 0, max: 4, step: 0.05 } },
         pulseWidth: {
             control: { type: "range", min: 0.005, max: 0.2, step: 0.005 },
+        },
+        pulseMinLength: {
+            control: { type: "range", min: 0, max: 2, step: 0.05 },
         },
         pad: { control: { type: "range", min: 0, max: 300, step: 10 } },
     },

@@ -26,7 +26,7 @@ import type {
     EffectGeometry,
     EffectRenderTarget,
 } from "@vfx-js/core";
-import { traceContours } from "./_contour";
+import { type Contour, traceContours } from "./_contour";
 import { SNOISE3D } from "./_noise";
 
 /** Max number of overlaid lines (caps the per-frame render loop). */
@@ -51,20 +51,24 @@ void main() {
 `;
 
 // (1b) Seed splat. Each traced boundary point is drawn as a 1px point
-// carrying its own buffer-uv and arc-length t. Texels without a seed stay
-// at the cleared value (a = 0 marks "invalid").
+// carrying its buffer-uv, absolute arc length (1 ≈ one buffer height) and
+// signed contour length (negative = a non-pulsing contour; magnitude in
+// the same units). Texels without a seed stay at the cleared value
+// (a = 0 marks "invalid").
 const VERT_SEED = `#version 300 es
 precision highp float;
-in vec3 position; // xy = buffer uv, z = arc-length t
+in vec4 position; // xy = buffer uv, z = arc length, w = signed contour length
 uniform float progress;
 out vec2 vUv;
 out float vT;
+out float vL;
 void main() {
     vUv = position.xy;
     vT = position.z;
+    vL = position.w;
     // Path reveal: seeds past the head are moved out of clip space, so
     // the flooded field is exact for the partial path.
-    vec2 clip = position.z <= progress
+    vec2 clip = position.z <= progress * abs(position.w)
         ? position.xy * 2.0 - 1.0
         : vec2(-10.0);
     gl_Position = vec4(clip, 0.0, 1.0);
@@ -76,9 +80,10 @@ const FRAG_SEED = `#version 300 es
 precision highp float;
 in vec2 vUv;
 in float vT;
+in float vL;
 out vec4 outColor;
 void main() {
-    outColor = vec4(vUv, vT, 1.0);
+    outColor = vec4(vUv, vT, vL);
 }
 `;
 
@@ -104,7 +109,7 @@ void main() {
         for (int x = -1; x <= 1; x++) {
             vec2 o = vec2(float(x), float(y)) * stepSize * texel;
             vec4 s = texture(seed, uv + o);
-            if (s.a > 0.5) {
+            if (s.a != 0.0) {
                 float dd = distance(s.rg * res, here);
                 if (dd < bestD) {
                     bestD = dd;
@@ -120,8 +125,9 @@ void main() {
 
 // (1d) Resolve pass. Convert "nearest seed coord" into an aspect-correct
 // distance, normalised so 1.0 ≈ one buffer-height away.
-// The sharp distance lands in .r and the nearest point's arc-length t in
-// .b; a blurred distance is packed into .g by the two blur passes below.
+// The sharp distance lands in .r, the nearest point's arc length in .b
+// and its signed contour length in .a; a blurred distance is packed into
+// .g by the two blur passes below.
 const FRAG_RESOLVE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -133,20 +139,22 @@ void main() {
     vec4 s = texture(seed, uv);
     float dist = 1.0;
     float t = 0.0;
-    if (s.a > 0.5) {
+    float sl = 0.0;
+    if (s.a != 0.0) {
         vec2 d = (uv - s.rg) * vec2(res.x / res.y, 1.0);
         dist = length(d);
         t = s.b;
+        sl = s.a;
     }
-    outColor = vec4(dist, 0.0, t, 1.0);
+    outColor = vec4(dist, 0.0, t, sl);
 }
 `;
 
 // (1e) Separable gaussian blur, run twice (dir = horizontal then vertical).
-// Passes the sharp distance (.r) and arc-length t (.b) through and writes
-// the blurred distance to .g: the render pass reads the crisp edge and the
-// crease-free glow field from one fetch. The first pass blurs .r, the
-// second re-blurs .g.
+// Passes the sharp distance (.r), arc length (.b) and signed contour
+// length (.a) through and writes the blurred distance to .g: the render
+// pass reads the crisp edge and the crease-free glow field from one
+// fetch. The first pass blurs .r, the second re-blurs .g.
 const FRAG_BLUR = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -173,7 +181,7 @@ void main() {
         sum += (dir.y > 0.5 ? s.g : s.r) * w;
         wsum += w;
     }
-    outColor = vec4(c.r, sum / wsum, c.b, 1.0);
+    outColor = vec4(c.r, sum / wsum, c.b, c.a);
 }
 `;
 
@@ -215,24 +223,33 @@ float shapeNoise(vec3 p) {
     return sign(n) * pow(abs(n), max(sharpness, 1.0));
 }
 
-// Traveling-pulse modulation along the contour (loops seamlessly).
+// Traveling-pulse modulation along the contour. arc is the absolute
+// arc length of the nearest boundary point and sl the signed length of
+// its contour (negative = a non-pulsing contour: a hole, or shorter
+// than pulseMinLength). Width and speed are in field units (1 ≈ buffer
+// height), so the pulse looks the same on short and long contours; one
+// pulse travels per loop.
 // d is the distance from the path: the pulse widens with d (conserving
 // energy) so it diffuses into the glow tails instead of cutting
-// cell-shaped highlights where the t field jumps at Voronoi cell
+// cell-shaped highlights where the field jumps at Voronoi cell
 // boundaries.
-float arcMod(float arc, float d) {
-    float pd = abs(fract(arc - time * pulseSpeed + 0.5) - 0.5);
+float arcMod(float arc, float sl, float d) {
+    if (sl <= 0.0) {
+        return 1.0;
+    }
+    float phase = fract((arc - time * pulseSpeed) / sl + 0.5) - 0.5;
+    float pd = abs(phase) * sl;
     float w = pulseWidth * (1.0 + d * 4.0);
     float gain = pulseIntensity * (pulseWidth / w);
     return 1.0 + gain * exp(-pd * pd / (w * w));
 }
 
 // Arc modulation at p, averaged over a disc that widens with the
-// distance d from the path. The t field is piecewise constant (nearest
-// boundary point), so a single tap cuts hard Voronoi seams into the
-// glow tails. The tap pattern is rotated per pixel with interleaved
-// gradient noise, dissolving the discrete tap levels into grain
-// instead of visible bands. m0 is the already-fetched center tap.
+// distance d from the path. The arc field is piecewise constant
+// (nearest boundary point), so a single tap cuts hard Voronoi seams
+// into the glow tails. The tap pattern is rotated per pixel with
+// interleaved gradient noise, dissolving the discrete tap levels into
+// grain instead of visible bands. m0 is the already-fetched center tap.
 float arcModCone(float m0, vec2 p, float d) {
     float r = max(d, 0.0) * 0.8;
     float base = 6.2831853 * fract(52.9829189 *
@@ -244,15 +261,15 @@ float arcModCone(float m0, vec2 p, float d) {
         // Alternate radii so taps cover the disc, not a single ring.
         float rr = r * (i % 2 == 0 ? 1.0 : 0.55);
         vec2 o = vec2(cos(a), sin(a)) * rr * ar;
-        m += arcMod(texture(distField, p + o).b, d);
+        vec4 f = texture(distField, p + o);
+        m += arcMod(f.b, f.a, d);
     }
     return m / 9.0;
 }
 
-// Distance-field lookup at a noise-warped uv for one line: x = distance,
-// y = arc-length t of the nearest boundary point, zw = the warped uv.
-// freq scales the noise, seed decorrelates lines.
-vec4 warpedDist(float t, float freq, float seed) {
+// Noise-warped lookup uv for one line. freq scales the noise, seed
+// decorrelates lines.
+vec2 warpUv(float t, float freq, float seed) {
     // Sample noise in an aspect-corrected (square) space so cells stay
     // round on non-square buffers instead of stretching horizontally.
     vec2 ar = vec2(res.x / res.y, 1.0);
@@ -279,8 +296,7 @@ vec4 warpedDist(float t, float freq, float seed) {
     // wiggle is isotropic too.
     warp.x /= ar.x;
 
-    vec4 f = texture(distField, uv + warp);
-    return vec4(f.r, f.b, uv + warp);
+    return uv + warp;
 }
 `;
 
@@ -305,10 +321,11 @@ void main() {
         if (i >= lineCount) {
             break;
         }
-        vec4 df = warpedDist(t, freq, float(i) * 31.7);
-        float g = (0.0015 * intensity) / max(df.x / thickness, eps);
+        vec2 wuv = warpUv(t, freq, float(i) * 31.7);
+        vec4 f = texture(distField, wuv);
+        float g = (0.0015 * intensity) / max(f.r / thickness, eps);
         float m = arcActive
-            ? arcModCone(arcMod(df.y, df.x), df.zw, df.x)
+            ? arcModCone(arcMod(f.b, f.a, f.r), wuv, f.r)
             : 1.0;
         glow += pow(g, 1. / (1. + softness)) * m * weight;
 
@@ -323,7 +340,9 @@ void main() {
     // with no medial-axis creases, mixed in by softness.
     vec4 f2 = texture(distField, uv);
     float g2 = 0.01 / max(f2.g / thickness, eps);
-    float m2 = arcActive ? arcModCone(arcMod(f2.b, f2.g), uv, f2.g) : 1.0;
+    float m2 = arcActive
+        ? arcModCone(arcMod(f2.b, f2.a, f2.g), uv, f2.g)
+        : 1.0;
     float glow2 = pow(g2, 1. / (1. + softness)) * m2;
 
     glow = mix(glow, glow2, softness * 0.5);
@@ -395,13 +414,26 @@ export type SaberParams = {
     progress: number;
     /**
      * Brightness of a pulse of light traveling along each contour.
-     * `0` disables the pulse.
+     * `0` disables the pulse. Inner contours (holes) don't pulse.
      */
     pulseIntensity: number;
-    /** Pulse travel speed, in loops per second. */
+    /**
+     * Pulse travel speed along the path, in buffer-height units per
+     * second — independent of each contour's length. One pulse loops
+     * per contour.
+     */
     pulseSpeed: number;
-    /** Pulse width, as a fraction of the contour length. */
+    /**
+     * Pulse width along the path, in buffer-height units (1 ≈ one
+     * buffer height) — independent of each contour's length.
+     */
     pulseWidth: number;
+    /**
+     * Contours shorter than this (in buffer-height units) don't pulse.
+     * Filters out the flicker of tiny specks on noisy sources.
+     * `0` pulses every contour.
+     */
+    pulseMinLength: number;
     /**
      * Rebuild the distance field continuously instead of caching it.
      * Needed for live sources (video / webcam) whose silhouette changes;
@@ -437,6 +469,7 @@ const DEFAULT_PARAMS: SaberParams = {
     pulseIntensity: 0.0,
     pulseSpeed: 0.5,
     pulseWidth: 0.05,
+    pulseMinLength: 0.0,
     dynamic: false,
     pad: 80,
 };
@@ -466,14 +499,17 @@ export class SaberEffect implements Effect {
     /** True while a mask readback is in flight (one at a time). */
     #pendingTrace = false;
 
-    /** Latest traced seed points (uv + t triples). Kept for re-floods. */
-    #seedPositions: Float32Array | null = null;
+    /** Latest traced contours + their buffer dims. Kept for re-floods. */
+    #contours: readonly Contour[] | null = null;
+    #traceW = 0;
+    #traceH = 0;
 
-    /** New seed points arrived; the geometry must be rebuilt. */
+    /** New contours arrived; the seed geometry must be rebuilt. */
     #seedsFresh = false;
 
-    /** Progress the field was last flooded with. */
+    /** Params the field was last flooded with. */
     #lastBuiltProgress = Number.NaN;
+    #lastBuiltPulseMinLength = Number.NaN;
 
     #disposed = false;
     #dirty = true;
@@ -550,15 +586,18 @@ export class SaberEffect implements Effect {
             this.#kickTrace(ctx, w, h);
         }
 
-        // Flood when new seeds arrived or the reveal head moved. The
-        // seeds are kept, so a progress change re-floods without a new
-        // trace.
+        // Flood when new contours arrived or a field-baked param moved.
+        // The contours are kept, so these changes re-flood without a
+        // new trace.
         const progress = Math.min(Math.max(this.params.progress, 0), 1);
+        const pulseMinLength = Math.max(this.params.pulseMinLength, 0);
         if (
-            this.#seedPositions &&
-            (this.#seedsFresh || progress !== this.#lastBuiltProgress)
+            this.#contours &&
+            (this.#seedsFresh ||
+                progress !== this.#lastBuiltProgress ||
+                pulseMinLength !== this.#lastBuiltPulseMinLength)
         ) {
-            this.#buildField(ctx, w, h, progress);
+            this.#buildField(ctx, w, h, progress, pulseMinLength);
         }
 
         const {
@@ -631,9 +670,10 @@ export class SaberEffect implements Effect {
         this.#field = null;
         this.#seedGeometry = null;
         this.#maskPixels = null;
-        this.#seedPositions = null;
+        this.#contours = null;
         this.#seedsFresh = false;
         this.#lastBuiltProgress = Number.NaN;
+        this.#lastBuiltPulseMinLength = Number.NaN;
         this.#dirty = true;
         this.#lastW = 0;
         this.#lastH = 0;
@@ -665,23 +705,9 @@ export class SaberEffect implements Effect {
                 if (this.#disposed) {
                     return;
                 }
-                // One seed vertex per boundary point: buffer uv (in the
-                // dims the mask was traced at) + arc-length t.
-                const contours = traceContours(pixels, w, h);
-                let total = 0;
-                for (const c of contours) {
-                    total += c.t.length;
-                }
-                const position = new Float32Array(total * 3);
-                let o = 0;
-                for (const c of contours) {
-                    for (let i = 0; i < c.t.length; i++) {
-                        position[o++] = (c.points[i * 2] + 0.5) / w;
-                        position[o++] = (c.points[i * 2 + 1] + 0.5) / h;
-                        position[o++] = c.t[i];
-                    }
-                }
-                this.#seedPositions = position;
+                this.#contours = traceContours(pixels, w, h);
+                this.#traceW = w;
+                this.#traceH = h;
                 this.#seedsFresh = true;
             },
             () => {
@@ -689,6 +715,35 @@ export class SaberEffect implements Effect {
                 this.#dirty = true;
             },
         );
+    }
+
+    // One seed vertex per boundary point: buffer uv (in the dims the mask
+    // was traced at), absolute arc length and signed contour length, both
+    // in buffer-height units (matching the field's distance
+    // normalization). Non-pulsing contours — holes and those shorter than
+    // pulseMinLength — carry a negative length.
+    #packSeeds(pulseMinLength: number): Float32Array {
+        const contours = this.#contours ?? [];
+        const w = this.#traceW;
+        const h = this.#traceH;
+        let total = 0;
+        for (const c of contours) {
+            total += c.t.length;
+        }
+        const position = new Float32Array(total * 4);
+        let o = 0;
+        for (const c of contours) {
+            const len = c.length / h;
+            const pulses = c.area >= 0 && len >= pulseMinLength;
+            const signedLen = pulses ? len : -len;
+            for (let i = 0; i < c.t.length; i++) {
+                position[o++] = (c.points[i * 2] + 0.5) / w;
+                position[o++] = (c.points[i * 2 + 1] + 0.5) / h;
+                position[o++] = c.t[i] * len;
+                position[o++] = signedLen;
+            }
+        }
+        return position;
     }
 
     // (2) Build the field from the traced seed points: splat (dropping
@@ -699,32 +754,38 @@ export class SaberEffect implements Effect {
         w: number,
         h: number,
         progress: number,
+        pulseMinLength: number,
     ): void {
         const seedA = this.#seedA;
         const seedB = this.#seedB;
         const field = this.#field;
-        const position = this.#seedPositions;
-        if (!seedA || !seedB || !field || !position) {
+        if (!seedA || !seedB || !field || !this.#contours) {
             return;
         }
         const res: [number, number] = [w, h];
 
         // The geometry is reused across re-floods (progress changes);
-        // it is rebuilt only when a new trace arrived.
-        if (this.#seedsFresh || !this.#seedGeometry) {
+        // it is repacked only when a new trace arrived or the pulse
+        // cutoff (baked into the seeds' sign) changed.
+        if (
+            this.#seedsFresh ||
+            pulseMinLength !== this.#lastBuiltPulseMinLength
+        ) {
             if (this.#seedGeometry) {
                 ctx.releaseGeometry(this.#seedGeometry);
                 this.#seedGeometry = null;
             }
+            const position = this.#packSeeds(pulseMinLength);
             if (position.length > 0) {
                 this.#seedGeometry = {
                     mode: "points",
-                    attributes: { position: { data: position, itemSize: 3 } },
+                    attributes: { position: { data: position, itemSize: 4 } },
                 };
             }
         }
         this.#seedsFresh = false;
         this.#lastBuiltProgress = progress;
+        this.#lastBuiltPulseMinLength = pulseMinLength;
 
         ctx.clear(seedA);
         if (this.#seedGeometry) {
