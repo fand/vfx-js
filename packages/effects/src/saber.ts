@@ -13,8 +13,8 @@
 //      arc-length position of its nearest boundary point. The path reveal
 //      (`progress`) happens here: seeds past the head are dropped, so the
 //      flooded field is exact for the partial path — hidden parts simply
-//      don't exist. The field is cached; it rebuilds only when the buffer
-//      resizes or `progress` changes (see `#buildField`).
+//      don't exist. The field is cached; see the class doc for what
+//      triggers a re-trace vs a re-flood.
 //   3. Every frame, warp the lookup into that field with animated 3D
 //      simplex noise (z = time) so the glowing outline wobbles and
 //      crackles like electricity.
@@ -91,7 +91,8 @@ void main() {
 
 // (1c) One JFA step. Look at the 8 neighbours (plus self) at the current
 // step distance and keep whichever carries the nearest valid seed.
-// The payload (seed uv + arc-length t) rides along untouched.
+// The payload (seed uv, arc length, signed contour length) rides along
+// untouched.
 const FRAG_JFA = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -475,7 +476,9 @@ const DEFAULT_PARAMS: SaberParams = {
  *
  * The silhouette is contour-traced on the CPU, then flooded into a
  * distance + arc-length field with the Jump Flooding Algorithm and
- * cached; it is rebuilt only when the buffer resizes. Call
+ * cached. It re-traces when the buffer resizes or `edgeThreshold`
+ * changes (every frame in `dynamic` mode), and re-floods the kept
+ * contours when `progress` or `pulseMinLength` moves. Call
  * {@link invalidate} to force a rebuild (e.g. after the source content
  * changes).
  *
