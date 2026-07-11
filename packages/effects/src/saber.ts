@@ -492,6 +492,9 @@ export class SaberEffect implements Effect {
     #lastBuiltProgress = Number.NaN;
     #lastBuiltPulseMinLength = Number.NaN;
 
+    /** False until the first flood; the field RT is all zeros before. */
+    #fieldBuilt = false;
+
     #disposed = false;
     #dirty = true;
     #lastW = 0;
@@ -581,6 +584,12 @@ export class SaberEffect implements Effect {
             this.#buildField(ctx, w, h, progress, pulseMinLength);
         }
 
+        // Until the first trace lands the field RT is all zeros; distance 0
+        // saturates the glow, so drawing would flash the whole rect white.
+        if (!this.#fieldBuilt) {
+            return;
+        }
+
         const {
             color,
             intensity,
@@ -651,6 +660,7 @@ export class SaberEffect implements Effect {
         this.#seedsFresh = false;
         this.#lastBuiltProgress = Number.NaN;
         this.#lastBuiltPulseMinLength = Number.NaN;
+        this.#fieldBuilt = false;
         this.#dirty = true;
         this.#lastW = 0;
         this.#lastH = 0;
@@ -812,5 +822,7 @@ export class SaberEffect implements Effect {
             uniforms: { src: read, res, dir: [0, 1] },
             target: field,
         });
+
+        this.#fieldBuilt = true;
     }
 }
