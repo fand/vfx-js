@@ -67,8 +67,10 @@ void main() {
     vT = position.z;
     vL = position.w;
     // Path reveal: seeds past the head are moved out of clip space, so
-    // the flooded field is exact for the partial path.
-    vec2 clip = position.z <= progress * abs(position.w)
+    // the flooded field is exact for the partial path. Strict < so
+    // progress 0 shows nothing; safe at 1 because a closed loop's last
+    // vertex ends one segment short of the total length.
+    vec2 clip = position.z < progress * abs(position.w)
         ? position.xy * 2.0 - 1.0
         : vec2(-10.0);
     gl_Position = vec4(clip, 0.0, 1.0);
