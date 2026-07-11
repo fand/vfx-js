@@ -110,22 +110,29 @@ export class Framebuffer implements Restorable {
         const tex = this.texture.texture;
         gl.bindTexture(gl.TEXTURE_2D, tex);
 
-        // Choose format based on float/non-float. For float textures, use
-        // RGBA16F as a fallback if linear filtering on RGBA32F is not
-        // supported by the GPU.
+        // Choose format based on float/non-float. RGBA32F needs
+        // OES_texture_float_linear only when the texture is linear
+        // filtered; nearest-filtered RTs keep full precision either way.
+        // Fall back to RGBA16F otherwise.
         const floatLinear = this.#ctx.floatLinearFilter;
         if (this.float && floatLinear && !this.#ctx.floatBlend) {
             // Blending into RGBA32F needs EXT_float_blend; fail fast
             // instead of letting blended draws drop silently.
             throw new Error("[VFX-JS] EXT_float_blend is not supported.");
         }
+        const needsLinear =
+            this.texture.minFilter === "linear" ||
+            this.texture.magFilter === "linear";
+        const use32F =
+            this.float &&
+            (floatLinear || (!needsLinear && this.#ctx.floatBlend));
         const internalFormat = this.float
-            ? floatLinear
+            ? use32F
                 ? gl.RGBA32F
                 : gl.RGBA16F
             : gl.RGBA8;
         const type = this.float
-            ? floatLinear
+            ? use32F
                 ? gl.FLOAT
                 : gl.HALF_FLOAT
             : gl.UNSIGNED_BYTE;
