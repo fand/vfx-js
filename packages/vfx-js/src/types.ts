@@ -900,7 +900,8 @@ export type EffectContext = {
      * so it needs the effect to keep rendering.
      *
      * Pass `out` to reuse a buffer; it must hold `width * height * 4`
-     * bytes. Float render targets are not supported.
+     * bytes or the call rejects. Float render targets are not
+     * supported and also reject.
      *
      * Rejects on host disposal or WebGL context loss. Only valid
      * during `Effect.render()`; other calls reject immediately.

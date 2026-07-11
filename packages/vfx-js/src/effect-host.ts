@@ -818,7 +818,16 @@ export class EffectHost {
         const w = source.width;
         const h = source.height;
         const size = w * h * 4;
-        const buf = out && out.length >= size ? out : new Uint8Array(size);
+        if (out && out.length < size) {
+            // A silent fresh allocation would leave the caller reading
+            // stale pixels from its own reference.
+            return Promise.reject(
+                new Error(
+                    `[VFX-JS] readPixels: out buffer too small (${out.length} < ${size})`,
+                ),
+            );
+        }
+        const buf = out ?? new Uint8Array(size);
 
         // Attach the RT's read texture to a throwaway FBO so ping-pong
         // RTs read the same side a sampler would see.
