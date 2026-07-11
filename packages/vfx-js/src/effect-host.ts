@@ -803,6 +803,17 @@ export class EffectHost {
             );
         }
 
+        // Reading a float attachment as RGBA/UNSIGNED_BYTE is an
+        // INVALID_OPERATION no-op: the fence still fires and the promise
+        // would resolve with zeros. Reject up front instead.
+        if (resolveRt(source).getWriteFbo().float) {
+            return Promise.reject(
+                new Error(
+                    "[VFX-JS] readPixels does not support float render targets",
+                ),
+            );
+        }
+
         const gl = this.#gl;
         const w = source.width;
         const h = source.height;
