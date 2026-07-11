@@ -221,6 +221,15 @@ float shapeNoise(vec3 p) {
     return sign(n) * pow(abs(n), max(sharpness, 1.0));
 }
 
+// Pulse payload (arc length in .b, signed contour length in .a) fetched
+// without filtering: linear interpolation blends the signed length
+// through zero along the boundary between pulsing and non-pulsing
+// contours, which reads as a permanent pulse there.
+vec4 payload(vec2 p) {
+    ivec2 ip = clamp(ivec2(p * res), ivec2(0), ivec2(res) - 1);
+    return texelFetch(distField, ip, 0);
+}
+
 // Traveling-pulse modulation along the contour. arc is the absolute
 // arc length of the nearest boundary point and sl the signed length of
 // its contour (negative = a non-pulsing contour: a hole, or shorter
@@ -259,7 +268,7 @@ float arcModCone(float m0, vec2 p, float d) {
         // Alternate radii so taps cover the disc, not a single ring.
         float rr = r * (i % 2 == 0 ? 1.0 : 0.55);
         vec2 o = vec2(cos(a), sin(a)) * rr * ar;
-        vec4 f = texture(distField, p + o);
+        vec4 f = payload(p + o);
         m += arcMod(f.b, f.a, d);
     }
     return m / 9.0;
@@ -315,9 +324,11 @@ void main() {
         vec2 wuv = warpUv(t, freq, float(i) * 31.7);
         vec4 f = texture(distField, wuv);
         float g = (0.0015 * intensity) / max(f.r / thickness, eps);
-        float m = arcActive
-            ? arcModCone(arcMod(f.b, f.a, f.r), wuv, f.r)
-            : 1.0;
+        float m = 1.0;
+        if (arcActive) {
+            vec4 fp = payload(wuv);
+            m = arcModCone(arcMod(fp.b, fp.a, f.r), wuv, f.r);
+        }
         glow += pow(g, 1. / (1. + softness)) * m * weight;
 
         freq *= noiseScaleStep;
@@ -331,9 +342,11 @@ void main() {
     // with no medial-axis creases, mixed in by softness.
     vec4 f2 = texture(distField, uv);
     float g2 = 0.01 / max(f2.g / thickness, eps);
-    float m2 = arcActive
-        ? arcModCone(arcMod(f2.b, f2.a, f2.g), uv, f2.g)
-        : 1.0;
+    float m2 = 1.0;
+    if (arcActive) {
+        vec4 fp2 = payload(uv);
+        m2 = arcModCone(arcMod(fp2.b, fp2.a, f2.g), uv, f2.g);
+    }
     float glow2 = pow(g2, 1. / (1. + softness)) * m2;
 
     glow = mix(glow, glow2, softness * 0.5);
