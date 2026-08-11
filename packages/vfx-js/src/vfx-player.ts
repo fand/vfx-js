@@ -308,8 +308,10 @@ export class VFXPlayer {
                 oldCanvas,
                 this.maxTextureSize,
             );
-            if (canvas.width === 0 || canvas.width === 0) {
-                throw "omg";
+            // Element not laid out yet (0-size canvas).
+            // Skip this frame and keep the previous texture.
+            if (canvas.width === 0 || canvas.height === 0) {
+                return;
             }
 
             const texture = new Texture(this.#ctx, canvas);
@@ -325,11 +327,11 @@ export class VFXPlayer {
             }
             e.srcTexture = texture;
             oldTexture.dispose();
-        } catch (e) {
-            console.error(e);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            this.#isRenderingToCanvas.set(e.element, false);
         }
-
-        this.#isRenderingToCanvas.set(e.element, false);
     }
 
     async addElement(
