@@ -1,0 +1,48 @@
+title: "[Showcase] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing! Posts with a live link and a recording get featured on the official site.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What you made
+      placeholder: A short description of your shader, site, or experiment.
+    validations:
+      required: true
+
+  - type: input
+    id: link
+    attributes:
+      label: Live link
+      description: CodePen, StackBlitz, or your own site.
+      placeholder: https://codepen.io/...
+    validations:
+      required: true
+
+  - type: textarea
+    id: media
+    attributes:
+      label: Screen recording or screenshot
+      description: Drag & drop a video or image here.
+    validations:
+      required: true
+
+  - type: textarea
+    id: source
+    attributes:
+      label: Source (optional)
+      render: javascript
+    validations:
+      required: false
+
+  - type: input
+    id: author
+    attributes:
+      label: Your links (optional)
+      description: X, Bluesky, portfolio — so we can credit you.
+    validations:
+      required: false

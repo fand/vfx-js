@@ -1,0 +1,56 @@
+title: "[Q&A] "
+labels: []
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What you're trying to do
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happens instead
+    validations:
+      required: true
+
+  - type: input
+    id: repro
+    attributes:
+      label: Reproduction
+      description: CodePen or StackBlitz link. It's hard to help without one.
+      placeholder: https://stackblitz.com/...
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: VFX-JS version
+      placeholder: 1.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: Browser / OS
+      placeholder: Chrome 128 / macOS 15
+    validations:
+      required: true
+
+  - type: dropdown
+    id: framework
+    attributes:
+      label: Framework
+      options:
+        - vanilla
+        - React
+        - Next.js
+        - Astro
+        - Vue
+        - Svelte
+        - other
+    validations:
+      required: false
