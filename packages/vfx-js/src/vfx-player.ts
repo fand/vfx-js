@@ -308,8 +308,8 @@ export class VFXPlayer {
                 oldCanvas,
                 this.maxTextureSize,
             );
-            // Element not laid out yet (0-size canvas). Skip this frame
-            // and keep the previous texture.
+            // Element not laid out yet (0-size canvas).
+            // Skip this frame and keep the previous texture.
             if (canvas.width === 0 || canvas.height === 0) {
                 return;
             }
