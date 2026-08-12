@@ -323,6 +323,7 @@ export class EffectHost {
             draw: (opts) => this.#draw(opts),
             blit: (source, target, opts) => this.#blit(source, target, opts),
             clear: (target) => this.#clear(target),
+            readPixels: (source, out) => this.#readPixels(source, out),
             onContextRestored: (cb) => {
                 const unsub = this.#glCtx.onContextRestored(cb);
                 this.#restoredUnsubs.push(unsub);
@@ -662,6 +663,7 @@ export class EffectHost {
         for (const fn of this.#perFrameAutoUpdate) {
             fn();
         }
+        this.#tickReadbacks();
     }
 
     // -- draw ---------------------------------------------------------------
@@ -757,6 +759,157 @@ export class EffectHost {
             resolver.swap();
         }
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
+    /**
+     * In-flight async readbacks. Each holds a pixel-pack buffer the GPU
+     * copies into and a fence marking when the copy is done; `#tickReadbacks`
+     * polls the fences each frame and resolves finished reads.
+     */
+    #pendingReadbacks: {
+        pbo: WebGLBuffer;
+        fence: WebGLSync;
+        size: number;
+        out: Uint8Array;
+        resolve: (buf: Uint8Array) => void;
+        reject: (err: Error) => void;
+    }[] = [];
+
+    #readbackRestoreHooked = false;
+
+    #readPixels(
+        source: EffectRenderTarget,
+        out?: Uint8Array,
+    ): Promise<Uint8Array> {
+        if (this.#phase !== "render") {
+            if (this.#phase === "update" && !this.#warnedDrawInUpdate) {
+                this.#warnedDrawInUpdate = true;
+                console.warn(
+                    "[VFX-JS] ctx.readPixels() called in update(); rejected. Move reads to render().",
+                );
+            }
+            return Promise.reject(
+                new Error("[VFX-JS] readPixels is only valid in render()"),
+            );
+        }
+        // Fences from before a context loss are dead handles; abort any
+        // in-flight readbacks so their promises don't hang forever.
+        if (!this.#readbackRestoreHooked) {
+            this.#readbackRestoreHooked = true;
+            this.#restoredUnsubs.push(
+                this.#glCtx.onContextRestored(() =>
+                    this.#failReadbacks("WebGL context restored"),
+                ),
+            );
+        }
+
+        // Reading a float attachment as RGBA/UNSIGNED_BYTE is an
+        // INVALID_OPERATION no-op: the fence still fires and the promise
+        // would resolve with zeros. Reject up front instead.
+        if (resolveRt(source).getWriteFbo().float) {
+            return Promise.reject(
+                new Error(
+                    "[VFX-JS] readPixels does not support float render targets",
+                ),
+            );
+        }
+
+        const gl = this.#gl;
+        const w = source.width;
+        const h = source.height;
+        const size = w * h * 4;
+        if (out && out.length < size) {
+            // A silent fresh allocation would leave the caller reading
+            // stale pixels from its own reference.
+            return Promise.reject(
+                new Error(
+                    `[VFX-JS] readPixels: out buffer too small (${out.length} < ${size})`,
+                ),
+            );
+        }
+        const buf = out ?? new Uint8Array(size);
+
+        // Attach the RT's read texture to a throwaway FBO so ping-pong
+        // RTs read the same side a sampler would see.
+        const tex = resolveRt(source).getReadTexture();
+        const fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,
+            gl.COLOR_ATTACHMENT0,
+            gl.TEXTURE_2D,
+            tex.texture,
+            0,
+        );
+
+        // Read into a pixel-pack buffer: the call returns immediately and
+        // the GPU copies in the background. A fence marks completion.
+        const pbo = gl.createBuffer();
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+        gl.bufferData(gl.PIXEL_PACK_BUFFER, size, gl.STREAM_READ);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.deleteFramebuffer(fbo);
+
+        const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+        gl.flush();
+        if (!pbo || !fence) {
+            return Promise.reject(
+                new Error("[VFX-JS] readPixels failed to allocate"),
+            );
+        }
+
+        return new Promise<Uint8Array>((resolve, reject) => {
+            this.#pendingReadbacks.push({
+                pbo,
+                fence,
+                size,
+                out: buf,
+                resolve,
+                reject,
+            });
+        });
+    }
+
+    /** Poll in-flight readbacks; resolve the ones the GPU has finished. */
+    #tickReadbacks(): void {
+        if (this.#pendingReadbacks.length === 0) {
+            return;
+        }
+        const gl = this.#gl;
+        if (gl.isContextLost()) {
+            this.#failReadbacks("WebGL context lost");
+            return;
+        }
+        this.#pendingReadbacks = this.#pendingReadbacks.filter((p) => {
+            const status = gl.clientWaitSync(p.fence, 0, 0);
+            if (status === gl.TIMEOUT_EXPIRED) {
+                return true; // still copying; try again next frame
+            }
+            if (status === gl.WAIT_FAILED) {
+                gl.deleteSync(p.fence);
+                gl.deleteBuffer(p.pbo);
+                p.reject(new Error("[VFX-JS] readPixels fence failed"));
+                return false;
+            }
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, p.pbo);
+            gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, p.out, 0, p.size);
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+            gl.deleteSync(p.fence);
+            gl.deleteBuffer(p.pbo);
+            p.resolve(p.out);
+            return false;
+        });
+    }
+
+    #failReadbacks(reason: string): void {
+        const pending = this.#pendingReadbacks;
+        this.#pendingReadbacks = [];
+        for (const p of pending) {
+            p.reject(new Error(`[VFX-JS] readPixels aborted: ${reason}`));
+        }
     }
 
     #doDraw(opts: EffectDrawOpts): void {
@@ -864,6 +1017,7 @@ export class EffectHost {
 
     dispose(): void {
         this.#phase = "disposed";
+        this.#failReadbacks("host disposed");
         for (const unsub of this.#restoredUnsubs) {
             unsub();
         }
