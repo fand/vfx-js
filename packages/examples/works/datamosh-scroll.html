@@ -358,7 +358,9 @@
   const pane = new Pane({ title: "Datamosh", expanded: false });
   pane.addBinding(effect.params, "dup", { min: 0, max: 8, step: 1 });
   pane.addBinding(effect.params, "blockSize", { min: 4, max: 64, step: 1 });
-  pane.addBinding(effect.params, "chromaGain", { min: 0, max: 3 });
+  // Peak chroma gain; fades back to 1 over the heal.
+  const look = { chromaGain: effect.params.chromaGain };
+  pane.addBinding(look, "chromaGain", { min: 0, max: 3 });
   pane.addBinding(effect.params, "intraClusterSize", { min: 1, max: 16, step: 1 });
   pane.addBinding(effect.params, "heal", { min: 100, max: 5000, step: 10 });
   // How long the old scene moshes before the swap.
@@ -370,12 +372,14 @@
   let shown = 0;
   let target = 0;
   let switchedAt = -Infinity;
+  let healFrom = -Infinity;
   let swapTimer;
 
   // Mosh the old scene first, then swap video and text under the mosh.
   const transition = (next) => {
     target = next;
     effect.enable();
+    healFrom = Infinity;
     clearTimeout(swapTimer);
     swapTimer = setTimeout(() => {
       if (next !== shown) {
@@ -386,6 +390,7 @@
       }
       // Restart the heal from the swap.
       effect.enable();
+      healFrom = performance.now();
     }, timing.leadMs);
   };
 
@@ -396,7 +401,10 @@
     );
     if (active !== target) transition(active);
 
-    const elapsed = performance.now() - switchedAt;
+    const now = performance.now();
+    const elapsed = now - switchedAt;
+    const heal = Math.min(1, Math.max(0, (now - healFrom) / effect.params.heal));
+    effect.params.chromaGain = look.chromaGain + (1 - look.chromaGain) * heal;
 
     // Zoom-out kick on switch, plus scroll parallax.
     const t = Math.min(1, elapsed / ZOOM_MS);
