@@ -15,6 +15,7 @@
 //   ME       cur vs prev    -> mvRT   (one fragment per block)
 //   residual cur - mc(prev) -> resRT
 //   decode   intra ? cur : mc(accum, mv) + res -> accRT (persistent)
+//            (per-block intra refresh heals the mosh back to the source)
 //   display  accRT          -> ctx.target
 //   blit     cur            -> prevRT (persistent; next frame's reference)
 //
@@ -40,6 +41,8 @@ void main() {
 // (px) that best matches the current block, into .rg of a float RT.
 // A small length bias breaks ties toward (0,0) so flat blocks don't latch
 // onto spurious large vectors.
+// Also picks the block mode into .b (1 = intra): random refresh, or a
+// poor best match, like an encoder falling back to intra.
 const FRAG_ME = `#version 300 es
 precision highp float;
 out vec4 outMV;
@@ -48,6 +51,25 @@ uniform vec2 uResolution;   // [w, h] in px
 uniform float uBlock;       // block size in px
 uniform float uSearch;      // search radius, in steps
 uniform float uStep;        // px per step (coverage = uSearch * uStep px)
+uniform float uIntraRate;
+uniform float uIntraThreshold;
+uniform float uIntraPatch;  // refresh patch size, in blocks
+uniform float uFrame;
+float hash(vec3 p) {
+    uvec3 q = uvec3(p) * uvec3(1597334673u, 3812015801u, 2798796415u);
+    return float((q.x ^ q.y ^ q.z) * 1597334673u) / 4294967295.0;
+}
+// Value noise, new field each frame. Patch size 1 = per-block hash.
+float patchNoise(vec2 p, float seed) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(vec3(i, seed));
+    float b = hash(vec3(i + vec2(1, 0), seed));
+    float c = hash(vec3(i + vec2(0, 1), seed));
+    float d = hash(vec3(i + vec2(1, 1), seed));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
 void main() {
     vec2 block = floor(gl_FragCoord.xy);
     vec2 base = block * uBlock;     // top-left pixel of this block
@@ -66,6 +88,7 @@ void main() {
 
     vec2 move = vec2(0.0);
     float bestSad = 1e9;
+    float bestRaw = 0.0;
     for (float by = -uSearch; by <= uSearch; by++) {
       for (float bx = -uSearch; bx <= uSearch; bx++) {
         vec2 cand = vec2(bx, by) * uStep;   // candidate displacement, px
@@ -74,15 +97,23 @@ void main() {
           vec3 cRef = texture(uRef, (base + off[k] + cand + 0.5) / uResolution).rgb;
           sad += dot(abs(cs[k] - cRef), vec3(1.0));
         }
+        float raw = sad;
         sad += length(cand) * 0.0025;   // prefer small motion on ties
         if (sad < bestSad) {
           bestSad = sad;
+          bestRaw = raw;
           move = cand;
         }
       }
     }
 
-    outMV = vec4(move, 0.0, 1.0);
+    // Mean abs diff per channel, 0..1.
+    float err = bestRaw / 27.0;
+    float n = patchNoise(block / max(uIntraPatch, 1.0), uFrame);
+    // Smooth noise clusters near 0.5; smoothstep makes it about uniform.
+    if (uIntraPatch > 1.0) n = smoothstep(0.0, 1.0, n);
+    bool intra = n < uIntraRate || err > uIntraThreshold;
+    outMV = vec4(move, intra ? 1.0 : 0.0, 1.0);
 }
 `;
 
@@ -112,7 +143,7 @@ uniform vec2 uResolution;
 uniform bool uIntra;
 uniform bool uUseResidual;
 void main() {
-    if (uIntra) {
+    if (uIntra || texture(uMV, uv).b > 0.5) {
         outColor = vec4(texture(uVideo, uv).rgb, 1.0);
         return;
     }
@@ -195,7 +226,7 @@ uniform bool uIntra;
 uniform bool uUseResidual;
 void main() {
     // I-frame: passthrough the input
-    if (uIntra) {
+    if (uIntra || texture(uMV, uv).b > 0.5) {
         outColor = vec4(luma(texture(uVideo, uv).rgb), 0.0, 0.0, 1.0);
         return;
     }
@@ -225,7 +256,7 @@ uniform bool uIntra;
 uniform bool uUseResidual;
 void main() {
     // I-frame: passthrough the input
-    if (uIntra) {
+    if (uIntra || texture(uMV, uv).b > 0.5) {
         outColor = vec4(chroma(texture(uVideo, uv).rgb), 0.0, 1.0);
         return;
     }
@@ -294,6 +325,21 @@ export type DatamoshParams = {
     colorSpace: DatamoshColorSpace;
     /** Chroma saturation boost (YCbCr output). 1 = unchanged. */
     chromaGain: number;
+    /**
+     * Chance per block per frame to refresh from the clean frame (0..1).
+     * Ramp up to heal the mosh gradually.
+     */
+    intraRate: number;
+    /**
+     * Blocks whose best motion match is worse than this go intra.
+     * Mean abs diff per channel (0..1); 1 = never.
+     */
+    intraThreshold: number;
+    /**
+     * Size of the random refresh patches, in blocks.
+     * 1 = each block refreshes on its own; larger = blobs of blocks.
+     */
+    intraPatchSize: number;
     /** Stage shown on the canvas. */
     view: DatamoshView;
 };
@@ -306,6 +352,9 @@ const DEFAULT_PARAMS: DatamoshParams = {
     dup: 0,
     colorSpace: "ycbcr",
     chromaGain: 1,
+    intraRate: 0,
+    intraThreshold: 1,
+    intraPatchSize: 1,
     view: "output",
 };
 
@@ -336,6 +385,7 @@ export class DatamoshEffect implements Effect {
     #cw = 0;
     #ch = 0;
     #block = 0;
+    #frame = 0;
     // Re-seed when the color model flips (accumulators change meaning).
     #lastColorSpace: DatamoshColorSpace;
 
@@ -472,6 +522,10 @@ export class DatamoshEffect implements Effect {
                     uBlock: this.#block,
                     uSearch: this.params.searchRange,
                     uStep: this.params.searchStep,
+                    uIntraRate: this.params.intraRate,
+                    uIntraThreshold: this.params.intraThreshold,
+                    uIntraPatch: this.params.intraPatchSize,
+                    uFrame: this.#frame++ % 65536,
                 },
                 target: mv,
             });

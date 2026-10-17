@@ -371,6 +371,17 @@ export function attachDatamoshPane(
         options: { rgb: "rgb", ycbcr: "ycbcr" },
     });
     pane.addBinding(effect.params, "chromaGain", { min: 0, max: 2, step: 0.1 });
+    pane.addBinding(effect.params, "intraRate", { min: 0, max: 1, step: 0.01 });
+    pane.addBinding(effect.params, "intraThreshold", {
+        min: 0,
+        max: 1,
+        step: 0.01,
+    });
+    pane.addBinding(effect.params, "intraPatchSize", {
+        min: 1,
+        max: 16,
+        step: 1,
+    });
 
     pane.addBinding(effect.params, "view", {
         options: {
