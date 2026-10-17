@@ -34,7 +34,7 @@
   /* Magazine layer. Drawn into the canvas so it gets moshed. */
   /* The DOM copy is invisible and only gives layout. */
   .mosh {
-    position: fixed;
+    position: absolute;
     inset: 5vh 6vw auto;
     opacity: 0;
     text-shadow: none;
@@ -288,10 +288,7 @@
   };
 
   // Draw the .mosh layer from its DOM layout: fills, top/bottom rules, text.
-  // Fixed to the screen; only the shown section's layer is drawn.
-  const moshLayers = [...document.querySelectorAll(".mosh")].map((el) => [
-    ...el.querySelectorAll("*"),
-  ]);
+  const moshEls = [...document.querySelectorAll(".mosh *")];
   const fill = (color, x, y, w, h) => {
     ctx2d.fillStyle = color;
     ctx2d.fillRect(x, y, w, h);
@@ -325,11 +322,11 @@
     }
     ctx2d.fillText(line, x, y);
   };
-  const drawMosh = (index) => {
+  const drawMosh = () => {
     ctx2d.textBaseline = "middle";
     ctx2d.shadowColor = "rgba(0, 0, 0, 0.5)";
     ctx2d.shadowBlur = 16;
-    for (const el of moshLayers[index]) {
+    for (const el of moshEls) {
       const r = el.getBoundingClientRect();
       if (!r.width || r.bottom < 0 || r.top > innerHeight) continue;
       const cs = getComputedStyle(el);
@@ -406,7 +403,7 @@
     const scale = 1.1 + 0.3 * (1 - t) ** 3;
     const dy = (scrollY - shown * innerHeight) * -0.3;
     draw(media[shown], scale, dy);
-    drawMosh(shown);
+    drawMosh();
     vfx.update(canvas);
     requestAnimationFrame(loop);
   };
