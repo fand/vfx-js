@@ -364,22 +364,32 @@
   pane.addBinding(effect.params, "chromaGain", { min: 0, max: 3 });
   pane.addBinding(effect.params, "intraClusterSize", { min: 1, max: 16, step: 1 });
   pane.addBinding(effect.params, "heal", { min: 100, max: 5000, step: 10 });
+  // How long the old scene moshes before the swap.
+  const timing = { leadMs: 200 };
+  pane.addBinding(timing, "leadMs", { min: 0, max: 1000, step: 10 });
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0 });
   await vfx.add(canvas, { effect });
 
   let shown = 0;
+  let target = 0;
   let switchedAt = -Infinity;
+  let swapTimer;
 
+  // Mosh the old scene first, then swap video and text under the mosh.
   const transition = (next) => {
+    target = next;
     effect.enable();
-    switchedAt = performance.now();
-    // Wait a frame so the mosh seeds from the old scene.
-    requestAnimationFrame(() => {
-      media[next].play();
-      media[shown].pause();
-      shown = next;
-      switchedAt = performance.now();
-    });
+    clearTimeout(swapTimer);
+    swapTimer = setTimeout(() => {
+      if (next !== shown) {
+        media[next].play();
+        media[shown].pause();
+        shown = next;
+        switchedAt = performance.now();
+      }
+      // Restart the heal from the swap.
+      effect.enable();
+    }, timing.leadMs);
   };
 
   const loop = () => {
@@ -387,7 +397,7 @@
       sections.length - 1,
       Math.max(0, Math.round(scrollY / innerHeight)),
     );
-    if (active !== shown) transition(active);
+    if (active !== target) transition(active);
 
     const elapsed = performance.now() - switchedAt;
 
