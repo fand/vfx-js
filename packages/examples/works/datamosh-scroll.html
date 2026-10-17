@@ -37,6 +37,7 @@
     position: absolute;
     inset: 5vh 6vw auto;
     opacity: 0;
+    text-align: left;
     text-shadow: none;
     --accent: #ffd23f;
   }
@@ -186,6 +187,15 @@
     text-transform: uppercase;
     opacity: 0.8;
   }
+  /* Section heading position. Default is bottom left. */
+  section.end {
+    align-items: flex-end;
+    text-align: right;
+  }
+  section.center {
+    align-items: center;
+    text-align: center;
+  }
   .tp-dfwv {
     position: fixed !important;
     z-index: 2;
@@ -221,7 +231,7 @@
   <h2>Push.</h2>
   <p>Morning. Wheels on warm concrete, no plan yet.</p>
 </section>
-<section data-src="https://videos.pexels.com/video-files/5039461/5039461-uhd_2732_1440_25fps.mp4">
+<section class="end" data-src="https://videos.pexels.com/video-files/5039461/5039461-uhd_2732_1440_25fps.mp4">
   <div class="mosh left">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 018</span>
@@ -243,7 +253,7 @@
   <h2>Drop.</h2>
   <p>Afternoon at the ramp. Lean in, don't look back.</p>
 </section>
-<section data-src="https://videos.pexels.com/video-files/33996198/14421886_1920_1080_24fps.mp4">
+<section class="center" data-src="https://videos.pexels.com/video-files/33996198/14421886_1920_1080_24fps.mp4">
   <div class="mosh wide">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 024</span>
