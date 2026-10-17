@@ -53,14 +53,14 @@ uniform float uSearch;      // search radius, in steps
 uniform float uStep;        // px per step (coverage = uSearch * uStep px)
 uniform float uIntraRate;
 uniform float uIntraThreshold;
-uniform float uIntraPatch;  // refresh patch size, in blocks
+uniform float uIntraCluster;  // refresh cluster size, in blocks
 uniform float uFrame;
 float hash(vec3 p) {
     uvec3 q = uvec3(p) * uvec3(1597334673u, 3812015801u, 2798796415u);
     return float((q.x ^ q.y ^ q.z) * 1597334673u) / 4294967295.0;
 }
-// Value noise, new field each frame. Patch size 1 = per-block hash.
-float patchNoise(vec2 p, float seed) {
+// Value noise, new field each frame. Cluster size 1 = per-block hash.
+float clusterNoise(vec2 p, float seed) {
     vec2 i = floor(p);
     vec2 f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
@@ -109,9 +109,9 @@ void main() {
 
     // Mean abs diff per channel, 0..1.
     float err = bestRaw / 27.0;
-    float n = patchNoise(block / max(uIntraPatch, 1.0), uFrame);
+    float n = clusterNoise(block / max(uIntraCluster, 1.0), uFrame);
     // Smooth noise clusters near 0.5; smoothstep makes it about uniform.
-    if (uIntraPatch > 1.0) n = smoothstep(0.0, 1.0, n);
+    if (uIntraCluster > 1.0) n = smoothstep(0.0, 1.0, n);
     bool intra = n < uIntraRate || err > uIntraThreshold;
     outMV = vec4(move, intra ? 1.0 : 0.0, 1.0);
 }
@@ -336,10 +336,10 @@ export type DatamoshParams = {
      */
     intraThreshold: number;
     /**
-     * Size of the random refresh patches, in blocks.
+     * Size of the random refresh clusters, in blocks.
      * 1 = each block refreshes on its own; larger = blobs of blocks.
      */
-    intraPatchSize: number;
+    intraClusterSize: number;
     /**
      * Auto-heal time in ms after `enable()`, then auto-disable.
      * Overrides `intraRate` / `intraThreshold` while healing.
@@ -363,7 +363,7 @@ const DEFAULT_PARAMS: DatamoshParams = {
     chromaGain: 1,
     intraRate: 0,
     intraThreshold: 1,
-    intraPatchSize: 1,
+    intraClusterSize: 1,
     heal: 0,
     view: "output",
 };
@@ -551,7 +551,7 @@ export class DatamoshEffect implements Effect {
                     uStep: this.params.searchStep,
                     uIntraRate: intraRate,
                     uIntraThreshold: intraThreshold,
-                    uIntraPatch: this.params.intraPatchSize,
+                    uIntraCluster: this.params.intraClusterSize,
                     uFrame: this.#frame++ % 65536,
                 },
                 target: mv,

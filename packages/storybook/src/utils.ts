@@ -377,7 +377,7 @@ export function attachDatamoshPane(
         max: 1,
         step: 0.01,
     });
-    pane.addBinding(effect.params, "intraPatchSize", {
+    pane.addBinding(effect.params, "intraClusterSize", {
         min: 1,
         max: 16,
         step: 1,

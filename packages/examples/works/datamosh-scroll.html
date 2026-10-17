@@ -349,7 +349,7 @@
   const effect = new DatamoshEffect({
     dup: 1,
     blockSize: 32,
-    intraPatchSize: 6,
+    intraClusterSize: 6,
     chromaGain: 3,
     // Heal block by block over 1.5s after each switch.
     heal: 1500,
@@ -359,7 +359,7 @@
   pane.addBinding(effect.params, "dup", { min: 0, max: 8, step: 1 });
   pane.addBinding(effect.params, "blockSize", { min: 4, max: 64, step: 1 });
   pane.addBinding(effect.params, "chromaGain", { min: 0, max: 3 });
-  pane.addBinding(effect.params, "intraPatchSize", { min: 1, max: 16, step: 1 });
+  pane.addBinding(effect.params, "intraClusterSize", { min: 1, max: 16, step: 1 });
   pane.addBinding(effect.params, "heal", { min: 100, max: 5000, step: 10 });
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0 });
   await vfx.add(canvas, { effect });
