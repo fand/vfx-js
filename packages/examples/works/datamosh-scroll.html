@@ -159,6 +159,25 @@
     blockquote {
       display: none;
     }
+    .masthead {
+      font-size: 11px;
+      letter-spacing: 0.15em;
+    }
+    .masthead span:nth-child(2) {
+      display: none;
+    }
+    /* Keep Flip's article at the bottom, clear of its top heading. */
+    .corner article {
+      margin-top: auto;
+    }
+    /* Move Roll's article to the top, clear of its bottom heading. */
+    .low {
+      bottom: auto;
+      display: block;
+    }
+    .low article {
+      margin-top: 28px;
+    }
   }
   h2 {
     margin: 0;
