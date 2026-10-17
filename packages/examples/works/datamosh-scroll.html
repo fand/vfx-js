@@ -31,14 +31,11 @@
     box-sizing: border-box;
     text-shadow: 0 0 24px rgba(0, 0, 0, 0.6);
   }
-  /* Magazine layer. Drawn into the canvas so it gets moshed. */
-  /* The DOM copy is invisible and only gives layout. */
-  .mosh {
+  /* Magazine layer. */
+  .mag {
     position: absolute;
     inset: 5vh 6vw auto;
-    opacity: 0;
     text-align: left;
-    text-shadow: none;
     --accent: #ffd23f;
   }
   .masthead {
@@ -185,7 +182,12 @@
     max-width: 32em;
     font-size: clamp(14px, 1.4vw, 20px);
   }
+  /* Headings are drawn into the canvas; the DOM copy only gives layout. */
+  .head {
+    opacity: 0;
+  }
   small {
+    display: block;
     margin-bottom: 12px;
     font-size: 13px;
     letter-spacing: 0.2em;
@@ -217,7 +219,7 @@
 <canvas id="bg"></canvas>
 
 <section data-src="https://videos.pexels.com/video-files/7334607/7334607-hd_1920_1080_24fps.mp4">
-  <div class="mosh">
+  <div class="mag">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 012</span>
     </div>
@@ -234,12 +236,14 @@
       <div class="cap"><span class="tag">1</span><span>Kick, push, coast. The first kilometre is always the quietest.</span></div>
     </article>
   </div>
-  <small>10:00 — Park path</small>
-  <h2>Push.</h2>
-  <p>Morning. Wheels on warm concrete, no plan yet.</p>
+  <div class="head">
+    <small>10:00 — Park path</small>
+    <h2>Push.</h2>
+    <p>Morning. Wheels on warm concrete, no plan yet.</p>
+  </div>
 </section>
 <section class="end" data-src="https://videos.pexels.com/video-files/5039461/5039461-uhd_2732_1440_25fps.mp4">
-  <div class="mosh left">
+  <div class="mag left">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 018</span>
     </div>
@@ -256,12 +260,14 @@
       <div class="cap"><span class="tag">2</span><span>Coping, chalk and a borrowed helmet. Nobody films the falls.</span></div>
     </article>
   </div>
-  <small>14:30 — Ramp</small>
-  <h2>Drop.</h2>
-  <p>Afternoon at the ramp. Lean in, don't look back.</p>
+  <div class="head">
+    <small>14:30 — Ramp</small>
+    <h2>Drop.</h2>
+    <p>Afternoon at the ramp. Lean in, don't look back.</p>
+  </div>
 </section>
 <section class="top-end" data-src="https://videos.pexels.com/video-files/33996198/14421886_1920_1080_24fps.mp4">
-  <div class="mosh wide">
+  <div class="mag wide">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 024</span>
     </div>
@@ -278,12 +284,14 @@
       <div class="cap"><span class="tag">3</span><span>Flip, catch, roll away. Shot at 18:10 with the sun behind the fence.</span></div>
     </article>
   </div>
-  <small>18:10 — Golden hour</small>
-  <h2>Flip.</h2>
-  <p>Low sun. Every trick looks better in this light.</p>
+  <div class="head">
+    <small>18:10 — Golden hour</small>
+    <h2>Flip.</h2>
+    <p>Low sun. Every trick looks better in this light.</p>
+  </div>
 </section>
 <section data-src="https://videos.pexels.com/video-files/33996206/14421890_1920_1080_24fps.mp4">
-  <div class="mosh low">
+  <div class="mag low">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 030</span>
     </div>
@@ -300,9 +308,11 @@
       <div class="cap"><span class="tag">4</span><span>Roll out. The lights come on behind us.</span></div>
     </article>
   </div>
-  <small>19:02 — Dusk</small>
-  <h2>Roll.</h2>
-  <p>One more line before the lights come on.</p>
+  <div class="head">
+    <small>19:02 — Dusk</small>
+    <h2>Roll.</h2>
+    <p>One more line before the lights come on.</p>
+  </div>
   <footer>
     Videos from Pexels by RDNE Stock project, cottonbro studio, and Marc
     Espejo.
@@ -345,8 +355,8 @@
     ctx2d.drawImage(el, (cw - w * s) / 2, (ch - h * s) / 2 + dy, w * s, h * s);
   };
 
-  // Draw the .mosh layer from its DOM layout: fills, top/bottom rules, text.
-  const moshEls = [...document.querySelectorAll(".mosh *")];
+  // Draw the headings into the canvas from their DOM layout, so they get moshed.
+  const moshEls = [...document.querySelectorAll(".head *")];
   const fill = (color, x, y, w, h) => {
     ctx2d.fillStyle = color;
     ctx2d.fillRect(x, y, w, h);
@@ -433,7 +443,7 @@
   let healFrom = -Infinity;
   let swapTimer;
 
-  // Mosh the old scene first, then swap video and text under the mosh.
+  // Mosh the old scene first, then swap video and headings under the mosh.
   const transition = (next) => {
     target = next;
     effect.enable();
