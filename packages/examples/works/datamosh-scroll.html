@@ -129,7 +129,12 @@
   .left article {
     margin: 28px auto 0 0;
   }
-  /* Full-width spread: headline across, text in two columns below. */
+  /* Full-width spread at the bottom: headline across, two columns below. */
+  .wide {
+    bottom: 8vh;
+    display: flex;
+    flex-direction: column;
+  }
   .wide .num {
     position: static;
     margin-top: 16px;
@@ -141,7 +146,7 @@
     column-gap: 32px;
     align-items: start;
     width: 100%;
-    margin-top: 8px;
+    margin-top: auto;
   }
   .wide .kicker,
   .wide h3 {
@@ -192,9 +197,11 @@
     align-items: flex-end;
     text-align: right;
   }
-  section.center {
-    align-items: center;
-    text-align: center;
+  section.top-end {
+    justify-content: flex-start;
+    align-items: flex-end;
+    padding-top: 14vh;
+    text-align: right;
   }
   .tp-dfwv {
     position: fixed !important;
@@ -253,7 +260,7 @@
   <h2>Drop.</h2>
   <p>Afternoon at the ramp. Lean in, don't look back.</p>
 </section>
-<section class="center" data-src="https://videos.pexels.com/video-files/33996198/14421886_1920_1080_24fps.mp4">
+<section class="top-end" data-src="https://videos.pexels.com/video-files/33996198/14421886_1920_1080_24fps.mp4">
   <div class="mosh wide">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 024</span>
