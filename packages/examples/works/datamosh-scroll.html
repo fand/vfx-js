@@ -120,11 +120,52 @@
     font-weight: bold;
     text-align: center;
   }
+  /* Article left, number right. */
+  .left .num {
+    left: auto;
+    right: 0;
+  }
+  .left article {
+    margin: 28px auto 0 0;
+  }
+  /* Full-width spread: headline across, text in two columns below. */
+  .wide .num {
+    position: static;
+    margin-top: 16px;
+    font-size: clamp(48px, 6vw, 80px);
+  }
+  .wide article {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 32px;
+    align-items: start;
+    width: 100%;
+    margin-top: 8px;
+  }
+  .wide .kicker,
+  .wide h3 {
+    grid-column: 1 / -1;
+  }
+  .wide h3 {
+    font-size: clamp(40px, 6.4vw, 96px);
+  }
+  /* Article at the bottom right. */
+  .low {
+    bottom: 8vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .low article {
+    margin-top: auto;
+  }
   @media (max-width: 700px) {
     .num,
     .cols,
     blockquote {
       display: none;
+    }
+    .wide article {
+      display: block;
     }
   }
   h2 {
@@ -181,7 +222,7 @@
   <p>Morning. Wheels on warm concrete, no plan yet.</p>
 </section>
 <section data-src="https://videos.pexels.com/video-files/5039461/5039461-uhd_2732_1440_25fps.mp4">
-  <div class="mosh">
+  <div class="mosh left">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 018</span>
     </div>
@@ -203,7 +244,7 @@
   <p>Afternoon at the ramp. Lean in, don't look back.</p>
 </section>
 <section data-src="https://videos.pexels.com/video-files/33996198/14421886_1920_1080_24fps.mp4">
-  <div class="mosh">
+  <div class="mosh wide">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 024</span>
     </div>
@@ -225,7 +266,7 @@
   <p>Low sun. Every trick looks better in this light.</p>
 </section>
 <section data-src="https://videos.pexels.com/video-files/33996206/14421890_1920_1080_24fps.mp4">
-  <div class="mosh">
+  <div class="mosh low">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 030</span>
     </div>
