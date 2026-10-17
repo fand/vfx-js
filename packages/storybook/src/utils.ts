@@ -382,6 +382,7 @@ export function attachDatamoshPane(
         max: 16,
         step: 1,
     });
+    pane.addBinding(effect.params, "heal", { min: 0, max: 5000, step: 10 });
 
     pane.addBinding(effect.params, "view", {
         options: {

@@ -256,13 +256,6 @@
   import { DatamoshEffect } from "@vfx-js/effects";
   import { Pane } from "tweakpane";
 
-  // Pure-motion smear, then intra refresh heals it block by block.
-  const timing = {
-    smearMs: 100,
-    healMs: 1500,
-    // Peak refresh chance per block per second.
-    healPerSec: 60,
-  };
   const ZOOM_MS = 1200;
 
   const sections = [...document.querySelectorAll("section")];
@@ -358,6 +351,8 @@
     blockSize: 32,
     intraPatchSize: 6,
     chromaGain: 3,
+    // Heal block by block over 1.5s after each switch.
+    heal: 1500,
   });
 
   const pane = new Pane({ title: "Datamosh", expanded: false });
@@ -365,15 +360,12 @@
   pane.addBinding(effect.params, "blockSize", { min: 4, max: 64, step: 1 });
   pane.addBinding(effect.params, "chromaGain", { min: 0, max: 3 });
   pane.addBinding(effect.params, "intraPatchSize", { min: 1, max: 16, step: 1 });
-  pane.addBinding(timing, "smearMs", { min: 0, max: 3000, step: 10 });
-  pane.addBinding(timing, "healMs", { min: 100, max: 5000, step: 10 });
-  pane.addBinding(timing, "healPerSec", { min: 1, max: 60 });
+  pane.addBinding(effect.params, "heal", { min: 100, max: 5000, step: 10 });
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0 });
   await vfx.add(canvas, { effect });
 
   let shown = 0;
   let switchedAt = -Infinity;
-  let lastNow = performance.now();
 
   const transition = (next) => {
     effect.enable();
@@ -387,22 +379,6 @@
     });
   };
 
-  // Smear: no residual, no refresh. Heal: ramp intra refresh up.
-  const updateMosh = (elapsed, dt) => {
-    if (!effect.enabled) return;
-    const t = Math.max(0, (elapsed - timing.smearMs) / timing.healMs);
-    if (t >= 1) {
-      effect.disable();
-      return;
-    }
-    effect.setParams({
-      useResidual: t > 0,
-      intraRate: Math.min(1, (timing.healPerSec * t ** 3 * dt) / 1000),
-      // Hard-to-predict blocks heal first.
-      intraThreshold: t > 0 ? 0.02 + 0.23 * (1 - t) : 1,
-    });
-  };
-
   const loop = () => {
     const active = Math.min(
       sections.length - 1,
@@ -410,10 +386,7 @@
     );
     if (active !== shown) transition(active);
 
-    const now = performance.now();
-    updateMosh(now - switchedAt, now - lastNow);
-    lastNow = now;
-    const elapsed = now - switchedAt;
+    const elapsed = performance.now() - switchedAt;
 
     // Zoom-out kick on switch, plus scroll parallax.
     const t = Math.min(1, elapsed / ZOOM_MS);
