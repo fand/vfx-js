@@ -16,8 +16,9 @@
   #bg {
     position: fixed;
     inset: 0;
-    width: 100vw;
-    height: 100vh;
+    /* % of the viewport, not 100vh, so the bitmap matches on mobile. */
+    width: 100%;
+    height: 100%;
   }
   section {
     position: relative;
@@ -343,7 +344,14 @@
     const v = document.createElement("video");
     // CORS-enabled so WebGL can read the frames.
     v.crossOrigin = "anonymous";
-    Object.assign(v, { src, muted: true, loop: true, playsInline: true });
+    Object.assign(v, {
+      src,
+      muted: true,
+      loop: true,
+      playsInline: true,
+      // Buffer every section up front, so a switch has a frame to cut to.
+      preload: "auto",
+    });
     return v;
   });
   media[0].play();
@@ -351,13 +359,13 @@
   const canvas = document.getElementById("bg");
   const ctx2d = canvas.getContext("2d");
   const resize = () => {
-    canvas.width = innerWidth;
-    canvas.height = innerHeight;
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
   };
   resize();
   addEventListener("resize", resize);
 
-  // Cover-fit, scaled up a bit so the parallax offset never shows an edge.
+  // Cover-fit, scaled up 10% so the parallax offset (up to 5%) never shows an edge.
   const draw = (el, dy) => {
     const w = el.videoWidth;
     const h = el.videoHeight;
@@ -462,7 +470,8 @@
     const dt = now - last;
     last = now;
     // Swap one frame after enable(), so the mosh starts from the old scene.
-    if (target !== shown) {
+    // Wait for the new video's first frame, so the cut lands in CUT_MS.
+    if (target !== shown && media[target].readyState >= 2) {
       media[target].play();
       media[shown].pause();
       shown = target;
@@ -483,10 +492,10 @@
     effect.params.healRate = healing < 0 ? 0 : 1 - 0.01 ** (dt / look.healMs);
     // Drop the cut frame's residual so the old picture stays (no I-frame).
     effect.params.useResidual = elapsed > CUT_MS;
-    if (heal >= 1 && effect.enabled) effect.disable();
+    if (heal >= 1 && target === shown && effect.enabled) effect.disable();
 
     // Scroll parallax.
-    const dy = (scrollY - shown * innerHeight) * -0.3;
+    const dy = (scrollY - shown * innerHeight) * -0.08;
     draw(media[shown], dy);
     drawMosh();
     vfx.update(canvas);

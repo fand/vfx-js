@@ -7,8 +7,8 @@
 //
 // - disabled: every frame decoded as intra -> straight passthrough.
 // - enabled: frames decoded as inter -> motion-compensate the held
-//   accumulator + residual, never refreshing it from a clean frame, so
-//   motion keeps dragging stale texture around (the mosh).
+//   accumulator + residual, so motion keeps dragging stale texture around
+//   (the mosh). Only heal-refreshed blocks go back to the clean frame.
 //
 // Pipeline per frame (RGB path):
 //   capture  ctx.src        -> curRT
