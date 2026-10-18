@@ -434,61 +434,48 @@
     blockSize: 32,
     healClusterSize: 6,
     chromaGain: 3,
+    healRate: 0.03,
   });
 
   const pane = new Pane({ title: "Datamosh", expanded: false });
   pane.addBinding(effect.params, "dup", { min: 0, max: 8, step: 1 });
   pane.addBinding(effect.params, "blockSize", { min: 4, max: 64, step: 1 });
   // Peak chroma gain; fades back to 1 over the heal.
-  // healRate applies only after the swap.
-  const look = { chromaGain: effect.params.chromaGain, healRate: 0.03 };
+  const look = { chromaGain: effect.params.chromaGain };
   pane.addBinding(look, "chromaGain", { min: 0, max: 3 });
-  pane.addBinding(look, "healRate", { min: 0, max: 0.3, step: 0.01 });
+  pane.addBinding(effect.params, "healRate", { min: 0, max: 0.3, step: 0.01 });
   pane.addBinding(effect.params, "healClusterSize", { min: 1, max: 16, step: 1 });
-  // How long the old scene moshes before the swap.
-  const timing = { leadMs: 200 };
-  pane.addBinding(timing, "leadMs", { min: 0, max: 1000, step: 10 });
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0 });
   await vfx.add(canvas, { effect });
 
   let shown = 0;
   let target = 0;
   let switchedAt = -Infinity;
-  let healFrom = -Infinity;
-  let swapTimer;
-
-  // Mosh the old scene first, then swap video and headings under the mosh.
-  const transition = (next) => {
-    target = next;
-    effect.enable();
-    healFrom = Infinity;
-    clearTimeout(swapTimer);
-    swapTimer = setTimeout(() => {
-      if (next !== shown) {
-        media[next].play();
-        media[shown].pause();
-        shown = next;
-        switchedAt = performance.now();
-      }
-      healFrom = performance.now();
-    }, timing.leadMs);
-  };
 
   const loop = () => {
     const active = Math.min(
       sections.length - 1,
       Math.max(0, Math.round(scrollY / innerHeight)),
     );
-    if (active !== target) transition(active);
-
     const now = performance.now();
+    // Swap one frame after enable(), so the mosh starts from the old scene.
+    if (target !== shown) {
+      media[target].play();
+      media[shown].pause();
+      shown = target;
+      switchedAt = now;
+    }
+    if (active !== target) {
+      target = active;
+      effect.enable();
+    }
+
     const elapsed = now - switchedAt;
-    const heal = Math.min(1, Math.max(0, (now - healFrom) / HEAL_MS));
+    const heal = Math.min(1, elapsed / HEAL_MS);
     effect.params.chromaGain = look.chromaGain + (1 - look.chromaGain) * heal;
-    effect.params.healRate = now < healFrom ? 0 : look.healRate;
     // Drop the cut frame's residual so the old picture stays (no I-frame).
     effect.params.useResidual = elapsed > CUT_MS;
-    if (heal >= 1 && effect.enabled) effect.disable();
+    if (heal >= 1 && target === shown && effect.enabled) effect.disable();
 
     // Zoom-out kick on switch, plus scroll parallax.
     const t = Math.min(1, elapsed / ZOOM_MS);
