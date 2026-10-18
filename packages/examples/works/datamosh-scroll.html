@@ -338,6 +338,8 @@
   const ZOOM_MS = 1200;
   // Heal time after each switch; chroma fades back over it too.
   const HEAL_MS = 1500;
+  // Covers the first frame of the new scene.
+  const CUT_MS = 50;
 
   const sections = [...document.querySelectorAll("section")];
   const media = sections.map(({ dataset: { src } }) => {
@@ -484,6 +486,8 @@
     const heal = Math.min(1, Math.max(0, (now - healFrom) / HEAL_MS));
     effect.params.chromaGain = look.chromaGain + (1 - look.chromaGain) * heal;
     effect.params.healRate = now < healFrom ? 0 : look.healRate;
+    // Drop the cut frame's residual so the old picture stays (no I-frame).
+    effect.params.useResidual = elapsed > CUT_MS;
     if (heal >= 1 && effect.enabled) effect.disable();
 
     // Zoom-out kick on switch, plus scroll parallax.
