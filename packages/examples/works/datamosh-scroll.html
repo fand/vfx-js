@@ -438,13 +438,11 @@
   // After a switch: hold the mosh, then heal and fade chroma back to 1.
   const look = {
     chromaGain: 2,
-    healRate: 0.05,
     holdMs: 1000,
     healMs: 500,
     zoomMs: 1200,
   };
   pane.addBinding(look, "chromaGain", { min: 0, max: 3 });
-  pane.addBinding(look, "healRate", { min: 0, max: 0.3, step: 0.01 });
   pane.addBinding(look, "holdMs", { min: 0, max: 3000, step: 10 });
   pane.addBinding(look, "healMs", { min: 10, max: 3000, step: 10 });
   pane.addBinding(look, "zoomMs", { min: 10, max: 3000, step: 10 });
@@ -455,6 +453,7 @@
   let shown = 0;
   let target = 0;
   let switchedAt = -Infinity;
+  let last = performance.now();
 
   const loop = () => {
     const active = Math.min(
@@ -462,6 +461,8 @@
       Math.max(0, Math.round(scrollY / innerHeight)),
     );
     const now = performance.now();
+    const dt = now - last;
+    last = now;
     // Swap one frame after enable(), so the mosh starts from the old scene.
     if (target !== shown) {
       media[target].play();
@@ -478,7 +479,8 @@
     const healing = elapsed - look.holdMs;
     const heal = Math.min(1, Math.max(0, healing / look.healMs));
     effect.params.chromaGain = look.chromaGain + (1 - look.chromaGain) * heal;
-    effect.params.healRate = healing < 0 ? 0 : look.healRate;
+    // Refresh rate that leaves 1% of blocks moshed at the end of the heal.
+    effect.params.healRate = healing < 0 ? 0 : 1 - 0.01 ** (dt / look.healMs);
     // Drop the cut frame's residual so the old picture stays (no I-frame).
     effect.params.useResidual = elapsed > CUT_MS;
     if (heal >= 1 && target === shown && effect.enabled) effect.disable();
