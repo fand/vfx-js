@@ -336,6 +336,8 @@
   import { Pane } from "tweakpane";
 
   const ZOOM_MS = 1200;
+  // Heal time after each switch; chroma fades back over it too.
+  const HEAL_MS = 1500;
 
   const sections = [...document.querySelectorAll("section")];
   const media = sections.map(({ dataset: { src } }) => {
@@ -430,18 +432,17 @@
     blockSize: 32,
     healClusterSize: 6,
     chromaGain: 3,
-    // Heal block by block over 1.5s after each switch.
-    heal: 1500,
   });
 
   const pane = new Pane({ title: "Datamosh", expanded: false });
   pane.addBinding(effect.params, "dup", { min: 0, max: 8, step: 1 });
   pane.addBinding(effect.params, "blockSize", { min: 4, max: 64, step: 1 });
   // Peak chroma gain; fades back to 1 over the heal.
-  const look = { chromaGain: effect.params.chromaGain };
+  // healRate applies only after the swap.
+  const look = { chromaGain: effect.params.chromaGain, healRate: 0.03 };
   pane.addBinding(look, "chromaGain", { min: 0, max: 3 });
+  pane.addBinding(look, "healRate", { min: 0, max: 0.3, step: 0.01 });
   pane.addBinding(effect.params, "healClusterSize", { min: 1, max: 16, step: 1 });
-  pane.addBinding(effect.params, "heal", { min: 100, max: 5000, step: 10 });
   // How long the old scene moshes before the swap.
   const timing = { leadMs: 200 };
   pane.addBinding(timing, "leadMs", { min: 0, max: 1000, step: 10 });
@@ -467,8 +468,6 @@
         shown = next;
         switchedAt = performance.now();
       }
-      // Restart the heal from the swap.
-      effect.enable();
       healFrom = performance.now();
     }, timing.leadMs);
   };
@@ -482,8 +481,10 @@
 
     const now = performance.now();
     const elapsed = now - switchedAt;
-    const heal = Math.min(1, Math.max(0, (now - healFrom) / effect.params.heal));
+    const heal = Math.min(1, Math.max(0, (now - healFrom) / HEAL_MS));
     effect.params.chromaGain = look.chromaGain + (1 - look.chromaGain) * heal;
+    effect.params.healRate = now < healFrom ? 0 : look.healRate;
+    if (heal >= 1 && effect.enabled) effect.disable();
 
     // Zoom-out kick on switch, plus scroll parallax.
     const t = Math.min(1, elapsed / ZOOM_MS);

@@ -340,18 +340,9 @@ export type DatamoshParams = {
      * 1 = each block refreshes on its own; larger = blobs of blocks.
      */
     healClusterSize: number;
-    /**
-     * Auto-heal time in ms after `enable()`, then auto-disable.
-     * Overrides `healRate` / `healThreshold` while healing.
-     * 0 = mosh until `disable()`.
-     */
-    heal: number;
     /** Stage shown on the canvas. */
     view: DatamoshView;
 };
-
-// Peak random refresh rate while healing, per block per second.
-const HEAL_PER_SEC = 60;
 
 const DEFAULT_PARAMS: DatamoshParams = {
     blockSize: 16,
@@ -364,7 +355,6 @@ const DEFAULT_PARAMS: DatamoshParams = {
     healRate: 0,
     healThreshold: 1,
     healClusterSize: 1,
-    heal: 0,
     view: "output",
 };
 
@@ -380,8 +370,6 @@ export class DatamoshEffect implements Effect {
     #enabled = false;
     // Re-seed the accumulator from a clean frame on the next mosh frame.
     #seed = true;
-    // Seconds since `enable()`, for `heal`.
-    #elapsed = 0;
 
     #curRT: EffectRenderTarget | null = null;
     #prevRT: EffectRenderTarget | null = null;
@@ -412,7 +400,6 @@ export class DatamoshEffect implements Effect {
 
     enable(): void {
         this.#enabled = true;
-        this.#elapsed = 0;
     }
 
     disable(): void {
@@ -517,20 +504,6 @@ export class DatamoshEffect implements Effect {
             this.#seed = true;
         }
 
-        let healRate = this.params.healRate;
-        let healThreshold = this.params.healThreshold;
-        if (this.#enabled && this.params.heal > 0) {
-            this.#elapsed += ctx.deltaTime;
-            const t = (this.#elapsed * 1000) / this.params.heal;
-            if (t >= 1) {
-                this.disable();
-            } else {
-                // Random refresh ramps up; hard-to-predict blocks heal first.
-                healRate = Math.min(1, HEAL_PER_SEC * t ** 3 * ctx.deltaTime);
-                healThreshold = 0.02 + 0.23 * (1 - t);
-            }
-        }
-
         const resolution: [number, number] = [this.#w, this.#h];
 
         // Capture the current frame into uv-space.
@@ -549,8 +522,8 @@ export class DatamoshEffect implements Effect {
                     uBlock: this.#block,
                     uSearch: this.params.searchRange,
                     uStep: this.params.searchStep,
-                    uHealRate: healRate,
-                    uHealThreshold: healThreshold,
+                    uHealRate: this.params.healRate,
+                    uHealThreshold: this.params.healThreshold,
                     uHealCluster: this.params.healClusterSize,
                     uFrame: this.#frame++ % 65536,
                 },
