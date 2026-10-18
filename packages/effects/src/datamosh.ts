@@ -53,7 +53,7 @@ uniform float uSearch;      // search radius, in steps
 uniform float uStep;        // px per step (coverage = uSearch * uStep px)
 uniform float uHealRate;
 uniform float uHealThreshold;
-uniform float uIntraCluster;  // refresh cluster size, in blocks
+uniform float uHealCluster;  // refresh cluster size, in blocks
 uniform float uFrame;
 float hash(vec3 p) {
     uvec3 q = uvec3(p) * uvec3(1597334673u, 3812015801u, 2798796415u);
@@ -109,9 +109,9 @@ void main() {
 
     // Mean abs diff per channel, 0..1.
     float err = bestRaw / 27.0;
-    float n = clusterNoise(block / max(uIntraCluster, 1.0), uFrame);
+    float n = clusterNoise(block / max(uHealCluster, 1.0), uFrame);
     // Smooth noise clusters near 0.5; smoothstep makes it about uniform.
-    if (uIntraCluster > 1.0) n = smoothstep(0.0, 1.0, n);
+    if (uHealCluster > 1.0) n = smoothstep(0.0, 1.0, n);
     bool intra = n < uHealRate || err > uHealThreshold;
     outMV = vec4(move, intra ? 1.0 : 0.0, 1.0);
 }
@@ -339,7 +339,7 @@ export type DatamoshParams = {
      * Size of the random refresh clusters, in blocks.
      * 1 = each block refreshes on its own; larger = blobs of blocks.
      */
-    intraClusterSize: number;
+    healClusterSize: number;
     /**
      * Auto-heal time in ms after `enable()`, then auto-disable.
      * Overrides `healRate` / `healThreshold` while healing.
@@ -363,7 +363,7 @@ const DEFAULT_PARAMS: DatamoshParams = {
     chromaGain: 1,
     healRate: 0,
     healThreshold: 1,
-    intraClusterSize: 1,
+    healClusterSize: 1,
     heal: 0,
     view: "output",
 };
@@ -551,7 +551,7 @@ export class DatamoshEffect implements Effect {
                     uStep: this.params.searchStep,
                     uHealRate: healRate,
                     uHealThreshold: healThreshold,
-                    uIntraCluster: this.params.intraClusterSize,
+                    uHealCluster: this.params.healClusterSize,
                     uFrame: this.#frame++ % 65536,
                 },
                 target: mv,
