@@ -335,7 +335,6 @@
   import { DatamoshEffect } from "@vfx-js/effects";
   import { Pane } from "tweakpane";
 
-  const ZOOM_MS = 1200;
   // Covers the first frame of the new scene.
   const CUT_MS = 50;
 
@@ -437,11 +436,18 @@
   pane.addBinding(effect.params, "dup", { min: 0, max: 8, step: 1 });
   pane.addBinding(effect.params, "blockSize", { min: 4, max: 64, step: 1 });
   // After a switch: hold the mosh, then heal and fade chroma back to 1.
-  const look = { chromaGain: 2, healRate: 0.05, holdMs: 1000, healMs: 500 };
+  const look = {
+    chromaGain: 2,
+    healRate: 0.05,
+    holdMs: 1000,
+    healMs: 500,
+    zoomMs: 1200,
+  };
   pane.addBinding(look, "chromaGain", { min: 0, max: 3 });
   pane.addBinding(look, "healRate", { min: 0, max: 0.3, step: 0.01 });
   pane.addBinding(look, "holdMs", { min: 0, max: 3000, step: 10 });
   pane.addBinding(look, "healMs", { min: 10, max: 3000, step: 10 });
+  pane.addBinding(look, "zoomMs", { min: 10, max: 3000, step: 10 });
   pane.addBinding(effect.params, "healClusterSize", { min: 1, max: 16, step: 1 });
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0 });
   await vfx.add(canvas, { effect });
@@ -478,7 +484,7 @@
     if (heal >= 1 && target === shown && effect.enabled) effect.disable();
 
     // Zoom-out kick on switch, plus scroll parallax.
-    const t = Math.min(1, elapsed / ZOOM_MS);
+    const t = Math.min(1, elapsed / look.zoomMs);
     const scale = 1.1 + 0.3 * (1 - t) ** 3;
     const dy = (scrollY - shown * innerHeight) * -0.3;
     draw(media[shown], scale, dy);
