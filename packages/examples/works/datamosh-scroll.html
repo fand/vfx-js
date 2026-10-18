@@ -357,13 +357,13 @@
   resize();
   addEventListener("resize", resize);
 
-  // Cover-fit with scale and vertical offset for extra motion on switch.
-  const draw = (el, scale, dy) => {
+  // Cover-fit, scaled up a bit so the parallax offset never shows an edge.
+  const draw = (el, dy) => {
     const w = el.videoWidth;
     const h = el.videoHeight;
     if (!w || !h) return;
     const { width: cw, height: ch } = canvas;
-    const s = Math.max(cw / w, ch / h) * scale;
+    const s = Math.max(cw / w, ch / h) * 1.1;
     ctx2d.drawImage(el, (cw - w * s) / 2, (ch - h * s) / 2 + dy, w * s, h * s);
   };
 
@@ -428,7 +428,7 @@
 
   const effect = new DatamoshEffect({
     dup: 0,
-    blockSize: 16,
+    blockSize: 32,
     healClusterSize: 2,
   });
 
@@ -440,12 +440,10 @@
     chromaGain: 2,
     holdMs: 1000,
     healMs: 500,
-    zoomMs: 1200,
   };
   pane.addBinding(look, "chromaGain", { min: 0, max: 3 });
   pane.addBinding(look, "holdMs", { min: 0, max: 3000, step: 10 });
   pane.addBinding(look, "healMs", { min: 10, max: 3000, step: 10 });
-  pane.addBinding(look, "zoomMs", { min: 10, max: 3000, step: 10 });
   pane.addBinding(effect.params, "healClusterSize", { min: 1, max: 16, step: 1 });
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0 });
   await vfx.add(canvas, { effect });
@@ -472,6 +470,8 @@
     }
     if (active !== target) {
       target = active;
+      // Start the clock here too, so this frame already holds the mosh.
+      switchedAt = now;
       effect.enable();
     }
 
@@ -483,13 +483,11 @@
     effect.params.healRate = healing < 0 ? 0 : 1 - 0.01 ** (dt / look.healMs);
     // Drop the cut frame's residual so the old picture stays (no I-frame).
     effect.params.useResidual = elapsed > CUT_MS;
-    if (heal >= 1 && target === shown && effect.enabled) effect.disable();
+    if (heal >= 1 && effect.enabled) effect.disable();
 
-    // Zoom-out kick on switch, plus scroll parallax.
-    const t = Math.min(1, elapsed / look.zoomMs);
-    const scale = 1.1 + 0.3 * (1 - t) ** 3;
+    // Scroll parallax.
     const dy = (scrollY - shown * innerHeight) * -0.3;
-    draw(media[shown], scale, dy);
+    draw(media[shown], dy);
     drawMosh();
     vfx.update(canvas);
     requestAnimationFrame(loop);
