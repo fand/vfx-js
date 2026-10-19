@@ -13,12 +13,17 @@
     color: white;
     font-family: "Helvetica Neue", Arial, sans-serif;
   }
-  #bg {
+  #bg,
+  #head {
     position: fixed;
     inset: 0;
     /* % of the viewport, not 100vh, so the bitmap matches on mobile. */
     width: 100%;
     height: 100%;
+  }
+  #head {
+    z-index: 1;
+    pointer-events: none;
   }
   section {
     position: relative;
@@ -233,6 +238,8 @@
 </style>
 
 <canvas id="bg"></canvas>
+<!-- Clean copy of the shown heading, above the mosh. -->
+<canvas id="head"></canvas>
 
 <section data-src="https://videos.pexels.com/video-files/7334607/7334607-hd_1920_1080_24fps.mp4">
   <div class="mag">
@@ -362,9 +369,13 @@
 
   const canvas = document.getElementById("bg");
   const ctx2d = canvas.getContext("2d");
+  const headCanvas = document.getElementById("head");
+  const headCtx = headCanvas.getContext("2d");
   const resize = () => {
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+    for (const c of [canvas, headCanvas]) {
+      c.width = c.clientWidth;
+      c.height = c.clientHeight;
+    }
   };
   resize();
   addEventListener("resize", resize);
@@ -379,66 +390,69 @@
     ctx2d.drawImage(el, (cw - w * s) / 2, (ch - h * s) / 2 + dy, w * s, h * s);
   };
 
-  // Draw text into the canvas from its DOM layout, so it gets moshed.
+  // Draw text into a canvas from its DOM layout, so it can be moshed.
   const headEls = sections.map((s) => [...s.querySelectorAll(".head *")]);
   const magEls = [...document.querySelectorAll(".mag *")];
-  const fill = (color, x, y, w, h) => {
-    ctx2d.fillStyle = color;
-    ctx2d.fillRect(x, y, w, h);
+  const fill = (ctx, color, x, y, w, h) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
   };
-  const drawText = (el, cs, r) => {
+  const drawText = (ctx, el, cs, r) => {
     const px = (k) => parseFloat(cs[k]);
     const left = r.left + px("paddingLeft");
     const right = r.right - px("paddingRight");
     const lh = px("lineHeight") || px("fontSize") * 1.2;
     const align = { right: "right", end: "right", center: "center" };
-    ctx2d.textAlign = align[cs.textAlign] ?? "left";
-    const x = { right, center: (left + right) / 2 }[ctx2d.textAlign] ?? left;
-    ctx2d.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    ctx.textAlign = align[cs.textAlign] ?? "left";
+    const x = { right, center: (left + right) / 2 }[ctx.textAlign] ?? left;
+    ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
     // "normal" is invalid on canvas and would keep the previous value.
-    ctx2d.letterSpacing =
+    ctx.letterSpacing =
       cs.letterSpacing === "normal" ? "0px" : cs.letterSpacing;
-    ctx2d.fillStyle = cs.color;
+    ctx.fillStyle = cs.color;
     let text = el.textContent.trim();
     if (cs.textTransform === "uppercase") text = text.toUpperCase();
     let line = "";
     let y = r.top + px("borderTopWidth") + px("paddingTop") + lh / 2;
     for (const word of text.split(/\s+/)) {
       const next = line ? `${line} ${word}` : word;
-      if (line && ctx2d.measureText(next).width > right - left) {
-        ctx2d.fillText(line, x, y);
+      if (line && ctx.measureText(next).width > right - left) {
+        ctx.fillText(line, x, y);
         line = word;
         y += lh;
       } else {
         line = next;
       }
     }
-    ctx2d.fillText(line, x, y);
+    ctx.fillText(line, x, y);
   };
   // dy shifts the DOM layout, e.g. to pin text to the screen.
-  const drawMosh = (els, dy = 0) => {
-    ctx2d.textBaseline = "middle";
-    ctx2d.shadowColor = "rgba(0, 0, 0, 0.5)";
-    ctx2d.shadowBlur = 16;
+  const drawEls = (ctx, els, dy = 0) => {
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+    ctx.shadowBlur = 16;
     for (const el of els) {
       const { x, y, width, height } = el.getBoundingClientRect();
       const r = new DOMRect(x, y + dy, width, height);
       if (!r.width || r.bottom < 0 || r.top > innerHeight) continue;
       const cs = getComputedStyle(el);
-      ctx2d.globalAlpha = Number(cs.opacity);
+      ctx.globalAlpha = Number(cs.opacity);
       if (cs.backgroundColor !== "rgba(0, 0, 0, 0)") {
-        fill(cs.backgroundColor, r.left, r.top, r.width, r.height);
+        fill(ctx, cs.backgroundColor, r.left, r.top, r.width, r.height);
       }
       const top = parseFloat(cs.borderTopWidth);
-      if (top) fill(cs.borderTopColor, r.left, r.top, r.width, top);
+      if (top) fill(ctx, cs.borderTopColor, r.left, r.top, r.width, top);
       const bottom = parseFloat(cs.borderBottomWidth);
       if (bottom) {
-        fill(cs.borderBottomColor, r.left, r.bottom - bottom, r.width, bottom);
+        const bottomY = r.bottom - bottom;
+        fill(ctx, cs.borderBottomColor, r.left, bottomY, r.width, bottom);
       }
-      if (!el.childElementCount && el.textContent.trim()) drawText(el, cs, r);
+      if (!el.childElementCount && el.textContent.trim()) {
+        drawText(ctx, el, cs, r);
+      }
     }
-    ctx2d.globalAlpha = 1;
-    ctx2d.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
   };
 
   const effect = new DatamoshEffect({
@@ -507,9 +521,13 @@
     // Scroll parallax.
     const dy = (scrollY - shown * innerHeight) * -0.08;
     draw(media[shown], dy);
-    if (look.moshText) drawMosh(magEls);
+    if (look.moshText) drawEls(ctx2d, magEls);
     // Pin the shown heading to the screen; it swaps with the video.
-    drawMosh(headEls[shown], -sections[shown].getBoundingClientRect().top);
+    const headDy = -sections[shown].getBoundingClientRect().top;
+    // Mosh a copy only while moshing, so the old heading smears.
+    if (effect.enabled) drawEls(ctx2d, headEls[shown], headDy);
+    headCtx.clearRect(0, 0, headCanvas.width, headCanvas.height);
+    drawEls(headCtx, headEls[shown], headDy);
     vfx.update(canvas);
     requestAnimationFrame(loop);
   };
