@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<script type="module" crossorigin src="../assets/datamosh-scroll-BBSeiYZ7.js"></script>
+<link rel="modulepreload" crossorigin href="../assets/modulepreload-polyfill-Dezn_h7o.js">
+<link rel="modulepreload" crossorigin href="../assets/tweakpane-Dp6sayNL.js">
+<link rel="modulepreload" crossorigin href="../assets/esm-mSnhxP00.js">
+<link rel="modulepreload" crossorigin href="../assets/esm-Drk6VsTA.js">
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Datamosh Scroll</title>
+
+<style>
+  html {
+    scroll-snap-type: y mandatory;
+  }
+  body {
+    margin: 0;
+    background: black;
+    color: white;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+  }
+  #bg,
+  #head {
+    position: fixed;
+    inset: 0;
+    /* % of the viewport, not 100vh, so the bitmap matches on mobile. */
+    width: 100%;
+    height: 100%;
+  }
+  #head {
+    z-index: 1;
+    pointer-events: none;
+  }
+  section {
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 8vh 6vw;
+    box-sizing: border-box;
+    text-shadow: 0 0 24px rgba(0, 0, 0, 0.6);
+  }
+  /* Magazine layer. */
+  .mag {
+    position: absolute;
+    inset: 5vh 6vw auto;
+    text-align: left;
+    --accent: #ffd23f;
+  }
+  .masthead {
+    display: flex;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    border-bottom: 2px solid white;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .num {
+    position: absolute;
+    top: 40px;
+    left: -0.04em;
+    font-size: clamp(48px, 6vw, 80px);
+    font-weight: bold;
+    line-height: 1;
+    letter-spacing: -0.06em;
+    opacity: 0.6;
+  }
+  article {
+    width: min(30em, 100%);
+    margin: 28px 0 0 auto;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .kicker {
+    display: block;
+    color: var(--accent);
+    font-weight: bold;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  h3 {
+    margin: 8px 0 0;
+    font: italic 400 clamp(28px, 3vw, 40px) / 1 Georgia, "Times New Roman",
+      serif;
+    letter-spacing: -0.02em;
+  }
+  .deck {
+    margin: 12px 0 0;
+    font: italic 18px / 1.3 Georgia, "Times New Roman", serif;
+    max-width: none;
+  }
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid white;
+  }
+  .cols p {
+    margin: 0;
+    font-size: 15px;
+  }
+  blockquote {
+    margin: 16px 0 0;
+    padding: 10px 0;
+    border-top: 2px solid var(--accent);
+    border-bottom: 2px solid var(--accent);
+    font: bold 18px / 1.2 "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: -0.01em;
+  }
+  .cap {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-top: 14px;
+    font-size: 13px;
+    opacity: 0.85;
+  }
+  .tag {
+    flex: none;
+    width: 22px;
+    background: var(--accent);
+    color: black;
+    font-weight: bold;
+    text-align: center;
+  }
+  /* Article left, number right. */
+  .left .num {
+    left: auto;
+    right: 0;
+  }
+  .left article {
+    margin: 28px auto 0 0;
+  }
+  /* Compact block in the bottom-left corner, clear of the subject. */
+  .corner {
+    bottom: 8vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .corner .num {
+    position: static;
+    margin-top: auto;
+  }
+  .corner article {
+    width: min(22em, 100%);
+    margin: 0 auto 0 0;
+  }
+  .corner .cols {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  /* Article at the bottom right. */
+  .low {
+    bottom: 8vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .low article {
+    margin-top: auto;
+  }
+  @media (max-width: 700px) {
+    .num,
+    .cols,
+    blockquote {
+      display: none;
+    }
+    section h2 {
+      font-size: clamp(88px, 24vw, 160px);
+    }
+    .masthead {
+      font-size: 11px;
+      letter-spacing: 0.15em;
+    }
+    .masthead span:nth-child(2) {
+      display: none;
+    }
+    /* Keep Flip's article at the bottom, clear of its top heading. */
+    .corner article {
+      margin-top: auto;
+    }
+    /* Move Roll's article to the top, clear of its bottom heading. */
+    .low {
+      bottom: auto;
+      display: block;
+    }
+    .low article {
+      margin-top: 28px;
+    }
+  }
+  h2 {
+    margin: 0;
+    font-size: clamp(64px, 18vw, 320px);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+  }
+  p {
+    margin: 16px 0 0;
+    max-width: 32em;
+    font-size: clamp(14px, 1.4vw, 20px);
+  }
+  /* Headings are drawn into the canvas; the DOM copy only gives layout. */
+  .head {
+    opacity: 0;
+  }
+  small {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+  /* Section heading position. Default is bottom left. */
+  section.end {
+    align-items: flex-end;
+    text-align: right;
+  }
+  section.top-end {
+    justify-content: flex-start;
+    align-items: flex-end;
+    padding-top: 14vh;
+    text-align: right;
+  }
+  .tp-dfwv {
+    position: fixed !important;
+    z-index: 2;
+  }
+  footer {
+    margin-top: 6vh;
+    font-size: 11px;
+    opacity: 0.6;
+  }
+</style>
+
+<canvas id="bg"></canvas>
+<!-- Clean copy of the shown heading, above the mosh. -->
+<canvas id="head"></canvas>
+
+<section>
+  <div class="mag">
+    <div class="masthead">
+      <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 012</span>
+    </div>
+    <div class="num">01</div>
+    <article>
+      <span class="kicker">Morning / Park path</span>
+      <h3>The plan is no plan.</h3>
+      <p class="deck">We met at ten with one board each, half a bottle of water and nowhere to be.</p>
+      <div class="cols">
+        <p>The park path is the best warm-up in the city: smooth and empty before lunch.</p>
+        <p>Somebody says the ramp is open today. We go anyway.</p>
+      </div>
+      <blockquote>“You don't pick where to go. The pavement does.”</blockquote>
+      <div class="cap"><span class="tag">1</span><span>Kick, push, coast. The first kilometre is always the quietest.</span></div>
+    </article>
+  </div>
+  <div class="head">
+    <small>10:00 — Park path</small>
+    <h2>Push.</h2>
+    <p>Morning. Wheels on warm concrete, no plan yet.</p>
+  </div>
+</section>
+<section class="end">
+  <div class="mag left">
+    <div class="masthead">
+      <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 018</span>
+    </div>
+    <div class="num">02</div>
+    <article>
+      <span class="kicker">Afternoon / Ramp</span>
+      <h3>Drop in or go home.</h3>
+      <p class="deck">The quarter pipe at the old yard is steeper than it looks, and everyone knows it.</p>
+      <div class="cols">
+        <p>The first drop is all in the head. Lean forward and trust the wheels.</p>
+        <p>We count falls instead of tricks. Eleven before three o'clock.</p>
+      </div>
+      <blockquote>“Commit. The ramp can tell when you don't.”</blockquote>
+      <div class="cap"><span class="tag">2</span><span>Coping, chalk and a borrowed helmet. Nobody films the falls.</span></div>
+    </article>
+  </div>
+  <div class="head">
+    <small>14:30 — Ramp</small>
+    <h2>Drop.</h2>
+    <p>Afternoon at the ramp. Lean in, don't look back.</p>
+  </div>
+</section>
+<section class="top-end">
+  <div class="mag corner">
+    <div class="masthead">
+      <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 024</span>
+    </div>
+    <div class="num">03</div>
+    <article>
+      <span class="kicker">Golden hour / Flat ground</span>
+      <h3>Everything looks like a photo now.</h3>
+      <p class="deck">Around six the light goes low and orange, and even the easy tricks look expensive.</p>
+      <div class="cols">
+        <p>The cameras come out. The kickflip lands on the fourth go.</p>
+        <p>Shadows stretch twice as long as we are. Nobody checks the time.</p>
+      </div>
+      <blockquote>“Golden hour forgives everything except bad footwork.”</blockquote>
+      <div class="cap"><span class="tag">3</span><span>Flip, catch, roll away. Shot at 18:10 with the sun behind the fence.</span></div>
+    </article>
+  </div>
+  <div class="head">
+    <small>18:10 — Golden hour</small>
+    <h2>Flip.</h2>
+    <p>Low sun. Every trick looks better in this light.</p>
+  </div>
+</section>
+<section>
+  <div class="mag low">
+    <div class="masthead">
+      <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 030</span>
+    </div>
+    <div class="num">04</div>
+    <article>
+      <span class="kicker">Dusk / The way home</span>
+      <h3>One more line.</h3>
+      <p class="deck">Streetlights in four minutes. Someone always says one more.</p>
+      <div class="cols">
+        <p>The last run is never the best, but it is the one you remember.</p>
+        <p>Boards under arms, we walk home. Next issue: rain.</p>
+      </div>
+      <blockquote>“See you tomorrow. Same time, no plan.”</blockquote>
+      <div class="cap"><span class="tag">4</span><span>Roll out. The lights come on behind us.</span></div>
+    </article>
+  </div>
+  <div class="head">
+    <small>19:02 — Dusk</small>
+    <h2>Roll.</h2>
+    <p>One more line before the lights come on.</p>
+  </div>
+  <footer>
+    Videos from Pexels by RDNE Stock project, cottonbro studio, and Marc
+    Espejo.
+  </footer>
+</section>
+
