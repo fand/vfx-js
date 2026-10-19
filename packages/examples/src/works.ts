@@ -179,4 +179,15 @@ export const works: Work[] = [
             "A playground for the Figma shader effect ports: warp, slice shift, pixel stretch, pattern refraction, pixelate, dither, and colored edges. Pick an image and tweak every parameter live with Tweakpane.",
         url: "./works/figma-effects.html",
     },
+    {
+        id: "datamosh-scroll",
+        index: "16",
+        title: "Datamosh Scroll",
+        tags: ["effect-api", "Glitch", "Transition"],
+        year: "2026",
+        author: "AMAGI",
+        description:
+            "A day of skateboarding, told as a one-page scroll site. Every section change drops the keyframe: the next scene's motion drags the last one along until intra refresh heals it block by block.",
+        url: "./works/datamosh-scroll.html",
+    },
 ];
