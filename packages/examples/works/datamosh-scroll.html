@@ -237,7 +237,7 @@
 <!-- Clean copy of the shown heading, above the mosh. -->
 <canvas id="head"></canvas>
 
-<section data-src="https://videos.pexels.com/video-files/7334607/7334607-hd_1920_1080_24fps.mp4">
+<section>
   <div class="mag">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 012</span>
@@ -261,7 +261,7 @@
     <p>Morning. Wheels on warm concrete, no plan yet.</p>
   </div>
 </section>
-<section class="end" data-src="https://videos.pexels.com/video-files/5039461/5039461-uhd_2732_1440_25fps.mp4">
+<section class="end">
   <div class="mag left">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 018</span>
@@ -285,7 +285,7 @@
     <p>Afternoon at the ramp. Lean in, don't look back.</p>
   </div>
 </section>
-<section class="top-end" data-src="https://videos.pexels.com/video-files/33996198/14421886_1920_1080_24fps.mp4">
+<section class="top-end">
   <div class="mag corner">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 024</span>
@@ -309,7 +309,7 @@
     <p>Low sun. Every trick looks better in this light.</p>
   </div>
 </section>
-<section data-src="https://videos.pexels.com/video-files/13062522/13062522-hd_1920_1080_30fps.mp4">
+<section>
   <div class="mag low">
     <div class="masthead">
       <span>Sidewalk</span><span>Issue 04 · Autumn 2026</span><span>p. 030</span>
@@ -347,10 +347,15 @@
   const CUT_MS = 50;
 
   const sections = [...document.querySelectorAll("section")];
-  const media = sections.map(({ dataset: { src } }) => {
+  // Pexels clips, re-encoded to 1080p 24fps VP9 to cut the size.
+  const srcs = [
+    new URL("./datamosh-scroll/push.webm", import.meta.url).href,
+    new URL("./datamosh-scroll/drop.webm", import.meta.url).href,
+    new URL("./datamosh-scroll/flip.webm", import.meta.url).href,
+    new URL("./datamosh-scroll/roll.webm", import.meta.url).href,
+  ];
+  const media = srcs.map((src) => {
     const v = document.createElement("video");
-    // CORS-enabled so WebGL can read the frames.
-    v.crossOrigin = "anonymous";
     Object.assign(v, {
       src,
       muted: true,
