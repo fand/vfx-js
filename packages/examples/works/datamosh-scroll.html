@@ -8,6 +8,7 @@
     scroll-snap-type: y mandatory;
   }
   body {
+    position: relative;
     margin: 0;
     background: black;
     color: white;
@@ -211,7 +212,7 @@
   .progress {
     position: fixed;
     z-index: 2;
-    right: 16px;
+    right: 40px;
     top: 35vh;
     width: 2px;
     height: 30vh;
@@ -223,6 +224,28 @@
     background: white;
     transform-origin: top;
     transform: scaleY(0);
+  }
+  /* Rulers that scroll with the page. Major tick per section. */
+  .ruler {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    left: 12px;
+    width: 12px;
+    height: 100%;
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    background:
+      repeating-linear-gradient(rgba(255, 255, 255, 0.7) 0 1px, transparent 1px 100vh),
+      repeating-linear-gradient(rgba(255, 255, 255, 0.4) 0 1px, transparent 1px 5vh)
+        0 0 / 50% 100% no-repeat;
+    pointer-events: none;
+  }
+  .ruler.right {
+    left: auto;
+    right: 12px;
+    border-left: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.4);
+    background-position: 0 0, right 0 top 0;
   }
   small {
     display: block;
@@ -357,6 +380,8 @@
   </footer>
 </section>
 <div class="progress"><i></i></div>
+<div class="ruler"></div>
+<div class="ruler right"></div>
 
 <script type="module">
   import { VFX } from "@vfx-js/core";
