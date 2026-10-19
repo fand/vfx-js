@@ -33,8 +33,10 @@
     text-shadow: 0 0 24px rgba(0, 0, 0, 0.6);
   }
   /* Magazine layer. */
+  /* Pinned like the headings; only the shown section's copy is visible. */
   .mag {
-    position: absolute;
+    position: fixed;
+    visibility: hidden;
     inset: 5vh 6vw auto;
     text-align: left;
     --accent: #ffd23f;
@@ -202,6 +204,26 @@
   .mosh-text .mag {
     opacity: 0;
   }
+  .shown .mag {
+    visibility: visible;
+  }
+  /* Scroll progress, since the text no longer moves. */
+  .progress {
+    position: fixed;
+    z-index: 2;
+    right: 16px;
+    top: 35vh;
+    width: 2px;
+    height: 30vh;
+    background: rgba(255, 255, 255, 0.25);
+  }
+  .progress i {
+    display: block;
+    height: 100%;
+    background: white;
+    transform-origin: top;
+    transform: scaleY(0);
+  }
   small {
     display: block;
     margin-bottom: 12px;
@@ -334,6 +356,7 @@
     Espejo.
   </footer>
 </section>
+<div class="progress"><i></i></div>
 
 <script type="module">
   import { VFX } from "@vfx-js/core";
@@ -381,7 +404,7 @@
 
   // Draw text into the canvas from its DOM layout, so it gets moshed.
   const headEls = sections.map((s) => [...s.querySelectorAll(".head *")]);
-  const magEls = [...document.querySelectorAll(".mag *")];
+  const magEls = sections.map((s) => [...s.querySelectorAll(".mag *")]);
   const fill = (color, x, y, w, h) => {
     ctx2d.fillStyle = color;
     ctx2d.fillRect(x, y, w, h);
@@ -466,7 +489,9 @@
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0, scrollPadding: false });
   await vfx.add(canvas, { effect });
 
+  const bar = document.querySelector(".progress i");
   let shown = 0;
+  sections[0].classList.add("shown");
   let target = 0;
   let switchedAt = -Infinity;
   let last = performance.now();
@@ -484,6 +509,8 @@
     if (target !== shown && media[target].readyState >= 2) {
       media[target].play();
       media[shown].pause();
+      sections[shown].classList.remove("shown");
+      sections[target].classList.add("shown");
       shown = target;
       switchedAt = now;
     }
@@ -504,10 +531,13 @@
     effect.params.useResidual = elapsed > CUT_MS;
     if (heal >= 1 && target === shown && effect.enabled) effect.disable();
 
+    const maxScroll = document.documentElement.scrollHeight - innerHeight;
+    bar.style.transform = `scaleY(${scrollY / maxScroll})`;
+
     // Scroll parallax.
     const dy = (scrollY - shown * innerHeight) * -0.08;
     draw(media[shown], dy);
-    if (look.moshText) drawMosh(magEls);
+    if (look.moshText) drawMosh(magEls[shown]);
     // Pin the shown heading to the screen; it swaps with the video.
     drawMosh(headEls[shown], -sections[shown].getBoundingClientRect().top);
     vfx.update(canvas);
