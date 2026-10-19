@@ -198,8 +198,9 @@
   .head {
     opacity: 0;
   }
-  .plain-text .head {
-    opacity: 1;
+  /* Same for the magazine text while it is moshed too. */
+  .mosh-text .mag {
+    opacity: 0;
   }
   small {
     display: block;
@@ -378,8 +379,9 @@
     ctx2d.drawImage(el, (cw - w * s) / 2, (ch - h * s) / 2 + dy, w * s, h * s);
   };
 
-  // Draw the headings into the canvas from their DOM layout, so they get moshed.
-  const moshEls = [...document.querySelectorAll(".head *")];
+  // Draw text into the canvas from its DOM layout, so it gets moshed.
+  const headEls = [...document.querySelectorAll(".head *")];
+  const magEls = [...document.querySelectorAll(".mag *")];
   const fill = (color, x, y, w, h) => {
     ctx2d.fillStyle = color;
     ctx2d.fillRect(x, y, w, h);
@@ -413,11 +415,11 @@
     }
     ctx2d.fillText(line, x, y);
   };
-  const drawMosh = () => {
+  const drawMosh = (els) => {
     ctx2d.textBaseline = "middle";
     ctx2d.shadowColor = "rgba(0, 0, 0, 0.5)";
     ctx2d.shadowBlur = 16;
-    for (const el of moshEls) {
+    for (const el of els) {
       const r = el.getBoundingClientRect();
       if (!r.width || r.bottom < 0 || r.top > innerHeight) continue;
       const cs = getComputedStyle(el);
@@ -450,14 +452,14 @@
     chromaGain: 2,
     holdMs: 1000,
     healMs: 500,
-    moshText: true,
+    moshText: false,
   };
   pane.addBinding(look, "chromaGain", { min: 0, max: 3 });
   pane.addBinding(look, "holdMs", { min: 0, max: 3000, step: 10 });
   pane.addBinding(look, "healMs", { min: 10, max: 3000, step: 10 });
-  // Off: show the DOM headings instead of drawing them into the canvas.
+  // Also draw the magazine text into the canvas, so it gets moshed.
   pane.addBinding(look, "moshText").on("change", ({ value }) => {
-    document.body.classList.toggle("plain-text", !value);
+    document.body.classList.toggle("mosh-text", value);
   });
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0 });
   await vfx.add(canvas, { effect });
@@ -503,7 +505,7 @@
     // Scroll parallax.
     const dy = (scrollY - shown * innerHeight) * -0.08;
     draw(media[shown], dy);
-    if (look.moshText) drawMosh();
+    drawMosh(look.moshText ? [...magEls, ...headEls] : headEls);
     vfx.update(canvas);
     requestAnimationFrame(loop);
   };
