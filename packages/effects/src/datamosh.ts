@@ -53,22 +53,10 @@ uniform float uSearch;      // search radius, in steps
 uniform float uStep;        // px per step (coverage = uSearch * uStep px)
 uniform float uHealRate;
 uniform float uHealThreshold;
-uniform float uHealCluster;  // refresh cluster size, in blocks
 uniform float uFrame;
 float hash(vec3 p) {
     uvec3 q = uvec3(p) * uvec3(1597334673u, 3812015801u, 2798796415u);
     return float((q.x ^ q.y ^ q.z) * 1597334673u) / 4294967295.0;
-}
-// Value noise, new field each frame. Cluster size 1 = per-block hash.
-float clusterNoise(vec2 p, float seed) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    float a = hash(vec3(i, seed));
-    float b = hash(vec3(i + vec2(1, 0), seed));
-    float c = hash(vec3(i + vec2(0, 1), seed));
-    float d = hash(vec3(i + vec2(1, 1), seed));
-    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 void main() {
     vec2 block = floor(gl_FragCoord.xy);
@@ -109,10 +97,7 @@ void main() {
 
     // Mean abs diff per channel, 0..1.
     float err = bestRaw / 27.0;
-    float n = clusterNoise(block / max(uHealCluster, 1.0), uFrame);
-    // Smooth noise clusters near 0.5; smoothstep makes it about uniform.
-    if (uHealCluster > 1.0) n = smoothstep(0.0, 1.0, n);
-    bool intra = n < uHealRate || err > uHealThreshold;
+    bool intra = hash(vec3(block, uFrame)) < uHealRate || err > uHealThreshold;
     outMV = vec4(move, intra ? 1.0 : 0.0, 1.0);
 }
 `;
@@ -335,11 +320,6 @@ export type DatamoshParams = {
      * Mean abs diff per channel (0..1); 1 = never.
      */
     healThreshold: number;
-    /**
-     * Size of the random refresh clusters, in blocks.
-     * 1 = each block refreshes on its own; larger = blobs of blocks.
-     */
-    healClusterSize: number;
     /** Stage shown on the canvas. */
     view: DatamoshView;
 };
@@ -354,7 +334,6 @@ const DEFAULT_PARAMS: DatamoshParams = {
     chromaGain: 1,
     healRate: 0,
     healThreshold: 1,
-    healClusterSize: 1,
     view: "output",
 };
 
@@ -524,7 +503,6 @@ export class DatamoshEffect implements Effect {
                     uStep: this.params.searchStep,
                     uHealRate: this.params.healRate,
                     uHealThreshold: this.params.healThreshold,
-                    uHealCluster: this.params.healClusterSize,
                     uFrame: this.#frame++ % 65536,
                 },
                 target: mv,

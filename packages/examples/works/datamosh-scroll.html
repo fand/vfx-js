@@ -437,7 +437,6 @@
   const effect = new DatamoshEffect({
     dup: 0,
     blockSize: 32,
-    healClusterSize: 2,
   });
 
   const pane = new Pane({ title: "Datamosh", expanded: false });
@@ -452,7 +451,6 @@
   pane.addBinding(look, "chromaGain", { min: 0, max: 3 });
   pane.addBinding(look, "holdMs", { min: 0, max: 3000, step: 10 });
   pane.addBinding(look, "healMs", { min: 10, max: 3000, step: 10 });
-  pane.addBinding(effect.params, "healClusterSize", { min: 1, max: 16, step: 1 });
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0 });
   await vfx.add(canvas, { effect });
 

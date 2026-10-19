@@ -377,11 +377,6 @@ export function attachDatamoshPane(
         max: 1,
         step: 0.01,
     });
-    pane.addBinding(effect.params, "healClusterSize", {
-        min: 1,
-        max: 16,
-        step: 1,
-    });
 
     pane.addBinding(effect.params, "view", {
         options: {
