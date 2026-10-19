@@ -198,6 +198,9 @@
   .head {
     opacity: 0;
   }
+  .plain-text .head {
+    opacity: 1;
+  }
   small {
     display: block;
     margin-bottom: 12px;
@@ -447,10 +450,15 @@
     chromaGain: 2,
     holdMs: 1000,
     healMs: 500,
+    moshText: true,
   };
   pane.addBinding(look, "chromaGain", { min: 0, max: 3 });
   pane.addBinding(look, "holdMs", { min: 0, max: 3000, step: 10 });
   pane.addBinding(look, "healMs", { min: 10, max: 3000, step: 10 });
+  // Off: show the DOM headings instead of drawing them into the canvas.
+  pane.addBinding(look, "moshText").on("change", ({ value }) => {
+    document.body.classList.toggle("plain-text", !value);
+  });
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0 });
   await vfx.add(canvas, { effect });
 
@@ -495,7 +503,7 @@
     // Scroll parallax.
     const dy = (scrollY - shown * innerHeight) * -0.08;
     draw(media[shown], dy);
-    drawMosh();
+    if (look.moshText) drawMosh();
     vfx.update(canvas);
     requestAnimationFrame(loop);
   };
