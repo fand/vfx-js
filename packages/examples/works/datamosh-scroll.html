@@ -203,10 +203,6 @@
   .head {
     opacity: 0;
   }
-  /* Same for the magazine text while it is moshed too. */
-  .mosh-text .mag {
-    opacity: 0;
-  }
   small {
     display: block;
     margin-bottom: 12px;
@@ -392,7 +388,6 @@
 
   // Draw text into a canvas from its DOM layout, so it can be moshed.
   const headEls = sections.map((s) => [...s.querySelectorAll(".head *")]);
-  const magEls = [...document.querySelectorAll(".mag *")];
   const fill = (ctx, color, x, y, w, h) => {
     ctx.fillStyle = color;
     ctx.fillRect(x, y, w, h);
@@ -465,18 +460,13 @@
   pane.addBinding(effect.params, "blockSize", { min: 4, max: 64, step: 1 });
   // After a switch: hold the mosh, then heal and fade chroma back to 1.
   const look = {
-    chromaGain: 2,
-    holdMs: 1000,
-    healMs: 500,
-    moshText: false,
+    chromaGain: 1.5,
+    holdMs: 500,
+    healMs: 1000,
   };
   pane.addBinding(look, "chromaGain", { min: 0, max: 3 });
   pane.addBinding(look, "holdMs", { min: 0, max: 3000, step: 10 });
   pane.addBinding(look, "healMs", { min: 10, max: 3000, step: 10 });
-  // Also draw the magazine text into the canvas, so it gets moshed.
-  pane.addBinding(look, "moshText").on("change", ({ value }) => {
-    document.body.classList.toggle("mosh-text", value);
-  });
   const vfx = new VFX({ pixelRatio: 1, zIndex: 0, scrollPadding: false });
   await vfx.add(canvas, { effect });
 
@@ -521,7 +511,6 @@
     // Scroll parallax.
     const dy = (scrollY - shown * innerHeight) * -0.08;
     draw(media[shown], dy);
-    if (look.moshText) drawEls(ctx2d, magEls);
     // Pin the shown heading to the screen; it swaps with the video.
     const headDy = -sections[shown].getBoundingClientRect().top;
     // Mosh a copy only while moshing, so the old heading smears.
