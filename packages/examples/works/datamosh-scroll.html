@@ -463,7 +463,7 @@
   pane.addBinding(look, "moshText").on("change", ({ value }) => {
     document.body.classList.toggle("mosh-text", value);
   });
-  const vfx = new VFX({ pixelRatio: 1, zIndex: 0 });
+  const vfx = new VFX({ pixelRatio: 1, zIndex: 0, scrollPadding: false });
   await vfx.add(canvas, { effect });
 
   let shown = 0;
