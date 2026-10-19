@@ -1,5 +1,13 @@
 # react-vfx
 
+## 1.1.1
+
+### Patch Changes
+
+- Updated dependencies [948860f]
+- Updated dependencies
+  - @vfx-js/core@1.2.0
+
 ## 1.1.0
 
 ### Minor Changes

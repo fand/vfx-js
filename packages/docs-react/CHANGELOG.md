@@ -1,5 +1,11 @@
 # docs-react-vfx
 
+## 0.0.14
+
+### Patch Changes
+
+- @vfx-js/react@1.1.1
+
 ## 0.0.13
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # react-vfx
 
+## 1.0.2
+
+### Patch Changes
+
+- @vfx-js/react@1.1.1
+
 ## 1.0.1
 
 ### Patch Changes
