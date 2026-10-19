@@ -313,10 +313,11 @@ export type DatamoshParams = {
     /**
      * Chance per block per frame to refresh from the clean frame (0..1).
      * Ramp up to heal the mosh gradually.
+     * Works with `healThreshold`: a block refreshes if either one hits.
      */
     healRate: number;
     /**
-     * Blocks whose best motion match is worse than this go intra.
+     * Refresh blocks whose best motion match is worse than this.
      * Mean abs diff per channel (0..1); 1 = never.
      */
     healThreshold: number;
