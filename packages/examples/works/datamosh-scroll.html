@@ -380,7 +380,7 @@
   };
 
   // Draw text into the canvas from its DOM layout, so it gets moshed.
-  const headEls = [...document.querySelectorAll(".head *")];
+  const headEls = sections.map((s) => [...s.querySelectorAll(".head *")]);
   const magEls = [...document.querySelectorAll(".mag *")];
   const fill = (color, x, y, w, h) => {
     ctx2d.fillStyle = color;
@@ -415,12 +415,14 @@
     }
     ctx2d.fillText(line, x, y);
   };
-  const drawMosh = (els) => {
+  // dy shifts the DOM layout, e.g. to pin text to the screen.
+  const drawMosh = (els, dy = 0) => {
     ctx2d.textBaseline = "middle";
     ctx2d.shadowColor = "rgba(0, 0, 0, 0.5)";
     ctx2d.shadowBlur = 16;
     for (const el of els) {
-      const r = el.getBoundingClientRect();
+      const { x, y, width, height } = el.getBoundingClientRect();
+      const r = new DOMRect(x, y + dy, width, height);
       if (!r.width || r.bottom < 0 || r.top > innerHeight) continue;
       const cs = getComputedStyle(el);
       ctx2d.globalAlpha = Number(cs.opacity);
@@ -505,7 +507,9 @@
     // Scroll parallax.
     const dy = (scrollY - shown * innerHeight) * -0.08;
     draw(media[shown], dy);
-    drawMosh(look.moshText ? [...magEls, ...headEls] : headEls);
+    if (look.moshText) drawMosh(magEls);
+    // Pin the shown heading to the screen; it swaps with the video.
+    drawMosh(headEls[shown], -sections[shown].getBoundingClientRect().top);
     vfx.update(canvas);
     requestAnimationFrame(loop);
   };
