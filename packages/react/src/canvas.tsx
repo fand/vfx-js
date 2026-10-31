@@ -18,7 +18,8 @@ type VFXCanvasProps = React.PropsWithChildren<
 >;
 
 /**
- * Wraps children in a `<canvas layoutsubtree>` and applies VFX via html-in-canvas.
+ * Wraps children in a `<canvas layoutsubtree content="drawable">` and applies
+ * VFX via html-in-canvas.
  * Falls back to a `<div>` with dom-to-canvas when unsupported.
  */
 export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
@@ -193,9 +194,12 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                 {
                     ...restDomProps,
                     ref: canvasRef,
+                    // Older Chrome reads `layoutsubtree`; 159+ reads
+                    // `content="drawable"` plus `drawable` on the child.
                     layoutsubtree: "",
+                    content: "drawable",
                 },
-                React.createElement("div", null, children),
+                React.createElement("div", { drawable: "" }, children),
             );
         }
 

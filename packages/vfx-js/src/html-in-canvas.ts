@@ -1,4 +1,5 @@
 /// <reference path="./html-in-canvas.d.ts" />
+import { markHicCanvas, redrawNestedCanvases } from "./hic-canvas.js";
 import { getImageSourceUrl } from "./image-source.js";
 
 /**
@@ -112,20 +113,27 @@ export interface CaptureOpts {
 }
 
 const canvasResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
+const paintListeners = new WeakMap<HTMLCanvasElement, (e?: Event) => void>();
 const childResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
 const savedMargins = new WeakMap<HTMLElement, string>();
 const savedWidths = new WeakMap<HTMLElement, string>();
 const savedBoxSizing = new WeakMap<HTMLElement, string>();
 const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
+const addedDrawable = new WeakSet<HTMLElement>();
 
 /**
- * Set up onpaint handler + ResizeObservers on a layoutsubtree canvas.
- * Returns the initial OffscreenCanvas from the first onpaint.
+ * Set up the paint handler + ResizeObservers on an html-in-canvas wrapper
+ * (`<canvas layoutsubtree content="drawable">`). Returns the initial
+ * OffscreenCanvas from the first paint.
  */
 export async function setupCapture(
     canvas: HTMLCanvasElement,
     opts: CaptureOpts,
 ): Promise<OffscreenCanvas> {
+    // Chrome 159+ paints only `content="drawable"` canvases and their
+    // `drawable` children; older Chrome uses `layoutsubtree`.
+    markHicCanvas(canvas, canvas.firstElementChild);
+
     const ctx = canvas.getContext("2d");
     if (!ctx) {
         throw new Error("Failed to get 2d context from layoutsubtree canvas");
@@ -139,14 +147,31 @@ export async function setupCapture(
         resolveFirst = resolve;
     });
 
-    canvas.onpaint = () => {
+    // Chrome fires both `onpaint` and the `paint` event for one paint;
+    // capture once per event.
+    let lastEvent: Event | null = null;
+    const onPaint = (e?: Event) => {
+        if (e) {
+            if (e === lastEvent) {
+                return;
+            }
+            lastEvent = e;
+        }
         const child = canvas.firstElementChild;
         if (!child || canvas.width === 0 || canvas.height === 0) {
             return;
         }
+        if (!child.hasAttribute("drawable")) {
+            child.setAttribute("drawable", "");
+        }
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Returns a DOMMatrix in older Chrome and nothing in newer; unused.
         ctx.drawElementImage(child, 0, 0);
+        // Chrome 156-159 draw nested canvases at the wrong size and clip
+        // them. A probe for this said "no bug" on a real Chrome 156 page
+        // load, so always redraw them.
+        redrawNestedCanvases(ctx, child);
 
         // Copy to OffscreenCanvas (with maxSize clamp)
         let w = canvas.width;
@@ -176,6 +201,9 @@ export async function setupCapture(
         }
         onCapture(offscreen);
     };
+    canvas.onpaint = onPaint;
+    canvas.addEventListener("paint", onPaint);
+    paintListeners.set(canvas, onPaint);
 
     // Pixel buffer sync + re-capture on resize
     const canvasRO = new ResizeObserver((entries) => {
@@ -225,6 +253,11 @@ export async function setupCapture(
  */
 export function teardownCapture(canvas: HTMLCanvasElement): void {
     canvas.onpaint = null;
+    const onPaint = paintListeners.get(canvas);
+    if (onPaint) {
+        canvas.removeEventListener("paint", onPaint);
+        paintListeners.delete(canvas);
+    }
     const canvasRO = canvasResizeObservers.get(canvas);
     if (canvasRO) {
         canvasRO.disconnect();
@@ -243,7 +276,8 @@ interface WrapResult {
 }
 
 /**
- * Wrap an element in a `<canvas layoutsubtree>` for html-in-canvas capture.
+ * Wrap an element in a `<canvas layoutsubtree content="drawable">` for
+ * html-in-canvas capture.
  *
  * CSS identity (class + style) is copied to the canvas so width/height
  * resolve via normal CSS cascade. Canvas is a replaced element — it does
@@ -263,7 +297,10 @@ export async function wrapElement(
     const rect = element.getBoundingClientRect();
 
     const canvas = document.createElement("canvas");
-    canvas.setAttribute("layoutsubtree", "");
+    if (!element.hasAttribute("drawable")) {
+        addedDrawable.add(element);
+    }
+    markHicCanvas(canvas, element);
 
     // Copy CSS identity
     canvas.className = element.className;
@@ -353,6 +390,10 @@ export function unwrapElement(
     // Move element back before canvas, then remove canvas
     canvas.parentNode?.insertBefore(element, canvas);
     canvas.remove();
+    if (addedDrawable.has(element)) {
+        element.removeAttribute("drawable");
+        addedDrawable.delete(element);
+    }
 
     // Restore original styles
     const savedMargin = savedMargins.get(element);
