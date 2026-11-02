@@ -26,7 +26,7 @@ if (supportsHtmlInCanvas()) { ... }
 </VFXCanvas>
 ```
 
-`VFXCanvas` renders `<canvas layoutsubtree ...rest>` directly, preserving user-passed HTML attributes. It calls `setupCapture`/`teardownCapture` internally.
+`VFXCanvas` renders `<canvas layoutsubtree content="drawable" ...rest>` directly, preserving user-passed HTML attributes. It calls `setupCapture`/`teardownCapture` internally.
 
 Falls back to a `<div>` with dom-to-canvas when html-in-canvas is not supported.
 
@@ -76,12 +76,23 @@ Under the hood, the element is captured via the browser's `drawElementImage` API
 
 ### Wrapping
 
-`vfx.addHTML(element, opts)` wraps the element in a `<canvas layoutsubtree>`:
+`vfx.addHTML(element, opts)` wraps the element in a `<canvas layoutsubtree content="drawable">` and marks it `drawable`:
 
 ```
 Before:  <div id="target">...</div>
-After:   <canvas layoutsubtree><div id="target">...</div></canvas>
+After:   <canvas layoutsubtree content="drawable"><div id="target" drawable>...</div></canvas>
 ```
+
+Chrome has used two markups for this:
+
+| Chrome | Wrapper | Child | Paint callback |
+| --- | --- | --- | --- |
+| ≤ 156 | `layoutsubtree` | — | `onpaint` |
+| 159 (Canary) | `content="drawable"` (`layoutsubtree` alone no longer paints) | `drawable` | `onpaint` / `paint` event |
+
+VFX-JS sets all of them and listens to both `onpaint` and the `paint` event (one capture per event), so the same wrapper works in either version. `drawElementImage` returns a `DOMMatrix` in older Chrome and nothing in newer; VFX-JS ignores the return value. Use `isHicCanvas(el)` / `markHicCanvas(canvas, child)` from `@vfx-js/core` if you build the wrapper yourself.
+
+Hit testing: on Chrome 156 clicks reach the wrapper's children only with `chrome://flags/#enable-experimental-web-platform-features`; without it, `elementFromPoint` returns the wrapper canvas. On 159 drawable children are hit-tested without that flag.
 
 The canvas copies the element's CSS identity (class + style attributes) so the cascade resolves its layout box; width follows the [Sizing policy](#sizing-policy). `layoutsubtree` makes children participate in layout (for hit testing, accessibility) but not paint — only the canvas's `onpaint` handler produces visual output.
 
@@ -98,6 +109,26 @@ canvas.onpaint → drawElementImage(child) → copy to OffscreenCanvas → clear
 The final `clearRect` empties the canvas so it appears invisible — no `opacity:0` needed.
 
 Re-capture is triggered by `canvas.requestPaint()`, called from a ResizeObserver on the canvas whenever its dimensions change.
+
+### Nested canvases
+
+`drawElementImage` draws a `<canvas>` inside the wrapper wrongly. This hits 2D and WebGL canvases alike (p5.js, three.js, ...):
+
+- **Chrome 156** draws it at its **buffer** size, 1 buffer px = 1 device px, ignoring its CSS size: a buffer of CSS size × devicePixelRatio looks right, a smaller buffer is drawn too small, a bigger one is cropped.
+- **Chrome 156 and 159** clip it to a buffer-sized box at the **captured element's origin**, not at the canvas's own position. A 640×360 canvas at (320, 212) inside the element keeps only its top-left 320×148 px.
+
+Every capture redraws each visible nested canvas on top, at its layout size and position. (A one-time probe for the bug said "no bug" on a real Chrome 156 page load, so VFX-JS always redraws.)
+
+```
+drawElementImage(child) → for each <canvas> in child: drawImage(canvas, content box × buffer scale)
+```
+
+Limits of the workaround:
+
+- It draws over everything, so elements stacked **above** a canvas (overlays, positioned labels) are hidden by it.
+- A canvas with transparent pixels shows the wrongly sized copy through them.
+- It uses the canvas's bounding box: rotated or skewed canvases, `object-fit`, and ancestors' `overflow` clipping are not respected.
+- Cost: one `drawImage` per visible canvas per capture.
 
 ### Canvas Sizing
 
@@ -130,7 +161,8 @@ The current approach uses per-element wrapper canvases with `drawElementImage` �
 
 ## Limitations
 
-- **Chrome Canary only** — requires `requestPaint`/`onpaint` APIs.
+- **Chrome only, behind a flag** — requires `drawElementImage` and `requestPaint` (Chrome 156 with `chrome://flags/#canvas-draw-element`, or Canary).
+- **Nested canvases** — redrawn by a workaround with the limits above; see [Nested canvases](#nested-canvases).
 - **Content-sized targets unsupported** — the element must fill its container or have an explicit px width; see [Sizing policy](#sizing-policy).
 - **No overlay mode** — `layoutsubtree` hides children visually; `overlay` option is stripped.
 - **Element-type selectors** (`div.foo`) won't match the canvas wrapper. Class selectors (`.foo`) work.

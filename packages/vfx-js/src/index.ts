@@ -4,6 +4,7 @@
  */
 
 export * from "./constants.js";
+export { isHicCanvas, markHicCanvas } from "./hic-canvas.js";
 export type { CaptureOpts } from "./html-in-canvas.js";
 export { setupCapture, teardownCapture } from "./html-in-canvas.js";
 export { supportsHtmlInCanvas } from "./html-in-canvas-support.js";

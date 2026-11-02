@@ -16,6 +16,7 @@ import { Quad } from "./gl/quad.js";
 import { loadImage, Texture, type TextureWrap } from "./gl/texture.js";
 import { Vec2, Vec4 } from "./gl/vec.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
+import { isHicCanvas } from "./hic-canvas.js";
 import { getImageSourceUrl } from "./image-source.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import { ProgramCache } from "./program-cache.js";
@@ -387,7 +388,7 @@ export class VFXPlayer {
             texture = new Texture(this.#ctx, element);
             type = "video" as VFXElementType;
         } else if (element instanceof HTMLCanvasElement) {
-            if (element.hasAttribute("layoutsubtree") && initialCapture) {
+            if (isHicCanvas(element) && initialCapture) {
                 texture = new Texture(this.#ctx, initialCapture);
                 type = "hic" as VFXElementType;
             } else {
@@ -682,7 +683,7 @@ export class VFXPlayer {
             texture = new Texture(this.#ctx, element);
             type = "video" as VFXElementType;
         } else if (element instanceof HTMLCanvasElement) {
-            if (element.hasAttribute("layoutsubtree") && initialCapture) {
+            if (isHicCanvas(element) && initialCapture) {
                 texture = new Texture(this.#ctx, initialCapture);
                 type = "hic" as VFXElementType;
             } else {

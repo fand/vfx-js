@@ -1,3 +1,4 @@
+import { isHicCanvas } from "./hic-canvas.js";
 import { unwrapElement, wrapElement } from "./html-in-canvas.js";
 import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 import {
@@ -98,7 +99,7 @@ export class VFX {
         } else if (element instanceof HTMLVideoElement) {
             await this.#addVideo(element, opts);
         } else if (element instanceof HTMLCanvasElement) {
-            if (element.hasAttribute("layoutsubtree") && initialCapture) {
+            if (isHicCanvas(element) && initialCapture) {
                 await this.#player.addElement(element, opts, initialCapture);
             } else {
                 await this.#addCanvas(element, opts);
@@ -109,7 +110,7 @@ export class VFX {
     }
 
     /**
-     * Update the HIC texture for a layoutsubtree canvas.
+     * Update the HIC texture for an html-in-canvas wrapper canvas.
      * @internal Used by VFXCanvas (@vfx-js/react).
      */
     updateHICTexture(
@@ -130,7 +131,7 @@ export class VFX {
 
     /**
      * Register an element using html-in-canvas API.
-     * Wraps the element in a `<canvas layoutsubtree>` and captures via drawElementImage.
+     * Wraps the element in a `<canvas layoutsubtree content="drawable">` and captures via drawElementImage.
      * Falls back to `add()` if html-in-canvas is not supported.
      */
     async addHTML(element: HTMLElement, opts: VFXProps): Promise<void> {
