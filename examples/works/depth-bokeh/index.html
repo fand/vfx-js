@@ -1,124 +1,13 @@
 <!DOCTYPE html>
-<script type="module" crossorigin src="../../assets/depth-bokeh-DVmSVCR0.js"></script>
-<link rel="modulepreload" crossorigin href="../../assets/modulepreload-polyfill-Dezn_h7o.js">
-<link rel="modulepreload" crossorigin href="../../assets/esm-DeB57fsh.js">
+<script type="module" crossorigin src="../../assets/depth-bokeh-DAjvR9IC.js"></script>
+<link rel="modulepreload" crossorigin href="../../assets/modulepreload-polyfill-P2Xu9kJm.js">
+<link rel="modulepreload" crossorigin href="../../assets/esm-Csj4ixHQ.js">
 
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Depth Bokeh</title>
 
-<style>
-  html,
-  body {
-    height: 100%;
-    margin: 0;
-    background: #0a0a0a;
-    color: #eee;
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  }
-  body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    touch-action: none;
-  }
-  #photo {
-    max-width: 100vw;
-    max-height: 100vh;
-    display: block;
-    user-select: none;
-    -webkit-user-drag: none;
-  }
-  .hint {
-    position: fixed;
-    left: 50%;
-    bottom: 16px;
-    transform: translateX(-50%);
-    font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.7);
-    background: rgba(0, 0, 0, 0.4);
-    padding: 6px 12px;
-    border-radius: 999px;
-    pointer-events: none;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-    z-index: 10001;
-  }
-  .indicator {
-    position: fixed;
-    left: 50%;
-    bottom: 48px;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 8px;
-    pointer-events: none;
-    z-index: 10001;
-  }
-  .indicator .dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    transition: background 180ms;
-  }
-  .indicator .dot.active {
-    background: #fff;
-  }
-  #webcam-overlay {
-    position: fixed;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 12px;
-    z-index: 10001;
-    background: rgba(0, 0, 0, 0.6);
-    color: #eee;
-    text-align: center;
-    padding: 24px;
-    box-sizing: border-box;
-    pointer-events: auto;
-    font-size: 0.9rem;
-    transition: opacity 180ms ease-out;
-  }
-  #webcam-overlay button {
-    appearance: none;
-    border: 0;
-    background: #fff;
-    color: #111;
-    font-size: 0.95rem;
-    font-weight: 600;
-    padding: 10px 20px;
-    border-radius: 999px;
-    cursor: pointer;
-  }
-  #webcam-overlay button:hover {
-    background: #f0f0f0;
-  }
-  #webcam-overlay .bar {
-    width: 220px;
-    height: 6px;
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.2);
-    overflow: hidden;
-  }
-  #webcam-overlay .bar > span {
-    display: block;
-    height: 100%;
-    background: #fff;
-    transition: width 120ms;
-  }
-  #webcam-overlay .label {
-    font-size: 0.8rem;
-    opacity: 0.75;
-    word-break: break-all;
-    max-width: 260px;
-  }
-  #webcam-overlay .err {
-    color: #ffb4b4;
-    max-width: 260px;
-  }
-</style>
+<style>html,body{color:#eee;background:#0a0a0a;height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,Helvetica Neue,sans-serif}body{touch-action:none;justify-content:center;align-items:center;display:flex;overflow:hidden}#photo{-webkit-user-select:none;user-select:none;-webkit-user-drag:none;max-width:100vw;max-height:100vh;display:block}.hint{color:#ffffffb3;pointer-events:none;text-shadow:0 1px 2px #0009;z-index:10001;background:#0006;border-radius:999px;padding:6px 12px;font-size:.85rem;position:fixed;bottom:16px;left:50%;transform:translate(-50%)}.indicator{pointer-events:none;z-index:10001;gap:8px;display:flex;position:fixed;bottom:48px;left:50%;transform:translate(-50%)}.indicator .dot{background:#ffffff4d;border-radius:50%;width:7px;height:7px;transition:background .18s}.indicator .dot.active{background:#fff}#webcam-overlay{z-index:10001;color:#eee;text-align:center;box-sizing:border-box;pointer-events:auto;background:#0009;flex-direction:column;justify-content:center;align-items:center;gap:12px;padding:24px;font-size:.9rem;transition:opacity .18s ease-out;display:none;position:fixed}#webcam-overlay button{appearance:none;color:#111;cursor:pointer;background:#fff;border:0;border-radius:999px;padding:10px 20px;font-size:.95rem;font-weight:600}#webcam-overlay button:hover{background:#f0f0f0}#webcam-overlay .bar{background:#fff3;border-radius:3px;width:220px;height:6px;overflow:hidden}#webcam-overlay .bar>span{background:#fff;height:100%;transition:width .12s;display:block}#webcam-overlay .label{opacity:.75;word-break:break-all;max-width:260px;font-size:.8rem}#webcam-overlay .err{color:#ffb4b4;max-width:260px}</style>
 
 <img id="photo" src="../../assets/img1-BIxrCEQW.png" alt="" />
 <div class="indicator"></div>

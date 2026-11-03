@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";var t;function n(){return(n=e((()=>{t=new URL(`pigeon-ScEf6bli.webp`,import.meta.url).href})))()}export{t as n,n as t};
