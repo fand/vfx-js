@@ -294,6 +294,9 @@ importers:
         specifier: 19.2.7
         version: 19.2.7(react@19.2.7)
     devDependencies:
+      '@biomejs/biome':
+        specifier: 2.4.11
+        version: 2.4.11
       '@chromatic-com/storybook':
         specifier: 5.1.2
         version: 5.1.2(storybook@10.3.5(@testing-library/dom@10.4.0)(prettier@2.8.8)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))

@@ -19,6 +19,7 @@
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.11",
     "@chromatic-com/storybook": "5.1.2",
     "@storybook/addon-docs": "10.3.5",
     "@storybook/html-vite": "10.3.5",
