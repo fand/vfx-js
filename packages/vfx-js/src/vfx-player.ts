@@ -415,7 +415,7 @@ export class VFXPlayer {
 
         // Hide original element
         if (type === "hic") {
-            /* onpaint clears the canvas — no need to hide */
+            /* the wrapper canvas clears itself once captured */
         } else if (opts.overlay === true) {
             /* Overlay mode. Do not hide the element */
         } else if (typeof opts.overlay === "number") {
@@ -709,7 +709,7 @@ export class VFXPlayer {
         const autoCrop = opts.autoCrop ?? true;
 
         if (type === "hic") {
-            /* onpaint clears the canvas */
+            /* the wrapper canvas clears itself once captured */
         } else if (opts.overlay === true) {
             /* overlay mode */
         } else if (typeof opts.overlay === "number") {

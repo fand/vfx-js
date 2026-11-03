@@ -1,5 +1,10 @@
 import { isHicCanvas } from "./hic-canvas.js";
-import { unwrapElement, wrapElement } from "./html-in-canvas.js";
+import {
+    releaseFirstCapture,
+    requestCapture,
+    unwrapElement,
+    wrapElement,
+} from "./html-in-canvas.js";
 import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 import {
     type Effect,
@@ -100,7 +105,7 @@ export class VFX {
             await this.#addVideo(element, opts);
         } else if (element instanceof HTMLCanvasElement) {
             if (isHicCanvas(element) && initialCapture) {
-                await this.#player.addElement(element, opts, initialCapture);
+                await this.#addHICCanvas(element, opts, initialCapture);
             } else {
                 await this.#addCanvas(element, opts);
             }
@@ -164,7 +169,19 @@ export class VFX {
         wrapper = canvas;
         this.#wrapperCanvases.set(element, wrapper);
 
-        await this.#player.addElement(wrapper, hicOpts, initialCapture);
+        await this.#addHICCanvas(wrapper, hicOpts, initialCapture);
+    }
+
+    async #addHICCanvas(
+        canvas: HTMLCanvasElement,
+        opts: VFXProps,
+        initialCapture: OffscreenCanvas,
+    ): Promise<void> {
+        try {
+            await this.#player.addElement(canvas, opts, initialCapture);
+        } finally {
+            releaseFirstCapture(canvas);
+        }
     }
 
     /**
@@ -205,15 +222,19 @@ export class VFX {
      * — call this after changing `img.src` or when responsive image
      * selection changes. Videos refresh automatically (no-op).
      * Otherwise re-snapshots the element's DOM subtree.
+     * For html-in-canvas elements, resolves once the new capture is in
+     * the texture, or after a short timeout.
      *
      * Useful for elements whose contents change (input, textarea, or an
      * `<img>` whose selected source swaps).
      */
     async update(element: HTMLElement): Promise<void> {
         const wrapper = this.#wrapperCanvases.get(element);
-        if (wrapper) {
-            wrapper.requestPaint();
-            return;
+        const hicCanvas =
+            wrapper ?? (element instanceof HTMLCanvasElement ? element : null);
+        const captured = hicCanvas ? requestCapture(hicCanvas) : undefined;
+        if (captured) {
+            return captured;
         }
 
         if (element instanceof HTMLImageElement) {
