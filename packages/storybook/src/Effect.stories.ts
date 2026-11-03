@@ -7,16 +7,14 @@ import {
     BloomEffect,
     ChromaticEffect,
     ColoredEdgesEffect,
-    type DitherStyle,
     DitherEffect,
+    type DitherStyle,
     DuotoneEffect,
-    TilePixelateEffect,
-    type TilePixelateShape,
+    FluidEffect,
+    GlitchEffect,
     GradientMapEffect,
     type GradientMapMixSpace,
     type GradientMapRepeat,
-    FluidEffect,
-    GlitchEffect,
     HalftoneEffect,
     HueShiftEffect,
     JPEGGlitchEffect,
@@ -24,22 +22,24 @@ import {
     ParticleEffect,
     ParticleExplodeEffect,
     PatternRefractionEffect,
-    type RefractionEdgeWrap,
-    type RefractionPattern,
     PixelateEffect,
     PixelSortEffect,
     PixelStretchEffect,
     RainbowEffect,
+    type RefractionEdgeWrap,
+    type RefractionPattern,
     RgbGlitchEffect,
     RgbShiftEffect,
     ScanlineEffect,
     SinewaveEffect,
     SliceShiftEffect,
+    TilePixelateEffect,
+    type TilePixelateShape,
     TritoneEffect,
     VignetteEffect,
     VoronoiEffect,
-    type WarpType,
     WarpEffect,
+    type WarpType,
 } from "@vfx-js/effects";
 import BbbWebm from "./assets/bbb.webm";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -604,7 +604,9 @@ particleExplode.play = async ({ canvasElement }) => {
         // so the burst is reproducible). Cap count for the SwiftShader
         // load budget, matching the Particle story.
         const vfx = initVFX({ autoplay: false });
-        const explode = new ParticleExplodeEffect({ count: VRT_PARTICLE_COUNT });
+        const explode = new ParticleExplodeEffect({
+            count: VRT_PARTICLE_COUNT,
+        });
         await vfx.add(img, { effect: explode });
         await driveVrt(vfx, img, {
             steps: EXPLODE_STEPS,
@@ -1279,7 +1281,9 @@ export const tilePixelate = presetStory<TilePixelateArgs>(
         stretch: { control: { type: "range", min: 0.2, max: 4, step: 0.1 } },
         gap: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         colorTrim: { control: { type: "range", min: 0, max: 8, step: 1 } },
-        averageColor: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        averageColor: {
+            control: { type: "range", min: 0, max: 1, step: 0.01 },
+        },
         dissolve: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         falloff: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         knockout: { control: { type: "boolean" } },
@@ -1336,7 +1340,9 @@ export const patternRefraction = presetStory<PatternRefractionArgs>(
         },
         centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        stripWidth: { control: { type: "range", min: 0.02, max: 1, step: 0.01 } },
+        stripWidth: {
+            control: { type: "range", min: 0.02, max: 1, step: 0.01 },
+        },
         angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
     },
     { clock: false },

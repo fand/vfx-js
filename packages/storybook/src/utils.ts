@@ -39,7 +39,8 @@ export function disposeAllPanes(): void {
 function trackPane(pane: Pane): void {
     // biome-ignore lint/suspicious/noExplicitAny: window-bag access
     const w = window as any;
-    (w.__vfxPanes ??= []).push(pane);
+    w.__vfxPanes ??= [];
+    w.__vfxPanes.push(pane);
 }
 
 export const isChromatic = (): boolean =>

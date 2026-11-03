@@ -1,13 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { Effect } from "@vfx-js/core";
+import { BloomEffect, PixelateEffect, ScanlineEffect } from "@vfx-js/effects";
+import { VFXCanvas, VFXProvider } from "@vfx-js/react";
 import { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { VFXCanvas, VFXProvider } from "@vfx-js/react";
-import {
-    BloomEffect,
-    PixelateEffect,
-    ScanlineEffect,
-} from "@vfx-js/effects";
 import "./preset.css";
 
 export default {

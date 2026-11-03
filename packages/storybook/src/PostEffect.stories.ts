@@ -1,8 +1,7 @@
 import type { Meta } from "@storybook/html-vite";
 import type { VFXPostEffect, VFXProps } from "@vfx-js/core";
-import { Timer } from "./Timer";
-
 import Logo from "./assets/logo-640w-20p.svg";
+import { Timer } from "./Timer";
 import { initVFX } from "./utils";
 import "./preset.css";
 

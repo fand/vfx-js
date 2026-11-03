@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
+import { VFXCanvas, VFXProvider } from "@vfx-js/react";
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { VFXCanvas, VFXProvider } from "@vfx-js/react";
 import { Timer } from "./Timer";
 import { initVFX } from "./utils";
 

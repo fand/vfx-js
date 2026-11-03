@@ -38,7 +38,7 @@ function addReferenceDot(container: HTMLElement, pos: [number, number]) {
 
 const render = (scrollable: boolean, pos: [number, number]): StoryObj => ({
     render: () => {
-        const root = document.getElementById("storybook-root")!;
+        const root = document.getElementById("storybook-root") as HTMLElement;
         root.style.height = "auto";
         root.style.display = "block";
 

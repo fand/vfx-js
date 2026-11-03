@@ -7,7 +7,9 @@
     "dev": "storybook dev -p 6006 --no-open",
     "build": "pnpm run build-storybook",
     "build-storybook": "storybook build -o docs-build",
-    "clean": "rm -rf docs-build"
+    "clean": "rm -rf docs-build",
+    "lint": "biome check src .storybook",
+    "format": "biome check --write src .storybook"
   },
   "dependencies": {
     "@vfx-js/core": "workspace:*",

@@ -1,11 +1,10 @@
-import type { VFXProps, shaders } from "@vfx-js/core";
 import type { Meta } from "@storybook/html-vite";
-import { Timer } from "./Timer";
-
-import { initVFX } from "./utils";
-import Logo from "./assets/logo-640w-20p.svg";
+import type { shaders, VFXProps } from "@vfx-js/core";
 import Jellyfish from "./assets/jellyfish.webp";
+import Logo from "./assets/logo-640w-20p.svg";
 import Pigeon from "./assets/pigeon.webp";
+import { Timer } from "./Timer";
+import { initVFX } from "./utils";
 import "./preset.css";
 
 interface PresetProps {
