@@ -35,7 +35,9 @@ export const decorators = [
             p.dispose?.();
         }
         w.__vfxPanes = [];
-        for (const el of document.querySelectorAll(".vfx-tweakpane-container")) {
+        for (const el of document.querySelectorAll(
+            ".vfx-tweakpane-container",
+        )) {
             el.remove();
         }
 

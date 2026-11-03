@@ -7,16 +7,14 @@ import {
     BloomEffect,
     ChromaticEffect,
     ColoredEdgesEffect,
-    type DitherStyle,
     DitherEffect,
+    type DitherStyle,
     DuotoneEffect,
-    TilePixelateEffect,
-    type TilePixelateShape,
+    FluidEffect,
+    GlitchEffect,
     GradientMapEffect,
     type GradientMapMixSpace,
     type GradientMapRepeat,
-    FluidEffect,
-    GlitchEffect,
     HalftoneEffect,
     HueShiftEffect,
     JPEGGlitchEffect,
@@ -24,22 +22,24 @@ import {
     ParticleEffect,
     ParticleExplodeEffect,
     PatternRefractionEffect,
-    type RefractionEdgeWrap,
-    type RefractionPattern,
     PixelateEffect,
     PixelSortEffect,
     PixelStretchEffect,
     RainbowEffect,
+    type RefractionEdgeWrap,
+    type RefractionPattern,
     RgbGlitchEffect,
     RgbShiftEffect,
     ScanlineEffect,
     SinewaveEffect,
     SliceShiftEffect,
+    TilePixelateEffect,
+    type TilePixelateShape,
     TritoneEffect,
     VignetteEffect,
     VoronoiEffect,
-    type WarpType,
     WarpEffect,
+    type WarpType,
 } from "@vfx-js/effects";
 import BbbWebm from "./assets/bbb.webm";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -56,15 +56,13 @@ import {
     attachPixelSortPane,
     disposeAllPanes,
     initVFX,
+    isChromatic,
 } from "./utils";
 
 export default {
     title: "Effect",
     parameters: { layout: "fullscreen" },
 } satisfies Meta<undefined>;
-
-const isChromatic = (): boolean =>
-    typeof navigator !== "undefined" && /Chromatic/.test(navigator.userAgent);
 
 // Fixed clock time (seconds) used for deterministic VRT snapshots of the
 // clock-driven effects — a representative animated frame, not t=0.
@@ -390,12 +388,12 @@ const VRT_DT = 1 / 60;
 // Fewer steps for the particle sims — each step is a heavy GPU frame
 // under SwiftShader (the Chromatic capture renderer), and the full
 // count drives it past the capture time budget.
-const PARTICLE_VRT_STEPS = 40;
+const PARTICLE_VRT_STEPS = 20;
 const EXPLODE_STEPS = 24;
 // Capture-only particle count. Far below the interactive default so the
 // SwiftShader fill/advect cost stays well within Chromatic's budget; a
-// 128x128 grid still fills a rich, recognizable frame.
-const VRT_PARTICLE_COUNT = 128 * 128;
+// 64x64 grid still fills a recognizable frame.
+const VRT_PARTICLE_COUNT = 64 * 64;
 
 // Deterministic VRT driver for the stateful sims (Fluid, Particle,
 // Particle Explode). Advances the virtual clock by a fixed dt and sweeps
@@ -606,7 +604,9 @@ particleExplode.play = async ({ canvasElement }) => {
         // so the burst is reproducible). Cap count for the SwiftShader
         // load budget, matching the Particle story.
         const vfx = initVFX({ autoplay: false });
-        const explode = new ParticleExplodeEffect({ count: VRT_PARTICLE_COUNT });
+        const explode = new ParticleExplodeEffect({
+            count: VRT_PARTICLE_COUNT,
+        });
         await vfx.add(img, { effect: explode });
         await driveVrt(vfx, img, {
             steps: EXPLODE_STEPS,
@@ -1281,7 +1281,9 @@ export const tilePixelate = presetStory<TilePixelateArgs>(
         stretch: { control: { type: "range", min: 0.2, max: 4, step: 0.1 } },
         gap: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         colorTrim: { control: { type: "range", min: 0, max: 8, step: 1 } },
-        averageColor: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        averageColor: {
+            control: { type: "range", min: 0, max: 1, step: 0.01 },
+        },
         dissolve: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         falloff: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         knockout: { control: { type: "boolean" } },
@@ -1338,7 +1340,9 @@ export const patternRefraction = presetStory<PatternRefractionArgs>(
         },
         centerX: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
         centerY: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        stripWidth: { control: { type: "range", min: 0.02, max: 1, step: 0.01 } },
+        stripWidth: {
+            control: { type: "range", min: 0.02, max: 1, step: 0.01 },
+        },
         angle: { control: { type: "range", min: -180, max: 180, step: 1 } },
     },
     { clock: false },

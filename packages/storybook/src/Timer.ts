@@ -58,7 +58,7 @@ export class Timer {
 
         this.#updateLabel();
 
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: window-bag access
         (window as any).timer = this;
     }
 

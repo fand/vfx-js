@@ -7,7 +7,9 @@
     "dev": "storybook dev -p 6006 --no-open",
     "build": "pnpm run build-storybook",
     "build-storybook": "storybook build -o docs-build",
-    "clean": "rm -rf docs-build"
+    "clean": "rm -rf docs-build",
+    "lint": "biome check src .storybook",
+    "format": "biome check --write src .storybook"
   },
   "dependencies": {
     "@vfx-js/core": "workspace:*",
@@ -17,6 +19,7 @@
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.11",
     "@chromatic-com/storybook": "5.1.2",
     "@storybook/addon-docs": "10.3.5",
     "@storybook/html-vite": "10.3.5",

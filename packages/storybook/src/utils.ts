@@ -39,8 +39,12 @@ export function disposeAllPanes(): void {
 function trackPane(pane: Pane): void {
     // biome-ignore lint/suspicious/noExplicitAny: window-bag access
     const w = window as any;
-    (w.__vfxPanes ??= []).push(pane);
+    w.__vfxPanes ??= [];
+    w.__vfxPanes.push(pane);
 }
+
+export const isChromatic = (): boolean =>
+    typeof navigator !== "undefined" && /Chromatic/.test(navigator.userAgent);
 
 export function initVFX(opts?: VFXOpts): VFX {
     // biome-ignore lint/suspicious/noExplicitAny: window-bag access

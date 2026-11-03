@@ -2,7 +2,7 @@ import type { Meta } from "@storybook/html-vite";
 import Jellyfish from "./assets/jellyfish.webp";
 import Logo from "./assets/logo-640w-20p.svg";
 import { buildFluidPasses } from "./stable-fluid";
-import { initVFX } from "./utils";
+import { initVFX, isChromatic } from "./utils";
 import "./preset.css";
 
 interface FluidArgs {
@@ -116,7 +116,9 @@ function playFluidDemo(
     // Simulate circular mouse motion
     const cx = Math.round(window.innerWidth / 2);
     const cy = Math.round(window.innerHeight / 2);
-    const frames = 100;
+    // SwiftShader (Chromatic capture env) can't run 100 full-canvas
+    // frames within the 30s load budget, so cap the warm-up there.
+    const frames = isChromatic() ? 10 : 100;
 
     for (let i = 0; i < frames; i++) {
         const angle = (i / frames) * Math.PI * 2;

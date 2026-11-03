@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
+
 // import { allModes } from "../.storybook/modes";
 
-import { initVFX } from "./utils";
-import { Timer } from "./Timer";
 import Logo from "./assets/logo-640w-20p.svg";
+import { Timer } from "./Timer";
+import { initVFX } from "./utils";
 import "./preset.css";
 
 export default {
@@ -31,7 +32,7 @@ function addPaddingDebug(container: HTMLElement) {
 
 const render = (opts = {}, scroll = [0, 0]): StoryObj => ({
     render: () => {
-        const root = document.getElementById("storybook-root")!;
+        const root = document.getElementById("storybook-root") as HTMLElement;
         root.style.height = "auto";
         root.style.display = "block";
 
@@ -101,7 +102,7 @@ const renderWithWrapper = (opts = {}): StoryObj => ({
         // by the VFX constructor, so it survives Storybook's root clearing.
         // Extra nesting (body > #storybook-root > wrapper) is unavoidable
         // in Storybook but doesn't affect the test.
-        const root = document.getElementById("storybook-root")!;
+        const root = document.getElementById("storybook-root") as HTMLElement;
         root.style.height = "auto";
         root.style.display = "block";
 
@@ -161,8 +162,6 @@ const renderWithWrapper = (opts = {}): StoryObj => ({
         },
     },
 });
-
-const S = 1000;
 
 // Plain layout
 export const Normal = render();
