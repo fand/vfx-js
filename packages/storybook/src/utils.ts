@@ -42,6 +42,9 @@ function trackPane(pane: Pane): void {
     (w.__vfxPanes ??= []).push(pane);
 }
 
+export const isChromatic = (): boolean =>
+    typeof navigator !== "undefined" && /Chromatic/.test(navigator.userAgent);
+
 export function initVFX(opts?: VFXOpts): VFX {
     // biome-ignore lint/suspicious/noExplicitAny: window-bag access
     const w = window as any;

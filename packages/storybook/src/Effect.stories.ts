@@ -56,15 +56,13 @@ import {
     attachPixelSortPane,
     disposeAllPanes,
     initVFX,
+    isChromatic,
 } from "./utils";
 
 export default {
     title: "Effect",
     parameters: { layout: "fullscreen" },
 } satisfies Meta<undefined>;
-
-const isChromatic = (): boolean =>
-    typeof navigator !== "undefined" && /Chromatic/.test(navigator.userAgent);
 
 // Fixed clock time (seconds) used for deterministic VRT snapshots of the
 // clock-driven effects — a representative animated frame, not t=0.
