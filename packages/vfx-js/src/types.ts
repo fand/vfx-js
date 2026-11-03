@@ -469,6 +469,9 @@ export type VFXElement = {
     backbuffer?: Backbuffer;
     autoCrop: boolean;
 
+    /** Skipped by render while a transition holds its plain content. */
+    frozen?: boolean;
+
     /** Present only for effect-path elements. */
     chain?: EffectChain;
 

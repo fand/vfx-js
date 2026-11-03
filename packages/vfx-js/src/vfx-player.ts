@@ -53,6 +53,18 @@ const gifFor = new Map<HTMLElement, GIFData>();
 /**
  * @internal
  */
+function drawCaptureOnCanvas(
+    canvas: HTMLCanvasElement,
+    capture: OffscreenCanvas,
+): void {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+        return;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(capture, 0, 0, canvas.width, canvas.height);
+}
+
 export class VFXPlayer {
     #opts: VFXOptsInner;
 
@@ -964,6 +976,9 @@ export class VFXPlayer {
         if (e?.type !== "hic") {
             return;
         }
+        if (e.frozen) {
+            drawCaptureOnCanvas(canvas, offscreen);
+        }
 
         const oldTexture = e.srcTexture;
 
@@ -980,6 +995,60 @@ export class VFXPlayer {
             e.srcTexture = texture;
             oldTexture.dispose();
         }
+    }
+
+    /**
+     * Stop rendering the elements inside `root` and show their plain
+     * content. Returns a function that undoes it.
+     */
+    freezeInside(root: HTMLElement): () => void {
+        const frozen: { e: VFXElement; opacity: string }[] = [];
+        for (const e of this.#elements) {
+            if (e.frozen || e.element === root || !root.contains(e.element)) {
+                continue;
+            }
+            e.frozen = true;
+            frozen.push({ e, opacity: e.element.style.opacity });
+            // The capture cannot see the overlay, so show the plain content.
+            if (e.type === "hic") {
+                const source = e.srcTexture.source;
+                if (source instanceof OffscreenCanvas) {
+                    drawCaptureOnCanvas(e.element as HTMLCanvasElement, source);
+                }
+            } else {
+                e.element.style.setProperty(
+                    "opacity",
+                    e.originalOpacity.toString(),
+                );
+            }
+        }
+
+        let done = false;
+        return () => {
+            if (done) {
+                return;
+            }
+            done = true;
+            for (const { e } of frozen) {
+                e.frozen = false;
+            }
+            // Wait a frame so the overlay is back first.
+            requestAnimationFrame(() => {
+                for (const { e, opacity } of frozen) {
+                    if (e.frozen || !this.#elements.includes(e)) {
+                        continue;
+                    }
+                    if (e.type === "hic") {
+                        const canvas = e.element as HTMLCanvasElement;
+                        canvas
+                            .getContext("2d")
+                            ?.clearRect(0, 0, canvas.width, canvas.height);
+                    } else {
+                        e.element.style.opacity = opacity;
+                    }
+                }
+            });
+        };
     }
 
     get maxTextureSize(): number {
@@ -1071,6 +1140,9 @@ export class VFXPlayer {
         }
 
         for (const e of this.#elements) {
+            if (e.frozen) {
+                continue;
+            }
             const domRect = e.element.getBoundingClientRect();
             // text-path texture is captured at ceil dimensions — match the
             // quad so the texture maps 1:1 with no sub-pixel squish.

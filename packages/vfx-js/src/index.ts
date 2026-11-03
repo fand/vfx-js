@@ -8,6 +8,27 @@ export { isHicCanvas, markHicCanvas } from "./hic-canvas.js";
 export type { CaptureOpts } from "./html-in-canvas.js";
 export { setupCapture, teardownCapture } from "./html-in-canvas.js";
 export { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
+export { crossfade } from "./transition/crossfade.js";
+export {
+    TransitionEffect,
+    type TransitionStartOpts,
+} from "./transition/effect.js";
+export {
+    BODY_OFFSET,
+    buildFrag,
+    describeGlslError,
+    PRELUDE,
+} from "./transition/glsl.js";
+export type {
+    AddTransitionOpts,
+    RunOpts,
+    Transition,
+    TransitionDef,
+    TransitionRun,
+    TransitionSpec,
+    TransitionUniforms,
+    TransitionWaitFor,
+} from "./transition/types.js";
 export type {
     Effect,
     EffectAttributeDescriptor,

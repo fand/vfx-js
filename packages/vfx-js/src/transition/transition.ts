@@ -1,0 +1,426 @@
+import type { Effect } from "../types.js";
+import type { VFX } from "../vfx.js";
+import { crossfade } from "./crossfade.js";
+import { TransitionEffect } from "./effect.js";
+import { buildFrag } from "./glsl.js";
+import type {
+    AddTransitionOpts,
+    RunOpts,
+    Transition,
+    TransitionDef,
+    TransitionUniforms,
+} from "./types.js";
+
+const DEFAULT_DURATION = 0.6;
+const MEDIA_TIMEOUT_MS = 1000;
+
+export type ResolvedSpec = {
+    transition: TransitionDef;
+    uniforms: TransitionUniforms;
+    reverse: boolean;
+    duration: number;
+};
+
+/**
+ * Pick the run options, then the named type, then the container defaults.
+ * Uniforms come with the shader from the first level that sets `transition`.
+ */
+export function resolveSpec(
+    opts: AddTransitionOpts,
+    run: RunOpts = {},
+): ResolvedSpec {
+    const typed = run.type !== undefined ? opts.types?.[run.type] : undefined;
+    const shader =
+        [run, typed].find((spec) => spec?.transition !== undefined) ?? opts;
+    return {
+        transition: shader.transition ?? crossfade,
+        uniforms: shader.uniforms ?? {},
+        reverse: run.reverse ?? typed?.reverse ?? opts.reverse ?? false,
+        duration:
+            run.duration ??
+            typed?.duration ??
+            opts.duration ??
+            DEFAULT_DURATION,
+    };
+}
+
+/** Wait for pending images, videos and `fonts`, or until the timeout. */
+export function waitForMedia(
+    root: ParentNode,
+    fonts: Promise<unknown> | undefined,
+    timeoutMs = MEDIA_TIMEOUT_MS,
+): Promise<void> {
+    const pending: Promise<unknown>[] = [];
+    for (const media of root.querySelectorAll<
+        HTMLImageElement | HTMLVideoElement
+    >("img, video")) {
+        const isImage = media.tagName === "IMG";
+        const ready = isImage
+            ? (media as HTMLImageElement).complete
+            : (media as HTMLVideoElement).readyState >= 2;
+        if (!ready) {
+            pending.push(
+                new Promise<void>((resolve) => {
+                    const done = () => resolve();
+                    media.addEventListener(
+                        isImage ? "load" : "loadeddata",
+                        done,
+                        { once: true },
+                    );
+                    media.addEventListener("error", done, { once: true });
+                }),
+            );
+        }
+    }
+    if (fonts) {
+        pending.push(fonts);
+    }
+    if (pending.length === 0) {
+        return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, timeoutMs);
+        const done = () => {
+            clearTimeout(timer);
+            resolve();
+        };
+        Promise.all(pending).then(done, done);
+    });
+}
+
+export type TransitionHost = Pick<
+    VFX,
+    "addHTML" | "update" | "updateEffects" | "remove" | "freezeInside"
+>;
+
+export type TransitionEffectLike = Effect &
+    Pick<TransitionEffect, "snapshot" | "start" | "cancel">;
+
+const nextFrame = () =>
+    new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+function sameEffects(a: readonly Effect[], b: readonly Effect[]): boolean {
+    return a.length === b.length && a.every((e, i) => e === b[i]);
+}
+
+export class TransitionController implements Transition {
+    #vfx: TransitionHost;
+    #element: HTMLElement;
+    #opts: AddTransitionOpts;
+    #effect: TransitionEffectLike;
+    #keepWrapped: boolean;
+    #onDestroy: (() => void) | undefined;
+    #unfreezers: (() => void)[] = [];
+
+    // Each run takes a new id; a run stops at its next await once it is stale.
+    #seq = 0;
+    #runningId: number | null = null;
+    #destroyed = false;
+
+    #wrapped = false;
+    #wrapping: Promise<void> | null = null;
+    #chain: readonly Effect[] = [];
+
+    #driverEffects = new Map<TransitionDef, Promise<Effect[]>>();
+    #loadedDriverEffects: Effect[] = [];
+    #frags = new Map<TransitionDef, string>();
+    // The run that owns the driver effects right now.
+    #active: { id: number; def: TransitionDef; fx: Effect[] } | null = null;
+
+    constructor(
+        vfx: TransitionHost,
+        element: HTMLElement,
+        opts: AddTransitionOpts = {},
+        onDestroy?: () => void,
+        effect: TransitionEffectLike = new TransitionEffect(),
+    ) {
+        this.#onDestroy = onDestroy;
+        this.#vfx = vfx;
+        this.#element = element;
+        this.#opts = opts;
+        this.#effect = effect;
+        this.#keepWrapped =
+            (opts.keepWrapped ?? false) || (opts.effects?.length ?? 0) > 0;
+    }
+
+    get running(): boolean {
+        return this.#runningId !== null;
+    }
+
+    async run(
+        cb: () => void | Promise<void>,
+        opts: RunOpts = {},
+    ): Promise<void> {
+        if (this.#destroyed) {
+            await cb();
+            return;
+        }
+        const id = ++this.#seq;
+        this.#runningId = id;
+        try {
+            await this.#run(id, cb, opts);
+        } finally {
+            if (this.#runningId === id) {
+                this.#runningId = null;
+            }
+            if (this.#seq === id) {
+                this.#unfreeze();
+            }
+        }
+    }
+
+    async #run(
+        id: number,
+        cb: () => void | Promise<void>,
+        opts: RunOpts,
+    ): Promise<void> {
+        const isCurrent = () => id === this.#seq;
+        // A stale run still applies its DOM change, just without animating.
+        let called = false;
+        const update = async () => {
+            if (!called) {
+                called = true;
+                await cb();
+            }
+        };
+
+        const spec = resolveSpec(this.#opts, opts);
+        const def = spec.transition;
+        let fx: Effect[] | null = null;
+        if (spec.duration > 0) {
+            try {
+                fx = await this.#ensureDriverEffects(def);
+            } catch (err) {
+                console.error(
+                    `[VFX-JS] transition "${def.name}" effects failed; cutting to the new content.`,
+                    err,
+                );
+            }
+            if (!isCurrent()) {
+                return update();
+            }
+        }
+
+        if (fx === null) {
+            this.#endActive();
+            this.#effect.cancel();
+            await update();
+            if (isCurrent()) {
+                if (this.#wrapped && this.#keepWrapped) {
+                    await this.#vfx.update(this.#element);
+                }
+                this.#releaseWrap(id);
+            }
+            return;
+        }
+
+        this.#freeze();
+        try {
+            await this.#ensureWrapped();
+        } catch (err) {
+            console.error(
+                "[VFX-JS] transition failed to wrap the element; cutting to the new content.",
+                err,
+            );
+            return update();
+        }
+        if (!isCurrent()) {
+            return update();
+        }
+        await this.#effect.snapshot();
+        if (!isCurrent()) {
+            return update();
+        }
+
+        this.#endActive();
+        if (fx.length > 0 || def.prepare) {
+            this.#active = { id, def, fx };
+            def.prepare?.(
+                {
+                    reverse: spec.reverse,
+                    uniforms: spec.uniforms,
+                    duration: spec.duration,
+                },
+                fx,
+            );
+        }
+
+        try {
+            await update();
+        } catch (err) {
+            if (isCurrent()) {
+                this.#endActive();
+                this.#effect.cancel();
+                this.#releaseWrap(id);
+            }
+            throw err;
+        }
+        if (!isCurrent()) {
+            return;
+        }
+        // New content may bring its own VFX elements.
+        this.#freeze();
+        try {
+            await this.#waitFor();
+        } catch (err) {
+            console.error("[VFX-JS] transition waitFor failed:", err);
+        }
+        if (!isCurrent()) {
+            return;
+        }
+        await this.#vfx.update(this.#element);
+        if (!isCurrent()) {
+            return;
+        }
+        await nextFrame();
+        if (!isCurrent()) {
+            return;
+        }
+
+        const driverFx = fx;
+        await this.#effect.start({
+            name: def.name,
+            frag: this.#fragOf(def),
+            uniforms: spec.uniforms,
+            duration: spec.duration,
+            reverse: spec.reverse,
+            onFrame: def.onFrame
+                ? (t, x, dt) => def.onFrame?.(t, x, dt, driverFx)
+                : undefined,
+            onEnd: () => this.#endActive(id),
+        });
+        if (isCurrent()) {
+            this.#releaseWrap(id);
+        }
+    }
+
+    cancel(): void {
+        const id = ++this.#seq;
+        this.#runningId = null;
+        this.#endActive();
+        this.#effect.cancel();
+        this.#unfreeze();
+        this.#releaseWrap(id);
+    }
+
+    destroy(): void {
+        if (this.#destroyed) {
+            return;
+        }
+        this.#destroyed = true;
+        this.cancel();
+        // The chain disposes the driver effects when the element is removed.
+        this.#driverEffects.clear();
+        this.#loadedDriverEffects = [];
+        this.#onDestroy?.();
+    }
+
+    #freeze(): void {
+        this.#unfreezers.push(this.#vfx.freezeInside(this.#element));
+    }
+
+    #unfreeze(): void {
+        const unfreezers = this.#unfreezers;
+        this.#unfreezers = [];
+        for (const unfreeze of unfreezers) {
+            unfreeze();
+        }
+    }
+
+    #fragOf(def: TransitionDef): string {
+        let frag = this.#frags.get(def);
+        if (!frag) {
+            frag = buildFrag(def.frag);
+            this.#frags.set(def, frag);
+        }
+        return frag;
+    }
+
+    #ensureDriverEffects(def: TransitionDef): Promise<Effect[]> {
+        let fx = this.#driverEffects.get(def);
+        if (!fx) {
+            fx = (def.effects ? def.effects() : Promise.resolve([])).then(
+                (created) => {
+                    this.#loadedDriverEffects.push(...created);
+                    return created;
+                },
+                (err) => {
+                    this.#driverEffects.delete(def);
+                    throw err;
+                },
+            );
+            this.#driverEffects.set(def, fx);
+        }
+        return fx;
+    }
+
+    #endActive(id?: number): void {
+        const active = this.#active;
+        if (active && (id === undefined || active.id === id)) {
+            this.#active = null;
+            active.def.onEnd?.(active.fx);
+        }
+    }
+
+    // Wrap the element, or sync the chain and take a fresh capture.
+    async #ensureWrapped(): Promise<void> {
+        if (this.#wrapping) {
+            await this.#wrapping;
+        }
+        const chain = [
+            this.#effect,
+            ...this.#loadedDriverEffects,
+            ...(this.#opts.effects ?? []),
+        ];
+        if (!this.#wrapped) {
+            const wrapping = this.#vfx
+                .addHTML(this.#element, { effect: chain })
+                .then(() => {
+                    this.#wrapped = true;
+                    this.#chain = chain;
+                })
+                .finally(() => {
+                    this.#wrapping = null;
+                });
+            this.#wrapping = wrapping;
+            await wrapping;
+            return;
+        }
+        if (!sameEffects(chain, this.#chain)) {
+            this.#chain = chain;
+            await this.#vfx.updateEffects(this.#element, chain);
+        }
+        await this.#vfx.update(this.#element);
+    }
+
+    // Unwrap once any pending wrap lands, unless a newer run took over.
+    #releaseWrap(id: number): void {
+        if (this.#keepWrapped && !this.#destroyed) {
+            return;
+        }
+        const unwrap = () => {
+            if (id !== this.#seq || !this.#wrapped) {
+                return;
+            }
+            this.#wrapped = false;
+            this.#chain = [];
+            this.#vfx.remove(this.#element);
+        };
+        if (this.#wrapping) {
+            this.#wrapping.then(unwrap, () => {});
+        } else {
+            unwrap();
+        }
+    }
+
+    #waitFor(): Promise<void> {
+        const waitFor = this.#opts.waitFor ?? "media";
+        if (waitFor === "none") {
+            return Promise.resolve();
+        }
+        if (waitFor === "media") {
+            return waitForMedia(this.#element, document.fonts?.ready);
+        }
+        return waitFor(this.#element);
+    }
+}

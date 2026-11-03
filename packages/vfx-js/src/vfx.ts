@@ -6,6 +6,8 @@ import {
     wrapElement,
 } from "./html-in-canvas.js";
 import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
+import { TransitionController } from "./transition/transition.js";
+import type { AddTransitionOpts, Transition } from "./transition/types.js";
 import {
     type Effect,
     getVFXOpts,
@@ -45,6 +47,7 @@ export class VFX {
     #player: VFXPlayer;
     #canvas: HTMLCanvasElement;
     #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
+    #transitions = new Set<Transition>();
 
     /**
      * Create a VFX instance if WebGL is available, or return `null`.
@@ -182,6 +185,35 @@ export class VFX {
         } finally {
             releaseFirstCapture(canvas);
         }
+    }
+
+    /**
+     * Animate an element from its old content to its new content with a
+     * shader. The element is wrapped only while a run is in flight.
+     *
+     * ```ts
+     * const t = vfx.addTransition(main, { duration: 0.6 });
+     * await t.run(() => renderNextPage());
+     * ```
+     */
+    addTransition(
+        element: HTMLElement,
+        opts: AddTransitionOpts = {},
+    ): Transition {
+        const transition = new TransitionController(this, element, opts, () =>
+            this.#transitions.delete(transition),
+        );
+        this.#transitions.add(transition);
+        return transition;
+    }
+
+    /**
+     * Stop rendering VFX elements inside `root` and show their plain
+     * content. Returns a function that undoes it.
+     * @internal Used by transitions.
+     */
+    freezeInside(root: HTMLElement): () => void {
+        return this.#player.freezeInside(root);
     }
 
     /**
@@ -324,6 +356,11 @@ export class VFX {
      * Destroy VFX and stop rendering.
      */
     destroy(): void {
+        for (const transition of this.#transitions) {
+            transition.destroy();
+        }
+        this.#transitions.clear();
+
         for (const [element, wrapper] of this.#wrapperCanvases) {
             unwrapElement(wrapper, element);
         }
