@@ -227,3 +227,105 @@ export const StableFluidElement = {
         layout: "fullscreen",
     },
 };
+
+const toBuffer = `
+vec2 toBuffer(vec2 uv) {
+    return (uv * resolution + (offset - viewport.xy)) / viewport.zw;
+}
+`;
+
+const copyShader = `
+precision highp float;
+uniform sampler2D src;
+uniform vec2 resolution;
+uniform vec2 offset;
+out vec4 outColor;
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    // The element texture has nothing outside 0..1
+    vec2 inside = step(vec2(0.0), uv) * step(uv, vec2(1.0));
+    outColor = texture(src, uv) * inside.x * inside.y;
+}
+`;
+
+const glowShader = `
+precision highp float;
+uniform sampler2D original;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform vec4 viewport;
+out vec4 outColor;
+${toBuffer}
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    vec2 texel = 4.0 / resolution;
+
+    vec4 c = vec4(0.0);
+    for (int x = -4; x <= 4; x++) {
+        for (int y = -4; y <= 4; y++) {
+            c += texture(original, toBuffer(uv + vec2(x, y) * texel));
+        }
+    }
+    outColor = c / 81.0;
+}
+`;
+
+const compositeShader = `
+precision highp float;
+uniform sampler2D original;
+uniform sampler2D glow;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform vec4 viewport;
+out vec4 outColor;
+${toBuffer}
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    vec4 base = texture(original, toBuffer(uv));
+    vec4 g = texture(glow, toBuffer(uv));
+    outColor = base + g * (1.0 - base.a);
+}
+`;
+
+const glowPasses = [
+    { frag: copyShader, target: "original" },
+    { frag: glowShader, target: "glow" },
+    { frag: compositeShader },
+];
+
+async function playGlowBleed(
+    canvasElement: HTMLElement,
+    overflow: number | true,
+) {
+    const img = canvasElement.querySelector("img") as HTMLImageElement;
+    await new Promise((o) => {
+        img.onload = o;
+    });
+
+    const vfx = initVFX({ autoplay: false });
+    await vfx.add(img, { shader: glowPasses, overflow });
+    vfx.render();
+}
+
+export const GlowBleedOverflow = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Logo;
+        return img;
+    },
+    play: ({ canvasElement }: { canvasElement: HTMLElement }) =>
+        playGlowBleed(canvasElement, 40),
+};
+
+export const GlowBleedFullscreen = {
+    render: () => {
+        const img = document.createElement("img");
+        img.src = Logo;
+        return img;
+    },
+    play: ({ canvasElement }: { canvasElement: HTMLElement }) =>
+        playGlowBleed(canvasElement, true),
+};
