@@ -12,17 +12,17 @@
     "dependencies": {
         "@vfx-js/core": "workspace:*",
         "@vfx-js/effects": "workspace:*",
-        "react": "19.2.5",
-        "react-dom": "19.2.5",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
         "tweakpane": "4.0.5"
     },
     "devDependencies": {
-        "@biomejs/biome": "2.4.11",
-        "@types/node": "24.12.2",
-        "@types/react": "19.2.14",
-        "@types/react-dom": "19.2.3",
-        "@vitejs/plugin-react": "6.0.1",
-        "typescript": "6.0.2",
-        "vite": "8.0.16"
+        "@biomejs/biome": "2.6.3",
+        "@types/node": "26.6.5",
+        "@types/react": "19.3.0",
+        "@types/react-dom": "19.3.0",
+        "@vitejs/plugin-react": "6.1.2",
+        "typescript": "6.0.3",
+        "vite": "8.3.5"
     }
 }

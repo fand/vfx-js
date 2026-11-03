@@ -105,6 +105,6 @@ export class Timer {
     };
 
     #updateLabel() {
-        this.#labelEl.innerText = `Time: ${this.#time.toFixed(1)} / ${this.#range[1]}`;
+        this.#labelEl.textContent = `Time: ${this.#time.toFixed(1)} / ${this.#range[1]}`;
     }
 }
