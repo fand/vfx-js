@@ -21,6 +21,15 @@ export type VFXTextureFormat = "RGBA" | "Float";
  * referenced as a `sampler2D` uniform in subsequent passes.
  * The last pass in the array renders to the screen.
  *
+ * Every pass gets `resolution` = element size and `offset` = element origin
+ * inside the render target, both in physical pixels.
+ * So `uv = (gl_FragCoord.xy - offset) / resolution` is element space.
+ * `viewport` is the render target rect `(x, y, w, h)` in physical pixels.
+ *
+ * With `overflow`, buffers VFX-JS renders (`<target>`, `backbuffer`, and
+ * `src` after the first pass) cover the whole buffer.
+ * Read them with `(uv * resolution + offset - viewport.xy) / viewport.zw`.
+ *
  * Note: auto-bind matches only `uniform sampler2D <name>;` declarations.
  * `isampler2D` / `usampler2D` are not supported yet.
  */
@@ -59,6 +68,7 @@ export type VFXPass = {
      * Render target size in pixels `[width, height]`.
      * When set, the backbuffer and intermediate buffer are created at this
      * fixed size instead of the viewport resolution.
+     * This pass uses the whole buffer: `resolution` = `size`, `offset` = 0.
      */
     size?: [number, number];
 
@@ -489,8 +499,8 @@ export type VFXPostEffect = {
      * Standard uniforms available:
      * - `sampler2D src`: The input texture (rendered canvas)
      * - `vec2 resolution`: Canvas resolution in pixels
-     * - `vec2 offset`: Offset values
-     * - `vec4 viewport`: Viewport information
+     * - `vec2 offset`: Element origin inside the render target in physical pixels (0 for post effects)
+     * - `vec4 viewport`: Render target rect `(x, y, w, h)` in physical pixels
      * - `float time`: Time in seconds since VFX started
      * - `vec2 mouse`: Mouse position in pixels
      * - `sampler2D backbuffer`: Previous frame texture (if persistent is enabled)

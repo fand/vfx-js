@@ -34,9 +34,9 @@ One coordinate rule for every pass and mode:
 
 Texture spaces:
 
-- `src` is element space (0..1 = element).
-- Render targets VFX-JS owns (`<target>` buffers, `backbuffer`) are buffer
-  space (0..1 = whole buffer). Read them with:
+- `src` in the first pass is the element texture: element space (0..1 = element).
+- Render targets VFX-JS owns (`<target>` buffers, `backbuffer`, and `src`
+  after the first pass) are buffer space (0..1 = whole buffer). Read them with:
 
 ```glsl
 vec2 toBuffer(vec2 uv) {
@@ -53,7 +53,8 @@ No new uniforms. Buffer sizes, resize logic, and the final pass stay as-is.
 ## Compatibility
 
 Only chains using `shader: VFXPass[]` together with `overflow` or fullscreen
-change. Nothing in this repo does that (docs `initMultipass` has no overflow;
+change. This includes pass-through chains: a later pass reading `src` with
+plain `uv` now sees the previous buffer squeezed into the element. Nothing in this repo does that (docs `initMultipass` has no overflow;
 `@vfx-js/effects` uses the effect path, which ignores `overflow`).
 
 Migration for affected user shaders, pick one:

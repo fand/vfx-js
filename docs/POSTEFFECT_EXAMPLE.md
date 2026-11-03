@@ -75,8 +75,8 @@ The post effect shader automatically receives these uniforms:
 
 - `sampler2D src`: The rendered canvas texture
 - `vec2 resolution`: Canvas resolution in pixels
-- `vec2 offset`: Offset values
-- `vec4 viewport`: Viewport information  
+- `vec2 offset`: Element origin inside the render target in physical pixels (0 for post effects)
+- `vec4 viewport`: Render target rect `(x, y, w, h)` in physical pixels
 - `float time`: Time in seconds since VFX started
 - `vec2 mouse`: Mouse position in pixels
 
