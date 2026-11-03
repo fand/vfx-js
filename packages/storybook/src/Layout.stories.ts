@@ -142,7 +142,7 @@ const zIndexBase = ({ zIndex, fgZIndex }: ZIndexProps) => {
 
     const z0 = document.createElement("div");
     z0.className = "fg";
-    z0.innerText = "Hello";
+    z0.textContent = "Hello";
     z0.style.zIndex = fgZIndex.toString();
     wrapper.appendChild(z0);
 

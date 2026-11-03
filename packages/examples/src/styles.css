@@ -206,6 +206,12 @@ body {
 .vf-foot-link:hover {
     color: #fff;
 }
+.vf-coord {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    color: inherit;
+    letter-spacing: 0.1em;
+}
 .vf-foot-link:hover .vf-coord {
     background: linear-gradient(
         90deg,
@@ -234,12 +240,6 @@ body {
 }
 .vf-gh:hover {
     color: #fff;
-}
-.vf-coord {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 10px;
-    color: inherit;
-    letter-spacing: 0.1em;
 }
 .vf-main {
     display: grid;

@@ -921,7 +921,7 @@ export class VFXPlayer {
      */
     async updateImageElement(element: HTMLImageElement): Promise<void> {
         const e = this.#elements.find((e) => e.element === element);
-        if (!e || e.type !== "img" || e.isGif) {
+        if (e?.type !== "img" || e.isGif) {
             return;
         }
 
@@ -961,7 +961,7 @@ export class VFXPlayer {
         offscreen: OffscreenCanvas,
     ): void {
         const e = this.#elements.find((e) => e.element === canvas);
-        if (!e || e.type !== "hic") {
+        if (e?.type !== "hic") {
             return;
         }
 

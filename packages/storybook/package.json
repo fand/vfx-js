@@ -15,17 +15,17 @@
     "@vfx-js/core": "workspace:*",
     "@vfx-js/effects": "workspace:*",
     "@vfx-js/react": "workspace:*",
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.11",
-    "@chromatic-com/storybook": "5.1.2",
-    "@storybook/addon-docs": "10.3.5",
-    "@storybook/html-vite": "10.3.5",
+    "@biomejs/biome": "2.6.3",
+    "@chromatic-com/storybook": "5.6.0",
+    "@storybook/addon-docs": "10.6.4",
+    "@storybook/html-vite": "10.6.4",
     "@tweakpane/core": "2.0.5",
-    "@types/node": "24.12.2",
-    "storybook": "10.3.5",
+    "@types/node": "26.6.5",
+    "storybook": "10.6.4",
     "tweakpane": "4.0.5"
   },
   "overrides": {
