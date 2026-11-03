@@ -10,3 +10,25 @@ export const VFXDiv = VFXElementFactory<"div">("div");
 export const VFXP = VFXElementFactory<"p">("p");
 
 export * from "./hooks.js";
+
+export {
+    VFXTransitionContext,
+    type VFXTransitionContextValue,
+} from "./transition/context.js";
+export { watchNavigationDirection } from "./transition/direction.js";
+export {
+    markBackNavigation,
+    setNextTransition,
+    takePending,
+    transition,
+} from "./transition/store.js";
+export {
+    type UseVFXTransition,
+    useVFXTransition,
+} from "./transition/useVFXTransition.js";
+export { useVFXTransitionSpec } from "./transition/useVFXTransitionSpec.js";
+export { VFXLink, type VFXLinkProps } from "./transition/VFXLink.js";
+export {
+    VFXTransition,
+    type VFXTransitionProps,
+} from "./transition/VFXTransition.js";
