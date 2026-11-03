@@ -388,12 +388,12 @@ const VRT_DT = 1 / 60;
 // Fewer steps for the particle sims — each step is a heavy GPU frame
 // under SwiftShader (the Chromatic capture renderer), and the full
 // count drives it past the capture time budget.
-const PARTICLE_VRT_STEPS = 40;
+const PARTICLE_VRT_STEPS = 20;
 const EXPLODE_STEPS = 24;
 // Capture-only particle count. Far below the interactive default so the
 // SwiftShader fill/advect cost stays well within Chromatic's budget; a
-// 128x128 grid still fills a rich, recognizable frame.
-const VRT_PARTICLE_COUNT = 128 * 128;
+// 64x64 grid still fills a recognizable frame.
+const VRT_PARTICLE_COUNT = 64 * 64;
 
 // Deterministic VRT driver for the stateful sims (Fluid, Particle,
 // Particle Explode). Advances the virtual clock by a fixed dt and sweeps
