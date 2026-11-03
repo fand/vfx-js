@@ -1,4 +1,4 @@
-import{i as e}from"./preload-helper-xPQekRTU.js";import{d as t,f as n}from"./utils-CtLogj3O.js";import{n as r,t as i}from"./logo-640w-20p-CDp-4Bv5.js";import{t as a}from"./preset-_bwWmH2a.js";import{n as o,t as s}from"./jellyfish-CWg8JMTu.js";function c(e){return`
+import{i as e}from"./preload-helper-xPQekRTU.js";import{n as t,t as n}from"./logo-640w-20p-CDp-4Bv5.js";import{d as r,f as i,p as a}from"./utils-DQN2J993.js";import{t as o}from"./preset-_bwWmH2a.js";import{n as s,t as c}from"./jellyfish-CWg8JMTu.js";function l(e){return`
 precision highp float;
 uniform sampler2D vort_vel;
 uniform sampler2D ${e};
@@ -16,7 +16,7 @@ void main() {
     vel -= vec2(R - L, T - B);
     outColor = vec4(vel, 0.0, 1.0);
 }
-`}function l(e,t){let n=[];n.push({frag:h,target:`p_a`,float:!0,size:e});let r=`p_a`;for(let i=0;i<t;i++)r=i%2==0?`p_b`:`p_a`,n.push({frag:g,target:r,float:!0,size:e});return{passes:n,lastTarget:r}}function u(e){let{simSize:t,mouseDelta:n}=e,r=l(t,e.pressureIterations);return[{frag:d,target:`canvas`},{frag:f,target:`curl`,float:!0,size:t},{frag:p,target:`vort_vel`,float:!0,size:t,uniforms:{mouseDelta:n,curlStrength:e.curlStrength,splatForce:e.splatForce,splatRadius:e.splatRadius}},{frag:m,target:`divergence`,float:!0,size:t},...r.passes,{frag:c(r.lastTarget),target:`proj_vel`,float:!0,size:t},{frag:_,target:`velocity`,persistent:!0,float:!0,size:t,uniforms:{velocityDissipation:e.velocityDissipation}},{frag:v,target:`dye`,persistent:!0,float:!0,uniforms:{mouseDelta:n,time:e.time,simSize:t,densityDissipation:e.densityDissipation,dyeSplatRadius:e.dyeSplatRadius,dyeSplatIntensity:e.dyeSplatIntensity}},{frag:y,uniforms:{showDye:+!!e.showDye,time:e.time,simSize:t}}]}var d,f,p,m,h,g,_,v,y,b=e((()=>{d=`
+`}function u(e,t){let n=[];n.push({frag:g,target:`p_a`,float:!0,size:e});let r=`p_a`;for(let i=0;i<t;i++)r=i%2==0?`p_b`:`p_a`,n.push({frag:_,target:r,float:!0,size:e});return{passes:n,lastTarget:r}}function d(e){let{simSize:t,mouseDelta:n}=e,r=u(t,e.pressureIterations);return[{frag:f,target:`canvas`},{frag:p,target:`curl`,float:!0,size:t},{frag:m,target:`vort_vel`,float:!0,size:t,uniforms:{mouseDelta:n,curlStrength:e.curlStrength,splatForce:e.splatForce,splatRadius:e.splatRadius}},{frag:h,target:`divergence`,float:!0,size:t},...r.passes,{frag:l(r.lastTarget),target:`proj_vel`,float:!0,size:t},{frag:v,target:`velocity`,persistent:!0,float:!0,size:t,uniforms:{velocityDissipation:e.velocityDissipation}},{frag:y,target:`dye`,persistent:!0,float:!0,uniforms:{mouseDelta:n,time:e.time,simSize:t,densityDissipation:e.densityDissipation,dyeSplatRadius:e.dyeSplatRadius,dyeSplatIntensity:e.dyeSplatIntensity}},{frag:b,uniforms:{showDye:+!!e.showDye,time:e.time,simSize:t}}]}var f,p,m,h,g,_,v,y,b,x=e((()=>{f=`
 precision highp float;
 uniform sampler2D src;
 uniform vec2 resolution;
@@ -26,7 +26,7 @@ void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     outColor = texture(src, uv);
 }
-`,f=`
+`,p=`
 precision highp float;
 uniform sampler2D velocity;
 uniform vec2 resolution;
@@ -41,7 +41,7 @@ void main() {
     float B = texture(velocity, uv - vec2(0.0, t.y)).x;
     outColor = vec4(0.5 * (R - L - T + B), 0.0, 0.0, 1.0);
 }
-`,p=`
+`,m=`
 precision highp float;
 uniform sampler2D velocity;
 uniform sampler2D curl;
@@ -86,7 +86,7 @@ void main() {
 
     outColor = vec4(vel, 0.0, 1.0);
 }
-`,m=`
+`,h=`
 precision highp float;
 uniform sampler2D vort_vel;
 uniform vec2 resolution;
@@ -107,11 +107,11 @@ void main() {
     if (uv.y - t.y < 0.0) B = -C.y;
     outColor = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
 }
-`,h=`
+`,g=`
 precision highp float;
 out vec4 outColor;
 void main() { outColor = vec4(0.0); }
-`,g=`
+`,_=`
 precision highp float;
 uniform sampler2D src;
 uniform sampler2D divergence;
@@ -128,7 +128,7 @@ void main() {
     float div = texture(divergence, uv).x;
     outColor = vec4((L + R + B + T - div) * 0.25, 0.0, 0.0, 1.0);
 }
-`,_=`
+`,v=`
 precision highp float;
 uniform sampler2D proj_vel;
 uniform vec2 resolution;
@@ -144,7 +144,7 @@ void main() {
     advected /= 1.0 + velocityDissipation * 0.016;
     outColor = vec4(advected, 0.0, 1.0);
 }
-`,v=`
+`,y=`
 precision highp float;
 uniform sampler2D velocity;
 uniform sampler2D dye;
@@ -188,7 +188,7 @@ void main() {
 
     outColor = vec4(max(d, vec3(0.0)), 1.0);
 }
-`,y=`
+`,b=`
 precision highp float;
 uniform sampler2D dye;
 uniform sampler2D velocity;
@@ -224,11 +224,11 @@ void main() {
         outColor += vec4(spectrum(sin(v * 3. + time) * 0.4 + 0.5), 1) * smoothstep(.2, .8, v) * 0.2;
     }
 }
-`}));function x(e){let t=0,n=0,r=0,i=()=>[n,r],a=e.simResolution,o=window.innerWidth/window.innerHeight;return{passes:u({simSize:o>1?[Math.round(a*o),a]:[a,Math.round(a/o)],mouseDelta:i,time:()=>t,pressureIterations:e.pressureIterations,curlStrength:e.curlStrength,velocityDissipation:e.velocityDissipation,densityDissipation:e.densityDissipation,splatForce:e.splatForce,splatRadius:e.splatRadius,dyeSplatRadius:e.dyeSplatRadius,dyeSplatIntensity:e.dyeSplatIntensity,showDye:e.showDye}),getTime:()=>t,setTime:e=>{t=e},setDelta:(e,t)=>{n=e,r=t}}}function S(e,t,n){let r=Math.round(window.innerWidth/2),i=Math.round(window.innerHeight/2);for(let e=0;e<100;e++){let a=e/100*Math.PI*2;n.setDelta(Math.cos(a)*15,Math.sin(a)*15),window.dispatchEvent(new MouseEvent(`pointermove`,{clientX:r+Math.cos(a)*100,clientY:i-Math.sin(a)*100})),n.setTime(e*.016),t.render()}e.addEventListener(`click`,()=>{let e=-1,r=-1,i;window.addEventListener(`pointermove`,t=>{let a=t.clientX,o=window.innerHeight-t.clientY;e>=0&&n.setDelta(a-e,o-r),e=a,r=o,clearTimeout(i),i=window.setTimeout(()=>n.setDelta(0,0),50)}),t.play()},{once:!0})}async function C(e,n){let r=e.querySelector(`img`);await new Promise(e=>{r.onload=e});let i=t({autoplay:!1});await i.add(r,{shader:N,overflow:n}),i.render()}var w,T,E,D,O,k,A,j,M,N,P,F,I;e((()=>{s(),i(),b(),n(),a(),w={simResolution:{control:{type:`range`,min:32,max:512,step:32}},pressureIterations:{control:{type:`range`,min:1,max:40,step:1}},curlStrength:{control:{type:`range`,min:0,max:100,step:1}},velocityDissipation:{control:{type:`range`,min:0,max:5,step:.05}},densityDissipation:{control:{type:`range`,min:0,max:5,step:.05}},splatForce:{control:{type:`range`,min:100,max:2e4,step:100}},splatRadius:{control:{type:`range`,min:1e-4,max:.01,step:1e-4}},dyeSplatRadius:{control:{type:`range`,min:1e-4,max:.01,step:1e-4}},dyeSplatIntensity:{control:{type:`range`,min:.001,max:.03,step:.001}},showDye:{control:`boolean`}},T={simResolution:128,pressureIterations:1,curlStrength:13,velocityDissipation:.6,densityDissipation:.65,splatForce:6e3,splatRadius:.002,dyeSplatRadius:.001,dyeSplatIntensity:.005,showDye:!1},E={title:`Multipass`,parameters:{layout:`fullscreen`}},D={args:{...T},argTypes:w,render:()=>{let e=document.createElement(`img`);return e.src=r,e},play:async({canvasElement:e,args:n})=>{let r=e.querySelector(`img`);await new Promise(e=>{r.onload=e});let i=x(n),a=t({autoplay:!1,postEffect:i.passes});await a.add(r,{shader:`uvGradient`}),S(e,a,i)},parameters:{layout:`fullscreen`}},O={args:{...T},argTypes:w,render:()=>{let e=document.createElement(`img`);return e.src=o,e},play:async({canvasElement:e,args:n})=>{let r=e.querySelector(`img`);await new Promise(e=>{r.onload=e});let i=x(n),a=t({autoplay:!1});await a.add(r,{shader:i.passes}),S(e,a,i)},parameters:{layout:`fullscreen`}},k=`
+`}));function S(e){let t=0,n=0,r=0,i=()=>[n,r],a=e.simResolution,o=window.innerWidth/window.innerHeight;return{passes:d({simSize:o>1?[Math.round(a*o),a]:[a,Math.round(a/o)],mouseDelta:i,time:()=>t,pressureIterations:e.pressureIterations,curlStrength:e.curlStrength,velocityDissipation:e.velocityDissipation,densityDissipation:e.densityDissipation,splatForce:e.splatForce,splatRadius:e.splatRadius,dyeSplatRadius:e.dyeSplatRadius,dyeSplatIntensity:e.dyeSplatIntensity,showDye:e.showDye}),getTime:()=>t,setTime:e=>{t=e},setDelta:(e,t)=>{n=e,r=t}}}function C(e,t,n){let r=Math.round(window.innerWidth/2),i=Math.round(window.innerHeight/2),o=a()?10:100;for(let e=0;e<o;e++){let a=e/o*Math.PI*2;n.setDelta(Math.cos(a)*15,Math.sin(a)*15),window.dispatchEvent(new MouseEvent(`pointermove`,{clientX:r+Math.cos(a)*100,clientY:i-Math.sin(a)*100})),n.setTime(e*.016),t.render()}e.addEventListener(`click`,()=>{let e=-1,r=-1,i;window.addEventListener(`pointermove`,t=>{let a=t.clientX,o=window.innerHeight-t.clientY;e>=0&&n.setDelta(a-e,o-r),e=a,r=o,clearTimeout(i),i=window.setTimeout(()=>n.setDelta(0,0),50)}),t.play()},{once:!0})}async function w(e,t){let n=e.querySelector(`img`);await new Promise(e=>{n.onload=e});let i=r({autoplay:!1});await i.add(n,{shader:P,overflow:t}),i.render()}var T,E,D,O,k,A,j,M,N,P,F,I,L;e((()=>{c(),n(),x(),i(),o(),T={simResolution:{control:{type:`range`,min:32,max:512,step:32}},pressureIterations:{control:{type:`range`,min:1,max:40,step:1}},curlStrength:{control:{type:`range`,min:0,max:100,step:1}},velocityDissipation:{control:{type:`range`,min:0,max:5,step:.05}},densityDissipation:{control:{type:`range`,min:0,max:5,step:.05}},splatForce:{control:{type:`range`,min:100,max:2e4,step:100}},splatRadius:{control:{type:`range`,min:1e-4,max:.01,step:1e-4}},dyeSplatRadius:{control:{type:`range`,min:1e-4,max:.01,step:1e-4}},dyeSplatIntensity:{control:{type:`range`,min:.001,max:.03,step:.001}},showDye:{control:`boolean`}},E={simResolution:128,pressureIterations:1,curlStrength:13,velocityDissipation:.6,densityDissipation:.65,splatForce:6e3,splatRadius:.002,dyeSplatRadius:.001,dyeSplatIntensity:.005,showDye:!1},D={title:`Multipass`,parameters:{layout:`fullscreen`}},O={args:{...E},argTypes:T,render:()=>{let e=document.createElement(`img`);return e.src=t,e},play:async({canvasElement:e,args:t})=>{let n=e.querySelector(`img`);await new Promise(e=>{n.onload=e});let i=S(t),a=r({autoplay:!1,postEffect:i.passes});await a.add(n,{shader:`uvGradient`}),C(e,a,i)},parameters:{layout:`fullscreen`}},k={args:{...E},argTypes:T,render:()=>{let e=document.createElement(`img`);return e.src=s,e},play:async({canvasElement:e,args:t})=>{let n=e.querySelector(`img`);await new Promise(e=>{n.onload=e});let i=S(t),a=r({autoplay:!1});await a.add(n,{shader:i.passes}),C(e,a,i)},parameters:{layout:`fullscreen`}},A=`
 vec2 toBuffer(vec2 uv) {
     return (uv * resolution + (offset - viewport.xy)) / viewport.zw;
 }
-`,A=`
+`,j=`
 precision highp float;
 uniform sampler2D src;
 uniform vec2 resolution;
@@ -241,14 +241,14 @@ void main() {
     vec2 inside = step(vec2(0.0), uv) * step(uv, vec2(1.0));
     outColor = texture(src, uv) * inside.x * inside.y;
 }
-`,j=`
+`,M=`
 precision highp float;
 uniform sampler2D original;
 uniform vec2 resolution;
 uniform vec2 offset;
 uniform vec4 viewport;
 out vec4 outColor;
-${k}
+${A}
 
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -262,7 +262,7 @@ void main() {
     }
     outColor = c / 81.0;
 }
-`,M=`
+`,N=`
 precision highp float;
 uniform sampler2D original;
 uniform sampler2D glow;
@@ -270,7 +270,7 @@ uniform vec2 resolution;
 uniform vec2 offset;
 uniform vec4 viewport;
 out vec4 outColor;
-${k}
+${A}
 
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -278,7 +278,7 @@ void main() {
     vec4 g = texture(glow, toBuffer(uv));
     outColor = base + g * (1.0 - base.a);
 }
-`,N=[{frag:A,target:`original`},{frag:j,target:`glow`},{frag:M}],P={render:()=>{let e=document.createElement(`img`);return e.src=r,e},play:({canvasElement:e})=>C(e,40)},F={render:()=>{let e=document.createElement(`img`);return e.src=r,e},play:({canvasElement:e})=>C(e,!0)},D.parameters={...D.parameters,docs:{...D.parameters?.docs,source:{originalSource:`{
+`,P=[{frag:j,target:`original`},{frag:M,target:`glow`},{frag:N}],F={render:()=>{let e=document.createElement(`img`);return e.src=t,e},play:({canvasElement:e})=>w(e,40)},I={render:()=>{let e=document.createElement(`img`);return e.src=t,e},play:({canvasElement:e})=>w(e,!0)},O.parameters={...O.parameters,docs:{...O.parameters?.docs,source:{originalSource:`{
   args: {
     ...defaultFluidArgs
   },
@@ -312,7 +312,7 @@ void main() {
   parameters: {
     layout: "fullscreen"
   }
-}`,...D.parameters?.docs?.source}}},O.parameters={...O.parameters,docs:{...O.parameters?.docs,source:{originalSource:`{
+}`,...O.parameters?.docs?.source}}},k.parameters={...k.parameters,docs:{...k.parameters?.docs,source:{originalSource:`{
   args: {
     ...defaultFluidArgs
   },
@@ -345,7 +345,7 @@ void main() {
   parameters: {
     layout: "fullscreen"
   }
-}`,...O.parameters?.docs?.source}}},P.parameters={...P.parameters,docs:{...P.parameters?.docs,source:{originalSource:`{
+}`,...k.parameters?.docs?.source}}},F.parameters={...F.parameters,docs:{...F.parameters?.docs,source:{originalSource:`{
   render: () => {
     const img = document.createElement("img");
     img.src = Logo;
@@ -356,7 +356,7 @@ void main() {
   }: {
     canvasElement: HTMLElement;
   }) => playGlowBleed(canvasElement, 40)
-}`,...P.parameters?.docs?.source}}},F.parameters={...F.parameters,docs:{...F.parameters?.docs,source:{originalSource:`{
+}`,...F.parameters?.docs?.source}}},I.parameters={...I.parameters,docs:{...I.parameters?.docs,source:{originalSource:`{
   render: () => {
     const img = document.createElement("img");
     img.src = Logo;
@@ -367,4 +367,4 @@ void main() {
   }: {
     canvasElement: HTMLElement;
   }) => playGlowBleed(canvasElement, true)
-}`,...F.parameters?.docs?.source}}},I=[`StableFluidPostEffect`,`StableFluidElement`,`GlowBleedOverflow`,`GlowBleedFullscreen`]}))();export{F as GlowBleedFullscreen,P as GlowBleedOverflow,O as StableFluidElement,D as StableFluidPostEffect,I as __namedExportsOrder,E as default};
+}`,...I.parameters?.docs?.source}}},L=[`StableFluidPostEffect`,`StableFluidElement`,`GlowBleedOverflow`,`GlowBleedFullscreen`]}))();export{I as GlowBleedFullscreen,F as GlowBleedOverflow,k as StableFluidElement,O as StableFluidPostEffect,L as __namedExportsOrder,D as default};

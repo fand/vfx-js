@@ -1,4 +1,4 @@
-import{i as e}from"./preload-helper-xPQekRTU.js";import{d as t,f as n}from"./utils-CtLogj3O.js";import{n as r,t as i}from"./logo-640w-20p-CDp-4Bv5.js";import{t as a}from"./preset-_bwWmH2a.js";import{n as o,t as s}from"./jellyfish-CWg8JMTu.js";import{n as c,t as l}from"./Timer-zmWoh-G8.js";var u,d,f,p,m,h,g,_,v,y,b,x,S,C,w,T,E,D,O,k;e((()=>{n(),c(),i(),s(),a(),u=`
+import{i as e}from"./preload-helper-xPQekRTU.js";import{n as t,t as n}from"./logo-640w-20p-CDp-4Bv5.js";import{d as r,f as i}from"./utils-DQN2J993.js";import{t as a}from"./preset-_bwWmH2a.js";import{n as o,t as s}from"./jellyfish-CWg8JMTu.js";import{n as c,t as l}from"./Timer-zmWoh-G8.js";var u,d,f,p,m,h,g,_,v,y,b,x,S,C,w,T,E,D,O,k;e((()=>{s(),n(),c(),i(),a(),u=`
 precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;
@@ -17,7 +17,7 @@ void main() {
     p.x *= resolution.x / resolution.y;
     outColor += (fract(length(p)) * .5 + .5) * 0.25;
 }
-`,d={title:`Layout`,parameters:{layout:`fullscreen`}},f={render:({padding:e})=>{let n=document.createElement(`img`);n.src=r;let i=document.createElement(`div`);return i.style.padding=`${e}px`,i.appendChild(n),t().add(n,{shader:u,overflow:!0}),i},args:{padding:100}},p={render:({overflow:e})=>{let n=document.createElement(`img`);n.src=r;let i=document.createElement(`div`);return i.style.padding=`${e*2}px`,i.appendChild(n),t().add(n,{shader:u,overflow:e}),i},args:{overflow:100}},m={render:({overflow:e})=>{let n=document.createElement(`img`);n.src=r;let[i,a,o,s]=e,c=document.createElement(`div`);return c.style.padding=`${i}px ${a}px ${o}px ${s}px`,c.appendChild(n),t().add(n,{shader:u,overflow:e}),c},args:{overflow:[50,100,150,200]}},h={render:({pixelRatio:e})=>{let n=document.createElement(`img`);return n.src=r,t({pixelRatio:e}).add(n,{shader:u}),n},args:{pixelRatio:.1}},g=({zIndex:e,fgZIndex:n})=>{let i=document.createElement(`img`);i.src=r;let a=document.createElement(`div`);a.className=`wrapper`,a.appendChild(i);let o=document.createElement(`div`);return o.className=`fg`,o.innerText=`Hello`,o.style.zIndex=n.toString(),a.appendChild(o),t({zIndex:e}).add(i,{shader:u}),a},_={render:g,args:{zIndex:0,fgZIndex:1}},v={render:g,args:{zIndex:-1,fgZIndex:0}},y=({zIndex:e})=>{let n=[[1,0,0],[0,1,0],[0,0,1]],i=document.createElement(`div`);i.className=`elementZIndexWrapper`;let a=t();for(let t=0;t<3;t++){let o=document.createElement(`img`);o.src=r,i.appendChild(o),a.add(o,{shader:`
+`,d={title:`Layout`,parameters:{layout:`fullscreen`}},f={render:({padding:e})=>{let n=document.createElement(`img`);n.src=t;let i=document.createElement(`div`);return i.style.padding=`${e}px`,i.appendChild(n),r().add(n,{shader:u,overflow:!0}),i},args:{padding:100}},p={render:({overflow:e})=>{let n=document.createElement(`img`);n.src=t;let i=document.createElement(`div`);return i.style.padding=`${e*2}px`,i.appendChild(n),r().add(n,{shader:u,overflow:e}),i},args:{overflow:100}},m={render:({overflow:e})=>{let n=document.createElement(`img`);n.src=t;let[i,a,o,s]=e,c=document.createElement(`div`);return c.style.padding=`${i}px ${a}px ${o}px ${s}px`,c.appendChild(n),r().add(n,{shader:u,overflow:e}),c},args:{overflow:[50,100,150,200]}},h={render:({pixelRatio:e})=>{let n=document.createElement(`img`);return n.src=t,r({pixelRatio:e}).add(n,{shader:u}),n},args:{pixelRatio:.1}},g=({zIndex:e,fgZIndex:n})=>{let i=document.createElement(`img`);i.src=t;let a=document.createElement(`div`);a.className=`wrapper`,a.appendChild(i);let o=document.createElement(`div`);return o.className=`fg`,o.innerText=`Hello`,o.style.zIndex=n.toString(),a.appendChild(o),r({zIndex:e}).add(i,{shader:u}),a},_={render:g,args:{zIndex:0,fgZIndex:1}},v={render:g,args:{zIndex:-1,fgZIndex:0}},y=({zIndex:e})=>{let n=[[1,0,0],[0,1,0],[0,0,1]],i=document.createElement(`div`);i.className=`elementZIndexWrapper`;let a=r();for(let r=0;r<3;r++){let o=document.createElement(`img`);o.src=t,i.appendChild(o),a.add(o,{shader:`
 precision highp float;
 uniform vec2 offset;
 uniform vec2 resolution;
@@ -30,7 +30,7 @@ void main() {
     outColor = texture(src, uv);
     outColor += vec4(bg, 0.5);
 }
-    `,zIndex:e[t],uniforms:{bg:n[t]}})}return i},b={render:y,args:{zIndex:[0,0,0]}},x={render:y,args:{zIndex:[1,3,2]}},S={render:y,args:{zIndex:[3,2,1]}},C={render:()=>{let e=document.createElement(`img`);return e.src=r,t().add(e,{shader:`
+    `,zIndex:e[r],uniforms:{bg:n[r]}})}return i},b={render:y,args:{zIndex:[0,0,0]}},x={render:y,args:{zIndex:[1,3,2]}},S={render:y,args:{zIndex:[3,2,1]}},C={render:()=>{let e=document.createElement(`img`);return e.src=t,r().add(e,{shader:`
         precision highp float;
         uniform vec2 offset;
         uniform vec2 resolution;
@@ -43,7 +43,7 @@ void main() {
             uv = (uv - .5) * 0.9 + .5;
             outColor = texture(src, uv) * 0.5;
         }
-        `,overlay:!0}),e},args:null},w=e=>({render:({wrap:e})=>{let n=document.createElement(`img`);return n.src=r,t().add(n,{shader:u,wrap:e,overflow:200}),n},args:{wrap:e},argTypes:{wrap:{control:{type:`select`},options:[`repeat`,`clamp`,`mirror`]}}}),T=w(`repeat`),E=w(`clamp`),D=w(`mirror`),O={render:({shader:e,autoCrop:n})=>{let r=new l(0,[0,10]);document.body.append(r.element);let i=document.createElement(`img`);return i.src=o,t().add(i,{shader:e,autoCrop:n,overflow:200,uniforms:{time:()=>r.time}}),i},args:{shader:`rainbow`,autoCrop:!0}},f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{
+        `,overlay:!0}),e},args:null},w=e=>({render:({wrap:e})=>{let n=document.createElement(`img`);return n.src=t,r().add(n,{shader:u,wrap:e,overflow:200}),n},args:{wrap:e},argTypes:{wrap:{control:{type:`select`},options:[`repeat`,`clamp`,`mirror`]}}}),T=w(`repeat`),E=w(`clamp`),D=w(`mirror`),O={render:({shader:e,autoCrop:t})=>{let n=new l(0,[0,10]);document.body.append(n.element);let i=document.createElement(`img`);return i.src=o,r().add(i,{shader:e,autoCrop:t,overflow:200,uniforms:{time:()=>n.time}}),i},args:{shader:`rainbow`,autoCrop:!0}},f.parameters={...f.parameters,docs:{...f.parameters?.docs,source:{originalSource:`{
   render: ({
     padding
   }) => {
