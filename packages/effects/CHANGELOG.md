@@ -1,5 +1,11 @@
 # @vfx-js/effects
 
+## 1.4.1
+
+### Patch Changes
+
+- Require `@vfx-js/core` 1.3.0 or later. Fluid and particle effects use `ctx.clear()`, which older core versions do not have.
+
 ## 1.4.0
 
 ### Minor Changes

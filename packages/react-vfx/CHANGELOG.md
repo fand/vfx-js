@@ -1,5 +1,12 @@
 # react-vfx
 
+## 1.0.3
+
+### Patch Changes
+
+- Updated dependencies [f25d02a]
+  - @vfx-js/react@1.1.2
+
 ## 1.0.2
 
 ### Patch Changes

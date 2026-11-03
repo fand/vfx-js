@@ -1,5 +1,14 @@
 # react-vfx
 
+## 1.1.2
+
+### Patch Changes
+
+- f25d02a: html-in-canvas: support Chrome 159+ (`content="drawable"` + `drawable` child, `paint` event) alongside `layoutsubtree`, and redraw nested canvases at their layout size and position where Chrome draws them at buffer size (156) or clips them to a box at the element's origin (156, 159).
+- Updated dependencies [f25d02a]
+- Updated dependencies [b82efab]
+  - @vfx-js/core@1.3.0
+
 ## 1.1.1
 
 ### Patch Changes
