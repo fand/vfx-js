@@ -114,6 +114,8 @@ Set `float: true` for 32-bit floating point render targets. Use this when storin
 
 Set `size: [width, height]` to render at a fixed resolution independent of the viewport. Useful for simulations that run at lower resolution.
 
+A fixed-size pass uses the whole buffer: `resolution` = `size` and `offset` = 0.
+
 ```javascript
 {
     frag: simulationShader,
@@ -174,13 +176,126 @@ Every pass automatically receives:
 
 | Uniform | Type | Description |
 |---------|------|-------------|
-| `src` | `sampler2D` | Input texture (previous pass output or canvas) |
-| `resolution` | `vec2` | Render target resolution in pixels |
-| `offset` | `vec2` | Offset values |
-| `viewport` | `vec4` | Viewport information |
+| `src` | `sampler2D` | Input texture. The first pass gets the element (or canvas). Later passes get the previous pass's buffer. |
+| `resolution` | `vec2` | Element size in physical pixels |
+| `offset` | `vec2` | Element origin inside the render target, in physical pixels |
+| `viewport` | `vec4` | Render target rect `(x, y, w, h)` in physical pixels. `viewport.zw` is the buffer size. |
 | `time` | `float` | Time in seconds since VFX started |
-| `mouse` | `vec2` | Mouse position in pixels |
+| `mouse` | `vec2` | Mouse position in render target pixels (same space as `gl_FragCoord`) |
 | `passIndex` | `int` | Index of the current pass |
+
+`uv = (gl_FragCoord.xy - offset) / resolution` is element space in every pass.
+For post effects, the element is the whole canvas, so `offset` is 0.
+
+Passes with `size` are the exception.
+They use the whole buffer: `resolution` = `size`, `offset` = 0.
+
+## Overflow
+
+When an element multipass chain uses `overflow` (or `overflow: true` for fullscreen), each intermediate buffer covers the element plus the overflow area.
+
+- `uv` is always element space. The overflow area is `uv < 0` or `uv > 1`.
+- The element texture (`src` in the first pass) is element space.
+- Buffers VFX-JS renders (`src` in later passes, `<target>` buffers, `backbuffer`) are buffer space: 0..1 is the whole buffer.
+
+Read buffers with `toBuffer`:
+
+```glsl
+vec2 toBuffer(vec2 uv) {
+    return (uv * resolution + (offset - viewport.xy)) / viewport.zw;
+}
+```
+
+It works in every pass, including the final one.
+Without overflow it returns `uv` unchanged.
+Fixed-size passes (`size`) have no element mapping, so there `toBuffer` returns `uv` too.
+
+### Example: Glow Bleed
+
+Pass 0 copies the element into a buffer.
+Pass 1 blurs that buffer into the overflow area.
+The final pass adds the glow on top of the element.
+
+```javascript
+const toBuffer = `
+vec2 toBuffer(vec2 uv) {
+    return (uv * resolution + (offset - viewport.xy)) / viewport.zw;
+}
+`;
+
+const copyShader = `
+precision highp float;
+uniform sampler2D src;
+uniform vec2 resolution;
+uniform vec2 offset;
+out vec4 outColor;
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    // The element texture has nothing outside 0..1
+    vec2 inside = step(vec2(0.0), uv) * step(uv, vec2(1.0));
+    outColor = texture(src, uv) * inside.x * inside.y;
+}
+`;
+
+const glowShader = `
+precision highp float;
+uniform sampler2D original;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform vec4 viewport;
+out vec4 outColor;
+${toBuffer}
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    vec2 texel = 4.0 / resolution;
+
+    vec4 c = vec4(0.0);
+    for (int x = -4; x <= 4; x++) {
+        for (int y = -4; y <= 4; y++) {
+            c += texture(original, toBuffer(uv + vec2(x, y) * texel));
+        }
+    }
+    outColor = c / 81.0;
+}
+`;
+
+const compositeShader = `
+precision highp float;
+uniform sampler2D original;
+uniform sampler2D glow;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform vec4 viewport;
+out vec4 outColor;
+${toBuffer}
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    vec4 base = texture(original, toBuffer(uv));
+    vec4 g = texture(glow, toBuffer(uv));
+    outColor = base + g * (1.0 - base.a);
+}
+`;
+
+vfx.add(element, {
+    overflow: 40,
+    shader: [
+        { frag: copyShader, target: "original" },
+        { frag: glowShader, target: "glow" },
+        { frag: compositeShader },
+    ],
+});
+```
+
+### Migration
+
+Before this change, intermediate passes in overflow or fullscreen chains got `resolution` = buffer size and `offset` = 0.
+To update such shaders, pick one:
+
+- Keep the old output: in intermediate passes, replace `offset` with `viewport.xy` and `resolution` with `viewport.zw`.
+- Use the new rule: leave intermediate passes as they are (pixel math is now element based), and read buffers in later passes with `toBuffer(uv)`.
 
 ## VFXPass Reference
 

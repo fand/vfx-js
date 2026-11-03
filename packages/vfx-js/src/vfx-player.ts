@@ -1174,11 +1174,6 @@ export class VFXPlayer {
             // Use local inputTexture (like post-effects) to avoid corrupting
             // the shared src uniform across frames.
             let inputTexture: Texture = e.srcTexture;
-            // #mouseX/Y are in viewport-Y-up coords, but glRect is in
-            // canvas-Y-up coords (canvas extends paddingX/Y outside the
-            // viewport). Add padding to convert to the same space.
-            const relMouseX = this.#mouseX + this.#paddingX - glRect.x;
-            const relMouseY = this.#mouseY + this.#paddingY - glRect.y;
 
             for (let i = 0; i < e.passes.length - 1; i++) {
                 const pass = e.passes[i];
@@ -1205,26 +1200,28 @@ export class VFXPlayer {
                     }
                 }
 
-                // Intermediate passes render to their own buffer,
-                // so offset is always 0 and resolution matches buffer size.
-                const bufferW = pass.size
-                    ? pass.size[0]
-                    : defaultRect.w * this.#pixelRatio;
-                const bufferH = pass.size
-                    ? pass.size[1]
-                    : defaultRect.h * this.#pixelRatio;
+                // Element-space uniforms, like the final pass.
+                // offset and mouse are relative to this pass's buffer.
                 const bufferRect = pass.size
                     ? getGLRect(0, 0, pass.size[0], pass.size[1])
                     : getGLRect(0, 0, defaultRect.w, defaultRect.h);
-
-                (pass.uniforms["resolution"].value as Vec2).set(
-                    bufferW,
-                    bufferH,
+                const passUniforms = getIntermediatePassUniforms(
+                    domRect,
+                    glRect,
+                    defaultRect,
+                    pass.size,
+                    [this.#mouseX, this.#mouseY],
+                    [this.#paddingX, this.#paddingY],
+                    this.#pixelRatio,
                 );
-                (pass.uniforms["offset"].value as Vec2).set(0, 0);
+                (pass.uniforms["resolution"].value as Vec2).set(
+                    ...passUniforms.resolution,
+                );
+                (pass.uniforms["offset"].value as Vec2).set(
+                    ...passUniforms.offset,
+                );
                 (pass.uniforms["mouse"].value as Vec2).set(
-                    (relMouseX / defaultRect.w) * bufferW,
-                    (relMouseY / defaultRect.h) * bufferH,
+                    ...passUniforms.mouse,
                 );
 
                 if (pass.backbuffer) {
@@ -2126,6 +2123,53 @@ export function parseOverflowOpts(
         return [false, MARGIN_ZERO];
     }
     return [false, createMargin(overflow)];
+}
+
+/**
+ * Uniforms for an intermediate pass of a multipass chain.
+ * `resolution` and `offset` give the element rect inside the pass buffer.
+ * Passes with a fixed `size` use the whole buffer.
+ * @internal
+ */
+export function getIntermediatePassUniforms(
+    elementSize: { width: number; height: number },
+    glRect: GLRect,
+    bufferGlRect: GLRect,
+    passSize: readonly [number, number] | undefined,
+    mouse: readonly [number, number],
+    padding: readonly [number, number],
+    pixelRatio: number,
+): {
+    resolution: [number, number];
+    offset: [number, number];
+    mouse: [number, number];
+} {
+    // Mouse in canvas coords, relative to the buffer origin
+    const mouseX = mouse[0] + padding[0] - bufferGlRect.x;
+    const mouseY = mouse[1] + padding[1] - bufferGlRect.y;
+
+    if (passSize) {
+        return {
+            resolution: [passSize[0], passSize[1]],
+            offset: [0, 0],
+            mouse: [
+                (mouseX / bufferGlRect.w) * passSize[0],
+                (mouseY / bufferGlRect.h) * passSize[1],
+            ],
+        };
+    }
+
+    return {
+        resolution: [
+            elementSize.width * pixelRatio,
+            elementSize.height * pixelRatio,
+        ],
+        offset: [
+            (glRect.x - bufferGlRect.x) * pixelRatio,
+            (glRect.y - bufferGlRect.y) * pixelRatio,
+        ],
+        mouse: [mouseX * pixelRatio, mouseY * pixelRatio],
+    };
 }
 
 export function parseIntersectionOpts(
