@@ -11,18 +11,11 @@ export const VFXP = VFXElementFactory<"p">("p");
 
 export * from "./hooks.js";
 
-export { watchNavigationDirection } from "./transition/direction.js";
-export {
-    markBackNavigation,
-    setNextTransition,
-    takePending,
-    transition,
-} from "./transition/store.js";
+export { setNextTransition, transition } from "./transition/store.js";
 export {
     type UseVFXTransition,
     useVFXTransition,
 } from "./transition/useVFXTransition.js";
-export { VFXLink, type VFXLinkProps } from "./transition/VFXLink.js";
 export {
     VFXTransition,
     type VFXTransitionProps,

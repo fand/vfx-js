@@ -276,19 +276,8 @@ intercept navigation. It ignores modified clicks, non-left buttons,
 `target="_blank"` and clicks with `defaultPrevented`. The spec expires
 after about 2 s.
 
-### `<VFXLink>`
-
-A Server Component cannot pass `onClick` to `Link`. Use `VFXLink`, a
-client component:
-
-```tsx
-import Link from "next/link";
-import { VFXLink } from "@vfx-js/react";
-
-<VFXLink as={Link} href="/next" transition={{ transition: glitch }}>Next</VFXLink>
-```
-
-`as` defaults to `"a"`. Your own `onClick` runs first.
+A Server Component cannot pass `onClick` to `Link`. Wrap the link in a
+small client component that passes `onClick={transition(spec)}`.
 
 ### `useVFXTransition`
 
