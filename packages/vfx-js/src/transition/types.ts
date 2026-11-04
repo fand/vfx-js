@@ -21,7 +21,7 @@ export type TransitionDef = {
 
     /**
      * Extra effects placed after the transition effect in the chain.
-     * Created once per transition object and kept for its lifetime.
+     * Created when a run first uses this def and kept while runs keep using it.
      * They must pass through (disabled) until `prepare`.
      */
     effects?(): Promise<Effect[]>;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { EffectDims } from "../types";
+import type { Effect, EffectDims } from "../types";
 import { crossfade } from "./crossfade";
 import { TransitionEffect, type TransitionStartOpts } from "./effect";
 import { BODY_OFFSET, describeGlslError } from "./glsl";
@@ -244,18 +244,28 @@ function setup(opts: { keepWrapped?: boolean; snapshotStalls?: boolean } = {}) {
             log.push("cancel");
         },
     };
+    let chain: Effect[] = [];
+    const disposed: Effect[] = [];
+    const toList = (effects: Effect | readonly Effect[] | undefined) =>
+        effects === undefined ? [] : [effects].flat();
     const vfx: TransitionHost = {
-        addHTML: async () => {
+        addHTML: async (_element, props) => {
             log.push("wrap");
+            chain = toList(props.effect);
         },
         update: async () => {
             log.push("update");
         },
-        updateEffects: async () => {
+        updateEffects: async (_element, effects) => {
             log.push("updateEffects");
+            const next = toList(effects);
+            disposed.push(...chain.filter((e) => !next.includes(e)));
+            chain = next;
         },
         remove: () => {
             log.push("unwrap");
+            disposed.push(...chain);
+            chain = [];
         },
         freezeInside: () => {
             log.push("freeze");
@@ -285,7 +295,14 @@ function setup(opts: { keepWrapped?: boolean; snapshotStalls?: boolean } = {}) {
         onDestroy,
         effect,
     );
-    return { transition, log, starts, onDestroy };
+    return {
+        transition,
+        log,
+        starts,
+        onDestroy,
+        disposed,
+        chain: () => chain,
+    };
 }
 
 describe("TransitionController", () => {
@@ -462,6 +479,77 @@ describe("TransitionController", () => {
             warn.mockRestore();
             vi.useRealTimers();
         }
+    });
+
+    const driverDef = (name: string) => {
+        const created: Effect[][] = [];
+        const def: TransitionDef = {
+            name,
+            frag: "",
+            effects: async () => {
+                const fx = [{ render: () => {} }];
+                created.push(fx);
+                return fx;
+            },
+        };
+        return { def, created };
+    };
+
+    test("a new def swaps the driver effects in the chain", async () => {
+        const { transition, starts, chain, disposed } = setup({
+            keepWrapped: true,
+        });
+        const a = driverDef("a");
+        const b = driverDef("b");
+        for (const [i, def] of [a.def, b.def, a.def].entries()) {
+            const run = transition.run(() => {}, { transition: def });
+            await settle();
+            starts[i].end();
+            await run;
+        }
+        expect(chain()).toHaveLength(2);
+        expect(chain()[1]).toBe(a.created[1][0]);
+        expect(disposed).toEqual([a.created[0][0], b.created[0][0]]);
+    });
+
+    test("a fresh def per run keeps the chain length", async () => {
+        const { transition, starts, chain, disposed } = setup({
+            keepWrapped: true,
+        });
+        for (let i = 0; i < 3; i++) {
+            const run = transition.run(() => {}, {
+                transition: driverDef(`fresh${i}`).def,
+            });
+            await settle();
+            starts[i].end();
+            await run;
+            expect(chain()).toHaveLength(2);
+        }
+        expect(disposed).toHaveLength(2);
+    });
+
+    test("driver effects of a dropped run stay out of the chain", async () => {
+        const { transition, starts, chain } = setup({ keepWrapped: true });
+        let resolveA: (fx: Effect[]) => void = () => {};
+        const slowFx = [{ render: () => {} }];
+        const slow: TransitionDef = {
+            name: "slow",
+            frag: "",
+            effects: () =>
+                new Promise<Effect[]>((resolve) => {
+                    resolveA = resolve;
+                }),
+        };
+        const b = driverDef("b");
+        const runA = transition.run(() => {}, { transition: slow });
+        const runB = transition.run(() => {}, { transition: b.def });
+        resolveA(slowFx);
+        await runA;
+        await settle();
+        starts[0].end();
+        await runB;
+        expect(chain()).toEqual([expect.anything(), b.created[0][0]]);
+        expect(chain()).not.toContain(slowFx[0]);
     });
 
     test("duration 0 cuts without wrapping", async () => {

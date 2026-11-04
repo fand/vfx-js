@@ -204,9 +204,10 @@ A shader that fails to compile logs the error with line numbers in your
 
 Some transitions need extra effects, like a datamosh or a pixel sort.
 
-- `effects` creates them once per `Transition`. They sit after the
-  transition in the chain and must pass through (disabled) until
-  `prepare`.
+- `effects` creates them when a run first uses the def. Runs that keep
+  using the same def reuse them; a run with another def disposes them.
+  They sit after the transition in the chain and must pass through
+  (disabled) until `prepare`.
 - `prepare` runs while the old content is held, before `cb`.
 - `onFrame` runs every frame: `t` is eased, `x` is linear, `dt` is seconds.
 - `onEnd` runs once when the run ends, is dropped or is cancelled. It must

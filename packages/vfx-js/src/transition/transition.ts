@@ -164,12 +164,16 @@ export class TransitionController implements Transition {
     #destroyed = false;
 
     #wrapped = false;
+    // A pending wrap or effect swap; the next one waits for it.
     #wrapping: Promise<void> | null = null;
     #chain: readonly Effect[] = [];
 
-    #driverEffects = new Map<TransitionDef, Promise<Effect[]>>();
-    #loadedDriverEffects: Effect[] = [];
-    #frags = new Map<TransitionDef, string>();
+    // The last def's driver effects and shader; the same def again reuses them.
+    #driver: {
+        def: TransitionDef;
+        fx: Promise<Effect[]>;
+        frag: string | null;
+    } | null = null;
     // The run that owns the driver effects right now.
     #active: { id: number; def: TransitionDef; fx: Effect[] } | null = null;
 
@@ -263,7 +267,7 @@ export class TransitionController implements Transition {
 
         this.#freeze();
         try {
-            await this.#ensureWrapped();
+            await this.#ensureWrapped(fx, isCurrent);
         } catch (err) {
             console.error(
                 "[VFX-JS] transition failed to wrap the element; cutting to the new content.",
@@ -392,8 +396,7 @@ export class TransitionController implements Transition {
         this.#destroyed = true;
         this.cancel();
         // The chain disposes the driver effects when the element is removed.
-        this.#driverEffects.clear();
-        this.#loadedDriverEffects = [];
+        this.#driver = null;
         this.#onDestroy?.();
     }
 
@@ -418,30 +421,31 @@ export class TransitionController implements Transition {
     }
 
     #fragOf(def: TransitionDef): string {
-        let frag = this.#frags.get(def);
-        if (!frag) {
-            frag = buildFrag(def.frag);
-            this.#frags.set(def, frag);
+        const driver = this.#driver;
+        if (driver?.def !== def) {
+            return buildFrag(def.frag);
         }
-        return frag;
+        driver.frag ??= buildFrag(def.frag);
+        return driver.frag;
     }
 
     #ensureDriverEffects(def: TransitionDef): Promise<Effect[]> {
-        let fx = this.#driverEffects.get(def);
-        if (!fx) {
-            fx = (def.effects ? def.effects() : Promise.resolve([])).then(
-                (created) => {
-                    this.#loadedDriverEffects.push(...created);
-                    return created;
-                },
-                (err) => {
-                    this.#driverEffects.delete(def);
-                    throw err;
-                },
-            );
-            this.#driverEffects.set(def, fx);
+        if (this.#driver?.def === def) {
+            return this.#driver.fx;
         }
-        return fx;
+        const driver = {
+            def,
+            fx: def.effects ? def.effects() : Promise.resolve([]),
+            frag: null,
+        };
+        // Let the next run retry after a failure.
+        driver.fx.catch(() => {
+            if (this.#driver === driver) {
+                this.#driver = null;
+            }
+        });
+        this.#driver = driver;
+        return driver.fx;
     }
 
     #endActive(id?: number): void {
@@ -453,13 +457,20 @@ export class TransitionController implements Transition {
     }
 
     // Wrap the element, or sync the chain and take a fresh capture.
-    async #ensureWrapped(): Promise<void> {
+    async #ensureWrapped(
+        driverFx: readonly Effect[],
+        isCurrent: () => boolean,
+    ): Promise<void> {
         if (this.#wrapping) {
             await this.#wrapping;
         }
+        // A newer run owns the chain now.
+        if (!isCurrent()) {
+            return;
+        }
         const chain = [
             this.#effect,
-            ...this.#loadedDriverEffects,
+            ...driverFx,
             ...(this.#opts.effects ?? []),
         ];
         if (!this.#wrapped) {
@@ -478,7 +489,14 @@ export class TransitionController implements Transition {
         }
         if (!sameEffects(chain, this.#chain)) {
             this.#chain = chain;
-            await this.#vfx.updateEffects(this.#element, chain);
+            // The chain disposes the effects it drops.
+            const swapping = this.#vfx
+                .updateEffects(this.#element, chain)
+                .finally(() => {
+                    this.#wrapping = null;
+                });
+            this.#wrapping = swapping;
+            await swapping;
         }
         await this.#vfx.update(this.#element);
     }
