@@ -2,7 +2,7 @@ import type { VFXPass, VFXPostEffect } from "@vfx-js/core";
 import { VFX } from "@vfx-js/core";
 import type * as React from "react";
 import { useEffect, useState } from "react";
-import { VFXContext } from "./context.js";
+import { VFXContext, VFXProviderMarker } from "./context.js";
 
 export interface VFXProviderProps {
     children?: React.ReactNode;
@@ -50,6 +50,10 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
     }, [props.pixelRatio, props.postEffect, props.wrapper, autoplay]); // TODO: add zIndex
 
     return (
-        <VFXContext.Provider value={vfx}>{props.children}</VFXContext.Provider>
+        <VFXProviderMarker.Provider value={true}>
+            <VFXContext.Provider value={vfx}>
+                {props.children}
+            </VFXContext.Provider>
+        </VFXProviderMarker.Provider>
     );
 };

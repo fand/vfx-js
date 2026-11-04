@@ -5,10 +5,10 @@ import {
     teardownCapture,
 } from "@vfx-js/core";
 import * as React from "react";
-import { useContext, useEffect, useRef } from "react";
-import { VFXContext } from "./context.js";
+import { useEffect, useRef } from "react";
 import { applyDelta, createOpQueue, type OpQueue } from "./lifecycle.js";
 import { splitVFXProps } from "./split-props.js";
+import { useVFXInstance } from "./use-vfx-instance.js";
 
 type VFXCanvasProps = React.PropsWithChildren<
     VFXProps & {
@@ -24,7 +24,7 @@ type VFXCanvasProps = React.PropsWithChildren<
  */
 export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
     function VFXCanvas(props, parentRef) {
-        const vfx = useContext(VFXContext);
+        const vfx = useVFXInstance();
         const canvasRef = useRef<HTMLCanvasElement>(null);
         const fallbackRef = useRef<HTMLDivElement>(null);
 
