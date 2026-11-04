@@ -41,8 +41,12 @@ and SPA page transitions.
   old size for the run and jumps afterwards, as a fallback only.
 - **Dropped `useVFXTransitionSpec`.** A page-declared spec only worked for
   the leaving page, since the entering page mounts after the run starts.
-  Nuxt and Astro have page-declared transitions, but a half-working one
-  is worse than none. Revisit with a deferred spec in core if wanted.
+  Nuxt (`definePageMeta({ pageTransition })`) and Astro
+  (`transition:animate`) have page-declared transitions where the
+  entering page's declaration counts, so a half-working one is worse
+  than none. It may come back if Astro support needs it. Doing it
+  right needs a deferred spec in core: `run(cb, () => opts)` resolved
+  after `cb`, so the entering page's declaration is readable.
 
 ## What was built
 
