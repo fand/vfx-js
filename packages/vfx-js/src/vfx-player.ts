@@ -1051,6 +1051,21 @@ export class VFXPlayer {
         };
     }
 
+    /**
+     * Keep rendering the element while it is off screen.
+     * Returns a function that undoes it.
+     */
+    forceRender(element: HTMLElement): () => void {
+        const e = this.#elements.find((e) => e.element === element);
+        if (!e || e.forceRender) {
+            return () => {};
+        }
+        e.forceRender = true;
+        return () => {
+            e.forceRender = false;
+        };
+    }
+
     get maxTextureSize(): number {
         return this.#ctx.maxTextureSize;
     }
@@ -1636,7 +1651,11 @@ export class VFXPlayer {
         e.isInLogicalViewport = isInLogicalViewport;
 
         // Quit if the element has left and the transition has ended
-        const isVisible = isInViewport && now - e.leaveTime <= e.release;
+        const isVisible =
+            (isInViewport && now - e.leaveTime <= e.release) ||
+            (e.forceRender === true &&
+                rect.right > rect.left &&
+                rect.bottom > rect.top);
 
         if (isVisible && !e.chain && e.passes.length > 0) {
             const u = e.passes[0].uniforms;

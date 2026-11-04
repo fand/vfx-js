@@ -472,6 +472,9 @@ export type VFXElement = {
     /** Skipped by render while a transition holds its plain content. */
     frozen?: boolean;
 
+    /** Rendered even when off screen, so a transition can finish. */
+    forceRender?: boolean;
+
     /** Present only for effect-path elements. */
     chain?: EffectChain;
 

@@ -93,13 +93,20 @@ export class TransitionEffect implements Effect {
         });
     }
 
-    /** Stop any transition and pass the capture through. */
+    /** Stop any transition, drop a pending snapshot and pass the capture through. */
     cancel(): void {
         this.#end();
         this.#spec = null;
         this.#hold = false;
-        if (this.#snapshotWaiters.length === 0) {
-            this.enabled = false;
+        this.enabled = false;
+        this.#resolveSnapshotWaiters();
+    }
+
+    #resolveSnapshotWaiters(): void {
+        const waiters = this.#snapshotWaiters;
+        this.#snapshotWaiters = [];
+        for (const w of waiters) {
+            w();
         }
     }
 
@@ -145,11 +152,7 @@ export class TransitionEffect implements Effect {
             ctx.blit(ctx.src, this.#ensureFrom(ctx));
             this.#spec = null;
             this.#hold = true;
-            const waiters = this.#snapshotWaiters;
-            this.#snapshotWaiters = [];
-            for (const w of waiters) {
-                w();
-            }
+            this.#resolveSnapshotWaiters();
         }
 
         const from = this.#from;
@@ -238,9 +241,6 @@ export class TransitionEffect implements Effect {
         this.#from = null;
         this.#fromSize = [0, 0];
         this.#end();
-        for (const w of this.#snapshotWaiters) {
-            w();
-        }
-        this.#snapshotWaiters = [];
+        this.#resolveSnapshotWaiters();
     }
 }

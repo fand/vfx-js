@@ -232,6 +232,16 @@ export class VFX {
     }
 
     /**
+     * Keep rendering the element while it is off screen.
+     * Returns a function that undoes it.
+     * @internal Used by transitions.
+     */
+    forceRender(element: HTMLElement): () => void {
+        const target = this.#wrapperCanvases.get(element) ?? element;
+        return this.#player.forceRender(target);
+    }
+
+    /**
      * Remove the element from VFX and stop rendering the shader.
      */
     remove(element: HTMLElement): void {

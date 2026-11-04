@@ -13,6 +13,8 @@ import type {
 
 const DEFAULT_DURATION = 0.6;
 const MEDIA_TIMEOUT_MS = 1000;
+// How long to wait for a frame that never renders before cutting.
+const STALL_TIMEOUT_MS = 1000;
 
 export type ResolvedSpec = {
     transition: TransitionDef;
@@ -115,10 +117,28 @@ export type TransitionHost = Pick<
     | "remove"
     | "freezeInside"
     | "lockSize"
+    | "forceRender"
 >;
 
 export type TransitionEffectLike = Effect &
     Pick<TransitionEffect, "snapshot" | "start" | "cancel">;
+
+// Resolves to false when the promise has not settled in time.
+function settlesWithin(promise: Promise<void>, ms: number): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(false), ms);
+        promise.then(
+            () => {
+                clearTimeout(timer);
+                resolve(true);
+            },
+            (err) => {
+                clearTimeout(timer);
+                reject(err);
+            },
+        );
+    });
+}
 
 const nextFrame = () =>
     new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -136,6 +156,7 @@ export class TransitionController implements Transition {
     #onDestroy: (() => void) | undefined;
     #unfreezers: (() => void)[] = [];
     #unlocks: (() => void)[] = [];
+    #warnedStall = false;
 
     // Each run takes a new id; a run stops at its next await once it is stale.
     #seq = 0;
@@ -254,9 +275,21 @@ export class TransitionController implements Transition {
             return update();
         }
         this.#unlocks.push(this.#vfx.lockSize(this.#element));
-        await this.#effect.snapshot();
+        this.#unlocks.push(this.#vfx.forceRender(this.#element));
+        const snapshotTaken = await settlesWithin(
+            this.#effect.snapshot(),
+            STALL_TIMEOUT_MS,
+        );
         if (!isCurrent()) {
             return update();
+        }
+        if (!snapshotTaken) {
+            this.#cutAfterStall();
+            await update();
+            if (isCurrent()) {
+                this.#releaseWrap(id);
+            }
+            return;
         }
 
         this.#endActive();
@@ -305,7 +338,7 @@ export class TransitionController implements Transition {
         }
 
         const driverFx = fx;
-        await this.#effect.start({
+        const started = this.#effect.start({
             name: def.name,
             frag: this.#fragOf(def),
             uniforms: spec.uniforms,
@@ -317,9 +350,29 @@ export class TransitionController implements Transition {
                 : undefined,
             onEnd: () => this.#endActive(id),
         });
-        if (isCurrent()) {
-            this.#releaseWrap(id);
+        const ended = await settlesWithin(
+            started,
+            spec.duration * 1000 + STALL_TIMEOUT_MS,
+        );
+        if (!isCurrent()) {
+            return;
         }
+        if (!ended) {
+            this.#cutAfterStall();
+        }
+        this.#releaseWrap(id);
+    }
+
+    // The element stopped rendering, so the effect never resolves.
+    #cutAfterStall(): void {
+        if (!this.#warnedStall) {
+            this.#warnedStall = true;
+            console.warn(
+                "[VFX-JS] transition target did not render in time; cutting to the new content.",
+            );
+        }
+        this.#endActive();
+        this.#effect.cancel();
     }
 
     cancel(): void {

@@ -208,7 +208,8 @@ describe("waitForMedia", () => {
     });
 });
 
-function setup(opts: { keepWrapped?: boolean } = {}) {
+function setup(opts: { keepWrapped?: boolean; snapshotStalls?: boolean } = {}) {
+    const { snapshotStalls = false, ...transitionOpts } = opts;
     const log: string[] = [];
     const starts: { opts: TransitionStartOpts; end: () => void }[] = [];
     let endCurrent: (() => void) | null = null;
@@ -219,9 +220,12 @@ function setup(opts: { keepWrapped?: boolean } = {}) {
     };
     const effect: TransitionEffectLike = {
         render: () => {},
-        snapshot: async () => {
+        snapshot: () => {
             end();
             log.push("snapshot");
+            return snapshotStalls
+                ? new Promise<void>(() => {})
+                : Promise.resolve();
         },
         start: (startOpts) => {
             end();
@@ -265,13 +269,19 @@ function setup(opts: { keepWrapped?: boolean } = {}) {
                 log.push("unlock");
             };
         },
+        forceRender: () => {
+            log.push("forceRender");
+            return () => {
+                log.push("unforceRender");
+            };
+        },
     };
     const element = {} as HTMLElement;
     const onDestroy = vi.fn();
     const transition = new TransitionController(
         vfx,
         element,
-        { waitFor: "none", ...opts },
+        { waitFor: "none", ...transitionOpts },
         onDestroy,
         effect,
     );
@@ -303,6 +313,7 @@ describe("TransitionController", () => {
             "freeze",
             "wrap",
             "lock",
+            "forceRender",
             "snapshot",
             "cb",
             "freeze",
@@ -312,6 +323,7 @@ describe("TransitionController", () => {
             "unfreeze",
             "unfreeze",
             "unlock",
+            "unforceRender",
         ]);
         expect(transition.running).toBe(false);
     });
@@ -406,6 +418,50 @@ describe("TransitionController", () => {
         expect(prepare).toHaveBeenCalledTimes(2);
         expect(prepare.mock.calls[0][1]).toBe(fx);
         expect(onEnd).toHaveBeenCalledTimes(2);
+    });
+
+    test("a snapshot that never lands times out and cuts", async () => {
+        vi.useFakeTimers();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            const { transition, log, starts } = setup({ snapshotStalls: true });
+            const cb = vi.fn();
+            const run = transition.run(cb);
+            await vi.advanceTimersByTimeAsync(999);
+            expect(cb).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(1);
+            await run;
+            expect(cb).toHaveBeenCalledOnce();
+            expect(starts).toHaveLength(0);
+            expect(log).toContain("cancel");
+            expect(log).toContain("unwrap");
+            expect(log).toContain("unforceRender");
+            expect(transition.running).toBe(false);
+            expect(warn).toHaveBeenCalledOnce();
+        } finally {
+            warn.mockRestore();
+            vi.useRealTimers();
+        }
+    });
+
+    test("a transition that never ends times out and unwraps", async () => {
+        vi.useFakeTimers();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            const { transition, log } = setup();
+            const cb = vi.fn();
+            const run = transition.run(cb, { duration: 0.5 });
+            await vi.advanceTimersByTimeAsync(1499);
+            expect(log).not.toContain("unwrap");
+            await vi.advanceTimersByTimeAsync(10);
+            await run;
+            expect(cb).toHaveBeenCalledOnce();
+            expect(log).toContain("unwrap");
+            expect(warn).toHaveBeenCalledOnce();
+        } finally {
+            warn.mockRestore();
+            vi.useRealTimers();
+        }
     });
 
     test("duration 0 cuts without wrapping", async () => {
