@@ -26,6 +26,7 @@
     "three": "0.186.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.3",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "26.6.5",
     "@types/react": "^19.3.0",
