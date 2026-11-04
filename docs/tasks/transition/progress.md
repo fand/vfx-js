@@ -135,6 +135,13 @@ keepWrapped: true })`, so these parts had no user left:
   `watchNavigationDirection` or `VFXLink`; `setNextTransition` and
   `transition` take `RunOpts`.
 
+## Spec fixes
+
+From [plan4.md](./plan4.md):
+
+- The still copy now covers the wrap frame only for transitions; plain
+  `addHTML` skips it. It sits one below the VFX canvas z-index.
+
 ## Verified
 
 - Lint, vitest (core 248, effects 14, react 25), `tsc --noEmit` and the

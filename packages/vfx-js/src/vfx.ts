@@ -143,7 +143,23 @@ export class VFX {
      * Wraps the element in a `<canvas layoutsubtree content="drawable">` and captures via drawElementImage.
      * Falls back to `add()` if html-in-canvas is not supported.
      */
-    async addHTML(element: HTMLElement, opts: VFXProps): Promise<void> {
+    addHTML(element: HTMLElement, opts: VFXProps): Promise<void> {
+        return this.#addHTML(element, opts, false);
+    }
+
+    /**
+     * Like `addHTML`, and a still copy covers the frame before the first capture.
+     * @internal Used by transitions.
+     */
+    addHTMLWithStill(element: HTMLElement, opts: VFXProps): Promise<void> {
+        return this.#addHTML(element, opts, true);
+    }
+
+    async #addHTML(
+        element: HTMLElement,
+        opts: VFXProps,
+        withStill: boolean,
+    ): Promise<void> {
         if (!supportsHtmlInCanvas()) {
             console.warn(
                 "html-in-canvas not supported, falling back to dom-to-canvas",
@@ -169,11 +185,18 @@ export class VFX {
                 this.#player.updateHICTexture(canvas, offscreen);
             },
             maxSize: this.#player.maxTextureSize,
+            stillCover: withStill ? { zIndex: this.#stillZIndex() } : undefined,
         });
         wrapper = canvas;
         this.#wrapperCanvases.set(element, wrapper);
 
         await this.#addHICCanvas(wrapper, hicOpts, initialCapture);
+    }
+
+    // One below the VFX canvas.
+    #stillZIndex(): number {
+        const zIndex = Number.parseInt(this.#canvas.style.zIndex, 10);
+        return Number.isNaN(zIndex) ? 9998 : zIndex - 1;
     }
 
     async #addHICCanvas(

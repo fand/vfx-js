@@ -111,7 +111,7 @@ export function waitForMedia(
 
 export type TransitionHost = Pick<
     VFX,
-    | "addHTML"
+    | "addHTMLWithStill"
     | "update"
     | "updateEffects"
     | "remove"
@@ -470,7 +470,7 @@ export class TransitionController implements Transition {
         const chain = [this.#effect, ...driverFx];
         if (!this.#wrapped) {
             const wrapping = this.#vfx
-                .addHTML(this.#element, { effect: chain })
+                .addHTMLWithStill(this.#element, { effect: chain })
                 .then(() => {
                     this.#wrapped = true;
                     this.#chain = chain;

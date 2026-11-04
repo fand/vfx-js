@@ -405,6 +405,11 @@ export function teardownCapture(canvas: HTMLCanvasElement): void {
     }
 }
 
+export interface WrapOpts extends CaptureOpts {
+    /** Cover the wrap frame with a still copy at this z-index. */
+    stillCover?: { zIndex: number };
+}
+
 interface WrapResult {
     canvas: HTMLCanvasElement;
     initialCapture: OffscreenCanvas;
@@ -427,7 +432,7 @@ interface WrapResult {
  */
 export async function wrapElement(
     element: HTMLElement,
-    opts: CaptureOpts,
+    opts: WrapOpts,
 ): Promise<WrapResult> {
     const rect = element.getBoundingClientRect();
 
@@ -485,7 +490,12 @@ export async function wrapElement(
 
     // A drawable child is not painted until its first capture lands, one
     // frame later. A still copy covers that frame.
-    stillCovers.set(canvas, coverWithStill(element));
+    if (opts.stillCover) {
+        stillCovers.set(
+            canvas,
+            coverWithStill(element, opts.stillCover.zIndex),
+        );
+    }
 
     // DOM swap
     savedMargins.set(element, element.style.margin);

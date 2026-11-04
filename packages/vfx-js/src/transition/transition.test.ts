@@ -249,7 +249,7 @@ function setup(opts: { keepWrapped?: boolean; snapshotStalls?: boolean } = {}) {
     const toList = (effects: Effect | readonly Effect[] | undefined) =>
         effects === undefined ? [] : [effects].flat();
     const vfx: TransitionHost = {
-        addHTML: async (_element, props) => {
+        addHTMLWithStill: async (_element, props) => {
             log.push("wrap");
             chain = toList(props.effect);
         },

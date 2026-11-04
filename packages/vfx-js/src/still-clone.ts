@@ -12,7 +12,10 @@
  *   The page holds a duplicate id for that one frame; the copy is hidden from
  *   assistive tech and ignores the pointer.
  */
-export function coverWithStill(element: HTMLElement): () => void {
+export function coverWithStill(
+    element: HTMLElement,
+    zIndex = 9998,
+): () => void {
     const rect = element.getBoundingClientRect();
     const clone = element.cloneNode(true) as HTMLElement;
     const from = [element, ...element.querySelectorAll<HTMLElement>("*")];
@@ -70,7 +73,7 @@ export function coverWithStill(element: HTMLElement): () => void {
     style.setProperty("margin", "0");
     style.setProperty("pointer-events", "none");
     // Above the page, below the VFX output canvas.
-    style.setProperty("z-index", "9998");
+    style.setProperty("z-index", zIndex.toString());
 
     // A sibling keeps inherited styles. A transformed ancestor shifts
     // fixed boxes, so measure once and correct.
