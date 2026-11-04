@@ -2,7 +2,7 @@ import type { RunOpts } from "@vfx-js/core";
 import type * as React from "react";
 
 // One VFX per page, so one pending spec for the next navigation.
-const PENDING_TTL_MS = 2000;
+const PENDING_TTL_MS = 10_000;
 
 let pending: { spec: RunOpts; at: number } | null = null;
 

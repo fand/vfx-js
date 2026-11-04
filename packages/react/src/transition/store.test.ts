@@ -2,6 +2,7 @@ import type { TransitionDef } from "@vfx-js/core";
 import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+    hasPending,
     markBackNavigation,
     setNextTransition,
     takePending,
@@ -78,9 +79,11 @@ describe("pending spec", () => {
         expect(takePending()).toBeNull();
     });
 
-    it("expires after 2 s", () => {
+    it("expires after 10 s", () => {
         setNextTransition({ transition: zoom });
-        vi.advanceTimersByTime(2001);
+        vi.advanceTimersByTime(9999);
+        expect(hasPending()).toBe(true);
+        vi.advanceTimersByTime(2);
         expect(takePending()).toBeNull();
     });
 

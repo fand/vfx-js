@@ -145,6 +145,7 @@ From [plan4.md](./plan4.md):
   videos, and gives up after 300 ms instead of 1 s.
 - `overflow` from the options wins over the transition's own, and a
   target that fills the canvas never grows the stage.
+- A click spec now lasts 10 s instead of 2 s, so slow navigations keep it.
 
 ## Verified
 

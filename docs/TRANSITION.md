@@ -276,7 +276,7 @@ import { transition } from "@vfx-js/react";
 Returns an `onClick` that stores the spec for the next run. It does not
 intercept navigation. It ignores modified clicks, non-left buttons,
 `target="_blank"` and clicks with `defaultPrevented`. The spec expires
-after about 2 s.
+after about 10 s.
 
 A Server Component cannot pass `onClick` to `Link`. Wrap the link in a
 small client component that passes `onClick={transition(spec)}`.
