@@ -6,7 +6,7 @@ import type {
     EffectRenderTarget,
 } from "../types.js";
 import { describeGlslError } from "./glsl.js";
-import type { TransitionUniforms } from "./types.js";
+import type { TransitionEase, TransitionUniforms } from "./types.js";
 
 export type TransitionStartOpts = {
     /** For error messages. */
@@ -20,6 +20,8 @@ export type TransitionStartOpts = {
     reverse: boolean;
     /** Draw outside the element: `true` for the whole canvas, a number for CSS px on every side. */
     overflow?: true | number;
+    /** Defaults to `"smoothstep"`. */
+    ease?: TransitionEase;
     /** Per-frame hook. `t` is eased, `x` linear, `dt` in seconds. */
     onFrame?(t: number, x: number, dt: number): void;
     /** Called once when this run finishes or is replaced. */
@@ -185,7 +187,8 @@ export class TransitionEffect implements Effect {
                 spec.duration > 0
                     ? (ctx.time - this.#startTime) / spec.duration
                     : 1;
-            const t = smoothstep(Math.min(Math.max(x, 0), 1));
+            const clamped = Math.min(Math.max(x, 0), 1);
+            const t = spec.ease === "linear" ? clamped : smoothstep(clamped);
             if (x >= 1 || this.#broken.has(spec.frag)) {
                 this.#spec = null;
                 this.enabled = false;

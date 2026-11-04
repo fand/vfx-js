@@ -154,6 +154,8 @@ type TransitionDef = {
     name: string;
     frag: string;                 // defines vec4 transition(vec2 uv, float t)
     overflow?: true | number;     // room to draw outside the element
+    uniforms?: TransitionUniforms; // defaults; the spec's uniforms win
+    ease?: "smoothstep" | "linear"; // how t follows progress; default "smoothstep"
     effects?(): Promise<Effect[]>;
     prepare?(run: TransitionRun, fx: Effect[]): void;
     onFrame?(t: number, x: number, dt: number, fx: Effect[]): void;
@@ -164,6 +166,7 @@ type TransitionDef = {
 ### GLSL
 
 `frag` defines one function. `t` goes from 0 to 1 with a smoothstep ease.
+Set `ease: "linear"` to get linear `t`.
 VFX-JS wraps it with a prelude and a `main`.
 
 ```ts
@@ -180,6 +183,9 @@ vec4 transition(vec2 uv, float t) {
 
 t.run(cb, { transition: wipe, uniforms: { softness: 0.05 } });
 ```
+
+Put defaults in `uniforms` on the def, e.g. `uniforms: { softness: 0.05 }`.
+The spec's `uniforms` override them key by key.
 
 The prelude gives you:
 

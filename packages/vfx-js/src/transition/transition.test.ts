@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { Effect, EffectDims } from "../types";
+import type { Effect, EffectContext, EffectDims } from "../types";
 import { crossfade } from "./crossfade";
 import { TransitionEffect, type TransitionStartOpts } from "./effect";
 import { BODY_OFFSET, describeGlslError } from "./glsl";
@@ -23,7 +23,29 @@ describe("resolveSpec", () => {
             reverse: false,
             duration: 0.6,
             overflow: undefined,
+            ease: "smoothstep",
         });
+    });
+
+    test("transition uniforms are defaults under the spec's", () => {
+        const cube: TransitionDef = {
+            name: "cube",
+            frag: "",
+            uniforms: { persp: 0.7, unzoom: 0.3 },
+        };
+        expect(resolveSpec({ transition: cube }).uniforms).toEqual({
+            persp: 0.7,
+            unzoom: 0.3,
+        });
+        expect(
+            resolveSpec({}, { transition: cube, uniforms: { persp: 0.2 } })
+                .uniforms,
+        ).toEqual({ persp: 0.2, unzoom: 0.3 });
+    });
+
+    test("carries the transition's ease", () => {
+        const linear: TransitionDef = { name: "l", frag: "", ease: "linear" };
+        expect(resolveSpec({ transition: linear }).ease).toBe("linear");
     });
 
     test("overflow from the options wins over the transition's", () => {
@@ -144,6 +166,51 @@ describe("TransitionEffect.outputRect", () => {
         const effect = start(true);
         void effect.snapshot();
         expect(effect.outputRect(dims)).toBeUndefined();
+    });
+});
+
+describe("TransitionEffect frames", () => {
+    const frameCtx = (time: number) =>
+        ({
+            time,
+            deltaTime: 0.1,
+            src: {},
+            target: null,
+            dims: { elementPixel: [10, 10] },
+            draw: vi.fn(),
+            blit: vi.fn(),
+            createRenderTarget: () => ({ dispose: () => {} }),
+        }) as unknown as EffectContext;
+
+    const run = (ease?: "smoothstep" | "linear") => {
+        const effect = new TransitionEffect();
+        void effect.snapshot();
+        effect.render(frameCtx(0));
+        const frames: [number, number][] = [];
+        void effect.start({
+            frag: "",
+            duration: 1,
+            reverse: false,
+            ease,
+            onFrame: (t, x) => frames.push([t, x]),
+        });
+        effect.render(frameCtx(10));
+        const ctx = frameCtx(10.25);
+        effect.render(ctx);
+        const draw = vi.mocked(ctx.draw).mock.calls[0][0];
+        return { frames, t: draw.uniforms?.t };
+    };
+
+    test("eases t with a smoothstep by default", () => {
+        const { frames, t } = run();
+        expect(frames[1]).toEqual([0.15625, 0.25]);
+        expect(t).toBe(0.15625);
+    });
+
+    test("a linear transition gets t equal to x", () => {
+        const { frames, t } = run("linear");
+        expect(frames[1]).toEqual([0.25, 0.25]);
+        expect(t).toBe(0.25);
     });
 });
 

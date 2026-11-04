@@ -11,6 +11,8 @@ export type TransitionUniforms = Record<
     Exclude<EffectUniformValue, EffectTexture | EffectRenderTarget>
 >;
 
+export type TransitionEase = "smoothstep" | "linear";
+
 /** One run of a transition, passed to the driver hooks. */
 export type TransitionRun = {
     reverse: boolean;
@@ -25,6 +27,10 @@ export type TransitionDef = {
     frag: string;
     /** Draw outside the element: `true` for the whole canvas, a number for CSS px on every side. */
     overflow?: true | number;
+    /** Default uniforms. The spec's uniforms win. */
+    uniforms?: TransitionUniforms;
+    /** How `t` follows linear progress. Defaults to `"smoothstep"`. */
+    ease?: TransitionEase;
 
     // Optional JS driver for transitions built on extra effects.
 

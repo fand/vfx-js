@@ -14,6 +14,7 @@ export type {
     RunOpts,
     Transition,
     TransitionDef,
+    TransitionEase,
     TransitionRun,
     TransitionSpec,
     TransitionUniforms,

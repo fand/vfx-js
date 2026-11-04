@@ -8,6 +8,7 @@ import type {
     RunOpts,
     Transition,
     TransitionDef,
+    TransitionEase,
     TransitionUniforms,
 } from "./types.js";
 
@@ -22,11 +23,13 @@ export type ResolvedSpec = {
     reverse: boolean;
     duration: number;
     overflow: true | number | undefined;
+    ease: TransitionEase;
 };
 
 /**
  * Pick the run options, then the named type, then the container defaults.
- * Uniforms come with the shader from the first level that sets `transition`.
+ * Uniforms come with the shader from the first level that sets `transition`,
+ * on top of the transition's own defaults.
  */
 export function resolveSpec(
     opts: AddTransitionOpts,
@@ -38,7 +41,7 @@ export function resolveSpec(
     const transition = shader.transition ?? crossfade;
     return {
         transition,
-        uniforms: shader.uniforms ?? {},
+        uniforms: { ...transition.uniforms, ...shader.uniforms },
         reverse: run.reverse ?? typed?.reverse ?? opts.reverse ?? false,
         duration:
             run.duration ??
@@ -50,6 +53,7 @@ export function resolveSpec(
             typed?.overflow ??
             opts.overflow ??
             transition.overflow,
+        ease: transition.ease ?? "smoothstep",
     };
 }
 
@@ -364,6 +368,7 @@ export class TransitionController implements Transition {
             duration: spec.duration,
             reverse: spec.reverse,
             overflow: spec.overflow,
+            ease: spec.ease,
             onFrame: def.onFrame
                 ? (t, x, dt) => def.onFrame?.(t, x, dt, driverFx)
                 : undefined,
