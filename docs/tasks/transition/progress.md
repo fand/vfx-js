@@ -118,6 +118,23 @@ From the PR #220 review ([plan2.md](./plan2.md)):
 - The still copy keeps the element's `id`, so `#app { … }` styles cover
   the wrap frame.
 
+## API trim
+
+From [plan3.md](./plan3.md). glide moves to `vfx.addTransition(stage, {
+keepWrapped: true })`, so these parts had no user left:
+
+- Dropped `AddTransitionOpts.effects`; the chain is the transition effect
+  plus the def's driver effects.
+- Core no longer exports `TransitionEffect`, `TransitionStartOpts`,
+  `BODY_OFFSET`, `PRELUDE`, `buildFrag` and `describeGlslError`.
+- Dropped `readOld` / `readNew` from the prelude; `datamosh` uses
+  `readFrom` / `readTo` with `reverse`.
+- `TransitionUniforms` takes the core uniform values (numbers and
+  vectors, no textures), so colors work.
+- React no longer exports `takePending`, `markBackNavigation`,
+  `watchNavigationDirection` or `VFXLink`; `setNextTransition` and
+  `transition` take `RunOpts`.
+
 ## Verified
 
 - Lint, vitest (core 248, effects 14, react 25), `tsc --noEmit` and the
@@ -136,7 +153,6 @@ From the PR #220 review ([plan2.md](./plan2.md)):
 - No React render tests (`VFXTransition`, `useVFXTransition`); the
   package has no DOM test setup.
 - `packages/docs` demo page not added (the site is one `main.ts` app).
-- glide rewrite happens in the glide repo. glide's full-screen stage may
-  want its old "opaque outside" `MAIN`; `PRELUDE` and `BODY_OFFSET` are
-  exported for that.
+- glide rewrite happens in the glide repo, on `addTransition` with
+  `keepWrapped: true`.
 - Exact peer versions are set at release time.
