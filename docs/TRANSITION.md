@@ -136,8 +136,9 @@ and the options' (picked run → type → container).
 Runs after `cb` and before the new capture.
 
 - `"media"` (default) waits for pending `<img>` loads, `<video>`
-  `loadeddata` and `document.fonts.ready`, up to about 1 s. It does not
-  watch CSS `background-image`.
+  `loadeddata` and `document.fonts.ready`, up to about 300 ms. Lazy
+  images off screen and `preload="none"` videos are not waited for. It
+  does not watch CSS `background-image`.
 - `"none"` captures right away.
 - A function gets the element and returns a promise.
 

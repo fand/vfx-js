@@ -153,12 +153,25 @@ describe("describeGlslError", () => {
     });
 });
 
-function fakeMedia(tagName: string, ready: boolean) {
+function fakeMedia(
+    tagName: string,
+    ready: boolean,
+    extra: { loading?: string; preload?: string; top?: number } = {},
+) {
     const listeners = new Map<string, () => void>();
+    const top = extra.top ?? 0;
     return {
         tagName,
         complete: ready,
         readyState: ready ? 4 : 0,
+        loading: extra.loading ?? "eager",
+        preload: extra.preload ?? "auto",
+        getBoundingClientRect: () => ({
+            left: 0,
+            top,
+            right: 100,
+            bottom: top + 100,
+        }),
         addEventListener: (type: string, fn: () => void) => {
             listeners.set(type, fn);
         },
@@ -173,9 +186,11 @@ function fakeRoot(media: unknown[]) {
 describe("waitForMedia", () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        vi.stubGlobal("window", { innerWidth: 800, innerHeight: 600 });
     });
     afterEach(() => {
         vi.useRealTimers();
+        vi.unstubAllGlobals();
     });
 
     test("resolves at once with nothing pending", async () => {
@@ -195,6 +210,39 @@ describe("waitForMedia", () => {
         expect(done).not.toHaveBeenCalled();
         video.fire("error");
         await vi.advanceTimersByTimeAsync(0);
+        expect(done).toHaveBeenCalled();
+    });
+
+    test("skips lazy images off screen and preload none videos", async () => {
+        const done = vi.fn();
+        waitForMedia(
+            fakeRoot([
+                fakeMedia("IMG", false, { loading: "lazy", top: 2000 }),
+                fakeMedia("VIDEO", false, { preload: "none" }),
+            ]),
+            undefined,
+        ).then(done);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(done).toHaveBeenCalled();
+    });
+
+    test("waits for lazy images on screen", async () => {
+        const img = fakeMedia("IMG", false, { loading: "lazy", top: 100 });
+        const done = vi.fn();
+        waitForMedia(fakeRoot([img]), undefined).then(done);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(done).not.toHaveBeenCalled();
+        img.fire("load");
+        await vi.advanceTimersByTimeAsync(0);
+        expect(done).toHaveBeenCalled();
+    });
+
+    test("gives up after 300 ms by default", async () => {
+        const done = vi.fn();
+        waitForMedia(fakeRoot([]), new Promise(() => {})).then(done);
+        await vi.advanceTimersByTimeAsync(299);
+        expect(done).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
         expect(done).toHaveBeenCalled();
     });
 

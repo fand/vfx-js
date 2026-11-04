@@ -12,7 +12,7 @@ import type {
 } from "./types.js";
 
 const DEFAULT_DURATION = 0.6;
-const MEDIA_TIMEOUT_MS = 1000;
+const MEDIA_TIMEOUT_MS = 300;
 // How long to wait for a frame that never renders before cutting.
 const STALL_TIMEOUT_MS = 1000;
 
@@ -65,6 +65,26 @@ export function resolveSpec(
     };
 }
 
+function isOnScreen(element: Element): boolean {
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.right > 0 &&
+        rect.bottom > 0 &&
+        rect.left < window.innerWidth &&
+        rect.top < window.innerHeight
+    );
+}
+
+// Lazy images off screen and `preload="none"` videos do not load on their own.
+function willNotLoad(media: HTMLImageElement | HTMLVideoElement): boolean {
+    if (media.tagName === "IMG") {
+        return (
+            (media as HTMLImageElement).loading === "lazy" && !isOnScreen(media)
+        );
+    }
+    return (media as HTMLVideoElement).preload === "none";
+}
+
 /** Wait for pending images, videos and `fonts`, or until the timeout. */
 export function waitForMedia(
     root: ParentNode,
@@ -79,7 +99,7 @@ export function waitForMedia(
         const ready = isImage
             ? (media as HTMLImageElement).complete
             : (media as HTMLVideoElement).readyState >= 2;
-        if (!ready) {
+        if (!ready && !willNotLoad(media)) {
             pending.push(
                 new Promise<void>((resolve) => {
                     const done = () => resolve();
