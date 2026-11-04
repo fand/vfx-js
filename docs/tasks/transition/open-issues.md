@@ -77,3 +77,9 @@ Navigation waits for the old snapshot (Astro), or the old page stays up
 until it (Next). On the small demo page it took about 20 ms, probably on
 the dom-to-canvas fallback (Playwright's Chrome had no html-in-canvas
 flag). Large pages and the html-in-canvas path are not measured.
+
+## gl-transitions
+
+All 123 entries without textures compiled and ran on /transitions
+(Playwright's Chrome, 0.3 s runs, no `[VFX-JS]` errors or warnings).
+`LumaWipe` and `DisplacementMap` need textures and are not listed.

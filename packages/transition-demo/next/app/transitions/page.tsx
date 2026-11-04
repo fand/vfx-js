@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageFrame } from "../_components/page-frame";
 import { presetList } from "../_lib/presets";
+import { GLPlayground } from "./gl-playground";
 import { Playground } from "./playground";
 
 export const metadata: Metadata = { title: "Transitions" };
@@ -17,11 +18,22 @@ export default function Transitions() {
                 </h1>
                 <p className="lead">
                     Click a preset to play it on the stage. Change the duration,
-                    play it in reverse, or let it loop.
+                    play it in reverse, or let it loop. Below that, every shader
+                    from gl-transitions.
                 </p>
             </section>
             <section className="doc-section">
                 <Playground />
+            </section>
+            <section className="doc-section">
+                <h2>gl-transitions</h2>
+                <p>
+                    Any shader from{" "}
+                    <a href="https://gl-transitions.com/">gl-transitions</a>{" "}
+                    works through <code>createGLTransition</code>. Pick one to
+                    play it.
+                </p>
+                <GLPlayground />
             </section>
             <section className="doc-section">
                 <table className="preset-table">

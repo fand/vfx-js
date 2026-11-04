@@ -23,6 +23,18 @@ await t.run(() => {
 });
 ```
 
+### gl-transitions
+
+Use any shader from [gl-transitions](https://gl-transitions.com/):
+
+```ts
+import { createGLTransition } from "@vfx-js/transitions";
+import transitions from "gl-transitions";
+
+const cube = transitions.find((t) => t.name === "Cube")!;
+await t.run(swap, { transition: createGLTransition(cube) });
+```
+
 See the [transition guide](https://github.com/fand/vfx-js/blob/main/docs/TRANSITION.md) for the full API and the preset list.
 
 ## License

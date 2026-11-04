@@ -320,6 +320,16 @@ button.addEventListener("click", () => {
   });
 });`,
             },
+            {
+                label: "gl-transitions",
+                code: `
+// npm i gl-transitions
+import { createGLTransition } from "@vfx-js/transitions";
+import transitions from "gl-transitions";
+
+const cube = transitions.find((t) => t.name === "Cube")!;
+t.run(swap, { transition: createGLTransition(cube, { persp: 0.5 }) });`,
+            },
         ],
         notes: [
             "run() resolves when the animation ends. A new run() drops the old one, but its callback still runs.",

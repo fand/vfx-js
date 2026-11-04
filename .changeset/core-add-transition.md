@@ -5,3 +5,5 @@
 `addTransition`: animate an element from its old content to its new content with a shader.
 
 Also: `update()` on html-in-canvas elements now resolves when the capture lands.
+
+`TransitionDef` takes default `uniforms` and `ease` (`"smoothstep"` or `"linear"`).

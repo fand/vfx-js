@@ -953,6 +953,7 @@ em {
 .pg-side {
     display: grid;
     gap: 16px;
+    min-width: 0;
 }
 .pg-list {
     display: grid;
@@ -1026,6 +1027,15 @@ em {
 }
 .pg-toggle input {
     accent-color: var(--em);
+}
+.pg-select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 10px;
+    background: #ffffff0a;
+    color: var(--fg);
+    font: 13px var(--mono);
 }
 .preset-table {
     width: 100%;

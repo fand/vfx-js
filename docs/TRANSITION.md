@@ -243,6 +243,36 @@ import {
 | `datamosh` / `createDatamosh({ blockSize })` | Hard cut through a datamosh that heals block by block. |
 | `pixelsort` / `createPixelsort({ direction })` | Content melts into sorted streaks and sorts back out. |
 
+### gl-transitions
+
+`createGLTransition` turns any shader from
+[gl-transitions](https://gl-transitions.com/) into a `TransitionDef`.
+
+```bash
+npm i gl-transitions
+```
+
+```ts
+import { createGLTransition } from "@vfx-js/transitions";
+import transitions from "gl-transitions";
+
+const cube = transitions.find((t) => t.name === "Cube")!;
+t.run(cb, { transition: createGLTransition(cube, { persp: 0.5 }) });
+```
+
+- Look a shader up by its `name` (PascalCase, e.g. `"Cube"`). The
+  package is one array, so `@vfx-js/transitions` does not import it.
+- `params` override the shader's `defaultParams`. An unknown key logs a
+  warning.
+- `t` is linear for these defs (`ease: "linear"`); each shader eases
+  itself.
+- Shaders that need extra textures (`LumaWipe`, `DisplacementMap`)
+  throw.
+- A param named like a core uniform (e.g. `reverse` in `BowTie`) is
+  renamed to `glParam_<name>`. Pass it to `createGLTransition` by its
+  own name. In a run's `uniforms`, use `glParam_reverse`.
+- Each shader keeps its author's license (MIT), listed in its entry.
+
 ## React API
 
 No `<VFXProvider>` is needed. Components outside a Provider share one
