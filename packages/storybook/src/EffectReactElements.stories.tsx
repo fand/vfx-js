@@ -1,6 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import { BloomEffect, PixelateEffect, ScanlineEffect } from "@vfx-js/effects";
-import { VFXDiv, VFXP, VFXProvider, VFXSpan, VFXVideo } from "@vfx-js/react";
+import {
+    useVFXConfig,
+    VFXDiv,
+    VFXP,
+    VFXProvider,
+    VFXSpan,
+    VFXVideo,
+} from "@vfx-js/react";
 import { createRoot } from "react-dom/client";
 import JellyfishMp4 from "./assets/jellyfish.mp4";
 import "./preset.css";
@@ -135,4 +142,47 @@ elementsSmokeTest.play = async ({ canvasElement }) => {
     const container = canvasElement.firstElementChild as HTMLElement;
     const root = createRoot(container);
     root.render(<SmokeTestApp />);
+};
+
+function NoProviderApp(): React.ReactElement {
+    useVFXConfig({ pixelRatio: 1 });
+    return (
+        <div style={ROOT_STYLE}>
+            <section>
+                <div style={SECTION_HEADER}>No VFXProvider</div>
+                <VFXVideo
+                    src={JellyfishMp4}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    style={{ width: 320, marginTop: 12 }}
+                    shader="rgbShift"
+                />
+            </section>
+            <section>
+                <VFXSpan shader="rainbow" style={{ fontSize: 48 }}>
+                    Shared instance
+                </VFXSpan>
+            </section>
+        </div>
+    );
+}
+
+export const noProvider: StoryObj<undefined> = {
+    name: "No Provider",
+    render: () => {
+        const root = document.getElementById("storybook-root");
+        if (root) {
+            root.style.height = "auto";
+            root.style.display = "block";
+        }
+        return document.createElement("div");
+    },
+    args: undefined,
+};
+noProvider.play = async ({ canvasElement }) => {
+    await new Promise((r) => requestAnimationFrame(r));
+    const container = canvasElement.firstElementChild as HTMLElement;
+    createRoot(container).render(<NoProviderApp />);
 };

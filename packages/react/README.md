@@ -20,7 +20,7 @@ These components works just like `<img>`, `<video>`, `<span>` and `<div>` - acce
 import * as VFX from '@vfx-js/react';
 
 export default () => (
-    <VFX.VFXProvider>
+    <>
         {/* Render image with shader */}
         <VFX.VFXImg src="cat.png" alt="image" shader="rgbShift"/>
 
@@ -39,7 +39,7 @@ export default () => (
         <VFX.VFXDiv shader="rainbow">
             <input type="text" value="hello" />
         </VFX.VFXDiv>
-    </VFX.VFXProvider>
+    </>
 );
 ```
 
@@ -53,6 +53,47 @@ NOTE: `VFXSpan` doesn't work if the content includes child nodes.
 <VFXSpan><a href="https://example.com">Yo</a></VFXSpan>
 ```
 
+### Options
+
+All VFX components outside `<VFXProvider>` share one WebGL canvas.
+Use `useVFXConfig` to set its options:
+
+```ts
+import { useVFXConfig, VFXImg } from '@vfx-js/react';
+
+export default () => {
+    useVFXConfig({ pixelRatio: 1, zIndex: -1 });
+    return <VFXImg src="cat.png" shader="rgbShift"/>;
+};
+```
+
+- Options: `pixelRatio`, `zIndex`, `postEffect`, `autoplay`.
+- A change in options recreates the canvas, so memo `postEffect` (e.g. with `useMemo`).
+- Options apply while the component is mounted. Call it once, e.g. in your root layout. If more than one is mounted, the last one wins.
+
+### VFXProvider
+
+Use `<VFXProvider>` when you need a separate VFX instance, e.g. to put the canvas in a `wrapper` element, or to access the instance through `VFXContext`:
+
+```ts
+import { useRef } from 'react';
+import { VFXProvider, VFXImg } from '@vfx-js/react';
+
+export default () => {
+    const wrapper = useRef<HTMLDivElement>(null);
+    return (
+        <div ref={wrapper} style={{ position: 'relative', overflow: 'hidden' }}>
+            <VFXProvider wrapper={wrapper} pixelRatio={1}>
+                <VFXImg src="cat.png" shader="rgbShift"/>
+            </VFXProvider>
+        </div>
+    );
+};
+```
+
+Components inside a Provider use its instance. `useVFXConfig` does nothing there.
+Each Provider has its own canvas, separate from the shared one. So a page with a Provider and components outside it has two canvases.
+
 ### Effect API
 
 Pass a prebuilt `Effect` instance (or array) from [`@vfx-js/effects`](https://www.npmjs.com/package/@vfx-js/effects) via the `effect` prop:
@@ -62,14 +103,14 @@ import * as VFX from '@vfx-js/react';
 import { BloomEffect, PixelateEffect } from '@vfx-js/effects';
 
 export default () => (
-    <VFX.VFXProvider>
+    <>
         <VFX.VFXImg src="cat.png" effect={new BloomEffect({ intensity: 5 })}/>
 
         <VFX.VFXImg src="doge.gif" effect={[
             new PixelateEffect({ size: 10 }),
             new BloomEffect({ intensity: 8 }),
         ]}/>
-    </VFX.VFXProvider>
+    </>
 );
 ```
 

@@ -14,8 +14,8 @@ npm install @vfx-js/react
 Then update your imports:
 
 ```diff
-- import { VFXProvider, VFXImg } from "react-vfx";
-+ import { VFXProvider, VFXImg } from "@vfx-js/react";
+- import { VFXImg } from "react-vfx";
++ import { VFXImg } from "@vfx-js/react";
 ```
 
 The two packages export exactly the same API. Switching is a pure rename.

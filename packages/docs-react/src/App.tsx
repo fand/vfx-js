@@ -10,8 +10,10 @@ import UsageSection from "./dom/UsageSection";
 import "./App.css";
 
 const App: React.FC = () => {
+    VFX.useVFXConfig({ pixelRatio: 1 });
+
     return (
-        <VFX.VFXProvider pixelRatio={1}>
+        <>
             <Bg />
             <div className="App">
                 <Frame />
@@ -21,7 +23,7 @@ const App: React.FC = () => {
                 <UsageSection />
                 <AuthorSection />
             </div>
-        </VFX.VFXProvider>
+        </>
     );
 };
 

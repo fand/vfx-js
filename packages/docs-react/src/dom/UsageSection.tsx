@@ -81,36 +81,7 @@ const UsageSection: React.FC = () => (
         <section>
             <h2 id="usage">Usage</h2>
             <p>
-                @vfx-js/react consists of{" "}
-                <b>
-                    <i>VFX Provider</i>
-                </b>{" "}
-                and{" "}
-                <b>
-                    <i>VFX Elements</i>
-                </b>
-                .
-            </p>
-            <p>
-                First, wrap your entire app with{" "}
-                <InlineCode>{"<VFXProvider>"}</InlineCode>.
-            </p>
-            <Code>
-                {dedent`
-            import { VFXProvider } from '@vfx-js/react';
-
-            function App {
-              return (
-                <VFXProvider>
-                  {/* Place your app here */}
-                </VFXProvider>
-              );
-            }
-        `}
-            </Code>
-            <p>
-                Then you can use VFX Elements anywhere in you app. Use{" "}
-                <InlineCode>{"<VFXImg>"}</InlineCode>,{" "}
+                Use <InlineCode>{"<VFXImg>"}</InlineCode>,{" "}
                 <InlineCode>{"<VFXVideo>"}</InlineCode> or{" "}
                 <InlineCode>{"<VFXSpan>"}</InlineCode> instead of{" "}
                 <InlineCode>{"<img>"}</InlineCode>,{" "}
