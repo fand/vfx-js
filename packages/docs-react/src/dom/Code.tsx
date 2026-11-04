@@ -20,18 +20,43 @@ const inlineStyle = {
     backgroundColor: "rgba(0,0,0,0.8)",
 } as const;
 
+type Token = { content: string };
+
+const lineLength = (line: Token[]): number =>
+    line.reduce((n, t) => n + t.content.length, 0) + 1;
+
+// Pairs each item with its start offset in the source, for a stable key.
+function withOffsets<T>(
+    items: T[],
+    length: (item: T) => number,
+): [T, number][] {
+    let offset = 0;
+    return items.map((item) => {
+        const start = offset;
+        offset += length(item);
+        return [item, start];
+    });
+}
+
 export const Code = ({ children }: any) => (
     <div>
         <Highlight language="jsx" theme={themes.oneDark} code={children}>
             {({ style, tokens, getLineProps, getTokenProps }) => (
                 <pre style={{ ...style, ...preStyle }}>
-                    {tokens.map((line, i) => (
-                        <div key={i} {...getLineProps({ line })}>
-                            {line.map((token, key) => (
-                                <span key={key} {...getTokenProps({ token })} />
-                            ))}
-                        </div>
-                    ))}
+                    {withOffsets(tokens, lineLength).map(
+                        ([line, lineOffset]) => (
+                            <div key={lineOffset} {...getLineProps({ line })}>
+                                {withOffsets(line, (t) => t.content.length).map(
+                                    ([token, tokenOffset]) => (
+                                        <span
+                                            key={tokenOffset}
+                                            {...getTokenProps({ token })}
+                                        />
+                                    ),
+                                )}
+                            </div>
+                        ),
+                    )}
                 </pre>
             )}
         </Highlight>

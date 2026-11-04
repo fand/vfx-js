@@ -7,7 +7,8 @@
     "dev": "vite --host",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "lint": "biome check src"
   },
   "dependencies": {
     "@react-spring/web": "^10.1.2",

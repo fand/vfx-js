@@ -1,13 +1,16 @@
-import React from "react";
-import { useInView } from "react-intersection-observer";
 import * as VFX from "@vfx-js/react";
+import type React from "react";
+import { useInView } from "react-intersection-observer";
 import "./ExamplesSection.css";
 
 function pub(name: string): string {
     return `${import.meta.env.BASE_URL}${name}`;
 }
 
-const LazyLoad: React.FC<{ height: number; children: React.ReactNode }> = ({ height, children }) => {
+const LazyLoad: React.FC<{ height: number; children: React.ReactNode }> = ({
+    height,
+    children,
+}) => {
     const { ref, inView } = useInView({ triggerOnce: true });
     return (
         <div ref={ref} style={{ minHeight: height }}>

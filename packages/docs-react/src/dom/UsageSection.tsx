@@ -1,9 +1,9 @@
-import React from "react";
 import * as VFX from "@vfx-js/react";
-import InputSection from "./InputSection";
-import DivSection from "./DivSection";
 import dedent from "dedent";
+import type React from "react";
 import { Code, InlineCode } from "./Code";
+import DivSection from "./DivSection";
+import InputSection from "./InputSection";
 
 const blink = `
 precision highp float;
@@ -232,8 +232,8 @@ const UsageSection: React.FC = () => (
             <section className="Secton4">
                 <h3>Custom Uniforms</h3>
                 <p>
-                    @vfx-js/react accepts custom uniform variables as `uniforms`.
-                    You can pass objects of parameters or functions:
+                    @vfx-js/react accepts custom uniform variables as
+                    `uniforms`. You can pass objects of parameters or functions:
                 </p>
                 <Code>
                     {dedent`

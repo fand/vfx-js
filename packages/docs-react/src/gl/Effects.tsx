@@ -1,8 +1,8 @@
-import { useMemo, forwardRef } from "react";
 import { EffectComposer } from "@react-three/postprocessing";
 import { FXAAEffect } from "postprocessing";
+import { forwardRef, useMemo } from "react";
 
-const FXAA = forwardRef(({}, ref) => {
+const FXAA = forwardRef((_props, ref) => {
     const effect = useMemo(() => new FXAAEffect(), []);
     return <primitive ref={ref} object={effect} />;
 });
