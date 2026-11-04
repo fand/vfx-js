@@ -38,10 +38,16 @@
 - `useVFXConfig` uses a fixed id per component. An option change updates that call in place, so mount order stays correct.
 - `acquire` cancels the pending destroy, and the destroy callback also checks the consumer count. Either check alone is enough, so no test fails without the cancel. Both stay.
 
+## Fixed along the way
+
+- `f283942c` Fixed the docs-react lint errors and added a `lint` script.
+  - Changed tsconfig `jsx` to `react-jsx` to match Vite.
+- `d358380d` Stopped building test files into `lib/` (core, react, react-vfx).
+  - The builds use `tsconfig.build.json`.
+  - `lint` type-checks the tests with `tsc --noEmit`.
+
 ## Known issues (already there before this change)
 
-- docs-react has 3 lint errors.
-- `*.test.ts` files get built into `lib/` and published.
 - `VFXProvider` does not pass `zIndex` to `new VFX` (TODO). This change leaves it as is.
 
 ## Next
