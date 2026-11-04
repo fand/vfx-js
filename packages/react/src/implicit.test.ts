@@ -206,6 +206,17 @@ describe("implicit instance", () => {
         expect(mock.state.instances[0].opts).toEqual({ pixelRatio: 2 });
     });
 
+    it("does not warn on two useVFXConfig calls with the same options", async () => {
+        function A() {
+            lib.useVFXConfig({ pixelRatio: 1 });
+            return null;
+        }
+        await render(
+            h("div", null, h(A), h(A), h(lib.VFXSpan, { shader: "rgbShift" })),
+        );
+        expect(warn).not.toHaveBeenCalled();
+    });
+
     it("keeps elements as plain DOM when new VFX throws", async () => {
         mock.state.throwOnCreate = true;
         await render(h(lib.VFXSpan, { shader: "rgbShift" }, "text"));
@@ -228,10 +239,12 @@ describe("under a Provider", () => {
             lib.useVFXConfig({ pixelRatio: 1 });
             return h(lib.VFXSpan, { shader: "rgbShift" });
         }
-        await render(h(lib.VFXProvider, { pixelRatio: 3 }, h(Inner)));
+        await render(
+            h(lib.VFXProvider, { pixelRatio: 3, zIndex: -1 }, h(Inner)),
+        );
         expect(mock.state.instances).toHaveLength(1);
         const [vfx] = mock.state.instances;
-        expect(vfx.opts).toMatchObject({ pixelRatio: 3 });
+        expect(vfx.opts).toMatchObject({ pixelRatio: 3, zIndex: -1 });
         expect(vfx.add).toHaveBeenCalledTimes(1);
         expect(warn).toHaveBeenCalledTimes(1);
     });

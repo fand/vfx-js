@@ -5,6 +5,11 @@ export type VFXConfig = {
     pixelRatio?: number;
     zIndex?: number;
     postEffect?: VFXPostEffect | VFXPass[];
+    /**
+     * Whether to start the render loop automatically (default `true`).
+     * Set to `false` to drive rendering manually via the VFX instance
+     * exposed through `VFXContext`.
+     */
     autoplay?: boolean;
 };
 
@@ -103,11 +108,12 @@ export function setConfig(owner: symbol, config: VFXConfig): void {
     if (entry) {
         entry.config = config;
     } else {
+        const prev = effectiveConfig();
         configOwners.push({ owner, config });
-        if (configOwners.length > 1) {
+        if (configOwners.length > 1 && !configEqual(prev, config)) {
             warnOnce(
                 "multiple",
-                "[@vfx-js/react] useVFXConfig is used in more than one mounted component. The last one mounted wins.",
+                "[@vfx-js/react] useVFXConfig is used in more than one mounted component with different options. The last one mounted wins.",
             );
         }
     }

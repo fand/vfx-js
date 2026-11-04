@@ -46,9 +46,12 @@
   - The builds use `tsconfig.build.json`.
   - `lint` type-checks the tests with `tsc --noEmit`.
 
-## Known issues (already there before this change)
+## Review fixes
 
-- `VFXProvider` does not pass `zIndex` to `new VFX` (TODO). This change leaves it as is.
+- `VFXProvider` now passes `zIndex` to `new VFX`. `VFXProviderProps` extends `VFXConfig`.
+- The "more than one `useVFXConfig`" warning fires only when the options differ.
+  Exit animations and islands mount the same config twice; that is fine.
+- Changeset notes the behavior change for components outside any Provider.
 
 ## Next
 

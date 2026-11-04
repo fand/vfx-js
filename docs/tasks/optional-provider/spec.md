@@ -71,7 +71,7 @@ type VFXConfig = {
   change. Options are compared by value for numbers and booleans, by
   reference for `postEffect`. Callers should memo `postEffect`.
 - Two mounted `useVFXConfig` calls: the last one mounted wins. It
-  warns once.
+  warns once if their options differ.
 - Under a Provider: does nothing. It warns once.
 
 ### `<VFXProvider>`
