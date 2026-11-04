@@ -24,6 +24,8 @@ export type VFXTransitionProps = AddTransitionOpts & {
 
 const keyOf = (element: React.ReactElement) => element.key;
 
+const OUTER_STYLE: React.CSSProperties = { display: "contents" };
+
 /**
  * Animate between pages with a shader.
  * Give the child a key that changes per page, e.g. `<Page key={pathname} />`.
@@ -101,9 +103,13 @@ export function VFXTransition(props: VFXTransitionProps) {
     }
     const rendered = latestShown.current;
 
+    // Core moves the inner div into a canvas during a run.
+    // React removes the outer div on unmount, and that one never moves.
     return (
-        <div ref={ref} className={className} style={style}>
-            {rendered}
+        <div style={OUTER_STYLE}>
+            <div ref={ref} className={className} style={style}>
+                {rendered}
+            </div>
         </div>
     );
 }

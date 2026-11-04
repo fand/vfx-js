@@ -255,7 +255,9 @@ import {
 ```
 
 Takes the `addTransition` options as props, plus `className` and
-`style`. It renders a `<div>` around one child. The child needs a `key`
+`style`. It renders two `<div>`s around one child: an outer one with
+`display: contents`, and an inner one that gets `className` and `style`
+and is the transition target. The child needs a `key`
 that changes per page; a child without a key never transitions.
 
 Each run uses the spec set by a click or by `setNextTransition`, else
