@@ -206,6 +206,23 @@ they use the implicit instance outside a Provider. The Next and Void
 demos and `docs/TRANSITION.md` no longer use the Provider. In the Next
 demo, one canvas serves the page runs and the home live stage.
 
+## gl-transitions adapter
+
+From [plan6.md](./plan6.md):
+
+- Core: `TransitionDef.uniforms` (defaults under the spec's) and
+  `TransitionDef.ease: "smoothstep" | "linear"`.
+- `createGLTransition(entry, params?)` in `@vfx-js/transitions` wraps a
+  `gl-transitions` entry: `getFromColor` / `getToColor` read the core
+  textures with clamp-to-edge, `progress` and `ratio` are globals set
+  per fragment, `t` is linear. Params named like a prelude uniform
+  (`reverse`) become `glParam_<name>`. Entries with `textures`
+  (`LumaWipe`, `DisplacementMap`) throw.
+- `gl-transitions` is a devDependency only (pinned 2.0.0, the newest
+  allowed by `minimumReleaseAge`). Test files no longer land in `lib/`.
+- All 123 entries without textures compile and run on the landing
+  site's Transitions page, which lists them in a select.
+
 ## Verified
 
 - Lint, vitest (core 258, effects 14, react 25), `tsc --noEmit` and the
