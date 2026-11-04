@@ -1,14 +1,13 @@
 import type { AddTransitionOpts, RunOpts, Transition } from "@vfx-js/core";
 import {
     useCallback,
-    useContext,
     useEffect,
     useLayoutEffect,
     useRef,
     useState,
     useTransition,
 } from "react";
-import { VFXContext } from "../context.js";
+import { useVFXInstance } from "../use-vfx-instance.js";
 import { useLiveOpts } from "./live-opts.js";
 
 export type UseVFXTransition = {
@@ -20,7 +19,7 @@ export type UseVFXTransition = {
 export function useVFXTransition(
     opts: AddTransitionOpts = {},
 ): UseVFXTransition {
-    const vfx = useContext(VFXContext);
+    const vfx = useVFXInstance();
     const liveOpts = useLiveOpts(opts);
     const [element, setElement] = useState<HTMLElement | null>(null);
     const transitionRef = useRef<Transition | null>(null);

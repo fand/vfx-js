@@ -4,13 +4,12 @@ import type { AddTransitionOpts, Transition } from "@vfx-js/core";
 import * as React from "react";
 import {
     startTransition,
-    useContext,
     useEffect,
     useLayoutEffect,
     useRef,
     useState,
 } from "react";
-import { VFXContext } from "../context.js";
+import { useVFXInstance } from "../use-vfx-instance.js";
 import { watchNavigationDirection } from "./direction.js";
 import { useLiveOpts } from "./live-opts.js";
 import { takePending } from "./store.js";
@@ -33,7 +32,7 @@ const OUTER_STYLE: React.CSSProperties = { display: "contents" };
  */
 export function VFXTransition(props: VFXTransitionProps) {
     const { children, className, style, ...opts } = props;
-    const vfx = useContext(VFXContext);
+    const vfx = useVFXInstance();
     const liveOpts = useLiveOpts(opts);
     const ref = useRef<HTMLDivElement>(null);
     const transitionRef = useRef<Transition | null>(null);

@@ -40,14 +40,12 @@ DOM must be updated. `run` resolves when the animation ends.
 ### React
 
 ```tsx
-import { VFXProvider, VFXTransition } from "@vfx-js/react";
+import { VFXTransition } from "@vfx-js/react";
 import { crossfade, glitch } from "@vfx-js/transitions";
 
-<VFXProvider>
-    <VFXTransition transition={crossfade} types={{ back: { transition: glitch, reverse: true } }}>
-        <Page key={pathname} />
-    </VFXTransition>
-</VFXProvider>
+<VFXTransition transition={crossfade} types={{ back: { transition: glitch, reverse: true } }}>
+    <Page key={pathname} />
+</VFXTransition>
 ```
 
 A new `key` on the child starts a run. The old page stays on screen until
@@ -240,6 +238,10 @@ import {
 | `pixelsort` / `createPixelsort({ direction })` | Content melts into sorted streaks and sorts back out. |
 
 ## React API
+
+No `<VFXProvider>` is needed. Components outside a Provider share one
+implicit VFX instance; set its options with `useVFXConfig`. Inside a
+Provider, transitions use the Provider's instance.
 
 ### `<VFXTransition>`
 

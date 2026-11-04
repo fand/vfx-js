@@ -19,7 +19,7 @@ export const frameworks: Framework[] = [
                 label: "app/shell.tsx",
                 code: `
 "use client";
-import { transition, VFXProvider, VFXTransition } from "@vfx-js/react";
+import { transition, VFXTransition } from "@vfx-js/react";
 import { glitch, swipe } from "@vfx-js/transitions";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -28,7 +28,7 @@ import { FrozenRouter } from "./frozen-router";
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   return (
-    <VFXProvider>
+    <>
       <nav>
         <Link href="/about" onClick={transition({ transition: glitch })}>
           About
@@ -43,7 +43,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <FrozenRouter>{children}</FrozenRouter>
         </div>
       </VFXTransition>
-    </VFXProvider>
+    </>
   );
 }`,
             },
@@ -89,7 +89,7 @@ export function FrozenRouter({ children }: { children: React.ReactNode }) {
             {
                 label: "Layout.tsx",
                 code: `
-import { transition, VFXProvider, VFXTransition } from "@vfx-js/react";
+import { transition, VFXTransition } from "@vfx-js/react";
 import { crossfade, glitch, swipe } from "@vfx-js/transitions";
 import { Link, useLocation, useOutlet } from "react-router";
 
@@ -97,7 +97,7 @@ export function Layout() {
   const { pathname } = useLocation();
   const outlet = useOutlet();
   return (
-    <VFXProvider>
+    <>
       <Link to="/about" onClick={transition({ transition: glitch })}>
         About
       </Link>
@@ -108,7 +108,7 @@ export function Layout() {
       >
         <div key={pathname}>{outlet}</div>
       </VFXTransition>
-    </VFXProvider>
+    </>
   );
 }`,
             },

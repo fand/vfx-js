@@ -134,17 +134,15 @@ export default function Home() {
                     </TLink>
                 </div>
                 <Code label="App.tsx">{`
-import { VFXProvider, VFXTransition } from "@vfx-js/react";
+import { VFXTransition } from "@vfx-js/react";
 import { glitch, swipe } from "@vfx-js/transitions";
 
 export function App({ pathname }) {
   return (
-    <VFXProvider>
-      <VFXTransition className="outlet" transition={glitch}
-        types={{ back: { transition: swipe, reverse: true } }}>
-        <Page key={pathname} />
-      </VFXTransition>
-    </VFXProvider>
+    <VFXTransition className="outlet" transition={glitch}
+      types={{ back: { transition: swipe, reverse: true } }}>
+      <Page key={pathname} />
+    </VFXTransition>
   );
 }
 `}</Code>

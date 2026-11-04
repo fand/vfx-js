@@ -1,5 +1,5 @@
 import "@vfx-js/transition-demo-shared/style.css";
-import { setNextTransition, VFXProvider, VFXTransition } from "@vfx-js/react";
+import { setNextTransition, VFXTransition } from "@vfx-js/react";
 import { pages } from "@vfx-js/transition-demo-shared";
 import { presets } from "@vfx-js/transition-demo-shared/transitions";
 import { swipe } from "@vfx-js/transitions";
@@ -10,7 +10,7 @@ import { Link, useRouter } from "@void/react";
 export default function Layout({ children }: { children: React.ReactNode }) {
     const { path } = useRouter();
     return (
-        <VFXProvider>
+        <>
             <nav className="nav">
                 {pages.map((p) => (
                     <Link
@@ -37,6 +37,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     {children}
                 </div>
             </VFXTransition>
-        </VFXProvider>
+        </>
     );
 }
