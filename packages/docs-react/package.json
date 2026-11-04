@@ -7,7 +7,8 @@
     "dev": "vite --host",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "lint": "biome check src"
   },
   "dependencies": {
     "@react-spring/web": "^10.1.2",
@@ -25,6 +26,7 @@
     "three": "0.186.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.3",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "26.6.5",
     "@types/react": "^19.3.0",

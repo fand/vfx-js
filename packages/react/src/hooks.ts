@@ -1,5 +1,5 @@
-import { useContext } from "react";
-import { VFXContext } from "./context.js";
+import { useMemo } from "react";
+import { useVFXInstance } from "./use-vfx-instance.js";
 
 export type UseVFX = {
     /**
@@ -12,13 +12,19 @@ export type UseVFX = {
 };
 
 export function useVFX(): UseVFX {
-    const vfx = useContext(VFXContext);
+    const vfx = useVFXInstance({ acquire: false });
 
-    return {
-        rerenderElement: (e: HTMLElement | null) => {
-            if (e) {
-                vfx?.update(e);
-            }
-        },
-    };
+    return useMemo(
+        () => ({
+            rerenderElement: (e: HTMLElement | null) => {
+                if (e) {
+                    vfx?.update(e);
+                }
+            },
+        }),
+        [vfx],
+    );
 }
+
+export type { VFXConfig } from "./store.js";
+export { useVFXConfig } from "./use-vfx-instance.js";

@@ -1,9 +1,9 @@
 import type { VFXProps } from "@vfx-js/core";
 import * as React from "react";
-import { useContext, useEffect, useState } from "react";
-import { VFXContext } from "./context.js";
+import { useEffect, useState } from "react";
 import { useVFXLifecycle } from "./lifecycle.js";
 import { splitVFXProps } from "./split-props.js";
+import { useVFXInstance } from "./use-vfx-instance.js";
 
 type VFXElementProps<T extends keyof React.JSX.IntrinsicElements> =
     React.JSX.IntrinsicElements[T] & VFXProps;
@@ -17,7 +17,7 @@ export function VFXElementFactory<T extends keyof React.JSX.IntrinsicElements>(
         props: VFXElementProps<T>,
         parentRef: React.ForwardedRef<HTMLElement>,
     ) {
-        const vfx = useContext(VFXContext);
+        const vfx = useVFXInstance();
 
         const [element, setElement] = useState<HTMLElement | null>(null);
         const ref = (e: HTMLElement): void => {

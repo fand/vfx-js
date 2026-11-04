@@ -1,17 +1,19 @@
-import React from "react";
 import * as VFX from "@vfx-js/react";
+import type React from "react";
 import Bg from "./Bg";
-import Frame from "./dom/Frame";
-import LogoSection from "./dom/LogoSection";
-import IntroSection from "./dom/IntroSection";
-import ExamplesSection from "./dom/ExamplesSection";
 import AuthorSection from "./dom/AuthorSection";
+import ExamplesSection from "./dom/ExamplesSection";
+import Frame from "./dom/Frame";
+import IntroSection from "./dom/IntroSection";
+import LogoSection from "./dom/LogoSection";
 import UsageSection from "./dom/UsageSection";
 import "./App.css";
 
 const App: React.FC = () => {
+    VFX.useVFXConfig({ pixelRatio: 1 });
+
     return (
-        <VFX.VFXProvider pixelRatio={1}>
+        <>
             <Bg />
             <div className="App">
                 <Frame />
@@ -21,7 +23,7 @@ const App: React.FC = () => {
                 <UsageSection />
                 <AuthorSection />
             </div>
-        </VFX.VFXProvider>
+        </>
     );
 };
 

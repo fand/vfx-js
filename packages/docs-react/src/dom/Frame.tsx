@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import "./Frame.css";
 
 const colors = ["#00FFEE", "#00FF99", "#0099FF", "#9900FF", "#FF0099"];

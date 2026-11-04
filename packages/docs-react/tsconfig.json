@@ -10,7 +10,7 @@
         "module": "ESNext",
         "moduleResolution": "bundler",
         "noEmit": true,
-        "jsx": "react"
+        "jsx": "react-jsx"
     },
     "include": ["src"]
 }

@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from "react";
 import * as VFX from "@vfx-js/react";
+import type React from "react";
+import { useCallback, useState } from "react";
 import "./InputSection.css";
-import { Code, InlineCode } from "./Code";
 import dedent from "dedent";
 import debounce from "lodash.debounce";
+import { Code, InlineCode } from "./Code";
 
 const InputSection: React.FC = () => {
     const [text, setText] = useState("Edit me!!!");

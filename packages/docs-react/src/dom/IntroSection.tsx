@@ -1,5 +1,5 @@
-import React from "react";
 import * as VFX from "@vfx-js/react";
+import type React from "react";
 import "./IntroSection.css";
 
 function pub(name: string): string {

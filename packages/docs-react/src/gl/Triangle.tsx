@@ -1,8 +1,8 @@
-import { RefObject, useRef } from "react";
+import type { SpringValue } from "@react-spring/web";
 import { useFrame } from "@react-three/fiber";
-import { Mesh } from "three";
 import { isMobile } from "is-mobile";
-import { SpringValue } from "@react-spring/web";
+import { RefObject, useRef } from "react";
+import type { Mesh } from "three";
 
 type TriangleProps = {
     scroll: SpringValue<number>;

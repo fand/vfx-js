@@ -1,9 +1,9 @@
-import React from "react";
 import * as VFX from "@vfx-js/react";
-import InputSection from "./InputSection";
-import DivSection from "./DivSection";
 import dedent from "dedent";
+import type React from "react";
 import { Code, InlineCode } from "./Code";
+import DivSection from "./DivSection";
+import InputSection from "./InputSection";
 
 const blink = `
 precision highp float;
@@ -81,36 +81,7 @@ const UsageSection: React.FC = () => (
         <section>
             <h2 id="usage">Usage</h2>
             <p>
-                @vfx-js/react consists of{" "}
-                <b>
-                    <i>VFX Provider</i>
-                </b>{" "}
-                and{" "}
-                <b>
-                    <i>VFX Elements</i>
-                </b>
-                .
-            </p>
-            <p>
-                First, wrap your entire app with{" "}
-                <InlineCode>{"<VFXProvider>"}</InlineCode>.
-            </p>
-            <Code>
-                {dedent`
-            import { VFXProvider } from '@vfx-js/react';
-
-            function App {
-              return (
-                <VFXProvider>
-                  {/* Place your app here */}
-                </VFXProvider>
-              );
-            }
-        `}
-            </Code>
-            <p>
-                Then you can use VFX Elements anywhere in you app. Use{" "}
-                <InlineCode>{"<VFXImg>"}</InlineCode>,{" "}
+                Use <InlineCode>{"<VFXImg>"}</InlineCode>,{" "}
                 <InlineCode>{"<VFXVideo>"}</InlineCode> or{" "}
                 <InlineCode>{"<VFXSpan>"}</InlineCode> instead of{" "}
                 <InlineCode>{"<img>"}</InlineCode>,{" "}
@@ -119,13 +90,13 @@ const UsageSection: React.FC = () => (
             </p>
             <p>
                 VFX Elements have <InlineCode>shader</InlineCode> property. etc.
-                All available shaders are listed{" "}
+                See{" "}
                 <a
                     href="https://github.com/fand/vfx-js/tree/main/packages/vfx-js/src/constants.ts"
                     target="_blank"
                     rel="noopener noreferrer"
                 >
-                    here
+                    the list of all shaders
                 </a>
                 .
             </p>
@@ -261,8 +232,8 @@ const UsageSection: React.FC = () => (
             <section className="Secton4">
                 <h3>Custom Uniforms</h3>
                 <p>
-                    @vfx-js/react accepts custom uniform variables as `uniforms`.
-                    You can pass objects of parameters or functions:
+                    @vfx-js/react accepts custom uniform variables as
+                    `uniforms`. You can pass objects of parameters or functions:
                 </p>
                 <Code>
                     {dedent`
@@ -331,6 +302,36 @@ const UsageSection: React.FC = () => (
                     I'm scrolling!
                 </VFX.VFXSpan>
             </section>
+        </section>
+        <section>
+            <h2 id="options">Options</h2>
+            <p>
+                All VFX Elements share one WebGL canvas. Use{" "}
+                <InlineCode>useVFXConfig</InlineCode> to set its options:
+            </p>
+            <Code>
+                {dedent`
+            import { useVFXConfig } from '@vfx-js/react';
+
+            function App() {
+              useVFXConfig({ pixelRatio: 1, zIndex: -1 });
+              return <MyPage />;
+            }
+        `}
+            </Code>
+            <p>
+                Use <InlineCode>{"<VFXProvider>"}</InlineCode> when you need a
+                separate canvas, e.g. inside a <InlineCode>wrapper</InlineCode>{" "}
+                element. See{" "}
+                <a
+                    href="https://github.com/fand/vfx-js/tree/main/packages/react#vfxprovider"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    GitHub
+                </a>{" "}
+                for details.
+            </p>
         </section>
     </>
 );

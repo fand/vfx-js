@@ -1,8 +1,8 @@
-import { useRef, useEffect, useState, RefObject } from "react";
+import type { SpringValue } from "@react-spring/web";
 import { useFrame } from "@react-three/fiber";
 import { isMobile } from "is-mobile";
-import { Object3D, Group, InstancedMesh } from "three";
-import { SpringValue } from "@react-spring/web";
+import { RefObject, useEffect, useRef, useState } from "react";
+import { type Group, type InstancedMesh, Object3D } from "three";
 
 function randomRange(min: number, max: number): number {
     const diff = max - min;
@@ -30,7 +30,7 @@ function Particles({ count }: { count: number }) {
             temp.rotation.set(a, a, a);
 
             let x = randomRange(-50, 50);
-            let y = randomRange(-140, 100);
+            const y = randomRange(-140, 100);
             let z = randomRange(-50, 50);
 
             let d = Math.sqrt(x * x + z * z);
@@ -49,7 +49,7 @@ function Particles({ count }: { count: number }) {
 
         // Update the instance
         ref.current.instanceMatrix.needsUpdate = true;
-    }, []);
+    }, [count, size]);
 
     return (
         <instancedMesh

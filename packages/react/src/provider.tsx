@@ -1,28 +1,23 @@
-import type { VFXPass, VFXPostEffect } from "@vfx-js/core";
 import { VFX } from "@vfx-js/core";
 import type * as React from "react";
 import { useEffect, useState } from "react";
-import { VFXContext } from "./context.js";
+import { VFXContext, VFXProviderMarker } from "./context.js";
+import type { VFXConfig } from "./store.js";
 
-export interface VFXProviderProps {
+export interface VFXProviderProps extends VFXConfig {
     children?: React.ReactNode;
-    pixelRatio?: number;
-    zIndex?: number;
-    postEffect?: VFXPostEffect | VFXPass[];
     /**
      * Wrapper element that the WebGL canvas will be appended to.
      * The wrapper element should have `position: relative` and `overflow: hidden`.
      * @see {@link @vfx-js/core!VFXOpts.wrapper} for details.
      */
     wrapper?: React.RefObject<HTMLElement | null>;
-    /**
-     * Whether to start the render loop automatically (default `true`).
-     * Set to `false` to drive rendering manually via the VFX instance
-     * exposed through {@link VFXContext}.
-     */
-    autoplay?: boolean;
 }
 
+/**
+ * Creates a separate VFX instance and canvas for its children.
+ * Components outside any Provider share one instance instead.
+ */
 export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
     const [vfx, setVFX] = useState<VFX | null>(null);
     const autoplay = props.autoplay ?? true;
@@ -32,6 +27,7 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
         try {
             vfx = new VFX({
                 pixelRatio: props.pixelRatio,
+                zIndex: props.zIndex,
                 postEffect: props.postEffect,
                 wrapper: props.wrapper?.current ?? undefined,
                 autoplay,
@@ -47,9 +43,19 @@ export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
             vfx.stop();
             vfx.destroy();
         };
-    }, [props.pixelRatio, props.postEffect, props.wrapper, autoplay]); // TODO: add zIndex
+    }, [
+        props.pixelRatio,
+        props.zIndex,
+        props.postEffect,
+        props.wrapper,
+        autoplay,
+    ]);
 
     return (
-        <VFXContext.Provider value={vfx}>{props.children}</VFXContext.Provider>
+        <VFXProviderMarker.Provider value={true}>
+            <VFXContext.Provider value={vfx}>
+                {props.children}
+            </VFXContext.Provider>
+        </VFXProviderMarker.Provider>
     );
 };

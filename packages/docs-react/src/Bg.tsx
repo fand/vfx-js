@@ -1,10 +1,11 @@
-import React, { useEffect, useCallback, createRef, useRef } from "react";
+import { useSpringValue } from "@react-spring/web";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { isMobile } from "is-mobile";
-import Triangle from "./gl/Triangle";
-import Fragments from "./gl/Fragments";
+import type React from "react";
+import { createRef, useCallback, useEffect, useRef } from "react";
 import Effects from "./gl/Effects";
-import { useSpringValue } from "@react-spring/web";
+import Fragments from "./gl/Fragments";
+import Triangle from "./gl/Triangle";
 
 const canvasStyle = {
     position: "fixed",
