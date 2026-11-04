@@ -65,6 +65,7 @@ const t = vfx.addTransition(el, {
     uniforms: {},            // uniforms for `transition`
     duration: 0.6,           // seconds
     reverse: false,
+    overflow: undefined,     // true (whole canvas) | px on every side
     types: {                 // specs picked by run(cb, { type })
         back: { transition: swipe, reverse: true },
     },
@@ -90,6 +91,7 @@ type RunOpts = {
     uniforms?: Record<string, number | [number, number]>;
     reverse?: boolean;
     duration?: number;        // 0 cuts without animation
+    overflow?: true | number;
 };
 ```
 
@@ -108,6 +110,13 @@ Each run picks its spec in this order:
 `transition` and `uniforms` travel together. They come from the first
 level that sets `transition`, so uniforms never reach a different
 shader. `reverse` and `duration` are picked per field.
+
+### `overflow`
+
+By default a transition draws only inside the element. `overflow` gives
+it room outside: `true` for the whole canvas, a number for CSS px on
+every side. The run uses the larger of the transition's own `overflow`
+and the options' (picked run → type → container).
 
 ### `waitFor`
 
@@ -132,6 +141,7 @@ effects must render all the time.
 type TransitionDef = {
     name: string;
     frag: string;                 // defines vec4 transition(vec2 uv, float t)
+    overflow?: true | number;     // room to draw outside the element
     effects?(): Promise<Effect[]>;
     prepare?(run: TransitionRun, fx: Effect[]): void;
     onFrame?(t: number, x: number, dt: number, fx: Effect[]): void;
@@ -168,6 +178,7 @@ The prelude gives you:
   swapped.
 - `inRange(p)` — whether `p` is inside [0, 1].
 - Reads outside [0, 1] return transparent black.
+- With `overflow`, `uv` goes below 0 and above 1 outside the element.
 - Uniforms: `t`, `reverse`, `resolution` (element size in physical px),
   `time`.
 
@@ -208,9 +219,9 @@ import {
 | ------ | ----- |
 | `crossfade` | Plain mix. Default. |
 | `swipe` / `createSwipe({ direction })` | Content moves left (default), right, up or down. |
-| `zoom` | Old content shrinks into the center; new grows out of it. |
-| `zoomBlur` | Radial blur with RGB split. |
-| `crosszoom` | Crossfade through a zoom blur. |
+| `zoom` | Old content grows out of the box; new grows out of the center. `overflow: true`. |
+| `zoomBlur` | Radial blur with RGB split. `overflow: true`. |
+| `crosszoom` | Crossfade through a zoom blur. `overflow: true`. |
 | `glitch` | Jittery RGB-split blocks. |
 | `glitchSlide` | Sliding stripes with RGB split. |
 | `datamosh` / `createDatamosh({ blockSize })` | Hard cut through a datamosh that heals block by block. |
@@ -324,9 +335,8 @@ router.push("/next");
   router outlet (`#app`, `<main>`).
 - There is one pending click spec per page, shared by all
   `<VFXTransition>`s.
-- When old and new content differ in height, the snapshot is stretched
-  over the new size.
-- Transitions draw only inside the element.
+- The element's size is locked during a run. When old and new content
+  differ in height, the layout jumps after the run ends.
 
 ## See also
 

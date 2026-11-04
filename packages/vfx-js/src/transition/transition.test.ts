@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { EffectDims } from "../types";
 import { crossfade } from "./crossfade";
-import type { TransitionStartOpts } from "./effect";
+import { TransitionEffect, type TransitionStartOpts } from "./effect";
 import { BODY_OFFSET, describeGlslError } from "./glsl";
 import {
     resolveSpec,
@@ -21,7 +22,44 @@ describe("resolveSpec", () => {
             uniforms: {},
             reverse: false,
             duration: 0.6,
+            overflow: undefined,
         });
+    });
+
+    test("overflow is the larger of the transition's and the options'", () => {
+        const wide: TransitionDef = { name: "wide", frag: "", overflow: 20 };
+        const full: TransitionDef = { name: "full", frag: "", overflow: true };
+        expect(resolveSpec({ transition: wide }).overflow).toBe(20);
+        expect(resolveSpec({ transition: wide, overflow: 10 }).overflow).toBe(
+            20,
+        );
+        expect(resolveSpec({ transition: wide, overflow: 50 }).overflow).toBe(
+            50,
+        );
+        expect(
+            resolveSpec({ transition: wide }, { overflow: true }).overflow,
+        ).toBe(true);
+        expect(resolveSpec({ transition: full, overflow: 5 }).overflow).toBe(
+            true,
+        );
+        expect(
+            resolveSpec(
+                {
+                    overflow: 5,
+                    types: { big: { transition: swipe, overflow: 30 } },
+                },
+                { type: "big", overflow: 8 },
+            ).overflow,
+        ).toBe(8);
+        expect(
+            resolveSpec(
+                {
+                    overflow: 5,
+                    types: { big: { transition: swipe, overflow: 30 } },
+                },
+                { type: "big" },
+            ).overflow,
+        ).toBe(30);
     });
 
     test("run options beat the type, which beats the container", () => {
@@ -67,6 +105,38 @@ describe("resolveSpec", () => {
         expect(
             resolveSpec({ transition: swipe }, { type: "nope" }).transition,
         ).toBe(swipe);
+    });
+});
+
+describe("TransitionEffect.outputRect", () => {
+    const dims = {
+        pixelRatio: 2,
+        contentRect: [0, 0, 100, 50],
+        canvasRect: [-10, -20, 400, 300],
+    } as unknown as EffectDims;
+    const start = (overflow?: true | number) => {
+        const effect = new TransitionEffect();
+        void effect.start({ frag: "", duration: 1, reverse: false, overflow });
+        return effect;
+    };
+
+    test("is undefined when idle or without overflow", () => {
+        expect(new TransitionEffect().outputRect(dims)).toBeUndefined();
+        expect(start().outputRect(dims)).toBeUndefined();
+    });
+
+    test("covers the canvas for true", () => {
+        expect(start(true).outputRect(dims)).toEqual([-10, -20, 400, 300]);
+    });
+
+    test("pads by CSS px for a number", () => {
+        expect(start(5).outputRect(dims)).toEqual([-10, -10, 120, 70]);
+    });
+
+    test("shrinks back while taking a snapshot", () => {
+        const effect = start(true);
+        void effect.snapshot();
+        expect(effect.outputRect(dims)).toBeUndefined();
     });
 });
 
@@ -189,6 +259,12 @@ function setup(opts: { keepWrapped?: boolean } = {}) {
                 log.push("unfreeze");
             };
         },
+        lockSize: () => {
+            log.push("lock");
+            return () => {
+                log.push("unlock");
+            };
+        },
     };
     const element = {} as HTMLElement;
     const onDestroy = vi.fn();
@@ -226,6 +302,7 @@ describe("TransitionController", () => {
         expect(log).toEqual([
             "freeze",
             "wrap",
+            "lock",
             "snapshot",
             "cb",
             "freeze",
@@ -234,6 +311,7 @@ describe("TransitionController", () => {
             "unwrap",
             "unfreeze",
             "unfreeze",
+            "unlock",
         ]);
         expect(transition.running).toBe(false);
     });
@@ -253,6 +331,9 @@ describe("TransitionController", () => {
         await runB;
         expect(cbB).toHaveBeenCalledOnce();
         expect(log.filter((s) => s === "unwrap")).toHaveLength(1);
+        expect(log.filter((s) => s === "lock").length).toBe(
+            log.filter((s) => s === "unlock").length,
+        );
         expect(log.filter((s) => s === "freeze").length).toBe(
             log.filter((s) => s === "unfreeze").length,
         );
@@ -279,6 +360,8 @@ describe("TransitionController", () => {
         await run;
         expect(log).toContain("cancel");
         expect(log).toContain("unfreeze");
+        expect(log.filter((s) => s === "lock")).toHaveLength(1);
+        expect(log.filter((s) => s === "unlock")).toHaveLength(1);
         expect(log[log.length - 1]).toBe("unwrap");
         expect(transition.running).toBe(false);
     });

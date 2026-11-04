@@ -19,7 +19,21 @@ export type ResolvedSpec = {
     uniforms: TransitionUniforms;
     reverse: boolean;
     duration: number;
+    overflow: true | number | undefined;
 };
+
+function largerOverflow(
+    a: true | number | undefined,
+    b: true | number | undefined,
+): true | number | undefined {
+    if (a === true || b === true) {
+        return true;
+    }
+    if (a === undefined || b === undefined) {
+        return a ?? b;
+    }
+    return Math.max(a, b);
+}
 
 /**
  * Pick the run options, then the named type, then the container defaults.
@@ -32,8 +46,9 @@ export function resolveSpec(
     const typed = run.type !== undefined ? opts.types?.[run.type] : undefined;
     const shader =
         [run, typed].find((spec) => spec?.transition !== undefined) ?? opts;
+    const transition = shader.transition ?? crossfade;
     return {
-        transition: shader.transition ?? crossfade,
+        transition,
         uniforms: shader.uniforms ?? {},
         reverse: run.reverse ?? typed?.reverse ?? opts.reverse ?? false,
         duration:
@@ -41,6 +56,10 @@ export function resolveSpec(
             typed?.duration ??
             opts.duration ??
             DEFAULT_DURATION,
+        overflow: largerOverflow(
+            transition.overflow,
+            run.overflow ?? typed?.overflow ?? opts.overflow,
+        ),
     };
 }
 
@@ -90,7 +109,12 @@ export function waitForMedia(
 
 export type TransitionHost = Pick<
     VFX,
-    "addHTML" | "update" | "updateEffects" | "remove" | "freezeInside"
+    | "addHTML"
+    | "update"
+    | "updateEffects"
+    | "remove"
+    | "freezeInside"
+    | "lockSize"
 >;
 
 export type TransitionEffectLike = Effect &
@@ -111,6 +135,7 @@ export class TransitionController implements Transition {
     #keepWrapped: boolean;
     #onDestroy: (() => void) | undefined;
     #unfreezers: (() => void)[] = [];
+    #unlocks: (() => void)[] = [];
 
     // Each run takes a new id; a run stops at its next await once it is stale.
     #seq = 0;
@@ -165,6 +190,7 @@ export class TransitionController implements Transition {
             }
             if (this.#seq === id) {
                 this.#unfreeze();
+                this.#unlock();
             }
         }
     }
@@ -227,6 +253,7 @@ export class TransitionController implements Transition {
         if (!isCurrent()) {
             return update();
         }
+        this.#unlocks.push(this.#vfx.lockSize(this.#element));
         await this.#effect.snapshot();
         if (!isCurrent()) {
             return update();
@@ -284,6 +311,7 @@ export class TransitionController implements Transition {
             uniforms: spec.uniforms,
             duration: spec.duration,
             reverse: spec.reverse,
+            overflow: spec.overflow,
             onFrame: def.onFrame
                 ? (t, x, dt) => def.onFrame?.(t, x, dt, driverFx)
                 : undefined,
@@ -300,6 +328,7 @@ export class TransitionController implements Transition {
         this.#endActive();
         this.#effect.cancel();
         this.#unfreeze();
+        this.#unlock();
         this.#releaseWrap(id);
     }
 
@@ -317,6 +346,14 @@ export class TransitionController implements Transition {
 
     #freeze(): void {
         this.#unfreezers.push(this.#vfx.freezeInside(this.#element));
+    }
+
+    #unlock(): void {
+        const unlocks = this.#unlocks;
+        this.#unlocks = [];
+        for (const unlock of unlocks) {
+            unlock();
+        }
     }
 
     #unfreeze(): void {

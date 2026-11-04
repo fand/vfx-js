@@ -14,6 +14,8 @@ export type TransitionDef = {
     name: string;
     /** GLSL that defines `vec4 transition(vec2 uv, float t)`. See `PRELUDE`. */
     frag: string;
+    /** Draw outside the element: `true` for the whole canvas, a number for CSS px on every side. */
+    overflow?: true | number;
 
     // Optional JS driver for transitions built on extra effects.
 
@@ -38,6 +40,8 @@ export type TransitionSpec = {
     reverse?: boolean;
     /** Seconds. */
     duration?: number;
+    /** Extra room to draw outside the element. The larger of this and the transition's own wins. */
+    overflow?: true | number;
 };
 
 /**

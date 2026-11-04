@@ -121,6 +121,7 @@ const savedBoxSizing = new WeakMap<HTMLElement, string>();
 const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
 const addedDrawable = new WeakSet<HTMLElement>();
 const captureWaiters = new WeakMap<HTMLCanvasElement, Set<() => void>>();
+const lockedCanvases = new WeakSet<HTMLCanvasElement>();
 
 const CAPTURE_TIMEOUT_MS = 300;
 
@@ -187,6 +188,40 @@ export function requestCapture(
     const captured = waitForFlush(waiters, timeoutMs);
     canvas.requestPaint();
     return captured;
+}
+
+/**
+ * Pin the canvas's CSS size so content changes don't resize it.
+ * Returns a function that restores the size and syncs the height to the child.
+ */
+export function lockCanvasSize(canvas: HTMLCanvasElement): () => void {
+    if (lockedCanvases.has(canvas)) {
+        return () => {};
+    }
+    lockedCanvases.add(canvas);
+    const { width, height, overflow } = canvas.style;
+    const rect = canvas.getBoundingClientRect();
+    canvas.style.setProperty("width", `${rect.width}px`);
+    canvas.style.setProperty("height", `${rect.height}px`);
+    // Taller new content must not spill out of the box; the capture is canvas-sized anyway.
+    canvas.style.setProperty("overflow", "hidden");
+
+    return () => {
+        if (!lockedCanvases.has(canvas)) {
+            return;
+        }
+        lockedCanvases.delete(canvas);
+        canvas.style.width = width;
+        canvas.style.height = height;
+        canvas.style.overflow = overflow;
+        const child = canvas.firstElementChild;
+        if (child) {
+            const childHeight = Math.round(
+                child.getBoundingClientRect().height,
+            );
+            canvas.style.setProperty("height", `${childHeight}px`);
+        }
+    };
 }
 
 /**
@@ -315,16 +350,18 @@ export async function setupCapture(
 
     // Sync CSS height from child (canvas doesn't auto-fit to children).
     const child = canvas.firstElementChild as HTMLElement | null;
-    let lastChildHeight = "";
     if (child) {
         const childRO = new ResizeObserver((entries) => {
+            if (lockedCanvases.has(canvas)) {
+                return;
+            }
             const box = entries[0].borderBoxSize?.[0];
             if (!box) {
                 return;
             }
             const h = `${Math.round(box.blockSize)}px`;
-            if (h !== lastChildHeight) {
-                lastChildHeight = h;
+            // Compare with the live style, since an unlock may have set it.
+            if (h !== canvas.style.height) {
                 canvas.style.setProperty("height", h);
             }
         });

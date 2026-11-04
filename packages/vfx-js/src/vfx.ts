@@ -1,5 +1,6 @@
 import { isHicCanvas } from "./hic-canvas.js";
 import {
+    lockCanvasSize,
     releaseFirstCapture,
     requestCapture,
     unwrapElement,
@@ -214,6 +215,20 @@ export class VFX {
      */
     freezeInside(root: HTMLElement): () => void {
         return this.#player.freezeInside(root);
+    }
+
+    /**
+     * Pin the size of the element's html-in-canvas wrapper.
+     * Returns a function that undoes it. No-op for other elements.
+     * @internal Used by transitions.
+     */
+    lockSize(element: HTMLElement): () => void {
+        const canvas =
+            this.#wrapperCanvases.get(element) ??
+            (element instanceof HTMLCanvasElement && isHicCanvas(element)
+                ? element
+                : undefined);
+        return canvas ? lockCanvasSize(canvas) : () => {};
     }
 
     /**

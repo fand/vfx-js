@@ -3,6 +3,7 @@ import type { TransitionDef } from "@vfx-js/core";
 /** Crossfade through a zoom blur toward the center that peaks halfway. */
 export const crosszoom: TransitionDef = {
     name: "crosszoom",
+    overflow: true,
     frag: `
 const float STRENGTH = 0.4;
 const float TAPS = 16.0;

@@ -3,6 +3,7 @@ import type { TransitionDef } from "@vfx-js/core";
 /** Radial blur with RGB split, peaking halfway, while crossfading. */
 export const zoomBlur: TransitionDef = {
     name: "zoom_blur",
+    overflow: true,
     frag: `
 vec4 splitRead(vec2 uvr, vec2 uvg, vec2 uvb, bool to) {
   vec4 r = to ? readTo(uvr) : readFrom(uvr);

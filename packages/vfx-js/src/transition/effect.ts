@@ -1,4 +1,10 @@
-import type { Effect, EffectContext, EffectRenderTarget } from "../types.js";
+import type { ElementRect } from "../rect.js";
+import type {
+    Effect,
+    EffectContext,
+    EffectDims,
+    EffectRenderTarget,
+} from "../types.js";
 import { describeGlslError } from "./glsl.js";
 import type { TransitionUniforms } from "./types.js";
 
@@ -12,6 +18,8 @@ export type TransitionStartOpts = {
     duration: number;
     /** Play backwards with the roles of the old and new content swapped. */
     reverse: boolean;
+    /** Draw outside the element: `true` for the whole canvas, a number for CSS px on every side. */
+    overflow?: true | number;
     /** Per-frame hook. `t` is eased, `x` linear, `dt` in seconds. */
     onFrame?(t: number, x: number, dt: number): void;
     /** Called once when this run finishes or is replaced. */
@@ -19,6 +27,19 @@ export type TransitionStartOpts = {
 };
 
 const smoothstep = (x: number) => x * x * (3 - 2 * x);
+
+// Like blit, but transparent outside the element when the stage is larger.
+const PASSTHROUGH_FRAG = `#version 300 es
+precision highp float;
+in vec2 uvContent;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+void main() {
+  bool inside = all(greaterThanEqual(uvContent, vec2(0.0))) && all(lessThanEqual(uvContent, vec2(1.0)));
+  outColor = inside ? texture(src, uvSrc) : vec4(0.0);
+}
+`;
 
 /**
  * One effect per transition target. States:
@@ -30,6 +51,7 @@ export class TransitionEffect implements Effect {
     enabled = false;
 
     #from: EffectRenderTarget | null = null;
+    #fromSize: readonly [number, number] = [0, 0];
     #snapshotWaiters: (() => void)[] = [];
     #hold = false;
     #spec: TransitionStartOpts | null = null;
@@ -50,13 +72,10 @@ export class TransitionEffect implements Effect {
         resolve?.();
     }
 
-    init(ctx: EffectContext): void {
-        this.#from = ctx.createRenderTarget();
-    }
-
     /** Copy the current capture into `from` on the next frame and hold it on screen. */
     snapshot(): Promise<void> {
         this.#end();
+        this.#spec = null;
         this.enabled = true;
         return new Promise((resolve) => this.#snapshotWaiters.push(resolve));
     }
@@ -88,15 +107,42 @@ export class TransitionEffect implements Effect {
         return this.#spec !== null;
     }
 
-    render(ctx: EffectContext): void {
-        const from = this.#from;
-        if (!from) {
-            ctx.blit(ctx.src);
-            return;
+    // Only a running transition grows the stage, so the snapshot and hold stay element-sized.
+    outputRect(dims: EffectDims): ElementRect | undefined {
+        const overflow = this.#spec?.overflow;
+        if (overflow === undefined || this.#snapshotWaiters.length > 0) {
+            return undefined;
         }
+        if (overflow === true) {
+            return dims.canvasRect;
+        }
+        const pad = overflow * dims.pixelRatio;
+        const [x, y, w, h] = dims.contentRect;
+        return [x - pad, y - pad, w + pad * 2, h + pad * 2];
+    }
 
+    #passthrough(ctx: EffectContext): void {
+        ctx.draw({
+            frag: PASSTHROUGH_FRAG,
+            uniforms: { src: ctx.src },
+            target: ctx.target,
+        });
+    }
+
+    // Element-sized with an explicit size, so a larger stage does not resize it.
+    #ensureFrom(ctx: EffectContext): EffectRenderTarget {
+        const [w, h] = ctx.dims.elementPixel;
+        if (!this.#from || this.#fromSize[0] !== w || this.#fromSize[1] !== h) {
+            this.#from?.dispose();
+            this.#from = ctx.createRenderTarget({ size: [w, h] });
+            this.#fromSize = [w, h];
+        }
+        return this.#from;
+    }
+
+    render(ctx: EffectContext): void {
         if (this.#snapshotWaiters.length > 0) {
-            ctx.blit(ctx.src, from);
+            ctx.blit(ctx.src, this.#ensureFrom(ctx));
             this.#spec = null;
             this.#hold = true;
             const waiters = this.#snapshotWaiters;
@@ -104,6 +150,12 @@ export class TransitionEffect implements Effect {
             for (const w of waiters) {
                 w();
             }
+        }
+
+        const from = this.#from;
+        if (!from) {
+            this.#passthrough(ctx);
+            return;
         }
 
         const spec = this.#spec;
@@ -119,7 +171,7 @@ export class TransitionEffect implements Effect {
             if (x >= 1 || this.#broken.has(spec.frag)) {
                 this.#spec = null;
                 this.enabled = false;
-                ctx.blit(ctx.src);
+                this.#passthrough(ctx);
                 this.#end();
                 return;
             }
@@ -143,7 +195,7 @@ export class TransitionEffect implements Effect {
                 }
                 this.#spec = null;
                 this.enabled = false;
-                ctx.blit(ctx.src);
+                this.#passthrough(ctx);
                 this.#end();
             }
             return;
@@ -155,7 +207,7 @@ export class TransitionEffect implements Effect {
         }
 
         this.enabled = false;
-        ctx.blit(ctx.src);
+        this.#passthrough(ctx);
     }
 
     #draw(
@@ -184,6 +236,7 @@ export class TransitionEffect implements Effect {
 
     dispose(): void {
         this.#from = null;
+        this.#fromSize = [0, 0];
         this.#end();
         for (const w of this.#snapshotWaiters) {
             w();
