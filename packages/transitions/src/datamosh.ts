@@ -1,5 +1,5 @@
 import type { Effect, TransitionDef } from "@vfx-js/core";
-import { DatamoshEffect } from "../datamosh";
+import { DatamoshEffect } from "@vfx-js/effects";
 
 const HOLD = 0.25;
 const CHROMA_GAIN = 1.5;

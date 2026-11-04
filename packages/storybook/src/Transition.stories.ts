@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { TransitionDef } from "@vfx-js/core";
-import * as presets from "@vfx-js/effects/transitions";
+import * as presets from "@vfx-js/transitions";
 import { initVFX, isChromatic } from "./utils";
 
 const TRANSITIONS: Record<string, TransitionDef> = {

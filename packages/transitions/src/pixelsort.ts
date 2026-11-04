@@ -1,5 +1,5 @@
 import type { Effect, TransitionDef } from "@vfx-js/core";
-import { type PixelSortDirection, PixelSortEffect } from "../pixelsort";
+import { type PixelSortDirection, PixelSortEffect } from "@vfx-js/effects";
 
 const OPPOSITE: Record<PixelSortDirection, PixelSortDirection> = {
     up: "down",

@@ -1,7 +1,6 @@
 import type { Effect, TransitionDef } from "@vfx-js/core";
+import type { DatamoshEffect, PixelSortEffect } from "@vfx-js/effects";
 import { describe, expect, test } from "vitest";
-import type { DatamoshEffect } from "../datamosh";
-import type { PixelSortEffect } from "../pixelsort";
 import * as presets from "./index";
 
 const run = { reverse: false, uniforms: {}, duration: 1 };

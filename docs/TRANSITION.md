@@ -21,7 +21,7 @@ without it, VFX-JS falls back to dom-to-canvas, which is slower.
 
 ```ts
 import { VFX } from "@vfx-js/core";
-import { swipe } from "@vfx-js/effects/transitions";
+import { swipe } from "@vfx-js/transitions";
 
 const vfx = new VFX();
 const panel = document.querySelector("#panel")!;
@@ -41,7 +41,7 @@ DOM must be updated. `run` resolves when the animation ends.
 
 ```tsx
 import { VFXProvider, VFXTransition } from "@vfx-js/react";
-import { crossfade, glitch } from "@vfx-js/effects/transitions";
+import { crossfade, glitch } from "@vfx-js/transitions";
 
 <VFXProvider>
     <VFXTransition transition={crossfade} types={{ back: { transition: glitch, reverse: true } }}>
@@ -216,7 +216,7 @@ not in module variables, since two containers may share one def.
 
 ## Presets
 
-`@vfx-js/effects/transitions` has the presets. It also re-exports
+`@vfx-js/transitions` has the presets. It also re-exports
 `crossfade` from core.
 
 ```ts
@@ -224,7 +224,7 @@ import {
     crossfade, crosszoom, datamosh, glitch, glitchSlide,
     pixelsort, swipe, zoom, zoomBlur,
     createDatamosh, createPixelsort, createSwipe,
-} from "@vfx-js/effects/transitions";
+} from "@vfx-js/transitions";
 ```
 
 | Preset | Notes |
