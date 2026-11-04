@@ -56,9 +56,7 @@ export type TransitionWaitFor =
 export type AddTransitionOpts = Partial<TransitionSpec> & {
     /** Specs picked by `run(cb, { type })`. */
     types?: Record<string, TransitionSpec>;
-    /** Persistent effects placed after the transition in the chain. */
-    effects?: Effect[];
-    /** Keep the element wrapped between runs. Forced on when `effects` is not empty. */
+    /** Keep the element wrapped between runs. */
     keepWrapped?: boolean;
     waitFor?: TransitionWaitFor;
 };

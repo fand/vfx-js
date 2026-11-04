@@ -189,8 +189,7 @@ export class TransitionController implements Transition {
         this.#element = element;
         this.#opts = opts;
         this.#effect = effect;
-        this.#keepWrapped =
-            (opts.keepWrapped ?? false) || (opts.effects?.length ?? 0) > 0;
+        this.#keepWrapped = opts.keepWrapped ?? false;
     }
 
     get running(): boolean {
@@ -468,11 +467,7 @@ export class TransitionController implements Transition {
         if (!isCurrent()) {
             return;
         }
-        const chain = [
-            this.#effect,
-            ...driverFx,
-            ...(this.#opts.effects ?? []),
-        ];
+        const chain = [this.#effect, ...driverFx];
         if (!this.#wrapped) {
             const wrapping = this.#vfx
                 .addHTML(this.#element, { effect: chain })

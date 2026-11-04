@@ -83,8 +83,7 @@ const t = vfx.addTransition(el, {
     types: {                 // specs picked by run(cb, { type })
         back: { transition: swipe, reverse: true },
     },
-    effects: [],             // persistent effects after the transition
-    keepWrapped: false,      // forced true when effects.length > 0
+    keepWrapped: false,      // keep the element wrapped between runs
     waitFor: "media",        // "media" | "none" | (el) => Promise<void>
 });
 ```
@@ -146,8 +145,7 @@ Runs after `cb` and before the new capture.
 
 By default the element is unwrapped after each run. Set
 `keepWrapped: true` to keep it wrapped, which saves the wrap cost on
-frequent runs. It is forced on when you pass `effects`, since those
-effects must render all the time.
+frequent runs.
 
 ## Writing a `TransitionDef`
 
