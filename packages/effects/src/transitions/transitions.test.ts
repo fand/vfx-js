@@ -1,4 +1,4 @@
-import { buildFrag, type Effect, type TransitionDef } from "@vfx-js/core";
+import type { Effect, TransitionDef } from "@vfx-js/core";
 import { describe, expect, test } from "vitest";
 import type { DatamoshEffect } from "../datamosh";
 import type { PixelSortEffect } from "../pixelsort";
@@ -26,10 +26,8 @@ describe("transition presets", () => {
         ]);
     });
 
-    test.each(defs)("%s builds a full shader", (_key, def) => {
-        const frag = buildFrag(def.frag);
-        expect(frag).toContain("vec4 transition(vec2 uv, float t)");
-        expect(frag).toContain("void main()");
+    test.each(defs)("%s declares the transition function", (_key, def) => {
+        expect(def.frag).toContain("vec4 transition(vec2 uv, float t)");
     });
 
     test("swipe bakes the direction into the shader", () => {

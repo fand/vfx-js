@@ -195,8 +195,7 @@ The prelude gives you:
   `time`.
 
 A shader that fails to compile logs the error with line numbers in your
-`frag`, then cuts straight to the new content. `buildFrag`, `PRELUDE` and
-`BODY_OFFSET` are exported from `@vfx-js/core` if you need the full source.
+`frag`, then cuts straight to the new content.
 
 ### Driver hooks
 

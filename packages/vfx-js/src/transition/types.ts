@@ -12,7 +12,7 @@ export type TransitionRun = {
 
 export type TransitionDef = {
     name: string;
-    /** GLSL that defines `vec4 transition(vec2 uv, float t)`. See `PRELUDE`. */
+    /** GLSL that defines `vec4 transition(vec2 uv, float t)`. */
     frag: string;
     /** Draw outside the element: `true` for the whole canvas, a number for CSS px on every side. */
     overflow?: true | number;
