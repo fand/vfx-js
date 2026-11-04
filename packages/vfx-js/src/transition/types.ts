@@ -1,6 +1,15 @@
-import type { Effect } from "../types.js";
+import type {
+    Effect,
+    EffectRenderTarget,
+    EffectTexture,
+    EffectUniformValue,
+} from "../types.js";
 
-export type TransitionUniforms = Record<string, number | [number, number]>;
+/** Numbers, vectors and arrays; no textures. */
+export type TransitionUniforms = Record<
+    string,
+    Exclude<EffectUniformValue, EffectTexture | EffectRenderTarget>
+>;
 
 /** One run of a transition, passed to the driver hooks. */
 export type TransitionRun = {

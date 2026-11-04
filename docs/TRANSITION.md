@@ -101,7 +101,7 @@ interface Transition {
 type RunOpts = {
     type?: string;            // key into `types`
     transition?: TransitionDef;
-    uniforms?: Record<string, number | [number, number]>;
+    uniforms?: TransitionUniforms; // numbers and vectors, no textures
     reverse?: boolean;
     duration?: number;        // 0 cuts without animation
     overflow?: true | number;
