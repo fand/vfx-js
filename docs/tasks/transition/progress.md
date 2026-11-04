@@ -171,7 +171,7 @@ reversed. Shared pages, CSS and preset names live in `shared/`.
 
 | Demo | Port | Wiring |
 | ---- | ---- | ------ |
-| Next.js 16 | 5001 | `<VFXTransition>` + `FrozenRouter` |
+| Next.js 16 | 5001 | `<VFXTransition>` + `FrozenRouter` (landing site, see below) |
 | Astro 7 | 5002 | core `run(cb)` in `before-preparation`, custom `swap` |
 | Nuxt 4 | 5003 | core `run(cb)` in `router.beforeEach`, ends on `page:finish` |
 | SvelteKit 3 | 5004 | core `run(cb)` in `onNavigate` |
@@ -182,6 +182,28 @@ In Playwright's Chrome (dom-to-canvas fallback), every demo snapshots
 the old page before the new one renders, on links and on back.
 Shader output was not checked by eye. Findings:
 [open-issues.md](./open-issues.md).
+
+## Landing site
+
+The Next.js demo is now a standalone landing site for
+`@vfx-js/transitions`. It no longer uses `shared/`; the other four
+demos still do.
+
+- Pages: Home (white), Getting Started (per-framework tabs), How it
+  works, Transitions (dark playground with every preset, duration,
+  reverse and autoplay) and Custom (live GLSL editor with uniforms).
+- Each header link plays its own preset; back plays `swipe` reversed.
+- The outlet has a fixed height and each page scrolls inside it. The
+  outlet passes `overflow: 0`, so zoom presets never cover the header.
+- Checked in Playwright's Chrome at 1440 and 390 px wide: page runs,
+  tab swipes, the playground and the shader lab all animate.
+
+## Next: optional `VFXProvider`
+
+Goes in a separate PR on main, merged before this branch. Spec:
+`docs/tasks/optional-provider/spec.md` on `feat/optional-provider`.
+After the rebase, switch `VFXTransition` and `useVFXTransition` to
+`useVFXInstance()` and drop `VFXProvider` from the demos and docs.
 
 ## Verified
 
