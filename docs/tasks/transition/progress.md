@@ -189,3 +189,5 @@ From [plan5.md](./plan5.md):
 - glide rewrite happens in the glide repo, on `addTransition` with
   `keepWrapped: true`.
 - Exact peer versions are set at release time.
+- Framework demo findings (Next App Router, Astro ClientRouter):
+  [open-issues.md](./open-issues.md).

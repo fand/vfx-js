@@ -1,0 +1,19 @@
+---
+import { findPage } from "@vfx-js/transition-demo-shared";
+
+const page = findPage(Astro.props.path);
+---
+
+<section class="page" style={{ background: page.theme }}>
+    <h1>{page.title}</h1>
+    <p>{page.lead}</p>
+    {
+        page.images.length > 0 && (
+            <div class="grid">
+                {page.images.map((src) => (
+                    <img src={src} alt="" crossorigin="anonymous" />
+                ))}
+            </div>
+        )
+    }
+</section>

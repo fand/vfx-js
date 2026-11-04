@@ -1,5 +1,6 @@
 packages:
   - "packages/*"
+  - "packages/transition-demo/*"
 
 linkWorkspacePackages: true
 minimumReleaseAge: 10080

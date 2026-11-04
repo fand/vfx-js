@@ -1,0 +1,62 @@
+* {
+    box-sizing: border-box;
+}
+html,
+body {
+    margin: 0;
+    height: 100%;
+    background: #000;
+    color: #f8fafc;
+    font-family: system-ui, sans-serif;
+}
+.nav {
+    display: flex;
+    gap: 16px;
+    height: 56px;
+    align-items: center;
+    padding: 0 24px;
+    border-bottom: 1px solid #334155;
+}
+.nav a {
+    color: #94a3b8;
+    text-decoration: none;
+}
+.nav a[aria-current="page"] {
+    color: #f8fafc;
+    font-weight: 600;
+}
+.nav .framework {
+    margin-left: auto;
+    color: #64748b;
+    font-size: 14px;
+}
+/* The transition target needs a fixed size. */
+.outlet {
+    height: calc(100dvh - 56px);
+    overflow: hidden;
+}
+.page {
+    height: 100%;
+    padding: 48px 24px;
+}
+.page h1 {
+    margin: 0 0 16px;
+    font-size: 48px;
+}
+.page p {
+    max-width: 40em;
+    color: #cbd5e1;
+    line-height: 1.6;
+}
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 24px;
+}
+.grid img {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    border-radius: 8px;
+}
