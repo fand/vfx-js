@@ -261,6 +261,9 @@ that changes per page; a child without a key never transitions.
 Each run uses the spec set by a click or by `setNextTransition`, else
 the props.
 
+The swap runs in a React transition, so a page that suspends keeps the
+old page on screen until it is ready.
+
 Back navigation is detected with the Navigation API when present, else
 with `popstate`. It sets `type: "back"`, so `types.back` applies.
 

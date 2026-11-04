@@ -3,6 +3,7 @@
 import type { AddTransitionOpts, Transition } from "@vfx-js/core";
 import * as React from "react";
 import {
+    startTransition,
     useContext,
     useEffect,
     useLayoutEffect,
@@ -71,7 +72,7 @@ export function VFXTransition(props: VFXTransitionProps) {
         requestedKey.current = key;
         const transition = transitionRef.current;
         if (!transition) {
-            setShown(next);
+            startTransition(() => setShown(next));
             return;
         }
         const swap = () =>
@@ -82,7 +83,8 @@ export function VFXTransition(props: VFXTransitionProps) {
                     return;
                 }
                 commitWaiters.current.push(resolve);
-                setShown(next);
+                // A page that suspends keeps the old page instead of a fallback.
+                startTransition(() => setShown(next));
             });
         transition.run(swap, takePending() ?? {}).catch((err) => {
             console.error("[@vfx-js/react] VFXTransition run failed:", err);
