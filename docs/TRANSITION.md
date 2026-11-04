@@ -312,8 +312,9 @@ router.push("/next");
 
 ## Limits
 
-- Nested VFX elements inside the container freeze during a run. They show
-  their plain content, not their effect.
+- Nested VFX elements inside the container freeze during a run,
+  including ones the new page mounts. They show their plain content, not
+  their effect.
 - Next.js `loading.tsx` shows its fallback as soon as the path changes,
   so the transition lands on the skeleton. Use `useVFXTransition` with
   your own ready signal instead.

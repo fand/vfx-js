@@ -207,7 +207,8 @@ export class VFX {
         try {
             await this.#player.addElement(canvas, opts, initialCapture);
         } finally {
-            releaseFirstCapture(canvas);
+            // A frozen element shows its plain capture until the freeze ends.
+            releaseFirstCapture(canvas, this.#player.isFrozen(canvas));
         }
     }
 

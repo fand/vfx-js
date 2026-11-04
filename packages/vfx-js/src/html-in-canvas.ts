@@ -236,11 +236,18 @@ function removeStillCover(canvas: HTMLCanvasElement): void {
  * the still copy `wrapElement` put over it.
  * Call it once the overlay has the element's texture.
  */
-export function releaseFirstCapture(canvas: HTMLCanvasElement): void {
+export function releaseFirstCapture(
+    canvas: HTMLCanvasElement,
+    keepCapture = false,
+): void {
     // The player's frame callback is queued first, so the overlay draws
     // in the same frame that this clears.
     requestAnimationFrame(() => {
-        canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+        if (!keepCapture) {
+            canvas
+                .getContext("2d")
+                ?.clearRect(0, 0, canvas.width, canvas.height);
+        }
         removeStillCover(canvas);
     });
 }

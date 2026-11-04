@@ -7,6 +7,7 @@ import {
     makeEffectRenderTargetFromFb,
     makeEffectTexture,
 } from "./effect-host.js";
+import { FreezeTracker } from "./freeze.js";
 import GIFData from "./gif.js";
 import { GLContext } from "./gl/context.js";
 import type { Framebuffer } from "./gl/framebuffer.js";
@@ -49,6 +50,22 @@ import type {
 } from "./types.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
+
+// The opacity that hides an element under its overlay, or null to leave it as is.
+function hiddenOpacityFor(
+    type: VFXElementType,
+    overlay: VFXProps["overlay"],
+): string | null {
+    // The wrapper canvas clears itself once captured.
+    if (type === "hic" || overlay === true) {
+        return null;
+    }
+    if (typeof overlay === "number") {
+        return overlay.toString();
+    }
+    // Don't hide a video completely, to prevent jank frames.
+    return type === "video" ? "0.0001" : "0";
+}
 
 /**
  * @internal
@@ -100,6 +117,33 @@ export class VFXPlayer {
     #playRequest: number | undefined = undefined;
     #pixelRatio = 2;
     #elements: VFXElement[] = [];
+    #freezes = new FreezeTracker({
+        showPlain: (e) => {
+            // The capture cannot see the overlay, so show the plain content.
+            if (e.type === "hic") {
+                const source = e.srcTexture.source;
+                if (source instanceof OffscreenCanvas) {
+                    drawCaptureOnCanvas(e.element as HTMLCanvasElement, source);
+                }
+            } else {
+                e.element.style.setProperty(
+                    "opacity",
+                    e.originalOpacity.toString(),
+                );
+            }
+        },
+        hidePlain: (e, opacity) => {
+            if (e.type === "hic") {
+                const canvas = e.element as HTMLCanvasElement;
+                canvas
+                    .getContext("2d")
+                    ?.clearRect(0, 0, canvas.width, canvas.height);
+            } else {
+                e.element.style.opacity = opacity;
+            }
+        },
+        isRegistered: (e) => this.#elements.includes(e),
+    });
 
     // Virtual animation clock. `time` exposed to effects is driven by this
     // (not raw wall time), so playback can be scaled, paused, rewound, or
@@ -425,17 +469,7 @@ export class VFXPlayer {
 
         const autoCrop = opts.autoCrop ?? true;
 
-        // Hide original element
-        if (type === "hic") {
-            /* the wrapper canvas clears itself once captured */
-        } else if (opts.overlay === true) {
-            /* Overlay mode. Do not hide the element */
-        } else if (typeof opts.overlay === "number") {
-            element.style.setProperty("opacity", opts.overlay.toString());
-        } else {
-            const opacity = type === "video" ? "0.0001" : "0"; // don't hide video element completely to prevent jank frames
-            element.style.setProperty("opacity", opacity.toString());
-        }
+        const hiddenOpacity = hiddenOpacityFor(type, opts.overlay);
 
         // Create shared uniforms
         const sharedUniforms: Uniforms = {
@@ -631,10 +665,18 @@ export class VFXPlayer {
         };
 
         this.#hitTest(elem, rect, now);
+        this.#register(elem, hiddenOpacity);
+    }
 
-        // Insert element and sort elements by z-index.
-        // Array.prototype.sort is stable sort, so the elements with same z
-        // will be rendered by the order they are added to VFX.
+    // Hide the element under its overlay, or freeze it inside a frozen root.
+    #register(elem: VFXElement, hiddenOpacity: string | null): void {
+        if (
+            !this.#freezes.adopt(elem, hiddenOpacity) &&
+            hiddenOpacity !== null
+        ) {
+            elem.element.style.setProperty("opacity", hiddenOpacity);
+        }
+        // Sort is stable, so elements with the same z render in the order they were added.
         this.#elements.push(elem);
         this.#elements.sort((a, b) => a.zIndex - b.zIndex);
     }
@@ -720,16 +762,7 @@ export class VFXPlayer {
 
         const autoCrop = opts.autoCrop ?? true;
 
-        if (type === "hic") {
-            /* the wrapper canvas clears itself once captured */
-        } else if (opts.overlay === true) {
-            /* overlay mode */
-        } else if (typeof opts.overlay === "number") {
-            element.style.setProperty("opacity", opts.overlay.toString());
-        } else {
-            const opacity = type === "video" ? "0.0001" : "0";
-            element.style.setProperty("opacity", opacity.toString());
-        }
+        const hiddenOpacity = hiddenOpacityFor(type, opts.overlay);
 
         // Effect-path specifics.
         const now = this.#time;
@@ -811,8 +844,7 @@ export class VFXPlayer {
         elem.chain = chain;
 
         this.#hitTest(elem, rect, now);
-        this.#elements.push(elem);
-        this.#elements.sort((a, b) => a.zIndex - b.zIndex);
+        this.#register(elem, hiddenOpacity);
     }
 
     /**
@@ -999,56 +1031,16 @@ export class VFXPlayer {
 
     /**
      * Stop rendering the elements inside `root` and show their plain
-     * content. Returns a function that undoes it.
+     * content, including ones added under it later.
+     * Returns a function that undoes it.
      */
     freezeInside(root: HTMLElement): () => void {
-        const frozen: { e: VFXElement; opacity: string }[] = [];
-        for (const e of this.#elements) {
-            if (e.frozen || e.element === root || !root.contains(e.element)) {
-                continue;
-            }
-            e.frozen = true;
-            frozen.push({ e, opacity: e.element.style.opacity });
-            // The capture cannot see the overlay, so show the plain content.
-            if (e.type === "hic") {
-                const source = e.srcTexture.source;
-                if (source instanceof OffscreenCanvas) {
-                    drawCaptureOnCanvas(e.element as HTMLCanvasElement, source);
-                }
-            } else {
-                e.element.style.setProperty(
-                    "opacity",
-                    e.originalOpacity.toString(),
-                );
-            }
-        }
+        return this.#freezes.freezeInside(root, this.#elements);
+    }
 
-        let done = false;
-        return () => {
-            if (done) {
-                return;
-            }
-            done = true;
-            for (const { e } of frozen) {
-                e.frozen = false;
-            }
-            // Wait a frame so the overlay is back first.
-            requestAnimationFrame(() => {
-                for (const { e, opacity } of frozen) {
-                    if (e.frozen || !this.#elements.includes(e)) {
-                        continue;
-                    }
-                    if (e.type === "hic") {
-                        const canvas = e.element as HTMLCanvasElement;
-                        canvas
-                            .getContext("2d")
-                            ?.clearRect(0, 0, canvas.width, canvas.height);
-                    } else {
-                        e.element.style.opacity = opacity;
-                    }
-                }
-            });
-        };
+    /** Whether the element is frozen by `freezeInside`. */
+    isFrozen(element: HTMLElement): boolean {
+        return this.#elements.some((e) => e.element === element && e.frozen);
     }
 
     /**
