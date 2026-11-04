@@ -354,9 +354,6 @@ importers:
       '@vfx-js/react':
         specifier: workspace:*
         version: link:../../react
-      '@vfx-js/transition-demo-shared':
-        specifier: workspace:*
-        version: link:../shared
       '@vfx-js/transitions':
         specifier: workspace:*
         version: link:../../transitions

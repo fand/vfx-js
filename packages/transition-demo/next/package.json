@@ -10,7 +10,6 @@
   "dependencies": {
     "@vfx-js/core": "workspace:*",
     "@vfx-js/react": "workspace:*",
-    "@vfx-js/transition-demo-shared": "workspace:*",
     "@vfx-js/transitions": "workspace:*",
     "next": "^16.4.3",
     "react": "^19.3.1",
