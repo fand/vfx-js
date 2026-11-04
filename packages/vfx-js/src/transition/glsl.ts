@@ -23,17 +23,13 @@ bool inRange(vec2 p) {
 vec4 premultiply(vec4 c) {
   return vec4(c.rgb * c.a, c.a);
 }
-vec4 readOld(vec2 p) {
-  return inRange(p) ? premultiply(texture(from, p)) : vec4(0.0);
-}
-vec4 readNew(vec2 p) {
-  return inRange(p) ? premultiply(texture(src, srcRectUv.xy + p * srcRectUv.zw)) : vec4(0.0);
-}
 vec4 readFrom(vec2 p) {
-  return reverse > 0.5 ? readNew(p) : readOld(p);
+  if (!inRange(p)) return vec4(0.0);
+  return premultiply(reverse > 0.5 ? texture(src, srcRectUv.xy + p * srcRectUv.zw) : texture(from, p));
 }
 vec4 readTo(vec2 p) {
-  return reverse > 0.5 ? readOld(p) : readNew(p);
+  if (!inRange(p)) return vec4(0.0);
+  return premultiply(reverse > 0.5 ? texture(from, p) : texture(src, srcRectUv.xy + p * srcRectUv.zw));
 }
 `;
 

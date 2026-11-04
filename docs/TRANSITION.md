@@ -186,8 +186,6 @@ The prelude gives you:
 - `readFrom(p)` / `readTo(p)` — the content you leave and the content you
   enter. They swap when `reverse` is true, so write only the forward
   animation.
-- `readOld(p)` / `readNew(p)` — the snapshot and the live capture, never
-  swapped.
 - `inRange(p)` — whether `p` is inside [0, 1].
 - Reads outside [0, 1] return transparent black.
 - With `overflow`, `uv` goes below 0 and above 1 outside the element.

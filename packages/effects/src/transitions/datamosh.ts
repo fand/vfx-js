@@ -30,7 +30,7 @@ export function createDatamosh(
         // The cut always lands on the new content, in both directions.
         frag: `
 vec4 transition(vec2 uv, float t) {
-  return readNew(uv);
+  return reverse > 0.5 ? readFrom(uv) : readTo(uv);
 }
 `,
         async effects(): Promise<Effect[]> {
