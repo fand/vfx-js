@@ -28,7 +28,7 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 - `pnpm run lint` - Run linting across all packages
 
 ### Testing
-- `pnpm test` - Run tests (specifically for @vfx-js/core package)
+- `pnpm test` - Run tests in every package that has them (core, effects, react, react-vfx)
 - `pnpm --filter @vfx-js/core run test:watch` - Run tests in watch mode
 
 ### Package-specific Development
@@ -58,6 +58,6 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 - Documentation is auto-generated with TypeDoc for the core package
 
 ### Testing
-- Core package uses Vitest for testing
+- Packages use Vitest for testing
 - Test files are located alongside source files with `.test.ts` extension
 - Run package-specific tests: `pnpm --filter @vfx-js/core run test`
