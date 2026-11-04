@@ -1,0 +1,122 @@
+/**
+ * A still copy of an element, pinned over its place on screen.
+ *
+ * Wrapping an element in an html-in-canvas canvas hides it until the first
+ * capture lands, one frame later. The copy covers that frame.
+ *
+ * - Scripts are dropped; `autoplay` is removed.
+ * - `<canvas>` and `<video>` become canvases holding their current picture.
+ * - `<iframe>` becomes an empty box of the same size, since a copy would load again.
+ * - Form values and scroll positions are copied over.
+ */
+export function coverWithStill(element: HTMLElement): () => void {
+    const rect = element.getBoundingClientRect();
+    const clone = element.cloneNode(true) as HTMLElement;
+    const from = [element, ...element.querySelectorAll<HTMLElement>("*")];
+    const to = [clone, ...clone.querySelectorAll<HTMLElement>("*")];
+    const scrolls: [HTMLElement, number, number][] = [];
+    const swaps: [Element, Node][] = [];
+
+    for (let i = 0; i < from.length && i < to.length; i++) {
+        const a = from[i];
+        const b = to[i];
+        if (a.scrollTop || a.scrollLeft) {
+            scrolls.push([b, a.scrollTop, a.scrollLeft]);
+        }
+        if (a instanceof HTMLScriptElement) {
+            swaps.push([b, document.createComment("script")]);
+        } else if (
+            a instanceof HTMLCanvasElement ||
+            a instanceof HTMLVideoElement
+        ) {
+            swaps.push([b, still(a)]);
+        } else if (a instanceof HTMLIFrameElement) {
+            swaps.push([b, box(a)]);
+        } else if (
+            a instanceof HTMLInputElement &&
+            b instanceof HTMLInputElement
+        ) {
+            b.value = a.value;
+            b.checked = a.checked;
+        } else if (
+            a instanceof HTMLTextAreaElement &&
+            b instanceof HTMLTextAreaElement
+        ) {
+            b.value = a.value;
+        } else if (
+            a instanceof HTMLSelectElement &&
+            b instanceof HTMLSelectElement
+        ) {
+            b.selectedIndex = a.selectedIndex;
+        } else if (a instanceof HTMLMediaElement) {
+            b.removeAttribute("autoplay");
+        }
+    }
+    for (const [old, next] of swaps) {
+        old.replaceWith(next);
+    }
+
+    clone.removeAttribute("id");
+    clone.setAttribute("aria-hidden", "true");
+    const style = clone.style;
+    style.setProperty("position", "fixed");
+    style.setProperty("left", `${rect.left}px`);
+    style.setProperty("top", `${rect.top}px`);
+    style.setProperty("width", `${rect.width}px`);
+    style.setProperty("height", `${rect.height}px`);
+    style.setProperty("box-sizing", "border-box");
+    style.setProperty("margin", "0");
+    style.setProperty("pointer-events", "none");
+    // Above the page, below the VFX output canvas.
+    style.setProperty("z-index", "9998");
+
+    // A sibling keeps inherited styles. A transformed ancestor shifts
+    // fixed boxes, so measure once and correct.
+    element.parentNode?.insertBefore(clone, element);
+    const placed = clone.getBoundingClientRect();
+    if (placed.left !== rect.left || placed.top !== rect.top) {
+        style.setProperty("left", `${rect.left * 2 - placed.left}px`);
+        style.setProperty("top", `${rect.top * 2 - placed.top}px`);
+    }
+    for (const [el, top, left] of scrolls) {
+        el.scrollTop = top;
+        el.scrollLeft = left;
+    }
+
+    return () => {
+        clone.remove();
+    };
+}
+
+/** Copy class and inline style, and pin the laid-out size. */
+function sameBox(from: HTMLElement, to: HTMLElement): void {
+    const r = from.getBoundingClientRect();
+    const cs = getComputedStyle(from);
+    to.className = from.className;
+    to.style.cssText = from.style.cssText;
+    to.style.width = `${r.width}px`;
+    to.style.height = `${r.height}px`;
+    to.style.display = cs.display === "inline" ? "inline-block" : cs.display;
+    to.style.boxSizing = "border-box";
+}
+
+function still(src: HTMLCanvasElement | HTMLVideoElement): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    const w = src instanceof HTMLVideoElement ? src.videoWidth : src.width;
+    const h = src instanceof HTMLVideoElement ? src.videoHeight : src.height;
+    c.width = Math.max(1, w);
+    c.height = Math.max(1, h);
+    sameBox(src, c);
+    try {
+        c.getContext("2d")?.drawImage(src, 0, 0, c.width, c.height);
+    } catch {
+        // A tainted or not-ready source stays empty.
+    }
+    return c;
+}
+
+function box(src: HTMLElement): HTMLElement {
+    const d = document.createElement("div");
+    sameBox(src, d);
+    return d;
+}

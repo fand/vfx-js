@@ -1,6 +1,7 @@
 /// <reference path="./html-in-canvas.d.ts" />
 import { markHicCanvas, redrawNestedCanvases } from "./hic-canvas.js";
 import { getImageSourceUrl } from "./image-source.js";
+import { coverWithStill } from "./still-clone.js";
 
 /**
  * Check if an image is cross-origin.
@@ -120,6 +121,7 @@ const savedWidths = new WeakMap<HTMLElement, string>();
 const savedBoxSizing = new WeakMap<HTMLElement, string>();
 const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
 const addedDrawable = new WeakSet<HTMLElement>();
+const stillCovers = new WeakMap<HTMLCanvasElement, () => void>();
 const captureWaiters = new WeakMap<HTMLCanvasElement, Set<() => void>>();
 const lockedCanvases = new WeakSet<HTMLCanvasElement>();
 
@@ -224,8 +226,14 @@ export function lockCanvasSize(canvas: HTMLCanvasElement): () => void {
     };
 }
 
+function removeStillCover(canvas: HTMLCanvasElement): void {
+    stillCovers.get(canvas)?.();
+    stillCovers.delete(canvas);
+}
+
 /**
- * Clear the first capture that `setupCapture` left on the canvas.
+ * Clear the first capture that `setupCapture` left on the canvas and drop
+ * the still copy `wrapElement` put over it.
  * Call it once the overlay has the element's texture.
  */
 export function releaseFirstCapture(canvas: HTMLCanvasElement): void {
@@ -233,6 +241,7 @@ export function releaseFirstCapture(canvas: HTMLCanvasElement): void {
     // in the same frame that this clears.
     requestAnimationFrame(() => {
         canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+        removeStillCover(canvas);
     });
 }
 
@@ -474,6 +483,10 @@ export async function wrapElement(
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
 
+    // A drawable child is not painted until its first capture lands, one
+    // frame later. A still copy covers that frame.
+    stillCovers.set(canvas, coverWithStill(element));
+
     // DOM swap
     savedMargins.set(element, element.style.margin);
     savedWidths.set(element, element.style.width);
@@ -505,6 +518,7 @@ export function unwrapElement(
     element: HTMLElement,
 ): void {
     teardownCapture(canvas);
+    removeStillCover(canvas);
 
     // Restore cross-origin image src and revoke blob URLs
     const restoreImages = imageRestorers.get(canvas);
