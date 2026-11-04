@@ -22,8 +22,7 @@ Mechanism (same as glide today):
   contract: when `cb` resolves, the DOM is updated. How to wait is the
   router adapter's job.
 - Who picks the transition, in order: `run` override → `type` lookup in
-  the container's `types` map → page declaration (React layer only;
-  forward uses the entering page's, back uses the leaving page's) →
+  the container's `types` map →
   container default. No mutable global like `setTransition(body)`.
 - Navigation names a `type` string; the container maps type → spec.
   Same split as React's `addTransitionType` + `enter={{ type: … }}`.
@@ -84,7 +83,6 @@ await run(() => startTransition(() => router.push("/next")), { type: "forward" }
 <Link href="/next" onClick={transition(glitch)}>…</Link>   // client component
 <VFXLink as={Link} href="/next" transition={glitch}>…</VFXLink>  // RSC-safe
 
-useVFXTransitionSpec({ transition: glitch });   // page declares its own
 ```
 
 `run()` steps: resolve spec → wrap (unless kept) → wait first paint →
@@ -156,10 +154,11 @@ Files under `packages/react/src/transition/`:
   store is empty.
 - `VFXTransition.tsx`: key-based. On a new child key, keep rendering the
   old child for one frame, run `t.run(() => setShown(next))`, resolve
-  after commit. Context exposes the container for page declarations.
+  after commit.
 - `useVFXTransition.ts`: `{ ref, run }`. `run` wraps the callback in a
   React 19 async action and resolves when `isPending` goes false.
-- `useVFXTransitionSpec.ts`: register the page's own spec in context.
+- (dropped) a page-declared spec hook: the entering page cannot declare
+  before the run starts, so it was removed.
 - `VFXLink.tsx`: `"use client"` wrapper that renders `as` (Next or
   react-router `Link`) with the click handler. Needed because a Server
   Component cannot pass `onClick` to `Link`.

@@ -260,12 +260,8 @@ Takes the `addTransition` options as props, plus `className` and
 `style`. It renders a `<div>` around one child. The child needs a `key`
 that changes per page; a child without a key never transitions.
 
-Each run uses, in order:
-
-1. The spec set by a click or by `setNextTransition`.
-2. When going back without a transition: the leaving page's
-   `useVFXTransitionSpec`, played reversed.
-3. The props.
+Each run uses the spec set by a click or by `setNextTransition`, else
+the props.
 
 Back navigation is detected with the Navigation API when present, else
 with `popstate`. It sets `type: "back"`, so `types.back` applies.
@@ -313,17 +309,6 @@ await run(() => setTab(next), { type: "forward" });
 `run` wraps `cb` in `startTransition` and starts the animation after
 React commits. If `cb` updates no state, it resolves on the next frame.
 
-### `useVFXTransitionSpec`
-
-A page declares its own transition while mounted:
-
-```tsx
-function About() {
-    useVFXTransitionSpec({ transition: glitch });
-    return <main>…</main>;
-}
-```
-
 ### `setNextTransition`
 
 For navigation from code:
@@ -337,8 +322,6 @@ router.push("/next");
 
 - Nested VFX elements inside the container freeze during a run. They show
   their plain content, not their effect.
-- The entering page's `useVFXTransitionSpec` is not used yet. It declares
-  only after it mounts, which is too late for the run.
 - Next.js `loading.tsx` shows its fallback as soon as the path changes,
   so the transition lands on the skeleton. Use `useVFXTransition` with
   your own ready signal instead.

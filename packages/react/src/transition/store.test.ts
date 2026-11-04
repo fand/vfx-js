@@ -6,7 +6,6 @@ import {
     setNextTransition,
     takePending,
     transition,
-    withPageSpec,
 } from "./store.js";
 
 const swipe: TransitionDef = { name: "swipe", frag: "" };
@@ -91,32 +90,5 @@ describe("pending spec", () => {
         expect(takePending()).toEqual({ transition: zoom });
         markBackNavigation();
         expect(takePending()).toEqual({ type: "back" });
-    });
-});
-
-describe("withPageSpec", () => {
-    const leaving = { transition: swipe, uniforms: { width: 1 }, duration: 2 };
-
-    it("uses the leaving page's spec, reversed, when going back", () => {
-        expect(withPageSpec({ type: "back" }, leaving)).toEqual({
-            type: "back",
-            transition: swipe,
-            uniforms: { width: 1 },
-            duration: 2,
-            reverse: true,
-        });
-    });
-
-    it("keeps an explicit transition", () => {
-        expect(
-            withPageSpec({ type: "back", transition: zoom }, leaving),
-        ).toEqual({ type: "back", transition: zoom });
-    });
-
-    it("leaves forward runs to the container", () => {
-        expect(withPageSpec(null, leaving)).toEqual({});
-        expect(withPageSpec({ type: "forward" }, leaving)).toEqual({
-            type: "forward",
-        });
     });
 });

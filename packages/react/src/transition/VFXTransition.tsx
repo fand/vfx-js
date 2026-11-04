@@ -1,27 +1,18 @@
 "use client";
 
-import type {
-    AddTransitionOpts,
-    Transition,
-    TransitionSpec,
-} from "@vfx-js/core";
+import type { AddTransitionOpts, Transition } from "@vfx-js/core";
 import * as React from "react";
 import {
     useContext,
     useEffect,
     useLayoutEffect,
-    useMemo,
     useRef,
     useState,
 } from "react";
 import { VFXContext } from "../context.js";
-import {
-    VFXTransitionContext,
-    type VFXTransitionContextValue,
-} from "./context.js";
 import { watchNavigationDirection } from "./direction.js";
 import { useLiveOpts } from "./live-opts.js";
-import { takePending, withPageSpec } from "./store.js";
+import { takePending } from "./store.js";
 
 export type VFXTransitionProps = AddTransitionOpts & {
     /** A single element. A new `key` starts a transition. */
@@ -48,22 +39,6 @@ export function VFXTransition(props: VFXTransitionProps) {
     const [shown, setShown] = useState(next);
     const requestedKey = useRef(keyOf(next));
     const commitWaiters = useRef<(() => void)[]>([]);
-    const declarations = useRef<TransitionSpec[]>([]);
-
-    const context = useMemo<VFXTransitionContextValue>(
-        () => ({
-            declare(spec) {
-                declarations.current.push(spec);
-                return () => {
-                    const i = declarations.current.lastIndexOf(spec);
-                    if (i !== -1) {
-                        declarations.current.splice(i, 1);
-                    }
-                };
-            },
-        }),
-        [],
-    );
 
     useEffect(() => watchNavigationDirection(), []);
 
@@ -99,8 +74,6 @@ export function VFXTransition(props: VFXTransitionProps) {
             setShown(next);
             return;
         }
-        // The entering page declares only after it mounts, so v1 falls back to the leaving page's spec.
-        const leaving = declarations.current[declarations.current.length - 1];
         const swap = () =>
             new Promise<void>((resolve) => {
                 // A newer key took over, so this page never shows.
@@ -111,11 +84,9 @@ export function VFXTransition(props: VFXTransitionProps) {
                 commitWaiters.current.push(resolve);
                 setShown(next);
             });
-        transition
-            .run(swap, withPageSpec(takePending(), leaving))
-            .catch((err) => {
-                console.error("[@vfx-js/react] VFXTransition run failed:", err);
-            });
+        transition.run(swap, takePending() ?? {}).catch((err) => {
+            console.error("[@vfx-js/react] VFXTransition run failed:", err);
+        });
     });
 
     // New key: keep the latest element of the old page until the run swaps.
@@ -129,10 +100,8 @@ export function VFXTransition(props: VFXTransitionProps) {
     const rendered = latestShown.current;
 
     return (
-        <VFXTransitionContext.Provider value={context}>
-            <div ref={ref} className={className} style={style}>
-                {rendered}
-            </div>
-        </VFXTransitionContext.Provider>
+        <div ref={ref} className={className} style={style}>
+            {rendered}
+        </div>
     );
 }

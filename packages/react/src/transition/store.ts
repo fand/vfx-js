@@ -60,25 +60,3 @@ export function transition(
         }
     };
 }
-
-/**
- * Fill in the run options from the leaving page's own spec when going back
- * without an explicit transition. Going back plays it reversed.
- */
-export function withPageSpec(
-    spec: RunOpts | null,
-    leaving: TransitionSpec | undefined,
-): RunOpts {
-    const run = spec ?? {};
-    const isBack = run.type === "back" || run.reverse === true;
-    if (run.transition || !leaving || !isBack) {
-        return run;
-    }
-    return {
-        ...run,
-        transition: leaving.transition,
-        uniforms: leaving.uniforms,
-        duration: run.duration ?? leaving.duration,
-        reverse: run.reverse ?? !(leaving.reverse ?? false),
-    };
-}
