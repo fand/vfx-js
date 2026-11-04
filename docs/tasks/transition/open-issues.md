@@ -1,7 +1,7 @@
 # Element transitions: open issues
 
 Found while building the framework demos in `packages/transition-demo/`
-(Next.js 16 App Router, Astro 7 ClientRouter). As of 2026-11-04.
+(Next.js 16, Astro 7, Nuxt 4, SvelteKit 3, Void 1.3). As of 2026-11-04.
 Not fixed in the library yet. See [progress.md](./progress.md).
 
 ## Two kinds of router problems
@@ -18,11 +18,13 @@ The issues below fall into two kinds.
   SvelteKit, Nuxt, Void). The DOM is not swapped whole, so layouts and
   state stay. The risk is that the old page goes away before the
   snapshot. Next hits this. React Router's `<Outlet>` likely does too,
-  since it reads the route from context. SvelteKit `onNavigate` and Nuxt
-  `router.beforeEach` can hold the update until the snapshot. Void's
-  pages mode renders pages through UI adapters; whether it hits this
-  depends on how the page reaches the component. None of these are
-  verified beyond Next.
+  since it reads the route from context (not verified).
+- Verified in the demos, no workaround needed:
+  - SvelteKit: `onNavigate` holds the DOM update until the snapshot.
+  - Nuxt: `router.beforeEach` holds the navigation; `page:finish` ends
+    the swap.
+  - Void (React adapter): the layout gets the page as an element with
+    its own props, so `<VFXTransition>` keeps the old page as is.
 
 ## Next.js App Router: the kept old page shows the new route
 

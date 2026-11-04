@@ -162,6 +162,27 @@ From [plan5.md](./plan5.md):
 - A run warns once when the new content is not captured in time.
 - `CLAUDE.md` says `pnpm test` runs every package with tests.
 
+## Framework demos
+
+`packages/transition-demo/` has the same three pages (Home, Gallery,
+About) in five frameworks. Each link picks a preset; back plays `swipe`
+reversed. Shared pages, CSS and preset names live in `shared/`.
+`pnpm dev` starts them all (`--concurrency 16` on the root script).
+
+| Demo | Port | Wiring |
+| ---- | ---- | ------ |
+| Next.js 16 | 5001 | `<VFXTransition>` + `FrozenRouter` |
+| Astro 7 | 5002 | core `run(cb)` in `before-preparation`, custom `swap` |
+| Nuxt 4 | 5003 | core `run(cb)` in `router.beforeEach`, ends on `page:finish` |
+| SvelteKit 3 | 5004 | core `run(cb)` in `onNavigate` |
+| Void 1.3 | 5005 | `<VFXTransition>` (React adapter) |
+
+Each demo builds with `build:demo`, kept out of the root `pnpm build`.
+In Playwright's Chrome (dom-to-canvas fallback), every demo snapshots
+the old page before the new one renders, on links and on back.
+Shader output was not checked by eye. Findings:
+[open-issues.md](./open-issues.md).
+
 ## Verified
 
 - Lint, vitest (core 258, effects 14, react 25), `tsc --noEmit` and the
@@ -189,5 +210,4 @@ From [plan5.md](./plan5.md):
 - glide rewrite happens in the glide repo, on `addTransition` with
   `keepWrapped: true`.
 - Exact peer versions are set at release time.
-- Framework demo findings (Next App Router, Astro ClientRouter):
-  [open-issues.md](./open-issues.md).
+- Framework demo findings: [open-issues.md](./open-issues.md).

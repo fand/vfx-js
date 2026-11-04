@@ -1,0 +1,5 @@
+dist/
+.void/
+.wrangler/
+.void-wrangler.jsonc
+void.lock.json

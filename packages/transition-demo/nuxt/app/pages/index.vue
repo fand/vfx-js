@@ -1,0 +1,3 @@
+<template>
+    <PageView path="/" />
+</template>
