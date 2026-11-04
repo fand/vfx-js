@@ -97,9 +97,10 @@ export const Tabs: StoryObj<Args> = {
         next.style.cssText = "margin-bottom:24px; font-size:1rem";
 
         // A fixed-size box: the tabs share one size, so nothing moves between them.
+        // Width is explicit too; the story root shrinks to its content otherwise.
         const container = document.createElement("div");
         container.style.cssText =
-            "height:240px; box-sizing:border-box; padding:24px; border-radius:16px; background:#222";
+            "width:560px; height:240px; box-sizing:border-box; padding:24px; border-radius:16px; background:#222";
         let index = 0;
         container.innerHTML = renderPage(index);
         root.append(next, container);
