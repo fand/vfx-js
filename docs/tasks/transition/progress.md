@@ -106,9 +106,21 @@ Commits on `feat/transition`, in order:
   `staticClone`). The unwrap frame has no gap: the element returns to
   plain DOM in the same frame the overlay draws it last.
 
+## Review fixes
+
+From the PR #220 review ([plan2.md](./plan2.md)):
+
+- `run()` no longer hangs when the target is off screen or hidden: the
+  player keeps rendering it during a run, and a 1 s timeout cuts to the
+  new content.
+- The chain holds only the current transition's driver effects;
+  switching transitions swaps them out and disposes the old ones.
+- The still copy keeps the element's `id`, so `#app { … }` styles cover
+  the wrap frame.
+
 ## Verified
 
-- Lint, vitest (core 242, effects 14, react 25), `tsc --noEmit` and the
+- Lint, vitest (core 248, effects 14, react 25), `tsc --noEmit` and the
   Storybook build pass.
 - In Chrome with html-in-canvas: box stays 560×240 through runs; corners
   clean mid-crossfade; zoomBlur with `overflow: full` draws across the

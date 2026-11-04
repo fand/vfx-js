@@ -8,6 +8,9 @@
  * - `<canvas>` and `<video>` become canvases holding their current picture.
  * - `<iframe>` becomes an empty box of the same size, since a copy would load again.
  * - Form values and scroll positions are copied over.
+ * - The `id` stays, so `#id` styles still apply.
+ *   The page holds a duplicate id for that one frame; the copy is hidden from
+ *   assistive tech and ignores the pointer.
  */
 export function coverWithStill(element: HTMLElement): () => void {
     const rect = element.getBoundingClientRect();
@@ -56,7 +59,6 @@ export function coverWithStill(element: HTMLElement): () => void {
         old.replaceWith(next);
     }
 
-    clone.removeAttribute("id");
     clone.setAttribute("aria-hidden", "true");
     const style = clone.style;
     style.setProperty("position", "fixed");
