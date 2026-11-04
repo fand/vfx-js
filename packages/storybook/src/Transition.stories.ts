@@ -21,6 +21,13 @@ type Args = {
     transition: keyof typeof TRANSITIONS;
     reverse: boolean;
     duration: number;
+    overflow: "none" | "48px" | "full";
+};
+
+const OVERFLOW: Record<Args["overflow"], true | number | undefined> = {
+    none: undefined,
+    "48px": 48,
+    full: true,
 };
 
 const PAGES = [
@@ -62,11 +69,20 @@ export default {
 } satisfies Meta<Args>;
 
 export const Tabs: StoryObj<Args> = {
-    args: { transition: "crossfade", reverse: false, duration: 0.8 },
+    args: {
+        transition: "crossfade",
+        reverse: false,
+        duration: 0.8,
+        overflow: "none",
+    },
     argTypes: {
         transition: {
             control: { type: "select" },
             options: Object.keys(TRANSITIONS),
+        },
+        overflow: {
+            control: { type: "select" },
+            options: Object.keys(OVERFLOW),
         },
         duration: { control: { type: "range", min: 0, max: 3, step: 0.1 } },
     },
@@ -80,9 +96,10 @@ export const Tabs: StoryObj<Args> = {
         next.textContent = "Next";
         next.style.cssText = "margin-bottom:24px; font-size:1rem";
 
+        // A fixed-size box: the tabs share one size, so nothing moves between them.
         const container = document.createElement("div");
         container.style.cssText =
-            "padding:24px; border-radius:16px; background:#222";
+            "height:240px; box-sizing:border-box; padding:24px; border-radius:16px; background:#222";
         let index = 0;
         container.innerHTML = renderPage(index);
         root.append(next, container);
@@ -93,6 +110,7 @@ export const Tabs: StoryObj<Args> = {
             transition: TRANSITIONS[args.transition],
             reverse: args.reverse,
             duration: args.duration,
+            overflow: OVERFLOW[args.overflow],
             waitFor: "none",
         });
         const swap = () =>

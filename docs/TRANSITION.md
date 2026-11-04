@@ -55,6 +55,20 @@ the transition has its snapshot.
 
 ## Core API
 
+### Sizing
+
+Give the target a fixed size: an explicit width and height, like a slide
+stage, a tab panel with `height: 240px`, or a viewport-sized router
+outlet. The old and new content then share one box, and the transition
+only mixes pixels.
+
+When the content changes the box's size, VFX-JS locks the box at its old
+size for the run and lets it jump to the new size afterwards. That keeps
+the textures the same size, but the jump is visible. Fix the size on the
+target instead of relying on this. The width rules of the
+[html-in-canvas sizing policy](./html-in-canvas.md#sizing-policy) apply
+too.
+
 ### `vfx.addTransition(element, opts?)`
 
 Returns a `Transition` at once. It touches no DOM until the first run.
@@ -335,8 +349,9 @@ router.push("/next");
   router outlet (`#app`, `<main>`).
 - There is one pending click spec per page, shared by all
   `<VFXTransition>`s.
-- The element's size is locked during a run. When old and new content
-  differ in height, the layout jumps after the run ends.
+- Content of a different size is not animated between sizes. The box is
+  locked at its old size for the run and jumps afterwards. See
+  [Sizing](#sizing).
 
 ## See also
 
