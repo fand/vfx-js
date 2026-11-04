@@ -14,6 +14,10 @@ export interface VFXProviderProps extends VFXConfig {
     wrapper?: React.RefObject<HTMLElement | null>;
 }
 
+/**
+ * Creates a separate VFX instance and canvas for its children.
+ * Components outside any Provider share one instance instead.
+ */
 export const VFXProvider: React.FC<VFXProviderProps> = (props) => {
     const [vfx, setVFX] = useState<VFX | null>(null);
     const autoplay = props.autoplay ?? true;

@@ -67,7 +67,7 @@ export default () => {
 };
 ```
 
-- Options: `pixelRatio`, `zIndex`, `postEffect`, `autoplay`.
+- Options: `pixelRatio`, `zIndex`, `postEffect`.
 - A change in options recreates the canvas, so memo `postEffect` (e.g. with `useMemo`).
 - Options apply while the component is mounted. Call it once, e.g. in your root layout. If more than one is mounted, the last one wins.
 
@@ -91,8 +91,45 @@ export default () => {
 };
 ```
 
+Props:
+
+- `pixelRatio`, `zIndex`, `postEffect`: same as `useVFXConfig`.
+- `wrapper`: a ref to the element the canvas is appended to. The element should have `position: relative` and `overflow: hidden`.
+- `autoplay` (default `true`): set `false` to drive rendering yourself.
+
 Components inside a Provider use its instance. `useVFXConfig` does nothing there.
 Each Provider has its own canvas, separate from the shared one. So a page with a Provider and components outside it has two canvases.
+
+#### Accessing the instance
+
+`VFXContext` holds the Provider's `VFX` instance. Use it with `autoplay={false}` to render frames yourself:
+
+```ts
+import { useContext, useEffect } from 'react';
+import { VFXContext, VFXProvider, VFXImg } from '@vfx-js/react';
+
+const Renderer = () => {
+    const vfx = useContext(VFXContext);
+    useEffect(() => {
+        if (!vfx) return;
+        let id = requestAnimationFrame(function loop() {
+            vfx.render();
+            id = requestAnimationFrame(loop);
+        });
+        return () => cancelAnimationFrame(id);
+    }, [vfx]);
+    return null;
+};
+
+export default () => (
+    <VFXProvider autoplay={false}>
+        <Renderer />
+        <VFXImg src="cat.png" shader="rgbShift"/>
+    </VFXProvider>
+);
+```
+
+`VFXContext` is `null` outside a Provider, and while the Provider is creating its instance.
 
 ### Effect API
 

@@ -303,6 +303,36 @@ const UsageSection: React.FC = () => (
                 </VFX.VFXSpan>
             </section>
         </section>
+        <section>
+            <h2 id="options">Options</h2>
+            <p>
+                All VFX Elements share one WebGL canvas. Use{" "}
+                <InlineCode>useVFXConfig</InlineCode> to set its options:
+            </p>
+            <Code>
+                {dedent`
+            import { useVFXConfig } from '@vfx-js/react';
+
+            function App() {
+              useVFXConfig({ pixelRatio: 1, zIndex: -1 });
+              return <MyPage />;
+            }
+        `}
+            </Code>
+            <p>
+                Use <InlineCode>{"<VFXProvider>"}</InlineCode> when you need a
+                separate canvas, e.g. inside a <InlineCode>wrapper</InlineCode>{" "}
+                element. See{" "}
+                <a
+                    href="https://github.com/fand/vfx-js/tree/main/packages/react#vfxprovider"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    GitHub
+                </a>{" "}
+                for details.
+            </p>
+        </section>
     </>
 );
 
