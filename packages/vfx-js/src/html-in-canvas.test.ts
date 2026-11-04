@@ -11,29 +11,29 @@ describe("waitForFlush", () => {
 
     test("resolves when the waiter is called", async () => {
         const waiters = new Set<() => void>();
-        let resolved = false;
-        waitForFlush(waiters, 300).then(() => {
-            resolved = true;
+        let result: boolean | undefined;
+        waitForFlush(waiters, 300).then((flushed) => {
+            result = flushed;
         });
         expect(waiters.size).toBe(1);
         for (const done of [...waiters]) {
             done();
         }
         await Promise.resolve();
-        expect(resolved).toBe(true);
+        expect(result).toBe(true);
         expect(waiters.size).toBe(0);
     });
 
     test("resolves on timeout and removes itself", async () => {
         const waiters = new Set<() => void>();
-        let resolved = false;
-        waitForFlush(waiters, 300).then(() => {
-            resolved = true;
+        let result: boolean | undefined;
+        waitForFlush(waiters, 300).then((flushed) => {
+            result = flushed;
         });
         await vi.advanceTimersByTimeAsync(299);
-        expect(resolved).toBe(false);
+        expect(result).toBeUndefined();
         await vi.advanceTimersByTimeAsync(1);
-        expect(resolved).toBe(true);
+        expect(result).toBe(false);
         expect(waiters.size).toBe(0);
     });
 });

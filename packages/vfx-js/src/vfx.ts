@@ -310,6 +310,14 @@ export class VFX {
      * `<img>` whose selected source swaps).
      */
     async update(element: HTMLElement): Promise<void> {
+        await this.updateInTime(element);
+    }
+
+    /**
+     * Like `update`, and resolves to false when an html-in-canvas capture timed out.
+     * @internal Used by transitions.
+     */
+    async updateInTime(element: HTMLElement): Promise<boolean> {
         const wrapper = this.#wrapperCanvases.get(element);
         const hicCanvas =
             wrapper ?? (element instanceof HTMLCanvasElement ? element : null);
@@ -319,13 +327,13 @@ export class VFX {
         }
 
         if (element instanceof HTMLImageElement) {
-            return this.#player.updateImageElement(element);
+            await this.#player.updateImageElement(element);
         } else if (element instanceof HTMLCanvasElement) {
             this.#player.updateCanvasElement(element);
-            return;
         } else {
-            return this.#player.updateTextElement(element);
+            await this.#player.updateTextElement(element);
         }
+        return true;
     }
 
     /**

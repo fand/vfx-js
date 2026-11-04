@@ -263,8 +263,18 @@ describe("waitForMedia", () => {
     });
 });
 
-function setup(opts: { keepWrapped?: boolean; snapshotStalls?: boolean } = {}) {
-    const { snapshotStalls = false, ...transitionOpts } = opts;
+function setup(
+    opts: {
+        keepWrapped?: boolean;
+        snapshotStalls?: boolean;
+        captureTimesOut?: boolean;
+    } = {},
+) {
+    const {
+        snapshotStalls = false,
+        captureTimesOut = false,
+        ...transitionOpts
+    } = opts;
     const log: string[] = [];
     const starts: { opts: TransitionStartOpts; end: () => void }[] = [];
     let endCurrent: (() => void) | null = null;
@@ -310,6 +320,10 @@ function setup(opts: { keepWrapped?: boolean; snapshotStalls?: boolean } = {}) {
         },
         update: async () => {
             log.push("update");
+        },
+        updateInTime: async () => {
+            log.push("update");
+            return !captureTimesOut;
         },
         updateEffects: async (_element, effects) => {
             log.push("updateEffects");
@@ -605,6 +619,23 @@ describe("TransitionController", () => {
         await runB;
         expect(chain()).toEqual([expect.anything(), b.created[0][0]]);
         expect(chain()).not.toContain(slowFx[0]);
+    });
+
+    test("warns once when the new content is not captured in time", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            const { transition, starts } = setup({ captureTimesOut: true });
+            for (let i = 0; i < 2; i++) {
+                const run = transition.run(() => {});
+                await settle();
+                starts[i].end();
+                await run;
+            }
+            expect(starts).toHaveLength(2);
+            expect(warn).toHaveBeenCalledOnce();
+        } finally {
+            warn.mockRestore();
+        }
     });
 
     test("duration 0 cuts without wrapping", async () => {

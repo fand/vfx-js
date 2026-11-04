@@ -121,6 +121,7 @@ export type TransitionHost = Pick<
     VFX,
     | "addHTMLWithStill"
     | "update"
+    | "updateInTime"
     | "updateEffects"
     | "remove"
     | "freezeInside"
@@ -165,6 +166,7 @@ export class TransitionController implements Transition {
     #unfreezers: (() => void)[] = [];
     #unlocks: (() => void)[] = [];
     #warnedStall = false;
+    #warnedLateCapture = false;
 
     // Each run takes a new id; a run stops at its next await once it is stale.
     #seq = 0;
@@ -339,7 +341,13 @@ export class TransitionController implements Transition {
         if (!isCurrent()) {
             return;
         }
-        await this.#vfx.update(this.#element);
+        const captured = await this.#vfx.updateInTime(this.#element);
+        if (!captured && !this.#warnedLateCapture) {
+            this.#warnedLateCapture = true;
+            console.warn(
+                "[VFX-JS] transition: the new content was not captured in time; it may pop in during the run.",
+            );
+        }
         if (!isCurrent()) {
             return;
         }

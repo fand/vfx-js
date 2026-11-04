@@ -129,18 +129,20 @@ const CAPTURE_TIMEOUT_MS = 300;
 
 /**
  * Add a waiter to the set and resolve when it is called or on timeout.
+ * Resolves to false on timeout.
  */
 export function waitForFlush(
     waiters: Set<() => void>,
     timeoutMs: number,
-): Promise<void> {
-    return new Promise<void>((resolve) => {
-        const done = () => {
+): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+        const finish = (flushed: boolean) => {
             clearTimeout(timer);
             waiters.delete(done);
-            resolve();
+            resolve(flushed);
         };
-        const timer = setTimeout(done, timeoutMs);
+        const done = () => finish(true);
+        const timer = setTimeout(() => finish(false), timeoutMs);
         waiters.add(done);
     });
 }
@@ -176,13 +178,13 @@ export function moveNode(
 
 /**
  * Request a new capture of a canvas set up by `setupCapture`.
- * Resolves after the capture is handed to `onCapture`, or after a timeout.
+ * Resolves after the capture is handed to `onCapture`, or to false after a timeout.
  * Returns `undefined` if the canvas has no capture set up.
  */
 export function requestCapture(
     canvas: HTMLCanvasElement,
     timeoutMs = CAPTURE_TIMEOUT_MS,
-): Promise<void> | undefined {
+): Promise<boolean> | undefined {
     const waiters = captureWaiters.get(canvas);
     if (!waiters) {
         return undefined;
