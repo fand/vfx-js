@@ -23,11 +23,11 @@ See `spec.md` for the goal and API.
 Module-level store for the implicit instance.
 
 - State: `instance`, `appliedConfig`, `refCount`, `configOwners`
-  (mount order), `failed`, `flushScheduled`, `destroyHandle`,
-  `listeners`.
+  (mount order), `failed`, `flushScheduled`, `listeners`.
 - `acquire()` / `release()`, called by elements.
-  - `acquire` cancels a pending destroy. 0 → 1 schedules a flush.
-  - `release` to 0 destroys one frame later (rAF).
+  - `acquire` 0 → 1 schedules a flush.
+  - `release` to 0 destroys one frame later (rAF), unless a consumer
+    mounted in between.
 - `setConfig(owner, opts)` / `clearConfig(owner)`. Owner is a symbol.
   `setConfig` adds a new owner or updates an existing one in place,
   without changing its order.
@@ -37,8 +37,7 @@ Module-level store for the implicit instance.
   - If `refCount > 0` and (no instance and not `failed`, or effective
     config differs from applied): create or replace.
   - Replace: `stop()` + `destroy()` the old one, `new VFX`, notify.
-  - `new VFX` throws: `failed = true`, instance stays `null`. A config
-    change clears `failed`.
+  - `VFX.init()` returns `null`: `failed = true`; no retry.
 - StrictMode unmount → mount and config clear → set run in the same
   tick, so the microtask flush sees no change and does nothing.
 

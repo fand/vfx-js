@@ -36,7 +36,7 @@
 
 - I merged plan commits 1 and 2. The tests render the real components, so they fail until the consumers switch over.
 - `useVFXConfig` uses a fixed id per component. An option change updates that call in place, so mount order stays correct.
-- `acquire` cancels the pending destroy, and the destroy callback also checks the consumer count. Either check alone is enough, so no test fails without the cancel. Both stay.
+- The destroy callback checks the consumer count; there is no cancel.
 
 ## Fixed along the way
 
@@ -52,6 +52,8 @@
 - The "more than one `useVFXConfig`" warning fires only when the options differ.
   Exit animations and islands mount the same config twice; that is fine.
 - Changeset notes the behavior change for components outside any Provider.
+- `store.ts` uses `VFX.init()`; `failed` is never reset.
+- Inside a Provider, `useVFXInstance` does not subscribe to the implicit store.
 
 ## Next
 

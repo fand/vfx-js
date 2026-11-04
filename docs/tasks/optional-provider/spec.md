@@ -115,8 +115,8 @@ reference count of mounted consumers.
   swaps from rebuilding the canvas.
 - **SSR:** the store is created only in effects, so nothing runs on the
   server. `useSyncExternalStore` gets a server snapshot of `null`.
-- **No WebGL:** `new VFX()` throws; the store keeps `null` and does not
-  retry until options change. Children render as plain DOM, as today.
+- **No WebGL:** `VFX.init()` returns `null`; the store does not retry.
+  Children render as plain DOM, as today.
 - **HMR:** module reload makes a new store. The old instance is
   destroyed by its last consumer's cleanup.
 

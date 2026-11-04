@@ -21,6 +21,13 @@ const mock = vi.hoisted(() => {
             this.opts = opts;
             state.instances.push(this);
         }
+        static init(opts: unknown): MockVFX | null {
+            try {
+                return new MockVFX(opts);
+            } catch {
+                return null;
+            }
+        }
     }
     return { state, MockVFX };
 });
@@ -65,9 +72,6 @@ beforeEach(async () => {
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
         frames.push(cb);
         return frames.length;
-    });
-    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
-        frames[id - 1] = () => {};
     });
     (
         globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }

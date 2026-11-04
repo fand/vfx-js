@@ -24,7 +24,6 @@ let appliedConfig: VFXConfig = {};
 let refCount = 0;
 let failed = false;
 let flushScheduled = false;
-let destroyHandle: number | null = null;
 const configOwners: { owner: symbol; config: VFXConfig }[] = [];
 const listeners = new Set<() => void>();
 
@@ -48,25 +47,18 @@ function destroyInstance(): void {
 
 function flush(): void {
     flushScheduled = false;
-    if (refCount === 0) {
+    if (refCount === 0 || failed) {
         return;
     }
     const config = effectiveConfig();
-    const changed = !configEqual(config, appliedConfig);
-    if (changed) {
-        failed = false;
-    }
-    if (instance ? !changed : failed) {
+    if (instance && configEqual(config, appliedConfig)) {
         return;
     }
     destroyInstance();
     appliedConfig = config;
-    try {
-        instance = new VFX({ ...config });
-    } catch {
-        // WebGL unavailable: elements stay plain DOM.
-        failed = true;
-    }
+    instance = VFX.init({ ...config });
+    // WebGL unavailable: elements stay plain DOM.
+    failed = instance === null;
     notify();
 }
 
@@ -79,10 +71,6 @@ function scheduleFlush(): void {
 
 export function acquire(): void {
     refCount++;
-    if (destroyHandle !== null) {
-        cancelAnimationFrame(destroyHandle);
-        destroyHandle = null;
-    }
     scheduleFlush();
 }
 
@@ -91,14 +79,12 @@ export function release(): void {
     if (refCount > 0) {
         return;
     }
-    destroyHandle = requestAnimationFrame(() => {
-        destroyHandle = null;
+    // Wait a frame so a remount in the same tick keeps the instance.
+    requestAnimationFrame(() => {
         if (refCount > 0) {
             return;
         }
         destroyInstance();
-        appliedConfig = {};
-        failed = false;
         notify();
     });
 }

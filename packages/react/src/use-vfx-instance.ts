@@ -13,6 +13,7 @@ import {
 } from "./store.js";
 
 const getServerSnapshot = (): null => null;
+const noopSubscribe = (): (() => void) => () => {};
 
 /**
  * Returns the Provider's VFX inside a Provider, else the implicit one.
@@ -24,7 +25,7 @@ export function useVFXInstance({
     const inProvider = useContext(VFXProviderMarker);
     const providerVfx = useContext(VFXContext);
     const implicitVfx = useSyncExternalStore(
-        subscribe,
+        inProvider ? noopSubscribe : subscribe,
         getSnapshot,
         getServerSnapshot,
     );
