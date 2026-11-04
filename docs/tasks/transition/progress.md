@@ -1,7 +1,9 @@
 # Element transitions: progress
 
-Status as of 2026-11-03. Branch `feat/transition`, PR #220.
-Plan: [plan.md](./plan.md). User guide: [docs/TRANSITION.md](../../TRANSITION.md).
+Status as of 2026-11-04. Branch `feat/transition`, PR #220.
+Plans: [plan.md](./plan.md), then the review follow-ups [plan2.md](./plan2.md),
+[plan3.md](./plan3.md), [plan4.md](./plan4.md), [plan5.md](./plan5.md).
+User guide: [docs/TRANSITION.md](../../TRANSITION.md).
 
 ## Where it started
 
@@ -23,8 +25,8 @@ and SPA page transitions.
   `enter={{ type: … }}` (which is still canary, not stable React).
 - **Wrap only during a run** (default). The element is plain DOM at rest
   and is wrapped in the html-in-canvas canvas only while `run()` is in
-  flight. `keepWrapped: true` only when persistent `effects` are given.
-  Avoids the hit-test flag and per-frame capture at rest.
+  flight. `keepWrapped: true` keeps it wrapped between runs; glide's
+  stage uses that. Avoids the hit-test flag and per-frame capture at rest.
 - **React: no navigation interception.** `onClick={transition(glitch)}`
   on any Link only records the next spec in a store; `<VFXTransition
   key={pathname}>` consumes it when the key changes. Works with Next,
@@ -66,8 +68,8 @@ Commits on `feat/transition`, in order:
 4. `ba6a413b` React: `<VFXTransition>` (key-based, defers the swap one
    frame so the old page renders until the snapshot), `useVFXTransition`
    (`{ ref, run }` over React 19 actions), `transition()` click helper
-   and store, `<VFXLink>` for Server Components, back / forward detection
-   via the Navigation API.
+   and store, `<VFXLink>` for Server Components (removed later), back /
+   forward detection via the Navigation API.
 5. `65ce57eb` `docs/TRANSITION.md`, Storybook "Transition / Tabs",
    changesets. Effects peer dependency on core bumped to `>=1.4.0`.
 6. `9a5300f9` Size lock during a run; `overflow` option
@@ -162,7 +164,7 @@ From [plan5.md](./plan5.md):
 
 ## Verified
 
-- Lint, vitest (core 248, effects 14, react 25), `tsc --noEmit` and the
+- Lint, vitest (core 258, effects 14, react 25), `tsc --noEmit` and the
   Storybook build pass.
 - In Chrome with html-in-canvas: box stays 560×240 through runs; corners
   clean mid-crossfade; zoomBlur with `overflow: full` draws across the
@@ -172,6 +174,12 @@ From [plan5.md](./plan5.md):
 
 - Chromatic snapshot of the Transition story (never run).
 - Nested freeze and `keepWrapped` paths in a real browser.
+- Everything after the review (plan2 to plan5) is covered by unit tests
+  and typecheck only. Worth a browser pass before merge: the two-div
+  `<VFXTransition>` on unmount mid-run, elements mounting under a frozen
+  root, the off-screen stall timeout, `waitFor` with lazy images, the
+  prelude without `readOld` / `readNew`, and `overflow` on a full-screen
+  target.
 - Next.js `loading.tsx` lands the transition on the skeleton. No fix in
   v1; use `useVFXTransition` with a manual ready signal, or drop the
   loading file for that route.
