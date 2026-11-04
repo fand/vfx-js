@@ -24,19 +24,6 @@ export type ResolvedSpec = {
     overflow: true | number | undefined;
 };
 
-function largerOverflow(
-    a: true | number | undefined,
-    b: true | number | undefined,
-): true | number | undefined {
-    if (a === true || b === true) {
-        return true;
-    }
-    if (a === undefined || b === undefined) {
-        return a ?? b;
-    }
-    return Math.max(a, b);
-}
-
 /**
  * Pick the run options, then the named type, then the container defaults.
  * Uniforms come with the shader from the first level that sets `transition`.
@@ -58,10 +45,11 @@ export function resolveSpec(
             typed?.duration ??
             opts.duration ??
             DEFAULT_DURATION,
-        overflow: largerOverflow(
+        overflow:
+            run.overflow ??
+            typed?.overflow ??
+            opts.overflow ??
             transition.overflow,
-            run.overflow ?? typed?.overflow ?? opts.overflow,
-        ),
     };
 }
 

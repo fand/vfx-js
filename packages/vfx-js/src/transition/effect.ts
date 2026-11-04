@@ -28,6 +28,17 @@ export type TransitionStartOpts = {
 
 const smoothstep = (x: number) => x * x * (3 - 2 * x);
 
+function covers(outer: ElementRect, inner: ElementRect): boolean {
+    const [x, y, w, h] = outer;
+    const [innerX, innerY, innerW, innerH] = inner;
+    return (
+        x <= innerX &&
+        y <= innerY &&
+        x + w >= innerX + innerW &&
+        y + h >= innerY + innerH
+    );
+}
+
 // Like blit, but transparent outside the element when the stage is larger.
 const PASSTHROUGH_FRAG = `#version 300 es
 precision highp float;
@@ -117,7 +128,11 @@ export class TransitionEffect implements Effect {
     // Only a running transition grows the stage, so the snapshot and hold stay element-sized.
     outputRect(dims: EffectDims): ElementRect | undefined {
         const overflow = this.#spec?.overflow;
-        if (overflow === undefined || this.#snapshotWaiters.length > 0) {
+        if (
+            overflow === undefined ||
+            this.#snapshotWaiters.length > 0 ||
+            covers(dims.contentRect, dims.canvasRect)
+        ) {
             return undefined;
         }
         if (overflow === true) {

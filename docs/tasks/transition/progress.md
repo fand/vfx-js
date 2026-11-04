@@ -141,6 +141,10 @@ From [plan4.md](./plan4.md):
 
 - The still copy now covers the wrap frame only for transitions; plain
   `addHTML` skips it. It sits one below the VFX canvas z-index.
+- `waitFor: "media"` skips lazy images off screen and `preload="none"`
+  videos, and gives up after 300 ms instead of 1 s.
+- `overflow` from the options wins over the transition's own, and a
+  target that fills the canvas never grows the stage.
 
 ## Verified
 

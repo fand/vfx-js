@@ -49,7 +49,7 @@ export type TransitionSpec = {
     reverse?: boolean;
     /** Seconds. */
     duration?: number;
-    /** Extra room to draw outside the element. The larger of this and the transition's own wins. */
+    /** Extra room to draw outside the element. Overrides the transition's own. */
     overflow?: true | number;
 };
 

@@ -128,8 +128,9 @@ shader. `reverse` and `duration` are picked per field.
 
 By default a transition draws only inside the element. `overflow` gives
 it room outside: `true` for the whole canvas, a number for CSS px on
-every side. The run uses the larger of the transition's own `overflow`
-and the options' (picked run → type → container).
+every side. The options' value (picked run → type → container) wins over
+the transition's own. A target that fills the canvas, like a full-screen
+outlet, never draws outside itself.
 
 ### `waitFor`
 
