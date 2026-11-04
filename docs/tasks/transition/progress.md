@@ -198,12 +198,13 @@ demos still do.
 - Checked in Playwright's Chrome at 1440 and 390 px wide: page runs,
   tab swipes, the playground and the shader lab all animate.
 
-## Next: optional `VFXProvider`
+## Optional `VFXProvider`
 
-Goes in a separate PR on main, merged before this branch. Spec:
-`docs/tasks/optional-provider/spec.md` on `feat/optional-provider`.
-After the rebase, switch `VFXTransition` and `useVFXTransition` to
-`useVFXInstance()` and drop `VFXProvider` from the demos and docs.
+`VFXProvider` became optional on main (#221); this branch is rebased on
+it. `<VFXTransition>` and `useVFXTransition` read `useVFXInstance()`, so
+they use the implicit instance outside a Provider. The Next and Void
+demos and `docs/TRANSITION.md` no longer use the Provider. In the Next
+demo, one canvas serves the page runs and the home live stage.
 
 ## Verified
 
