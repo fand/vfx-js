@@ -149,6 +149,17 @@ From [plan4.md](./plan4.md):
 - `<VFXTransition>` swaps pages in `startTransition`, so a suspending
   page keeps the old one on screen instead of the Suspense fallback.
 
+## Small fixes
+
+From [plan5.md](./plan5.md):
+
+- `<VFXTransition>` renders an outer `display: contents` div around the
+  target, so React never removes a node that core moved.
+- VFX elements that the new page mounts during a run start frozen and
+  show their plain content until the run ends.
+- A run warns once when the new content is not captured in time.
+- `CLAUDE.md` says `pnpm test` runs every package with tests.
+
 ## Verified
 
 - Lint, vitest (core 248, effects 14, react 25), `tsc --noEmit` and the
