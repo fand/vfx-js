@@ -153,6 +153,8 @@ this, with `VFX` mocked.
 
 - Limiting the draw area to a wrapper's rect.
 - Changing options on a live instance without replacing it.
+- Passing the other core options (`scrollPadding`, `fixedCanvas`,
+  `preserveDrawingBuffer`, `timeScale`) through React.
 
 ## After merge
 
