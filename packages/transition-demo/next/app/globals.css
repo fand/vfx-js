@@ -246,13 +246,20 @@ em {
     text-align: center;
     overflow: hidden;
     isolation: isolate;
+    background: var(--white);
+    color: var(--ink);
+    /* Resolve again here so the theme's accent wins. */
+    --em: var(--accent);
 }
 .hero::before {
     content: "";
     position: absolute;
     inset: 0;
     z-index: -2;
-    background-image: radial-gradient(#0b0b1022 1px, transparent 1px);
+    background-image: radial-gradient(
+        color-mix(in srgb, var(--ink) 13%, transparent) 1px,
+        transparent 1px
+    );
     background-size: 22px 22px;
     mask-image: radial-gradient(ellipse at center, #000 20%, transparent 70%);
 }
@@ -282,7 +289,7 @@ em {
     padding: 6px 14px 6px 6px;
     border: 1px solid var(--line);
     border-radius: 999px;
-    background: #ffffffcc;
+    background: color-mix(in srgb, var(--white) 80%, transparent);
     font-family: var(--mono);
     font-size: 13px;
     color: var(--ink-2);
@@ -361,6 +368,200 @@ em {
     100% {
         transform: scaleY(1);
         opacity: 0;
+    }
+}
+
+/* Hero themes. Each preset redefines the palette inside the hero. */
+/* Colors come from Sanzo Wada's Dictionary of Color Combinations. */
+/* The background is the combination's pale color mixed with white. */
+.hero-em {
+    white-space: nowrap;
+    /* The title line sets the height, so themes never move the layout. */
+    line-height: 0;
+}
+.hero[data-theme]:not([data-theme="crossfade"]) {
+    --white: color-mix(in oklab, var(--wada-bg) 50%, #ffffff);
+    --ink-2: color-mix(in oklab, var(--ink) 75%, var(--white));
+    --ink-3: color-mix(in oklab, var(--ink) 50%, var(--white));
+    --line: color-mix(in oklab, var(--ink) 14%, var(--white));
+}
+.hero[data-theme]:not([data-theme="crossfade"]) .hero-glow {
+    opacity: 0.35;
+}
+/* #139 Neutral Gray, Salvia Blue, Deep Indigo */
+.hero[data-theme="swipe"] {
+    --wada-bg: #b5d1cc;
+    --ink: #000831;
+    --accent: #000831;
+}
+.hero[data-theme="swipe"] .hero-em {
+    font-family: var(--sans);
+    font-style: normal;
+    font-weight: 100;
+    font-size: 0.66em;
+    letter-spacing: 0.02em;
+}
+/* #84 Seashell Pink, Deep Slate Green */
+.hero[data-theme="zoom"] {
+    --wada-bg: #ffcfc4;
+    --ink: #0f261f;
+    --accent: #0f261f;
+}
+/* #177 Grayish Lavender A, Buffy Citrine, Pale Burnt Lake */
+.hero[data-theme="zoomBlur"] {
+    --wada-bg: #b8b8ff;
+    --ink: #730f1f;
+    --accent: #888d2a;
+}
+.hero[data-theme="zoomBlur"] .hero-em {
+    font-family: var(--mono);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 0.7em;
+    letter-spacing: -0.06em;
+}
+/* #190 Ivory Buff, English Red, Black */
+.hero[data-theme="crosszoom"] {
+    --wada-bg: #ebd999;
+    --ink: #000000;
+    --accent: #de4500;
+}
+.hero[data-theme="crosszoom"] .hero-em {
+    font-size: 1.16em;
+}
+/* #104 Sulpher Yellow, Carmine Red */
+.hero[data-theme="glitch"] {
+    --wada-bg: #f5f5b8;
+    --ink: #a10b2b;
+    --accent: #a10b2b;
+}
+.hero[data-theme="glitch"] .hero-em {
+    font-family: var(--sans);
+    font-style: normal;
+    font-weight: 900;
+    font-size: 0.8em;
+    letter-spacing: -0.04em;
+}
+/* #171 Glaucous Green, Yellow Orange, Pale Burnt Lake */
+.hero[data-theme="glitchSlide"] {
+    --wada-bg: #b3e8c2;
+    --ink: #730f1f;
+    --accent: #ff8c00;
+}
+.hero[data-theme="glitchSlide"] .hero-em {
+    font-family: var(--sans);
+    font-style: normal;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: transparent;
+    -webkit-text-stroke: 0.025em var(--ink);
+}
+/* #18 Cameo Pink, Fawn, Dusky Madder Violet */
+.hero[data-theme="jpegGlitch"] {
+    --wada-bg: #e6adcf;
+    --ink: #2d0060;
+    --accent: #2d0060;
+}
+.hero[data-theme="jpegGlitch"] .hero-em {
+    padding: 0 0.12em;
+    background: var(--ink);
+    color: var(--white);
+    font-family: "Hiragino Sans", "Noto Sans JP", var(--sans);
+    font-style: normal;
+    font-weight: 900;
+    font-size: 0.6em;
+    letter-spacing: -0.04em;
+}
+/* #75 Pale King's Blue, Violet Blue */
+.hero[data-theme="datamosh"] {
+    --wada-bg: #abf5ed;
+    --ink: #202d85;
+    --accent: #202d85;
+}
+/* #60 Pale Lemon Yellow, Dark Tyrian Blue */
+.hero[data-theme="pixelsort"] {
+    --wada-bg: #fff59e;
+    --ink: #0d2b52;
+    --accent: #0d2b52;
+}
+.hero[data-theme="pixelsort"] .hero-em {
+    font-size: 1.16em;
+}
+
+/* Preset carousel under the title */
+.carousel {
+    --gap: 76px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: var(--gap);
+    width: min(100%, 760px);
+    height: 52px;
+    margin-top: 28px;
+    overflow: hidden;
+    mask-image: linear-gradient(
+        90deg,
+        transparent,
+        #000 22%,
+        #000 78%,
+        transparent
+    );
+}
+.carousel-side {
+    display: flex;
+    gap: var(--gap);
+    min-width: 0;
+}
+.carousel-side:first-child {
+    justify-content: flex-end;
+}
+.carousel-item {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    margin: 0 -18px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink);
+    font: 600 18px var(--sans);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.carousel-item:hover {
+    background: var(
+        --carousel-hover,
+        color-mix(in oklab, var(--acid) 45%, var(--white))
+    );
+}
+.hero[data-theme]:not([data-theme="crossfade"]) {
+    --carousel-hover: color-mix(in oklab, var(--ink) 10%, var(--white));
+}
+.carousel-item[data-current] {
+    font-size: 24px;
+}
+.carousel-play {
+    width: 0;
+    height: 0;
+    border-block: 0.38em solid transparent;
+    border-left: 0.6em solid currentColor;
+}
+@media (max-width: 640px) {
+    .carousel {
+        --gap: 56px;
+    }
+    .carousel-item {
+        font-size: 15px;
+        margin: 0 -12px;
+        padding: 0 12px;
+    }
+    .carousel-item[data-current] {
+        font-size: 19px;
     }
 }
 

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Code } from "./_components/code";
+import { HeroStage } from "./_components/hero-stage";
 import { LiveStage } from "./_components/live-stage";
 import { PageFrame } from "./_components/page-frame";
 import { PageTransition } from "./_components/page-transition";
-import { TLink } from "./_components/t-link";
 
 const features = [
     {
@@ -42,41 +42,7 @@ export default function Home() {
     return (
         <PageFrame tone="light">
             <PageTransition preset="zoom" />
-            <section className="hero">
-                <div className="hero-glow" aria-hidden />
-                <p className="eyebrow">
-                    <span className="pill">new</span> @vfx-js/transitions
-                </p>
-                <h1 className="hero-title">
-                    Shader <em>transitions</em>
-                    <br />
-                    for the DOM.
-                </h1>
-                <p className="hero-tagline">
-                    Swap any element — a tab, a carousel, a whole page — through
-                    a WebGL shader. One component for React. A few lines for
-                    everything else.
-                </p>
-                <div className="hero-cta">
-                    <Link href="/getting-started" className="btn btn-primary">
-                        Get started
-                    </Link>
-                    {/* A click spec beats the page's own (pixelsort). */}
-                    <TLink
-                        href="/transitions"
-                        preset="datamosh"
-                        className="btn btn-ghost"
-                    >
-                        See all transitions →
-                    </TLink>
-                </div>
-                <div className="hero-install">
-                    <code>npm i @vfx-js/core @vfx-js/transitions</code>
-                </div>
-                <span className="scroll-cue" aria-hidden>
-                    scroll
-                </span>
-            </section>
+            <HeroStage />
 
             <section className="section split split-live">
                 <div className="section-head">
