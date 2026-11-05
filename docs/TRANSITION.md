@@ -40,16 +40,21 @@ DOM must be updated. `run` resolves when the animation ends.
 ### React
 
 ```tsx
-import { VFXTransition } from "@vfx-js/react";
-import { crossfade, glitch } from "@vfx-js/transitions";
+import { TransitionIn, VFXTransition } from "@vfx-js/react";
+import { crossfade, glitch, swipe } from "@vfx-js/transitions";
 
-<VFXTransition transition={crossfade} types={{ back: { transition: glitch, reverse: true } }}>
-    <Page key={pathname} />
+<VFXTransition pageKey={pathname} transition={crossfade}
+    types={{ back: { transition: swipe, reverse: true } }}>
+    {page}
 </VFXTransition>
+
+// In a page:
+<TransitionIn transition={glitch} />
 ```
 
-A new `key` on the child starts a run. The old page stays on screen until
-the transition has its snapshot.
+A new `pageKey` starts a run. The old page stays on screen until the
+transition has its snapshot. The incoming page can pick its own
+transition with `<TransitionIn>`.
 
 ## Core API
 
@@ -129,6 +134,9 @@ Each run picks its spec in this order:
 `transition` and `uniforms` travel together. They come from the first
 level that sets `transition`, so uniforms never reach a different
 shader. `reverse` and `duration` are picked per field.
+
+In React, `<VFXTransition>` first builds the `RunOpts` from a click, the
+incoming page and back navigation. See [Which spec wins](#which-spec-wins).
 
 ### `overflow`
 
@@ -293,29 +301,126 @@ Provider, transitions use the Provider's instance.
 
 ```tsx
 <VFXTransition
+    pageKey={pathname}
     transition={crossfade}
     duration={0.6}
     types={{ back: { transition: swipe, reverse: true } }}
     className="outlet"
 >
-    <Page key={pathname} />
+    {children}
 </VFXTransition>
 ```
 
-Takes the `addTransition` options as props, plus `className` and
-`style`. It renders two `<div>`s around one child: an outer one with
-`display: contents`, and an inner one that gets `className` and `style`
-and is the transition target. The child needs a `key`
-that changes per page; a child without a key never transitions.
+Takes the `addTransition` options as props, plus `pageKey`, `className`
+and `style`. It renders two `<div>`s around the children: an outer one
+with `display: contents`, and an inner one that gets `className` and
+`style` and is the transition target.
 
-Each run uses the spec set by a click or by `setNextTransition`, else
-the props.
+- `pageKey` changes per page, e.g. the pathname. A new key starts a run.
+  Use a string or a number.
+- A new key mounts the children fresh, so page state does not carry over.
+- Without a `pageKey`, it never transitions. It just renders the children.
+- Children can be anything. While the key stays the same, the latest
+  children render. After a change, the old page stays until the swap.
 
 The swap runs in a React transition, so a page that suspends keeps the
 old page on screen until it is ready.
 
 Back navigation is detected with the Navigation API when present, else
 with `popstate`. It sets `type: "back"`, so `types.back` applies.
+
+React Router reads the route from context, like Next does. Pass
+`useOutlet()` as the children, so the old page keeps its own route:
+
+```tsx
+import { useLocation, useOutlet } from "react-router";
+
+export function Layout() {
+    const { pathname } = useLocation();
+    const outlet = useOutlet();
+    return (
+        <VFXTransition className="outlet" pageKey={pathname}>
+            {outlet}
+        </VFXTransition>
+    );
+}
+```
+
+### `<TransitionIn>` and `useTransitionIn`
+
+The incoming page says how it enters:
+
+```tsx
+import { TransitionIn } from "@vfx-js/react";
+import { glitch } from "@vfx-js/transitions";
+
+export default function AboutPage() {
+    return (
+        <>
+            <TransitionIn transition={glitch} />
+            <h1>About</h1>
+        </>
+    );
+}
+```
+
+`useTransitionIn(spec)` is the hook form for client components.
+`<TransitionIn>` renders nothing.
+
+- Only the spec at mount counts. Later prop changes are ignored.
+- Outside a `<VFXTransition>`, it does nothing and warns once.
+- A Server Component can only pass plain defs, since props must be
+  serializable. Presets with JS hooks, like `datamosh` and `pixelsort`,
+  need a client component that calls `useTransitionIn`.
+
+### Which spec wins
+
+Each run builds its `RunOpts` in this order:
+
+1. A `transition(spec)` click or `setNextTransition(spec)`. It wins whole.
+2. The incoming page's `<TransitionIn>` or `useTransitionIn`.
+3. Back navigation adds `type: "back"` under 1 and 2, so `types.back`
+   fills the fields a page spec leaves out. A page that sets its own
+   `transition` plays it with `types.back`'s `reverse`; `types.back`'s
+   shader is used when the page sets none.
+4. The `<VFXTransition>` props.
+
+Core then resolves the spec as in [Spec resolution](#spec-resolution).
+
+### `@vfx-js/react/next`
+
+`VFXTransition` for the Next.js App Router:
+
+```tsx
+// app/layout.tsx
+import { VFXTransition } from "@vfx-js/react/next";
+import { swipe } from "@vfx-js/transitions";
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+    return (
+        <html lang="en">
+            <body>
+                <VFXTransition
+                    className="outlet"
+                    types={{ back: { transition: swipe, reverse: true } }}
+                >
+                    {children}
+                </VFXTransition>
+            </body>
+        </html>
+    );
+}
+```
+
+- It takes the same props without `pageKey`. It uses `usePathname()` as
+  the key.
+- It pins the router context per page, so the old page keeps rendering
+  its own route while it animates out.
+- The pin uses an internal Next import
+  (`next/dist/shared/lib/app-router-context.shared-runtime`). A Next
+  upgrade may break it.
+- `next` is an optional peer dependency. Import everything else from
+  `@vfx-js/react`.
 
 ### `transition(spec)` on a Link
 
@@ -326,8 +431,8 @@ import { transition } from "@vfx-js/react";
 <Link href="/next" onClick={transition({ transition: glitch })}>Next</Link>
 ```
 
-Returns an `onClick` that stores the spec for the next run. It does not
-intercept navigation. It ignores modified clicks, non-left buttons,
+Returns an `onClick` that stores the spec for the next run. It wins over
+the page's `<TransitionIn>`. It does not intercept navigation. It ignores modified clicks, non-left buttons,
 `target="_blank"` and clicks with `defaultPrevented`. The spec expires
 after about 10 s.
 

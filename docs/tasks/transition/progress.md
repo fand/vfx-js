@@ -244,10 +244,58 @@ From [plan6.md](./plan6.md):
 - Next.js `loading.tsx` lands the transition on the skeleton. No fix in
   v1; use `useVFXTransition` with a manual ready signal, or drop the
   loading file for that route.
-- No React render tests (`VFXTransition`, `useVFXTransition`); the
-  package has no DOM test setup.
+- No render tests for `useVFXTransition`. `VFXTransition` has them since
+  plan7.
 - `packages/docs` demo page not added (the site is one `main.ts` app).
 - glide rewrite happens in the glide repo, on `addTransition` with
   `keepWrapped: true`.
 - Exact peer versions are set at release time.
 - Framework demo findings: [open-issues.md](./open-issues.md).
+
+## Page-declared React transitions (plan7)
+
+[plan7.md](./plan7.md). The incoming page says how it enters.
+
+- Core: `run(cb, opts)` takes a function for `opts`. It is called once
+  after `cb` resolves. With it, driver effects and `prepare` run after
+  `cb`; the chain is swapped while the old snapshot is held.
+- React store: pending specs carry `kind: "click" | "back"`.
+  `takePending()` returns `{ spec, kind }`.
+- `<VFXTransition pageKey>`: any children, a new key mounts them fresh.
+  The keyed-child trigger is gone.
+- `<TransitionIn>` and `useTransitionIn`: the page registers its spec at
+  mount. Order: click > page > `types.back` under both > props
+  (`resolveRunOpts`).
+- `@vfx-js/react/next`: `usePathname()` as `pageKey`, plus
+  `FrozenRouter`. `next` is an optional peer.
+- Demos: Next pages use a client `<PageTransition preset>`, since
+  presets with JS hooks can't cross from a Server Component. The header
+  uses plain links; two `TLink`s stay as click overrides. Void puts
+  `<TransitionIn>` in the shared page view and drops `setNextTransition`.
+- Docs: `TRANSITION.md` React API rewritten.
+
+Verified:
+
+- Lint and `tsc --noEmit` in core and react.
+- Vitest: core 267, react 50 (with render tests under happy-dom),
+  transitions 25, react-vfx 2.
+- `@vfx-js/react` build writes `lib/{esm,cjs}/next`; both resolve from
+  Node.
+- Next and Void demo builds pass.
+
+Verified in the browser (Next demo on the dev server, Playwright,
+shader programs traced through `useProgram`):
+
+- Every page enters with its own shader: `/getting-started` swipe,
+  `/transitions` pixelsort, `/` zoom, `/custom` glitch.
+- A `TLink` click overrides the page spec (datamosh into `/transitions`).
+- Back into `/` plays the page's own shader (zoom) with `reverse` 1,
+  since the page spec sits on top of `types.back`. `types.back`'s
+  shader is used only when the page sets none.
+- datamosh and pixelsort run on the lazy path with no `[VFX-JS]` errors
+  or warnings.
+
+Not verified:
+
+- Whether the chain swap after the snapshot shows a plain frame. Needs
+  an eye on the screen, not a trace.

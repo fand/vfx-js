@@ -17,8 +17,10 @@ The issues below fall into two kinds.
 - **Routers that render components** (Next App Router, React Router,
   SvelteKit, Nuxt, Void). The DOM is not swapped whole, so layouts and
   state stay. The risk is that the old page goes away before the
-  snapshot. Next hits this. React Router's `<Outlet>` likely does too,
-  since it reads the route from context (not verified).
+  snapshot. Next hits this (resolved, see below). React Router's
+  `<Outlet>` likely does too, since it reads the route from context.
+  Pass `pageKey={useLocation().pathname}` and `useOutlet()` as the
+  children instead (not verified).
 - Verified in the demos, no workaround needed:
   - SvelteKit: `onNavigate` holds the DOM update until the snapshot.
   - Nuxt: `router.beforeEach` holds the navigation; `page:finish` ends
@@ -26,22 +28,18 @@ The issues below fall into two kinds.
   - Void (React adapter): the layout gets the page as an element with
     its own props, so `<VFXTransition>` keeps the old page as is.
 
-## Next.js App Router: the kept old page shows the new route
+## Next.js App Router: the kept old page shows the new route (resolved)
 
-`<VFXTransition>` keeps the old child element until it has the snapshot.
-In an App Router layout, `children` is not the page. It is a router
-outlet that reads the current route from `LayoutRouterContext`. So the
-kept old element renders the new route, and the run animates 2 → 2.
+In an App Router layout, `children` is a router outlet that reads the
+current route from `LayoutRouterContext`. So a kept old page rendered
+the new route, and the run animated 2 → 2.
 
-- The example in `docs/TRANSITION.md` (`<Page key={pathname} />` in a
-  layout) hits this.
-- The demo works around it with `FrozenRouter`
-  (`packages/transition-demo/next/app/frozen-router.tsx`). It pins the
-  context from mount.
-- `LayoutRouterContext` is internal
+- Resolved by `@vfx-js/react/next` ([plan7](./plan7.md)). Its
+  `VFXTransition` uses `usePathname()` as `pageKey` and pins the context
+  per page with `FrozenRouter`.
+- Still a risk: `LayoutRouterContext` is internal
   (`next/dist/shared/lib/app-router-context.shared-runtime`), so it can
   break on a Next upgrade.
-- Option: ship it as `@vfx-js/react/next`, or at least document it.
 
 ## Astro ClientRouter: users must write the glue by hand
 
