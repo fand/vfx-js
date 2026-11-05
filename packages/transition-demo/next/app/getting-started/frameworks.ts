@@ -154,6 +154,7 @@ export default defineNuxtPlugin((nuxtApp) => {
             },
         ],
         notes: [
+            "Give the target a fixed height, like 100dvh. Old and new content then share one box; a size change jumps at the end of the run.",
             "Detect back with history.state.position and pass a spec like { transition: swipe, reverse: true } to run().",
         ],
     },
@@ -202,7 +203,9 @@ export default defineNuxtPlugin((nuxtApp) => {
 </main>`,
             },
         ],
-        notes: [],
+        notes: [
+            "Give the target a fixed height, like 100dvh. Old and new content then share one box; a size change jumps at the end of the run.",
+        ],
     },
     {
         id: "astro",
@@ -262,6 +265,7 @@ export function setupTransition() {
             },
         ],
         notes: [
+            "Give the target a fixed height, like 100dvh. Old and new content then share one box; a size change jumps at the end of the run.",
             "Use swapFunctions from astro:transitions/client for the head, attributes and focus.",
         ],
     },
@@ -299,6 +303,7 @@ t.run(swap, { transition: createGLTransition(cube, { persp: 0.5 }) });`,
             },
         ],
         notes: [
+            "Give the target a fixed height, like 100dvh. Old and new content then share one box; a size change jumps at the end of the run.",
             "run() resolves when the animation ends. A new run() drops the old one, but its callback still runs.",
         ],
     },

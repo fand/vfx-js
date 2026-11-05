@@ -22,7 +22,6 @@ export const nav: NavItem[] = [
         href: "/getting-started",
         label: "Getting Started",
         sections: [
-            { id: "steps", label: "Three steps" },
             { id: "setup", label: "Setup by framework" },
             { id: "next", label: "Next" },
         ],

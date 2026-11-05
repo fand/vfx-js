@@ -14,34 +14,6 @@ export default function GettingStarted() {
                 <h1>Getting Started</h1>
             </section>
 
-            <section id="steps" className="doc-section">
-                <ol className="steps">
-                    <li>
-                        <strong>Install</strong>
-                        <span>
-                            <code>@vfx-js/core</code> and{" "}
-                            <code>@vfx-js/transitions</code>. Add{" "}
-                            <code>@vfx-js/react</code> for React.
-                        </span>
-                    </li>
-                    <li>
-                        <strong>Fix the size</strong>
-                        <span>
-                            The target is your router outlet. Give it a height,
-                            like <code>100dvh</code>. In React,{" "}
-                            <code>&lt;VFXTransition&gt;</code> fills the
-                            viewport by default.
-                        </span>
-                    </li>
-                    <li>
-                        <strong>Hook the router</strong>
-                        <span>
-                            Start a run before the swap. Pick a preset per link.
-                        </span>
-                    </li>
-                </ol>
-            </section>
-
             <section id="setup" className="doc-section">
                 <FrameworkTabs />
             </section>
