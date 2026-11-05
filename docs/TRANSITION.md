@@ -43,14 +43,19 @@ DOM must be updated. `run` resolves when the animation ends.
 import { TransitionIn, VFXTransition } from "@vfx-js/react";
 import { crossfade, glitch, swipe } from "@vfx-js/transitions";
 
+// Once, around the router outlet. Fills the viewport by default.
 <VFXTransition pageKey={pathname} transition={crossfade}
     types={{ back: { transition: swipe, reverse: true } }}>
     {page}
 </VFXTransition>
 
-// In a page:
+// In a page: how this page enters.
 <TransitionIn transition={glitch} />
 ```
+
+The container owns the outlet box and keeps the old page on screen until
+the snapshot is taken. The page only names its shader. Next.js users
+import `VFXTransition` from `@vfx-js/react/next` and skip `pageKey`.
 
 A new `pageKey` starts a run. The old page stays on screen until the
 transition has its snapshot. The incoming page can pick its own
@@ -317,8 +322,15 @@ outer one with `display: contents`, and an inner one that gets
 
 The target fills the viewport height by default (`height: 100dvh;
 overflow: hidden`), so pages share one box and scroll inside it. `style`
-merges on top. Pass `fullscreen={false}` to drop the default and size the target
-with your own CSS, e.g. `calc(100dvh - <header>)` under a header.
+merges on top. Pass `fullscreen={false}` to drop the default and size
+the target with your own CSS, e.g. `calc(100dvh - <header>)` under a
+header. The default assumes a CSS reset: the browser's
+`body { margin: 8px }` makes a `100dvh` box overflow the page by 16px.
+
+Pages scroll inside the box on purpose. Document scroll does not work
+for page transitions: the target would be as tall as the page, and the
+router resets the scroll position during the swap, so the old snapshot
+would show the wrong part of the page.
 
 - `pageKey` changes per page, e.g. the pathname. A new key starts a run.
   Use a string or a number.
@@ -374,6 +386,10 @@ export default function AboutPage() {
 - A Server Component can only pass plain defs, since props must be
   serializable. Presets with JS hooks, like `datamosh` and `pixelsort`,
   need a client component that calls `useTransitionIn`.
+- The component form exists for Next.js, where `page.tsx` is a Server
+  Component and cannot call hooks. Next has no way to export custom
+  client settings from a page; its route segment config is a fixed list,
+  and the TypeScript plugin rejects other exports.
 
 ### Which spec wins
 
@@ -388,6 +404,18 @@ Each run builds its `RunOpts` in this order:
 4. The `<VFXTransition>` props.
 
 Core then resolves the spec as in [Spec resolution](#spec-resolution).
+
+Why the page, not the link: a link only knows where it goes, while the
+page knows how it wants to appear, and a page is reached from many
+links, from code and from the back button. The click spec stays as a
+per-link override.
+
+Why `<VFXTransition>` cannot be left out: unlike `<VFXProvider>`, it is
+not just configuration. It owns the outlet element and holds the old
+page in the React tree until core has its snapshot. Without it, the
+router would commit the new page first and there would be nothing to
+snapshot. Rendering the whole page through a canvas at all times would
+remove that need, but it is a different runtime mode and is not planned.
 
 ### `@vfx-js/react/next`
 
@@ -478,7 +506,9 @@ router.push("/next");
 - `<body>` cannot be the target, since a canvas cannot wrap it. Target the
   router outlet (`#app`, `<main>`).
 - There is one pending click spec per page, shared by all
-  `<VFXTransition>`s.
+  `<VFXTransition>`s. Page specs are per container, through context.
+- `<TransitionIn>` outside a `<VFXTransition>` does nothing. A spec
+  changed after mount is ignored; it is read once when the page mounts.
 - Content of a different size is not animated between sizes. The box is
   locked at its old size for the run and jumps afterwards. See
   [Sizing](#sizing).

@@ -28,8 +28,9 @@ and SPA page transitions.
   flight. `keepWrapped: true` keeps it wrapped between runs; glide's
   stage uses that. Avoids the hit-test flag and per-frame capture at rest.
 - **React: no navigation interception.** `onClick={transition(glitch)}`
-  on any Link only records the next spec in a store; `<VFXTransition
-  key={pathname}>` consumes it when the key changes. Works with Next,
+  on any Link only records the next spec in a store; `<VFXTransition>`
+  consumes it when its page changes (first a keyed child, now
+  `pageKey`; see plan7). Works with Next,
   react-router, TanStack, wouter and plain `<a>`. Does not work where
   the DOM swap is not a React re-render (Astro ClientRouter, Turbo, htmx,
   MPA); core `run(cb)` can be wired to those by hand.
@@ -49,6 +50,7 @@ and SPA page transitions.
   than none. It may come back if Astro support needs it. Doing it
   right needs a deferred spec in core: `run(cb, () => opts)` resolved
   after `cb`, so the entering page's declaration is readable.
+  Done in plan7 as `<TransitionIn>`.
 
 ## What was built
 
@@ -277,10 +279,65 @@ From [plan6.md](./plan6.md):
   demos pass it, since their header takes part of the viewport.
 - Docs: `TRANSITION.md` React API rewritten.
 
+Decisions from the discussion:
+
+- **The page declares, the link overrides.** The old API tied a Link
+  click to a global note and a keyed child; the two were linked only by
+  a module store, and the entered page had no say. A page is reached
+  from many links, from code and from back, so it is the right owner.
+  The click spec stays as a per-link override.
+- **`pageKey`, not `key`.** A `key` on `<VFXTransition>` remounts it,
+  which destroys the controller and the old DOM before the snapshot.
+  Not `id` either, since next to `className` and `style` it reads as the
+  DOM id. The rendered page is keyed by `pageKey` internally, so pages
+  of the same component type still remount and `<TransitionIn>`
+  registers again. That remount also re-pins `FrozenRouter` in the Next
+  adapter.
+- **Timing.** The page spec is known only after React commits the new
+  page, which is after the snapshot. Child layout effects run before the
+  parent's, so the page registers its spec before the container resolves
+  the swap. Core binds the shader after `cb` through the lazy `opts`
+  function; `frag` was already bound at `start()`, so only driver
+  effects and `prepare` moved.
+- **Component and hook.** `page.tsx` in the Next App Router is a Server
+  Component and cannot call hooks, so `<TransitionIn>` (a client
+  component that renders nothing) is the form for pages, and
+  `useTransitionIn` for client code. Server Components can only pass
+  plain defs; presets with JS hooks need a client wrapper. Next has no
+  API to export custom client settings from a page, and
+  `metadata.other` as a `<meta>` carrier was considered and rejected as
+  a hack.
+- **`<VFXTransition>` stays required.** `<VFXProvider>` could be made
+  optional because it only owns a global instance. `<VFXTransition>`
+  owns the outlet element and the old page's lifetime in the React
+  tree. Without it the router commits the new page before any snapshot;
+  Next's `pushState` happens at commit, so neither the Navigation API
+  nor a click gives a signal in time. The only way around is rendering
+  the whole page through a canvas at all times (`keepWrapped` on the
+  outlet plus a last-frame texture in core), which is a different
+  runtime mode and is left out.
+- **Fullscreen by default.** The target gets `height: 100dvh; overflow:
+  hidden` unless `fullscreen={false}`. "Fill from my top edge to the
+  viewport bottom" was considered and rejected: the demo's header above
+  the outlet is incidental, and a measured offset adds a hydration
+  step. Pages must scroll inside a viewport-bound box anyway: document
+  scroll would mean page-tall textures and a snapshot showing the wrong
+  part after the router scrolls to top. `fill` and `unstyled` were
+  tried as names before `fullscreen`.
+- **Back under the page spec.** `type: "back"` sits under the page spec,
+  so a page with its own shader plays it reversed on back, and
+  `types.back`'s shader is used only when the page sets none. This is
+  what the browser pass showed; keep or flip in `resolveRunOpts` if the
+  other reading turns out to be wanted.
+- **Demos.** Nav links are plain `Link`s so the page specs are visible;
+  two `TLink`s remain as click overrides. The Next getting-started
+  snippet is `app/layout.tsx` plus `app/about/page.tsx`: the adapter is
+  a client component, so no shell file and no CSS are needed.
+
 Verified:
 
 - Lint and `tsc --noEmit` in core and react.
-- Vitest: core 267, react 50 (with render tests under happy-dom),
+- Vitest: core 267, react 51 (with render tests under happy-dom),
   transitions 25, react-vfx 2.
 - `@vfx-js/react` build writes `lib/{esm,cjs}/next`; both resolve from
   Node.
