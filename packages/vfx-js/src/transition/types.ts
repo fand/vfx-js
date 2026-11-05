@@ -1,5 +1,6 @@
 import type {
     Effect,
+    EffectContext,
     EffectRenderTarget,
     EffectTexture,
     EffectUniformValue,
@@ -14,42 +15,75 @@ export type TransitionUniforms = Record<
 /** How `t` follows linear progress. A function maps 0..1 progress to `t`. */
 export type TransitionEase = "smoothstep" | "linear" | ((x: number) => number);
 
-/** One run of a transition, passed to the driver hooks. */
+/** One run of a transition, passed to `TransitionEffect.start`. */
 export type TransitionRun = {
     reverse: boolean;
+    /** The spec's uniforms. Defaults on the def are not merged in. */
     uniforms: TransitionUniforms;
     /** Seconds. */
     duration: number;
+    /** The spec's overflow, if set. */
+    overflow?: true | number;
 };
+
+/** `x` is linear progress, `t` the eased one. Both go from 0 to 1 and ignore `reverse`. */
+export type TransitionProgress = { readonly t: number; readonly x: number };
+
+/** The effect context during a run. */
+export type TransitionEffectContext = EffectContext & {
+    /** The snapshot of the old content, element-sized. */
+    readonly from: EffectRenderTarget;
+    readonly progress: TransitionProgress;
+    /** True while the old content is held, before the animation. `progress` is zero then. */
+    readonly holding: boolean;
+    readonly reverse: boolean;
+    readonly run: TransitionRun;
+    /** End the run now and show the new content, e.g. when a shader fails. */
+    cut(): void;
+};
+
+/**
+ * An effect that takes part in a run.
+ * Outside a run it is skipped and the chain passes its input through.
+ * `render` also runs while the old content is held (`ctx.holding`); pass the input through then unless you need those frames.
+ * `update` runs only while the animation plays.
+ */
+export interface TransitionEffect extends Effect {
+    /** Called once per run while the old content is held, before the first frame. */
+    start?(run: TransitionRun): void;
+    /** Called once when the run ends, is dropped or is cancelled. */
+    end?(): void;
+    update?(ctx: TransitionEffectContext): void;
+    render?(ctx: TransitionEffectContext): void;
+}
 
 export type TransitionDef = {
     name: string;
+    /** The `t` this transition expects. A spec's `ease` wins. Defaults to `"smoothstep"`. */
+    ease?: TransitionEase;
+    /**
+     * Create the effects for one container, in chain order.
+     * Called when a run first uses this def; runs that keep using it reuse them.
+     */
+    create(): TransitionEffect | TransitionEffect[];
+};
+
+export type ShaderTransitionOpts = {
+    name: string;
     /** GLSL that defines `vec4 transition(vec2 uv, float t)`. */
     frag: string;
-    /** Draw outside the element: `true` for the whole canvas, a number for CSS px on every side. */
-    overflow?: true | number;
     /** Default uniforms. The spec's uniforms win. */
     uniforms?: TransitionUniforms;
-    /** The `t` this shader expects. A spec's `ease` wins. Defaults to `"smoothstep"`. */
     ease?: TransitionEase;
+    /** Draw outside the element: `true` for the whole canvas, a number for CSS px on every side. The spec's overflow wins. */
+    overflow?: true | number;
+};
 
-    // Optional JS driver for transitions built on extra effects.
-
-    /**
-     * Extra effects placed after the transition effect in the chain.
-     * Created when a run first uses this def and kept while runs keep using it.
-     * They must pass through (disabled) until `prepare`.
-     */
-    effects?(): Promise<Effect[]>;
-    /**
-     * Called while the old snapshot is held on screen.
-     * With a lazy spec this is after the DOM changed.
-     */
-    prepare?(run: TransitionRun, fx: Effect[]): void;
-    /** Called every frame while running. `t` is eased, `x` is linear, both 0..1. `dt` is seconds. */
-    onFrame?(t: number, x: number, dt: number, fx: Effect[]): void;
-    /** Called once when the run ends or is replaced. Must leave `fx` passing through. */
-    onEnd?(fx: Effect[]): void;
+export type ShaderTransitionDef = Omit<TransitionDef, "create"> & {
+    readonly frag: string;
+    readonly uniforms: TransitionUniforms;
+    readonly overflow?: true | number;
+    create(): TransitionEffect;
 };
 
 export type TransitionSpec = {

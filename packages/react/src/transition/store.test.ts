@@ -8,8 +8,8 @@ import {
     transition,
 } from "./store.js";
 
-const swipe: TransitionDef = { name: "swipe", frag: "" };
-const zoom: TransitionDef = { name: "zoom", frag: "" };
+const swipe: TransitionDef = { name: "swipe", create: () => [] };
+const zoom: TransitionDef = { name: "zoom", create: () => [] };
 
 function click(
     init: Partial<React.MouseEvent> = {},

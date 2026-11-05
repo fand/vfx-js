@@ -1,7 +1,7 @@
-import type { TransitionDef } from "@vfx-js/core";
+import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
 
 /** Horizontal stripes slide sideways with RGB split; the content swaps halfway. */
-export const glitchSlide: TransitionDef = {
+export const glitchSlide: ShaderTransitionDef = shaderTransition({
     name: "glitch_slide",
     frag: `
 vec4 splitRead(vec2 uvr, vec2 uvg, vec2 uvb, bool to) {
@@ -29,4 +29,4 @@ vec4 transition(vec2 uv, float t) {
   return mix(c1, c2, smoothstep(0.45, 0.55, t));
 }
 `,
-};
+});

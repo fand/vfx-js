@@ -2,8 +2,8 @@ import type { TransitionDef } from "@vfx-js/core";
 import { describe, expect, it } from "vitest";
 import { resolveRunOpts } from "./scope.js";
 
-const swipe: TransitionDef = { name: "swipe", frag: "" };
-const zoom: TransitionDef = { name: "zoom", frag: "" };
+const swipe: TransitionDef = { name: "swipe", create: () => [] };
+const zoom: TransitionDef = { name: "zoom", create: () => [] };
 
 describe("resolveRunOpts", () => {
     it("is empty with nothing set", () => {

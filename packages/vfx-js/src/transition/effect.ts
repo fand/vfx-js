@@ -5,27 +5,29 @@ import type {
     EffectDims,
     EffectRenderTarget,
 } from "../types.js";
-import { describeGlslError } from "./glsl.js";
-import type { TransitionEase, TransitionUniforms } from "./types.js";
+import type {
+    TransitionEase,
+    TransitionEffect,
+    TransitionEffectContext,
+    TransitionProgress,
+    TransitionRun,
+} from "./types.js";
 
 export type TransitionStartOpts = {
-    /** For error messages. */
-    name?: string;
-    /** Full shader, see `buildFrag`. */
-    frag: string;
-    uniforms?: TransitionUniforms;
     /** Seconds. */
     duration: number;
-    /** Play backwards with the roles of the old and new content swapped. */
-    reverse: boolean;
-    /** Draw outside the element: `true` for the whole canvas, a number for CSS px on every side. */
-    overflow?: true | number;
     /** Defaults to `"smoothstep"`. */
     ease?: TransitionEase;
-    /** Per-frame hook. `t` is eased, `x` linear, `dt` in seconds. */
-    onFrame?(t: number, x: number, dt: number): void;
     /** Called once when this run finishes or is replaced. */
     onEnd?(): void;
+};
+
+/** What the transition effects of a run see. Null while idle. */
+export type TransitionFrame = {
+    from: EffectRenderTarget;
+    progress: TransitionProgress;
+    /** True while the old content is held, before the animation. */
+    holding: boolean;
 };
 
 const smoothstep = (x: number) => x * x * (3 - 2 * x);
@@ -37,37 +39,15 @@ function applyEase(ease: TransitionEase | undefined, x: number): number {
     return ease === "linear" ? x : smoothstep(x);
 }
 
-function covers(outer: ElementRect, inner: ElementRect): boolean {
-    const [x, y, w, h] = outer;
-    const [innerX, innerY, innerW, innerH] = inner;
-    return (
-        x <= innerX &&
-        y <= innerY &&
-        x + w >= innerX + innerW &&
-        y + h >= innerY + innerH
-    );
-}
-
-// Like blit, but transparent outside the element when the stage is larger.
-const PASSTHROUGH_FRAG = `#version 300 es
-precision highp float;
-in vec2 uvContent;
-in vec2 uvSrc;
-out vec4 outColor;
-uniform sampler2D src;
-void main() {
-  bool inside = all(greaterThanEqual(uvContent, vec2(0.0))) && all(lessThanEqual(uvContent, vec2(1.0)));
-  outColor = inside ? texture(src, uvSrc) : vec4(0.0);
-}
-`;
+const HELD: TransitionProgress = { t: 0, x: 0 };
 
 /**
- * One effect per transition target. States:
+ * First effect of every transition chain. States:
  * - idle: disabled, the chain passes the capture through.
  * - hold: shows the snapshot of the old content while the new one is captured.
- * - running: mixes the snapshot (`from`) and the live capture (`src`).
+ * - playing: disabled, so the live capture goes to the transition effects; it only keeps time.
  */
-export class TransitionEffect implements Effect {
+export class TransitionStage implements Effect {
     enabled = false;
 
     #from: EffectRenderTarget | null = null;
@@ -76,11 +56,9 @@ export class TransitionEffect implements Effect {
     #hold = false;
     #spec: TransitionStartOpts | null = null;
     #startTime: number | null = null;
+    #progress: TransitionProgress = HELD;
     #onEnd: (() => void) | null = null;
-
     #endHook: (() => void) | null = null;
-    /** Shaders that failed to compile; later runs with them cut straight to the new content. */
-    #broken = new Set<string>();
 
     /** End the current run: call its `onEnd` and settle the promise from `start()`. */
     #end(): void {
@@ -106,8 +84,9 @@ export class TransitionEffect implements Effect {
         this.#spec = spec;
         this.#endHook = spec.onEnd ?? null;
         this.#startTime = null;
+        this.#progress = HELD;
         this.#hold = false;
-        this.enabled = true;
+        this.enabled = false;
         return new Promise((resolve) => {
             this.#onEnd = resolve;
         });
@@ -134,30 +113,45 @@ export class TransitionEffect implements Effect {
         return this.#spec !== null;
     }
 
-    // Only a running transition grows the stage, so the snapshot and hold stay element-sized.
-    outputRect(dims: EffectDims): ElementRect | undefined {
-        const overflow = this.#spec?.overflow;
-        if (
-            overflow === undefined ||
-            this.#snapshotWaiters.length > 0 ||
-            covers(dims.contentRect, dims.canvasRect)
-        ) {
-            return undefined;
+    get frame(): TransitionFrame | null {
+        const from = this.#from;
+        if (!from || (!this.#hold && !this.#spec)) {
+            return null;
         }
-        if (overflow === true) {
-            return dims.canvasRect;
-        }
-        const pad = overflow * dims.pixelRatio;
-        const [x, y, w, h] = dims.contentRect;
-        return [x - pad, y - pad, w + pad * 2, h + pad * 2];
+        return {
+            from,
+            progress: this.#progress,
+            holding: this.#spec === null,
+        };
     }
 
-    #passthrough(ctx: EffectContext): void {
-        ctx.draw({
-            frag: PASSTHROUGH_FRAG,
-            uniforms: { src: ctx.src },
-            target: ctx.target,
-        });
+    /** End the playing run now; the live capture shows from this frame on. */
+    cut(): void {
+        if (this.#spec) {
+            this.#spec = null;
+            this.#end();
+        }
+    }
+
+    update(ctx: EffectContext): void {
+        const spec = this.#spec;
+        if (!spec) {
+            return;
+        }
+        if (this.#startTime === null) {
+            this.#startTime = ctx.time;
+        }
+        const x =
+            spec.duration > 0
+                ? (ctx.time - this.#startTime) / spec.duration
+                : 1;
+        if (x >= 1) {
+            this.#spec = null;
+            this.#end();
+            return;
+        }
+        const clamped = Math.max(x, 0);
+        this.#progress = { t: applyEase(spec.ease, clamped), x: clamped };
     }
 
     // Element-sized with an explicit size, so a larger stage does not resize it.
@@ -178,88 +172,12 @@ export class TransitionEffect implements Effect {
             this.#hold = true;
             this.#resolveSnapshotWaiters();
         }
-
-        const from = this.#from;
-        if (!from) {
-            this.#passthrough(ctx);
+        if (this.#from && this.#hold) {
+            ctx.blit(this.#from);
             return;
         }
-
-        const spec = this.#spec;
-        if (spec) {
-            if (this.#startTime === null) {
-                this.#startTime = ctx.time;
-            }
-            const x =
-                spec.duration > 0
-                    ? (ctx.time - this.#startTime) / spec.duration
-                    : 1;
-            const clamped = Math.min(Math.max(x, 0), 1);
-            const t = applyEase(spec.ease, clamped);
-            if (x >= 1 || this.#broken.has(spec.frag)) {
-                this.#spec = null;
-                this.enabled = false;
-                this.#passthrough(ctx);
-                this.#end();
-                return;
-            }
-            spec.onFrame?.(t, Math.max(x, 0), ctx.deltaTime);
-            try {
-                this.#draw(ctx, spec, from, t);
-            } catch (e) {
-                this.#broken.add(spec.frag);
-                const name = spec.name ?? "?";
-                const lines = describeGlslError(e);
-                if (lines) {
-                    console.error(
-                        `[VFX-JS] transition "${name}" failed to compile; cutting to the new content.\n  ${lines.join("\n  ")}`,
-                    );
-                    console.debug(e);
-                } else {
-                    console.error(
-                        `[VFX-JS] transition "${name}" failed; cutting to the new content.`,
-                        e,
-                    );
-                }
-                this.#spec = null;
-                this.enabled = false;
-                this.#passthrough(ctx);
-                this.#end();
-            }
-            return;
-        }
-
-        if (this.#hold) {
-            ctx.blit(from);
-            return;
-        }
-
         this.enabled = false;
-        this.#passthrough(ctx);
-    }
-
-    #draw(
-        ctx: EffectContext,
-        spec: TransitionStartOpts,
-        from: EffectRenderTarget,
-        t: number,
-    ): void {
-        ctx.draw({
-            frag: spec.frag,
-            uniforms: {
-                ...spec.uniforms,
-                from,
-                src: ctx.src,
-                t,
-                reverse: spec.reverse ? 1 : 0,
-                resolution: [
-                    ctx.dims.elementPixel[0],
-                    ctx.dims.elementPixel[1],
-                ],
-                time: ctx.time,
-            },
-            target: ctx.target,
-        });
+        ctx.blit(ctx.src);
     }
 
     dispose(): void {
@@ -267,5 +185,96 @@ export class TransitionEffect implements Effect {
         this.#fromSize = [0, 0];
         this.#end();
         this.#resolveSnapshotWaiters();
+    }
+}
+
+export type TransitionFrameSource = {
+    readonly frame: TransitionFrame | null;
+    cut(): void;
+};
+
+/**
+ * Puts a `TransitionEffect` in the chain.
+ * Skipped outside a run; during one it passes the run state on the context.
+ */
+export class TransitionSlot implements Effect {
+    readonly effect: TransitionEffect;
+    #source: TransitionFrameSource;
+    #run: TransitionRun | null = null;
+
+    constructor(effect: TransitionEffect, source: TransitionFrameSource) {
+        this.effect = effect;
+        this.#source = source;
+    }
+
+    get enabled(): boolean {
+        return (
+            this.#run !== null &&
+            typeof this.effect.render === "function" &&
+            this.effect.enabled !== false
+        );
+    }
+
+    start(run: TransitionRun): void {
+        this.#run = run;
+        this.effect.start?.(run);
+    }
+
+    end(): void {
+        if (this.#run === null) {
+            return;
+        }
+        this.#run = null;
+        this.effect.end?.();
+    }
+
+    #context(ctx: EffectContext): TransitionEffectContext | null {
+        const frame = this.#source.frame;
+        const run = this.#run;
+        if (!frame || !run) {
+            return null;
+        }
+        return {
+            ...ctx,
+            from: frame.from,
+            progress: frame.progress,
+            holding: frame.holding,
+            reverse: run.reverse,
+            run,
+            cut: () => this.#source.cut(),
+        };
+    }
+
+    init(ctx: EffectContext): void | Promise<void> {
+        return this.effect.init?.(ctx);
+    }
+
+    update(ctx: EffectContext): void {
+        const frame = this.#source.frame;
+        if (!frame || frame.holding) {
+            return;
+        }
+        const transitionCtx = this.#context(ctx);
+        if (transitionCtx) {
+            this.effect.update?.(transitionCtx);
+        }
+    }
+
+    // The run can end between this frame's enabled check and render, so pass through then.
+    render(ctx: EffectContext): void {
+        const transitionCtx = this.#context(ctx);
+        if (transitionCtx && this.effect.render) {
+            this.effect.render(transitionCtx);
+        } else {
+            ctx.blit(ctx.src);
+        }
+    }
+
+    outputRect(dims: EffectDims): ElementRect | undefined {
+        return this.#run ? this.effect.outputRect?.(dims) : undefined;
+    }
+
+    dispose(): void {
+        this.effect.dispose?.();
     }
 }

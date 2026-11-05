@@ -1,7 +1,7 @@
-import type { TransitionDef } from "@vfx-js/core";
+import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
 
 /** The old content shrinks into the center while the new one grows out of it. */
-export const zoom: TransitionDef = {
+export const zoom: ShaderTransitionDef = shaderTransition({
     name: "zoom",
     overflow: true,
     frag: `
@@ -13,4 +13,4 @@ vec4 transition(vec2 uv, float t) {
   return mix(readFrom(uv1), to, t);
 }
 `,
-};
+});

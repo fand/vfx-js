@@ -1,14 +1,18 @@
 import type { Effect } from "../types.js";
 import type { VFX } from "../vfx.js";
 import { crossfade } from "./crossfade.js";
-import { TransitionEffect } from "./effect.js";
-import { buildFrag } from "./glsl.js";
+import {
+    type TransitionFrame,
+    TransitionSlot,
+    TransitionStage,
+} from "./effect.js";
 import type {
     AddTransitionOpts,
     RunOpts,
     Transition,
     TransitionDef,
     TransitionEase,
+    TransitionRun,
     TransitionUniforms,
 } from "./types.js";
 
@@ -26,13 +30,12 @@ export type ResolvedSpec = {
     ease: TransitionEase;
 };
 
-// A resolved spec with its loaded driver effects.
-type Bound = { spec: ResolvedSpec; fx: Effect[] };
+// A resolved spec with the def's effects in their slots.
+type Bound = { spec: ResolvedSpec; slots: TransitionSlot[] };
 
 /**
  * Pick the run options, then the named type, then the container defaults.
- * Uniforms come with the shader from the first level that sets `transition`,
- * on top of the transition's own defaults.
+ * Uniforms come with the shader from the first level that sets `transition`.
  */
 export function resolveSpec(
     opts: AddTransitionOpts,
@@ -44,18 +47,14 @@ export function resolveSpec(
     const transition = shader.transition ?? crossfade;
     return {
         transition,
-        uniforms: { ...transition.uniforms, ...shader.uniforms },
+        uniforms: shader.uniforms ?? {},
         reverse: run.reverse ?? typed?.reverse ?? opts.reverse ?? false,
         duration:
             run.duration ??
             typed?.duration ??
             opts.duration ??
             DEFAULT_DURATION,
-        overflow:
-            run.overflow ??
-            typed?.overflow ??
-            opts.overflow ??
-            transition.overflow,
+        overflow: run.overflow ?? typed?.overflow ?? opts.overflow,
         ease:
             run.ease ??
             typed?.ease ??
@@ -141,8 +140,10 @@ export type TransitionHost = Pick<
     | "forceRender"
 >;
 
-export type TransitionEffectLike = Effect &
-    Pick<TransitionEffect, "snapshot" | "start" | "cancel">;
+export type TransitionStageLike = Effect &
+    Pick<TransitionStage, "snapshot" | "start" | "cancel" | "cut"> & {
+        readonly frame: TransitionFrame | null;
+    };
 
 // Resolves to false when the promise has not settled in time.
 function settlesWithin(promise: Promise<void>, ms: number): Promise<boolean> {
@@ -172,7 +173,7 @@ export class TransitionController implements Transition {
     #vfx: TransitionHost;
     #element: HTMLElement;
     #opts: AddTransitionOpts;
-    #effect: TransitionEffectLike;
+    #stage: TransitionStageLike;
     #keepWrapped: boolean;
     #onDestroy: (() => void) | undefined;
     #unfreezers: (() => void)[] = [];
@@ -190,27 +191,23 @@ export class TransitionController implements Transition {
     #wrapping: Promise<void> | null = null;
     #chain: readonly Effect[] = [];
 
-    // The last def's driver effects and shader; the same def again reuses them.
-    #driver: {
-        def: TransitionDef;
-        fx: Promise<Effect[]>;
-        frag: string | null;
-    } | null = null;
-    // The run that owns the driver effects right now.
-    #active: { id: number; def: TransitionDef; fx: Effect[] } | null = null;
+    // The last def's effects; the same def again reuses them.
+    #cache: { def: TransitionDef; slots: TransitionSlot[] } | null = null;
+    // The run that owns the effects right now.
+    #active: { id: number; slots: TransitionSlot[] } | null = null;
 
     constructor(
         vfx: TransitionHost,
         element: HTMLElement,
         opts: AddTransitionOpts = {},
         onDestroy?: () => void,
-        effect: TransitionEffectLike = new TransitionEffect(),
+        stage: TransitionStageLike = new TransitionStage(),
     ) {
         this.#onDestroy = onDestroy;
         this.#vfx = vfx;
         this.#element = element;
         this.#opts = opts;
-        this.#effect = effect;
+        this.#stage = stage;
         this.#keepWrapped = opts.keepWrapped ?? false;
     }
 
@@ -257,7 +254,7 @@ export class TransitionController implements Transition {
         };
         const cut = async () => {
             this.#endActive();
-            this.#effect.cancel();
+            this.#stage.cancel();
             await update();
             if (isCurrent()) {
                 if (this.#wrapped && this.#keepWrapped) {
@@ -270,7 +267,7 @@ export class TransitionController implements Transition {
         // A static spec binds before the snapshot, a lazy one after `cb`.
         let bound: Bound | null = null;
         if (typeof opts !== "function") {
-            bound = await this.#bind(resolveSpec(this.#opts, opts));
+            bound = this.#bind(resolveSpec(this.#opts, opts));
             if (!isCurrent()) {
                 return update();
             }
@@ -281,7 +278,7 @@ export class TransitionController implements Transition {
 
         this.#freeze();
         try {
-            await this.#ensureWrapped(bound?.fx ?? null, isCurrent, true);
+            await this.#ensureWrapped(bound?.slots ?? null, isCurrent, true);
         } catch (err) {
             console.error(
                 "[VFX-JS] transition failed to wrap the element; cutting to the new content.",
@@ -295,7 +292,7 @@ export class TransitionController implements Transition {
         this.#unlocks.push(this.#vfx.lockSize(this.#element));
         this.#unlocks.push(this.#vfx.forceRender(this.#element));
         const snapshotTaken = await settlesWithin(
-            this.#effect.snapshot(),
+            this.#stage.snapshot(),
             STALL_TIMEOUT_MS,
         );
         if (!isCurrent()) {
@@ -323,7 +320,7 @@ export class TransitionController implements Transition {
         } catch (err) {
             if (isCurrent()) {
                 this.#endActive();
-                this.#effect.cancel();
+                this.#stage.cancel();
                 this.#releaseWrap(id);
             }
             throw err;
@@ -333,7 +330,7 @@ export class TransitionController implements Transition {
         }
 
         if (bound === null) {
-            bound = await this.#bind(resolveSpec(this.#opts, lazyOpts));
+            bound = this.#bind(resolveSpec(this.#opts, lazyOpts));
             if (!isCurrent()) {
                 return;
             }
@@ -342,7 +339,7 @@ export class TransitionController implements Transition {
             }
             // The transition effect stays first, so the held snapshot survives the swap.
             try {
-                await this.#ensureWrapped(bound.fx, isCurrent, false);
+                await this.#ensureWrapped(bound.slots, isCurrent, false);
             } catch (err) {
                 console.error(
                     "[VFX-JS] transition failed to swap the effects; cutting to the new content.",
@@ -381,19 +378,10 @@ export class TransitionController implements Transition {
             return;
         }
 
-        const { spec, fx } = bound;
-        const def = spec.transition;
-        const started = this.#effect.start({
-            name: def.name,
-            frag: this.#fragOf(def),
-            uniforms: spec.uniforms,
+        const { spec } = bound;
+        const started = this.#stage.start({
             duration: spec.duration,
-            reverse: spec.reverse,
-            overflow: spec.overflow,
             ease: spec.ease,
-            onFrame: def.onFrame
-                ? (t, x, dt) => def.onFrame?.(t, x, dt, fx)
-                : undefined,
             onEnd: () => this.#endActive(id),
         });
         const ended = await settlesWithin(
@@ -409,37 +397,37 @@ export class TransitionController implements Transition {
         this.#releaseWrap(id);
     }
 
-    // Load the driver effects. Null means cut: no duration, or the effects failed.
-    async #bind(spec: ResolvedSpec): Promise<Bound | null> {
+    // Get the def's effects. Null means cut: no duration, or create() failed.
+    #bind(spec: ResolvedSpec): Bound | null {
         if (spec.duration <= 0) {
             return null;
         }
         const def = spec.transition;
         try {
-            return { spec, fx: await this.#ensureDriverEffects(def) };
+            return { spec, slots: this.#slotsOf(def) };
         } catch (err) {
             console.error(
-                `[VFX-JS] transition "${def.name}" effects failed; cutting to the new content.`,
+                `[VFX-JS] transition "${def.name}" create() failed; cutting to the new content.`,
                 err,
             );
             return null;
         }
     }
 
-    // Hand the driver effects to this run.
-    #prepare(id: number, { spec, fx }: Bound): void {
+    // Hand the effects to this run.
+    #prepare(id: number, { spec, slots }: Bound): void {
         this.#endActive();
-        const def = spec.transition;
-        if (fx.length > 0 || def.prepare) {
-            this.#active = { id, def, fx };
-            def.prepare?.(
-                {
-                    reverse: spec.reverse,
-                    uniforms: spec.uniforms,
-                    duration: spec.duration,
-                },
-                fx,
-            );
+        this.#active = { id, slots };
+        const run: TransitionRun = {
+            reverse: spec.reverse,
+            uniforms: spec.uniforms,
+            duration: spec.duration,
+        };
+        if (spec.overflow !== undefined) {
+            run.overflow = spec.overflow;
+        }
+        for (const slot of slots) {
+            slot.start(run);
         }
     }
 
@@ -452,14 +440,14 @@ export class TransitionController implements Transition {
             );
         }
         this.#endActive();
-        this.#effect.cancel();
+        this.#stage.cancel();
     }
 
     cancel(): void {
         const id = ++this.#seq;
         this.#runningId = null;
         this.#endActive();
-        this.#effect.cancel();
+        this.#stage.cancel();
         this.#unfreeze();
         this.#unlock();
         this.#releaseWrap(id);
@@ -471,8 +459,8 @@ export class TransitionController implements Transition {
         }
         this.#destroyed = true;
         this.cancel();
-        // The chain disposes the driver effects when the element is removed.
-        this.#driver = null;
+        // The chain disposes the effects when the element is removed.
+        this.#cache = null;
         this.#onDestroy?.();
     }
 
@@ -496,46 +484,31 @@ export class TransitionController implements Transition {
         }
     }
 
-    #fragOf(def: TransitionDef): string {
-        const driver = this.#driver;
-        if (driver?.def !== def) {
-            return buildFrag(def.frag);
+    #slotsOf(def: TransitionDef): TransitionSlot[] {
+        if (this.#cache?.def === def) {
+            return this.#cache.slots;
         }
-        driver.frag ??= buildFrag(def.frag);
-        return driver.frag;
-    }
-
-    #ensureDriverEffects(def: TransitionDef): Promise<Effect[]> {
-        if (this.#driver?.def === def) {
-            return this.#driver.fx;
-        }
-        const driver = {
-            def,
-            fx: def.effects ? def.effects() : Promise.resolve([]),
-            frag: null,
-        };
-        // Let the next run retry after a failure.
-        driver.fx.catch(() => {
-            if (this.#driver === driver) {
-                this.#driver = null;
-            }
-        });
-        this.#driver = driver;
-        return driver.fx;
+        const slots = [def.create()]
+            .flat()
+            .map((effect) => new TransitionSlot(effect, this.#stage));
+        this.#cache = { def, slots };
+        return slots;
     }
 
     #endActive(id?: number): void {
         const active = this.#active;
         if (active && (id === undefined || active.id === id)) {
             this.#active = null;
-            active.def.onEnd?.(active.fx);
+            for (const slot of active.slots) {
+                slot.end();
+            }
         }
     }
 
     // Wrap the element, or sync the chain and optionally take a fresh capture.
-    // Null `driverFx` keeps the driver effects already in the chain.
+    // Null `slots` keeps the effects already in the chain.
     async #ensureWrapped(
-        driverFx: readonly Effect[] | null,
+        slots: readonly Effect[] | null,
         isCurrent: () => boolean,
         recapture: boolean,
     ): Promise<void> {
@@ -547,11 +520,11 @@ export class TransitionController implements Transition {
             return;
         }
         const chain =
-            driverFx !== null
-                ? [this.#effect, ...driverFx]
+            slots !== null
+                ? [this.#stage, ...slots]
                 : this.#wrapped
                   ? this.#chain
-                  : [this.#effect];
+                  : [this.#stage];
         if (!this.#wrapped) {
             const wrapping = this.#vfx
                 .addHTMLWithStill(this.#element, { effect: chain })

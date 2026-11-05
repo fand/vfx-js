@@ -1,7 +1,7 @@
-import type { TransitionDef } from "@vfx-js/core";
+import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
 
 /** Crossfade through a zoom blur toward the center that peaks halfway. */
-export const crosszoom: TransitionDef = {
+export const crosszoom: ShaderTransitionDef = shaderTransition({
     name: "crosszoom",
     overflow: true,
     frag: `
@@ -37,4 +37,4 @@ vec4 transition(vec2 uv, float t) {
   return c / total;
 }
 `,
-};
+});

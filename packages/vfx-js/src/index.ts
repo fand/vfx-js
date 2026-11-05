@@ -9,12 +9,18 @@ export type { CaptureOpts } from "./html-in-canvas.js";
 export { setupCapture, teardownCapture } from "./html-in-canvas.js";
 export { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 export { crossfade } from "./transition/crossfade.js";
+export { shaderTransition } from "./transition/shader.js";
 export type {
     AddTransitionOpts,
     RunOpts,
+    ShaderTransitionDef,
+    ShaderTransitionOpts,
     Transition,
     TransitionDef,
     TransitionEase,
+    TransitionEffect,
+    TransitionEffectContext,
+    TransitionProgress,
     TransitionRun,
     TransitionSpec,
     TransitionUniforms,

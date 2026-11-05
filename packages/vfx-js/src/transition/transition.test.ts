@@ -1,19 +1,36 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { Effect, EffectContext, EffectDims } from "../types";
+import type {
+    Effect,
+    EffectContext,
+    EffectDims,
+    EffectRenderTarget,
+} from "../types";
 import { crossfade } from "./crossfade";
-import { TransitionEffect, type TransitionStartOpts } from "./effect";
+import {
+    type TransitionFrameSource,
+    TransitionSlot,
+    TransitionStage,
+    type TransitionStartOpts,
+} from "./effect";
 import { BODY_OFFSET, describeGlslError } from "./glsl";
+import { shaderTransition } from "./shader";
 import {
     resolveSpec,
     TransitionController,
-    type TransitionEffectLike,
     type TransitionHost,
+    type TransitionStageLike,
     waitForMedia,
 } from "./transition";
-import type { TransitionDef, TransitionEase } from "./types";
+import type {
+    TransitionDef,
+    TransitionEase,
+    TransitionEffect,
+    TransitionEffectContext,
+    TransitionRun,
+} from "./types";
 
-const swipe: TransitionDef = { name: "swipe", frag: "" };
-const zoom: TransitionDef = { name: "zoom", frag: "" };
+const swipe = shaderTransition({ name: "swipe", frag: "" });
+const zoom = shaderTransition({ name: "zoom", frag: "" });
 
 describe("resolveSpec", () => {
     test("uses defaults", () => {
@@ -27,29 +44,34 @@ describe("resolveSpec", () => {
         });
     });
 
-    test("transition uniforms are defaults under the spec's", () => {
-        const cube: TransitionDef = {
+    test("uniforms are the spec's only; def defaults merge in the effect", () => {
+        const cube = shaderTransition({
             name: "cube",
             frag: "",
             uniforms: { persp: 0.7, unzoom: 0.3 },
-        };
-        expect(resolveSpec({ transition: cube }).uniforms).toEqual({
-            persp: 0.7,
-            unzoom: 0.3,
         });
+        expect(resolveSpec({ transition: cube }).uniforms).toEqual({});
         expect(
             resolveSpec({}, { transition: cube, uniforms: { persp: 0.2 } })
                 .uniforms,
-        ).toEqual({ persp: 0.2, unzoom: 0.3 });
+        ).toEqual({ persp: 0.2 });
     });
 
     test("carries the transition's ease", () => {
-        const linear: TransitionDef = { name: "l", frag: "", ease: "linear" };
+        const linear = shaderTransition({
+            name: "l",
+            frag: "",
+            ease: "linear",
+        });
         expect(resolveSpec({ transition: linear }).ease).toBe("linear");
     });
 
     test("ease: run beats the type, the container and the def", () => {
-        const linear: TransitionDef = { name: "l", frag: "", ease: "linear" };
+        const linear = shaderTransition({
+            name: "l",
+            frag: "",
+            ease: "linear",
+        });
         const cubic = (x: number) => x * x * x;
         const opts = {
             transition: linear,
@@ -65,20 +87,12 @@ describe("resolveSpec", () => {
         expect(resolveSpec({}).ease).toBe("smoothstep");
     });
 
-    test("overflow from the options wins over the transition's", () => {
-        const wide: TransitionDef = { name: "wide", frag: "", overflow: 20 };
-        const full: TransitionDef = { name: "full", frag: "", overflow: true };
-        expect(resolveSpec({ transition: wide }).overflow).toBe(20);
-        expect(resolveSpec({ transition: wide, overflow: 10 }).overflow).toBe(
-            10,
+    test("overflow: run beats the type, which beats the container", () => {
+        expect(resolveSpec({ transition: swipe }).overflow).toBeUndefined();
+        expect(resolveSpec({ overflow: 10 }).overflow).toBe(10);
+        expect(resolveSpec({ overflow: 10 }, { overflow: true }).overflow).toBe(
+            true,
         );
-        expect(resolveSpec({ transition: wide, overflow: 50 }).overflow).toBe(
-            50,
-        );
-        expect(
-            resolveSpec({ transition: wide }, { overflow: true }).overflow,
-        ).toBe(true);
-        expect(resolveSpec({ transition: full, overflow: 5 }).overflow).toBe(5);
         expect(
             resolveSpec(
                 {
@@ -156,29 +170,46 @@ describe("resolveSpec", () => {
     });
 });
 
-describe("TransitionEffect.outputRect", () => {
+const run: TransitionRun = { reverse: false, uniforms: {}, duration: 1 };
+
+describe("shaderTransition outputRect", () => {
     const dims = {
         pixelRatio: 2,
         contentRect: [0, 0, 100, 50],
         canvasRect: [-10, -20, 400, 300],
     } as unknown as EffectDims;
-    const start = (overflow?: true | number) => {
-        const effect = new TransitionEffect();
-        void effect.start({ frag: "", duration: 1, reverse: false, overflow });
+    const start = (
+        defOverflow?: true | number,
+        specOverflow?: true | number,
+    ) => {
+        const effect = shaderTransition({
+            name: "s",
+            frag: "",
+            overflow: defOverflow,
+        }).create();
+        effect.start?.(
+            specOverflow === undefined
+                ? run
+                : { ...run, overflow: specOverflow },
+        );
         return effect;
     };
 
-    test("is undefined when idle or without overflow", () => {
-        expect(new TransitionEffect().outputRect(dims)).toBeUndefined();
-        expect(start().outputRect(dims)).toBeUndefined();
+    test("is undefined without overflow", () => {
+        expect(start().outputRect?.(dims)).toBeUndefined();
     });
 
     test("covers the canvas for true", () => {
-        expect(start(true).outputRect(dims)).toEqual([-10, -20, 400, 300]);
+        expect(start(true).outputRect?.(dims)).toEqual([-10, -20, 400, 300]);
     });
 
     test("pads by CSS px for a number", () => {
-        expect(start(5).outputRect(dims)).toEqual([-10, -10, 120, 70]);
+        expect(start(5).outputRect?.(dims)).toEqual([-10, -10, 120, 70]);
+    });
+
+    test("the spec's overflow wins over the def's", () => {
+        expect(start(20, 5).outputRect?.(dims)).toEqual([-10, -10, 120, 70]);
+        expect(start(5, true).outputRect?.(dims)).toEqual([-10, -20, 400, 300]);
     });
 
     test("is undefined when the element fills the canvas", () => {
@@ -186,70 +217,203 @@ describe("TransitionEffect.outputRect", () => {
             ...dims,
             contentRect: [-10, -20, 400, 300],
         } as unknown as EffectDims;
-        expect(start(true).outputRect(fullDims)).toBeUndefined();
-        expect(start(5).outputRect(fullDims)).toBeUndefined();
-    });
-
-    test("shrinks back while taking a snapshot", () => {
-        const effect = start(true);
-        void effect.snapshot();
-        expect(effect.outputRect(dims)).toBeUndefined();
+        expect(start(true).outputRect?.(fullDims)).toBeUndefined();
+        expect(start(5).outputRect?.(fullDims)).toBeUndefined();
     });
 });
 
-describe("TransitionEffect frames", () => {
-    const frameCtx = (time: number) =>
-        ({
-            time,
-            deltaTime: 0.1,
-            src: {},
-            target: null,
-            dims: { elementPixel: [10, 10] },
-            draw: vi.fn(),
-            blit: vi.fn(),
-            createRenderTarget: () => ({ dispose: () => {} }),
-        }) as unknown as EffectContext;
+const frameCtx = (time: number) =>
+    ({
+        time,
+        deltaTime: 0.1,
+        src: {},
+        target: null,
+        dims: { elementPixel: [10, 10] },
+        draw: vi.fn(),
+        blit: vi.fn(),
+        createRenderTarget: () => ({ dispose: () => {} }),
+    }) as unknown as EffectContext;
 
-    const run = (ease?: TransitionEase) => {
-        const effect = new TransitionEffect();
-        void effect.snapshot();
-        effect.render(frameCtx(0));
-        const frames: [number, number][] = [];
-        void effect.start({
-            frag: "",
-            duration: 1,
-            reverse: false,
-            ease,
-            onFrame: (t, x) => frames.push([t, x]),
-        });
-        effect.render(frameCtx(10));
-        const ctx = frameCtx(10.25);
-        effect.render(ctx);
-        const draw = vi.mocked(ctx.draw).mock.calls[0][0];
-        return { frames, t: draw.uniforms?.t };
+describe("TransitionStage", () => {
+    const play = (ease?: TransitionEase) => {
+        const stage = new TransitionStage();
+        void stage.snapshot();
+        stage.render(frameCtx(0));
+        const held = stage.frame;
+        void stage.start({ duration: 1, ease });
+        stage.update(frameCtx(10));
+        stage.update(frameCtx(10.25));
+        return { stage, held };
     };
 
+    test("holds the snapshot with zero progress before the start", () => {
+        const { held } = play();
+        expect(held).toMatchObject({
+            progress: { t: 0, x: 0 },
+            holding: true,
+        });
+    });
+
+    test("is disabled while playing, so the live capture flows on", () => {
+        const { stage } = play();
+        expect(stage.enabled).toBe(false);
+        expect(stage.frame?.holding).toBe(false);
+    });
+
     test("eases t with a smoothstep by default", () => {
-        const { frames, t } = run();
-        expect(frames[1]).toEqual([0.15625, 0.25]);
-        expect(t).toBe(0.15625);
+        expect(play().stage.frame?.progress).toEqual({ t: 0.15625, x: 0.25 });
     });
 
-    test("a linear transition gets t equal to x", () => {
-        const { frames, t } = run("linear");
-        expect(frames[1]).toEqual([0.25, 0.25]);
-        expect(t).toBe(0.25);
+    test("a linear ease gives t equal to x", () => {
+        expect(play("linear").stage.frame?.progress).toEqual({
+            t: 0.25,
+            x: 0.25,
+        });
     });
 
-    test("a function ease gives the same t to the shader and onFrame", () => {
+    test("a function ease gets x in 0..1", () => {
         const seen: number[] = [];
-        const { frames, t } = run((x) => {
+        const { stage } = play((x) => {
             seen.push(x);
             return x * x;
         });
-        expect(frames[1]).toEqual([0.0625, 0.25]);
-        expect(t).toBe(0.0625);
+        expect(stage.frame?.progress).toEqual({ t: 0.0625, x: 0.25 });
         expect(seen.every((x) => x >= 0 && x <= 1)).toBe(true);
+    });
+
+    test("cut ends the playing run at once", async () => {
+        const stage = new TransitionStage();
+        void stage.snapshot();
+        stage.render(frameCtx(0));
+        const onEnd = vi.fn();
+        const ended = stage.start({ duration: 1, onEnd });
+        stage.update(frameCtx(10));
+        stage.cut();
+        await ended;
+        expect(onEnd).toHaveBeenCalledOnce();
+        expect(stage.frame).toBeNull();
+    });
+
+    test("ends once the duration has passed", async () => {
+        const stage = new TransitionStage();
+        void stage.snapshot();
+        stage.render(frameCtx(0));
+        const onEnd = vi.fn();
+        const ended = stage.start({ duration: 1, onEnd });
+        stage.update(frameCtx(10));
+        stage.update(frameCtx(11));
+        await ended;
+        expect(onEnd).toHaveBeenCalledOnce();
+        expect(stage.frame).toBeNull();
+    });
+});
+
+describe("TransitionSlot", () => {
+    const from = { dispose: () => {} } as unknown as EffectRenderTarget;
+    const source = (holding: boolean, t = 0.5): TransitionFrameSource => ({
+        frame: { from, progress: { t, x: 0.25 }, holding },
+        cut: vi.fn(),
+    });
+
+    test("is skipped outside a run", () => {
+        const slot = new TransitionSlot({ render: vi.fn() }, source(false));
+        expect(slot.enabled).toBe(false);
+        slot.start(run);
+        expect(slot.enabled).toBe(true);
+        slot.end();
+        expect(slot.enabled).toBe(false);
+    });
+
+    test("passes the run state on the context", () => {
+        const render = vi.fn();
+        const update = vi.fn();
+        const slot = new TransitionSlot({ render, update }, source(false));
+        slot.start({ ...run, reverse: true, uniforms: { a: 1 } });
+        slot.update(frameCtx(0));
+        slot.render(frameCtx(0));
+        const ctx: TransitionEffectContext = render.mock.calls[0][0];
+        expect(ctx.from).toBe(from);
+        expect(ctx.progress).toEqual({ t: 0.5, x: 0.25 });
+        expect(ctx.reverse).toBe(true);
+        expect(ctx.run.uniforms).toEqual({ a: 1 });
+        expect(ctx.time).toBe(0);
+        expect(update).toHaveBeenCalledOnce();
+    });
+
+    test("renders but does not update while the old content is held", () => {
+        const render = vi.fn();
+        const update = vi.fn();
+        const slot = new TransitionSlot({ render, update }, source(true));
+        slot.start(run);
+        slot.update(frameCtx(0));
+        slot.render(frameCtx(0));
+        expect(update).not.toHaveBeenCalled();
+        expect(render).toHaveBeenCalledOnce();
+    });
+
+    test("passes the input through once the run has ended", () => {
+        const render = vi.fn();
+        const slot = new TransitionSlot({ render }, source(false));
+        const ctx = frameCtx(0);
+        slot.render(ctx);
+        expect(render).not.toHaveBeenCalled();
+        expect(ctx.blit).toHaveBeenCalledWith(ctx.src);
+    });
+});
+
+describe("shaderTransition", () => {
+    const ctxOf = (t: number, uniforms = {}, holding = false) =>
+        ({
+            ...frameCtx(0),
+            gl: {},
+            from: {},
+            progress: { t, x: 0.25 },
+            holding,
+            reverse: false,
+            run: { ...run, uniforms },
+            cut: vi.fn(),
+        }) as unknown as TransitionEffectContext;
+
+    test("shows the plain snapshot while holding", () => {
+        const effect = shaderTransition({ name: "h", frag: "" }).create();
+        const ctx = ctxOf(0, {}, true);
+        effect.render?.(ctx);
+        expect(ctx.draw).not.toHaveBeenCalled();
+        expect(ctx.blit).toHaveBeenCalledWith(ctx.src);
+    });
+
+    test("draws with the eased t and the def's uniforms under the spec's", () => {
+        const effect = shaderTransition({
+            name: "u",
+            frag: "/* body */",
+            uniforms: { a: 1, b: 2 },
+        }).create();
+        const ctx = ctxOf(0.3, { b: 5 });
+        effect.render?.(ctx);
+        const draw = vi.mocked(ctx.draw).mock.calls[0][0];
+        expect(draw.frag).toContain("/* body */");
+        expect(draw.uniforms).toMatchObject({ a: 1, b: 5, t: 0.3 });
+    });
+
+    test("a shader that fails to compile logs once and cuts the run", () => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
+        try {
+            const def = shaderTransition({ name: "bad", frag: "/* bad */" });
+            const ctx = ctxOf(0.3);
+            vi.mocked(ctx.draw).mockImplementation(() => {
+                throw new Error("compile failed\nERROR: 0:1: oops");
+            });
+            def.create().render?.(ctx);
+            def.create().render?.(ctx);
+            expect(ctx.draw).toHaveBeenCalledOnce();
+            expect(ctx.blit).toHaveBeenCalledTimes(2);
+            expect(ctx.cut).toHaveBeenCalledTimes(2);
+            expect(error).toHaveBeenCalledOnce();
+        } finally {
+            error.mockRestore();
+            debug.mockRestore();
+        }
     });
 });
 
@@ -389,7 +553,9 @@ function setup(
         endCurrent = null;
         f?.();
     };
-    const effect: TransitionEffectLike = {
+    const stage: TransitionStageLike = {
+        frame: null,
+        cut: () => {},
         render: () => {},
         snapshot: () => {
             end();
@@ -468,7 +634,7 @@ function setup(
         element,
         { waitFor: "none", ...transitionOpts },
         onDestroy,
-        effect,
+        stage,
     );
     return {
         transition,
@@ -587,29 +753,51 @@ describe("TransitionController", () => {
         expect(onDestroy).toHaveBeenCalledOnce();
     });
 
-    test("driver effects are created once and hooked into the run", async () => {
-        const fx = [{ render: () => {} }];
-        const effects = vi.fn(async () => fx);
-        const prepare = vi.fn();
-        const onEnd = vi.fn();
-        const def: TransitionDef = {
-            name: "driver",
-            frag: "",
-            effects,
-            prepare,
-            onEnd,
-        };
+    test("effects are created once and hooked into the run", async () => {
+        const start = vi.fn();
+        const end = vi.fn();
+        const effect: TransitionEffect = { render: () => {}, start, end };
+        const create = vi.fn(() => effect);
+        const def: TransitionDef = { name: "hooked", create };
         const { transition, starts } = setup();
         for (let i = 0; i < 2; i++) {
-            const run = transition.run(() => {}, { transition: def });
+            const run = transition.run(() => {}, {
+                transition: def,
+                uniforms: { a: 1 },
+            });
             await settle();
             starts[i].end();
             await run;
         }
-        expect(effects).toHaveBeenCalledOnce();
-        expect(prepare).toHaveBeenCalledTimes(2);
-        expect(prepare.mock.calls[0][1]).toBe(fx);
-        expect(onEnd).toHaveBeenCalledTimes(2);
+        expect(create).toHaveBeenCalledOnce();
+        expect(start).toHaveBeenCalledTimes(2);
+        expect(start.mock.calls[0][0]).toEqual({
+            reverse: false,
+            uniforms: { a: 1 },
+            duration: 0.6,
+        });
+        expect(end).toHaveBeenCalledTimes(2);
+    });
+
+    test("a def whose create() throws cuts", async () => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            const def: TransitionDef = {
+                name: "broken",
+                create: () => {
+                    throw new Error("nope");
+                },
+            };
+            const { transition, log, starts } = setup();
+            const cb = vi.fn();
+            await transition.run(cb, { transition: def });
+            expect(cb).toHaveBeenCalledOnce();
+            expect(starts).toHaveLength(0);
+            expect(log).not.toContain("wrap");
+            expect(error).toHaveBeenCalledOnce();
+        } finally {
+            error.mockRestore();
+        }
     });
 
     test("a snapshot that never lands times out and cuts", async () => {
@@ -656,35 +844,39 @@ describe("TransitionController", () => {
         }
     });
 
-    const driverDef = (name: string) => {
-        const created: Effect[][] = [];
+    const effectsOf = (chain: Effect[]) =>
+        chain.slice(1).map((slot) => (slot as TransitionSlot).effect);
+
+    const countedDef = (name: string) => {
+        const created: TransitionEffect[] = [];
         const def: TransitionDef = {
             name,
-            frag: "",
-            effects: async () => {
-                const fx = [{ render: () => {} }];
-                created.push(fx);
-                return fx;
+            create: () => {
+                const effect = { render: () => {} };
+                created.push(effect);
+                return effect;
             },
         };
         return { def, created };
     };
 
-    test("a new def swaps the driver effects in the chain", async () => {
+    test("a new def swaps the effects in the chain", async () => {
         const { transition, starts, chain, disposed } = setup({
             keepWrapped: true,
         });
-        const a = driverDef("a");
-        const b = driverDef("b");
+        const a = countedDef("a");
+        const b = countedDef("b");
         for (const [i, def] of [a.def, b.def, a.def].entries()) {
             const run = transition.run(() => {}, { transition: def });
             await settle();
             starts[i].end();
             await run;
         }
-        expect(chain()).toHaveLength(2);
-        expect(chain()[1]).toBe(a.created[1][0]);
-        expect(disposed).toEqual([a.created[0][0], b.created[0][0]]);
+        expect(effectsOf(chain())).toEqual([a.created[1]]);
+        expect(effectsOf([{}, ...disposed])).toEqual([
+            a.created[0],
+            b.created[0],
+        ]);
     });
 
     test("a fresh def per run keeps the chain length", async () => {
@@ -693,7 +885,7 @@ describe("TransitionController", () => {
         });
         for (let i = 0; i < 3; i++) {
             const run = transition.run(() => {}, {
-                transition: driverDef(`fresh${i}`).def,
+                transition: countedDef(`fresh${i}`).def,
             });
             await settle();
             starts[i].end();
@@ -703,28 +895,32 @@ describe("TransitionController", () => {
         expect(disposed).toHaveLength(2);
     });
 
-    test("driver effects of a dropped run stay out of the chain", async () => {
+    test("effects of a dropped run stay out of the chain", async () => {
         const { transition, starts, chain } = setup({ keepWrapped: true });
-        let resolveA: (fx: Effect[]) => void = () => {};
-        const slowFx = [{ render: () => {} }];
-        const slow: TransitionDef = {
-            name: "slow",
-            frag: "",
-            effects: () =>
-                new Promise<Effect[]>((resolve) => {
-                    resolveA = resolve;
-                }),
-        };
-        const b = driverDef("b");
-        const runA = transition.run(() => {}, { transition: slow });
+        const a = countedDef("a");
+        const b = countedDef("b");
+        const runA = transition.run(() => {}, { transition: a.def });
         const runB = transition.run(() => {}, { transition: b.def });
-        resolveA(slowFx);
         await runA;
         await settle();
         starts[0].end();
         await runB;
-        expect(chain()).toEqual([expect.anything(), b.created[0][0]]);
-        expect(chain()).not.toContain(slowFx[0]);
+        expect(effectsOf(chain())).toEqual([b.created[0]]);
+    });
+
+    test("a def with several effects puts them all in the chain", async () => {
+        const first = { render: () => {} };
+        const second = { render: () => {} };
+        const def: TransitionDef = {
+            name: "pair",
+            create: () => [first, second],
+        };
+        const { transition, starts, chain } = setup({ keepWrapped: true });
+        const run = transition.run(() => {}, { transition: def });
+        await settle();
+        starts[0].end();
+        await run;
+        expect(effectsOf(chain())).toEqual([first, second]);
     });
 
     test("warns once when the new content is not captured in time", async () => {
@@ -753,10 +949,7 @@ describe("TransitionController", () => {
     });
 
     test("lazy opts resolve after cb and bind the def then", async () => {
-        const { def } = driverDef("lazy");
-        def.frag = "/* lazy */";
-        const prepare = vi.fn();
-        def.prepare = prepare;
+        const { def, created } = countedDef("lazy");
         const { transition, log, starts, chain } = setup();
         const run = transition.run(
             () => {
@@ -779,22 +972,23 @@ describe("TransitionController", () => {
         ];
         expect(log.filter((s) => order.includes(s))).toEqual(order);
         expect(log.indexOf("wrap")).toBeLessThan(log.indexOf("snapshot"));
-        expect(prepare).toHaveBeenCalledOnce();
-        expect(starts[0].opts.frag).toContain("/* lazy */");
+        expect(created).toHaveLength(1);
         expect(chain()).toEqual([]);
     });
 
-    test("lazy opts without driver effects keep the chain", async () => {
-        const { transition, log, starts } = setup();
-        const run = transition.run(
-            () => {},
-            () => ({ transition: swipe }),
-        );
-        await settle();
-        starts[0].end();
-        await run;
-        expect(log).not.toContain("updateEffects");
-        expect(starts[0].opts.name).toBe("swipe");
+    test("lazy opts reuse the effects of the same def", async () => {
+        const { def } = countedDef("same");
+        const { transition, log, starts } = setup({ keepWrapped: true });
+        for (let i = 0; i < 2; i++) {
+            const run = transition.run(
+                () => {},
+                () => ({ transition: def }),
+            );
+            await settle();
+            starts[i].end();
+            await run;
+        }
+        expect(log.filter((s) => s === "updateEffects")).toHaveLength(1);
     });
 
     test("lazy duration 0 cuts after cb and unwraps", async () => {

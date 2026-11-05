@@ -1,7 +1,7 @@
-import type { TransitionDef } from "@vfx-js/core";
+import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
 
 /** Jittery RGB-split blocks; the content swaps halfway. */
-export const glitch: TransitionDef = {
+export const glitch: ShaderTransitionDef = shaderTransition({
     name: "glitch",
     frag: `
 float gnoise(float y) {
@@ -38,4 +38,4 @@ vec4 transition(vec2 uv, float t) {
   return mix(c1, c2, step(0.5, t));
 }
 `,
-};
+});

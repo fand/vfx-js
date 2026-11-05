@@ -1,6 +1,6 @@
 "use client";
 
-import type { TransitionDef } from "@vfx-js/core";
+import { shaderTransition } from "@vfx-js/core";
 import { useVFXTransition } from "@vfx-js/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { highlight } from "../_components/highlight";
@@ -49,8 +49,8 @@ export function ShaderLab() {
     };
 
     // The program is cached by its source, so a new def per edit is cheap.
-    const def = useMemo<TransitionDef>(
-        () => ({ name: "custom", frag }),
+    const def = useMemo(
+        () => shaderTransition({ name: "custom", frag }),
         [frag],
     );
 

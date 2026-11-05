@@ -1,13 +1,40 @@
-import type { Effect, TransitionDef } from "@vfx-js/core";
 import type {
-    DatamoshEffect,
-    JPEGGlitchEffect,
-    PixelSortEffect,
-} from "@vfx-js/effects";
-import { describe, expect, test } from "vitest";
+    ShaderTransitionDef,
+    TransitionDef,
+    TransitionEffect,
+    TransitionEffectContext,
+    TransitionRun,
+} from "@vfx-js/core";
+import { describe, expect, test, vi } from "vitest";
+import type { DatamoshTransitionEffect } from "./datamosh";
 import * as presets from "./index";
+import type { JpegGlitchTransitionEffect } from "./jpeg-glitch";
+import type { PixelsortTransitionEffect } from "./pixelsort";
 
-const run = { reverse: false, uniforms: {}, duration: 1 };
+const run: TransitionRun = { reverse: false, uniforms: {}, duration: 1 };
+
+const frame = (t: number, x = t) =>
+    ({
+        progress: { t, x },
+        deltaTime: 0.016,
+        src: {},
+        target: null,
+        draw: vi.fn(),
+        blit: vi.fn(),
+    }) as unknown as TransitionEffectContext;
+
+const effectsOf = (def: TransitionDef): TransitionEffect[] =>
+    [def.create()].flat();
+
+const shaderPresets: [string, ShaderTransitionDef][] = [
+    ["crossfade", presets.crossfade],
+    ["crosszoom", presets.crosszoom],
+    ["glitch", presets.glitch],
+    ["glitchSlide", presets.glitchSlide],
+    ["swipe", presets.swipe],
+    ["zoom", presets.zoom],
+    ["zoomBlur", presets.zoomBlur],
+];
 
 describe("transition presets", () => {
     const defs = Object.entries(presets).filter(
@@ -30,8 +57,15 @@ describe("transition presets", () => {
         ]);
     });
 
-    test.each(defs)("%s declares the transition function", (_key, def) => {
-        expect(def.frag).toContain("vec4 transition(vec2 uv, float t)");
+    test.each(shaderPresets)(
+        "%s declares the transition function",
+        (_key, def) => {
+            expect(def.frag).toContain("vec4 transition(vec2 uv, float t)");
+        },
+    );
+
+    test.each(defs)("%s creates its effects", (_key, def) => {
+        expect(effectsOf(def).length).toBeGreaterThan(0);
     });
 
     test.each([
@@ -52,81 +86,76 @@ describe("transition presets", () => {
 });
 
 describe("pixelsort", () => {
-    test("each container keeps its own state", async () => {
-        const def = presets.createPixelsort({ direction: "right" });
-        const fxA = (await def.effects?.()) as Effect[];
-        const fxB = (await def.effects?.()) as Effect[];
-        const sortA = fxA[0] as PixelSortEffect;
-        const sortB = fxB[0] as PixelSortEffect;
+    const sortOf = (def: TransitionDef) =>
+        effectsOf(def)[1] as PixelsortTransitionEffect;
 
-        def.prepare?.({ ...run, reverse: true }, fxA);
-        def.prepare?.(run, fxB);
-        def.onFrame?.(0.2, 0.2, 0.016, fxA);
-        def.onFrame?.(0.2, 0.2, 0.016, fxB);
+    test("each container keeps its own state", () => {
+        const def = presets.createPixelsort({ direction: "right" });
+        const sortA = sortOf(def);
+        const sortB = sortOf(def);
+        sortA.start({ ...run, reverse: true });
+        sortB.start(run);
+        sortA.update(frame(0.2));
+        sortB.update(frame(0.2));
         // Reversed, 0.2 is past the forward halfway, so A sorts back in.
         expect(sortA.params.direction).toBe("left");
         expect(sortB.params.direction).toBe("right");
 
-        def.onEnd?.(fxA);
-        expect((sortA as Effect).enabled).toBe(false);
-        expect((sortB as Effect).enabled).toBe(true);
+        sortA.end();
+        expect(sortA.params.range[0]).toBe(1);
+        expect(sortB.params.range[0]).not.toBe(1);
     });
 
-    test("factories do not share state", async () => {
-        const up = presets.createPixelsort();
-        const left = presets.createPixelsort({ direction: "left" });
-        const fxUp = (await up.effects?.()) as Effect[];
-        const fxLeft = (await left.effects?.()) as Effect[];
-        up.prepare?.(run, fxUp);
-        left.prepare?.(run, fxLeft);
-        expect((fxUp[0] as PixelSortEffect).params.direction).toBe("up");
-        expect((fxLeft[0] as PixelSortEffect).params.direction).toBe("left");
+    test("factories do not share state", () => {
+        const up = sortOf(presets.createPixelsort());
+        const left = sortOf(presets.createPixelsort({ direction: "left" }));
+        up.start(run);
+        left.start(run);
+        expect(up.params.direction).toBe("up");
+        expect(left.params.direction).toBe("left");
     });
 });
 
 describe("datamosh", () => {
-    test("each container keeps its own state", async () => {
+    test("each container keeps its own state", () => {
         const def = presets.createDatamosh({ blockSize: 8 });
-        const fxA = (await def.effects?.()) as Effect[];
-        const fxB = (await def.effects?.()) as Effect[];
-        const moshA = fxA[0] as DatamoshEffect;
-        const moshB = fxB[0] as DatamoshEffect;
+        const moshA = effectsOf(def)[1] as DatamoshTransitionEffect;
+        const moshB = effectsOf(def)[1] as DatamoshTransitionEffect;
         expect(moshA.params.blockSize).toBe(8);
 
-        def.prepare?.(run, fxA);
+        moshA.start(run);
         for (let i = 0; i < 3; i++) {
-            def.onFrame?.(0.1, 0.1, 0.016, fxA);
+            moshA.update(frame(0.1));
         }
-        def.prepare?.({ ...run, duration: 2 }, fxB);
-        def.onFrame?.(0.1, 0.1, 0.016, fxB);
+        moshB.start({ ...run, duration: 2 });
+        moshB.update(frame(0.1));
         // A is past the cut frames, B just started.
         expect(moshA.params.useResidual).toBe(true);
         expect(moshB.params.useResidual).toBe(false);
 
-        def.onEnd?.(fxA);
+        moshA.end();
         expect(moshA.enabled).toBe(false);
         expect(moshB.enabled).toBe(true);
     });
 });
 
 describe("jpegGlitch", () => {
-    test("glitches only in the middle and peaks at the cut", async () => {
+    test("glitches only in the middle and peaks at the cut", () => {
         const def = presets.createJpegGlitch({ iterations: 40 });
-        const fx = (await def.effects?.()) as Effect[];
-        const effect = fx[0] as JPEGGlitchEffect;
-        expect(effect.enabled).toBe(false);
+        expect(def.ease).toBe("linear");
+        const effect = effectsOf(def)[1] as JpegGlitchTransitionEffect;
 
-        def.prepare?.(run, fx);
-        expect(effect.enabled).toBe(true);
-        def.onFrame?.(0.05, 0.05, 0.016, fx);
+        effect.start();
+        effect.render(frame(0.05));
         expect(effect.params.bypass).toBe(true);
-        def.onFrame?.(0.5, 0.5, 0.016, fx);
+        effect.render(frame(0.5));
         expect(effect.params.bypass).toBe(false);
         expect(effect.params.iterations).toBe(40);
-        def.onFrame?.(0.95, 0.95, 0.016, fx);
+        effect.render(frame(0.95));
         expect(effect.params.bypass).toBe(true);
 
-        def.onEnd?.(fx);
-        expect(effect.enabled).toBe(false);
+        effect.render(frame(0.5));
+        effect.end();
+        expect(effect.params.bypass).toBe(true);
     });
 });

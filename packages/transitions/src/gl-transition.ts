@@ -1,4 +1,8 @@
-import type { TransitionDef, TransitionUniforms } from "@vfx-js/core";
+import {
+    type ShaderTransitionDef,
+    shaderTransition,
+    type TransitionUniforms,
+} from "@vfx-js/core";
 
 /** One entry of the `gl-transitions` package. */
 export type GLTransitionDef = {
@@ -34,7 +38,7 @@ const paramName = (name: string) =>
 export function createGLTransition(
     def: GLTransitionDef,
     params: TransitionUniforms = {},
-): TransitionDef {
+): ShaderTransitionDef {
     const types = def.paramsTypes ?? {};
     const textures = [
         ...(def.textures ?? []),
@@ -74,7 +78,7 @@ export function createGLTransition(
         uniforms[paramName(key)] = values[key] as TransitionUniforms[string];
     }
 
-    return {
+    return shaderTransition({
         name: `gl:${def.name}`,
         frag: `
 float progress;
@@ -94,5 +98,5 @@ vec4 transition(vec2 uv, float t) {
 `,
         uniforms,
         ease: "linear",
-    };
+    });
 }

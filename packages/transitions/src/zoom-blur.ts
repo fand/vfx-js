@@ -1,7 +1,7 @@
-import type { TransitionDef } from "@vfx-js/core";
+import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
 
 /** Radial blur with RGB split, peaking halfway, while crossfading. */
-export const zoomBlur: TransitionDef = {
+export const zoomBlur: ShaderTransitionDef = shaderTransition({
     name: "zoom_blur",
     overflow: true,
     frag: `
@@ -35,4 +35,4 @@ vec4 transition(vec2 uv, float t) {
   return mix(c1 / 16.0, c2 / 16.0, t);
 }
 `,
-};
+});

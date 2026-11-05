@@ -1,4 +1,4 @@
-import type { TransitionDef } from "@vfx-js/core";
+import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
 
 export type SwipeDirection = "left" | "right" | "up" | "down";
 
@@ -13,9 +13,9 @@ const MOVES: Record<SwipeDirection, [number, number]> = {
 /** The content moves toward `direction` and the new content follows it in. */
 export function createSwipe(
     opts: { direction?: SwipeDirection } = {},
-): TransitionDef {
+): ShaderTransitionDef {
     const [x, y] = MOVES[opts.direction ?? "left"];
-    return {
+    return shaderTransition({
         name: "swipe",
         frag: `
 const vec2 move = vec2(${x.toFixed(1)}, ${y.toFixed(1)});
@@ -26,8 +26,8 @@ vec4 transition(vec2 uv, float t) {
   return inRange(p) ? readFrom(p) : readTo(p + move);
 }
 `,
-    };
+    });
 }
 
 /** Content moves left, the new content enters from the right. */
-export const swipe: TransitionDef = createSwipe();
+export const swipe: ShaderTransitionDef = createSwipe();

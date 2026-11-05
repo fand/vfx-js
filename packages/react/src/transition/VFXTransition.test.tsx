@@ -28,8 +28,8 @@ vi.mock("../use-vfx-instance.js", () => ({
     useVFXInstance: () => mock.vfx,
 }));
 
-const swipe: TransitionDef = { name: "swipe", frag: "" };
-const zoom: TransitionDef = { name: "zoom", frag: "" };
+const swipe: TransitionDef = { name: "swipe", create: () => [] };
+const zoom: TransitionDef = { name: "zoom", create: () => [] };
 
 (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
