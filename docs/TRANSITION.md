@@ -86,6 +86,7 @@ const t = vfx.addTransition(el, {
     uniforms: {},            // uniforms for `transition`
     duration: 0.6,           // seconds
     reverse: false,
+    ease: undefined,         // "smoothstep" | "linear" | (x) => t
     overflow: undefined,     // true (whole canvas) | px on every side
     types: {                 // specs picked by run(cb, { type })
         prev: { transition: swipe, reverse: true },
@@ -114,6 +115,7 @@ type RunOpts = {
     uniforms?: TransitionUniforms; // numbers and vectors, no textures
     reverse?: boolean;
     duration?: number;        // 0 cuts without animation
+    ease?: TransitionEase;    // "smoothstep" | "linear" | (x: number) => number
     overflow?: true | number;
 };
 ```
@@ -137,7 +139,11 @@ Each run picks its spec in this order:
 
 `transition` and `uniforms` travel together. They come from the first
 level that sets `transition`, so uniforms never reach a different
-shader. `reverse` and `duration` are picked per field.
+shader. `reverse`, `duration` and `ease` are picked per field.
+`ease` then falls back to the def's `ease`, then `"smoothstep"`.
+
+A function `ease` gets progress clamped to 0..1 and returns `t`.
+The shader and `onFrame` get the same eased `t`.
 
 In React, `<VFXTransition>` first builds the `RunOpts` from a click or
 the incoming page. See [Which spec wins](#which-spec-wins).
@@ -175,7 +181,7 @@ type TransitionDef = {
     frag: string;                 // defines vec4 transition(vec2 uv, float t)
     overflow?: true | number;     // room to draw outside the element
     uniforms?: TransitionUniforms; // defaults; the spec's uniforms win
-    ease?: "smoothstep" | "linear"; // how t follows progress; default "smoothstep"
+    ease?: TransitionEase;        // the t this shader expects; a spec's ease wins
     effects?(): Promise<Effect[]>;
     prepare?(run: TransitionRun, fx: Effect[]): void;
     onFrame?(t: number, x: number, dt: number, fx: Effect[]): void;
@@ -186,7 +192,8 @@ type TransitionDef = {
 ### GLSL
 
 `frag` defines one function. `t` goes from 0 to 1 with a smoothstep ease.
-Set `ease: "linear"` to get linear `t`.
+Set `ease` on the def to change the default, e.g. `"linear"` for a
+shader that eases `t` itself. A spec's `ease` wins over it.
 VFX-JS wraps it with a prelude and a `main`.
 
 ```ts
@@ -290,7 +297,7 @@ t.run(cb, { transition: createGLTransition(cube, { persp: 0.5 }) });
 - `params` override the shader's `defaultParams`. An unknown key logs a
   warning.
 - `t` is linear for these defs (`ease: "linear"`); each shader eases
-  itself.
+  itself. Setting `ease: "smoothstep"` on the spec eases it twice.
 - Shaders that need extra textures (`LumaWipe`, `DisplacementMap`)
   throw.
 - A param named like a core uniform (e.g. `reverse` in `BowTie`) is

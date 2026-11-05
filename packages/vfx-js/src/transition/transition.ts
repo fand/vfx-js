@@ -56,7 +56,12 @@ export function resolveSpec(
             typed?.overflow ??
             opts.overflow ??
             transition.overflow,
-        ease: transition.ease ?? "smoothstep",
+        ease:
+            run.ease ??
+            typed?.ease ??
+            opts.ease ??
+            transition.ease ??
+            "smoothstep",
     };
 }
 

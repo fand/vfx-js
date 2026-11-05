@@ -30,6 +30,13 @@ export type TransitionStartOpts = {
 
 const smoothstep = (x: number) => x * x * (3 - 2 * x);
 
+function applyEase(ease: TransitionEase | undefined, x: number): number {
+    if (typeof ease === "function") {
+        return ease(x);
+    }
+    return ease === "linear" ? x : smoothstep(x);
+}
+
 function covers(outer: ElementRect, inner: ElementRect): boolean {
     const [x, y, w, h] = outer;
     const [innerX, innerY, innerW, innerH] = inner;
@@ -188,7 +195,7 @@ export class TransitionEffect implements Effect {
                     ? (ctx.time - this.#startTime) / spec.duration
                     : 1;
             const clamped = Math.min(Math.max(x, 0), 1);
-            const t = spec.ease === "linear" ? clamped : smoothstep(clamped);
+            const t = applyEase(spec.ease, clamped);
             if (x >= 1 || this.#broken.has(spec.frag)) {
                 this.#spec = null;
                 this.enabled = false;

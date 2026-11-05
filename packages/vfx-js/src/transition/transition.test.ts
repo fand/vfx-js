@@ -10,7 +10,7 @@ import {
     type TransitionHost,
     waitForMedia,
 } from "./transition";
-import type { TransitionDef } from "./types";
+import type { TransitionDef, TransitionEase } from "./types";
 
 const swipe: TransitionDef = { name: "swipe", frag: "" };
 const zoom: TransitionDef = { name: "zoom", frag: "" };
@@ -46,6 +46,23 @@ describe("resolveSpec", () => {
     test("carries the transition's ease", () => {
         const linear: TransitionDef = { name: "l", frag: "", ease: "linear" };
         expect(resolveSpec({ transition: linear }).ease).toBe("linear");
+    });
+
+    test("ease: run beats the type, the container and the def", () => {
+        const linear: TransitionDef = { name: "l", frag: "", ease: "linear" };
+        const cubic = (x: number) => x * x * x;
+        const opts = {
+            transition: linear,
+            ease: "smoothstep" as const,
+            types: { fast: { transition: linear, ease: cubic } },
+        };
+        expect(resolveSpec(opts, { type: "fast", ease: "linear" }).ease).toBe(
+            "linear",
+        );
+        expect(resolveSpec(opts, { type: "fast" }).ease).toBe(cubic);
+        expect(resolveSpec(opts).ease).toBe("smoothstep");
+        expect(resolveSpec({ transition: linear }).ease).toBe("linear");
+        expect(resolveSpec({}).ease).toBe("smoothstep");
     });
 
     test("overflow from the options wins over the transition's", () => {
@@ -193,7 +210,7 @@ describe("TransitionEffect frames", () => {
             createRenderTarget: () => ({ dispose: () => {} }),
         }) as unknown as EffectContext;
 
-    const run = (ease?: "smoothstep" | "linear") => {
+    const run = (ease?: TransitionEase) => {
         const effect = new TransitionEffect();
         void effect.snapshot();
         effect.render(frameCtx(0));
@@ -222,6 +239,17 @@ describe("TransitionEffect frames", () => {
         const { frames, t } = run("linear");
         expect(frames[1]).toEqual([0.25, 0.25]);
         expect(t).toBe(0.25);
+    });
+
+    test("a function ease gives the same t to the shader and onFrame", () => {
+        const seen: number[] = [];
+        const { frames, t } = run((x) => {
+            seen.push(x);
+            return x * x;
+        });
+        expect(frames[1]).toEqual([0.0625, 0.25]);
+        expect(t).toBe(0.0625);
+        expect(seen.every((x) => x >= 0 && x <= 1)).toBe(true);
     });
 });
 

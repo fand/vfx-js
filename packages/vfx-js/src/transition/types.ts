@@ -11,7 +11,8 @@ export type TransitionUniforms = Record<
     Exclude<EffectUniformValue, EffectTexture | EffectRenderTarget>
 >;
 
-export type TransitionEase = "smoothstep" | "linear";
+/** How `t` follows linear progress. A function maps 0..1 progress to `t`. */
+export type TransitionEase = "smoothstep" | "linear" | ((x: number) => number);
 
 /** One run of a transition, passed to the driver hooks. */
 export type TransitionRun = {
@@ -29,7 +30,7 @@ export type TransitionDef = {
     overflow?: true | number;
     /** Default uniforms. The spec's uniforms win. */
     uniforms?: TransitionUniforms;
-    /** How `t` follows linear progress. Defaults to `"smoothstep"`. */
+    /** The `t` this shader expects. A spec's `ease` wins. Defaults to `"smoothstep"`. */
     ease?: TransitionEase;
 
     // Optional JS driver for transitions built on extra effects.
@@ -60,6 +61,8 @@ export type TransitionSpec = {
     duration?: number;
     /** Extra room to draw outside the element. Overrides the transition's own. */
     overflow?: true | number;
+    /** How `t` follows progress. Overrides the transition's own. */
+    ease?: TransitionEase;
 };
 
 /**
