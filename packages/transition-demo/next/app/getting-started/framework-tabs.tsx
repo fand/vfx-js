@@ -4,24 +4,31 @@ import { useEffect, useRef, useState } from "react";
 import { Code } from "../_components/code";
 import { frameworks } from "./frameworks";
 
-// Matches the opacity transition on .tab-body.
-const FADE_MS = 200;
+// Matches the fade-out on .tab-body.is-out.
+const FADE_OUT_MS = 100;
 
 export function FrameworkTabs() {
     const [selected, setSelected] = useState(0);
     const [shown, setShown] = useState(0);
+    // No fade-in on the first render.
+    const [switched, setSwitched] = useState(false);
     const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
     const fw = frameworks[shown];
-    const fading = selected !== shown;
+    const fadingOut = selected !== shown;
 
     useEffect(() => () => clearTimeout(timer.current), []);
 
     // Fade out, swap the panel, then fade in.
     const select = (i: number) => {
         setSelected(i);
+        setSwitched(true);
         clearTimeout(timer.current);
-        timer.current = setTimeout(() => setShown(i), FADE_MS);
+        timer.current = setTimeout(() => setShown(i), FADE_OUT_MS);
     };
+
+    const bodyClass = ["tab-body", switched && "is-in", fadingOut && "is-out"]
+        .filter(Boolean)
+        .join(" ");
 
     return (
         <div className="tabs">
@@ -39,7 +46,7 @@ export function FrameworkTabs() {
                 ))}
             </div>
             <div className="tab-panel">
-                <div className="tab-body" style={{ opacity: fading ? 0 : 1 }}>
+                <div key={fw.id} className={bodyClass}>
                     <h3>{fw.name}</h3>
                     <p className="tab-intro">{fw.intro}</p>
                     <div className="tab-install">

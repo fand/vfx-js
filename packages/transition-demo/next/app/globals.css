@@ -749,7 +749,20 @@ em {
 }
 .tab-body {
     padding: 32px;
-    transition: opacity 0.2s;
+}
+.tab-body.is-in {
+    animation: tab-in 0.5s ease-out;
+}
+.tab-body.is-out {
+    opacity: 0;
+    transition: opacity 0.1s;
+    animation: none;
+}
+@keyframes tab-in {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
 }
 .tab-body h3 {
     margin: 0;
@@ -1303,6 +1316,7 @@ em {
 @media (prefers-reduced-motion: reduce) {
     .hero-glow,
     .scroll-cue::after,
+    .tab-body.is-in,
     .dot {
         animation: none;
     }
