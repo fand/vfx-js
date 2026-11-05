@@ -6,6 +6,9 @@
 
 Also: `update()` on html-in-canvas elements now resolves when the capture lands.
 
-`TransitionDef` takes default `uniforms` and `ease` (`"smoothstep"` or `"linear"`).
+A `TransitionDef` is `{ name, ease?, create() }`. `create()` returns `TransitionEffect`s: effects that also see the old snapshot, the progress and the run in `ctx`.
+`shaderTransition({ name, frag, uniforms?, ease?, overflow? })` builds a def from one shader.
 
-`run(cb, opts)` takes a function for `opts`, called once after `cb` resolves. Use it when the spec depends on the new content. With a function, driver effects and `prepare` run after `cb`, while the old snapshot is still on screen.
+The spec takes `transition`, `uniforms`, `reverse`, `duration`, `overflow` and `ease` (`"smoothstep"`, `"linear"` or a function). The run's values win over the container's, then the def's.
+
+`run(cb, opts)` takes a function for `opts`, called once after `cb` resolves. Use it when the spec depends on the new content.

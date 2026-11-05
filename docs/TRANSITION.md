@@ -486,6 +486,8 @@ export default function AboutPage() {
 - Write your own defs in a file that starts with `"use client"`, and import them from there.
 - A Server Component can't call a factory like `createSwipe()`.
   Call it in a `"use client"` file and export the result.
+- Import `crossfade` from `@vfx-js/transitions`, not core.
+  Core is not a `"use client"` module.
 - The component form exists for Next.js, where `page.tsx` is a Server
   Component and cannot call hooks. Next has no way to export custom
   client settings from a page; its route segment config is a fixed list,

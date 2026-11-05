@@ -406,7 +406,7 @@ See [plan9.md](./plan9.md).
 
 - Removed back navigation from `@vfx-js/react`. `resolveRunOpts` is now
   "click spec if any, else page spec".
-- Added `ease` to the spec (run → type → container → def → `"smoothstep"`),
+- Added `ease` to the spec (run → container → def → `"smoothstep"`),
   with function eases.
 - Transitions are effects: `TransitionDef = { name, ease?, create() }`,
   `TransitionEffect` with `start` / `end`, and `TransitionEffectContext`
@@ -420,6 +420,27 @@ See [plan9.md](./plan9.md).
 Verified in the browser (Next demo, Playwright): crossfade, swipe, zoom,
 glitch, jpegGlitch, datamosh, pixelsort and gl-transitions Cube, forward
 and reverse, no console errors. A broken shader logs once and cuts.
+
+- Added `"use client"` to the `@vfx-js/react` and `@vfx-js/transitions`
+  entries. A def holds functions, so it can't be a prop from a Server
+  Component; as a client reference it can. Server pages can use
+  `<TransitionIn transition={glitch} />` again (Next demo, Playwright).
+  - Kept `<TransitionIn>`: page-level config stays in `page.tsx`.
+  - Rejected: picking the spec by pathname in a client shell (config
+    leaves the page), and plain-data shader defs (two def shapes, and
+    effect defs still need a client file).
+  - Own defs and factory calls like `createSwipe()` go in a
+    `"use client"` file. Core has no directive, so Next users import
+    `crossfade` from `@vfx-js/transitions`.
+  - Before this, importing `@vfx-js/react` from a Server Component
+    failed on `createContext`.
+- Getting Started (Next demo): removed the steps list, moved the
+  fixed-size note to the core-based tabs, and made the setup tabs size
+  to their content with a CSS fade (0.1 s out, 0.5 s in with a 10 px
+  slide).
+
+Not verified in a browser: the rewritten Custom page, the broken-shader
+cut timing, and the SvelteKit / Nuxt / Astro back specs.
 
 Release note: `@vfx-js/transitions` now imports `shaderTransition` from
 core at runtime. Raise its `@vfx-js/core` peer range to the release that

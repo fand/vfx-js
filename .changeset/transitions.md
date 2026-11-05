@@ -9,3 +9,5 @@ New package with transition presets for `addTransition`.
 Presets without `overflow` (and gl-transitions) stay inside the element when the container sets `overflow`.
 
 `jpegGlitch` / `createJpegGlitch`: hard cut through a real JPEG glitch, built on `JPEGGlitchEffect`.
+
+The entry is a `"use client"` module, so a Next.js Server Component can pass presets as props.
