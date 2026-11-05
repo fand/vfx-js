@@ -2,7 +2,7 @@
 
 Changes to the transition API before release. Branch `feat/transition`.
 Context: [progress.md](./progress.md), [docs/TRANSITION.md](../../TRANSITION.md).
-Status: sections 1–3 done. "Other issues" still open.
+Status: sections 1–4 done.
 
 ## 1. Remove back navigation
 
@@ -163,3 +163,7 @@ t.run(cb, { transition: zoom }); // container uniforms dropped
 ```
 
 - React, demos (incl. SvelteKit / Nuxt / Astro back code: use a spec variable), docs, tests.
+
+Done. `resolveSpec` reads run, then container, then the def (for `ease`).
+SvelteKit, Nuxt and Astro keep their back detection and pass a `back`
+spec variable to `run()`.

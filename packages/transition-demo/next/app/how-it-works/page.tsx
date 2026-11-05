@@ -191,29 +191,25 @@ export default function HowItWorks() {
                             <code>&lt;TransitionIn&gt;</code>
                         </li>
                         <li>
-                            <code>types[type]</code>, when the spec sets{" "}
-                            <code>type</code>
-                        </li>
-                        <li>
                             The options from <code>addTransition</code> or the
                             component props
                         </li>
                     </ol>
                     <p>
-                        <code>transition</code> and <code>uniforms</code> travel
-                        together, so uniforms never reach the wrong shader.
+                        Fields are picked one by one. A run that sets its own{" "}
+                        <code>transition</code> drops the container&apos;s{" "}
+                        <code>uniforms</code>, so they never reach the wrong
+                        shader.
                     </p>
                 </div>
                 <Code label="spec.ts">{`
-const t = vfx.addTransition(outlet, {
-  transition: crossfade,          // default
-  types: {
-    prev: { transition: swipe, reverse: true },
-  },
-});
+const t = vfx.addTransition(outlet, { transition: crossfade });
 
-t.run(swap, { type: "prev" });
-t.run(swap, { transition: glitch }); // wins over both
+// Keep a spec in a variable and pass it to run().
+const back = { transition: swipe, reverse: true };
+
+t.run(swap, back);
+t.run(swap, { duration: 2 }); // crossfade, 2 s
 `}</Code>
             </section>
 

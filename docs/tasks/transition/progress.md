@@ -413,6 +413,9 @@ See [plan9.md](./plan9.md).
   with `from`, `progress`, `holding`, `reverse`, `run`, `cut()`.
   `shaderTransition()` keeps one-shader authoring. All presets ported.
 - Docs and the Next demo's custom page show the new API.
+- Removed `types` / `type`. Levels are run, container, def. Run
+  `uniforms` merge over the container's unless the run sets its own
+  `transition`.
 
 Verified in the browser (Next demo, Playwright): crossfade, swipe, zoom,
 glitch, jpegGlitch, datamosh, pixelsort and gl-transitions Cube, forward

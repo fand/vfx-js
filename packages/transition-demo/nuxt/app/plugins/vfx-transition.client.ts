@@ -3,6 +3,8 @@ import { findPage } from "@vfx-js/transition-demo-shared";
 import { presets } from "@vfx-js/transition-demo-shared/transitions";
 import { swipe } from "@vfx-js/transitions";
 
+const backSpec: RunOpts = { transition: swipe, reverse: true };
+
 // Hold each navigation in `beforeEach` until `run` has the old page,
 // then let `run` wait for the new page to render.
 export default defineNuxtPlugin((nuxtApp) => {
@@ -22,7 +24,6 @@ export default defineNuxtPlugin((nuxtApp) => {
         }
         transition = new VFX().addTransition(outlet, {
             duration: 0.8,
-            types: { back: { transition: swipe, reverse: true } },
         });
     });
 
@@ -44,7 +45,7 @@ export default defineNuxtPlugin((nuxtApp) => {
         // On back/forward the history entry has already changed.
         const back = (window.history.state?.position ?? position) < position;
         const opts: RunOpts = back
-            ? { type: "back" }
+            ? backSpec
             : { transition: presets[findPage(to.path).transition] };
         return new Promise<void>((snapshotTaken) => {
             t.run(() => {

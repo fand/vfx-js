@@ -66,85 +66,47 @@ describe("resolveSpec", () => {
         expect(resolveSpec({ transition: linear }).ease).toBe("linear");
     });
 
-    test("ease: run beats the type, the container and the def", () => {
+    test("ease: run beats the container, which beats the def", () => {
         const linear = shaderTransition({
             name: "l",
             frag: "",
             ease: "linear",
         });
         const cubic = (x: number) => x * x * x;
-        const opts = {
-            transition: linear,
-            ease: "smoothstep" as const,
-            types: { fast: { transition: linear, ease: cubic } },
-        };
-        expect(resolveSpec(opts, { type: "fast", ease: "linear" }).ease).toBe(
-            "linear",
+        const opts = { transition: linear, ease: cubic };
+        expect(resolveSpec(opts, { ease: "smoothstep" }).ease).toBe(
+            "smoothstep",
         );
-        expect(resolveSpec(opts, { type: "fast" }).ease).toBe(cubic);
-        expect(resolveSpec(opts).ease).toBe("smoothstep");
+        expect(resolveSpec(opts).ease).toBe(cubic);
         expect(resolveSpec({ transition: linear }).ease).toBe("linear");
         expect(resolveSpec({}).ease).toBe("smoothstep");
     });
 
-    test("overflow: run beats the type, which beats the container", () => {
+    test("overflow: run beats the container", () => {
         expect(resolveSpec({ transition: swipe }).overflow).toBeUndefined();
         expect(resolveSpec({ overflow: 10 }).overflow).toBe(10);
         expect(resolveSpec({ overflow: 10 }, { overflow: true }).overflow).toBe(
             true,
         );
-        expect(
-            resolveSpec(
-                {
-                    overflow: 5,
-                    types: { big: { transition: swipe, overflow: 30 } },
-                },
-                { type: "big", overflow: 8 },
-            ).overflow,
-        ).toBe(8);
-        expect(
-            resolveSpec(
-                {
-                    overflow: 5,
-                    types: { big: { transition: swipe, overflow: 30 } },
-                },
-                { type: "big" },
-            ).overflow,
-        ).toBe(30);
     });
 
-    test("run options beat the type, which beats the container", () => {
-        const opts = {
-            transition: swipe,
-            duration: 1,
-            types: { back: { transition: zoom, reverse: true } },
-        };
-        expect(resolveSpec(opts, { type: "back" })).toMatchObject({
+    test("run options beat the container per field", () => {
+        const opts = { transition: swipe, duration: 1, reverse: true };
+        expect(resolveSpec(opts, { transition: zoom })).toMatchObject({
             transition: zoom,
             reverse: true,
             duration: 1,
         });
         expect(
-            resolveSpec(opts, { type: "back", reverse: false, duration: 2 }),
-        ).toMatchObject({ transition: zoom, reverse: false, duration: 2 });
+            resolveSpec(opts, { reverse: false, duration: 2 }),
+        ).toMatchObject({ transition: swipe, reverse: false, duration: 2 });
     });
 
-    test("uniforms come from the level that sets the shader", () => {
-        const opts = {
-            transition: swipe,
-            uniforms: { width: 1 },
-            types: { back: { transition: zoom, uniforms: { strength: 2 } } },
-        };
-        expect(resolveSpec(opts, { type: "back" })).toMatchObject({
-            transition: zoom,
-            uniforms: { strength: 2 },
-        });
-        expect(
-            resolveSpec(opts, { type: "back", transition: crossfade }),
-        ).toMatchObject({ transition: crossfade, uniforms: {} });
+    test("run uniforms without a shader win over the container's", () => {
+        const opts = { transition: swipe, uniforms: { width: 1, soft: 2 } };
         expect(resolveSpec(opts, { uniforms: { width: 5 } })).toMatchObject({
             transition: swipe,
-            uniforms: { width: 1 },
+            uniforms: { width: 5, soft: 2 },
         });
         expect(resolveSpec({ uniforms: { width: 1 } })).toMatchObject({
             transition: crossfade,
@@ -152,21 +114,15 @@ describe("resolveSpec", () => {
         });
     });
 
-    test("a run spec without a shader takes the back type's shader", () => {
-        const opts = {
-            transition: swipe,
-            duration: 1,
-            types: { back: { transition: zoom, duration: 2 } },
-        };
+    test("a run with its own shader drops the container's uniforms", () => {
+        const opts = { transition: swipe, uniforms: { width: 1 } };
+        expect(resolveSpec(opts, { transition: zoom })).toMatchObject({
+            transition: zoom,
+            uniforms: {},
+        });
         expect(
-            resolveSpec(opts, { type: "back", duration: 0.3 }),
-        ).toMatchObject({ transition: zoom, duration: 0.3 });
-    });
-
-    test("unknown type falls back to the container", () => {
-        expect(
-            resolveSpec({ transition: swipe }, { type: "nope" }).transition,
-        ).toBe(swipe);
+            resolveSpec(opts, { transition: zoom, uniforms: { strength: 2 } }),
+        ).toMatchObject({ transition: zoom, uniforms: { strength: 2 } });
     });
 });
 

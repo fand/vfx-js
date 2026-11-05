@@ -58,8 +58,8 @@ describe("transition()", () => {
     });
 
     it("accepts target=_self", () => {
-        transition({ type: "forward" })(click({}, "_self"));
-        expect(takePending()).toEqual({ type: "forward" });
+        transition({ duration: 2 })(click({}, "_self"));
+        expect(takePending()).toEqual({ duration: 2 });
     });
 });
 

@@ -88,9 +88,6 @@ const t = vfx.addTransition(el, {
     reverse: false,
     ease: undefined,         // "smoothstep" | "linear" | (x) => t
     overflow: undefined,     // true (whole canvas) | px on every side
-    types: {                 // specs picked by run(cb, { type })
-        prev: { transition: swipe, reverse: true },
-    },
     keepWrapped: false,      // keep the element wrapped between runs
     waitFor: "media",        // "media" | "none" | (el) => Promise<void>
 });
@@ -110,7 +107,6 @@ interface Transition {
 }
 
 type RunOpts = {
-    type?: string;            // key into `types`
     transition?: TransitionDef;
     uniforms?: TransitionUniforms; // numbers and vectors, no textures
     reverse?: boolean;
@@ -131,16 +127,30 @@ effects are set up and `start` runs after `cb`, not before the snapshot.
 
 ### Spec resolution
 
-Each run picks its spec in this order:
+Each field comes from the first level that sets it:
 
 1. The `RunOpts` passed to `run`.
-2. `types[type]`, when `type` is set.
-3. The container options from `addTransition`.
+2. The container options from `addTransition`.
+3. The def, for `ease` (then `"smoothstep"`).
 
-`transition` and `uniforms` travel together. They come from the first
-level that sets `transition`, so uniforms never reach a different
-shader. `reverse`, `duration` and `ease` are picked per field.
-`ease` then falls back to the def's `ease`, then `"smoothstep"`.
+`uniforms` merge per key, run over container. A run that sets its own
+`transition` drops the container's `uniforms`, so they never reach a
+different shader. `shaderTransition` lays its own defaults under them.
+
+```ts
+const t = vfx.addTransition(el, { transition: wipe, uniforms: { softness: 0.1 } });
+t.run(cb, { uniforms: { softness: 0.3 } }); // wipe, softness 0.3
+t.run(cb, { transition: zoom });            // zoom, no container uniforms
+```
+
+To reuse a spec, keep it in a variable. TypeScript catches a typo in its
+name.
+
+```ts
+export const back: RunOpts = { transition: swipe, reverse: true };
+
+t.run(cb, back);
+```
 
 A function `ease` gets progress clamped to 0..1 and returns `t`.
 The shader and JS effects get the same eased `t`.
@@ -152,7 +162,7 @@ the incoming page. See [Which spec wins](#which-spec-wins).
 
 By default a transition draws only inside the element. `overflow` gives
 it room outside: `true` for the whole canvas, a number for CSS px on
-every side. The options' value (picked run → type → container) wins over
+every side. The options' value (picked run → container) wins over
 the transition's own. A target that fills the canvas, like a full-screen
 outlet, never draws outside itself.
 
@@ -556,7 +566,7 @@ const { ref, run } = useVFXTransition({ transition: swipe });
 
 <div ref={ref}>{tab}</div>
 
-await run(() => setTab(next), { type: "forward" });
+await run(() => setTab(next), { reverse: true });
 ```
 
 `run` wraps `cb` in `startTransition` and starts the animation after

@@ -109,16 +109,12 @@ export type TransitionWaitFor =
     | ((element: HTMLElement) => Promise<void>);
 
 export type AddTransitionOpts = Partial<TransitionSpec> & {
-    /** Specs picked by `run(cb, { type })`. */
-    types?: Record<string, TransitionSpec>;
     /** Keep the element wrapped between runs. */
     keepWrapped?: boolean;
     waitFor?: TransitionWaitFor;
 };
 
-export type RunOpts = Partial<TransitionSpec> & {
-    type?: string;
-};
+export type RunOpts = Partial<TransitionSpec>;
 
 export interface Transition {
     /**

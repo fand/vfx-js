@@ -8,6 +8,8 @@
     import { swipe } from "@vfx-js/transitions";
     import { onMount } from "svelte";
 
+    const back = { transition: swipe, reverse: true };
+
     let { children } = $props();
     let outlet: HTMLElement;
     let transition: Transition | undefined;
@@ -16,7 +18,6 @@
         const vfx = new VFX();
         transition = vfx.addTransition(outlet, {
             duration: 0.8,
-            types: { back: { transition: swipe, reverse: true } },
         });
         return () => vfx.destroy();
     });
@@ -29,7 +30,7 @@
         }
         const opts =
             nav.type === "popstate" && (nav.delta ?? 0) < 0
-                ? { type: "back" }
+                ? back
                 : { transition: presets[findPage(nav.to.url.pathname).transition] };
         const t = transition;
         return new Promise<void>((snapshotTaken) => {

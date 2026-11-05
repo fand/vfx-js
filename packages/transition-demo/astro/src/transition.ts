@@ -7,6 +7,8 @@ import { VFX } from "@vfx-js/core";
 import { presets } from "@vfx-js/transition-demo-shared/transitions";
 import { swipe } from "@vfx-js/transitions";
 
+const back = { transition: swipe, reverse: true };
+
 // Wire core `run(cb)` to Astro ClientRouter by hand.
 // `run` snapshots the old page before `cb`, so the router waits for the
 // snapshot in `before-preparation`, and `cb` waits for the swap.
@@ -20,7 +22,6 @@ export function setupTransition() {
     }
     const t = vfx.addTransition(outlet, {
         duration: 0.8,
-        types: { back: { transition: swipe, reverse: true } },
     });
 
     let finishSwap: (() => void) | null = null;
@@ -43,7 +44,7 @@ export function setupTransition() {
                 : undefined;
             const opts =
                 ev.direction === "back"
-                    ? { type: "back" }
+                    ? back
                     : preset
                       ? { transition: preset }
                       : {};

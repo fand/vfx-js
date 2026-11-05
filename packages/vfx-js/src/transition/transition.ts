@@ -34,33 +34,24 @@ export type ResolvedSpec = {
 type Bound = { spec: ResolvedSpec; slots: TransitionSlot[] };
 
 /**
- * Pick the run options, then the named type, then the container defaults.
- * Uniforms come with the shader from the first level that sets `transition`.
+ * Pick the run options, then the container defaults, then the def's.
+ * A run that sets `transition` drops the container's uniforms, so they never reach another shader.
  */
 export function resolveSpec(
     opts: AddTransitionOpts,
     run: RunOpts = {},
 ): ResolvedSpec {
-    const typed = run.type !== undefined ? opts.types?.[run.type] : undefined;
-    const shader =
-        [run, typed].find((spec) => spec?.transition !== undefined) ?? opts;
-    const transition = shader.transition ?? crossfade;
+    const runSetsShader = run.transition !== undefined;
+    const transition = run.transition ?? opts.transition ?? crossfade;
     return {
         transition,
-        uniforms: shader.uniforms ?? {},
-        reverse: run.reverse ?? typed?.reverse ?? opts.reverse ?? false,
-        duration:
-            run.duration ??
-            typed?.duration ??
-            opts.duration ??
-            DEFAULT_DURATION,
-        overflow: run.overflow ?? typed?.overflow ?? opts.overflow,
-        ease:
-            run.ease ??
-            typed?.ease ??
-            opts.ease ??
-            transition.ease ??
-            "smoothstep",
+        uniforms: runSetsShader
+            ? { ...run.uniforms }
+            : { ...opts.uniforms, ...run.uniforms },
+        reverse: run.reverse ?? opts.reverse ?? false,
+        duration: run.duration ?? opts.duration ?? DEFAULT_DURATION,
+        overflow: run.overflow ?? opts.overflow,
+        ease: run.ease ?? opts.ease ?? transition.ease ?? "smoothstep",
     };
 }
 

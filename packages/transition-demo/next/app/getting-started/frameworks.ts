@@ -116,7 +116,7 @@ export function Tabs() {
                 label: "plugins/vfx-transition.client.ts",
                 code: `
 import { type Transition, VFX } from "@vfx-js/core";
-import { glitch, swipe } from "@vfx-js/transitions";
+import { glitch } from "@vfx-js/transitions";
 
 export default defineNuxtPlugin((nuxtApp) => {
   const router = useRouter();
@@ -126,10 +126,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
   nuxtApp.hook("app:mounted", () => {
     const outlet = document.querySelector<HTMLElement>("main.outlet")!;
-    t = new VFX().addTransition(outlet, {
-      transition: glitch,
-      types: { back: { transition: swipe, reverse: true } },
-    });
+    t = new VFX().addTransition(outlet, { transition: glitch });
   });
   nuxtApp.hook("page:finish", release);
 
@@ -157,7 +154,7 @@ export default defineNuxtPlugin((nuxtApp) => {
             },
         ],
         notes: [
-            'Detect back with history.state.position and pass { type: "back" } to run().',
+            "Detect back with history.state.position and pass a spec like { transition: swipe, reverse: true } to run().",
         ],
     },
     {
@@ -175,27 +172,27 @@ export default defineNuxtPlugin((nuxtApp) => {
   import { glitch, swipe } from "@vfx-js/transitions";
   import { onMount } from "svelte";
 
+  // A spec in a variable; pass it to run().
+  const back = { transition: swipe, reverse: true };
+
   let { children } = $props();
   let outlet: HTMLElement;
   let t: Transition | undefined;
 
   onMount(() => {
     const vfx = new VFX();
-    t = vfx.addTransition(outlet, {
-      transition: glitch,
-      types: { back: { transition: swipe, reverse: true } },
-    });
+    t = vfx.addTransition(outlet, { transition: glitch });
     return () => vfx.destroy();
   });
 
   onNavigate((nav) => {
     if (!t || !nav.to) return;
-    const back = nav.type === "popstate" && (nav.delta ?? 0) < 0;
+    const isBack = nav.type === "popstate" && (nav.delta ?? 0) < 0;
     return new Promise<void>((snapshotTaken) => {
       t!.run(async () => {
         snapshotTaken();
         await nav.complete;
-      }, back ? { type: "back" } : {});
+      }, isBack ? back : {});
     });
   });
 </script>
