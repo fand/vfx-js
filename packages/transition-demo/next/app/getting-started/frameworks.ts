@@ -13,7 +13,7 @@ export const frameworks: Framework[] = [
         id: "next",
         name: "Next.js",
         install: "npm i @vfx-js/core @vfx-js/react @vfx-js/transitions",
-        intro: "Put <VFXTransition> from @vfx-js/react/next around the layout's children. It is a client component, so the layout stays a Server Component. Each page picks its transition with useTransitionIn in a small client component.",
+        intro: "Put <VFXTransition> from @vfx-js/react/next around the layout's children. It is a client component, so the layout stays a Server Component. Each page picks its transition with <TransitionIn>.",
         snippets: [
             {
                 label: "app/layout.tsx",
@@ -31,28 +31,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 }`,
             },
             {
-                label: "app/about/enter.tsx",
-                code: `
-"use client";
-
-import { useTransitionIn } from "@vfx-js/react";
-import { glitch } from "@vfx-js/transitions";
-
-// A def holds functions, so it can't cross from a Server Component.
-export function Enter() {
-  useTransitionIn({ transition: glitch });
-  return null;
-}`,
-            },
-            {
                 label: "app/about/page.tsx",
                 code: `
-import { Enter } from "./enter";
+import { TransitionIn } from "@vfx-js/react";
+import { glitch } from "@vfx-js/transitions";
 
 export default function About() {
   return (
     <>
-      <Enter />
+      <TransitionIn transition={glitch} />
       <h1>About</h1>
     </>
   );
@@ -62,6 +49,7 @@ export default function About() {
         notes: [
             "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
             "A Server Component can't pass onClick to Link. Wrap the link in a small client component.",
+            'Presets cross from a Server Component as-is. Put your own defs and factory calls like createSwipe() in a "use client" file.',
             "loading.tsx shows its fallback as soon as the path changes, so the transition lands on the skeleton.",
         ],
     },

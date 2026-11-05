@@ -1,3 +1,5 @@
+"use client";
+
 export { crossfade } from "@vfx-js/core";
 export { crosszoom } from "./crosszoom";
 export { createDatamosh, datamosh } from "./datamosh";

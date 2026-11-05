@@ -481,8 +481,11 @@ export default function AboutPage() {
 
 - Only the spec at mount counts. Later prop changes are ignored.
 - Outside a `<VFXTransition>`, it does nothing and warns once.
-- A def holds functions, so a Server Component can't pass one as a prop.
-  In Next.js, call `useTransitionIn` in a small client component.
+- A Server Component can pass a preset as a prop.
+  `@vfx-js/transitions` is a `"use client"` module, so its exports cross as client references.
+- Write your own defs in a file that starts with `"use client"`, and import them from there.
+- A Server Component can't call a factory like `createSwipe()`.
+  Call it in a `"use client"` file and export the result.
 - The component form exists for Next.js, where `page.tsx` is a Server
   Component and cannot call hooks. Next has no way to export custom
   client settings from a page; its route segment config is a fixed list,
