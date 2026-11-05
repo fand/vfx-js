@@ -2,7 +2,8 @@
 
 import type { TransitionDef } from "@vfx-js/core";
 import { useVFXTransition } from "@vfx-js/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { highlight } from "../_components/highlight";
 import { Scene } from "../_components/scenes";
 import { examples } from "./examples";
 
@@ -15,6 +16,37 @@ export function ShaderLab() {
     );
     const [scene, setScene] = useState(0);
     const { ref, run } = useVFXTransition({ duration: 1.2 });
+    const preRef = useRef<HTMLPreElement>(null);
+    const caretRef = useRef<number | null>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Restore the caret after a Tab edit re-renders the value.
+    useEffect(() => {
+        const caret = caretRef.current;
+        if (caret !== null && textareaRef.current) {
+            textareaRef.current.setSelectionRange(caret, caret);
+            caretRef.current = null;
+        }
+    });
+
+    const syncScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+        if (preRef.current) {
+            preRef.current.scrollTop = e.currentTarget.scrollTop;
+            preRef.current.scrollLeft = e.currentTarget.scrollLeft;
+        }
+    };
+
+    const insertTab = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key !== "Tab" || e.shiftKey) {
+            return;
+        }
+        e.preventDefault();
+        const { selectionStart, selectionEnd, value } = e.currentTarget;
+        caretRef.current = selectionStart + 2;
+        setFrag(
+            `${value.slice(0, selectionStart)}  ${value.slice(selectionEnd)}`,
+        );
+    };
 
     // The program is cached by its source, so a new def per edit is cheap.
     const def = useMemo<TransitionDef>(
@@ -57,12 +89,21 @@ export function ShaderLab() {
                         </button>
                     ))}
                 </div>
-                <textarea
-                    spellCheck={false}
-                    value={frag}
-                    onChange={(e) => setFrag(e.target.value)}
-                    aria-label="Transition GLSL"
-                />
+                <div className="lab-code">
+                    <pre aria-hidden ref={preRef}>
+                        <code>{highlight(`${frag}\n`)}</code>
+                    </pre>
+                    <textarea
+                        ref={textareaRef}
+                        spellCheck={false}
+                        wrap="off"
+                        value={frag}
+                        onChange={(e) => setFrag(e.target.value)}
+                        onScroll={syncScroll}
+                        onKeyDown={insertTab}
+                        aria-label="Transition GLSL"
+                    />
+                </div>
                 <p className="lab-hint">
                     Edit and press Play. Compile errors print to the console
                     with line numbers.

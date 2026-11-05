@@ -677,6 +677,9 @@ em {
 .tk-t {
     color: #6fe0ff;
 }
+.tk-f {
+    color: #ffc66e;
+}
 
 /* Docs pages */
 .doc-title {
@@ -1122,22 +1125,50 @@ em {
     background: var(--acid);
     color: var(--ink);
 }
-.lab textarea {
+/* The textarea sits over a highlighted copy; both layers must match exactly. */
+.lab-code {
+    position: relative;
     flex: 1;
     min-height: 320px;
+    border-radius: 14px;
+    box-shadow: inset 0 0 0 1px #ffffff14;
+}
+.lab-code:focus-within {
+    box-shadow: inset 0 0 0 1px var(--acid);
+}
+.lab-code pre,
+.lab-code textarea {
+    position: absolute;
+    inset: 0;
+    margin: 0;
     padding: 18px;
     border: 0;
     border-radius: 14px;
+    font: 13px / 1.7 var(--mono);
+    font-variant-ligatures: none;
+    letter-spacing: 0;
+    tab-size: 2;
+    white-space: pre;
+    overflow: auto;
+}
+.lab-code pre {
+    overflow: hidden;
     background: #0d0d14;
     color: #e6e6ef;
-    box-shadow: inset 0 0 0 1px #ffffff14;
-    font: 13px / 1.7 var(--mono);
-    resize: vertical;
-    tab-size: 2;
 }
-.lab textarea:focus {
+.lab-code pre code {
+    font: inherit;
+}
+.lab-code textarea {
+    background: transparent;
+    color: transparent;
+    caret-color: #e6e6ef;
+    resize: none;
     outline: none;
-    box-shadow: inset 0 0 0 1px var(--acid);
+}
+.lab-code textarea::selection {
+    background: #ffffff30;
+    color: transparent;
 }
 .frame .lab-hint {
     margin: 10px 0 0;

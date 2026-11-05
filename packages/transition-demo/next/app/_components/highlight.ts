@@ -1,7 +1,24 @@
 import { createElement, type ReactNode } from "react";
 
-const TOKEN =
-    /(\/\/[^\n]*|<!--[\s\S]*?-->)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|\b(import|from|export|const|let|return|await|async|new|function|type|if|else|for|of|uniform|vec2|vec3|vec4|float|bool|true|false)\b|\b(\d+(?:\.\d+)?)\b|(<\/?[A-Za-z][\w.-]*|\/?>)/g;
+const KEYWORDS =
+    "import|from|export|const|let|return|await|async|new|function|type|if|else|for|of|in|out|uniform|precision|void|int|bool|float|vec2|vec3|vec4|mat2|mat3|mat4|sampler2D|discard|true|false";
+const BUILTINS =
+    "mix|smoothstep|step|fract|clamp|texture|length|dot|sin|cos|floor|abs|min|max|pow|normalize";
+
+// Groups, in order: comment (incl. GLSL `#` lines), string, keyword, builtin, number, tag.
+const TOKEN = new RegExp(
+    [
+        /(\/\/[^\n]*|<!--[\s\S]*?-->|^[ \t]*#[^\n]*)/.source,
+        /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/.source,
+        `\\b(${KEYWORDS})\\b`,
+        `\\b(${BUILTINS})(?=\\s*\\()`,
+        /\b(\d+(?:\.\d+)?)\b/.source,
+        /(<\/?[A-Za-z][\w.-]*|\/?>)/.source,
+    ].join("|"),
+    "gm",
+);
+
+const CLASSES = ["tk-c", "tk-s", "tk-k", "tk-f", "tk-n", "tk-t"];
 
 export function highlight(src: string): ReactNode[] {
     const out: ReactNode[] = [];
@@ -11,16 +28,14 @@ export function highlight(src: string): ReactNode[] {
         if (i > last) {
             out.push(src.slice(last, i));
         }
-        const cls = m[1]
-            ? "tk-c"
-            : m[2]
-              ? "tk-s"
-              : m[3]
-                ? "tk-k"
-                : m[4]
-                  ? "tk-n"
-                  : "tk-t";
-        out.push(createElement("span", { key: i, className: cls }, m[0]));
+        const group = m.findIndex((g, n) => n > 0 && g !== undefined);
+        out.push(
+            createElement(
+                "span",
+                { key: i, className: CLASSES[group - 1] },
+                m[0],
+            ),
+        );
         last = i + m[0].length;
     }
     out.push(src.slice(last));
