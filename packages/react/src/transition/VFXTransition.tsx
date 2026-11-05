@@ -1,8 +1,9 @@
 "use client";
 
-import type { AddTransitionOpts, Transition } from "@vfx-js/core";
-import * as React from "react";
+import type { AddTransitionOpts, RunOpts, Transition } from "@vfx-js/core";
+import type * as React from "react";
 import {
+    Fragment,
     startTransition,
     useEffect,
     useLayoutEffect,
@@ -12,35 +13,56 @@ import {
 import { useVFXInstance } from "../use-vfx-instance.js";
 import { watchNavigationDirection } from "./direction.js";
 import { useLiveOpts } from "./live-opts.js";
+import {
+    resolveRunOpts,
+    type TransitionScope,
+    TransitionScopeContext,
+} from "./scope.js";
 import { takePending } from "./store.js";
 
 export type VFXTransitionProps = AddTransitionOpts & {
-    /** A single element. A new `key` starts a transition. */
-    children: React.ReactElement;
+    /** Changes per page, e.g. the pathname. A new key mounts the children fresh. */
+    pageKey?: string | number;
+    children: React.ReactNode;
     className?: string;
     style?: React.CSSProperties;
 };
 
-const keyOf = (element: React.ReactElement) => element.key;
+type Shown = { key: string | number | undefined; node: React.ReactNode };
 
 const OUTER_STYLE: React.CSSProperties = { display: "contents" };
 
 /**
  * Animate between pages with a shader.
- * Give the child a key that changes per page, e.g. `<Page key={pathname} />`.
- * A child without a key never transitions.
+ * Pass a `pageKey` that changes per page, e.g. the pathname.
+ * Without a `pageKey` it never transitions.
  */
 export function VFXTransition(props: VFXTransitionProps) {
-    const { children, className, style, ...opts } = props;
+    const { pageKey, children, className, style, ...opts } = props;
     const vfx = useVFXInstance();
     const liveOpts = useLiveOpts(opts);
     const ref = useRef<HTMLDivElement>(null);
     const transitionRef = useRef<Transition | null>(null);
 
-    const next = React.Children.only(children);
-    const [shown, setShown] = useState(next);
-    const requestedKey = useRef(keyOf(next));
+    const [shown, setShown] = useState<Shown>({
+        key: pageKey,
+        node: children,
+    });
+    const requestedKey = useRef(pageKey);
     const commitWaiters = useRef<(() => void)[]>([]);
+
+    // The spec of the page that mounts during a run.
+    const incoming = useRef<RunOpts | null>(null);
+    const [scope] = useState<TransitionScope>(() => ({
+        register(spec) {
+            incoming.current = spec;
+            return () => {
+                if (incoming.current === spec) {
+                    incoming.current = null;
+                }
+            };
+        },
+    }));
 
     useEffect(() => watchNavigationDirection(), []);
 
@@ -66,13 +88,14 @@ export function VFXTransition(props: VFXTransitionProps) {
     }, [shown]);
 
     useEffect(() => {
-        const key = keyOf(next);
+        const key = pageKey;
         if (key === requestedKey.current) {
             return;
         }
         requestedKey.current = key;
+        const next: Shown = { key, node: children };
         const transition = transitionRef.current;
-        if (!transition) {
+        if (!transition || key === undefined) {
             startTransition(() => setShown(next));
             return;
         }
@@ -87,18 +110,21 @@ export function VFXTransition(props: VFXTransitionProps) {
                 // A page that suspends keeps the old page instead of a fallback.
                 startTransition(() => setShown(next));
             });
-        transition.run(swap, takePending() ?? {}).catch((err) => {
-            console.error("[@vfx-js/react] VFXTransition run failed:", err);
-        });
+        incoming.current = null;
+        transition
+            .run(swap, () => resolveRunOpts(takePending(), incoming.current))
+            .catch((err) => {
+                console.error("[@vfx-js/react] VFXTransition run failed:", err);
+            });
     });
 
-    // New key: keep the latest element of the old page until the run swaps.
+    // New key: keep the latest children of the old page until the run swaps.
     const latestShown = useRef(shown);
-    if (keyOf(latestShown.current) !== keyOf(shown)) {
+    if (latestShown.current.key !== shown.key) {
         latestShown.current = shown;
     }
-    if (keyOf(next) === keyOf(shown)) {
-        latestShown.current = next;
+    if (pageKey === undefined || pageKey === shown.key) {
+        latestShown.current = { key: shown.key, node: children };
     }
     const rendered = latestShown.current;
 
@@ -107,7 +133,9 @@ export function VFXTransition(props: VFXTransitionProps) {
     return (
         <div style={OUTER_STYLE}>
             <div ref={ref} className={className} style={style}>
-                {rendered}
+                <TransitionScopeContext.Provider value={scope}>
+                    <Fragment key={rendered.key}>{rendered.node}</Fragment>
+                </TransitionScopeContext.Provider>
             </div>
         </div>
     );
