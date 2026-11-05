@@ -40,11 +40,8 @@ export default function Custom() {
     return (
         <PageFrame tone="paper">
             <PageTransition preset="glitch" />
-            <section className="doc-hero">
-                <p className="kicker">Custom transitions</p>
-                <h1>
-                    Write <em>one</em> function.
-                </h1>
+            <section className="doc-title">
+                <h1>Custom Transitions</h1>
                 <p className="lead">
                     A transition is a fragment of GLSL that defines{" "}
                     <code>vec4 transition(vec2 uv, float t)</code>. VFX-JS adds

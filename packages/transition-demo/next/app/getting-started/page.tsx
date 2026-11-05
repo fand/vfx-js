@@ -10,16 +10,8 @@ export default function GettingStarted() {
     return (
         <PageFrame tone="paper">
             <PageTransition preset="swipe" />
-            <section className="doc-hero">
-                <p className="kicker">Getting Started</p>
-                <h1>
-                    Pick your <em>stack</em>.
-                </h1>
-                <p className="lead">
-                    Every setup follows the same three steps: give the outlet a
-                    fixed size, snapshot the old page before the DOM changes,
-                    and let the shader run.
-                </p>
+            <section className="doc-title">
+                <h1>Getting Started</h1>
             </section>
 
             <section id="steps" className="doc-section">

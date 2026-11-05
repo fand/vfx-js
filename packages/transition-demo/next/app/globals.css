@@ -405,7 +405,7 @@ em {
 /* Sections */
 .section,
 .doc-section,
-.doc-hero {
+.doc-title {
     width: min(var(--max), 100% - 48px);
     margin: 0 auto;
 }
@@ -428,8 +428,7 @@ em {
 .frame[data-tone="paper"] .kicker {
     color: var(--accent);
 }
-.section h2,
-.doc-hero h1 {
+.section h2 {
     margin: 0;
     font-size: clamp(38px, 5.4vw, 76px);
     font-weight: 600;
@@ -679,12 +678,13 @@ em {
 }
 
 /* Docs pages */
-.doc-hero {
-    padding: 112px 0 56px;
+.doc-title {
+    padding: 56px 0 8px;
 }
-.doc-hero h1 {
-    font-size: clamp(48px, 7.5vw, 112px);
-    letter-spacing: -0.055em;
+.doc-title h1 {
+    margin: 0;
+    font: 600 40px / 1.1 var(--sans);
+    letter-spacing: -0.03em;
 }
 .doc-section {
     padding: 40px 0;
@@ -1325,7 +1325,7 @@ em {
     }
     .section,
     .doc-section,
-    .doc-hero,
+    .doc-title,
     .footer-inner {
         width: calc(100% - 32px);
     }

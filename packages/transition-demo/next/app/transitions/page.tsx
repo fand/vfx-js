@@ -11,13 +11,8 @@ export default function Transitions() {
     return (
         <PageFrame tone="dark">
             <PageTransition preset="pixelsort" />
-            <section className="doc-hero">
-                <p className="kicker">Transitions</p>
-                <h1>
-                    Nine presets.
-                    <br />
-                    <em>Zero</em> config.
-                </h1>
+            <section className="doc-title">
+                <h1>Transitions</h1>
                 <p className="lead">
                     Click a preset to play it on the stage. Change the duration,
                     play it in reverse, or let it loop. Below that, every shader

@@ -53,18 +53,8 @@ export default function HowItWorks() {
     return (
         <PageFrame tone="paper">
             <PageTransition preset="crosszoom" />
-            <section className="doc-hero">
-                <p className="kicker">How it works</p>
-                <h1>
-                    Two textures,
-                    <br />
-                    <em>one</em> shader.
-                </h1>
-                <p className="lead">
-                    A run looks like <code>document.startViewTransition</code>.
-                    The difference: the frames go through WebGL, so the
-                    animation can be anything a fragment shader can draw.
-                </p>
+            <section className="doc-title">
+                <h1>How It Works</h1>
             </section>
 
             <section className="doc-section">
