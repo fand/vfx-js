@@ -2,7 +2,7 @@
 
 Changes to the transition API before release. Branch `feat/transition`.
 Context: [progress.md](./progress.md), [docs/TRANSITION.md](../../TRANSITION.md).
-Status: design only, nothing done yet.
+Status: sections 1–3 done. "Other issues" still open.
 
 ## 1. Remove back navigation
 
@@ -24,6 +24,9 @@ Remove it now. We can add it later without breaking anything.
 - Core: no change.
 
 A back navigation still runs, with the page spec or the container defaults.
+
+Done. Non-React demos (SvelteKit, Nuxt, Astro) keep their own back
+detection; it is plain core usage.
 
 ## 2. `ease` on the spec
 
@@ -48,6 +51,8 @@ type TransitionSpec = {
 - `t` is computed in JS, so a function costs nothing extra.
 - The same eased `t` goes to the shader and to JS hooks.
 - Docs: smoothstep on a gl-transitions def eases twice.
+
+Done. A function ease gets `x` clamped to 0..1.
 
 ## 3. Transitions as effects
 
@@ -100,6 +105,28 @@ To decide:
 - `overflow`: maybe move to the effect's `outputRect` and drop it from the spec.
 - Ports: gl-transitions go through `shaderTransition`.
   Datamosh, pixelsort and jpegGlitch become plain effects.
+
+Done. Decisions:
+
+- Per-def cache kept: `create()` runs once per container per def.
+- `TransitionDef` keeps `ease?` as the def's default `t`.
+  `shaderTransition` sets it.
+- `overflow` stays on the spec and reaches effects as `run.overflow`.
+  `shaderTransition` takes a def-level `overflow`; the spec's wins.
+- `run.uniforms` holds the spec's uniforms only.
+  `shaderTransition` merges its own defaults under them.
+- `ctx.holding`: `render` also runs while the old content is held,
+  so datamosh gets those frames. Shader effects pass the snapshot
+  through then; they never draw at t=0. `update` runs only while playing.
+- `ctx.cut()` ends the run now. A shader that fails to compile logs once
+  and cuts; the broken set is keyed per GL context and shader source.
+- Internals: `TransitionStage` (snapshot, hold, timing; off while playing)
+  and `TransitionSlot` (wraps each effect, skips it outside a run).
+- Datamosh, pixelsort and jpegGlitch subclass their `@vfx-js/effects`
+  effect. jpegGlitch sets params in `render`, since the base `update()`
+  takes no context.
+- Lazy opts swap the chain after `cb`, during the hold. No re-capture,
+  no compile at swap time, no wrong frame.
 
 ## Other issues (not decided)
 

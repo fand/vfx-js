@@ -399,3 +399,25 @@ Verified in the browser (Next demo, Playwright, 1280px and 390px):
 - Custom editor: highlight, Tab, layers aligned, scroll sync.
 - `/` → `/getting-started` lands with the sidebar in place; no console
   warnings.
+
+## API review (plan9)
+
+See [plan9.md](./plan9.md).
+
+- Removed back navigation from `@vfx-js/react`. `resolveRunOpts` is now
+  "click spec if any, else page spec".
+- Added `ease` to the spec (run → type → container → def → `"smoothstep"`),
+  with function eases.
+- Transitions are effects: `TransitionDef = { name, ease?, create() }`,
+  `TransitionEffect` with `start` / `end`, and `TransitionEffectContext`
+  with `from`, `progress`, `holding`, `reverse`, `run`, `cut()`.
+  `shaderTransition()` keeps one-shader authoring. All presets ported.
+- Docs and the Next demo's custom page show the new API.
+
+Verified in the browser (Next demo, Playwright): crossfade, swipe, zoom,
+glitch, jpegGlitch, datamosh, pixelsort and gl-transitions Cube, forward
+and reverse, no console errors. A broken shader logs once and cuts.
+
+Release note: `@vfx-js/transitions` now imports `shaderTransition` from
+core at runtime. Raise its `@vfx-js/core` peer range to the release that
+ships it.

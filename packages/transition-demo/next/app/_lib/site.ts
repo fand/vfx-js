@@ -51,11 +51,11 @@ export const nav: NavItem[] = [
         href: "/custom",
         label: "Custom",
         sections: [
-            { id: "def", label: "A TransitionDef" },
+            { id: "def", label: "shaderTransition" },
             { id: "prelude", label: "What the prelude gives you" },
             { id: "overflow", label: "Draw outside the box" },
-            { id: "hooks", label: "Driver hooks" },
-            { id: "state", label: "Keep state per effect" },
+            { id: "hooks", label: "Transition effects" },
+            { id: "state", label: "State lives on the effect" },
         ],
     },
 ];

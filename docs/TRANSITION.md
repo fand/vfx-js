@@ -126,8 +126,8 @@ lost. If `cb` throws, the run cancels and `run` rejects.
 
 `opts` can be a function. It is called once, right after `cb` resolves,
 so the spec can depend on the new content. If it throws, the run
-cancels and `run` rejects, as with `cb`. With a function, driver effects
-and `prepare` run after `cb`, not before the snapshot.
+cancels and `run` rejects, as with `cb`. With a function, the def's
+effects are set up and `start` runs after `cb`, not before the snapshot.
 
 ### Spec resolution
 
@@ -143,7 +143,7 @@ shader. `reverse`, `duration` and `ease` are picked per field.
 `ease` then falls back to the def's `ease`, then `"smoothstep"`.
 
 A function `ease` gets progress clamped to 0..1 and returns `t`.
-The shader and `onFrame` get the same eased `t`.
+The shader and JS effects get the same eased `t`.
 
 In React, `<VFXTransition>` first builds the `RunOpts` from a click or
 the incoming page. See [Which spec wins](#which-spec-wins).
@@ -173,31 +173,25 @@ By default the element is unwrapped after each run. Set
 `keepWrapped: true` to keep it wrapped, which saves the wrap cost on
 frequent runs.
 
-## Writing a `TransitionDef`
+## Custom transitions
+
+A `TransitionDef` is a factory for effects. Most transitions are one
+shader, so start with `shaderTransition`.
 
 ```ts
 type TransitionDef = {
     name: string;
-    frag: string;                 // defines vec4 transition(vec2 uv, float t)
-    overflow?: true | number;     // room to draw outside the element
-    uniforms?: TransitionUniforms; // defaults; the spec's uniforms win
-    ease?: TransitionEase;        // the t this shader expects; a spec's ease wins
-    effects?(): Promise<Effect[]>;
-    prepare?(run: TransitionRun, fx: Effect[]): void;
-    onFrame?(t: number, x: number, dt: number, fx: Effect[]): void;
-    onEnd?(fx: Effect[]): void;
+    ease?: TransitionEase; // the t this transition expects; a spec's ease wins
+    create(): TransitionEffect | TransitionEffect[];
 };
 ```
 
-### GLSL
-
-`frag` defines one function. `t` goes from 0 to 1 with a smoothstep ease.
-Set `ease` on the def to change the default, e.g. `"linear"` for a
-shader that eases `t` itself. A spec's `ease` wins over it.
-VFX-JS wraps it with a prelude and a `main`.
+### `shaderTransition`
 
 ```ts
-const wipe: TransitionDef = {
+import { shaderTransition } from "@vfx-js/core";
+
+const wipe = shaderTransition({
     name: "wipe",
     frag: `
 uniform float softness;
@@ -206,13 +200,17 @@ vec4 transition(vec2 uv, float t) {
   return mix(readTo(uv), readFrom(uv), m);
 }
 `,
-};
+    uniforms: { softness: 0.05 }, // defaults; the spec's uniforms win
+    // ease?: TransitionEase,     // default "smoothstep"
+    // overflow?: true | number,  // room outside the element; the spec's wins
+});
 
-t.run(cb, { transition: wipe, uniforms: { softness: 0.05 } });
+t.run(cb, { transition: wipe, uniforms: { softness: 0.1 } });
 ```
 
-Put defaults in `uniforms` on the def, e.g. `uniforms: { softness: 0.05 }`.
-The spec's `uniforms` override them key by key.
+`frag` defines one function. `t` goes from 0 to 1 with a smoothstep ease.
+Set `ease` to change the default, e.g. `"linear"` for a shader that eases
+`t` itself. VFX-JS wraps `frag` with a prelude and a `main`.
 
 The prelude gives you:
 
@@ -230,24 +228,106 @@ The prelude gives you:
 A shader that fails to compile logs the error with line numbers in your
 `frag`, then cuts straight to the new content.
 
-### Driver hooks
+### `TransitionEffect`
 
-Some transitions need extra effects, like a datamosh or a pixel sort.
+For more than one shader, return your own effects from `create()`. A
+transition effect is an [`Effect`](./EFFECT.md) with two more hooks, and
+its context carries the run.
 
-- `effects` creates them when a run first uses the def. Runs that keep
-  using the same def reuse them; a run with another def disposes them.
-  They sit after the transition in the chain and must pass through
-  (disabled) until `prepare`.
-- `prepare` runs while the old snapshot is held on screen. With static
-  `opts` this is before `cb`. With a function for `opts` it is after the
-  DOM changed.
-- `onFrame` runs every frame: `t` is eased, `x` is linear, `dt` is seconds.
-- `onEnd` runs once when the run ends, is dropped or is cancelled. It must
-  leave the effects passing through.
+```ts
+interface TransitionEffect extends Effect {
+    start?(run: TransitionRun): void; // once per run, while the old content is held
+    end?(): void;                     // once when the run ends, is dropped or is cancelled
+    update?(ctx: TransitionEffectContext): void;
+    render?(ctx: TransitionEffectContext): void;
+}
 
-The element is unwrapped between runs, so these effects get `dispose()`
-and then `init()` again. Keep per-run state keyed by the effect object,
-not in module variables, since two containers may share one def.
+type TransitionEffectContext = EffectContext & {
+    from: EffectRenderTarget;  // snapshot of the old content
+    progress: { t: number; x: number }; // eased and linear, 0..1
+    holding: boolean;          // old content held, before the animation
+    reverse: boolean;
+    run: TransitionRun;        // { reverse, uniforms, duration, overflow? }
+    cut(): void;               // end the run now and show the new content
+};
+```
+
+- Effects run in array order. `ctx.src` is the live new content for the
+  first one, and the previous effect's output after that.
+- Outside a run the effects are skipped and the chain passes its input
+  through.
+- `render` also runs while `holding`, with zero progress. Pass the input
+  through then (`ctx.blit(ctx.src)`), unless you need those frames.
+  `update` runs only while the animation plays.
+- `create()` runs once per container, the first time a run uses the
+  def. Runs that keep using it reuse the effects; a run with another def
+  disposes them. Keep state on the effect instance.
+- The element is unwrapped between runs, so the effects get `dispose()`
+  and then `init()` again.
+- `run.uniforms` holds the spec's uniforms only.
+
+A blur that peaks halfway, on top of a crossfade:
+
+```ts
+import {
+    type EffectContext,
+    type EffectRenderTarget,
+    type TransitionDef,
+    type TransitionEffect,
+    type TransitionEffectContext,
+} from "@vfx-js/core";
+import { crossfade } from "@vfx-js/transitions";
+
+const FRAG_BLUR = `#version 300 es
+precision highp float;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+uniform vec2 dir;
+void main() {
+    vec4 c = vec4(0.0);
+    for (int i = -4; i <= 4; i++) {
+        c += texture(src, uvSrc + dir * float(i));
+    }
+    outColor = c / 9.0;
+}
+`;
+
+class BlurPulse implements TransitionEffect {
+    #blurredX: EffectRenderTarget | null = null;
+
+    init(ctx: EffectContext) {
+        this.#blurredX = ctx.createRenderTarget();
+    }
+
+    render(ctx: TransitionEffectContext) {
+        if (ctx.holding || !this.#blurredX) {
+            ctx.blit(ctx.src);
+            return;
+        }
+        const [w, h] = ctx.dims.elementPixel;
+        const r = 4 * Math.sin(Math.PI * ctx.progress.t);
+        ctx.draw({
+            frag: FRAG_BLUR,
+            uniforms: { src: ctx.src, dir: [r / w, 0] },
+            target: this.#blurredX,
+        });
+        ctx.draw({
+            frag: FRAG_BLUR,
+            uniforms: { src: this.#blurredX, dir: [0, r / h] },
+            target: ctx.target,
+        });
+    }
+}
+
+export const blurFade: TransitionDef = {
+    name: "blur_fade",
+    create: () => [crossfade.create(), new BlurPulse()],
+};
+```
+
+An effect from `@vfx-js/effects` can be extended the same way. See
+`datamosh`, `pixelsort` and `jpegGlitch` in `@vfx-js/transitions`.
 
 ## Presets
 
@@ -514,5 +594,5 @@ router.push("/next");
 
 ## See also
 
-- [EFFECT.md](./EFFECT.md) — the Effect API used by driver effects.
+- [EFFECT.md](./EFFECT.md) — the Effect API that transition effects extend.
 - [html-in-canvas.md](./html-in-canvas.md) — how the capture works.
