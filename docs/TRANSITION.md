@@ -311,13 +311,13 @@ Provider, transitions use the Provider's instance.
 ```
 
 Takes the `addTransition` options as props, plus `pageKey`, `className`,
-`style` and `unstyled`. It renders two `<div>`s around the children: an
+`style` and `fullscreen`. It renders two `<div>`s around the children: an
 outer one with `display: contents`, and an inner one that gets
 `className` and `style` and is the transition target.
 
 The target fills the viewport height by default (`height: 100dvh;
 overflow: hidden`), so pages share one box and scroll inside it. `style`
-merges on top. Pass `unstyled` to drop the default and size the target
+merges on top. Pass `fullscreen={false}` to drop the default and size the target
 with your own CSS, e.g. `calc(100dvh - <header>)` under a header.
 
 - `pageKey` changes per page, e.g. the pathname. A new key starts a run.

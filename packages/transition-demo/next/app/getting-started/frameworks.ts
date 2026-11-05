@@ -53,7 +53,7 @@ export default function About() {
             },
         ],
         notes: [
-            "The target fills the viewport height and pages scroll inside it. Pass unstyled to size it with your own CSS, e.g. under a header.",
+            "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
             "A Server Component can't pass onClick to Link. Wrap the link in a small client component.",
             "A Server Component can only pass plain defs to <TransitionIn>. Presets with JS hooks, like datamosh and pixelsort, need a client component that calls useTransitionIn.",
             "loading.tsx shows its fallback as soon as the path changes, so the transition lands on the skeleton.",

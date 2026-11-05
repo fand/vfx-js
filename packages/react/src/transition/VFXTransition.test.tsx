@@ -69,7 +69,7 @@ describe("VFXTransition", () => {
         return run.opts();
     };
 
-    it("fills the viewport height unless unstyled", () => {
+    it("fills the viewport height unless fullscreen is false", () => {
         // happy-dom drops `dvh`, so check the overflow and the height's absence.
         act(() => {
             root.render(
@@ -81,7 +81,7 @@ describe("VFXTransition", () => {
         expect(target.style.overflow).toBe("hidden");
         expect(target.style.color).toBe("red");
         act(() => {
-            root.render(<VFXTransition unstyled>x</VFXTransition>);
+            root.render(<VFXTransition fullscreen={false}>x</VFXTransition>);
         });
         expect(target.getAttribute("style")).toBeNull();
     });

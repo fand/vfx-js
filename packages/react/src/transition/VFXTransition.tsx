@@ -26,8 +26,8 @@ export type VFXTransitionProps = AddTransitionOpts & {
     children: React.ReactNode;
     className?: string;
     style?: React.CSSProperties;
-    /** Skip the default viewport-height box and size the target with your own CSS. */
-    unstyled?: boolean;
+    /** Size the target to the viewport height. Default `true`; `false` leaves sizing to your CSS. */
+    fullscreen?: boolean;
 };
 
 type Shown = { key: string | number | undefined; node: React.ReactNode };
@@ -43,10 +43,17 @@ const FILL_STYLE: React.CSSProperties = {
  * Animate between pages with a shader.
  * Pass a `pageKey` that changes per page, e.g. the pathname.
  * Without a `pageKey` it never transitions.
- * The target fills the viewport height by default; pass `unstyled` to size it yourself.
+ * The target fills the viewport height by default; pass `fullscreen={false}` to size it yourself.
  */
 export function VFXTransition(props: VFXTransitionProps) {
-    const { pageKey, children, className, style, unstyled, ...opts } = props;
+    const {
+        pageKey,
+        children,
+        className,
+        style,
+        fullscreen = true,
+        ...opts
+    } = props;
     const vfx = useVFXInstance();
     const liveOpts = useLiveOpts(opts);
     const ref = useRef<HTMLDivElement>(null);
@@ -143,7 +150,7 @@ export function VFXTransition(props: VFXTransitionProps) {
             <div
                 ref={ref}
                 className={className}
-                style={unstyled ? style : { ...FILL_STYLE, ...style }}
+                style={fullscreen ? { ...FILL_STYLE, ...style } : style}
             >
                 <TransitionScopeContext.Provider value={scope}>
                     <Fragment key={rendered.key}>{rendered.node}</Fragment>

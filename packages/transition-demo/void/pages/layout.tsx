@@ -23,7 +23,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span className="framework">Void</span>
             </nav>
             <VFXTransition
-                unstyled
+                fullscreen={false}
                 className="outlet"
                 pageKey={path}
                 duration={0.8}

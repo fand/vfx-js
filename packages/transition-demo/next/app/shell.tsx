@@ -9,9 +9,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <>
             <Header />
             {/* overflow 0 keeps zoom presets from drawing over the header. */}
-            {/* unstyled: the header takes part of the viewport, so .outlet sets the height. */}
+            {/* The header takes part of the viewport, so .outlet sets the height. */}
             <VFXTransition
-                unstyled
+                fullscreen={false}
                 className="outlet"
                 duration={0.9}
                 overflow={0}
