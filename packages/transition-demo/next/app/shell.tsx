@@ -1,13 +1,10 @@
 "use client";
 
-import { VFXTransition } from "@vfx-js/react";
+import { VFXTransition } from "@vfx-js/react/next";
 import { swipe } from "@vfx-js/transitions";
-import { usePathname } from "next/navigation";
 import { Header } from "./_components/header";
-import { FrozenRouter } from "./frozen-router";
 
 export function Shell({ children }: { children: React.ReactNode }) {
-    const pathname = usePathname();
     return (
         <>
             <Header />
@@ -18,9 +15,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 overflow={0}
                 types={{ back: { transition: swipe, reverse: true } }}
             >
-                <div key={pathname} className="outlet-page">
-                    <FrozenRouter>{children}</FrozenRouter>
-                </div>
+                <div className="outlet-page">{children}</div>
             </VFXTransition>
         </>
     );

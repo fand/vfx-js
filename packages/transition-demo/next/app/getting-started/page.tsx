@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PageFrame } from "../_components/page-frame";
-import { TLink } from "../_components/t-link";
+import { PageTransition } from "../_components/page-transition";
 import { FrameworkTabs } from "./framework-tabs";
 
 export const metadata: Metadata = { title: "Getting Started" };
@@ -8,6 +9,7 @@ export const metadata: Metadata = { title: "Getting Started" };
 export default function GettingStarted() {
     return (
         <PageFrame tone="paper">
+            <PageTransition preset="swipe" />
             <section className="doc-hero">
                 <p className="kicker">Getting Started</p>
                 <h1>
@@ -51,22 +53,14 @@ export default function GettingStarted() {
             </section>
 
             <section className="doc-section doc-next">
-                <TLink
-                    href="/how-it-works"
-                    preset="crosszoom"
-                    className="next-card"
-                >
+                <Link href="/how-it-works" className="next-card">
                     <span>Next</span>
                     <strong>How it works →</strong>
-                </TLink>
-                <TLink
-                    href="/transitions"
-                    preset="pixelsort"
-                    className="next-card"
-                >
+                </Link>
+                <Link href="/transitions" className="next-card">
                     <span>Try</span>
                     <strong>All transitions →</strong>
-                </TLink>
+                </Link>
             </section>
         </PageFrame>
     );

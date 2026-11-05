@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Code } from "../_components/code";
 import { PageFrame } from "../_components/page-frame";
+import { PageTransition } from "../_components/page-transition";
 import { TLink } from "../_components/t-link";
 
 export const metadata: Metadata = { title: "How it works" };
@@ -50,6 +52,7 @@ const limits = [
 export default function HowItWorks() {
     return (
         <PageFrame tone="paper">
+            <PageTransition preset="crosszoom" />
             <section className="doc-hero">
                 <p className="kicker">How it works</p>
                 <h1>
@@ -187,6 +190,10 @@ export default function HowItWorks() {
                             or set by a <code>transition()</code> click
                         </li>
                         <li>
+                            The incoming page&apos;s{" "}
+                            <code>&lt;TransitionIn&gt;</code>
+                        </li>
+                        <li>
                             <code>types[type]</code>, like{" "}
                             <code>types.back</code> on browser back
                         </li>
@@ -223,15 +230,16 @@ t.run(swap, { transition: glitch }); // wins over both
             </section>
 
             <section className="doc-section doc-next">
-                <TLink
-                    href="/transitions"
-                    preset="pixelsort"
-                    className="next-card"
-                >
+                <Link href="/transitions" className="next-card">
                     <span>Next</span>
                     <strong>All transitions →</strong>
-                </TLink>
-                <TLink href="/custom" preset="glitch" className="next-card">
+                </Link>
+                {/* A click spec beats the page's own (glitch). */}
+                <TLink
+                    href="/custom"
+                    preset="glitchSlide"
+                    className="next-card"
+                >
                     <span>Build</span>
                     <strong>Your own shader →</strong>
                 </TLink>

@@ -9,14 +9,13 @@ export const links = {
 export type NavItem = {
     href: string;
     label: string;
-    preset: PresetName;
 };
 
 export const nav: NavItem[] = [
-    { href: "/getting-started", label: "Getting Started", preset: "swipe" },
-    { href: "/how-it-works", label: "How it works", preset: "crosszoom" },
-    { href: "/transitions", label: "Transitions", preset: "pixelsort" },
-    { href: "/custom", label: "Custom", preset: "glitch" },
+    { href: "/getting-started", label: "Getting Started" },
+    { href: "/how-it-works", label: "How it works" },
+    { href: "/transitions", label: "Transitions" },
+    { href: "/custom", label: "Custom" },
 ];
 
 export type PresetName =

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Code } from "../_components/code";
 import { PageFrame } from "../_components/page-frame";
-import { TLink } from "../_components/t-link";
+import { PageTransition } from "../_components/page-transition";
 import { ShaderLab } from "./shader-lab";
 
 export const metadata: Metadata = { title: "Custom transitions" };
@@ -38,6 +39,7 @@ const hooks = [
 export default function Custom() {
     return (
         <PageFrame tone="paper">
+            <PageTransition preset="glitch" />
             <section className="doc-hero">
                 <p className="kicker">Custom transitions</p>
                 <h1>
@@ -203,14 +205,10 @@ vec4 transition(vec2 uv, float t) {
             </section>
 
             <section className="doc-section doc-next">
-                <TLink
-                    href="/transitions"
-                    preset="pixelsort"
-                    className="next-card"
-                >
+                <Link href="/transitions" className="next-card">
                     <span>Compare</span>
                     <strong>All presets →</strong>
-                </TLink>
+                </Link>
                 <a
                     className="next-card"
                     href="https://github.com/fand/vfx-js/blob/main/docs/TRANSITION.md"

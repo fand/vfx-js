@@ -13,55 +13,39 @@ export const frameworks: Framework[] = [
         id: "next",
         name: "Next.js",
         install: "npm i @vfx-js/core @vfx-js/react @vfx-js/transitions",
-        intro: "Wrap the layout's children in <VFXTransition> and key them by pathname. Put the shell in a client component.",
+        intro: "Wrap the layout's children in <VFXTransition> from @vfx-js/react/next. Each page picks its transition with <TransitionIn>.",
         snippets: [
             {
                 label: "app/shell.tsx",
                 code: `
 "use client";
-import { transition, VFXTransition } from "@vfx-js/react";
-import { glitch, swipe } from "@vfx-js/transitions";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { FrozenRouter } from "./frozen-router";
+import { VFXTransition } from "@vfx-js/react/next";
+import { swipe } from "@vfx-js/transitions";
 
 export function Shell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   return (
-    <>
-      <nav>
-        <Link href="/about" onClick={transition({ transition: glitch })}>
-          About
-        </Link>
-      </nav>
-      <VFXTransition
-        className="outlet"
-        duration={0.8}
-        types={{ back: { transition: swipe, reverse: true } }}
-      >
-        <div key={pathname}>
-          <FrozenRouter>{children}</FrozenRouter>
-        </div>
-      </VFXTransition>
-    </>
+    <VFXTransition
+      className="outlet"
+      duration={0.8}
+      types={{ back: { transition: swipe, reverse: true } }}
+    >
+      {children}
+    </VFXTransition>
   );
 }`,
             },
             {
-                label: "app/frozen-router.tsx",
+                label: "app/about/page.tsx",
                 code: `
-"use client";
-import { LayoutRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import { useContext, useRef } from "react";
+import { TransitionIn } from "@vfx-js/react";
+import { glitch } from "@vfx-js/transitions";
 
-// Keeps the old page on its own route while it animates out.
-export function FrozenRouter({ children }: { children: React.ReactNode }) {
-  const context = useContext(LayoutRouterContext);
-  const frozen = useRef(context).current;
+export default function About() {
   return (
-    <LayoutRouterContext.Provider value={frozen}>
-      {children}
-    </LayoutRouterContext.Provider>
+    <>
+      <TransitionIn transition={glitch} />
+      <h1>About</h1>
+    </>
   );
 }`,
             },
@@ -77,6 +61,7 @@ export function FrozenRouter({ children }: { children: React.ReactNode }) {
         ],
         notes: [
             "A Server Component can't pass onClick to Link. Wrap the link in a small client component.",
+            "A Server Component can only pass plain defs to <TransitionIn>. Presets with JS hooks, like datamosh and pixelsort, need a client component that calls useTransitionIn.",
             "loading.tsx shows its fallback as soon as the path changes, so the transition lands on the skeleton.",
         ],
     },
@@ -84,7 +69,7 @@ export function FrozenRouter({ children }: { children: React.ReactNode }) {
         id: "react",
         name: "React",
         install: "npm i @vfx-js/core @vfx-js/react @vfx-js/transitions",
-        intro: "Any router works. A new key on the child starts a run. Here with React Router.",
+        intro: "Any router works. A new pageKey starts a run. Here with React Router.",
         snippets: [
             {
                 label: "Layout.tsx",
@@ -98,15 +83,17 @@ export function Layout() {
   const outlet = useOutlet();
   return (
     <>
+      {/* A click spec wins over the page's <TransitionIn>. */}
       <Link to="/about" onClick={transition({ transition: glitch })}>
         About
       </Link>
       <VFXTransition
         className="outlet"
+        pageKey={pathname}
         transition={crossfade}
         types={{ back: { transition: swipe, reverse: true } }}
       >
-        <div key={pathname}>{outlet}</div>
+        {outlet}
       </VFXTransition>
     </>
   );

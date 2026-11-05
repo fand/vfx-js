@@ -11,13 +11,25 @@
   "main": "./lib/esm/index.js",
   "types": "lib/esm/index.d.ts",
   "exports": {
-    "require": {
-      "types": "./lib/cjs/index.d.ts",
-      "default": "./lib/cjs/index.js"
+    ".": {
+      "require": {
+        "types": "./lib/cjs/index.d.ts",
+        "default": "./lib/cjs/index.js"
+      },
+      "import": {
+        "types": "./lib/esm/index.d.ts",
+        "default": "./lib/esm/index.js"
+      }
     },
-    "import": {
-      "types": "./lib/esm/index.d.ts",
-      "default": "./lib/esm/index.js"
+    "./next": {
+      "require": {
+        "types": "./lib/cjs/next/index.d.ts",
+        "default": "./lib/cjs/next/index.js"
+      },
+      "import": {
+        "types": "./lib/esm/next/index.d.ts",
+        "default": "./lib/esm/next/index.js"
+      }
     }
   },
   "scripts": {
@@ -37,7 +49,13 @@
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "next": "^14.0.0 || ^15.0.0 || ^16.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@vfx-js/core": "workspace:*"
@@ -49,6 +67,7 @@
     "@types/react-dom": "19.3.0",
     "happy-dom": "21.0.4",
     "lint-staged": "^17.6.0",
+    "next": "16.4.3",
     "npm-run-all2": "^9.0.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",

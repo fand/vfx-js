@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PageFrame } from "../_components/page-frame";
+import { PageTransition } from "../_components/page-transition";
 import { presetList } from "../_lib/presets";
 import { GLPlayground } from "./gl-playground";
 import { Playground } from "./playground";
@@ -9,6 +10,7 @@ export const metadata: Metadata = { title: "Transitions" };
 export default function Transitions() {
     return (
         <PageFrame tone="dark">
+            <PageTransition preset="pixelsort" />
             <section className="doc-hero">
                 <p className="kicker">Transitions</p>
                 <h1>

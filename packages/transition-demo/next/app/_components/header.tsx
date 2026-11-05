@@ -1,9 +1,7 @@
 "use client";
 
-import { transition } from "@vfx-js/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { presets } from "../_lib/presets";
 import { nav } from "../_lib/site";
 
 export function Header() {
@@ -11,11 +9,7 @@ export function Header() {
     const tone = pathname === "/transitions" ? "dark" : "light";
     return (
         <header className="header" data-tone={tone}>
-            <Link
-                href="/"
-                className="brand"
-                onClick={transition({ transition: presets.crossfade })}
-            >
+            <Link href="/" className="brand">
                 <span className="brand-mark" aria-hidden />
                 <span>
                     vfx-js<span className="brand-slash">/</span>transitions
@@ -29,9 +23,6 @@ export function Header() {
                         aria-current={
                             item.href === pathname ? "page" : undefined
                         }
-                        onClick={transition({
-                            transition: presets[item.preset],
-                        })}
                     >
                         {item.label}
                     </Link>

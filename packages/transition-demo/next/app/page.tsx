@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { Code } from "./_components/code";
 import { LiveStage } from "./_components/live-stage";
 import { PageFrame } from "./_components/page-frame";
+import { PageTransition } from "./_components/page-transition";
 import { TLink } from "./_components/t-link";
 
 const features = [
@@ -39,6 +41,7 @@ const features = [
 export default function Home() {
     return (
         <PageFrame tone="light">
+            <PageTransition preset="zoom" />
             <section className="hero">
                 <div className="hero-glow" aria-hidden />
                 <p className="eyebrow">
@@ -55,16 +58,13 @@ export default function Home() {
                     everything else.
                 </p>
                 <div className="hero-cta">
-                    <TLink
-                        href="/getting-started"
-                        preset="swipe"
-                        className="btn btn-primary"
-                    >
+                    <Link href="/getting-started" className="btn btn-primary">
                         Get started
-                    </TLink>
+                    </Link>
+                    {/* A click spec beats the page's own (pixelsort). */}
                     <TLink
                         href="/transitions"
-                        preset="pixelsort"
+                        preset="datamosh"
                         className="btn btn-ghost"
                     >
                         See all transitions →
@@ -119,31 +119,32 @@ export default function Home() {
                     <h2>
                         Wrap the outlet.
                         <br />
-                        <em>Key</em> the page.
+                        Let the <em>page</em> pick.
                     </h2>
                     <p className="lead">
-                        A new key starts a run. The old page stays on screen
-                        until the shader has its snapshot.
+                        A new pageKey starts a run. The incoming page says how
+                        it enters. The old page stays on screen until the shader
+                        has its snapshot.
                     </p>
-                    <TLink
-                        href="/how-it-works"
-                        preset="crosszoom"
-                        className="text-link"
-                    >
+                    <Link href="/how-it-works" className="text-link">
                         How it works →
-                    </TLink>
+                    </Link>
                 </div>
                 <Code label="App.tsx">{`
-import { VFXTransition } from "@vfx-js/react";
+import { TransitionIn, VFXTransition } from "@vfx-js/react";
 import { glitch, swipe } from "@vfx-js/transitions";
 
-export function App({ pathname }) {
+export function App({ pathname, page }) {
   return (
-    <VFXTransition className="outlet" transition={glitch}
+    <VFXTransition className="outlet" pageKey={pathname}
       types={{ back: { transition: swipe, reverse: true } }}>
-      <Page key={pathname} />
+      {page}
     </VFXTransition>
   );
+}
+
+export function About() {
+  return <><TransitionIn transition={glitch} /><h1>About</h1></>;
 }
 `}</Code>
             </section>

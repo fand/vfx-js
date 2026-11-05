@@ -223,6 +223,9 @@ importers:
       lint-staged:
         specifier: ^17.6.0
         version: 17.6.0
+      next:
+        specifier: 16.4.3
+        version: 16.4.3(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       npm-run-all2:
         specifier: ^9.0.4
         version: 9.0.4
