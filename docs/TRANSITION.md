@@ -90,7 +90,10 @@ const t = vfx.addTransition(el, {
 
 ```ts
 interface Transition {
-    run(cb: () => void | Promise<void>, opts?: RunOpts): Promise<void>;
+    run(
+        cb: () => void | Promise<void>,
+        opts?: RunOpts | (() => RunOpts),
+    ): Promise<void>;
     cancel(): void;   // end the current run and show the live content
     destroy(): void;  // cancel and stop tracking the element
     readonly running: boolean;
@@ -109,6 +112,11 @@ type RunOpts = {
 A new `run()` during a run drops the old one. The old promise resolves
 (it never rejects), and its callback still runs, so no DOM change is
 lost. If `cb` throws, the run cancels and `run` rejects.
+
+`opts` can be a function. It is called once, right after `cb` resolves,
+so the spec can depend on the new content. If it throws, the run
+cancels and `run` rejects, as with `cb`. With a function, driver effects
+and `prepare` run after `cb`, not before the snapshot.
 
 ### Spec resolution
 
@@ -209,7 +217,9 @@ Some transitions need extra effects, like a datamosh or a pixel sort.
   using the same def reuse them; a run with another def disposes them.
   They sit after the transition in the chain and must pass through
   (disabled) until `prepare`.
-- `prepare` runs while the old content is held, before `cb`.
+- `prepare` runs while the old snapshot is held on screen. With static
+  `opts` this is before `cb`. With a function for `opts` it is after the
+  DOM changed.
 - `onFrame` runs every frame: `t` is eased, `x` is linear, `dt` is seconds.
 - `onEnd` runs once when the run ends, is dropped or is cancelled. It must
   leave the effects passing through.

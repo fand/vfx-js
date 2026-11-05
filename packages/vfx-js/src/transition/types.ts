@@ -40,7 +40,10 @@ export type TransitionDef = {
      * They must pass through (disabled) until `prepare`.
      */
     effects?(): Promise<Effect[]>;
-    /** Called while the old content is held on screen, before the DOM changes. */
+    /**
+     * Called while the old snapshot is held on screen.
+     * With a lazy spec this is after the DOM changed.
+     */
     prepare?(run: TransitionRun, fx: Effect[]): void;
     /** Called every frame while running. `t` is eased, `x` is linear, both 0..1. `dt` is seconds. */
     onFrame?(t: number, x: number, dt: number, fx: Effect[]): void;
@@ -81,8 +84,15 @@ export type RunOpts = Partial<TransitionSpec> & {
 };
 
 export interface Transition {
-    /** Change the DOM in `cb` and animate from the old content to the new. */
-    run(cb: () => void | Promise<void>, opts?: RunOpts): Promise<void>;
+    /**
+     * Change the DOM in `cb` and animate from the old content to the new.
+     * `opts` can be a function, called once right after `cb` resolves.
+     * Use it when the spec depends on the new content.
+     */
+    run(
+        cb: () => void | Promise<void>,
+        opts?: RunOpts | (() => RunOpts),
+    ): Promise<void>;
     /** End the current run and show the live content. */
     cancel(): void;
     /** Cancel and stop tracking the element. */

@@ -121,6 +121,17 @@ describe("resolveSpec", () => {
         });
     });
 
+    test("a run spec without a shader takes the back type's shader", () => {
+        const opts = {
+            transition: swipe,
+            duration: 1,
+            types: { back: { transition: zoom, duration: 2 } },
+        };
+        expect(
+            resolveSpec(opts, { type: "back", duration: 0.3 }),
+        ).toMatchObject({ transition: zoom, duration: 0.3 });
+    });
+
     test("unknown type falls back to the container", () => {
         expect(
             resolveSpec({ transition: swipe }, { type: "nope" }).transition,
@@ -711,5 +722,80 @@ describe("TransitionController", () => {
         await transition.run(cb, { duration: 0 });
         expect(cb).toHaveBeenCalledOnce();
         expect(log).not.toContain("wrap");
+    });
+
+    test("lazy opts resolve after cb and bind the def then", async () => {
+        const { def } = driverDef("lazy");
+        def.frag = "/* lazy */";
+        const prepare = vi.fn();
+        def.prepare = prepare;
+        const { transition, log, starts, chain } = setup();
+        const run = transition.run(
+            () => {
+                log.push("cb");
+            },
+            () => {
+                log.push("resolveOpts");
+                return { transition: def };
+            },
+        );
+        await settle();
+        starts[0].end();
+        await run;
+        const order = [
+            "snapshot",
+            "cb",
+            "resolveOpts",
+            "updateEffects",
+            "start",
+        ];
+        expect(log.filter((s) => order.includes(s))).toEqual(order);
+        expect(log.indexOf("wrap")).toBeLessThan(log.indexOf("snapshot"));
+        expect(prepare).toHaveBeenCalledOnce();
+        expect(starts[0].opts.frag).toContain("/* lazy */");
+        expect(chain()).toEqual([]);
+    });
+
+    test("lazy opts without driver effects keep the chain", async () => {
+        const { transition, log, starts } = setup();
+        const run = transition.run(
+            () => {},
+            () => ({ transition: swipe }),
+        );
+        await settle();
+        starts[0].end();
+        await run;
+        expect(log).not.toContain("updateEffects");
+        expect(starts[0].opts.name).toBe("swipe");
+    });
+
+    test("lazy duration 0 cuts after cb and unwraps", async () => {
+        const { transition, log, starts } = setup();
+        const cb = vi.fn(() => {
+            log.push("cb");
+        });
+        await transition.run(cb, () => ({ duration: 0 }));
+        expect(cb).toHaveBeenCalledOnce();
+        expect(starts).toHaveLength(0);
+        expect(log.indexOf("snapshot")).toBeLessThan(log.indexOf("cb"));
+        expect(log.indexOf("cb")).toBeLessThan(log.indexOf("cancel"));
+        expect(log).toContain("unwrap");
+        expect(transition.running).toBe(false);
+    });
+
+    test("lazy opts that throw reject the run and unwrap", async () => {
+        const { transition, log, starts } = setup();
+        const cb = vi.fn();
+        const err = new Error("nope");
+        await expect(
+            transition.run(cb, () => {
+                throw err;
+            }),
+        ).rejects.toBe(err);
+        expect(cb).toHaveBeenCalledOnce();
+        expect(starts).toHaveLength(0);
+        expect(log).toContain("cancel");
+        expect(log).toContain("unwrap");
+        expect(transition.running).toBe(false);
     });
 });

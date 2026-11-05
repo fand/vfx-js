@@ -26,6 +26,9 @@ export type ResolvedSpec = {
     ease: TransitionEase;
 };
 
+// A resolved spec with its loaded driver effects.
+type Bound = { spec: ResolvedSpec; fx: Effect[] };
+
 /**
  * Pick the run options, then the named type, then the container defaults.
  * Uniforms come with the shader from the first level that sets `transition`,
@@ -212,7 +215,7 @@ export class TransitionController implements Transition {
 
     async run(
         cb: () => void | Promise<void>,
-        opts: RunOpts = {},
+        opts: RunOpts | (() => RunOpts) = {},
     ): Promise<void> {
         if (this.#destroyed) {
             await cb();
@@ -236,7 +239,7 @@ export class TransitionController implements Transition {
     async #run(
         id: number,
         cb: () => void | Promise<void>,
-        opts: RunOpts,
+        opts: RunOpts | (() => RunOpts),
     ): Promise<void> {
         const isCurrent = () => id === this.#seq;
         // A stale run still applies its DOM change, just without animating.
@@ -247,25 +250,7 @@ export class TransitionController implements Transition {
                 await cb();
             }
         };
-
-        const spec = resolveSpec(this.#opts, opts);
-        const def = spec.transition;
-        let fx: Effect[] | null = null;
-        if (spec.duration > 0) {
-            try {
-                fx = await this.#ensureDriverEffects(def);
-            } catch (err) {
-                console.error(
-                    `[VFX-JS] transition "${def.name}" effects failed; cutting to the new content.`,
-                    err,
-                );
-            }
-            if (!isCurrent()) {
-                return update();
-            }
-        }
-
-        if (fx === null) {
+        const cut = async () => {
             this.#endActive();
             this.#effect.cancel();
             await update();
@@ -275,12 +260,23 @@ export class TransitionController implements Transition {
                 }
                 this.#releaseWrap(id);
             }
-            return;
+        };
+
+        // A static spec binds before the snapshot, a lazy one after `cb`.
+        let bound: Bound | null = null;
+        if (typeof opts !== "function") {
+            bound = await this.#bind(resolveSpec(this.#opts, opts));
+            if (!isCurrent()) {
+                return update();
+            }
+            if (bound === null) {
+                return cut();
+            }
         }
 
         this.#freeze();
         try {
-            await this.#ensureWrapped(fx, isCurrent);
+            await this.#ensureWrapped(bound?.fx ?? null, isCurrent, true);
         } catch (err) {
             console.error(
                 "[VFX-JS] transition failed to wrap the element; cutting to the new content.",
@@ -309,21 +305,16 @@ export class TransitionController implements Transition {
             return;
         }
 
-        this.#endActive();
-        if (fx.length > 0 || def.prepare) {
-            this.#active = { id, def, fx };
-            def.prepare?.(
-                {
-                    reverse: spec.reverse,
-                    uniforms: spec.uniforms,
-                    duration: spec.duration,
-                },
-                fx,
-            );
+        if (bound) {
+            this.#prepare(id, bound);
         }
 
+        let lazyOpts: RunOpts | undefined;
         try {
             await update();
+            if (typeof opts === "function" && isCurrent()) {
+                lazyOpts = opts();
+            }
         } catch (err) {
             if (isCurrent()) {
                 this.#endActive();
@@ -335,6 +326,31 @@ export class TransitionController implements Transition {
         if (!isCurrent()) {
             return;
         }
+
+        if (bound === null) {
+            bound = await this.#bind(resolveSpec(this.#opts, lazyOpts));
+            if (!isCurrent()) {
+                return;
+            }
+            if (bound === null) {
+                return cut();
+            }
+            // The transition effect stays first, so the held snapshot survives the swap.
+            try {
+                await this.#ensureWrapped(bound.fx, isCurrent, false);
+            } catch (err) {
+                console.error(
+                    "[VFX-JS] transition failed to swap the effects; cutting to the new content.",
+                    err,
+                );
+                return cut();
+            }
+            if (!isCurrent()) {
+                return;
+            }
+            this.#prepare(id, bound);
+        }
+
         // New content may bring its own VFX elements.
         this.#freeze();
         try {
@@ -360,7 +376,8 @@ export class TransitionController implements Transition {
             return;
         }
 
-        const driverFx = fx;
+        const { spec, fx } = bound;
+        const def = spec.transition;
         const started = this.#effect.start({
             name: def.name,
             frag: this.#fragOf(def),
@@ -370,7 +387,7 @@ export class TransitionController implements Transition {
             overflow: spec.overflow,
             ease: spec.ease,
             onFrame: def.onFrame
-                ? (t, x, dt) => def.onFrame?.(t, x, dt, driverFx)
+                ? (t, x, dt) => def.onFrame?.(t, x, dt, fx)
                 : undefined,
             onEnd: () => this.#endActive(id),
         });
@@ -385,6 +402,40 @@ export class TransitionController implements Transition {
             this.#cutAfterStall();
         }
         this.#releaseWrap(id);
+    }
+
+    // Load the driver effects. Null means cut: no duration, or the effects failed.
+    async #bind(spec: ResolvedSpec): Promise<Bound | null> {
+        if (spec.duration <= 0) {
+            return null;
+        }
+        const def = spec.transition;
+        try {
+            return { spec, fx: await this.#ensureDriverEffects(def) };
+        } catch (err) {
+            console.error(
+                `[VFX-JS] transition "${def.name}" effects failed; cutting to the new content.`,
+                err,
+            );
+            return null;
+        }
+    }
+
+    // Hand the driver effects to this run.
+    #prepare(id: number, { spec, fx }: Bound): void {
+        this.#endActive();
+        const def = spec.transition;
+        if (fx.length > 0 || def.prepare) {
+            this.#active = { id, def, fx };
+            def.prepare?.(
+                {
+                    reverse: spec.reverse,
+                    uniforms: spec.uniforms,
+                    duration: spec.duration,
+                },
+                fx,
+            );
+        }
     }
 
     // The element stopped rendering, so the effect never resolves.
@@ -476,10 +527,12 @@ export class TransitionController implements Transition {
         }
     }
 
-    // Wrap the element, or sync the chain and take a fresh capture.
+    // Wrap the element, or sync the chain and optionally take a fresh capture.
+    // Null `driverFx` keeps the driver effects already in the chain.
     async #ensureWrapped(
-        driverFx: readonly Effect[],
+        driverFx: readonly Effect[] | null,
         isCurrent: () => boolean,
+        recapture: boolean,
     ): Promise<void> {
         if (this.#wrapping) {
             await this.#wrapping;
@@ -488,7 +541,12 @@ export class TransitionController implements Transition {
         if (!isCurrent()) {
             return;
         }
-        const chain = [this.#effect, ...driverFx];
+        const chain =
+            driverFx !== null
+                ? [this.#effect, ...driverFx]
+                : this.#wrapped
+                  ? this.#chain
+                  : [this.#effect];
         if (!this.#wrapped) {
             const wrapping = this.#vfx
                 .addHTMLWithStill(this.#element, { effect: chain })
@@ -514,7 +572,9 @@ export class TransitionController implements Transition {
             this.#wrapping = swapping;
             await swapping;
         }
-        await this.#vfx.update(this.#element);
+        if (recapture) {
+            await this.#vfx.update(this.#element);
+        }
     }
 
     // Unwrap once any pending wrap lands, unless a newer run took over.
