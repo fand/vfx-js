@@ -307,6 +307,88 @@ em {
     padding-right: 0.06em;
     letter-spacing: -0.03em;
 }
+/* All variants share one grid cell, so the widest sets the size. */
+.hero-word {
+    display: inline-grid;
+    align-items: baseline;
+    justify-items: center;
+    vertical-align: baseline;
+    /* A length, not a ratio, so bigger variants keep the line height. */
+    line-height: 0.9em;
+    height: 0.9em;
+}
+.hero-word > span {
+    grid-area: 1 / 1;
+    visibility: hidden;
+    white-space: nowrap;
+}
+.hero-word > [data-active] {
+    visibility: visible;
+}
+.hero-word-serif {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.16em;
+    letter-spacing: -0.03em;
+}
+.hero-word-thin {
+    font-weight: 100;
+    font-size: 0.66em;
+    letter-spacing: 0.02em;
+}
+.hero-word-acid {
+    padding: 0 0.12em;
+    background: var(--night);
+    color: var(--acid);
+    font-size: 0.92em;
+    font-weight: 800;
+}
+.hero-word-kana {
+    font-family: "Hiragino Sans", "Noto Sans JP", var(--sans);
+    font-weight: 900;
+    font-size: 0.66em;
+    letter-spacing: -0.04em;
+}
+.hero-word-mono {
+    font-family: var(--mono);
+    font-size: 0.7em;
+    font-weight: 500;
+    letter-spacing: -0.06em;
+    color: var(--accent);
+}
+.hero-word-outline {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: transparent;
+    -webkit-text-stroke: 0.025em var(--ink);
+}
+.hero-word-gradient {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 1.2em;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, var(--accent), var(--hot));
+    background-clip: text;
+    color: transparent;
+}
+.hero-word-block {
+    padding: 0 0.12em;
+    background: var(--accent);
+    color: var(--white);
+    font-family: var(--mono);
+    font-size: 0.7em;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+}
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
 .hero-tagline {
     max-width: 34em;
     margin: 32px 0 0;

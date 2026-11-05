@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Code } from "./_components/code";
+import { HeroWord } from "./_components/hero-word";
 import { LiveStage } from "./_components/live-stage";
 import { PageFrame } from "./_components/page-frame";
 import { PageTransition } from "./_components/page-transition";
@@ -48,7 +49,7 @@ export default function Home() {
                     <span className="pill">new</span> @vfx-js/transitions
                 </p>
                 <h1 className="hero-title">
-                    Shader <em>transitions</em>
+                    Shader <HeroWord />
                     <br />
                     for the DOM.
                 </h1>
