@@ -19,18 +19,12 @@ export const frameworks: Framework[] = [
                 label: "app/layout.tsx",
                 code: `
 import { VFXTransition } from "@vfx-js/react/next";
-import { swipe } from "@vfx-js/transitions";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <VFXTransition
-          duration={0.8}
-          types={{ back: { transition: swipe, reverse: true } }}
-        >
-          {children}
-        </VFXTransition>
+        <VFXTransition duration={0.8}>{children}</VFXTransition>
       </body>
     </html>
   );
@@ -69,7 +63,7 @@ export default function About() {
                 label: "Layout.tsx",
                 code: `
 import { transition, VFXTransition } from "@vfx-js/react";
-import { crossfade, glitch, swipe } from "@vfx-js/transitions";
+import { crossfade, glitch } from "@vfx-js/transitions";
 import { Link, useLocation, useOutlet } from "react-router";
 
 export function Layout() {
@@ -81,11 +75,7 @@ export function Layout() {
       <Link to="/about" onClick={transition({ transition: glitch })}>
         About
       </Link>
-      <VFXTransition
-        pageKey={pathname}
-        transition={crossfade}
-        types={{ back: { transition: swipe, reverse: true } }}
-      >
+      <VFXTransition pageKey={pathname} transition={crossfade}>
         {outlet}
       </VFXTransition>
     </>

@@ -1,7 +1,6 @@
 import "@vfx-js/transition-demo-shared/style.css";
 import { VFXTransition } from "@vfx-js/react";
 import { pages } from "@vfx-js/transition-demo-shared";
-import { swipe } from "@vfx-js/transitions";
 import { Link, useRouter } from "@void/react";
 
 // Void passes the page as an element with its own props,
@@ -27,7 +26,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 className="outlet"
                 pageKey={path}
                 duration={0.8}
-                types={{ back: { transition: swipe, reverse: true } }}
             >
                 <div style={{ height: "100%" }}>{children}</div>
             </VFXTransition>

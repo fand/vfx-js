@@ -3,7 +3,7 @@ import type { RunOpts, TransitionDef } from "@vfx-js/core";
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { markBackNavigation, setNextTransition, takePending } from "./store.js";
+import { setNextTransition, takePending } from "./store.js";
 import { TransitionIn, useTransitionIn } from "./TransitionIn.js";
 import { VFXTransition } from "./VFXTransition.js";
 
@@ -119,16 +119,6 @@ describe("VFXTransition", () => {
         setNextTransition({ transition: swipe });
         render("b", <TransitionIn transition={zoom} />);
         expect(await swap(mock.runs[0])).toEqual({ transition: swipe });
-    });
-
-    it("a back mark stays under the page spec", async () => {
-        render("a", <p>a</p>);
-        markBackNavigation();
-        render("b", <TransitionIn duration={2} />);
-        expect(await swap(mock.runs[0])).toEqual({
-            type: "back",
-            duration: 2,
-        });
     });
 
     it("the old page's spec does not leak into the next run", async () => {

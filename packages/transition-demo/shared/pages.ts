@@ -15,7 +15,7 @@ export const pages: DemoPage[] = [
         label: "Home",
         transition: "crossfade",
         title: "Shader page transitions",
-        lead: "Each link uses a different preset. The browser back button plays the reverse.",
+        lead: "Each link uses a different preset.",
         images: [],
         theme: "#0f172a",
     },

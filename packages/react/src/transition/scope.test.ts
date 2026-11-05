@@ -19,24 +19,9 @@ describe("resolveRunOpts", () => {
     it("a click spec wins whole over the page", () => {
         expect(
             resolveRunOpts(
-                { spec: { transition: swipe }, kind: "click" },
+                { transition: swipe },
                 { transition: zoom, duration: 2 },
             ),
         ).toEqual({ transition: swipe });
-    });
-
-    it("keeps a back mark under the page spec", () => {
-        expect(
-            resolveRunOpts(
-                { spec: { type: "back" }, kind: "back" },
-                { duration: 2 },
-            ),
-        ).toEqual({ type: "back", duration: 2 });
-    });
-
-    it("keeps a back mark without a page spec", () => {
-        expect(
-            resolveRunOpts({ spec: { type: "back" }, kind: "back" }, null),
-        ).toEqual({ type: "back" });
     });
 });

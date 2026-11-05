@@ -41,11 +41,10 @@ DOM must be updated. `run` resolves when the animation ends.
 
 ```tsx
 import { TransitionIn, VFXTransition } from "@vfx-js/react";
-import { crossfade, glitch, swipe } from "@vfx-js/transitions";
+import { crossfade, glitch } from "@vfx-js/transitions";
 
 // Once, around the router outlet. Fills the viewport by default.
-<VFXTransition pageKey={pathname} transition={crossfade}
-    types={{ back: { transition: swipe, reverse: true } }}>
+<VFXTransition pageKey={pathname} transition={crossfade}>
     {page}
 </VFXTransition>
 
@@ -89,7 +88,7 @@ const t = vfx.addTransition(el, {
     reverse: false,
     overflow: undefined,     // true (whole canvas) | px on every side
     types: {                 // specs picked by run(cb, { type })
-        back: { transition: swipe, reverse: true },
+        prev: { transition: swipe, reverse: true },
     },
     keepWrapped: false,      // keep the element wrapped between runs
     waitFor: "media",        // "media" | "none" | (el) => Promise<void>
@@ -140,8 +139,8 @@ Each run picks its spec in this order:
 level that sets `transition`, so uniforms never reach a different
 shader. `reverse` and `duration` are picked per field.
 
-In React, `<VFXTransition>` first builds the `RunOpts` from a click, the
-incoming page and back navigation. See [Which spec wins](#which-spec-wins).
+In React, `<VFXTransition>` first builds the `RunOpts` from a click or
+the incoming page. See [Which spec wins](#which-spec-wins).
 
 ### `overflow`
 
@@ -312,7 +311,6 @@ Provider, transitions use the Provider's instance.
     pageKey={pathname}
     transition={crossfade}
     duration={0.6}
-    types={{ back: { transition: swipe, reverse: true } }}
 >
     {children}
 </VFXTransition>
@@ -345,8 +343,8 @@ would show the wrong part of the page.
 The swap runs in a React transition, so a page that suspends keeps the
 old page on screen until it is ready.
 
-Back navigation is detected with the Navigation API when present, else
-with `popstate`. It sets `type: "back"`, so `types.back` applies.
+Browser back runs like any other navigation: with the page spec, or the
+props when the page sets none.
 
 React Router reads the route from context, like Next does. Pass
 `useOutlet()` as the children, so the old page keeps its own route:
@@ -396,16 +394,12 @@ export default function AboutPage() {
 
 ### Which spec wins
 
-Each run builds its `RunOpts` in this order:
+Each run uses one spec as its `RunOpts`:
 
-1. A `transition(spec)` click or `setNextTransition(spec)`. It wins whole.
-2. The incoming page's `<TransitionIn>` or `useTransitionIn`.
-3. Back navigation adds `type: "back"` under 1 and 2, so `types.back`
-   fills the fields a page spec leaves out. A page that sets its own
-   `transition` plays it with `types.back`'s `reverse`; `types.back`'s
-   shader is used when the page sets none.
-4. The `<VFXTransition>` props.
+- A `transition(spec)` click or `setNextTransition(spec)`, if set.
+- Else the incoming page's `<TransitionIn>` or `useTransitionIn`.
 
+The `<VFXTransition>` props fill the fields that spec leaves out.
 Core then resolves the spec as in [Spec resolution](#spec-resolution).
 
 Why the page, not the link: a link only knows where it goes, while the
@@ -427,17 +421,12 @@ remove that need, but it is a different runtime mode and is not planned.
 ```tsx
 // app/layout.tsx
 import { VFXTransition } from "@vfx-js/react/next";
-import { swipe } from "@vfx-js/transitions";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     return (
         <html lang="en">
             <body>
-                <VFXTransition
-                    types={{ back: { transition: swipe, reverse: true } }}
-                >
-                    {children}
-                </VFXTransition>
+                <VFXTransition>{children}</VFXTransition>
             </body>
         </html>
     );

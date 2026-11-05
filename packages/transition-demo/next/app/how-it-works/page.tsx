@@ -191,8 +191,8 @@ export default function HowItWorks() {
                             <code>&lt;TransitionIn&gt;</code>
                         </li>
                         <li>
-                            <code>types[type]</code>, like{" "}
-                            <code>types.back</code> on browser back
+                            <code>types[type]</code>, when the spec sets{" "}
+                            <code>type</code>
                         </li>
                         <li>
                             The options from <code>addTransition</code> or the
@@ -208,11 +208,11 @@ export default function HowItWorks() {
 const t = vfx.addTransition(outlet, {
   transition: crossfade,          // default
   types: {
-    back: { transition: swipe, reverse: true }, // on back
+    prev: { transition: swipe, reverse: true },
   },
 });
 
-t.run(swap, { type: "back" });
+t.run(swap, { type: "prev" });
 t.run(swap, { transition: glitch }); // wins over both
 `}</Code>
             </section>

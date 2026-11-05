@@ -11,7 +11,6 @@ import {
     useState,
 } from "react";
 import { useVFXInstance } from "../use-vfx-instance.js";
-import { watchNavigationDirection } from "./direction.js";
 import { useLiveOpts } from "./live-opts.js";
 import {
     resolveRunOpts,
@@ -78,8 +77,6 @@ export function VFXTransition(props: VFXTransitionProps) {
             };
         },
     }));
-
-    useEffect(() => watchNavigationDirection(), []);
 
     useEffect(() => {
         const element = ref.current;

@@ -3,7 +3,6 @@ import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     hasPending,
-    markBackNavigation,
     setNextTransition,
     takePending,
     transition,
@@ -38,10 +37,7 @@ describe("transition()", () => {
 
     it("sets the spec on a plain left click", () => {
         transition({ transition: swipe })(click());
-        expect(takePending()).toEqual({
-            spec: { transition: swipe },
-            kind: "click",
-        });
+        expect(takePending()).toEqual({ transition: swipe });
     });
 
     it.each([
@@ -63,10 +59,7 @@ describe("transition()", () => {
 
     it("accepts target=_self", () => {
         transition({ type: "forward" })(click({}, "_self"));
-        expect(takePending()).toEqual({
-            spec: { type: "forward" },
-            kind: "click",
-        });
+        expect(takePending()).toEqual({ type: "forward" });
     });
 });
 
@@ -81,10 +74,7 @@ describe("pending spec", () => {
 
     it("is taken once", () => {
         setNextTransition({ transition: zoom });
-        expect(takePending()).toEqual({
-            spec: { transition: zoom },
-            kind: "click",
-        });
+        expect(takePending()).toEqual({ transition: zoom });
         expect(takePending()).toBeNull();
     });
 
@@ -94,28 +84,5 @@ describe("pending spec", () => {
         expect(hasPending()).toBe(true);
         vi.advanceTimersByTime(2);
         expect(takePending()).toBeNull();
-    });
-
-    it("back only fills an empty store", () => {
-        setNextTransition({ transition: zoom });
-        markBackNavigation();
-        expect(takePending()).toEqual({
-            spec: { transition: zoom },
-            kind: "click",
-        });
-        markBackNavigation();
-        expect(takePending()).toEqual({
-            spec: { type: "back" },
-            kind: "back",
-        });
-    });
-
-    it("a click replaces a back mark", () => {
-        markBackNavigation();
-        setNextTransition({ transition: zoom });
-        expect(takePending()).toEqual({
-            spec: { transition: zoom },
-            kind: "click",
-        });
     });
 });

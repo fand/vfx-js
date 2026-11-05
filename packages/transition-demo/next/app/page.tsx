@@ -88,8 +88,7 @@ export default function Home() {
                     </h2>
                     <p className="lead">
                         This whole site runs on it. Each link in the header uses
-                        a different preset. Hit the browser back button and it
-                        plays a reversed swipe.
+                        a different preset.
                     </p>
                 </div>
                 <LiveStage />
@@ -132,12 +131,11 @@ export default function Home() {
                 </div>
                 <Code label="App.tsx">{`
 import { TransitionIn, VFXTransition } from "@vfx-js/react";
-import { glitch, swipe } from "@vfx-js/transitions";
+import { glitch } from "@vfx-js/transitions";
 
 export function App({ pathname, page }) {
   return (
-    <VFXTransition className="outlet" pageKey={pathname}
-      types={{ back: { transition: swipe, reverse: true } }}>
+    <VFXTransition className="outlet" pageKey={pathname}>
       {page}
     </VFXTransition>
   );
