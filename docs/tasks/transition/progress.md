@@ -359,3 +359,11 @@ Not verified:
 
 - Whether the chain swap after the snapshot shows a plain frame. Needs
   an eye on the screen, not a trace.
+
+## Demo polish (plan8)
+
+[plan8.md](./plan8.md). Planned, not started: sidebar inside the outlet
+on doc pages, plain `<h1>` headers, a before → run → after DOM figure on
+How it works, presets guard `inRange(uv)` and the playground drops
+`overflow: 48`, datamosh display transparent outside the content rect,
+overlay highlight for the Custom editor.
