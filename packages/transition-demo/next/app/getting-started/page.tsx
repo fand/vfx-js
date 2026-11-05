@@ -28,7 +28,9 @@ export default function GettingStarted() {
                         <strong>Fix the size</strong>
                         <span>
                             The target is your router outlet. Give it a height,
-                            like <code>100dvh</code>.
+                            like <code>100dvh</code>. In React,{" "}
+                            <code>&lt;VFXTransition&gt;</code> fills the
+                            viewport by default.
                         </span>
                     </li>
                     <li>

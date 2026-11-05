@@ -481,9 +481,8 @@ export default function AboutPage() {
 
 - Only the spec at mount counts. Later prop changes are ignored.
 - Outside a `<VFXTransition>`, it does nothing and warns once.
-- A Server Component can only pass plain defs, since props must be
-  serializable. Presets with JS hooks, like `datamosh` and `pixelsort`,
-  need a client component that calls `useTransitionIn`.
+- A def holds functions, so a Server Component can't pass one as a prop.
+  In Next.js, call `useTransitionIn` in a small client component.
 - The component form exists for Next.js, where `page.tsx` is a Server
   Component and cannot call hooks. Next has no way to export custom
   client settings from a page; its route segment config is a fixed list,
