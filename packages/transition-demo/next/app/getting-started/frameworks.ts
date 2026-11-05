@@ -13,24 +13,27 @@ export const frameworks: Framework[] = [
         id: "next",
         name: "Next.js",
         install: "npm i @vfx-js/core @vfx-js/react @vfx-js/transitions",
-        intro: "Wrap the layout's children in <VFXTransition> from @vfx-js/react/next. Each page picks its transition with <TransitionIn>.",
+        intro: "Put <VFXTransition> from @vfx-js/react/next around the layout's children. It is a client component, so the layout stays a Server Component. Each page picks its transition with <TransitionIn>.",
         snippets: [
             {
-                label: "app/shell.tsx",
+                label: "app/layout.tsx",
                 code: `
-"use client";
 import { VFXTransition } from "@vfx-js/react/next";
 import { swipe } from "@vfx-js/transitions";
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <VFXTransition
-      className="outlet"
-      duration={0.8}
-      types={{ back: { transition: swipe, reverse: true } }}
-    >
-      {children}
-    </VFXTransition>
+    <html lang="en">
+      <body>
+        <VFXTransition
+          className="outlet"
+          duration={0.8}
+          types={{ back: { transition: swipe, reverse: true } }}
+        >
+          {children}
+        </VFXTransition>
+      </body>
+    </html>
   );
 }`,
             },
