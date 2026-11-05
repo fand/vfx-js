@@ -22,6 +22,7 @@
 // The YCbCr 4:2:0 path swaps decode for luma (full res) + chroma (half
 // res, truncated MV); the truncation is what makes color drift off edges.
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
+import { captureContent } from "./_capture";
 
 // Premultiplied copy of an internal RT to the canvas. `uvContent` maps
 // the content rect into the target buffer.
@@ -496,7 +497,7 @@ export class DatamoshEffect implements Effect {
         const resolution: [number, number] = [this.#w, this.#h];
 
         // Capture the current frame into uv-space.
-        ctx.blit(ctx.src, cur);
+        captureContent(ctx, cur);
 
         // ME + residual feed both the decoder and the debug views, so run
         // them whenever moshing OR inspecting an intermediate stage.
@@ -604,7 +605,7 @@ export class DatamoshEffect implements Effect {
         this.#display(ctx, cur, prev, mv, res, acc, chromaAcc);
 
         // Reference for next frame's motion estimation.
-        ctx.blit(ctx.src, prev);
+        captureContent(ctx, prev);
     }
 
     // Route the selected stage to the canvas. "output" shows the decoded

@@ -1160,6 +1160,7 @@ em {
     font: inherit;
 }
 .lab-code textarea {
+    color-scheme: dark;
     background: transparent;
     color: transparent;
     caret-color: #e6e6ef;

@@ -8,6 +8,7 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
+import { captureContent, copyRT } from "./_capture";
 
 const KEY_FUNC = `
 float key(vec3 c, int mode) {
@@ -124,8 +125,13 @@ void main() {
 }
 `;
 
+// Unrotated: writes the padded `ctx.target`, so the low-res buffers use
+// `uvContent` and `srcHi` (`ctx.src`) uses `uvSrc`.
+// Rotated: writes the box-sized `sortedRT`, so every buffer uses `uv`.
 const FRAG_GATHER = `#version 300 es
 precision highp float;
+in vec2 uv;
+in vec2 uvContent;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
@@ -143,25 +149,31 @@ uniform vec2 rot;
 ${KEY_FUNC}
 ${SEGMENT_SCAN}
 void main() {
+    vec2 p = masked == 1 ? uv : uvContent;
+    vec2 hiUv = masked == 1 ? uv : uvSrc;
+    if (any(lessThan(p, vec2(0.0))) || any(greaterThan(p, vec2(1.0)))) {
+        outColor = vec4(0.0);
+        return;
+    }
     // Crisp source edge at full output resolution. The lenient low-res run
     // membership lets sorted content spill up to a cell into the padding;
     // clip it back to the exact rotated rect here so the boundary is sharp
     // and never reveals the padding, independent of sortRes.
     if (masked == 1) {
-        vec2 sp = boxToSrc(uvSrc * boxSize - boxSize * 0.5, imgSize, rot);
+        vec2 sp = boxToSrc(p * boxSize - boxSize * 0.5, imgSize, rot);
         if (sp.x < 0.0 || sp.x > imgSize.x || sp.y < 0.0 || sp.y > imgSize.y) {
             outColor = vec4(0.0);
             return;
         }
     }
-    int lowA = axis == 0 ? int(uvSrc.x * lowSize.x) : int(uvSrc.y * lowSize.y);
-    int b    = axis == 0 ? int(uvSrc.y * lowSize.y) : int(uvSrc.x * lowSize.x);
+    int lowA = axis == 0 ? int(p.x * lowSize.x) : int(p.y * lowSize.y);
+    int b    = axis == 0 ? int(p.y * lowSize.y) : int(p.x * lowSize.x);
     int L    = int(axis == 0 ? lowSize.x : lowSize.y);
     ivec2 lowP = toXY(lowA, b, axis);
     float myKey = key(texelFetch(src, lowP, 0).rgb, keyMode);
     if (!runActive(src, lowA, b, axis, keyMode, threshold, thresholdHigh, masked, lowSize, boxSize, imgSize, rot)) {
         // padding / out-of-band pixels skip the low-res buffer entirely.
-        vec4 c = texture(srcHi, uvSrc);
+        vec4 c = texture(srcHi, hiUv);
         outColor = vec4(c.rgb * c.a, c.a);
         return;
     }
@@ -173,7 +185,7 @@ void main() {
         if (r == targetRank) {
             // unmoved pixels keep the hi-res source; moved pixels take the low-res sorted color
             if (i == lowA) {
-                vec4 c = texture(srcHi, uvSrc);
+                vec4 c = texture(srcHi, hiUv);
                 outColor = vec4(c.rgb * c.a, c.a);
             } else {
                 vec4 c = texelFetch(src, toXY(i, b, axis), 0);
@@ -182,7 +194,7 @@ void main() {
             return;
         }
     }
-    vec4 c = texture(srcHi, uvSrc);
+    vec4 c = texture(srcHi, hiUv);
     outColor = vec4(c.rgb * c.a, c.a);
 }
 `;
@@ -434,7 +446,6 @@ export class PixelSortEffect implements Effect {
         const sortedRT = this.#sortedRT;
         const rotated =
             this.params.angle !== 0 && rotRT !== null && sortedRT !== null;
-        let sortSrc: EffectTexture | EffectRenderTarget = ctx.src;
         let sortHi: EffectTexture | EffectRenderTarget = ctx.src;
         let sortTarget = ctx.target;
         let rot = [1, 0];
@@ -450,12 +461,15 @@ export class PixelSortEffect implements Effect {
                 uniforms: { src: ctx.src, srcSize: [w, h], boxSize, rot },
                 target: rotRT,
             });
-            sortSrc = rotRT;
             sortHi = rotRT;
             sortTarget = sortedRT;
         }
 
-        ctx.blit(sortSrc, this.#lowRT);
+        if (rotated && rotRT !== null) {
+            copyRT(ctx, rotRT, this.#lowRT);
+        } else {
+            captureContent(ctx, this.#lowRT);
+        }
         // Rotated path: the sort masks out the bounding-box padding by
         // coordinate (insideSrc), keeping the run boundary exact and
         // decoupled from threshold.
