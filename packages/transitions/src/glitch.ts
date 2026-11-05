@@ -19,6 +19,8 @@ vec4 splitRead(vec2 uvr, vec2 uvg, vec2 uvb, bool to) {
 }
 
 vec4 transition(vec2 uv, float t) {
+  // A container overflow must not show wrapped content outside the element.
+  if (!inRange(uv)) return vec4(0.0);
   float amount = sin(floor(t * 10.0 + 0.5) / 10.0 * 3.141593);
   vec2 uvr = uv, uvg = uv, uvb = uv;
   if (gnoise(t * 3.0 + 10.0) > 0.0) {

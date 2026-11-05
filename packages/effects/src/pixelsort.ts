@@ -231,6 +231,7 @@ void main() {
 // Inverse of ROTATE_IN: for each output pixel, sample the sorted bounding-box
 // buffer at the rotated location, restoring the original orientation. `src`
 // is already premultiplied, so it composites as-is.
+// Transparent outside the content, so a padded target doesn't stretch the box edge.
 const ROTATE_OUT = `#version 300 es
 precision highp float;
 in vec2 uvContent;
@@ -240,6 +241,10 @@ uniform vec2 srcSize;
 uniform vec2 boxSize;
 uniform vec2 rot;
 void main() {
+    if (any(lessThan(uvContent, vec2(0.0))) || any(greaterThan(uvContent, vec2(1.0)))) {
+        outColor = vec4(0.0);
+        return;
+    }
     vec2 dSrc = uvContent * srcSize - srcSize * 0.5;
     vec2 dBox = vec2(
         rot.x * dSrc.x - rot.y * dSrc.y,

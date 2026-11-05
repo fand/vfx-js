@@ -29,6 +29,15 @@ describe("transition presets", () => {
         expect(def.frag).toContain("vec4 transition(vec2 uv, float t)");
     });
 
+    test.each([
+        ["swipe", presets.swipe],
+        ["swipe up", presets.createSwipe({ direction: "up" })],
+        ["glitch", presets.glitch],
+        ["glitchSlide", presets.glitchSlide],
+    ])("%s stays inside the element", (_key, def) => {
+        expect(def.frag).toContain("if (!inRange(uv)) return vec4(0.0);");
+    });
+
     test("swipe bakes the direction into the shader", () => {
         expect(presets.createSwipe({ direction: "up" }).frag).toContain(
             "vec2(0.0, 1.0)",

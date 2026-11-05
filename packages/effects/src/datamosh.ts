@@ -25,12 +25,17 @@ import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 
 // Premultiplied copy of an internal RT to the canvas. `uvContent` maps
 // the content rect into the target buffer.
+// Transparent outside the content, so a padded target doesn't stretch the edges.
 const FRAG_DISPLAY = `#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
 uniform sampler2D tex;
 void main() {
+    if (any(lessThan(uvContent, vec2(0.0))) || any(greaterThan(uvContent, vec2(1.0)))) {
+        outColor = vec4(0.0);
+        return;
+    }
     vec4 c = texture(tex, uvContent);
     outColor = vec4(c.rgb * c.a, c.a);
 }
@@ -270,6 +275,10 @@ uniform sampler2D uLumaAcc;
 uniform sampler2D uChromaAcc;
 uniform float uChromaGain;
 void main() {
+    if (any(lessThan(uvContent, vec2(0.0))) || any(greaterThan(uvContent, vec2(1.0)))) {
+        outColor = vec4(0.0);
+        return;
+    }
     float Y = texture(uLumaAcc, uvContent).r;
     vec2 cbcr = (texture(uChromaAcc, uvContent).rg - 0.5) * uChromaGain;
     vec3 rgb = vec3(

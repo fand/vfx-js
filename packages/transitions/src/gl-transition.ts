@@ -85,6 +85,8 @@ vec4 getToColor(vec2 p) { return readTo(clamp(p, 0.0, 1.0)); }
 ${glsl}
 
 vec4 transition(vec2 uv, float t) {
+  // getFromColor clamps, so a container overflow would stretch the edges.
+  if (!inRange(uv)) return vec4(0.0);
   progress = t;
   ratio = resolution.x / resolution.y;
   return glTransition_(uv);

@@ -216,6 +216,8 @@ The prelude gives you:
 - `inRange(p)` — whether `p` is inside [0, 1].
 - Reads outside [0, 1] return transparent black.
 - With `overflow`, `uv` goes below 0 and above 1 outside the element.
+- A shader that wraps or shifts `uv` should guard with `inRange(uv)`, so a
+  container `overflow` doesn't draw content outside the element.
 - Uniforms: `t`, `reverse`, `resolution` (element size in physical px),
   `time`.
 

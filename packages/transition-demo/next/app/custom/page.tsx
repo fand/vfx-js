@@ -10,7 +10,10 @@ export const metadata: Metadata = { title: "Custom transitions" };
 const prelude = [
     ["readFrom(p)", "The content you leave. Transparent black outside [0, 1]."],
     ["readTo(p)", "The content you enter."],
-    ["inRange(p)", "Whether p is inside [0, 1]."],
+    [
+        "inRange(p)",
+        "Whether p is inside [0, 1]. Guard with it when you wrap or shift uv, so a container overflow doesn't draw outside the element.",
+    ],
     ["t", "Progress, 0 → 1, smoothstep eased."],
     ["resolution", "Element size in physical px."],
     ["time", "Seconds since VFX-JS started."],

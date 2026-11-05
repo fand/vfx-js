@@ -62,7 +62,7 @@ export function Playground() {
     const [reverse, setReverse] = useState(false);
     const [auto, setAuto] = useState(false);
     const [scene, setScene] = useState(0);
-    const { ref, run } = useVFXTransition({ overflow: 48 });
+    const { ref, run } = useVFXTransition();
     const selectedIndex = useRef(entries.indexOf(selected));
 
     const play = useCallback(
