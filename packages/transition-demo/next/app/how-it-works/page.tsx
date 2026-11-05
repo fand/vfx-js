@@ -1,38 +1,45 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Code } from "../_components/code";
+import { highlight } from "../_components/highlight";
 import { PageFrame } from "../_components/page-frame";
 import { PageTransition } from "../_components/page-transition";
 import { TLink } from "../_components/t-link";
 
 export const metadata: Metadata = { title: "How it works" };
 
-const pipeline = [
+const steps = [
     {
-        n: "01",
         title: "Snapshot",
         body: "VFX-JS captures the element's current content into a texture. The old page is held on screen.",
-        tag: "from",
     },
     {
-        n: "02",
         title: "Swap",
         body: "Your callback changes the DOM. A router swap, a setState, innerHTML — anything.",
-        tag: "cb()",
     },
     {
-        n: "03",
         title: "Capture",
         body: "After images, videos and fonts load, VFX-JS captures the new content.",
-        tag: "to",
     },
     {
-        n: "04",
         title: "Shade",
         body: "A fragment shader mixes the two textures while t goes from 0 to 1.",
-        tag: "t → 1",
     },
 ];
+
+const domBefore = `<main class="outlet">
+  <PageA />
+</main>`;
+
+const domRun = `<canvas layoutsubtree>
+  <main class="outlet">
+    <PageB />
+  </main>
+</canvas>`;
+
+const domAfter = `<main class="outlet">
+  <PageB />
+</main>`;
 
 // Smoothstep curve, sampled for the SVG path.
 const curve = Array.from({ length: 41 }, (_, i) => {
@@ -58,21 +65,44 @@ export default function HowItWorks() {
             </section>
 
             <section className="doc-section">
-                <div className="pipeline">
-                    {pipeline.map((p) => (
-                        <div key={p.n} className="pipe">
-                            <div className="pipe-top">
-                                <span className="pipe-n">{p.n}</span>
-                                <span className="pipe-tag">{p.tag}</span>
-                            </div>
-                            <h3>{p.title}</h3>
-                            <p>{p.body}</p>
-                        </div>
+                <figure className="dom-fig">
+                    <div className="dom-step">
+                        <span className="dom-label">before</span>
+                        <pre>
+                            <code>{highlight(domBefore)}</code>
+                        </pre>
+                    </div>
+                    <span className="dom-arrow">run(cb)</span>
+                    <div className="dom-step">
+                        <span className="dom-label">run</span>
+                        <pre>
+                            <code>{highlight(domRun)}</code>
+                        </pre>
+                        <p className="dom-caption">
+                            The snapshot of A is <code>readFrom</code>, the live
+                            capture of B is <code>readTo</code>. The shader
+                            mixes them on the VFX canvas while the real DOM is
+                            already B.
+                        </p>
+                    </div>
+                    <span className="dom-arrow">t = 1</span>
+                    <div className="dom-step">
+                        <span className="dom-label">after</span>
+                        <pre>
+                            <code>{highlight(domAfter)}</code>
+                        </pre>
+                    </div>
+                </figure>
+                <ol className="dom-steps">
+                    {steps.map((step) => (
+                        <li key={step.title}>
+                            <strong>{step.title}.</strong> {step.body}
+                        </li>
                     ))}
-                </div>
+                </ol>
             </section>
 
-            <section id="dom" className="doc-section two-col">
+            <section id="dom" className="doc-section doc-prose">
                 <div>
                     <h2>The DOM stays DOM</h2>
                     <p>
@@ -87,29 +117,6 @@ export default function HowItWorks() {
                         back to dom-to-canvas, which is slower.
                     </p>
                 </div>
-                <figure className="wrap-fig" aria-hidden>
-                    <div className="wrap-row">
-                        <span className="wrap-label">rest</span>
-                        <div className="wrap-box">
-                            <code>&lt;main class="outlet"&gt;</code>
-                        </div>
-                    </div>
-                    <div className="wrap-row">
-                        <span className="wrap-label">run</span>
-                        <div className="wrap-box wrap-box-run">
-                            <code>&lt;canvas&gt;</code>
-                            <div className="wrap-box">
-                                <code>&lt;main class="outlet"&gt;</code>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="wrap-row">
-                        <span className="wrap-label">rest</span>
-                        <div className="wrap-box">
-                            <code>&lt;main class="outlet"&gt;</code>
-                        </div>
-                    </div>
-                </figure>
             </section>
 
             <section id="easing" className="doc-section two-col">
