@@ -272,6 +272,9 @@ From [plan6.md](./plan6.md):
   presets with JS hooks can't cross from a Server Component. The header
   uses plain links; two `TLink`s stay as click overrides. Void puts
   `<TransitionIn>` in the shared page view and drops `setNextTransition`.
+- `<VFXTransition>` fills the viewport height by default
+  (`100dvh`, `overflow: hidden`); `unstyled` drops it. The demos pass
+  `unstyled`, since their header takes part of the viewport.
 - Docs: `TRANSITION.md` React API rewritten.
 
 Verified:

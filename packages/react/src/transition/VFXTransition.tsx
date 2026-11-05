@@ -26,19 +26,27 @@ export type VFXTransitionProps = AddTransitionOpts & {
     children: React.ReactNode;
     className?: string;
     style?: React.CSSProperties;
+    /** Skip the default viewport-height box and size the target with your own CSS. */
+    unstyled?: boolean;
 };
 
 type Shown = { key: string | number | undefined; node: React.ReactNode };
 
 const OUTER_STYLE: React.CSSProperties = { display: "contents" };
+// Pages share one viewport-sized box and scroll inside it.
+const FILL_STYLE: React.CSSProperties = {
+    height: "100dvh",
+    overflow: "hidden",
+};
 
 /**
  * Animate between pages with a shader.
  * Pass a `pageKey` that changes per page, e.g. the pathname.
  * Without a `pageKey` it never transitions.
+ * The target fills the viewport height by default; pass `unstyled` to size it yourself.
  */
 export function VFXTransition(props: VFXTransitionProps) {
-    const { pageKey, children, className, style, ...opts } = props;
+    const { pageKey, children, className, style, unstyled, ...opts } = props;
     const vfx = useVFXInstance();
     const liveOpts = useLiveOpts(opts);
     const ref = useRef<HTMLDivElement>(null);
@@ -132,7 +140,11 @@ export function VFXTransition(props: VFXTransitionProps) {
     // React removes the outer div on unmount, and that one never moves.
     return (
         <div style={OUTER_STYLE}>
-            <div ref={ref} className={className} style={style}>
+            <div
+                ref={ref}
+                className={className}
+                style={unstyled ? style : { ...FILL_STYLE, ...style }}
+            >
                 <TransitionScopeContext.Provider value={scope}>
                     <Fragment key={rendered.key}>{rendered.node}</Fragment>
                 </TransitionScopeContext.Provider>

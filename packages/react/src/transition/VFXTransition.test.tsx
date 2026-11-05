@@ -69,6 +69,23 @@ describe("VFXTransition", () => {
         return run.opts();
     };
 
+    it("fills the viewport height unless unstyled", () => {
+        // happy-dom drops `dvh`, so check the overflow and the height's absence.
+        act(() => {
+            root.render(
+                <VFXTransition style={{ color: "red" }}>x</VFXTransition>,
+            );
+        });
+        const target = container.firstElementChild
+            ?.firstElementChild as HTMLElement;
+        expect(target.style.overflow).toBe("hidden");
+        expect(target.style.color).toBe("red");
+        act(() => {
+            root.render(<VFXTransition unstyled>x</VFXTransition>);
+        });
+        expect(target.getAttribute("style")).toBeNull();
+    });
+
     it("renders the latest children while pageKey is unchanged", () => {
         render("a", <p>one</p>);
         render("a", <p>two</p>);

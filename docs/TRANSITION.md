@@ -62,7 +62,7 @@ transition with `<TransitionIn>`.
 
 Give the target a fixed size: an explicit width and height, like a slide
 stage, a tab panel with `height: 240px`, or a viewport-sized router
-outlet. The old and new content then share one box, and the transition
+outlet (`<VFXTransition>` does this by default). The old and new content then share one box, and the transition
 only mixes pixels.
 
 When the content changes the box's size, VFX-JS locks the box at its old
@@ -305,16 +305,20 @@ Provider, transitions use the Provider's instance.
     transition={crossfade}
     duration={0.6}
     types={{ back: { transition: swipe, reverse: true } }}
-    className="outlet"
 >
     {children}
 </VFXTransition>
 ```
 
-Takes the `addTransition` options as props, plus `pageKey`, `className`
-and `style`. It renders two `<div>`s around the children: an outer one
-with `display: contents`, and an inner one that gets `className` and
-`style` and is the transition target.
+Takes the `addTransition` options as props, plus `pageKey`, `className`,
+`style` and `unstyled`. It renders two `<div>`s around the children: an
+outer one with `display: contents`, and an inner one that gets
+`className` and `style` and is the transition target.
+
+The target fills the viewport height by default (`height: 100dvh;
+overflow: hidden`), so pages share one box and scroll inside it. `style`
+merges on top. Pass `unstyled` to drop the default and size the target
+with your own CSS, e.g. `calc(100dvh - <header>)` under a header.
 
 - `pageKey` changes per page, e.g. the pathname. A new key starts a run.
   Use a string or a number.
@@ -339,9 +343,7 @@ export function Layout() {
     const { pathname } = useLocation();
     const outlet = useOutlet();
     return (
-        <VFXTransition className="outlet" pageKey={pathname}>
-            {outlet}
-        </VFXTransition>
+        <VFXTransition pageKey={pathname}>{outlet}</VFXTransition>
     );
 }
 ```
@@ -401,7 +403,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <html lang="en">
             <body>
                 <VFXTransition
-                    className="outlet"
                     types={{ back: { transition: swipe, reverse: true } }}
                 >
                     {children}
