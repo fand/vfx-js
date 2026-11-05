@@ -57,7 +57,9 @@ const entries: Entry[] = [
 ];
 
 export function Playground() {
-    const [selected, setSelected] = useState(entries[8]);
+    const [selected, setSelected] = useState(
+        () => entries.find((e) => e.id === "pixelsort") ?? entries[0],
+    );
     const [duration, setDuration] = useState(1.2);
     const [reverse, setReverse] = useState(false);
     const [auto, setAuto] = useState(false);

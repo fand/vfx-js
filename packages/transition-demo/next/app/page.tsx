@@ -8,8 +8,8 @@ import { TLink } from "./_components/t-link";
 const features = [
     {
         k: "01",
-        title: "Nine presets, one import",
-        body: "Glitch, pixel sort, datamosh, zoom blur and more. Pick one per link, or set a default.",
+        title: "Ten presets, one import",
+        body: "Glitch, JPEG glitch, pixel sort, datamosh, zoom blur and more. Pick one per link, or set a default.",
     },
     {
         k: "02",

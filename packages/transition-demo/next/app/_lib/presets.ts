@@ -5,6 +5,7 @@ import {
     datamosh,
     glitch,
     glitchSlide,
+    jpegGlitch,
     pixelsort,
     swipe,
     zoom,
@@ -20,6 +21,7 @@ export const presets: Record<PresetName, TransitionDef> = {
     crosszoom,
     glitch,
     glitchSlide,
+    jpegGlitch,
     datamosh,
     pixelsort,
 };
@@ -42,6 +44,11 @@ export const presetList: PresetInfo[] = [
     { name: "crosszoom", note: "Crossfade through a zoom blur." },
     { name: "glitch", note: "Jittery RGB-split blocks." },
     { name: "glitchSlide", note: "Sliding stripes with RGB split." },
+    {
+        name: "jpegGlitch",
+        note: "Hard cut through a real JPEG glitch.",
+        factory: "createJpegGlitch({ iterations, quality })",
+    },
     {
         name: "datamosh",
         note: "Hard cut that heals block by block.",

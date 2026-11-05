@@ -4,6 +4,7 @@ export { createDatamosh, datamosh } from "./datamosh";
 export { createGLTransition, type GLTransitionDef } from "./gl-transition";
 export { glitch } from "./glitch";
 export { glitchSlide } from "./glitch-slide";
+export { createJpegGlitch, jpegGlitch } from "./jpeg-glitch";
 export { createPixelsort, pixelsort } from "./pixelsort";
 export { createSwipe, type SwipeDirection, swipe } from "./swipe";
 export { zoom } from "./zoom";

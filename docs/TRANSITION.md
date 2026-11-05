@@ -250,9 +250,9 @@ not in module variables, since two containers may share one def.
 
 ```ts
 import {
-    crossfade, crosszoom, datamosh, glitch, glitchSlide,
+    crossfade, crosszoom, datamosh, glitch, glitchSlide, jpegGlitch,
     pixelsort, swipe, zoom, zoomBlur,
-    createDatamosh, createPixelsort, createSwipe,
+    createDatamosh, createJpegGlitch, createPixelsort, createSwipe,
 } from "@vfx-js/transitions";
 ```
 
@@ -265,6 +265,7 @@ import {
 | `crosszoom` | Crossfade through a zoom blur. `overflow: true`. |
 | `glitch` | Jittery RGB-split blocks. |
 | `glitchSlide` | Sliding stripes with RGB split. |
+| `jpegGlitch` / `createJpegGlitch({ iterations, quality })` | Hard cut through a real JPEG glitch: encode, corrupt the bytes, decode. |
 | `datamosh` / `createDatamosh({ blockSize })` | Hard cut through a datamosh that heals block by block. |
 | `pixelsort` / `createPixelsort({ direction })` | Content melts into sorted streaks and sorts back out. |
 

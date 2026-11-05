@@ -1,5 +1,9 @@
 import type { Effect, TransitionDef } from "@vfx-js/core";
-import type { DatamoshEffect, PixelSortEffect } from "@vfx-js/effects";
+import type {
+    DatamoshEffect,
+    JPEGGlitchEffect,
+    PixelSortEffect,
+} from "@vfx-js/effects";
 import { describe, expect, test } from "vitest";
 import * as presets from "./index";
 
@@ -18,6 +22,7 @@ describe("transition presets", () => {
             "datamosh",
             "glitch",
             "glitchSlide",
+            "jpegGlitch",
             "pixelsort",
             "swipe",
             "zoom",
@@ -101,5 +106,27 @@ describe("datamosh", () => {
         def.onEnd?.(fxA);
         expect(moshA.enabled).toBe(false);
         expect(moshB.enabled).toBe(true);
+    });
+});
+
+describe("jpegGlitch", () => {
+    test("glitches only in the middle and peaks at the cut", async () => {
+        const def = presets.createJpegGlitch({ iterations: 40 });
+        const fx = (await def.effects?.()) as Effect[];
+        const effect = fx[0] as JPEGGlitchEffect;
+        expect(effect.enabled).toBe(false);
+
+        def.prepare?.(run, fx);
+        expect(effect.enabled).toBe(true);
+        def.onFrame?.(0.05, 0.05, 0.016, fx);
+        expect(effect.params.bypass).toBe(true);
+        def.onFrame?.(0.5, 0.5, 0.016, fx);
+        expect(effect.params.bypass).toBe(false);
+        expect(effect.params.iterations).toBe(40);
+        def.onFrame?.(0.95, 0.95, 0.016, fx);
+        expect(effect.params.bypass).toBe(true);
+
+        def.onEnd?.(fx);
+        expect(effect.enabled).toBe(false);
     });
 });

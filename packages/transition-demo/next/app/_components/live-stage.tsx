@@ -14,6 +14,7 @@ const order: PresetName[] = [
     "datamosh",
     "crosszoom",
     "glitchSlide",
+    "jpegGlitch",
     "zoomBlur",
 ];
 

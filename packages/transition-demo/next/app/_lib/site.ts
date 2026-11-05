@@ -68,5 +68,6 @@ export type PresetName =
     | "crosszoom"
     | "glitch"
     | "glitchSlide"
+    | "jpegGlitch"
     | "datamosh"
     | "pixelsort";
