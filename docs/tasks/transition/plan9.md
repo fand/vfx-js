@@ -128,9 +128,38 @@ Done. Decisions:
 - Lazy opts swap the chain after `cb`, during the hold. No re-capture,
   no compile at swap time, no wrong frame.
 
-## Other issues (not decided)
+## 4. Remove `types`, fix run uniforms
 
-- `type` is a plain `string`. Typos aren't caught; keys of `types` are not inferred.
+Problems:
+
+- `type` is a plain `string`. Typos aren't caught.
 - An unknown `type` falls back to the container defaults without a warning.
-- `uniforms` come with the shader from the first level that sets `transition`.
-  So `run({ type: "x", uniforms })` drops the run's `uniforms`.
+- `uniforms` come only from the level that sets `transition`.
+  So `run({ uniforms })` without `transition` drops the run's `uniforms`.
+
+With back gone, `types` has little use. A spec held in a variable does the same job,
+and TS catches typos in variable names.
+
+```ts
+// before
+<VFXTransition types={{ slide: { transition: swipe, reverse: true } }}>
+<Link onClick={transition({ type: "slide" })}>
+
+// after
+export const slide = { transition: swipe, reverse: true };
+<Link onClick={transition(slide)}>
+```
+
+- Core: drop `types` from `AddTransitionOpts` and `type` from `RunOpts`.
+  Levels become run, container, def.
+- Uniforms: take the level that sets `transition` and every level closer to the run.
+  Merge them per key over the def defaults.
+  Levels farther than that are dropped, so another shader's uniforms never leak in.
+
+```ts
+vfx.addTransition(el, { transition: swipe, uniforms: { softness: 0.1 } });
+t.run(cb, { uniforms: { softness: 0.3 } }); // 0.3 (was 0.1)
+t.run(cb, { transition: zoom }); // container uniforms dropped
+```
+
+- React, demos (incl. SvelteKit / Nuxt / Astro back code: use a spec variable), docs, tests.
