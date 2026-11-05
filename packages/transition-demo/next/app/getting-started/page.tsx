@@ -22,7 +22,7 @@ export default function GettingStarted() {
                 </p>
             </section>
 
-            <section className="doc-section">
+            <section id="steps" className="doc-section">
                 <ol className="steps">
                     <li>
                         <strong>Install</strong>
@@ -48,11 +48,11 @@ export default function GettingStarted() {
                 </ol>
             </section>
 
-            <section className="doc-section">
+            <section id="setup" className="doc-section">
                 <FrameworkTabs />
             </section>
 
-            <section className="doc-section doc-next">
+            <section id="next" className="doc-section doc-next">
                 <Link href="/how-it-works" className="next-card">
                     <span>Next</span>
                     <strong>How it works →</strong>

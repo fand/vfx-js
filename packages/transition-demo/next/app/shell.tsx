@@ -2,6 +2,7 @@
 
 import { VFXTransition } from "@vfx-js/react/next";
 import { swipe } from "@vfx-js/transitions";
+import { DocSidebar } from "./_components/doc-sidebar";
 import { Header } from "./_components/header";
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -17,7 +18,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 overflow={0}
                 types={{ back: { transition: swipe, reverse: true } }}
             >
-                <div className="outlet-page">{children}</div>
+                <div className="outlet-page">
+                    <DocSidebar />
+                    {children}
+                </div>
             </VFXTransition>
         </>
     );

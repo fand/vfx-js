@@ -56,7 +56,7 @@ export default function Custom() {
                 <ShaderLab />
             </section>
 
-            <section className="doc-section two-col">
+            <section id="def" className="doc-section two-col">
                 <div>
                     <h2>A TransitionDef</h2>
                     <p>
@@ -88,7 +88,7 @@ t.run(swap, { transition: wipe, uniforms: { softness: 0.05 } });
 `}</Code>
             </section>
 
-            <section className="doc-section">
+            <section id="prelude" className="doc-section">
                 <h2>What the prelude gives you</h2>
                 <dl className="api-table">
                     {prelude.map(([k, v]) => (
@@ -102,7 +102,7 @@ t.run(swap, { transition: wipe, uniforms: { softness: 0.05 } });
                 </dl>
             </section>
 
-            <section className="doc-section two-col">
+            <section id="overflow" className="doc-section two-col">
                 <div>
                     <h2>Draw outside the box</h2>
                     <p>
@@ -134,7 +134,7 @@ vec4 transition(vec2 uv, float t) {
 `}</Code>
             </section>
 
-            <section className="doc-section">
+            <section id="hooks" className="doc-section">
                 <h2>Driver hooks</h2>
                 <p className="lead">
                     Some looks need more than one pass: a datamosh, a pixel
@@ -153,7 +153,7 @@ vec4 transition(vec2 uv, float t) {
                 </dl>
             </section>
 
-            <section className="doc-section two-col">
+            <section id="state" className="doc-section two-col">
                 <div>
                     <h2>Keep state per effect</h2>
                     <p>

@@ -142,9 +142,12 @@ em {
     overflow: hidden;
 }
 .outlet-page {
+    display: flex;
     height: 100%;
 }
 .frame {
+    flex: 1;
+    min-width: 0;
     height: 100%;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -176,6 +179,58 @@ em {
 }
 .frame-main {
     min-height: 100%;
+}
+
+/* Doc sidebar */
+.doc-sidebar {
+    flex: none;
+    width: 232px;
+    overflow-y: auto;
+    padding: 32px 20px;
+    border-right: 1px solid var(--line);
+    background: var(--white);
+    color: var(--ink);
+    font-size: 14px;
+}
+.doc-sidebar[data-tone="dark"] {
+    background: var(--night);
+    color: #f4f4f5;
+    border-color: #1d1d24;
+}
+.doc-sidebar ul {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.doc-sidebar a {
+    display: block;
+    padding: 6px 12px;
+    border-radius: 8px;
+    color: color-mix(in srgb, currentColor 62%, transparent);
+    text-decoration: none;
+    transition:
+        color 0.2s,
+        background 0.2s;
+}
+.doc-sidebar a:hover {
+    color: inherit;
+    background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.doc-sidebar a[aria-current="page"] {
+    color: inherit;
+    font-weight: 600;
+    background: color-mix(in srgb, currentColor 9%, transparent);
+}
+.doc-sidebar ul ul {
+    margin: 4px 0 8px 12px;
+    padding-left: 8px;
+    border-left: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+.doc-sidebar ul ul a {
+    padding: 4px 10px;
+    font-size: 13px;
 }
 
 /* Hero */
@@ -1222,6 +1277,9 @@ em {
 
 /* Small screens */
 @media (max-width: 900px) {
+    .doc-sidebar {
+        display: none;
+    }
     .features,
     .pipeline,
     .steps {

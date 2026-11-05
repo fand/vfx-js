@@ -24,10 +24,10 @@ export default function Transitions() {
                     from gl-transitions.
                 </p>
             </section>
-            <section className="doc-section">
+            <section id="playground" className="doc-section">
                 <Playground />
             </section>
-            <section className="doc-section">
+            <section id="gl-transitions" className="doc-section">
                 <h2>gl-transitions</h2>
                 <p>
                     Any shader from{" "}
@@ -37,7 +37,7 @@ export default function Transitions() {
                 </p>
                 <GLPlayground />
             </section>
-            <section className="doc-section">
+            <section id="presets" className="doc-section">
                 <table className="preset-table">
                     <thead>
                         <tr>

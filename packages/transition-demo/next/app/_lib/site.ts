@@ -6,16 +6,58 @@ export const links = {
     issues: "https://github.com/fand/vfx-js/issues",
 };
 
-export type NavItem = {
-    href: string;
+export type NavSection = {
+    id: string;
     label: string;
 };
 
+export type NavItem = {
+    href: string;
+    label: string;
+    sections: NavSection[];
+};
+
 export const nav: NavItem[] = [
-    { href: "/getting-started", label: "Getting Started" },
-    { href: "/how-it-works", label: "How it works" },
-    { href: "/transitions", label: "Transitions" },
-    { href: "/custom", label: "Custom" },
+    {
+        href: "/getting-started",
+        label: "Getting Started",
+        sections: [
+            { id: "steps", label: "Three steps" },
+            { id: "setup", label: "Setup by framework" },
+            { id: "next", label: "Next" },
+        ],
+    },
+    {
+        href: "/how-it-works",
+        label: "How it works",
+        sections: [
+            { id: "dom", label: "The DOM stays DOM" },
+            { id: "easing", label: "t is eased for you" },
+            { id: "size", label: "Fixed size, shared box" },
+            { id: "precedence", label: "Which spec wins" },
+            { id: "limits", label: "Limits" },
+        ],
+    },
+    {
+        href: "/transitions",
+        label: "Transitions",
+        sections: [
+            { id: "playground", label: "Playground" },
+            { id: "gl-transitions", label: "gl-transitions" },
+            { id: "presets", label: "Preset list" },
+        ],
+    },
+    {
+        href: "/custom",
+        label: "Custom",
+        sections: [
+            { id: "def", label: "A TransitionDef" },
+            { id: "prelude", label: "What the prelude gives you" },
+            { id: "overflow", label: "Draw outside the box" },
+            { id: "hooks", label: "Driver hooks" },
+            { id: "state", label: "Keep state per effect" },
+        ],
+    },
 ];
 
 export type PresetName =

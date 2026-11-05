@@ -82,7 +82,7 @@ export default function HowItWorks() {
                 </div>
             </section>
 
-            <section className="doc-section two-col">
+            <section id="dom" className="doc-section two-col">
                 <div>
                     <h2>The DOM stays DOM</h2>
                     <p>
@@ -122,7 +122,7 @@ export default function HowItWorks() {
                 </figure>
             </section>
 
-            <section className="doc-section two-col">
+            <section id="easing" className="doc-section two-col">
                 <div>
                     <h2>t is eased for you</h2>
                     <p>
@@ -153,7 +153,7 @@ export default function HowItWorks() {
                 </figure>
             </section>
 
-            <section className="doc-section two-col">
+            <section id="size" className="doc-section two-col">
                 <div>
                     <h2>Fixed size, shared box</h2>
                     <p>
@@ -180,7 +180,7 @@ export default function HowItWorks() {
 `}</Code>
             </section>
 
-            <section className="doc-section two-col">
+            <section id="precedence" className="doc-section two-col">
                 <div>
                     <h2>Which spec wins</h2>
                     <p>Each run picks its spec in this order:</p>
@@ -220,7 +220,7 @@ t.run(swap, { transition: glitch }); // wins over both
 `}</Code>
             </section>
 
-            <section className="doc-section">
+            <section id="limits" className="doc-section">
                 <h2>Limits</h2>
                 <ul className="limits">
                     {limits.map((l) => (
