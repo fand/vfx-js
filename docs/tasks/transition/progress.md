@@ -383,8 +383,9 @@ Found in the browser pass, not in the plan:
   edges. Datamosh and pixelsort now copy the content rect through
   `effects/src/_capture.ts` (`captureContent`, `copyRT`) and return
   transparent outside [0, 1].
-- Same pattern, not fixed: `jpeg-glitch.ts` blits `ctx.src` into an
-  element-sized RT; `bad-jpeg.ts` samples `uvSrc` into low-res RTs and
+- `jpegGlitch` preset added on `JPEGGlitchEffect`, whose readback now
+  uses `captureContent` too.
+- Same pattern, not fixed: `bad-jpeg.ts` samples `uvSrc` into low-res RTs and
   blits a content-only RT to the padded target. Only shows under a
   padded stage (a transition with `overflow`, or an effect with an
   `outputRect` before them).
