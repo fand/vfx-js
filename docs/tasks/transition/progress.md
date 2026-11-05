@@ -362,8 +362,39 @@ Not verified:
 
 ## Demo polish (plan8)
 
-[plan8.md](./plan8.md). Planned, not started: sidebar inside the outlet
-on doc pages, plain `<h1>` headers, a before → run → after DOM figure on
-How it works, presets guard `inRange(uv)` and the playground drops
-`overflow: 48`, datamosh display transparent outside the content rect,
-overlay highlight for the Custom editor.
+[plan8.md](./plan8.md). Done on `feat/transition`.
+
+- Sidebar inside the outlet on doc pages (`DocSidebar`, null on `/`),
+  with per-page section anchors from `site.ts`. Hidden under 900px.
+- Plain `<h1>` titles replace `.doc-hero`.
+- How it works opens with a before → run → after DOM figure; the old
+  pipeline cards and the later wrap figure are gone.
+- swipe, glitch, glitchSlide and the gl-transitions wrapper guard
+  `inRange(uv)`, so a container `overflow` doesn't leak content.
+- Playground drops `overflow: 48`; each preset uses its own.
+- Custom editor: overlay highlight (`_components/highlight.ts`), Tab
+  inserts two spaces.
+
+Found in the browser pass, not in the plan:
+
+- `ctx.blit` and the `uvSrc` / `uvContent` varyings follow the stage's
+  rects. Under a padded stage, a blit into an element-sized RT squeezes
+  the pad into the element, and a `uvContent` display stretches the
+  edges. Datamosh and pixelsort now copy the content rect through
+  `effects/src/_capture.ts` (`captureContent`, `copyRT`) and return
+  transparent outside [0, 1].
+- Same pattern, not fixed: `jpeg-glitch.ts` blits `ctx.src` into an
+  element-sized RT; `bad-jpeg.ts` samples `uvSrc` into low-res RTs and
+  blits a content-only RT to the padded target. Only shows under a
+  padded stage (a transition with `overflow`, or an effect with an
+  `outputRect` before them).
+
+Verified in the browser (Next demo, Playwright, 1280px and 390px):
+
+- glitch, swipe up, datamosh, pixelsort stay inside the stage; with
+  `overflow: 48` put back, datamosh and pixelsort fill the stage exactly
+  with an empty pad.
+- zoom and crosszoom spread past the stage with no hard edge.
+- Custom editor: highlight, Tab, layers aligned, scroll sync.
+- `/` → `/getting-started` lands with the sidebar in place; no console
+  warnings.
