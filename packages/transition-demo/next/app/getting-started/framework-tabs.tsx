@@ -1,26 +1,26 @@
 "use client";
 
-import { useVFXTransition } from "@vfx-js/react";
-import { createSwipe } from "@vfx-js/transitions";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Code } from "../_components/code";
 import { frameworks } from "./frameworks";
 
-const toLeft = createSwipe({ direction: "left" });
-const toRight = createSwipe({ direction: "right" });
+// Matches the opacity transition on .tab-body.
+const FADE_MS = 200;
 
 export function FrameworkTabs() {
-    const [active, setActive] = useState(0);
-    const { ref, run } = useVFXTransition({ duration: 0.55 });
-    const fw = frameworks[active];
+    const [selected, setSelected] = useState(0);
+    const [shown, setShown] = useState(0);
+    const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+    const fw = frameworks[shown];
+    const fading = selected !== shown;
 
+    useEffect(() => () => clearTimeout(timer.current), []);
+
+    // Fade out, swap the panel, then fade in.
     const select = (i: number) => {
-        if (i === active) {
-            return;
-        }
-        run(() => setActive(i), {
-            transition: i > active ? toLeft : toRight,
-        });
+        setSelected(i);
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => setShown(i), FADE_MS);
     };
 
     return (
@@ -31,15 +31,15 @@ export function FrameworkTabs() {
                         key={f.id}
                         type="button"
                         role="tab"
-                        aria-selected={i === active}
+                        aria-selected={i === selected}
                         onClick={() => select(i)}
                     >
                         {f.name}
                     </button>
                 ))}
             </div>
-            <div className="tab-panel" ref={ref}>
-                <div className="tab-body" key={fw.id}>
+            <div className="tab-panel">
+                <div className="tab-body" style={{ opacity: fading ? 0 : 1 }}>
                     <h3>{fw.name}</h3>
                     <p className="tab-intro">{fw.intro}</p>
                     <div className="tab-install">

@@ -749,6 +749,7 @@ em {
 }
 .tab-body {
     padding: 32px;
+    transition: opacity 0.2s;
 }
 .tab-body h3 {
     margin: 0;
