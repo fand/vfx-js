@@ -328,15 +328,6 @@ em {
     gap: 12px;
     margin-top: 36px;
 }
-.hero-install {
-    margin-top: 22px;
-    font-size: 13px;
-    color: var(--ink-3);
-}
-.hero-install code::before {
-    content: "$ ";
-    color: var(--accent);
-}
 .scroll-cue {
     position: absolute;
     bottom: 28px;
@@ -491,14 +482,17 @@ em {
 /* Preset carousel under the title */
 .carousel {
     --gap: 76px;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    position: relative;
+    display: flex;
     align-items: center;
     gap: var(--gap);
     width: min(100%, 760px);
     height: 52px;
     margin-top: 28px;
-    overflow: hidden;
+    padding-inline: 18px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
     mask-image: linear-gradient(
         90deg,
         transparent,
@@ -507,13 +501,12 @@ em {
         transparent
     );
 }
-.carousel-side {
-    display: flex;
-    gap: var(--gap);
-    min-width: 0;
+.carousel::-webkit-scrollbar {
+    display: none;
 }
-.carousel-side:first-child {
-    justify-content: flex-end;
+/* Hidden until it is scrolled to the current item. */
+.carousel:not([data-ready]) {
+    visibility: hidden;
 }
 .carousel-item {
     display: inline-flex;
