@@ -2,7 +2,7 @@
 
 Demos of `@vfx-js/transitions` with each framework's router.
 
-- `next/` is the public demo site.
+- `next/` is the public demo site, deployed to amagi.dev/vfx-js-transition.
 - The others are for checking the router glue locally. They are not deployed.
 
 | Demo | Dev server | Port |

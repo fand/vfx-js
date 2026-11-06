@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 
-const config: NextConfig = {};
+// Static site served at amagi.dev/vfx-js-transition.
+const config: NextConfig = {
+    output: "export",
+    basePath: "/vfx-js-transition",
+    trailingSlash: true,
+};
 
 export default config;

@@ -117,8 +117,8 @@ em {
     color: var(--white);
 }
 .loader .brand-mark {
-    width: 96px;
-    height: 96px;
+    width: 288px;
+    height: 288px;
 }
 :root[data-loading] .header {
     opacity: 0;

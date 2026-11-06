@@ -1,0 +1,38 @@
+name: Deploy to amagi.dev/vfx-js-transition
+
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: pnpm/action-setup@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v6
+              with:
+                  node-version: "24"
+                  cache: "pnpm"
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build
+              run: pnpm run build
+
+            - name: Build transition demo
+              run: pnpm --filter @vfx-js/transition-demo-next run build:demo
+
+            - name: Deploy
+              uses: peaceiris/actions-gh-pages@v4
+              with:
+                  deploy_key: ${{ secrets.VFX_JS_TRANSITION_DEPLOY_KEY }}
+                  external_repository: fand/vfx-js-transition
+                  publish_branch: gh-pages
+                  publish_dir: ./packages/transition-demo/next/out
