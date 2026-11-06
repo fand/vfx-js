@@ -44,7 +44,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
-    "@types/node": "26.6.5",
     "@vfx-js/core": "workspace:*",
     "gl-transitions": "2.0.0",
     "lint-staged": "^17.6.0",

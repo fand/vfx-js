@@ -17,7 +17,7 @@
 //   decode   intra ? cur : mc(accum, mv) + res -> accRT (persistent)
 //            (per-block intra refresh heals the mosh back to the source)
 //   display  accRT          -> ctx.target
-//   blit     cur            -> prevRT (persistent; next frame's reference)
+//   capture  ctx.src        -> prevRT (persistent; next frame's reference)
 //
 // The YCbCr 4:2:0 path swaps decode for luma (full res) + chroma (half
 // res, truncated MV); the truncation is what makes color drift off edges.

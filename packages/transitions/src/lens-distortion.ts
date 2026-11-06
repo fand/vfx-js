@@ -1,4 +1,5 @@
 import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { IGN, MIRROR } from "./_shared";
 
 /**
  * A lens warps the content harder and harder, swaps it at the peak and relaxes.
@@ -19,16 +20,8 @@ const float TAPS = 12.0;
 // Width of the growing warp's edge.
 const float SOFT = 0.5;
 
-// Interleaved gradient noise: a per-pixel offset that hides the bands between taps.
-float ign(vec2 p) {
-  return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
-}
-
-// Mirror reads past the edge, so the warp shows content instead of holes.
-vec2 mirror(vec2 p) {
-  return 1.0 - abs(1.0 - mod(p, 2.0));
-}
-
+${IGN}
+${MIRROR}
 vec4 transition(vec2 uv, float t) {
   // A container overflow must not show warped content outside the element.
   if (!inRange(uv)) return vec4(0.0);

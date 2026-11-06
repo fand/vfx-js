@@ -1,6 +1,6 @@
 import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
 
-/** The old content shrinks into the center while the new one grows out of it. */
+/** The old content zooms in while the new one grows out of the center. */
 export const zoom: ShaderTransitionDef = shaderTransition({
     name: "zoom",
     overflow: true,

@@ -1,11 +1,11 @@
-import {
-    shaderTransition,
-    type TransitionDef,
-    type TransitionEffect,
-    type TransitionEffectContext,
-    type TransitionRun,
+import type {
+    TransitionDef,
+    TransitionEffect,
+    TransitionEffectContext,
+    TransitionRun,
 } from "@vfx-js/core";
 import { type PixelSortDirection, PixelSortEffect } from "@vfx-js/effects";
+import { hardCut } from "./_shared";
 
 const OPPOSITE: Record<PixelSortDirection, PixelSortDirection> = {
     up: "down",
@@ -13,15 +13,6 @@ const OPPOSITE: Record<PixelSortDirection, PixelSortDirection> = {
     left: "right",
     right: "left",
 };
-
-const cut = shaderTransition({
-    name: "pixelsort",
-    frag: `
-vec4 transition(vec2 uv, float t) {
-  return t < 0.5 ? readFrom(uv) : readTo(uv);
-}
-`,
-});
 
 export class PixelsortTransitionEffect
     extends PixelSortEffect
@@ -68,7 +59,7 @@ export function createPixelsort(
     const outDir = opts.direction ?? "up";
     return {
         name: "pixelsort",
-        create: () => [cut.create(), new PixelsortTransitionEffect(outDir)],
+        create: () => [hardCut.create(), new PixelsortTransitionEffect(outDir)],
     };
 }
 

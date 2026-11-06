@@ -1,22 +1,13 @@
 import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { IGN, SPLIT_READ } from "./_shared";
 
 /** Radial blur with RGB split, peaking halfway, while crossfading. */
 export const zoomBlur: ShaderTransitionDef = shaderTransition({
     name: "zoom_blur",
     overflow: true,
     frag: `
-vec4 splitRead(vec2 uvr, vec2 uvg, vec2 uvb, bool to) {
-  vec4 r = to ? readTo(uvr) : readFrom(uvr);
-  vec4 g = to ? readTo(uvg) : readFrom(uvg);
-  vec4 b = to ? readTo(uvb) : readFrom(uvb);
-  return vec4(r.r, g.g, b.b, (r.a + g.a + b.a) / 3.0);
-}
-
-// Interleaved gradient noise: a per-pixel offset that hides the rings of 16 taps.
-float ign(vec2 p) {
-  return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
-}
-
+${SPLIT_READ}
+${IGN}
 vec4 transition(vec2 uv, float t) {
   float jitter = ign(gl_FragCoord.xy);
   float blur = sin(t * 3.141593);

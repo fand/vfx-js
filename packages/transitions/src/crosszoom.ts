@@ -1,4 +1,5 @@
 import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { IGN } from "./_shared";
 
 /** Crossfade through a zoom blur toward the center that peaks halfway. */
 export const crosszoom: ShaderTransitionDef = shaderTransition({
@@ -8,11 +9,7 @@ export const crosszoom: ShaderTransitionDef = shaderTransition({
 const float STRENGTH = 0.4;
 const float TAPS = 16.0;
 
-// Interleaved gradient noise: a per-pixel offset that hides the bands of a fixed tap pattern.
-float ign(vec2 p) {
-  return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
-}
-
+${IGN}
 // Quintic ease in/out, so the blur builds up and settles smoothly.
 float ease(float x) {
   return x < 0.5 ? 16.0 * x * x * x * x * x : 1.0 + 16.0 * pow(x - 1.0, 5.0);

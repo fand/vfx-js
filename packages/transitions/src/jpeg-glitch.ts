@@ -1,24 +1,15 @@
-import {
-    shaderTransition,
-    type TransitionDef,
-    type TransitionEffect,
-    type TransitionEffectContext,
+import type {
+    TransitionDef,
+    TransitionEffect,
+    TransitionEffectContext,
 } from "@vfx-js/core";
 import { JPEGGlitchEffect } from "@vfx-js/effects";
+import { hardCut } from "./_shared";
 
 /** Glitch only in the middle; outside it the live capture shows with no codec lag. */
 const WINDOW = 0.12;
 /** Re-glitches per second. The real rate is capped by encode/decode latency. */
 const SPEED = 30;
-
-const cut = shaderTransition({
-    name: "jpeg_glitch",
-    frag: `
-vec4 transition(vec2 uv, float t) {
-  return t < 0.5 ? readFrom(uv) : readTo(uv);
-}
-`,
-});
 
 export class JpegGlitchTransitionEffect
     extends JPEGGlitchEffect
@@ -70,7 +61,7 @@ export function createJpegGlitch(
         // Linear, so the glitch window and the cut line up with the envelope.
         ease: "linear",
         create: () => [
-            cut.create(),
+            hardCut.create(),
             new JpegGlitchTransitionEffect(maxIterations, quality),
         ],
     };

@@ -1,4 +1,5 @@
 import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { MIRROR } from "./_shared";
 
 /** Simplex noise warps the content, peaking halfway, while crossfading. */
 export const distortFade: ShaderTransitionDef = shaderTransition({
@@ -39,11 +40,7 @@ float fbm(vec2 p) {
   return snoise(p) * 0.7 + snoise(p * 2.3 + 17.0) * 0.3;
 }
 
-// Mirror reads past the edge, so the warp shows content instead of holes.
-vec2 mirror(vec2 p) {
-  return 1.0 - abs(1.0 - mod(p, 2.0));
-}
-
+${MIRROR}
 vec4 transition(vec2 uv, float t) {
   // A container overflow must not show warped content outside the element.
   if (!inRange(uv)) return vec4(0.0);

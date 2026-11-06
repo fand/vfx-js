@@ -1,16 +1,11 @@
 import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { SPLIT_READ } from "./_shared";
 
 /** Horizontal stripes slide sideways with RGB split; the content swaps halfway. */
 export const glitchSlide: ShaderTransitionDef = shaderTransition({
     name: "glitch_slide",
     frag: `
-vec4 splitRead(vec2 uvr, vec2 uvg, vec2 uvb, bool to) {
-  vec4 r = to ? readTo(uvr) : readFrom(uvr);
-  vec4 g = to ? readTo(uvg) : readFrom(uvg);
-  vec4 b = to ? readTo(uvb) : readFrom(uvb);
-  return vec4(r.r, g.g, b.b, (r.a + g.a + b.a) / 3.0);
-}
-
+${SPLIT_READ}
 vec4 transition(vec2 uv, float t) {
   // A container overflow must not show wrapped content outside the element.
   if (!inRange(uv)) return vec4(0.0);
