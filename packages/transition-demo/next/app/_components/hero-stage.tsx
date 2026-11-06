@@ -11,6 +11,7 @@ import {
 } from "react";
 import { presetList, presets } from "../_lib/presets";
 import type { PresetName } from "../_lib/site";
+import { ContourCanvas } from "./contour-canvas";
 import { TLink } from "./t-link";
 
 const AUTOPLAY_INTERVAL = 3000;
@@ -34,6 +35,11 @@ const labels: Record<PresetName, string> = {
     pixelsort: "PixelSort",
 };
 
+/** The hero cycles through these palettes as presets play. */
+const palettes = ["default", "orange", "purple", "green"];
+/** The background patterns, cycled the same way. */
+const patterns = ["dots", "grid", "diagonal", "contour", "sine"];
+
 /** The hero word changes with the theme. */
 const words: Partial<Record<PresetName, string>> = {
     swipe: "TRANSITIONS",
@@ -42,7 +48,7 @@ const words: Partial<Record<PresetName, string>> = {
     zoomBlur: "transitions_",
 };
 
-/** The hero. Each preset has its own theme, and the preset plays on switch. */
+/** The hero. Each preset sets a palette, pattern and font, and the preset plays on switch. */
 export function HeroStage() {
     const { ref, run } = useVFXTransition({ duration: 1.1, overflow: 0 });
     const [theme, setTheme] = useState<PresetName>(names[0]);
@@ -207,6 +213,9 @@ export function HeroStage() {
         });
     };
 
+    const themeIndex = names.indexOf(theme);
+    const pattern = patterns[themeIndex % patterns.length];
+
     const items = [];
     for (let copy = 0; copy < COPIES; copy++) {
         const home = copy === HOME;
@@ -239,8 +248,15 @@ export function HeroStage() {
     }
 
     return (
-        <section className="hero" data-theme={theme} ref={setRefs}>
+        <section
+            className="hero"
+            data-theme={theme}
+            data-palette={palettes[themeIndex % palettes.length]}
+            data-pattern={pattern}
+            ref={setRefs}
+        >
             <div className="hero-glow" aria-hidden />
+            <ContourCanvas active={pattern === "contour"} />
             <p className="eyebrow">
                 <span className="pill">new</span> @vfx-js/transitions
             </p>

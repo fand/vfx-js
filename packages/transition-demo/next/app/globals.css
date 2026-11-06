@@ -346,21 +346,78 @@ em {
     /* Resolve again here so the theme's accent wins. */
     --em: var(--accent);
 }
-.hero::before {
+/* Back to front: glow, frost veil, pattern. */
+/* The pattern changes with the preset. */
+.hero::after {
+    --pattern: color-mix(in srgb, var(--ink) 13%, transparent);
     content: "";
     position: absolute;
     inset: 0;
-    z-index: -2;
-    background-image: radial-gradient(
-        color-mix(in srgb, var(--ink) 13%, transparent) 1px,
-        transparent 1px
-    );
-    background-size: 22px 22px;
+    z-index: -1;
+    pointer-events: none;
     mask-image: radial-gradient(ellipse at center, #000 20%, transparent 70%);
+}
+.hero[data-pattern="dots"]::after {
+    background-image: radial-gradient(var(--pattern) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+.hero[data-pattern="grid"]::after {
+    --pattern: color-mix(in srgb, var(--ink) 8%, transparent);
+    background-image:
+        linear-gradient(var(--pattern) 1px, transparent 1px),
+        linear-gradient(90deg, var(--pattern) 1px, transparent 1px),
+        linear-gradient(var(--pattern) 1px, transparent 1px),
+        linear-gradient(90deg, var(--pattern) 1px, transparent 1px);
+    background-size:
+        120px 120px,
+        120px 120px,
+        24px 24px,
+        24px 24px;
+    background-position: center;
+}
+.hero[data-pattern="diagonal"]::after {
+    --pattern: color-mix(in srgb, var(--ink) 9%, transparent);
+    background-image: repeating-linear-gradient(
+        -55deg,
+        var(--pattern) 0 1px,
+        transparent 1px 9px
+    );
+}
+/* The SVG pattern is a mask, so it takes the ink color. */
+.hero[data-pattern="sine"]::after {
+    background-color: var(--pattern);
+    mask-image:
+        var(--pattern-svg),
+        radial-gradient(ellipse at center, #000 20%, transparent 70%);
+    mask-size:
+        var(--pattern-size),
+        100% 100%;
+    mask-repeat: repeat, no-repeat;
+    mask-position: center;
+    mask-composite: intersect;
+}
+/* Contour lines are drawn live by a WebGL canvas. */
+.hero-contour {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    display: none;
+    width: 100%;
+    height: 100%;
+    color: var(--ink);
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse at center, #000 20%, transparent 70%);
+}
+.hero[data-pattern="contour"] .hero-contour {
+    display: block;
+}
+.hero[data-pattern="sine"]::after {
+    --pattern-size: 96px 16px;
+    --pattern-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='16'%3E%3Cpath d='M0 8 C16 0 32 0 48 8 S80 16 96 8' fill='none' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E");
 }
 .hero-glow {
     position: absolute;
-    z-index: -1;
+    z-index: -3;
     width: min(900px, 90vw);
     aspect-ratio: 1.6;
     border-radius: 50%;
@@ -457,47 +514,60 @@ em {
     }
 }
 
-/* Hero themes. Each preset redefines the palette inside the hero. */
-/* Colors come from Sanzo Wada's Dictionary of Color Combinations. */
-/* The background is the combination's pale color mixed with white. */
+/* Hero palettes. The hero cycles through them as presets play. */
+/* Each one is white frosted glass with a soft color glow behind it. */
 .hero-em {
     white-space: nowrap;
     /* The title line sets the height, so themes never move the layout. */
     line-height: 0;
 }
-.hero[data-theme]:not([data-theme="crossfade"]) {
-    --white: color-mix(in oklab, var(--wada-bg) 50%, #ffffff);
+.hero[data-palette]:not([data-palette="default"]) {
+    --white: color-mix(in oklab, var(--glow-a) 6%, #fbfbfd);
     --ink-2: color-mix(in oklab, var(--ink) 75%, var(--white));
     --ink-3: color-mix(in oklab, var(--ink) 50%, var(--white));
-    --line: color-mix(in oklab, var(--ink) 14%, var(--white));
+    --line: color-mix(in oklab, var(--ink) 12%, var(--white));
 }
-.hero[data-theme]:not([data-theme="crossfade"]) .hero-glow {
-    opacity: 0.35;
+.hero[data-palette]:not([data-palette="default"]) .hero-glow {
+    width: min(2100px, 182vw);
+    aspect-ratio: 1.5;
+    background:
+        radial-gradient(closest-side at 32% 58%, var(--glow-a), transparent),
+        radial-gradient(closest-side at 68% 42%, var(--glow-b), transparent);
+    filter: blur(112px);
+    opacity: 1;
 }
-/* #139 Neutral Gray, Salvia Blue, Deep Indigo */
-.hero[data-theme="swipe"] {
-    --wada-bg: #b5d1cc;
-    --ink: #000831;
-    --accent: #000831;
+/* The frost: a white veil over the glow. */
+.hero[data-palette]:not([data-palette="default"])::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    background: color-mix(in srgb, #ffffff 30%, transparent);
 }
+.hero[data-palette="orange"] {
+    --glow-a: #ffa877;
+    --glow-b: #ffd0b8;
+    --accent: #e8521d;
+}
+.hero[data-palette="purple"] {
+    --glow-a: #b9a1ff;
+    --glow-b: #c9b8ff;
+    --accent: #3d33e6;
+}
+.hero[data-palette="green"] {
+    --glow-a: #8ef0c4;
+    --glow-b: #b5f2ff;
+    --accent: #0b8a60;
+}
+
+/* Hero type. Some presets change the hero word's font. */
 .hero[data-theme="swipe"] .hero-em {
     font-family: var(--sans);
     font-style: normal;
     font-weight: 100;
     font-size: 0.66em;
     letter-spacing: 0.02em;
-}
-/* #84 Seashell Pink, Deep Slate Green */
-.hero[data-theme="zoom"] {
-    --wada-bg: #ffcfc4;
-    --ink: #0f261f;
-    --accent: #0f261f;
-}
-/* #177 Grayish Lavender A, Buffy Citrine, Pale Burnt Lake */
-.hero[data-theme="zoomBlur"] {
-    --wada-bg: #b8b8ff;
-    --ink: #730f1f;
-    --accent: #888d2a;
 }
 .hero[data-theme="zoomBlur"] .hero-em {
     font-family: var(--mono);
@@ -506,20 +576,8 @@ em {
     font-size: 0.7em;
     letter-spacing: -0.06em;
 }
-/* #190 Ivory Buff, English Red, Black */
-.hero[data-theme="crosszoom"] {
-    --wada-bg: #ebd999;
-    --ink: #000000;
-    --accent: #de4500;
-}
 .hero[data-theme="crosszoom"] .hero-em {
     font-size: 1.16em;
-}
-/* #104 Sulpher Yellow, Carmine Red */
-.hero[data-theme="glitch"] {
-    --wada-bg: #f5f5b8;
-    --ink: #a10b2b;
-    --accent: #a10b2b;
 }
 .hero[data-theme="glitch"] .hero-em {
     font-family: var(--sans);
@@ -528,12 +586,6 @@ em {
     font-size: 0.8em;
     letter-spacing: -0.04em;
 }
-/* #171 Glaucous Green, Yellow Orange, Pale Burnt Lake */
-.hero[data-theme="glitchSlide"] {
-    --wada-bg: #b3e8c2;
-    --ink: #730f1f;
-    --accent: #ff8c00;
-}
 .hero[data-theme="glitchSlide"] .hero-em {
     font-family: var(--sans);
     font-style: normal;
@@ -541,12 +593,6 @@ em {
     letter-spacing: -0.02em;
     color: transparent;
     -webkit-text-stroke: 0.025em var(--ink);
-}
-/* #18 Cameo Pink, Fawn, Dusky Madder Violet */
-.hero[data-theme="jpegGlitch"] {
-    --wada-bg: #e6adcf;
-    --ink: #2d0060;
-    --accent: #2d0060;
 }
 .hero[data-theme="jpegGlitch"] .hero-em {
     padding: 0 0.12em;
@@ -557,18 +603,6 @@ em {
     font-weight: 900;
     font-size: 0.6em;
     letter-spacing: -0.04em;
-}
-/* #75 Pale King's Blue, Violet Blue */
-.hero[data-theme="datamosh"] {
-    --wada-bg: #abf5ed;
-    --ink: #202d85;
-    --accent: #202d85;
-}
-/* #60 Pale Lemon Yellow, Dark Tyrian Blue */
-.hero[data-theme="pixelsort"] {
-    --wada-bg: #fff59e;
-    --ink: #0d2b52;
-    --accent: #0d2b52;
 }
 .hero[data-theme="pixelsort"] .hero-em {
     font-size: 1.16em;
