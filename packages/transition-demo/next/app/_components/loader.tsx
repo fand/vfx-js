@@ -5,9 +5,8 @@ import { lensDistortion } from "@vfx-js/transitions";
 import { useEffect, useState } from "react";
 import { BrandMark } from "./header";
 
-// Wait for the logo animation in CSS: stroke trim, then fill.
-// It also gives VFX-JS time to attach the transition.
-const MIN_SHOW_MS = 500;
+// Gives VFX-JS time to attach the transition.
+const MIN_SHOW_MS = 300;
 
 const pageLoaded = () =>
     new Promise<void>((resolve) => {
@@ -17,6 +16,17 @@ const pageLoaded = () =>
         }
         window.addEventListener("load", () => resolve(), { once: true });
     });
+
+// The CSS logo animation starts at first paint, before hydration.
+// So wait for it to end, not for a timer.
+const logoDrawn = () =>
+    Promise.all(
+        (
+            document
+                .querySelector(".loader")
+                ?.getAnimations({ subtree: true }) ?? []
+        ).map((a) => a.finished.catch(() => {})),
+    );
 
 /**
  * False until fonts and images are in.
@@ -29,6 +39,7 @@ export function useLoaded(): boolean {
         Promise.all([
             document.fonts.ready,
             pageLoaded(),
+            logoDrawn(),
             new Promise((r) => setTimeout(r, MIN_SHOW_MS)),
         ]).then(() => {
             if (cancelled) {
