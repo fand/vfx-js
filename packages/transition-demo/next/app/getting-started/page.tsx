@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Getting Started" };
 
 export default function GettingStarted() {
     return (
-        <PageFrame tone="paper">
+        <PageFrame tone="paper" simpleFooter>
             <PageTransition preset="swipe" />
             <section className="doc-title">
                 <h1>Getting Started</h1>

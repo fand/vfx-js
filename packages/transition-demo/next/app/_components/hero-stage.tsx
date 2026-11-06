@@ -133,6 +133,31 @@ export function HeroStage() {
         };
     }, []);
 
+    // Keep the header clear while the hero is under it.
+    useEffect(() => {
+        const hero = section.current;
+        const frame = hero?.closest(".frame");
+        if (!hero || !frame) {
+            return;
+        }
+        const root = document.documentElement;
+        const update = () => {
+            const header = document.querySelector(".header")?.clientHeight ?? 0;
+            const under = frame.scrollTop < hero.offsetHeight - header;
+            if (under) {
+                root.dataset.header = "clear";
+            } else {
+                delete root.dataset.header;
+            }
+        };
+        update();
+        frame.addEventListener("scroll", update, { passive: true });
+        return () => {
+            frame.removeEventListener("scroll", update);
+            delete root.dataset.header;
+        };
+    }, []);
+
     useEffect(() => {
         if (reducedMotion()) {
             setAutoplay(false);

@@ -4,7 +4,7 @@
     --ink-3: #8a8a96;
     --line: #e7e5df;
     --white: #ffffff;
-    --paper: #f5f3ee;
+    --paper: #f4f8fd;
     --night: #08080b;
     --accent: #2f2bff;
     --hot: #ff4d2e;
@@ -63,9 +63,12 @@ em {
 }
 
 /* Header */
+/* Floats over the outlet, so it can turn clear over the home hero. */
 .header {
-    position: relative;
-    z-index: 10;
+    position: absolute;
+    inset: 0 0 auto;
+    /* Above the VFX-JS canvas (z-index 9999), which draws runs under the header. */
+    z-index: 10000;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -74,14 +77,19 @@ em {
     background: var(--white);
     border-bottom: 1px solid var(--line);
     transition:
-        background 0.6s,
+        background 0.3s,
         color 0.6s,
-        border-color 0.6s;
+        border-color 0.3s;
 }
 .header[data-tone="dark"] {
     background: var(--night);
     color: #f4f4f5;
     border-color: #1d1d24;
+}
+/* Set by the home hero while it is under the header. */
+:root[data-header="clear"] .header {
+    background: transparent;
+    border-color: transparent;
 }
 .brand {
     display: flex;
@@ -137,14 +145,102 @@ em {
     margin-left: 8px;
 }
 
+.header-menu-button {
+    display: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-right: -8px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+}
+.header-menu-button span,
+.header-menu-button span::before,
+.header-menu-button span::after {
+    display: block;
+    width: 20px;
+    height: 1.5px;
+    background: currentColor;
+    transition:
+        transform 0.2s,
+        background 0.2s;
+}
+.header-menu-button span {
+    position: relative;
+}
+.header-menu-button span::before,
+.header-menu-button span::after {
+    content: "";
+    position: absolute;
+    left: 0;
+}
+.header-menu-button span::before {
+    top: -6px;
+}
+.header-menu-button span::after {
+    top: 6px;
+}
+.header-menu-button span[data-open="true"] {
+    background: transparent;
+}
+.header-menu-button span[data-open="true"]::before {
+    transform: translateY(6px) rotate(45deg);
+}
+.header-menu-button span[data-open="true"]::after {
+    transform: translateY(-6px) rotate(-45deg);
+}
+.header-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 8px 12px;
+    background: var(--white);
+    border-bottom: 1px solid var(--line);
+}
+.header[data-tone="dark"] .header-menu {
+    background: var(--night);
+    border-color: #1d1d24;
+}
+.header-menu a {
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 15px;
+    color: color-mix(in srgb, currentColor 70%, transparent);
+    text-decoration: none;
+}
+.header-menu a[aria-current="page"] {
+    color: inherit;
+    background: color-mix(in srgb, currentColor 9%, transparent);
+}
+.header-menu hr {
+    width: calc(100% - 24px);
+    margin: 6px 12px;
+    border: 0;
+    border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
 /* The transition target needs a fixed size, so pages scroll inside it. */
+/* It runs under the header, and pages leave room for it. */
 .outlet {
-    height: calc(100dvh - var(--header));
+    height: 100dvh;
     overflow: hidden;
 }
 .outlet-page {
     display: flex;
     height: 100%;
+    background: var(--white);
+}
+.outlet-page:has(> .frame[data-tone="paper"]) {
+    background: var(--paper);
+}
+.outlet-page:has(> .frame[data-tone="dark"]) {
+    background: var(--night);
 }
 .frame {
     flex: 1;
@@ -164,7 +260,7 @@ em {
 }
 .frame[data-tone="paper"] {
     --bg: var(--paper);
-    --rule: #e2ded4;
+    --rule: #ececf3;
 }
 .frame[data-tone="dark"] {
     --bg: var(--night);
@@ -180,6 +276,7 @@ em {
 }
 .frame-main {
     min-height: 100%;
+    padding-top: var(--header);
 }
 
 /* Doc sidebar */
@@ -187,16 +284,12 @@ em {
     flex: none;
     width: 232px;
     overflow-y: auto;
-    padding: 32px 20px;
-    border-right: 1px solid var(--line);
-    background: var(--white);
+    padding: calc(32px + var(--header)) 20px 32px;
     color: var(--ink);
-    font-size: 14px;
+    font-size: 16px;
 }
 .doc-sidebar[data-tone="dark"] {
-    background: var(--night);
     color: #f4f4f5;
-    border-color: #1d1d24;
 }
 .doc-sidebar ul {
     display: grid;
@@ -231,7 +324,7 @@ em {
 }
 .doc-sidebar ul ul a {
     padding: 4px 10px;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 /* Hero */
@@ -241,8 +334,10 @@ em {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: calc(100dvh - var(--header));
-    padding: 80px 24px 120px;
+    /* Reach up under the header so its background shows there. */
+    min-height: 100dvh;
+    margin-top: calc(-1 * var(--header));
+    padding: calc(80px + var(--header)) 24px 120px;
     text-align: center;
     overflow: hidden;
     isolation: isolate;
@@ -1517,10 +1612,32 @@ em {
     color: #6b6b78;
 }
 
+.footer-simple {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    width: min(var(--max), 100% - 48px);
+    margin: 40px auto 0;
+    padding: 24px 0 32px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--soft);
+}
+.footer-simple p {
+    margin: 0;
+}
+.footer-simple a {
+    color: var(--muted);
+}
+
 /* Small screens */
 @media (max-width: 900px) {
-    .doc-sidebar {
+    .doc-sidebar,
+    .header-nav {
         display: none;
+    }
+    .header-menu-button {
+        display: grid;
     }
     .features,
     .split,
@@ -1552,21 +1669,11 @@ em {
     .brand > span:last-child {
         display: none;
     }
-    .header-nav {
-        gap: 0;
-    }
-    .header-nav a {
-        padding: 6px 7px;
-        font-size: 12px;
-        white-space: nowrap;
-    }
-    .header-gh {
-        display: none;
-    }
     .section,
     .doc-section,
     .doc-title,
-    .footer-inner {
+    .footer-inner,
+    .footer-simple {
         width: calc(100% - 32px);
     }
     .tab-body {

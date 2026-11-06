@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Transitions" };
 
 export default function Transitions() {
     return (
-        <PageFrame tone="dark">
+        <PageFrame tone="dark" simpleFooter>
             <PageTransition preset="pixelsort" />
             <section className="doc-title">
                 <h1>Transitions</h1>

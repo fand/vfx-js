@@ -22,7 +22,23 @@ const columns = [
     },
 ];
 
-export function Footer() {
+export function Footer({ simple = false }: { simple?: boolean }) {
+    if (simple) {
+        return (
+            <footer className="footer-simple">
+                <p>
+                    Part of{" "}
+                    <a href={links.vfxjs} target="_blank" rel="noreferrer">
+                        VFX-JS
+                    </a>
+                    . MIT License.
+                </p>
+                <a href={links.github} target="_blank" rel="noreferrer">
+                    GitHub <span aria-hidden>↗</span>
+                </a>
+            </footer>
+        );
+    }
     return (
         <footer className="footer">
             <div className="footer-inner">

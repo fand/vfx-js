@@ -2,11 +2,32 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { nav } from "../_lib/site";
+import { useEffect, useState } from "react";
+import { links, nav } from "../_lib/site";
 
 export function Header() {
     const pathname = usePathname();
-    const tone = pathname === "/transitions" ? "dark" : "light";
+    const tone =
+        pathname === "/transitions" || pathname === "/playground"
+            ? "dark"
+            : "light";
+    const isDocs = nav.some((item) => item.href === pathname);
+    const [open, setOpen] = useState(false);
+    const close = () => setOpen(false);
+
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setOpen(false);
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [open]);
+
     return (
         <header className="header" data-tone={tone}>
             <Link href="/" className="brand">
@@ -16,30 +37,87 @@ export function Header() {
                 </span>
             </Link>
             <nav className="header-nav">
-                {nav.map((item) => (
-                    <Link
-                        key={item.href}
-                        href={item.href}
-                        aria-current={
-                            item.href === pathname ? "page" : undefined
-                        }
-                    >
-                        {item.label}
-                    </Link>
-                ))}
+                <Link
+                    href="/getting-started"
+                    aria-current={isDocs ? "page" : undefined}
+                >
+                    Docs
+                </Link>
+                <Link
+                    href="/playground"
+                    aria-current={
+                        pathname === "/playground" ? "page" : undefined
+                    }
+                >
+                    Playground
+                </Link>
+                <a href={links.vfxjs} target="_blank" rel="noreferrer">
+                    VFX-JS
+                </a>
                 <a
                     className="header-gh"
-                    href="https://github.com/fand/vfx-js"
+                    href={links.github}
                     target="_blank"
                     rel="noreferrer"
                 >
                     <GitHubIcon />
                 </a>
             </nav>
+            <button
+                type="button"
+                className="header-menu-button"
+                aria-label={open ? "Close menu" : "Open menu"}
+                aria-expanded={open}
+                aria-controls="header-menu"
+                onClick={() => setOpen((v) => !v)}
+            >
+                <span data-open={open} aria-hidden />
+            </button>
+            {open && (
+                <nav id="header-menu" className="header-menu">
+                    {nav.map((item) => (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            aria-current={
+                                item.href === pathname ? "page" : undefined
+                            }
+                            onClick={close}
+                        >
+                            {item.label}
+                        </Link>
+                    ))}
+                    <hr />
+                    <Link
+                        href="/playground"
+                        aria-current={
+                            pathname === "/playground" ? "page" : undefined
+                        }
+                        onClick={close}
+                    >
+                        Playground
+                    </Link>
+                    <a
+                        href={links.vfxjs}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={close}
+                    >
+                        VFX-JS
+                    </a>
+                    <a
+                        href={links.github}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={close}
+                    >
+                        GitHub
+                    </a>
+                </nav>
+            )}
         </header>
     );
 }
-
 export function GitHubIcon() {
     return (
         <svg viewBox="0 0 16 16" width="18" height="18" role="img">

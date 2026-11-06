@@ -58,7 +58,7 @@ const limits = [
 
 export default function HowItWorks() {
     return (
-        <PageFrame tone="paper">
+        <PageFrame tone="paper" simpleFooter>
             <PageTransition preset="crosszoom" />
             <section className="doc-title">
                 <h1>How It Works</h1>

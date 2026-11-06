@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRef } from "react";
 import { nav } from "../_lib/site";
 
 export function DocSidebar() {
-    const pathname = usePathname();
-    if (pathname === "/") {
+    // Keep the path from mount. During a run the old page stays on screen,
+    // and usePathname would already give it the new path.
+    const pathname = useRef(usePathname()).current;
+    if (pathname === "/" || pathname === "/playground") {
         return null;
     }
     const tone = pathname === "/transitions" ? "dark" : "light";
