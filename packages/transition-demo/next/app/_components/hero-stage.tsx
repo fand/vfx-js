@@ -1,6 +1,7 @@
 "use client";
 
 import { useVFXTransition } from "@vfx-js/react";
+import { createPixelScan } from "@vfx-js/transitions";
 import Link from "next/link";
 import {
     useCallback,
@@ -19,6 +20,12 @@ const BLINK_MS = 300;
 /** Copies of the list. The middle one is home; the rest let it scroll endlessly. */
 const COPIES = 5;
 const HOME = Math.floor(COPIES / 2);
+
+// The hero plays pixelScan in rings.
+const heroPresets = {
+    ...presets,
+    pixelScan: createPixelScan({ direction: "center" }),
+};
 
 // crossfade is too plain to show off.
 const names = presetList
@@ -101,7 +108,7 @@ export function HeroStage() {
                         pattern: pickOther(patterns, prev.pattern),
                     }));
                 },
-                { transition: presets[name] },
+                { transition: heroPresets[name] },
             );
             busy.current = false;
         },
