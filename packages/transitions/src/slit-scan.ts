@@ -1,13 +1,13 @@
-import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 
 /**
  * A scan line sweeps left to right and smears the old content into stripes.
  * A second sweep draws the new content out of its own stripes.
  * Each color channel lags behind the last.
  */
-export const slitScan: ShaderTransitionDef = shaderTransition({
-    name: "slit_scan",
-    frag: `
+export class SlitScan extends ShaderTransition {
+    readonly name = "slit_scan";
+    readonly frag = `
 const vec3 LAG = vec3(0.0, 0.2, 0.4);
 
 vec4 splitRead(float xr, float xg, float xb, float y, bool to) {
@@ -38,5 +38,5 @@ vec4 transition(vec2 uv, float t) {
   }
   return c;
 }
-`,
-});
+`;
+}

@@ -1,29 +1,30 @@
-import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 import { IGN, MIRROR } from "./_shared";
+
+export type LensDistortionParams = {
+    /** Scales the warp. Default 1. */
+    strength?: number;
+    /** Splits the warp into a rainbow; 0 turns it off. Default 0.6. */
+    dispersion?: number;
+    /** Extra scale over the whole run; 0 turns it off. Default 3. */
+    zoom?: number;
+};
 
 /**
  * A lens warps the content harder and harder, swaps it at the peak and relaxes.
  * The old content zooms in as it fades out; the new one zooms back out to normal.
  * At the peak the center is magnified and the edges fold back into it.
- * `strength` scales the warp. `dispersion` splits it into a rainbow; 0 turns it off.
- * `zoom` is the extra scale over the whole run; 0 turns it off.
  */
-export function createLensDistortion(
-    opts: { strength?: number; dispersion?: number; zoom?: number } = {},
-): ShaderTransitionDef {
-    const strength = (opts.strength ?? 1).toFixed(3);
-    const dispersion = Math.max(0, opts.dispersion ?? 0.6).toFixed(3);
-    const zoom = Math.max(0, opts.zoom ?? 3).toFixed(3);
-    return shaderTransition({
-        name: "lens_distortion",
-        frag: `
-const float STRENGTH = ${strength};
-const float DISPERSION = ${dispersion};
+export class LensDistortion extends ShaderTransition<LensDistortionParams> {
+    readonly name = "lens_distortion";
+    readonly frag = `
+uniform float strength;
+uniform float dispersion;
+// The old content zooms from 1 to 1 + zoom; the new one from 1 + zoom back to 1.
+uniform float zoom;
 const float TAPS = 12.0;
 // Width of the growing warp's edge.
 const float SOFT = 0.5;
-// The old content zooms from 1 to 1 + ZOOM; the new one from 1 + ZOOM back to 1.
-const float ZOOM = ${zoom};
 
 ${IGN}
 ${MIRROR}
@@ -43,15 +44,15 @@ vec4 transition(vec2 uv, float t) {
     amount = 1.0 - smoothstep(reach - SOFT, reach, l);
   }
   float jitter = ign(gl_FragCoord.xy);
-  float zoomFrom = 1.0 + ZOOM * t;
-  float zoomTo = 1.0 + ZOOM * (1.0 - t);
+  float zoomFrom = 1.0 + zoom * t;
+  float zoomTo = 1.0 + zoom * (1.0 - t);
 
   vec3 rgb = vec3(0.0);
   vec3 total = vec3(0.0);
   float alpha = 0.0;
   for (float n = 0.0; n < TAPS; n += 1.0) {
     float k = (n + jitter) / TAPS;
-    float s = amount * STRENGTH * (1.0 + DISPERSION * (k - 0.5) * 2.0);
+    float s = amount * strength * (1.0 + dispersion * (k - 0.5) * 2.0);
     vec2 q = p * (1.0 - l * s);
     q.x /= aspect;
     vec4 c = vec4(0.0);
@@ -65,9 +66,13 @@ vec4 transition(vec2 uv, float t) {
   }
   return vec4(rgb / total, alpha / TAPS);
 }
-`,
-    });
-}
+`;
 
-/** Lens warp with a strong rainbow split. */
-export const lensDistortion: ShaderTransitionDef = createLensDistortion();
+    uniforms() {
+        return {
+            strength: this.params.strength ?? 1,
+            dispersion: Math.max(0, this.params.dispersion ?? 0.6),
+            zoom: Math.max(0, this.params.zoom ?? 3),
+        };
+    }
+}

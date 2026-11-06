@@ -1,7 +1,12 @@
-import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 import { IGN } from "./_shared";
 
 export type SwipeDirection = "left" | "right" | "up" | "down";
+
+export type SwipeParams = {
+    /** Where the content moves. Default `"left"`. */
+    direction?: SwipeDirection;
+};
 
 // Direction the content moves, in uv space (y up).
 const MOVES: Record<SwipeDirection, [number, number]> = {
@@ -15,14 +20,10 @@ const MOVES: Record<SwipeDirection, [number, number]> = {
  * The content moves toward `direction` and the new content follows it in.
  * Mid-way it stretches along the move and blurs with the motion.
  */
-export function createSwipe(
-    opts: { direction?: SwipeDirection } = {},
-): ShaderTransitionDef {
-    const [x, y] = MOVES[opts.direction ?? "left"];
-    return shaderTransition({
-        name: "swipe",
-        frag: `
-const vec2 move = vec2(${x.toFixed(1)}, ${y.toFixed(1)});
+export class Swipe extends ShaderTransition<SwipeParams> {
+    readonly name = "swipe";
+    readonly frag = `
+uniform vec2 move;
 const float STRETCH = 0.6;
 const float BLUR = 0.2;
 const float TAPS = 16.0;
@@ -48,9 +49,9 @@ vec4 transition(vec2 uv, float t) {
   }
   return c / TAPS;
 }
-`,
-    });
-}
+`;
 
-/** Content moves left, the new content enters from the right. */
-export const swipe: ShaderTransitionDef = createSwipe();
+    uniforms() {
+        return { move: MOVES[this.params.direction ?? "left"] };
+    }
+}

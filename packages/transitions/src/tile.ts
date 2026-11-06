@@ -1,17 +1,28 @@
-import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 
 /** Where the tiles start to shrink. `center` spreads out in rings; the others sweep toward that side. */
 export type TileDirection = "center" | "left" | "right" | "up" | "down";
 
 export type TileShape = "hex" | "square";
 
-// Delay of the tile at `center`, in [0, 1]. `extent` is half the grid size, in tiles.
-const DELAYS: Record<TileDirection, string> = {
-    center: "length(center) / length(extent)",
-    left: "(extent.x - center.x) / (extent.x * 2.0)",
-    right: "(center.x + extent.x) / (extent.x * 2.0)",
-    up: "(center.y + extent.y) / (extent.y * 2.0)",
-    down: "(extent.y - center.y) / (extent.y * 2.0)",
+export type TileParams = {
+    /** Default `"center"`. */
+    direction?: TileDirection;
+    /** Default `"hex"`. */
+    shape?: TileShape;
+    /** Tiles along the longer side. Default 12. */
+    count?: number;
+    /** Opacity of the drop shadow under the shrinking tiles; 0 turns it off. Default 0.5. */
+    shadow?: number;
+};
+
+// The side the sweep moves toward, in tile space (y up). Zero spreads out in rings.
+const SWEEPS: Record<TileDirection, [number, number]> = {
+    center: [0, 0],
+    left: [-1, 0],
+    right: [1, 0],
+    up: [0, 1],
+    down: [0, -1],
 };
 
 // `cellOf` returns the point relative to its tile center, then the center.
@@ -43,44 +54,31 @@ float cellDist(vec2 p) {
 `,
 };
 
-/**
- * The old content splits into tiles that shrink away and show the new content.
- * `count` is the number of tiles along the longer side.
- * `shadow` is the opacity of the drop shadow under the shrinking tiles; 0 turns it off.
- */
-export function createTile(
-    opts: {
-        direction?: TileDirection;
-        shape?: TileShape;
-        count?: number;
-        shadow?: number;
-    } = {},
-): ShaderTransitionDef {
-    const delay = DELAYS[opts.direction ?? "center"];
-    const shape = SHAPES[opts.shape ?? "hex"];
-    const count = Math.max(1, Math.round(opts.count ?? 12)).toFixed(1);
-    const shadow = Math.min(Math.max(opts.shadow ?? 0.5, 0), 1).toFixed(3);
-    return shaderTransition({
-        name: "tile",
-        frag: `
-const float COUNT = ${count};
+const fragOf = (shape: TileShape) => `
+uniform float count;
+uniform float shadow;
+// Zero spreads out in rings; otherwise the side the sweep moves toward.
+uniform vec2 sweep;
 const float SPREAD = 0.6;
-const float SHADOW = ${shadow};
 // Shadow offset and blur at full lift, in tiles.
 const vec2 SHADOW_OFFSET = vec2(0.05, -0.08);
 const float SHADOW_BLUR = 0.12;
-${shape}
+${SHAPES[shape]}
 vec4 transition(vec2 uv, float t) {
   // A container overflow must not show tiles outside the element.
   if (!inRange(uv)) return vec4(0.0);
   // Grid in tile units, centered on the element.
-  float tilePx = max(resolution.x, resolution.y) / COUNT;
+  float tilePx = max(resolution.x, resolution.y) / count;
   vec2 extent = resolution * 0.5 / tilePx;
   vec4 cell = cellOf((uv - 0.5) * resolution / tilePx);
   vec2 local = cell.xy;
   vec2 center = cell.zw;
 
-  float d = clamp(${delay}, 0.0, 1.0);
+  // Delay of this tile, in [0, 1]. The extent is half the grid size, in tiles.
+  float d = sweep == vec2(0.0)
+    ? length(center) / length(extent)
+    : 0.5 + dot(center / (extent * 2.0), sweep);
+  d = clamp(d, 0.0, 1.0);
   float scale = 1.0 - smoothstep(0.0, 1.0, clamp((t - d * SPREAD) / (1.0 - SPREAD), 0.0, 1.0));
   // Distance outside the shrunk tile, in pixels.
   float edge = (cellDist(local) - 0.5 * scale) * tilePx;
@@ -92,7 +90,7 @@ vec4 transition(vec2 uv, float t) {
   float lift = 1.0 - scale;
   float blur = SHADOW_BLUR * lift * tilePx + 1.0;
   float shadowEdge = (cellDist(local - SHADOW_OFFSET * lift) - 0.5 * scale) * tilePx;
-  float shade = SHADOW * smoothstep(0.0, 0.2, lift) * (1.0 - smoothstep(-blur, blur, shadowEdge));
+  float shade = shadow * smoothstep(0.0, 0.2, lift) * (1.0 - smoothstep(-blur, blur, shadowEdge));
   to = vec4(to.rgb * (1.0 - shade), max(to.a, shade));
   if (inside <= 0.0) return to;
 
@@ -100,9 +98,27 @@ vec4 transition(vec2 uv, float t) {
   from *= inside;
   return from + to * (1.0 - from.a);
 }
-`,
-    });
-}
+`;
 
-/** Hex tiles shrink away from the center out. */
-export const tile: ShaderTransitionDef = createTile();
+// The shape changes the shader, so each one is its own.
+const FRAGS: Record<TileShape, string> = {
+    hex: fragOf("hex"),
+    square: fragOf("square"),
+};
+
+/** The old content splits into tiles that shrink away and show the new content. */
+export class Tile extends ShaderTransition<TileParams> {
+    readonly name = "tile";
+
+    get frag(): string {
+        return FRAGS[this.params.shape ?? "hex"];
+    }
+
+    uniforms() {
+        return {
+            count: Math.max(1, Math.round(this.params.count ?? 12)),
+            shadow: Math.min(Math.max(this.params.shadow ?? 0.5, 0), 1),
+            sweep: SWEEPS[this.params.direction ?? "center"],
+        };
+    }
+}

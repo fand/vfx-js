@@ -1,12 +1,12 @@
-import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 
 /**
  * The old content stretches from the top down into vertical streaks.
  * It fades to the new content, stretched the same way, which then settles from the top down.
  */
-export const pixelStretch: ShaderTransitionDef = shaderTransition({
-    name: "pixel_stretch",
-    frag: `
+export class PixelStretch extends ShaderTransition {
+    readonly name = "pixel_stretch";
+    readonly frag = `
 const float SMOOTH = 0.05;
 
 // Quadratic smooth min (Inigo Quilez) to round the corner where the streaks start.
@@ -37,5 +37,5 @@ vec4 transition(vec2 uv, float t) {
   }
   return c;
 }
-`,
-});
+`;
+}

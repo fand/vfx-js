@@ -1,11 +1,16 @@
 import {
-    shaderTransition,
-    type TransitionDef,
+    ShaderTransition,
     type TransitionEffect,
     type TransitionEffectContext,
     type TransitionRun,
 } from "@vfx-js/core";
 import { DatamoshEffect } from "@vfx-js/effects";
+import { StagedTransition } from "./_shared";
+
+export type DatamoshParams = {
+    /** Block size in px, 2 or more. Default 32. */
+    blockSize?: number;
+};
 
 const HOLD = 0.25;
 const CHROMA_GAIN = 1.5;
@@ -14,30 +19,33 @@ const CUT_FRAMES = 2;
 const DEFAULT_BLOCK_SIZE = 32;
 
 // The cut always lands on the new content, in both directions.
-const cut = shaderTransition({
-    name: "datamosh",
-    frag: `
+class Cut extends ShaderTransition {
+    readonly name = "datamosh";
+    readonly frag = `
 vec4 transition(vec2 uv, float t) {
   return reverse > 0.5 ? readFrom(uv) : readTo(uv);
 }
-`,
-});
+`;
+}
 
-export class DatamoshTransitionEffect
-    extends DatamoshEffect
-    implements TransitionEffect
-{
-    #blockSize: number;
+function validBlockSize(size: number | undefined): number {
+    return size !== undefined && Number.isFinite(size) && size >= 2
+        ? Math.round(size)
+        : DEFAULT_BLOCK_SIZE;
+}
+
+export class DatamoshStage extends DatamoshEffect implements TransitionEffect {
+    #blockSize: () => number;
     #frames = 0;
     #healSec = 1;
 
-    constructor(blockSize: number) {
-        super({ dup: 0, blockSize });
+    constructor(blockSize: () => number) {
+        super({ dup: 0, blockSize: blockSize() });
         this.#blockSize = blockSize;
     }
 
     start(run: TransitionRun): void {
-        this.params.blockSize = this.#blockSize;
+        this.params.blockSize = this.#blockSize();
         this.params.chromaGain = CHROMA_GAIN;
         this.params.useResidual = false;
         this.params.healRate = 0;
@@ -68,18 +76,10 @@ export class DatamoshTransitionEffect
  * are moved to match the new one, held for 25% of the duration, then healed
  * block by block.
  */
-export function createDatamosh(
-    opts: { blockSize?: number } = {},
-): TransitionDef {
-    const size = opts.blockSize;
-    const blockSize =
-        size !== undefined && Number.isFinite(size) && size >= 2
-            ? Math.round(size)
-            : DEFAULT_BLOCK_SIZE;
-    return {
-        name: "datamosh",
-        create: () => [cut.create(), new DatamoshTransitionEffect(blockSize)],
-    };
+export class Datamosh extends StagedTransition<DatamoshParams> {
+    readonly name = "datamosh";
+    protected readonly stages = [
+        new Cut(),
+        new DatamoshStage(() => validBlockSize(this.params.blockSize)),
+    ];
 }
-
-export const datamosh: TransitionDef = createDatamosh();

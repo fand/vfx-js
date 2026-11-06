@@ -1,31 +1,34 @@
-import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 
 /** Where the fronts sweep. `center` spreads out in rings. */
 export type PixelScanDirection = "right" | "left" | "up" | "down" | "center";
 
-// Where the front reaches cell `pi`, in [0, 1]. Cells span [-scale, scale] in x and the aspect-scaled range in y.
-const CELL_POS: Record<PixelScanDirection, string> = {
-    right: "pi.x / (scale * 2.0) + 0.5",
-    left: "0.5 - pi.x / (scale * 2.0)",
-    up: "pi.y / (scale * aspect() * 2.0) + 0.5",
-    down: "0.5 - pi.y / (scale * aspect() * 2.0)",
-    center: "length(pi / scale) / length(vec2(1.0, aspect()))",
+export type PixelScanParams = {
+    /** Default `"right"`. */
+    direction?: PixelScanDirection;
+    /** Fill the gap between the fronts with black; false leaves it transparent. Default true. */
+    blackout?: boolean;
+};
+
+// The side the fronts sweep toward (y up). Zero spreads out in rings.
+const SWEEPS: Record<PixelScanDirection, [number, number]> = {
+    right: [1, 0],
+    left: [-1, 0],
+    up: [0, 1],
+    down: [0, -1],
+    center: [0, 0],
 };
 
 /**
  * A front of glowing pixel cells sweeps toward `direction` and takes the old content away.
  * A second front follows a little later and brings the new content in.
- * `blackout` fills the gap between them with black; false leaves it transparent.
  */
-export function createPixelScan(
-    opts: { direction?: PixelScanDirection; blackout?: boolean } = {},
-): ShaderTransitionDef {
-    const cellPos = CELL_POS[opts.direction ?? "right"];
-    const blackout = (opts.blackout ?? true) ? "1.0" : "0.0";
-    return shaderTransition({
-        name: "pixel_scan",
-        frag: `
-const float BLACKOUT = ${blackout};
+export class PixelScan extends ShaderTransition<PixelScanParams> {
+    readonly name = "pixel_scan";
+    readonly frag = `
+uniform float blackout;
+// Zero spreads out in rings; otherwise the side the fronts sweep toward.
+uniform vec2 sweep;
 const float W = 0.2;
 // Half width of each glowing front.
 const float GLOW = 0.12;
@@ -52,9 +55,11 @@ float aspect() {
   return resolution.y / resolution.x;
 }
 
-// Where the front reaches the cell, in [0, 1].
+// Where the front reaches the cell, in [0, 1]. Cells span [-scale, scale] in x and the aspect-scaled range in y.
 float cellPos(vec2 pi, float scale) {
-  return ${cellPos};
+  vec2 size = vec2(1.0, aspect());
+  if (sweep == vec2(0.0)) return length(pi / scale) / length(size);
+  return 0.5 + dot(pi / (scale * size * 2.0), sweep);
 }
 
 vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
@@ -96,7 +101,7 @@ vec4 draw(vec2 uv, vec2 p, float t, float scale) {
   vec4 from = readFrom(uv);
   vec4 to = readTo(uv);
   float a = max(from.a, to.a);
-  float gap = BLACKOUT * (out_ - in_);
+  float gap = blackout * (out_ - in_);
   vec4 c = from * (1.0 - out_) + to * in_ + vec4(0.0, 0.0, 0.0, a) * gap;
   vec4 glow = cellsColor(p * scale, scale, t) + cellsColor(p * scale, scale, tIn);
   return c + glow * 1.5;
@@ -116,9 +121,12 @@ vec4 transition(vec2 uv, float t) {
   c /= LAYERS;
   return vec4(c.rgb, min(c.a, 1.0));
 }
-`,
-    });
-}
+`;
 
-/** Pixel cells sweep left to right, with a black gap between old and new. */
-export const pixelScan: ShaderTransitionDef = createPixelScan();
+    uniforms() {
+        return {
+            blackout: (this.params.blackout ?? true) ? 1 : 0,
+            sweep: SWEEPS[this.params.direction ?? "right"],
+        };
+    }
+}
