@@ -2,7 +2,8 @@
 
 Status as of 2026-11-06. Branch `feat/transition`, PR #220.
 Plans: [plan.md](./plan.md), then the review follow-ups [plan2.md](./plan2.md),
-[plan3.md](./plan3.md), [plan4.md](./plan4.md), [plan5.md](./plan5.md).
+[plan3.md](./plan3.md), [plan4.md](./plan4.md), [plan5.md](./plan5.md),
+[plan10.md](./plan10.md).
 User guide: [docs/TRANSITION.md](../../TRANSITION.md).
 
 ## Where it started
@@ -590,3 +591,65 @@ Not done:
   stills only.
 - No hero CSS theme (font) for the new presets.
 - `slitScan`, `pixelScan` and `pixelStretch` have no direction option.
+
+## Slides: show() on the handle
+
+From [plan10.md](./plan10.md). `run(cb)` fits routers, which build the
+new content on the fly. It did not fit tabs, carousels or steps, where
+every slide is already in the DOM. The old Core example also called an
+undefined `renderTab`.
+
+Model:
+
+- A container and its **direct children** as slides. No marker attribute.
+  Controls go outside the container.
+- One slide shows at a time. The others carry `hidden`, which needs no CSS.
+
+Core API:
+
+- `TransitionHandle.show(slide, opts?)`. `SlideRef = HTMLElement | number
+  | string`: an element, an index into the children, or a selector.
+  `ShowOpts = RunOpts & { remove?: boolean }`.
+- A missing or nested target throws a `TypeError` before any run.
+- A detached element is appended to the container first.
+- The slide already shown alone resolves at once, with no run. The check
+  is skipped while a run is in flight, since that run may still change
+  the slides.
+- `remove: true` removes the other slides instead of hiding them. It is
+  stripped before the run, so it never reaches the spec.
+- `show` is built on `run(cb, opts)`; `run` stays the primitive.
+- Renamed the `Transition` interface to `TransitionHandle`: it is the
+  per-element controller, and the name clashed with `<Transition>`
+  components. Shipped without an alias, since `addTransition` is
+  unreleased. The class keeps the name `TransitionController`.
+
+React: the bindings use `run` only. React owns the children, so toggling
+`hidden` from core would fight it. Only the type imports changed.
+
+Storybook: the Tabs story renders all pages up front as `<section>`s
+(all but the first `hidden`) and switches with `show(index)`.
+
+Docs and demo: the tabs example (`#panel` with three `<section>`s,
+buttons with `data-panel`, `t.show(tab.dataset.panel!)`) replaces the
+`renderTab` / `renderNextTab` snippets in `docs/TRANSITION.md`, the
+landing page's Vanilla tab and the Vanilla getting-started section.
+`docs/TRANSITION.md` documents `show`, `SlideRef`, `ShowOpts` and the
+`hidden` trap: a user `display` rule beats `hidden`, so add
+`[hidden] { display: none !important }` or use `remove: true`. The
+SvelteKit, Nuxt and Astro snippets stay on `run`. How it works: the Swap
+step says `show(slide)` writes the callback for you.
+
+Tests (`transition.test.ts`, fake host plus a small fake DOM): `show`
+hides the others after the snapshot; index and selector resolve; missing
+or non-child targets throw before a run; a detached slide is appended;
+`remove: true` removes the others; the shown slide starts no run;
+`ShowOpts` reach the run (`reverse`).
+
+Not done:
+
+- No per-slide default spec in core (the `<TransitionIn>` equivalent).
+  Could be a spec map on the handle later.
+- The SvelteKit and Nuxt demos got the type rename but were not
+  type-checked.
+- `show()` has not run in a real browser yet. The storybook Tabs story
+  was not run either.
