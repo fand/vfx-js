@@ -22,7 +22,7 @@ export const metadata: Metadata = {
         template: "%s — VFX-JS Transitions",
     },
     description:
-        "Swap any element through a WebGL shader. Presets for React, Next.js and plain JS.",
+        "Next-level page transitions with HTML-in-Canvas. Run your live pages through WebGL shaders in a few lines of React or plain JS.",
 };
 
 export default function RootLayout({

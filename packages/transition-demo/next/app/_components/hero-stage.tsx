@@ -302,9 +302,8 @@ export function HeroStage() {
                 />
             </div>
             <p className="hero-tagline">
-                Swap any element — a tab, a carousel, a whole page — through a
-                WebGL shader. One component for React. A few lines for
-                everything else.
+                Next-level page transitions with HTML-in-Canvas. Your live pages
+                go through WebGL shaders, in a few lines of React or plain JS.
             </p>
             <div className="hero-cta">
                 <Link href="/getting-started" className="btn btn-primary">
