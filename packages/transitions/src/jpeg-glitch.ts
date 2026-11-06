@@ -28,7 +28,7 @@ export class JpegGlitchTransitionEffect
     #quality: number;
 
     constructor(maxIterations: number, quality: number) {
-        super({ quality, bypass: true });
+        super({ quality, bypass: true, resolutionScale: 0.25 });
         this.#maxIterations = maxIterations;
         this.#quality = quality;
     }
