@@ -756,8 +756,10 @@ em {
         box-shadow 0.15s ease,
         backdrop-filter 0.15s ease;
 }
+/* With nothing hovered or focused, the middle item looks active. */
 .carousel-item:hover,
-.carousel-item:focus-visible {
+.carousel-item:focus-visible,
+.carousel:not(:hover, :has(:focus-visible)) .carousel-item[data-center] {
     scale: 1.12;
     background: var(--glass);
     box-shadow: var(--glass-shadow);
@@ -834,11 +836,17 @@ em {
     transition: translate 0.15s ease;
 }
 .carousel-item:hover .carousel-play,
-.carousel-item:focus-visible .carousel-play {
+.carousel-item:focus-visible .carousel-play,
+.carousel:not(:hover, :has(:focus-visible))
+    .carousel-item[data-center]
+    .carousel-play {
     opacity: 1;
 }
 .carousel-item:hover .carousel-label,
-.carousel-item:focus-visible .carousel-label {
+.carousel-item:focus-visible .carousel-label,
+.carousel:not(:hover, :has(:focus-visible))
+    .carousel-item[data-center]
+    .carousel-label {
     translate: var(--shift) 0;
 }
 @media (max-width: 640px) {

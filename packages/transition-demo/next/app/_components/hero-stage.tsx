@@ -58,6 +58,27 @@ const labels: Record<PresetName, string> = {
 const palettes = ["default", "orange", "purple", "green"];
 const patterns = ["dots", "grid", "diagonal", "contour", "sine"];
 
+/** Sets `data-center` on the item closest to the middle of the list. */
+function markCenter(el: HTMLElement) {
+    const mid = el.getBoundingClientRect().left + el.clientWidth / 2;
+    let best: Element | null = null;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (const item of el.children) {
+        const r = item.getBoundingClientRect();
+        const dist = Math.abs(r.left + r.width / 2 - mid);
+        if (dist < bestDist) {
+            best = item;
+            bestDist = dist;
+        }
+    }
+    for (const item of el.querySelectorAll("[data-center]")) {
+        if (item !== best) {
+            item.removeAttribute("data-center");
+        }
+    }
+    best?.setAttribute("data-center", "");
+}
+
 /** The hero word changes with the theme. */
 const words: Partial<Record<PresetName, string>> = {
     swipe: "TRANSITIONS",
@@ -130,6 +151,7 @@ export function HeroStage() {
         el.dataset.ready = "";
         el.scrollLeft = centerOf(el, item);
         focusRef.current += wrapScroll(el);
+        markCenter(el);
     }, [focus]);
 
     useEffect(() => {
@@ -150,6 +172,12 @@ export function HeroStage() {
             clearTimeout(timer);
             timer = window.setTimeout(onScrollEnd, 150);
         };
+        let frame = 0;
+        const onScrollCenter = () => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => markCenter(el));
+        };
+        el.addEventListener("scroll", onScrollCenter, { passive: true });
         const stop = () => setAutoplay(false);
         const hasScrollEnd = "onscrollend" in window;
         el.addEventListener(
@@ -161,6 +189,8 @@ export function HeroStage() {
         el.addEventListener("touchstart", stop, { passive: true });
         return () => {
             clearTimeout(timer);
+            cancelAnimationFrame(frame);
+            el.removeEventListener("scroll", onScrollCenter);
             el.removeEventListener("scrollend", onScrollEnd);
             el.removeEventListener("scroll", onScroll);
             el.removeEventListener("pointerdown", stop);
