@@ -370,7 +370,7 @@ import {
 | `slitScan` | A scan line smears the content into stripes, then draws the new one out of its own. |
 | `pixelScan` | A front of glowing pixel cells sweeps left to right. |
 | `pixelStretch` | Content stretches into streaks from the top, fades to the new one, which settles from the top. |
-| `tile` / `createTile({ direction, count })` | Content splits into tiles that shrink away. `direction`: `center` (default), `left`, `right`, `up`, `down`. |
+| `tile` / `createTile({ direction, shape, count })` | Content splits into tiles that shrink away. `direction`: `center` (default), `left`, `right`, `up`, `down`. `shape`: `hex` (default) or `square`. |
 
 ### gl-transitions
 

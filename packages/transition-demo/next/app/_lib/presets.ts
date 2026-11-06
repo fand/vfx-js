@@ -80,6 +80,6 @@ export const presetList: PresetInfo[] = [
     {
         name: "tile",
         note: "Tiles shrink away to show the new content.",
-        factory: "createTile({ direction, count })",
+        factory: "createTile({ direction, shape, count })",
     },
 ];

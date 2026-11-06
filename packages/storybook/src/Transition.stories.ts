@@ -21,6 +21,7 @@ const TRANSITIONS: Record<string, TransitionDef> = {
     pixelStretch: presets.pixelStretch,
     tile: presets.tile,
     tileUp: presets.createTile({ direction: "up" }),
+    tileSquare: presets.createTile({ shape: "square" }),
 };
 
 type Args = {

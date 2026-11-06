@@ -13,6 +13,6 @@ export { pixelStretch } from "./pixel-stretch";
 export { createPixelsort, pixelsort } from "./pixelsort";
 export { slitScan } from "./slit-scan";
 export { createSwipe, type SwipeDirection, swipe } from "./swipe";
-export { createTile, type TileDirection, tile } from "./tile";
+export { createTile, type TileDirection, type TileShape, tile } from "./tile";
 export { zoom } from "./zoom";
 export { zoomBlur } from "./zoom-blur";

@@ -99,11 +99,17 @@ describe("transition presets", () => {
         expect(presets.swipe.frag).toContain("vec2(-1.0, 0.0)");
     });
 
-    test("tile bakes the direction and count into the shader", () => {
-        const def = presets.createTile({ direction: "up", count: 8 });
-        expect(def.frag).toContain("(id.y + extent.y)");
+    test("tile bakes the options into the shader", () => {
+        const def = presets.createTile({
+            direction: "up",
+            shape: "square",
+            count: 8,
+        });
+        expect(def.frag).toContain("(center.y + extent.y)");
         expect(def.frag).toContain("COUNT = 8.0");
-        expect(presets.tile.frag).toContain("length(id)");
+        expect(def.frag).not.toContain("HEX");
+        expect(presets.tile.frag).toContain("length(center)");
+        expect(presets.tile.frag).toContain("HEX");
     });
 
     test("lensDistortion bakes the options into the shader", () => {
