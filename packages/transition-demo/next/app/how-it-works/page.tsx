@@ -48,14 +48,6 @@ const curve = Array.from({ length: 41 }, (_, i) => {
     return `${i === 0 ? "M" : "L"}${(x * 300).toFixed(1)},${(160 - y * 160).toFixed(1)}`;
 }).join(" ");
 
-const limits = [
-    "Nested VFX elements in the container freeze during a run and show their plain content.",
-    "<body> can't be the target. Target the router outlet, like <main>.",
-    "Content of a different size isn't animated between sizes. The box is locked at its old size and jumps afterwards.",
-    "One pending click spec per page, shared by all <VFXTransition>s.",
-    "Multi-page (cross-document) navigation isn't supported. Turbo and htmx need core run(cb) by hand.",
-];
-
 export default function HowItWorks() {
     return (
         <PageFrame tone="paper" simpleFooter>
@@ -220,13 +212,37 @@ t.run(swap, { duration: 2 }); // crossfade, 2 s
 `}</Code>
             </section>
 
-            <section id="limits" className="doc-section">
-                <h2>Limits</h2>
-                <ul className="limits">
-                    {limits.map((l) => (
-                        <li key={l}>{l}</li>
-                    ))}
-                </ul>
+            <section id="limitations" className="doc-section doc-prose">
+                <div>
+                    <h2>Limitations</h2>
+                    <h3>Nested VFX elements freeze</h3>
+                    <p>
+                        VFX elements inside the container stop during a run and
+                        show their plain content.
+                    </p>
+                    <h3>
+                        <code>&lt;body&gt;</code> can't be the target
+                    </h3>
+                    <p>
+                        Target the router outlet instead, like{" "}
+                        <code>&lt;main&gt;</code>.
+                    </p>
+                    <h3>Size changes aren't animated</h3>
+                    <p>
+                        If the new content has a different size, the box stays
+                        at the old size during the run and jumps afterwards.
+                    </p>
+                    <h3>One pending click spec per page</h3>
+                    <p>
+                        All <code>&lt;VFXTransition&gt;</code>s on the page
+                        share it.
+                    </p>
+                    <h3>No multi-page navigation</h3>
+                    <p>
+                        Cross-document navigation isn't supported. With Turbo or
+                        htmx, call core <code>run(cb)</code> by hand.
+                    </p>
+                </div>
             </section>
 
             <section className="doc-section doc-next">

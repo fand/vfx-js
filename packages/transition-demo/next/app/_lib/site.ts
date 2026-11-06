@@ -34,7 +34,7 @@ export const nav: NavItem[] = [
             { id: "easing", label: "t is eased for you" },
             { id: "size", label: "Fixed size, shared box" },
             { id: "precedence", label: "Which spec wins" },
-            { id: "limits", label: "Limits" },
+            { id: "limitations", label: "Limitations" },
         ],
     },
     {

@@ -1555,23 +1555,6 @@ em {
     line-height: 1.9;
     color: var(--muted);
 }
-.limits {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 12px;
-    margin: 24px 0 0;
-    padding: 0;
-    list-style: none;
-}
-.limits li {
-    padding: 20px 22px;
-    border-radius: 14px;
-    background: var(--card);
-    box-shadow: 0 0 0 1px var(--rule);
-    line-height: 1.6;
-    color: var(--muted);
-}
-
 /* Transitions playground */
 .playground {
     display: grid;
@@ -2094,4 +2077,12 @@ em {
 }
 .doc-prose > div {
     max-width: 68ch;
+}
+.doc-prose h3 {
+    margin: 32px 0 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+.doc-prose h3 + p {
+    margin-top: 8px;
 }
