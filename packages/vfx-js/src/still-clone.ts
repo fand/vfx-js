@@ -87,10 +87,54 @@ export function coverWithStill(
         el.scrollTop = top;
         el.scrollLeft = left;
     }
+    freezeAnimations(from, to);
 
     return () => {
         clone.remove();
     };
+}
+
+/**
+ * A fresh clone starts its CSS animations from zero.
+ * Hold each one at the original's time, so the still matches the element.
+ * Pairs by element, pseudo-element and animation name: the clone has no
+ * CSS transitions or script animations, so list order would not line up.
+ */
+function freezeAnimations(from: Element[], to: Element[]): void {
+    const root = from[0];
+    const cloneRoot = to[0];
+    if (!root || !cloneRoot || typeof root.getAnimations !== "function") {
+        return;
+    }
+    const keyOf = (anim: Animation, order: Map<Element, number>) => {
+        if (!("animationName" in anim)) {
+            return null;
+        }
+        const effect = anim.effect as KeyframeEffect | null;
+        const target = effect?.target;
+        const i = target ? order.get(target) : undefined;
+        if (i === undefined) {
+            return null;
+        }
+        return `${i}|${effect?.pseudoElement ?? ""}|${anim.animationName}`;
+    };
+    const toOrder = new Map(to.map((el, i) => [el, i]));
+    const clones = new Map<string, Animation>();
+    for (const anim of cloneRoot.getAnimations({ subtree: true })) {
+        const key = keyOf(anim, toOrder);
+        if (key) {
+            clones.set(key, anim);
+        }
+    }
+    const fromOrder = new Map(from.map((el, i) => [el, i]));
+    for (const anim of root.getAnimations({ subtree: true })) {
+        const key = keyOf(anim, fromOrder);
+        const copy = key && clones.get(key);
+        if (copy) {
+            copy.currentTime = anim.currentTime;
+            copy.pause();
+        }
+    }
 }
 
 /** Copy class and inline style, and pin the laid-out size. */

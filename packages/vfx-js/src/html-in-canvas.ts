@@ -511,6 +511,9 @@ export async function wrapElement(
     savedWidths.set(element, element.style.width);
     savedBoxSizing.set(element, element.style.boxSizing);
     element.parentNode?.insertBefore(canvas, element);
+    // Style the new canvas before the move. moveBefore into an unstyled
+    // parent restarts the element's CSS animations.
+    getComputedStyle(canvas).display;
     moveNode(canvas, element, null);
     element.style.setProperty("margin", "0");
 
