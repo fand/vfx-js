@@ -4,7 +4,8 @@ import type { NextConfig } from "next";
 const config: NextConfig = {
     output: "export",
     basePath: "/vfx-js-transition",
-    trailingSlash: true,
+    // No image server in a static export.
+    images: { unoptimized: true },
 };
 
 export default config;

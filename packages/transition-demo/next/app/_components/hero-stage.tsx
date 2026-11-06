@@ -20,7 +20,10 @@ const BLINK_MS = 300;
 const COPIES = 5;
 const HOME = Math.floor(COPIES / 2);
 
-const names = presetList.map((p) => p.name);
+// crossfade is too plain to show off.
+const names = presetList
+    .map((p) => p.name)
+    .filter((name) => name !== "crossfade");
 
 const labels: Record<PresetName, string> = {
     crossfade: "Crossfade",
@@ -309,11 +312,11 @@ export function HeroStage() {
                 </Link>
                 {/* A click spec beats the page's own (pixelsort). */}
                 <TLink
-                    href="/transitions"
+                    href="/presets"
                     preset="datamosh"
                     className="btn btn-ghost"
                 >
-                    See all transitions →
+                    See all presets →
                 </TLink>
             </div>
             <span className="scroll-cue" aria-hidden>

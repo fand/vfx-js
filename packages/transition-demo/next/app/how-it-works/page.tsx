@@ -246,9 +246,9 @@ t.run(swap, { duration: 2 }); // crossfade, 2 s
             </section>
 
             <section className="doc-section doc-next">
-                <Link href="/transitions" className="next-card">
+                <Link href="/presets" className="next-card">
                     <span>Next</span>
-                    <strong>All transitions →</strong>
+                    <strong>All presets →</strong>
                 </Link>
                 {/* A click spec beats the page's own (glitch). */}
                 <TLink

@@ -143,6 +143,19 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         });
     };
 
+    // `?preset=<name>` opens that preset, e.g. from the Presets page.
+    useEffect(() => {
+        const name = new URLSearchParams(window.location.search).get("preset");
+        const next = name && sourceOf(`preset:${name}`);
+        if (!next) {
+            return;
+        }
+        setSource(next);
+        setFrag(next.frag);
+        setValues(next.uniforms);
+        setParams(defaultParams(next.factory));
+    }, []);
+
     /** Loads `id` into the editor and plays it once. */
     const pick = (id: string) => {
         const next = sourceOf(id);

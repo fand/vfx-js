@@ -8,7 +8,7 @@ import { links, nav } from "../_lib/site";
 export function Header() {
     const pathname = usePathname();
     const tone =
-        pathname === "/transitions" || pathname === "/playground"
+        pathname === "/presets" || pathname === "/playground"
             ? "dark"
             : "light";
     const isDocs = nav.some((item) => item.href === pathname);
