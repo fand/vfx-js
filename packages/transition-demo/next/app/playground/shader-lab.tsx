@@ -2,6 +2,7 @@
 
 import {
     shaderTransition,
+    type TransitionDef,
     type TransitionEase,
     type TransitionUniforms,
 } from "@vfx-js/core";
@@ -10,7 +11,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Code } from "../_components/code";
 import { highlight } from "../_components/highlight";
 import { LabScene } from "./lab-scene";
-import { groups, type Source, type SourceGroup, sourceOf } from "./sources";
+import {
+    defaultParams,
+    groups,
+    type ParamSpec,
+    type ParamValues,
+    type Source,
+    type SourceGroup,
+    sourceOf,
+} from "./sources";
 
 const first = sourceOf(groups[0].options[0].id) as Source;
 
@@ -58,6 +67,9 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
     const [source, setSource] = useState(first);
     const [frag, setFrag] = useState(first.frag);
     const [values, setValues] = useState<TransitionUniforms>(first.uniforms);
+    const [params, setParams] = useState<ParamValues>(() =>
+        defaultParams(first.factory),
+    );
     const [scene, setScene] = useState(0);
     const [tab, setTab] = useState<Tab>("presets");
     const [easeIndex, setEaseIndex] = useState(0);
@@ -97,16 +109,32 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
     // The program is cached by its source, so a new def per edit is cheap.
     const def = useMemo(
         () =>
-            shaderTransition({
-                name: "custom",
-                frag,
-                ease: source.ease,
-                overflow: source.overflow,
-            }),
-        [frag, source],
+            source.effect && source.factory
+                ? source.factory.build(params)
+                : shaderTransition({
+                      name: "custom",
+                      frag,
+                      ease: source.ease,
+                      overflow: source.overflow,
+                  }),
+        [frag, source, params],
     );
 
-    const play = (reverse = false, transition = def, uniforms = values) => {
+    /** A new param builds the preset again. A shader preset reloads its GLSL into the editor. */
+    const setParam = (name: string, value: string | number) => {
+        const next = { ...params, [name]: value };
+        setParams(next);
+        const built = source.factory?.build(next);
+        if (built && "frag" in built) {
+            setFrag((built.frag as string).trim());
+        }
+    };
+
+    const play = (
+        reverse = false,
+        transition: TransitionDef = def,
+        uniforms = values,
+    ) => {
         run(() => setScene((s) => s + 1), {
             transition,
             uniforms,
@@ -121,17 +149,21 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         if (!next) {
             return;
         }
+        const nextParams = defaultParams(next.factory);
         setSource(next);
         setFrag(next.frag);
         setValues(next.uniforms);
+        setParams(nextParams);
         play(
             false,
-            shaderTransition({
-                name: "custom",
-                frag: next.frag,
-                ease: next.ease,
-                overflow: next.overflow,
-            }),
+            next.effect && next.factory
+                ? next.factory.build(nextParams)
+                : shaderTransition({
+                      name: "custom",
+                      frag: next.frag,
+                      ease: next.ease,
+                      overflow: next.overflow,
+                  }),
             next.uniforms,
         );
     };
@@ -144,6 +176,32 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                     <LabScene index={scene} />
                 </div>
                 <div className="lab-controls">
+                    <label className="pg-range">
+                        <span>ease</span>
+                        <select
+                            className="pg-select"
+                            value={easeIndex}
+                            onChange={(e) =>
+                                setEaseIndex(Number(e.target.value))
+                            }
+                        >
+                            {eases.map((e, i) => (
+                                <option key={e.label} value={i}>
+                                    {i === 0
+                                        ? `default (${easeName(source.ease)})`
+                                        : e.label}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    {source.factory?.params.map((p) => (
+                        <ParamInput
+                            key={`${source.id}:${p.name}`}
+                            spec={p}
+                            value={params[p.name] ?? p.value}
+                            onChange={(v) => setParam(p.name, v)}
+                        />
+                    ))}
                     {source.sliders.map((u) => (
                         <label key={u.name} className="pg-range">
                             <span>
@@ -169,24 +227,6 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                             />
                         </label>
                     ))}
-                    <label className="pg-range">
-                        <span>ease</span>
-                        <select
-                            className="pg-select"
-                            value={easeIndex}
-                            onChange={(e) =>
-                                setEaseIndex(Number(e.target.value))
-                            }
-                        >
-                            {eases.map((e, i) => (
-                                <option key={e.label} value={i}>
-                                    {i === 0
-                                        ? `default (${easeName(source.ease)})`
-                                        : e.label}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
                     <div className="lab-buttons">
                         <button
                             type="button"
@@ -261,28 +301,83 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                             </>
                         )}
                     </p>
-                    <div className="lab-code">
-                        <pre aria-hidden ref={preRef}>
-                            <code>{highlight(`${frag}\n`)}</code>
-                        </pre>
-                        <textarea
-                            ref={textareaRef}
-                            spellCheck={false}
-                            wrap="off"
-                            value={frag}
-                            onChange={(e) => setFrag(e.target.value)}
-                            onScroll={syncScroll}
-                            onKeyDown={insertTab}
-                            aria-label="Transition GLSL"
-                        />
-                    </div>
-                    <p className="lab-hint">
-                        Edit and press Play. Compile errors print to the console
-                        with line numbers.
-                    </p>
+                    {source.effect ? (
+                        <p className="lab-hint">
+                            {source.label} runs effects, not a shader, so it has
+                            no GLSL to edit. Change its params under the stage.
+                        </p>
+                    ) : (
+                        <div className="lab-code">
+                            <pre aria-hidden ref={preRef}>
+                                <code>{highlight(`${frag}\n`)}</code>
+                            </pre>
+                            <textarea
+                                ref={textareaRef}
+                                spellCheck={false}
+                                wrap="off"
+                                value={frag}
+                                onChange={(e) => setFrag(e.target.value)}
+                                onScroll={syncScroll}
+                                onKeyDown={insertTab}
+                                aria-label="Transition GLSL"
+                            />
+                        </div>
+                    )}
+                    {!source.effect && (
+                        <p className="lab-hint">
+                            Edit and press Play. Compile errors print to the
+                            console with line numbers.
+                        </p>
+                    )}
                 </div>
             </div>
         </div>
+    );
+}
+
+/** A select or a slider for one factory param. */
+function ParamInput({
+    spec,
+    value,
+    onChange,
+}: {
+    spec: ParamSpec;
+    value: string | number;
+    onChange: (value: string | number) => void;
+}) {
+    if (spec.kind === "select") {
+        return (
+            <label className="pg-range">
+                <span>{spec.name}</span>
+                <select
+                    className="pg-select"
+                    value={String(value)}
+                    onChange={(e) => onChange(e.target.value)}
+                >
+                    {spec.options.map((o) => (
+                        <option key={o} value={o}>
+                            {o}
+                        </option>
+                    ))}
+                </select>
+            </label>
+        );
+    }
+    return (
+        <label className="pg-range">
+            <span>
+                {spec.name}{" "}
+                <b>{Number(value).toFixed(spec.step >= 1 ? 0 : 2)}</b>
+            </span>
+            <input
+                type="range"
+                min={spec.min}
+                max={spec.max}
+                step={spec.step}
+                value={Number(value)}
+                onChange={(e) => onChange(Number(e.target.value))}
+            />
+        </label>
     );
 }
 

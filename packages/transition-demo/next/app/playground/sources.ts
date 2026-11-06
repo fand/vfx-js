@@ -1,5 +1,20 @@
-import type { ShaderTransitionDef, TransitionUniforms } from "@vfx-js/core";
-import { createGLTransition } from "@vfx-js/transitions";
+import type {
+    ShaderTransitionDef,
+    TransitionDef,
+    TransitionUniforms,
+} from "@vfx-js/core";
+import {
+    createDatamosh,
+    createGLTransition,
+    createJpegGlitch,
+    createLensDistortion,
+    createPixelsort,
+    createSwipe,
+    createTile,
+    type SwipeDirection,
+    type TileDirection,
+    type TileShape,
+} from "@vfx-js/transitions";
 import transitions from "gl-transitions";
 import { presets } from "../_lib/presets";
 import { examples, type UniformSpec } from "./examples";
@@ -15,7 +30,157 @@ export type Source = {
     overflow?: ShaderTransitionDef["overflow"];
     /** Set for shaders from gl-transitions, which keep their author's license. */
     credit?: Credit;
+    factory?: Factory;
+    /** Set for presets that run effects, not a shader. They have no GLSL to edit. */
+    effect?: boolean;
 };
+
+/** A factory option of a preset. */
+export type ParamSpec =
+    | { name: string; kind: "select"; options: string[]; value: string }
+    | {
+          name: string;
+          kind: "range";
+          min: number;
+          max: number;
+          step: number;
+          value: number;
+      };
+
+export type ParamValues = Record<string, string | number>;
+
+/** A preset built by a factory. Changing a param builds it again. */
+export type Factory = {
+    params: ParamSpec[];
+    build: (values: ParamValues) => TransitionDef;
+};
+
+const directions = ["left", "right", "up", "down"];
+
+// Factory options of the presets. Shader presets bake them into GLSL constants, so they have no uniforms.
+const factories: Record<string, Factory> = {
+    swipe: {
+        params: [
+            {
+                name: "direction",
+                kind: "select",
+                options: directions,
+                value: "left",
+            },
+        ],
+        build: (v) => createSwipe({ direction: v.direction as SwipeDirection }),
+    },
+    tile: {
+        params: [
+            {
+                name: "direction",
+                kind: "select",
+                options: ["center", ...directions],
+                value: "center",
+            },
+            {
+                name: "shape",
+                kind: "select",
+                options: ["hex", "square"],
+                value: "hex",
+            },
+            {
+                name: "count",
+                kind: "range",
+                min: 2,
+                max: 40,
+                step: 1,
+                value: 12,
+            },
+        ],
+        build: (v) =>
+            createTile({
+                direction: v.direction as TileDirection,
+                shape: v.shape as TileShape,
+                count: Number(v.count),
+            }),
+    },
+    lensDistortion: {
+        params: [
+            {
+                name: "strength",
+                kind: "range",
+                min: 0,
+                max: 3,
+                step: 0.05,
+                value: 1,
+            },
+            {
+                name: "dispersion",
+                kind: "range",
+                min: 0,
+                max: 2,
+                step: 0.05,
+                value: 0.6,
+            },
+        ],
+        build: (v) =>
+            createLensDistortion({
+                strength: Number(v.strength),
+                dispersion: Number(v.dispersion),
+            }),
+    },
+    pixelsort: {
+        params: [
+            {
+                name: "direction",
+                kind: "select",
+                options: ["up", "down", "left", "right"],
+                value: "up",
+            },
+        ],
+        build: (v) =>
+            createPixelsort({
+                direction: v.direction as "up" | "down" | "left" | "right",
+            }),
+    },
+    datamosh: {
+        params: [
+            {
+                name: "blockSize",
+                kind: "range",
+                min: 2,
+                max: 128,
+                step: 1,
+                value: 32,
+            },
+        ],
+        build: (v) => createDatamosh({ blockSize: Number(v.blockSize) }),
+    },
+    jpegGlitch: {
+        params: [
+            {
+                name: "iterations",
+                kind: "range",
+                min: 1,
+                max: 256,
+                step: 1,
+                value: 64,
+            },
+            {
+                name: "quality",
+                kind: "range",
+                min: 0,
+                max: 1,
+                step: 0.05,
+                value: 0.3,
+            },
+        ],
+        build: (v) =>
+            createJpegGlitch({
+                iterations: Number(v.iterations),
+                quality: Number(v.quality),
+            }),
+    },
+};
+
+export const defaultParams = (f: Factory | undefined): ParamValues =>
+    Object.fromEntries(f?.params.map((p) => [p.name, p.value]) ?? []);
 
 export type Credit = { author: string; license: string; href: string };
 
@@ -28,9 +193,7 @@ export type SourceGroup = {
 
 const isShader = (def: object): def is ShaderTransitionDef => "frag" in def;
 
-const presetDefs = Object.entries(presets).filter(
-    (entry): entry is [string, ShaderTransitionDef] => isShader(entry[1]),
-);
+const presetDefs = Object.entries(presets);
 
 // "Name <mail>" → "Name", for a tidy list. The license and link keep full credit.
 const authorOf = (author: string) =>
@@ -126,7 +289,23 @@ export function sourceOf(id: string): Source | undefined {
     }
     if (kind === "preset") {
         const def = presetDefs.find(([n]) => n === name)?.[1];
-        return def && fromDef(id, name, def);
+        if (!def) {
+            return undefined;
+        }
+        const factory = factories[name];
+        if (!isShader(def)) {
+            return {
+                id,
+                label: name,
+                frag: "",
+                sliders: [],
+                uniforms: {},
+                ease: def.ease,
+                factory,
+                effect: true,
+            };
+        }
+        return { ...fromDef(id, name, def), factory };
     }
     if (kind === "gl") {
         const entry = glEntries.find((e) => e.name === name);
