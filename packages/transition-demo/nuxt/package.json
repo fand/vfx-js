@@ -6,7 +6,8 @@
     "dev": "nuxt dev",
     "build:demo": "nuxt generate",
     "preview": "nuxt preview --port 5003",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxi typecheck"
   },
   "dependencies": {
     "@vfx-js/core": "workspace:*",
@@ -15,5 +16,9 @@
     "nuxt": "4.6.3",
     "vue": "3.5.44",
     "vue-router": "5.4.0"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vue-tsc": "3.3.13"
   }
 }

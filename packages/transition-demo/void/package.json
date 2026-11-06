@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build:demo": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@vfx-js/core": "workspace:*",

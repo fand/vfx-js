@@ -9,7 +9,7 @@ export type DemoPage = {
 };
 
 // Same pages in every demo, so the frameworks can be compared side by side.
-export const pages: DemoPage[] = [
+export const pages: [DemoPage, ...DemoPage[]] = [
     {
         path: "/",
         label: "Home",
