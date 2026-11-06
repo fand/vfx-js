@@ -27,6 +27,9 @@ const heroPresets = {
     pixelScan: createPixelScan({ direction: "center" }),
 };
 
+// Runs longer than the 1.1 s default. The rings need time to spread.
+const durations: Partial<Record<PresetName, number>> = { pixelScan: 1.8 };
+
 // crossfade is too plain to show off.
 const names = presetList
     .map((p) => p.name)
@@ -108,7 +111,10 @@ export function HeroStage() {
                         pattern: pickOther(patterns, prev.pattern),
                     }));
                 },
-                { transition: heroPresets[name] },
+                {
+                    transition: heroPresets[name],
+                    duration: durations[name],
+                },
             );
             busy.current = false;
         },
