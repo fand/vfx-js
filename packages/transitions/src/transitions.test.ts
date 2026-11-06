@@ -31,7 +31,12 @@ const shaderPresets: [string, ShaderTransitionDef][] = [
     ["crosszoom", presets.crosszoom],
     ["glitch", presets.glitch],
     ["glitchSlide", presets.glitchSlide],
+    ["lensDistortion", presets.lensDistortion],
+    ["pixelScan", presets.pixelScan],
+    ["pixelStretch", presets.pixelStretch],
+    ["slitScan", presets.slitScan],
     ["swipe", presets.swipe],
+    ["tile", presets.tile],
     ["zoom", presets.zoom],
     ["zoomBlur", presets.zoomBlur],
 ];
@@ -50,8 +55,13 @@ describe("transition presets", () => {
             "glitch",
             "glitchSlide",
             "jpegGlitch",
+            "lensDistortion",
+            "pixelScan",
+            "pixelStretch",
             "pixelsort",
+            "slitScan",
             "swipe",
+            "tile",
             "zoom",
             "zoomBlur",
         ]);
@@ -73,6 +83,11 @@ describe("transition presets", () => {
         ["swipe up", presets.createSwipe({ direction: "up" })],
         ["glitch", presets.glitch],
         ["glitchSlide", presets.glitchSlide],
+        ["lensDistortion", presets.lensDistortion],
+        ["pixelScan", presets.pixelScan],
+        ["pixelStretch", presets.pixelStretch],
+        ["slitScan", presets.slitScan],
+        ["tile", presets.tile],
     ])("%s stays inside the element", (_key, def) => {
         expect(def.frag).toContain("if (!inRange(uv)) return vec4(0.0);");
     });
@@ -82,6 +97,19 @@ describe("transition presets", () => {
             "vec2(0.0, 1.0)",
         );
         expect(presets.swipe.frag).toContain("vec2(-1.0, 0.0)");
+    });
+
+    test("tile bakes the direction and count into the shader", () => {
+        const def = presets.createTile({ direction: "up", count: 8 });
+        expect(def.frag).toContain("(id.y + extent.y)");
+        expect(def.frag).toContain("COUNT = 8.0");
+        expect(presets.tile.frag).toContain("length(id)");
+    });
+
+    test("lensDistortion bakes the options into the shader", () => {
+        const def = presets.createLensDistortion({ dispersion: 0 });
+        expect(def.frag).toContain("DISPERSION = 0.000");
+        expect(presets.lensDistortion.frag).toContain("DISPERSION = 0.600");
     });
 });
 

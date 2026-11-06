@@ -69,4 +69,9 @@ export type PresetName =
     | "glitchSlide"
     | "jpegGlitch"
     | "datamosh"
-    | "pixelsort";
+    | "pixelsort"
+    | "lensDistortion"
+    | "slitScan"
+    | "pixelScan"
+    | "pixelStretch"
+    | "tile";

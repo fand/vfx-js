@@ -33,6 +33,11 @@ const labels: Record<PresetName, string> = {
     jpegGlitch: "JpegGlitch",
     datamosh: "Datamosh",
     pixelsort: "PixelSort",
+    lensDistortion: "LensDistortion",
+    slitScan: "SlitScan",
+    pixelScan: "PixelScan",
+    pixelStretch: "PixelStretch",
+    tile: "Tile",
 };
 
 /** Each run picks a new palette and pattern at random. */

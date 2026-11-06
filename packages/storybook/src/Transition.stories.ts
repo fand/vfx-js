@@ -15,6 +15,12 @@ const TRANSITIONS: Record<string, TransitionDef> = {
     datamosh: presets.datamosh,
     pixelsort: presets.pixelsort,
     pixelsortRight: presets.createPixelsort({ direction: "right" }),
+    lensDistortion: presets.lensDistortion,
+    slitScan: presets.slitScan,
+    pixelScan: presets.pixelScan,
+    pixelStretch: presets.pixelStretch,
+    tile: presets.tile,
+    tileUp: presets.createTile({ direction: "up" }),
 };
 
 type Args = {

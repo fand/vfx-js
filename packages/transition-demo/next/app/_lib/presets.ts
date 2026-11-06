@@ -6,8 +6,13 @@ import {
     glitch,
     glitchSlide,
     jpegGlitch,
+    lensDistortion,
+    pixelScan,
+    pixelStretch,
     pixelsort,
+    slitScan,
     swipe,
+    tile,
     zoom,
     zoomBlur,
 } from "@vfx-js/transitions";
@@ -24,6 +29,11 @@ export const presets: Record<PresetName, TransitionDef> = {
     jpegGlitch,
     datamosh,
     pixelsort,
+    lensDistortion,
+    slitScan,
+    pixelScan,
+    pixelStretch,
+    tile,
 };
 
 export type PresetInfo = {
@@ -58,5 +68,18 @@ export const presetList: PresetInfo[] = [
         name: "pixelsort",
         note: "Melts into sorted streaks and sorts back out.",
         factory: "createPixelsort({ direction })",
+    },
+    {
+        name: "lensDistortion",
+        note: "Lens warp with a rainbow split.",
+        factory: "createLensDistortion({ strength, dispersion })",
+    },
+    { name: "slitScan", note: "Smears into stripes and back out." },
+    { name: "pixelScan", note: "A front of glowing pixel cells." },
+    { name: "pixelStretch", note: "Stretches into streaks from the top." },
+    {
+        name: "tile",
+        note: "Tiles shrink away to show the new content.",
+        factory: "createTile({ direction, count })",
     },
 ];

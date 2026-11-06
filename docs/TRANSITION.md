@@ -347,8 +347,10 @@ An effect from `@vfx-js/effects` can be extended the same way. See
 ```ts
 import {
     crossfade, crosszoom, datamosh, glitch, glitchSlide, jpegGlitch,
-    pixelsort, swipe, zoom, zoomBlur,
-    createDatamosh, createJpegGlitch, createPixelsort, createSwipe,
+    lensDistortion, pixelScan, pixelStretch, pixelsort, slitScan, swipe,
+    tile, zoom, zoomBlur,
+    createDatamosh, createJpegGlitch, createLensDistortion, createPixelsort,
+    createSwipe, createTile,
 } from "@vfx-js/transitions";
 ```
 
@@ -364,6 +366,11 @@ import {
 | `jpegGlitch` / `createJpegGlitch({ iterations, quality })` | Hard cut through a real JPEG glitch: encode, corrupt the bytes, decode. |
 | `datamosh` / `createDatamosh({ blockSize })` | Hard cut through a datamosh that heals block by block. |
 | `pixelsort` / `createPixelsort({ direction })` | Content melts into sorted streaks and sorts back out. |
+| `lensDistortion` / `createLensDistortion({ strength, dispersion })` | Lens warp that peaks halfway, with a rainbow split. `dispersion: 0` turns the split off. |
+| `slitScan` | A scan line smears the content into stripes, then draws the new one out of its own. |
+| `pixelScan` | A front of glowing pixel cells sweeps left to right. |
+| `pixelStretch` | Content stretches into streaks from the top, fades to the new one, which settles from the top. |
+| `tile` / `createTile({ direction, count })` | Content splits into tiles that shrink away. `direction`: `center` (default), `left`, `right`, `up`, `down`. |
 
 ### gl-transitions
 
