@@ -1724,8 +1724,10 @@ em {
 .lab {
     display: grid;
     grid-template-columns: 1.3fr 1fr;
+    /* Fills the frame, so each column scrolls on its own. */
+    grid-template-rows: minmax(0, 1fr);
     gap: 20px;
-    min-height: 100%;
+    height: 100%;
     /* The page has no .frame-main, so leave room for the header here. */
     padding: calc(20px + var(--header)) 20px 20px;
     color: #e6e6ef;
@@ -1909,9 +1911,41 @@ em {
     color: #8b8b9c;
 }
 .lab-preview {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 16px;
-    align-content: start;
+    min-height: 0;
+    overflow-y: auto;
+}
+/* Keep their size; the column scrolls instead. */
+.lab-preview > * {
+    flex: none;
+}
+.lab-transport {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.lab-transport .btn {
+    flex: none;
+    min-width: 112px;
+    justify-content: center;
+    background: var(--acid);
+    color: var(--ink);
+}
+.lab-transport .btn:disabled {
+    opacity: 0.5;
+}
+.lab-t {
+    flex: none;
+    width: 56px;
+    font: 13px var(--mono);
+    color: #fff;
+}
+.lab-transport input {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--acid);
 }
 .lab-controls {
     display: grid;
@@ -1922,17 +1956,6 @@ em {
     --muted: #a1a1ad;
     --fg: #fff;
     --em: var(--acid);
-}
-.lab-buttons {
-    display: flex;
-    gap: 10px;
-}
-.lab-buttons .btn-primary {
-    background: var(--acid);
-    color: var(--ink);
-}
-.lab-buttons .btn-ghost {
-    color: #e6e6ef;
 }
 .api-table {
     display: grid;
@@ -2066,6 +2089,14 @@ em {
     .api-table div {
         grid-template-columns: 1fr;
         gap: 6px;
+    }
+    /* One column: the page scrolls, not the column. */
+    .lab {
+        grid-template-rows: auto;
+        height: auto;
+    }
+    .lab-preview {
+        overflow: visible;
     }
 }
 @media (max-width: 720px) {
