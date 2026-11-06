@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
-// Static site served at amagi.dev/vfx-js-transition.
+// Static site served at amagi.dev/vfx-js-transitions.
 const config: NextConfig = {
     output: "export",
-    basePath: "/vfx-js-transition",
+    basePath: "/vfx-js-transitions",
     // No image server in a static export.
     images: { unoptimized: true },
 };

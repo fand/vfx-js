@@ -1,4 +1,4 @@
-name: Deploy to amagi.dev/vfx-js-transition
+name: Deploy to amagi.dev/vfx-js-transitions
 
 on:
     push:
@@ -32,7 +32,7 @@ jobs:
             - name: Deploy
               uses: peaceiris/actions-gh-pages@v4
               with:
-                  deploy_key: ${{ secrets.VFX_JS_TRANSITION_DEPLOY_KEY }}
-                  external_repository: fand/vfx-js-transition
+                  deploy_key: ${{ secrets.VFX_JS_TRANSITIONS_DEPLOY_KEY }}
+                  external_repository: fand/vfx-js-transitions
                   publish_branch: gh-pages
                   publish_dir: ./packages/transition-demo/next/out
