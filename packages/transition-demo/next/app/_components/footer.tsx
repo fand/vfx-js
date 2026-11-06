@@ -1,4 +1,5 @@
 import { links } from "../_lib/site";
+import { BrandMarkPaths } from "./header";
 
 const columns = [
     {
@@ -81,6 +82,26 @@ export function Footer({ simple = false }: { simple?: boolean }) {
                     </div>
                 ))}
             </div>
+            {/* textLength stretches the wordmark to the full width. */}
+            <svg
+                className="footer-logo"
+                viewBox="0 0 1000 125"
+                role="img"
+                aria-label="vfx-js/transitions"
+            >
+                <g transform="translate(0 5) scale(0.4455) translate(-25 -70)">
+                    <BrandMarkPaths />
+                </g>
+                <text
+                    x="135"
+                    y="95"
+                    textLength="865"
+                    lengthAdjust="spacingAndGlyphs"
+                >
+                    vfx-js<tspan className="footer-logo-slash">/</tspan>
+                    transitions
+                </text>
+            </svg>
         </footer>
     );
 }

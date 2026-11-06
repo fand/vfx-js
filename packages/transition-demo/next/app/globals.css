@@ -1958,7 +1958,7 @@ em {
 /* Footer */
 .footer {
     margin-top: 40px;
-    padding: 72px 0 48px;
+    padding: 120px 0 32px;
     background: var(--ink);
     color: #e6e6ef;
 }
@@ -2010,6 +2010,19 @@ em {
 }
 .footer-col a span {
     color: #6b6b78;
+}
+
+.footer-logo {
+    display: block;
+    width: calc(100% - 48px);
+    margin: 160px auto 0;
+    overflow: visible;
+    fill: currentColor;
+    font: 600 123px var(--sans);
+    letter-spacing: -0.04em;
+}
+.footer-logo-slash {
+    fill: var(--acid);
 }
 
 .footer-simple {
@@ -2073,6 +2086,19 @@ em {
     .doc-section,
     .doc-title,
     .footer-inner,
+    .footer-logo {
+        display: block;
+        width: calc(100% - 48px);
+        margin: 160px auto 0;
+        overflow: visible;
+        fill: currentColor;
+        font: 600 100px var(--sans);
+        letter-spacing: -0.04em;
+    }
+    .footer-logo-slash {
+        fill: var(--acid);
+    }
+
     .footer-simple {
         width: calc(100% - 32px);
     }
