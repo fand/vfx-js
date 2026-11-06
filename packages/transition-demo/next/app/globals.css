@@ -2014,7 +2014,7 @@ em {
 
 .footer-logo {
     display: block;
-    width: calc(100% - 48px);
+    width: 60%;
     margin: 160px auto 0;
 }
 
