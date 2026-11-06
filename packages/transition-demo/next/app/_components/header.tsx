@@ -131,7 +131,7 @@ export function GitHubIcon() {
 }
 
 /** The VFX-JS Transitions logo. Takes the text color. */
-function BrandMark() {
+export function BrandMark() {
     return (
         <svg
             className="brand-mark"

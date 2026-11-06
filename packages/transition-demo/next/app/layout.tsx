@@ -33,6 +33,7 @@ export default function RootLayout({
     return (
         <html
             lang="en"
+            data-loading=""
             className={`${sans.variable} ${serif.variable} ${mono.variable}`}
         >
             <body>

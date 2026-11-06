@@ -79,7 +79,8 @@ em {
     transition:
         background 0.3s,
         color 0.6s,
-        border-color 0.3s;
+        border-color 0.3s,
+        opacity 0.4s;
 }
 .header[data-tone="dark"] {
     background: var(--night);
@@ -104,6 +105,23 @@ em {
     flex: none;
     width: 28px;
     height: 28px;
+}
+/* Covers the page until it is ready. The header hides too. */
+.loader {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    background: var(--night);
+    color: var(--white);
+}
+.loader .brand-mark {
+    width: 96px;
+    height: 96px;
+}
+:root[data-loading] .header {
+    opacity: 0;
 }
 .brand-slash {
     margin: 0 2px;
@@ -228,6 +246,7 @@ em {
     overflow: hidden;
 }
 .outlet-page {
+    position: relative;
     display: flex;
     height: 100%;
     background: var(--white);
