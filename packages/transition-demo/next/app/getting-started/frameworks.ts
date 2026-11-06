@@ -107,6 +107,54 @@ export function Tabs() {
         ],
     },
     {
+        id: "void",
+        name: "Void",
+        install: "npm i @vfx-js/core @vfx-js/react @vfx-js/transitions",
+        intro: "Put <VFXTransition> in the layout with the path as pageKey. Void hands the layout each page as its own element, so the old page keeps rendering until the run swaps it.",
+        snippets: [
+            {
+                label: "pages/layout.tsx",
+                code: `
+import { VFXTransition } from "@vfx-js/react";
+import { Link, useRouter } from "@void/react";
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  const { path } = useRouter();
+  return (
+    <>
+      <nav>
+        <Link href="/">Home</Link>
+        <Link href="/about">About</Link>
+      </nav>
+      <VFXTransition pageKey={path} duration={0.8}>
+        {children}
+      </VFXTransition>
+    </>
+  );
+}`,
+            },
+            {
+                label: "pages/about.tsx",
+                code: `
+import { TransitionIn } from "@vfx-js/react";
+import { glitch } from "@vfx-js/transitions";
+
+export default function About() {
+  return (
+    <>
+      <TransitionIn transition={glitch} />
+      <h1>About</h1>
+    </>
+  );
+}`,
+            },
+        ],
+        notes: [
+            "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
+            "This uses the React adapter (@void/react).",
+        ],
+    },
+    {
         id: "nuxt",
         name: "Nuxt",
         install: "npm i @vfx-js/core @vfx-js/transitions",
@@ -216,6 +264,11 @@ export default defineNuxtPlugin((nuxtApp) => {
             {
                 label: "src/transition.ts",
                 code: `
+import {
+  swapFunctions,
+  type TransitionBeforePreparationEvent,
+  type TransitionBeforeSwapEvent,
+} from "astro:transitions/client";
 import { VFX } from "@vfx-js/core";
 import { glitch } from "@vfx-js/transitions";
 
@@ -223,11 +276,16 @@ export function setupTransition() {
   const outlet = document.querySelector<HTMLElement>("main.outlet")!;
   const t = new VFX().addTransition(outlet, { transition: glitch });
   let finishSwap: (() => void) | null = null;
+  const release = () => { finishSwap?.(); finishSwap = null; };
 
-  document.addEventListener("astro:before-preparation", (ev) => {
+  document.addEventListener("astro:before-preparation", (e) => {
+    const ev = e as TransitionBeforePreparationEvent;
     const load = ev.loader;
     ev.loader = async () => {
       await load();
+      // A newer or aborted navigation frees this run.
+      release();
+      ev.signal.addEventListener("abort", release);
       await new Promise<void>((snapshotTaken) => {
         t.run(() => {
           snapshotTaken();
@@ -237,13 +295,20 @@ export function setupTransition() {
     };
   });
 
-  document.addEventListener("astro:before-swap", (ev) => {
+  document.addEventListener("astro:before-swap", (e) => {
+    const ev = e as TransitionBeforeSwapEvent;
     ev.swap = () => {
-      // Swap head as usual, but only replace <main> in the body,
+      const doc = ev.newDocument;
+      // Same as Astro's swap, except the body: replace only the outlet,
       // so the canvas and the target stay in the document.
-      const main = ev.newDocument.querySelector("main.outlet")!;
+      swapFunctions.deselectScripts(doc);
+      swapFunctions.swapRootAttributes(doc);
+      swapFunctions.swapHeadElements(doc);
+      const restoreFocus = swapFunctions.saveFocus();
+      const main = doc.querySelector("main.outlet")!;
       outlet.replaceChildren(...main.childNodes);
-      finishSwap?.();
+      restoreFocus();
+      release();
     };
   });
 }`,
@@ -266,7 +331,8 @@ export function setupTransition() {
         ],
         notes: [
             "Give the target a fixed height, like 100dvh. Old and new content then share one box; a size change jumps at the end of the run.",
-            "Use swapFunctions from astro:transitions/client for the head, attributes and focus.",
+            "Only the outlet is swapped. Swap anything else that changes per page, like a nav, the same way.",
+            "transition:persist inside the outlet does not work with this swap.",
         ],
     },
     {
