@@ -15,6 +15,8 @@ This is a Turborepo monorepo with the following key packages:
 - `packages/docs/` - Documentation website and demos
 - `packages/storybook/` - Component stories and visual tests
 - `packages/effects/` - Additional effect implementations
+- `packages/transitions/` - Transition presets for `addTransition` (@vfx-js/transitions)
+- `packages/transition-demo/` - Demo site and framework examples for transitions (private)
 - `packages/docs-react/` - React-specific documentation
 
 The core library uses Three.js for WebGL rendering and provides a VFX class that manages effects applied to DOM elements. Effects are shader-based and can be configured with various parameters including uniforms, overflow settings, and timing controls.
@@ -28,7 +30,7 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 - `pnpm run lint` - Run linting across all packages
 
 ### Testing
-- `pnpm test` - Run tests (specifically for @vfx-js/core package)
+- `pnpm test` - Run tests in every package that has them (core, transitions, react, react-vfx)
 - `pnpm --filter @vfx-js/core run test:watch` - Run tests in watch mode
 
 ### Package-specific Development
@@ -58,6 +60,6 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 - Documentation is auto-generated with TypeDoc for the core package
 
 ### Testing
-- Core package uses Vitest for testing
+- Packages use Vitest for testing
 - Test files are located alongside source files with `.test.ts` extension
 - Run package-specific tests: `pnpm --filter @vfx-js/core run test`

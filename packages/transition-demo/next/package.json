@@ -1,0 +1,25 @@
+{
+  "name": "@vfx-js/transition-demo-next",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 5001",
+    "build:demo": "next build",
+    "preview": "next start -p 5001",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vfx-js/core": "workspace:*",
+    "@vfx-js/react": "workspace:*",
+    "@vfx-js/transitions": "workspace:*",
+    "gl-transitions": "2.0.0",
+    "next": "^16.4.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/react": "^19.3.0",
+    "typescript": "6.0.3"
+  }
+}

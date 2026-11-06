@@ -1,0 +1,15 @@
+---
+import PageView from "../components/PageView.astro";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout>
+    <PageView path="/about" />
+</Layout>
+
+<!-- Page-only CSS lands in <head>, so the swap must update the head too. -->
+<style is:global>
+    .page h1 {
+        color: #f9a8d4;
+    }
+</style>

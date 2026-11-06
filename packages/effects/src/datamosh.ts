@@ -17,20 +17,26 @@
 //   decode   intra ? cur : mc(accum, mv) + res -> accRT (persistent)
 //            (per-block intra refresh heals the mosh back to the source)
 //   display  accRT          -> ctx.target
-//   blit     cur            -> prevRT (persistent; next frame's reference)
+//   capture  ctx.src        -> prevRT (persistent; next frame's reference)
 //
 // The YCbCr 4:2:0 path swaps decode for luma (full res) + chroma (half
 // res, truncated MV); the truncation is what makes color drift off edges.
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
+import { captureContent } from "./_capture";
 
 // Premultiplied copy of an internal RT to the canvas. `uvContent` maps
 // the content rect into the target buffer.
+// Transparent outside the content, so a padded target doesn't stretch the edges.
 const FRAG_DISPLAY = `#version 300 es
 precision highp float;
 in vec2 uvContent;
 out vec4 outColor;
 uniform sampler2D tex;
 void main() {
+    if (any(lessThan(uvContent, vec2(0.0))) || any(greaterThan(uvContent, vec2(1.0)))) {
+        outColor = vec4(0.0);
+        return;
+    }
     vec4 c = texture(tex, uvContent);
     outColor = vec4(c.rgb * c.a, c.a);
 }
@@ -270,6 +276,10 @@ uniform sampler2D uLumaAcc;
 uniform sampler2D uChromaAcc;
 uniform float uChromaGain;
 void main() {
+    if (any(lessThan(uvContent, vec2(0.0))) || any(greaterThan(uvContent, vec2(1.0)))) {
+        outColor = vec4(0.0);
+        return;
+    }
     float Y = texture(uLumaAcc, uvContent).r;
     vec2 cbcr = (texture(uChromaAcc, uvContent).rg - 0.5) * uChromaGain;
     vec3 rgb = vec3(
@@ -487,7 +497,7 @@ export class DatamoshEffect implements Effect {
         const resolution: [number, number] = [this.#w, this.#h];
 
         // Capture the current frame into uv-space.
-        ctx.blit(ctx.src, cur);
+        captureContent(ctx, cur);
 
         // ME + residual feed both the decoder and the debug views, so run
         // them whenever moshing OR inspecting an intermediate stage.
@@ -595,7 +605,7 @@ export class DatamoshEffect implements Effect {
         this.#display(ctx, cur, prev, mv, res, acc, chromaAcc);
 
         // Reference for next frame's motion estimation.
-        ctx.blit(ctx.src, prev);
+        captureContent(ctx, prev);
     }
 
     // Route the selected stage to the canvas. "output" shows the decoded

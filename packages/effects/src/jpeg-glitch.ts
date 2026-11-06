@@ -29,6 +29,7 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
+import { captureContent } from "./_capture";
 
 // Passthrough of the live source to the canvas (used until the first
 // glitch result is ready). Premultiplied for the canvas blend.
@@ -556,9 +557,9 @@ export class JPEGGlitchEffect implements Effect {
             return;
         }
 
-        // Read the element capture back to the CPU. ctx.blit leaves the
+        // Read the element capture back to the CPU. The draw leaves the
         // readback RT's framebuffer bound, so readPixels reads from it.
-        ctx.blit(ctx.src, this.#readRT);
+        captureContent(ctx, this.#readRT);
         const gl = ctx.gl;
         gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.#raw);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);

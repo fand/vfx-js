@@ -1,6 +1,17 @@
 import { isHicCanvas } from "./hic-canvas.js";
-import { unwrapElement, wrapElement } from "./html-in-canvas.js";
+import {
+    lockCanvasSize,
+    releaseFirstCapture,
+    requestCapture,
+    unwrapElement,
+    wrapElement,
+} from "./html-in-canvas.js";
 import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
+import { TransitionController } from "./transition/transition.js";
+import type {
+    AddTransitionOpts,
+    TransitionHandle,
+} from "./transition/types.js";
 import {
     type Effect,
     getVFXOpts,
@@ -40,6 +51,7 @@ export class VFX {
     #player: VFXPlayer;
     #canvas: HTMLCanvasElement;
     #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
+    #transitions = new Set<TransitionHandle>();
 
     /**
      * Create a VFX instance if WebGL is available, or return `null`.
@@ -100,7 +112,7 @@ export class VFX {
             await this.#addVideo(element, opts);
         } else if (element instanceof HTMLCanvasElement) {
             if (isHicCanvas(element) && initialCapture) {
-                await this.#player.addElement(element, opts, initialCapture);
+                await this.#addHICCanvas(element, opts, initialCapture);
             } else {
                 await this.#addCanvas(element, opts);
             }
@@ -134,7 +146,23 @@ export class VFX {
      * Wraps the element in a `<canvas layoutsubtree content="drawable">` and captures via drawElementImage.
      * Falls back to `add()` if html-in-canvas is not supported.
      */
-    async addHTML(element: HTMLElement, opts: VFXProps): Promise<void> {
+    addHTML(element: HTMLElement, opts: VFXProps): Promise<void> {
+        return this.#addHTML(element, opts, false);
+    }
+
+    /**
+     * Like `addHTML`, and a still copy covers the frame before the first capture.
+     * @internal Used by transitions.
+     */
+    addHTMLWithStill(element: HTMLElement, opts: VFXProps): Promise<void> {
+        return this.#addHTML(element, opts, true);
+    }
+
+    async #addHTML(
+        element: HTMLElement,
+        opts: VFXProps,
+        withStill: boolean,
+    ): Promise<void> {
         if (!supportsHtmlInCanvas()) {
             console.warn(
                 "html-in-canvas not supported, falling back to dom-to-canvas",
@@ -160,11 +188,81 @@ export class VFX {
                 this.#player.updateHICTexture(canvas, offscreen);
             },
             maxSize: this.#player.maxTextureSize,
+            stillCover: withStill ? { zIndex: this.#stillZIndex() } : undefined,
         });
         wrapper = canvas;
         this.#wrapperCanvases.set(element, wrapper);
 
-        await this.#player.addElement(wrapper, hicOpts, initialCapture);
+        await this.#addHICCanvas(wrapper, hicOpts, initialCapture);
+    }
+
+    // One below the VFX canvas.
+    #stillZIndex(): number {
+        const zIndex = Number.parseInt(this.#canvas.style.zIndex, 10);
+        return Number.isNaN(zIndex) ? 9998 : zIndex - 1;
+    }
+
+    async #addHICCanvas(
+        canvas: HTMLCanvasElement,
+        opts: VFXProps,
+        initialCapture: OffscreenCanvas,
+    ): Promise<void> {
+        try {
+            await this.#player.addElement(canvas, opts, initialCapture);
+        } finally {
+            // A frozen element shows its plain capture until the freeze ends.
+            releaseFirstCapture(canvas, this.#player.isFrozen(canvas));
+        }
+    }
+
+    /**
+     * Animate an element from its old content to its new content with a
+     * shader. The element is wrapped only while a run is in flight,
+     * unless `keepWrapped` is set.
+     *
+     * ```ts
+     * const t = vfx.addTransition(main, { duration: 0.6 });
+     * await t.run(() => renderNextPage());
+     * ```
+     */
+    addTransition(
+        element: HTMLElement,
+        opts: AddTransitionOpts = {},
+    ): TransitionHandle {
+        const transition = new TransitionController(this, element, opts, () =>
+            this.#transitions.delete(transition),
+        );
+        this.#transitions.add(transition);
+        return transition;
+    }
+
+    /**
+     * Stop rendering VFX elements inside `root` and show their plain
+     * content. Returns a function that undoes it.
+     * @internal Used by transitions.
+     */
+    freezeInside(root: HTMLElement): () => void {
+        return this.#player.freezeInside(root);
+    }
+
+    /**
+     * Pin the size of the element's html-in-canvas wrapper.
+     * Returns a function that undoes it. No-op for other elements.
+     * @internal Used by transitions.
+     */
+    lockSize(element: HTMLElement): () => void {
+        const canvas = this.#wrapperCanvases.get(element);
+        return canvas ? lockCanvasSize(canvas) : () => {};
+    }
+
+    /**
+     * Keep rendering the element while it is off screen.
+     * Returns a function that undoes it.
+     * @internal Used by transitions.
+     */
+    forceRender(element: HTMLElement): () => void {
+        const target = this.#wrapperCanvases.get(element) ?? element;
+        return this.#player.forceRender(target);
     }
 
     /**
@@ -205,25 +303,37 @@ export class VFX {
      * — call this after changing `img.src` or when responsive image
      * selection changes. Videos refresh automatically (no-op).
      * Otherwise re-snapshots the element's DOM subtree.
+     * For html-in-canvas elements, resolves once the new capture is in
+     * the texture, or after a short timeout.
      *
      * Useful for elements whose contents change (input, textarea, or an
      * `<img>` whose selected source swaps).
      */
     async update(element: HTMLElement): Promise<void> {
+        await this.updateInTime(element);
+    }
+
+    /**
+     * Like `update`, and resolves to false when an html-in-canvas capture timed out.
+     * @internal Used by transitions.
+     */
+    async updateInTime(element: HTMLElement): Promise<boolean> {
         const wrapper = this.#wrapperCanvases.get(element);
-        if (wrapper) {
-            wrapper.requestPaint();
-            return;
+        const hicCanvas =
+            wrapper ?? (element instanceof HTMLCanvasElement ? element : null);
+        const captured = hicCanvas ? requestCapture(hicCanvas) : undefined;
+        if (captured) {
+            return captured;
         }
 
         if (element instanceof HTMLImageElement) {
-            return this.#player.updateImageElement(element);
+            await this.#player.updateImageElement(element);
         } else if (element instanceof HTMLCanvasElement) {
             this.#player.updateCanvasElement(element);
-            return;
         } else {
-            return this.#player.updateTextElement(element);
+            await this.#player.updateTextElement(element);
         }
+        return true;
     }
 
     /**
@@ -303,6 +413,11 @@ export class VFX {
      * Destroy VFX and stop rendering.
      */
     destroy(): void {
+        for (const transition of this.#transitions) {
+            transition.destroy();
+        }
+        this.#transitions.clear();
+
         for (const [element, wrapper] of this.#wrapperCanvases) {
             unwrapElement(wrapper, element);
         }

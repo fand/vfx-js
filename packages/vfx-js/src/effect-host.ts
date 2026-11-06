@@ -155,13 +155,16 @@ void main() {
 // Copy fragment backing `ctx.blit`. Samples `uvSrc` (captured content →
 // dst buffer), unlike PASSTHROUGH_FRAG which samples the full dst buffer
 // (`uv`) for the stageCount=0 identity copy.
+// Outside the src it writes transparent, so a dst larger than the src
+// does not repeat the src's edge pixels.
 const BLIT_FRAG_300 = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
 void main() {
-    outColor = texture(src, uvSrc);
+    bool inside = all(greaterThanEqual(uvSrc, vec2(0.0))) && all(lessThanEqual(uvSrc, vec2(1.0)));
+    outColor = inside ? texture(src, uvSrc) : vec4(0.0);
 }
 `;
 
@@ -170,7 +173,8 @@ precision highp float;
 varying vec2 uvSrc;
 uniform sampler2D src;
 void main() {
-    gl_FragColor = texture2D(src, uvSrc);
+    bool inside = all(greaterThanEqual(uvSrc, vec2(0.0))) && all(lessThanEqual(uvSrc, vec2(1.0)));
+    gl_FragColor = inside ? texture2D(src, uvSrc) : vec4(0.0);
 }
 `;
 

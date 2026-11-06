@@ -1068,6 +1068,15 @@ describe("EffectHost.blit", () => {
         expect(programs[0].uploads[0]["src"]).toBeDefined();
     });
 
+    it("writes transparent outside the source instead of its edge pixels", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        host.ctx.blit(makeSource(host));
+        expect(programs[0].frag).toMatch(
+            /inside \? texture\(src, uvSrc\) : vec4\(0\.0\)/,
+        );
+    });
+
     it("defaults to ctx.target when target is omitted; explicit RT overrides", () => {
         const { host } = makeHost();
         host.setPhase("render");

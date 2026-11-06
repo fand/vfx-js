@@ -1,6 +1,7 @@
 /// <reference path="./html-in-canvas.d.ts" />
 import { markHicCanvas, redrawNestedCanvases } from "./hic-canvas.js";
 import { getImageSourceUrl } from "./image-source.js";
+import { coverWithStill } from "./still-clone.js";
 
 /**
  * Check if an image is cross-origin.
@@ -120,11 +121,146 @@ const savedWidths = new WeakMap<HTMLElement, string>();
 const savedBoxSizing = new WeakMap<HTMLElement, string>();
 const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
 const addedDrawable = new WeakSet<HTMLElement>();
+const stillCovers = new WeakMap<HTMLCanvasElement, () => void>();
+const captureWaiters = new WeakMap<HTMLCanvasElement, Set<() => void>>();
+const lockedCanvases = new WeakSet<HTMLCanvasElement>();
+
+const CAPTURE_TIMEOUT_MS = 300;
+
+/**
+ * Add a waiter to the set and resolve when it is called or on timeout.
+ * Resolves to false on timeout.
+ */
+export function waitForFlush(
+    waiters: Set<() => void>,
+    timeoutMs: number,
+): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+        const finish = (flushed: boolean) => {
+            clearTimeout(timer);
+            waiters.delete(done);
+            resolve(flushed);
+        };
+        const done = () => finish(true);
+        const timer = setTimeout(() => finish(false), timeoutMs);
+        waiters.add(done);
+    });
+}
+
+function flushWaiters(waiters: Set<() => void> | undefined): void {
+    if (!waiters) {
+        return;
+    }
+    for (const done of [...waiters]) {
+        done();
+    }
+}
+
+/**
+ * Move a node and keep its state (iframes, video, focus) when the browser
+ * supports `moveBefore`.
+ */
+export function moveNode(
+    parent: ParentNode & Node,
+    node: Node,
+    before: Node | null,
+): void {
+    if (typeof parent.moveBefore === "function") {
+        try {
+            parent.moveBefore(node, before);
+            return;
+        } catch {
+            // Throws when the move can't keep state, e.g. across documents.
+        }
+    }
+    parent.insertBefore(node, before);
+}
+
+/**
+ * Request a new capture of a canvas set up by `setupCapture`.
+ * Resolves after the capture is handed to `onCapture`, or to false after a timeout.
+ * Returns `undefined` if the canvas has no capture set up.
+ */
+export function requestCapture(
+    canvas: HTMLCanvasElement,
+    timeoutMs = CAPTURE_TIMEOUT_MS,
+): Promise<boolean> | undefined {
+    const waiters = captureWaiters.get(canvas);
+    if (!waiters) {
+        return undefined;
+    }
+    const captured = waitForFlush(waiters, timeoutMs);
+    canvas.requestPaint();
+    return captured;
+}
+
+/**
+ * Pin the canvas's CSS size so content changes don't resize it.
+ * Returns a function that restores the size and syncs the height to the child.
+ */
+export function lockCanvasSize(canvas: HTMLCanvasElement): () => void {
+    if (lockedCanvases.has(canvas)) {
+        return () => {};
+    }
+    lockedCanvases.add(canvas);
+    const { width, height, overflow } = canvas.style;
+    const rect = canvas.getBoundingClientRect();
+    canvas.style.setProperty("width", `${rect.width}px`);
+    canvas.style.setProperty("height", `${rect.height}px`);
+    // Taller new content must not spill out of the box; the capture is canvas-sized anyway.
+    canvas.style.setProperty("overflow", "hidden");
+
+    return () => {
+        if (!lockedCanvases.has(canvas)) {
+            return;
+        }
+        lockedCanvases.delete(canvas);
+        canvas.style.width = width;
+        canvas.style.height = height;
+        canvas.style.overflow = overflow;
+        const child = canvas.firstElementChild;
+        if (child) {
+            const childHeight = Math.round(
+                child.getBoundingClientRect().height,
+            );
+            canvas.style.setProperty("height", `${childHeight}px`);
+        }
+    };
+}
+
+function removeStillCover(canvas: HTMLCanvasElement): void {
+    stillCovers.get(canvas)?.();
+    stillCovers.delete(canvas);
+}
+
+/**
+ * Clear the first capture that `setupCapture` left on the canvas and drop
+ * the still copy `wrapElement` put over it.
+ * Call it once the overlay has the element's texture.
+ */
+export function releaseFirstCapture(
+    canvas: HTMLCanvasElement,
+    keepCapture = false,
+): void {
+    // The player's frame callback is queued first, so the overlay draws
+    // in the same frame that this clears.
+    requestAnimationFrame(() => {
+        if (!keepCapture) {
+            canvas
+                .getContext("2d")
+                ?.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        removeStillCover(canvas);
+    });
+}
 
 /**
  * Set up the paint handler + ResizeObservers on an html-in-canvas wrapper
  * (`<canvas layoutsubtree content="drawable">`). Returns the initial
  * OffscreenCanvas from the first paint.
+ *
+ * The first capture stays on the canvas so wrapping does not flash.
+ * `VFX.add` releases it once the overlay shows the texture.
  */
 export async function setupCapture(
     canvas: HTMLCanvasElement,
@@ -140,6 +276,8 @@ export async function setupCapture(
     }
 
     const { onCapture, maxSize } = opts;
+    const waiters = new Set<() => void>();
+    captureWaiters.set(canvas, waiters);
     let offscreen: OffscreenCanvas | null = null;
 
     let resolveFirst: ((oc: OffscreenCanvas) => void) | null = null;
@@ -191,15 +329,17 @@ export async function setupCapture(
         offCtx.clearRect(0, 0, w, h);
         offCtx.drawImage(canvas, 0, 0, w, h);
 
-        // Clear so VFXPlayer's WebGL canvas renders the shader version
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
         if (resolveFirst) {
             resolveFirst(offscreen);
             resolveFirst = null;
+            flushWaiters(waiters);
             return; // initial capture is returned via promise, skip onCapture
         }
+
+        // Clear so VFXPlayer's WebGL canvas renders the shader version
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         onCapture(offscreen);
+        flushWaiters(waiters);
     };
     canvas.onpaint = onPaint;
     canvas.addEventListener("paint", onPaint);
@@ -228,16 +368,18 @@ export async function setupCapture(
 
     // Sync CSS height from child (canvas doesn't auto-fit to children).
     const child = canvas.firstElementChild as HTMLElement | null;
-    let lastChildHeight = "";
     if (child) {
         const childRO = new ResizeObserver((entries) => {
+            if (lockedCanvases.has(canvas)) {
+                return;
+            }
             const box = entries[0].borderBoxSize?.[0];
             if (!box) {
                 return;
             }
             const h = `${Math.round(box.blockSize)}px`;
-            if (h !== lastChildHeight) {
-                lastChildHeight = h;
+            // Compare with the live style, since an unlock may have set it.
+            if (h !== canvas.style.height) {
                 canvas.style.setProperty("height", h);
             }
         });
@@ -253,6 +395,8 @@ export async function setupCapture(
  */
 export function teardownCapture(canvas: HTMLCanvasElement): void {
     canvas.onpaint = null;
+    flushWaiters(captureWaiters.get(canvas));
+    captureWaiters.delete(canvas);
     const onPaint = paintListeners.get(canvas);
     if (onPaint) {
         canvas.removeEventListener("paint", onPaint);
@@ -268,6 +412,11 @@ export function teardownCapture(canvas: HTMLCanvasElement): void {
         childRO.disconnect();
         childResizeObservers.delete(canvas);
     }
+}
+
+interface WrapOpts extends CaptureOpts {
+    /** Cover the wrap frame with a still copy at this z-index. */
+    stillCover?: { zIndex: number };
 }
 
 interface WrapResult {
@@ -292,7 +441,7 @@ interface WrapResult {
  */
 export async function wrapElement(
     element: HTMLElement,
-    opts: CaptureOpts,
+    opts: WrapOpts,
 ): Promise<WrapResult> {
     const rect = element.getBoundingClientRect();
 
@@ -348,12 +497,24 @@ export async function wrapElement(
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
 
+    // A drawable child is not painted until its first capture lands, one
+    // frame later. A still copy covers that frame.
+    if (opts.stillCover) {
+        stillCovers.set(
+            canvas,
+            coverWithStill(element, opts.stillCover.zIndex),
+        );
+    }
+
     // DOM swap
     savedMargins.set(element, element.style.margin);
     savedWidths.set(element, element.style.width);
     savedBoxSizing.set(element, element.style.boxSizing);
     element.parentNode?.insertBefore(canvas, element);
-    canvas.appendChild(element);
+    // Style the new canvas before the move. moveBefore into an unstyled
+    // parent restarts the element's CSS animations.
+    getComputedStyle(canvas).display;
+    moveNode(canvas, element, null);
     element.style.setProperty("margin", "0");
 
     // layoutsubtree canvas doesn't establish a standard block formatting
@@ -379,6 +540,7 @@ export function unwrapElement(
     element: HTMLElement,
 ): void {
     teardownCapture(canvas);
+    removeStillCover(canvas);
 
     // Restore cross-origin image src and revoke blob URLs
     const restoreImages = imageRestorers.get(canvas);
@@ -388,7 +550,10 @@ export function unwrapElement(
     }
 
     // Move element back before canvas, then remove canvas
-    canvas.parentNode?.insertBefore(element, canvas);
+    const parent = canvas.parentNode;
+    if (parent) {
+        moveNode(parent, element, canvas);
+    }
     canvas.remove();
     if (addedDrawable.has(element)) {
         element.removeAttribute("drawable");

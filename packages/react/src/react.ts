@@ -10,3 +10,14 @@ export const VFXDiv = VFXElementFactory<"div">("div");
 export const VFXP = VFXElementFactory<"p">("p");
 
 export * from "./hooks.js";
+
+export { setNextTransition, transition } from "./transition/store.js";
+export { TransitionIn, useTransitionIn } from "./transition/TransitionIn.js";
+export {
+    type UseVFXTransition,
+    useVFXTransition,
+} from "./transition/useVFXTransition.js";
+export {
+    VFXTransition,
+    type VFXTransitionProps,
+} from "./transition/VFXTransition.js";

@@ -15,6 +15,7 @@
     "@vfx-js/core": "workspace:*",
     "@vfx-js/effects": "workspace:*",
     "@vfx-js/react": "workspace:*",
+    "@vfx-js/transitions": "workspace:*",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

@@ -4,7 +4,7 @@
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev --ui tui",
+    "dev": "turbo run dev --ui tui --concurrency 16",
     "clean": "turbo run clean",
     "lint": "turbo run lint",
     "prepare": "husky",
@@ -17,7 +17,8 @@
   },
   "devDependencies": {
     "husky": "^9.1.7",
-    "turbo": "^2.11.10"
+    "turbo": "^2.11.10",
+    "wrangler": "4.153.0"
   },
   "author": "AMAGI <mail@amagi.dev> (https://amagi.dev/)",
   "homepage": "https://github.com/fand/vfx-js#readme",
