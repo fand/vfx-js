@@ -3,6 +3,7 @@ import { IGN, MIRROR } from "./_shared";
 
 /**
  * A lens warps the content harder and harder, swaps it at the peak and relaxes.
+ * The old content also zooms in as it fades out.
  * At the peak the center is magnified and the edges fold back into it.
  * `strength` scales the warp. `dispersion` splits it into a rainbow; 0 turns it off.
  */
@@ -19,6 +20,8 @@ const float DISPERSION = ${dispersion};
 const float TAPS = 12.0;
 // Width of the growing warp's edge.
 const float SOFT = 0.5;
+// How far the old content zooms in by the end.
+const float ZOOM = 1.0;
 
 ${IGN}
 ${MIRROR}
@@ -38,6 +41,7 @@ vec4 transition(vec2 uv, float t) {
     amount = 1.0 - smoothstep(reach - SOFT, reach, l);
   }
   float jitter = ign(gl_FragCoord.xy);
+  float zoom = 1.0 + ZOOM * t;
 
   vec3 rgb = vec3(0.0);
   vec3 total = vec3(0.0);
@@ -47,10 +51,9 @@ vec4 transition(vec2 uv, float t) {
     float s = amount * STRENGTH * (1.0 + DISPERSION * (k - 0.5) * 2.0);
     vec2 q = p * (1.0 - l * s);
     q.x /= aspect;
-    q = mirror(q * 0.5 + 0.5);
     vec4 c = vec4(0.0);
-    if (mixT < 1.0) c += readFrom(q) * (1.0 - mixT);
-    if (mixT > 0.0) c += readTo(q) * mixT;
+    if (mixT < 1.0) c += readFrom(mirror(q / zoom * 0.5 + 0.5)) * (1.0 - mixT);
+    if (mixT > 0.0) c += readTo(mirror(q * 0.5 + 0.5)) * mixT;
     // Each tap adds to the color channels near its place in the spectrum.
     vec3 w = max(vec3(0.0), 1.0 - abs(vec3(k) - vec3(0.0, 0.5, 1.0)) * 2.0);
     rgb += c.rgb * w;
