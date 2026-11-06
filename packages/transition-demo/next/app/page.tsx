@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Code } from "./_components/code";
+import { CodeTabs } from "./_components/code-tabs";
 import { HeroStage } from "./_components/hero-stage";
 import { PageFrame } from "./_components/page-frame";
 import { PageTransition } from "./_components/page-transition";
@@ -37,26 +37,34 @@ const features = [
     },
 ];
 
-export default function Home() {
-    return (
-        <PageFrame tone="light">
-            <PageTransition preset="zoom" />
-            <HeroStage />
+const usage = [
+    {
+        name: "React",
+        code: `
+import { TransitionIn, VFXTransition } from "@vfx-js/react";
+import { glitch } from "@vfx-js/transitions";
 
-            <section className="section split">
-                <div className="section-head">
-                    <p className="kicker">Any element</p>
-                    <h2>
-                        Change the DOM inside <em>run()</em>.
-                    </h2>
-                    <p className="lead">
-                        addTransition takes any element: a tab panel, a
-                        carousel, a router outlet. VFX-JS snapshots the old
-                        content before your callback and captures the new
-                        content after it, then mixes the two with the shader.
-                    </p>
-                </div>
-                <Code label="tabs.ts">{`
+export function App({ pathname, page }) {
+  return (
+    <VFXTransition className="outlet" pageKey={pathname}>
+      {page}
+    </VFXTransition>
+  );
+}
+
+export function About() {
+  return (
+    <>
+      <TransitionIn transition={glitch} />
+      <h1>About</h1>
+    </>
+  );
+}
+`,
+    },
+    {
+        name: "Vanilla",
+        code: `
 import { VFX } from "@vfx-js/core";
 import { swipe } from "@vfx-js/transitions";
 
@@ -69,10 +77,38 @@ tab.addEventListener("click", () => {
     panel.innerHTML = renderTab(tab.dataset.id);
   });
 });
-`}</Code>
+`,
+    },
+];
+
+export default function Home() {
+    return (
+        <PageFrame tone="light">
+            <PageTransition preset="zoom" />
+            <HeroStage />
+
+            <section className="section split split-usage">
+                <div className="section-head">
+                    <p className="kicker">Usage</p>
+                    <h2>
+                        Wrap the element that <em>changes</em>.
+                    </h2>
+                    <p className="lead">
+                        In React, put VFXTransition around the router outlet. A
+                        new pageKey starts a run, and each page can pick how it
+                        enters. Without React, pass the element to addTransition
+                        and change its DOM inside run(). Either way, the old
+                        content stays on screen until the shader has its
+                        snapshot.
+                    </p>
+                    <Link href="/how-it-works" className="text-link">
+                        How it works →
+                    </Link>
+                </div>
+                <CodeTabs tabs={usage} />
             </section>
 
-            <section className="section">
+            <section className="section section-features">
                 <div className="section-head">
                     <p className="kicker">Features</p>
                     <h2>
@@ -88,41 +124,6 @@ tab.addEventListener("click", () => {
                         </article>
                     ))}
                 </div>
-            </section>
-
-            <section className="section split">
-                <div className="section-head">
-                    <p className="kicker">React in 10 lines</p>
-                    <h2>
-                        Wrap the outlet.
-                        <br />
-                        Let the <em>page</em> pick.
-                    </h2>
-                    <p className="lead">
-                        A new pageKey starts a run. The incoming page says how
-                        it enters. The old page stays on screen until the shader
-                        has its snapshot.
-                    </p>
-                    <Link href="/how-it-works" className="text-link">
-                        How it works →
-                    </Link>
-                </div>
-                <Code label="App.tsx">{`
-import { TransitionIn, VFXTransition } from "@vfx-js/react";
-import { glitch } from "@vfx-js/transitions";
-
-export function App({ pathname, page }) {
-  return (
-    <VFXTransition className="outlet" pageKey={pathname}>
-      {page}
-    </VFXTransition>
-  );
-}
-
-export function About() {
-  return <><TransitionIn transition={glitch} /><h1>About</h1></>;
-}
-`}</Code>
             </section>
         </PageFrame>
     );

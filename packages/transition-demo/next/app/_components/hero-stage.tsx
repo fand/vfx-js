@@ -35,9 +35,8 @@ const labels: Record<PresetName, string> = {
     pixelsort: "PixelSort",
 };
 
-/** The hero cycles through these palettes as presets play. */
+/** Each run picks a new palette and pattern at random. */
 const palettes = ["default", "orange", "purple", "green"];
-/** The background patterns, cycled the same way. */
 const patterns = ["dots", "grid", "diagonal", "contour", "sine"];
 
 /** The hero word changes with the theme. */
@@ -48,14 +47,19 @@ const words: Partial<Record<PresetName, string>> = {
     zoomBlur: "transitions_",
 };
 
-/** The hero. Each preset sets a palette, pattern and font, and the preset plays on switch. */
+/**
+ * The hero. A switch plays the preset and sets a random palette and pattern.
+ * Some presets also change the title font.
+ */
 export function HeroStage() {
     const { ref, run } = useVFXTransition({ duration: 1.1, overflow: 0 });
     const [theme, setTheme] = useState<PresetName>(names[0]);
+    const [look, setLook] = useState({ palette: "default", pattern: "dots" });
     // The item to center, as an index into the repeated list.
     // A new object each time, so a repeat click centers again.
     const [focus, setFocus] = useState({ index: HOME * names.length });
-    const [autoplay, setAutoplay] = useState(true);
+    // Off for now; set to true to step through presets again.
+    const [autoplay, setAutoplay] = useState(false);
     const focusRef = useRef(focus.index);
     const busy = useRef(false);
     const section = useRef<HTMLElement | null>(null);
@@ -83,6 +87,10 @@ export function HeroStage() {
                     focusRef.current = index;
                     setFocus({ index });
                     setTheme(name);
+                    setLook((prev) => ({
+                        palette: pickOther(palettes, prev.palette),
+                        pattern: pickOther(patterns, prev.pattern),
+                    }));
                 },
                 { transition: presets[name] },
             );
@@ -213,9 +221,6 @@ export function HeroStage() {
         });
     };
 
-    const themeIndex = names.indexOf(theme);
-    const pattern = patterns[themeIndex % patterns.length];
-
     const items = [];
     for (let copy = 0; copy < COPIES; copy++) {
         const home = copy === HOME;
@@ -251,12 +256,12 @@ export function HeroStage() {
         <section
             className="hero"
             data-theme={theme}
-            data-palette={palettes[themeIndex % palettes.length]}
-            data-pattern={pattern}
+            data-palette={look.palette}
+            data-pattern={look.pattern}
             ref={setRefs}
         >
             <div className="hero-glow" aria-hidden />
-            <PatternCanvas pattern={pattern} />
+            <PatternCanvas pattern={look.pattern} />
             <p className="eyebrow">
                 <span className="pill">new</span> @vfx-js/transitions
             </p>
@@ -327,6 +332,12 @@ function wrapScroll(el: HTMLElement) {
         el.scrollLeft += shift * copyWidth;
     }
     return shift * names.length;
+}
+
+/** A random item of `list` other than `current`. */
+function pickOther(list: string[], current: string) {
+    const rest = list.filter((x) => x !== current);
+    return rest[Math.floor(Math.random() * rest.length)];
 }
 
 const reducedMotion = () =>

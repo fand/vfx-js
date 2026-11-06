@@ -101,13 +101,9 @@ em {
     text-decoration: none;
 }
 .brand-mark {
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    background:
-        linear-gradient(135deg, transparent 50%, var(--hot) 50%),
-        linear-gradient(45deg, var(--accent), #8a5cff);
-    box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 10%, transparent);
+    flex: none;
+    width: 28px;
+    height: 28px;
 }
 .brand-slash {
     margin: 0 2px;
@@ -400,18 +396,68 @@ em {
 .hero[data-pattern="sine"] .hero-shader > [data-pattern="sine"] {
     display: block;
 }
+/* Each blob circles on its own clock. */
+@property --blob-1 {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+@property --blob-2 {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 120deg;
+}
+@property --blob-3 {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 240deg;
+}
 .hero-glow {
     position: absolute;
     z-index: -3;
-    width: min(900px, 90vw);
+    width: min(1350px, 135vw);
     aspect-ratio: 1.6;
     border-radius: 50%;
     background:
-        radial-gradient(closest-side at 35% 55%, #2f2bff26, transparent),
-        radial-gradient(closest-side at 65% 45%, #ff4d2e1f, transparent),
-        radial-gradient(closest-side at 50% 50%, #d6ff3d33, transparent);
-    filter: blur(30px);
-    animation: drift 14s ease-in-out infinite alternate;
+        radial-gradient(
+            closest-side at calc(35% + 8% * cos(var(--blob-1)))
+                calc(55% + 10% * sin(var(--blob-1))),
+            #2f2bff60,
+            transparent
+        ),
+        radial-gradient(
+            closest-side at calc(65% + 8% * cos(var(--blob-2)))
+                calc(45% + 10% * sin(var(--blob-2))),
+            #ff4d2e4d,
+            transparent
+        ),
+        radial-gradient(
+            closest-side at calc(50% + 8% * cos(var(--blob-3)))
+                calc(50% + 10% * sin(var(--blob-3))),
+            #d6ff3d7b,
+            transparent
+        );
+    filter: blur(45px);
+    animation:
+        drift 14s ease-in-out infinite alternate,
+        blob-1 5s linear infinite,
+        blob-2 8s linear infinite reverse,
+        blob-3 11s linear infinite;
+}
+@keyframes blob-1 {
+    to {
+        --blob-1: 360deg;
+    }
+}
+@keyframes blob-2 {
+    to {
+        --blob-2: 480deg;
+    }
+}
+@keyframes blob-3 {
+    to {
+        --blob-3: 600deg;
+    }
 }
 @keyframes drift {
     to {
@@ -520,6 +566,8 @@ em {
         radial-gradient(closest-side at 68% 42%, var(--glow-b), transparent);
     filter: blur(112px);
     opacity: 1;
+    /* Palette glows stay put; only the drift. */
+    animation: drift 14s ease-in-out infinite alternate;
 }
 /* The frost: a white veil over the glow. */
 .hero[data-palette]:not([data-palette="default"])::before {
@@ -598,7 +646,7 @@ em {
     /* Room for the grown item and its shadow, given back by the margins. */
     --room: 24px;
     position: relative;
-    width: min(100%, 760px);
+    width: min(90%, 760px);
     margin: calc(28px - var(--room)) 0 calc(-1 * var(--room));
 }
 /* Items fade near the edges as they scroll. */
@@ -633,6 +681,9 @@ em {
     visibility: hidden;
 }
 .carousel-item {
+    --pad: 18px;
+    /* How far the label moves on hover to make room for the play icon. */
+    --shift: 6px;
     position: relative;
     --glass: color-mix(in oklab, var(--white) 55%, transparent);
     --glass-shadow:
@@ -643,8 +694,8 @@ em {
     align-items: center;
     gap: 10px;
     height: 44px;
-    margin: 0 -18px;
-    padding: 0 18px;
+    margin: 0 calc(-1 * var(--pad));
+    padding: 0 var(--pad);
     border: 0;
     border-radius: 999px;
     background: transparent;
@@ -722,17 +773,18 @@ em {
     translate: -2px 0;
     rotate: 135deg;
 }
-/* Shown on hover only, in the left padding; the label makes room. */
+/* Shown on hover only, between the left edge and the moved label. */
+/* Nudged right, since the round edge makes the middle look too far left. */
 .carousel-play {
     position: absolute;
     top: 50%;
-    left: 5px;
+    left: calc((var(--pad) + var(--shift)) / 2 + 3px);
     width: 0;
     height: 0;
     border-block: 0.32em solid transparent;
     border-left: 0.5em solid currentColor;
     opacity: 0;
-    translate: 0 -50%;
+    translate: -50% -50%;
     transition: opacity 0.15s ease;
 }
 .carousel-label {
@@ -744,16 +796,18 @@ em {
 }
 .carousel-item:hover .carousel-label,
 .carousel-item:focus-visible .carousel-label {
-    translate: 6px 0;
+    translate: var(--shift) 0;
 }
 @media (max-width: 640px) {
+    .hero-title {
+        font-size: 17vw;
+    }
     .carousel {
-        --gap: 56px;
+        --gap: 36px;
     }
     .carousel-item {
-        font-size: 15px;
-        margin: 0 -12px;
-        padding: 0 12px;
+        --pad: 10px;
+        font-size: 13px;
     }
 }
 
@@ -851,11 +905,19 @@ em {
     align-items: center;
     padding-bottom: 140px;
 }
+/* Top-aligned, so switching code tabs grows the box downward only. */
+.split-usage {
+    align-items: start;
+}
 .split .section-head {
     margin: 0;
 }
 
 /* Features */
+/* Last on the home page; more room before the footer. */
+.section-features {
+    padding-bottom: 120px;
+}
 .features {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1173,6 +1235,27 @@ em {
     cursor: pointer;
 }
 .code-bar button:hover {
+    color: #fff;
+}
+.code-tabs {
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 8px;
+}
+.code-tabs button {
+    padding: 6px 14px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+.code-tabs button:hover {
+    color: #fff;
+}
+.code-tabs button[aria-selected="true"] {
+    background: #ffffff14;
     color: #fff;
 }
 .code pre {
