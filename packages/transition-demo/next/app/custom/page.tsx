@@ -200,7 +200,7 @@ export const pixelsort: TransitionDef = {
                     <span>Try it</span>
                     <strong>Playground →</strong>
                 </Link>
-                <Link href="/transitions" className="next-card">
+                <Link href="/presets" className="next-card">
                     <span>Compare</span>
                     <strong>All presets →</strong>
                 </Link>

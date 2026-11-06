@@ -34,6 +34,12 @@ jobs:
             - name: Build
               run: pnpm run build
 
+            # Served under the same basePath as on amagi.dev.
+            - name: Build transition demo
+              run: |
+                  pnpm --filter @vfx-js/transition-demo-next run build:demo
+                  cp -r packages/transition-demo/next/out packages/docs/dist/vfx-js-transition
+
             - name: Deploy to Cloudflare Pages
               id: deploy
               uses: cloudflare/wrangler-action@v3
@@ -55,5 +61,6 @@ jobs:
                       | Examples | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/examples/ |
                       | Storybook | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/storybook/ |
                       | Docs | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/docs/ |
+                      | Transition | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/vfx-js-transition/ |
 
                       <sub>This branch URL stays the same across pushes. Latest deploy: ${{ steps.deploy.outputs.deployment-url }}</sub>

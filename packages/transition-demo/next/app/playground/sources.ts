@@ -8,9 +8,11 @@ import {
     createGLTransition,
     createJpegGlitch,
     createLensDistortion,
+    createPixelScan,
     createPixelsort,
     createSwipe,
     createTile,
+    type PixelScanDirection,
     type SwipeDirection,
     type TileDirection,
     type TileShape,
@@ -92,12 +94,21 @@ const factories: Record<string, Factory> = {
                 step: 1,
                 value: 12,
             },
+            {
+                name: "shadow",
+                kind: "range",
+                min: 0,
+                max: 1,
+                step: 0.05,
+                value: 0.5,
+            },
         ],
         build: (v) =>
             createTile({
                 direction: v.direction as TileDirection,
                 shape: v.shape as TileShape,
                 count: Number(v.count),
+                shadow: Number(v.shadow),
             }),
     },
     lensDistortion: {
@@ -118,11 +129,20 @@ const factories: Record<string, Factory> = {
                 step: 0.05,
                 value: 0.6,
             },
+            {
+                name: "zoom",
+                kind: "range",
+                min: 0,
+                max: 6,
+                step: 0.1,
+                value: 3,
+            },
         ],
         build: (v) =>
             createLensDistortion({
                 strength: Number(v.strength),
                 dispersion: Number(v.dispersion),
+                zoom: Number(v.zoom),
             }),
     },
     pixelsort: {
@@ -152,6 +172,27 @@ const factories: Record<string, Factory> = {
         ],
         build: (v) => createDatamosh({ blockSize: Number(v.blockSize) }),
     },
+    pixelScan: {
+        params: [
+            {
+                name: "direction",
+                kind: "select",
+                options: ["right", "left", "up", "down", "center"],
+                value: "right",
+            },
+            {
+                name: "blackout",
+                kind: "select",
+                options: ["true", "false"],
+                value: "true",
+            },
+        ],
+        build: (v) =>
+            createPixelScan({
+                direction: v.direction as PixelScanDirection,
+                blackout: v.blackout === "true",
+            }),
+    },
     jpegGlitch: {
         params: [
             {
@@ -160,7 +201,7 @@ const factories: Record<string, Factory> = {
                 min: 1,
                 max: 256,
                 step: 1,
-                value: 64,
+                value: 4,
             },
             {
                 name: "quality",
@@ -168,7 +209,7 @@ const factories: Record<string, Factory> = {
                 min: 0,
                 max: 1,
                 step: 0.05,
-                value: 0.3,
+                value: 0.1,
             },
         ],
         build: (v) =>

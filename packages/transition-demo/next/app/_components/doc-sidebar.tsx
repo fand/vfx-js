@@ -12,7 +12,7 @@ export function DocSidebar() {
     if (pathname === "/" || pathname === "/playground") {
         return null;
     }
-    const tone = pathname === "/transitions" ? "dark" : "light";
+    const tone = pathname === "/presets" ? "dark" : "light";
     return (
         <nav className="doc-sidebar" data-tone={tone} aria-label="Docs">
             <ul>

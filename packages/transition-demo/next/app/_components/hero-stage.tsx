@@ -1,6 +1,7 @@
 "use client";
 
 import { useVFXTransition } from "@vfx-js/react";
+import { createPixelScan } from "@vfx-js/transitions";
 import Link from "next/link";
 import {
     useCallback,
@@ -20,7 +21,19 @@ const BLINK_MS = 300;
 const COPIES = 5;
 const HOME = Math.floor(COPIES / 2);
 
-const names = presetList.map((p) => p.name);
+// The hero plays pixelScan in rings.
+const heroPresets = {
+    ...presets,
+    pixelScan: createPixelScan({ direction: "center" }),
+};
+
+// Runs longer than the 1.1 s default. The rings need time to spread.
+const durations: Partial<Record<PresetName, number>> = { pixelScan: 1.8 };
+
+// crossfade is too plain to show off.
+const names = presetList
+    .map((p) => p.name)
+    .filter((name) => name !== "crossfade");
 
 const labels: Record<PresetName, string> = {
     crossfade: "Crossfade",
@@ -44,6 +57,31 @@ const labels: Record<PresetName, string> = {
 /** Each run picks a new palette and pattern at random. */
 const palettes = ["default", "orange", "purple", "green"];
 const patterns = ["dots", "grid", "diagonal", "contour", "sine"];
+// datamosh moves blocks along the motion, so it lands on a moving pattern.
+const patternsFor: Partial<Record<PresetName, string[]>> = {
+    datamosh: ["contour", "sine"],
+};
+
+/** Sets `data-center` on `target`, or on the item closest to the middle of the list. */
+function markCenter(el: HTMLElement, target?: Element) {
+    const mid = el.getBoundingClientRect().left + el.clientWidth / 2;
+    let best: Element | null = target ?? null;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (const item of target ? [] : el.children) {
+        const r = item.getBoundingClientRect();
+        const dist = Math.abs(r.left + r.width / 2 - mid);
+        if (dist < bestDist) {
+            best = item;
+            bestDist = dist;
+        }
+    }
+    for (const item of el.querySelectorAll("[data-center]")) {
+        if (item !== best) {
+            item.removeAttribute("data-center");
+        }
+    }
+    best?.setAttribute("data-center", "");
+}
 
 /** The hero word changes with the theme. */
 const words: Partial<Record<PresetName, string>> = {
@@ -63,7 +101,8 @@ export function HeroStage() {
     const [look, setLook] = useState({ palette: "default", pattern: "dots" });
     // The item to center, as an index into the repeated list.
     // A new object each time, so a repeat click centers again.
-    const [focus, setFocus] = useState({ index: HOME * names.length });
+    // The first preset is showing, so the next one starts in the middle.
+    const [focus, setFocus] = useState({ index: HOME * names.length + 1 });
     // Off for now; set to true to step through presets again.
     const [autoplay, setAutoplay] = useState(false);
     const focusRef = useRef(focus.index);
@@ -72,7 +111,7 @@ export function HeroStage() {
     const list = useRef<HTMLDivElement>(null);
 
     /**
-     * Plays the preset at `index`. The list is centered on it when the run lands.
+     * Plays the preset at `index`. When the run lands, the next item is centered.
      * With `blinkFirst`, the clicked item blinks before the run.
      */
     const go = useCallback(
@@ -85,20 +124,31 @@ export function HeroStage() {
             const item = list.current?.children[index] as
                 | HTMLElement
                 | undefined;
+            // It becomes the middle item when the run lands, so it stays active until then.
+            if (list.current && item) {
+                markCenter(list.current, item);
+            }
             if (blinkFirst && item && !reducedMotion()) {
                 await blink(item, BLINK_MS);
             }
             await run(
                 () => {
-                    focusRef.current = index;
-                    setFocus({ index });
+                    // The next preset takes the middle, so the played one sits just left of it.
+                    focusRef.current = index + 1;
+                    setFocus({ index: index + 1 });
                     setTheme(name);
                     setLook((prev) => ({
                         palette: pickOther(palettes, prev.palette),
-                        pattern: pickOther(patterns, prev.pattern),
+                        pattern: pickOther(
+                            patternsFor[name] ?? patterns,
+                            prev.pattern,
+                        ),
                     }));
                 },
-                { transition: presets[name] },
+                {
+                    transition: heroPresets[name],
+                    duration: durations[name],
+                },
             );
             busy.current = false;
         },
@@ -114,6 +164,7 @@ export function HeroStage() {
         el.dataset.ready = "";
         el.scrollLeft = centerOf(el, item);
         focusRef.current += wrapScroll(el);
+        markCenter(el);
     }, [focus]);
 
     useEffect(() => {
@@ -134,6 +185,16 @@ export function HeroStage() {
             clearTimeout(timer);
             timer = window.setTimeout(onScrollEnd, 150);
         };
+        let frame = 0;
+        const onScrollCenter = () => {
+            cancelAnimationFrame(frame);
+            // A run marks its own item and scrolls to it afterwards.
+            if (busy.current) {
+                return;
+            }
+            frame = requestAnimationFrame(() => markCenter(el));
+        };
+        el.addEventListener("scroll", onScrollCenter, { passive: true });
         const stop = () => setAutoplay(false);
         const hasScrollEnd = "onscrollend" in window;
         el.addEventListener(
@@ -145,6 +206,8 @@ export function HeroStage() {
         el.addEventListener("touchstart", stop, { passive: true });
         return () => {
             clearTimeout(timer);
+            cancelAnimationFrame(frame);
+            el.removeEventListener("scroll", onScrollCenter);
             el.removeEventListener("scrollend", onScrollEnd);
             el.removeEventListener("scroll", onScroll);
             el.removeEventListener("pointerdown", stop);
@@ -197,7 +260,7 @@ export function HeroStage() {
         }
         const id = setInterval(() => {
             if (visible && !document.hidden) {
-                go(focusRef.current + 1);
+                go(focusRef.current);
             }
         }, AUTOPLAY_INTERVAL);
         return () => {
@@ -246,7 +309,12 @@ export function HeroStage() {
                             ? `Play ${labels[name]} again`
                             : `Play ${labels[name]}`
                     }
-                    onClick={() => {
+                    onClick={(e) => {
+                        // A focused item gets scrolled back into view, which undoes the jump between copies.
+                        // A mouse click needs no focus ring, so drop it.
+                        if (e.detail > 0) {
+                            e.currentTarget.blur();
+                        }
                         setAutoplay(false);
                         go(index, true);
                     }}
@@ -299,9 +367,8 @@ export function HeroStage() {
                 />
             </div>
             <p className="hero-tagline">
-                Swap any element — a tab, a carousel, a whole page — through a
-                WebGL shader. One component for React. A few lines for
-                everything else.
+                Next-level page transitions with HTML-in-Canvas. Your live pages
+                go through WebGL shaders, in a few lines of React or plain JS.
             </p>
             <div className="hero-cta">
                 <Link href="/getting-started" className="btn btn-primary">
@@ -309,11 +376,11 @@ export function HeroStage() {
                 </Link>
                 {/* A click spec beats the page's own (pixelsort). */}
                 <TLink
-                    href="/transitions"
+                    href="/presets"
                     preset="datamosh"
                     className="btn btn-ghost"
                 >
-                    See all transitions →
+                    See all presets →
                 </TLink>
             </div>
             <span className="scroll-cue" aria-hidden>

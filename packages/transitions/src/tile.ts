@@ -46,18 +46,29 @@ float cellDist(vec2 p) {
 /**
  * The old content splits into tiles that shrink away and show the new content.
  * `count` is the number of tiles along the longer side.
+ * `shadow` is the opacity of the drop shadow under the shrinking tiles; 0 turns it off.
  */
 export function createTile(
-    opts: { direction?: TileDirection; shape?: TileShape; count?: number } = {},
+    opts: {
+        direction?: TileDirection;
+        shape?: TileShape;
+        count?: number;
+        shadow?: number;
+    } = {},
 ): ShaderTransitionDef {
     const delay = DELAYS[opts.direction ?? "center"];
     const shape = SHAPES[opts.shape ?? "hex"];
     const count = Math.max(1, Math.round(opts.count ?? 12)).toFixed(1);
+    const shadow = Math.min(Math.max(opts.shadow ?? 0.5, 0), 1).toFixed(3);
     return shaderTransition({
         name: "tile",
         frag: `
 const float COUNT = ${count};
 const float SPREAD = 0.6;
+const float SHADOW = ${shadow};
+// Shadow offset and blur at full lift, in tiles.
+const vec2 SHADOW_OFFSET = vec2(0.05, -0.08);
+const float SHADOW_BLUR = 0.12;
 ${shape}
 vec4 transition(vec2 uv, float t) {
   // A container overflow must not show tiles outside the element.
@@ -75,7 +86,16 @@ vec4 transition(vec2 uv, float t) {
   float edge = (cellDist(local) - 0.5 * scale) * tilePx;
   float inside = 1.0 - smoothstep(0.0, 1.0, edge);
   vec4 to = readTo(uv);
-  if (scale <= 0.0 || inside <= 0.0) return to;
+  if (scale <= 0.0) return to;
+
+  // The tile lifts as it shrinks, so its shadow moves away and softens.
+  float lift = 1.0 - scale;
+  float blur = SHADOW_BLUR * lift * tilePx + 1.0;
+  float shadowEdge = (cellDist(local - SHADOW_OFFSET * lift) - 0.5 * scale) * tilePx;
+  float shade = SHADOW * smoothstep(0.0, 0.2, lift) * (1.0 - smoothstep(-blur, blur, shadowEdge));
+  to = vec4(to.rgb * (1.0 - shade), max(to.a, shade));
+  if (inside <= 0.0) return to;
+
   vec4 from = readFrom((center + local / scale) * tilePx / resolution + 0.5);
   from *= inside;
   return from + to * (1.0 - from.a);

@@ -56,6 +56,16 @@ const eases: { label: string; ease?: TransitionEase }[] = [
     },
 ];
 
+const smoothstep = (x: number) => x * x * (3 - 2 * x);
+
+/** An ease as a function of progress. */
+const easeFn = (ease: TransitionEase | undefined) =>
+    typeof ease === "function"
+        ? ease
+        : ease === "linear"
+          ? (x: number) => x
+          : smoothstep;
+
 const easeName = (ease: TransitionEase | undefined) =>
     typeof ease === "function" ? "custom" : (ease ?? "smoothstep");
 
@@ -73,7 +83,18 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
     const [scene, setScene] = useState(0);
     const [tab, setTab] = useState<Tab>("presets");
     const [easeIndex, setEaseIndex] = useState(0);
-    const { ref, run } = useVFXTransition({ duration: 1.2 });
+    const [duration, setDuration] = useState(1.2);
+    const [progress, setProgress] = useState(0);
+    const [playing, setPlaying] = useState(false);
+    const { ref, run } = useVFXTransition();
+    // A held run reads its t from here every frame, so Play, Pause and the slider all drive it.
+    const clock = useRef<{
+        x: number;
+        ease: (x: number) => number;
+        active: boolean;
+        def?: TransitionDef;
+        values?: TransitionUniforms;
+    }>({ x: 0, ease: smoothstep, active: false });
     const preRef = useRef<HTMLPreElement>(null);
     const caretRef = useRef<number | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -130,18 +151,93 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         }
     };
 
-    const play = (
-        reverse = false,
-        transition: TransitionDef = def,
-        uniforms = values,
-    ) => {
+    // A new ease applies to a held run at once.
+    clock.current.ease = easeFn(eases[easeIndex].ease ?? source.ease);
+    // Effect presets like datamosh follow real time, not t, so they play a normal run.
+    const timed = Boolean(source.effect);
+
+    /** Starts a run held at the clock. A new shader or uniforms starts a new one. */
+    const hold = (transition: TransitionDef, uniforms: TransitionUniforms) => {
+        const c = clock.current;
+        if (c.active && c.def === transition && c.values === uniforms) {
+            return;
+        }
+        c.active = true;
+        c.def = transition;
+        c.values = uniforms;
         run(() => setScene((s) => s + 1), {
             transition,
             uniforms,
-            reverse,
-            ease: eases[easeIndex].ease,
+            duration: 3600,
+            ease: () => c.ease(c.x),
         });
     };
+
+    const play = (
+        transition: TransitionDef = def,
+        uniforms = values,
+        isTimed = timed,
+    ) => {
+        const c = clock.current;
+        if (c.x >= 1) {
+            c.x = 0;
+        }
+        if (isTimed) {
+            c.active = false;
+            c.x = 0;
+            run(() => setScene((s) => s + 1), {
+                transition,
+                uniforms,
+                duration,
+                ease: eases[easeIndex].ease,
+            });
+        } else {
+            hold(transition, uniforms);
+        }
+        setPlaying(true);
+    };
+
+    const scrub = (x: number) => {
+        setPlaying(false);
+        clock.current.x = x;
+        setProgress(x);
+        hold(def, values);
+    };
+
+    // Moves the clock while playing; it stops at the end.
+    useEffect(() => {
+        if (!playing) {
+            return;
+        }
+        let last = performance.now();
+        let id = 0;
+        const tick = (now: number) => {
+            const c = clock.current;
+            c.x = Math.min(1, c.x + (now - last) / 1000 / duration);
+            last = now;
+            setProgress(c.x);
+            if (c.x >= 1) {
+                setPlaying(false);
+                return;
+            }
+            id = requestAnimationFrame(tick);
+        };
+        id = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(id);
+    }, [playing, duration]);
+
+    // `?preset=<name>` opens that preset, e.g. from the Presets page.
+    useEffect(() => {
+        const name = new URLSearchParams(window.location.search).get("preset");
+        const next = name && sourceOf(`preset:${name}`);
+        if (!next) {
+            return;
+        }
+        setSource(next);
+        setFrag(next.frag);
+        setValues(next.uniforms);
+        setParams(defaultParams(next.factory));
+    }, []);
 
     /** Loads `id` into the editor and plays it once. */
     const pick = (id: string) => {
@@ -154,8 +250,9 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         setFrag(next.frag);
         setValues(next.uniforms);
         setParams(nextParams);
+        clock.current.x = 0;
+        clock.current.active = false;
         play(
-            false,
             next.effect && next.factory
                 ? next.factory.build(nextParams)
                 : shaderTransition({
@@ -165,6 +262,7 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                       overflow: next.overflow,
                   }),
             next.uniforms,
+            Boolean(next.effect),
         );
     };
 
@@ -176,6 +274,30 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                     <LabScene index={scene} />
                 </div>
                 <div className="lab-controls">
+                    <div className="lab-transport">
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            disabled={playing && timed}
+                            onClick={
+                                playing ? () => setPlaying(false) : () => play()
+                            }
+                        >
+                            {playing ? "❚❚ Pause" : "▶ Play"}
+                        </button>
+                        <span className="lab-t">
+                            t={clock.current.ease(progress).toFixed(2)}
+                        </span>
+                        <input
+                            type="range"
+                            aria-label="progress"
+                            min={0}
+                            max={1}
+                            step={0.001}
+                            value={progress}
+                            onChange={(e) => scrub(Number(e.target.value))}
+                        />
+                    </div>
                     <label className="pg-range">
                         <span>ease</span>
                         <select
@@ -193,6 +315,21 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                                 </option>
                             ))}
                         </select>
+                    </label>
+                    <label className="pg-range">
+                        <span>
+                            duration <b>{duration.toFixed(1)}s</b>
+                        </span>
+                        <input
+                            type="range"
+                            min={0.2}
+                            max={5}
+                            step={0.1}
+                            value={duration}
+                            onChange={(e) =>
+                                setDuration(Number(e.target.value))
+                            }
+                        />
                     </label>
                     {source.factory?.params.map((p) => (
                         <ParamInput
@@ -227,22 +364,6 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                             />
                         </label>
                     ))}
-                    <div className="lab-buttons">
-                        <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() => play()}
-                        >
-                            ▶ Play
-                        </button>
-                        <button
-                            type="button"
-                            className="btn btn-ghost"
-                            onClick={() => play(true)}
-                        >
-                            ◀ Reverse
-                        </button>
-                    </div>
                 </div>
             </div>
             <div className="lab-editor">

@@ -1,10 +1,36 @@
 import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
 
-/** A front of glowing pixel cells sweeps left to right and swaps the content behind it. */
-export const pixelScan: ShaderTransitionDef = shaderTransition({
-    name: "pixel_scan",
-    frag: `
+/** Where the fronts sweep. `center` spreads out in rings. */
+export type PixelScanDirection = "right" | "left" | "up" | "down" | "center";
+
+// Where the front reaches cell `pi`, in [0, 1]. Cells span [-scale, scale] in x and the aspect-scaled range in y.
+const CELL_POS: Record<PixelScanDirection, string> = {
+    right: "pi.x / (scale * 2.0) + 0.5",
+    left: "0.5 - pi.x / (scale * 2.0)",
+    up: "pi.y / (scale * aspect() * 2.0) + 0.5",
+    down: "0.5 - pi.y / (scale * aspect() * 2.0)",
+    center: "length(pi / scale) / length(vec2(1.0, aspect()))",
+};
+
+/**
+ * A front of glowing pixel cells sweeps toward `direction` and takes the old content away.
+ * A second front follows a little later and brings the new content in.
+ * `blackout` fills the gap between them with black; false leaves it transparent.
+ */
+export function createPixelScan(
+    opts: { direction?: PixelScanDirection; blackout?: boolean } = {},
+): ShaderTransitionDef {
+    const cellPos = CELL_POS[opts.direction ?? "right"];
+    const blackout = (opts.blackout ?? true) ? "1.0" : "0.0";
+    return shaderTransition({
+        name: "pixel_scan",
+        frag: `
+const float BLACKOUT = ${blackout};
 const float W = 0.2;
+// Half width of each glowing front.
+const float GLOW = 0.12;
+// How far the front of the new content trails the old one.
+const float GAP = 0.6;
 const float LAYERS = 3.0;
 
 float hash(vec2 p) {
@@ -28,7 +54,7 @@ float aspect() {
 
 // Where the front reaches the cell, in [0, 1].
 float cellPos(vec2 pi, float scale) {
-  return pi.x / (scale * 2.0) + 0.5;
+  return ${cellPos};
 }
 
 vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
@@ -42,7 +68,7 @@ vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
   vec4 color = vec4(hsv2rgb(vec3((pc.x * 13.0 / pc.y * 17.0) * 0.3, 1.0, 1.0)), 1.0);
   float x = cellPos(pi, scale);
   float n = hash(pi);
-  float anim = smoothstep(W * 2.0, 0.0, abs(x + n * W - t));
+  float anim = smoothstep(GLOW, 0.0, abs(x + n * W - t));
   color *= anim;
   color *= mix(1.0, clamp(0.3 / abs(sdBox(p - pc, 0.5)), 0.0, 10.0), edge * pow(anim, 10.0));
   return color * alpha;
@@ -62,9 +88,18 @@ vec4 cellsColor(vec2 p, float scale, float t) {
 vec4 draw(vec2 uv, vec2 p, float t, float scale) {
   vec2 pi = floor(p * scale);
   float x = cellPos(pi, scale);
-  float swap = smoothstep(t, t - W, x + hash(pi) * W);
-  vec4 c = mix(readFrom(uv), readTo(uv), swap);
-  return c + cellsColor(p * scale, scale, t) * 1.5;
+  float h = x + hash(pi) * W;
+  // The old content leaves at the front t; the new one arrives at a second front behind it.
+  float tIn = t - GAP;
+  float out_ = smoothstep(t, t - W, h);
+  float in_ = smoothstep(tIn, tIn - W, h);
+  vec4 from = readFrom(uv);
+  vec4 to = readTo(uv);
+  float a = max(from.a, to.a);
+  float gap = BLACKOUT * (out_ - in_);
+  vec4 c = from * (1.0 - out_) + to * in_ + vec4(0.0, 0.0, 0.0, a) * gap;
+  vec4 glow = cellsColor(p * scale, scale, t) + cellsColor(p * scale, scale, tIn);
+  return c + glow * 1.5;
 }
 
 vec4 transition(vec2 uv, float t) {
@@ -72,8 +107,8 @@ vec4 transition(vec2 uv, float t) {
   if (!inRange(uv)) return vec4(0.0);
   vec2 p = uv * 2.0 - 1.0;
   p.y *= aspect();
-  // Start and end with the front and its glow fully off the element.
-  t = t * (1.0 + W * 5.0) - W * 2.0;
+  // Start and end with both fronts and their glow fully off the element.
+  t = mix(-GLOW, 1.0 + W * 2.0 + GAP + GLOW, t);
   vec4 c = vec4(0.0);
   for (float i = 0.0; i < LAYERS; i++) {
     c += draw(uv, p, t, abs(cos(i) * 7.3 + 10.0));
@@ -82,4 +117,8 @@ vec4 transition(vec2 uv, float t) {
   return vec4(c.rgb, min(c.a, 1.0));
 }
 `,
-});
+    });
+}
+
+/** Pixel cells sweep left to right, with a black gap between old and new. */
+export const pixelScan: ShaderTransitionDef = createPixelScan();

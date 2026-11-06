@@ -88,17 +88,18 @@ export default function Home() {
 
             <section className="section split split-usage">
                 <div className="section-head">
-                    <p className="kicker">Usage</p>
+                    <p className="kicker">Why VFX-JS</p>
                     <h2>
-                        Wrap the element that <em>changes</em>.
+                        Your real pages, through a <em>shader</em>.
                     </h2>
                     <p className="lead">
-                        In React, put VFXTransition around the router outlet. A
-                        new pageKey starts a run, and each page can pick how it
-                        enters. Without React, pass the element to addTransition
-                        and change its DOM inside run(). Either way, the old
-                        content stays on screen until the shader has its
-                        snapshot.
+                        WebGL transitions usually work only on images you draw
+                        yourself. VFX-JS captures the live DOM, with its text,
+                        layout and CSS, so any page or component can glitch,
+                        melt or warp into the next. Keep your markup and your
+                        router. Add one component in React, or one call without
+                        it. The old content stays on screen until the shader has
+                        its snapshot, so nothing flashes.
                     </p>
                     <Link href="/how-it-works" className="text-link">
                         How it works →

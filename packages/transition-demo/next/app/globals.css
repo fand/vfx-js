@@ -117,8 +117,26 @@ em {
     color: var(--white);
 }
 .loader .brand-mark {
-    width: 96px;
-    height: 96px;
+    width: 288px;
+    height: 288px;
+}
+.loader .brand-mark path {
+    stroke: var(--white);
+    stroke-width: 2;
+    stroke-dasharray: 1;
+    animation:
+        loader-trim 0.3s ease-in-out both,
+        loader-fill 0.5s 0.3s ease-out both;
+}
+@keyframes loader-trim {
+    from {
+        stroke-dashoffset: 1;
+    }
+}
+@keyframes loader-fill {
+    from {
+        fill-opacity: 0;
+    }
 }
 :root[data-loading] .header {
     opacity: 0;
@@ -738,8 +756,10 @@ em {
         box-shadow 0.15s ease,
         backdrop-filter 0.15s ease;
 }
+/* With nothing hovered or focused, the middle item looks active. */
 .carousel-item:hover,
-.carousel-item:focus-visible {
+.carousel-item:focus-visible,
+.carousel:not(:hover, :has(:focus-visible)) .carousel-item[data-center] {
     scale: 1.12;
     background: var(--glass);
     box-shadow: var(--glass-shadow);
@@ -816,11 +836,17 @@ em {
     transition: translate 0.15s ease;
 }
 .carousel-item:hover .carousel-play,
-.carousel-item:focus-visible .carousel-play {
+.carousel-item:focus-visible .carousel-play,
+.carousel:not(:hover, :has(:focus-visible))
+    .carousel-item[data-center]
+    .carousel-play {
     opacity: 1;
 }
 .carousel-item:hover .carousel-label,
-.carousel-item:focus-visible .carousel-label {
+.carousel-item:focus-visible .carousel-label,
+.carousel:not(:hover, :has(:focus-visible))
+    .carousel-item[data-center]
+    .carousel-label {
     translate: var(--shift) 0;
 }
 @media (max-width: 640px) {
@@ -1045,7 +1071,6 @@ em {
     font-weight: 400;
 }
 
-.pg-stage,
 .lab-stage {
     aspect-ratio: 16 / 9;
     border-radius: var(--radius);
@@ -1202,18 +1227,6 @@ em {
     .lab-scene * {
         animation: none;
     }
-}
-.pg-now {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 18px;
-    font-size: 14px;
-    color: var(--muted);
-}
-.pg-now code {
-    font-size: 14px;
-    color: var(--fg);
 }
 .dot {
     width: 8px;
@@ -1555,51 +1568,7 @@ em {
     line-height: 1.9;
     color: var(--muted);
 }
-.limits {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 12px;
-    margin: 24px 0 0;
-    padding: 0;
-    list-style: none;
-}
-.limits li {
-    padding: 20px 22px;
-    border-radius: 14px;
-    background: var(--card);
-    box-shadow: 0 0 0 1px var(--rule);
-    line-height: 1.6;
-    color: var(--muted);
-}
-
-/* Transitions playground */
-.playground {
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 24px;
-    align-items: start;
-}
-.pg-stage {
-    box-shadow:
-        0 0 0 1px #ffffff14,
-        0 60px 120px -50px #d6ff3d40;
-}
-.pg-now span:last-child {
-    color: var(--soft);
-}
-.pg-side {
-    display: grid;
-    gap: 16px;
-    min-width: 0;
-}
-.pg-list {
-    display: grid;
-    gap: 4px;
-    padding: 8px;
-    border-radius: var(--radius);
-    background: var(--card);
-    box-shadow: 0 0 0 1px var(--rule);
-}
+/* Playground list and controls */
 .pg-item {
     display: flex;
     justify-content: space-between;
@@ -1629,14 +1598,6 @@ em {
 .pg-item[aria-pressed="true"] .pg-play {
     opacity: 1;
 }
-.pg-controls {
-    display: grid;
-    gap: 14px;
-    padding: 18px;
-    border-radius: var(--radius);
-    background: var(--card);
-    box-shadow: 0 0 0 1px var(--rule);
-}
 .pg-range {
     display: grid;
     gap: 8px;
@@ -1651,18 +1612,6 @@ em {
 }
 .pg-range input {
     width: 100%;
-    accent-color: var(--em);
-}
-.pg-toggle {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--muted);
-    cursor: pointer;
-}
-.pg-toggle input {
     accent-color: var(--em);
 }
 .pg-select {
@@ -1694,6 +1643,61 @@ em {
     color: var(--muted);
 }
 .preset-table td:first-child code {
+    color: var(--acid);
+}
+.preset-list {
+    display: grid;
+    gap: 16px;
+    margin-top: 24px;
+}
+.preset {
+    display: grid;
+    grid-template-columns: minmax(0, 360px) 1fr;
+    gap: 28px;
+    padding: 20px;
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: 0 0 0 1px var(--rule);
+    scroll-margin-top: calc(var(--header) + 16px);
+}
+.preset-thumb {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+}
+.preset-body {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    min-width: 0;
+}
+.preset-body h3 {
+    margin: 0;
+    font-size: 20px;
+}
+.preset-body h3 code {
+    color: var(--acid);
+}
+.preset-body p {
+    margin: 0;
+}
+.preset-import {
+    margin: 0;
+    padding: 12px 14px;
+    overflow-x: auto;
+    border-radius: 8px;
+    background: var(--ink);
+    font: 13px / 1.5 var(--mono);
+}
+.preset-body .preset-table {
+    font-size: 14px;
+}
+.preset-body .preset-table th,
+.preset-body .preset-table td {
+    padding: 8px 6px;
+}
+.preset-body .text-link {
+    justify-self: start;
     color: var(--acid);
 }
 
@@ -1728,8 +1732,10 @@ em {
 .lab {
     display: grid;
     grid-template-columns: 1.3fr 1fr;
+    /* Fills the frame, so each column scrolls on its own. */
+    grid-template-rows: minmax(0, 1fr);
     gap: 20px;
-    min-height: 100%;
+    height: 100%;
     /* The page has no .frame-main, so leave room for the header here. */
     padding: calc(20px + var(--header)) 20px 20px;
     color: #e6e6ef;
@@ -1913,9 +1919,41 @@ em {
     color: #8b8b9c;
 }
 .lab-preview {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 16px;
-    align-content: start;
+    min-height: 0;
+    overflow-y: auto;
+}
+/* Keep their size; the column scrolls instead. */
+.lab-preview > * {
+    flex: none;
+}
+.lab-transport {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.lab-transport .btn {
+    flex: none;
+    min-width: 112px;
+    justify-content: center;
+    background: var(--acid);
+    color: var(--ink);
+}
+.lab-transport .btn:disabled {
+    opacity: 0.5;
+}
+.lab-t {
+    flex: none;
+    width: 56px;
+    font: 13px var(--mono);
+    color: #fff;
+}
+.lab-transport input {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--acid);
 }
 .lab-controls {
     display: grid;
@@ -1926,17 +1964,6 @@ em {
     --muted: #a1a1ad;
     --fg: #fff;
     --em: var(--acid);
-}
-.lab-buttons {
-    display: flex;
-    gap: 10px;
-}
-.lab-buttons .btn-primary {
-    background: var(--acid);
-    color: var(--ink);
-}
-.lab-buttons .btn-ghost {
-    color: #e6e6ef;
 }
 .api-table {
     display: grid;
@@ -1962,7 +1989,7 @@ em {
 /* Footer */
 .footer {
     margin-top: 40px;
-    padding: 72px 0 48px;
+    padding: 120px 0 32px;
     background: var(--ink);
     color: #e6e6ef;
 }
@@ -2016,6 +2043,12 @@ em {
     color: #6b6b78;
 }
 
+.footer-logo {
+    display: block;
+    width: 60%;
+    margin: 160px auto 0;
+}
+
 .footer-simple {
     display: flex;
     justify-content: space-between;
@@ -2046,7 +2079,7 @@ em {
     .features,
     .split,
     .two-col,
-    .playground,
+    .preset,
     .lab,
     .doc-next,
     .footer-inner {
@@ -2065,6 +2098,14 @@ em {
         grid-template-columns: 1fr;
         gap: 6px;
     }
+    /* One column: the page scrolls, not the column. */
+    .lab {
+        grid-template-rows: auto;
+        height: auto;
+    }
+    .lab-preview {
+        overflow: visible;
+    }
 }
 @media (max-width: 720px) {
     .header {
@@ -2077,6 +2118,19 @@ em {
     .doc-section,
     .doc-title,
     .footer-inner,
+    .footer-logo {
+        display: block;
+        width: calc(100% - 48px);
+        margin: 160px auto 0;
+        overflow: visible;
+        fill: currentColor;
+        font: 600 100px var(--sans);
+        letter-spacing: -0.04em;
+    }
+    .footer-logo-slash {
+        fill: var(--acid);
+    }
+
     .footer-simple {
         width: calc(100% - 32px);
     }
@@ -2088,10 +2142,19 @@ em {
     .hero-glow,
     .scroll-cue::after,
     .tab-body.is-in,
-    .dot {
+    .dot,
+    .loader .brand-mark path {
         animation: none;
     }
 }
 .doc-prose > div {
     max-width: 68ch;
+}
+.doc-prose h3 {
+    margin: 32px 0 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+.doc-prose h3 + p {
+    margin-top: 8px;
 }

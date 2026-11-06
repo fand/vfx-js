@@ -23,9 +23,9 @@ export default function GettingStarted() {
                     <span>Next</span>
                     <strong>How it works →</strong>
                 </Link>
-                <Link href="/transitions" className="next-card">
+                <Link href="/presets" className="next-card">
                     <span>Try</span>
-                    <strong>All transitions →</strong>
+                    <strong>All presets →</strong>
                 </Link>
             </section>
         </PageFrame>
