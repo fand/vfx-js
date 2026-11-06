@@ -1,6 +1,6 @@
 # Element transitions: progress
 
-Status as of 2026-11-04. Branch `feat/transition`, PR #220.
+Status as of 2026-11-06. Branch `feat/transition`, PR #220.
 Plans: [plan.md](./plan.md), then the review follow-ups [plan2.md](./plan2.md),
 [plan3.md](./plan3.md), [plan4.md](./plan4.md), [plan5.md](./plan5.md).
 User guide: [docs/TRANSITION.md](../../TRANSITION.md).
@@ -445,3 +445,148 @@ cut timing, and the SvelteKit / Nuxt / Astro back specs.
 Release note: `@vfx-js/transitions` now imports `shaderTransition` from
 core at runtime. Raise its `@vfx-js/core` peer range to the release that
 ships it.
+
+## Demo polish: hero, header, Playground
+
+Home hero (`_components/hero-stage.tsx`):
+
+- The hero is its own `useVFXTransition` target. Each preset sets three
+  things, by its index in the preset list:
+  - `data-palette`: normal, orange, purple, green, in that order. Each
+    color is white frosted glass: a near-white background, a large
+    blurred glow of the color, and a white veil over it. The ink stays
+    dark; only the accent changes.
+  - `data-pattern`: dots, grid, diagonal, contour, sine. The pattern
+    covers the whole hero; only the color glow is a soft circle.
+  - `data-theme`: the title word's font, for some presets.
+  - Layers, back to front: glow, veil (`::before`), pattern (`::after`
+    or the contour canvas).
+  - Rejected: one Sanzo Wada color per preset (looked off; the target
+    was a frosted look), strong backgrounds, and swapping the title
+    word every 500 ms.
+- Contour lines are animated simplex noise, drawn by a second VFX-JS
+  instance (`contour-canvas.tsx`, shader in `_lib/contour.ts`).
+  - `wrapper` puts its canvas inside the hero, so the html-in-canvas
+    capture of a run includes it.
+  - `scrollPadding: false` makes the canvas `position: fixed`, which
+    matches the viewport-based element rects. With the default, the
+    canvas moves with the hero inside `.frame` while the rects move
+    too, so the lines drift at twice the scroll speed.
+  - It plays only while the contour pattern is on, and calls
+    `render()` on switch so the capture has a frame.
+  - Tried first: a static SVG `feTurbulence` filter (stair-stepped from
+    8-bit noise), a generated contour SVG tile (fine but static), and
+    raw WebGL2 (worked, but needed a `biome-ignore` for
+    `gl.useProgram`, which the React hook rule misreads).
+- A preset carousel sits under the title. It is a native horizontal
+  scroll with 5 copies of the list, and it jumps back to the middle copy
+  when scrolling stops. Chevrons scroll by half its width.
+- A click blinks the label for 0.3 s, then runs the preset; the list is
+  already centered on it when the run lands. Autoplay steps every 3 s
+  and stops on any touch or scroll.
+- Hover grows the item with `scale` (not `font-size`, which moved the
+  neighbors) and adds a glass background. Edge fades use a scroll-driven
+  animation, because a mask on the list stops `backdrop-filter`.
+- Tried and dropped: sliding the carousel during the run. The new side
+  is live, but smoothstep presets show it at ~8% for the first 0.2 s, so
+  the slide was invisible on half the presets. A play hook on the def
+  worked but was only needed for that.
+- Removed the `npm i` line from the hero.
+
+Header and docs layout:
+
+- The header floats over the outlet (z-index above the VFX-JS canvas).
+  It is clear while the home hero is under it, white once scrolled past.
+  The hero sets `data-header="clear"` on `<html>`.
+- `DocSidebar` keeps its pathname from mount. `FrozenRouter` in
+  `@vfx-js/react/next` freezes `LayoutRouterContext` only, so
+  `usePathname()` in the old page already gave the new path and the
+  sidebar showed before the snapshot.
+- The sidebar links to the Playground, outside `nav`.
+
+Playground (`app/playground/`):
+
+- Right column tabs: Presets, Edit, gl-transitions. Presets lists our
+  examples and presets; gl-transitions has an intro (credit, count, a
+  `createGLTransition` example) and shows each author. Edit shows the
+  author, license and a link for gl-transitions sources.
+- The stage is a small web page (`lab-scene.tsx`): heading, text, SVG
+  shapes and CSS animation, in two layouts that alternate. Its padding
+  is in percent; `cq` units on the container itself read the viewport.
+- Page and panels use `#202028`.
+
+Core fix (`html-in-canvas.ts`, `still-clone.ts`):
+
+- Wrapping restarted the element's CSS animations. In Chrome 157,
+  `moveBefore` into a parent inserted in the same task restarts them; a
+  style flush on the new canvas first keeps them running.
+- The still clone holds each CSS animation at the original's time,
+  paired by element, pseudo-element and name.
+
+Verified in the browser (Next demo, Playwright, 1280px and 375px):
+
+- Carousel scroll, wrap, blink, autoplay stop, hover; layout never moves
+  across themes.
+- Palettes and patterns; the contour canvas animates, shows in a run's
+  capture, and stays inside the hero when `.frame` scrolls.
+- Header clear and white states, and stays above runs.
+- top → docs with no sidebar flash.
+- CSS animation time keeps going through a run (1526 → 3034 ms); the
+  clone matches the original.
+
+Not done:
+
+- `FrozenRouter` should also freeze `PathnameContext`. Any app that
+  calls `usePathname()` in the outlet hits the sidebar bug.
+- No changeset yet for the core animation fix.
+- The clone animation sync has no test; jsdom has no `getAnimations`.
+- "Started by Gaëtan Renaudeau" in the gl-transitions intro is not
+  checked against a source.
+
+## New presets: lensDistortion, slitScan, pixelScan, pixelStretch, tile
+
+All are one `shaderTransition` each, in `packages/transitions/src/`.
+All return transparent outside the element, so a container overflow
+shows nothing extra.
+
+- `lensDistortion` / `createLensDistortion({ strength, dispersion })`:
+  `p *= 1 - length(p) * s`, with `p` centered and y in [-1, 1]. At the
+  peak the center is magnified and the edges fold back into it. The
+  first half grows a full-strength warp out from the center in a soft
+  circle; the second half relaxes it with `sin(πt)`. Dispersion: 12
+  taps with `s` spread by ±`dispersion` (default 0.6), each tap
+  weighted by its place in the spectrum. Reads past the edge mirror.
+  Crossfade over t 0.35–0.65.
+- `slitScan`: ported from the docs logo shader. Prev smears into columns
+  left to right (t 0–0.48), a quick crossfade joins the two fully
+  smeared states (0.48–0.52), then next draws out of its own columns
+  (0.52–1). RGB lag 0 / 0.2 / 0.4.
+- `pixelScan`: ported from `examples/works/pixel-scan.html`. A front of
+  glowing cells sweeps left to right and swaps prev for next behind it.
+  The `t` range is widened so the front and glow are fully off the
+  element at t=0 and t=1. Glow uses the max alpha of both sides at the
+  cell center (no mip reads).
+- `pixelStretch`: prev stretches into vertical streaks from the top
+  down (t 0–0.4), crossfades to next stretched the same way (0.4–0.6),
+  then next settles from the top down (0.6–1). Uses the smin / smax of
+  the Figma Pixel Stretch effect to round the corner.
+- `tile` / `createTile({ direction, shape, count })`: prev splits into
+  tiles that shrink to their centers and show next. `shape`: `hex`
+  (default) or `square`. `direction`: `center` (rings out, default),
+  `left`, `right`, `up`, `down`; it is the way the wave travels, so
+  `up` starts at the bottom. `count` is tiles along the longer side
+  (default 12). Tiles shrink over 40% of the run, delayed by up to 60%.
+
+Wired into the demo preset list and hero labels, storybook
+(`tileUp`, `tileSquare`), `docs/TRANSITION.md` and the preset tests.
+
+Verified: each shader compiles in WebGL2 and was rendered at fixed `t`
+(0 to 1) with two test textures in Playwright. t=0 shows prev and t=1
+shows next exactly.
+
+Not done:
+
+- Not yet seen in the real demo or storybook; values are tuned on
+  stills only.
+- No hero CSS theme (font) for the new presets.
+- `slitScan`, `pixelScan` and `pixelStretch` have no direction option.

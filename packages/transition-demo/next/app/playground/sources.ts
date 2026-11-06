@@ -22,8 +22,8 @@ export type Credit = { author: string; license: string; href: string };
 export type SourceGroup = {
     label: string;
     options: { id: string; label: string; author?: string }[];
-    /** Shown under the heading for third-party shaders. */
-    credit?: { text: string; href: string };
+    /** Shaders from gl-transitions, not ours. They get their own tab. */
+    thirdParty?: boolean;
 };
 
 const isShader = (def: object): def is ShaderTransitionDef => "frag" in def;
@@ -61,10 +61,7 @@ export const groups: SourceGroup[] = [
             label: e.name,
             author: authorOf(e.author),
         })),
-        credit: {
-            text: "Community shaders from gl-transitions.com. Each keeps its author's license.",
-            href: "https://gl-transitions.com/",
-        },
+        thirdParty: true,
     },
 ];
 

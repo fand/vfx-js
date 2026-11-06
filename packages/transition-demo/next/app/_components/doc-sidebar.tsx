@@ -41,6 +41,10 @@ export function DocSidebar() {
                     );
                 })}
             </ul>
+            {/* Not in `nav`: the Playground is a tool page, not a doc. */}
+            <Link href="/playground" className="doc-sidebar-extra">
+                Playground →
+            </Link>
         </nav>
     );
 }

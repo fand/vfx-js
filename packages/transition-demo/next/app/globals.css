@@ -313,6 +313,12 @@ em {
     font-weight: 600;
     background: color-mix(in srgb, currentColor 9%, transparent);
 }
+.doc-sidebar .doc-sidebar-extra {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+    border-radius: 0;
+}
 .doc-sidebar ul ul {
     margin: 4px 0 8px 12px;
     padding-left: 8px;
@@ -1673,6 +1679,18 @@ em {
 }
 
 /* Playground: shader lab */
+/* Lighter than the other dark pages; the header follows it. */
+:root:has(.lab) {
+    --lab-bg: #202028;
+    /* Opaque, so sticky headings cover what scrolls under them. */
+    --lab-panel: color-mix(in srgb, #ffffff 3%, var(--lab-bg));
+}
+.frame:has(> .lab),
+:root:has(.lab) .header[data-tone="dark"],
+:root:has(.lab) .header[data-tone="dark"] .header-menu {
+    --bg: var(--lab-bg);
+    background: var(--lab-bg);
+}
 .lab-head {
     padding: 20px 0 8px;
 }
@@ -1720,6 +1738,10 @@ em {
         background 0.2s,
         color 0.2s;
 }
+/* The gl-transitions tab sits apart, on the right. */
+.lab-tabs button:last-child {
+    margin-left: auto;
+}
 .lab-tabs button:hover {
     color: #e6e6ef;
 }
@@ -1746,7 +1768,7 @@ em {
     overflow-y: auto;
     padding: 18px 8px;
     border-radius: 14px;
-    background: #0d0d14;
+    background: var(--lab-panel);
     box-shadow: inset 0 0 0 1px #ffffff14;
 }
 /* Headings stick while their group scrolls past. */
@@ -1759,7 +1781,7 @@ em {
     gap: 8px;
     margin: 0 0 6px;
     padding: 10px 14px 8px;
-    background: #0d0d14;
+    background: var(--lab-panel);
     font: 600 16px var(--sans);
     letter-spacing: -0.01em;
     color: #fff;
@@ -1768,26 +1790,23 @@ em {
     font: 11px var(--mono);
     color: #6b6b78;
 }
-/* Third-party shaders sit in their own box, with credit to their authors. */
-.lab-group[data-third-party] {
-    margin-top: 8px;
-    padding-bottom: 6px;
-    border: 1px dashed #ffffff24;
-    border-radius: 12px;
+.lab-intro {
+    display: grid;
+    gap: 12px;
+    margin: 4px 14px 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #ffffff14;
 }
-.frame .lab-group[data-third-party] h2 {
-    top: -18px;
-    border-radius: 12px 12px 0 0;
+.frame .lab-intro p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #c8c8d4;
 }
-.frame .lab-credit {
-    margin: -2px 14px 10px;
-    font-size: 13px;
-    line-height: 1.5;
+.frame .lab-intro a {
+    color: #fff;
 }
-.frame .lab-credit a {
-    color: #a1a1ad;
-}
-.frame .lab-credit a:hover {
+.frame .lab-intro a:hover {
     color: var(--acid);
 }
 .lab-list .pg-item > span:first-child {
@@ -1851,7 +1870,7 @@ em {
 }
 .lab-code pre {
     overflow: hidden;
-    background: #0d0d14;
+    background: var(--lab-panel);
     color: #e6e6ef;
 }
 .lab-code pre code {
@@ -1884,7 +1903,7 @@ em {
     gap: 16px;
     padding: 18px;
     border-radius: 14px;
-    background: #ffffff08;
+    background: var(--lab-panel);
     --muted: #a1a1ad;
     --fg: #fff;
     --em: var(--acid);

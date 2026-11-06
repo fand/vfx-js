@@ -1,20 +1,66 @@
 "use client";
 
-import { shaderTransition, type TransitionUniforms } from "@vfx-js/core";
+import {
+    shaderTransition,
+    type TransitionEase,
+    type TransitionUniforms,
+} from "@vfx-js/core";
 import { useVFXTransition } from "@vfx-js/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Code } from "../_components/code";
 import { highlight } from "../_components/highlight";
 import { LabScene } from "./lab-scene";
-import { groups, type Source, sourceOf } from "./sources";
+import { groups, type Source, type SourceGroup, sourceOf } from "./sources";
 
 const first = sourceOf(groups[0].options[0].id) as Source;
+
+type Tab = "presets" | "edit" | "gl";
+
+// gl-transitions sits last, on the far right: the shaders are not ours.
+const tabs: { id: Tab; label: string }[] = [
+    { id: "presets", label: "Presets" },
+    { id: "edit", label: "Edit" },
+    { id: "gl", label: "gl-transitions" },
+];
+
+/** Easing choices. The first keeps the source's own ease. */
+const eases: { label: string; ease?: TransitionEase }[] = [
+    { label: "default" },
+    { label: "linear", ease: "linear" },
+    { label: "smoothstep", ease: "smoothstep" },
+    {
+        label: "easeInOutCubic",
+        ease: (x) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2),
+    },
+    { label: "easeInCubic", ease: (x) => x ** 3 },
+    { label: "easeOutCubic", ease: (x) => 1 - (1 - x) ** 3 },
+    {
+        label: "easeInOutExpo",
+        ease: (x) =>
+            x <= 0
+                ? 0
+                : x >= 1
+                  ? 1
+                  : x < 0.5
+                    ? 2 ** (20 * x - 10) / 2
+                    : (2 - 2 ** (-20 * x + 10)) / 2,
+    },
+];
+
+const easeName = (ease: TransitionEase | undefined) =>
+    typeof ease === "function" ? "custom" : (ease ?? "smoothstep");
+
+const ownGroups = groups.filter((g) => !g.thirdParty);
+const glGroups = groups.filter((g) => g.thirdParty);
+const glCount = glGroups.reduce((n, g) => n + g.options.length, 0);
 
 export function ShaderLab({ head }: { head?: React.ReactNode }) {
     const [source, setSource] = useState(first);
     const [frag, setFrag] = useState(first.frag);
     const [values, setValues] = useState<TransitionUniforms>(first.uniforms);
     const [scene, setScene] = useState(0);
-    const [tab, setTab] = useState<"presets" | "edit">("presets");
+    const [tab, setTab] = useState<Tab>("presets");
+    const [easeIndex, setEaseIndex] = useState(0);
     const { ref, run } = useVFXTransition({ duration: 1.2 });
     const preRef = useRef<HTMLPreElement>(null);
     const caretRef = useRef<number | null>(null);
@@ -61,7 +107,12 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
     );
 
     const play = (reverse = false, transition = def, uniforms = values) => {
-        run(() => setScene((s) => s + 1), { transition, uniforms, reverse });
+        run(() => setScene((s) => s + 1), {
+            transition,
+            uniforms,
+            reverse,
+            ease: eases[easeIndex].ease,
+        });
     };
 
     /** Loads `id` into the editor and plays it once. */
@@ -118,6 +169,24 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                             />
                         </label>
                     ))}
+                    <label className="pg-range">
+                        <span>ease</span>
+                        <select
+                            className="pg-select"
+                            value={easeIndex}
+                            onChange={(e) =>
+                                setEaseIndex(Number(e.target.value))
+                            }
+                        >
+                            {eases.map((e, i) => (
+                                <option key={e.label} value={i}>
+                                    {i === 0
+                                        ? `default (${easeName(source.ease)})`
+                                        : e.label}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
                     <div className="lab-buttons">
                         <button
                             type="button"
@@ -138,84 +207,36 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
             </div>
             <div className="lab-editor">
                 <div className="lab-tabs" role="tablist">
-                    <button
-                        type="button"
-                        role="tab"
-                        id="lab-tab-presets"
-                        aria-controls="lab-panel-presets"
-                        aria-selected={tab === "presets"}
-                        onClick={() => setTab("presets")}
-                    >
-                        Presets
-                    </button>
-                    <button
-                        type="button"
-                        role="tab"
-                        id="lab-tab-edit"
-                        aria-controls="lab-panel-edit"
-                        aria-selected={tab === "edit"}
-                        onClick={() => setTab("edit")}
-                    >
-                        Edit
-                    </button>
-                </div>
-                {/* Both panels stay mounted, so the editor keeps its scroll and caret. */}
-                <div
-                    className="lab-panel lab-list"
-                    role="tabpanel"
-                    id="lab-panel-presets"
-                    aria-labelledby="lab-tab-presets"
-                    hidden={tab !== "presets"}
-                >
-                    {groups.map((g) => (
-                        <section
-                            key={g.label}
-                            className="lab-group"
-                            data-third-party={g.credit ? "" : undefined}
+                    {tabs.map((t) => (
+                        <button
+                            key={t.id}
+                            type="button"
+                            role="tab"
+                            id={`lab-tab-${t.id}`}
+                            aria-controls={`lab-panel-${t.id}`}
+                            aria-selected={tab === t.id}
+                            onClick={() => setTab(t.id)}
                         >
-                            <h2>
-                                {g.label}
-                                <span>{g.options.length}</span>
-                            </h2>
-                            {g.credit && (
-                                <p className="lab-credit">
-                                    <a
-                                        href={g.credit.href}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                    >
-                                        {g.credit.text} ↗
-                                    </a>
-                                </p>
-                            )}
-                            <ul>
-                                {g.options.map((o) => (
-                                    <li key={o.id}>
-                                        <button
-                                            type="button"
-                                            className="pg-item"
-                                            aria-pressed={o.id === source.id}
-                                            onClick={() => pick(o.id)}
-                                        >
-                                            <span>{o.label}</span>
-                                            {o.author && (
-                                                <span className="lab-author">
-                                                    by {o.author}
-                                                </span>
-                                            )}
-                                            <span
-                                                className="pg-play"
-                                                aria-hidden
-                                            >
-                                                ▶
-                                            </span>
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        </section>
+                            {t.label}
+                        </button>
                     ))}
                 </div>
+                {/* All panels stay mounted, so the editor keeps its scroll and caret. */}
+                <SourceList
+                    id="presets"
+                    hidden={tab !== "presets"}
+                    groups={ownGroups}
+                    current={source.id}
+                    onPick={pick}
+                />
+                <SourceList
+                    id="gl"
+                    hidden={tab !== "gl"}
+                    intro={<GLIntro />}
+                    groups={glGroups}
+                    current={source.id}
+                    onPick={pick}
+                />
                 <div
                     className="lab-panel lab-edit"
                     role="tabpanel"
@@ -261,6 +282,106 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                     </p>
                 </div>
             </div>
+        </div>
+    );
+}
+
+/** One tab panel of loadable sources. With an intro, the groups drop their headings. */
+function SourceList({
+    id,
+    hidden,
+    intro,
+    groups,
+    current,
+    onPick,
+}: {
+    id: Tab;
+    hidden: boolean;
+    intro?: React.ReactNode;
+    groups: SourceGroup[];
+    current: string;
+    onPick: (id: string) => void;
+}) {
+    return (
+        <div
+            className="lab-panel lab-list"
+            role="tabpanel"
+            id={`lab-panel-${id}`}
+            aria-labelledby={`lab-tab-${id}`}
+            hidden={hidden}
+        >
+            {intro}
+            {groups.map((g) => (
+                <section key={g.label}>
+                    {!intro && (
+                        <h2>
+                            {g.label}
+                            <span>{g.options.length}</span>
+                        </h2>
+                    )}
+                    <ul>
+                        {g.options.map((o) => (
+                            <li key={o.id}>
+                                <button
+                                    type="button"
+                                    className="pg-item"
+                                    aria-pressed={o.id === current}
+                                    onClick={() => onPick(o.id)}
+                                >
+                                    <span>{o.label}</span>
+                                    {o.author && (
+                                        <span className="lab-author">
+                                            by {o.author}
+                                        </span>
+                                    )}
+                                    <span className="pg-play" aria-hidden>
+                                        ▶
+                                    </span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ))}
+        </div>
+    );
+}
+
+const glExample = `
+import { createGLTransition } from "@vfx-js/transitions";
+import transitions from "gl-transitions";
+
+const cube = transitions.find((t) => t.name === "Cube");
+t.run(cb, { transition: createGLTransition(cube, { persp: 0.5 }) });
+`;
+
+/** Credit for gl-transitions, and how to use its shaders with VFX-JS. */
+function GLIntro() {
+    return (
+        <div className="lab-intro">
+            <p>
+                <a
+                    href="https://gl-transitions.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                >
+                    gl-transitions
+                </a>{" "}
+                is an open collection of GLSL transitions, started by Gaëtan
+                Renaudeau and published by its contributors.
+            </p>
+            <p>
+                The {glCount} shaders below were written by the community. Each
+                keeps its author&apos;s license, shown in the Edit tab. Shaders
+                that need extra textures are left out.
+            </p>
+            <p>
+                Install <code>gl-transitions</code>, then{" "}
+                <code>createGLTransition</code> from{" "}
+                <code>@vfx-js/transitions</code> turns any of them into a VFX-JS
+                transition:
+            </p>
+            <Code label="main.ts">{glExample}</Code>
         </div>
     );
 }
