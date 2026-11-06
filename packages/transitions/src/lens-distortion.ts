@@ -3,15 +3,17 @@ import { IGN, MIRROR } from "./_shared";
 
 /**
  * A lens warps the content harder and harder, swaps it at the peak and relaxes.
- * The old content also zooms in as it fades out.
+ * The old content zooms in as it fades out; the new one zooms back out to normal.
  * At the peak the center is magnified and the edges fold back into it.
  * `strength` scales the warp. `dispersion` splits it into a rainbow; 0 turns it off.
+ * `zoom` is the extra scale over the whole run; 0 turns it off.
  */
 export function createLensDistortion(
-    opts: { strength?: number; dispersion?: number } = {},
+    opts: { strength?: number; dispersion?: number; zoom?: number } = {},
 ): ShaderTransitionDef {
     const strength = (opts.strength ?? 1).toFixed(3);
     const dispersion = Math.max(0, opts.dispersion ?? 0.6).toFixed(3);
+    const zoom = Math.max(0, opts.zoom ?? 3).toFixed(3);
     return shaderTransition({
         name: "lens_distortion",
         frag: `
@@ -20,8 +22,8 @@ const float DISPERSION = ${dispersion};
 const float TAPS = 12.0;
 // Width of the growing warp's edge.
 const float SOFT = 0.5;
-// How far the old content zooms in by the end.
-const float ZOOM = 1.0;
+// The old content zooms from 1 to 1 + ZOOM; the new one from 1 + ZOOM back to 1.
+const float ZOOM = ${zoom};
 
 ${IGN}
 ${MIRROR}
@@ -41,7 +43,8 @@ vec4 transition(vec2 uv, float t) {
     amount = 1.0 - smoothstep(reach - SOFT, reach, l);
   }
   float jitter = ign(gl_FragCoord.xy);
-  float zoom = 1.0 + ZOOM * t;
+  float zoomFrom = 1.0 + ZOOM * t;
+  float zoomTo = 1.0 + ZOOM * (1.0 - t);
 
   vec3 rgb = vec3(0.0);
   vec3 total = vec3(0.0);
@@ -52,8 +55,8 @@ vec4 transition(vec2 uv, float t) {
     vec2 q = p * (1.0 - l * s);
     q.x /= aspect;
     vec4 c = vec4(0.0);
-    if (mixT < 1.0) c += readFrom(mirror(q / zoom * 0.5 + 0.5)) * (1.0 - mixT);
-    if (mixT > 0.0) c += readTo(mirror(q * 0.5 + 0.5)) * mixT;
+    if (mixT < 1.0) c += readFrom(mirror(q / zoomFrom * 0.5 + 0.5)) * (1.0 - mixT);
+    if (mixT > 0.0) c += readTo(mirror(q / zoomTo * 0.5 + 0.5)) * mixT;
     // Each tap adds to the color channels near its place in the spectrum.
     vec3 w = max(vec3(0.0), 1.0 - abs(vec3(k) - vec3(0.0, 0.5, 1.0)) * 2.0);
     rgb += c.rgb * w;

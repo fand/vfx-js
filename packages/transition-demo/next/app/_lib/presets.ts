@@ -195,6 +195,12 @@ export const presetList: PresetInfo[] = [
                 default: "0.6",
                 note: "Rainbow split. 0 turns it off.",
             },
+            {
+                name: "zoom",
+                type: "number",
+                default: "3",
+                note: "Old content zooms in this much, new zooms back out from it. 0 turns it off.",
+            },
         ],
     },
     {

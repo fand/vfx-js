@@ -119,11 +119,20 @@ const factories: Record<string, Factory> = {
                 step: 0.05,
                 value: 0.6,
             },
+            {
+                name: "zoom",
+                kind: "range",
+                min: 0,
+                max: 6,
+                step: 0.1,
+                value: 3,
+            },
         ],
         build: (v) =>
             createLensDistortion({
                 strength: Number(v.strength),
                 dispersion: Number(v.dispersion),
+                zoom: Number(v.zoom),
             }),
     },
     pixelsort: {
