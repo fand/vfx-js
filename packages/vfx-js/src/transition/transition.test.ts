@@ -5,7 +5,7 @@ import type {
     EffectDims,
     EffectRenderTarget,
 } from "../types";
-import { crossfade } from "./crossfade";
+import { Crossfade } from "./crossfade";
 import {
     type TransitionFrameSource,
     TransitionSlot,
@@ -13,159 +13,139 @@ import {
     type TransitionStartOpts,
 } from "./effect";
 import { BODY_OFFSET, describeGlslError } from "./glsl";
-import { shaderTransition } from "./shader";
+import { ShaderTransition } from "./shader";
 import {
     resolveSpec,
+    sameParams,
     TransitionController,
     type TransitionHost,
     type TransitionStageLike,
     waitForMedia,
 } from "./transition";
 import type {
-    TransitionDef,
+    AddTransitionOpts,
+    Transition,
     TransitionEase,
-    TransitionEffect,
     TransitionEffectContext,
     TransitionRun,
 } from "./types";
 
-const swipe = shaderTransition({ name: "swipe", frag: "" });
-const zoom = shaderTransition({ name: "zoom", frag: "" });
+const shaderClass = (
+    name: string,
+    frag = "",
+    own: { ease?: TransitionEase; overflow?: true | number } = {},
+) =>
+    class extends ShaderTransition<Record<string, number>> {
+        readonly name = name;
+        readonly frag = frag;
+        ease = own.ease;
+        overflow = own.overflow;
+    };
+
+const Swipe = shaderClass("swipe");
+const Zoom = shaderClass("zoom");
 
 describe("resolveSpec", () => {
     test("uses defaults", () => {
         expect(resolveSpec({})).toEqual({
-            transition: crossfade,
-            uniforms: {},
+            transition: Crossfade,
+            params: undefined,
             reverse: false,
             duration: 0.6,
             overflow: undefined,
-            ease: "smoothstep",
+            ease: undefined,
         });
     });
 
-    test("uniforms are the spec's only; def defaults merge in the effect", () => {
-        const cube = shaderTransition({
-            name: "cube",
-            frag: "",
-            uniforms: { persp: 0.7, unzoom: 0.3 },
-        });
-        expect(resolveSpec({ transition: cube }).uniforms).toEqual({});
-        expect(
-            resolveSpec({}, { transition: cube, uniforms: { persp: 0.2 } })
-                .uniforms,
-        ).toEqual({ persp: 0.2 });
-    });
-
-    test("carries the transition's ease", () => {
-        const linear = shaderTransition({
-            name: "l",
-            frag: "",
-            ease: "linear",
-        });
-        expect(resolveSpec({ transition: linear }).ease).toBe("linear");
-    });
-
-    test("ease: run beats the container, which beats the def", () => {
-        const linear = shaderTransition({
-            name: "l",
-            frag: "",
-            ease: "linear",
-        });
+    test("ease and overflow: run beats the container", () => {
         const cubic = (x: number) => x * x * x;
-        const opts = { transition: linear, ease: cubic };
-        expect(resolveSpec(opts, { ease: "smoothstep" }).ease).toBe(
-            "smoothstep",
-        );
-        expect(resolveSpec(opts).ease).toBe(cubic);
-        expect(resolveSpec({ transition: linear }).ease).toBe("linear");
-        expect(resolveSpec({}).ease).toBe("smoothstep");
-    });
-
-    test("overflow: run beats the container", () => {
-        expect(resolveSpec({ transition: swipe }).overflow).toBeUndefined();
-        expect(resolveSpec({ overflow: 10 }).overflow).toBe(10);
-        expect(resolveSpec({ overflow: 10 }, { overflow: true }).overflow).toBe(
-            true,
-        );
+        const opts = { transition: Swipe, ease: cubic, overflow: 10 };
+        expect(
+            resolveSpec(opts, { ease: "linear", overflow: true }),
+        ).toMatchObject({ ease: "linear", overflow: true });
+        expect(resolveSpec(opts)).toMatchObject({ ease: cubic, overflow: 10 });
     });
 
     test("run options beat the container per field", () => {
-        const opts = { transition: swipe, duration: 1, reverse: true };
-        expect(resolveSpec(opts, { transition: zoom })).toMatchObject({
-            transition: zoom,
+        const opts = { transition: Swipe, duration: 1, reverse: true };
+        expect(resolveSpec(opts, { transition: Zoom })).toMatchObject({
+            transition: Zoom,
             reverse: true,
             duration: 1,
         });
         expect(
             resolveSpec(opts, { reverse: false, duration: 2 }),
-        ).toMatchObject({ transition: swipe, reverse: false, duration: 2 });
+        ).toMatchObject({ transition: Swipe, reverse: false, duration: 2 });
     });
 
-    test("run uniforms without a shader win over the container's", () => {
-        const opts = { transition: swipe, uniforms: { width: 1, soft: 2 } };
-        expect(resolveSpec(opts, { uniforms: { width: 5 } })).toMatchObject({
-            transition: swipe,
-            uniforms: { width: 5, soft: 2 },
+    test("run params without a transition win over the container's", () => {
+        const opts = { transition: Swipe, params: { width: 1, soft: 2 } };
+        expect(resolveSpec(opts, { params: { width: 5 } })).toMatchObject({
+            transition: Swipe,
+            params: { width: 5, soft: 2 },
         });
-        expect(resolveSpec({ uniforms: { width: 1 } })).toMatchObject({
-            transition: crossfade,
-            uniforms: { width: 1 },
+        expect(resolveSpec({ params: { width: 1 } })).toMatchObject({
+            transition: Crossfade,
+            params: { width: 1 },
         });
     });
 
-    test("a run with its own shader drops the container's uniforms", () => {
-        const opts = { transition: swipe, uniforms: { width: 1 } };
-        expect(resolveSpec(opts, { transition: zoom })).toMatchObject({
-            transition: zoom,
-            uniforms: {},
-        });
+    test("a run that sets transition drops the container's params", () => {
+        const opts = { transition: Swipe, params: { width: 1 } };
+        expect(resolveSpec(opts, { transition: Zoom }).params).toBeUndefined();
         expect(
-            resolveSpec(opts, { transition: zoom, uniforms: { strength: 2 } }),
-        ).toMatchObject({ transition: zoom, uniforms: { strength: 2 } });
+            resolveSpec(opts, { transition: Zoom, params: { strength: 2 } })
+                .params,
+        ).toEqual({ strength: 2 });
     });
 });
 
-const run: TransitionRun = { reverse: false, uniforms: {}, duration: 1 };
+describe("sameParams", () => {
+    test("compares shallowly and arrays by item", () => {
+        expect(sameParams({ a: 1, b: [1, 2] }, { b: [1, 2], a: 1 })).toBe(true);
+        expect(sameParams(undefined, {})).toBe(true);
+        expect(sameParams({ a: 1 }, { a: 2 })).toBe(false);
+        expect(sameParams({ a: [1, 2] }, { a: [1, 3] })).toBe(false);
+        expect(sameParams({ a: 1 }, { a: 1, b: 1 })).toBe(false);
+        expect(sameParams({ a: { x: 1 } }, { a: { x: 1 } })).toBe(false);
+    });
+});
 
-describe("shaderTransition outputRect", () => {
+const run: TransitionRun = { reverse: false, duration: 1 };
+
+describe("ShaderTransition outputRect", () => {
     const dims = {
         pixelRatio: 2,
         contentRect: [0, 0, 100, 50],
         canvasRect: [-10, -20, 400, 300],
     } as unknown as EffectDims;
     const start = (
-        defOverflow?: true | number,
-        specOverflow?: true | number,
+        ownOverflow?: true | number,
+        runOverflow?: true | number,
     ) => {
-        const effect = shaderTransition({
-            name: "s",
-            frag: "",
-            overflow: defOverflow,
-        }).create();
-        effect.start?.(
-            specOverflow === undefined
-                ? run
-                : { ...run, overflow: specOverflow },
+        const Class = shaderClass("s", "", { overflow: ownOverflow });
+        const effect = new Class();
+        effect.start(
+            runOverflow === undefined ? run : { ...run, overflow: runOverflow },
         );
         return effect;
     };
 
     test("is undefined without overflow", () => {
-        expect(start().outputRect?.(dims)).toBeUndefined();
+        expect(start().outputRect(dims)).toBeUndefined();
     });
 
     test("covers the canvas for true", () => {
-        expect(start(true).outputRect?.(dims)).toEqual([-10, -20, 400, 300]);
+        expect(start(true).outputRect(dims)).toEqual([-10, -20, 400, 300]);
     });
 
     test("pads by CSS px for a number", () => {
-        expect(start(5).outputRect?.(dims)).toEqual([-10, -10, 120, 70]);
+        expect(start(5).outputRect(dims)).toEqual([-10, -10, 120, 70]);
     });
 
-    test("the spec's overflow wins over the def's", () => {
-        expect(start(20, 5).outputRect?.(dims)).toEqual([-10, -10, 120, 70]);
-        expect(start(5, true).outputRect?.(dims)).toEqual([-10, -20, 400, 300]);
+    test("the run's overflow wins over the transition's", () => {
+        expect(start(20, 5).outputRect(dims)).toEqual([-10, -10, 120, 70]);
+        expect(start(5, true).outputRect(dims)).toEqual([-10, -20, 400, 300]);
     });
 
     test("is undefined when the element fills the canvas", () => {
@@ -173,8 +153,8 @@ describe("shaderTransition outputRect", () => {
             ...dims,
             contentRect: [-10, -20, 400, 300],
         } as unknown as EffectDims;
-        expect(start(true).outputRect?.(fullDims)).toBeUndefined();
-        expect(start(5).outputRect?.(fullDims)).toBeUndefined();
+        expect(start(true).outputRect(fullDims)).toBeUndefined();
+        expect(start(5).outputRect(fullDims)).toBeUndefined();
     });
 });
 
@@ -284,14 +264,14 @@ describe("TransitionSlot", () => {
         const render = vi.fn();
         const update = vi.fn();
         const slot = new TransitionSlot({ render, update }, source(false));
-        slot.start({ ...run, reverse: true, uniforms: { a: 1 } });
+        slot.start({ ...run, reverse: true });
         slot.update(frameCtx(0));
         slot.render(frameCtx(0));
         const ctx: TransitionEffectContext = render.mock.calls[0][0];
         expect(ctx.from).toBe(from);
         expect(ctx.progress).toEqual({ t: 0.5, x: 0.25 });
         expect(ctx.reverse).toBe(true);
-        expect(ctx.run.uniforms).toEqual({ a: 1 });
+        expect(ctx.run).toEqual({ ...run, reverse: true });
         expect(ctx.time).toBe(0);
         expect(update).toHaveBeenCalledOnce();
     });
@@ -317,8 +297,8 @@ describe("TransitionSlot", () => {
     });
 });
 
-describe("shaderTransition", () => {
-    const ctxOf = (t: number, uniforms = {}, holding = false) =>
+describe("ShaderTransition", () => {
+    const ctxOf = (t: number, holding = false) =>
         ({
             ...frameCtx(0),
             gl: {},
@@ -326,42 +306,59 @@ describe("shaderTransition", () => {
             progress: { t, x: 0.25 },
             holding,
             reverse: false,
-            run: { ...run, uniforms },
+            run,
             cut: vi.fn(),
         }) as unknown as TransitionEffectContext;
 
     test("shows the plain snapshot while holding", () => {
-        const effect = shaderTransition({ name: "h", frag: "" }).create();
-        const ctx = ctxOf(0, {}, true);
-        effect.render?.(ctx);
+        const Class = shaderClass("h");
+        const ctx = ctxOf(0, true);
+        new Class().render(ctx);
         expect(ctx.draw).not.toHaveBeenCalled();
         expect(ctx.blit).toHaveBeenCalledWith(ctx.src);
     });
 
-    test("draws with the eased t and the def's uniforms under the spec's", () => {
-        const effect = shaderTransition({
-            name: "u",
-            frag: "/* body */",
-            uniforms: { a: 1, b: 2 },
-        }).create();
-        const ctx = ctxOf(0.3, { b: 5 });
-        effect.render?.(ctx);
+    test("draws with the eased t and the uniforms from params", () => {
+        class Scaled extends ShaderTransition<{ scale: number }> {
+            readonly name = "scaled";
+            readonly frag = "/* body */";
+            uniforms() {
+                return { scale: this.params.scale * 2 };
+            }
+        }
+        const effect = new Scaled({ scale: 3 });
+        const ctx = ctxOf(0.3);
+        effect.render(ctx);
         const draw = vi.mocked(ctx.draw).mock.calls[0][0];
         expect(draw.frag).toContain("/* body */");
-        expect(draw.uniforms).toMatchObject({ a: 1, b: 5, t: 0.3 });
+        expect(draw.uniforms).toMatchObject({ scale: 6, t: 0.3 });
+        effect.params = { scale: 1 };
+        effect.render(ctx);
+        expect(vi.mocked(ctx.draw).mock.calls[1][0].uniforms).toMatchObject({
+            scale: 2,
+        });
+    });
+
+    test("instances with the same body share one shader string", () => {
+        const Class = shaderClass("shared", "/* shared */");
+        const ctx = ctxOf(0.3);
+        new Class().render(ctx);
+        new Class().render(ctx);
+        const [first, second] = vi.mocked(ctx.draw).mock.calls;
+        expect(first[0].frag).toBe(second[0].frag);
     });
 
     test("a shader that fails to compile logs once and cuts the run", () => {
         const error = vi.spyOn(console, "error").mockImplementation(() => {});
         const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
         try {
-            const def = shaderTransition({ name: "bad", frag: "/* bad */" });
+            const Bad = shaderClass("bad", "/* bad */");
             const ctx = ctxOf(0.3);
             vi.mocked(ctx.draw).mockImplementation(() => {
                 throw new Error("compile failed\nERROR: 0:1: oops");
             });
-            def.create().render?.(ctx);
-            def.create().render?.(ctx);
+            new Bad().render(ctx);
+            new Bad().render(ctx);
             expect(ctx.draw).toHaveBeenCalledOnce();
             expect(ctx.blit).toHaveBeenCalledTimes(2);
             expect(ctx.cut).toHaveBeenCalledTimes(2);
@@ -490,8 +487,7 @@ describe("waitForMedia", () => {
 });
 
 function setup(
-    opts: {
-        keepWrapped?: boolean;
+    opts: AddTransitionOpts & {
         snapshotStalls?: boolean;
         captureTimesOut?: boolean;
         element?: HTMLElement;
@@ -624,6 +620,35 @@ describe("TransitionController", () => {
         return starts[i];
     };
 
+    const effectsOf = (chain: Effect[]) =>
+        chain.slice(1).map((slot) => (slot as TransitionSlot).effect);
+
+    const countedClass = (name: string) => {
+        const created: Counted[] = [];
+        class Counted implements Transition {
+            readonly name = name;
+            readonly params: unknown;
+            constructor(params?: Record<string, unknown>) {
+                this.params = params;
+                created.push(this);
+            }
+            render() {}
+        }
+        return { Class: Counted, created };
+    };
+
+    const runOnce = async (
+        transition: TransitionController,
+        starts: unknown[],
+        opts: Parameters<TransitionController["run"]>[1],
+    ) => {
+        const i = starts.length;
+        const run = transition.run(() => {}, opts);
+        await settle();
+        ((await started(starts, i)) as { end: () => void }).end();
+        await run;
+    };
+
     test("runs the steps in order and unwraps at the end", async () => {
         const { transition, log, starts } = setup();
         const done = transition.run(() => {
@@ -719,44 +744,37 @@ describe("TransitionController", () => {
         expect(onDestroy).toHaveBeenCalledOnce();
     });
 
-    test("effects are created once and hooked into the run", async () => {
+    test("an instance is used as is and hooked into the run", async () => {
         const start = vi.fn();
         const end = vi.fn();
-        const effect: TransitionEffect = { render: () => {}, start, end };
-        const create = vi.fn(() => effect);
-        const def: TransitionDef = { name: "hooked", create };
-        const { transition, starts } = setup();
+        const instance: Transition = { render: () => {}, start, end };
+        const { transition, starts, chain } = setup({ keepWrapped: true });
         for (let i = 0; i < 2; i++) {
-            const run = transition.run(() => {}, {
-                transition: def,
-                uniforms: { a: 1 },
-            });
+            const run = transition.run(() => {}, { transition: instance });
             await settle();
             (await started(starts, i)).end();
             await run;
         }
-        expect(create).toHaveBeenCalledOnce();
+        expect(effectsOf(chain())).toEqual([instance]);
         expect(start).toHaveBeenCalledTimes(2);
         expect(start.mock.calls[0][0]).toEqual({
             reverse: false,
-            uniforms: { a: 1 },
             duration: 0.6,
         });
         expect(end).toHaveBeenCalledTimes(2);
     });
 
-    test("a def whose create() throws cuts", async () => {
+    test("a class whose constructor throws cuts", async () => {
         const error = vi.spyOn(console, "error").mockImplementation(() => {});
         try {
-            const def: TransitionDef = {
-                name: "broken",
-                create: () => {
+            class Broken implements Transition {
+                constructor() {
                     throw new Error("nope");
-                },
-            };
+                }
+            }
             const { transition, log, starts } = setup();
             const cb = vi.fn();
-            await transition.run(cb, { transition: def });
+            await transition.run(cb, { transition: Broken });
             expect(cb).toHaveBeenCalledOnce();
             expect(starts).toHaveLength(0);
             expect(log).not.toContain("wrap");
@@ -810,33 +828,14 @@ describe("TransitionController", () => {
         }
     });
 
-    const effectsOf = (chain: Effect[]) =>
-        chain.slice(1).map((slot) => (slot as TransitionSlot).effect);
-
-    const countedDef = (name: string) => {
-        const created: TransitionEffect[] = [];
-        const def: TransitionDef = {
-            name,
-            create: () => {
-                const effect = { render: () => {} };
-                created.push(effect);
-                return effect;
-            },
-        };
-        return { def, created };
-    };
-
-    test("a new def swaps the effects in the chain", async () => {
+    test("a new class swaps the transition in the chain", async () => {
         const { transition, starts, chain, disposed } = setup({
             keepWrapped: true,
         });
-        const a = countedDef("a");
-        const b = countedDef("b");
-        for (const [i, def] of [a.def, b.def, a.def].entries()) {
-            const run = transition.run(() => {}, { transition: def });
-            await settle();
-            (await started(starts, i)).end();
-            await run;
+        const a = countedClass("a");
+        const b = countedClass("b");
+        for (const Class of [a.Class, b.Class, a.Class]) {
+            await runOnce(transition, starts, { transition: Class });
         }
         expect(effectsOf(chain())).toEqual([a.created[1]]);
         expect(effectsOf([{}, ...disposed])).toEqual([
@@ -845,13 +844,13 @@ describe("TransitionController", () => {
         ]);
     });
 
-    test("a fresh def per run keeps the chain length", async () => {
+    test("a fresh class per run keeps the chain length", async () => {
         const { transition, starts, chain, disposed } = setup({
             keepWrapped: true,
         });
         for (let i = 0; i < 3; i++) {
             const run = transition.run(() => {}, {
-                transition: countedDef(`fresh${i}`).def,
+                transition: countedClass(`fresh${i}`).Class,
             });
             await settle();
             (await started(starts, i)).end();
@@ -863,10 +862,10 @@ describe("TransitionController", () => {
 
     test("effects of a dropped run stay out of the chain", async () => {
         const { transition, starts, chain } = setup({ keepWrapped: true });
-        const a = countedDef("a");
-        const b = countedDef("b");
-        const runA = transition.run(() => {}, { transition: a.def });
-        const runB = transition.run(() => {}, { transition: b.def });
+        const a = countedClass("a");
+        const b = countedClass("b");
+        const runA = transition.run(() => {}, { transition: a.Class });
+        const runB = transition.run(() => {}, { transition: b.Class });
         await runA;
         await settle();
         (await started(starts, 0)).end();
@@ -874,19 +873,140 @@ describe("TransitionController", () => {
         expect(effectsOf(chain())).toEqual([b.created[0]]);
     });
 
-    test("a def with several effects puts them all in the chain", async () => {
-        const first = { render: () => {} };
-        const second = { render: () => {} };
-        const def: TransitionDef = {
-            name: "pair",
-            create: () => [first, second],
-        };
-        const { transition, starts, chain } = setup({ keepWrapped: true });
-        const run = transition.run(() => {}, { transition: def });
+    test("a class makes a new transition per container", async () => {
+        const { Class, created } = countedClass("each");
+        const first = setup();
+        const second = setup();
+        const runs = [first, second].map(({ transition }) =>
+            transition.run(() => {}, { transition: Class }),
+        );
         await settle();
-        (await started(starts, 0)).end();
-        await run;
-        expect(effectsOf(chain())).toEqual([first, second]);
+        (await started(first.starts, 0)).end();
+        (await started(second.starts, 0)).end();
+        await Promise.all(runs);
+        expect(created).toHaveLength(2);
+        expect(created[0]).not.toBe(created[1]);
+    });
+
+    test("the same class with equal params reuses the transition", async () => {
+        const { Class, created } = countedClass("same");
+        const { transition, starts } = setup({ keepWrapped: true });
+        for (let i = 0; i < 2; i++) {
+            await runOnce(transition, starts, {
+                transition: Class,
+                params: { amount: 1, dir: [1, 0] },
+            });
+        }
+        expect(created).toHaveLength(1);
+        expect(created[0].params).toEqual({ amount: 1, dir: [1, 0] });
+    });
+
+    test("changed params make a new transition and dispose the old", async () => {
+        const { Class, created } = countedClass("changed");
+        const { transition, starts, chain, disposed } = setup({
+            keepWrapped: true,
+        });
+        await runOnce(transition, starts, {
+            transition: Class,
+            params: { amount: 1 },
+        });
+        await runOnce(transition, starts, {
+            transition: Class,
+            params: { amount: 2 },
+        });
+        expect(created).toHaveLength(2);
+        expect(created[1].params).toEqual({ amount: 2 });
+        expect(effectsOf(chain())).toEqual([created[1]]);
+        expect(effectsOf([{}, ...disposed])).toEqual([created[0]]);
+    });
+
+    test("a run that sets transition drops the container's params", async () => {
+        const { Class, created } = countedClass("drop");
+        const { transition, starts } = setup({
+            transition: Class,
+            params: { amount: 1 },
+        });
+        await runOnce(transition, starts, { params: { speed: 2 } });
+        await runOnce(transition, starts, { transition: Class });
+        expect(created.map((c) => c.params)).toEqual([
+            { amount: 1, speed: 2 },
+            undefined,
+        ]);
+    });
+
+    test("the spec's ease and overflow beat the transition's own", async () => {
+        const start = vi.fn();
+        const instance: Transition = {
+            ease: "linear",
+            overflow: 5,
+            render: () => {},
+            start,
+        };
+        const { transition, starts } = setup({ keepWrapped: true });
+        await runOnce(transition, starts, { transition: instance });
+        await runOnce(transition, starts, {
+            transition: instance,
+            ease: "smoothstep",
+            overflow: true,
+        });
+        expect(starts.map((s) => s.opts.ease)).toEqual([
+            "linear",
+            "smoothstep",
+        ]);
+        expect(start.mock.calls.map(([run]) => run.overflow)).toEqual([
+            5,
+            true,
+        ]);
+    });
+
+    test("an instance running in another container warns and cuts", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            const instance: Transition = { name: "busy", render: () => {} };
+            const first = setup();
+            const second = setup();
+            const running = first.transition.run(() => {}, {
+                transition: instance,
+            });
+            await settle();
+            const cb = vi.fn();
+            for (let i = 0; i < 2; i++) {
+                await second.transition.run(cb, { transition: instance });
+            }
+            expect(cb).toHaveBeenCalledTimes(2);
+            expect(second.starts).toHaveLength(0);
+            expect(warn).toHaveBeenCalledOnce();
+            (await started(first.starts, 0)).end();
+            await running;
+            await runOnce(second.transition, second.starts, {
+                transition: instance,
+            });
+            expect(second.starts).toHaveLength(1);
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
+    test("destroy releases the instance", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            const instance: Transition = { render: () => {} };
+            const first = setup();
+            const second = setup();
+            const running = first.transition.run(() => {}, {
+                transition: instance,
+            });
+            await settle();
+            first.transition.destroy();
+            await running;
+            await runOnce(second.transition, second.starts, {
+                transition: instance,
+            });
+            expect(second.starts).toHaveLength(1);
+            expect(warn).not.toHaveBeenCalled();
+        } finally {
+            warn.mockRestore();
+        }
     });
 
     test("warns once when the new content is not captured in time", async () => {
@@ -914,8 +1034,8 @@ describe("TransitionController", () => {
         expect(log).not.toContain("wrap");
     });
 
-    test("lazy opts resolve after cb and bind the def then", async () => {
-        const { def, created } = countedDef("lazy");
+    test("lazy opts resolve after cb and bind the transition then", async () => {
+        const { Class, created } = countedClass("lazy");
         const { transition, log, starts, chain } = setup();
         const run = transition.run(
             () => {
@@ -923,7 +1043,7 @@ describe("TransitionController", () => {
             },
             () => {
                 log.push("resolveOpts");
-                return { transition: def };
+                return { transition: Class };
             },
         );
         await settle();
@@ -942,13 +1062,13 @@ describe("TransitionController", () => {
         expect(chain()).toEqual([]);
     });
 
-    test("lazy opts reuse the effects of the same def", async () => {
-        const { def } = countedDef("same");
+    test("lazy opts reuse the transition of the same class", async () => {
+        const { Class } = countedClass("same");
         const { transition, log, starts } = setup({ keepWrapped: true });
         for (let i = 0; i < 2; i++) {
             const run = transition.run(
                 () => {},
-                () => ({ transition: def }),
+                () => ({ transition: Class }),
             );
             await settle();
             (await started(starts, i)).end();
@@ -1160,14 +1280,11 @@ describe("TransitionController.show", () => {
 
     test("passes the options to the run but keeps remove out", async () => {
         const start = vi.fn();
-        const def: TransitionDef = {
-            name: "hooked",
-            create: () => ({ render: () => {}, start }),
-        };
+        const instance: Transition = { render: () => {}, start };
         const dom = slides("a", "b");
         const { transition, starts } = setup({ element: dom.element });
         const done = transition.show(1, {
-            transition: def,
+            transition: instance,
             reverse: true,
             remove: true,
         });
@@ -1176,7 +1293,6 @@ describe("TransitionController.show", () => {
         await done;
         expect(start).toHaveBeenCalledWith({
             reverse: true,
-            uniforms: {},
             duration: 0.6,
         });
     });

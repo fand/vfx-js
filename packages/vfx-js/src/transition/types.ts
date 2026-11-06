@@ -18,11 +18,9 @@ export type TransitionEase = "smoothstep" | "linear" | ((x: number) => number);
 /** One run of a transition, passed to `TransitionEffect.start`. */
 export type TransitionRun = {
     reverse: boolean;
-    /** The spec's uniforms. Defaults on the def are not merged in. */
-    uniforms: TransitionUniforms;
     /** Seconds. */
     duration: number;
-    /** The spec's overflow, if set. */
+    /** The spec's overflow, else the transition's own, if set. */
     overflow?: true | number;
 };
 
@@ -57,38 +55,33 @@ export interface TransitionEffect extends Effect {
     render?(ctx: TransitionEffectContext): void;
 }
 
-export type TransitionDef = {
-    name: string;
+/** A transition: one effect plus the defaults a spec can override. Write it as a class. */
+export interface Transition extends TransitionEffect {
+    readonly name?: string;
     /** The `t` this transition expects. A spec's `ease` wins. Defaults to `"smoothstep"`. */
     ease?: TransitionEase;
-    /**
-     * Create the effects for one container, in chain order.
-     * Called when a run first uses this def; runs that keep using it reuse them.
-     */
-    create(): TransitionEffect | TransitionEffect[];
-};
-
-export type ShaderTransitionOpts = {
-    name: string;
-    /** GLSL that defines `vec4 transition(vec2 uv, float t)`. */
-    frag: string;
-    /** Default uniforms. The spec's uniforms win. */
-    uniforms?: TransitionUniforms;
-    ease?: TransitionEase;
-    /** Draw outside the element: `true` for the whole canvas, a number for CSS px on every side. The spec's overflow wins. */
+    /** Draw outside the element: `true` for the whole canvas, a number for CSS px on every side. A spec's `overflow` wins. */
     overflow?: true | number;
-};
+}
 
-export type ShaderTransitionDef = Omit<TransitionDef, "create"> & {
-    readonly frag: string;
-    readonly uniforms: TransitionUniforms;
-    readonly overflow?: true | number;
-    create(): TransitionEffect;
-};
+/** A transition class. Core makes one instance per container with `new Class(params)`. */
+export type TransitionClass<P = never> = new (params?: P) => Transition;
 
-export type TransitionSpec = {
-    transition: TransitionDef;
-    uniforms?: TransitionUniforms;
+// A class's constructor params, or `unknown` when the class is not known.
+type ParamsOf<T> =
+    T extends TransitionClass<infer P>
+        ? [P] extends [never]
+            ? unknown
+            : P
+        : never;
+
+export type TransitionSpec<
+    T extends Transition | TransitionClass = Transition | TransitionClass,
+> = {
+    /** A class, or an instance to use as is. An instance runs in one container at a time. */
+    transition: T;
+    /** Constructor params. Only with a class. */
+    params?: ParamsOf<T>;
     /** Play backwards with the roles of the old and new content swapped. */
     reverse?: boolean;
     /** Seconds. */
@@ -108,18 +101,24 @@ export type TransitionWaitFor =
     | "none"
     | ((element: HTMLElement) => Promise<void>);
 
-export type AddTransitionOpts = Partial<TransitionSpec> & {
+export type AddTransitionOpts<
+    T extends Transition | TransitionClass = Transition | TransitionClass,
+> = Partial<TransitionSpec<T>> & {
     /** Keep the element wrapped between runs. */
     keepWrapped?: boolean;
     waitFor?: TransitionWaitFor;
 };
 
-export type RunOpts = Partial<TransitionSpec>;
+export type RunOpts<
+    T extends Transition | TransitionClass = Transition | TransitionClass,
+> = Partial<TransitionSpec<T>>;
 
 /** A direct child of the container, its index, or a selector inside it. */
 export type SlideRef = HTMLElement | number | string;
 
-export type ShowOpts = RunOpts & {
+export type ShowOpts<
+    T extends Transition | TransitionClass = Transition | TransitionClass,
+> = RunOpts<T> & {
     /** Remove the slides it hides instead of hiding them. Default false. */
     remove?: boolean;
 };
@@ -132,15 +131,18 @@ export interface TransitionHandle {
      * Throws a `TypeError` when `slide` is not a direct child.
      * Resolves at once when the slide is already the only one shown and no run is in flight.
      */
-    show(slide: SlideRef, opts?: ShowOpts): Promise<void>;
+    show<T extends Transition | TransitionClass>(
+        slide: SlideRef,
+        opts?: ShowOpts<T>,
+    ): Promise<void>;
     /**
      * Change the DOM in `cb` and animate from the old content to the new.
      * `opts` can be a function, called once right after `cb` resolves.
      * Use it when the spec depends on the new content.
      */
-    run(
+    run<T extends Transition | TransitionClass>(
         cb: () => void | Promise<void>,
-        opts?: RunOpts | (() => RunOpts),
+        opts?: RunOpts<T> | (() => RunOpts<T>),
     ): Promise<void>;
     /** End the current run and show the live content. */
     cancel(): void;

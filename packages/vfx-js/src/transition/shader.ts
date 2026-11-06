@@ -2,13 +2,24 @@ import type { ElementRect } from "../rect.js";
 import type { EffectDims } from "../types.js";
 import { buildFrag, describeGlslError } from "./glsl.js";
 import type {
-    ShaderTransitionDef,
-    ShaderTransitionOpts,
-    TransitionEffect,
+    Transition,
+    TransitionEase,
     TransitionEffectContext,
     TransitionRun,
     TransitionUniforms,
 } from "./types.js";
+
+// Full shaders by body; instances with the same body share one string.
+const built = new Map<string, string>();
+
+function fullFrag(body: string): string {
+    let frag = built.get(body);
+    if (frag === undefined) {
+        frag = buildFrag(body);
+        built.set(body, frag);
+    }
+    return frag;
+}
 
 // Shaders that failed per GL context; later runs with them cut at once.
 const broken = new WeakMap<WebGL2RenderingContext, Set<string>>();
@@ -48,23 +59,27 @@ function reportBroken(name: string, err: unknown): void {
     }
 }
 
-class ShaderTransitionEffect implements TransitionEffect {
-    #name: string;
-    #frag: string;
-    #uniforms: TransitionUniforms;
-    #overflow: true | number | undefined;
+/**
+ * A transition made of one shader.
+ * `frag` defines `vec4 transition(vec2 uv, float t)` and reads the two sides with `readFrom` / `readTo`.
+ */
+export abstract class ShaderTransition<P extends object = object>
+    implements Transition
+{
+    abstract readonly name: string;
+    abstract readonly frag: string;
+    ease?: TransitionEase;
+    overflow?: true | number;
+    params: P;
     #run: TransitionRun | null = null;
 
-    constructor(
-        name: string,
-        frag: string,
-        uniforms: TransitionUniforms,
-        overflow: true | number | undefined,
-    ) {
-        this.#name = name;
-        this.#frag = frag;
-        this.#uniforms = uniforms;
-        this.#overflow = overflow;
+    constructor(params: P = {} as P) {
+        this.params = params;
+    }
+
+    /** Uniforms for this frame. Read `this.params` here. */
+    uniforms(_ctx: TransitionEffectContext): TransitionUniforms {
+        return {};
     }
 
     start(run: TransitionRun): void {
@@ -77,7 +92,7 @@ class ShaderTransitionEffect implements TransitionEffect {
 
     // A target that fills the canvas never draws outside itself.
     outputRect(dims: EffectDims): ElementRect | undefined {
-        const overflow = this.#run?.overflow ?? this.#overflow;
+        const overflow = this.#run?.overflow ?? this.overflow;
         if (
             overflow === undefined ||
             covers(dims.contentRect, dims.canvasRect)
@@ -98,18 +113,18 @@ class ShaderTransitionEffect implements TransitionEffect {
             ctx.blit(ctx.src);
             return;
         }
+        const frag = fullFrag(this.frag);
         const failed = brokenIn(ctx.gl);
-        if (failed.has(this.#frag)) {
+        if (failed.has(frag)) {
             ctx.cut();
             ctx.blit(ctx.src);
             return;
         }
         try {
             ctx.draw({
-                frag: this.#frag,
+                frag,
                 uniforms: {
-                    ...this.#uniforms,
-                    ...ctx.run.uniforms,
+                    ...this.uniforms(ctx),
                     from: ctx.from,
                     src: ctx.src,
                     t: ctx.progress.t,
@@ -123,37 +138,10 @@ class ShaderTransitionEffect implements TransitionEffect {
                 target: ctx.target,
             });
         } catch (err) {
-            failed.add(this.#frag);
-            reportBroken(this.#name, err);
+            failed.add(frag);
+            reportBroken(this.name, err);
             ctx.cut();
             ctx.blit(ctx.src);
         }
     }
-}
-
-/**
- * A transition made of one shader.
- * `frag` defines `vec4 transition(vec2 uv, float t)` and reads the two sides with `readFrom` / `readTo`.
- */
-export function shaderTransition(
-    opts: ShaderTransitionOpts,
-): ShaderTransitionDef {
-    const uniforms = opts.uniforms ?? {};
-    let full: string | null = null;
-    return {
-        name: opts.name,
-        frag: opts.frag,
-        uniforms,
-        overflow: opts.overflow,
-        ease: opts.ease,
-        create() {
-            full ??= buildFrag(opts.frag);
-            return new ShaderTransitionEffect(
-                opts.name,
-                full,
-                uniforms,
-                opts.overflow,
-            );
-        },
-    };
 }

@@ -1,6 +1,6 @@
 import type { Effect } from "../types.js";
 import type { VFX } from "../vfx.js";
-import { crossfade } from "./crossfade.js";
+import { Crossfade } from "./crossfade.js";
 import {
     type TransitionFrame,
     TransitionSlot,
@@ -11,11 +11,11 @@ import type {
     RunOpts,
     ShowOpts,
     SlideRef,
-    TransitionDef,
+    Transition,
+    TransitionClass,
     TransitionEase,
     TransitionHandle,
     TransitionRun,
-    TransitionUniforms,
 } from "./types.js";
 
 const DEFAULT_DURATION = 0.6;
@@ -24,38 +24,71 @@ const MEDIA_TIMEOUT_MS = 300;
 const STALL_TIMEOUT_MS = 1000;
 
 export type ResolvedSpec = {
-    transition: TransitionDef;
-    uniforms: TransitionUniforms;
+    transition: Transition | TransitionClass;
+    /** Constructor params. Only used with a class. */
+    params: unknown;
     reverse: boolean;
     duration: number;
+    /** The spec's own; the transition's fills in later. */
     overflow: true | number | undefined;
-    ease: TransitionEase;
+    ease: TransitionEase | undefined;
 };
 
-// A resolved spec with the def's effects in their slots.
-type Bound = { spec: ResolvedSpec; slots: TransitionSlot[] };
+// A run's settings with the transition in its slot.
+type Bound = {
+    run: TransitionRun;
+    ease: TransitionEase;
+    slots: TransitionSlot[];
+};
 
 /**
- * Pick the run options, then the container defaults, then the def's.
- * A run that sets `transition` drops the container's uniforms, so they never reach another shader.
+ * Pick the run options, then the container defaults.
+ * A run that sets `transition` drops the container's params, so they never reach another class.
  */
 export function resolveSpec(
     opts: AddTransitionOpts,
     run: RunOpts = {},
 ): ResolvedSpec {
-    const runSetsShader = run.transition !== undefined;
-    const transition = run.transition ?? opts.transition ?? crossfade;
+    const runSetsTransition = run.transition !== undefined;
+    const params = runSetsTransition
+        ? run.params
+        : opts.params === undefined && run.params === undefined
+          ? undefined
+          : { ...(opts.params as object), ...(run.params as object) };
     return {
-        transition,
-        uniforms: runSetsShader
-            ? { ...run.uniforms }
-            : { ...opts.uniforms, ...run.uniforms },
+        transition: run.transition ?? opts.transition ?? Crossfade,
+        params,
         reverse: run.reverse ?? opts.reverse ?? false,
         duration: run.duration ?? opts.duration ?? DEFAULT_DURATION,
         overflow: run.overflow ?? opts.overflow,
-        ease: run.ease ?? opts.ease ?? transition.ease ?? "smoothstep",
+        ease: run.ease ?? opts.ease,
     };
 }
+
+const isClass = (
+    source: Transition | TransitionClass,
+): source is TransitionClass => typeof source === "function";
+
+function sameValue(a: unknown, b: unknown): boolean {
+    if (Array.isArray(a) && Array.isArray(b)) {
+        return a.length === b.length && a.every((item, i) => item === b[i]);
+    }
+    return a === b;
+}
+
+/** Shallow equal; arrays compare by item. Missing params equal empty ones. */
+export function sameParams(a: unknown, b: unknown): boolean {
+    const left = (a ?? {}) as Record<string, unknown>;
+    const right = (b ?? {}) as Record<string, unknown>;
+    const keys = Object.keys(left);
+    return (
+        keys.length === Object.keys(right).length &&
+        keys.every((key) => key in right && sameValue(left[key], right[key]))
+    );
+}
+
+// The handle that runs each instance right now.
+const claims = new WeakMap<Transition, TransitionController>();
 
 function isOnScreen(element: Element): boolean {
     const rect = element.getBoundingClientRect();
@@ -173,6 +206,7 @@ export class TransitionController implements TransitionHandle {
     #unlocks: (() => void)[] = [];
     #warnedStall = false;
     #warnedLateCapture = false;
+    #warnedClash = false;
 
     // Each run takes a new id; a run stops at its next await once it is stale.
     #seq = 0;
@@ -184,8 +218,17 @@ export class TransitionController implements TransitionHandle {
     #wrapping: Promise<void> | null = null;
     #chain: readonly Effect[] = [];
 
-    // The last def's effects; the same def again reuses them.
-    #cache: { def: TransitionDef; slots: TransitionSlot[] } | null = null;
+    // The last transition; the same instance, or the same class with equal params, reuses it.
+    #cache: {
+        key: {
+            source: Transition | TransitionClass;
+            params: unknown;
+        };
+        transition: Transition;
+        slots: TransitionSlot[];
+    } | null = null;
+    // The instance this handle claimed for its run.
+    #claimed: Transition | null = null;
     // The run that owns the effects right now.
     #active: { id: number; slots: TransitionSlot[] } | null = null;
 
@@ -281,6 +324,7 @@ export class TransitionController implements TransitionHandle {
             if (this.#seq === id) {
                 this.#unfreeze();
                 this.#unlock();
+                this.#release();
             }
         }
     }
@@ -425,15 +469,14 @@ export class TransitionController implements TransitionHandle {
             return;
         }
 
-        const { spec } = bound;
         const started = this.#stage.start({
-            duration: spec.duration,
-            ease: spec.ease,
+            duration: bound.run.duration,
+            ease: bound.ease,
             onEnd: () => this.#endActive(id),
         });
         const ended = await settlesWithin(
             started,
-            spec.duration * 1000 + STALL_TIMEOUT_MS,
+            bound.run.duration * 1000 + STALL_TIMEOUT_MS,
         );
         if (!isCurrent()) {
             return;
@@ -444,35 +487,70 @@ export class TransitionController implements TransitionHandle {
         this.#releaseWrap(id);
     }
 
-    // Get the def's effects. Null means cut: no duration, or create() failed.
+    // Get the transition in its slot. Null means cut: no duration, a failed constructor, or a busy instance.
     #bind(spec: ResolvedSpec): Bound | null {
         if (spec.duration <= 0) {
             return null;
         }
-        const def = spec.transition;
+        const source = spec.transition;
+        if (!isClass(source) && !this.#claim(source)) {
+            return null;
+        }
+        let transition: Transition;
+        let slots: TransitionSlot[];
         try {
-            return { spec, slots: this.#slotsOf(def) };
+            ({ transition, slots } = this.#slotsOf(source, spec.params));
         } catch (err) {
             console.error(
-                `[VFX-JS] transition "${def.name}" create() failed; cutting to the new content.`,
+                `[VFX-JS] transition "${source.name}" constructor failed; cutting to the new content.`,
                 err,
             );
             return null;
         }
+        const run: TransitionRun = {
+            reverse: spec.reverse,
+            duration: spec.duration,
+        };
+        const overflow = spec.overflow ?? transition.overflow;
+        if (overflow !== undefined) {
+            run.overflow = overflow;
+        }
+        const ease = spec.ease ?? transition.ease ?? "smoothstep";
+        return { run, ease, slots };
+    }
+
+    // False when another live handle runs this instance.
+    #claim(transition: Transition): boolean {
+        const owner = claims.get(transition);
+        if (owner && owner !== this) {
+            if (!this.#warnedClash) {
+                this.#warnedClash = true;
+                console.warn(
+                    `[VFX-JS] transition "${transition.name ?? "unnamed"}" instance is running in another container; cutting to the new content. Pass the class to share it.`,
+                );
+            }
+            return false;
+        }
+        if (this.#claimed !== transition) {
+            this.#release();
+        }
+        claims.set(transition, this);
+        this.#claimed = transition;
+        return true;
+    }
+
+    #release(): void {
+        const claimed = this.#claimed;
+        this.#claimed = null;
+        if (claimed && claims.get(claimed) === this) {
+            claims.delete(claimed);
+        }
     }
 
     // Hand the effects to this run.
-    #prepare(id: number, { spec, slots }: Bound): void {
+    #prepare(id: number, { run, slots }: Bound): void {
         this.#endActive();
         this.#active = { id, slots };
-        const run: TransitionRun = {
-            reverse: spec.reverse,
-            uniforms: spec.uniforms,
-            duration: spec.duration,
-        };
-        if (spec.overflow !== undefined) {
-            run.overflow = spec.overflow;
-        }
         for (const slot of slots) {
             slot.start(run);
         }
@@ -497,6 +575,7 @@ export class TransitionController implements TransitionHandle {
         this.#stage.cancel();
         this.#unfreeze();
         this.#unlock();
+        this.#release();
         this.#releaseWrap(id);
     }
 
@@ -531,15 +610,25 @@ export class TransitionController implements TransitionHandle {
         }
     }
 
-    #slotsOf(def: TransitionDef): TransitionSlot[] {
-        if (this.#cache?.def === def) {
-            return this.#cache.slots;
+    // A new transition's slots replace the old ones; the chain disposes the ones it drops.
+    #slotsOf(
+        source: Transition | TransitionClass,
+        params: unknown,
+    ): { transition: Transition; slots: TransitionSlot[] } {
+        const cache = this.#cache;
+        if (
+            cache?.key.source === source &&
+            (!isClass(source) || sameParams(cache.key.params, params))
+        ) {
+            return cache;
         }
-        const slots = [def.create()]
-            .flat()
-            .map((effect) => new TransitionSlot(effect, this.#stage));
-        this.#cache = { def, slots };
-        return slots;
+        // Params are checked against the class where the spec is written.
+        const transition = isClass(source)
+            ? new (source as TransitionClass<unknown>)(params)
+            : source;
+        const slots = [new TransitionSlot(transition, this.#stage)];
+        this.#cache = { key: { source, params }, transition, slots };
+        return { transition, slots };
     }
 
     #endActive(id?: number): void {
