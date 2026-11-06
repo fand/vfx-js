@@ -68,15 +68,14 @@ export function About() {
 import { VFX } from "@vfx-js/core";
 import { swipe } from "@vfx-js/transitions";
 
+// <div id="panel">: one <section> per tab, all but one hidden.
 const vfx = new VFX();
 const panel = document.querySelector("#panel");
-const t = vfx.addTransition(panel, { transition: swipe });
+const t = vfx.addTransition(panel, { transition: swipe, duration: 0.6 });
 
-tab.addEventListener("click", () => {
-  t.run(() => {
-    panel.innerHTML = renderTab(tab.dataset.id);
-  });
-});
+for (const tab of document.querySelectorAll("[data-panel]")) {
+  tab.addEventListener("click", () => t.show(tab.dataset.panel));
+}
 `,
     },
 ];

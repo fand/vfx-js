@@ -115,12 +115,12 @@ export function Tabs() {
             {
                 label: "plugins/vfx-transition.client.ts",
                 code: `
-import { type Transition, VFX } from "@vfx-js/core";
+import { type TransitionHandle, VFX } from "@vfx-js/core";
 import { glitch } from "@vfx-js/transitions";
 
 export default defineNuxtPlugin((nuxtApp) => {
   const router = useRouter();
-  let t: Transition | undefined;
+  let t: TransitionHandle | undefined;
   let finishSwap: (() => void) | null = null;
   const release = () => { finishSwap?.(); finishSwap = null; };
 
@@ -169,7 +169,7 @@ export default defineNuxtPlugin((nuxtApp) => {
                 code: `
 <script lang="ts">
   import { onNavigate } from "$app/navigation";
-  import { type Transition, VFX } from "@vfx-js/core";
+  import { type TransitionHandle, VFX } from "@vfx-js/core";
   import { glitch, swipe } from "@vfx-js/transitions";
   import { onMount } from "svelte";
 
@@ -178,7 +178,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
   let { children } = $props();
   let outlet: HTMLElement;
-  let t: Transition | undefined;
+  let t: TransitionHandle | undefined;
 
   onMount(() => {
     const vfx = new VFX();
@@ -273,8 +273,22 @@ export function setupTransition() {
         id: "vanilla",
         name: "Vanilla",
         install: "npm i @vfx-js/core @vfx-js/transitions",
-        intro: "run(cb) works like document.startViewTransition(cb): change the DOM in cb, and the shader does the rest.",
+        intro: "show(slide) switches between slides already in the DOM. For content built on the fly, run(cb) works like document.startViewTransition(cb): change the DOM in cb, and the shader does the rest.",
         snippets: [
+            {
+                label: "index.html",
+                code: `
+<nav>
+  <button data-panel="#home">Home</button>
+  <button data-panel="#about">About</button>
+  <button data-panel="#contact">Contact</button>
+</nav>
+<div id="panel">
+  <section id="home">...</section>
+  <section id="about" hidden>...</section>
+  <section id="contact" hidden>...</section>
+</div>`,
+            },
             {
                 label: "main.ts",
                 code: `
@@ -283,13 +297,12 @@ import { swipe } from "@vfx-js/transitions";
 
 const vfx = new VFX();
 const panel = document.querySelector<HTMLElement>("#panel")!;
-const t = vfx.addTransition(panel, { transition: swipe, duration: 0.6 });
+const tabs = document.querySelectorAll<HTMLElement>("[data-panel]");
 
-button.addEventListener("click", () => {
-  t.run(() => {
-    panel.innerHTML = renderNextTab();
-  });
-});`,
+const t = vfx.addTransition(panel, { transition: swipe, duration: 0.6 });
+for (const tab of tabs) {
+  tab.addEventListener("click", () => t.show(tab.dataset.panel!));
+}`,
             },
             {
                 label: "gl-transitions",
@@ -299,12 +312,13 @@ import { createGLTransition } from "@vfx-js/transitions";
 import transitions from "gl-transitions";
 
 const cube = transitions.find((t) => t.name === "Cube")!;
-t.run(swap, { transition: createGLTransition(cube, { persp: 0.5 }) });`,
+t.show("#about", { transition: createGLTransition(cube, { persp: 0.5 }) });`,
             },
         ],
         notes: [
             "Give the target a fixed height, like 100dvh. Old and new content then share one box; a size change jumps at the end of the run.",
-            "run() resolves when the animation ends. A new run() drops the old one, but its callback still runs.",
+            "Slides are the direct children of the target. A display rule on a slide beats hidden; add [hidden] { display: none !important }.",
+            "show() and run() resolve when the animation ends. A new run drops the old one, but its DOM change still lands.",
         ],
     },
 ];

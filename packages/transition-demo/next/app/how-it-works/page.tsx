@@ -15,7 +15,7 @@ const steps = [
     },
     {
         title: "Swap",
-        body: "Your callback changes the DOM. A router swap, a setState, innerHTML — anything.",
+        body: "Your callback changes the DOM. A router swap, a setState, innerHTML — anything. With slides already in the DOM, show(slide) writes it for you.",
     },
     {
         title: "Capture",

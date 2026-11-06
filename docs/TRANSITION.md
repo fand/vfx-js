@@ -19,23 +19,39 @@ without it, VFX-JS falls back to dom-to-canvas, which is slower.
 
 ### Core
 
+```html
+<nav>
+    <button data-panel="#home">Home</button>
+    <button data-panel="#about">About</button>
+    <button data-panel="#contact">Contact</button>
+</nav>
+<div id="panel">
+    <section id="home">...</section>
+    <section id="about" hidden>...</section>
+    <section id="contact" hidden>...</section>
+</div>
+```
+
 ```ts
 import { VFX } from "@vfx-js/core";
 import { swipe } from "@vfx-js/transitions";
 
 const vfx = new VFX();
-const panel = document.querySelector("#panel")!;
-const t = vfx.addTransition(panel, { transition: swipe, duration: 0.6 });
+const panel = document.querySelector<HTMLElement>("#panel")!;
+const tabs = document.querySelectorAll<HTMLElement>("[data-panel]");
 
-button.addEventListener("click", () => {
-    t.run(() => {
-        panel.innerHTML = renderNextTab();
-    });
-});
+const t = vfx.addTransition(panel, { transition: swipe, duration: 0.6 });
+for (const tab of tabs) {
+    tab.addEventListener("click", () => t.show(tab.dataset.panel!));
+}
 ```
 
+The sections are the slides. `show` hides the others and shows the one
+you pick, with a transition. Keep the buttons outside the container.
+
+When the content is built on the fly, change the DOM in `run` instead.
 `run` mirrors `document.startViewTransition(cb)`: when `cb` resolves, the
-DOM must be updated. `run` resolves when the animation ends.
+DOM must be updated. Both resolve when the animation ends.
 
 ### React
 
@@ -78,7 +94,7 @@ too.
 
 ### `vfx.addTransition(element, opts?)`
 
-Returns a `Transition` at once. It touches no DOM until the first run.
+Returns a `TransitionHandle` at once. It touches no DOM until the first run.
 
 ```ts
 const t = vfx.addTransition(el, {
@@ -93,10 +109,11 @@ const t = vfx.addTransition(el, {
 });
 ```
 
-### `Transition`
+### `TransitionHandle`
 
 ```ts
-interface Transition {
+interface TransitionHandle {
+    show(slide: SlideRef, opts?: ShowOpts): Promise<void>;
     run(
         cb: () => void | Promise<void>,
         opts?: RunOpts | (() => RunOpts),
@@ -105,6 +122,13 @@ interface Transition {
     destroy(): void;  // cancel and stop tracking the element
     readonly running: boolean;
 }
+
+// A direct child of the container, its index, or a selector inside it.
+type SlideRef = HTMLElement | number | string;
+
+type ShowOpts = RunOpts & {
+    remove?: boolean; // remove the other slides instead of hiding them
+};
 
 type RunOpts = {
     transition?: TransitionDef;
@@ -115,6 +139,28 @@ type RunOpts = {
     overflow?: true | number;
 };
 ```
+
+### `show(slide, opts?)`
+
+Use `show` when every slide is already in the DOM: tabs, carousels,
+steps. The slides are the container's direct children. One shows at a
+time; the others carry the `hidden` attribute.
+
+- `slide` is an element, an index into the children, or a selector.
+- An element that is not in the DOM is appended to the container first.
+- A missing target, or one that is not a direct child, throws a
+  `TypeError` before any run starts.
+- Showing the slide that is already the only one shown starts no run.
+- `remove: true` removes the other slides instead of hiding them.
+- The other `ShowOpts` work as in `run`.
+
+A `display` rule on a slide beats `hidden`. Add
+`[hidden] { display: none !important }`, or use `remove: true`.
+
+### `run(cb, opts?)`
+
+The primitive for content built on the fly: routers, `innerHTML`,
+templates. `show` is built on it. Change the DOM in `cb`.
 
 A new `run()` during a run drops the old one. The old promise resolves
 (it never rejects), and its callback still runs, so no DOM change is
@@ -408,6 +454,9 @@ t.run(cb, { transition: createGLTransition(cube, { persp: 0.5 }) });
 No `<VFXProvider>` is needed. Components outside a Provider share one
 implicit VFX instance; set its options with `useVFXConfig`. Inside a
 Provider, transitions use the Provider's instance.
+
+The React bindings use `run` only. React owns the children, so there is
+no `show`.
 
 ### `<VFXTransition>`
 
