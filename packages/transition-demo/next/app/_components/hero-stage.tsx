@@ -1,13 +1,11 @@
 "use client";
 
-import type { TransitionDef, TransitionEffect } from "@vfx-js/core";
 import { useVFXTransition } from "@vfx-js/react";
 import Link from "next/link";
 import {
     useCallback,
     useEffect,
     useLayoutEffect,
-    useMemo,
     useRef,
     useState,
 } from "react";
@@ -16,7 +14,7 @@ import type { PresetName } from "../_lib/site";
 import { TLink } from "./t-link";
 
 const AUTOPLAY_INTERVAL = 3000;
-const SLIDE_MS = 200;
+const BLINK_MS = 300;
 /** Copies of the list. The middle one is home; the rest let it scroll endlessly. */
 const COPIES = 5;
 const HOME = Math.floor(COPIES / 2);
@@ -56,63 +54,35 @@ export function HeroStage() {
     const busy = useRef(false);
     const section = useRef<HTMLElement | null>(null);
     const list = useRef<HTMLDivElement>(null);
-    // Called once when the next run starts to play.
-    const onPlay = useRef<(() => void) | null>(null);
-    const hooked = useMemo(() => {
-        const fire = () => {
-            const f = onPlay.current;
-            onPlay.current = null;
-            f?.();
-        };
-        return Object.fromEntries(
-            names.map((n) => [n, withPlayHook(presets[n], fire)]),
-        ) as Record<PresetName, TransitionDef>;
-    }, []);
 
     /**
-     * Plays the preset at `index` and centers the list on it.
-     * With `slide`, the list scrolls there once the run starts to play.
-     * The new side of the run is live (html-in-canvas), so the scroll shows.
+     * Plays the preset at `index`. The list is centered on it when the run lands.
+     * With `blinkFirst`, the clicked item blinks before the run.
      */
     const go = useCallback(
-        async (index: number, slide = false) => {
+        async (index: number, blinkFirst = false) => {
             if (busy.current) {
                 return;
             }
             busy.current = true;
             const name = names[index % names.length];
-            const center = () => {
-                const el = list.current;
-                const item = el?.children[index] as HTMLElement | undefined;
-                if (!el || !item) {
-                    return;
-                }
-                if (!slide || reducedMotion()) {
-                    el.scrollLeft = centerOf(el, item);
-                    focusRef.current += wrapScroll(el);
-                    return;
-                }
-                scrollToCenter(el, item, SLIDE_MS).then(() => {
-                    focusRef.current += wrapScroll(el);
-                });
-            };
-            onPlay.current = center;
+            const item = list.current?.children[index] as
+                | HTMLElement
+                | undefined;
+            if (blinkFirst && item && !reducedMotion()) {
+                await blink(item, BLINK_MS);
+            }
             await run(
                 () => {
                     focusRef.current = index;
                     setFocus({ index });
                     setTheme(name);
                 },
-                { transition: hooked[name] },
+                { transition: presets[name] },
             );
-            // The run ended without playing, e.g. it was cancelled.
-            if (onPlay.current === center) {
-                onPlay.current = null;
-                center();
-            }
             busy.current = false;
         },
-        [run, hooked],
+        [run],
     );
 
     useLayoutEffect(() => {
@@ -122,10 +92,6 @@ export function HeroStage() {
             return;
         }
         el.dataset.ready = "";
-        // A run centers the list itself once it plays.
-        if (busy.current) {
-            return;
-        }
         el.scrollLeft = centerOf(el, item);
         focusRef.current += wrapScroll(el);
     }, [focus]);
@@ -203,6 +169,19 @@ export function HeroStage() {
         [ref],
     );
 
+    /** Scrolls the list by half its width, without playing a preset. */
+    const scrollList = (direction: number) => {
+        const el = list.current;
+        if (!el) {
+            return;
+        }
+        setAutoplay(false);
+        el.scrollBy({
+            left: (direction * el.clientWidth) / 2,
+            behavior: reducedMotion() ? "auto" : "smooth",
+        });
+    };
+
     const items = [];
     for (let copy = 0; copy < COPIES; copy++) {
         const home = copy === HOME;
@@ -246,8 +225,26 @@ export function HeroStage() {
                 <br />
                 for the DOM.
             </h1>
-            <div className="carousel" ref={list}>
-                {items}
+            {/* The frame gives the grown item room without moving the layout. */}
+            <div className="carousel-frame">
+                <div className="carousel" ref={list}>
+                    {items}
+                </div>
+                {/* The list loops, so it can always scroll both ways. */}
+                <button
+                    type="button"
+                    className="carousel-arrow"
+                    data-side="left"
+                    aria-label="Scroll presets left"
+                    onClick={() => scrollList(-1)}
+                />
+                <button
+                    type="button"
+                    className="carousel-arrow"
+                    data-side="right"
+                    aria-label="Scroll presets right"
+                    onClick={() => scrollList(1)}
+                />
             </div>
             <p className="hero-tagline">
                 Swap any element — a tab, a carousel, a whole page — through a
@@ -299,45 +296,13 @@ function centerOf(el: HTMLElement, item: HTMLElement) {
     return item.offsetLeft + item.offsetWidth / 2 - el.clientWidth / 2;
 }
 
-/** Scrolls `item` to the middle over `ms`. Native smooth scroll has no duration. */
-function scrollToCenter(el: HTMLElement, item: HTMLElement, ms: number) {
-    const from = el.scrollLeft;
-    const to = centerOf(el, item);
-    return new Promise<void>((resolve) => {
-        const start = performance.now();
-        const step = (now: number) => {
-            const t = Math.min(1, (now - start) / ms);
-            el.scrollLeft = from + (to - from) * (1 - (1 - t) ** 3);
-            if (t < 1) {
-                requestAnimationFrame(step);
-            } else {
-                resolve();
-            }
-        };
-        requestAnimationFrame(step);
-    });
-}
-
-/** Wraps `def` so `onPlay` fires on the first frame each run plays. */
-function withPlayHook(def: TransitionDef, onPlay: () => void): TransitionDef {
-    return {
-        // Keep fields like `overflow` that core may read from the def.
-        ...def,
-        create() {
-            let playing = false;
-            // No `render`, so the chain passes its input through.
-            const hook: TransitionEffect = {
-                start() {
-                    playing = false;
-                },
-                update() {
-                    if (!playing) {
-                        playing = true;
-                        onPlay();
-                    }
-                },
-            };
-            return [def.create(), hook].flat();
-        },
-    };
+/** Blinks `item` for `ms`. The CSS animation runs while `data-blink` is set. */
+function blink(item: HTMLElement, ms: number) {
+    item.dataset.blink = "";
+    return new Promise<void>((resolve) =>
+        setTimeout(() => {
+            delete item.dataset.blink;
+            resolve();
+        }, ms),
+    );
 }

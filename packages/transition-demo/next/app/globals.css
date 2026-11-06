@@ -480,26 +480,36 @@ em {
 }
 
 /* Preset carousel under the title */
+.carousel-frame {
+    /* Room for the grown item and its shadow, given back by the margins. */
+    --room: 24px;
+    position: relative;
+    width: min(100%, 760px);
+    margin: calc(28px - var(--room)) 0 calc(-1 * var(--room));
+}
+/* Items fade near the edges as they scroll. */
+/* A mask on the list would stop the glass from blurring the hero. */
+@keyframes carousel-edge {
+    0%,
+    100% {
+        opacity: 0;
+    }
+    30%,
+    70% {
+        opacity: 1;
+    }
+}
 .carousel {
     --gap: 76px;
     position: relative;
     display: flex;
     align-items: center;
     gap: var(--gap);
-    width: min(100%, 760px);
-    height: 52px;
-    margin-top: 28px;
+    height: calc(52px + var(--room) * 2);
     padding-inline: 18px;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
-    mask-image: linear-gradient(
-        90deg,
-        transparent,
-        #000 22%,
-        #000 78%,
-        transparent
-    );
 }
 .carousel::-webkit-scrollbar {
     display: none;
@@ -509,6 +519,10 @@ em {
     visibility: hidden;
 }
 .carousel-item {
+    --glass: color-mix(in oklab, var(--white) 55%, transparent);
+    --glass-shadow:
+        0 10px 28px -10px color-mix(in oklab, var(--ink) 45%, transparent),
+        inset 0 0 0 1px color-mix(in oklab, #ffffff 55%, transparent);
     display: inline-flex;
     flex: none;
     align-items: center;
@@ -524,19 +538,74 @@ em {
     letter-spacing: -0.01em;
     white-space: nowrap;
     cursor: pointer;
-    transition: background 0.2s;
+    animation: carousel-edge linear both;
+    animation-timeline: view(inline);
+    /* Grow with scale, not font-size, so the neighbors stay put. */
+    transition:
+        scale 0.15s ease,
+        background 0.15s ease,
+        box-shadow 0.15s ease,
+        backdrop-filter 0.15s ease;
 }
-.carousel-item:hover {
-    background: var(
-        --carousel-hover,
-        color-mix(in oklab, var(--acid) 45%, var(--white))
-    );
+.carousel-item:hover,
+.carousel-item:focus-visible {
+    scale: 1.12;
+    background: var(--glass);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(10px) saturate(1.4);
+    outline: none;
 }
-.hero[data-theme]:not([data-theme="crossfade"]) {
-    --carousel-hover: color-mix(in oklab, var(--ink) 10%, var(--white));
+.carousel-item[data-blink] {
+    animation:
+        carousel-edge linear both,
+        carousel-blink 0.1s step-end 3;
+    animation-timeline: view(inline), auto;
 }
-.carousel-item[data-current] {
-    font-size: 24px;
+/* Only the label blinks; the background stays. */
+@keyframes carousel-blink {
+    50% {
+        color: transparent;
+    }
+}
+.carousel-arrow {
+    position: absolute;
+    top: 50%;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-3);
+    cursor: pointer;
+    translate: 0 -50%;
+    transition: color 0.15s;
+}
+.carousel-arrow:hover {
+    color: var(--ink);
+}
+/* Outside the list, in the hero's side padding on phones. */
+.carousel-arrow[data-side="left"] {
+    left: -24px;
+}
+.carousel-arrow[data-side="right"] {
+    right: -24px;
+}
+.carousel-arrow::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-top: 1.5px solid currentColor;
+    border-left: 1.5px solid currentColor;
+}
+.carousel-arrow[data-side="left"]::before {
+    translate: 2px 0;
+    rotate: -45deg;
+}
+.carousel-arrow[data-side="right"]::before {
+    translate: -2px 0;
+    rotate: 135deg;
 }
 .carousel-play {
     width: 0;
@@ -552,9 +621,6 @@ em {
         font-size: 15px;
         margin: 0 -12px;
         padding: 0 12px;
-    }
-    .carousel-item[data-current] {
-        font-size: 19px;
     }
 }
 
