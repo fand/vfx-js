@@ -304,16 +304,6 @@ for (const tab of tabs) {
   tab.addEventListener("click", () => t.show(tab.dataset.panel!));
 }`,
             },
-            {
-                label: "gl-transitions",
-                code: `
-// npm i gl-transitions
-import { createGLTransition } from "@vfx-js/transitions";
-import transitions from "gl-transitions";
-
-const cube = transitions.find((t) => t.name === "Cube")!;
-t.show("#about", { transition: createGLTransition(cube, { persp: 0.5 }) });`,
-            },
         ],
         notes: [
             "Give the target a fixed height, like 100dvh. Old and new content then share one box; a size change jumps at the end of the run.",
