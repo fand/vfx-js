@@ -56,19 +56,22 @@ const PAGES = [
     },
 ];
 
-function renderPage(index: number): string {
-    const page = PAGES[index % PAGES.length];
+function renderPage(index: number): HTMLElement {
+    const page = PAGES[index];
     const cards = [1, 2, 3]
         .map(
             (n) =>
                 `<li style="flex:1; padding:16px; border-radius:12px; background:${page.color}; color:#111">Card ${n}</li>`,
         )
         .join("");
-    return `
+    const section = document.createElement("section");
+    section.innerHTML = `
         <h2 style="margin:0 0 12px">${page.title}</h2>
         <p style="margin:0 0 24px; line-height:1.6">${page.body}</p>
         <ul style="display:flex; gap:16px; margin:0; padding:0; list-style:none">${cards}</ul>
     `;
+    section.hidden = index > 0;
+    return section;
 }
 
 export default {
@@ -110,7 +113,7 @@ export const Tabs: StoryObj<Args> = {
         container.style.cssText =
             "width:560px; height:240px; box-sizing:border-box; padding:24px; border-radius:16px; background:#222";
         let index = 0;
-        container.innerHTML = renderPage(index);
+        container.append(...PAGES.map((_, i) => renderPage(i)));
         root.append(next, container);
 
         const chromatic = isChromatic();
@@ -122,11 +125,10 @@ export const Tabs: StoryObj<Args> = {
             overflow: OVERFLOW[args.overflow],
             waitFor: "none",
         });
-        const swap = () =>
-            transition.run(() => {
-                index++;
-                container.innerHTML = renderPage(index);
-            });
+        const swap = () => {
+            index = (index + 1) % PAGES.length;
+            return transition.show(index);
+        };
         next.addEventListener("click", () => void swap());
 
         if (chromatic) {

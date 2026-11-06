@@ -1,4 +1,8 @@
-import type { AddTransitionOpts, RunOpts, Transition } from "@vfx-js/core";
+import type {
+    AddTransitionOpts,
+    RunOpts,
+    TransitionHandle,
+} from "@vfx-js/core";
 import {
     useCallback,
     useEffect,
@@ -22,7 +26,7 @@ export function useVFXTransition(
     const vfx = useVFXInstance();
     const liveOpts = useLiveOpts(opts);
     const [element, setElement] = useState<HTMLElement | null>(null);
-    const transitionRef = useRef<Transition | null>(null);
+    const transitionRef = useRef<TransitionHandle | null>(null);
     const [isPending, startTransition] = useTransition();
     const sawPending = useRef(false);
     const settleWaiters = useRef<(() => void)[]>([]);

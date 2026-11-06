@@ -1,4 +1,4 @@
-import { type RunOpts, type Transition, VFX } from "@vfx-js/core";
+import { type RunOpts, type TransitionHandle, VFX } from "@vfx-js/core";
 import { findPage } from "@vfx-js/transition-demo-shared";
 import { presets } from "@vfx-js/transition-demo-shared/transitions";
 import { swipe } from "@vfx-js/transitions";
@@ -9,7 +9,7 @@ const backSpec: RunOpts = { transition: swipe, reverse: true };
 // then let `run` wait for the new page to render.
 export default defineNuxtPlugin((nuxtApp) => {
     const router = useRouter();
-    let transition: Transition | undefined;
+    let transition: TransitionHandle | undefined;
     let position = window.history.state?.position ?? 0;
     let finishSwap: (() => void) | null = null;
     const releaseSwap = () => {

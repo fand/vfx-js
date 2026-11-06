@@ -4,7 +4,7 @@
     import { page } from "$app/state";
     import { findPage, pages } from "@vfx-js/transition-demo-shared";
     import { presets } from "@vfx-js/transition-demo-shared/transitions";
-    import { type Transition, VFX } from "@vfx-js/core";
+    import { type TransitionHandle, VFX } from "@vfx-js/core";
     import { swipe } from "@vfx-js/transitions";
     import { onMount } from "svelte";
 
@@ -12,7 +12,7 @@
 
     let { children } = $props();
     let outlet: HTMLElement;
-    let transition: Transition | undefined;
+    let transition: TransitionHandle | undefined;
 
     onMount(() => {
         const vfx = new VFX();
