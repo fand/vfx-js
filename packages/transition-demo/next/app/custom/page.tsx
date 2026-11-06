@@ -21,9 +21,10 @@ const prelude = [
 
 const hooks = [
     [
-        "create()",
-        "On the def. Makes the effects for one container when a run uses the def. Later runs with the same def reuse them; switching to another def and back calls it again.",
+        "constructor(params)",
+        "Core calls new Class(params) once per container. Later runs with the same class and equal params reuse the instance.",
     ],
+    ["init(ctx), dispose()", "When the instance joins and leaves a container."],
     ["start(run)", "Once per run, while the old content is held."],
     [
         "update(ctx)",
@@ -44,19 +45,21 @@ export default function Custom() {
             <section className="doc-title">
                 <h1>Custom Transitions</h1>
                 <p className="lead">
-                    A transition is a fragment of GLSL that defines{" "}
-                    <code>vec4 transition(vec2 uv, float t)</code>. VFX-JS adds
-                    the prelude, the textures and <code>main</code>.
+                    A transition is a class. Most are one fragment of GLSL that
+                    defines <code>vec4 transition(vec2 uv, float t)</code>.
+                    VFX-JS adds the prelude, the textures and <code>main</code>.
                 </p>
             </section>
 
             <section id="def" className="doc-section two-col">
                 <div>
-                    <h2>shaderTransition</h2>
+                    <h2>ShaderTransition</h2>
                     <p>
-                        Give it a <code>name</code> and the <code>frag</code>.
-                        Declare your own uniforms, set defaults, and pass values
-                        with each run. Use it anywhere a preset goes.
+                        Extend it and set a <code>name</code> and the{" "}
+                        <code>frag</code>. Params come in through the
+                        constructor and are typed. Turn them into uniforms in{" "}
+                        <code>uniforms()</code>, which runs every frame. Use the
+                        class anywhere a preset goes.
                     </p>
                     <p>
                         <code>readFrom</code> and <code>readTo</code> swap when{" "}
@@ -65,21 +68,23 @@ export default function Custom() {
                     </p>
                 </div>
                 <Code label="wipe.ts">{`
-import { shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 
-export const wipe = shaderTransition({
-  name: "wipe",
-  frag: \`
+export class Wipe extends ShaderTransition<{ softness?: number }> {
+  name = "wipe";
+  frag = \`
 uniform float softness;
 vec4 transition(vec2 uv, float t) {
   float m = smoothstep(t - softness, t + softness, uv.x);
   return mix(readTo(uv), readFrom(uv), m);
 }
-\`,
-  uniforms: { softness: 0.05 },
-});
+\`;
+  uniforms() {
+    return { softness: this.params.softness ?? 0.05 };
+  }
+}
 
-t.run(swap, { transition: wipe, uniforms: { softness: 0.1 } });
+t.run(swap, { transition: Wipe, params: { softness: 0.1 } });
 `}</Code>
             </section>
 
@@ -108,33 +113,34 @@ t.run(swap, { transition: wipe, uniforms: { softness: 0.1 } });
                         element.
                     </p>
                     <p>
-                        The run's options win over the def's own value. This
+                        The run's options win over the class's own value. This
                         site passes <code>overflow: 0</code> on the page outlet,
                         so zooms never cover the header.
                     </p>
                 </div>
                 <Code label="zoom.ts">{`
-export const zoom = shaderTransition({
-  name: "zoom",
-  overflow: true,
-  frag: \`
+export class Zoom extends ShaderTransition {
+  name = "zoom";
+  overflow = true as const;
+  frag = \`
 vec4 transition(vec2 uv, float t) {
   vec2 uv1 = (uv - 0.5) * (1.0 - t) + 0.5;
   vec2 uv2 = (uv - 0.5) / (t * 0.999 + 0.001) + 0.5;
   vec4 to = inRange(uv) ? readTo(fract(uv2)) : vec4(0.0);
   return mix(readFrom(uv1), to, t);
 }
-\`,
-});
+\`;
+}
 `}</Code>
             </section>
 
             <section id="hooks" className="doc-section">
-                <h2>Transition effects</h2>
+                <h2>Hooks</h2>
                 <p className="lead">
-                    Some looks need more than one shader: a datamosh, a pixel
-                    sort. A def's <code>create()</code> can return your own
-                    effects, which see the run on their context.
+                    A transition is also an effect, so it gets the effect hooks
+                    plus a few for the run. Some looks need more than one
+                    shader, like a datamosh or a pixel sort. For those, write a
+                    class that implements <code>Transition</code> directly.
                 </p>
                 <dl className="api-table">
                     {hooks.map(([k, v]) => (
@@ -150,13 +156,45 @@ vec4 transition(vec2 uv, float t) {
 
             <section id="state" className="doc-section two-col">
                 <div>
-                    <h2>State lives on the effect</h2>
+                    <h2>State lives on the instance</h2>
                     <p>
-                        Each container gets its own effects, so keep per-run
-                        state on the instance.
+                        Each container gets its own instance of a class, so keep
+                        per-run state on <code>this</code>. Call{" "}
+                        <code>super.start(run)</code> when you override{" "}
+                        <code>start</code> on a <code>ShaderTransition</code>.
                     </p>
+                </div>
+                <Code label="flash.ts">{`
+export class Flash extends ShaderTransition {
+  name = "flash";
+  frag = \`
+uniform vec3 tint;
+vec4 transition(vec2 uv, float t) {
+  vec4 c = mix(readFrom(uv), readTo(uv), t);
+  return c + vec4(tint * sin(t * 3.141593), 0.0) * c.a;
+}
+\`;
+  #tint: [number, number, number] = [1, 1, 1];
+
+  start(run: TransitionRun) {
+    super.start(run);
+    // A new color on every run.
+    this.#tint = [Math.random(), Math.random(), Math.random()];
+  }
+  uniforms() {
+    return { tint: this.#tint };
+  }
+}
+`}</Code>
+            </section>
+
+            <section id="effects" className="doc-section two-col">
+                <div>
+                    <h2>Build on an effect</h2>
                     <p>
-                        Transition effects follow the{" "}
+                        A class that implements <code>Transition</code> can
+                        extend any effect from <code>@vfx-js/effects</code>.
+                        They follow the{" "}
                         <a
                             href="https://github.com/fand/vfx-js/blob/main/docs/EFFECT.md"
                             target="_blank"
@@ -164,34 +202,28 @@ vec4 transition(vec2 uv, float t) {
                         >
                             Effect API
                         </a>
-                        , so you can extend an effect from{" "}
-                        <code>@vfx-js/effects</code>.
+                        . The effect sees the new content as{" "}
+                        <code>ctx.src</code> and the old one as{" "}
+                        <code>ctx.from</code>.
                     </p>
                 </div>
-                <Code label="pixelsort.ts">{`
-const cut = shaderTransition({
-  name: "pixelsort",
-  frag: \`
-vec4 transition(vec2 uv, float t) {
-  return t < 0.5 ? readFrom(uv) : readTo(uv);
-}
-\`,
-});
+                <Code label="sort-in.ts">{`
+import type { Transition, TransitionEffectContext } from "@vfx-js/core";
+import { PixelSortEffect } from "@vfx-js/effects";
 
-class Sort extends PixelSortEffect implements TransitionEffect {
+// The new content sorts out of streaks.
+export class SortIn extends PixelSortEffect implements Transition {
+  name = "sort-in";
+  constructor() {
+    super({ range: [1, 1] });
+  }
   start() {
     this.params.range[0] = 1;
   }
   update(ctx: TransitionEffectContext) {
-    // Fully sorted at the halfway swap.
-    this.params.range[0] = Math.abs(1 - 2 * ctx.progress.t);
+    this.params.range[0] = ctx.progress.t;
   }
 }
-
-export const pixelsort: TransitionDef = {
-  name: "pixelsort",
-  create: () => [cut.create(), new Sort({ range: [1, 1] })],
-};
 `}</Code>
             </section>
 

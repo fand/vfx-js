@@ -42,7 +42,7 @@ const usage = [
         name: "React",
         code: `
 import { TransitionIn, VFXTransition } from "@vfx-js/react";
-import { glitch } from "@vfx-js/transitions";
+import { Glitch } from "@vfx-js/transitions";
 
 export function App({ pathname, page }) {
   return (
@@ -55,7 +55,7 @@ export function App({ pathname, page }) {
 export function About() {
   return (
     <>
-      <TransitionIn transition={glitch} />
+      <TransitionIn transition={Glitch} />
       <h1>About</h1>
     </>
   );
@@ -66,12 +66,12 @@ export function About() {
         name: "Vanilla",
         code: `
 import { VFX } from "@vfx-js/core";
-import { swipe } from "@vfx-js/transitions";
+import { Swipe } from "@vfx-js/transitions";
 
 // <div id="panel">: one <section> per tab, all but one hidden.
 const vfx = new VFX();
 const panel = document.querySelector("#panel");
-const t = vfx.addTransition(panel, { transition: swipe, duration: 0.6 });
+const t = vfx.addTransition(panel, { transition: Swipe, duration: 0.6 });
 
 for (const tab of document.querySelectorAll("[data-panel]")) {
   tab.addEventListener("click", () => t.show(tab.dataset.panel));

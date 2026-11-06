@@ -1,7 +1,6 @@
 "use client";
 
 import { useVFXTransition } from "@vfx-js/react";
-import { createPixelScan } from "@vfx-js/transitions";
 import Link from "next/link";
 import {
     useCallback,
@@ -22,9 +21,8 @@ const COPIES = 5;
 const HOME = Math.floor(COPIES / 2);
 
 // The hero plays pixelScan in rings.
-const heroPresets = {
-    ...presets,
-    pixelScan: createPixelScan({ direction: "center" }),
+const heroParams: Partial<Record<PresetName, object>> = {
+    pixelScan: { direction: "center" },
 };
 
 // Runs longer than the 1.1 s default. The rings need time to spread.
@@ -98,6 +96,8 @@ const words: Partial<Record<PresetName, string>> = {
 export function HeroStage() {
     const { ref, run } = useVFXTransition({ duration: 1.1, overflow: 0 });
     const [theme, setTheme] = useState<PresetName>(names[0]);
+    // The title keeps its plain serif look until the first preset plays.
+    const [played, setPlayed] = useState(false);
     const [look, setLook] = useState({ palette: "default", pattern: "dots" });
     // The item to center, as an index into the repeated list.
     // A new object each time, so a repeat click centers again.
@@ -137,6 +137,7 @@ export function HeroStage() {
                     focusRef.current = index + 1;
                     setFocus({ index: index + 1 });
                     setTheme(name);
+                    setPlayed(true);
                     setLook((prev) => ({
                         palette: pickOther(palettes, prev.palette),
                         pattern: pickOther(
@@ -146,7 +147,8 @@ export function HeroStage() {
                     }));
                 },
                 {
-                    transition: heroPresets[name],
+                    transition: presets[name],
+                    params: heroParams[name],
                     duration: durations[name],
                 },
             );
@@ -329,7 +331,7 @@ export function HeroStage() {
     return (
         <section
             className="hero"
-            data-theme={theme}
+            data-theme={played ? theme : undefined}
             data-palette={look.palette}
             data-pattern={look.pattern}
             ref={setRefs}
@@ -341,7 +343,9 @@ export function HeroStage() {
             </p>
             <h1 className="hero-title">
                 Shader{" "}
-                <em className="hero-em">{words[theme] ?? "transitions"}</em>
+                <em className="hero-em">
+                    {(played && words[theme]) || "transitions"}
+                </em>
                 <br />
                 for the DOM.
             </h1>

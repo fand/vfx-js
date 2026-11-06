@@ -9,10 +9,13 @@ export const metadata: Metadata = { title: "API reference" };
 type Row = [name: string, body: string];
 
 const containerOpts: Row[] = [
-    ["transition: TransitionDef", "The shader. Defaults to crossfade."],
     [
-        "uniforms: TransitionUniforms",
-        "Uniforms for transition. Numbers and vectors.",
+        "transition: TransitionClass | Transition",
+        "A class, or an instance to use as is. Defaults to Crossfade. Core makes one instance of a class per container.",
+    ],
+    [
+        "params: object",
+        "Constructor params for the class. Typed from the class. Not used with an instance.",
     ],
     ["duration: number", "Seconds. Defaults to 0.6. 0 cuts without animation."],
     [
@@ -21,11 +24,11 @@ const containerOpts: Row[] = [
     ],
     [
         'ease: "smoothstep" | "linear" | (x) => t',
-        "How t follows progress. Defaults to the def's ease, then smoothstep.",
+        "How t follows progress. Defaults to the transition's ease, then smoothstep.",
     ],
     [
         "overflow: true | number",
-        "Room to draw outside the element. true for the whole canvas, a number for CSS px on every side.",
+        "Room to draw outside the element. true for the whole canvas, a number for CSS px on every side. Defaults to the transition's overflow.",
     ],
     [
         "keepWrapped: boolean",
@@ -53,12 +56,12 @@ const handle: Row[] = [
 
 const runOpts: Row[] = [
     [
-        "transition, uniforms, duration, reverse, ease, overflow",
+        "transition, params, duration, reverse, ease, overflow",
         "Same as the container options. A run's value wins.",
     ],
     [
-        "uniforms",
-        "Merge per key, run over container. A run with its own transition drops the container's uniforms.",
+        "params",
+        "Merge per key, run over container. A run with its own transition drops the container's params.",
     ],
     [
         "opts as a function",
@@ -85,27 +88,31 @@ const vfxTransitionProps: Row[] = [
     ],
 ];
 
-const defFields: Row[] = [
-    ["name: string", "A name for logs."],
+const transitionFields: Row[] = [
+    ["name?: string", "A name for logs."],
     [
         "ease?: TransitionEase",
         "The t this transition expects. A spec's ease wins.",
     ],
     [
-        "create(): TransitionEffect | TransitionEffect[]",
-        "Makes the effects for one container. Runs that keep the def reuse them.",
+        "overflow?: true | number",
+        "Room outside the element. A spec's overflow wins.",
+    ],
+    [
+        "start(run), update(ctx), render(ctx), end()",
+        "Effect hooks for a run, plus init and dispose. render also runs while the old content is held.",
     ],
 ];
 
-const shaderOpts: Row[] = [
+const shaderFields: Row[] = [
     ["name: string", "A name for logs."],
     ["frag: string", "GLSL that defines vec4 transition(vec2 uv, float t)."],
-    ["uniforms?: TransitionUniforms", "Defaults. The spec's uniforms win."],
-    ["ease?: TransitionEase", 'Defaults to "smoothstep".'],
+    ["params: P", "Set by the constructor. Change it any time."],
     [
-        "overflow?: true | number",
-        "Room outside the element. The spec's overflow wins.",
+        "uniforms(ctx): TransitionUniforms",
+        "Uniforms for this frame. Read this.params here.",
     ],
+    ["ease?, overflow?", "Defaults. A spec's value wins."],
 ];
 
 function Table({ rows }: { rows: Row[] }) {
@@ -144,10 +151,10 @@ export default function Api() {
                 </p>
                 <Code label="core">{`
 import { VFX } from "@vfx-js/core";
-import { swipe } from "@vfx-js/transitions";
+import { Swipe } from "@vfx-js/transitions";
 
 const vfx = new VFX();
-const t = vfx.addTransition(el, { transition: swipe, duration: 0.6 });
+const t = vfx.addTransition(el, { transition: Swipe, duration: 0.6 });
 `}</Code>
                 <Table rows={containerOpts} />
             </section>
@@ -165,10 +172,12 @@ const t = vfx.addTransition(el, { transition: swipe, duration: 0.6 });
                 <h2>RunOpts</h2>
                 <p>
                     Each field comes from the first level that sets it: the run,
-                    then the container, then the def (for <code>ease</code>).
+                    then the container, then the transition (for{" "}
+                    <code>ease</code> and <code>overflow</code>).
                 </p>
                 <Code label="run">{`
-t.run(() => render(next), { transition: glitch, reverse: true });
+t.run(() => render(next), { transition: Glitch, reverse: true });
+t.run(() => render(next), { transition: Swipe, params: { direction: "up" } });
 `}</Code>
                 <Table rows={runOpts} />
             </section>
@@ -182,7 +191,7 @@ t.run(() => render(next), { transition: glitch, reverse: true });
                     defaults to the pathname.
                 </p>
                 <Code label="layout.tsx">{`
-<VFXTransition pageKey={pathname} transition={crossfade} duration={0.6}>
+<VFXTransition pageKey={pathname} transition={Crossfade} duration={0.6}>
   {children}
 </VFXTransition>
 `}</Code>
@@ -194,12 +203,13 @@ t.run(() => render(next), { transition: glitch, reverse: true });
                 <p>
                     The incoming page says how it enters. Only the spec at mount
                     counts. Use the component in Server Components and the hook
-                    in client components.
+                    in client components. From a Server Component, pass the
+                    class and plain <code>params</code>.
                 </p>
                 <Code label="page.tsx">{`
-<TransitionIn transition={glitch} />
+<TransitionIn transition={Glitch} params={{ amount: 1.5 }} />
 // or, in a client component:
-useTransitionIn({ transition: glitch });
+useTransitionIn({ transition: Glitch });
 `}</Code>
             </section>
 
@@ -212,7 +222,7 @@ useTransitionIn({ transition: glitch });
                     s. It ignores modified and non-left clicks.
                 </p>
                 <Code label="link.tsx">{`
-<Link href="/about" onClick={transition({ transition: glitch })}>About</Link>
+<Link href="/about" onClick={transition({ transition: Glitch })}>About</Link>
 `}</Code>
             </section>
 
@@ -224,7 +234,7 @@ useTransitionIn({ transition: glitch });
                     <code>startTransition</code> and starts after React commits.
                 </p>
                 <Code label="tabs.tsx">{`
-const { ref, run } = useVFXTransition({ transition: swipe });
+const { ref, run } = useVFXTransition({ transition: Swipe });
 
 <div ref={ref}>{tab}</div>
 
@@ -239,31 +249,50 @@ await run(() => setTab(next), { reverse: true });
                     the page.
                 </p>
                 <Code label="navigate.ts">{`
-setNextTransition({ transition: zoom });
+setNextTransition({ transition: Zoom });
 router.push("/next");
 `}</Code>
             </section>
 
-            <section id="transition-def" className="doc-section">
-                <h2>TransitionDef</h2>
+            <section id="use-transition-instance" className="doc-section">
+                <h2>useTransitionInstance(Class, params?)</h2>
                 <p>
-                    What every preset is. Most are one shader, made with{" "}
-                    <code>shaderTransition</code>. See{" "}
+                    Makes one instance and keeps it while the class and params
+                    stay equal. Params compare shallowly, so an inline object is
+                    fine. New params make a new instance, which applies from the
+                    next run. To change a run while it plays, set{" "}
+                    <code>fx.params</code> on the instance.
+                </p>
+                <Code label="slider.tsx">{`
+const fx = useTransitionInstance(Glitch, { speed: 1 });
+
+<VFXTransition pageKey={pathname} transition={fx}>{children}</VFXTransition>
+<input type="range" onChange={(e) => (fx.params = { amount: +e.target.value })} />
+`}</Code>
+            </section>
+
+            <section id="transition" className="doc-section">
+                <h2>Transition</h2>
+                <p>
+                    What every preset is: an effect object with a few defaults.
+                    Write one as a class. An instance runs in one container at a
+                    time; pass the class to share it. See{" "}
                     <Link href="/custom" className="text-link">
                         Custom
                     </Link>{" "}
-                    for effects.
+                    for examples.
                 </p>
-                <Table rows={defFields} />
+                <Table rows={transitionFields} />
             </section>
 
             <section id="shader-transition" className="doc-section">
-                <h2>shaderTransition(opts)</h2>
+                <h2>ShaderTransition</h2>
                 <p>
-                    From <code>@vfx-js/core</code>. Wraps your <code>frag</code>{" "}
-                    with a prelude and a <code>main</code>.
+                    From <code>@vfx-js/core</code>. A base class for one shader.
+                    It wraps your <code>frag</code> with a prelude and a{" "}
+                    <code>main</code>, and holds the old content before the run.
                 </p>
-                <Table rows={shaderOpts} />
+                <Table rows={shaderFields} />
             </section>
 
             <section className="doc-section doc-next">

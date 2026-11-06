@@ -1,19 +1,21 @@
-import type {
-    ShaderTransitionDef,
-    TransitionDef,
-    TransitionUniforms,
+import {
+    ShaderTransition,
+    type Transition,
+    type TransitionEase,
+    type TransitionEffectContext,
+    type TransitionUniforms,
 } from "@vfx-js/core";
 import {
-    createDatamosh,
     createGLTransition,
-    createJpegGlitch,
-    createLensDistortion,
-    createPixelScan,
-    createPixelsort,
-    createSwipe,
-    createTile,
+    Datamosh,
+    JpegGlitch,
+    LensDistortion,
+    PixelScan,
     type PixelScanDirection,
+    Pixelsort,
+    Swipe,
     type SwipeDirection,
+    Tile,
     type TileDirection,
     type TileShape,
 } from "@vfx-js/transitions";
@@ -28,8 +30,8 @@ export type Source = {
     frag: string;
     sliders: UniformSpec[];
     uniforms: TransitionUniforms;
-    ease?: ShaderTransitionDef["ease"];
-    overflow?: ShaderTransitionDef["overflow"];
+    ease?: TransitionEase;
+    overflow?: true | number;
     /** Set for shaders from gl-transitions, which keep their author's license. */
     credit?: Credit;
     factory?: Factory;
@@ -51,15 +53,49 @@ export type ParamSpec =
 
 export type ParamValues = Record<string, string | number>;
 
-/** A preset built by a factory. Changing a param builds it again. */
+/** A preset with constructor params. Changing a param builds it again. */
 export type Factory = {
     params: ParamSpec[];
-    build: (values: ParamValues) => TransitionDef;
+    build: (values: ParamValues) => Transition;
 };
+
+/** GLSL from the editor as a transition. Its params are the uniforms. */
+export class LabShader extends ShaderTransition<TransitionUniforms> {
+    readonly name = "custom";
+    readonly frag: string;
+
+    constructor(
+        frag: string,
+        opts: { ease?: TransitionEase; overflow?: true | number } = {},
+    ) {
+        super({});
+        this.frag = frag;
+        this.ease = opts.ease;
+        this.overflow = opts.overflow;
+    }
+
+    uniforms(): TransitionUniforms {
+        return this.params;
+    }
+}
+
+// The lab reads uniforms outside a run, where no context exists.
+const noContext = {} as TransitionEffectContext;
+
+/** The GLSL and uniforms of a shader preset, for the editor. */
+export function shaderOf(transition: Transition) {
+    if (!(transition instanceof ShaderTransition)) {
+        return undefined;
+    }
+    return {
+        frag: transition.frag.trim(),
+        uniforms: transition.uniforms(noContext),
+    };
+}
 
 const directions = ["left", "right", "up", "down"];
 
-// Factory options of the presets. Shader presets bake them into GLSL constants, so they have no uniforms.
+// Constructor params of the presets, shown as selects and sliders.
 const factories: Record<string, Factory> = {
     swipe: {
         params: [
@@ -70,7 +106,7 @@ const factories: Record<string, Factory> = {
                 value: "left",
             },
         ],
-        build: (v) => createSwipe({ direction: v.direction as SwipeDirection }),
+        build: (v) => new Swipe({ direction: v.direction as SwipeDirection }),
     },
     tile: {
         params: [
@@ -104,7 +140,7 @@ const factories: Record<string, Factory> = {
             },
         ],
         build: (v) =>
-            createTile({
+            new Tile({
                 direction: v.direction as TileDirection,
                 shape: v.shape as TileShape,
                 count: Number(v.count),
@@ -139,7 +175,7 @@ const factories: Record<string, Factory> = {
             },
         ],
         build: (v) =>
-            createLensDistortion({
+            new LensDistortion({
                 strength: Number(v.strength),
                 dispersion: Number(v.dispersion),
                 zoom: Number(v.zoom),
@@ -155,7 +191,7 @@ const factories: Record<string, Factory> = {
             },
         ],
         build: (v) =>
-            createPixelsort({
+            new Pixelsort({
                 direction: v.direction as "up" | "down" | "left" | "right",
             }),
     },
@@ -170,7 +206,7 @@ const factories: Record<string, Factory> = {
                 value: 32,
             },
         ],
-        build: (v) => createDatamosh({ blockSize: Number(v.blockSize) }),
+        build: (v) => new Datamosh({ blockSize: Number(v.blockSize) }),
     },
     pixelScan: {
         params: [
@@ -188,7 +224,7 @@ const factories: Record<string, Factory> = {
             },
         ],
         build: (v) =>
-            createPixelScan({
+            new PixelScan({
                 direction: v.direction as PixelScanDirection,
                 blackout: v.blackout === "true",
             }),
@@ -213,7 +249,7 @@ const factories: Record<string, Factory> = {
             },
         ],
         build: (v) =>
-            createJpegGlitch({
+            new JpegGlitch({
                 iterations: Number(v.iterations),
                 quality: Number(v.quality),
             }),
@@ -232,9 +268,7 @@ export type SourceGroup = {
     thirdParty?: boolean;
 };
 
-const isShader = (def: object): def is ShaderTransitionDef => "frag" in def;
-
-const presetDefs = Object.entries(presets);
+const presetClasses = Object.entries(presets);
 
 // "Name <mail>" → "Name", for a tidy list. The license and link keep full credit.
 const authorOf = (author: string) =>
@@ -253,7 +287,7 @@ export const groups: SourceGroup[] = [
     },
     {
         label: "Presets",
-        options: presetDefs.map(([name]) => ({
+        options: presetClasses.map(([name]) => ({
             id: `preset:${name}`,
             label: name,
         })),
@@ -292,21 +326,24 @@ function slidersOf(
     );
 }
 
-function fromDef(
+function fromShader(
     id: string,
     label: string,
-    def: ShaderTransitionDef,
+    transition: Transition,
     types?: Record<string, string>,
-): Source {
-    return {
-        id,
-        label,
-        frag: def.frag.trim(),
-        sliders: slidersOf(def.uniforms, types),
-        uniforms: def.uniforms,
-        ease: def.ease,
-        overflow: def.overflow,
-    };
+): Source | undefined {
+    const shader = shaderOf(transition);
+    return (
+        shader && {
+            id,
+            label,
+            frag: shader.frag,
+            sliders: slidersOf(shader.uniforms, types),
+            uniforms: shader.uniforms,
+            ease: transition.ease,
+            overflow: transition.overflow,
+        }
+    );
 }
 
 export function sourceOf(id: string): Source | undefined {
@@ -329,35 +366,40 @@ export function sourceOf(id: string): Source | undefined {
         );
     }
     if (kind === "preset") {
-        const def = presetDefs.find(([n]) => n === name)?.[1];
-        if (!def) {
+        const Class = presetClasses.find(([n]) => n === name)?.[1];
+        if (!Class) {
             return undefined;
         }
         const factory = factories[name];
-        if (!isShader(def)) {
+        const transition = factory
+            ? factory.build(defaultParams(factory))
+            : new Class();
+        const shader = fromShader(id, name, transition);
+        if (!shader) {
             return {
                 id,
                 label: name,
                 frag: "",
                 sliders: [],
                 uniforms: {},
-                ease: def.ease,
+                ease: transition.ease,
                 factory,
                 effect: true,
             };
         }
-        return { ...fromDef(id, name, def), factory };
+        // Params drive the uniforms of a preset with params, so it gets no extra sliders.
+        return factory ? { ...shader, sliders: [], factory } : shader;
     }
     if (kind === "gl") {
         const entry = glEntries.find((e) => e.name === name);
+        if (!entry) {
+            return undefined;
+        }
+        const Class = createGLTransition(entry);
+        const shader = fromShader(id, name, new Class(), entry.paramsTypes);
         return (
-            entry && {
-                ...fromDef(
-                    id,
-                    name,
-                    createGLTransition(entry),
-                    entry.paramsTypes,
-                ),
+            shader && {
+                ...shader,
                 credit: {
                     author: authorOf(entry.author),
                     license: entry.license,

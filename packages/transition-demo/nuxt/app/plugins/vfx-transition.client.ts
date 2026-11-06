@@ -1,9 +1,9 @@
 import { type RunOpts, type TransitionHandle, VFX } from "@vfx-js/core";
 import { findPage } from "@vfx-js/transition-demo-shared";
 import { presets } from "@vfx-js/transition-demo-shared/transitions";
-import { swipe } from "@vfx-js/transitions";
+import { Swipe } from "@vfx-js/transitions";
 
-const backSpec: RunOpts = { transition: swipe, reverse: true };
+const backSpec: RunOpts = { transition: Swipe, reverse: true };
 
 // Hold each navigation in `beforeEach` until `run` has the old page,
 // then let `run` wait for the new page to render.

@@ -34,12 +34,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 label: "app/about/page.tsx",
                 code: `
 import { TransitionIn } from "@vfx-js/react";
-import { glitch } from "@vfx-js/transitions";
+import { Glitch } from "@vfx-js/transitions";
 
 export default function About() {
   return (
     <>
-      <TransitionIn transition={glitch} />
+      <TransitionIn transition={Glitch} />
       <h1>About</h1>
     </>
   );
@@ -49,7 +49,7 @@ export default function About() {
         notes: [
             "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
             "A Server Component can't pass onClick to Link. Wrap the link in a small client component.",
-            'Presets cross from a Server Component as-is. Put your own defs and factory calls like createSwipe() in a "use client" file.',
+            'Preset classes cross from a Server Component as-is. Pass options as plain params, e.g. <TransitionIn transition={Swipe} params={{ direction: "up" }} />. Make instances with useTransitionInstance in a client component.',
             "loading.tsx shows its fallback as soon as the path changes, so the transition lands on the skeleton.",
         ],
     },
@@ -63,7 +63,7 @@ export default function About() {
                 label: "Layout.tsx",
                 code: `
 import { transition, VFXTransition } from "@vfx-js/react";
-import { crossfade, glitch } from "@vfx-js/transitions";
+import { Crossfade, Glitch } from "@vfx-js/transitions";
 import { Link, useLocation, useOutlet } from "react-router";
 
 export function Layout() {
@@ -72,10 +72,10 @@ export function Layout() {
   return (
     <>
       {/* A click spec wins over the page's <TransitionIn>. */}
-      <Link to="/about" onClick={transition({ transition: glitch })}>
+      <Link to="/about" onClick={transition({ transition: Glitch })}>
         About
       </Link>
-      <VFXTransition pageKey={pathname} transition={crossfade}>
+      <VFXTransition pageKey={pathname} transition={Crossfade}>
         {outlet}
       </VFXTransition>
     </>
@@ -86,13 +86,13 @@ export function Layout() {
                 label: "Tabs.tsx",
                 code: `
 import { useVFXTransition } from "@vfx-js/react";
-import { swipe } from "@vfx-js/transitions";
+import { Swipe } from "@vfx-js/transitions";
 import { useState } from "react";
 
 // For containers you render yourself, like tabs.
 export function Tabs() {
   const [tab, setTab] = useState(0);
-  const { ref, run } = useVFXTransition({ transition: swipe });
+  const { ref, run } = useVFXTransition({ transition: Swipe });
   return (
     <>
       <button onClick={() => run(() => setTab(tab + 1))}>Next</button>
@@ -137,12 +137,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 label: "pages/about.tsx",
                 code: `
 import { TransitionIn } from "@vfx-js/react";
-import { glitch } from "@vfx-js/transitions";
+import { Glitch } from "@vfx-js/transitions";
 
 export default function About() {
   return (
     <>
-      <TransitionIn transition={glitch} />
+      <TransitionIn transition={Glitch} />
       <h1>About</h1>
     </>
   );
@@ -178,13 +178,13 @@ export default function About() {
                 label: "main.ts",
                 code: `
 import { VFX } from "@vfx-js/core";
-import { swipe } from "@vfx-js/transitions";
+import { Swipe } from "@vfx-js/transitions";
 
 const vfx = new VFX();
 const panel = document.querySelector<HTMLElement>("#panel")!;
 const tabs = document.querySelectorAll<HTMLElement>("[data-panel]");
 
-const t = vfx.addTransition(panel, { transition: swipe, duration: 0.6 });
+const t = vfx.addTransition(panel, { transition: Swipe, duration: 0.6 });
 for (const tab of tabs) {
   tab.addEventListener("click", () => t.show(tab.dataset.panel!));
 }`,

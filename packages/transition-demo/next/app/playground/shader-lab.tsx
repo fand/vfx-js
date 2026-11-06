@@ -1,23 +1,24 @@
 "use client";
 
-import {
-    shaderTransition,
-    type TransitionDef,
-    type TransitionEase,
-    type TransitionUniforms,
+import type {
+    Transition,
+    TransitionEase,
+    TransitionUniforms,
 } from "@vfx-js/core";
 import { useVFXTransition } from "@vfx-js/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Code } from "../_components/code";
 import { highlight } from "../_components/highlight";
 import { LabScene } from "./lab-scene";
 import {
     defaultParams,
     groups,
+    LabShader,
     type ParamSpec,
     type ParamValues,
     type Source,
     type SourceGroup,
+    shaderOf,
     sourceOf,
 } from "./sources";
 
@@ -92,8 +93,7 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         x: number;
         ease: (x: number) => number;
         active: boolean;
-        def?: TransitionDef;
-        values?: TransitionUniforms;
+        transition?: Transition;
     }>({ x: 0, ease: smoothstep, active: false });
     const preRef = useRef<HTMLPreElement>(null);
     const caretRef = useRef<number | null>(null);
@@ -127,27 +127,30 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         );
     };
 
-    // The program is cached by its source, so a new def per edit is cheap.
-    const def = useMemo(
+    // The program is cached by its source, so a new instance per edit is cheap.
+    const transition = useMemo(
         () =>
             source.effect && source.factory
                 ? source.factory.build(params)
-                : shaderTransition({
-                      name: "custom",
-                      frag,
-                      ease: source.ease,
-                      overflow: source.overflow,
-                  }),
+                : new LabShader(frag, source),
         [frag, source, params],
     );
 
-    /** A new param builds the preset again. A shader preset reloads its GLSL into the editor. */
+    // Sliders change the uniforms of a held run in place.
+    useLayoutEffect(() => {
+        if (transition instanceof LabShader) {
+            transition.params = values;
+        }
+    }, [transition, values]);
+
+    /** A new param builds the preset again. A shader preset reloads its GLSL and uniforms. */
     const setParam = (name: string, value: string | number) => {
         const next = { ...params, [name]: value };
         setParams(next);
-        const built = source.factory?.build(next);
-        if (built && "frag" in built) {
-            setFrag((built.frag as string).trim());
+        const built = source.factory && shaderOf(source.factory.build(next));
+        if (built) {
+            setFrag(built.frag);
+            setValues(built.uniforms);
         }
     };
 
@@ -156,28 +159,22 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
     // Effect presets like datamosh follow real time, not t, so they play a normal run.
     const timed = Boolean(source.effect);
 
-    /** Starts a run held at the clock. A new shader or uniforms starts a new one. */
-    const hold = (transition: TransitionDef, uniforms: TransitionUniforms) => {
+    /** Starts a run held at the clock. A new transition starts a new one. */
+    const hold = (next: Transition) => {
         const c = clock.current;
-        if (c.active && c.def === transition && c.values === uniforms) {
+        if (c.active && c.transition === next) {
             return;
         }
         c.active = true;
-        c.def = transition;
-        c.values = uniforms;
+        c.transition = next;
         run(() => setScene((s) => s + 1), {
-            transition,
-            uniforms,
+            transition: next,
             duration: 3600,
             ease: () => c.ease(c.x),
         });
     };
 
-    const play = (
-        transition: TransitionDef = def,
-        uniforms = values,
-        isTimed = timed,
-    ) => {
+    const play = (next: Transition = transition, isTimed = timed) => {
         const c = clock.current;
         if (c.x >= 1) {
             c.x = 0;
@@ -186,13 +183,12 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
             c.active = false;
             c.x = 0;
             run(() => setScene((s) => s + 1), {
-                transition,
-                uniforms,
+                transition: next,
                 duration,
                 ease: eases[easeIndex].ease,
             });
         } else {
-            hold(transition, uniforms);
+            hold(next);
         }
         setPlaying(true);
     };
@@ -201,7 +197,7 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         setPlaying(false);
         clock.current.x = x;
         setProgress(x);
-        hold(def, values);
+        hold(transition);
     };
 
     // Moves the clock while playing; it stops at the end.
@@ -252,16 +248,12 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         setParams(nextParams);
         clock.current.x = 0;
         clock.current.active = false;
+        const shader = new LabShader(next.frag, next);
+        shader.params = next.uniforms;
         play(
             next.effect && next.factory
                 ? next.factory.build(nextParams)
-                : shaderTransition({
-                      name: "custom",
-                      frag: next.frag,
-                      ease: next.ease,
-                      overflow: next.overflow,
-                  }),
-            next.uniforms,
+                : shader,
             Boolean(next.effect),
         );
     };
@@ -567,8 +559,8 @@ const glExample = `
 import { createGLTransition } from "@vfx-js/transitions";
 import transitions from "gl-transitions";
 
-const cube = transitions.find((t) => t.name === "Cube");
-t.run(cb, { transition: createGLTransition(cube, { persp: 0.5 }) });
+const Cube = createGLTransition(transitions.find((t) => t.name === "Cube"));
+t.run(cb, { transition: Cube, params: { persp: 0.5 } });
 `;
 
 /** Credit for gl-transitions, and how to use its shaders with VFX-JS. */

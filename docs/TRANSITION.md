@@ -36,13 +36,13 @@ without it, VFX-JS falls back to dom-to-canvas, which is slower.
 
 ```ts
 import { VFX } from "@vfx-js/core";
-import { swipe } from "@vfx-js/transitions";
+import { Swipe } from "@vfx-js/transitions";
 
 const vfx = new VFX();
 const panel = document.querySelector<HTMLElement>("#panel")!;
 const tabs = document.querySelectorAll<HTMLElement>("[data-panel]");
 
-const t = vfx.addTransition(panel, { transition: swipe, duration: 0.6 });
+const t = vfx.addTransition(panel, { transition: Swipe, duration: 0.6 });
 for (const tab of tabs) {
     tab.addEventListener("click", () => t.show(tab.dataset.panel!));
 }
@@ -59,19 +59,19 @@ DOM must be updated. Both resolve when the animation ends.
 
 ```tsx
 import { TransitionIn, VFXTransition } from "@vfx-js/react";
-import { crossfade, glitch } from "@vfx-js/transitions";
+import { Crossfade, Glitch } from "@vfx-js/transitions";
 
 // Once, around the router outlet. Fills the viewport by default.
-<VFXTransition pageKey={pathname} transition={crossfade}>
+<VFXTransition pageKey={pathname} transition={Crossfade}>
     {page}
 </VFXTransition>
 
 // In a page: how this page enters.
-<TransitionIn transition={glitch} />
+<TransitionIn transition={Glitch} params={{ amount: 1.5 }} />
 ```
 
 The container owns the outlet box and keeps the old page on screen until
-the snapshot is taken. The page only names its shader. Next.js users
+the snapshot is taken. The page only names its transition. Next.js users
 import `VFXTransition` from `@vfx-js/react/next`. Its `pageKey` defaults to the pathname.
 
 A new `pageKey` starts a run. The old page stays on screen until the
@@ -100,8 +100,8 @@ Returns a `TransitionHandle` at once. It touches no DOM until the first run.
 
 ```ts
 const t = vfx.addTransition(el, {
-    transition: crossfade,   // TransitionDef, default crossfade
-    uniforms: {},            // uniforms for `transition`
+    transition: Crossfade,   // a class or an instance, default Crossfade
+    params: {},              // constructor params, only with a class
     duration: 0.6,           // seconds
     reverse: false,
     ease: undefined,         // "smoothstep" | "linear" | (x) => t
@@ -132,9 +132,9 @@ type ShowOpts = RunOpts & {
     remove?: boolean; // remove the other slides instead of hiding them
 };
 
-type RunOpts = {
-    transition?: TransitionDef;
-    uniforms?: TransitionUniforms; // numbers and vectors, no textures
+type RunOpts<T extends Transition | TransitionClass> = {
+    transition?: T;            // a class, or an instance to use as is
+    params?: ParamsOf<T>;      // constructor params, typed from the class
     reverse?: boolean;
     duration?: number;        // 0 cuts without animation
     ease?: TransitionEase;    // "smoothstep" | "linear" | (x: number) => number
@@ -171,8 +171,8 @@ the run cancels and `run` rejects, even for a dropped run.
 
 `opts` can be a function. It is called once, right after `cb` resolves,
 so the spec can depend on the new content. If it throws, the run
-cancels and `run` rejects, as with `cb`. With a function, the def's
-effects are set up and `start` runs after `cb`, not before the snapshot.
+cancels and `run` rejects, as with `cb`. With a function, the transition
+is set up and `start` runs after `cb`, not before the snapshot.
 
 ### Spec resolution
 
@@ -180,23 +180,34 @@ Each field comes from the first level that sets it:
 
 1. The `RunOpts` passed to `run`.
 2. The container options from `addTransition`.
-3. The def, for `ease` (then `"smoothstep"`).
+3. The transition object, for `ease` and `overflow` (then `"smoothstep"`
+   and none).
 
-`uniforms` merge per key, run over container. A run that sets its own
-`transition` drops the container's `uniforms`, so they never reach a
-different shader. `shaderTransition` lays its own defaults under them.
+`params` merge per key, run over container. A run that sets its own
+`transition` drops the container's `params`, so they never reach a
+different class. The class fills in its own defaults.
 
 ```ts
-const t = vfx.addTransition(el, { transition: wipe, uniforms: { softness: 0.1 } });
-t.run(cb, { uniforms: { softness: 0.3 } }); // wipe, softness 0.3
-t.run(cb, { transition: zoom });            // zoom, no container uniforms
+const t = vfx.addTransition(el, { transition: Wipe, params: { softness: 0.1 } });
+t.run(cb, { params: { softness: 0.3 } }); // Wipe, softness 0.3
+t.run(cb, { transition: Zoom });          // Zoom, no container params
 ```
+
+### Class or instance
+
+- A class: core calls `new Class(params)` once per container. A later run
+  with the same class and shallow-equal params reuses that instance.
+  Other params make a new one. One class can run in many containers at
+  once, and it can cross from a React Server Component.
+- An instance: core uses it as is. Change `instance.params` to change a
+  run while it plays. An instance runs in one container at a time; a
+  second container that tries it warns once and cuts.
 
 To reuse a spec, keep it in a variable. TypeScript catches a typo in its
 name.
 
 ```ts
-export const back: RunOpts = { transition: swipe, reverse: true };
+export const back: RunOpts = { transition: Swipe, reverse: true };
 
 t.run(cb, back);
 ```
@@ -234,42 +245,48 @@ frequent runs.
 
 ## Custom transitions
 
-A `TransitionDef` is a factory for effects. Most transitions are one
-shader, so start with `shaderTransition`.
+A transition is an object that implements `Transition`. Write it as a
+class. Most transitions are one shader, so start with `ShaderTransition`.
 
 ```ts
-type TransitionDef = {
-    name: string;
-    ease?: TransitionEase; // the t this transition expects; a spec's ease wins
-    create(): TransitionEffect | TransitionEffect[];
-};
+interface Transition extends TransitionEffect {
+    readonly name?: string;
+    ease?: TransitionEase;    // the t this transition expects; a spec's ease wins
+    overflow?: true | number; // room outside the element; a spec's overflow wins
+}
 ```
 
-### `shaderTransition`
+### `ShaderTransition`
 
 ```ts
-import { shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 
-const wipe = shaderTransition({
-    name: "wipe",
-    frag: `
+class Wipe extends ShaderTransition<{ softness?: number }> {
+    name = "wipe";
+    frag = `
 uniform float softness;
 vec4 transition(vec2 uv, float t) {
   float m = smoothstep(t - softness, t + softness, uv.x);
   return mix(readTo(uv), readFrom(uv), m);
 }
-`,
-    uniforms: { softness: 0.05 }, // defaults; the spec's uniforms win
+`;
     // ease?: TransitionEase,     // default "smoothstep"
-    // overflow?: true | number,  // room outside the element; the spec's wins
-});
+    // overflow?: true | number,  // room outside the element
 
-t.run(cb, { transition: wipe, uniforms: { softness: 0.1 } });
+    // Every frame. Read this.params here.
+    uniforms() {
+        return { softness: this.params.softness ?? 0.05 };
+    }
+}
+
+t.run(cb, { transition: Wipe, params: { softness: 0.1 } });
 ```
 
 `frag` defines one function. `t` goes from 0 to 1 with a smoothstep ease.
 Set `ease` to change the default, e.g. `"linear"` for a shader that eases
 `t` itself. VFX-JS wraps `frag` with a prelude and a `main`.
+Instances with the same `frag` share one program. A `frag` that depends on
+params, e.g. a getter, compiles one program per distinct string.
 
 The prelude gives you:
 
@@ -289,9 +306,9 @@ A shader that fails to compile logs the error with line numbers in your
 
 ### `TransitionEffect`
 
-For more than one shader, return your own effects from `create()`. A
-transition effect is an [`Effect`](./EFFECT.md) with two more hooks, and
-its context carries the run.
+For more than one shader, implement `Transition` directly. A transition
+is an [`Effect`](./EFFECT.md) with two more hooks, and its context carries
+the run.
 
 ```ts
 interface TransitionEffect extends Effect {
@@ -306,54 +323,55 @@ type TransitionEffectContext = EffectContext & {
     progress: { t: number; x: number }; // eased and linear, 0..1
     holding: boolean;          // old content held, before the animation
     reverse: boolean;
-    run: TransitionRun;        // { reverse, uniforms, duration, overflow? }
+    run: TransitionRun;        // { reverse, duration, overflow? }
     cut(): void;               // end the run now and show the new content
 };
 ```
 
-- Effects run in array order. `ctx.src` is the live new content for the
-  first one, and the previous effect's output after that.
-- Outside a run the effects are skipped and the chain passes its input
+- `ctx.src` is the live new content and `ctx.from` the old one.
+- Outside a run the transition is skipped and the chain passes its input
   through.
 - `render` also runs while `holding`, with zero progress. Pass the input
   through then (`ctx.blit(ctx.src)`), unless you need those frames.
   `update` runs only while the animation plays.
-- `create()` runs when a run uses the def on a container. Runs that keep
-  using it reuse the effects; a run with another def disposes them, so
-  switching back calls `create()` again. Keep state on the effect
-  instance.
-- The element is unwrapped between runs, so the effects get `dispose()`
-  and then `init()` again.
-- `run.uniforms` holds the spec's uniforms only.
+- Keep state on the instance. Each container gets its own instance of a
+  class; a run with another transition disposes it.
+- The element is unwrapped between runs, so the transition gets
+  `dispose()` and then `init()` again.
+- `run.overflow` is the spec's overflow, else the transition's own.
 
-A blur that peaks halfway, on top of a crossfade:
+A blur that peaks halfway, while crossfading:
 
 ```ts
-import {
-    type EffectContext,
-    type EffectRenderTarget,
-    type TransitionDef,
-    type TransitionEffect,
-    type TransitionEffectContext,
+import type {
+    EffectContext,
+    EffectRenderTarget,
+    Transition,
+    TransitionEffectContext,
 } from "@vfx-js/core";
-import { crossfade } from "@vfx-js/transitions";
 
+// Blurs along `dir`, mixing in the old content by `mixT`.
 const FRAG_BLUR = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
+in vec2 uvContent;
 out vec4 outColor;
 uniform sampler2D src;
+uniform sampler2D from;
 uniform vec2 dir;
+uniform float mixT;
 void main() {
     vec4 c = vec4(0.0);
     for (int i = -4; i <= 4; i++) {
-        c += texture(src, uvSrc + dir * float(i));
+        vec2 d = dir * float(i);
+        c += mix(texture(from, uvContent + d), texture(src, uvSrc + d), mixT);
     }
     outColor = c / 9.0;
 }
 `;
 
-class BlurPulse implements TransitionEffect {
+export class BlurFade implements Transition {
+    name = "blur_fade";
     #blurredX: EffectRenderTarget | null = null;
 
     init(ctx: EffectContext) {
@@ -366,67 +384,66 @@ class BlurPulse implements TransitionEffect {
             return;
         }
         const [w, h] = ctx.dims.elementPixel;
-        const r = 4 * Math.sin(Math.PI * ctx.progress.t);
+        const { t } = ctx.progress;
+        const r = 4 * Math.sin(Math.PI * t);
         ctx.draw({
             frag: FRAG_BLUR,
-            uniforms: { src: ctx.src, dir: [r / w, 0] },
+            uniforms: { src: ctx.src, from: ctx.from, dir: [r / w, 0], mixT: t },
             target: this.#blurredX,
         });
         ctx.draw({
             frag: FRAG_BLUR,
-            uniforms: { src: this.#blurredX, dir: [0, r / h] },
+            uniforms: { src: this.#blurredX, from: this.#blurredX, dir: [0, r / h], mixT: 1 },
             target: ctx.target,
         });
     }
 }
-
-export const blurFade: TransitionDef = {
-    name: "blur_fade",
-    create: () => [crossfade.create(), new BlurPulse()],
-};
 ```
 
-An effect from `@vfx-js/effects` can be extended the same way. See
-`datamosh`, `pixelsort` and `jpegGlitch` in `@vfx-js/transitions`.
+It ignores `reverse` to stay short. `ShaderTransition` handles it for you.
+
+A class can also extend an effect from `@vfx-js/effects` and implement
+`Transition`. `Datamosh`, `Pixelsort` and `JpegGlitch` in
+`@vfx-js/transitions` are built on effects.
 
 ## Presets
 
-`@vfx-js/transitions` has the presets. It also re-exports
-`crossfade` from core.
+`@vfx-js/transitions` has the presets. It also re-exports `Crossfade`
+from core. Each preset is a class; options go in `params`.
 
 ```ts
 import {
-    crossfade, crosszoom, datamosh, distortFade, glitch, glitchSlide,
-    jpegGlitch, lensDistortion, pixelScan, pixelStretch, pixelsort,
-    slitScan, swipe, tile, zoom, zoomBlur,
-    createDatamosh, createJpegGlitch, createLensDistortion, createPixelsort,
-    createSwipe, createTile,
+    Crossfade, Crosszoom, Datamosh, DistortFade, Glitch, GlitchSlide,
+    JpegGlitch, LensDistortion, PixelScan, PixelStretch, Pixelsort,
+    SlitScan, Swipe, Tile, Zoom, ZoomBlur,
 } from "@vfx-js/transitions";
+
+t.run(cb, { transition: Swipe, params: { direction: "up" } });
 ```
 
-| Preset | Notes |
-| ------ | ----- |
-| `crossfade` | Plain mix. Default. |
-| `swipe` / `createSwipe({ direction })` | Content moves left (default), right, up or down. |
-| `zoom` | Old content grows out of the box; new grows out of the center. `overflow: true`. |
-| `zoomBlur` | Radial blur with RGB split. `overflow: true`. |
-| `crosszoom` | Crossfade through a zoom blur. `overflow: true`. |
-| `glitch` | Jittery RGB-split blocks. |
-| `glitchSlide` | Sliding stripes with RGB split. |
-| `jpegGlitch` / `createJpegGlitch({ iterations, quality })` | Hard cut through a real JPEG glitch: encode, corrupt the bytes, decode. |
-| `datamosh` / `createDatamosh({ blockSize })` | Hard cut through a datamosh that heals block by block. |
-| `pixelsort` / `createPixelsort({ direction })` | Content melts into sorted streaks and sorts back out. |
-| `lensDistortion` / `createLensDistortion({ strength, dispersion })` | Lens warp that peaks halfway, with a rainbow split. `dispersion: 0` turns the split off. |
-| `slitScan` | A scan line smears the content into stripes, then draws the new one out of its own. |
-| `pixelScan` | A front of glowing pixel cells sweeps left to right. |
-| `pixelStretch` | Content stretches into streaks from the top, fades to the new one, which settles from the top. |
-| `distortFade` | Simplex noise warp that peaks halfway, while crossfading. |
-| `tile` / `createTile({ direction, shape, count })` | Content splits into tiles that shrink away. `direction`: `center` (default), `left`, `right`, `up`, `down`. `shape`: `hex` (default) or `square`. |
+| Preset | Params | Notes |
+| ------ | ------ | ----- |
+| `Crossfade` | | Plain mix. Default. |
+| `Swipe` | `direction` | Content moves left (default), right, up or down. |
+| `Zoom` | | Old content grows out of the box; new grows out of the center. `overflow: true`. |
+| `ZoomBlur` | | Radial blur with RGB split. `overflow: true`. |
+| `Crosszoom` | | Crossfade through a zoom blur. `overflow: true`. |
+| `Glitch` | `amount`, `speed` | Jittery RGB-split blocks. Both default to 1. |
+| `GlitchSlide` | | Sliding stripes with RGB split. |
+| `JpegGlitch` | `iterations`, `quality` | Hard cut through a real JPEG glitch: encode, corrupt the bytes, decode. |
+| `Datamosh` | `blockSize` | Hard cut through a datamosh that heals block by block. |
+| `Pixelsort` | `direction` | Content melts into sorted streaks and sorts back out. |
+| `LensDistortion` | `strength`, `dispersion`, `zoom` | Lens warp that peaks halfway, with a rainbow split. `dispersion: 0` turns the split off. |
+| `SlitScan` | | A scan line smears the content into stripes, then draws the new one out of its own. |
+| `PixelScan` | `direction`, `blackout` | A front of glowing pixel cells sweeps right (default), left, up, down or out from the `center`. |
+| `PixelStretch` | | Content stretches into streaks from the top, fades to the new one, which settles from the top. |
+| `DistortFade` | | Simplex noise warp that peaks halfway, while crossfading. |
+| `Tile` | `direction`, `shape`, `count`, `shadow` | Content splits into tiles that shrink away. `direction`: `center` (default), `left`, `right`, `up`, `down`. `shape`: `hex` (default) or `square`. |
 
 ### gl-transitions
 
 `createGLTransition` turns any shader from
-[gl-transitions](https://gl-transitions.com/) into a `TransitionDef`.
+[gl-transitions](https://gl-transitions.com/) into a transition class.
 
 ```bash
 npm i gl-transitions
@@ -436,21 +453,21 @@ npm i gl-transitions
 import { createGLTransition } from "@vfx-js/transitions";
 import transitions from "gl-transitions";
 
-const cube = transitions.find((t) => t.name === "Cube")!;
-t.run(cb, { transition: createGLTransition(cube, { persp: 0.5 }) });
+const Cube = createGLTransition(transitions.find((t) => t.name === "Cube")!);
+t.run(cb, { transition: Cube, params: { persp: 0.5 } });
 ```
 
 - Look a shader up by its `name` (PascalCase, e.g. `"Cube"`). The
   package is one array, so `@vfx-js/transitions` does not import it.
 - `params` override the shader's `defaultParams`. An unknown key logs a
   warning.
-- `t` is linear for these defs (`ease: "linear"`); each shader eases
+- `t` is linear for these classes (`ease: "linear"`); each shader eases
   itself. Setting `ease: "smoothstep"` on the spec eases it twice.
 - Shaders that need extra textures (`LumaWipe`, `DisplacementMap`)
   throw.
 - A param named like a core uniform (e.g. `reverse` in `BowTie`) is
-  renamed to `glParam_<name>`. Pass it to `createGLTransition` by its
-  own name. In a run's `uniforms`, use `glParam_reverse`.
+  renamed to `glParam_<name>` in the shader. Pass it by its own name in
+  `params`.
 - Each shader keeps its author's license (MIT), listed in its entry.
 
 ## React API
@@ -467,7 +484,7 @@ no `show`.
 ```tsx
 <VFXTransition
     pageKey={pathname}
-    transition={crossfade}
+    transition={Crossfade}
     duration={0.6}
 >
     {children}
@@ -525,12 +542,12 @@ The incoming page says how it enters:
 
 ```tsx
 import { TransitionIn } from "@vfx-js/react";
-import { glitch } from "@vfx-js/transitions";
+import { Glitch } from "@vfx-js/transitions";
 
 export default function AboutPage() {
     return (
         <>
-            <TransitionIn transition={glitch} />
+            <TransitionIn transition={Glitch} params={{ amount: 1.5 }} />
             <h1>About</h1>
         </>
     );
@@ -542,12 +559,13 @@ export default function AboutPage() {
 
 - Only the spec at mount counts. Later prop changes are ignored.
 - Outside a `<VFXTransition>`, it does nothing and warns once.
-- A Server Component can pass a preset as a prop.
-  `@vfx-js/transitions` is a `"use client"` module, so its exports cross as client references.
-- Write your own defs in a file that starts with `"use client"`, and import them from there.
-- A Server Component can't call a factory like `createSwipe()`.
-  Call it in a `"use client"` file and export the result.
-- Import `crossfade` from `@vfx-js/transitions`, not core.
+- A Server Component can pass a preset class and plain `params` as props.
+  `@vfx-js/transitions` is a `"use client"` module, so its classes cross as client references.
+  `params` is checked against the class.
+- Write your own classes in a file that starts with `"use client"`, and import them from there.
+- An instance cannot cross from a Server Component. Make it in a client
+  component, e.g. with `useTransitionInstance`.
+- Import `Crossfade` from `@vfx-js/transitions`, not core.
   Core is not a `"use client"` module.
 - The component form exists for Next.js, where `page.tsx` is a Server
   Component and cannot call hooks. Next has no way to export custom
@@ -611,7 +629,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 "use client";
 import { transition } from "@vfx-js/react";
 
-<Link href="/next" onClick={transition({ transition: glitch })}>Next</Link>
+<Link href="/next" onClick={transition({ transition: Glitch })}>Next</Link>
 ```
 
 Returns an `onClick` that stores the spec for the next run. It wins over
@@ -627,7 +645,7 @@ small client component that passes `onClick={transition(spec)}`.
 For containers you render yourself:
 
 ```tsx
-const { ref, run } = useVFXTransition({ transition: swipe });
+const { ref, run } = useVFXTransition({ transition: Swipe });
 
 <div ref={ref}>{tab}</div>
 
@@ -642,9 +660,27 @@ React commits. If `cb` updates no state, it resolves on the next frame.
 For navigation from code:
 
 ```ts
-setNextTransition({ transition: zoom });
+setNextTransition({ transition: Zoom });
 router.push("/next");
 ```
+
+### `useTransitionInstance`
+
+Makes one instance of a class and keeps it while the class and params
+stay equal. Params compare shallowly, so an inline object is fine.
+
+```tsx
+"use client";
+import { useTransitionInstance, VFXTransition } from "@vfx-js/react";
+import { Glitch } from "@vfx-js/transitions";
+
+const fx = useTransitionInstance(Glitch, { speed: 2 });
+
+<VFXTransition pageKey={pathname} transition={fx}>{children}</VFXTransition>
+```
+
+- New params make a new instance. It applies from the next run.
+- To change a run while it plays, set `fx.params`, e.g. from a slider.
 
 ## Limits
 
@@ -669,5 +705,5 @@ router.push("/next");
 
 ## See also
 
-- [EFFECT.md](./EFFECT.md) — the Effect API that transition effects extend.
+- [EFFECT.md](./EFFECT.md) — the Effect API that transitions extend.
 - [html-in-canvas.md](./html-in-canvas.md) — how the capture works.

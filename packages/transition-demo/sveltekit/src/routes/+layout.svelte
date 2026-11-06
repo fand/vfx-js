@@ -4,11 +4,11 @@
     import { page } from "$app/state";
     import { findPage, pages } from "@vfx-js/transition-demo-shared";
     import { presets } from "@vfx-js/transition-demo-shared/transitions";
-    import { type TransitionHandle, VFX } from "@vfx-js/core";
-    import { swipe } from "@vfx-js/transitions";
+    import { type RunOpts, type TransitionHandle, VFX } from "@vfx-js/core";
+    import { Swipe } from "@vfx-js/transitions";
     import { onMount } from "svelte";
 
-    const back = { transition: swipe, reverse: true };
+    const back = { transition: Swipe, reverse: true };
 
     let { children } = $props();
     let outlet: HTMLElement;
@@ -28,7 +28,7 @@
         if (!transition || !nav.to || nav.to.url.pathname === nav.from?.url.pathname) {
             return;
         }
-        const opts =
+        const opts: RunOpts =
             nav.type === "popstate" && (nav.delta ?? 0) < 0
                 ? back
                 : { transition: presets[findPage(nav.to.url.pathname).transition] };
