@@ -1,10 +1,21 @@
 import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
 
-/** A front of glowing pixel cells sweeps left to right and swaps the content behind it. */
-export const pixelScan: ShaderTransitionDef = shaderTransition({
-    name: "pixel_scan",
-    frag: `
+/**
+ * A front of glowing pixel cells sweeps left to right and swaps the content behind it.
+ * The old content goes first and the new one follows a little later.
+ * `blackout` fills the gap between them with black; false leaves it transparent.
+ */
+export function createPixelScan(
+    opts: { blackout?: boolean } = {},
+): ShaderTransitionDef {
+    const blackout = (opts.blackout ?? true) ? "1.0" : "0.0";
+    return shaderTransition({
+        name: "pixel_scan",
+        frag: `
+const float BLACKOUT = ${blackout};
 const float W = 0.2;
+// How far the new content trails the old one.
+const float GAP = 0.3;
 const float LAYERS = 3.0;
 
 float hash(vec2 p) {
@@ -62,9 +73,17 @@ vec4 cellsColor(vec2 p, float scale, float t) {
 vec4 draw(vec2 uv, vec2 p, float t, float scale) {
   vec2 pi = floor(p * scale);
   float x = cellPos(pi, scale);
-  float swap = smoothstep(t, t - W, x + hash(pi) * W);
-  vec4 c = mix(readFrom(uv), readTo(uv), swap);
-  return c + cellsColor(p * scale, scale, t) * 1.5;
+  float h = x + hash(pi) * W;
+  float out_ = smoothstep(t, t - W, h);
+  float in_ = smoothstep(t - GAP, t - GAP - W, h);
+  vec4 from = readFrom(uv);
+  vec4 to = readTo(uv);
+  float a = max(from.a, to.a);
+  float gap = BLACKOUT * (out_ - in_);
+  vec4 c = from * (1.0 - out_) + to * in_ + vec4(0.0, 0.0, 0.0, a) * gap;
+  // With blackout, the cells glow mostly over the black gap, so bright content stays readable.
+  float glow = mix(1.0, mix(0.2, 1.0, gap), BLACKOUT);
+  return c + cellsColor(p * scale, scale, t) * 1.5 * glow;
 }
 
 vec4 transition(vec2 uv, float t) {
@@ -72,8 +91,8 @@ vec4 transition(vec2 uv, float t) {
   if (!inRange(uv)) return vec4(0.0);
   vec2 p = uv * 2.0 - 1.0;
   p.y *= aspect();
-  // Start and end with the front and its glow fully off the element.
-  t = t * (1.0 + W * 5.0) - W * 2.0;
+  // Start and end with the front, its glow and the gap fully off the element.
+  t = t * (1.0 + W * 5.0 + GAP) - W * 2.0;
   vec4 c = vec4(0.0);
   for (float i = 0.0; i < LAYERS; i++) {
     c += draw(uv, p, t, abs(cos(i) * 7.3 + 10.0));
@@ -82,4 +101,8 @@ vec4 transition(vec2 uv, float t) {
   return vec4(c.rgb, min(c.a, 1.0));
 }
 `,
-});
+    });
+}
+
+/** Pixel cells sweep left to right, with a black gap between old and new. */
+export const pixelScan: ShaderTransitionDef = createPixelScan();

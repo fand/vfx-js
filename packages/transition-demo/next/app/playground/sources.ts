@@ -8,6 +8,7 @@ import {
     createGLTransition,
     createJpegGlitch,
     createLensDistortion,
+    createPixelScan,
     createPixelsort,
     createSwipe,
     createTile,
@@ -151,6 +152,17 @@ const factories: Record<string, Factory> = {
             },
         ],
         build: (v) => createDatamosh({ blockSize: Number(v.blockSize) }),
+    },
+    pixelScan: {
+        params: [
+            {
+                name: "blackout",
+                kind: "select",
+                options: ["true", "false"],
+                value: "true",
+            },
+        ],
+        build: (v) => createPixelScan({ blackout: v.blackout === "true" }),
     },
     jpegGlitch: {
         params: [

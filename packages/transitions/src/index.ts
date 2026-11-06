@@ -9,7 +9,7 @@ export { glitch } from "./glitch";
 export { glitchSlide } from "./glitch-slide";
 export { createJpegGlitch, jpegGlitch } from "./jpeg-glitch";
 export { createLensDistortion, lensDistortion } from "./lens-distortion";
-export { pixelScan } from "./pixel-scan";
+export { createPixelScan, pixelScan } from "./pixel-scan";
 export { pixelStretch } from "./pixel-stretch";
 export { createPixelsort, pixelsort } from "./pixelsort";
 export { slitScan } from "./slit-scan";
