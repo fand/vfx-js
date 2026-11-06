@@ -460,18 +460,12 @@ importers:
 
   packages/transition-demo/void:
     dependencies:
-      '@vfx-js/core':
-        specifier: workspace:*
-        version: link:../../vfx-js
       '@vfx-js/react':
         specifier: workspace:*
         version: link:../../react
       '@vfx-js/transition-demo-shared':
         specifier: workspace:*
         version: link:../shared
-      '@vfx-js/transitions':
-        specifier: workspace:*
-        version: link:../../transitions
       '@void/react':
         specifier: 1.3.0
         version: 1.3.0(6781df24775cdcd1597e5083f8e48d09)
@@ -497,9 +491,6 @@ importers:
       '@biomejs/biome':
         specifier: 2.6.3
         version: 2.6.3
-      '@types/node':
-        specifier: 26.6.5
-        version: 26.6.5
       '@vfx-js/core':
         specifier: workspace:*
         version: link:../vfx-js

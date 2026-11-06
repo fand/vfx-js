@@ -23,7 +23,7 @@ const features = [
     {
         k: "04",
         title: "Waits for new images",
-        body: "Before it captures the new content, VFX-JS waits up to about a second for new images, videos and fonts, so the new page does not show up half loaded.",
+        body: "Before it captures the new content, VFX-JS waits up to about 300 ms for new images, videos and fonts, so the new page does not show up half loaded.",
     },
     {
         k: "05",

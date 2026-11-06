@@ -124,8 +124,9 @@ export default function HowItWorks() {
                     <h2>t is eased for you</h2>
                     <p>
                         Your shader gets <code>t</code> from 0 to 1 with a
-                        smoothstep ease. Driver hooks also get the linear{" "}
-                        <code>x</code> and <code>dt</code> in seconds.
+                        smoothstep ease. <code>TransitionEffect</code> hooks
+                        also get the linear <code>ctx.progress.x</code> and{" "}
+                        <code>ctx.deltaTime</code> in seconds.
                     </p>
                     <p>
                         With <code>reverse: true</code>, <code>readFrom</code>{" "}
@@ -167,7 +168,7 @@ export default function HowItWorks() {
                 </div>
                 <Code label="style.css">{`
 .outlet {
-  height: calc(100dvh - 64px);
+  height: 100dvh;
   overflow: hidden;
 }
 .page {
@@ -180,26 +181,32 @@ export default function HowItWorks() {
             <section id="precedence" className="doc-section two-col">
                 <div>
                     <h2>Which spec wins</h2>
-                    <p>Each run picks its spec in this order:</p>
+                    <p>Each field of a run is picked in this order:</p>
                     <ol className="order">
                         <li>
-                            <code>RunOpts</code> passed to <code>run()</code>,
-                            or set by a <code>transition()</code> click
-                        </li>
-                        <li>
-                            The incoming page&apos;s{" "}
-                            <code>&lt;TransitionIn&gt;</code>
+                            The <code>RunOpts</code> passed to{" "}
+                            <code>run()</code>
                         </li>
                         <li>
                             The options from <code>addTransition</code> or the
                             component props
                         </li>
+                        <li>
+                            For <code>ease</code>, the def&apos;s own ease, then
+                            smoothstep
+                        </li>
                     </ol>
                     <p>
-                        Fields are picked one by one. A run that sets its own{" "}
-                        <code>transition</code> drops the container&apos;s{" "}
-                        <code>uniforms</code>, so they never reach the wrong
-                        shader.
+                        A run that sets its own <code>transition</code> drops
+                        the container&apos;s <code>uniforms</code>, so they
+                        never reach the wrong shader.
+                    </p>
+                    <p>
+                        In React the run&apos;s <code>RunOpts</code> is one
+                        whole spec: a <code>transition()</code> click or{" "}
+                        <code>setNextTransition()</code> if set, else the
+                        incoming page&apos;s <code>&lt;TransitionIn&gt;</code>.
+                        The two are not merged.
                     </p>
                 </div>
                 <Code label="spec.ts">{`

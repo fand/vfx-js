@@ -51,7 +51,7 @@ export const presetList: PresetInfo[] = [
         note: "Content moves out, the new one follows it in.",
         factory: "createSwipe({ direction })",
     },
-    { name: "zoom", note: "Old shrinks to the center, new grows out of it." },
+    { name: "zoom", note: "Old zooms in, new grows out of the center." },
     { name: "zoomBlur", note: "Radial blur with RGB split." },
     { name: "crosszoom", note: "Crossfade through a zoom blur." },
     { name: "glitch", note: "Jittery RGB-split blocks." },

@@ -1,4 +1,4 @@
-import { crossfade, glitch, pixelsort, swipe } from "@vfx-js/transitions";
+import { crossfade, glitch, pixelsort } from "@vfx-js/transitions";
 
 // Maps the `transition` field of a page to a preset.
-export const presets = { crossfade, glitch, pixelsort, swipe };
+export const presets = { crossfade, glitch, pixelsort };

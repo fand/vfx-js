@@ -22,7 +22,7 @@ const prelude = [
 const hooks = [
     [
         "create()",
-        "On the def. Makes the effects for one container, the first time a run uses the def. Later runs reuse them.",
+        "On the def. Makes the effects for one container when a run uses the def. Later runs with the same def reuse them; switching to another def and back calls it again.",
     ],
     ["start(run)", "Once per run, while the old content is held."],
     [

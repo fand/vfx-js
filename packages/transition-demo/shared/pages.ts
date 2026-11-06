@@ -1,7 +1,7 @@
 export type DemoPage = {
     path: string;
     label: string;
-    transition: "crossfade" | "glitch" | "pixelsort" | "swipe";
+    transition: "crossfade" | "glitch" | "pixelsort";
     title: string;
     lead: string;
     images: string[];
