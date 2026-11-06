@@ -22,7 +22,7 @@ export const metadata: Metadata = {
         template: "%s — VFX-JS Transitions",
     },
     description:
-        "Swap any element through a WebGL shader. Presets for React, Next.js, Nuxt, SvelteKit, Astro and plain JS.",
+        "Swap any element through a WebGL shader. Presets for React, Next.js and plain JS.",
 };
 
 export default function RootLayout({

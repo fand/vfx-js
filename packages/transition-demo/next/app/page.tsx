@@ -13,7 +13,7 @@ const features = [
     {
         k: "02",
         title: "Any router",
-        body: "Drop-in React component for Next.js. A small hook for Nuxt, SvelteKit and Astro. Plain run(cb) for everything else.",
+        body: "Drop-in React component for Next.js and React routers. Plain run(cb) for everything else.",
     },
     {
         k: "03",
