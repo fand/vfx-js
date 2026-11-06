@@ -73,7 +73,16 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
     const [scene, setScene] = useState(0);
     const [tab, setTab] = useState<Tab>("presets");
     const [easeIndex, setEaseIndex] = useState(0);
-    const { ref, run } = useVFXTransition({ duration: 1.2 });
+    const [duration, setDuration] = useState(1.2);
+    const [scrubT, setScrubT] = useState(0);
+    const { ref, run } = useVFXTransition();
+    // While scrubbing, a long run reads t from here every frame.
+    const scrubRef = useRef<{
+        t: number;
+        active: boolean;
+        def?: TransitionDef;
+        values?: TransitionUniforms;
+    }>({ t: 0, active: false });
     const preRef = useRef<HTMLPreElement>(null);
     const caretRef = useRef<number | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -135,11 +144,33 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         transition: TransitionDef = def,
         uniforms = values,
     ) => {
+        scrubRef.current.active = false;
         run(() => setScene((s) => s + 1), {
             transition,
             uniforms,
             reverse,
+            duration,
             ease: eases[easeIndex].ease,
+        });
+    };
+
+    /** Holds the run at `t`. The first move starts a run that never ends on its own. */
+    const scrub = (t: number) => {
+        setScrubT(t);
+        const state = scrubRef.current;
+        state.t = t;
+        // A new shader or uniforms starts a new run.
+        if (state.active && state.def === def && state.values === values) {
+            return;
+        }
+        state.active = true;
+        state.def = def;
+        state.values = values;
+        run(() => setScene((s) => s + 1), {
+            transition: def,
+            uniforms: values,
+            duration: 3600,
+            ease: () => state.t,
         });
     };
 
@@ -206,6 +237,34 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                                 </option>
                             ))}
                         </select>
+                    </label>
+                    <label className="pg-range">
+                        <span>
+                            duration <b>{duration.toFixed(1)}s</b>
+                        </span>
+                        <input
+                            type="range"
+                            min={0.2}
+                            max={5}
+                            step={0.1}
+                            value={duration}
+                            onChange={(e) =>
+                                setDuration(Number(e.target.value))
+                            }
+                        />
+                    </label>
+                    <label className="pg-range">
+                        <span>
+                            t <b>{scrubT.toFixed(2)}</b>
+                        </span>
+                        <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={scrubT}
+                            onChange={(e) => scrub(Number(e.target.value))}
+                        />
                     </label>
                     {source.factory?.params.map((p) => (
                         <ParamInput
