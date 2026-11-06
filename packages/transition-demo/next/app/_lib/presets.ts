@@ -3,6 +3,7 @@ import {
     crossfade,
     crosszoom,
     datamosh,
+    distortFade,
     glitch,
     glitchSlide,
     jpegGlitch,
@@ -34,6 +35,7 @@ export const presets: Record<PresetName, TransitionDef> = {
     pixelScan,
     pixelStretch,
     tile,
+    distortFade,
 };
 
 export type PresetInfo = {
@@ -82,4 +84,5 @@ export const presetList: PresetInfo[] = [
         note: "Tiles shrink away to show the new content.",
         factory: "createTile({ direction, shape, count })",
     },
+    { name: "distortFade", note: "Noise warp while crossfading." },
 ];

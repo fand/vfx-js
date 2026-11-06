@@ -74,4 +74,5 @@ export type PresetName =
     | "slitScan"
     | "pixelScan"
     | "pixelStretch"
-    | "tile";
+    | "tile"
+    | "distortFade";

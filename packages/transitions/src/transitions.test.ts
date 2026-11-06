@@ -29,6 +29,7 @@ const effectsOf = (def: TransitionDef): TransitionEffect[] =>
 const shaderPresets: [string, ShaderTransitionDef][] = [
     ["crossfade", presets.crossfade],
     ["crosszoom", presets.crosszoom],
+    ["distortFade", presets.distortFade],
     ["glitch", presets.glitch],
     ["glitchSlide", presets.glitchSlide],
     ["lensDistortion", presets.lensDistortion],
@@ -52,6 +53,7 @@ describe("transition presets", () => {
             "crossfade",
             "crosszoom",
             "datamosh",
+            "distortFade",
             "glitch",
             "glitchSlide",
             "jpegGlitch",
@@ -83,6 +85,7 @@ describe("transition presets", () => {
         ["swipe up", presets.createSwipe({ direction: "up" })],
         ["glitch", presets.glitch],
         ["glitchSlide", presets.glitchSlide],
+        ["distortFade", presets.distortFade],
         ["lensDistortion", presets.lensDistortion],
         ["pixelScan", presets.pixelScan],
         ["pixelStretch", presets.pixelStretch],

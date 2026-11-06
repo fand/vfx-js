@@ -3,6 +3,7 @@
 export { crossfade } from "@vfx-js/core";
 export { crosszoom } from "./crosszoom";
 export { createDatamosh, datamosh } from "./datamosh";
+export { distortFade } from "./distort-fade";
 export { createGLTransition, type GLTransitionDef } from "./gl-transition";
 export { glitch } from "./glitch";
 export { glitchSlide } from "./glitch-slide";

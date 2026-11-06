@@ -22,6 +22,7 @@ const TRANSITIONS: Record<string, TransitionDef> = {
     tile: presets.tile,
     tileUp: presets.createTile({ direction: "up" }),
     tileSquare: presets.createTile({ shape: "square" }),
+    distortFade: presets.distortFade,
 };
 
 type Args = {

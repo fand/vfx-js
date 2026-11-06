@@ -38,6 +38,7 @@ const labels: Record<PresetName, string> = {
     pixelScan: "PixelScan",
     pixelStretch: "PixelStretch",
     tile: "Tile",
+    distortFade: "DistortFade",
 };
 
 /** Each run picks a new palette and pattern at random. */

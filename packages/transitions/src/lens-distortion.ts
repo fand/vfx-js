@@ -16,6 +16,8 @@ export function createLensDistortion(
 const float STRENGTH = ${strength};
 const float DISPERSION = ${dispersion};
 const float TAPS = 12.0;
+// Width of the growing warp's edge.
+const float SOFT = 0.5;
 
 // Interleaved gradient noise: a per-pixel offset that hides the bands between taps.
 float ign(vec2 p) {
@@ -30,13 +32,18 @@ vec2 mirror(vec2 p) {
 vec4 transition(vec2 uv, float t) {
   // A container overflow must not show warped content outside the element.
   if (!inRange(uv)) return vec4(0.0);
-  float amount = sin(t * 3.141593);
   float mixT = smoothstep(0.35, 0.65, t);
   // Centered, with 1 at the top and bottom edges.
   float aspect = resolution.x / resolution.y;
   vec2 p = uv * 2.0 - 1.0;
   p.x *= aspect;
   float l = length(p);
+  // The first half grows the warp out from the center; the second half relaxes it.
+  float amount = sin(t * 3.141593);
+  if (t < 0.5) {
+    float reach = t * 2.0 * (length(vec2(aspect, 1.0)) + SOFT);
+    amount = 1.0 - smoothstep(reach - SOFT, reach, l);
+  }
   float jitter = ign(gl_FragCoord.xy);
 
   vec3 rgb = vec3(0.0);
