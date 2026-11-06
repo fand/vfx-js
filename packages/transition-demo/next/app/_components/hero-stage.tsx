@@ -302,7 +302,12 @@ export function HeroStage() {
                             ? `Play ${labels[name]} again`
                             : `Play ${labels[name]}`
                     }
-                    onClick={() => {
+                    onClick={(e) => {
+                        // A focused item gets scrolled back into view, which undoes the jump between copies.
+                        // A mouse click needs no focus ring, so drop it.
+                        if (e.detail > 0) {
+                            e.currentTarget.blur();
+                        }
                         setAutoplay(false);
                         go(index, true);
                     }}
