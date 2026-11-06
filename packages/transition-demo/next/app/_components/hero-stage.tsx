@@ -97,7 +97,8 @@ export function HeroStage() {
     const [look, setLook] = useState({ palette: "default", pattern: "dots" });
     // The item to center, as an index into the repeated list.
     // A new object each time, so a repeat click centers again.
-    const [focus, setFocus] = useState({ index: HOME * names.length });
+    // The first preset is showing, so the next one starts in the middle.
+    const [focus, setFocus] = useState({ index: HOME * names.length + 1 });
     // Off for now; set to true to step through presets again.
     const [autoplay, setAutoplay] = useState(false);
     const focusRef = useRef(focus.index);
@@ -106,7 +107,7 @@ export function HeroStage() {
     const list = useRef<HTMLDivElement>(null);
 
     /**
-     * Plays the preset at `index`. The list is centered on it when the run lands.
+     * Plays the preset at `index`. When the run lands, the next item is centered.
      * With `blinkFirst`, the clicked item blinks before the run.
      */
     const go = useCallback(
@@ -128,8 +129,9 @@ export function HeroStage() {
             }
             await run(
                 () => {
-                    focusRef.current = index;
-                    setFocus({ index });
+                    // The next preset takes the middle, so the played one sits just left of it.
+                    focusRef.current = index + 1;
+                    setFocus({ index: index + 1 });
                     setTheme(name);
                     setLook((prev) => ({
                         palette: pickOther(palettes, prev.palette),
@@ -251,7 +253,7 @@ export function HeroStage() {
         }
         const id = setInterval(() => {
             if (visible && !document.hidden) {
-                go(focusRef.current + 1);
+                go(focusRef.current);
             }
         }, AUTOPLAY_INTERVAL);
         return () => {
