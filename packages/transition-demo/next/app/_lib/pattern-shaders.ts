@@ -6,6 +6,7 @@ uniform float time;
 uniform float speed;
 uniform float dpr;
 uniform float levels;
+uniform float lineWidth;
 uniform vec4 ink;
 out vec4 outColor;
 
@@ -59,12 +60,44 @@ float snoise(vec3 v) {
 }
 
 void main() {
-    vec2 p = (gl_FragCoord.xy - offset) / dpr / 520.0;
+    vec2 p = (gl_FragCoord.xy - offset) / dpr / 1040.0;
     float t = time * speed;
     float n = snoise(vec3(p, t)) + 0.3 * snoise(vec3(p * 2.3, t * 1.4));
     float f = n * levels * 0.5;
-    // Distance to the nearest level in pixels, for a 1px line.
-    float d = abs(fract(f - 0.5) - 0.5) / fwidth(f);
-    float a = (1.0 - clamp(d / dpr, 0.0, 1.0)) * ink.a;
+    // Distance to the nearest level in CSS px.
+    float d = abs(fract(f - 0.5) - 0.5) / fwidth(f) / dpr;
+    float a = (1.0 - clamp(d / lineWidth, 0.0, 1.0)) * ink.a;
+    outColor = vec4(ink.rgb * a, a);
+}`;
+
+/** Stacked sine waves. Each `waves` entry: center and amplitude (fractions of the height), wavelength in CSS px, speed in rad/s. */
+export const waveShader = `
+precision highp float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float time;
+uniform float dpr;
+uniform float lineWidth;
+uniform vec4 ink;
+uniform vec4 waves[8];
+uniform float phases[8];
+out vec4 outColor;
+
+void main() {
+    float height = resolution.y / dpr;
+    vec2 p = (gl_FragCoord.xy - offset) / dpr;
+    float a = 0.0;
+    for (int i = 0; i < 8; i++) {
+        vec4 w = waves[i];
+        float k = 6.2831853 / w.z;
+        float phase = p.x * k + time * w.w + phases[i];
+        float y = height * (0.5 + w.x + w.y * sin(phase));
+        float slope = height * w.y * k * cos(phase);
+        // Distance to the curve in CSS px, kept even on steep parts.
+        float d = abs(p.y - y) / sqrt(1.0 + slope * slope);
+        float c = 1.0 - clamp(d / lineWidth, 0.0, 1.0);
+        a += c * (1.0 - a);
+    }
+    a *= ink.a;
     outColor = vec4(ink.rgb * a, a);
 }`;

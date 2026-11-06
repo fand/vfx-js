@@ -355,14 +355,14 @@ em {
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    mask-image: radial-gradient(ellipse at center, #000 20%, transparent 70%);
 }
 .hero[data-pattern="dots"]::after {
+    --pattern: color-mix(in srgb, var(--ink) 20%, transparent);
     background-image: radial-gradient(var(--pattern) 1px, transparent 1px);
     background-size: 22px 22px;
 }
 .hero[data-pattern="grid"]::after {
-    --pattern: color-mix(in srgb, var(--ink) 8%, transparent);
+    --pattern: color-mix(in srgb, var(--ink) 6%, transparent);
     background-image:
         linear-gradient(var(--pattern) 1px, transparent 1px),
         linear-gradient(90deg, var(--pattern) 1px, transparent 1px),
@@ -383,39 +383,22 @@ em {
         transparent 1px 9px
     );
 }
-/* The SVG pattern is a mask, so it takes the ink color. */
-.hero[data-pattern="sine"]::after {
-    background-color: var(--pattern);
-    mask-image:
-        var(--pattern-svg),
-        radial-gradient(ellipse at center, #000 20%, transparent 70%);
-    mask-size:
-        var(--pattern-size),
-        100% 100%;
-    mask-repeat: repeat, no-repeat;
-    mask-position: center;
-    mask-composite: intersect;
-}
-/* Contour lines are drawn live by VFX-JS. */
-.hero-contour {
+/* Contour and sine are drawn live by VFX-JS. */
+.hero-shader {
     position: absolute;
     inset: 0;
     z-index: -1;
-    display: none;
     color: var(--ink);
     pointer-events: none;
-    mask-image: radial-gradient(ellipse at center, #000 20%, transparent 70%);
 }
-.hero-contour-area {
+.hero-shader > div {
     position: absolute;
     inset: 0;
+    display: none;
 }
-.hero[data-pattern="contour"] .hero-contour {
+.hero[data-pattern="contour"] .hero-shader > [data-pattern="contour"],
+.hero[data-pattern="sine"] .hero-shader > [data-pattern="sine"] {
     display: block;
-}
-.hero[data-pattern="sine"]::after {
-    --pattern-size: 96px 16px;
-    --pattern-svg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='16'%3E%3Cpath d='M0 8 C16 0 32 0 48 8 S80 16 96 8' fill='none' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E");
 }
 .hero-glow {
     position: absolute;

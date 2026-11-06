@@ -11,7 +11,7 @@ import {
 } from "react";
 import { presetList, presets } from "../_lib/presets";
 import type { PresetName } from "../_lib/site";
-import { ContourCanvas } from "./contour-canvas";
+import { PatternCanvas } from "./pattern-canvas";
 import { TLink } from "./t-link";
 
 const AUTOPLAY_INTERVAL = 3000;
@@ -256,7 +256,7 @@ export function HeroStage() {
             ref={setRefs}
         >
             <div className="hero-glow" aria-hidden />
-            <ContourCanvas active={pattern === "contour"} />
+            <PatternCanvas pattern={pattern} />
             <p className="eyebrow">
                 <span className="pill">new</span> @vfx-js/transitions
             </p>
