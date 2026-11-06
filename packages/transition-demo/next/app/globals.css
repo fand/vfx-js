@@ -936,6 +936,157 @@ em {
     overflow: hidden;
     background: var(--ink);
 }
+/* Playground stage: a small web page, so it reads as HTML. */
+/* Colors from the hero's Sanzo Wada combinations. */
+.lab-scene {
+    --bg: #f5f5b8;
+    --fg: #a10b2b;
+    --shape-1: #a10b2b;
+    --shape-2: #ffbf6e;
+    --shape-3: #172713;
+    position: relative;
+    display: grid;
+    grid-template-columns: 34% 1fr;
+    align-items: center;
+    gap: 5cqw;
+    width: 100%;
+    height: 100%;
+    /* Percent, not cq units: those would read an outer container here. */
+    padding: 4% 6%;
+    background: var(--bg);
+    color: var(--fg);
+    container-type: size;
+}
+.lab-scene[data-scene="b"] {
+    --bg: #d4efdc;
+    --fg: #730f1f;
+    --shape-1: #ff8c00;
+    --shape-2: #730f1f;
+    --shape-3: #b3e8c2;
+}
+.lab-scene[data-scene="c"] {
+    --bg: #d6faf6;
+    --fg: #202d85;
+    --shape-1: #202d85;
+    --shape-2: #f59994;
+    --shape-3: #96bfe6;
+}
+.lab-scene[data-scene="d"] {
+    --bg: #0b0b10;
+    --fg: #f4f4f5;
+    --shape-1: var(--acid);
+    --shape-2: #8a5cff;
+    --shape-3: var(--hot);
+}
+.lab-scene-art {
+    width: 100%;
+    height: 80cqh;
+    overflow: visible;
+}
+/* Layout B: text first, shapes on the right. */
+.lab-scene[data-layout="b"] {
+    grid-template-columns: 1fr 34%;
+}
+.lab-scene[data-layout="b"] .lab-scene-art {
+    order: 1;
+}
+.lab-scene-art * {
+    transform-box: fill-box;
+    transform-origin: center;
+}
+.shape-circle {
+    fill: var(--shape-1);
+    animation: lab-bob 2.4s ease-in-out infinite alternate;
+}
+.shape-square {
+    fill: var(--shape-2);
+    animation: lab-spin 6s linear infinite;
+}
+.shape-tri {
+    fill: var(--shape-3);
+    mix-blend-mode: multiply;
+    animation: lab-sway 3s ease-in-out infinite alternate;
+}
+.lab-scene[data-scene="d"] .shape-tri {
+    mix-blend-mode: screen;
+}
+@keyframes lab-bob {
+    to {
+        translate: 0 -8%;
+    }
+}
+@keyframes lab-spin {
+    to {
+        rotate: 360deg;
+    }
+}
+@keyframes lab-sway {
+    from {
+        rotate: -8deg;
+    }
+    to {
+        rotate: 8deg;
+    }
+}
+.lab-scene-text {
+    display: grid;
+    gap: 3cqh;
+    align-content: center;
+}
+.lab-scene-kicker {
+    font: max(11px, 3.6cqh) var(--mono);
+    opacity: 0.6;
+}
+.frame .lab-scene h2 {
+    margin: 0;
+    font: 700 14cqh / 0.95 var(--sans);
+    letter-spacing: -0.04em;
+}
+.frame .lab-scene p {
+    margin: 0;
+    font-size: max(12px, 5.4cqh);
+    line-height: 1.4;
+    color: inherit;
+    opacity: 0.85;
+}
+.lab-scene code {
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    font-size: 0.9em;
+}
+.lab-scene-action {
+    justify-self: start;
+    padding: 1.8cqh 3.4cqh;
+    border-radius: 999px;
+    background: var(--fg);
+    color: var(--bg);
+    font: 600 max(11px, 4.4cqh) var(--sans);
+}
+.lab-scene-live {
+    position: absolute;
+    top: 5cqh;
+    right: 4cqw;
+    display: flex;
+    align-items: center;
+    gap: 1.2cqh;
+    font: 600 max(10px, 3.2cqh) var(--mono);
+    letter-spacing: 0.12em;
+}
+.lab-scene-spinner {
+    width: 3.4cqh;
+    height: 3.4cqh;
+    border: max(1.5px, 0.4cqh) solid
+        color-mix(in srgb, currentColor 25%, transparent);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: lab-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    .lab-scene * {
+        animation: none;
+    }
+}
 .live-stage {
     box-shadow:
         0 1px 0 #ffffff inset,
@@ -1423,39 +1574,108 @@ em {
     color: var(--acid);
 }
 
-/* Custom: shader lab */
+/* Playground: shader lab */
+.lab-head {
+    padding: 20px 0 8px;
+}
+.lab-head h1 {
+    margin: 0;
+    font: 600 32px / 1.1 var(--sans);
+    letter-spacing: -0.03em;
+}
+.lab-head p {
+    max-width: 40em;
+    margin: 10px 0 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--muted);
+}
 .lab {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.3fr 1fr;
     gap: 20px;
-    padding: 20px;
-    border-radius: 24px;
-    background: var(--ink);
+    min-height: 100%;
+    /* The page has no .frame-main, so leave room for the header here. */
+    padding: calc(20px + var(--header)) 20px 20px;
     color: #e6e6ef;
 }
 .lab-editor {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
 }
 .lab-tabs {
     display: flex;
-    flex-wrap: wrap;
     gap: 4px;
     margin-bottom: 12px;
 }
 .lab-tabs button {
-    padding: 7px 12px;
+    padding: 8px 16px;
     border: 0;
     border-radius: 999px;
-    background: #ffffff0d;
+    background: transparent;
     color: #a1a1ad;
-    font: 12px var(--mono);
+    font: 500 14px var(--sans);
     cursor: pointer;
+    transition:
+        background 0.2s,
+        color 0.2s;
 }
-.lab-tabs button[aria-pressed="true"] {
-    background: var(--acid);
-    color: var(--ink);
+.lab-tabs button:hover {
+    color: #e6e6ef;
+}
+.lab-tabs button[aria-selected="true"] {
+    background: #ffffff14;
+    color: #fff;
+}
+.lab-tabs button:focus-visible {
+    outline: 1px solid var(--acid);
+}
+.lab-panel {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 320px;
+}
+.lab-panel[hidden] {
+    display: none;
+}
+/* Scrolls inside the column, so the long gl-transitions list keeps the row height. */
+.lab-list {
+    flex-basis: 0;
+    gap: 20px;
+    overflow-y: auto;
+    padding: 18px 8px;
+    border-radius: 14px;
+    background: #0d0d14;
+    box-shadow: inset 0 0 0 1px #ffffff14;
+}
+.frame .lab-list h2 {
+    margin: 0 14px 8px;
+    font: 11px var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #8b8b9c;
+}
+/* Same rows as the Transitions page list (.pg-item). */
+.lab-list ul {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.lab-list .pg-item {
+    width: 100%;
+}
+.lab-list .pg-item:focus-visible {
+    outline: 1px solid var(--acid);
+}
+.frame .lab-current {
+    margin: 0 0 10px;
+    font: 12px var(--mono);
+    color: #a1a1ad;
 }
 /* The textarea sits over a highlighted copy; both layers must match exactly. */
 .lab-code {

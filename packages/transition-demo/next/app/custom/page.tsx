@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Code } from "../_components/code";
 import { PageFrame } from "../_components/page-frame";
 import { PageTransition } from "../_components/page-transition";
-import { ShaderLab } from "./shader-lab";
 
 export const metadata: Metadata = { title: "Custom transitions" };
 
@@ -40,7 +39,7 @@ const hooks = [
 
 export default function Custom() {
     return (
-        <PageFrame tone="paper">
+        <PageFrame tone="paper" simpleFooter>
             <PageTransition preset="glitch" />
             <section className="doc-title">
                 <h1>Custom Transitions</h1>
@@ -49,10 +48,6 @@ export default function Custom() {
                     <code>vec4 transition(vec2 uv, float t)</code>. VFX-JS adds
                     the prelude, the textures and <code>main</code>.
                 </p>
-            </section>
-
-            <section className="doc-section">
-                <ShaderLab />
             </section>
 
             <section id="def" className="doc-section two-col">
@@ -201,6 +196,10 @@ export const pixelsort: TransitionDef = {
             </section>
 
             <section className="doc-section doc-next">
+                <Link href="/playground" className="next-card">
+                    <span>Try it</span>
+                    <strong>Playground →</strong>
+                </Link>
                 <Link href="/transitions" className="next-card">
                     <span>Compare</span>
                     <strong>All presets →</strong>
