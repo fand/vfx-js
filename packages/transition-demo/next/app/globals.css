@@ -2016,13 +2016,6 @@ em {
     display: block;
     width: calc(100% - 48px);
     margin: 160px auto 0;
-    overflow: visible;
-    fill: currentColor;
-    font: 600 123px var(--sans);
-    letter-spacing: -0.04em;
-}
-.footer-logo-slash {
-    fill: var(--acid);
 }
 
 .footer-simple {

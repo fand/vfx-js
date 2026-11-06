@@ -1,5 +1,4 @@
 import { links } from "../_lib/site";
-import { BrandMarkPaths } from "./header";
 
 const columns = [
     {
@@ -82,25 +81,28 @@ export function Footer({ simple = false }: { simple?: boolean }) {
                     </div>
                 ))}
             </div>
-            {/* textLength stretches the wordmark to the full width. */}
+            {/* The VFX-JS logo, from packages/docs/public/vfx-js-logo-no-padding.svg. */}
             <svg
                 className="footer-logo"
-                viewBox="0 0 1000 125"
+                viewBox="0 0 960 361"
+                fill="currentColor"
                 role="img"
-                aria-label="vfx-js/transitions"
+                aria-label="VFX-JS"
             >
-                <g transform="translate(0 5) scale(0.4455) translate(-25 -70)">
-                    <BrandMarkPaths />
-                </g>
-                <text
-                    x="135"
-                    y="95"
-                    textLength="865"
-                    lengthAdjust="spacingAndGlyphs"
-                >
-                    vfx-js<tspan className="footer-logo-slash">/</tspan>
-                    transitions
-                </text>
+                <path d="M735.716 273.351V222.969H838.076L670.137 55.0303H924.229V105.412H792.061L960 273.351H735.716Z" />
+                <path
+                    fillRule="evenodd"
+                    clipRule="evenodd"
+                    d="M601.492 222.969H656.333V0H706.714V273.351H551.111L601.492 222.969Z"
+                />
+                <path d="M628.262 139V188.513H578.749L554.178 164.185L578.749 139H628.262Z" />
+                <path
+                    fillRule="evenodd"
+                    clipRule="evenodd"
+                    d="M330.942 55.0303L440.103 164.191L243.811 360.482H315.353L475.874 199.962L529.171 253.259L564.942 217.488L511.645 164.191L620.805 55.0303H549.263L475.874 128.42L402.484 55.0303H330.942ZM585.958 238.504L551.111 273.351H620.805L585.958 238.504Z"
+                />
+                <path d="M295.883 105.412V264.179L245.502 314.624V55.0303H383.57V105.412H295.883ZM322.592 188.513V139H372.105L396.676 164.185L372.105 188.513H322.592Z" />
+                <path d="M167.939 203.992V55.0303H218.321V325.916L0 107.595V36.0531L167.939 203.992Z" />
             </svg>
         </footer>
     );
