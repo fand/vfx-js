@@ -240,8 +240,8 @@ export function HeroStage() {
                         go(index, true);
                     }}
                 >
-                    {current && <span className="carousel-play" aria-hidden />}
-                    {labels[name]}
+                    <span className="carousel-play" aria-hidden />
+                    <span className="carousel-label">{labels[name]}</span>
                 </button>,
             );
         }
