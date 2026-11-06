@@ -57,6 +57,10 @@ const labels: Record<PresetName, string> = {
 /** Each run picks a new palette and pattern at random. */
 const palettes = ["default", "orange", "purple", "green"];
 const patterns = ["dots", "grid", "diagonal", "contour", "sine"];
+// datamosh moves blocks along the motion, so it lands on a moving pattern.
+const patternsFor: Partial<Record<PresetName, string[]>> = {
+    datamosh: ["contour", "sine"],
+};
 
 /** Sets `data-center` on `target`, or on the item closest to the middle of the list. */
 function markCenter(el: HTMLElement, target?: Element) {
@@ -135,7 +139,10 @@ export function HeroStage() {
                     setTheme(name);
                     setLook((prev) => ({
                         palette: pickOther(palettes, prev.palette),
-                        pattern: pickOther(patterns, prev.pattern),
+                        pattern: pickOther(
+                            patternsFor[name] ?? patterns,
+                            prev.pattern,
+                        ),
                     }));
                 },
                 {
