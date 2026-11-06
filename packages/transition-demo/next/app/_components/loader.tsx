@@ -1,8 +1,9 @@
 "use client";
 
 import { setNextTransition } from "@vfx-js/react";
-import { lensDistortion } from "@vfx-js/transitions";
-import { useEffect, useState } from "react";
+import { crossfade, lensDistortion } from "@vfx-js/transitions";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "./header";
 
 // Gives VFX-JS time to attach the transition.
@@ -30,10 +31,13 @@ const logoDrawn = () =>
 
 /**
  * False until fonts and images are in.
- * Then the next outlet run plays lensDistortion, from the cover to the page.
+ * Then the next outlet run goes from the cover to the page:
+ * lensDistortion on the top page, a short crossfade elsewhere.
  */
 export function useLoaded(): boolean {
     const [loaded, setLoaded] = useState(false);
+    // The path at mount; the cover only shows on the first page.
+    const isTop = useRef(usePathname() === "/");
     useEffect(() => {
         let cancelled = false;
         Promise.all([
@@ -45,7 +49,11 @@ export function useLoaded(): boolean {
             if (cancelled) {
                 return;
             }
-            setNextTransition({ transition: lensDistortion, duration: 1.4 });
+            setNextTransition(
+                isTop.current
+                    ? { transition: lensDistortion, duration: 1.4 }
+                    : { transition: crossfade, duration: 0.3 },
+            );
             setLoaded(true);
             document.documentElement.removeAttribute("data-loading");
         });
