@@ -1,6 +1,6 @@
 "use client";
 
-import type { RunOpts } from "@vfx-js/core";
+import type { RunOpts, Transition, TransitionClass } from "@vfx-js/core";
 import { useContext, useLayoutEffect, useRef } from "react";
 import { warnOnce } from "../store.js";
 import { TransitionScopeContext } from "./scope.js";
@@ -10,7 +10,9 @@ import { TransitionScopeContext } from "./scope.js";
  * A Link's `transition(spec)` still wins for that click.
  * Only the spec at mount counts.
  */
-export function useTransitionIn(spec: RunOpts): void {
+export function useTransitionIn<T extends Transition | TransitionClass>(
+    spec: RunOpts<T>,
+): void {
     const scope = useContext(TransitionScopeContext);
     const specRef = useRef(spec);
     useLayoutEffect(() => {
@@ -25,8 +27,13 @@ export function useTransitionIn(spec: RunOpts): void {
     }, [scope]);
 }
 
-/** Component form of `useTransitionIn`, so a Server Component page can use it. */
-export function TransitionIn(props: RunOpts): null {
+/**
+ * Component form of `useTransitionIn`, so a Server Component page can use it.
+ * Pass the class and plain `params`; an instance does not cross the server boundary.
+ */
+export function TransitionIn<T extends Transition | TransitionClass>(
+    props: RunOpts<T>,
+): null {
     useTransitionIn(props);
     return null;
 }

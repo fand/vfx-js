@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { RunOpts, TransitionDef } from "@vfx-js/core";
+import type { RunOpts, Transition } from "@vfx-js/core";
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,8 +28,17 @@ vi.mock("../use-vfx-instance.js", () => ({
     useVFXInstance: () => mock.vfx,
 }));
 
-const swipe: TransitionDef = { name: "swipe", create: () => [] };
-const zoom: TransitionDef = { name: "zoom", create: () => [] };
+class Swipe implements Transition {
+    readonly name = "swipe";
+}
+class Zoom implements Transition {
+    readonly name = "zoom";
+}
+
+class Wave implements Transition {
+    readonly name = "wave";
+    constructor(readonly params: { amount?: number } = {}) {}
+}
 
 (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -107,22 +116,42 @@ describe("VFXTransition", () => {
         render(
             "b",
             <>
-                <TransitionIn transition={zoom} />
+                <TransitionIn transition={Zoom} />
                 <p>b</p>
             </>,
         );
-        expect(await swap(mock.runs[0])).toEqual({ transition: zoom });
+        expect(await swap(mock.runs[0])).toEqual({ transition: Zoom });
+    });
+
+    it("TransitionIn passes the class params", async () => {
+        render("a", <p>a</p>);
+        render("b", <TransitionIn transition={Wave} params={{ amount: 2 }} />);
+        expect(await swap(mock.runs[0])).toEqual({
+            transition: Wave,
+            params: { amount: 2 },
+        });
+        // @ts-expect-error params follow the class
+        void (<TransitionIn transition={Wave} params={{ amount: "x" }} />);
+        void (
+            <VFXTransition
+                transition={Wave}
+                // @ts-expect-error params follow the class
+                params={{ amount: "x" }}
+            >
+                x
+            </VFXTransition>
+        );
     });
 
     it("a click beats the page spec", async () => {
         render("a", <p>a</p>);
-        setNextTransition({ transition: swipe });
-        render("b", <TransitionIn transition={zoom} />);
-        expect(await swap(mock.runs[0])).toEqual({ transition: swipe });
+        setNextTransition({ transition: Swipe });
+        render("b", <TransitionIn transition={Zoom} />);
+        expect(await swap(mock.runs[0])).toEqual({ transition: Swipe });
     });
 
     it("the old page's spec does not leak into the next run", async () => {
-        render("a", <TransitionIn transition={zoom} />);
+        render("a", <TransitionIn transition={Zoom} />);
         render("b", <p>b</p>);
         expect(await swap(mock.runs[0])).toEqual({});
     });
@@ -135,11 +164,11 @@ describe("VFXTransition", () => {
             bump = () => setCount((c) => c + 1);
             return <p>{count}</p>;
         }
-        render("a", <Page spec={{ transition: swipe }} />);
+        render("a", <Page spec={{ transition: Swipe }} />);
         act(() => bump());
         expect(container.textContent).toBe("1");
-        render("b", <Page spec={{ transition: zoom }} />);
-        expect(await swap(mock.runs[0])).toEqual({ transition: zoom });
+        render("b", <Page spec={{ transition: Zoom }} />);
+        expect(await swap(mock.runs[0])).toEqual({ transition: Zoom });
         expect(container.textContent).toBe("0");
     });
 });

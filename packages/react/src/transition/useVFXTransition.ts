@@ -1,6 +1,8 @@
 import type {
     AddTransitionOpts,
     RunOpts,
+    Transition,
+    TransitionClass,
     TransitionHandle,
 } from "@vfx-js/core";
 import {
@@ -17,11 +19,14 @@ import { useLiveOpts } from "./live-opts.js";
 export type UseVFXTransition = {
     ref: (element: HTMLElement | null) => void;
     /** Run `cb` inside `startTransition` and animate once React has committed. */
-    run: (cb: () => void | Promise<void>, opts?: RunOpts) => Promise<void>;
+    run: <T extends Transition | TransitionClass>(
+        cb: () => void | Promise<void>,
+        opts?: RunOpts<T>,
+    ) => Promise<void>;
 };
 
-export function useVFXTransition(
-    opts: AddTransitionOpts = {},
+export function useVFXTransition<T extends Transition | TransitionClass>(
+    opts: AddTransitionOpts<T> = {},
 ): UseVFXTransition {
     const vfx = useVFXInstance();
     const liveOpts = useLiveOpts(opts);

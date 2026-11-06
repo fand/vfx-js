@@ -1,4 +1,4 @@
-import type { TransitionDef } from "@vfx-js/core";
+import type { Transition } from "@vfx-js/core";
 import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -8,8 +8,12 @@ import {
     transition,
 } from "./store.js";
 
-const swipe: TransitionDef = { name: "swipe", create: () => [] };
-const zoom: TransitionDef = { name: "zoom", create: () => [] };
+class Swipe implements Transition {
+    readonly name = "swipe";
+}
+class Zoom implements Transition {
+    readonly name = "zoom";
+}
 
 function click(
     init: Partial<React.MouseEvent> = {},
@@ -36,8 +40,8 @@ describe("transition()", () => {
     });
 
     it("sets the spec on a plain left click", () => {
-        transition({ transition: swipe })(click());
-        expect(takePending()).toEqual({ transition: swipe });
+        transition({ transition: Swipe })(click());
+        expect(takePending()).toEqual({ transition: Swipe });
     });
 
     it.each([
@@ -48,12 +52,12 @@ describe("transition()", () => {
         ["shift", { shiftKey: true }],
         ["alt", { altKey: true }],
     ])("ignores %s", (_name, init) => {
-        transition({ transition: swipe })(click(init));
+        transition({ transition: Swipe })(click(init));
         expect(takePending()).toBeNull();
     });
 
     it("ignores target=_blank", () => {
-        transition({ transition: swipe })(click({}, "_blank"));
+        transition({ transition: Swipe })(click({}, "_blank"));
         expect(takePending()).toBeNull();
     });
 
@@ -73,13 +77,13 @@ describe("pending spec", () => {
     });
 
     it("is taken once", () => {
-        setNextTransition({ transition: zoom });
-        expect(takePending()).toEqual({ transition: zoom });
+        setNextTransition({ transition: Zoom });
+        expect(takePending()).toEqual({ transition: Zoom });
         expect(takePending()).toBeNull();
     });
 
     it("expires after 10 s", () => {
-        setNextTransition({ transition: zoom });
+        setNextTransition({ transition: Zoom });
         vi.advanceTimersByTime(9999);
         expect(hasPending()).toBe(true);
         vi.advanceTimersByTime(2);

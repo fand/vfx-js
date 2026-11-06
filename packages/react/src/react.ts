@@ -13,6 +13,7 @@ export * from "./hooks.js";
 
 export { setNextTransition, transition } from "./transition/store.js";
 export { TransitionIn, useTransitionIn } from "./transition/TransitionIn.js";
+export { useTransitionInstance } from "./transition/useTransitionInstance.js";
 export {
     type UseVFXTransition,
     useVFXTransition,
