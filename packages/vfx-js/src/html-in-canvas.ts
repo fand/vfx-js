@@ -260,7 +260,7 @@ export function releaseFirstCapture(
  * OffscreenCanvas from the first paint.
  *
  * The first capture stays on the canvas so wrapping does not flash.
- * Call `releaseFirstCapture` once the overlay shows the texture.
+ * `VFX.add` releases it once the overlay shows the texture.
  */
 export async function setupCapture(
     canvas: HTMLCanvasElement,
@@ -414,7 +414,7 @@ export function teardownCapture(canvas: HTMLCanvasElement): void {
     }
 }
 
-export interface WrapOpts extends CaptureOpts {
+interface WrapOpts extends CaptureOpts {
     /** Cover the wrap frame with a still copy at this z-index. */
     stillCover?: { zIndex: number };
 }

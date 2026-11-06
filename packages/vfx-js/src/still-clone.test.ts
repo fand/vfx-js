@@ -56,7 +56,7 @@ describe("coverWithStill", () => {
         const source = fakeElement({ id: "app" }, (node) => {
             clone = node;
         });
-        coverWithStill(source as unknown as HTMLElement);
+        coverWithStill(source as unknown as HTMLElement, 9998);
         expect(clone?.getAttribute("id")).toBe("app");
         expect(clone?.getAttribute("aria-hidden")).toBe("true");
     });

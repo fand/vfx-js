@@ -67,9 +67,6 @@ function hiddenOpacityFor(
     return type === "video" ? "0.0001" : "0";
 }
 
-/**
- * @internal
- */
 function drawCaptureOnCanvas(
     canvas: HTMLCanvasElement,
     capture: OffscreenCanvas,
@@ -82,6 +79,9 @@ function drawCaptureOnCanvas(
     ctx.drawImage(capture, 0, 0, canvas.width, canvas.height);
 }
 
+/**
+ * @internal
+ */
 export class VFXPlayer {
     #opts: VFXOptsInner;
 

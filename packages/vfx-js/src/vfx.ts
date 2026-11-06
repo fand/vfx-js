@@ -217,7 +217,8 @@ export class VFX {
 
     /**
      * Animate an element from its old content to its new content with a
-     * shader. The element is wrapped only while a run is in flight.
+     * shader. The element is wrapped only while a run is in flight,
+     * unless `keepWrapped` is set.
      *
      * ```ts
      * const t = vfx.addTransition(main, { duration: 0.6 });
@@ -250,11 +251,7 @@ export class VFX {
      * @internal Used by transitions.
      */
     lockSize(element: HTMLElement): () => void {
-        const canvas =
-            this.#wrapperCanvases.get(element) ??
-            (element instanceof HTMLCanvasElement && isHicCanvas(element)
-                ? element
-                : undefined);
+        const canvas = this.#wrapperCanvases.get(element);
         return canvas ? lockCanvasSize(canvas) : () => {};
     }
 

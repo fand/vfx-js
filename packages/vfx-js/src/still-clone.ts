@@ -14,7 +14,7 @@
  */
 export function coverWithStill(
     element: HTMLElement,
-    zIndex = 9998,
+    zIndex: number,
 ): () => void {
     const rect = element.getBoundingClientRect();
     const clone = element.cloneNode(true) as HTMLElement;

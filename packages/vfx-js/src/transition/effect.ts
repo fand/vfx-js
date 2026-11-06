@@ -14,7 +14,7 @@ import type {
 } from "./types.js";
 
 export type TransitionStartOpts = {
-    /** Seconds. */
+    /** Seconds. Above 0. */
     duration: number;
     /** Defaults to `"smoothstep"`. */
     ease?: TransitionEase;
@@ -57,16 +57,16 @@ export class TransitionStage implements Effect {
     #spec: TransitionStartOpts | null = null;
     #startTime: number | null = null;
     #progress: TransitionProgress = HELD;
+    #resolveEnd: (() => void) | null = null;
     #onEnd: (() => void) | null = null;
-    #endHook: (() => void) | null = null;
 
-    /** End the current run: call its `onEnd` and settle the promise from `start()`. */
+    /** End the current run: call `spec.onEnd` and settle the promise from `start()`. */
     #end(): void {
-        const hook = this.#endHook;
-        this.#endHook = null;
-        hook?.();
-        const resolve = this.#onEnd;
+        const onEnd = this.#onEnd;
         this.#onEnd = null;
+        onEnd?.();
+        const resolve = this.#resolveEnd;
+        this.#resolveEnd = null;
         resolve?.();
     }
 
@@ -82,13 +82,13 @@ export class TransitionStage implements Effect {
     start(spec: TransitionStartOpts): Promise<void> {
         this.#end();
         this.#spec = spec;
-        this.#endHook = spec.onEnd ?? null;
+        this.#onEnd = spec.onEnd ?? null;
         this.#startTime = null;
         this.#progress = HELD;
         this.#hold = false;
         this.enabled = false;
         return new Promise((resolve) => {
-            this.#onEnd = resolve;
+            this.#resolveEnd = resolve;
         });
     }
 
@@ -107,10 +107,6 @@ export class TransitionStage implements Effect {
         for (const w of waiters) {
             w();
         }
-    }
-
-    get running(): boolean {
-        return this.#spec !== null;
     }
 
     get frame(): TransitionFrame | null {
@@ -141,10 +137,7 @@ export class TransitionStage implements Effect {
         if (this.#startTime === null) {
             this.#startTime = ctx.time;
         }
-        const x =
-            spec.duration > 0
-                ? (ctx.time - this.#startTime) / spec.duration
-                : 1;
+        const x = (ctx.time - this.#startTime) / spec.duration;
         if (x >= 1) {
             this.#spec = null;
             this.#end();
@@ -168,7 +161,6 @@ export class TransitionStage implements Effect {
     render(ctx: EffectContext): void {
         if (this.#snapshotWaiters.length > 0) {
             ctx.blit(ctx.src, this.#ensureFrom(ctx));
-            this.#spec = null;
             this.#hold = true;
             this.#resolveSnapshotWaiters();
         }

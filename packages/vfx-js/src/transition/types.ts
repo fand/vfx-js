@@ -101,7 +101,7 @@ export type TransitionSpec = {
 
 /**
  * What to wait for after the DOM changes, before the new content is captured.
- * `"media"` waits for pending images, videos and fonts, up to about a second.
+ * `"media"` waits for pending images, videos and fonts, up to about 300 ms.
  */
 export type TransitionWaitFor =
     | "media"
@@ -130,7 +130,7 @@ export interface TransitionHandle {
      * Show one slide and hide the other direct children, with a run.
      * A detached element is appended first.
      * Throws a `TypeError` when `slide` is not a direct child.
-     * Resolves at once when the slide is already the only one shown.
+     * Resolves at once when the slide is already the only one shown and no run is in flight.
      */
     show(slide: SlideRef, opts?: ShowOpts): Promise<void>;
     /**
