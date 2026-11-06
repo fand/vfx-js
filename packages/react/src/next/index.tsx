@@ -9,7 +9,10 @@ import {
     type VFXTransitionProps as BaseVFXTransitionProps,
 } from "../transition/VFXTransition.js";
 
-export type VFXTransitionProps = Omit<BaseVFXTransitionProps, "pageKey">;
+export type VFXTransitionProps = Omit<BaseVFXTransitionProps, "pageKey"> & {
+    /** Defaults to the pathname. */
+    pageKey?: string | number;
+};
 
 // Layout `children` reads the current route from LayoutRouterContext,
 // so a kept old page would render the new route.
@@ -24,11 +27,15 @@ function FrozenRouter({ children }: { children: React.ReactNode }) {
     );
 }
 
-/** `VFXTransition` for the App Router. Each pathname is one page. */
-export function VFXTransition({ children, ...props }: VFXTransitionProps) {
+/** `VFXTransition` for the App Router. Each pathname is one page by default. */
+export function VFXTransition({
+    children,
+    pageKey,
+    ...props
+}: VFXTransitionProps) {
     const pathname = usePathname();
     return (
-        <BaseVFXTransition {...props} pageKey={pathname}>
+        <BaseVFXTransition {...props} pageKey={pageKey ?? pathname}>
             <FrozenRouter>{children}</FrozenRouter>
         </BaseVFXTransition>
     );

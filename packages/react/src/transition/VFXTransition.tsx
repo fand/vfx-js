@@ -16,11 +16,7 @@ import {
 } from "react";
 import { useVFXInstance } from "../use-vfx-instance.js";
 import { useLiveOpts } from "./live-opts.js";
-import {
-    resolveRunOpts,
-    type TransitionScope,
-    TransitionScopeContext,
-} from "./scope.js";
+import { type TransitionScope, TransitionScopeContext } from "./scope.js";
 import { takePending } from "./store.js";
 
 export type VFXTransitionProps = AddTransitionOpts & {
@@ -128,7 +124,8 @@ export function VFXTransition(props: VFXTransitionProps) {
             });
         incoming.current = null;
         transition
-            .run(swap, () => resolveRunOpts(takePending(), incoming.current))
+            // A click spec wins whole over the page spec.
+            .run(swap, () => takePending() ?? incoming.current ?? {})
             .catch((err) => {
                 console.error("[@vfx-js/react] VFXTransition run failed:", err);
             });

@@ -6,10 +6,6 @@ const PENDING_TTL_MS = 10_000;
 
 let pending: { spec: RunOpts; at: number } | null = null;
 
-export function setPending(spec: RunOpts): void {
-    pending = { spec, at: Date.now() };
-}
-
 export function hasPending(): boolean {
     return pending !== null && Date.now() - pending.at <= PENDING_TTL_MS;
 }
@@ -23,7 +19,7 @@ export function takePending(): RunOpts | null {
 
 /** Use this spec for the next transition, e.g. before `router.push()`. */
 export function setNextTransition(spec: RunOpts): void {
-    setPending(spec);
+    pending = { spec, at: Date.now() };
 }
 
 function isPlainLeftClick(e: React.MouseEvent): boolean {
@@ -47,7 +43,7 @@ function isPlainLeftClick(e: React.MouseEvent): boolean {
 export function transition(spec: RunOpts): (e: React.MouseEvent) => void {
     return (e) => {
         if (isPlainLeftClick(e)) {
-            setPending(spec);
+            setNextTransition(spec);
         }
     };
 }
