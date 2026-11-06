@@ -14,8 +14,10 @@ export function createPixelScan(
         frag: `
 const float BLACKOUT = ${blackout};
 const float W = 0.2;
-// How far the new content trails the old one.
-const float GAP = 0.3;
+// Half width of each glowing front.
+const float GLOW = 0.12;
+// How far the front of the new content trails the old one.
+const float GAP = 0.6;
 const float LAYERS = 3.0;
 
 float hash(vec2 p) {
@@ -53,7 +55,7 @@ vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {
   vec4 color = vec4(hsv2rgb(vec3((pc.x * 13.0 / pc.y * 17.0) * 0.3, 1.0, 1.0)), 1.0);
   float x = cellPos(pi, scale);
   float n = hash(pi);
-  float anim = smoothstep(W * 2.0, 0.0, abs(x + n * W - t));
+  float anim = smoothstep(GLOW, 0.0, abs(x + n * W - t));
   color *= anim;
   color *= mix(1.0, clamp(0.3 / abs(sdBox(p - pc, 0.5)), 0.0, 10.0), edge * pow(anim, 10.0));
   return color * alpha;
@@ -74,16 +76,17 @@ vec4 draw(vec2 uv, vec2 p, float t, float scale) {
   vec2 pi = floor(p * scale);
   float x = cellPos(pi, scale);
   float h = x + hash(pi) * W;
+  // The old content leaves at the front t; the new one arrives at a second front behind it.
+  float tIn = t - GAP;
   float out_ = smoothstep(t, t - W, h);
-  float in_ = smoothstep(t - GAP, t - GAP - W, h);
+  float in_ = smoothstep(tIn, tIn - W, h);
   vec4 from = readFrom(uv);
   vec4 to = readTo(uv);
   float a = max(from.a, to.a);
   float gap = BLACKOUT * (out_ - in_);
   vec4 c = from * (1.0 - out_) + to * in_ + vec4(0.0, 0.0, 0.0, a) * gap;
-  // With blackout, the cells glow mostly over the black gap, so bright content stays readable.
-  float glow = mix(1.0, mix(0.2, 1.0, gap), BLACKOUT);
-  return c + cellsColor(p * scale, scale, t) * 1.5 * glow;
+  vec4 glow = cellsColor(p * scale, scale, t) + cellsColor(p * scale, scale, tIn);
+  return c + glow * 1.5;
 }
 
 vec4 transition(vec2 uv, float t) {
@@ -91,8 +94,8 @@ vec4 transition(vec2 uv, float t) {
   if (!inRange(uv)) return vec4(0.0);
   vec2 p = uv * 2.0 - 1.0;
   p.y *= aspect();
-  // Start and end with the front, its glow and the gap fully off the element.
-  t = t * (1.0 + W * 5.0 + GAP) - W * 2.0;
+  // Start and end with both fronts and their glow fully off the element.
+  t = mix(-GLOW, 1.0 + W * 2.0 + GAP + GLOW, t);
   vec4 c = vec4(0.0);
   for (float i = 0.0; i < LAYERS; i++) {
     c += draw(uv, p, t, abs(cos(i) * 7.3 + 10.0));
