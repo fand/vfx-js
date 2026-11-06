@@ -168,8 +168,26 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                     hidden={tab !== "presets"}
                 >
                     {groups.map((g) => (
-                        <section key={g.label}>
-                            <h2>{g.label}</h2>
+                        <section
+                            key={g.label}
+                            className="lab-group"
+                            data-third-party={g.credit ? "" : undefined}
+                        >
+                            <h2>
+                                {g.label}
+                                <span>{g.options.length}</span>
+                            </h2>
+                            {g.credit && (
+                                <p className="lab-credit">
+                                    <a
+                                        href={g.credit.href}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        {g.credit.text} ↗
+                                    </a>
+                                </p>
+                            )}
                             <ul>
                                 {g.options.map((o) => (
                                     <li key={o.id}>
@@ -180,6 +198,11 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                                             onClick={() => pick(o.id)}
                                         >
                                             <span>{o.label}</span>
+                                            {o.author && (
+                                                <span className="lab-author">
+                                                    by {o.author}
+                                                </span>
+                                            )}
                                             <span
                                                 className="pg-play"
                                                 aria-hidden
@@ -200,7 +223,23 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                     aria-labelledby="lab-tab-edit"
                     hidden={tab !== "edit"}
                 >
-                    <p className="lab-current">{source.label}</p>
+                    <p className="lab-current">
+                        {source.label}
+                        {source.credit && (
+                            <>
+                                {" "}
+                                · by {source.credit.author} ·{" "}
+                                {source.credit.license} ·{" "}
+                                <a
+                                    href={source.credit.href}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    gl-transitions ↗
+                                </a>
+                            </>
+                        )}
+                    </p>
                     <div className="lab-code">
                         <pre aria-hidden ref={preRef}>
                             <code>{highlight(`${frag}\n`)}</code>

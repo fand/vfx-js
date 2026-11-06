@@ -13,11 +13,17 @@ export type Source = {
     uniforms: TransitionUniforms;
     ease?: ShaderTransitionDef["ease"];
     overflow?: ShaderTransitionDef["overflow"];
+    /** Set for shaders from gl-transitions, which keep their author's license. */
+    credit?: Credit;
 };
+
+export type Credit = { author: string; license: string; href: string };
 
 export type SourceGroup = {
     label: string;
-    options: { id: string; label: string }[];
+    options: { id: string; label: string; author?: string }[];
+    /** Shown under the heading for third-party shaders. */
+    credit?: { text: string; href: string };
 };
 
 const isShader = (def: object): def is ShaderTransitionDef => "frag" in def;
@@ -25,6 +31,10 @@ const isShader = (def: object): def is ShaderTransitionDef => "frag" in def;
 const presetDefs = Object.entries(presets).filter(
     (entry): entry is [string, ShaderTransitionDef] => isShader(entry[1]),
 );
+
+// "Name <mail>" → "Name", for a tidy list. The license and link keep full credit.
+const authorOf = (author: string) =>
+    author.replace(/\s*<[^>]*>/, "").trim() || author;
 
 // Transitions that need extra textures are not supported.
 const glEntries = transitions.filter((e) => e.textures.length === 0);
@@ -46,7 +56,15 @@ export const groups: SourceGroup[] = [
     },
     {
         label: "gl-transitions",
-        options: glEntries.map((e) => ({ id: `gl:${e.name}`, label: e.name })),
+        options: glEntries.map((e) => ({
+            id: `gl:${e.name}`,
+            label: e.name,
+            author: authorOf(e.author),
+        })),
+        credit: {
+            text: "Community shaders from gl-transitions.com. Each keeps its author's license.",
+            href: "https://gl-transitions.com/",
+        },
     },
 ];
 
@@ -116,8 +134,19 @@ export function sourceOf(id: string): Source | undefined {
     if (kind === "gl") {
         const entry = glEntries.find((e) => e.name === name);
         return (
-            entry &&
-            fromDef(id, name, createGLTransition(entry), entry.paramsTypes)
+            entry && {
+                ...fromDef(
+                    id,
+                    name,
+                    createGLTransition(entry),
+                    entry.paramsTypes,
+                ),
+                credit: {
+                    author: authorOf(entry.author),
+                    license: entry.license,
+                    href: `https://gl-transitions.com/editor/${entry.name}`,
+                },
+            }
         );
     }
     return undefined;

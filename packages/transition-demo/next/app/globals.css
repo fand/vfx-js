@@ -1651,12 +1651,54 @@ em {
     background: #0d0d14;
     box-shadow: inset 0 0 0 1px #ffffff14;
 }
+/* Headings stick while their group scrolls past. */
 .frame .lab-list h2 {
-    margin: 0 14px 8px;
+    position: sticky;
+    top: -18px;
+    z-index: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 6px;
+    padding: 10px 14px 8px;
+    background: #0d0d14;
+    font: 600 16px var(--sans);
+    letter-spacing: -0.01em;
+    color: #fff;
+}
+.lab-list h2 span {
     font: 11px var(--mono);
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: #8b8b9c;
+    color: #6b6b78;
+}
+/* Third-party shaders sit in their own box, with credit to their authors. */
+.lab-group[data-third-party] {
+    margin-top: 8px;
+    padding-bottom: 6px;
+    border: 1px dashed #ffffff24;
+    border-radius: 12px;
+}
+.frame .lab-group[data-third-party] h2 {
+    top: -18px;
+    border-radius: 12px 12px 0 0;
+}
+.frame .lab-credit {
+    margin: -2px 14px 10px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.frame .lab-credit a {
+    color: #a1a1ad;
+}
+.frame .lab-credit a:hover {
+    color: var(--acid);
+}
+.lab-list .pg-item > span:first-child {
+    flex: 1;
+}
+.lab-author {
+    margin-right: 12px;
+    font-size: 11px;
+    opacity: 0.55;
 }
 /* Same rows as the Transitions page list (.pg-item). */
 .lab-list ul {
@@ -1676,6 +1718,12 @@ em {
     margin: 0 0 10px;
     font: 12px var(--mono);
     color: #a1a1ad;
+}
+.frame .lab-current a {
+    color: inherit;
+}
+.frame .lab-current a:hover {
+    color: var(--acid);
 }
 /* The textarea sits over a highlighted copy; both layers must match exactly. */
 .lab-code {
