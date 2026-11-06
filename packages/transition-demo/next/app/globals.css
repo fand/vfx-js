@@ -126,7 +126,7 @@ em {
     stroke-dasharray: 1;
     animation:
         loader-trim 0.3s ease-in-out both,
-        loader-fill 0.2s 0.3s ease-out both;
+        loader-fill 0.5s 0.3s ease-out both;
 }
 @keyframes loader-trim {
     from {
