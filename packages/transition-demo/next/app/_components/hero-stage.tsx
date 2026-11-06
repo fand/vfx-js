@@ -58,12 +58,12 @@ const labels: Record<PresetName, string> = {
 const palettes = ["default", "orange", "purple", "green"];
 const patterns = ["dots", "grid", "diagonal", "contour", "sine"];
 
-/** Sets `data-center` on the item closest to the middle of the list. */
-function markCenter(el: HTMLElement) {
+/** Sets `data-center` on `target`, or on the item closest to the middle of the list. */
+function markCenter(el: HTMLElement, target?: Element) {
     const mid = el.getBoundingClientRect().left + el.clientWidth / 2;
-    let best: Element | null = null;
+    let best: Element | null = target ?? null;
     let bestDist = Number.POSITIVE_INFINITY;
-    for (const item of el.children) {
+    for (const item of target ? [] : el.children) {
         const r = item.getBoundingClientRect();
         const dist = Math.abs(r.left + r.width / 2 - mid);
         if (dist < bestDist) {
@@ -119,6 +119,10 @@ export function HeroStage() {
             const item = list.current?.children[index] as
                 | HTMLElement
                 | undefined;
+            // It becomes the middle item when the run lands, so it stays active until then.
+            if (list.current && item) {
+                markCenter(list.current, item);
+            }
             if (blinkFirst && item && !reducedMotion()) {
                 await blink(item, BLINK_MS);
             }
@@ -175,6 +179,10 @@ export function HeroStage() {
         let frame = 0;
         const onScrollCenter = () => {
             cancelAnimationFrame(frame);
+            // A run marks its own item and scrolls to it afterwards.
+            if (busy.current) {
+                return;
+            }
             frame = requestAnimationFrame(() => markCenter(el));
         };
         el.addEventListener("scroll", onScrollCenter, { passive: true });
