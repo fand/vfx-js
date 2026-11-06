@@ -1,13 +1,26 @@
 import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
 
+/** Where the fronts sweep. `center` spreads out in rings. */
+export type PixelScanDirection = "right" | "left" | "up" | "down" | "center";
+
+// Where the front reaches cell `pi`, in [0, 1]. Cells span [-scale, scale] in x and the aspect-scaled range in y.
+const CELL_POS: Record<PixelScanDirection, string> = {
+    right: "pi.x / (scale * 2.0) + 0.5",
+    left: "0.5 - pi.x / (scale * 2.0)",
+    up: "pi.y / (scale * aspect() * 2.0) + 0.5",
+    down: "0.5 - pi.y / (scale * aspect() * 2.0)",
+    center: "length(pi / scale) / length(vec2(1.0, aspect()))",
+};
+
 /**
- * A front of glowing pixel cells sweeps left to right and swaps the content behind it.
- * The old content goes first and the new one follows a little later.
+ * A front of glowing pixel cells sweeps toward `direction` and takes the old content away.
+ * A second front follows a little later and brings the new content in.
  * `blackout` fills the gap between them with black; false leaves it transparent.
  */
 export function createPixelScan(
-    opts: { blackout?: boolean } = {},
+    opts: { direction?: PixelScanDirection; blackout?: boolean } = {},
 ): ShaderTransitionDef {
+    const cellPos = CELL_POS[opts.direction ?? "right"];
     const blackout = (opts.blackout ?? true) ? "1.0" : "0.0";
     return shaderTransition({
         name: "pixel_scan",
@@ -41,7 +54,7 @@ float aspect() {
 
 // Where the front reaches the cell, in [0, 1].
 float cellPos(vec2 pi, float scale) {
-  return pi.x / (scale * 2.0) + 0.5;
+  return ${cellPos};
 }
 
 vec4 cell(vec2 p, vec2 pi, float scale, float t, float edge) {

@@ -12,6 +12,7 @@ import {
     createPixelsort,
     createSwipe,
     createTile,
+    type PixelScanDirection,
     type SwipeDirection,
     type TileDirection,
     type TileShape,
@@ -174,13 +175,23 @@ const factories: Record<string, Factory> = {
     pixelScan: {
         params: [
             {
+                name: "direction",
+                kind: "select",
+                options: ["right", "left", "up", "down", "center"],
+                value: "right",
+            },
+            {
                 name: "blackout",
                 kind: "select",
                 options: ["true", "false"],
                 value: "true",
             },
         ],
-        build: (v) => createPixelScan({ blackout: v.blackout === "true" }),
+        build: (v) =>
+            createPixelScan({
+                direction: v.direction as PixelScanDirection,
+                blackout: v.blackout === "true",
+            }),
     },
     jpegGlitch: {
         params: [

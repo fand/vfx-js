@@ -216,6 +216,12 @@ export const presetList: PresetInfo[] = [
         factory: "createPixelScan",
         options: [
             {
+                name: "direction",
+                type: '"right" | "left" | "up" | "down" | "center"',
+                default: '"right"',
+                note: "Where the fronts sweep. center spreads out in rings.",
+            },
+            {
                 name: "blackout",
                 type: "boolean",
                 default: "true",
