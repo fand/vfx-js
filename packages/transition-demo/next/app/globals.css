@@ -120,6 +120,24 @@ em {
     width: 288px;
     height: 288px;
 }
+.loader .brand-mark path {
+    stroke: var(--white);
+    stroke-width: 2;
+    stroke-dasharray: 1;
+    animation:
+        loader-trim 0.3s ease-in-out both,
+        loader-fill 0.2s 0.3s ease-out both;
+}
+@keyframes loader-trim {
+    from {
+        stroke-dashoffset: 1;
+    }
+}
+@keyframes loader-fill {
+    from {
+        fill-opacity: 0;
+    }
+}
 :root[data-loading] .header {
     opacity: 0;
 }
@@ -2071,7 +2089,8 @@ em {
     .hero-glow,
     .scroll-cue::after,
     .tab-body.is-in,
-    .dot {
+    .dot,
+    .loader .brand-mark path {
         animation: none;
     }
 }

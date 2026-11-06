@@ -5,9 +5,9 @@ import { lensDistortion } from "@vfx-js/transitions";
 import { useEffect, useState } from "react";
 import { BrandMark } from "./header";
 
-// Keep the logo up this long, so it does not just flash.
+// Wait for the logo animation in CSS: stroke trim, then fill.
 // It also gives VFX-JS time to attach the transition.
-const MIN_SHOW_MS = 300;
+const MIN_SHOW_MS = 500;
 
 const pageLoaded = () =>
     new Promise<void>((resolve) => {
