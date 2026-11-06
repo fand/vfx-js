@@ -190,7 +190,7 @@ const factories: Record<string, Factory> = {
                 min: 1,
                 max: 256,
                 step: 1,
-                value: 64,
+                value: 4,
             },
             {
                 name: "quality",
@@ -198,7 +198,7 @@ const factories: Record<string, Factory> = {
                 min: 0,
                 max: 1,
                 step: 0.05,
-                value: 0.3,
+                value: 0.1,
             },
         ],
         build: (v) =>

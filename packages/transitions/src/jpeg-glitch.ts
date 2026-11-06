@@ -54,8 +54,8 @@ export class JpegGlitchTransitionEffect
 export function createJpegGlitch(
     opts: { iterations?: number; quality?: number } = {},
 ): TransitionDef {
-    const maxIterations = Math.max(1, Math.round(opts.iterations ?? 64));
-    const quality = Math.min(Math.max(opts.quality ?? 0.3, 0), 1);
+    const maxIterations = Math.max(1, Math.round(opts.iterations ?? 4));
+    const quality = Math.min(Math.max(opts.quality ?? 0.1, 0), 1);
     return {
         name: "jpeg_glitch",
         // Linear, so the glitch window and the cut line up with the envelope.

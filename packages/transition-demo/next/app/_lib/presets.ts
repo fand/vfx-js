@@ -158,13 +158,13 @@ export const presetList: PresetInfo[] = [
             {
                 name: "iterations",
                 type: "number",
-                default: "64",
+                default: "4",
                 note: "Encode and corrupt passes at the peak. More is messier.",
             },
             {
                 name: "quality",
                 type: "number (0–1)",
-                default: "0.3",
+                default: "0.1",
                 note: "JPEG quality. Lower gives bigger blocks.",
             },
         ],
