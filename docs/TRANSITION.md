@@ -72,7 +72,7 @@ import { crossfade, glitch } from "@vfx-js/transitions";
 
 The container owns the outlet box and keeps the old page on screen until
 the snapshot is taken. The page only names its shader. Next.js users
-import `VFXTransition` from `@vfx-js/react/next` and skip `pageKey`.
+import `VFXTransition` from `@vfx-js/react/next`. Its `pageKey` defaults to the pathname.
 
 A new `pageKey` starts a run. The old page stays on screen until the
 transition has its snapshot. The incoming page can pick its own
@@ -152,7 +152,8 @@ time; the others carry the `hidden` attribute.
 - An element that is not in the DOM is appended to the container first.
 - A missing target, or one that is not a direct child, throws a
   `TypeError` before any run starts.
-- Showing the slide that is already the only one shown starts no run.
+- Showing the slide that is already the only one shown starts no run,
+  unless a run is in flight.
 - `remove: true` removes the other slides instead of hiding them.
 - The other `ShowOpts` work as in `run`.
 
@@ -164,9 +165,9 @@ A `display` rule on a slide beats `hidden`. Add
 The primitive for content built on the fly: routers, `innerHTML`,
 templates. `show` is built on it. Change the DOM in `cb`.
 
-A new `run()` during a run drops the old one. The old promise resolves
-(it never rejects), and its callback still runs, so no DOM change is
-lost. If `cb` throws, the run cancels and `run` rejects.
+A new `run()` during a run drops the old one. The old promise resolves,
+and its callback still runs, so no DOM change is lost. If `cb` throws,
+the run cancels and `run` rejects, even for a dropped run.
 
 `opts` can be a function. It is called once, right after `cb` resolves,
 so the spec can depend on the new content. If it throws, the run
@@ -317,9 +318,10 @@ type TransitionEffectContext = EffectContext & {
 - `render` also runs while `holding`, with zero progress. Pass the input
   through then (`ctx.blit(ctx.src)`), unless you need those frames.
   `update` runs only while the animation plays.
-- `create()` runs once per container, the first time a run uses the
-  def. Runs that keep using it reuse the effects; a run with another def
-  disposes them. Keep state on the effect instance.
+- `create()` runs when a run uses the def on a container. Runs that keep
+  using it reuse the effects; a run with another def disposes them, so
+  switching back calls `create()` again. Keep state on the effect
+  instance.
 - The element is unwrapped between runs, so the effects get `dispose()`
   and then `init()` again.
 - `run.uniforms` holds the spec's uniforms only.
@@ -614,7 +616,7 @@ import { transition } from "@vfx-js/react";
 
 Returns an `onClick` that stores the spec for the next run. It wins over
 the page's `<TransitionIn>`. It does not intercept navigation. It ignores modified clicks, non-left buttons,
-`target="_blank"` and clicks with `defaultPrevented`. The spec expires
+a `target` other than `_self`, and clicks with `defaultPrevented`. The spec expires
 after about 10 s.
 
 A Server Component cannot pass `onClick` to `Link`. Wrap the link in a
