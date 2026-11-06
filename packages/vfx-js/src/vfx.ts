@@ -8,7 +8,10 @@ import {
 } from "./html-in-canvas.js";
 import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 import { TransitionController } from "./transition/transition.js";
-import type { AddTransitionOpts, Transition } from "./transition/types.js";
+import type {
+    AddTransitionOpts,
+    TransitionHandle,
+} from "./transition/types.js";
 import {
     type Effect,
     getVFXOpts,
@@ -48,7 +51,7 @@ export class VFX {
     #player: VFXPlayer;
     #canvas: HTMLCanvasElement;
     #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
-    #transitions = new Set<Transition>();
+    #transitions = new Set<TransitionHandle>();
 
     /**
      * Create a VFX instance if WebGL is available, or return `null`.
@@ -224,7 +227,7 @@ export class VFX {
     addTransition(
         element: HTMLElement,
         opts: AddTransitionOpts = {},
-    ): Transition {
+    ): TransitionHandle {
         const transition = new TransitionController(this, element, opts, () =>
             this.#transitions.delete(transition),
         );

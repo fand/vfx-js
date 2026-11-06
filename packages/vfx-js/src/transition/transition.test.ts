@@ -494,11 +494,13 @@ function setup(
         keepWrapped?: boolean;
         snapshotStalls?: boolean;
         captureTimesOut?: boolean;
+        element?: HTMLElement;
     } = {},
 ) {
     const {
         snapshotStalls = false,
         captureTimesOut = false,
+        element = {} as HTMLElement,
         ...transitionOpts
     } = opts;
     const log: string[] = [];
@@ -583,7 +585,6 @@ function setup(
             };
         },
     };
-    const element = {} as HTMLElement;
     const onDestroy = vi.fn();
     const transition = new TransitionController(
         vfx,
@@ -975,5 +976,190 @@ describe("TransitionController", () => {
         expect(log).toContain("cancel");
         expect(log).toContain("unwrap");
         expect(transition.running).toBe(false);
+    });
+});
+
+// Just enough DOM for show(). Selectors match by id, like "#b".
+class FakeElement {
+    id: string;
+    hidden = false;
+    parentElement: FakeElement | null = null;
+    children: FakeElement[] = [];
+    connected = false;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    get isConnected(): boolean {
+        return this.parentElement?.isConnected ?? this.connected;
+    }
+
+    append(child: FakeElement): void {
+        child.remove();
+        child.parentElement = this;
+        this.children.push(child);
+    }
+
+    remove(): void {
+        const parent = this.parentElement;
+        if (parent) {
+            parent.children = parent.children.filter((c) => c !== this);
+            this.parentElement = null;
+        }
+    }
+
+    contains(other: FakeElement): boolean {
+        return (
+            other === this ||
+            this.children.some((child) => child.contains(other))
+        );
+    }
+
+    querySelector(selector: string): FakeElement | null {
+        for (const child of this.children) {
+            if (`#${child.id}` === selector) {
+                return child;
+            }
+            const found = child.querySelector(selector);
+            if (found) {
+                return found;
+            }
+        }
+        return null;
+    }
+}
+
+function slides(...ids: string[]) {
+    const container = new FakeElement("container");
+    container.connected = true;
+    for (const id of ids) {
+        const slide = new FakeElement(id);
+        slide.hidden = id !== ids[0];
+        container.append(slide);
+    }
+    const byId = (id: string) =>
+        container.querySelector(`#${id}`) as FakeElement;
+    const shown = () =>
+        container.children.filter((c) => !c.hidden).map((c) => c.id);
+    return {
+        container,
+        byId,
+        shown,
+        element: container as unknown as HTMLElement,
+    };
+}
+
+describe("TransitionController.show", () => {
+    beforeEach(() => {
+        vi.stubGlobal("requestAnimationFrame", (fn: () => void) =>
+            setTimeout(fn, 0),
+        );
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    const settle = () => new Promise((r) => setTimeout(r, 5));
+    const asElement = (el: FakeElement) => el as unknown as HTMLElement;
+
+    test("hides the other children after the snapshot and shows the slide", async () => {
+        const dom = slides("a", "b", "c");
+        const { transition, log, starts } = setup({ element: dom.element });
+        const done = transition.show(asElement(dom.byId("b")));
+        expect(dom.shown()).toEqual(["a"]);
+        await settle();
+        expect(log.indexOf("snapshot")).toBeLessThan(log.indexOf("start"));
+        expect(dom.shown()).toEqual(["b"]);
+        starts[0].end();
+        await done;
+        expect(dom.shown()).toEqual(["b"]);
+        expect(dom.container.children).toHaveLength(3);
+    });
+
+    test("resolves an index or a selector", async () => {
+        const dom = slides("a", "b", "c");
+        const { transition, starts } = setup({ element: dom.element });
+        const byIndex = transition.show(2);
+        await settle();
+        starts[0].end();
+        await byIndex;
+        expect(dom.shown()).toEqual(["c"]);
+        const bySelector = transition.show("#b");
+        await settle();
+        starts[1].end();
+        await bySelector;
+        expect(dom.shown()).toEqual(["b"]);
+    });
+
+    test("throws before a run for a missing or non-child slide", () => {
+        const dom = slides("a", "b");
+        const nested = new FakeElement("nested");
+        dom.byId("b").append(nested);
+        const outside = new FakeElement("outside");
+        outside.connected = true;
+        const { transition, log } = setup({ element: dom.element });
+        expect(() => transition.show(5)).toThrow(TypeError);
+        expect(() => transition.show("#none")).toThrow(TypeError);
+        expect(() => transition.show("#nested")).toThrow(TypeError);
+        expect(() => transition.show(asElement(nested))).toThrow(TypeError);
+        expect(() => transition.show(asElement(outside))).toThrow(TypeError);
+        expect(log).toEqual([]);
+        expect(transition.running).toBe(false);
+    });
+
+    test("appends a detached slide, then shows it", async () => {
+        const dom = slides("a", "b");
+        const fresh = new FakeElement("fresh");
+        const { transition, starts } = setup({ element: dom.element });
+        const done = transition.show(asElement(fresh));
+        expect(fresh.parentElement).toBeNull();
+        await settle();
+        starts[0].end();
+        await done;
+        expect(fresh.parentElement).toBe(dom.container);
+        expect(dom.shown()).toEqual(["fresh"]);
+    });
+
+    test("remove: true removes the other slides", async () => {
+        const dom = slides("a", "b", "c");
+        const { transition, starts } = setup({ element: dom.element });
+        const done = transition.show(1, { remove: true });
+        await settle();
+        starts[0].end();
+        await done;
+        expect(dom.container.children.map((c) => c.id)).toEqual(["b"]);
+        expect(dom.shown()).toEqual(["b"]);
+    });
+
+    test("the slide already shown resolves without a run", async () => {
+        const dom = slides("a", "b");
+        const { transition, log } = setup({ element: dom.element });
+        await transition.show(0);
+        expect(log).toEqual([]);
+        expect(transition.running).toBe(false);
+    });
+
+    test("passes the options to the run but keeps remove out", async () => {
+        const start = vi.fn();
+        const def: TransitionDef = {
+            name: "hooked",
+            create: () => ({ render: () => {}, start }),
+        };
+        const dom = slides("a", "b");
+        const { transition, starts } = setup({ element: dom.element });
+        const done = transition.show(1, {
+            transition: def,
+            reverse: true,
+            remove: true,
+        });
+        await settle();
+        starts[0].end();
+        await done;
+        expect(start).toHaveBeenCalledWith({
+            reverse: true,
+            uniforms: {},
+            duration: 0.6,
+        });
     });
 });

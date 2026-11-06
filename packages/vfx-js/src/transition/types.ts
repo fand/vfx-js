@@ -116,7 +116,23 @@ export type AddTransitionOpts = Partial<TransitionSpec> & {
 
 export type RunOpts = Partial<TransitionSpec>;
 
-export interface Transition {
+/** A direct child of the container, its index, or a selector inside it. */
+export type SlideRef = HTMLElement | number | string;
+
+export type ShowOpts = RunOpts & {
+    /** Remove the slides it hides instead of hiding them. Default false. */
+    remove?: boolean;
+};
+
+/** Controls the transitions of one element. */
+export interface TransitionHandle {
+    /**
+     * Show one slide and hide the other direct children, with a run.
+     * A detached element is appended first.
+     * Throws a `TypeError` when `slide` is not a direct child.
+     * Resolves at once when the slide is already the only one shown.
+     */
+    show(slide: SlideRef, opts?: ShowOpts): Promise<void>;
     /**
      * Change the DOM in `cb` and animate from the old content to the new.
      * `opts` can be a function, called once right after `cb` resolves.

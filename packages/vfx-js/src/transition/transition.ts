@@ -9,9 +9,11 @@ import {
 import type {
     AddTransitionOpts,
     RunOpts,
-    Transition,
+    ShowOpts,
+    SlideRef,
     TransitionDef,
     TransitionEase,
+    TransitionHandle,
     TransitionRun,
     TransitionUniforms,
 } from "./types.js";
@@ -160,7 +162,7 @@ function sameEffects(a: readonly Effect[], b: readonly Effect[]): boolean {
     return a.length === b.length && a.every((e, i) => e === b[i]);
 }
 
-export class TransitionController implements Transition {
+export class TransitionController implements TransitionHandle {
     #vfx: TransitionHost;
     #element: HTMLElement;
     #opts: AddTransitionOpts;
@@ -204,6 +206,60 @@ export class TransitionController implements Transition {
 
     get running(): boolean {
         return this.#runningId !== null;
+    }
+
+    show(slide: SlideRef, opts: ShowOpts = {}): Promise<void> {
+        const target = this.#resolveSlide(slide);
+        const { remove = false, ...runOpts } = opts;
+        // A pending run may still change the slides, so only skip when idle.
+        if (!this.running && this.#isOnlyShown(target)) {
+            return Promise.resolve();
+        }
+        return this.run(() => {
+            if (target.parentElement !== this.#element) {
+                this.#element.append(target);
+            }
+            for (const child of Array.from(this.#element.children)) {
+                if (child === target) {
+                    continue;
+                }
+                if (remove) {
+                    child.remove();
+                } else {
+                    (child as HTMLElement).hidden = true;
+                }
+            }
+            target.hidden = false;
+        }, runOpts);
+    }
+
+    #resolveSlide(slide: SlideRef): HTMLElement {
+        const container = this.#element;
+        const target =
+            typeof slide === "number"
+                ? container.children[slide]
+                : typeof slide === "string"
+                  ? container.querySelector(slide)
+                  : slide;
+        if (!target) {
+            throw new TypeError(`[VFX-JS] show(): no slide for ${slide}.`);
+        }
+        const isChild = target.parentElement === container;
+        if (!isChild && (target.isConnected || container.contains(target))) {
+            throw new TypeError(
+                "[VFX-JS] show(): the slide must be a direct child of the container.",
+            );
+        }
+        return target as HTMLElement;
+    }
+
+    #isOnlyShown(target: HTMLElement): boolean {
+        if (target.parentElement !== this.#element || target.hidden) {
+            return false;
+        }
+        return Array.from(this.#element.children).every(
+            (child) => child === target || (child as HTMLElement).hidden,
+        );
     }
 
     async run(
