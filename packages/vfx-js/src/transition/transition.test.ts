@@ -614,6 +614,15 @@ describe("TransitionController", () => {
     });
 
     const settle = () => new Promise((r) => setTimeout(r, 5));
+    // A slow machine needs more than one settle() to reach the start.
+    const started = async <T>(starts: T[], i: number): Promise<T> => {
+        await vi.waitFor(() => {
+            if (!starts[i]) {
+                throw new Error(`run ${i} has not started`);
+            }
+        });
+        return starts[i];
+    };
 
     test("runs the steps in order and unwraps at the end", async () => {
         const { transition, log, starts } = setup();
@@ -622,7 +631,7 @@ describe("TransitionController", () => {
         });
         await settle();
         expect(transition.running).toBe(true);
-        starts[0].end();
+        (await started(starts, 0)).end();
         await done;
         expect(log).toEqual([
             "freeze",
@@ -654,7 +663,7 @@ describe("TransitionController", () => {
         expect(cbA).toHaveBeenCalledOnce();
         await settle();
         expect(starts).toHaveLength(2);
-        starts[1].end();
+        (await started(starts, 1)).end();
         await runB;
         expect(cbB).toHaveBeenCalledOnce();
         expect(log.filter((s) => s === "unwrap")).toHaveLength(1);
@@ -674,7 +683,7 @@ describe("TransitionController", () => {
         await runA;
         expect(cbA).toHaveBeenCalledOnce();
         await settle();
-        starts[0].end();
+        (await started(starts, 0)).end();
         await runB;
         expect(starts).toHaveLength(1);
     });
@@ -700,7 +709,7 @@ describe("TransitionController", () => {
         for (let i = 0; i < 2; i++) {
             const run = transition.run(() => {});
             await settle();
-            starts[i].end();
+            (await started(starts, i)).end();
             await run;
         }
         expect(log.filter((s) => s === "wrap")).toHaveLength(1);
@@ -723,7 +732,7 @@ describe("TransitionController", () => {
                 uniforms: { a: 1 },
             });
             await settle();
-            starts[i].end();
+            (await started(starts, i)).end();
             await run;
         }
         expect(create).toHaveBeenCalledOnce();
@@ -826,7 +835,7 @@ describe("TransitionController", () => {
         for (const [i, def] of [a.def, b.def, a.def].entries()) {
             const run = transition.run(() => {}, { transition: def });
             await settle();
-            starts[i].end();
+            (await started(starts, i)).end();
             await run;
         }
         expect(effectsOf(chain())).toEqual([a.created[1]]);
@@ -845,7 +854,7 @@ describe("TransitionController", () => {
                 transition: countedDef(`fresh${i}`).def,
             });
             await settle();
-            starts[i].end();
+            (await started(starts, i)).end();
             await run;
             expect(chain()).toHaveLength(2);
         }
@@ -860,7 +869,7 @@ describe("TransitionController", () => {
         const runB = transition.run(() => {}, { transition: b.def });
         await runA;
         await settle();
-        starts[0].end();
+        (await started(starts, 0)).end();
         await runB;
         expect(effectsOf(chain())).toEqual([b.created[0]]);
     });
@@ -875,7 +884,7 @@ describe("TransitionController", () => {
         const { transition, starts, chain } = setup({ keepWrapped: true });
         const run = transition.run(() => {}, { transition: def });
         await settle();
-        starts[0].end();
+        (await started(starts, 0)).end();
         await run;
         expect(effectsOf(chain())).toEqual([first, second]);
     });
@@ -887,7 +896,7 @@ describe("TransitionController", () => {
             for (let i = 0; i < 2; i++) {
                 const run = transition.run(() => {});
                 await settle();
-                starts[i].end();
+                (await started(starts, i)).end();
                 await run;
             }
             expect(starts).toHaveLength(2);
@@ -918,7 +927,7 @@ describe("TransitionController", () => {
             },
         );
         await settle();
-        starts[0].end();
+        (await started(starts, 0)).end();
         await run;
         const order = [
             "snapshot",
@@ -942,7 +951,7 @@ describe("TransitionController", () => {
                 () => ({ transition: def }),
             );
             await settle();
-            starts[i].end();
+            (await started(starts, i)).end();
             await run;
         }
         expect(log.filter((s) => s === "updateEffects")).toHaveLength(1);
@@ -1061,6 +1070,15 @@ describe("TransitionController.show", () => {
     });
 
     const settle = () => new Promise((r) => setTimeout(r, 5));
+    // A slow machine needs more than one settle() to reach the start.
+    const started = async <T>(starts: T[], i: number): Promise<T> => {
+        await vi.waitFor(() => {
+            if (!starts[i]) {
+                throw new Error(`run ${i} has not started`);
+            }
+        });
+        return starts[i];
+    };
     const asElement = (el: FakeElement) => el as unknown as HTMLElement;
 
     test("hides the other children after the snapshot and shows the slide", async () => {
@@ -1071,7 +1089,7 @@ describe("TransitionController.show", () => {
         await settle();
         expect(log.indexOf("snapshot")).toBeLessThan(log.indexOf("start"));
         expect(dom.shown()).toEqual(["b"]);
-        starts[0].end();
+        (await started(starts, 0)).end();
         await done;
         expect(dom.shown()).toEqual(["b"]);
         expect(dom.container.children).toHaveLength(3);
@@ -1082,12 +1100,12 @@ describe("TransitionController.show", () => {
         const { transition, starts } = setup({ element: dom.element });
         const byIndex = transition.show(2);
         await settle();
-        starts[0].end();
+        (await started(starts, 0)).end();
         await byIndex;
         expect(dom.shown()).toEqual(["c"]);
         const bySelector = transition.show("#b");
         await settle();
-        starts[1].end();
+        (await started(starts, 1)).end();
         await bySelector;
         expect(dom.shown()).toEqual(["b"]);
     });
@@ -1115,7 +1133,7 @@ describe("TransitionController.show", () => {
         const done = transition.show(asElement(fresh));
         expect(fresh.parentElement).toBeNull();
         await settle();
-        starts[0].end();
+        (await started(starts, 0)).end();
         await done;
         expect(fresh.parentElement).toBe(dom.container);
         expect(dom.shown()).toEqual(["fresh"]);
@@ -1126,7 +1144,7 @@ describe("TransitionController.show", () => {
         const { transition, starts } = setup({ element: dom.element });
         const done = transition.show(1, { remove: true });
         await settle();
-        starts[0].end();
+        (await started(starts, 0)).end();
         await done;
         expect(dom.container.children.map((c) => c.id)).toEqual(["b"]);
         expect(dom.shown()).toEqual(["b"]);
@@ -1154,7 +1172,7 @@ describe("TransitionController.show", () => {
             remove: true,
         });
         await settle();
-        starts[0].end();
+        (await started(starts, 0)).end();
         await done;
         expect(start).toHaveBeenCalledWith({
             reverse: true,
