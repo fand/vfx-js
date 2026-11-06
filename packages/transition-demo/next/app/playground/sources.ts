@@ -93,12 +93,21 @@ const factories: Record<string, Factory> = {
                 step: 1,
                 value: 12,
             },
+            {
+                name: "shadow",
+                kind: "range",
+                min: 0,
+                max: 1,
+                step: 0.05,
+                value: 0.5,
+            },
         ],
         build: (v) =>
             createTile({
                 direction: v.direction as TileDirection,
                 shape: v.shape as TileShape,
                 count: Number(v.count),
+                shadow: Number(v.shadow),
             }),
     },
     lensDistortion: {

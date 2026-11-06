@@ -135,6 +135,12 @@ export const presetList: PresetInfo[] = [
                 default: "12",
                 note: "Tiles along the longer side.",
             },
+            {
+                name: "shadow",
+                type: "number (0–1)",
+                default: "0.5",
+                note: "Drop shadow under the shrinking tiles. 0 turns it off.",
+            },
         ],
     },
     { name: "glitch", note: "Jittery RGB-split blocks.", category: "bold" },
