@@ -1,5 +1,7 @@
 # Transition API
 
+> **Experimental.** The transition API may change in minor releases.
+
 `vfx.addTransition` animates an element from its old content to its new
 content with a shader. Use it for tab panels, carousels, or page
 transitions in a single-page app.

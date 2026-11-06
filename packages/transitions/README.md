@@ -2,6 +2,8 @@
 
 Page transition presets for [`@vfx-js/core`](https://www.npmjs.com/package/@vfx-js/core).
 
+> **Experimental.** The API may change in any 0.x release.
+
 ## Install
 
 ```bash

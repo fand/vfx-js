@@ -2,6 +2,8 @@
 "@vfx-js/react": minor
 ---
 
+**Experimental.** The transition API may change in minor releases.
+
 `VFXTransition`, `useVFXTransition`, `transition()`, `setNextTransition()`.
 
 - `<VFXTransition pageKey>`: a new `pageKey` starts a run and mounts the children fresh. Children can be anything. The target fills the viewport height unless `fullscreen={false}`.

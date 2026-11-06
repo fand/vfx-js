@@ -2,6 +2,8 @@
 "@vfx-js/core": minor
 ---
 
+**Experimental.** The transition API may change in minor releases.
+
 `addTransition`: animate an element from its old content to its new content with a shader. It returns a `TransitionHandle`.
 
 Also: `update()` on html-in-canvas elements now resolves when the capture lands.
