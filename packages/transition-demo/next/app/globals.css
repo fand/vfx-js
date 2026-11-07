@@ -2045,8 +2045,9 @@ em {
 
 .footer-logo {
     display: block;
-    width: 60%;
-    margin: 160px auto 0;
+    width: 94%;
+    margin: 80px auto 40px;
+    opacity: 0.5;
 }
 
 .footer-simple {
@@ -2126,6 +2127,10 @@ em {
         fill: currentColor;
         font: 600 100px var(--sans);
         letter-spacing: -0.04em;
+    }
+    .footer-logo {
+        width: 94%;
+        margin: 80px auto 40px;
     }
     .footer-logo-slash {
         fill: var(--acid);
