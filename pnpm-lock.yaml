@@ -401,6 +401,9 @@ importers:
       '@vfx-js/transitions':
         specifier: workspace:*
         version: link:../../transitions
+      '@vfx-js/vue':
+        specifier: workspace:*
+        version: link:../../vue
       nuxt:
         specifier: 4.6.3
         version: 4.6.3(613c1c632b9c23deda17aa92825ba6b7)
@@ -548,6 +551,43 @@ importers:
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/vue:
+    dependencies:
+      '@vfx-js/core':
+        specifier: workspace:*
+        version: link:../vfx-js
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.6.3
+        version: 2.6.3
+      '@types/node':
+        specifier: 26.6.5
+        version: 26.6.5
+      happy-dom:
+        specifier: 21.0.4
+        version: 21.0.4
+      lint-staged:
+        specifier: ^17.6.0
+        version: 17.6.0
+      npm-run-all2:
+        specifier: ^9.0.4
+        version: 9.0.4
+      rimraf:
+        specifier: ^6.1.3
+        version: 6.1.3
+      tsconfig-to-dual-package:
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@6.0.3)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+      vue:
+        specifier: 3.5.44
+        version: 3.5.44(typescript@6.0.3)
 
 packages:
 

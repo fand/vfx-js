@@ -1,0 +1,83 @@
+# @vfx-js/vue
+
+Shader page transitions for Vue and Nuxt, built on [@vfx-js/core](https://www.npmjs.com/package/@vfx-js/core).
+
+```sh
+npm i @vfx-js/core @vfx-js/vue @vfx-js/transitions
+```
+
+## Nuxt
+
+Put `<VFXTransition>` from `@vfx-js/vue/nuxt` around `<NuxtPage />`.
+Each path is one page.
+
+```vue
+<!-- app/app.vue -->
+<script setup lang="ts">
+import { Crossfade, Swipe } from "@vfx-js/transitions";
+import { transition } from "@vfx-js/vue";
+import { VFXTransition } from "@vfx-js/vue/nuxt";
+</script>
+
+<template>
+    <nav>
+        <NuxtLink to="/">Home</NuxtLink>
+        <NuxtLink to="/gallery" @click="transition({ transition: Swipe })">
+            Gallery
+        </NuxtLink>
+    </nav>
+    <VFXTransition :transition="Crossfade" :duration="0.8">
+        <NuxtPage />
+    </VFXTransition>
+</template>
+```
+
+A page picks how it enters with `useTransitionIn`:
+
+```vue
+<!-- app/pages/about.vue -->
+<script setup lang="ts">
+import { Glitch } from "@vfx-js/transitions";
+import { useTransitionIn } from "@vfx-js/vue";
+
+useTransitionIn({ transition: Glitch });
+</script>
+```
+
+### Which spec wins
+
+1. The link's `transition(spec)`, for that click.
+2. The new page's `useTransitionIn(spec)`.
+3. The props of `<VFXTransition>`.
+
+Back and forward add `reverse: true` to the spec that wins.
+
+## API
+
+### `<VFXTransition>` (`@vfx-js/vue/nuxt`)
+
+Props: `transition`, `params`, `reverse`, `duration`, `overflow`, `ease`,
+`waitFor`, `keepWrapped`, and `fullscreen`.
+
+- The target fills the viewport height by default, and pages scroll
+  inside it. Pass `:fullscreen="false"` to size it with your own CSS,
+  e.g. under a header.
+- `class`, `style` and other attributes go on the target.
+- On the server it renders plain divs. No `<ClientOnly>` needed.
+
+### `transition(spec)`
+
+Returns a click handler. Use it as `@click="transition(spec)"` on a link.
+Modified clicks and links with another `target` are ignored.
+
+### `setNextTransition(spec)`
+
+Use this spec for the next navigation, e.g. before `navigateTo()`.
+
+### `useTransitionIn(spec)`
+
+Call it in a page's `setup`. Only the spec at setup counts.
+
+## License
+
+MIT

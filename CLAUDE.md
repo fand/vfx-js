@@ -12,6 +12,7 @@ This is a Turborepo monorepo with the following key packages:
 - `packages/vfx-js/` - Core VFX library (@vfx-js/core) built with Three.js
 - `packages/react/` - React bindings (@vfx-js/react)
 - `packages/react-vfx/` - Backward-compat wrapper re-exporting @vfx-js/react
+- `packages/vue/` - Vue bindings for transitions (@vfx-js/vue, with `@vfx-js/vue/nuxt`)
 - `packages/docs/` - Documentation website and demos
 - `packages/storybook/` - Component stories and visual tests
 - `packages/effects/` - Additional effect implementations
@@ -30,7 +31,7 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 - `pnpm run lint` - Run linting across all packages
 
 ### Testing
-- `pnpm test` - Run tests in every package that has them (core, transitions, react, react-vfx)
+- `pnpm test` - Run tests in every package that has them (core, transitions, react, react-vfx, vue)
 - `pnpm --filter @vfx-js/core run test:watch` - Run tests in watch mode
 
 ### Package-specific Development

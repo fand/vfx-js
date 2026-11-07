@@ -13,6 +13,7 @@
     "@vfx-js/core": "workspace:*",
     "@vfx-js/transition-demo-shared": "workspace:*",
     "@vfx-js/transitions": "workspace:*",
+    "@vfx-js/vue": "workspace:*",
     "nuxt": "4.6.3",
     "vue": "3.5.44",
     "vue-router": "5.4.0"
