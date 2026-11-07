@@ -31,6 +31,11 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 - `pnpm run clean` - Clean build artifacts across all packages
 - `pnpm run lint` - Run linting across all packages
 
+### Agent docs
+- `skills/vfx-js/` is the agent skill. `llms-full.txt` on the docs site is built from it.
+- When you add, rename or remove a public export, subpath or shader preset, update `skills/vfx-js/` in the same change.
+- `pnpm --filter docs test` fails when the skill misses a public export.
+
 ### Testing
 - `pnpm test` - Run tests in every package that has them (core, transitions, react, react-vfx, vue, svelte)
 - `pnpm --filter @vfx-js/core run test:watch` - Run tests in watch mode

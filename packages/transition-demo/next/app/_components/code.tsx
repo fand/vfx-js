@@ -6,9 +6,12 @@ import { highlight } from "./highlight";
 export function Code({
     children,
     label,
+    plain,
 }: {
     children: string;
     label?: string;
+    /** Skip syntax highlighting, e.g. for prose prompts. */
+    plain?: boolean;
 }) {
     const code = children.trim();
     const [copied, setCopied] = useState(false);
@@ -27,7 +30,7 @@ export function Code({
                 </button>
             </div>
             <pre>
-                <code>{highlight(code)}</code>
+                <code>{plain ? code : highlight(code)}</code>
             </pre>
         </div>
     );

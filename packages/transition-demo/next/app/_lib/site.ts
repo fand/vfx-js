@@ -27,6 +27,17 @@ export const nav: NavItem[] = [
         ],
     },
     {
+        href: "/ai",
+        label: "Use with AI",
+        sections: [
+            { id: "skill", label: "Install the skill" },
+            { id: "llms", label: "Or use llms.txt" },
+            { id: "prompts", label: "Prompts that work" },
+            { id: "write", label: "Write a transition with AI" },
+            { id: "check", label: "Check the result" },
+        ],
+    },
+    {
         href: "/how-it-works",
         label: "How it works",
         sections: [
