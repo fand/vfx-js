@@ -113,11 +113,18 @@ export default function HowItWorks() {
 
             <section id="easing" className="doc-section two-col">
                 <div>
-                    <h2>t is eased for you</h2>
+                    <h2>Easing</h2>
                     <p>
-                        Your shader gets <code>t</code> from 0 to 1 with a
-                        smoothstep ease. <code>TransitionEffect</code> hooks
-                        also get the linear <code>ctx.progress.x</code> and{" "}
+                        Your shader gets <code>t</code> from 0 to 1, eased with
+                        smoothstep by default. Set <code>ease</code> to{" "}
+                        <code>"linear"</code> or a function{" "}
+                        <code>(x) =&gt; t</code> to change it. A spec&apos;s{" "}
+                        <code>ease</code> wins over the transition&apos;s own.
+                    </p>
+                    <p>
+                        <code>TransitionEffect</code> hooks get both the eased{" "}
+                        <code>ctx.progress.t</code> and the linear{" "}
+                        <code>ctx.progress.x</code>, plus{" "}
                         <code>ctx.deltaTime</code> in seconds.
                     </p>
                     <p>
@@ -128,7 +135,7 @@ export default function HowItWorks() {
                 </div>
                 <figure className="curve-fig" aria-hidden>
                     <svg viewBox="-20 -10 340 200" role="img">
-                        <title>Smoothstep ease curve</title>
+                        <title>Default smoothstep ease curve</title>
                         <line x1="0" y1="160" x2="300" y2="160" />
                         <line x1="0" y1="0" x2="0" y2="160" />
                         <path className="curve-diag" d="M0,160 L300,0" />
