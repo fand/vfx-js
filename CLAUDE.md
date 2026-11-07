@@ -12,8 +12,8 @@ This is a Turborepo monorepo with the following key packages:
 - `packages/vfx-js/` - Core VFX library (@vfx-js/core) built with Three.js
 - `packages/react/` - React bindings (@vfx-js/react)
 - `packages/react-vfx/` - Backward-compat wrapper re-exporting @vfx-js/react
-- `packages/vue/` - Vue bindings for transitions (@vfx-js/vue, with `@vfx-js/vue/nuxt`)
-- `packages/svelte/` - Svelte bindings for transitions (@vfx-js/svelte, with `@vfx-js/svelte/sveltekit`). Built with `svelte-package`, ESM only
+- `packages/vue/` - Vue bindings for transitions and element effects (@vfx-js/vue, with `@vfx-js/vue/nuxt`)
+- `packages/svelte/` - Svelte bindings for transitions and element effects (@vfx-js/svelte, with `@vfx-js/svelte/sveltekit`). Built with `svelte-package`, ESM only
 - `packages/docs/` - Documentation website and demos
 - `packages/storybook/` - Component stories and visual tests
 - `packages/effects/` - Additional effect implementations

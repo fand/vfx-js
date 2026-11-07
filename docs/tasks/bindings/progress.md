@@ -79,3 +79,35 @@ See [plan2.md](./plan2.md).
 
 - Open the PRs (one per package, per plan2.md).
 - Getting Started tabs for Nuxt and SvelteKit, once the page has them.
+
+## Done: element effects
+
+See [plan3.md](./plan3.md).
+
+- `element.ts` in each package: `bindElement(el)` and `updateElement(el)`.
+  Same diff and queue as React. Copied, no core change.
+- Vue: `vVfx` directive, with `getSSRProps`.
+- Svelte: `vfx(props | () => props)` attachment in `attachment.svelte.ts`.
+  `svelte-package` emits it as `.svelte.js`, so `$effect` still works.
+- Both demos: `rgbShift` on the About `<h1>`, through a PageView prop.
+- READMEs, changesets (minor), `CLAUDE.md`.
+
+## Checked (element effects)
+
+- Tests: vue 32 (14 new), svelte 34 (18 new). Lint and build pass.
+- Nuxt and SvelteKit dev, in Playwright's Chrome:
+  - `/about` loaded directly: heading has the effect, one canvas,
+    no errors.
+  - No update loop: no mutations on the `<h1>` over 3 s, no long frames.
+  - Home → About → Home → About by link, then back and forward: each
+    run shows a second canvas mid-run and one after. The effect comes
+    back on About. No errors.
+- Demo `build:demo` passes for both.
+
+## Changes from the plan (element effects)
+
+- The observer also watches `childList`. Vue sets element text with
+  `textContent`, which is not a characterData change.
+- `releaseVFX()` runs after the queued remove, not right away. A slow
+  add can't outlive the VFX.
+- `peekVFX()` added to each `vfx.ts`, for `updateElement`.

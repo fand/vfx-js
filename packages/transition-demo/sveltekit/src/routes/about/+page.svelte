@@ -2,4 +2,4 @@
     import PageView from "../../lib/PageView.svelte";
 </script>
 
-<PageView path="/about" />
+<PageView path="/about" headingShader="rgbShift" />

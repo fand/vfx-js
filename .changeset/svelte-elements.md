@@ -1,0 +1,5 @@
+---
+"@vfx-js/svelte": minor
+---
+
+Add element effects: the `vfx(props)` attachment puts a shader on any element, and `updateElement(el)` re-captures its texture. Pass a getter to apply changes without re-running the attachment.
