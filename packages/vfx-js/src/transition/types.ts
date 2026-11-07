@@ -107,6 +107,11 @@ export type AddTransitionOpts<
     /** Keep the element wrapped between runs. */
     keepWrapped?: boolean;
     waitFor?: TransitionWaitFor;
+    /**
+     * How a slide enters with `show()`.
+     * Its fields go over the container's; `show()` opts go over it.
+     */
+    slideSpec?: (slide: HTMLElement) => RunOpts | undefined;
 };
 
 export type RunOpts<

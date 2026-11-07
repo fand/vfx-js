@@ -42,26 +42,39 @@ type Bound = {
 };
 
 /**
- * Pick the run options, then the container defaults.
- * A run that sets `transition` drops the container's params, so they never reach another class.
+ * Put `top` over `base`, field by field.
+ * A `top` that sets `transition` drops the base params, so they never reach another class.
  */
+export function layerSpec(base: RunOpts, top: RunOpts): RunOpts {
+    const params =
+        top.transition !== undefined
+            ? top.params
+            : base.params === undefined && top.params === undefined
+              ? undefined
+              : { ...(base.params as object), ...(top.params as object) };
+    return {
+        transition: top.transition ?? base.transition,
+        params,
+        reverse: top.reverse ?? base.reverse,
+        duration: top.duration ?? base.duration,
+        overflow: top.overflow ?? base.overflow,
+        ease: top.ease ?? base.ease,
+    };
+}
+
+/** Put the run options over the container defaults, then fill in the rest. */
 export function resolveSpec(
     opts: AddTransitionOpts,
     run: RunOpts = {},
 ): ResolvedSpec {
-    const runSetsTransition = run.transition !== undefined;
-    const params = runSetsTransition
-        ? run.params
-        : opts.params === undefined && run.params === undefined
-          ? undefined
-          : { ...(opts.params as object), ...(run.params as object) };
+    const spec = layerSpec(opts, run);
     return {
-        transition: run.transition ?? opts.transition ?? Crossfade,
-        params,
-        reverse: run.reverse ?? opts.reverse ?? false,
-        duration: run.duration ?? opts.duration ?? DEFAULT_DURATION,
-        overflow: run.overflow ?? opts.overflow,
-        ease: run.ease ?? opts.ease,
+        transition: spec.transition ?? Crossfade,
+        params: spec.params,
+        reverse: spec.reverse ?? false,
+        duration: spec.duration ?? DEFAULT_DURATION,
+        overflow: spec.overflow,
+        ease: spec.ease,
     };
 }
 
@@ -258,6 +271,8 @@ export class TransitionController implements TransitionHandle {
         if (!this.running && this.#isOnlyShown(target)) {
             return Promise.resolve();
         }
+        const slideSpec = this.#opts.slideSpec?.(target);
+        const spec = slideSpec ? layerSpec(slideSpec, runOpts) : runOpts;
         return this.run(() => {
             if (target.parentElement !== this.#element) {
                 this.#element.append(target);
@@ -273,7 +288,7 @@ export class TransitionController implements TransitionHandle {
                 }
             }
             target.hidden = false;
-        }, runOpts);
+        }, spec);
     }
 
     #resolveSlide(slide: SlideRef): HTMLElement {
