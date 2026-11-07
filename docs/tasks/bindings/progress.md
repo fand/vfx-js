@@ -77,15 +77,14 @@ See [plan2.md](./plan2.md).
 
 ## Next
 
-- One PR for both packages: #226 (transitions, element effects,
-  Storybook stories).
-- Getting Started: Nuxt, Vue and SvelteKit tabs added. Not checked in a
-  browser.
-- Astro: try the open questions in plan.md first.
-- `VFXCanvas`: done, see below.
-- Config API for Vue and Svelte: done, see below.
-- Router subpaths: done, see below.
-- Not checked: the html-in-canvas path, Chromatic for the new stories.
+- #226 has everything: transitions, element effects, `VFXCanvas`,
+  router subpaths, config API, Storybook stories, docs.
+- Checked in a browser: Getting Started tabs (Nuxt, Vue, SvelteKit), the
+  html-in-canvas path (Chromium with `CanvasDrawElement`), the fallback.
+- Not checked: Chromatic for the new stories.
+- Separate work: Astro (try the open questions in plan.md first);
+  `VFXProvider` and `useVFXTransition` for Vue / Svelte if asked;
+  React `VFXCanvas` hydration in Next.
 
 ## Done: element effects
 
