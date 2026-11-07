@@ -27,7 +27,7 @@ jobs:
               run: pnpm run build
 
             - name: Build transition demo
-              run: pnpm --filter @vfx-js/transition-demo-next run build:demo
+              run: pnpm --filter docs-transitions run build:demo
 
             - name: Deploy
               uses: peaceiris/actions-gh-pages@v4
@@ -35,4 +35,4 @@ jobs:
                   deploy_key: ${{ secrets.VFX_JS_TRANSITIONS_DEPLOY_KEY }}
                   external_repository: fand/vfx-js-transitions
                   publish_branch: gh-pages
-                  publish_dir: ./packages/transition-demo/next/out
+                  publish_dir: ./packages/docs-transitions/out

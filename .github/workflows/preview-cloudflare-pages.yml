@@ -37,8 +37,8 @@ jobs:
             # Served under the same basePath as on amagi.dev.
             - name: Build transition demo
               run: |
-                  pnpm --filter @vfx-js/transition-demo-next run build:demo
-                  cp -r packages/transition-demo/next/out packages/docs/dist/vfx-js-transitions
+                  pnpm --filter docs-transitions run build:demo
+                  cp -r packages/docs-transitions/out packages/docs/dist/vfx-js-transitions
 
             - name: Deploy to Cloudflare Pages
               id: deploy

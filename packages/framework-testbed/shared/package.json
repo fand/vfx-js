@@ -1,0 +1,13 @@
+{
+  "name": "@vfx-js/testbed-shared",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./pages.ts",
+    "./transitions": "./transitions.ts",
+    "./style.css": "./style.css"
+  },
+  "dependencies": {
+    "@vfx-js/transitions": "workspace:*"
+  }
+}
