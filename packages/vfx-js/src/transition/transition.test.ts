@@ -707,9 +707,8 @@ describe("TransitionController", () => {
         const runB = transition.run(cbB);
         await runA;
         expect(cbA).toHaveBeenCalledOnce();
-        await settle();
-        expect(starts).toHaveLength(2);
         (await started(starts, 1)).end();
+        expect(starts).toHaveLength(2);
         await runB;
         expect(cbB).toHaveBeenCalledOnce();
         expect(log.filter((s) => s === "unwrap")).toHaveLength(1);
