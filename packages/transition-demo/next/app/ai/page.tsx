@@ -11,10 +11,16 @@ const llmsFull = "https://amagi.dev/vfx-js/llms-full.txt";
 
 const prompts = [
     {
-        label: "Next.js page transitions",
+        label: "Next.js",
         text: `Add page transitions to this Next.js App Router app with @vfx-js/react and @vfx-js/transitions.
 Use Crossfade by default. The About page enters with Glitch.
-Going back plays Swipe in reverse.`,
+The Gallery link uses Swipe.`,
+    },
+    {
+        label: "Nuxt",
+        text: `Add page transitions to this Nuxt app with <VFXTransition> from @vfx-js/vue/nuxt.
+Use Crossfade by default, and Glitch for the About page with useTransitionIn.
+Keep the header outside the transition and size the target under it.`,
     },
     {
         label: "Tabs",
@@ -23,7 +29,7 @@ Keep all panels in the DOM and use show(). Swipe right when the new tab is to th
     },
     {
         label: "Other routers",
-        text: `Wire VFX-JS transitions to this SvelteKit app with core run(cb).
+        text: `Wire VFX-JS transitions to Astro's ClientRouter with core run(cb).
 Hold the navigation until the snapshot is taken. Target the <main> outlet.`,
     },
 ];
@@ -70,7 +76,7 @@ export default function UseWithAI() {
                     </p>
                     <p>
                         It covers the presets, <code>show</code> and{" "}
-                        <code>run</code>, React and Next.js, custom transitions,
+                        <code>run</code>, React, Vue and Svelte, custom transitions,
                         and the pitfalls. The agent reads it when a task needs
                         it.
                     </p>
