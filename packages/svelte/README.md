@@ -106,7 +106,9 @@ Render any markup, form controls included, into a shader.
 - The server and the first render use the `<div>`. After mount, a
   supporting browser switches to the `<canvas>` once, so the children
   mount again and their local state resets at that point.
-- `bind:element` follows the switch: the `<div>` first, then the `<canvas>`.
+- `bind:element` gives the element the effect is on: the `<canvas>`
+  if supported, else the `<div>`. It is `null` on the server, until the
+  effect is bound, and after unmount.
 - Style an inner element, not `VFXCanvas` itself. Padding on the canvas
   stretches the texture.
   See [html-in-canvas.md](../../docs/html-in-canvas.md) for sizing.

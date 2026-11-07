@@ -253,21 +253,65 @@ describe("VFXCanvas", () => {
         }
     });
 
-    it("exposes the div first, then the canvas", async () => {
-        const canvasRef = ref<{ el: HTMLElement | null } | null>(null);
-        app = createApp({
-            render: () =>
-                h(
-                    VFXCanvas,
-                    { ref: canvasRef, shader: "rgbShift" },
-                    { default: () => "hi" },
-                ),
+    describe("element", () => {
+        // A parent with `v-model:element`.
+        function mountWithModel(seen: (string | null)[]) {
+            const element = ref<HTMLElement | null>(null);
+            app = createApp({
+                render: () =>
+                    h(
+                        VFXCanvas,
+                        {
+                            shader: "rgbShift",
+                            element: element.value,
+                            "onUpdate:element": (el: HTMLElement | null) => {
+                                element.value = el;
+                                seen.push(el?.tagName ?? null);
+                            },
+                        },
+                        { default: () => "hi" },
+                    ),
+            });
+            app.mount(container);
+            return element;
+        }
+
+        it("is null until bound, then the canvas only", async () => {
+            const seen: (string | null)[] = [];
+            const element = mountWithModel(seen);
+            expect(seen).toEqual([]);
+            expect(element.value).toBeNull();
+            await nextTick();
+            await flush();
+            expect(seen).toEqual(["CANVAS"]);
+            expect(element.value).toBe(container.firstElementChild);
         });
-        app.mount(container);
-        expect(canvasRef.value?.el?.tagName).toBe("DIV");
-        await nextTick();
-        expect(canvasRef.value?.el?.tagName).toBe("CANVAS");
-        expect(canvasRef.value?.el).toBe(container.firstElementChild);
+
+        it("is the div when not supported", async () => {
+            mock.supported.value = false;
+            const seen: (string | null)[] = [];
+            const element = mountWithModel(seen);
+            await nextTick();
+            expect(seen).toEqual(["DIV"]);
+            expect(element.value).toBe(container.firstElementChild);
+        });
+
+        it("is null after unmount", async () => {
+            const seen: (string | null)[] = [];
+            const element = mountWithModel(seen);
+            await nextTick();
+            await flush();
+            await unmount();
+            expect(seen).toEqual(["CANVAS", null]);
+            expect(element.value).toBeNull();
+        });
+
+        it("does not put element on the root", async () => {
+            mountWithModel([]);
+            await nextTick();
+            const root = container.firstElementChild as HTMLElement;
+            expect(root.hasAttribute("element")).toBe(false);
+        });
     });
 
     it("renders the div on the server, with no core calls", async () => {

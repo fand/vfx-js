@@ -40,18 +40,27 @@ const VFX_PROP_KEYS = Object.keys(vfxProps) as (keyof VFXProps)[];
 /**
  * Render children into a shader.
  * Uses html-in-canvas when the browser has it, and dom-to-canvas otherwise.
- * `expose`s `el`, the root element.
+ * `v-model:element` gives the element the effect is on, or null when there is none.
  */
 export const VFXCanvas = defineComponent({
     name: "VFXCanvas",
     inheritAttrs: false,
-    props: vfxProps,
-    setup(props, { attrs, slots, expose }) {
+    props: {
+        ...vfxProps,
+        /** Use `v-model:element`. Read only; the component sets it. */
+        element: {
+            type: null as unknown as PropType<HTMLElement | null>,
+            default: undefined,
+        },
+    },
+    emits: {
+        "update:element": (_element: HTMLElement | null) => true,
+    },
+    setup(props, { attrs, slots, emit }) {
         // The server and the first client render use the div.
         // After mount, a supporting browser switches to the canvas once.
         const supported = ref(false);
         const el = shallowRef<HTMLElement | null>(null);
-        expose({ el });
 
         let controller: ElementController | null = null;
         let bound: HTMLElement | null = null;
@@ -86,6 +95,7 @@ export const VFXCanvas = defineComponent({
                 controller = bindElement(wanted, { capture: supported.value });
                 controller.update(currentProps());
             }
+            emit("update:element", wanted);
         };
 
         watch(

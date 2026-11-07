@@ -40,7 +40,7 @@ Both have a `VFXCanvas` component with the same props and markup as React's.
 </VFXCanvas>
 ```
 
-They render the `<div>` on the server and on the first client render, then switch to the `<canvas>` after mount when html-in-canvas is supported. The children mount again once at that point. Get the root element with `expose`d `el` (Vue) or `bind:element` (Svelte).
+They render the `<div>` on the server and on the first client render, then switch to the `<canvas>` after mount when html-in-canvas is supported. The children mount again once at that point. `v-model:element` (Vue) or `bind:element` (Svelte) gives the element the effect is on, and `null` until then.
 
 ## Sizing policy
 

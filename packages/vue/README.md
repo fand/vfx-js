@@ -121,12 +121,11 @@ import { VFXCanvas } from "@vfx-js/vue";
 import { ref } from "vue";
 
 const text = ref("");
-const card = ref<InstanceType<typeof VFXCanvas> | null>(null);
-// card.value?.el is the root element.
+const element = ref<HTMLElement | null>(null);
 </script>
 
 <template>
-    <VFXCanvas ref="card" shader="rgbShift" class="card">
+    <VFXCanvas v-model:element="element" shader="rgbShift" class="card">
         <h2>Title</h2>
         <input v-model="text" />
     </VFXCanvas>
@@ -143,7 +142,9 @@ const card = ref<InstanceType<typeof VFXCanvas> | null>(null);
 - The server and the first render use the `<div>`. After mount, a
   supporting browser switches to the `<canvas>` once, so the children
   mount again and their local state resets at that point.
-- `el` follows the switch: the `<div>` first, then the `<canvas>`.
+- `v-model:element` gives the element the effect is on: the `<canvas>`
+  if supported, else the `<div>`. It is `null` on the server, until the
+  effect is bound, and after unmount.
 - Style an inner element, not `VFXCanvas` itself. Padding on the canvas
   stretches the texture.
   See [html-in-canvas.md](../../docs/html-in-canvas.md) for sizing.

@@ -12,7 +12,7 @@
     type Props = VFXProps &
         Omit<HTMLAttributes<HTMLElement>, keyof VFXProps | "children"> & {
             children?: Snippet;
-            /** The root element: the `<div>` first, then the `<canvas>` if supported. */
+            /** The element the effect is on, or null when there is none. Use `bind:element`. */
             element?: HTMLElement | null;
         };
 
@@ -62,10 +62,14 @@
     function attach(capture: boolean): Attachment<HTMLElement> {
         return (el) => {
             const controller = bindElement(el, { capture });
+            element = el;
             $effect(() => {
                 controller.update(currentProps());
             });
-            return () => controller.destroy();
+            return () => {
+                controller.destroy();
+                element = null;
+            };
         };
     }
     const attachDiv = attach(false);
@@ -93,7 +97,6 @@
     <canvas
         {...attrs}
         {...CANVAS_ATTRS}
-        bind:this={element}
         {@attach attachCanvas}
     >
         <div {...CHILD_ATTRS}>{@render children?.()}</div>
@@ -101,7 +104,6 @@
 {:else}
     <div
         {...attrs}
-        bind:this={element}
         {@attach mode === "div" && attachDiv}
     >
         {@render children?.()}

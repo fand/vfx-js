@@ -158,8 +158,10 @@ See [plan5.md](./plan5.md).
 - `element.ts` (both): `bindElement(el, { capture })` sets up the
   html-in-canvas capture, adds with it, and re-adds with the latest one.
   Files differ only in the log prefix.
-- Vue `VFXCanvas` (`canvas.ts`) with `expose({ el })`; Svelte
-  `VFXCanvas.svelte` with a bindable `element`.
+- Vue `VFXCanvas` (`canvas.ts`) with `v-model:element`; Svelte
+  `VFXCanvas.svelte` with `bind:element`. Both give the element the
+  effect is on: `null`, then the `<canvas>` or the `<div>`, then `null`
+  after unmount. Never the `<div>` before the `<canvas>`.
 - Both render the `<div>` first and switch to the `<canvas>` after mount.
   The `<div>` is never bound when html-in-canvas is supported.
 - Storybook: "Effect/Vue › Canvas" and "Effect/Svelte › Canvas"

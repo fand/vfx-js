@@ -264,14 +264,29 @@ describe("VFXCanvas", () => {
         }
     });
 
-    it("binds element to the div first, then the canvas", async () => {
-        const seen: string[] = [];
-        const root = await render({ shader: "rgbShift" }, (el) => {
-            if (el) {
-                seen.push(el.tagName);
-            }
+    describe("element", () => {
+        const record = (seen: (string | null)[]) => (el: HTMLElement | null) =>
+            seen.push(el?.tagName ?? null);
+
+        it("is the canvas only, never the div", async () => {
+            const seen: (string | null)[] = [];
+            const root = await render({ shader: "rgbShift" }, record(seen));
+            expect(seen).toEqual(["CANVAS"]);
+            expect(root.tagName).toBe("CANVAS");
         });
-        expect(seen).toEqual(["DIV", "CANVAS"]);
-        expect(root.tagName).toBe("CANVAS");
+
+        it("is the div when not supported", async () => {
+            mock.supported.value = false;
+            const seen: (string | null)[] = [];
+            await render({ shader: "rgbShift" }, record(seen));
+            expect(seen).toEqual(["DIV"]);
+        });
+
+        it("is null after unmount", async () => {
+            const seen: (string | null)[] = [];
+            await render({ shader: "rgbShift" }, record(seen));
+            await destroy();
+            expect(seen).toEqual(["CANVAS", null]);
+        });
     });
 });
