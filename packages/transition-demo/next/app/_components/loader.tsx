@@ -41,6 +41,7 @@ export function useLoaded(): boolean {
     const isTop = useRef(usePathname() === "/");
     useEffect(() => {
         let cancelled = false;
+        let timer: number | undefined;
         Promise.all([
             document.fonts.ready,
             pageLoaded(),
@@ -55,10 +56,14 @@ export function useLoaded(): boolean {
                 : { transition: Crossfade, duration: 0.3 };
             setNextTransition(spec);
             setLoaded(true);
-            document.documentElement.removeAttribute("data-loading");
+            // Show the header after the run, so it stays off the cover.
+            timer = window.setTimeout(() => {
+                document.documentElement.removeAttribute("data-loading");
+            }, (spec.duration ?? 0) * 1000);
         });
         return () => {
             cancelled = true;
+            window.clearTimeout(timer);
         };
     }, []);
     return loaded;
