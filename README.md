@@ -44,6 +44,16 @@ vfx.add(img, {
 });
 ```
 
+## Use with AI agents
+
+Install the VFX-JS skill for Claude Code, Codex, Cursor and other agents:
+
+```
+npx skills add fand/vfx-js
+```
+
+Or point your agent to [llms.txt](https://amagi.dev/vfx-js/llms.txt) / [llms-full.txt](https://amagi.dev/vfx-js/llms-full.txt).
+
 ## Examples
 
 You can find basic examples on the VFX-JS website.

@@ -1,0 +1,36 @@
+# VFX-JS
+
+> VFX-JS is a JavaScript library that adds WebGL shader effects to HTML elements (images, videos, text, any element) and animates tab, carousel and page transitions. Packages: `@vfx-js/core` (the `VFX` class), `@vfx-js/react` (React components and `<VFXTransition>`), `@vfx-js/effects` (prebuilt effects), `@vfx-js/transitions` (transition presets).
+
+Quick start:
+
+```ts
+import { VFX } from "@vfx-js/core";
+
+const vfx = new VFX();
+await vfx.add(document.querySelector("img")!, { shader: "glitch", overflow: 100 });
+```
+
+VFX-JS runs in the browser only and needs WebGL. Create the `VFX` instance in client code and reuse one instance per page.
+
+## Docs
+
+- [Full guide for AI agents](https://amagi.dev/vfx-js/llms-full.txt): every file below in one file
+- [Overview](https://raw.githubusercontent.com/fand/vfx-js/main/skills/vfx-js/SKILL.md): packages, presets, options, React, pitfalls
+- [Custom shaders](https://raw.githubusercontent.com/fand/vfx-js/main/skills/vfx-js/references/shader.md): GLSL template, built-in uniforms, overflow, multipass, post effects
+- [Effects](https://raw.githubusercontent.com/fand/vfx-js/main/skills/vfx-js/references/effects.md): prebuilt effects and the Effect API
+- [Transitions](https://raw.githubusercontent.com/fand/vfx-js/main/skills/vfx-js/references/transitions.md): `addTransition`, presets, custom transitions, React and Next.js
+
+## Agent skill
+
+- [vfx-js skill](https://github.com/fand/vfx-js/tree/main/skills/vfx-js): install with `npx skills add fand/vfx-js`
+
+## Optional
+
+- [API reference](https://amagi.dev/vfx-js/docs/): TypeDoc for `@vfx-js/core`
+- [Examples](https://amagi.dev/vfx-js/examples/)
+- [Effect demos](https://amagi.dev/vfx-js/storybook/)
+- [Transition demo](https://amagi.dev/vfx-js-transitions/)
+- [Transition API (long form)](https://raw.githubusercontent.com/fand/vfx-js/main/docs/TRANSITION.md)
+- [Effect API (long form)](https://raw.githubusercontent.com/fand/vfx-js/main/docs/EFFECT.md)
+- [Multipass (long form)](https://raw.githubusercontent.com/fand/vfx-js/main/docs/MULTIPASS.md)
