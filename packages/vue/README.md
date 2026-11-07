@@ -1,6 +1,6 @@
 # @vfx-js/vue
 
-Shader page transitions for Vue and Nuxt, built on [@vfx-js/core](https://www.npmjs.com/package/@vfx-js/core).
+Shader page transitions and element effects for Vue and Nuxt, built on [@vfx-js/core](https://www.npmjs.com/package/@vfx-js/core).
 
 ```sh
 npm i @vfx-js/core @vfx-js/vue @vfx-js/transitions
@@ -52,6 +52,37 @@ useTransitionIn({ transition: Glitch });
 
 Back and forward add `reverse: true` to the spec that wins.
 
+## Element effects
+
+Add a shader to any element with `v-vfx`.
+Images, videos, canvases and text all work.
+
+```vue
+<script setup lang="ts">
+import { vVfx } from "@vfx-js/vue";
+</script>
+
+<template>
+    <img v-vfx="{ shader: 'rgbShift' }" src="cat.png" />
+    <h1 v-vfx="{ shader: 'glitch', overflow: 30 }">Hello</h1>
+</template>
+```
+
+To use it in every component, register it once:
+
+```ts
+import { vVfx } from "@vfx-js/vue";
+
+app.directive("vfx", vVfx);
+```
+
+- The value is `VFXProps` from `@vfx-js/core`. `null` or `undefined` means no effect.
+- A new object with the same values does nothing.
+  A new `effect` alone swaps the effect chain; any other change re-adds the element.
+- Text and attribute changes inside the element update its texture.
+  For changes it can't see, like an input's value, call `updateElement(el)`.
+- Elements and `<VFXTransition>` share one WebGL canvas.
+
 ## API
 
 ### `<VFXTransition>` (`@vfx-js/vue/nuxt`)
@@ -73,6 +104,14 @@ Modified clicks and links with another `target` are ignored.
 ### `setNextTransition(spec)`
 
 Use this spec for the next navigation, e.g. before `navigateTo()`.
+
+### `vVfx`
+
+The directive. See [Element effects](#element-effects).
+
+### `updateElement(el)`
+
+Re-capture the texture of an element with `v-vfx`.
 
 ### `useTransitionIn(spec)`
 
