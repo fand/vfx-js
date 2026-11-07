@@ -155,6 +155,98 @@ export default function About() {
         ],
     },
     {
+        id: "nuxt",
+        name: "Nuxt",
+        install: "npm i @vfx-js/core @vfx-js/vue @vfx-js/transitions",
+        intro: "Put <VFXTransition> from @vfx-js/vue/nuxt around <NuxtPage />. It holds each navigation until the old page is captured. Each page picks its transition with useTransitionIn.",
+        snippets: [
+            {
+                label: "app/app.vue",
+                code: `
+<script setup lang="ts">
+import { Crossfade, Swipe } from "@vfx-js/transitions";
+import { transition } from "@vfx-js/vue";
+import { VFXTransition } from "@vfx-js/vue/nuxt";
+</script>
+
+<template>
+  <nav>
+    <NuxtLink to="/">Home</NuxtLink>
+    <NuxtLink to="/gallery" @click="transition({ transition: Swipe })">
+      Gallery
+    </NuxtLink>
+  </nav>
+  <VFXTransition :transition="Crossfade" :duration="0.8">
+    <NuxtPage />
+  </VFXTransition>
+</template>`,
+            },
+            {
+                label: "app/pages/about.vue",
+                code: `
+<script setup lang="ts">
+import { Glitch } from "@vfx-js/transitions";
+import { useTransitionIn } from "@vfx-js/vue";
+
+useTransitionIn({ transition: Glitch });
+</script>
+
+<template>
+  <h1>About</h1>
+</template>`,
+            },
+        ],
+        notes: [
+            'The target fills the viewport height and pages scroll inside it. Pass :fullscreen="false" to size it with your own CSS, e.g. under a header.',
+            "A link's transition(spec) wins over the page's useTransitionIn. Back plays the winning spec reversed.",
+            "Navigate from code with setNextTransition({ transition }) before navigateTo().",
+        ],
+    },
+    {
+        id: "sveltekit",
+        name: "SvelteKit",
+        install: "npm i @vfx-js/core @vfx-js/svelte @vfx-js/transitions",
+        intro: "Put <VFXTransition> from @vfx-js/svelte/sveltekit around the layout's children. It uses onNavigate, so SvelteKit waits for the old page to be captured. Each page picks its transition with transitionIn.",
+        snippets: [
+            {
+                label: "src/routes/+layout.svelte",
+                code: `
+<script lang="ts">
+  import { transition } from "@vfx-js/svelte";
+  import { VFXTransition } from "@vfx-js/svelte/sveltekit";
+  import { Crossfade, Swipe } from "@vfx-js/transitions";
+
+  let { children } = $props();
+</script>
+
+<nav>
+  <a href="/">Home</a>
+  <a href="/gallery" {@attach transition({ transition: Swipe })}>Gallery</a>
+</nav>
+<VFXTransition transition={Crossfade} duration={0.8}>
+  {@render children()}
+</VFXTransition>`,
+            },
+            {
+                label: "src/routes/about/+page.svelte",
+                code: `
+<script lang="ts">
+  import { transitionIn } from "@vfx-js/svelte";
+  import { Glitch } from "@vfx-js/transitions";
+
+  transitionIn({ transition: Glitch });
+</script>
+
+<h1>About</h1>`,
+            },
+        ],
+        notes: [
+            "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
+            "A link's transition(spec) wins over the page's transitionIn. Back plays the winning spec reversed.",
+            "Needs Svelte 5.29 or later for {@attach}. Navigate from code with setNextTransition({ transition }) before goto().",
+        ],
+    },
+    {
         id: "vanilla",
         name: "Vanilla",
         install: "npm i @vfx-js/core @vfx-js/transitions",

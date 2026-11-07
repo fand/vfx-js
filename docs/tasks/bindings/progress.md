@@ -79,7 +79,7 @@ See [plan2.md](./plan2.md).
 
 - One PR for both packages: #226 (transitions, element effects,
   Storybook stories).
-- Getting Started tabs for Nuxt and SvelteKit. The page has none yet.
+- Getting Started: Nuxt and SvelteKit tabs added. Not checked in a browser.
 - Astro: try the open questions in plan.md first.
 - Later, if asked: `VFXCanvas`, a config API (`pixelRatio`, `zIndex`,
   `postEffect`), `@vfx-js/vue/router`, `@vfx-js/react/react-router`.
