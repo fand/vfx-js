@@ -1,374 +1,246 @@
 # Bindings: implementation plan
 
-The goal and the API are in [plan.md](./plan.md). This file says how to
-build it, file by file. Scope: core `hold()`, the shared spec store,
-React on `hold()`, `@vfx-js/vue` (+ `/nuxt`), `@vfx-js/svelte`
-(+ `/sveltekit`). Astro is last and gets its own plan once the open
-questions in plan.md are tried.
+The API is in [plan.md](./plan.md). This file says how to build the Vue
+and Svelte packages.
 
-## Fixes to plan.md
+## Scope
 
-- Presets are classes now (#224): `Crossfade`, `Swipe`, `Glitch`, not
-  `crossfade`. Update the snippets in plan.md and in the Getting Started
-  tabs.
-- `TransitionClass` does not help Astro: a class does not reach the
-  client from `.astro` props either. Specs as names stay.
-- React `<VFXTransition>` fills the viewport by default
-  (`fullscreen`) and renders an outer `display: contents` div. Vue and
-  Svelte do the same, so the tabs read the same.
+- `@vfx-js/vue`, with `@vfx-js/vue/nuxt`.
+- `@vfx-js/svelte`, with `@vfx-js/svelte/sveltekit`.
+- No change in `@vfx-js/core` or `@vfx-js/react`.
+- Astro is out for now.
 
-## Step 1. Core `hold()`
+## Changes from plan.md
 
-`packages/vfx-js/src/transition/transition.ts`, `types.ts`.
+- No core `hold()`. Each `<VFXTransition>` owns its handle, so the
+  binding can tell an old navigation from a new one itself. Core
+  `run(cb, opts)` does the rest: `opts` can be a function, called right
+  after `cb` resolves, so the spec is read when the new page is in.
+- The pending spec store stays where it is. Each package has its own
+  copy (`setNextTransition`, `takePending`, about 30 lines). Sharing it
+  only matters with two frameworks on one page.
+- Presets are classes now (#224): `Crossfade`, `Swipe`, `Glitch`.
+  Snippets in plan.md use the old names.
+- `<VFXTransition>` matches React: it fills the viewport by default
+  (`fullscreen`), and renders an outer `display: contents` div around
+  the target.
 
-`hold()` is a run whose `cb` waits on a deferred. The spec is always
-lazy, so it uses the existing lazy path (bind after `cb`, then swap the
-effects with `#ensureWrapped(slots, isCurrent, false)`).
+## What the bindings give
 
-```ts
-hold(opts: { signal?: AbortSignal } = {}): Promise<TransitionHold> {
-    let releaseCb!: () => void;
-    const swapped = new Promise<void>((r) => { releaseCb = r; });
-    let spec: RunOpts | (() => RunOpts) = {};
-    let id = 0;
-    let done = false;
+The router glue is a few lines, as in the demos. The packages are for
+the rest:
 
-    return new Promise((resolveHold) => {
-        const ran = this.run(() => {
-            // Called after the snapshot, or at once for a stale or cut run.
-            resolveHold(hold);
-            return swapped;
-        }, () => (typeof spec === "function" ? spec() : spec));
-        id = this.#seq;
-        this.#holds.set(id, releaseCb);
-        const hold: TransitionHold = {
-            release: (s) => {
-                if (done) return Promise.resolve();
-                done = true;
-                if (s) spec = s;
-                releaseCb();
-                return id === this.#seq ? ran : Promise.resolve();
-            },
-            cancel: () => {
-                if (done) return;
-                done = true;
-                releaseCb();
-                if (id === this.#seq) this.cancel();
-            },
-        };
-        opts.signal?.addEventListener("abort", hold.cancel, { once: true });
-        if (opts.signal?.aborted) hold.cancel();
-    });
-}
-```
+- `transition(spec)` on a link, `useTransitionIn` / `transitionIn` on a
+  page, and the order: link spec, then page spec, then the
+  `<VFXTransition>` props.
+- Back detection. Back adds `reverse: true` to the spec that wins.
+- One VFX instance, made on mount and destroyed on unmount.
+- SSR: one plain div, no `<ClientOnly>`.
 
-Details:
-
-- `#holds: Map<id, () => void>`. `run()` and `cancel()` resolve every
-  held deferred whose id is older than the new `#seq`. Without this an
-  old hold that nobody releases keeps a stale run pending forever. The
-  stale run then returns at its next `isCurrent()` check, as today.
-- `run()` stays as is. Do not rewrite `run` on top of `hold`: `run`
-  binds a static spec before the snapshot, and the effects start their
-  `start()` while held. `hold` can't, since its spec comes later. The
-  stack in plan.md ("run is hold + cb + release") holds for behavior,
-  not for code.
-- A destroyed handle: `run` calls `cb` at once, so `hold()` resolves
-  with a hold whose `release` does nothing.
-- `release()` with no spec: see step 2.
-- The `ran` promise rejects only when `cb` throws. Ours never throws,
-  so `release()` never rejects. Swallow `ran` errors inside `hold` so no
-  unhandled rejection shows when nobody calls `release`.
-- Export `TransitionHold` from `src/index.ts`.
-
-Tests in `transition/transition.test.ts`, with the fake host:
-
-1. `hold()` resolves after the snapshot; `running` is true.
-2. `release(spec)` binds `spec` after release, not before (spy the
-   transition constructor).
-3. `release()` resolves when the run ends.
-4. A newer `hold`, `run` or `show` wins: the old `release` resolves at
-   once and does not start; the old `cancel` does not stop the new run.
-5. `release` twice: the second does nothing.
-6. An aborted signal, before and after the snapshot, is `cancel()`.
-7. `cancel()` on the handle while held frees the hold.
-8. `hold()` on a destroyed handle.
-9. Snapshot stall: `hold()` still resolves, `release()` cuts.
-
-## Step 2. Move the spec store to core
-
-New `packages/vfx-js/src/transition/pending.ts`, moved from
-`packages/react/src/transition/store.ts`:
-
-- `setNextTransition(spec)`, `takeNextTransition()` (was `takePending`),
-  `hasNextTransition()`.
-- `isPlainLeftClick(e: MouseEvent, el: Element)`, DOM types only.
-- Keep the state on `globalThis[Symbol.for("vfx-js.pending")]`. Two
-  copies of core in one bundle (a binding resolving its own core) must
-  still share one pending spec.
-
-Export `setNextTransition` and `takeNextTransition` from core.
-`takeNextTransition` is for binding authors; say so in its doc comment.
-
-`release()` with no spec: `takeNextTransition() ?? {}`. With a spec, the
-spec as given; the binding builds the priority itself:
+## Shared parts (each package)
 
 ```ts
-hold.release(() => takeNextTransition() ?? pageSpec ?? {});
+// pending.ts — same as packages/react/src/transition/store.ts,
+// without the React event type.
+setNextTransition(spec: RunOpts): void;
+takePending(): RunOpts | null;      // 10 s TTL, once
+isPlainLeftClick(e: MouseEvent, el: Element): boolean;
+
+// scope.ts
+type TransitionScope = { register(spec: RunOpts): () => void };
+// register sets `incoming`; the remover clears it only if it still holds that spec.
+
+// spec.ts
+const pickSpec = (incoming: RunOpts | null, back: boolean): RunOpts => {
+    const spec = takePending() ?? incoming ?? {};
+    return back ? { ...spec, reverse: true } : spec;
+};
+
+// vfx.ts — one refcounted VFX per page.
+// acquire() on mount, release() on unmount; destroy one frame after
+// the count hits 0, so a remount in that frame keeps the canvas.
 ```
 
-Every binding uses this one line. Container props come in through
-`resolveSpec` as the defaults, so the order link → page → component
-holds.
+`<VFXTransition>` props: `AddTransitionOpts` plus `fullscreen`,
+`class`, `style`. Props go into one live options object passed to
+`addTransition`, so a prop change applies on the next run (as React
+`useLiveOpts`). `pixelRatio` and `zIndex` are read when the VFX is made.
 
-React:
-
-- `store.ts` keeps `transition(spec)` (it takes `React.MouseEvent`),
-  built on core `isPlainLeftClick` and `setNextTransition`.
-- Re-export `setNextTransition` from core. `store.test.ts` moves its
-  store cases to core and keeps the click cases.
-
-## Step 3. React `<VFXTransition>` on `hold()`
-
-`packages/react/src/transition/VFXTransition.tsx`:
-
-```ts
-useEffect(() => {
-    ...
-    incoming.current = null;
-    const held = transition.hold();
-    held.then((h) => {
-        if (requestedKey.current !== key) return h.cancel();
-        commitWaiters.current.push(() =>
-            h.release(() => takeNextTransition() ?? incoming.current ?? {}),
-        );
-        startTransition(() => setShown(next));
-    });
-});
-```
-
-- `commitWaiters` stays: it is how React says "committed". The swap
-  promise goes.
-- `h.cancel()` on a newer key is safe: a newer hold already won, so it
-  does nothing.
-- `VFXTransition.test.tsx` must pass unchanged. No public API change, no
-  changeset beyond a patch.
-- `useVFXTransition.run` keeps `transition.run(...)`; it changes the DOM
-  in one function.
-
-## Step 4. `@vfx-js/vue`
+## `@vfx-js/vue`
 
 ### Package
 
-`packages/vue/`, copied from `packages/react/` (tsc dual build,
-`tsconfig-to-dual-package`, biome, vitest).
+`packages/vue/`, set up like `packages/react/`: tsc dual build,
+`tsconfig-to-dual-package`, biome, vitest with happy-dom.
 
-- Components in `.ts` with `defineComponent` and `h()`. No SFC, so no
-  Vite or `vue-tsc` build; `tsc` is enough.
-- `peerDependencies`: `vue ^3.5`, `nuxt ^4` (optional). `dependencies`:
-  `@vfx-js/core workspace:*`.
+- Components in `.ts` with `defineComponent` and `h()`. No SFC, so tsc
+  is enough.
+- `peerDependencies`: `vue ^3.5`, `nuxt ^4` (optional).
+- `dependencies`: `@vfx-js/core workspace:*`.
 - `exports`: `.` and `./nuxt`.
 
 ```
 src/
-  index.ts             transition, useTransitionIn, VFXTransition (plain)
+  index.ts             transition, useTransitionIn, setNextTransition
+  pending.ts  scope.ts  spec.ts  vfx.ts
   transition.ts        transition(spec) → (e: MouseEvent) => void
-  scope.ts             InjectionKey<TransitionScope>
   use-transition-in.ts
-  vfx.ts               shared VFX instance (see below)
+  base.ts              VFXTransitionBase: divs, addTransition, provide(scope)
   nuxt/index.ts        VFXTransition for Nuxt
-  *.test.ts            happy-dom, core mocked
 ```
-
-### Shared VFX instance
-
-There is no Provider. `vfx.ts` keeps one refcounted `VFX`: `acquire()`
-in `onMounted`, `release()` in `onUnmounted`, destroy one frame after
-the count hits 0 (same rule as React `store.ts`). Props: `pixelRatio`,
-`zIndex` on `<VFXTransition>`, read at creation only. A config API
-like `useVFXConfig` waits until element bindings come.
-
-### `VFXTransition` (base)
-
-- Renders `div(display: contents) > div(ref, fill style) > slot`.
-- `onMounted`: `vfx.addTransition(el, liveOpts)`. `liveOpts` is one
-  object updated from props in a `watchEffect`, like React `useLiveOpts`.
-- `provide(scope)`. `scope.register(spec)` sets `incoming`, returns an
-  unregister that clears it only if it still holds that spec.
-- Exposes `hold()` and `handle` to the router wrapper through a
-  composable, not to users.
 
 ### `@vfx-js/vue/nuxt`
 
-`VFXTransition` wraps the base and wires the router in `onMounted`:
+`VFXTransition` renders the base and wires the router in `onMounted`.
+Same as `transition-demo/nuxt/app/plugins/vfx-transition.client.ts`,
+with the spec from `pickSpec`.
 
 ```ts
-const router = useRouter();          // from "vue-router" (Nuxt installs it)
-const nuxtApp = useNuxtApp();        // from "nuxt/app"
-let current: TransitionHold | null = null;
-let back = false;
+let finish: (() => void) | null = null;
+const free = () => { finish?.(); finish = null; };
 let position = history.state?.position ?? 0;
 
-const removeGuard = router.beforeEach(async (to, from) => {
-    if (to.path === from.path) return;
-    current?.cancel();
+const offGuard = router.beforeEach((to, from) => {
+    const t = handle.value;
+    if (!t || to.path === from.path) return;
+    free(); // a newer navigation drops this one
     // On back/forward the history entry has already changed.
-    back = (history.state?.position ?? position) < position;
-    scope.reset();
-    current = await base.hold();
+    const back = (history.state?.position ?? position) < position;
+    scope.incoming = null;
+    return new Promise<void>((taken) =>
+        t.run(() => {
+            taken();
+            return new Promise<void>((r) => { finish = r; });
+        }, () => pickSpec(scope.incoming, back)).catch(console.error),
+    );
 });
-const removeFinish = nuxtApp.hook("page:finish", () => {
-    const h = current; current = null;
-    h?.release(() => back ? withReverse(spec()) : spec());
-});
-router.afterEach((_t, _f, failure) => {
+const offFinish = nuxtApp.hook("page:finish", free);
+const offAfter = router.afterEach((_to, _from, failure) => {
     position = history.state?.position ?? position;
-    if (failure) { current?.cancel(); current = null; }
+    if (failure) free();
 });
+onUnmounted(() => { offGuard(); offFinish(); offAfter(); free(); });
 ```
 
-- `spec()` is `takeNextTransition() ?? incoming ?? {}`. Back adds
-  `reverse: true` to whatever wins. The demo plays `Swipe` reversed on
-  back; that is the demo's choice, not the binding's. Offer a
-  `backTransition` prop later if asked.
-- Remove the guard and the hook in `onUnmounted`.
-- `page:finish` fires after the new page's `setup`, so `useTransitionIn`
-  has registered by then.
-- Risk: importing `nuxt/app` from a library. Check that Nuxt resolves it
-  without `build.transpile`. If not, ship `@vfx-js/vue/nuxt` as a Nuxt
-  module (`defineNuxtModule`) that adds the component and transpiles
-  itself.
+- `router` from `useRouter()` (`vue-router`), `nuxtApp` from
+  `useNuxtApp()` (`nuxt/app`).
+- `page:finish` comes after the new page's `setup`, so
+  `useTransitionIn` has registered by then.
 
-### `transition(spec)` and `useTransitionIn(spec)`
+### `transition` and `useTransitionIn`
 
-- `transition(spec)` returns `(e: MouseEvent) => void`. Check that
-  `@click` on `<NuxtLink>` falls through to the `<a>` and runs; order
-  against RouterLink does not matter, the spec is read at release.
-- `useTransitionIn(spec)`: `inject(scope)`, register in `setup`,
-  unregister in `onUnmounted`. Warn once outside `<VFXTransition>`.
+- `transition(spec)` returns a click handler for
+  `@click="transition(spec)"`.
+- `useTransitionIn(spec)`: `inject` the scope, register in `setup`,
+  remove in `onUnmounted`. Warn once without a scope.
 
 ### Tests
 
-happy-dom, `vi.mock("@vfx-js/core")` with a fake handle whose `hold()`
-records calls.
+Mock `@vfx-js/core` with a fake `VFX` and handle that records `run`.
 
-- Mount and unmount add and destroy one transition; one VFX for two
-  `<VFXTransition>`s.
-- `useTransitionIn` registers in the scope; unmount clears it.
-- Nuxt wrapper with a fake router and fake `nuxtApp`: `beforeEach`
-  waits for `hold()`; `page:finish` calls `release` with link → page
-  order; a second navigation cancels the first hold; a failed
-  navigation cancels.
+- One VFX for two `<VFXTransition>`s; destroyed one frame after the
+  last unmount.
+- `useTransitionIn` registers; unmount clears it.
+- Nuxt wrapper with a fake router and `nuxtApp`:
+  - `beforeEach` waits until `run` calls `cb`.
+  - `page:finish` ends the run; the spec is link, then page, then `{}`.
+  - Back adds `reverse`.
+  - A second navigation frees the first; a failed one frees it too.
+  - The same path does not run.
 
-## Step 5. `@vfx-js/svelte`
+## `@vfx-js/svelte`
 
 ### Package
 
-`packages/svelte/`, built with `@sveltejs/package` (`svelte-package`).
-It ships `.svelte` and `.js` + `.d.ts` under `dist/`, ESM only. Lint with
-`biome` + `svelte-check`.
+`packages/svelte/`, built with `svelte-package`. It ships `.svelte`,
+`.js` and `.d.ts`, ESM only. Lint with biome and `svelte-check`.
 
 - `peerDependencies`: `svelte ^5.29` (`{@attach}`), `@sveltejs/kit ^3`
   (optional).
-- `exports`: `.` and `./sveltekit`, each with `types` and `svelte`
-  conditions.
+- `exports`: `.` and `./sveltekit`, each with `types` and `svelte`.
 
 ```
 src/lib/
-  index.ts
-  transition.ts          attachment: (spec) => (node) => cleanup
-  transition-in.ts       transitionIn(spec) via getContext
-  scope.ts               context key
-  vfx.ts                 shared VFX instance, same rule as Vue
-  VFXTransition.svelte   base: div > div + scope context
-  sveltekit/
-    index.ts
-    VFXTransition.svelte onNavigate wiring
+  index.ts             transition, transitionIn, setNextTransition
+  pending.ts  scope.ts  spec.ts  vfx.ts
+  transition.ts        attachment: (spec) => (node) => remover
+  transition-in.ts     getContext
+  VFXTransitionBase.svelte
+  sveltekit/index.ts
+  sveltekit/VFXTransition.svelte
 ```
 
 ### `@vfx-js/svelte/sveltekit`
 
+Same as `transition-demo/sveltekit/src/routes/+layout.svelte`.
+
 ```ts
 onNavigate((nav) => {
-    if (!handle || !nav.to || nav.to.url.pathname === nav.from?.url.pathname) return;
+    const t = handle;
+    if (!t || !nav.to || nav.to.url.pathname === nav.from?.url.pathname) return;
     const back = nav.type === "popstate" && (nav.delta ?? 0) < 0;
-    scope.reset();
-    return handle.hold().then((h) => {
-        nav.complete.then(
-            () => h.release(() => back ? withReverse(spec()) : spec()),
-            () => h.cancel(),
-        );
-    });
+    scope.incoming = null;
+    return new Promise<void>((taken) =>
+        t.run(async () => {
+            taken();
+            await nav.complete;
+        }, () => pickSpec(scope.incoming, back)).catch(() => {}),
+    );
 });
 ```
 
-- `onNavigate` waits for the returned promise, so the snapshot comes
-  before the DOM update. A newer navigation wins through core.
-- `$app/navigation` is only imported in the `/sveltekit` subpath.
+- `onNavigate` waits for the promise, so the snapshot comes before the
+  DOM update.
+- A failed navigation rejects `nav.complete`. `cb` throws and core
+  ends the run.
+- `$app/navigation` is only imported under `/sveltekit`.
 
-### `transition(spec)` and `transitionIn(spec)`
+### `transition` and `transitionIn`
 
-- `transition(spec)` is an attachment: add a `click` listener that calls
-  `setNextTransition` on a plain left click; return the remover.
-- `transitionIn(spec)`: `getContext(key)`, register at init, unregister
-  in `onDestroy`. Warn once without a context.
+- `transition(spec)` is an attachment: a `click` listener that calls
+  `setNextTransition` on a plain left click. Returns the remover.
+- `transitionIn(spec)`: `getContext`, register at init, remove in
+  `onDestroy`. Warn once without a context.
 
 ### Tests
 
-vitest + `@testing-library/svelte` or `mount()` from svelte, happy-dom,
-core mocked. Same cases as Vue, with a fake `onNavigate` (mock
-`$app/navigation`).
+vitest, happy-dom, `mount()` from `svelte`, core mocked, `$app/navigation`
+mocked with a fake `onNavigate`. Same cases as Vue.
 
-## Step 6. Demos and docs
+## Demos and docs
 
-- `packages/transition-demo/nuxt`: drop `plugins/vfx-transition.client.ts`,
-  use `<VFXTransition>` in `app.vue`, `transition(spec)` on links, and
-  pass the back spec as the demo does today.
-- `packages/transition-demo/sveltekit`: same in `+layout.svelte`.
+- `transition-demo/nuxt`: remove the plugin; `app.vue` uses
+  `<VFXTransition>` and `transition(spec)` on the links.
+- `transition-demo/sveltekit`: same in `+layout.svelte`.
 - Getting Started (`next/app/getting-started/frameworks.ts`): the Nuxt
-  and SvelteKit tabs use the bindings; move the fixed-height note above
-  the tabs.
-- READMEs for both packages. `docs/TRANSITION.md`: `hold()` under
-  `TransitionHandle`, and when to use `show`, `run` or `hold`.
-- `CLAUDE.md`: list `packages/vue/` and `packages/svelte/`.
-- Changesets: minor for `@vfx-js/core` (`hold`, store), patch for
-  `@vfx-js/react`, initial `0.1.0` for the two new packages.
+  and SvelteKit tabs use the packages. Move the fixed-height note above
+  the tabs. Astro keeps its tab as is.
+- A README per package.
+- `CLAUDE.md`: add `packages/vue/` and `packages/svelte/`.
+- Changesets: `0.1.0` for both packages.
 
-## Step 7. Astro (separate plan)
+## PRs
 
-Try the open questions first, in the existing demo glue, on `hold()`:
+1. `@vfx-js/vue` + `/nuxt`, tests, Nuxt demo, Nuxt tab, README.
+2. `@vfx-js/svelte` + `/sveltekit`, tests, SvelteKit demo, SvelteKit
+   tab, README.
 
-- Detach and reattach the canvas and the target in one task. Does the
-  WebGL context survive? Does html-in-canvas keep its state? Does core
-  see a stall?
-- `transition:persist` inside the target.
-
-Then write `plan3.md` for `@vfx-js/astro`.
-
-## Commits / PRs
-
-1. Core `hold()` + tests. (PR 1)
-2. Core spec store; React re-exports; React `<VFXTransition>` on
-   `hold()`. (PR 1)
-3. `@vfx-js/vue` + `/nuxt`, tests, Nuxt demo port. (PR 2)
-4. `@vfx-js/svelte` + `/sveltekit`, tests, SvelteKit demo port. (PR 3)
-5. Docs, Getting Started tabs, changesets. (PR 2 and 3 each carry their
-   own part.)
-
-PR 1 lands first. PR 2 and 3 do not depend on each other.
+They do not depend on each other.
 
 ## Check before merge
 
-- `pnpm test`, `pnpm run lint`, `pnpm run build`.
-- In a browser, each demo: link, back, forward, a click during a run,
-  a navigation to the same page, a failed navigation. Only one canvas.
+- `pnpm test`, `pnpm run lint`, `pnpm run build`, and `build:demo` for
+  the ported demo.
+- In a browser: link, back, forward, a click during a run, the same
+  page, a failed navigation. Only one canvas.
 
 ## Open
 
-- Vue: is `nuxt/app` safe to import from a package, or do we need a
-  Nuxt module?
-- Back spec: keep "the winning spec + `reverse`", or add a
-  `backTransition` prop on every `<VFXTransition>`?
-- Should `vfx.ts` (the shared instance) live in core so React, Vue and
-  Svelte share one canvas on a page with two frameworks? Not needed for
-  transitions alone.
+- Can a package import `nuxt/app` without `build.transpile`? If not,
+  ship `/nuxt` as a Nuxt module that adds the component.
+- `@click` on `<NuxtLink>`: check it reaches the `<a>`. The order
+  against RouterLink does not matter, since the spec is read at the end.
+- Back spec: "winning spec + `reverse`" for now. A `backTransition`
+  prop later if asked.
+- Later, if the same glue shows up a fourth time, move it to core as
+  `hold()`.
