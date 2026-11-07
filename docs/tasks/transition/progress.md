@@ -3,15 +3,9 @@
 All plans are merged (#220, #224). Only open items are left.
 Older notes are in git history.
 
-## Checked in Chrome 157 with html-in-canvas (2026-11-07)
+## Bugs
 
-`show()` and the Tabs story, the review fixes, nested freeze and `keepWrapped` all work.
-SvelteKit and Nuxt demos type-check.
-
-## Found in the browser check
-
-- Fixed: a target hidden with `display: none` inside `cb` threw in the paint handler.
-- Open: a `position: fixed` or `absolute` target sized by its insets breaks once wrapped.
+- A `position: fixed` or `absolute` target sized by its insets breaks once wrapped.
   The canvas copies the insets, but a replaced element does not stretch, and the child RO sets the canvas height to the content height.
   Fix, checked by hand in Chrome: canvas `width` / `height` = `calc(100% - <insets>)`, element `position: static; height: 100%`.
   An in-flow `100vw` × `100vh` target works today.
