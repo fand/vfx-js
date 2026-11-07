@@ -673,10 +673,12 @@ export class EffectChain {
 
     #ensureIntermediate(k: number, bufferSize: [number, number]): void {
         const current = this.#intermediates[k];
+        // Framebuffer floors its size, so compare floored sizes.
+        // Else a fractional size reallocates every frame.
         if (
             current &&
-            current.fb.width === bufferSize[0] &&
-            current.fb.height === bufferSize[1]
+            current.fb.width === Math.max(1, Math.floor(bufferSize[0])) &&
+            current.fb.height === Math.max(1, Math.floor(bufferSize[1]))
         ) {
             return;
         }
