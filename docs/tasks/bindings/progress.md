@@ -82,8 +82,8 @@ See [plan2.md](./plan2.md).
 - Getting Started: Nuxt, Vue and SvelteKit tabs added. Not checked in a
   browser.
 - Astro: try the open questions in plan.md first.
-- `VFXCanvas` (html-in-canvas wrapper): a separate PR.
-- Later, if asked: a config API (`pixelRatio`, `zIndex`, `postEffect`).
+- `VFXCanvas`: done, see below.
+- Config API for Vue and Svelte: separate plan.
 - Router subpaths: done, see below.
 - Not checked: the html-in-canvas path, Chromatic for the new stories.
 
@@ -150,3 +150,36 @@ See [plan4.md](./plan4.md).
   ends, so `/about` loaded directly would transition from nothing.
 - React props type keeps `AddTransitionOpts<T>` like `/next`, so
   `params` stays typed per transition class.
+
+## Done: `VFXCanvas`
+
+See [plan5.md](./plan5.md).
+
+- `element.ts` (both): `bindElement(el, { capture })` sets up the
+  html-in-canvas capture, adds with it, and re-adds with the latest one.
+  Files differ only in the log prefix.
+- Vue `VFXCanvas` (`canvas.ts`) with `expose({ el })`; Svelte
+  `VFXCanvas.svelte` with a bindable `element`.
+- Both render the `<div>` first and switch to the `<canvas>` after mount.
+  The `<div>` is never bound when html-in-canvas is supported.
+- Storybook: "Effect/Vue › Canvas" and "Effect/Svelte › Canvas"
+  (CRT Bloom, with an `<input>`).
+- READMEs, `docs/html-in-canvas.md`, changesets.
+
+## Checked (`VFXCanvas`)
+
+- Tests: vue 64, svelte 54 (unit, plus SSR with `vue/server-renderer`
+  and `svelte/server`). Lint and build pass.
+- Storybook in Chrome for Testing (Playwright's Chromium build):
+  - With `--enable-blink-features=CanvasDrawElement`, html-in-canvas is
+    on. Both stories render the `<canvas>`, the effect shows, typed text
+    shows in the texture, one VFX canvas, no errors.
+  - Without the flag: the `<div>` fallback. Same checks pass.
+  - Story switching between the Vue and Svelte stories leaves one
+    canvas. React stories leave their canvas behind; they never unmount.
+
+## Fixed along the way (`VFXCanvas`)
+
+- Vue: the fallback `<div>` was bound twice (from `onMounted` and the
+  `el` watcher), so two controllers added the same effects. Now one
+  `sync()` binds only when the element changes. The test checks one add.

@@ -56,3 +56,25 @@ export function storyContainer(): HTMLElement {
     }
     return document.createElement("div");
 }
+
+export const CRT_EFFECT_IDS = ["pixelate", "scanline", "bloom"] as const;
+
+export const CRT_PANEL_STYLE =
+    "position:fixed; top:16px; right:16px; z-index:10000; width:200px; padding:12px; background:rgba(20,20,20,0.85); color:#fff; font-family:system-ui, sans-serif; font-size:13px; border-radius:6px";
+
+export const CRT_CANVAS_STYLE =
+    "display:block; width:min(640px, 90vw); margin:64px auto";
+
+// Style the inner div, not the canvas.
+// Padding on the canvas would stretch the captured texture.
+export const CRT_CARD_STYLE =
+    "padding:40px 48px; background:linear-gradient(135deg, #1a0030 0%, #001a30 100%); border-radius:12px; box-shadow:0 0 0 1px rgba(255,255,255,0.1); font-family:system-ui, sans-serif";
+
+export const CRT_TITLE_STYLE =
+    "margin:0; font-size:48px; font-weight:800; color:#ff4fa3; text-shadow:0 0 12px rgba(255,79,163,0.6); letter-spacing:-1px";
+
+export const CRT_TEXT_STYLE =
+    "margin:24px 0 0; font-size:18px; line-height:1.6; color:#a0e4ff";
+
+export const CRT_INPUT_STYLE =
+    "margin-top:24px; padding:8px 12px; font-size:18px; border-radius:6px; border:1px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.08); color:#ffe066; width:100%; box-sizing:border-box";

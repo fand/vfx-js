@@ -111,6 +111,43 @@ app.directive("vfx", vVfx);
   For changes it can't see, like an input's value, call `updateElement(el)`.
 - Elements and `<VFXTransition>` share one WebGL canvas.
 
+## `VFXCanvas`
+
+Render any markup, form controls included, into a shader.
+
+```vue
+<script setup lang="ts">
+import { VFXCanvas } from "@vfx-js/vue";
+import { ref } from "vue";
+
+const text = ref("");
+const card = ref<InstanceType<typeof VFXCanvas> | null>(null);
+// card.value?.el is the root element.
+</script>
+
+<template>
+    <VFXCanvas ref="card" shader="rgbShift" class="card">
+        <h2>Title</h2>
+        <input v-model="text" />
+    </VFXCanvas>
+</template>
+```
+
+- Props are `VFXProps` (`shader`, `uniforms`, `effect`, ...).
+  Other attributes go on the root element.
+- Browsers with html-in-canvas (Chrome Canary, or Chrome with
+  `chrome://flags/#canvas-draw-element`) render
+  `<canvas layoutsubtree>` and capture its children as they paint.
+  Typing in an input shows up in the texture.
+- Other browsers render a `<div>` and capture it with dom-to-canvas.
+- The server and the first render use the `<div>`. After mount, a
+  supporting browser switches to the `<canvas>` once, so the children
+  mount again and their local state resets at that point.
+- `el` follows the switch: the `<div>` first, then the `<canvas>`.
+- Style an inner element, not `VFXCanvas` itself. Padding on the canvas
+  stretches the texture.
+  See [html-in-canvas.md](../../docs/html-in-canvas.md) for sizing.
+
 ## API
 
 ### `<VFXTransition>` (`@vfx-js/vue/nuxt`, `@vfx-js/vue/router`)
@@ -139,6 +176,10 @@ Use this spec for the next navigation, e.g. before `navigateTo()` or
 ### `vVfx`
 
 The directive. See [Element effects](#element-effects).
+
+### `VFXCanvas`
+
+A component. See [`VFXCanvas`](#vfxcanvas).
 
 ### `updateElement(el)`
 

@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import { BloomEffect, PixelateEffect, ScanlineEffect } from "@vfx-js/effects";
-import { vVfx } from "@vfx-js/vue";
+import { VFXCanvas, vVfx } from "@vfx-js/vue";
 import {
     type App,
     type Component,
+    computed,
     createApp,
     defineComponent,
     h,
@@ -14,6 +15,13 @@ import JellyfishMp4 from "./assets/jellyfish.mp4";
 import Jellyfish from "./assets/jellyfish.webp";
 import {
     bloomParams,
+    CRT_CANVAS_STYLE,
+    CRT_CARD_STYLE,
+    CRT_EFFECT_IDS,
+    CRT_INPUT_STYLE,
+    CRT_PANEL_STYLE,
+    CRT_TEXT_STYLE,
+    CRT_TITLE_STYLE,
     ROOT_STYLE,
     SECTION_HEADER_STYLE,
     SHADERS,
@@ -230,3 +238,82 @@ export const live: StoryObj<undefined> = {
 };
 live.play = ({ canvasElement }) =>
     mountStory(canvasElement.firstElementChild as HTMLElement, Live);
+
+const Canvas = defineComponent({
+    setup() {
+        const instances = {
+            pixelate: new PixelateEffect({ size: 6 }),
+            scanline: new ScanlineEffect({ spacing: 4 }),
+            bloom: new BloomEffect({
+                ...bloomParams(),
+                intensity: 4.0,
+                pad: 200,
+            }),
+        };
+        const enabled = ref({ pixelate: true, scanline: true, bloom: true });
+        const effect = computed(() =>
+            CRT_EFFECT_IDS.filter((id) => enabled.value[id]).map(
+                (id) => instances[id],
+            ),
+        );
+        const text = ref("Type here");
+
+        return () => [
+            h("div", { style: CRT_PANEL_STYLE }, [
+                h(
+                    "div",
+                    { style: "margin-bottom:8px; font-weight:600" },
+                    "VFXCanvas: effect chain",
+                ),
+                ...CRT_EFFECT_IDS.map((id) =>
+                    h("label", { style: "display:block" }, [
+                        h("input", {
+                            type: "checkbox",
+                            checked: enabled.value[id],
+                            onChange: () => {
+                                enabled.value = {
+                                    ...enabled.value,
+                                    [id]: !enabled.value[id],
+                                };
+                            },
+                        }),
+                        ` ${id}`,
+                    ]),
+                ),
+            ]),
+            h(
+                VFXCanvas,
+                { effect: effect.value, style: CRT_CANVAS_STYLE },
+                {
+                    default: () =>
+                        h("div", { style: CRT_CARD_STYLE }, [
+                            h("h1", { style: CRT_TITLE_STYLE }, "VFX-JS"),
+                            h(
+                                "p",
+                                { style: CRT_TEXT_STYLE },
+                                "Live HTML captured into a WebGL texture, then run through an effect chain.",
+                            ),
+                            h("input", {
+                                value: text.value,
+                                onInput: (e: Event) => {
+                                    text.value = (
+                                        e.target as HTMLInputElement
+                                    ).value;
+                                },
+                                style: CRT_INPUT_STYLE,
+                            }),
+                            h("p", { style: CRT_TEXT_STYLE }, text.value),
+                        ]),
+                },
+            ),
+        ];
+    },
+});
+
+export const canvas: StoryObj<undefined> = {
+    name: "Canvas",
+    render: () => document.createElement("div"),
+    args: undefined,
+};
+canvas.play = ({ canvasElement }) =>
+    mountStory(canvasElement.firstElementChild as HTMLElement, Canvas);

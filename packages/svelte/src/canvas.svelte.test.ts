@@ -234,6 +234,8 @@ describe("VFXCanvas", () => {
             expect(mock.vfx.add).toHaveBeenCalledWith(root, {
                 shader: "rgbShift",
             });
+            expect(mock.vfx.add).toHaveBeenCalledTimes(1);
+            expect(mock.init).toHaveBeenCalledTimes(1);
             expect(mock.setupCapture).not.toHaveBeenCalled();
         });
 

@@ -54,6 +54,7 @@ export const VFXCanvas = defineComponent({
         expose({ el });
 
         let controller: ElementController | null = null;
+        let bound: HTMLElement | null = null;
         let mounted = false;
 
         const currentProps = (): VFXProps => {
@@ -66,13 +67,23 @@ export const VFXCanvas = defineComponent({
             return out as VFXProps;
         };
 
-        const bind = (node: HTMLElement | null) => {
+        // Bind the root once it is the element we want; never bind twice.
+        const sync = () => {
+            const node = el.value;
+            const wanted =
+                mounted &&
+                node !== null &&
+                supported.value === node instanceof HTMLCanvasElement
+                    ? node
+                    : null;
+            if (wanted === bound) {
+                return;
+            }
             controller?.destroy();
             controller = null;
-            if (node) {
-                controller = bindElement(node, {
-                    capture: node instanceof HTMLCanvasElement,
-                });
+            bound = wanted;
+            if (wanted) {
+                controller = bindElement(wanted, { capture: supported.value });
                 controller.update(currentProps());
             }
         };
@@ -81,28 +92,16 @@ export const VFXCanvas = defineComponent({
             () => VFX_PROP_KEYS.map((key) => props[key]),
             () => controller?.update(currentProps()),
         );
-        watch(
-            el,
-            (node) => {
-                if (mounted) {
-                    bind(node);
-                }
-            },
-            { flush: "post" },
-        );
+        watch(el, sync, { flush: "post" });
 
         onMounted(() => {
             mounted = true;
             supported.value = supportsHtmlInCanvas();
-            // A supporting browser binds the canvas once it renders.
-            if (!supported.value) {
-                bind(el.value);
-            }
+            sync();
         });
         onBeforeUnmount(() => {
             mounted = false;
-            controller?.destroy();
-            controller = null;
+            sync();
         });
 
         return () => {

@@ -78,6 +78,39 @@ Images, videos, canvases and text all work.
   For changes it can't see, like an input's value, call `updateElement(el)`.
 - Elements and `<VFXTransition>` share one WebGL canvas.
 
+## `VFXCanvas`
+
+Render any markup, form controls included, into a shader.
+
+```svelte
+<script lang="ts">
+    import { VFXCanvas } from "@vfx-js/svelte";
+
+    let text = $state("");
+    let element = $state<HTMLElement | null>(null);
+</script>
+
+<VFXCanvas shader="rgbShift" class="card" bind:element>
+    <h2>Title</h2>
+    <input bind:value={text} />
+</VFXCanvas>
+```
+
+- Props are `VFXProps` (`shader`, `uniforms`, `effect`, ...).
+  Other attributes go on the root element.
+- Browsers with html-in-canvas (Chrome Canary, or Chrome with
+  `chrome://flags/#canvas-draw-element`) render
+  `<canvas layoutsubtree>` and capture its children as they paint.
+  Typing in an input shows up in the texture.
+- Other browsers render a `<div>` and capture it with dom-to-canvas.
+- The server and the first render use the `<div>`. After mount, a
+  supporting browser switches to the `<canvas>` once, so the children
+  mount again and their local state resets at that point.
+- `bind:element` follows the switch: the `<div>` first, then the `<canvas>`.
+- Style an inner element, not `VFXCanvas` itself. Padding on the canvas
+  stretches the texture.
+  See [html-in-canvas.md](../../docs/html-in-canvas.md) for sizing.
+
 ## API
 
 ### `<VFXTransition>` (`@vfx-js/svelte/sveltekit`)
@@ -103,6 +136,10 @@ Use this spec for the next navigation, e.g. before `goto()`.
 ### `vfx(props)`
 
 The attachment. See [Element effects](#element-effects).
+
+### `VFXCanvas`
+
+A component. See [`VFXCanvas`](#vfxcanvas).
 
 ### `updateElement(el)`
 
