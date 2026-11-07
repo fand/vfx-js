@@ -174,6 +174,31 @@ useVFXConfig({ pixelRatio: 1, zIndex: -1 });
 - A replace during a page transition cuts to the new page.
 - With two mounted callers, the last one mounted wins, with a warning.
 
+### Drive frames yourself
+
+With `autoplay: false`, nothing renders until you call `render()`.
+`useVFXInstance()` gives the shared VFX as a ref. It follows replaces
+and is `null` while there is none. Reading it does not keep the VFX
+alive.
+
+```vue
+<script setup lang="ts">
+import { useVFXConfig, useVFXInstance } from "@vfx-js/vue";
+import { onMounted, onUnmounted } from "vue";
+
+useVFXConfig({ autoplay: false });
+const vfx = useVFXInstance();
+
+let frame = 0;
+const loop = () => {
+    vfx.value?.render();
+    frame = requestAnimationFrame(loop);
+};
+onMounted(loop);
+onUnmounted(() => cancelAnimationFrame(frame));
+</script>
+```
+
 ## API
 
 ### `<VFXTransition>` (`@vfx-js/vue/nuxt`, `@vfx-js/vue/router`)
@@ -210,6 +235,10 @@ A component. See [`VFXCanvas`](#vfxcanvas).
 ### `useVFXConfig(config)`
 
 Set the options of the shared VFX. See [Config](#config).
+
+### `useVFXInstance()`
+
+The shared VFX as a ref, or `null`. See [Drive frames yourself](#drive-frames-yourself).
 
 ### `updateElement(el)`
 

@@ -14,6 +14,7 @@ import {
 import { VFXCanvas } from "./canvas.js";
 import { useVFXConfig } from "./config.js";
 import { vVfx } from "./directive.js";
+import { useVFXInstance } from "./instance.js";
 import { VFXTransition } from "./nuxt/index.js";
 import type { VFXConfig } from "./vfx.js";
 
@@ -291,6 +292,88 @@ describe("useVFXConfig", () => {
             { shader: "rgbShift" },
             latest,
         );
+    });
+});
+
+describe("useVFXInstance", () => {
+    let container: HTMLElement;
+    let app: App | null;
+    const config = ref<VFXConfig>({});
+    const showElement = ref(false);
+    let read: () => unknown = () => undefined;
+
+    const Reader = defineComponent({
+        setup() {
+            const vfx = useVFXInstance();
+            read = () => vfx.value;
+            return () => null;
+        },
+    });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mock.instances.length = 0;
+        mock.state.fail = false;
+        config.value = {};
+        showElement.value = false;
+        container = document.createElement("div");
+        document.body.appendChild(container);
+        app = createApp({
+            render: () =>
+                h(ConfigOwner, { config: config.value }, () => [
+                    h(Reader),
+                    showElement.value
+                        ? withDirectives(h("h1", "hi"), [
+                              [vVfx, { shader: "rgbShift" }],
+                          ])
+                        : null,
+                ]),
+        });
+        app.mount(container);
+    });
+    afterEach(async () => {
+        app?.unmount();
+        container.remove();
+        await flush();
+        await frame();
+    });
+
+    it("is null without consumers, and reading makes no VFX", async () => {
+        await flush();
+        expect(read()).toBeNull();
+        expect(mock.init).not.toHaveBeenCalled();
+    });
+
+    it("is the VFX once a consumer attaches", async () => {
+        showElement.value = true;
+        await nextTick();
+        await flush();
+        expect(mock.init).toHaveBeenCalledTimes(1);
+        expect(read()).toBe(mock.instances[0]);
+    });
+
+    it("follows a config replace", async () => {
+        showElement.value = true;
+        await nextTick();
+        await flush();
+        config.value = { pixelRatio: 2 };
+        await nextTick();
+        await flush();
+        expect(mock.instances).toHaveLength(2);
+        expect(read()).toBe(mock.instances[1]);
+    });
+
+    it("is null a frame after the last consumer goes", async () => {
+        showElement.value = true;
+        await nextTick();
+        await flush();
+        showElement.value = false;
+        await nextTick();
+        await flush();
+        expect(read()).toBe(mock.instances[0]);
+        await frame();
+        expect(read()).toBeNull();
+        expect(mock.init).toHaveBeenCalledTimes(1);
     });
 });
 

@@ -198,12 +198,16 @@ See [plan6.md](./plan6.md).
   capture keeps running across a replace.
 - Vue `useVFXConfig(config | ref | getter)`, Svelte
   `vfxConfig(config | getter)`, and the `VFXConfig` type.
+- Vue `useVFXInstance()` (a shallow ref), Svelte `vfxInstance()`
+  (`.current`): the shared VFX for `autoplay: false`. The store notifies
+  on create, replace and destroy. Reading does not keep the VFX alive.
 - Storybook: "Effect/Vue › Config" and "Effect/Svelte › Config".
 - READMEs, changesets, comparison page.
 
 ## Checked (config API)
 
-- Tests: vue 78, svelte 67 (11 new each). Lint and build pass.
+- Tests: vue 82, svelte 71 (15 new each, 4 of them for the instance
+  getter). Lint and build pass.
 - Storybook in Chrome for Testing: pixelRatio 1 → 2 → 1 and zIndex
   default → -1 → default each give one canvas with the new size and
   z-index, and the effects stay. Four fast toggles end with one canvas.

@@ -3,6 +3,7 @@ import { flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VFXConfig } from "./lib/vfx.js";
 import ConfigHarness from "./test/ConfigHarness.svelte";
+import InstanceHarness from "./test/InstanceHarness.svelte";
 import ThreeOwners from "./test/ThreeOwners.svelte";
 
 const mock = vi.hoisted(() => {
@@ -251,6 +252,83 @@ describe("vfxConfig", () => {
             { shader: "rgbShift" },
             latest,
         );
+    });
+});
+
+describe("vfxInstance", () => {
+    let container: HTMLElement;
+    let app: Record<string, unknown> | null;
+    let state: { config: VFXConfig; showElement: boolean };
+    let read: () => unknown = () => undefined;
+
+    async function change(fn: () => void) {
+        fn();
+        flushSync();
+        await flush();
+    }
+
+    beforeEach(async () => {
+        vi.clearAllMocks();
+        mock.instances.length = 0;
+        mock.state.fail = false;
+        container = document.createElement("div");
+        document.body.appendChild(container);
+        const initial = $state({
+            config: {} as VFXConfig,
+            showElement: false,
+            onRead: (fn: () => unknown) => {
+                read = fn;
+            },
+        });
+        state = initial;
+        app = mount(InstanceHarness, { target: container, props: initial });
+        flushSync();
+        await flush();
+    });
+    afterEach(async () => {
+        if (app) {
+            unmount(app);
+        }
+        container.remove();
+        await flush();
+        await frame();
+    });
+
+    it("is null without consumers, and reading makes no VFX", () => {
+        expect(read()).toBeNull();
+        expect(mock.init).not.toHaveBeenCalled();
+    });
+
+    it("is the VFX once a consumer attaches", async () => {
+        await change(() => {
+            state.showElement = true;
+        });
+        expect(mock.init).toHaveBeenCalledTimes(1);
+        expect(read()).toBe(mock.instances[0]);
+    });
+
+    it("follows a config replace", async () => {
+        await change(() => {
+            state.showElement = true;
+        });
+        await change(() => {
+            state.config = { pixelRatio: 2 };
+        });
+        expect(mock.instances).toHaveLength(2);
+        expect(read()).toBe(mock.instances[1]);
+    });
+
+    it("is null a frame after the last consumer goes", async () => {
+        await change(() => {
+            state.showElement = true;
+        });
+        await change(() => {
+            state.showElement = false;
+        });
+        expect(read()).toBe(mock.instances[0]);
+        await frame();
+        expect(read()).toBeNull();
+        expect(mock.init).toHaveBeenCalledTimes(1);
     });
 });
 

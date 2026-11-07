@@ -141,6 +141,33 @@ Set the options of the shared VFX with `vfxConfig`, e.g. in
   proxy each time it is assigned, so it counts as a new reference and
   replaces the VFX.
 
+### Drive frames yourself
+
+With `autoplay: false`, nothing renders until you call `render()`.
+`vfxInstance()` gives the shared VFX as `.current`. It follows replaces
+and is `null` while there is none. Reading it does not keep the VFX
+alive.
+
+```svelte
+<script lang="ts">
+    import { vfxConfig, vfxInstance } from "@vfx-js/svelte";
+    import { onMount } from "svelte";
+
+    vfxConfig({ autoplay: false });
+    const instance = vfxInstance();
+
+    onMount(() => {
+        let frame = 0;
+        const loop = () => {
+            instance.current?.render();
+            frame = requestAnimationFrame(loop);
+        };
+        loop();
+        return () => cancelAnimationFrame(frame);
+    });
+</script>
+```
+
 ## API
 
 ### `<VFXTransition>` (`@vfx-js/svelte/sveltekit`)
@@ -174,6 +201,10 @@ A component. See [`VFXCanvas`](#vfxcanvas).
 ### `vfxConfig(config)`
 
 Set the options of the shared VFX. See [Config](#config).
+
+### `vfxInstance()`
+
+The shared VFX as `.current`, or `null`. See [Drive frames yourself](#drive-frames-yourself).
 
 ### `updateElement(el)`
 

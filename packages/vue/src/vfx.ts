@@ -30,16 +30,28 @@ let failed = false;
 let replacing = false;
 let flushScheduled = false;
 const consumers = new Set<Consumer>();
+const subscribers = new Set<(vfx: VFX | null) => void>();
 const configOwners: { owner: symbol; config: VFXConfig }[] = [];
 
 function effectiveConfig(): VFXConfig {
     return configOwners[configOwners.length - 1]?.config ?? {};
 }
 
+function setInstance(vfx: VFX | null): void {
+    if (vfx === instance) {
+        return;
+    }
+    instance = vfx;
+    for (const subscriber of subscribers) {
+        subscriber(vfx);
+    }
+}
+
 function create(): void {
     appliedConfig = effectiveConfig();
-    instance = VFX.init({ ...appliedConfig });
-    failed = instance === null;
+    const vfx = VFX.init({ ...appliedConfig });
+    failed = vfx === null;
+    setInstance(vfx);
 }
 
 function destroy(vfx: VFX): void {
@@ -67,7 +79,7 @@ async function flush(): Promise<void> {
         return;
     }
     replacing = true;
-    instance = null;
+    setInstance(null);
     // Let each consumer leave the old instance before it goes.
     await Promise.all([...consumers].map(detachOne));
     destroy(old);
@@ -120,7 +132,7 @@ export function attachVFX(attach: Attach): () => void {
                     return;
                 }
                 destroy(instance);
-                instance = null;
+                setInstance(null);
             });
         });
     };
@@ -154,6 +166,19 @@ export function clearConfig(owner: symbol): void {
 /** The shared VFX if one exists, without taking a reference. */
 export function peekVFX(): VFX | null {
     return instance;
+}
+
+/**
+ * Call `subscriber` each time the shared VFX is made, replaced or destroyed.
+ * Does not keep the VFX alive. Returns the unsubscribe.
+ */
+export function subscribeVFX(
+    subscriber: (vfx: VFX | null) => void,
+): () => void {
+    subscribers.add(subscriber);
+    return () => {
+        subscribers.delete(subscriber);
+    };
 }
 
 const warned = new Set<string>();
