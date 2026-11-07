@@ -3,6 +3,8 @@
 import type {
     AddTransitionOpts,
     RunOpts,
+    Transition,
+    TransitionClass,
     TransitionHandle,
 } from "@vfx-js/core";
 import type * as React from "react";
@@ -19,7 +21,11 @@ import { useLiveOpts } from "./live-opts.js";
 import { type TransitionScope, TransitionScopeContext } from "./scope.js";
 import { takePending } from "./store.js";
 
-export type VFXTransitionProps = AddTransitionOpts & {
+export type VFXTransitionProps<
+    T extends Transition | TransitionClass = Transition | TransitionClass,
+> = AddTransitionOpts<T> & VFXTransitionOwnProps;
+
+export type VFXTransitionOwnProps = {
     /** Changes per page, e.g. the pathname. A new key mounts the children fresh. */
     pageKey?: string | number;
     children: React.ReactNode;
@@ -44,7 +50,9 @@ const FILL_STYLE: React.CSSProperties = {
  * Without a `pageKey` it never transitions.
  * The target fills the viewport height by default; pass `fullscreen={false}` to size it yourself.
  */
-export function VFXTransition(props: VFXTransitionProps) {
+export function VFXTransition<T extends Transition | TransitionClass>(
+    props: VFXTransitionProps<T>,
+) {
     const {
         pageKey,
         children,

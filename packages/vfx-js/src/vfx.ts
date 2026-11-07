@@ -10,6 +10,8 @@ import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 import { TransitionController } from "./transition/transition.js";
 import type {
     AddTransitionOpts,
+    Transition,
+    TransitionClass,
     TransitionHandle,
 } from "./transition/types.js";
 import {
@@ -225,9 +227,9 @@ export class VFX {
      * await t.run(() => renderNextPage());
      * ```
      */
-    addTransition(
+    addTransition<T extends Transition | TransitionClass>(
         element: HTMLElement,
-        opts: AddTransitionOpts = {},
+        opts: AddTransitionOpts<T> = {},
     ): TransitionHandle {
         const transition = new TransitionController(this, element, opts, () =>
             this.#transitions.delete(transition),

@@ -1,10 +1,10 @@
-import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 import { MIRROR } from "./_shared";
 
 /** Simplex noise warps the content, peaking halfway, while crossfading. */
-export const distortFade: ShaderTransitionDef = shaderTransition({
-    name: "distort_fade",
-    frag: `
+export class DistortFade extends ShaderTransition {
+    readonly name = "distort_fade";
+    readonly frag = `
 const float STRENGTH = 0.15;
 const float SCALE = 1.0;
 
@@ -52,5 +52,5 @@ vec4 transition(vec2 uv, float t) {
   vec2 q = mirror(uv + offset);
   return mix(readFrom(q), readTo(q), smoothstep(0.3, 0.7, t));
 }
-`,
-});
+`;
+}

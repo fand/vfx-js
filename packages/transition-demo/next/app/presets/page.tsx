@@ -5,7 +5,12 @@ import { Code } from "../_components/code";
 import { highlight } from "../_components/highlight";
 import { PageFrame } from "../_components/page-frame";
 import { PageTransition } from "../_components/page-transition";
-import { categories, type PresetInfo, presetList } from "../_lib/presets";
+import {
+    categories,
+    classNameOf,
+    type PresetInfo,
+    presetList,
+} from "../_lib/presets";
 import type { PresetName } from "../_lib/site";
 import crossfadeThumb from "./thumbs/crossfade.webp";
 import crosszoomThumb from "./thumbs/crosszoom.webp";
@@ -45,9 +50,13 @@ const thumbs: Record<PresetName, StaticImageData> = {
     distortFade: distortFadeThumb,
 };
 
-function importOf(p: PresetInfo): string {
-    const names = p.factory ? `${p.name}, ${p.factory}` : p.name;
-    return `import { ${names} } from "@vfx-js/transitions";`;
+function usageOf(p: PresetInfo): string {
+    const name = classNameOf(p.name);
+    const option = p.options?.[0];
+    const spec = option
+        ? `{ transition: ${name}, params: { ${option.name}: ${option.default} } }`
+        : `{ transition: ${name} }`;
+    return `import { ${name} } from "@vfx-js/transitions";\n\nt.run(swap, ${spec});`;
 }
 
 function Preset({ preset: p }: { preset: PresetInfo }) {
@@ -56,7 +65,7 @@ function Preset({ preset: p }: { preset: PresetInfo }) {
             <Image className="preset-thumb" src={thumbs[p.name]} alt="" />
             <div className="preset-body">
                 <h3>
-                    <code>{p.name}</code>
+                    <code>{classNameOf(p.name)}</code>
                 </h3>
                 <p>
                     {p.note}
@@ -69,13 +78,13 @@ function Preset({ preset: p }: { preset: PresetInfo }) {
                     )}
                 </p>
                 <pre className="preset-import">
-                    <code>{highlight(importOf(p))}</code>
+                    <code>{highlight(usageOf(p))}</code>
                 </pre>
                 {p.options && (
                     <table className="preset-table">
                         <thead>
                             <tr>
-                                <th>Option</th>
+                                <th>Param</th>
                                 <th>Type</th>
                                 <th>Default</th>
                                 <th />
@@ -118,8 +127,9 @@ export default function Presets() {
                 <h1>Presets</h1>
                 <p className="lead">
                     Every preset in <code>@vfx-js/transitions</code>, grouped by
-                    what it suits. Pass one as <code>transition</code>. Presets
-                    with options also have a <code>create*</code> factory.
+                    what it suits. Each preset is a class. Pass it as{" "}
+                    <code>transition</code>, and its options as{" "}
+                    <code>params</code>.
                 </p>
             </section>
             {categories.map((c) => (
@@ -141,8 +151,10 @@ export default function Presets() {
                     <p>
                         <code>createGLTransition</code> turns any shader from{" "}
                         <a href="https://gl-transitions.com/">gl-transitions</a>{" "}
-                        into a transition. Look one up by its <code>name</code>.
-                        Shaders that need extra textures are not supported.
+                        into a transition class. Look one up by its{" "}
+                        <code>name</code>. Its uniforms go in{" "}
+                        <code>params</code>. Shaders that need extra textures
+                        are not supported.
                     </p>
                     <p>
                         Try them all in the{" "}
@@ -156,8 +168,8 @@ export default function Presets() {
 import { createGLTransition } from "@vfx-js/transitions";
 import transitions from "gl-transitions";
 
-const cube = transitions.find((t) => t.name === "Cube")!;
-t.run(swap, { transition: createGLTransition(cube, { persp: 0.5 }) });
+const Cube = createGLTransition(transitions.find((t) => t.name === "Cube")!);
+t.run(swap, { transition: Cube, params: { persp: 0.5 } });
 `}</Code>
             </section>
             <section className="doc-section doc-next">

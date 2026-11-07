@@ -1,11 +1,15 @@
 import type {
-    TransitionDef,
     TransitionEffect,
     TransitionEffectContext,
     TransitionRun,
 } from "@vfx-js/core";
 import { type PixelSortDirection, PixelSortEffect } from "@vfx-js/effects";
-import { hardCut } from "./_shared";
+import { HardCut, StagedTransition } from "./_shared";
+
+export type PixelsortParams = {
+    /** Where the old content melts. Default `"up"`. */
+    direction?: PixelSortDirection;
+};
 
 const OPPOSITE: Record<PixelSortDirection, PixelSortDirection> = {
     up: "down",
@@ -14,32 +18,34 @@ const OPPOSITE: Record<PixelSortDirection, PixelSortDirection> = {
     right: "left",
 };
 
-export class PixelsortTransitionEffect
+export class PixelsortStage
     extends PixelSortEffect
     implements TransitionEffect
 {
-    #outDir: PixelSortDirection;
+    #outDirection: () => PixelSortDirection;
     #reverse = false;
 
-    constructor(outDir: PixelSortDirection) {
+    constructor(outDirection: () => PixelSortDirection) {
         super({ range: [1, 1] });
-        this.#outDir = outDir;
+        this.#outDirection = outDirection;
     }
 
     start(run: TransitionRun): void {
+        const outDirection = this.#outDirection();
         this.#reverse = run.reverse;
         this.params.direction = run.reverse
-            ? OPPOSITE[this.#outDir]
-            : this.#outDir;
+            ? OPPOSITE[outDirection]
+            : outDirection;
         this.params.range[0] = 1;
     }
 
     update(ctx: TransitionEffectContext): void {
         const { t } = ctx.progress;
+        const outDirection = this.#outDirection();
         // Reverse plays the forward run backward, so its halves swap directions.
         const forwardT = this.#reverse ? 1 - t : t;
         this.params.direction =
-            forwardT < 0.5 ? this.#outDir : OPPOSITE[this.#outDir];
+            forwardT < 0.5 ? outDirection : OPPOSITE[outDirection];
         // Fully sorted at the halfway swap.
         this.params.range[0] = Math.abs(1 - 2 * t);
     }
@@ -53,14 +59,10 @@ export class PixelsortTransitionEffect
  * The old content melts into sorted streaks toward `direction`; the new one
  * sorts back out of them from the opposite side.
  */
-export function createPixelsort(
-    opts: { direction?: PixelSortDirection } = {},
-): TransitionDef {
-    const outDir = opts.direction ?? "up";
-    return {
-        name: "pixelsort",
-        create: () => [hardCut.create(), new PixelsortTransitionEffect(outDir)],
-    };
+export class Pixelsort extends StagedTransition<PixelsortParams> {
+    readonly name = "pixelsort";
+    protected readonly stages = [
+        new HardCut(),
+        new PixelsortStage(() => this.params.direction ?? "up"),
+    ];
 }
-
-export const pixelsort: TransitionDef = createPixelsort();

@@ -51,11 +51,12 @@ export const nav: NavItem[] = [
         href: "/custom",
         label: "Custom",
         sections: [
-            { id: "def", label: "shaderTransition" },
+            { id: "def", label: "ShaderTransition" },
             { id: "prelude", label: "What the prelude gives you" },
             { id: "overflow", label: "Draw outside the box" },
-            { id: "hooks", label: "Transition effects" },
-            { id: "state", label: "State lives on the effect" },
+            { id: "hooks", label: "Hooks" },
+            { id: "state", label: "State lives on the instance" },
+            { id: "effects", label: "Build on an effect" },
         ],
     },
     {
@@ -70,8 +71,12 @@ export const nav: NavItem[] = [
             { id: "transition-link", label: "transition(spec)" },
             { id: "use-vfx-transition", label: "useVFXTransition" },
             { id: "set-next-transition", label: "setNextTransition" },
-            { id: "transition-def", label: "TransitionDef" },
-            { id: "shader-transition", label: "shaderTransition" },
+            {
+                id: "use-transition-instance",
+                label: "useTransitionInstance",
+            },
+            { id: "transition", label: "Transition" },
+            { id: "shader-transition", label: "ShaderTransition" },
         ],
     },
 ];

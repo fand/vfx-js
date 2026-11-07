@@ -1,4 +1,4 @@
-import type { RunOpts } from "@vfx-js/core";
+import type { RunOpts, Transition, TransitionClass } from "@vfx-js/core";
 import type * as React from "react";
 
 // One VFX per page, so one pending spec for the next navigation.
@@ -18,7 +18,9 @@ export function takePending(): RunOpts | null {
 }
 
 /** Use this spec for the next transition, e.g. before `router.push()`. */
-export function setNextTransition(spec: RunOpts): void {
+export function setNextTransition<T extends Transition | TransitionClass>(
+    spec: RunOpts<T>,
+): void {
     pending = { spec, at: Date.now() };
 }
 
@@ -40,7 +42,9 @@ function isPlainLeftClick(e: React.MouseEvent): boolean {
 }
 
 /** Returns an `onClick` that sets the spec for the navigation the click starts. */
-export function transition(spec: RunOpts): (e: React.MouseEvent) => void {
+export function transition<T extends Transition | TransitionClass>(
+    spec: RunOpts<T>,
+): (e: React.MouseEvent) => void {
     return (e) => {
         if (isPlainLeftClick(e)) {
             setNextTransition(spec);

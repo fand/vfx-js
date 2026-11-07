@@ -1,23 +1,32 @@
 "use client";
 
-export { crossfade } from "@vfx-js/core";
-export { crosszoom } from "./crosszoom";
-export { createDatamosh, datamosh } from "./datamosh";
-export { distortFade } from "./distort-fade";
-export { createGLTransition, type GLTransitionDef } from "./gl-transition";
-export { glitch } from "./glitch";
-export { glitchSlide } from "./glitch-slide";
-export { createJpegGlitch, jpegGlitch } from "./jpeg-glitch";
-export { createLensDistortion, lensDistortion } from "./lens-distortion";
+export { Crossfade } from "@vfx-js/core";
+export { Crosszoom } from "./crosszoom";
+export { Datamosh, type DatamoshParams } from "./datamosh";
+export { DistortFade } from "./distort-fade";
 export {
-    createPixelScan,
+    createGLTransition,
+    type GLTransitionClass,
+    type GLTransitionDef,
+} from "./gl-transition";
+export { Glitch, type GlitchParams } from "./glitch";
+export { GlitchSlide } from "./glitch-slide";
+export { JpegGlitch, type JpegGlitchParams } from "./jpeg-glitch";
+export { LensDistortion, type LensDistortionParams } from "./lens-distortion";
+export {
+    PixelScan,
     type PixelScanDirection,
-    pixelScan,
+    type PixelScanParams,
 } from "./pixel-scan";
-export { pixelStretch } from "./pixel-stretch";
-export { createPixelsort, pixelsort } from "./pixelsort";
-export { slitScan } from "./slit-scan";
-export { createSwipe, type SwipeDirection, swipe } from "./swipe";
-export { createTile, type TileDirection, type TileShape, tile } from "./tile";
-export { zoom } from "./zoom";
-export { zoomBlur } from "./zoom-blur";
+export { PixelStretch } from "./pixel-stretch";
+export { Pixelsort, type PixelsortParams } from "./pixelsort";
+export { SlitScan } from "./slit-scan";
+export { Swipe, type SwipeDirection, type SwipeParams } from "./swipe";
+export {
+    Tile,
+    type TileDirection,
+    type TileParams,
+    type TileShape,
+} from "./tile";
+export { Zoom } from "./zoom";
+export { ZoomBlur } from "./zoom-blur";

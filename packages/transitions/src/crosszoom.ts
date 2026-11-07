@@ -1,11 +1,11 @@
-import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 import { IGN } from "./_shared";
 
 /** Crossfade through a zoom blur toward the center that peaks halfway. */
-export const crosszoom: ShaderTransitionDef = shaderTransition({
-    name: "crosszoom",
-    overflow: true,
-    frag: `
+export class Crosszoom extends ShaderTransition {
+    readonly name = "crosszoom";
+    overflow = true as const;
+    readonly frag = `
 const float STRENGTH = 0.4;
 const float TAPS = 16.0;
 
@@ -33,5 +33,5 @@ vec4 transition(vec2 uv, float t) {
   }
   return c / total;
 }
-`,
-});
+`;
+}

@@ -1,9 +1,9 @@
-import { type ShaderTransitionDef, shaderTransition } from "@vfx-js/core";
+import { ShaderTransition } from "@vfx-js/core";
 
 /** Horizontal stripes slide sideways with RGB split, from the old content into the new. */
-export const glitchSlide: ShaderTransitionDef = shaderTransition({
-    name: "glitch_slide",
-    frag: `
+export class GlitchSlide extends ShaderTransition {
+    readonly name = "glitch_slide";
+    readonly frag = `
 // The old content, then the new one to its right, as one strip.
 vec4 strip(vec2 p) {
   return p.x < 1.0 ? readFrom(p) : readTo(vec2(p.x - 1.0, p.y));
@@ -33,5 +33,5 @@ vec4 transition(vec2 uv, float t) {
   vec4 b = strip(uvb);
   return vec4(r.r, g.g, b.b, (r.a + g.a + b.a) / 3.0);
 }
-`,
-});
+`;
+}

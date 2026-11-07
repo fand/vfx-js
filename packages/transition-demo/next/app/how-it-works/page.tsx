@@ -184,14 +184,14 @@ export default function HowItWorks() {
                             component props
                         </li>
                         <li>
-                            For <code>ease</code>, the def&apos;s own ease, then
-                            smoothstep
+                            For <code>ease</code> and <code>overflow</code>, the
+                            transition&apos;s own value, then the default
                         </li>
                     </ol>
                     <p>
                         A run that sets its own <code>transition</code> drops
-                        the container&apos;s <code>uniforms</code>, so they
-                        never reach the wrong shader.
+                        the container&apos;s <code>params</code>, so they never
+                        reach the wrong class.
                     </p>
                     <p>
                         In React the run&apos;s <code>RunOpts</code> is one
@@ -202,13 +202,13 @@ export default function HowItWorks() {
                     </p>
                 </div>
                 <Code label="spec.ts">{`
-const t = vfx.addTransition(outlet, { transition: crossfade });
+const t = vfx.addTransition(outlet, { transition: Crossfade });
 
 // Keep a spec in a variable and pass it to run().
-const back = { transition: swipe, reverse: true };
+const back = { transition: Swipe, reverse: true };
 
 t.run(swap, back);
-t.run(swap, { duration: 2 }); // crossfade, 2 s
+t.run(swap, { duration: 2 }); // Crossfade, 2 s
 `}</Code>
             </section>
 

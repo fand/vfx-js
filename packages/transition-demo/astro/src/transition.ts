@@ -3,11 +3,11 @@ import {
     type TransitionBeforePreparationEvent,
     type TransitionBeforeSwapEvent,
 } from "astro:transitions/client";
-import { VFX } from "@vfx-js/core";
+import { type RunOpts, VFX } from "@vfx-js/core";
 import { presets } from "@vfx-js/transition-demo-shared/transitions";
-import { swipe } from "@vfx-js/transitions";
+import { Swipe } from "@vfx-js/transitions";
 
-const back = { transition: swipe, reverse: true };
+const back = { transition: Swipe, reverse: true };
 
 // Wire core `run(cb)` to Astro ClientRouter by hand.
 // `run` snapshots the old page before `cb`, so the router waits for the
@@ -42,7 +42,7 @@ export function setupTransition() {
             const preset = name
                 ? presets[name as keyof typeof presets]
                 : undefined;
-            const opts =
+            const opts: RunOpts =
                 ev.direction === "back"
                     ? back
                     : preset

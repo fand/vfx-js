@@ -1,7 +1,8 @@
 "use client";
 
+import type { RunOpts } from "@vfx-js/core";
 import { setNextTransition } from "@vfx-js/react";
-import { crossfade, lensDistortion } from "@vfx-js/transitions";
+import { Crossfade, LensDistortion } from "@vfx-js/transitions";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "./header";
@@ -49,11 +50,10 @@ export function useLoaded(): boolean {
             if (cancelled) {
                 return;
             }
-            setNextTransition(
-                isTop.current
-                    ? { transition: lensDistortion, duration: 1.4 }
-                    : { transition: crossfade, duration: 0.3 },
-            );
+            const spec: RunOpts = isTop.current
+                ? { transition: LensDistortion, duration: 1.4 }
+                : { transition: Crossfade, duration: 0.3 };
+            setNextTransition(spec);
             setLoaded(true);
             document.documentElement.removeAttribute("data-loading");
         });

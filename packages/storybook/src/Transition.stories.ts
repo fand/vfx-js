@@ -1,28 +1,33 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-import type { TransitionDef } from "@vfx-js/core";
+import type { RunOpts } from "@vfx-js/core";
 import * as presets from "@vfx-js/transitions";
 import { initVFX, isChromatic } from "./utils";
 
-const TRANSITIONS: Record<string, TransitionDef> = {
-    crossfade: presets.crossfade,
-    swipe: presets.swipe,
-    swipeUp: presets.createSwipe({ direction: "up" }),
-    zoom: presets.zoom,
-    zoomBlur: presets.zoomBlur,
-    crosszoom: presets.crosszoom,
-    glitch: presets.glitch,
-    glitchSlide: presets.glitchSlide,
-    datamosh: presets.datamosh,
-    pixelsort: presets.pixelsort,
-    pixelsortRight: presets.createPixelsort({ direction: "right" }),
-    lensDistortion: presets.lensDistortion,
-    slitScan: presets.slitScan,
-    pixelScan: presets.pixelScan,
-    pixelStretch: presets.pixelStretch,
-    tile: presets.tile,
-    tileUp: presets.createTile({ direction: "up" }),
-    tileSquare: presets.createTile({ shape: "square" }),
-    distortFade: presets.distortFade,
+type Preset = Pick<RunOpts, "transition" | "params">;
+
+const TRANSITIONS: Record<string, Preset> = {
+    crossfade: { transition: presets.Crossfade },
+    swipe: { transition: presets.Swipe },
+    swipeUp: { transition: presets.Swipe, params: { direction: "up" } },
+    zoom: { transition: presets.Zoom },
+    zoomBlur: { transition: presets.ZoomBlur },
+    crosszoom: { transition: presets.Crosszoom },
+    glitch: { transition: presets.Glitch },
+    glitchSlide: { transition: presets.GlitchSlide },
+    datamosh: { transition: presets.Datamosh },
+    pixelsort: { transition: presets.Pixelsort },
+    pixelsortRight: {
+        transition: presets.Pixelsort,
+        params: { direction: "right" },
+    },
+    lensDistortion: { transition: presets.LensDistortion },
+    slitScan: { transition: presets.SlitScan },
+    pixelScan: { transition: presets.PixelScan },
+    pixelStretch: { transition: presets.PixelStretch },
+    tile: { transition: presets.Tile },
+    tileUp: { transition: presets.Tile, params: { direction: "up" } },
+    tileSquare: { transition: presets.Tile, params: { shape: "square" } },
+    distortFade: { transition: presets.DistortFade },
 };
 
 type Args = {
@@ -119,7 +124,7 @@ export const Tabs: StoryObj<Args> = {
         const chromatic = isChromatic();
         const vfx = initVFX(chromatic ? { timeScale: 0 } : undefined);
         const transition = vfx.addTransition(container, {
-            transition: TRANSITIONS[args.transition],
+            ...TRANSITIONS[args.transition],
             reverse: args.reverse,
             duration: args.duration,
             overflow: OVERFLOW[args.overflow],

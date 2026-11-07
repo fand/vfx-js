@@ -1,8 +1,4 @@
-import {
-    type ShaderTransitionDef,
-    shaderTransition,
-    type TransitionUniforms,
-} from "@vfx-js/core";
+import { ShaderTransition, type TransitionUniforms } from "@vfx-js/core";
 
 /** One entry of the `gl-transitions` package. */
 export type GLTransitionDef = {
@@ -34,11 +30,13 @@ const RESERVED = new Set([
 const paramName = (name: string) =>
     RESERVED.has(name) ? `glParam_${name}` : name;
 
-/** Use a shader from gl-transitions as a `TransitionDef`. `params` override its defaults. */
-export function createGLTransition(
-    def: GLTransitionDef,
-    params: TransitionUniforms = {},
-): ShaderTransitionDef {
+/** A class made by `createGLTransition`. Its params override the shader's defaults. */
+export type GLTransitionClass = new (
+    params?: TransitionUniforms,
+) => ShaderTransition<TransitionUniforms>;
+
+/** Use a shader from gl-transitions as a transition class. */
+export function createGLTransition(def: GLTransitionDef): GLTransitionClass {
     const types = def.paramsTypes ?? {};
     const textures = [
         ...(def.textures ?? []),
@@ -54,13 +52,6 @@ export function createGLTransition(
             `[VFX-JS] gl-transition "${def.name}" has no \`vec4 transition(vec2 uv)\`.`,
         );
     }
-    for (const key of Object.keys(params)) {
-        if (!(key in types)) {
-            console.warn(
-                `[VFX-JS] gl-transition "${def.name}" has no param "${key}".`,
-            );
-        }
-    }
 
     let glsl = def.glsl.replace(SIGNATURE, "vec4 glTransition_(vec2 $1)");
     for (const key of Object.keys(types)) {
@@ -72,15 +63,7 @@ export function createGLTransition(
             );
         }
     }
-    const uniforms: TransitionUniforms = {};
-    const values = { ...def.defaultParams, ...params };
-    for (const key of Object.keys(values)) {
-        uniforms[paramName(key)] = values[key] as TransitionUniforms[string];
-    }
-
-    return shaderTransition({
-        name: `gl:${def.name}`,
-        frag: `
+    const frag = `
 float progress;
 float ratio;
 vec4 getFromColor(vec2 p) { return readFrom(clamp(p, 0.0, 1.0)); }
@@ -95,8 +78,33 @@ vec4 transition(vec2 uv, float t) {
   ratio = resolution.x / resolution.y;
   return glTransition_(uv);
 }
-`,
-        uniforms,
-        ease: "linear",
-    });
+`;
+
+    return class extends ShaderTransition<TransitionUniforms> {
+        readonly name = `gl:${def.name}`;
+        readonly frag = frag;
+        ease = "linear" as const;
+
+        constructor(params: TransitionUniforms = {}) {
+            super(params);
+            for (const key of Object.keys(params)) {
+                if (!(key in types)) {
+                    console.warn(
+                        `[VFX-JS] gl-transition "${def.name}" has no param "${key}".`,
+                    );
+                }
+            }
+        }
+
+        uniforms(): TransitionUniforms {
+            const uniforms: TransitionUniforms = {};
+            const values = { ...def.defaultParams, ...this.params };
+            for (const key of Object.keys(values)) {
+                uniforms[paramName(key)] = values[
+                    key
+                ] as TransitionUniforms[string];
+            }
+            return uniforms;
+        }
+    };
 }

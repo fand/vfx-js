@@ -1,3 +1,4 @@
+import type { TransitionEffectContext } from "@vfx-js/core";
 import transitions from "gl-transitions";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { createGLTransition, type GLTransitionDef } from "./gl-transition";
@@ -15,13 +16,16 @@ vec4 transition(vec2 uv) {
     paramsTypes: { amount: "float", dir: "vec2" },
 };
 
+const ctx = {} as TransitionEffectContext;
+
 afterEach(() => {
     vi.restoreAllMocks();
 });
 
 describe("createGLTransition", () => {
     test("wraps the snippet", () => {
-        const def = createGLTransition(wave);
+        const Wave = createGLTransition(wave);
+        const def = new Wave();
         expect(def.name).toBe("gl:wave");
         expect(def.ease).toBe("linear");
         expect(def.frag).toContain("float progress;");
@@ -39,11 +43,11 @@ describe("createGLTransition", () => {
         "vec4  transition( vec2  p )",
         "vec4\ntransition(\n  vec2 p\n)",
     ])("matches %j", (signature) => {
-        const def = createGLTransition({
+        const Class = createGLTransition({
             name: "s",
             glsl: `${signature} { return getToColor(p); }`,
         });
-        expect(def.frag).toContain("vec4 glTransition_(vec2 p)");
+        expect(new Class().frag).toContain("vec4 glTransition_(vec2 p)");
     });
 
     test("throws without a transition function", () => {
@@ -53,14 +57,15 @@ describe("createGLTransition", () => {
     });
 
     test("params override the defaults", () => {
-        expect(createGLTransition(wave).uniforms).toEqual({
+        const Wave = createGLTransition(wave);
+        expect(new Wave().uniforms(ctx)).toEqual({
             amount: 0.5,
             dir: [1, 0],
         });
-        expect(createGLTransition(wave, { amount: 2 }).uniforms).toEqual({
-            amount: 2,
-            dir: [1, 0],
-        });
+        const strong = new Wave({ amount: 2 });
+        expect(strong.uniforms(ctx)).toEqual({ amount: 2, dir: [1, 0] });
+        strong.params = { amount: 3 };
+        expect(strong.uniforms(ctx)).toEqual({ amount: 3, dir: [1, 0] });
     });
 
     test("throws on textures", () => {
@@ -82,29 +87,28 @@ describe("createGLTransition", () => {
 
     test("warns on an unknown param", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-        createGLTransition(wave, { amout: 1 });
+        const Wave = createGLTransition(wave);
+        new Wave({ amout: 1 });
         expect(warn).toHaveBeenCalledOnce();
         expect(warn.mock.calls[0][0]).toContain("amout");
     });
 
     test("renames params that clash with core names", () => {
-        const def = createGLTransition(
-            {
-                name: "bow",
-                glsl: `
+        const Bow = createGLTransition({
+            name: "bow",
+            glsl: `
 uniform bool reverse; // = false
 vec4 transition(vec2 uv) {
   return reverse ? getFromColor(uv) : getToColor(uv);
 }
 `,
-                defaultParams: { reverse: false },
-                paramsTypes: { reverse: "bool" },
-            },
-            { reverse: true },
-        );
+            defaultParams: { reverse: false },
+            paramsTypes: { reverse: "bool" },
+        });
+        const def = new Bow({ reverse: true });
         expect(def.frag).toContain("uniform bool glParam_reverse;");
         expect(def.frag).toContain("return glParam_reverse ?");
-        expect(def.uniforms).toEqual({ glParam_reverse: true });
+        expect(def.uniforms(ctx)).toEqual({ glParam_reverse: true });
     });
 
     test("accepts every gl-transitions entry without textures", () => {
@@ -117,7 +121,8 @@ vec4 transition(vec2 uv) {
             if (entry.textures.length > 0) {
                 expect(() => createGLTransition(entry)).toThrow();
             } else {
-                expect(createGLTransition(entry).name).toBe(`gl:${entry.name}`);
+                const Class = createGLTransition(entry);
+                expect(new Class().name).toBe(`gl:${entry.name}`);
             }
         }
     });
