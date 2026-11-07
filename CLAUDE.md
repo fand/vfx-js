@@ -18,7 +18,8 @@ This is a Turborepo monorepo with the following key packages:
 - `packages/storybook/` - Component stories and visual tests
 - `packages/effects/` - Additional effect implementations
 - `packages/transitions/` - Transition presets for `addTransition` (@vfx-js/transitions)
-- `packages/transition-demo/` - Demo site and framework examples for transitions (private)
+- `packages/docs-transitions/` - Transitions demo and docs site (Next.js, private)
+- `packages/framework-testbed/` - Astro, Nuxt, SvelteKit and Void apps to check the bindings locally (private)
 - `packages/docs-react/` - React-specific documentation
 
 The core library uses Three.js for WebGL rendering and provides a VFX class that manages effects applied to DOM elements. Effects are shader-based and can be configured with various parameters including uniforms, overflow settings, and timing controls.

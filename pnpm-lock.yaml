@@ -135,6 +135,40 @@ importers:
         specifier: 8.3.5
         version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
 
+  packages/docs-transitions:
+    dependencies:
+      '@vfx-js/core':
+        specifier: workspace:*
+        version: link:../vfx-js
+      '@vfx-js/react':
+        specifier: workspace:*
+        version: link:../react
+      '@vfx-js/transitions':
+        specifier: workspace:*
+        version: link:../transitions
+      gl-transitions:
+        specifier: 2.0.0
+        version: 2.0.0
+      next:
+        specifier: ^16.4.3
+        version: 16.4.3(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.5
+        version: 26.6.5
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
   packages/effects:
     devDependencies:
       '@biomejs/biome':
@@ -201,6 +235,123 @@ importers:
       vite:
         specifier: 8.3.5
         version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
+
+  packages/framework-testbed/astro:
+    dependencies:
+      '@vfx-js/core':
+        specifier: workspace:*
+        version: link:../../vfx-js
+      '@vfx-js/testbed-shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@vfx-js/transitions':
+        specifier: workspace:*
+        version: link:../../transitions
+      astro:
+        specifier: ^7.4.2
+        version: 7.4.2(@types/node@26.6.5)(aws4fetch@1.0.20)(db0@0.3.4(better-sqlite3@13.0.3)(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261028.1)(better-sqlite3@13.0.3)(kysely@0.29.7)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1))(mysql2@3.24.6(@types/node@26.6.5)))(esbuild@0.28.2)(ioredis@5.11.1)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
+    devDependencies:
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
+  packages/framework-testbed/nuxt:
+    dependencies:
+      '@vfx-js/core':
+        specifier: workspace:*
+        version: link:../../vfx-js
+      '@vfx-js/testbed-shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@vfx-js/transitions':
+        specifier: workspace:*
+        version: link:../../transitions
+      '@vfx-js/vue':
+        specifier: workspace:*
+        version: link:../../vue
+      nuxt:
+        specifier: 4.6.3
+        version: 4.6.3(613c1c632b9c23deda17aa92825ba6b7)
+      vue:
+        specifier: 3.5.44
+        version: 3.5.44(typescript@6.0.3)
+      vue-router:
+        specifier: 5.4.0
+        version: 5.4.0(@vue/compiler-sfc@3.5.44)(esbuild@0.28.2)(rolldown@1.2.15)(rollup@4.65.1)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue@3.5.44(typescript@6.0.3))
+    devDependencies:
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vue-tsc:
+        specifier: 3.3.13
+        version: 3.3.13(typescript@6.0.3)
+
+  packages/framework-testbed/shared:
+    dependencies:
+      '@vfx-js/transitions':
+        specifier: workspace:*
+        version: link:../../transitions
+
+  packages/framework-testbed/sveltekit:
+    dependencies:
+      '@vfx-js/core':
+        specifier: workspace:*
+        version: link:../../vfx-js
+      '@vfx-js/svelte':
+        specifier: workspace:*
+        version: link:../../svelte
+      '@vfx-js/testbed-shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@vfx-js/transitions':
+        specifier: workspace:*
+        version: link:../../transitions
+    devDependencies:
+      '@sveltejs/adapter-static':
+        specifier: 4.0.0
+        version: 4.0.0(@sveltejs/kit@3.1.0(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(svelte@5.57.3)(typescript@6.0.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))
+      '@sveltejs/kit':
+        specifier: 3.1.0
+        version: 3.1.0(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(svelte@5.57.3)(typescript@6.0.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: 7.3.1
+        version: 7.3.1(svelte@5.57.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+      svelte:
+        specifier: 5.57.3
+        version: 5.57.3
+      svelte-check:
+        specifier: 4.7.7
+        version: 4.7.7(picomatch@4.0.7)(svelte@5.57.3)(typescript@6.0.3)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
+
+  packages/framework-testbed/void:
+    dependencies:
+      '@vfx-js/react':
+        specifier: workspace:*
+        version: link:../../react
+      '@vfx-js/testbed-shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@void/react':
+        specifier: 1.3.0
+        version: 1.3.0(586b9e5d534ba2e34b36fddde0c520d1)
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
+      void:
+        specifier: 1.3.0
+        version: 1.3.0(@sveltejs/kit@3.1.0(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(svelte@5.57.3)(typescript@6.0.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(@types/node@26.6.5)(arktype@2.2.9)(kysely@0.29.7)(next@16.4.3(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.3)(valibot@1.5.0(typescript@6.0.3))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vitest@5.0.5(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vue@3.5.44(typescript@6.0.3))(workerd@1.20261023.1)(wrangler@4.153.0(@cloudflare/workers-types@5.20261028.1)(@types/node@26.6.5))(zod@4.6.7)
 
   packages/react:
     dependencies:
@@ -406,157 +557,6 @@ importers:
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/transition-demo/astro:
-    dependencies:
-      '@vfx-js/core':
-        specifier: workspace:*
-        version: link:../../vfx-js
-      '@vfx-js/transition-demo-shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@vfx-js/transitions':
-        specifier: workspace:*
-        version: link:../../transitions
-      astro:
-        specifier: ^7.4.2
-        version: 7.4.2(@types/node@26.6.5)(aws4fetch@1.0.20)(db0@0.3.4(better-sqlite3@13.0.3)(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261028.1)(better-sqlite3@13.0.3)(kysely@0.29.7)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1))(mysql2@3.24.6(@types/node@26.6.5)))(esbuild@0.28.2)(ioredis@5.11.1)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
-    devDependencies:
-      typescript:
-        specifier: 6.0.3
-        version: 6.0.3
-
-  packages/transition-demo/next:
-    dependencies:
-      '@vfx-js/core':
-        specifier: workspace:*
-        version: link:../../vfx-js
-      '@vfx-js/react':
-        specifier: workspace:*
-        version: link:../../react
-      '@vfx-js/transitions':
-        specifier: workspace:*
-        version: link:../../transitions
-      gl-transitions:
-        specifier: 2.0.0
-        version: 2.0.0
-      next:
-        specifier: ^16.4.3
-        version: 16.4.3(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      react:
-        specifier: ^19.3.1
-        version: 19.3.1
-      react-dom:
-        specifier: ^19.3.1
-        version: 19.3.1(react@19.3.1)
-    devDependencies:
-      '@types/node':
-        specifier: 26.6.5
-        version: 26.6.5
-      '@types/react':
-        specifier: ^19.3.0
-        version: 19.3.0
-      typescript:
-        specifier: 6.0.3
-        version: 6.0.3
-
-  packages/transition-demo/nuxt:
-    dependencies:
-      '@vfx-js/core':
-        specifier: workspace:*
-        version: link:../../vfx-js
-      '@vfx-js/transition-demo-shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@vfx-js/transitions':
-        specifier: workspace:*
-        version: link:../../transitions
-      '@vfx-js/vue':
-        specifier: workspace:*
-        version: link:../../vue
-      nuxt:
-        specifier: 4.6.3
-        version: 4.6.3(613c1c632b9c23deda17aa92825ba6b7)
-      vue:
-        specifier: 3.5.44
-        version: 3.5.44(typescript@6.0.3)
-      vue-router:
-        specifier: 5.4.0
-        version: 5.4.0(@vue/compiler-sfc@3.5.44)(esbuild@0.28.2)(rolldown@1.2.15)(rollup@4.65.1)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vue@3.5.44(typescript@6.0.3))
-    devDependencies:
-      typescript:
-        specifier: 6.0.3
-        version: 6.0.3
-      vue-tsc:
-        specifier: 3.3.13
-        version: 3.3.13(typescript@6.0.3)
-
-  packages/transition-demo/shared:
-    dependencies:
-      '@vfx-js/transitions':
-        specifier: workspace:*
-        version: link:../../transitions
-
-  packages/transition-demo/sveltekit:
-    dependencies:
-      '@vfx-js/core':
-        specifier: workspace:*
-        version: link:../../vfx-js
-      '@vfx-js/svelte':
-        specifier: workspace:*
-        version: link:../../svelte
-      '@vfx-js/transition-demo-shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@vfx-js/transitions':
-        specifier: workspace:*
-        version: link:../../transitions
-    devDependencies:
-      '@sveltejs/adapter-static':
-        specifier: 4.0.0
-        version: 4.0.0(@sveltejs/kit@3.1.0(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(svelte@5.57.3)(typescript@6.0.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))
-      '@sveltejs/kit':
-        specifier: 3.1.0
-        version: 3.1.0(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(svelte@5.57.3)(typescript@6.0.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      '@sveltejs/vite-plugin-svelte':
-        specifier: 7.3.1
-        version: 7.3.1(svelte@5.57.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
-      svelte:
-        specifier: 5.57.3
-        version: 5.57.3
-      svelte-check:
-        specifier: 4.7.7
-        version: 4.7.7(picomatch@4.0.7)(svelte@5.57.3)(typescript@6.0.3)
-      typescript:
-        specifier: 6.0.3
-        version: 6.0.3
-      vite:
-        specifier: 8.3.5
-        version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
-
-  packages/transition-demo/void:
-    dependencies:
-      '@vfx-js/react':
-        specifier: workspace:*
-        version: link:../../react
-      '@vfx-js/transition-demo-shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@void/react':
-        specifier: 1.3.0
-        version: 1.3.0(586b9e5d534ba2e34b36fddde0c520d1)
-      react:
-        specifier: ^19.3.1
-        version: 19.3.1
-      react-dom:
-        specifier: ^19.3.1
-        version: 19.3.1(react@19.3.1)
-      vite:
-        specifier: 8.3.5
-        version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
-      void:
-        specifier: 1.3.0
-        version: 1.3.0(@sveltejs/kit@3.1.0(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(svelte@5.57.3)(typescript@6.0.3)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(@types/node@26.6.5)(arktype@2.2.9)(kysely@0.29.7)(next@16.4.3(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.3)(valibot@1.5.0(typescript@6.0.3))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))(vitest@5.0.5(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vue@3.5.44(typescript@6.0.3))(workerd@1.20261023.1)(wrangler@4.153.0(@cloudflare/workers-types@5.20261028.1)(@types/node@26.6.5))(zod@4.6.7)
 
   packages/transitions:
     dependencies:

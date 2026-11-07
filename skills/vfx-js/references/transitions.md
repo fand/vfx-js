@@ -414,7 +414,7 @@ router.beforeNavigate(() =>
 );
 ```
 
-Astro example: https://github.com/fand/vfx-js/blob/main/packages/transition-demo/astro/src/transition.ts
+Astro example: https://github.com/fand/vfx-js/blob/main/packages/framework-testbed/astro/src/transition.ts
 
 ## Rules and pitfalls
 

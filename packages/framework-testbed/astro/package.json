@@ -1,0 +1,20 @@
+{
+  "name": "@vfx-js/testbed-astro",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build:demo": "astro build",
+    "preview": "astro preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vfx-js/core": "workspace:*",
+    "@vfx-js/testbed-shared": "workspace:*",
+    "@vfx-js/transitions": "workspace:*",
+    "astro": "^7.4.2"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

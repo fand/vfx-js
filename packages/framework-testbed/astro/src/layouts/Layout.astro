@@ -1,0 +1,41 @@
+---
+import "@vfx-js/testbed-shared/style.css";
+import { pages } from "@vfx-js/testbed-shared";
+import { ClientRouter } from "astro:transitions";
+
+const current = Astro.url.pathname.replace(/\/$/, "") || "/";
+const page = pages.find((p) => p.path === current);
+---
+
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html lang="en" transition:animate="none">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width" />
+        <title>{page?.label ?? "Demo"} | Astro</title>
+        <ClientRouter />
+    </head>
+    <body>
+        <nav class="nav">
+            {
+                pages.map((p) => (
+                    <a
+                        href={p.path}
+                        data-transition={p.transition}
+                        aria-current={p.path === current ? "page" : undefined}
+                    >
+                        {p.label}
+                    </a>
+                ))
+            }
+            <span class="framework">Astro</span>
+        </nav>
+        <main class="outlet">
+            <slot />
+        </main>
+        <script>
+            import { setupTransition } from "../transition";
+            setupTransition();
+        </script>
+    </body>
+</html>
