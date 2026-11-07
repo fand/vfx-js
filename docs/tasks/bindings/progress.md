@@ -79,10 +79,12 @@ See [plan2.md](./plan2.md).
 
 - One PR for both packages: #226 (transitions, element effects,
   Storybook stories).
-- Getting Started: Nuxt and SvelteKit tabs added. Not checked in a browser.
+- Getting Started: Nuxt, Vue and SvelteKit tabs added. Not checked in a
+  browser.
 - Astro: try the open questions in plan.md first.
-- Later, if asked: `VFXCanvas`, a config API (`pixelRatio`, `zIndex`,
-  `postEffect`), `@vfx-js/vue/router`, `@vfx-js/react/react-router`.
+- `VFXCanvas` (html-in-canvas wrapper): a separate PR.
+- Later, if asked: a config API (`pixelRatio`, `zIndex`, `postEffect`).
+- Router subpaths: done, see below.
 - Not checked: the html-in-canvas path, Chromatic for the new stories.
 
 ## Done: element effects
@@ -116,3 +118,35 @@ See [plan3.md](./plan3.md).
 - `releaseVFX()` runs after the queued remove, not right away. A slow
   add can't outlive the VFX.
 - `peekVFX()` added to each `vfx.ts`, for `updateElement`.
+
+## Done: router subpaths
+
+See [plan4.md](./plan4.md).
+
+- `@vfx-js/vue/router`: `VFXTransition` for vue-router without Nuxt.
+  The new page is in after `afterEach` plus `nextTick`.
+  - Shared glue moved to `connect-router.ts`; `/nuxt` uses it too.
+- `@vfx-js/react/react-router`: renders `useOutlet()` with the pathname
+  as `pageKey`. Peer `react-router ^7` (optional), devDep 7.18.5.
+- Storybook: "Transition/Vue" uses a real vue-router
+  (`createMemoryHistory`). New "Transition/React Router".
+- READMEs, `docs/TRANSITION.md`, Getting Started (React tab uses the
+  subpath, new Vue tab), changesets.
+
+## Checked (router subpaths)
+
+- Tests: vue 44 (12 new for the router), react 51 (4 new). Lint and
+  build pass. `nuxt.test.ts` unchanged.
+- The React test fails with `<Outlet />` in place of `useOutlet()`: the
+  kept page shows the new route.
+- Storybook in Playwright's Chrome: both stories run on each Next, with
+  two canvases mid-run and one after. Switching between stories leaves
+  one canvas. No errors.
+
+## Changes from the plan (router subpaths)
+
+- The first navigation (`from.matched` empty) does not run. A plain Vue
+  app mounts `<VFXTransition>` before vue-router's first navigation
+  ends, so `/about` loaded directly would transition from nothing.
+- React props type keeps `AddTransitionOpts<T>` like `/next`, so
+  `params` stays typed per transition class.

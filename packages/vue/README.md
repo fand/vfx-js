@@ -1,6 +1,6 @@
 # @vfx-js/vue
 
-Shader page transitions and element effects for Vue and Nuxt, built on [@vfx-js/core](https://www.npmjs.com/package/@vfx-js/core).
+Shader page transitions and element effects for Vue, Vue Router and Nuxt, built on [@vfx-js/core](https://www.npmjs.com/package/@vfx-js/core).
 
 ```sh
 npm i @vfx-js/core @vfx-js/vue @vfx-js/transitions
@@ -44,7 +44,35 @@ useTransitionIn({ transition: Glitch });
 </script>
 ```
 
-### Which spec wins
+## Vue Router
+
+Without Nuxt, put `<VFXTransition>` from `@vfx-js/vue/router` around
+`<RouterView />`. Pages and links work the same as in Nuxt.
+
+```vue
+<!-- App.vue -->
+<script setup lang="ts">
+import { Crossfade } from "@vfx-js/transitions";
+import { VFXTransition } from "@vfx-js/vue/router";
+</script>
+
+<template>
+    <VFXTransition :transition="Crossfade">
+        <RouterView />
+    </VFXTransition>
+</template>
+```
+
+- It reads the router from the app (`app.use(router)`), so it needs no
+  import of `vue-router`. Without a router it warns and does nothing.
+- The first navigation does not run a transition.
+- The new page counts as in one tick after the navigation is confirmed.
+  Lazy route components are loaded by then.
+- A page with an async `setup` under your own `<Suspense>` may be
+  captured before it resolves. Use `waitFor` on `<VFXTransition>` to
+  wait for it.
+
+## Which spec wins
 
 1. The link's `transition(spec)`, for that click.
 2. The new page's `useTransitionIn(spec)`.
@@ -85,7 +113,7 @@ app.directive("vfx", vVfx);
 
 ## API
 
-### `<VFXTransition>` (`@vfx-js/vue/nuxt`)
+### `<VFXTransition>` (`@vfx-js/vue/nuxt`, `@vfx-js/vue/router`)
 
 Props: `transition`, `params`, `reverse`, `duration`, `overflow`, `ease`,
 `waitFor`, `keepWrapped`, and `fullscreen`.
@@ -95,6 +123,8 @@ Props: `transition`, `params`, `reverse`, `duration`, `overflow`, `ease`,
   e.g. under a header.
 - `class`, `style` and other attributes go on the target.
 - On the server it renders plain divs. No `<ClientOnly>` needed.
+- Both take the same props. They differ only in how they learn that
+  the new page is in.
 
 ### `transition(spec)`
 
@@ -103,7 +133,8 @@ Modified clicks and links with another `target` are ignored.
 
 ### `setNextTransition(spec)`
 
-Use this spec for the next navigation, e.g. before `navigateTo()`.
+Use this spec for the next navigation, e.g. before `navigateTo()` or
+`router.push()`.
 
 ### `vVfx`
 

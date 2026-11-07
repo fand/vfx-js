@@ -36,8 +36,16 @@ const config: StorybookConfig = {
                 ...config.resolve?.alias,
                 // During development, resolve to source files for hot reloading
                 "@vfx-js/core": join(__dirname, "../../vfx-js/src/index.ts"),
-                "@vfx-js/react": join(__dirname, "../../react/src/react.ts"),
                 // Subpaths first, so the package alias does not swallow them.
+                "@vfx-js/react/react-router": join(
+                    __dirname,
+                    "../../react/src/react-router/index.tsx",
+                ),
+                "@vfx-js/react": join(__dirname, "../../react/src/react.ts"),
+                "@vfx-js/vue/router": join(
+                    __dirname,
+                    "../../vue/src/router/index.ts",
+                ),
                 "@vfx-js/vue/nuxt": join(
                     __dirname,
                     "../../vue/src/nuxt/index.ts",

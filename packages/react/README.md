@@ -222,6 +222,37 @@ uniform sampler2D texture1;
 uniform sampler2D texture2;
 ``` -->
 
+## Page transitions
+
+`VFXTransition` animates between pages with a shader.
+See [TRANSITION.md](../../docs/TRANSITION.md) for the full API.
+
+### React Router
+
+Import `VFXTransition` from `@vfx-js/react/react-router` and use it in
+place of `<Outlet />`. Each pathname is one page.
+
+```tsx
+import { VFXTransition } from "@vfx-js/react/react-router";
+import { Crossfade } from "@vfx-js/transitions";
+
+function Layout() {
+    return (
+        <>
+            <nav>...</nav>
+            <VFXTransition transition={Crossfade} />
+        </>
+    );
+}
+```
+
+- It takes the same props as `VFXTransition` without `children`.
+  `pageKey` defaults to the pathname, so a search-only change does not run.
+- The old page keeps its own route while it animates out:
+  `useParams`, `useMatches` and nested outlets stay on the old route.
+  `useLocation()` inside the old page reads the new location.
+- `react-router` 7 is an optional peer dependency.
+
 ## Future work
 
 -   Passing custom uniforms

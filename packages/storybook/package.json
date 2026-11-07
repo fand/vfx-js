@@ -20,8 +20,10 @@
     "@vfx-js/vue": "workspace:*",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "react-router": "7.18.5",
     "svelte": "5.57.3",
-    "vue": "3.5.44"
+    "vue": "3.5.44",
+    "vue-router": "5.4.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",

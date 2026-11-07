@@ -57,27 +57,24 @@ export default function About() {
         id: "react",
         name: "React",
         install: "npm i @vfx-js/core @vfx-js/react @vfx-js/transitions",
-        intro: "Any router works. A new pageKey starts a run. Here with React Router.",
+        intro: "With React Router, use <VFXTransition> from @vfx-js/react/react-router in place of <Outlet />. Each pathname is one page. With another router, use <VFXTransition> from @vfx-js/react and pass a pageKey that changes per page.",
         snippets: [
             {
                 label: "Layout.tsx",
                 code: `
-import { transition, VFXTransition } from "@vfx-js/react";
+import { transition } from "@vfx-js/react";
+import { VFXTransition } from "@vfx-js/react/react-router";
 import { Crossfade, Glitch } from "@vfx-js/transitions";
-import { Link, useLocation, useOutlet } from "react-router";
+import { Link } from "react-router";
 
 export function Layout() {
-  const { pathname } = useLocation();
-  const outlet = useOutlet();
   return (
     <>
       {/* A click spec wins over the page's <TransitionIn>. */}
       <Link to="/about" onClick={transition({ transition: Glitch })}>
         About
       </Link>
-      <VFXTransition pageKey={pathname} transition={Crossfade}>
-        {outlet}
-      </VFXTransition>
+      <VFXTransition transition={Crossfade} />
     </>
   );
 }`,
@@ -103,7 +100,8 @@ export function Tabs() {
             },
         ],
         notes: [
-            "Navigate from code with setNextTransition({ transition }) before router.push().",
+            "The old page keeps its own route while it animates out, but useLocation() inside it reads the new location.",
+            "Navigate from code with setNextTransition({ transition }) before navigate().",
         ],
     },
     {
@@ -200,6 +198,55 @@ useTransitionIn({ transition: Glitch });
             'The target fills the viewport height and pages scroll inside it. Pass :fullscreen="false" to size it with your own CSS, e.g. under a header.',
             "A link's transition(spec) wins over the page's useTransitionIn. Back plays the winning spec reversed.",
             "Navigate from code with setNextTransition({ transition }) before navigateTo().",
+        ],
+    },
+    {
+        id: "vue",
+        name: "Vue",
+        install: "npm i @vfx-js/core @vfx-js/vue @vfx-js/transitions",
+        intro: "Put <VFXTransition> from @vfx-js/vue/router around <RouterView />. It reads the router from app.use(router) and holds each navigation until the old page is captured. Each page picks its transition with useTransitionIn.",
+        snippets: [
+            {
+                label: "App.vue",
+                code: `
+<script setup lang="ts">
+import { Crossfade, Swipe } from "@vfx-js/transitions";
+import { transition } from "@vfx-js/vue";
+import { VFXTransition } from "@vfx-js/vue/router";
+</script>
+
+<template>
+  <nav>
+    <RouterLink to="/">Home</RouterLink>
+    <RouterLink to="/gallery" @click="transition({ transition: Swipe })">
+      Gallery
+    </RouterLink>
+  </nav>
+  <VFXTransition :transition="Crossfade" :duration="0.8">
+    <RouterView />
+  </VFXTransition>
+</template>`,
+            },
+            {
+                label: "pages/About.vue",
+                code: `
+<script setup lang="ts">
+import { Glitch } from "@vfx-js/transitions";
+import { useTransitionIn } from "@vfx-js/vue";
+
+useTransitionIn({ transition: Glitch });
+</script>
+
+<template>
+  <h1>About</h1>
+</template>`,
+            },
+        ],
+        notes: [
+            'The target fills the viewport height and pages scroll inside it. Pass :fullscreen="false" to size it with your own CSS, e.g. under a header.',
+            "A link's transition(spec) wins over the page's useTransitionIn. Back plays the winning spec reversed.",
+            "A page with an async setup under your own <Suspense> may be captured before it resolves. Use waitFor on <VFXTransition> to wait for it.",
+            "Navigate from code with setNextTransition({ transition }) before router.push().",
         ],
     },
     {
