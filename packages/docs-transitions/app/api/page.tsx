@@ -38,6 +38,10 @@ const containerOpts: Row[] = [
         'waitFor: "media" | "none" | (el) => Promise<void>',
         'What to wait for before the new capture. "media" waits for images, videos and fonts, up to about 300 ms.',
     ],
+    [
+        "slideSpec: (slide) => RunOpts | undefined",
+        "How each slide enters with show(). Its fields go over the container's; show() opts go over it.",
+    ],
 ];
 
 const handle: Row[] = [

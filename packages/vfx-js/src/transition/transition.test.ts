@@ -15,6 +15,7 @@ import {
 import { BODY_OFFSET, describeGlslError } from "./glsl";
 import { ShaderTransition } from "./shader";
 import {
+    layerSpec,
     resolveSpec,
     sameParams,
     TransitionController,
@@ -97,6 +98,26 @@ describe("resolveSpec", () => {
             resolveSpec(opts, { transition: Zoom, params: { strength: 2 } })
                 .params,
         ).toEqual({ strength: 2 });
+    });
+});
+
+describe("layerSpec", () => {
+    test("puts the top over the base per field", () => {
+        expect(
+            layerSpec(
+                { transition: Swipe, duration: 1, reverse: true },
+                { duration: 2 },
+            ),
+        ).toMatchObject({ transition: Swipe, duration: 2, reverse: true });
+    });
+
+    test("merges params unless the top sets a transition", () => {
+        const base = { transition: Swipe, params: { width: 1, soft: 2 } };
+        expect(layerSpec(base, { params: { width: 5 } }).params).toEqual({
+            width: 5,
+            soft: 2,
+        });
+        expect(layerSpec(base, { transition: Zoom }).params).toBeUndefined();
     });
 });
 
@@ -686,9 +707,8 @@ describe("TransitionController", () => {
         const runB = transition.run(cbB);
         await runA;
         expect(cbA).toHaveBeenCalledOnce();
-        await settle();
-        expect(starts).toHaveLength(2);
         (await started(starts, 1)).end();
+        expect(starts).toHaveLength(2);
         await runB;
         expect(cbB).toHaveBeenCalledOnce();
         expect(log.filter((s) => s === "unwrap")).toHaveLength(1);
@@ -1295,5 +1315,58 @@ describe("TransitionController.show", () => {
             reverse: true,
             duration: 0.6,
         });
+    });
+
+    test("slideSpec sets how each slide enters", async () => {
+        const start = vi.fn();
+        const instance: Transition = { render: () => {}, start };
+        const dom = slides("a", "b", "c");
+        const slideSpec = vi.fn((slide: HTMLElement) =>
+            slide.id === "b"
+                ? { transition: instance, duration: 2 }
+                : undefined,
+        );
+        const { transition, starts } = setup({
+            element: dom.element,
+            duration: 1,
+            reverse: true,
+            slideSpec,
+        });
+        const toB = transition.show(1);
+        await settle();
+        (await started(starts, 0)).end();
+        await toB;
+        expect(slideSpec).toHaveBeenCalledWith(dom.byId("b"));
+        expect(start).toHaveBeenCalledWith({ reverse: true, duration: 2 });
+        expect(starts[0].opts.duration).toBe(2);
+
+        const toC = transition.show(2);
+        await settle();
+        (await started(starts, 1)).end();
+        await toC;
+        expect(starts[1].opts.duration).toBe(1);
+    });
+
+    test("show() opts go over the slide spec", async () => {
+        const start = vi.fn();
+        const instance: Transition = { render: () => {}, start };
+        const dom = slides("a", "b");
+        const { transition, starts } = setup({
+            element: dom.element,
+            slideSpec: () => ({ transition: instance, duration: 2 }),
+        });
+        const done = transition.show(1, { duration: 3, reverse: true });
+        await settle();
+        (await started(starts, 0)).end();
+        await done;
+        expect(start).toHaveBeenCalledWith({ reverse: true, duration: 3 });
+    });
+
+    test("slideSpec is not called for the slide already shown", async () => {
+        const slideSpec = vi.fn(() => undefined);
+        const dom = slides("a", "b");
+        const { transition } = setup({ element: dom.element, slideSpec });
+        await transition.show(0);
+        expect(slideSpec).not.toHaveBeenCalled();
     });
 });

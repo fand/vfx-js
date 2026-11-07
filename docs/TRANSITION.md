@@ -117,6 +117,7 @@ const t = vfx.addTransition(el, {
     overflow: undefined,     // true (whole canvas) | px on every side
     keepWrapped: false,      // keep the element wrapped between runs
     waitFor: "media",        // "media" | "none" | (el) => Promise<void>
+    slideSpec: undefined,    // (slide) => RunOpts | undefined, for show()
 });
 ```
 
@@ -165,6 +166,17 @@ time; the others carry the `hidden` attribute.
   unless a run is in flight.
 - `remove: true` removes the other slides instead of hiding them.
 - The other `ShowOpts` work as in `run`.
+- `slideSpec` in `addTransition` sets how each slide enters. It gets the
+  slide and returns a spec. Its fields go over the container's, and the
+  `ShowOpts` go over it.
+
+```ts
+const t = vfx.addTransition(steps, {
+    transition: Swipe,
+    slideSpec: (slide) =>
+        slide.id === "done" ? { transition: Zoom, duration: 1 } : undefined,
+});
+```
 
 A `display` rule on a slide beats `hidden`. Add
 `[hidden] { display: none !important }`, or use `remove: true`.
