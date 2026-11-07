@@ -1,6 +1,6 @@
 import type { VFX, VFXProps } from "@vfx-js/core";
 import { setupCapture, teardownCapture } from "@vfx-js/core";
-import { acquireVFX, peekVFX, releaseVFX } from "./vfx.js";
+import { attachVFX, peekVFX } from "./vfx.js";
 
 export type { VFXProps };
 
@@ -84,34 +84,26 @@ export function bindElement(
     el: HTMLElement,
     options: BindOptions = {},
 ): ElementController {
-    const vfx = acquireVFX();
-    if (!vfx) {
-        let released = false;
-        return {
-            update() {},
-            destroy() {
-                if (!released) {
-                    released = true;
-                    releaseVFX();
-                }
-            },
-        };
-    }
-
     // One queue, so add, update and remove never overlap.
     const queue = createOpQueue();
-    // What core has now. Read when an op runs, not when it is queued.
+    // The props asked for, and the VFX to show them on.
+    let wanted: VFXProps | null = null;
+    let target: VFX | null = null;
+    // What a VFX has now. Read when an op runs, not when it is queued.
     let applied: VFXProps | null = null;
+    let appliedOn: VFX | null = null;
     let destroyed = false;
 
     const canvas =
         options.capture && el instanceof HTMLCanvasElement ? el : null;
     let captureStarted = false;
+    let captureTornDown = false;
     let latestCapture: OffscreenCanvas | null = null;
 
     // Resolves false when nothing was added.
     // The latest capture keeps `vfx.add` on the html-in-canvas path.
-    const add = async (props: VFXProps): Promise<boolean> => {
+    // The capture runs across a VFX replace; it is set up once.
+    const add = async (vfx: VFX, props: VFXProps): Promise<boolean> => {
         if (!canvas) {
             await vfx.add(el, props);
             return true;
@@ -121,17 +113,55 @@ export function bindElement(
             latestCapture = await setupCapture(canvas, {
                 onCapture: (capture) => {
                     latestCapture = capture;
-                    vfx.updateHICTexture(canvas, capture);
+                    target?.updateHICTexture(canvas, capture);
                 },
                 maxSize: vfx.maxTextureSize,
             });
-            // Unmounted during setup: the destroy op tears it down.
-            if (destroyed) {
+            // Unmounted or replaced during setup: a later op takes over.
+            if (destroyed || target !== vfx) {
                 return false;
             }
         }
         await vfx.add(canvas, props, latestCapture ?? undefined);
         return true;
+    };
+
+    // Move what core has toward `wanted` on `target`.
+    const reconcile = async () => {
+        if (destroyed && canvas && captureStarted && !captureTornDown) {
+            captureTornDown = true;
+            teardownCapture(canvas);
+        }
+        if (appliedOn && appliedOn !== target) {
+            appliedOn.remove(el);
+            applied = null;
+            appliedOn = null;
+        }
+        const vfx = target;
+        const next = destroyed ? null : wanted;
+        const prev = applied;
+        if (!vfx || prev === next) {
+            return;
+        }
+        try {
+            if (!next) {
+                vfx.remove(el);
+                applied = null;
+                appliedOn = null;
+            } else if (!prev) {
+                if (await add(vfx, next)) {
+                    applied = next;
+                    appliedOn = vfx;
+                }
+            } else {
+                await applyDelta(vfx, el, prev, next, (props) =>
+                    add(vfx, props),
+                );
+                applied = next;
+            }
+        } catch (err) {
+            logError(prev ? "update" : "add", err);
+        }
     };
 
     // Text and attribute changes do not reach the texture by themselves.
@@ -140,8 +170,8 @@ export function bindElement(
     let observer: MutationObserver | null = null;
     if (!canvas && !hasOwnTexture(el)) {
         observer = new MutationObserver(() => {
-            if (applied) {
-                vfx.update(el).catch((err) => logError("update", err));
+            if (applied && appliedOn) {
+                appliedOn.update(el).catch((err) => logError("update", err));
             }
         });
         observer.observe(el, {
@@ -152,33 +182,22 @@ export function bindElement(
         });
     }
 
+    const release = attachVFX((vfx) => {
+        target = vfx;
+        queue.enqueue(reconcile);
+        return () => {
+            target = null;
+            return queue.enqueue(reconcile);
+        };
+    });
+
     return {
         update(props) {
             if (destroyed) {
                 return;
             }
-            const next = props ?? null;
-            queue.enqueue(async () => {
-                const prev = applied;
-                if (prev === next) {
-                    return;
-                }
-                try {
-                    if (!next) {
-                        vfx.remove(el);
-                        applied = null;
-                    } else if (!prev) {
-                        if (await add(next)) {
-                            applied = next;
-                        }
-                    } else {
-                        await applyDelta(vfx, el, prev, next, add);
-                        applied = next;
-                    }
-                } catch (err) {
-                    logError(prev ? "update" : "add", err);
-                }
-            });
+            wanted = props ?? null;
+            queue.enqueue(reconcile);
         },
         destroy() {
             if (destroyed) {
@@ -186,18 +205,10 @@ export function bindElement(
             }
             destroyed = true;
             observer?.disconnect();
-            // Release after the remove, so a slow add does not outlive the VFX.
-            queue
-                .enqueue(() => {
-                    if (canvas && captureStarted) {
-                        teardownCapture(canvas);
-                    }
-                    if (applied) {
-                        vfx.remove(el);
-                        applied = null;
-                    }
-                })
-                .finally(releaseVFX);
+            // The release waits for the remove, so a slow add does not outlive the VFX.
+            release();
+            // Without a VFX there is no detach, but the capture may still run.
+            queue.enqueue(reconcile);
         },
     };
 }

@@ -23,7 +23,7 @@ import {
     type TransitionScope,
     TransitionScopeKey,
 } from "./scope.js";
-import { acquireVFX, releaseVFX } from "./vfx.js";
+import { attachVFX } from "./vfx.js";
 
 const OUTER_STYLE: CSSProperties = { display: "contents" };
 // Pages share one viewport-sized box and scroll inside it.
@@ -101,30 +101,32 @@ export function defineVFXTransition(
 
             let handle: TransitionHandle | null = null;
             let disconnect: (() => void) | null = null;
-            let acquired = false;
+            let release: (() => void) | null = null;
 
             onMounted(() => {
                 const element = el.value;
                 if (!element) {
                     return;
                 }
-                const vfx = acquireVFX();
-                acquired = true;
-                handle =
-                    vfx?.addTransition(element, live as AddTransitionOpts) ??
-                    null;
+                // A config change replaces the VFX; a run on the old one is cut.
+                release = attachVFX((vfx) => {
+                    handle = vfx.addTransition(
+                        element,
+                        live as AddTransitionOpts,
+                    );
+                    return () => {
+                        handle?.destroy();
+                        handle = null;
+                    };
+                });
                 disconnect = connect({ handle: () => handle, scope, app });
             });
 
             onBeforeUnmount(() => {
                 disconnect?.();
                 disconnect = null;
-                handle?.destroy();
-                handle = null;
-                if (acquired) {
-                    acquired = false;
-                    releaseVFX();
-                }
+                release?.();
+                release = null;
             });
 
             // Core moves the inner div into a canvas during a run.

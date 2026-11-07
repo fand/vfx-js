@@ -14,7 +14,7 @@
     import { onMount, setContext, type Snippet } from "svelte";
     import type { HTMLAttributes } from "svelte/elements";
     import { createScope, TransitionScopeKey } from "../scope.js";
-    import { acquireVFX, releaseVFX } from "../vfx.js";
+    import { attachVFX } from "../vfx.js";
 
     type Props = AddTransitionOpts<T> &
         Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
@@ -70,15 +70,16 @@
     let target: HTMLDivElement;
     let handle: TransitionHandle | null = null;
 
-    onMount(() => {
-        const vfx = acquireVFX();
-        handle = vfx?.addTransition(target, live as AddTransitionOpts) ?? null;
-        return () => {
-            handle?.destroy();
-            handle = null;
-            releaseVFX();
-        };
-    });
+    // A config change replaces the VFX; a run on the old one is cut.
+    onMount(() =>
+        attachVFX((vfx) => {
+            handle = vfx.addTransition(target, live as AddTransitionOpts);
+            return () => {
+                handle?.destroy();
+                handle = null;
+            };
+        }),
+    );
 
     // SvelteKit waits for this promise before it updates the DOM,
     // so the run captures the old page first.
