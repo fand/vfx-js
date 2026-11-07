@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@vfx-js/core": "workspace:*",
+    "@vfx-js/svelte": "workspace:*",
     "@vfx-js/transition-demo-shared": "workspace:*",
     "@vfx-js/transitions": "workspace:*"
   },

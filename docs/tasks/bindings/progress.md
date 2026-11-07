@@ -41,6 +41,41 @@ See [plan2.md](./plan2.md).
 - Getting Started has no Nuxt tab on this branch, so it was not
   touched.
 
+## Done: `@vfx-js/svelte`
+
+- `packages/svelte/`: built with `svelte-package`, ESM only. Ships the
+  `.svelte` file with `lang="ts"`; Svelte 5 compiles it as is.
+  - `.`: `transition` (an attachment), `setNextTransition`, `transitionIn`.
+  - `./sveltekit`: `VFXTransition`.
+  - Peers: `svelte ^5.29`, `@sveltejs/kit ^3` (optional).
+- `transition-demo/sveltekit` uses the package.
+- README, changeset (minor, so `0.1.0`), `CLAUDE.md`.
+
+## Checked (svelte)
+
+- 16 tests pass (`src/sveltekit.svelte.test.ts`, happy-dom, core
+  mocked, `$app/navigation` aliased to `src/test/app-navigation.ts`).
+  biome and `svelte-check` pass. Build passes.
+- The SvelteKit demo, `vite dev` and `vite build`: SSR renders the two
+  divs. In Playwright's Chrome: link, back, forward, and a click during
+  a run. Only one canvas. The old page stays on screen until the new
+  one is in.
+
+## Fixed along the way
+
+- The root `.gitignore` had `lib/`, so the SvelteKit demo's
+  `src/lib/PageView.svelte` was never committed, and the demo did not
+  build from a clean checkout. Added `!**/src/lib/` and recreated the
+  file from the Nuxt one. The same rule would have hidden
+  `packages/svelte/src/lib/`.
+
+## Differences from the old demo glue
+
+- Forward through history (popstate, `delta > 0`) used the target
+  page's preset. Now it uses the page spec or the props, like any
+  navigation without a link spec. Same in Nuxt.
+
 ## Next
 
-- `@vfx-js/svelte` + `/sveltekit`.
+- Open the PRs (one per package, per plan2.md).
+- Getting Started tabs for Nuxt and SvelteKit, once the page has them.
