@@ -31,3 +31,8 @@ export function releaseVFX(): void {
         instance = null;
     });
 }
+
+/** The shared VFX if one exists, without taking a reference. */
+export function peekVFX(): VFX | null {
+    return instance;
+}

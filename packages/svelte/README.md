@@ -1,6 +1,6 @@
 # @vfx-js/svelte
 
-Shader page transitions for Svelte 5 and SvelteKit, built on [@vfx-js/core](https://www.npmjs.com/package/@vfx-js/core).
+Shader page transitions and element effects for Svelte 5 and SvelteKit, built on [@vfx-js/core](https://www.npmjs.com/package/@vfx-js/core).
 
 ```sh
 npm i @vfx-js/core @vfx-js/svelte @vfx-js/transitions
@@ -52,6 +52,32 @@ A page picks how it enters with `transitionIn`:
 
 Back adds `reverse: true` to the spec that wins.
 
+## Element effects
+
+Add a shader to any element with the `vfx` attachment.
+Images, videos, canvases and text all work.
+
+```svelte
+<script lang="ts">
+    import { vfx } from "@vfx-js/svelte";
+    let shader = $state("rgbShift");
+</script>
+
+<img {@attach vfx({ shader: "rgbShift" })} src="cat.png" alt="" />
+<h1 {@attach vfx(() => ({ shader }))}>Hello</h1>
+```
+
+- The value is `VFXProps` from `@vfx-js/core`. `null` or `undefined` means no effect.
+- Pass a plain object, or a getter that returns one.
+  - A plain object that reads state makes Svelte re-run the attachment,
+    so any change removes and re-adds the element.
+  - A getter keeps the attachment and applies only the diff.
+    A new object with the same values does nothing, and a new `effect`
+    alone swaps the effect chain. Use it for props that change.
+- Text and attribute changes inside the element update its texture.
+  For changes it can't see, like an input's value, call `updateElement(el)`.
+- Elements and `<VFXTransition>` share one WebGL canvas.
+
 ## API
 
 ### `<VFXTransition>` (`@vfx-js/svelte/sveltekit`)
@@ -73,6 +99,14 @@ Modified clicks and links with another `target` are ignored.
 ### `setNextTransition(spec)`
 
 Use this spec for the next navigation, e.g. before `goto()`.
+
+### `vfx(props)`
+
+The attachment. See [Element effects](#element-effects).
+
+### `updateElement(el)`
+
+Re-capture the texture of an element with `vfx`.
 
 ### `transitionIn(spec)`
 
