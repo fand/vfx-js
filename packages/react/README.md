@@ -53,6 +53,19 @@ NOTE: `VFXSpan` doesn't work if the content includes child nodes.
 <VFXSpan><a href="https://example.com">Yo</a></VFXSpan>
 ```
 
+### VFXCanvas
+
+`VFXCanvas` renders its children into a shader with html-in-canvas, and falls back to a `<div>` with dom-to-canvas when the browser doesn't support it.
+
+```ts
+<VFXCanvas shader="rainbow">
+    <h1>Hello</h1>
+    <input type="text" />
+</VFXCanvas>
+```
+
+NOTE: With SSR, `VFXCanvas` renders a `<div>` first and switches to `<canvas>` after hydration, so its children mount again once.
+
 ### Options
 
 All VFX components outside `<VFXProvider>` share one WebGL canvas.

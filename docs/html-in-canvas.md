@@ -30,6 +30,8 @@ if (supportsHtmlInCanvas()) { ... }
 
 Falls back to a `<div>` with dom-to-canvas when html-in-canvas is not supported.
 
+With SSR it renders the `<div>` on the server and during hydration, then switches to the `<canvas>` when html-in-canvas is supported. The children mount again once at that point.
+
 ### Vue (`@vfx-js/vue`) and Svelte (`@vfx-js/svelte`)
 
 Both have a `VFXCanvas` component with the same props and markup as React's.
