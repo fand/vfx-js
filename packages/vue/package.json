@@ -76,7 +76,7 @@
     "vue": "3.5.44"
   },
   "lint-staged": {
-    "src/*.ts": [
+    "src/**/*.ts": [
       "biome check --no-errors-on-unmatched --files-ignore-unknown=true"
     ]
   },

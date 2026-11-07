@@ -12,7 +12,8 @@ import {
 } from "vue";
 import { bindElement, type ElementController } from "./element.js";
 
-// No runtime type, so Vue never casts an absent boolean to `false`.
+// No runtime type, so Vue never casts an absent prop to `false`.
+// Boolean props below use `default: undefined` for the same reason.
 function vfxProp<K extends keyof VFXProps>() {
     return {
         type: null as unknown as PropType<VFXProps[K]>,
@@ -24,13 +25,16 @@ const vfxProps = {
     shader: vfxProp<"shader">(),
     release: vfxProp<"release">(),
     uniforms: vfxProp<"uniforms">(),
-    overlay: vfxProp<"overlay">(),
+    overlay: {
+        type: [Boolean, Number] as PropType<true | number>,
+        default: undefined,
+    },
     intersection: vfxProp<"intersection">(),
     overflow: vfxProp<"overflow">(),
     wrap: vfxProp<"wrap">(),
     zIndex: vfxProp<"zIndex">(),
-    backbuffer: vfxProp<"backbuffer">(),
-    autoCrop: vfxProp<"autoCrop">(),
+    backbuffer: { type: Boolean, default: undefined },
+    autoCrop: { type: Boolean, default: undefined },
     glslVersion: vfxProp<"glslVersion">(),
     effect: vfxProp<"effect">(),
 } as const;

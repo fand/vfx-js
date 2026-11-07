@@ -228,6 +228,29 @@ describe("VFXCanvas", () => {
             expect(mock.setupCapture).not.toHaveBeenCalled();
         });
 
+        it("casts boolean shorthand props to true, and leaves absent ones out", async () => {
+            app = createApp({
+                components: { VFXCanvas },
+                template: `
+                    <VFXCanvas shader="rgbShift" backbuffer autoCrop overlay />
+                    <VFXCanvas shader="rgbShift" />
+                `,
+            });
+            app.mount(container);
+            await nextTick();
+            await flush();
+            const [withFlags, plain] = [...container.children];
+            expect(mock.vfx.add).toHaveBeenCalledWith(withFlags, {
+                shader: "rgbShift",
+                backbuffer: true,
+                autoCrop: true,
+                overlay: true,
+            });
+            expect(mock.vfx.add).toHaveBeenCalledWith(plain, {
+                shader: "rgbShift",
+            });
+        });
+
         it("updates on a text change", async () => {
             const root = await mount({ shader: "rgbShift" });
             text.value = "bye";
