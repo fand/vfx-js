@@ -30,6 +30,20 @@ if (supportsHtmlInCanvas()) { ... }
 
 Falls back to a `<div>` with dom-to-canvas when html-in-canvas is not supported.
 
+With SSR it renders the `<div>` on the server and during hydration, then switches to the `<canvas>` when html-in-canvas is supported. The children mount again once at that point.
+
+### Vue (`@vfx-js/vue`) and Svelte (`@vfx-js/svelte`)
+
+Both have a `VFXCanvas` component with the same props and markup as React's.
+
+```vue
+<VFXCanvas shader="rainbow">
+  <h1>Hello</h1>
+</VFXCanvas>
+```
+
+They render the `<div>` on the server and on the first client render, then switch to the `<canvas>` after mount when html-in-canvas is supported. The children mount again once at that point. `v-model:element` (Vue) or `bind:element` (Svelte) gives the element the effect is on, and `null` until then.
+
 ## Sizing policy
 
 The canvas's content-box must equal the wrapped element's border-box. Since the canvas is a replaced element, width can't be derived from its children, so it comes from one of two supported cases — anything else is unsupported:

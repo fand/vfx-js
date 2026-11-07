@@ -17,7 +17,7 @@ pnpm dev
 
 | Command      | Description                       |
 | ------------ | --------------------------------- |
-| `pnpm dev`   | Start dev mode for all packages   |
+| `pnpm dev`   | Start the docs and demo sites, and watch the libraries they use |
 | `pnpm build` | Build all packages                |
 | `pnpm lint`  | Lint all packages                 |
 | `pnpm test`  | Run tests                         |

@@ -53,6 +53,19 @@ NOTE: `VFXSpan` doesn't work if the content includes child nodes.
 <VFXSpan><a href="https://example.com">Yo</a></VFXSpan>
 ```
 
+### VFXCanvas
+
+`VFXCanvas` renders its children into a shader with html-in-canvas, and falls back to a `<div>` with dom-to-canvas when the browser doesn't support it.
+
+```ts
+<VFXCanvas shader="rainbow">
+    <h1>Hello</h1>
+    <input type="text" />
+</VFXCanvas>
+```
+
+NOTE: With SSR, `VFXCanvas` renders a `<div>` first and switches to `<canvas>` after hydration, so its children mount again once.
+
 ### Options
 
 All VFX components outside `<VFXProvider>` share one WebGL canvas.
@@ -221,6 +234,37 @@ uniform sampler2D input;
 uniform sampler2D texture1;
 uniform sampler2D texture2;
 ``` -->
+
+## Page transitions
+
+`VFXTransition` animates between pages with a shader.
+See [TRANSITION.md](../../docs/TRANSITION.md) for the full API.
+
+### React Router
+
+Import `VFXTransition` from `@vfx-js/react/react-router` and use it in
+place of `<Outlet />`. Each pathname is one page.
+
+```tsx
+import { VFXTransition } from "@vfx-js/react/react-router";
+import { Crossfade } from "@vfx-js/transitions";
+
+function Layout() {
+    return (
+        <>
+            <nav>...</nav>
+            <VFXTransition transition={Crossfade} />
+        </>
+    );
+}
+```
+
+- It takes the same props as `VFXTransition` without `children`.
+  `pageKey` defaults to the pathname, so a search-only change does not run.
+- The old page keeps its own route while it animates out:
+  `useParams`, `useMatches` and nested outlets stay on the old route.
+  `useLocation()` inside the old page reads the new location.
+- `react-router` 7 is an optional peer dependency.
 
 ## Future work
 

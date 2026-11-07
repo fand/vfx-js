@@ -1,3 +1,3 @@
 <template>
-    <PageView path="/about" />
+    <PageView path="/about" heading-shader="rgbShift" />
 </template>

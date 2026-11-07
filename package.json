@@ -4,7 +4,7 @@
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev --ui tui --concurrency 16",
+    "dev": "turbo run dev --ui tui --filter=docs --filter=docs-react --filter=@vfx-js/transition-demo-next --filter=@vfx-js/core --filter=@vfx-js/effects --filter=@vfx-js/react --filter=@vfx-js/transitions",
     "clean": "turbo run clean",
     "lint": "turbo run lint",
     "prepare": "husky",

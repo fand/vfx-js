@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+        "target": "es2022",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "lib": ["es2022", "dom"],
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "skipLibCheck": true,
+        "verbatimModuleSyntax": true,
+        "isolatedModules": true,
+        "types": ["@sveltejs/kit"],
+        "noEmit": true
+    },
+    "include": ["src", "vitest.config.ts", "svelte.config.js"]
+}

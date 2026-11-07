@@ -1,0 +1,85 @@
+{
+  "name": "@vfx-js/svelte",
+  "description": "WebGL page transitions for Svelte and SvelteKit",
+  "version": "0.0.0",
+  "files": [
+    "package.json",
+    "README.md",
+    "dist/",
+    "!dist/**/*.test.*"
+  ],
+  "type": "module",
+  "svelte": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "svelte": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./sveltekit": {
+      "types": "./dist/sveltekit/index.d.ts",
+      "svelte": "./dist/sveltekit/index.js",
+      "default": "./dist/sveltekit/index.js"
+    }
+  },
+  "scripts": {
+    "build": "run-s clean build:package",
+    "build:package": "svelte-package -i src/lib -o dist",
+    "clean": "rimraf dist",
+    "dev": "svelte-package -i src/lib -o dist -w",
+    "lint": "biome check . && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "format": "biome check --write .",
+    "lint-staged": "lint-staged",
+    "test": "vitest --run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "@sveltejs/kit": "^3.0.0",
+    "svelte": "^5.29.0"
+  },
+  "peerDependenciesMeta": {
+    "@sveltejs/kit": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@vfx-js/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@sveltejs/kit": "3.1.0",
+    "@sveltejs/package": "^3.0.2",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "happy-dom": "21.0.4",
+    "lint-staged": "^17.6.0",
+    "npm-run-all2": "^9.0.4",
+    "rimraf": "^6.1.3",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.7",
+    "typescript": "6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,svelte}": [
+      "biome check --no-errors-on-unmatched --files-ignore-unknown=true"
+    ]
+  },
+  "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
+  "homepage": "https://amagi.dev/vfx-js",
+  "repository": {
+    "url": "https://github.com/fand/vfx-js"
+  },
+  "bugs": {
+    "url": "https://github.com/fand/vfx-js/issues"
+  },
+  "keywords": [
+    "glsl",
+    "svelte",
+    "sveltekit",
+    "transition",
+    "webgl"
+  ],
+  "license": "MIT"
+}
