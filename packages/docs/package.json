@@ -15,6 +15,7 @@
     "build:storybook-dist": "rm -rf dist/storybook && cp -a storybook dist/storybook",
     "build:examples-dist": "rm -rf dist/examples && cp -a examples dist/examples",
     "build:llms": "node scripts/build-llms-full.mjs",
+    "test": "node scripts/check-skill.mjs",
     "preview": "vite preview",
     "clean": "rimraf dist storybook typedoc examples"
   },

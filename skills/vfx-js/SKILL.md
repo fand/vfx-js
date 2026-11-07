@@ -81,7 +81,7 @@ vfx.add(el, {
 ### `VFX` methods
 
 - `add(el, props)` → `Promise<void>`. Start rendering an element.
-- `addHTML(el, props)` → render any HTML subtree, with live updates (html-in-canvas, Chrome only, falls back to a slower capture).
+- `addHTML(el, props)` → render any HTML subtree, with live updates (html-in-canvas, Chrome only, falls back to a slower capture). Check support with `supportsHtmlInCanvas()`.
 - `remove(el)`, `update(el)` (re-capture after the content changes), `updateEffects(el, effects)`.
 - `addTransition(el, opts)` → `TransitionHandle`. See [references/transitions.md](references/transitions.md).
 - `play()`, `stop()`, `render()`, `destroy()`, `setTime(t)`, `timeScale`.

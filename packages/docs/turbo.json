@@ -1,0 +1,15 @@
+{
+    "$schema": "https://turbo.build/schema.json",
+    "extends": ["//"],
+    "tasks": {
+        "test": {
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/skills/**",
+                "$TURBO_ROOT$/packages/*/src/**",
+                "$TURBO_ROOT$/packages/*/package.json"
+            ],
+            "outputs": []
+        }
+    }
+}
