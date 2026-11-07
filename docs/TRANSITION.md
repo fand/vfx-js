@@ -78,6 +78,14 @@ A new `pageKey` starts a run. The old page stays on screen until the
 transition has its snapshot. The incoming page can pick its own
 transition with `<TransitionIn>`.
 
+### Vue and Svelte
+
+Nuxt and SvelteKit have their own `<VFXTransition>`:
+[`@vfx-js/vue/nuxt`](../packages/vue/README.md) and
+[`@vfx-js/svelte/sveltekit`](../packages/svelte/README.md).
+Each path is one page. Pages pick their transition with
+`useTransitionIn` (Vue) or `transitionIn` (Svelte).
+
 ## Core API
 
 ### Sizing
