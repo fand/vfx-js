@@ -15,14 +15,14 @@ Each path is one page.
 <!-- app/app.vue -->
 <script setup lang="ts">
 import { Crossfade, Swipe } from "@vfx-js/transitions";
-import { transition } from "@vfx-js/vue";
+import { vTransition } from "@vfx-js/vue";
 import { VFXTransition } from "@vfx-js/vue/nuxt";
 </script>
 
 <template>
     <nav>
         <NuxtLink to="/">Home</NuxtLink>
-        <NuxtLink to="/gallery" @click="transition({ transition: Swipe })">
+        <NuxtLink to="/gallery" v-transition="{ transition: Swipe }">
             Gallery
         </NuxtLink>
     </nav>
@@ -74,7 +74,7 @@ import { VFXTransition } from "@vfx-js/vue/router";
 
 ## Which spec wins
 
-1. The link's `transition(spec)`, for that click.
+1. The link's `v-transition` spec, for that click.
 2. The new page's `useTransitionIn(spec)`.
 3. The props of `<VFXTransition>`.
 
@@ -214,10 +214,19 @@ Props: `transition`, `params`, `reverse`, `duration`, `overflow`, `ease`,
 - Both take the same props. They differ only in how they learn that
   the new page is in.
 
+### `vTransition`
+
+The directive for links: `v-transition="spec"`. A click on the link
+sets the spec for the navigation it starts.
+Modified clicks and links with another `target` are ignored.
+
 ### `transition(spec)`
 
-Returns a click handler. Use it as `@click="transition(spec)"` on a link.
-Modified clicks and links with another `target` are ignored.
+Returns a click handler that does the same as `vTransition`.
+Use it in code, e.g. `addEventListener("click", transition(spec))`,
+or as `:onClick="transition(spec)"`.
+In templates, `@click="transition(spec)"` does not work: Vue wraps it,
+so the returned handler never runs.
 
 ### `setNextTransition(spec)`
 

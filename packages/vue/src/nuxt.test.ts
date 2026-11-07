@@ -10,6 +10,7 @@ import {
     nextTick,
     ref,
 } from "vue";
+import { vTransition } from "./directive.js";
 import { VFXTransition } from "./nuxt/index.js";
 import { setNextTransition, takePending, transition } from "./pending.js";
 import { useTransitionIn } from "./use-transition-in.js";
@@ -247,6 +248,23 @@ describe("VFXTransition (nuxt)", () => {
         expect(await go("/", "/about", About)).toEqual({ transition: Swipe });
     });
 
+    it("uses the spec of a v-transition link from a template", async () => {
+        app = createApp({
+            components: { VFXTransition },
+            directives: { transition: vTransition },
+            setup: () => ({ page, spec: { transition: Swipe } }),
+            template: `
+                <a href="/about" v-transition="spec">About</a>
+                <VFXTransition><component :is="page" /></VFXTransition>
+            `,
+        });
+        app.config.globalProperties.$router = nuxt.router;
+        (app as unknown as { $nuxt: unknown }).$nuxt = nuxt.nuxtApp;
+        app.mount(container);
+        container.querySelector("a")?.dispatchEvent(new MouseEvent("click"));
+        expect(await go("/", "/about", About)).toEqual({ transition: Swipe });
+    });
+
     it("falls back to {} so the props apply", async () => {
         mount({ transition: Swipe });
         expect(await go("/", "/home2", Home)).toEqual({});
@@ -325,6 +343,74 @@ describe("transition", () => {
         a.dispatchEvent(new MouseEvent("click", { metaKey: true }));
         expect(takePending()).toBeNull();
         a.target = "_blank";
+        a.dispatchEvent(new MouseEvent("click"));
+        expect(takePending()).toBeNull();
+    });
+});
+
+describe("vTransition", () => {
+    let container: HTMLElement;
+    let app: App | null;
+
+    function mount(template: string, setup: () => Record<string, unknown>) {
+        app = createApp({
+            directives: { transition: vTransition },
+            setup,
+            template,
+        });
+        app.mount(container);
+        return container.querySelector("a") as HTMLAnchorElement;
+    }
+
+    beforeEach(() => {
+        takePending();
+        container = document.createElement("div");
+        app = null;
+    });
+    afterEach(() => {
+        app?.unmount();
+    });
+
+    it("sets the latest spec on a plain left click", async () => {
+        const spec = ref<RunOpts>({ transition: Swipe });
+        const a = mount('<a href="/" v-transition="spec">x</a>', () => ({
+            spec,
+        }));
+        a.dispatchEvent(new MouseEvent("click"));
+        expect(takePending()).toEqual({ transition: Swipe });
+        spec.value = { transition: Zoom };
+        await nextTick();
+        a.dispatchEvent(new MouseEvent("click"));
+        expect(takePending()).toEqual({ transition: Zoom });
+    });
+
+    it("ignores modified clicks and other targets", () => {
+        const a = mount(
+            '<a href="/" target="_blank" v-transition="spec">x</a>',
+            () => ({ spec: { transition: Swipe } }),
+        );
+        a.dispatchEvent(new MouseEvent("click"));
+        a.removeAttribute("target");
+        a.dispatchEvent(new MouseEvent("click", { metaKey: true }));
+        expect(takePending()).toBeNull();
+    });
+
+    it("removes the listener on unmount", () => {
+        const a = mount('<a href="/" v-transition="spec">x</a>', () => ({
+            spec: { transition: Swipe },
+        }));
+        app?.unmount();
+        app = null;
+        a.dispatchEvent(new MouseEvent("click"));
+        expect(takePending()).toBeNull();
+    });
+
+    // Vue wraps `@click="f(x)"` in `$event => f(x)`, so the handler is dropped.
+    it('is needed because @click="transition(spec)" does nothing', () => {
+        const a = mount(
+            '<a href="/" @click="transition({ transition: Swipe })">x</a>',
+            () => ({ transition, Swipe }),
+        );
         a.dispatchEvent(new MouseEvent("click"));
         expect(takePending()).toBeNull();
     });

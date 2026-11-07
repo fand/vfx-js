@@ -22,7 +22,7 @@ export function setNextTransition<T extends Transition | TransitionClass>(
     pending = { spec, at: Date.now() };
 }
 
-function isPlainLeftClick(e: MouseEvent): boolean {
+export function isPlainLeftClick(e: MouseEvent): boolean {
     if (
         e.defaultPrevented ||
         e.button !== 0 ||
@@ -41,7 +41,8 @@ function isPlainLeftClick(e: MouseEvent): boolean {
 
 /**
  * Returns a click handler that sets the spec for the navigation the click starts.
- * Use it as `@click="transition(spec)"`.
+ * In templates, use `v-transition="spec"` instead.
+ * Use this in code, e.g. `addEventListener("click", transition(spec))` or `:onClick="transition(spec)"`.
  */
 export function transition<T extends Transition | TransitionClass>(
     spec: RunOpts<T>,

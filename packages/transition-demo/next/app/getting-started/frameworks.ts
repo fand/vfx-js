@@ -163,14 +163,14 @@ export default function About() {
                 code: `
 <script setup lang="ts">
 import { Crossfade, Swipe } from "@vfx-js/transitions";
-import { transition } from "@vfx-js/vue";
+import { vTransition } from "@vfx-js/vue";
 import { VFXTransition } from "@vfx-js/vue/nuxt";
 </script>
 
 <template>
   <nav>
     <NuxtLink to="/">Home</NuxtLink>
-    <NuxtLink to="/gallery" @click="transition({ transition: Swipe })">
+    <NuxtLink to="/gallery" v-transition="{ transition: Swipe }">
       Gallery
     </NuxtLink>
   </nav>
@@ -196,7 +196,7 @@ useTransitionIn({ transition: Glitch });
         ],
         notes: [
             'The target fills the viewport height and pages scroll inside it. Pass :fullscreen="false" to size it with your own CSS, e.g. under a header.',
-            "A link's transition(spec) wins over the page's useTransitionIn. Back plays the winning spec reversed.",
+            "A link's v-transition spec wins over the page's useTransitionIn. Back plays the winning spec reversed.",
             "Navigate from code with setNextTransition({ transition }) before navigateTo().",
         ],
     },
@@ -211,14 +211,14 @@ useTransitionIn({ transition: Glitch });
                 code: `
 <script setup lang="ts">
 import { Crossfade, Swipe } from "@vfx-js/transitions";
-import { transition } from "@vfx-js/vue";
+import { vTransition } from "@vfx-js/vue";
 import { VFXTransition } from "@vfx-js/vue/router";
 </script>
 
 <template>
   <nav>
     <RouterLink to="/">Home</RouterLink>
-    <RouterLink to="/gallery" @click="transition({ transition: Swipe })">
+    <RouterLink to="/gallery" v-transition="{ transition: Swipe }">
       Gallery
     </RouterLink>
   </nav>
@@ -244,7 +244,7 @@ useTransitionIn({ transition: Glitch });
         ],
         notes: [
             'The target fills the viewport height and pages scroll inside it. Pass :fullscreen="false" to size it with your own CSS, e.g. under a header.',
-            "A link's transition(spec) wins over the page's useTransitionIn. Back plays the winning spec reversed.",
+            "A link's v-transition spec wins over the page's useTransitionIn. Back plays the winning spec reversed.",
             "A page with an async setup under your own <Suspense> may be captured before it resolves. Use waitFor on <VFXTransition> to wait for it.",
             "Navigate from code with setNextTransition({ transition }) before router.push().",
         ],

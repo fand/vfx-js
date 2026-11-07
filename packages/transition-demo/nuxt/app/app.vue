@@ -2,7 +2,7 @@
 import { findPage, pages } from "@vfx-js/transition-demo-shared";
 import { presets } from "@vfx-js/transition-demo-shared/transitions";
 import { Swipe } from "@vfx-js/transitions";
-import { transition } from "@vfx-js/vue";
+import { vTransition } from "@vfx-js/vue";
 import { VFXTransition } from "@vfx-js/vue/nuxt";
 
 const route = useRoute();
@@ -16,7 +16,7 @@ useHead(() => ({ title: `${findPage(route.path).label} | Nuxt` }));
             :key="p.path"
             :to="p.path"
             :aria-current="p.path === route.path ? 'page' : undefined"
-            @click="transition({ transition: presets[p.transition] })"
+            v-transition="{ transition: presets[p.transition] }"
         >
             {{ p.label }}
         </NuxtLink>
