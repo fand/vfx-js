@@ -157,6 +157,7 @@ describe("VFXTransition (nuxt)", () => {
         mock.vfx.destroy.mockClear();
         mock.vfx.addTransition.mockClear();
         mock.handle.destroy.mockClear();
+        mock.handle.cancel.mockClear();
         takePending();
         page.value = Home;
         nuxt = fakeNuxt();
@@ -305,6 +306,7 @@ describe("VFXTransition (nuxt)", () => {
         await nuxt.navigate("/", "/a");
         nuxt.afterEach(new Error("aborted"));
         await mock.runs[0].done;
+        expect(mock.handle.cancel).toHaveBeenCalledTimes(1);
     });
 
     it("removes the router hooks on unmount", () => {

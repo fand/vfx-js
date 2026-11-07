@@ -64,7 +64,9 @@ export function connectRouter(
     });
     const offAfter = router.afterEach((_to, _from, failure) => {
         position = historyPosition() ?? position;
-        if (failure) {
+        // The page did not change, so end the run without animating.
+        if (failure && finish) {
+            ctx.handle()?.cancel();
             free();
         }
     });

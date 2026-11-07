@@ -147,6 +147,7 @@ describe("VFXTransition (router)", () => {
         mock.init.mockClear();
         mock.vfx.destroy.mockClear();
         mock.handle.destroy.mockClear();
+        mock.handle.cancel.mockClear();
         takePending();
         page.value = Home;
         router = fakeRouter(page);
@@ -213,13 +214,31 @@ describe("VFXTransition (router)", () => {
         await router.startOnly("/", "/b");
         await first.done;
         expect(mock.runs).toHaveLength(2);
+        expect(mock.handle.cancel).not.toHaveBeenCalled();
     });
 
-    it("frees the run of a failed navigation", async () => {
+    it("cancels the run of a navigation a later guard aborts", async () => {
         mount();
         await router.startOnly("/", "/a");
+        const run = mock.runs[0];
+        let heldAtCancel = false;
+        mock.handle.cancel.mockImplementationOnce(() => {
+            heldAtCancel = run.endText === null;
+        });
         router.fail("/", "/a");
+        await run.done;
+        expect(mock.handle.cancel).toHaveBeenCalledTimes(1);
+        // Cancelled while held, so the run never animates.
+        expect(heldAtCancel).toBe(true);
+    });
+
+    it("frees the run on unmount without cancelling", async () => {
+        mount();
+        await router.startOnly("/", "/a");
+        app?.unmount();
+        app = null;
         await mock.runs[0].done;
+        expect(mock.handle.cancel).not.toHaveBeenCalled();
     });
 
     it("skips a navigation to the same path", async () => {
