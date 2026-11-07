@@ -30,6 +30,16 @@
         "types": "./lib/esm/nuxt/index.d.ts",
         "default": "./lib/esm/nuxt/index.js"
       }
+    },
+    "./router": {
+      "require": {
+        "types": "./lib/cjs/router/index.d.ts",
+        "default": "./lib/cjs/router/index.js"
+      },
+      "import": {
+        "types": "./lib/esm/router/index.d.ts",
+        "default": "./lib/esm/router/index.js"
+      }
     }
   },
   "scripts": {
