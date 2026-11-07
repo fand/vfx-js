@@ -1,5 +1,11 @@
 # @vfx-js/effects
 
+## 1.4.2
+
+### Patch Changes
+
+- 3b9589a: `DatamoshEffect`, `PixelSortEffect` and `JPEGGlitchEffect` capture only the content rect when the input stage is padded. They used to squeeze the pad into the element and stretch the edges.
+
 ## 1.4.1
 
 ### Patch Changes

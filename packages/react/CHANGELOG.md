@@ -1,5 +1,30 @@
 # react-vfx
 
+## 1.2.0
+
+### Minor Changes
+
+- 99b198b: `<VFXProvider>` is now optional. Components outside a Provider share one VFX instance. Use the new `useVFXConfig` hook to set its options.
+
+  Note: components rendered outside any Provider used to render as plain DOM. They now create a shared canvas on `document.body`. A page with a Provider and components outside it has two canvases.
+
+  `<VFXProvider zIndex>` now works. It was ignored before.
+
+- 3b9589a: **Experimental.** The transition API may change in minor releases.
+
+  `VFXTransition`, `useVFXTransition`, `transition()`, `setNextTransition()`.
+
+  - `<VFXTransition pageKey>`: a new `pageKey` starts a run and mounts the children fresh. Children can be anything. The target fills the viewport height unless `fullscreen={false}`.
+  - `<TransitionIn>` and `useTransitionIn(spec)`: the incoming page sets how it enters. A click spec still wins.
+  - `@vfx-js/react/next`: `VFXTransition` for the Next.js App Router. `pageKey` defaults to the pathname. `next` is an optional peer dependency.
+  - The package entry is a `"use client"` module, so Server Components can import `<TransitionIn>`.
+
+### Patch Changes
+
+- Updated dependencies [3b9589a]
+- Updated dependencies [3b9589a]
+  - @vfx-js/core@1.4.0
+
 ## 1.1.2
 
 ### Patch Changes
