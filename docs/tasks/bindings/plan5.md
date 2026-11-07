@@ -36,6 +36,18 @@ import { VFXCanvas } from "@vfx-js/vue";
   as React does.
 - Not supported: renders `<div>children</div>` and uses dom-to-canvas.
 
+### Getting the element
+
+React's `ref` gives the `<canvas>` or `<div>`. Vue's `ref` and Svelte's
+`bind:this` give the component, so expose the element:
+
+- Vue: `defineExpose`-style `expose({ el })`, where `el` is a
+  `Ref<HTMLElement | null>`. Usage: `canvasRef.value?.el`.
+- Svelte: a bindable `element` prop. Usage: `bind:element={el}`.
+
+The element changes once, from `<div>` to `<canvas>`, after mount (see
+"SSR and hydration"). `el` / `element` follows it.
+
 ## Shared part: extend `element.ts`
 
 `VFXCanvas` is `bindElement` plus capture. Add an option instead of a
@@ -90,12 +102,14 @@ nothing on the server, and the right element on the client only.
   - Props change: `controller.update(props)` from a `watch` on the
     VFX props (deep: false; the key compare stops needless re-adds).
   - `onBeforeUnmount`: `destroy()`.
+- `expose({ el })` with the current root element.
 - Export `VFXCanvas` from `.`.
 
 ## Svelte
 
 - `src/lib/VFXCanvas.svelte`.
-  - `let { children, shader, ..., ...attrs } = $props()`.
+  - `let { children, element = $bindable(null), shader, ..., ...attrs } = $props()`.
+  - `bind:this={element}` on whichever root is rendered.
   - `supported = $state(false)`; set in `onMount`.
   - `{#if supported}` canvas with `layoutsubtree`, `content="drawable"`
     and a `drawable` child; `{:else}` div.
@@ -125,6 +139,7 @@ Each package:
   calls `update`.
 - SSR (`vue/server-renderer`, `svelte/server`): the div; no core calls.
 - Attrs land on the root element.
+- Vue `el` / Svelte `element` is the `<div>` first, then the `<canvas>`.
 
 ## Storybook
 
@@ -146,7 +161,7 @@ or Canary.
 ## Docs
 
 - READMEs: a `VFXCanvas` section (supported browsers, the one-time
-  remount).
+  remount, getting the element).
 - Changesets: extend the element-effects ones.
 - `docs/html-in-canvas.md`: mention the Vue and Svelte components next
   to React.
@@ -156,3 +171,8 @@ or Canary.
 
 - lint, test, build in packages/vue and packages/svelte.
 - `build-storybook`.
+
+## After this
+
+Config API for Vue and Svelte (`pixelRatio`, `zIndex`, `postEffect`,
+`autoplay`), like React's `useVFXConfig`. Separate plan.
