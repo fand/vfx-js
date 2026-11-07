@@ -15,15 +15,20 @@
     "@vfx-js/core": "workspace:*",
     "@vfx-js/effects": "workspace:*",
     "@vfx-js/react": "workspace:*",
+    "@vfx-js/svelte": "workspace:*",
     "@vfx-js/transitions": "workspace:*",
+    "@vfx-js/vue": "workspace:*",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "svelte": "5.57.3",
+    "vue": "3.5.44"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
     "@chromatic-com/storybook": "5.6.0",
     "@storybook/addon-docs": "10.6.4",
     "@storybook/html-vite": "10.6.4",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@tweakpane/core": "2.0.5",
     "@types/node": "26.6.5",
     "storybook": "10.6.4",
