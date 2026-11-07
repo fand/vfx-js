@@ -1,5 +1,15 @@
 # react-vfx
 
+## 1.3.0
+
+### Minor Changes
+
+- 7990d89: Add `@vfx-js/react/react-router`: a `VFXTransition` for React Router. Use it in place of `<Outlet />`; `pageKey` defaults to the pathname, and the old page keeps its own route while it animates out.
+
+### Patch Changes
+
+- f2634f6: Fix the `VFXCanvas` hydration mismatch with SSR when the browser supports html-in-canvas.
+
 ## 1.2.0
 
 ### Minor Changes
