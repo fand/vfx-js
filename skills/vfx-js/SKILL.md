@@ -1,6 +1,6 @@
 ---
 name: vfx-js
-description: Add WebGL shader effects and page transitions to websites with VFX-JS (@vfx-js/core, @vfx-js/react, @vfx-js/effects, @vfx-js/transitions). Use when a site needs visual effects on images, videos or text (glitch, RGB shift, pixelate, bloom, halftone, particles...), animated tab, carousel or page transitions, or when writing custom GLSL effects or transitions for VFX-JS.
+description: Add WebGL shader effects and page transitions to websites with VFX-JS (@vfx-js/core, @vfx-js/react, @vfx-js/vue, @vfx-js/svelte, @vfx-js/effects, @vfx-js/transitions). Works with plain JS, React, Next.js, React Router, Vue, Nuxt, Svelte and SvelteKit. Use when a site needs visual effects on images, videos or text (glitch, RGB shift, pixelate, bloom, halftone, particles...), animated tab, carousel or page transitions, or when writing custom GLSL effects or transitions for VFX-JS.
 ---
 
 # VFX-JS
@@ -16,7 +16,9 @@ Docs: https://amagi.dev/vfx-js/ Â· Examples: https://amagi.dev/vfx-js/examples Â
 | Package | Use it for |
 | --- | --- |
 | `@vfx-js/core` | The `VFX` class. Shader presets, custom shaders, the Effect API, `addTransition`. |
-| `@vfx-js/react` | React components (`VFXImg`, `VFXVideo`, `VFXSpan`, `VFXDiv`, `VFXP`) and `<VFXTransition>`. |
+| `@vfx-js/react` | React components (`VFXImg`, `VFXVideo`, `VFXSpan`, `VFXDiv`, `VFXP`, `VFXCanvas`) and `<VFXTransition>`. Subpaths `/next`, `/react-router`. |
+| `@vfx-js/vue` | Vue directive `v-vfx`, `VFXCanvas`, and `<VFXTransition>` from `/nuxt` or `/router`. |
+| `@vfx-js/svelte` | Svelte 5 attachment `vfx`, `VFXCanvas`, and `<VFXTransition>` from `/sveltekit`. |
 | `@vfx-js/effects` | Prebuilt `Effect` classes (`BloomEffect`, `PixelateEffect`, ...). |
 | `@vfx-js/transitions` | Transition presets (`Swipe`, `Glitch`, `Zoom`, ...). Experimental. |
 
@@ -104,6 +106,54 @@ import { VFXImg, VFXSpan, VFXVideo } from "@vfx-js/react";
 - No provider is needed. Components share one canvas. Set its options with `useVFXConfig({ pixelRatio, zIndex, postEffect })`.
 - Use `<VFXProvider>` only for a separate canvas (e.g. a `wrapper`), and `VFXContext` to get the `VFX` instance.
 - The package is `"use client"`. In Next.js App Router, use the components from a client component or directly in a Server Component (they cross as client references). Pass only serializable props from a Server Component: preset names, GLSL strings, plain uniforms.
+- `<VFXCanvas shader="rainbow">...</VFXCanvas>` renders any markup, form controls included. With SSR it renders a `<div>` first and switches to `<canvas>` after hydration, so its children mount again once.
+
+## Vue and Nuxt
+
+```bash
+npm i @vfx-js/core @vfx-js/vue
+```
+
+```vue
+<script setup lang="ts">
+import { vVfx } from "@vfx-js/vue";
+</script>
+
+<template>
+    <img v-vfx="{ shader: 'rgbShift' }" src="cat.png" />
+    <h1 v-vfx="{ shader: 'glitch', overflow: 30 }">Hello</h1>
+</template>
+```
+
+- The value is `VFXProps`. `null` / `undefined` means no effect. Register it globally with `app.directive("vfx", vVfx)`.
+- `VFXCanvas` renders any markup into a shader. `v-model:element` gives the element the effect is on.
+- `useVFXConfig({ pixelRatio, zIndex, postEffect, autoplay })` in `setup` sets the shared canvas options. `useVFXInstance()` gives the `VFX` as a ref.
+- Call `updateElement(el)` after changes the directive can't see, like an input's value.
+- Works with SSR (Nuxt). No `<ClientOnly>` needed.
+
+## Svelte and SvelteKit
+
+Needs Svelte 5.29 or later.
+
+```bash
+npm i @vfx-js/core @vfx-js/svelte
+```
+
+```svelte
+<script lang="ts">
+    import { vfx } from "@vfx-js/svelte";
+    let shader = $state("rgbShift");
+</script>
+
+<img {@attach vfx({ shader: "rgbShift" })} src="cat.png" alt="" />
+<h1 {@attach vfx(() => ({ shader }))}>Hello</h1>
+```
+
+- Pass a getter (`() => ({ ... })`) for props that change. A plain object that reads state removes and re-adds the element on every change.
+- `VFXCanvas` renders any markup into a shader. `bind:element` gives the element the effect is on.
+- `vfxConfig({ ... })` sets the shared canvas options. `vfxInstance().current` is the `VFX`.
+- Keep a `postEffect` object out of `$state`; every new proxy replaces the canvas.
+- Call `updateElement(el)` after changes the attachment can't see.
 
 ## Rules and pitfalls
 

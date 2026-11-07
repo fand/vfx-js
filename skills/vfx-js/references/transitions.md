@@ -219,21 +219,35 @@ export class BlurFade implements Transition {
 npm i @vfx-js/react @vfx-js/transitions
 ```
 
-Page transitions: put `<VFXTransition>` once around the router outlet.
+Page transitions: put one `<VFXTransition>` around the router outlet.
+Pick the import for your router:
+
+| Router | Import | Usage |
+| --- | --- | --- |
+| Next.js App Router | `@vfx-js/react/next` | `<VFXTransition>{children}</VFXTransition>` in `app/layout.tsx` |
+| React Router 7 | `@vfx-js/react/react-router` | `<VFXTransition transition={Crossfade} />` in place of `<Outlet />` |
+| Other | `@vfx-js/react` | `<VFXTransition pageKey={pathname}>{page}</VFXTransition>` |
 
 ```tsx
-import { VFXTransition } from "@vfx-js/react";
+// React Router
+import { VFXTransition } from "@vfx-js/react/react-router";
 import { Crossfade } from "@vfx-js/transitions";
 
-<VFXTransition pageKey={pathname} transition={Crossfade} duration={0.6}>
-    {outlet}
-</VFXTransition>
+export function Layout() {
+    return (
+        <>
+            <nav>...</nav>
+            <VFXTransition transition={Crossfade} duration={0.6} />
+        </>
+    );
+}
 ```
 
-- A new `pageKey` starts a run. Without `pageKey` it never transitions.
+- The router versions use the pathname as the key. A search-only change does not run.
+- With `@vfx-js/react`, a new `pageKey` starts a run. Without `pageKey` it never transitions.
 - The target fills the viewport (`height: 100dvh; overflow: hidden`). Pages scroll inside it. Use a CSS reset (`body { margin: 0 }`).
 - `fullscreen={false}` drops the default size; size it with `className` / `style`, e.g. `height: calc(100dvh - 64px)` under a header.
-- React Router: pass `useOutlet()` as children and `useLocation().pathname` as `pageKey`.
+- React Router: the old page keeps its own route while it animates out, but `useLocation()` inside it reads the new location.
 
 ### Next.js App Router
 
@@ -284,7 +298,7 @@ export function NextLink() {
 
 - Which spec wins: a link's `transition(spec)` or `setNextTransition(spec)`, then the page's `<TransitionIn>`, then the `<VFXTransition>` props.
 - `useTransitionIn(spec)` is the hook form of `<TransitionIn>`. Only the spec at mount counts.
-- `setNextTransition(spec)` before `router.push()` for navigation from code.
+- `setNextTransition(spec)` before `router.push()` / `navigate()` for navigation from code.
 - Import `Crossfade` from `@vfx-js/transitions`, not `@vfx-js/core`, in Server Components.
 - Write custom transition classes in a file that starts with `"use client"`.
 - An instance cannot cross from a Server Component. Make it in a client component with `useTransitionInstance(Class, params)`.
@@ -301,25 +315,106 @@ const { ref, run } = useVFXTransition({ transition: Swipe });
 await run(() => setTab(next), { reverse: true });
 ```
 
-## Other routers
+## Vue: Nuxt and Vue Router
 
-Use core `run(cb)`. Hold the navigation until `run` has taken the snapshot, then let `cb` wait for the new page:
-
-```ts
-// SvelteKit +layout.svelte
-onNavigate((nav) => {
-    if (!transition) return;
-    return new Promise<void>((snapshotTaken) => {
-        transition.run(async () => {
-            snapshotTaken();       // the router may now update the DOM
-            await nav.complete;    // the new page is in the DOM
-        }).catch(() => {});
-    });
-});
+```bash
+npm i @vfx-js/core @vfx-js/vue @vfx-js/transitions
 ```
 
-The same pattern works for Vue Router / Nuxt (`router.beforeEach`) and Astro ClientRouter (`astro:before-preparation`, with a custom `swap`).
-Examples: https://github.com/fand/vfx-js/tree/main/packages/transition-demo
+```vue
+<!-- app/app.vue (Nuxt) -->
+<script setup lang="ts">
+import { Crossfade, Swipe } from "@vfx-js/transitions";
+import { vTransition } from "@vfx-js/vue";
+import { VFXTransition } from "@vfx-js/vue/nuxt";
+</script>
+
+<template>
+    <nav>
+        <NuxtLink to="/">Home</NuxtLink>
+        <NuxtLink to="/gallery" v-transition="{ transition: Swipe }">Gallery</NuxtLink>
+    </nav>
+    <VFXTransition :transition="Crossfade" :duration="0.8">
+        <NuxtPage />
+    </VFXTransition>
+</template>
+```
+
+```vue
+<!-- app/pages/about.vue -->
+<script setup lang="ts">
+import { Glitch } from "@vfx-js/transitions";
+import { useTransitionIn } from "@vfx-js/vue";
+
+useTransitionIn({ transition: Glitch });
+</script>
+```
+
+- Without Nuxt, import `VFXTransition` from `@vfx-js/vue/router` and wrap `<RouterView />`. It reads the router from `app.use(router)`.
+- Each path is one page. The first navigation does not run.
+- Which spec wins: the link's `v-transition`, then the page's `useTransitionIn`, then the `<VFXTransition>` props. Back and forward add `reverse: true`.
+- `setNextTransition(spec)` before `navigateTo()` / `router.push()`.
+- In templates use `v-transition`, not `@click="transition(spec)"`; Vue wraps the handler, so it never runs.
+- Props are the `addTransition` options plus `fullscreen`. `:fullscreen="false"` lets you size the target with CSS.
+- A page with an async `setup` under your own `<Suspense>` may be captured early. Use `waitFor`.
+
+## Svelte: SvelteKit
+
+```bash
+npm i @vfx-js/core @vfx-js/svelte @vfx-js/transitions
+```
+
+```svelte
+<!-- src/routes/+layout.svelte -->
+<script lang="ts">
+    import { transition } from "@vfx-js/svelte";
+    import { VFXTransition } from "@vfx-js/svelte/sveltekit";
+    import { Crossfade, Swipe } from "@vfx-js/transitions";
+
+    let { children } = $props();
+</script>
+
+<nav>
+    <a href="/">Home</a>
+    <a href="/gallery" {@attach transition({ transition: Swipe })}>Gallery</a>
+</nav>
+<VFXTransition transition={Crossfade} duration={0.8}>
+    {@render children()}
+</VFXTransition>
+```
+
+```svelte
+<!-- src/routes/about/+page.svelte -->
+<script lang="ts">
+    import { transitionIn } from "@vfx-js/svelte";
+    import { Glitch } from "@vfx-js/transitions";
+
+    transitionIn({ transition: Glitch });
+</script>
+```
+
+- Needs Svelte 5.29 or later (`{@attach}`).
+- Which spec wins: the link's `transition(spec)`, then the page's `transitionIn`, then the `<VFXTransition>` props. Back adds `reverse: true`.
+- `setNextTransition(spec)` before `goto()`.
+- `fullscreen={false}` lets you size the target with CSS.
+
+## Other routers
+
+Astro ClientRouter, Turbo, htmx and others have no binding.
+Use core `run(cb)`: hold the navigation until `run` has taken the snapshot, then let `cb` wait for the new page.
+
+```ts
+router.beforeNavigate(() =>
+    new Promise<void>((snapshotTaken) => {
+        t.run(() => {
+            snapshotTaken();                 // the router may now swap the DOM
+            return waitForNewPageInDom();    // resolve when the new page is in
+        }).catch(console.error);
+    }),
+);
+```
+
+Astro example: https://github.com/fand/vfx-js/blob/main/packages/transition-demo/astro/src/transition.ts
 
 ## Rules and pitfalls
 
@@ -330,4 +425,5 @@ Examples: https://github.com/fand/vfx-js/tree/main/packages/transition-demo
 - VFX elements inside the target freeze during a run.
 - Next.js `loading.tsx` shows its fallback at once, so the transition lands on the skeleton.
 - Multi-page (cross-document) navigation is not supported.
+- Vue and Svelte `<VFXTransition>` render plain divs on the server. No client-only wrapper is needed.
 - Respect `prefers-reduced-motion`: pass `duration: 0` when it matches.
