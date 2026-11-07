@@ -299,6 +299,10 @@ export async function setupCapture(
         if (!child || canvas.width === 0 || canvas.height === 0) {
             return;
         }
+        // A child without a box (`display: none`) has nothing to draw, and drawElementImage throws.
+        if (child.getClientRects().length === 0) {
+            return;
+        }
         if (!child.hasAttribute("drawable")) {
             child.setAttribute("drawable", "");
         }
