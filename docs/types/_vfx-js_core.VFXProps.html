@@ -16,7 +16,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">type</span> <span class="tsd-kind-type-alias">VFXProps</span> <span class="tsd-signature-symbol">=</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#autocrop">autoCrop</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#backbuffer">backbuffer</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#effect">effect</a><span class="tsd-signature-symbol">?:</span> <a href="../interfaces/_vfx-js_core.Effect.html" class="tsd-signature-type tsd-kind-interface">Effect</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-keyword">readonly</span> <a href="../interfaces/_vfx-js_core.Effect.html" class="tsd-signature-type tsd-kind-interface">Effect</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#glslversion">glslVersion</a><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.GlslVersion.html" class="tsd-signature-type tsd-kind-type-alias">GlslVersion</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#intersection">intersection</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">rootMargin</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.MarginOpts.html" class="tsd-signature-type tsd-kind-type-alias">MarginOpts</a><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">threshold</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#overflow">overflow</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">true</span> <span class="tsd-signature-symbol">|</span> <a href="_vfx-js_core.MarginOpts.html" class="tsd-signature-type tsd-kind-type-alias">MarginOpts</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#overlay">overlay</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">true</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#release">release</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#shader">shader</a><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.ShaderPreset.html" class="tsd-signature-type tsd-kind-type-alias">ShaderPreset</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <a href="_vfx-js_core.VFXPass.html" class="tsd-signature-type tsd-kind-type-alias">VFXPass</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#uniforms">uniforms</a><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.VFXUniforms.html" class="tsd-signature-type tsd-kind-type-alias">VFXUniforms</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#wrap">wrap</a><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.VFXWrap.html" class="tsd-signature-type tsd-kind-type-alias">VFXWrap</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-symbol">[</span><a href="_vfx-js_core.VFXWrap.html" class="tsd-signature-type tsd-kind-type-alias">VFXWrap</a><span class="tsd-signature-symbol">,</span> <a href="_vfx-js_core.VFXWrap.html" class="tsd-signature-type tsd-kind-type-alias">VFXWrap</a><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#zindex">zIndex</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L243">types.ts:243</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L243">types.ts:243</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -49,14 +49,14 @@ If <code>true</code>, The preset shaders will crop the input texture automatical
 VFX-JS provides <code>uniform bool autoCrop;</code> to help this.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L376">types.ts:376</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L376">types.ts:376</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="backbuffer"><code class="tsd-tag">Optional</code><span>backbuffer</span><a href="#backbuffer" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">backbuffer</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
 <div class="tsd-comment tsd-typography"><p>Whether the shader uses the backbuffer or not.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L367">types.ts:367</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L367">types.ts:367</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="effect"><code class="tsd-tag">Optional</code><span>effect</span><a href="#effect" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">effect</span><span class="tsd-signature-symbol">?:</span> <a href="../interfaces/_vfx-js_core.Effect.html" class="tsd-signature-type tsd-kind-interface">Effect</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-keyword">readonly</span> <a href="../interfaces/_vfx-js_core.Effect.html" class="tsd-signature-type tsd-kind-interface">Effect</a><span class="tsd-signature-symbol">[]</span></div>
@@ -71,14 +71,14 @@ across multiple elements. Use a factory that returns a new Effect<br>
 per call.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L395">types.ts:395</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L395">types.ts:395</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="glslversion"><code class="tsd-tag">Optional</code><span>glsl<wbr/>Version</span><a href="#glslversion" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">glslVersion</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.GlslVersion.html" class="tsd-signature-type tsd-kind-type-alias">GlslVersion</a></div>
 <div class="tsd-comment tsd-typography"><p>See <a href="_vfx-js_core.GlslVersion.html" class="tsd-kind-type-alias">GlslVersion</a>.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L379">types.ts:379</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L379">types.ts:379</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="intersection"><code class="tsd-tag">Optional</code><span>intersection</span><a href="#intersection" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">intersection</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">rootMargin</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.MarginOpts.html" class="tsd-signature-type tsd-kind-type-alias">MarginOpts</a><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">threshold</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span></div>
@@ -97,7 +97,7 @@ These properties work similarly to the IntersectionObsrever options.</p>
 <div class="tsd-comment tsd-typography"><p>Threshold for the element to be considered &quot;entered&quot; to the viewport.</p>
 </div></li></ul></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L316">types.ts:316</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L316">types.ts:316</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="overflow"><code class="tsd-tag">Optional</code><span>overflow</span><a href="#overflow" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">overflow</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">true</span> <span class="tsd-signature-symbol">|</span> <a href="_vfx-js_core.MarginOpts.html" class="tsd-signature-type tsd-kind-type-alias">MarginOpts</a></div>
@@ -116,7 +116,7 @@ their dst rect via each effect's own <code>outputRect</code> return (use<br>
 and <code>effect</code> emits a dev warning.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L343">types.ts:343</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L343">types.ts:343</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="overlay"><code class="tsd-tag">Optional</code><span>overlay</span><a href="#overlay" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">overlay</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">true</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">number</span></div>
@@ -129,7 +129,7 @@ However, in some cases you might want not to hide the original element.<br>
 For example, <code>overlay: 0.5</code> will set the opacity of the orignal element to 0.5.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L310">types.ts:310</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L310">types.ts:310</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="release"><code class="tsd-tag">Optional</code><span>release</span><a href="#release" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">release</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
@@ -140,7 +140,7 @@ and it stops rendering after it got out of the viewport by scroll etc.</p>
 This is useful when the element has overflow and it has to be rendered after it left the viewport.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L263">types.ts:263</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L263">types.ts:263</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="shader"><code class="tsd-tag">Optional</code><span>shader</span><a href="#shader" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">shader</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.ShaderPreset.html" class="tsd-signature-type tsd-kind-type-alias">ShaderPreset</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <a href="_vfx-js_core.VFXPass.html" class="tsd-signature-type tsd-kind-type-alias">VFXPass</a><span class="tsd-signature-symbol">[]</span></div>
@@ -150,7 +150,7 @@ then VFX-JS will use the corresponding shader preset.</p>
 <p>You can also write the shader by yourself, and pass the shader code here.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L252">types.ts:252</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L252">types.ts:252</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="uniforms"><code class="tsd-tag">Optional</code><span>uniforms</span><a href="#uniforms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">uniforms</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.VFXUniforms.html" class="tsd-signature-type tsd-kind-type-alias">VFXUniforms</a></div>
@@ -171,7 +171,7 @@ This is useful to make a parameters that can change by time or user interactions
 <p>Supported uniform types are defined as <a href="./VFXUniformValue"><code>VFXUniformValue</code></a>.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L296">types.ts:296</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L296">types.ts:296</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="wrap"><code class="tsd-tag">Optional</code><span>wrap</span><a href="#wrap" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">wrap</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.VFXWrap.html" class="tsd-signature-type tsd-kind-type-alias">VFXWrap</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-symbol">[</span><a href="_vfx-js_core.VFXWrap.html" class="tsd-signature-type tsd-kind-type-alias">VFXWrap</a><span class="tsd-signature-symbol">,</span> <a href="_vfx-js_core.VFXWrap.html" class="tsd-signature-type tsd-kind-type-alias">VFXWrap</a><span class="tsd-signature-symbol">]</span></div>
@@ -181,7 +181,7 @@ or you can provide a tuple to spefify different modes for horizontal / vertical 
 <p>If not provided, VFX-JS will use &quot;repeat&quot; mode for both horizontal and vertical wrapping.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L353">types.ts:353</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L353">types.ts:353</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="zindex"><code class="tsd-tag">Optional</code><span>z<wbr/>Index</span><a href="#zindex" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">zIndex</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
@@ -191,7 +191,7 @@ For example, when we have elements with <code>zIndex: 1</code> and <code>zIndex:
 When elements have the same <code>zIndex</code>, they are rendered in the order they were added.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/7990d893cce6f4a3b33081770482c215e3c92720/packages/vfx-js/src/types.ts#L362">types.ts:362</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f2634f6aa530e5b34c2ce5a02c8eea728fbb0b3f/packages/vfx-js/src/types.ts#L362">types.ts:362</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
