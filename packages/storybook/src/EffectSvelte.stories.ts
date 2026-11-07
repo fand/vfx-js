@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import { type Component, mount, unmount } from "svelte";
 import { storyContainer } from "./stories/styles";
 import Canvas from "./stories/svelte/Canvas.svelte";
+import Config from "./stories/svelte/Config.svelte";
 import Elements from "./stories/svelte/Elements.svelte";
 import Live from "./stories/svelte/Live.svelte";
 import "./preset.css";
@@ -48,3 +49,11 @@ export const canvas: StoryObj<undefined> = {
 };
 canvas.play = ({ canvasElement }) =>
     mountStory(canvasElement.firstElementChild as HTMLElement, Canvas);
+
+export const config: StoryObj<undefined> = {
+    name: "Config",
+    render: storyContainer,
+    args: undefined,
+};
+config.play = ({ canvasElement }) =>
+    mountStory(canvasElement.firstElementChild as HTMLElement, Config);

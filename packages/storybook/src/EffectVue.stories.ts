@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
 import { BloomEffect, PixelateEffect, ScanlineEffect } from "@vfx-js/effects";
-import { VFXCanvas, vVfx } from "@vfx-js/vue";
+import { useVFXConfig, VFXCanvas, vVfx } from "@vfx-js/vue";
 import {
     type App,
     type Component,
@@ -317,3 +317,67 @@ export const canvas: StoryObj<undefined> = {
 };
 canvas.play = ({ canvasElement }) =>
     mountStory(canvasElement.firstElementChild as HTMLElement, Canvas);
+
+const Config = defineComponent({
+    setup() {
+        const pixelRatio = ref(1);
+        const zIndex = ref<number | undefined>(undefined);
+        useVFXConfig(() => ({
+            pixelRatio: pixelRatio.value,
+            zIndex: zIndex.value,
+        }));
+
+        return () =>
+            h("div", { style: ROOT_STYLE }, [
+                h("div", [
+                    h(
+                        "button",
+                        {
+                            style: "margin-right:8px",
+                            onClick: () => {
+                                pixelRatio.value =
+                                    pixelRatio.value === 1 ? 2 : 1;
+                            },
+                        },
+                        `pixelRatio: ${pixelRatio.value}`,
+                    ),
+                    h(
+                        "button",
+                        {
+                            onClick: () => {
+                                zIndex.value =
+                                    zIndex.value === undefined ? -1 : undefined;
+                            },
+                        },
+                        `zIndex: ${zIndex.value ?? "default"}`,
+                    ),
+                ]),
+                section(
+                    "img + rgbShift",
+                    withDirectives(
+                        h("img", { src: Jellyfish, style: "width:320px" }),
+                        [[vVfx, { shader: "rgbShift" }]],
+                    ),
+                ),
+                section(
+                    "h1 + glitch",
+                    withDirectives(
+                        h(
+                            "h1",
+                            { style: "font-size:64px; margin:0" },
+                            "Config",
+                        ),
+                        [[vVfx, { shader: "glitch" }]],
+                    ),
+                ),
+            ]);
+    },
+});
+
+export const config: StoryObj<undefined> = {
+    name: "Config",
+    render: storyContainer,
+    args: undefined,
+};
+config.play = ({ canvasElement }) =>
+    mountStory(canvasElement.firstElementChild as HTMLElement, Config);

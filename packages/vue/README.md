@@ -149,6 +149,31 @@ const element = ref<HTMLElement | null>(null);
   stretches the texture.
   See [html-in-canvas.md](../../docs/html-in-canvas.md) for sizing.
 
+## Config
+
+Set the options of the shared VFX with `useVFXConfig`, e.g. in
+`app.vue` or a layout. Call it in `setup`.
+
+```vue
+<script setup lang="ts">
+import { useVFXConfig } from "@vfx-js/vue";
+
+useVFXConfig({ pixelRatio: 1, zIndex: -1 });
+// Or follow a ref or a getter:
+// useVFXConfig(() => ({ pixelRatio: hiDpi.value ? 2 : 1 }));
+</script>
+```
+
+- Same keys as React's `useVFXConfig`: `pixelRatio`, `zIndex`,
+  `postEffect`, `autoplay`.
+- It applies while the calling component is mounted. On unmount the
+  options go back to the defaults.
+- A change replaces the shared VFX: every element and transition is
+  re-added on the new one. Numbers and booleans compare by value,
+  `postEffect` by reference.
+- A replace during a page transition cuts to the new page.
+- With two mounted callers, the last one mounted wins, with a warning.
+
 ## API
 
 ### `<VFXTransition>` (`@vfx-js/vue/nuxt`, `@vfx-js/vue/router`)
@@ -181,6 +206,10 @@ The directive. See [Element effects](#element-effects).
 ### `VFXCanvas`
 
 A component. See [`VFXCanvas`](#vfxcanvas).
+
+### `useVFXConfig(config)`
+
+Set the options of the shared VFX. See [Config](#config).
 
 ### `updateElement(el)`
 

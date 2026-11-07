@@ -83,7 +83,7 @@ See [plan2.md](./plan2.md).
   browser.
 - Astro: try the open questions in plan.md first.
 - `VFXCanvas`: done, see below.
-- Config API for Vue and Svelte: separate plan.
+- Config API for Vue and Svelte: done, see below.
 - Router subpaths: done, see below.
 - Not checked: the html-in-canvas path, Chromatic for the new stories.
 
@@ -185,3 +185,35 @@ See [plan5.md](./plan5.md).
 - Vue: the fallback `<div>` was bound twice (from `onMounted` and the
   `el` watcher), so two controllers added the same effects. Now one
   `sync()` binds only when the element changes. The test checks one add.
+
+## Done: config API
+
+See [plan6.md](./plan6.md).
+
+- `vfx.ts` (both, same file except the log prefix): `attachVFX`,
+  `setConfig`, `clearConfig`, `peekVFX`. A config change detaches every
+  consumer, replaces the VFX, and attaches them again.
+- Consumers: `bindElement` (`v-vfx`, `vfx()`, `VFXCanvas`) and both
+  `VFXTransition`s attach through `attachVFX`. The html-in-canvas
+  capture keeps running across a replace.
+- Vue `useVFXConfig(config | ref | getter)`, Svelte
+  `vfxConfig(config | getter)`, and the `VFXConfig` type.
+- Storybook: "Effect/Vue › Config" and "Effect/Svelte › Config".
+- READMEs, changesets, comparison page.
+
+## Checked (config API)
+
+- Tests: vue 78, svelte 67 (11 new each). Lint and build pass.
+- Storybook in Chrome for Testing: pixelRatio 1 → 2 → 1 and zIndex
+  default → -1 → default each give one canvas with the new size and
+  z-index, and the effects stay. Four fast toggles end with one canvas.
+  Transition stories still run (html-in-canvas and fallback). No errors.
+
+## Changes from the plan (config API)
+
+- `bindElement` reads the latest props when an op runs, not the props
+  of each update. Fast changes a → b → c now apply as a → c.
+- The warning for two config owners has the same text in both packages,
+  so the store files stay the same.
+- Svelte `$state` proxies a `postEffect` object again on each assign,
+  so it counts as a new one. The README says to keep it out of `$state`.

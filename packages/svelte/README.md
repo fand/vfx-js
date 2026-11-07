@@ -113,6 +113,34 @@ Render any markup, form controls included, into a shader.
   stretches the texture.
   See [html-in-canvas.md](../../docs/html-in-canvas.md) for sizing.
 
+## Config
+
+Set the options of the shared VFX with `vfxConfig`, e.g. in
+`+layout.svelte`. Call it when the component is created.
+
+```svelte
+<script lang="ts">
+    import { vfxConfig } from "@vfx-js/svelte";
+
+    vfxConfig({ pixelRatio: 1, zIndex: -1 });
+    // Or follow state with a getter:
+    // vfxConfig(() => ({ pixelRatio: hiDpi ? 2 : 1 }));
+</script>
+```
+
+- Same keys as React's `useVFXConfig`: `pixelRatio`, `zIndex`,
+  `postEffect`, `autoplay`.
+- It applies while the calling component is mounted. On unmount the
+  options go back to the defaults.
+- A change replaces the shared VFX: every element and transition is
+  re-added on the new one. Numbers and booleans compare by value,
+  `postEffect` by reference.
+- A replace during a page transition cuts to the new page.
+- With two mounted callers, the last one mounted wins, with a warning.
+- Keep a `postEffect` object out of `$state`. Svelte wraps it in a new
+  proxy each time it is assigned, so it counts as a new reference and
+  replaces the VFX.
+
 ## API
 
 ### `<VFXTransition>` (`@vfx-js/svelte/sveltekit`)
@@ -142,6 +170,10 @@ The attachment. See [Element effects](#element-effects).
 ### `VFXCanvas`
 
 A component. See [`VFXCanvas`](#vfxcanvas).
+
+### `vfxConfig(config)`
+
+Set the options of the shared VFX. See [Config](#config).
 
 ### `updateElement(el)`
 
