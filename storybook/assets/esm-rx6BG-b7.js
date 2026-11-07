@@ -1,27 +1,27 @@
-import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{i as t,o as n,t as r}from"./src-C7oMt-ub.js";import{d as i,f as a,p as ee}from"./utils-BakBuWZ9.js";import{nt as o,t as s,w as te}from"./esm-Dh2VieTG.js";function c(e,t,n){return{...e,src:t,target:n,draw:t=>e.draw({...t,target:t.target??n}),blit:(t,r,i)=>e.blit(t,r??n,i),clear:t=>e.clear(t??n)}}var l,u,d,f,p,m,h,g,_;function v(){return(v=e((()=>{r(),l=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},u=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},f=`
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{o as t,t as n}from"./src-C7oMt-ub.js";import{nt as r,t as i,w as a}from"./esm-Dh2VieTG.js";function ee(e,t,n){return{...e,src:t,target:n,draw:t=>e.draw({...t,target:t.target??n}),blit:(t,r,i)=>e.blit(t,r??n,i),clear:t=>e.clear(t??n)}}var o,s,c,l,u,d,f,p,m;function h(){return(h=e((()=>{n(),o=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},s=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},l=`
 vec4 splitRead(vec2 uvr, vec2 uvg, vec2 uvb, bool to) {
   vec4 r = to ? readTo(uvr) : readFrom(uvr);
   vec4 g = to ? readTo(uvg) : readFrom(uvg);
   vec4 b = to ? readTo(uvb) : readFrom(uvb);
   return vec4(r.r, g.g, b.b, (r.a + g.a + b.a) / 3.0);
 }
-`,p=`
+`,u=`
 float ign(vec2 p) {
   return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
-`,m=`
+`,d=`
 vec2 mirror(vec2 p) {
   return 1.0 - abs(1.0 - mod(p, 2.0));
 }
-`,h=class extends n{constructor(){super(...arguments),this.name=`hard_cut`,this.frag=`
+`,f=class extends t{constructor(){super(...arguments),this.name=`hard_cut`,this.frag=`
 vec4 transition(vec2 uv, float t) {
   return t < 0.5 ? readFrom(uv) : readTo(uv);
 }
-`}},g=e=>typeof e.render==`function`&&e.enabled!==!1,_=class{constructor(e={}){d.set(this,[]),this.params=e}async init(e){l(this,d,this.stages.slice(1).map(()=>e.createRenderTarget()),`f`);for(let t of this.stages)await t.init?.(e)}start(e){for(let t of this.stages)t.start?.(e)}update(e){for(let t of this.stages)t.update?.(e)}render(e){let t=this.stages.filter(g);if(t.length===0){e.blit(e.src);return}let n=e.src;for(let[r,i]of t.entries()){if(r===t.length-1){i.render?.({...e,src:n});return}let a=u(this,d,`f`)[r];e.clear(a),i.render?.(c(e,n,a)),n=a}}end(){for(let e of this.stages)e.end?.()}outputRect(e){let t=this.stages.filter(g);return t[t.length-1]?.outputRect?.(e)}dispose(){for(let e of this.stages)e.dispose?.();for(let e of u(this,d,`f`))e.dispose();l(this,d,[],`f`)}},d=new WeakMap})))()}var y;function b(){return(b=e((()=>{r(),v(),y=class extends n{constructor(){super(...arguments),this.name=`crosszoom`,this.overflow=!0,this.frag=`
+`}},p=e=>typeof e.render==`function`&&e.enabled!==!1,m=class{constructor(e={}){c.set(this,[]),this.params=e}async init(e){o(this,c,this.stages.slice(1).map(()=>e.createRenderTarget()),`f`);for(let t of this.stages)await t.init?.(e)}start(e){for(let t of this.stages)t.start?.(e)}update(e){for(let t of this.stages)t.update?.(e)}render(e){let t=this.stages.filter(p);if(t.length===0){e.blit(e.src);return}let n=e.src;for(let[r,i]of t.entries()){if(r===t.length-1){i.render?.({...e,src:n});return}let a=s(this,c,`f`)[r];e.clear(a),i.render?.(ee(e,n,a)),n=a}}end(){for(let e of this.stages)e.end?.()}outputRect(e){let t=this.stages.filter(p);return t[t.length-1]?.outputRect?.(e)}dispose(){for(let e of this.stages)e.dispose?.();for(let e of s(this,c,`f`))e.dispose();o(this,c,[],`f`)}},c=new WeakMap})))()}var te;function g(){return(g=e((()=>{n(),h(),te=class extends t{constructor(){super(...arguments),this.name=`crosszoom`,this.overflow=!0,this.frag=`
 const float STRENGTH = 0.4;
 const float TAPS = 16.0;
 
-${p}
+${u}
 // Quintic ease in/out, so the blur builds up and settles smoothly.
 float ease(float x) {
   return x < 0.5 ? 16.0 * x * x * x * x * x : 1.0 + 16.0 * pow(x - 1.0, 5.0);
@@ -45,11 +45,11 @@ vec4 transition(vec2 uv, float t) {
   }
   return c / total;
 }
-`}}})))()}function ne(e){return e!==void 0&&Number.isFinite(e)&&e>=2?Math.round(e):ie}var x,S,C,w,T,E,D,re,ie,ae,oe,se;function ce(){return(ce=e((()=>{r(),s(),v(),x=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},S=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},E=.25,D=1.5,re=2,ie=32,ae=class extends n{constructor(){super(...arguments),this.name=`datamosh`,this.frag=`
+`}}})))()}function ne(e){return e!==void 0&&Number.isFinite(e)&&e>=2?Math.round(e):re}var _,v,y,b,x,S,C,w,re,ie,T,E;function D(){return(D=e((()=>{n(),i(),h(),_=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},v=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},S=.25,C=1.5,w=2,re=32,ie=class extends t{constructor(){super(...arguments),this.name=`datamosh`,this.frag=`
 vec4 transition(vec2 uv, float t) {
   return reverse > 0.5 ? readFrom(uv) : readTo(uv);
 }
-`}},oe=class extends o{constructor(e){super({dup:0,blockSize:e()}),C.set(this,void 0),w.set(this,0),T.set(this,1),x(this,C,e,`f`)}start(e){this.params.blockSize=S(this,C,`f`).call(this),this.params.chromaGain=D,this.params.useResidual=!1,this.params.healRate=0,x(this,w,0,`f`),x(this,T,Math.max(e.duration*.75,.001),`f`),this.enable()}update(e){var t;let{x:n}=e.progress,r=Math.min(Math.max((n-E)/.75,0),1);this.params.useResidual=x(this,w,(t=S(this,w,`f`),++t),`f`)>re,this.params.chromaGain=D+-.5*r,this.params.healRate=n<E?0:1-.01**(e.deltaTime/S(this,T,`f`))}end(){this.disable()}},C=new WeakMap,w=new WeakMap,T=new WeakMap,se=class extends _{constructor(){super(...arguments),this.name=`datamosh`,this.stages=[new ae,new oe(()=>ne(this.params.blockSize))]}}})))()}var le;function ue(){return(ue=e((()=>{r(),v(),le=class extends n{constructor(){super(...arguments),this.name=`distort_fade`,this.frag=`
+`}},T=class extends r{constructor(e){super({dup:0,blockSize:e()}),y.set(this,void 0),b.set(this,0),x.set(this,1),_(this,y,e,`f`)}start(e){this.params.blockSize=v(this,y,`f`).call(this),this.params.chromaGain=C,this.params.useResidual=!1,this.params.healRate=0,_(this,b,0,`f`),_(this,x,Math.max(e.duration*.75,.001),`f`),this.enable()}update(e){var t;let{x:n}=e.progress,r=Math.min(Math.max((n-S)/.75,0),1);this.params.useResidual=_(this,b,(t=v(this,b,`f`),++t),`f`)>w,this.params.chromaGain=C+-.5*r,this.params.healRate=n<S?0:1-.01**(e.deltaTime/v(this,x,`f`))}end(){this.disable()}},y=new WeakMap,b=new WeakMap,x=new WeakMap,E=class extends m{constructor(){super(...arguments),this.name=`datamosh`,this.stages=[new ie,new T(()=>ne(this.params.blockSize))]}}})))()}var O;function k(){return(k=e((()=>{n(),h(),O=class extends t{constructor(){super(...arguments),this.name=`distort_fade`,this.frag=`
 const float STRENGTH = 0.15;
 const float SCALE = 1.0;
 
@@ -85,7 +85,7 @@ float fbm(vec2 p) {
   return snoise(p) * 0.7 + snoise(p * 2.3 + 17.0) * 0.3;
 }
 
-${m}
+${d}
 vec4 transition(vec2 uv, float t) {
   // A container overflow must not show warped content outside the element.
   if (!inRange(uv)) return vec4(0.0);
@@ -97,7 +97,7 @@ vec4 transition(vec2 uv, float t) {
   vec2 q = mirror(uv + offset);
   return mix(readFrom(q), readTo(q), smoothstep(0.3, 0.7, t));
 }
-`}}})))()}function de(){return(de=e((()=>{r()})))()}var O;function k(){return(k=e((()=>{r(),v(),O=class extends n{constructor(){super(...arguments),this.name=`glitch`,this.frag=`
+`}}})))()}function A(){return(A=e((()=>{n()})))()}var j;function M(){return(M=e((()=>{n(),h(),j=class extends t{constructor(){super(...arguments),this.name=`glitch`,this.frag=`
 uniform float amount;
 uniform float speed;
 
@@ -108,7 +108,7 @@ vec2 gnoise(vec2 uv) {
   return vec2(gnoise(uv.x), gnoise(uv.y + 100.0));
 }
 
-${f}
+${l}
 vec4 transition(vec2 uv, float t) {
   // A container overflow must not show wrapped content outside the element.
   if (!inRange(uv)) return vec4(0.0);
@@ -129,7 +129,7 @@ vec4 transition(vec2 uv, float t) {
   vec4 c2 = splitRead(uvr, uvg, uvb, true);
   return mix(c1, c2, step(0.5, t));
 }
-`}uniforms(){return{amount:this.params.amount??1,speed:this.params.speed??1}}}})))()}var A;function j(){return(j=e((()=>{r(),A=class extends n{constructor(){super(...arguments),this.name=`glitch_slide`,this.frag=`
+`}uniforms(){return{amount:this.params.amount??1,speed:this.params.speed??1}}}})))()}var ae;function N(){return(N=e((()=>{n(),ae=class extends t{constructor(){super(...arguments),this.name=`glitch_slide`,this.frag=`
 // The old content, then the new one to its right, as one strip.
 vec4 strip(vec2 p) {
   return p.x < 1.0 ? readFrom(p) : readTo(vec2(p.x - 1.0, p.y));
@@ -159,7 +159,7 @@ vec4 transition(vec2 uv, float t) {
   vec4 b = strip(uvb);
   return vec4(r.r, g.g, b.b, (r.a + g.a + b.a) / 3.0);
 }
-`}}})))()}function M(){return(M=e((()=>{s(),v()})))()}var N;function P(){return(P=e((()=>{r(),v(),N=class extends n{constructor(){super(...arguments),this.name=`lens_distortion`,this.frag=`
+`}}})))()}function oe(){return(oe=e((()=>{i(),h()})))()}var se;function P(){return(P=e((()=>{n(),h(),se=class extends t{constructor(){super(...arguments),this.name=`lens_distortion`,this.frag=`
 uniform float strength;
 uniform float dispersion;
 // The old content zooms from 1 to 1 + zoom; the new one from 1 + zoom back to 1.
@@ -168,8 +168,8 @@ const float TAPS = 12.0;
 // Width of the growing warp's edge.
 const float SOFT = 0.5;
 
-${p}
-${m}
+${u}
+${d}
 vec4 transition(vec2 uv, float t) {
   // A container overflow must not show warped content outside the element.
   if (!inRange(uv)) return vec4(0.0);
@@ -208,7 +208,7 @@ vec4 transition(vec2 uv, float t) {
   }
   return vec4(rgb / total, alpha / TAPS);
 }
-`}uniforms(){return{strength:this.params.strength??1,dispersion:Math.max(0,this.params.dispersion??.6),zoom:Math.max(0,this.params.zoom??3)}}}})))()}var F,I;function L(){return(L=e((()=>{r(),F={right:[1,0],left:[-1,0],up:[0,1],down:[0,-1],center:[0,0]},I=class extends n{constructor(){super(...arguments),this.name=`pixel_scan`,this.frag=`
+`}uniforms(){return{strength:this.params.strength??1,dispersion:Math.max(0,this.params.dispersion??.6),zoom:Math.max(0,this.params.zoom??3)}}}})))()}var F,I;function L(){return(L=e((()=>{n(),F={right:[1,0],left:[-1,0],up:[0,1],down:[0,-1],center:[0,0]},I=class extends t{constructor(){super(...arguments),this.name=`pixel_scan`,this.frag=`
 uniform float blackout;
 // Zero spreads out in rings; otherwise the side the fronts sweep toward.
 uniform vec2 sweep;
@@ -304,7 +304,7 @@ vec4 transition(vec2 uv, float t) {
   c /= LAYERS;
   return vec4(c.rgb, min(c.a, 1.0));
 }
-`}uniforms(){return{blackout:this.params.blackout??!0?1:0,sweep:F[this.params.direction??`right`]}}}})))()}var R;function z(){return(z=e((()=>{r(),R=class extends n{constructor(){super(...arguments),this.name=`pixel_stretch`,this.frag=`
+`}uniforms(){return{blackout:this.params.blackout??!0?1:0,sweep:F[this.params.direction??`right`]}}}})))()}var R;function z(){return(z=e((()=>{n(),R=class extends t{constructor(){super(...arguments),this.name=`pixel_stretch`,this.frag=`
 const float SMOOTH = 0.05;
 
 // Quadratic smooth min (Inigo Quilez) to round the corner where the streaks start.
@@ -335,7 +335,7 @@ vec4 transition(vec2 uv, float t) {
   }
   return c;
 }
-`}}})))()}var B,V,H,U,W,fe,G;function pe(){return(pe=e((()=>{s(),v(),B=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},V=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},W={up:`down`,down:`up`,left:`right`,right:`left`},fe=class extends te{constructor(e){super({range:[1,1]}),H.set(this,void 0),U.set(this,!1),B(this,H,e,`f`)}start(e){let t=V(this,H,`f`).call(this);B(this,U,e.reverse,`f`),this.params.direction=e.reverse?W[t]:t,this.params.range[0]=1}update(e){let{t}=e.progress,n=V(this,H,`f`).call(this),r=V(this,U,`f`)?1-t:t;this.params.direction=r<.5?n:W[n],this.params.range[0]=Math.abs(1-2*t)}end(){this.params.range[0]=1}},H=new WeakMap,U=new WeakMap,G=class extends _{constructor(){super(...arguments),this.name=`pixelsort`,this.stages=[new h,new fe(()=>this.params.direction??`up`)]}}})))()}var me;function he(){return(he=e((()=>{r(),me=class extends n{constructor(){super(...arguments),this.name=`slit_scan`,this.frag=`
+`}}})))()}var B,V,H,U,W,G,K;function q(){return(q=e((()=>{i(),h(),B=function(e,t,n,r,i){if(r===`m`)throw TypeError(`Private method is not writable`);if(r===`a`&&!i)throw TypeError(`Private accessor was defined without a setter`);if(typeof t==`function`?e!==t||!i:!t.has(e))throw TypeError(`Cannot write private member to an object whose class did not declare it`);return r===`a`?i.call(e,n):i?i.value=n:t.set(e,n),n},V=function(e,t,n,r){if(n===`a`&&!r)throw TypeError(`Private accessor was defined without a getter`);if(typeof t==`function`?e!==t||!r:!t.has(e))throw TypeError(`Cannot read private member from an object whose class did not declare it`);return n===`m`?r:n===`a`?r.call(e):r?r.value:t.get(e)},W={up:`down`,down:`up`,left:`right`,right:`left`},G=class extends a{constructor(e){super({range:[1,1]}),H.set(this,void 0),U.set(this,!1),B(this,H,e,`f`)}start(e){let t=V(this,H,`f`).call(this);B(this,U,e.reverse,`f`),this.params.direction=e.reverse?W[t]:t,this.params.range[0]=1}update(e){let{t}=e.progress,n=V(this,H,`f`).call(this),r=V(this,U,`f`)?1-t:t;this.params.direction=r<.5?n:W[n],this.params.range[0]=Math.abs(1-2*t)}end(){this.params.range[0]=1}},H=new WeakMap,U=new WeakMap,K=class extends m{constructor(){super(...arguments),this.name=`pixelsort`,this.stages=[new f,new G(()=>this.params.direction??`up`)]}}})))()}var ce;function J(){return(J=e((()=>{n(),ce=class extends t{constructor(){super(...arguments),this.name=`slit_scan`,this.frag=`
 const vec3 LAG = vec3(0.0, 0.2, 0.4);
 
 vec4 splitRead(float xr, float xg, float xb, float y, bool to) {
@@ -366,13 +366,13 @@ vec4 transition(vec2 uv, float t) {
   }
   return c;
 }
-`}}})))()}var ge,K;function _e(){return(_e=e((()=>{r(),v(),ge={left:[-1,0],right:[1,0],up:[0,1],down:[0,-1]},K=class extends n{constructor(){super(...arguments),this.name=`swipe`,this.frag=`
+`}}})))()}var le,ue;function Y(){return(Y=e((()=>{n(),h(),le={left:[-1,0],right:[1,0],up:[0,1],down:[0,-1]},ue=class extends t{constructor(){super(...arguments),this.name=`swipe`,this.frag=`
 uniform vec2 move;
 const float STRETCH = 0.6;
 const float BLUR = 0.2;
 const float TAPS = 16.0;
 
-${p}
+${u}
 // The old and new content as one strip along the move.
 vec4 strip(vec2 p) {
   return inRange(p) ? readFrom(p) : readTo(p + move);
@@ -393,7 +393,7 @@ vec4 transition(vec2 uv, float t) {
   }
   return c / TAPS;
 }
-`}uniforms(){return{move:ge[this.params.direction??`left`]}}}})))()}var ve,ye,q,be,J;function xe(){return(xe=e((()=>{r(),ve={center:[0,0],left:[-1,0],right:[1,0],up:[0,1],down:[0,-1]},ye={hex:`
+`}uniforms(){return{move:le[this.params.direction??`left`]}}}})))()}var de,fe,X,pe,me;function Z(){return(Z=e((()=>{n(),de={center:[0,0],left:[-1,0],right:[1,0],up:[0,1],down:[0,-1]},fe={hex:`
 const vec2 HEX = vec2(1.0, 1.7320508);
 vec4 cellOf(vec2 g) {
   vec4 ids = floor(vec4(g, g - vec2(0.5, 1.0)) / HEX.xyxy) + 0.5;
@@ -415,7 +415,7 @@ float cellDist(vec2 p) {
   p = abs(p);
   return max(p.x, p.y);
 }
-`},q=e=>`
+`},X=e=>`
 uniform float count;
 uniform float shadow;
 // Zero spreads out in rings; otherwise the side the sweep moves toward.
@@ -424,7 +424,7 @@ const float SPREAD = 0.6;
 // Shadow offset and blur at full lift, in tiles.
 const vec2 SHADOW_OFFSET = vec2(0.05, -0.08);
 const float SHADOW_BLUR = 0.12;
-${ye[e]}
+${fe[e]}
 vec4 transition(vec2 uv, float t) {
   // A container overflow must not show tiles outside the element.
   if (!inRange(uv)) return vec4(0.0);
@@ -459,7 +459,7 @@ vec4 transition(vec2 uv, float t) {
   from *= inside;
   return from + to * (1.0 - from.a);
 }
-`,be={hex:q(`hex`),square:q(`square`)},J=class extends n{constructor(){super(...arguments),this.name=`tile`}get frag(){return be[this.params.shape??`hex`]}uniforms(){return{count:Math.max(1,Math.round(this.params.count??12)),shadow:Math.min(Math.max(this.params.shadow??.5,0),1),sweep:ve[this.params.direction??`center`]}}}})))()}var Se;function Ce(){return(Ce=e((()=>{r(),Se=class extends n{constructor(){super(...arguments),this.name=`zoom`,this.overflow=!0,this.frag=`
+`,pe={hex:X(`hex`),square:X(`square`)},me=class extends t{constructor(){super(...arguments),this.name=`tile`}get frag(){return pe[this.params.shape??`hex`]}uniforms(){return{count:Math.max(1,Math.round(this.params.count??12)),shadow:Math.min(Math.max(this.params.shadow??.5,0),1),sweep:de[this.params.direction??`center`]}}}})))()}var he;function Q(){return(Q=e((()=>{n(),he=class extends t{constructor(){super(...arguments),this.name=`zoom`,this.overflow=!0,this.frag=`
 vec4 transition(vec2 uv, float t) {
   vec2 uv1 = (uv - 0.5) * (1.0 - t) + 0.5;
   vec2 uv2 = (uv - 0.5) / (t * 0.999 + 0.001) + 0.5;
@@ -467,9 +467,9 @@ vec4 transition(vec2 uv, float t) {
   vec4 to = inRange(uv) ? readTo(fract(uv2)) : vec4(0.0);
   return mix(readFrom(uv1), to, t);
 }
-`}}})))()}var we;function Y(){return(Y=e((()=>{r(),v(),we=class extends n{constructor(){super(...arguments),this.name=`zoom_blur`,this.overflow=!0,this.frag=`
-${f}
-${p}
+`}}})))()}var ge;function $(){return($=e((()=>{n(),h(),ge=class extends t{constructor(){super(...arguments),this.name=`zoom_blur`,this.overflow=!0,this.frag=`
+${l}
+${u}
 vec4 transition(vec2 uv, float t) {
   float jitter = ign(gl_FragCoord.xy);
   float blur = sin(t * 3.141593);
@@ -487,81 +487,4 @@ vec4 transition(vec2 uv, float t) {
   }
   return mix(c1 / 16.0, c2 / 16.0, t);
 }
-`}}})))()}function Te(){return(Te=e((()=>{r(),b(),ce(),ue(),de(),k(),j(),M(),P(),L(),z(),pe(),he(),_e(),xe(),Ce(),Y()})))()}function Ee(e){let t=Q[e],n=[1,2,3].map(e=>`<li style="flex:1; padding:16px; border-radius:12px; background:${t.color}; color:#111">Card ${e}</li>`).join(``),r=document.createElement(`section`);return r.innerHTML=`
-        <h2 style="margin:0 0 12px">${t.title}</h2>
-        <p style="margin:0 0 24px; line-height:1.6">${t.body}</p>
-        <ul style="display:flex; gap:16px; margin:0; padding:0; list-style:none">${n}</ul>
-    `,r.hidden=e>0,r}var X,Z,Q,De,$,Oe;function ke(){return(ke=e((()=>{Te(),a(),X={crossfade:{transition:t},swipe:{transition:K},swipeUp:{transition:K,params:{direction:`up`}},zoom:{transition:Se},zoomBlur:{transition:we},crosszoom:{transition:y},glitch:{transition:O},glitchSlide:{transition:A},datamosh:{transition:se},pixelsort:{transition:G},pixelsortRight:{transition:G,params:{direction:`right`}},lensDistortion:{transition:N},slitScan:{transition:me},pixelScan:{transition:I},pixelStretch:{transition:R},tile:{transition:J},tileUp:{transition:J,params:{direction:`up`}},tileSquare:{transition:J,params:{shape:`square`}},distortFade:{transition:le}},Z={none:void 0,"48px":48,full:!0},Q=[{title:`Tab one`,color:`#ff4f6d`,body:`Click Next to swap this panel with a shader transition.`},{title:`Tab two`,color:`#3fb6ff`,body:`The old content is held while the DOM changes, then mixed into the new one.`},{title:`Tab three`,color:`#7bdc6b`,body:`A new run during a transition drops the old one.`}],De={title:`Transition`,parameters:{layout:`fullscreen`}},$={args:{transition:`crossfade`,reverse:!1,duration:.8,overflow:`none`},argTypes:{transition:{control:{type:`select`},options:Object.keys(X)},overflow:{control:{type:`select`},options:Object.keys(Z)},duration:{control:{type:`range`,min:0,max:3,step:.1}}},render:e=>{let t=document.createElement(`div`);t.style.cssText=`padding:64px; font-family:sans-serif; color:white; max-width:720px`;let n=document.createElement(`button`);n.textContent=`Next`,n.style.cssText=`margin-bottom:24px; font-size:1rem`;let r=document.createElement(`div`);r.style.cssText=`width:560px; height:240px; box-sizing:border-box; padding:24px; border-radius:16px; background:#222`;let a=0;r.append(...Q.map((e,t)=>Ee(t))),t.append(n,r);let o=ee(),s=i(o?{timeScale:0}:void 0),te=s.addTransition(r,{...X[e.transition],reverse:e.reverse,duration:e.duration,overflow:Z[e.overflow],waitFor:`none`}),c=()=>(a=(a+1)%Q.length,te.show(a));return n.addEventListener(`click`,()=>void c()),o&&requestAnimationFrame(()=>{c(),setTimeout(()=>{s.setTime(e.duration/2),s.render()},1e3)}),t}},Oe=[`Tabs`],$.parameters={...$.parameters,docs:{...$.parameters?.docs,source:{originalSource:`{
-  args: {
-    transition: "crossfade",
-    reverse: false,
-    duration: 0.8,
-    overflow: "none"
-  },
-  argTypes: {
-    transition: {
-      control: {
-        type: "select"
-      },
-      options: Object.keys(TRANSITIONS)
-    },
-    overflow: {
-      control: {
-        type: "select"
-      },
-      options: Object.keys(OVERFLOW)
-    },
-    duration: {
-      control: {
-        type: "range",
-        min: 0,
-        max: 3,
-        step: 0.1
-      }
-    }
-  },
-  render: args => {
-    const root = document.createElement("div");
-    root.style.cssText = "padding:64px; font-family:sans-serif; color:white; max-width:720px";
-
-    // Keep the button outside the container, so the capture never covers it.
-    const next = document.createElement("button");
-    next.textContent = "Next";
-    next.style.cssText = "margin-bottom:24px; font-size:1rem";
-
-    // A fixed-size box: the tabs share one size, so nothing moves between them.
-    // Width is explicit too; the story root shrinks to its content otherwise.
-    const container = document.createElement("div");
-    container.style.cssText = "width:560px; height:240px; box-sizing:border-box; padding:24px; border-radius:16px; background:#222";
-    let index = 0;
-    container.append(...PAGES.map((_, i) => renderPage(i)));
-    root.append(next, container);
-    const chromatic = isChromatic();
-    const vfx = initVFX(chromatic ? {
-      timeScale: 0
-    } : undefined);
-    const transition = vfx.addTransition(container, {
-      ...TRANSITIONS[args.transition],
-      reverse: args.reverse,
-      duration: args.duration,
-      overflow: OVERFLOW[args.overflow],
-      waitFor: "none"
-    });
-    const swap = () => {
-      index = (index + 1) % PAGES.length;
-      return transition.show(index);
-    };
-    next.addEventListener("click", () => void swap());
-    if (chromatic) {
-      // Pin the clock halfway through one run for a stable snapshot.
-      requestAnimationFrame(() => {
-        void swap();
-        setTimeout(() => {
-          vfx.setTime(args.duration / 2);
-          vfx.render();
-        }, 1000);
-      });
-    }
-    return root;
-  }
-}`,...$.parameters?.docs?.source}}}})))()}ke();export{$ as Tabs,Oe as __namedExportsOrder,De as default};
+`}}})))()}function _e(){return(_e=e((()=>{n(),g(),D(),k(),A(),M(),N(),oe(),P(),L(),z(),q(),J(),Y(),Z(),Q(),$()})))()}export{M as C,D,E,te as O,j as S,k as T,L as _,Q as a,ae as b,ue as c,J as d,K as f,I as g,z as h,he as i,g as k,Y as l,R as m,ge as n,me as o,q as p,$ as r,Z as s,_e as t,ce as u,se as v,O as w,N as x,P as y};
