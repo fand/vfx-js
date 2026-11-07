@@ -12,6 +12,8 @@ This is a Turborepo monorepo with the following key packages:
 - `packages/vfx-js/` - Core VFX library (@vfx-js/core) built with Three.js
 - `packages/react/` - React bindings (@vfx-js/react)
 - `packages/react-vfx/` - Backward-compat wrapper re-exporting @vfx-js/react
+- `packages/vue/` - Vue bindings for transitions and element effects (@vfx-js/vue, with `@vfx-js/vue/nuxt`)
+- `packages/svelte/` - Svelte bindings for transitions and element effects (@vfx-js/svelte, with `@vfx-js/svelte/sveltekit`). Built with `svelte-package`, ESM only
 - `packages/docs/` - Documentation website and demos
 - `packages/storybook/` - Component stories and visual tests
 - `packages/effects/` - Additional effect implementations
@@ -24,13 +26,13 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 ## Common Commands
 
 ### Development
-- `pnpm run dev` - Start development mode for all packages (uses Turborepo TUI)
+- `pnpm run dev` - Start docs, docs-react and the transition demo site (Next), plus watchers for core, effects, react and transitions (uses Turborepo TUI). Start anything else with `pnpm --filter <package> dev`
 - `pnpm run build` - Build all packages
 - `pnpm run clean` - Clean build artifacts across all packages
 - `pnpm run lint` - Run linting across all packages
 
 ### Testing
-- `pnpm test` - Run tests in every package that has them (core, transitions, react, react-vfx)
+- `pnpm test` - Run tests in every package that has them (core, transitions, react, react-vfx, vue, svelte)
 - `pnpm --filter @vfx-js/core run test:watch` - Run tests in watch mode
 
 ### Package-specific Development

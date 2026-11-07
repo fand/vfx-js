@@ -72,11 +72,20 @@ import { Crossfade, Glitch } from "@vfx-js/transitions";
 
 The container owns the outlet box and keeps the old page on screen until
 the snapshot is taken. The page only names its transition. Next.js users
-import `VFXTransition` from `@vfx-js/react/next`. Its `pageKey` defaults to the pathname.
+import `VFXTransition` from `@vfx-js/react/next`, and React Router users
+from `@vfx-js/react/react-router`. Their `pageKey` defaults to the pathname.
 
 A new `pageKey` starts a run. The old page stays on screen until the
 transition has its snapshot. The incoming page can pick its own
 transition with `<TransitionIn>`.
+
+### Vue and Svelte
+
+Nuxt, Vue Router and SvelteKit have their own `<VFXTransition>`:
+[`@vfx-js/vue/nuxt`, `@vfx-js/vue/router`](../packages/vue/README.md) and
+[`@vfx-js/svelte/sveltekit`](../packages/svelte/README.md).
+Each path is one page. Pages pick their transition with
+`useTransitionIn` (Vue) or `transitionIn` (Svelte).
 
 ## Core API
 
@@ -622,6 +631,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   upgrade may break it.
 - `next` is an optional peer dependency. Import everything else from
   `@vfx-js/react`.
+
+### `@vfx-js/react/react-router`
+
+`VFXTransition` for React Router. Use it in place of `<Outlet />`:
+
+```tsx
+import { VFXTransition } from "@vfx-js/react/react-router";
+
+<VFXTransition transition={Crossfade} />
+```
+
+- It takes the same props without `children`. `pageKey` defaults to the
+  pathname.
+- It renders `useOutlet()`, which carries its own route context, so the
+  old page keeps rendering its own route while it animates out.
+  `useLocation()` inside the old page reads the new location.
+- `react-router` 7 is an optional peer dependency.
 
 ### `transition(spec)` on a Link
 
