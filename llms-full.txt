@@ -636,10 +636,12 @@ const t = vfx.addTransition(el, {
     overflow: undefined,   // true (whole canvas) | CSS px on every side
     keepWrapped: false,    // keep the canvas wrapper between runs
     waitFor: "media",      // wait for images / videos / fonts (~300 ms max) | "none" | (el) => Promise
+    slideSpec: undefined,  // (slide) => RunOpts | undefined: how each slide enters with show()
 });
 ```
 
-`run` and `show` take the same fields (except `keepWrapped`, `waitFor`).
+`run` and `show` take the same fields (except `keepWrapped`, `waitFor`, `slideSpec`).
+`show` puts its opts over the slide's `slideSpec`, then over the container's.
 A run's fields win over the container's. A run that sets its own `transition` drops the container's `params`.
 
 Handle: `show(slide, opts)`, `run(cb, opts)`, `cancel()`, `destroy()`, `running`.
