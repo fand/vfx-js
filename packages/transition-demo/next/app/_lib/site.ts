@@ -42,7 +42,7 @@ export const nav: NavItem[] = [
         label: "How it works",
         sections: [
             { id: "dom", label: "The DOM stays DOM" },
-            { id: "easing", label: "t is eased for you" },
+            { id: "easing", label: "Easing" },
             { id: "size", label: "Fixed size, shared box" },
             { id: "precedence", label: "Which spec wins" },
             { id: "limitations", label: "Limitations" },
