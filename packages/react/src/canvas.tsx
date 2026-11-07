@@ -5,10 +5,13 @@ import {
     teardownCapture,
 } from "@vfx-js/core";
 import * as React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { applyDelta, createOpQueue, type OpQueue } from "./lifecycle.js";
 import { splitVFXProps } from "./split-props.js";
 import { useVFXInstance } from "./use-vfx-instance.js";
+
+const noopSubscribe = () => () => {};
+const getServerSupport = () => false;
 
 type VFXCanvasProps = React.PropsWithChildren<
     VFXProps & {
@@ -33,7 +36,13 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
             children?: React.ReactNode;
         };
 
-        const isSupported = supportsHtmlInCanvas();
+        // Server and hydration render `<div>`.
+        // The client then swaps to `<canvas>` when supported.
+        const renderCanvas = useSyncExternalStore(
+            noopSubscribe,
+            supportsHtmlInCanvas,
+            getServerSupport,
+        );
 
         const propsRef = useRef(vfxProps);
         propsRef.current = vfxProps;
@@ -43,13 +52,13 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
         const queueRef = useRef<OpQueue | null>(null);
 
         useEffect(() => {
-            const el = isSupported ? canvasRef.current : fallbackRef.current;
+            const el = renderCanvas ? canvasRef.current : fallbackRef.current;
             if (parentRef instanceof Function) {
                 parentRef(el);
             } else if (parentRef) {
                 parentRef.current = el;
             }
-        }, [parentRef, isSupported]);
+        }, [parentRef, renderCanvas]);
 
         useEffect(() => {
             if (!vfx) {
@@ -61,7 +70,7 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                 queueRef.current = queue;
             }
 
-            if (isSupported) {
+            if (renderCanvas) {
                 const canvas = canvasRef.current;
                 if (!canvas) {
                     return;
@@ -107,6 +116,10 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                 };
             }
 
+            // Hydration rendered `<div>`, but the next render swaps to `<canvas>`.
+            if (supportsHtmlInCanvas()) {
+                return;
+            }
             const el = fallbackRef.current;
             if (!el) {
                 return;
@@ -145,13 +158,13 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                     lastAppliedRef.current = null;
                 });
             };
-        }, [vfx, isSupported]);
+        }, [vfx, renderCanvas]);
 
         useEffect(() => {
             if (!vfx) {
                 return;
             }
-            const target = isSupported
+            const target = renderCanvas
                 ? canvasRef.current
                 : fallbackRef.current;
             if (!target) {
@@ -173,7 +186,7 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                         // HIC slow path needs the latest capture to stay
                         // on the HIC route in VFX.add.
                         if (
-                            isSupported &&
+                            renderCanvas &&
                             latestCaptureRef.current &&
                             el instanceof HTMLCanvasElement
                         ) {
@@ -186,9 +199,9 @@ export const VFXCanvas = React.forwardRef<HTMLElement, VFXCanvasProps>(
                     console.error("[@vfx-js/react] applyDelta failed:", err);
                 }
             });
-        }, [vfx, isSupported, vfxProps]);
+        }, [vfx, renderCanvas, vfxProps]);
 
-        if (isSupported) {
+        if (renderCanvas) {
             return React.createElement(
                 "canvas",
                 {
