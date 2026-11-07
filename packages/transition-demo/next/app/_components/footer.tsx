@@ -44,7 +44,7 @@ export function Footer({ simple = false }: { simple?: boolean }) {
             <div className="footer-inner">
                 <div className="footer-brand">
                     <p className="footer-big">
-                        Make the <em>swap</em> the show.
+                        @vfx-js/<em>transitions</em>
                     </p>
                     <p className="footer-small">
                         Part of{" "}
