@@ -60,8 +60,19 @@ vi.mock("@vfx-js/core", () => ({
     teardownCapture: mock.teardownCapture,
 }));
 
-// Svelte leaves hydration comments in the DOM.
-const html = (el: Element) => el.innerHTML.replace(/<!--.*?-->/g, "");
+// Svelte leaves hydration comments in the DOM; drop the comment nodes.
+function html(el: Element): string {
+    const copy = el.cloneNode(true) as Element;
+    const walker = document.createTreeWalker(copy, NodeFilter.SHOW_COMMENT);
+    const comments: Node[] = [];
+    while (walker.nextNode()) {
+        comments.push(walker.currentNode);
+    }
+    for (const comment of comments) {
+        comment.parentNode?.removeChild(comment);
+    }
+    return copy.innerHTML;
+}
 
 // Run queued ops. happy-dom runs frames as immediates, so stay in microtasks.
 async function flush() {

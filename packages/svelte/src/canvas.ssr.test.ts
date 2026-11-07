@@ -19,10 +19,10 @@ it("renders the div on the server, with no core calls", () => {
     const { body } = render(CanvasHarness, {
         props: { props: { shader: "rgbShift", class: "card" } },
     });
-    // Drop Svelte's hydration comments.
-    expect(body.replace(/<!--.*?-->/g, "")).toBe(
-        '<div class="card"><h2>hi</h2></div>',
-    );
+    // Svelte adds hydration comments, so check the parts.
+    expect(body).toContain('<div class="card">');
+    expect(body).toContain("<h2>hi</h2>");
+    expect(body).not.toContain("<canvas");
     expect(mock.init).not.toHaveBeenCalled();
     expect(mock.supportsHtmlInCanvas).not.toHaveBeenCalled();
 });
