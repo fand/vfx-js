@@ -1,4 +1,5 @@
 import type { VFX, VFXProps } from "@vfx-js/core";
+import { setupCapture, teardownCapture } from "@vfx-js/core";
 import { acquireVFX, peekVFX, releaseVFX } from "./vfx.js";
 
 export type { VFXProps };
@@ -7,6 +8,13 @@ export type ElementController = {
     update(props: VFXProps | null | undefined): void;
     destroy(): void;
 };
+
+export type BindOptions = {
+    /** Capture the children of an html-in-canvas `<canvas>`. */
+    capture?: boolean;
+};
+
+const LOG_PREFIX = "[@vfx-js/vue]";
 
 const NON_EFFECT_KEYS: readonly (keyof VFXProps)[] = [
     "shader",
@@ -45,6 +53,7 @@ async function applyDelta(
     el: HTMLElement,
     prev: VFXProps,
     next: VFXProps,
+    add: (props: VFXProps) => Promise<boolean>,
 ): Promise<void> {
     const sameKeys = nonEffectKeysEqual(prev, next);
     if (sameKeys && prev.effect === next.effect) {
@@ -55,11 +64,11 @@ async function applyDelta(
         return;
     }
     vfx.remove(el);
-    await vfx.add(el, next);
+    await add(next);
 }
 
 function logError(what: string, err: unknown): void {
-    console.error(`[@vfx-js/vue] ${what} failed:`, err);
+    console.error(`${LOG_PREFIX} ${what} failed:`, err);
 }
 
 function hasOwnTexture(el: HTMLElement): boolean {
@@ -71,7 +80,10 @@ function hasOwnTexture(el: HTMLElement): boolean {
 }
 
 /** Drive `vfx.add` / `remove` / `updateEffects` for one element. */
-export function bindElement(el: HTMLElement): ElementController {
+export function bindElement(
+    el: HTMLElement,
+    options: BindOptions = {},
+): ElementController {
     const vfx = acquireVFX();
     if (!vfx) {
         let released = false;
@@ -92,10 +104,41 @@ export function bindElement(el: HTMLElement): ElementController {
     let applied: VFXProps | null = null;
     let destroyed = false;
 
+    const canvas =
+        options.capture && el instanceof HTMLCanvasElement ? el : null;
+    let captureStarted = false;
+    let latestCapture: OffscreenCanvas | null = null;
+
+    // Resolves false when nothing was added.
+    // The latest capture keeps `vfx.add` on the html-in-canvas path.
+    const add = async (props: VFXProps): Promise<boolean> => {
+        if (!canvas) {
+            await vfx.add(el, props);
+            return true;
+        }
+        if (!captureStarted) {
+            captureStarted = true;
+            latestCapture = await setupCapture(canvas, {
+                onCapture: (capture) => {
+                    latestCapture = capture;
+                    vfx.updateHICTexture(canvas, capture);
+                },
+                maxSize: vfx.maxTextureSize,
+            });
+            // Unmounted during setup: the destroy op tears it down.
+            if (destroyed) {
+                return false;
+            }
+        }
+        await vfx.add(canvas, props, latestCapture ?? undefined);
+        return true;
+    };
+
     // Text and attribute changes do not reach the texture by themselves.
-    // Vue sets text with textContent, which is a childList change.
+    // Text set with textContent is a childList change.
+    // A captured canvas follows its DOM by itself.
     let observer: MutationObserver | null = null;
-    if (!hasOwnTexture(el)) {
+    if (!canvas && !hasOwnTexture(el)) {
         observer = new MutationObserver(() => {
             if (applied) {
                 vfx.update(el).catch((err) => logError("update", err));
@@ -125,10 +168,11 @@ export function bindElement(el: HTMLElement): ElementController {
                         vfx.remove(el);
                         applied = null;
                     } else if (!prev) {
-                        await vfx.add(el, next);
-                        applied = next;
+                        if (await add(next)) {
+                            applied = next;
+                        }
                     } else {
-                        await applyDelta(vfx, el, prev, next);
+                        await applyDelta(vfx, el, prev, next, add);
                         applied = next;
                     }
                 } catch (err) {
@@ -145,6 +189,9 @@ export function bindElement(el: HTMLElement): ElementController {
             // Release after the remove, so a slow add does not outlive the VFX.
             queue
                 .enqueue(() => {
+                    if (canvas && captureStarted) {
+                        teardownCapture(canvas);
+                    }
                     if (applied) {
                         vfx.remove(el);
                         applied = null;

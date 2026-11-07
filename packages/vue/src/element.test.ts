@@ -11,7 +11,7 @@ import {
     withDirectives,
 } from "vue";
 import { vVfx } from "./directive.js";
-import { updateElement } from "./element.js";
+import { bindElement, updateElement } from "./element.js";
 import { VFXTransition } from "./nuxt/index.js";
 
 const mock = vi.hoisted(() => {
@@ -29,22 +29,52 @@ const mock = vi.hoisted(() => {
         updateEffects: vi.fn(async () => {
             calls.push("updateEffects");
         }),
+        updateHICTexture: vi.fn((_el: HTMLElement, _capture: unknown) => {
+            calls.push("updateHICTexture");
+        }),
+        maxTextureSize: 4096,
         addTransition: vi.fn(() => ({ destroy: vi.fn() })),
         stop: vi.fn(),
         destroy: vi.fn(),
     };
     const init = vi.fn(() => vfx);
+    // Fake html-in-canvas capture. `setupHold` keeps setup pending.
+    const capture = {
+        setupHold: null as Promise<void> | null,
+        onCapture: null as ((capture: unknown) => void) | null,
+    };
+    const setupCapture = vi.fn(
+        async (
+            _canvas: HTMLCanvasElement,
+            opts: { onCapture: (capture: unknown) => void },
+        ) => {
+            calls.push("setupCapture");
+            capture.onCapture = opts.onCapture;
+            await capture.setupHold;
+            return { name: "first capture" };
+        },
+    );
+    const teardownCapture = vi.fn((_canvas: HTMLCanvasElement) => {
+        calls.push("teardownCapture");
+    });
     return {
         calls,
         vfx,
         init,
+        capture,
+        setupCapture,
+        teardownCapture,
         delayAdd(p: Promise<void> | null) {
             addDelay = p;
         },
     };
 });
 
-vi.mock("@vfx-js/core", () => ({ VFX: { init: mock.init } }));
+vi.mock("@vfx-js/core", () => ({
+    VFX: { init: mock.init },
+    setupCapture: mock.setupCapture,
+    teardownCapture: mock.teardownCapture,
+}));
 
 // Run queued ops. happy-dom runs frames as immediates, so stay in microtasks.
 async function flush() {
@@ -72,10 +102,8 @@ describe("vVfx", () => {
     beforeEach(() => {
         mock.calls.length = 0;
         mock.delayAdd(null);
-        for (const fn of Object.values(mock.vfx)) {
-            fn.mockClear();
-        }
-        mock.init.mockClear();
+        vi.clearAllMocks();
+        mock.capture.setupHold = null;
         container = document.createElement("div");
         document.body.appendChild(container);
         apps = [];
@@ -261,5 +289,127 @@ describe("vVfx", () => {
     it("updateElement does nothing without a VFX", async () => {
         await updateElement(document.createElement("div"));
         expect(mock.vfx.update).not.toHaveBeenCalled();
+    });
+});
+
+describe("bindElement with capture", () => {
+    let canvas: HTMLCanvasElement;
+
+    function bind(props: VFXProps) {
+        const controller = bindElement(canvas, { capture: true });
+        controller.update(props);
+        return controller;
+    }
+
+    beforeEach(() => {
+        mock.calls.length = 0;
+        mock.delayAdd(null);
+        vi.clearAllMocks();
+        mock.capture.setupHold = null;
+        canvas = document.createElement("canvas");
+        canvas.appendChild(document.createElement("div"));
+        document.body.appendChild(canvas);
+    });
+    afterEach(async () => {
+        canvas.remove();
+        await flush();
+        await frame();
+    });
+
+    it("sets up the capture, then adds with it", async () => {
+        const controller = bind({ shader: "rgbShift" });
+        await flush();
+        expect(mock.calls).toEqual(["setupCapture", "add"]);
+        expect(mock.setupCapture).toHaveBeenCalledWith(canvas, {
+            onCapture: expect.any(Function),
+            maxSize: 4096,
+        });
+        expect(mock.vfx.add).toHaveBeenCalledWith(
+            canvas,
+            { shader: "rgbShift" },
+            { name: "first capture" },
+        );
+        controller.destroy();
+    });
+
+    it("sends each new capture to the texture", async () => {
+        const controller = bind({ shader: "rgbShift" });
+        await flush();
+        const next = { name: "next capture" };
+        mock.capture.onCapture?.(next);
+        expect(mock.vfx.updateHICTexture).toHaveBeenCalledWith(canvas, next);
+        controller.destroy();
+    });
+
+    it("re-adds with the latest capture when another key changes", async () => {
+        const controller = bind({ shader: "rgbShift" });
+        await flush();
+        const latest = { name: "latest capture" };
+        mock.capture.onCapture?.(latest);
+        controller.update({ shader: "glitch" });
+        await flush();
+        expect(mock.calls).toEqual([
+            "setupCapture",
+            "add",
+            "updateHICTexture",
+            "remove",
+            "add",
+        ]);
+        expect(mock.vfx.add).toHaveBeenLastCalledWith(
+            canvas,
+            { shader: "glitch" },
+            latest,
+        );
+        expect(mock.setupCapture).toHaveBeenCalledTimes(1);
+        controller.destroy();
+    });
+
+    it("uses updateEffects when only effect changes", async () => {
+        const first = { render() {} };
+        const second = { render() {} };
+        const controller = bind({ effect: first });
+        await flush();
+        controller.update({ effect: second });
+        await flush();
+        expect(mock.calls).toEqual(["setupCapture", "add", "updateEffects"]);
+        controller.destroy();
+    });
+
+    it("tears down the capture, then removes", async () => {
+        const controller = bind({ shader: "rgbShift" });
+        await flush();
+        controller.destroy();
+        await flush();
+        expect(mock.calls).toEqual([
+            "setupCapture",
+            "add",
+            "teardownCapture",
+            "remove",
+        ]);
+    });
+
+    it("tears down after a pending setup and never adds", async () => {
+        let finish!: () => void;
+        mock.capture.setupHold = new Promise((r) => {
+            finish = r;
+        });
+        const controller = bind({ shader: "rgbShift" });
+        await flush();
+        controller.destroy();
+        await flush();
+        expect(mock.teardownCapture).not.toHaveBeenCalled();
+        finish();
+        await flush();
+        expect(mock.calls).toEqual(["setupCapture", "teardownCapture"]);
+        expect(mock.vfx.add).not.toHaveBeenCalled();
+    });
+
+    it("does not observe the canvas", async () => {
+        const controller = bind({ shader: "rgbShift" });
+        await flush();
+        canvas.firstElementChild?.append("text");
+        await flush();
+        expect(mock.vfx.update).not.toHaveBeenCalled();
+        controller.destroy();
     });
 });
