@@ -17,7 +17,7 @@ Fields are updated each frame automatically.</p>
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">type</span> <span class="tsd-kind-type-alias">EffectContext</span> <span class="tsd-signature-symbol">=</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#deltatime">deltaTime</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#dims">dims</a><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectDims.html" class="tsd-signature-type tsd-kind-type-alias">EffectDims</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#entertime">enterTime</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#gl">gl</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">WebGL2RenderingContext</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#intersection">intersection</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#leavetime">leaveTime</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#mouse">mouse</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#mouseviewport">mouseViewport</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#pixelratio">pixelRatio</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#quad">quad</a><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectQuad.html" class="tsd-signature-type tsd-kind-type-alias">EffectQuad</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#resolution">resolution</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#src">src</a><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectTexture.html" class="tsd-signature-type tsd-kind-type-alias">EffectTexture</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#target">target</a><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectRenderTarget.html" class="tsd-signature-type tsd-kind-type-alias">EffectRenderTarget</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#time">time</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#uniforms">uniforms</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Readonly</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <a href="_vfx-js_effects.EffectUniformValue.html" class="tsd-signature-type tsd-kind-type-alias">EffectUniformValue</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#vfxprops">vfxProps</a><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectVFXProps.html" class="tsd-signature-type tsd-kind-type-alias">EffectVFXProps</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#blit-1">blit</a><span class="tsd-signature-symbol">(</span><br/>        <span class="tsd-kind-parameter">source</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectRenderTarget.html" class="tsd-signature-type tsd-kind-type-alias">EffectRenderTarget</a> <span class="tsd-signature-symbol">|</span> <a href="_vfx-js_effects.EffectTexture.html" class="tsd-signature-type tsd-kind-type-alias">EffectTexture</a><span class="tsd-signature-symbol">,</span><br/>        <span class="tsd-kind-parameter">target</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_effects.EffectRenderTarget.html" class="tsd-signature-type tsd-kind-type-alias">EffectRenderTarget</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">,</span><br/>        <span class="tsd-kind-parameter">opts</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_effects.EffectBlitOpts.html" class="tsd-signature-type tsd-kind-type-alias">EffectBlitOpts</a><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#clear-1">clear</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">target</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_effects.EffectRenderTarget.html" class="tsd-signature-type tsd-kind-type-alias">EffectRenderTarget</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#createrendertarget-1">createRenderTarget</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">opts</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_effects.EffectRenderTargetOpts.html" class="tsd-signature-type tsd-kind-type-alias">EffectRenderTargetOpts</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectRenderTarget.html" class="tsd-signature-type tsd-kind-type-alias">EffectRenderTarget</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#draw-1">draw</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">opts</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectDrawOpts.html" class="tsd-signature-type tsd-kind-type-alias">EffectDrawOpts</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#oncontextrestored-1">onContextRestored</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">cb</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#releasegeometry-1">releaseGeometry</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">geometry</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectGeometry.html" class="tsd-signature-type tsd-kind-type-alias">EffectGeometry</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#wraptexture-1">wrapTexture</a><span class="tsd-signature-symbol">(</span><br/>        <span class="tsd-kind-parameter">source</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectTextureSource.html" class="tsd-signature-type tsd-kind-type-alias">EffectTextureSource</a><span class="tsd-signature-symbol">,</span><br/>        <span class="tsd-kind-parameter">opts</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">{</span><br/>            <span class="tsd-kind-property">autoUpdate</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>            <span class="tsd-kind-property">filter</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_effects.EffectTextureFilter.html" class="tsd-signature-type tsd-kind-type-alias">EffectTextureFilter</a><span class="tsd-signature-symbol">;</span><br/>            <span class="tsd-kind-property">size</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">;</span><br/>            <span class="tsd-kind-property">wrap</span><span class="tsd-signature-symbol">?:</span><br/>                <span class="tsd-signature-symbol">|</span> <a href="_vfx-js_effects.EffectTextureWrap.html" class="tsd-signature-type tsd-kind-type-alias">EffectTextureWrap</a><br/>                <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-symbol">[</span><a href="_vfx-js_effects.EffectTextureWrap.html" class="tsd-signature-type tsd-kind-type-alias">EffectTextureWrap</a><span class="tsd-signature-symbol">,</span> <a href="_vfx-js_effects.EffectTextureWrap.html" class="tsd-signature-type tsd-kind-type-alias">EffectTextureWrap</a><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">;</span><br/>        <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectTexture.html" class="tsd-signature-type tsd-kind-type-alias">EffectTexture</a><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:642</li></ul></aside>
+<li>Defined in vfx-js/lib/esm/types.d.ts:648</li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -59,7 +59,7 @@ Fields are updated each frame automatically.</p>
 <h3 class="tsd-anchor-link" id="deltatime"><code class="tsd-tag">Readonly</code><span>delta<wbr/>Time</span><a href="#deltatime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">deltaTime</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:644</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:650</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="dims"><code class="tsd-tag">Readonly</code><span>dims</span><a href="#dims" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">dims</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectDims.html" class="tsd-signature-type tsd-kind-type-alias">EffectDims</a></div>
@@ -68,12 +68,12 @@ Fields are updated each frame automatically.</p>
 holds placeholder values until the first frame resolves.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:671</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:677</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="entertime"><code class="tsd-tag">Readonly</code><span>enter<wbr/>Time</span><a href="#entertime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">enterTime</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:653</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:659</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="gl"><code class="tsd-tag">Readonly</code><span>gl</span><a href="#gl" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">gl</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">WebGL2RenderingContext</span></div>
@@ -83,69 +83,69 @@ holds placeholder values until the first frame resolves.</p>
 <code>dispose()</code>, rebuild in <code>onContextRestored(cb)</code>.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:739</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:746</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="intersection"><code class="tsd-tag">Readonly</code><span>intersection</span><a href="#intersection" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">intersection</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:652</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:658</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="leavetime"><code class="tsd-tag">Readonly</code><span>leave<wbr/>Time</span><a href="#leavetime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">leaveTime</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:654</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:660</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="mouse"><code class="tsd-tag">Readonly</code><span>mouse</span><a href="#mouse" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">mouse</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span></div>
 <div class="tsd-comment tsd-typography"><p>Mouse position on the element (element-local, bottom-left origin).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:649</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:655</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="mouseviewport"><code class="tsd-tag">Readonly</code><span>mouse<wbr/>Viewport</span><a href="#mouseviewport" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">mouseViewport</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span></div>
 <div class="tsd-comment tsd-typography"><p>Mouse position on the canvas (canvas-local, bottom-left origin).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:651</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:657</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="pixelratio"><code class="tsd-tag">Readonly</code><span>pixel<wbr/>Ratio</span><a href="#pixelratio" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">pixelRatio</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:645</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:651</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="quad"><code class="tsd-tag">Readonly</code><span>quad</span><a href="#quad" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">quad</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectQuad.html" class="tsd-signature-type tsd-kind-type-alias">EffectQuad</a></div>
 <div class="tsd-comment tsd-typography"><p>Default fullscreen quad (NDC -1..1), mapped to the target's viewport.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:673</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:679</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="resolution"><code class="tsd-tag">Readonly</code><span>resolution</span><a href="#resolution" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">resolution</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span></div>
 <div class="tsd-comment tsd-typography"><p>Canvas resolution, physical px.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:647</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:653</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="src"><code class="tsd-tag">Readonly</code><span>src</span><a href="#src" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">src</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectTexture.html" class="tsd-signature-type tsd-kind-type-alias">EffectTexture</a></div>
 <div class="tsd-comment tsd-typography"><p>Element capture texture (read-only input for the first stage).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:656</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:662</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="target"><code class="tsd-tag">Readonly</code><span>target</span><a href="#target" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">target</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectRenderTarget.html" class="tsd-signature-type tsd-kind-type-alias">EffectRenderTarget</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></div>
 <div class="tsd-comment tsd-typography"><p>Destination assigned to this stage. <code>null</code> means the canvas.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:658</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:664</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="time"><code class="tsd-tag">Readonly</code><span>time</span><a href="#time" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">time</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:643</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:649</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="uniforms"><code class="tsd-tag">Readonly</code><span>uniforms</span><a href="#uniforms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">uniforms</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Readonly</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <a href="_vfx-js_effects.EffectUniformValue.html" class="tsd-signature-type tsd-kind-type-alias">EffectUniformValue</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></div>
@@ -154,12 +154,12 @@ Values are re-evaluated every frame efore <code>update()</code>.<br>
 Built-in uniforms (time etc) are exposed as top-level ctx fields instead.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:664</li></ul></aside></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:670</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="vfxprops"><code class="tsd-tag">Readonly</code><span>vfx<wbr/>Props</span><a href="#vfxprops" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">vfxProps</span><span class="tsd-signature-symbol">:</span> <a href="_vfx-js_effects.EffectVFXProps.html" class="tsd-signature-type tsd-kind-type-alias">EffectVFXProps</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:665</li></ul></aside></section></section></details>
+<li>Defined in vfx-js/lib/esm/types.d.ts:671</li></ul></aside></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -185,7 +185,7 @@ copy passes (capture, downsample, source passthrough).</p>
 <li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">opts</span>: <a href="_vfx-js_effects.EffectBlitOpts.html" class="tsd-signature-type tsd-kind-type-alias">EffectBlitOpts</a></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:721</li></ul></aside></div></li></ul></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:728</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="clear"><span>clear</span><a href="#clear" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -204,7 +204,7 @@ Clears both sides of a ping-pong (<code>persistent: true</code>) RT.</p>
 <li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">target</span>: <a href="_vfx-js_effects.EffectRenderTarget.html" class="tsd-signature-type tsd-kind-type-alias">EffectRenderTarget</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:731</li></ul></aside></div></li></ul></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:738</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="createrendertarget"><span>create<wbr/>Render<wbr/>Target</span><a href="#createrendertarget" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -219,7 +219,7 @@ Clears both sides of a ping-pong (<code>persistent: true</code>) RT.</p>
 <li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">opts</span>: <a href="_vfx-js_effects.EffectRenderTargetOpts.html" class="tsd-signature-type tsd-kind-type-alias">EffectRenderTargetOpts</a></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="_vfx-js_effects.EffectRenderTarget.html" class="tsd-signature-type tsd-kind-type-alias">EffectRenderTarget</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:675</li></ul></aside></div></li></ul></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:681</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="draw"><span>draw</span><a href="#draw" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -235,7 +235,7 @@ Only valid during <code>Effect.render()</code>; other calls are ignored.</p>
 <li><span><span class="tsd-kind-parameter">opts</span>: <a href="_vfx-js_effects.EffectDrawOpts.html" class="tsd-signature-type tsd-kind-type-alias">EffectDrawOpts</a></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:709</li></ul></aside></div></li></ul></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:716</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="oncontextrestored"><span>on<wbr/>Context<wbr/>Restored</span><a href="#oncontextrestored" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -253,7 +253,7 @@ via raw <code>ctx.gl</code>. High-level API resources (<code>createRenderTarget<
 <li><span><span class="tsd-kind-parameter">cb</span>: <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:747</li></ul></aside></div></li></ul></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:754</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="releasegeometry"><span>release<wbr/>Geometry</span><a href="#releasegeometry" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -271,7 +271,7 @@ chain is disposed.</p>
 <li><span><span class="tsd-kind-parameter">geometry</span>: <a href="_vfx-js_effects.EffectGeometry.html" class="tsd-signature-type tsd-kind-type-alias">EffectGeometry</a></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:683</li></ul></aside></div></li></ul></section>
+<li>Defined in vfx-js/lib/esm/types.d.ts:689</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="wraptexture"><span>wrap<wbr/>Texture</span><a href="#wraptexture" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -289,7 +289,8 @@ the texture yourself from <code>onContextRestored(cb)</code>.</li>
 </ul>
 <p><code>autoUpdate</code> defaults to <code>true</code> for <code>HTMLVideoElement</code>,<br>
 <code>HTMLCanvasElement</code>, and <code>OffscreenCanvas</code>, and <code>false</code> for<br>
-everything else.</p>
+everything else.<br>
+With <code>autoUpdate: false</code>, call <code>texture.update()</code> after the source changes.</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -298,7 +299,7 @@ everything else.</p>
 <li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">opts</span>: <span class="tsd-signature-symbol">{</span><br/>    <span class="tsd-kind-property">autoUpdate</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">filter</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_effects.EffectTextureFilter.html" class="tsd-signature-type tsd-kind-type-alias">EffectTextureFilter</a><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">size</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">wrap</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_effects.EffectTextureWrap.html" class="tsd-signature-type tsd-kind-type-alias">EffectTextureWrap</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-symbol">[</span><a href="_vfx-js_effects.EffectTextureWrap.html" class="tsd-signature-type tsd-kind-type-alias">EffectTextureWrap</a><span class="tsd-signature-symbol">,</span> <a href="_vfx-js_effects.EffectTextureWrap.html" class="tsd-signature-type tsd-kind-type-alias">EffectTextureWrap</a><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="_vfx-js_effects.EffectTexture.html" class="tsd-signature-type tsd-kind-type-alias">EffectTexture</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in vfx-js/lib/esm/types.d.ts:699</li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in vfx-js/lib/esm/types.d.ts:706</li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

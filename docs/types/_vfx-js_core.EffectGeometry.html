@@ -16,7 +16,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">type</span> <span class="tsd-kind-type-alias">EffectGeometry</span> <span class="tsd-signature-symbol">=</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#attributes">attributes</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <a href="_vfx-js_core.EffectAttributeDescriptor.html" class="tsd-signature-type tsd-kind-type-alias">EffectAttributeDescriptor</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#drawrange">drawRange</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">count</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">start</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#indices">indices</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Uint16Array</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Uint32Array</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#instancecount">instanceCount</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#mode">mode</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;triangles&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;lines&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;lineStrip&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;points&quot;</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/e3e11fbf32c80e1eb916c45007dea15161277464/packages/vfx-js/src/types.ts#L699">types.ts:699</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f86bc71c3da671676cfa90fcb62f288a9cce4b0a/packages/vfx-js/src/types.ts#L706">types.ts:706</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -41,35 +41,35 @@ Names must match the <code>attribute</code> / <code>in</code> declarations<br>
 in your vertex shader (<code>&quot;position&quot;</code> is conventional).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/e3e11fbf32c80e1eb916c45007dea15161277464/packages/vfx-js/src/types.ts#L708">types.ts:708</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f86bc71c3da671676cfa90fcb62f288a9cce4b0a/packages/vfx-js/src/types.ts#L715">types.ts:715</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="drawrange"><code class="tsd-tag">Optional</code><span>draw<wbr/>Range</span><a href="#drawrange" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">drawRange</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">count</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">start</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span></div>
 <div class="tsd-comment tsd-typography"><p>Restrict the draw call to a sub-range of vertices/indices.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/e3e11fbf32c80e1eb916c45007dea15161277464/packages/vfx-js/src/types.ts#L717">types.ts:717</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f86bc71c3da671676cfa90fcb62f288a9cce4b0a/packages/vfx-js/src/types.ts#L724">types.ts:724</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="indices"><code class="tsd-tag">Optional</code><span>indices</span><a href="#indices" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">indices</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Uint16Array</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Uint32Array</span></div>
 <div class="tsd-comment tsd-typography"><p>Optional index buffer for indexed drawing.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/e3e11fbf32c80e1eb916c45007dea15161277464/packages/vfx-js/src/types.ts#L711">types.ts:711</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f86bc71c3da671676cfa90fcb62f288a9cce4b0a/packages/vfx-js/src/types.ts#L718">types.ts:718</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="instancecount"><code class="tsd-tag">Optional</code><span>instance<wbr/>Count</span><a href="#instancecount" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">instanceCount</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Number of instances for instanced drawing.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/e3e11fbf32c80e1eb916c45007dea15161277464/packages/vfx-js/src/types.ts#L714">types.ts:714</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f86bc71c3da671676cfa90fcb62f288a9cce4b0a/packages/vfx-js/src/types.ts#L721">types.ts:721</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="mode"><code class="tsd-tag">Optional</code><span>mode</span><a href="#mode" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">mode</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;triangles&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;lines&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;lineStrip&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;points&quot;</span></div>
 <div class="tsd-comment tsd-typography"><p>Primitive type to draw. (Default: <code>&quot;triangles&quot;</code>)</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/e3e11fbf32c80e1eb916c45007dea15161277464/packages/vfx-js/src/types.ts#L701">types.ts:701</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/f86bc71c3da671676cfa90fcb62f288a9cce4b0a/packages/vfx-js/src/types.ts#L708">types.ts:708</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
