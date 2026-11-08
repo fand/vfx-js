@@ -1,7 +1,9 @@
 "use client";
 
+import { supportsHtmlInCanvas } from "@vfx-js/core";
 import { VFXTransition } from "@vfx-js/react/next";
 import { usePathname } from "next/navigation";
+import { useLayoutEffect } from "react";
 import { DocSidebar } from "./_components/doc-sidebar";
 import { Header } from "./_components/header";
 import { LoaderCover, useLoaded } from "./_components/loader";
@@ -9,6 +11,12 @@ import { LoaderCover, useLoaded } from "./_components/loader";
 export function Shell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const loaded = useLoaded();
+    // The CSS switches some pages to system fonts without HTML-in-Canvas.
+    useLayoutEffect(() => {
+        if (!supportsHtmlInCanvas()) {
+            document.documentElement.dataset.hic = "off";
+        }
+    }, []);
     // The loader is its own page, so leaving it is a normal run.
     const pageKey = loaded ? pathname : "loading";
     return (

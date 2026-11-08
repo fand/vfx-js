@@ -1,5 +1,6 @@
 "use client";
 
+import { supportsHtmlInCanvas } from "@vfx-js/core";
 import { useVFXTransition } from "@vfx-js/react";
 import Link from "next/link";
 import {
@@ -11,7 +12,7 @@ import {
 } from "react";
 import { presetList, presets } from "../_lib/presets";
 import type { PresetName } from "../_lib/site";
-import { PatternCanvas } from "./pattern-canvas";
+import { PatternCanvas, SHADER_PATTERNS } from "./pattern-canvas";
 import { TLink } from "./t-link";
 
 const AUTOPLAY_INTERVAL = 3000;
@@ -59,6 +60,20 @@ const patterns = ["dots", "grid", "diagonal", "contour", "sine"];
 const patternsFor: Partial<Record<PresetName, string[]>> = {
     datamosh: ["contour", "sine"],
 };
+
+/**
+ * The patterns a run of `name` can pick.
+ * Without HTML-in-Canvas the capture misses shader patterns, so only CSS ones are left.
+ */
+function patternChoices(name: PresetName) {
+    if (supportsHtmlInCanvas()) {
+        return patternsFor[name] ?? patterns;
+    }
+    const usable = (list: string[]) =>
+        list.filter((p) => !SHADER_PATTERNS.includes(p));
+    const preferred = usable(patternsFor[name] ?? []);
+    return preferred.length > 0 ? preferred : usable(patterns);
+}
 
 /** Sets `data-center` on `target`, or on the item closest to the middle of the list. */
 function markCenter(el: HTMLElement, target?: Element) {
@@ -140,10 +155,7 @@ export function HeroStage() {
                     setPlayed(true);
                     setLook((prev) => ({
                         palette: pickOther(palettes, prev.palette),
-                        pattern: pickOther(
-                            patternsFor[name] ?? patterns,
-                            prev.pattern,
-                        ),
+                        pattern: pickOther(patternChoices(name), prev.pattern),
                     }));
                 },
                 {

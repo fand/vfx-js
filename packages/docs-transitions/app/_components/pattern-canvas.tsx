@@ -1,6 +1,6 @@
 "use client";
 
-import { VFX } from "@vfx-js/core";
+import { supportsHtmlInCanvas, VFX } from "@vfx-js/core";
 import { useEffect, useRef } from "react";
 import { contourShader, waveShader } from "../_lib/pattern-shaders";
 
@@ -8,7 +8,7 @@ const CONTOUR = { levels: 28, speed: 0.04, opacity: 0.12, lineWidth: 0.75 };
 const WAVE = { count: 8, opacity: 0.16, lineWidth: 0.8 };
 
 /** Patterns drawn by shaders. Others are plain CSS. */
-const SHADER_PATTERNS = ["contour", "sine"];
+export const SHADER_PATTERNS = ["contour", "sine"];
 
 /**
  * Animated hero patterns, drawn by a VFX-JS instance of its own.
@@ -25,7 +25,8 @@ export function PatternCanvas({ pattern }: { pattern: string }) {
         const wrapperEl = wrapper.current;
         const contourEl = contour.current;
         const waveEl = wave.current;
-        if (!wrapperEl || !contourEl || !waveEl) {
+        // The hero never picks a shader pattern then, so skip the GL context.
+        if (!wrapperEl || !contourEl || !waveEl || !supportsHtmlInCanvas()) {
             return;
         }
         const dpr = Math.min(window.devicePixelRatio, 2);
