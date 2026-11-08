@@ -2,7 +2,7 @@
 // color grading). Ported from Figma's "Gradient map" shader effect.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 import type { Effect, EffectContext } from "@vfx-js/core";
-import { parseHexColor } from "./_figma-common";
+import { parseHexColor } from "./_figma-common.js";
 
 const MAX_STOPS = 8;
 

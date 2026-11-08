@@ -23,11 +23,10 @@ Older notes are in git history.
 
 - `@vfx-js/react/next` reads `LayoutRouterContext`, which is internal to Next.
   A Next upgrade can break it.
-- Astro ClientRouter has no helper; users write the glue by hand.
-  Demo glue: `packages/transition-demo/astro/src/transition.ts`.
-  - `transition:persist` inside the outlet does not work.
-  - Only `<nav>` and `<main>` are swapped, so a footer never updates.
-  - The loader waits for the fetch, then the snapshot. Start the run at `before-preparation` and await both.
+- `@vfx-js/astro`: not checked in Safari or Firefox.
+  Without `moveBefore`, Astro's swap falls back to `appendChild`, which detaches the target and canvas for a moment.
+  - A new page without `<VFXTransition>` drops the live target and the handle. Unit tests only.
+  - A VFX made with `wrapper` is not kept across the swap; only a canvas under `<body>` is.
 - Routers that swap only a container (Swup, Barba.js, htmx) should work inside `run(cb)`. Not verified.
 - Snapshot latency is not measured on large pages or on the html-in-canvas path.
   The small demo page took about 20 ms on the fallback.

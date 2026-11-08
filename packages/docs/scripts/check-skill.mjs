@@ -25,9 +25,16 @@ const packages = {
         ".": "src/lib/index.ts",
         "./sveltekit": "src/lib/sveltekit/index.ts",
     },
+    astro: {
+        ".": "src/index.ts",
+        "./client": "src/client/index.ts",
+    },
     effects: { ".": "src/index.ts" },
     transitions: { ".": "src/index.ts" },
 };
+
+// Subpaths that only the package itself imports.
+const internalSubpaths = new Set(["@vfx-js/astro/client/install"]);
 
 // Exports the skill leaves out on purpose.
 const ignored = new Set([
@@ -106,12 +113,13 @@ for (const [dir, entries] of Object.entries(packages)) {
     const subpaths = keys.some((k) => k.startsWith(".")) ? keys : ["."];
     for (const subpath of subpaths) {
         if (subpath === "./package.json") continue;
+        const name = subpath === "." ? pkg.name : `${pkg.name}${subpath.slice(1)}`;
+        if (internalSubpaths.has(name)) continue;
         const entry = entries[subpath];
         if (!entry) {
             missing.push(`${pkg.name}: add "${subpath}" to packages in check-skill.mjs`);
             continue;
         }
-        const name = subpath === "." ? pkg.name : `${pkg.name}${subpath.slice(1)}`;
         if (!skill.includes(name)) {
             missing.push(`${name}: import path not mentioned`);
         }

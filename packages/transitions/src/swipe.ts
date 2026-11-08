@@ -1,5 +1,5 @@
 import { ShaderTransition } from "@vfx-js/core";
-import { IGN } from "./_shared";
+import { IGN } from "./_shared.js";
 
 export type SwipeDirection = "left" | "right" | "up" | "down";
 

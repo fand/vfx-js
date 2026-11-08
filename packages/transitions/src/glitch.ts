@@ -1,5 +1,5 @@
 import { ShaderTransition } from "@vfx-js/core";
-import { SPLIT_READ } from "./_shared";
+import { SPLIT_READ } from "./_shared.js";
 
 export type GlitchParams = {
     /** Scale of the block shift. Default 1. */

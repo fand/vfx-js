@@ -2,7 +2,7 @@
 // strip's sample toward the center. Ported from Figma's "Slice shift" effect.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 import type { Effect, EffectContext } from "@vfx-js/core";
-import { GLSL_COMMON } from "./_figma-common";
+import { GLSL_COMMON } from "./_figma-common.js";
 
 const FRAG_SLICE_SHIFT = `#version 300 es
 precision highp float;

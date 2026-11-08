@@ -8,7 +8,7 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
-import { captureContent, copyRT } from "./_capture";
+import { captureContent, copyRT } from "./_capture.js";
 
 const KEY_FUNC = `
 float key(vec3 c, int mode) {

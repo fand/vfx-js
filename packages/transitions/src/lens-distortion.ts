@@ -1,5 +1,5 @@
 import { ShaderTransition } from "@vfx-js/core";
-import { IGN, MIRROR } from "./_shared";
+import { IGN, MIRROR } from "./_shared.js";
 
 export type LensDistortionParams = {
     /** Scales the warp. Default 1. */

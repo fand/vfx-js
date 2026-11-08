@@ -1,8 +1,32 @@
 ---
+import { VFXSpan } from "@vfx-js/astro";
 import PageView from "../components/PageView.astro";
 import Layout from "../layouts/Layout.astro";
+
+// Tints the text by the pointer position.
+const shader = `
+precision highp float;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform sampler2D src;
+uniform vec2 pointer;
+out vec4 outColor;
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    vec4 color = texture(src, uv);
+    outColor = vec4(color.rgb * vec3(pointer, 1.0), color.a);
+}
+`;
 ---
 
 <Layout>
-    <PageView path="/" />
+    <PageView path="/">
+        <p>
+            <VFXSpan shader={shader} uniforms="pointer">
+                Move the pointer to tint this text.
+            </VFXSpan>
+        </p>
+        <p><a href="/image">An astro:assets image with data-vfx</a></p>
+    </PageView>
 </Layout>

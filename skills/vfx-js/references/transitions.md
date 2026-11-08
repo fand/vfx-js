@@ -400,9 +400,53 @@ npm i @vfx-js/core @vfx-js/svelte @vfx-js/transitions
 - `setNextTransition(spec)` before `goto()`.
 - `fullscreen={false}` lets you size the target with CSS.
 
+## Astro: ClientRouter
+
+```bash
+npm i @vfx-js/core @vfx-js/astro @vfx-js/transitions
+```
+
+```astro
+---
+// src/layouts/Layout.astro
+import { ClientRouter } from "astro:transitions";
+import { VFXTransition } from "@vfx-js/astro";
+---
+
+<html lang="en" transition:animate="none">
+    <head><ClientRouter /></head>
+    <body>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/gallery" data-vfx-transition="swipe">Gallery</a>
+        </nav>
+        <VFXTransition transition="crossfade" duration={0.8}>
+            <slot />
+        </VFXTransition>
+    </body>
+</html>
+```
+
+```astro
+---
+// src/pages/about.astro
+import { TransitionIn } from "@vfx-js/astro";
+---
+
+<TransitionIn transition="glitch" />
+```
+
+- Needs `<ClientRouter />`. Without it links reload the page and nothing animates.
+- `transition:animate="none"` turns off the browser's view transition; the shader is the animation.
+- Transitions are names: lowercase class names from `@vfx-js/transitions` (`crossfade`, `swipe`, `glitch`, `pixelsort`, ...). Register others with `registerVFX({ transitions: { name: ClassOrInstance } })` from `@vfx-js/astro/client`. `ease` is `"smoothstep"`, `"linear"`, or a name from `registerVFX({ eases })`.
+- A link spec is a name or JSON: `data-vfx-transition='{"transition":"swipe","params":{"direction":"left"}}'`.
+- Which spec wins: the link's `data-vfx-transition`, then the page's `<TransitionIn>`, then the `<VFXTransition>` props. Back adds `reverse: true`.
+- `fullscreen={false}` lets you size the target with CSS.
+- `installTransition({ swapFunctions })` from `@vfx-js/astro/client` is what `<VFXTransition>` calls. You rarely need it.
+
 ## Other routers
 
-Astro ClientRouter, Turbo, htmx and others have no binding.
+Turbo, htmx and others have no binding.
 Use core `run(cb)`: hold the navigation until `run` has taken the snapshot, then let `cb` wait for the new page.
 
 ```ts
@@ -416,8 +460,6 @@ router.beforeNavigate(() =>
 );
 ```
 
-Astro example: https://github.com/fand/vfx-js/blob/main/packages/framework-testbed/astro/src/transition.ts
-
 ## Rules and pitfalls
 
 - Give the target a fixed size (explicit height, or the viewport). Content of a different size does not animate between sizes; the box jumps after the run.
@@ -427,5 +469,5 @@ Astro example: https://github.com/fand/vfx-js/blob/main/packages/framework-testb
 - VFX elements inside the target freeze during a run.
 - Next.js `loading.tsx` shows its fallback at once, so the transition lands on the skeleton.
 - Multi-page (cross-document) navigation is not supported.
-- Vue and Svelte `<VFXTransition>` render plain divs on the server. No client-only wrapper is needed.
+- Vue, Svelte and Astro `<VFXTransition>` render plain divs on the server. No client-only wrapper is needed.
 - Respect `prefers-reduced-motion`: pass `duration: 0` when it matches.

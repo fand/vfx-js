@@ -9,11 +9,11 @@ import type {
     TransitionRun,
 } from "@vfx-js/core";
 import { describe, expect, test, vi } from "vitest";
-import { HardCut, StagedTransition } from "./_shared";
-import type { DatamoshStage } from "./datamosh";
-import * as presets from "./index";
-import type { JpegGlitchStage } from "./jpeg-glitch";
-import type { PixelsortStage } from "./pixelsort";
+import { HardCut, StagedTransition } from "./_shared.js";
+import type { DatamoshStage } from "./datamosh.js";
+import * as presets from "./index.js";
+import type { JpegGlitchStage } from "./jpeg-glitch.js";
+import type { PixelsortStage } from "./pixelsort.js";
 
 const run: TransitionRun = { reverse: false, duration: 1 };
 

@@ -1,5 +1,6 @@
 ---
 import "@vfx-js/testbed-shared/style.css";
+import { VFXTransition } from "@vfx-js/astro";
 import { pages } from "@vfx-js/testbed-shared";
 import { ClientRouter } from "astro:transitions";
 
@@ -21,7 +22,7 @@ const page = pages.find((p) => p.path === current);
                 pages.map((p) => (
                     <a
                         href={p.path}
-                        data-transition={p.transition}
+                        data-vfx-transition={p.transition}
                         aria-current={p.path === current ? "page" : undefined}
                     >
                         {p.label}
@@ -30,12 +31,26 @@ const page = pages.find((p) => p.path === current);
             }
             <span class="framework">Astro</span>
         </nav>
-        <main class="outlet">
+        <!-- Back plays the default, crossfade, reversed. -->
+        <VFXTransition
+            class="outlet"
+            fullscreen={false}
+            transition="crossfade"
+            duration={0.8}
+        >
             <slot />
-        </main>
+        </VFXTransition>
         <script>
-            import { setupTransition } from "../transition";
-            setupTransition();
+            import { registerVFX } from "@vfx-js/astro/client";
+
+            let pointer: [number, number] = [1, 1];
+            window.addEventListener("pointermove", (e) => {
+                pointer = [
+                    e.clientX / window.innerWidth,
+                    e.clientY / window.innerHeight,
+                ];
+            });
+            registerVFX({ uniforms: { pointer: { pointer: () => pointer } } });
         </script>
     </body>
 </html>

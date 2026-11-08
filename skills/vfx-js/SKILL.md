@@ -1,6 +1,6 @@
 ---
 name: vfx-js
-description: Add WebGL shader effects and page transitions to websites with VFX-JS (@vfx-js/core, @vfx-js/react, @vfx-js/vue, @vfx-js/svelte, @vfx-js/effects, @vfx-js/transitions). Works with plain JS, React, Next.js, React Router, Vue, Nuxt, Svelte and SvelteKit. Use when a site needs visual effects on images, videos or text (glitch, RGB shift, pixelate, bloom, halftone, particles...), animated tab, carousel or page transitions, or when writing custom GLSL effects or transitions for VFX-JS.
+description: Add WebGL shader effects and page transitions to websites with VFX-JS (@vfx-js/core, @vfx-js/react, @vfx-js/vue, @vfx-js/svelte, @vfx-js/astro, @vfx-js/effects, @vfx-js/transitions). Works with plain JS, React, Next.js, React Router, Vue, Nuxt, Svelte, SvelteKit and Astro. Use when a site needs visual effects on images, videos or text (glitch, RGB shift, pixelate, bloom, halftone, particles...), animated tab, carousel or page transitions, or when writing custom GLSL effects or transitions for VFX-JS.
 ---
 
 # VFX-JS
@@ -19,6 +19,7 @@ Docs: https://amagi.dev/vfx-js/ Â· Examples: https://amagi.dev/vfx-js/examples Â
 | `@vfx-js/react` | React components (`VFXImg`, `VFXVideo`, `VFXSpan`, `VFXDiv`, `VFXP`, `VFXCanvas`) and `<VFXTransition>`. Subpaths `/next`, `/react-router`. |
 | `@vfx-js/vue` | Vue directive `v-vfx`, `VFXCanvas`, and `<VFXTransition>` from `/nuxt` or `/router`. |
 | `@vfx-js/svelte` | Svelte 5 attachment `vfx`, `VFXCanvas`, and `<VFXTransition>` from `/sveltekit`. |
+| `@vfx-js/astro` | Astro components (`VFXImg`, `VFXVideo`, `VFXSpan`, `VFXDiv`, `VFXP`), `<VFXTransition>`, `<TransitionIn>`. `registerVFX` from `/client`. |
 | `@vfx-js/effects` | Prebuilt `Effect` classes (`BloomEffect`, `PixelateEffect`, ...). |
 | `@vfx-js/transitions` | Transition presets (`Swipe`, `Glitch`, `Zoom`, ...). Experimental. |
 
@@ -154,6 +155,41 @@ npm i @vfx-js/core @vfx-js/svelte
 - `vfxConfig({ ... })` sets the shared canvas options. `vfxInstance().current` is the `VFX`.
 - Keep a `postEffect` object out of `$state`; every new proxy replaces the canvas.
 - Call `updateElement(el)` after changes the attachment can't see.
+
+## Astro
+
+Needs Astro 5 or later. No framework island.
+
+```bash
+npm i @vfx-js/core @vfx-js/astro
+```
+
+```astro
+---
+import { VFXImg, VFXSpan } from "@vfx-js/astro";
+---
+
+<VFXImg src="/cat.png" alt="" shader="rgbShift" />
+<VFXSpan shader="glitch" overflow={30}>Hello</VFXSpan>
+```
+
+- `VFXImg`, `VFXVideo`, `VFXSpan`, `VFXDiv`, `VFXP` take `VFXProps` that fit in HTML: `shader` is a preset, GLSL, or `"@name"` of a registered `VFXPass[]`; `uniforms` is plain numbers or the name of registered uniforms; no `effect`.
+- The props become a `data-vfx` JSON attribute. Any element with `data-vfx` works, e.g. `<Image src={cat} alt="" data-vfx='{"shader":"rgbShift"}' />` from `astro:assets`.
+- Register functions by name in a client `<script>` in the layout:
+
+```ts
+import { registerVFX } from "@vfx-js/astro/client";
+
+registerVFX({
+    uniforms: { mouse: { mouse: () => [mx, my] } },
+    shaders: { blur: [pass1, pass2] },
+    vfx: { pixelRatio: 1 },   // shared canvas options; only before the VFX is made
+});
+```
+
+- An element whose name is not registered yet waits until it is.
+- `getVFX()` from `@vfx-js/astro/client` gives the shared `VFX` (or `null` without WebGL). `install()` starts the `data-vfx` watcher; the components call it for you.
+- Page transitions: see [references/transitions.md](references/transitions.md).
 
 ## Rules and pitfalls
 
