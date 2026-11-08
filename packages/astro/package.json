@@ -23,14 +23,15 @@
     "test:watch": "vitest --dir src"
   },
   "peerDependencies": {
+    "@vfx-js/core": "workspace:^",
     "astro": ">=5"
   },
   "dependencies": {
-    "@vfx-js/core": "workspace:*",
-    "@vfx-js/transitions": "workspace:*"
+    "@vfx-js/transitions": "workspace:^"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
+    "@vfx-js/core": "workspace:*",
     "astro": "^7.4.2",
     "happy-dom": "21.0.4",
     "lint-staged": "^17.6.0",

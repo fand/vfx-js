@@ -2,6 +2,7 @@
 "@vfx-js/react": minor
 "@vfx-js/vue": minor
 "@vfx-js/svelte": minor
+"@vfx-js/astro": minor
 "react-vfx": patch
 ---
 
