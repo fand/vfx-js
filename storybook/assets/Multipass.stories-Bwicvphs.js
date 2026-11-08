@@ -252,7 +252,7 @@ ${k}
 
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    vec2 texel = 4.0 / resolution;
+    vec2 texel = 8.0 / resolution;
 
     vec4 c = vec4(0.0);
     for (int x = -4; x <= 4; x++) {
@@ -276,7 +276,9 @@ void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     vec4 base = texture(original, toBuffer(uv));
     vec4 g = texture(glow, toBuffer(uv));
-    outColor = base + g * (1.0 - base.a);
+    // Strong pink halo, so a shifted or clipped glow shows up in VRT.
+    float halo = min(g.a * 3.0, 1.0);
+    outColor = base + vec4(1.0, 0.2, 0.6, 1.0) * halo * (1.0 - base.a);
 }
 `,N=[{frag:A,target:`original`},{frag:j,target:`glow`},{frag:M}],P={render:()=>{let e=document.createElement(`img`);return e.src=t,e},play:({canvasElement:e})=>C(e,40)},F={render:()=>{let e=document.createElement(`img`);return e.src=t,e},play:({canvasElement:e})=>C(e,!0)},I=[`StableFluidPostEffect`,`StableFluidElement`,`GlowBleedOverflow`,`GlowBleedFullscreen`],D.parameters={...D.parameters,docs:{...D.parameters?.docs,source:{originalSource:`{
   args: {
