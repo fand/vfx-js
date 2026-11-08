@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import { VFXCanvas, VFXProvider } from "@vfx-js/react";
 import React from "react";
 import { createRoot } from "react-dom/client";
+import Jellyfish from "./assets/jellyfish.webp";
 import { Timer } from "./Timer";
 import { initVFX } from "./utils";
 
@@ -384,5 +385,33 @@ export const InsetSizedPercentMargin: StoryObj = {
     play: async ({ canvasElement }) => {
         await new Promise((r) => requestAnimationFrame(r));
         setupHIC(qs(canvasElement, "#percent-margin-target"), solidShader);
+    },
+};
+
+// A replaced element with `inset: 0` keeps its intrinsic size.
+export const InsetReplacedElement: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "margin: 96px 16px; font-family:sans-serif; color:white";
+
+        for (const id of ["replaced-ref", "replaced-target"]) {
+            const box = document.createElement("div");
+            box.style.cssText =
+                "position:relative; width:900px; height:500px; margin-bottom:32px; outline:1px solid #888";
+            const img = document.createElement("img");
+            img.id = id;
+            img.src = Jellyfish;
+            img.style.cssText = "position:absolute; inset:0";
+            box.appendChild(img);
+            container.appendChild(box);
+        }
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        const img = qs<HTMLImageElement>(canvasElement, "#replaced-target");
+        await img.decode();
+        setupHIC(img, solidShader);
     },
 };
