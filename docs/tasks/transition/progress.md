@@ -3,13 +3,6 @@
 All plans are merged (#220, #224). Only open items are left.
 Older notes are in git history.
 
-## Bugs
-
-- A `position: fixed` or `absolute` target sized by its insets breaks once wrapped.
-  The canvas copies the insets, but a replaced element does not stretch, and the child RO sets the canvas height to the content height.
-  Fix, checked by hand in Chrome: canvas `width` / `height` = `calc(100% - <insets>)`, element `position: static; height: 100%`.
-  An in-flow `100vw` × `100vh` target works today.
-
 ## Not checked
 
 - Chromatic snapshot of the Transition story (never run).

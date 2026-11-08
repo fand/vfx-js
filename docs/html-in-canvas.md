@@ -52,6 +52,7 @@ The canvas's content-box must equal the wrapped element's border-box. Since the 
 | --- | --- | --- |
 | Fills its containing block (`width: auto` block, or `width: 100%`) | `100%` | ✅ tracks parent |
 | Explicit **px** width (`width: 400px`) | pinned `rect.width` | constant (reflow-safe) |
+| Sized by insets (`position: fixed`/`absolute`, `inset: 10px`, `auto` width/height) | `calc(100% - <insets> - <margins>)`, height too | ✅ tracks containing block |
 | **Content-sized** (`inline`/`inline-block`, `float`, `fit-content`, binding `max-width`, or width + centering margins) | — | ❌ **unsupported** |
 
 The litmus test: **does the target's border-box equal its parent's content-box width?** If yes, or if it has a fixed px width, it works. Otherwise it's content-sized and must be wrapped.

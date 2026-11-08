@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { moveNode, waitForFlush, wrapElement } from "./html-in-canvas";
+import {
+    moveNode,
+    unwrapElement,
+    waitForFlush,
+    wrapElement,
+} from "./html-in-canvas";
 
 describe("waitForFlush", () => {
     beforeEach(() => {
@@ -91,23 +96,27 @@ const ELEMENT_CLASSES = [
 
 function fakeNode(tag: string) {
     const attrs = new Map<string, string>();
+    const values: Record<string, string> = {
+        height: "",
+        width: "",
+        margin: "",
+        boxSizing: "",
+        zIndex: "",
+        position: "",
+    };
+    const style = Object.assign(values, {
+        setProperty(name: string, value: string) {
+            const key = name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+            values[key] = value;
+        },
+    });
     const node = {
         tag,
         className: "",
         scrollTop: 0,
         scrollLeft: 0,
-        style: {
-            height: "",
-            width: "",
-            margin: "",
-            boxSizing: "",
-            zIndex: "",
-            setProperty(name: string, value: string) {
-                if (name === "z-index") {
-                    node.style.zIndex = value;
-                }
-            },
-        },
+        style,
+        computedStyleMap: undefined as unknown,
         parentNode: null as unknown,
         getBoundingClientRect: () => ({
             left: 0,
@@ -121,6 +130,7 @@ function fakeNode(tag: string) {
         setAttribute: (name: string, value: string) => attrs.set(name, value),
         removeAttribute: (name: string) => attrs.delete(name),
         insertBefore: () => {},
+        remove: () => {},
         cloneNode: () => fakeNode(`${tag}-clone`),
     };
     return node;
@@ -173,5 +183,79 @@ describe("wrapElement", () => {
             "canvas",
         ]);
         expect(inserted[0].style.zIndex).toBe("41");
+    });
+
+    // Missing props read as `auto`, like unset insets and sizes.
+    const stubComputed = (values: Record<string, string>) => {
+        element.computedStyleMap = () => ({
+            get: (prop: string) => ({
+                toString: () => values[prop] ?? "auto",
+            }),
+        });
+    };
+    const canvasStyle = () => inserted[0].style;
+
+    test("sizes the canvas from all four insets of a fixed element", () => {
+        stubComputed({
+            position: "fixed",
+            top: "10px",
+            right: "10px",
+            bottom: "10px",
+            left: "10px",
+            "margin-top": "0px",
+            "margin-right": "3%",
+            "margin-bottom": "0px",
+            "margin-left": "2px",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("calc(100% - 10px - 10px - 2px - 3%)");
+        expect(canvasStyle().height).toBe(
+            "calc(100% - 10px - 10px - 0px - 0px)",
+        );
+        expect(element.style.position).toBe("static");
+        expect(element.style.height).toBe("100%");
+    });
+
+    test("sizes only the width of an absolute element with left/right", () => {
+        stubComputed({
+            position: "absolute",
+            right: "5%",
+            left: "1em",
+            "margin-right": "0px",
+            "margin-left": "0px",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("calc(100% - 1em - 5% - 0px - 0px)");
+        expect(canvasStyle().height).toBe("10px");
+        expect(element.style.position).toBe("static");
+        expect(element.style.height).toBe("");
+    });
+
+    test("unwrap restores the old inline position and height", () => {
+        element.style.position = "fixed";
+        element.style.height = "auto";
+        stubComputed({
+            position: "fixed",
+            top: "0px",
+            right: "0px",
+            bottom: "0px",
+            left: "0px",
+        });
+        wrap({});
+        unwrapElement(
+            inserted[0] as unknown as HTMLCanvasElement,
+            element as unknown as HTMLElement,
+        );
+        expect(element.style.position).toBe("fixed");
+        expect(element.style.height).toBe("auto");
+    });
+
+    test("leaves a non-positioned element as is", () => {
+        stubComputed({ position: "static", top: "10px", bottom: "10px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("100%");
+        expect(canvasStyle().height).toBe("10px");
+        expect(element.style.position).toBe("");
+        expect(element.style.height).toBe("");
     });
 });
