@@ -29,7 +29,7 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
-import { captureContent } from "./_capture";
+import { captureContent } from "./_capture.js";
 
 // Passthrough of the live source to the canvas (used until the first
 // glitch result is ready). Premultiplied for the canvas blend.

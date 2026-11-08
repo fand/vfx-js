@@ -1,7 +1,7 @@
 import type { TransitionEffectContext } from "@vfx-js/core";
 import transitions from "gl-transitions";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createGLTransition, type GLTransitionDef } from "./gl-transition";
+import { createGLTransition, type GLTransitionDef } from "./gl-transition.js";
 
 const wave: GLTransitionDef = {
     name: "wave",

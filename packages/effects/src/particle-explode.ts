@@ -14,7 +14,7 @@ import {
     GLSL_CURL_NOISE,
     LIFE_JITTER_MAX,
     LIFE_JITTER_MIN,
-} from "./_curl-noise";
+} from "./_curl-noise.js";
 import {
     clampDt,
     FRAG_PARTICLE,
@@ -24,7 +24,7 @@ import {
     QUAD_VERTS,
     sanitizeCount,
     stateSizeFromCount,
-} from "./_particle-common";
+} from "./_particle-common.js";
 
 const LIFE_JITTER_MIN_GLSL = LIFE_JITTER_MIN.toFixed(4);
 const LIFE_JITTER_MAX_GLSL = LIFE_JITTER_MAX.toFixed(4);

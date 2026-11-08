@@ -5,7 +5,7 @@ import {
     type TransitionRun,
 } from "@vfx-js/core";
 import { DatamoshEffect } from "@vfx-js/effects";
-import { StagedTransition } from "./_shared";
+import { StagedTransition } from "./_shared.js";
 
 export type DatamoshParams = {
     /** Block size in px, 2 or more. Default 32. */

@@ -22,7 +22,7 @@
 // The YCbCr 4:2:0 path swaps decode for luma (full res) + chroma (half
 // res, truncated MV); the truncation is what makes color drift off edges.
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
-import { captureContent } from "./_capture";
+import { captureContent } from "./_capture.js";
 
 // Premultiplied copy of an internal RT to the canvas. `uvContent` maps
 // the content rect into the target buffer.

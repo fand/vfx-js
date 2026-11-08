@@ -4,7 +4,7 @@ import type {
     TransitionRun,
 } from "@vfx-js/core";
 import { type PixelSortDirection, PixelSortEffect } from "@vfx-js/effects";
-import { HardCut, StagedTransition } from "./_shared";
+import { HardCut, StagedTransition } from "./_shared.js";
 
 export type PixelsortParams = {
     /** Where the old content melts. Default `"up"`. */

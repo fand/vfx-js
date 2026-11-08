@@ -1,5 +1,5 @@
 import { ShaderTransition } from "@vfx-js/core";
-import { IGN, SPLIT_READ } from "./_shared";
+import { IGN, SPLIT_READ } from "./_shared.js";
 
 /** Radial blur with RGB split, peaking halfway, while crossfading. */
 export class ZoomBlur extends ShaderTransition {
