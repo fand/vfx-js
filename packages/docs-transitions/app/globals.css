@@ -788,6 +788,10 @@ em {
         animation-timeline: view(inline), auto;
     }
 }
+/* Shadows fade out during a run. See misdrawsShadows in hero-stage. */
+.hero[data-flat] :is(.btn, .carousel-item, .carousel-item[data-center]) {
+    box-shadow: none;
+}
 /* Only the label blinks; the background stays. */
 @keyframes carousel-blink {
     50% {

@@ -143,8 +143,15 @@ export function HeroStage() {
             if (list.current && item) {
                 markCenter(list.current, item);
             }
+            // Shadows fade out with the blink, so the capture has none.
+            const flat = misdrawsShadows();
+            if (flat) {
+                section.current?.setAttribute("data-flat", "");
+            }
             if (blinkFirst && item && !reducedMotion()) {
                 await blink(item, BLINK_MS);
+            } else if (flat) {
+                await new Promise((resolve) => setTimeout(resolve, BLINK_MS));
             }
             await run(
                 () => {
@@ -164,6 +171,7 @@ export function HeroStage() {
                     duration: durations[name],
                 },
             );
+            section.current?.removeAttribute("data-flat");
             busy.current = false;
         },
         [run],
@@ -428,6 +436,12 @@ function pickOther(list: string[], current: string) {
     const rest = list.filter((x) => x !== current);
     return rest[Math.floor(Math.random() * rest.length)];
 }
+
+/** Safari misdraws box-shadows in the capture without HTML-in-Canvas. */
+const misdrawsShadows = () =>
+    !supportsHtmlInCanvas() &&
+    /AppleWebKit/.test(navigator.userAgent) &&
+    !/Chrome\/|Chromium\//.test(navigator.userAgent);
 
 const reducedMotion = () =>
     matchMedia("(prefers-reduced-motion: reduce)").matches;
