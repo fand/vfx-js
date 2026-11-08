@@ -461,7 +461,14 @@ function getInsetSizing(element: HTMLElement): InsetSizing {
         }
         // Auto margins resolve to 0 here, so only subtract set ones.
         const margins = [`margin-${start}`, `margin-${end}`]
-            .map(value)
+            .map((prop) => {
+                const margin = value(prop);
+                // Vertical % margins use the width, so pin them to px; they won't track resizes.
+                if (size === "height" && margin.includes("%")) {
+                    return getComputedStyle(element).getPropertyValue(prop);
+                }
+                return margin;
+            })
             .filter((margin) => margin !== "auto");
         return `calc(${["100%", startInset, endInset, ...margins].join(" - ")})`;
     };

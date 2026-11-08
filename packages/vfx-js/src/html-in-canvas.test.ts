@@ -250,6 +250,30 @@ describe("wrapElement", () => {
         expect(element.style.height).toBe("auto");
     });
 
+    test("uses px for percent vertical margins in the height", () => {
+        vi.stubGlobal("getComputedStyle", () => ({
+            display: "block",
+            getPropertyValue: (prop: string) =>
+                prop.startsWith("margin-") ? "30px" : "",
+        }));
+        stubComputed({
+            position: "absolute",
+            top: "0px",
+            right: "0px",
+            bottom: "0px",
+            left: "0px",
+            "margin-top": "5%",
+            "margin-right": "5%",
+            "margin-bottom": "5%",
+            "margin-left": "5%",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("calc(100% - 0px - 0px - 5% - 5%)");
+        expect(canvasStyle().height).toBe(
+            "calc(100% - 0px - 0px - 30px - 30px)",
+        );
+    });
+
     test("leaves a non-positioned element as is", () => {
         stubComputed({ position: "static", top: "10px", bottom: "10px" });
         wrap({});
