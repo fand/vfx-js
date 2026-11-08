@@ -92,7 +92,7 @@ vfx.add(el, {
 ## React
 
 ```bash
-npm i @vfx-js/react
+npm i @vfx-js/core @vfx-js/react
 ```
 
 ```tsx

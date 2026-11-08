@@ -218,7 +218,7 @@ export class BlurFade implements Transition {
 ## React
 
 ```bash
-npm i @vfx-js/react @vfx-js/transitions
+npm i @vfx-js/core @vfx-js/react @vfx-js/transitions
 ```
 
 Page transitions: put one `<VFXTransition>` around the router outlet.

@@ -8,7 +8,7 @@
 ## Install
 
 ```
-npm i @vfx-js/react
+npm i @vfx-js/core @vfx-js/react
 ```
 
 ## Usage

@@ -8,7 +8,7 @@
 
 ```sh
 npm uninstall react-vfx
-npm install @vfx-js/react
+npm install @vfx-js/core @vfx-js/react
 ```
 
 Then update your imports:
