@@ -262,7 +262,7 @@ ${toBuffer}
 
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    vec2 texel = 4.0 / resolution;
+    vec2 texel = 8.0 / resolution;
 
     vec4 c = vec4(0.0);
     for (int x = -4; x <= 4; x++) {
@@ -288,7 +288,9 @@ void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     vec4 base = texture(original, toBuffer(uv));
     vec4 g = texture(glow, toBuffer(uv));
-    outColor = base + g * (1.0 - base.a);
+    // Strong pink halo, so a shifted or clipped glow shows up in VRT.
+    float halo = min(g.a * 3.0, 1.0);
+    outColor = base + vec4(1.0, 0.2, 0.6, 1.0) * halo * (1.0 - base.a);
 }
 `;
 
