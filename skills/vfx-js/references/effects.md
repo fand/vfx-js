@@ -136,7 +136,7 @@ Always declare `#version 300 es` in `ctx.draw` shaders.
 | `uniforms` | User `uniforms` from `vfx.add`, evaluated each frame. |
 | `dims` | Sizes: `elementPixel`, `canvasPixel`, `pixelRatio`, `contentRect`, `srcRect`, `canvasRect`. |
 | `createRenderTarget(opts)` | `{ size?, float?, persistent?, wrap?, filter?, mipmap? }`. Call in `init`. |
-| `wrapTexture(source, opts)` | Wrap an image, canvas, video or `WebGLTexture`. Call in `init`. |
+| `wrapTexture(source, opts)` | Wrap an image, canvas, video or `WebGLTexture`. Call in `init`. With `autoUpdate: false`, call `tex.update()` after the source changes. |
 | `draw(opts)` | `{ frag, vert?, geometry?, uniforms?, target?, blend?, swap? }`. |
 | `blit(source, target?)` | Copy a texture into a target. |
 | `clear(target?)` | Clear a render target. |

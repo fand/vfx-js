@@ -467,6 +467,48 @@ describe("EffectHost.wrapTexture", () => {
         expect(t.needsUpdate).toBe(false);
     });
 
+    it("update() re-uploads a texture with autoUpdate: false", () => {
+        const { host } = makeHost();
+        const canvas = Object.assign(new HTMLCanvasElementStub(), {
+            width: 50,
+            height: 50,
+        });
+        const handle = host.ctx.wrapTexture(
+            canvas as unknown as HTMLCanvasElement,
+            { autoUpdate: false },
+        );
+        const t = textures[textures.length - 1];
+        t.needsUpdate = false;
+        host.tickAutoUpdates();
+        expect(t.needsUpdate).toBe(false);
+        handle.update();
+        expect(t.needsUpdate).toBe(true);
+    });
+
+    it("update() is a no-op after dispose()", () => {
+        const { host } = makeHost();
+        const img = Object.assign(new HTMLImageElementStub(), {
+            naturalWidth: 10,
+            naturalHeight: 10,
+        });
+        const handle = host.ctx.wrapTexture(img as unknown as HTMLImageElement);
+        const t = textures[textures.length - 1];
+        handle.dispose();
+        t.needsUpdate = false;
+        handle.update();
+        expect(t.needsUpdate).toBe(false);
+    });
+
+    it("update() is a no-op for WebGLTexture handles", () => {
+        const { host } = makeHost();
+        const fakeGlTex = {} as unknown as WebGLTexture;
+        const handle = host.ctx.wrapTexture(fakeGlTex, { size: [8, 8] });
+        const t = textures[textures.length - 1];
+        t.needsUpdate = false;
+        handle.update();
+        expect(t.needsUpdate).toBe(false);
+    });
+
     it("WebGLTexture requires opts.size", () => {
         const { host } = makeHost();
         // Our stub's duck-check for isWebGLTextureHandle returns true
