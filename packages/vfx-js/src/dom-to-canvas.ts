@@ -68,6 +68,7 @@ export default async function getCanvasFromElement(
     newElement.style.setProperty("opacity", originalOpacity.toString());
     newElement.style.setProperty("margin", "0px");
     zeroCollapsingMargins(newElement);
+    applyScrollOffsets(element, newElement);
     // Pin the clone's outer box to integer pixels. Host-DOM text metrics and
     // the SVG rasterizer's text metrics can disagree by tiny sub-pixel
     // amounts (visibly so at non-100% browser zoom); a 0–1 px buffer here
@@ -252,6 +253,61 @@ function zeroCollapsingMargins(root: HTMLElement): void {
         child.style.setProperty("margin-bottom", "0px");
         el = child;
     }
+}
+
+/**
+ * The clone loses scroll positions.
+ * So move the children of each scrolled element by its scroll offset instead.
+ */
+function applyScrollOffsets(original: Element, clone: Element): void {
+    const dx = -original.scrollLeft;
+    const dy = -original.scrollTop;
+    for (let i = 0; i < original.children.length; i++) {
+        const c1 = original.children[i];
+        const c2 = clone.children[i];
+        if (!c1 || !(c2 instanceof HTMLElement || c2 instanceof SVGElement)) {
+            continue;
+        }
+        if (dx !== 0 || dy !== 0) {
+            shiftBy(c2, dx, dy);
+        }
+        applyScrollOffsets(c1, c2);
+    }
+}
+
+/** Adds (dx, dy) to the `translate` that syncStylesOfTree copied. */
+function shiftBy(el: HTMLElement | SVGElement, dx: number, dy: number): void {
+    const value = el.style.getPropertyValue("translate");
+    const [x = "0px", y = "0px", z] =
+        value && value !== "none" ? splitTopLevel(value) : [];
+    const shifted = `calc(${x} + ${dx}px) calc(${y} + ${dy}px)`;
+    el.style.setProperty("translate", z ? `${shifted} ${z}` : shifted);
+}
+
+/** Splits on spaces outside parentheses, so calc() stays whole. */
+function splitTopLevel(value: string): string[] {
+    const parts: string[] = [];
+    let depth = 0;
+    let part = "";
+    for (const ch of value.trim()) {
+        if (ch === "(") {
+            depth++;
+        } else if (ch === ")") {
+            depth--;
+        }
+        if (ch === " " && depth === 0) {
+            if (part) {
+                parts.push(part);
+            }
+            part = "";
+        } else {
+            part += ch;
+        }
+    }
+    if (part) {
+        parts.push(part);
+    }
+    return parts;
 }
 
 // ref. https://stackoverflow.com/questions/44698967/

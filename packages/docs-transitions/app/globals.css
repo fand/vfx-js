@@ -16,6 +16,14 @@
     --serif: var(--font-serif), Georgia, serif;
     --mono: var(--font-mono), ui-monospace, monospace;
 }
+/* The fallback capture can't use web fonts, so the home page uses the same system fonts. */
+/* Otherwise the hero changes layout during a transition. */
+:root[data-hic="off"] .frame:has(.hero) {
+    --sans: system-ui, sans-serif;
+    --serif: Georgia, serif;
+    --mono: ui-monospace, monospace;
+    font-family: var(--sans);
+}
 
 * {
     box-sizing: border-box;
@@ -747,8 +755,6 @@ em {
     letter-spacing: -0.01em;
     white-space: nowrap;
     cursor: pointer;
-    animation: carousel-edge linear both;
-    animation-timeline: view(inline);
     /* Grow with scale, not font-size, so the neighbors stay put. */
     transition:
         scale 0.15s ease,
@@ -767,10 +773,24 @@ em {
     outline: none;
 }
 .carousel-item[data-blink] {
-    animation:
-        carousel-edge linear both,
-        carousel-blink 0.1s step-end 3;
-    animation-timeline: view(inline), auto;
+    animation: carousel-blink 0.1s step-end 3;
+}
+/* Without scroll timelines the edge fade would stick at opacity 0, so skip it. */
+@supports (animation-timeline: view()) {
+    .carousel-item {
+        animation: carousel-edge linear both;
+        animation-timeline: view(inline);
+    }
+    .carousel-item[data-blink] {
+        animation:
+            carousel-edge linear both,
+            carousel-blink 0.1s step-end 3;
+        animation-timeline: view(inline), auto;
+    }
+}
+/* Shadows fade out during a run. See misdrawsShadows in hero-stage. */
+.hero[data-flat] :is(.btn, .carousel-item, .carousel-item[data-center]) {
+    box-shadow: none;
 }
 /* Only the label blinks; the background stays. */
 @keyframes carousel-blink {
