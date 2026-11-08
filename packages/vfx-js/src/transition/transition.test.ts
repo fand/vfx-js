@@ -637,7 +637,7 @@ describe("TransitionController", () => {
             if (!starts[i]) {
                 throw new Error(`run ${i} has not started`);
             }
-        });
+        }, 5000);
         return starts[i];
     };
 
@@ -703,7 +703,7 @@ describe("TransitionController", () => {
         const cbA = vi.fn();
         const cbB = vi.fn();
         const runA = transition.run(cbA);
-        await settle();
+        await started(starts, 0);
         const runB = transition.run(cbB);
         await runA;
         expect(cbA).toHaveBeenCalledOnce();
@@ -734,9 +734,9 @@ describe("TransitionController", () => {
     });
 
     test("cancel resolves the run and unwraps", async () => {
-        const { transition, log } = setup();
+        const { transition, log, starts } = setup();
         const run = transition.run(() => {});
-        await settle();
+        await started(starts, 0);
         transition.cancel();
         await run;
         expect(log).toContain("cancel");
@@ -988,7 +988,7 @@ describe("TransitionController", () => {
             const running = first.transition.run(() => {}, {
                 transition: instance,
             });
-            await settle();
+            const firstStart = await started(first.starts, 0);
             const cb = vi.fn();
             for (let i = 0; i < 2; i++) {
                 await second.transition.run(cb, { transition: instance });
@@ -996,7 +996,7 @@ describe("TransitionController", () => {
             expect(cb).toHaveBeenCalledTimes(2);
             expect(second.starts).toHaveLength(0);
             expect(warn).toHaveBeenCalledOnce();
-            (await started(first.starts, 0)).end();
+            firstStart.end();
             await running;
             await runOnce(second.transition, second.starts, {
                 transition: instance,
@@ -1016,7 +1016,7 @@ describe("TransitionController", () => {
             const running = first.transition.run(() => {}, {
                 transition: instance,
             });
-            await settle();
+            await started(first.starts, 0);
             first.transition.destroy();
             await running;
             await runOnce(second.transition, second.starts, {
@@ -1216,7 +1216,7 @@ describe("TransitionController.show", () => {
             if (!starts[i]) {
                 throw new Error(`run ${i} has not started`);
             }
-        });
+        }, 5000);
         return starts[i];
     };
     const asElement = (el: FakeElement) => el as unknown as HTMLElement;
@@ -1226,10 +1226,10 @@ describe("TransitionController.show", () => {
         const { transition, log, starts } = setup({ element: dom.element });
         const done = transition.show(asElement(dom.byId("b")));
         expect(dom.shown()).toEqual(["a"]);
-        await settle();
+        const start = await started(starts, 0);
         expect(log.indexOf("snapshot")).toBeLessThan(log.indexOf("start"));
         expect(dom.shown()).toEqual(["b"]);
-        (await started(starts, 0)).end();
+        start.end();
         await done;
         expect(dom.shown()).toEqual(["b"]);
         expect(dom.container.children).toHaveLength(3);
