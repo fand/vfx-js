@@ -6,72 +6,72 @@ export {
     type AsciiImageSource,
     type AsciiParams,
     type AsciiPresetName,
-} from "./ascii";
-export { BadJpegEffect, type BadJpegEffectOptions } from "./bad-jpeg";
-export { BloomEffect } from "./bloom";
-export { ChromaticEffect, type ChromaticParams } from "./chromatic";
+} from "./ascii.js";
+export { BadJpegEffect, type BadJpegEffectOptions } from "./bad-jpeg.js";
+export { BloomEffect } from "./bloom.js";
+export { ChromaticEffect, type ChromaticParams } from "./chromatic.js";
 export {
     ColoredEdgesEffect,
     type ColoredEdgesParams,
-} from "./colored-edges";
+} from "./colored-edges.js";
 export {
     type DatamoshColorSpace,
     DatamoshEffect,
     type DatamoshParams,
     type DatamoshView,
-} from "./datamosh";
-export { DitherEffect, type DitherParams, type DitherStyle } from "./dither";
-export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone";
-export { FluidEffect } from "./fluid";
-export { GlitchEffect, type GlitchParams } from "./glitch";
+} from "./datamosh.js";
+export { DitherEffect, type DitherParams, type DitherStyle } from "./dither.js";
+export { DuotoneEffect, type DuotoneParams, type Rgba } from "./duotone.js";
+export { FluidEffect } from "./fluid.js";
+export { GlitchEffect, type GlitchParams } from "./glitch.js";
 export {
     GradientMapEffect,
     type GradientMapMixSpace,
     type GradientMapParams,
     type GradientMapRepeat,
-} from "./gradient-map";
-export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone";
-export { HueShiftEffect, type HueShiftParams } from "./hue-shift";
-export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch";
-export { LightStreakEffect, type LightStreakParams } from "./light-streak";
+} from "./gradient-map.js";
+export { HalftoneEffect, type HalftoneInkPresetName } from "./halftone.js";
+export { HueShiftEffect, type HueShiftParams } from "./hue-shift.js";
+export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch.js";
+export { LightStreakEffect, type LightStreakParams } from "./light-streak.js";
 export {
     MATRIX_GLYPHS,
     type MatrixColor,
     MatrixEffect,
     type MatrixGlyphs,
     type MatrixParams,
-} from "./matrix";
-export { ParticleEffect } from "./particle";
-export { ParticleExplodeEffect } from "./particle-explode";
+} from "./matrix.js";
+export { ParticleEffect } from "./particle.js";
+export { ParticleExplodeEffect } from "./particle-explode.js";
 export {
     PatternRefractionEffect,
     type PatternRefractionParams,
     type RefractionEdgeWrap,
     type RefractionPattern,
-} from "./pattern-refraction";
+} from "./pattern-refraction.js";
 export {
     PixelStretchEffect,
     type PixelStretchParams,
-} from "./pixel-stretch";
-export { PixelateEffect } from "./pixelate";
+} from "./pixel-stretch.js";
+export { PixelateEffect } from "./pixelate.js";
 export {
     type PixelSortDirection,
     PixelSortEffect,
     type PixelSortKey,
     type PixelSortParams,
-} from "./pixelsort";
-export { RainbowEffect, type RainbowParams } from "./rainbow";
-export { RgbGlitchEffect, type RgbGlitchParams } from "./rgb-glitch";
-export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift";
-export { ScanlineEffect } from "./scanline";
-export { SinewaveEffect, type SinewaveParams } from "./sinewave";
-export { SliceShiftEffect, type SliceShiftParams } from "./slice-shift";
+} from "./pixelsort.js";
+export { RainbowEffect, type RainbowParams } from "./rainbow.js";
+export { RgbGlitchEffect, type RgbGlitchParams } from "./rgb-glitch.js";
+export { RgbShiftEffect, type RgbShiftParams } from "./rgb-shift.js";
+export { ScanlineEffect } from "./scanline.js";
+export { SinewaveEffect, type SinewaveParams } from "./sinewave.js";
+export { SliceShiftEffect, type SliceShiftParams } from "./slice-shift.js";
 export {
     TilePixelateEffect,
     type TilePixelateParams,
     type TilePixelateShape,
-} from "./tile-pixelate";
-export { TritoneEffect, type TritoneParams } from "./tritone";
-export { VignetteEffect, type VignetteParams } from "./vignette";
-export { VoronoiEffect } from "./voronoi";
-export { WarpEffect, type WarpParams, type WarpType } from "./warp";
+} from "./tile-pixelate.js";
+export { TritoneEffect, type TritoneParams } from "./tritone.js";
+export { VignetteEffect, type VignetteParams } from "./vignette.js";
+export { VoronoiEffect } from "./voronoi.js";
+export { WarpEffect, type WarpParams, type WarpType } from "./warp.js";

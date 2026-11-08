@@ -1,0 +1,62 @@
+{
+  "name": "@vfx-js/astro",
+  "description": "WebGL page transitions and element effects for Astro",
+  "version": "0.0.0",
+  "files": [
+    "package.json",
+    "README.md",
+    "env.d.ts",
+    "src/",
+    "!src/**/*.test.ts"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client/index.ts",
+    "./client/install": "./src/client/install.ts"
+  },
+  "scripts": {
+    "lint": "biome check . && tsc --noEmit",
+    "format": "biome check --write .",
+    "lint-staged": "lint-staged",
+    "test": "vitest --dir src --run",
+    "test:watch": "vitest --dir src"
+  },
+  "peerDependencies": {
+    "astro": ">=5"
+  },
+  "dependencies": {
+    "@vfx-js/core": "workspace:*",
+    "@vfx-js/transitions": "workspace:*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "astro": "^7.4.2",
+    "happy-dom": "21.0.4",
+    "lint-staged": "^17.6.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "biome check --no-errors-on-unmatched --files-ignore-unknown=true"
+    ]
+  },
+  "author": "Takayosi Amagi <fand.gmork@gmail.com> (https://amagi.dev/)",
+  "homepage": "https://amagi.dev/vfx-js",
+  "repository": {
+    "url": "https://github.com/fand/vfx-js"
+  },
+  "bugs": {
+    "url": "https://github.com/fand/vfx-js/issues"
+  },
+  "keywords": [
+    "astro",
+    "effects",
+    "glsl",
+    "shader",
+    "transition",
+    "webgl"
+  ],
+  "license": "MIT"
+}

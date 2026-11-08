@@ -4,7 +4,7 @@
 // `reach`. Ported (and reshaped) from Figma's "Pixel stretch" effect.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 import type { Effect, EffectContext } from "@vfx-js/core";
-import { GLSL_COMMON } from "./_figma-common";
+import { GLSL_COMMON } from "./_figma-common.js";
 
 const FRAG_PIXEL_STRETCH = `#version 300 es
 precision highp float;

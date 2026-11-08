@@ -1,5 +1,5 @@
 import { ShaderTransition } from "@vfx-js/core";
-import { IGN } from "./_shared";
+import { IGN } from "./_shared.js";
 
 /** Crossfade through a zoom blur toward the center that peaks halfway. */
 export class Crosszoom extends ShaderTransition {

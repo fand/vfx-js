@@ -1,0 +1,13 @@
+---
+import { Image } from "astro:assets";
+import gradient from "../assets/gradient.png";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout>
+    <section class="page">
+        <h1>Image</h1>
+        <p>An Image from astro:assets with a data-vfx attribute.</p>
+        <Image src={gradient} alt="" data-vfx='{"shader":"rgbShift"}' />
+    </section>
+</Layout>

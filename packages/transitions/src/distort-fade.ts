@@ -1,5 +1,5 @@
 import { ShaderTransition } from "@vfx-js/core";
-import { MIRROR } from "./_shared";
+import { MIRROR } from "./_shared.js";
 
 /** Simplex noise warps the content, peaking halfway, while crossfading. */
 export class DistortFade extends ShaderTransition {

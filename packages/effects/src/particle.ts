@@ -20,7 +20,7 @@ import {
     GLSL_CURL_NOISE,
     LIFE_JITTER_MAX,
     LIFE_JITTER_MIN,
-} from "./_curl-noise";
+} from "./_curl-noise.js";
 import {
     clampDt,
     FRAG_PARTICLE,
@@ -30,7 +30,7 @@ import {
     QUAD_VERTS,
     sanitizeCount,
     stateSizeFromCount,
-} from "./_particle-common";
+} from "./_particle-common.js";
 
 // State texture footprint: 4 internal buffers total (pos persistent =
 // 2 internal, color + vel single = 1 each) × stateSize² × 16 B =

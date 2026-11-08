@@ -14,6 +14,7 @@ This is a Turborepo monorepo with the following key packages:
 - `packages/react-vfx/` - Backward-compat wrapper re-exporting @vfx-js/react
 - `packages/vue/` - Vue bindings for transitions and element effects (@vfx-js/vue, with `@vfx-js/vue/nuxt`)
 - `packages/svelte/` - Svelte bindings for transitions and element effects (@vfx-js/svelte, with `@vfx-js/svelte/sveltekit`). Built with `svelte-package`, ESM only
+- `packages/astro/` - Astro components for transitions and element effects (@vfx-js/astro, with `@vfx-js/astro/client`). Ships source, no build
 - `packages/docs/` - Documentation website and demos
 - `packages/storybook/` - Component stories and visual tests
 - `packages/effects/` - Additional effect implementations
@@ -38,7 +39,7 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 - `pnpm --filter docs test` fails when the skill misses a public export.
 
 ### Testing
-- `pnpm test` - Run tests in every package that has them (core, transitions, react, react-vfx, vue, svelte)
+- `pnpm test` - Run tests in every package that has them (core, transitions, react, react-vfx, vue, svelte, astro)
 - `pnpm --filter @vfx-js/core run test:watch` - Run tests in watch mode
 
 ### Package-specific Development

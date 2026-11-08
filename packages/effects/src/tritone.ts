@@ -2,7 +2,7 @@
 // cycle. Ported from the `tritone` shader preset.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 import type { Effect, EffectContext } from "@vfx-js/core";
-import type { Rgba } from "./duotone";
+import type { Rgba } from "./duotone.js";
 
 const FRAG_TRITONE = `#version 300 es
 precision highp float;

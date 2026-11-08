@@ -1,9 +1,11 @@
 ---
+import { TransitionIn } from "@vfx-js/astro";
 import PageView from "../components/PageView.astro";
 import Layout from "../layouts/Layout.astro";
 ---
 
 <Layout>
+    <TransitionIn transition="glitch" />
     <PageView path="/about" />
 </Layout>
 

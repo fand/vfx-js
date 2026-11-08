@@ -294,6 +294,54 @@ useTransitionIn({ transition: Glitch });
         ],
     },
     {
+        id: "astro",
+        name: "Astro",
+        install: "npm i @vfx-js/core @vfx-js/astro @vfx-js/transitions",
+        intro: "Put <VFXTransition> from @vfx-js/astro around the layout's <slot />. It hooks into <ClientRouter> and holds each navigation until the old page is captured. Each page picks its transition with <TransitionIn>.",
+        snippets: [
+            {
+                label: "src/layouts/Layout.astro",
+                code: `
+---
+import { ClientRouter } from "astro:transitions";
+import { VFXTransition } from "@vfx-js/astro";
+---
+
+<!-- The shader is the animation, so turn off the view transition. -->
+<html lang="en" transition:animate="none">
+  <head><ClientRouter /></head>
+  <body>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/gallery" data-vfx-transition="swipe">Gallery</a>
+    </nav>
+    <VFXTransition transition="crossfade" duration={0.8}>
+      <slot />
+    </VFXTransition>
+  </body>
+</html>`,
+            },
+            {
+                label: "src/pages/about.astro",
+                code: `
+---
+import { TransitionIn } from "@vfx-js/astro";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout>
+  <TransitionIn transition="glitch" />
+  <h1>About</h1>
+</Layout>`,
+            },
+        ],
+        notes: [
+            "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
+            "Transitions are names: the class names from @vfx-js/transitions in lowercase. Register your own with registerVFX from @vfx-js/astro/client.",
+            "A link's data-vfx-transition wins over the page's <TransitionIn>. Back plays the winning spec reversed.",
+        ],
+    },
+    {
         id: "vanilla",
         name: "Vanilla",
         install: "npm i @vfx-js/core @vfx-js/transitions",

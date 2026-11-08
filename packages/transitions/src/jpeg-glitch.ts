@@ -1,6 +1,6 @@
 import type { TransitionEffect, TransitionEffectContext } from "@vfx-js/core";
 import { JPEGGlitchEffect } from "@vfx-js/effects";
-import { HardCut, StagedTransition } from "./_shared";
+import { HardCut, StagedTransition } from "./_shared.js";
 
 export type JpegGlitchParams = {
     /** Glitch passes at the peak. Default 4. */

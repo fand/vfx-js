@@ -1,0 +1,14 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import { type ElementProps, splitProps, toAttr } from "../client/attr";
+
+type Props = ElementProps & HTMLAttributes<"p">;
+
+const [effect, rest] = splitProps(Astro.props);
+---
+
+<p {...rest} data-vfx={toAttr(effect)}><slot /></p>
+
+<script>
+    import "../client/install";
+</script>
