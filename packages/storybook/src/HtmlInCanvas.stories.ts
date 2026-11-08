@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import { VFXCanvas, VFXProvider } from "@vfx-js/react";
 import React from "react";
 import { createRoot } from "react-dom/client";
+import Jellyfish from "./assets/jellyfish.webp";
 import { Timer } from "./Timer";
 import { initVFX } from "./utils";
 
@@ -280,5 +281,117 @@ export const ReactVFXCanvas: StoryObj = {
                 ),
             ),
         );
+    },
+};
+
+// Inset-sized absolute target with auto width/height.
+const insetSizedCss = `
+.inset-box {
+    position: relative;
+    display: inline-block;
+    width: 360px;
+    height: 220px;
+    margin-right: 32px;
+    background: #333;
+}
+.inset-target {
+    position: absolute;
+    inset: 24px;
+    border: 8px solid #fc4;
+    background: #246;
+    padding: 12px;
+    font-weight: bold;
+}
+`;
+
+export const InsetSized: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "margin: 96px 16px; font-family:sans-serif; color:white";
+        const style = document.createElement("style");
+        style.textContent = insetSizedCss;
+        container.appendChild(style);
+
+        for (const [id, label] of [
+            ["inset-sized-ref", "REFERENCE"],
+            ["inset-sized-target", "WITH addHTML"],
+        ]) {
+            const box = document.createElement("div");
+            box.className = "inset-box";
+            box.innerHTML = `
+                <div id="${id}" class="inset-target">
+                    ${label}
+                </div>
+            `;
+            container.appendChild(box);
+        }
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        setupHIC(qs(canvasElement, "#inset-sized-target"), "none");
+    },
+};
+
+// Percent vertical margins resolve against the containing block width.
+export const InsetSizedPercentMargin: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "margin: 96px 16px; font-family:sans-serif; color:white";
+
+        const targetCss =
+            "position:absolute; top:0; bottom:0; left:0; right:0; margin:5% 0; background:linear-gradient(90deg,#284,#28a); font-weight:bold; padding:8px";
+
+        for (const [id, label] of [
+            ["percent-margin-ref", "REFERENCE"],
+            ["percent-margin-target", "WITH addHTML"],
+        ]) {
+            const box = document.createElement("div");
+            box.style.cssText =
+                "position:relative; width:600px; height:200px; margin-bottom:32px; outline:1px solid #888";
+            const target = document.createElement("div");
+            target.id = id;
+            target.style.cssText = targetCss;
+            target.textContent = label;
+            box.appendChild(target);
+            container.appendChild(box);
+        }
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        setupHIC(qs(canvasElement, "#percent-margin-target"), solidShader);
+    },
+};
+
+// A replaced element with `inset: 0` keeps its intrinsic size.
+export const InsetReplacedElement: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "margin: 96px 16px; font-family:sans-serif; color:white";
+
+        for (const id of ["replaced-ref", "replaced-target"]) {
+            const box = document.createElement("div");
+            box.style.cssText =
+                "position:relative; width:900px; height:500px; margin-bottom:32px; outline:1px solid #888";
+            const img = document.createElement("img");
+            img.id = id;
+            img.src = Jellyfish;
+            img.style.cssText = "position:absolute; inset:0";
+            box.appendChild(img);
+            container.appendChild(box);
+        }
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        const img = qs<HTMLImageElement>(canvasElement, "#replaced-target");
+        await img.decode();
+        setupHIC(img, solidShader);
     },
 };

@@ -84,6 +84,19 @@ const MARGIN_PROPS = [
     "margin-left",
 ] as const;
 
+// Elements with an intrinsic size; insets don't stretch them.
+const REPLACED_TAGS = new Set([
+    "IMG",
+    "VIDEO",
+    "CANVAS",
+    "IFRAME",
+    "EMBED",
+    "OBJECT",
+    "INPUT",
+    "TEXTAREA",
+    "SELECT",
+]);
+
 const POSITION_FLOW_STYLES = [
     "position",
     "top",
@@ -119,11 +132,15 @@ const childResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
 const savedMargins = new WeakMap<HTMLElement, string>();
 const savedWidths = new WeakMap<HTMLElement, string>();
 const savedBoxSizing = new WeakMap<HTMLElement, string>();
+const savedPositions = new WeakMap<HTMLElement, string>();
+const savedHeights = new WeakMap<HTMLElement, string>();
 const imageRestorers = new WeakMap<HTMLCanvasElement, () => void>();
 const addedDrawable = new WeakSet<HTMLElement>();
 const stillCovers = new WeakMap<HTMLCanvasElement, () => void>();
 const captureWaiters = new WeakMap<HTMLCanvasElement, Set<() => void>>();
 const lockedCanvases = new WeakSet<HTMLCanvasElement>();
+// Canvases whose height comes from top/bottom insets, not the child.
+const insetHeightCanvases = new WeakSet<HTMLCanvasElement>();
 
 const CAPTURE_TIMEOUT_MS = 300;
 
@@ -219,7 +236,7 @@ export function lockCanvasSize(canvas: HTMLCanvasElement): () => void {
         canvas.style.height = height;
         canvas.style.overflow = overflow;
         const child = canvas.firstElementChild;
-        if (child) {
+        if (child && !insetHeightCanvases.has(canvas)) {
             const childHeight = Math.round(
                 child.getBoundingClientRect().height,
             );
@@ -374,7 +391,7 @@ export async function setupCapture(
     const child = canvas.firstElementChild as HTMLElement | null;
     if (child) {
         const childRO = new ResizeObserver((entries) => {
-            if (lockedCanvases.has(canvas)) {
+            if (lockedCanvases.has(canvas) || insetHeightCanvases.has(canvas)) {
                 return;
             }
             const box = entries[0].borderBoxSize?.[0];
@@ -418,6 +435,74 @@ export function teardownCapture(canvas: HTMLCanvasElement): void {
     }
 }
 
+interface InsetSizing {
+    /** `calc()` width from left/right insets, or null. */
+    width: string | null;
+    /** `calc()` height from top/bottom insets, or null. */
+    height: string | null;
+}
+
+/**
+ * Find a fixed/absolute element sized by its insets (e.g. `inset: 10px`
+ * with auto width/height). A canvas won't stretch that way, so it needs
+ * an explicit size. Uses computed values since getComputedStyle gives px.
+ */
+function getInsetSizing(element: HTMLElement): InsetSizing {
+    const none = { width: null, height: null };
+    if (
+        typeof element.computedStyleMap !== "function" ||
+        REPLACED_TAGS.has(element.tagName)
+    ) {
+        return none;
+    }
+    const styles = element.computedStyleMap();
+    const value = (prop: string) => styles.get(prop)?.toString() ?? "auto";
+    const position = value("position");
+    if (position !== "fixed" && position !== "absolute") {
+        return none;
+    }
+    const sizeFromInsets = (
+        size: string,
+        start: string,
+        end: string,
+    ): string | null => {
+        const startInset = value(start);
+        const endInset = value(end);
+        if (
+            value(size) !== "auto" ||
+            startInset === "auto" ||
+            endInset === "auto"
+        ) {
+            return null;
+        }
+        // Auto margins resolve to 0 here, so only subtract set ones.
+        const margins = [`margin-${start}`, `margin-${end}`]
+            .map((prop) => {
+                const margin = value(prop);
+                // Vertical % margins use the width, so pin them to px; they won't track resizes.
+                if (size === "height" && margin.includes("%")) {
+                    return getComputedStyle(element).getPropertyValue(prop);
+                }
+                return margin;
+            })
+            .filter((margin) => margin !== "auto");
+        return `calc(${["100%", startInset, endInset, ...margins].join(" - ")})`;
+    };
+    return {
+        width: sizeFromInsets("width", "left", "right"),
+        height: sizeFromInsets("height", "top", "bottom"),
+    };
+}
+
+/** A replaced element with `width: auto` keeps its intrinsic width. */
+function hasIntrinsicWidth(element: HTMLElement): boolean {
+    return (
+        REPLACED_TAGS.has(element.tagName) &&
+        typeof element.computedStyleMap === "function" &&
+        element.computedStyleMap().get("width")?.toString() === "auto"
+    );
+}
+
 interface WrapOpts extends CaptureOpts {
     /** Cover the wrap frame with a still copy at this z-index. */
     stillCover?: { zIndex: number };
@@ -448,6 +533,7 @@ export async function wrapElement(
     opts: WrapOpts,
 ): Promise<WrapResult> {
     const rect = element.getBoundingClientRect();
+    const insetSizing = getInsetSizing(element);
 
     const canvas = document.createElement("canvas");
     if (!element.hasAttribute("drawable")) {
@@ -485,14 +571,24 @@ export async function wrapElement(
 
     // Full-width target → 100% (tracks resizes); explicit px width → pinned
     // border-box (constant, reflow-safe). Content-sized unsupported (see docs).
-    if (element.style.width.endsWith("px")) {
+    // Inset-sized target → size from the insets, since a canvas won't stretch.
+    // Intrinsic-width replaced element → pinned too.
+    if (insetSizing.width) {
+        canvas.style.setProperty("width", insetSizing.width);
+    } else if (
+        element.style.width.endsWith("px") ||
+        hasIntrinsicWidth(element)
+    ) {
         canvas.style.setProperty("width", `${rect.width}px`);
     } else {
         canvas.style.setProperty("width", "100%");
     }
     // Replaced element — height doesn't derive from children, so seed an
     // explicit border-box height. setupCapture's child RO keeps it in sync.
-    if (!canvas.style.height) {
+    if (insetSizing.height) {
+        canvas.style.setProperty("height", insetSizing.height);
+        insetHeightCanvases.add(canvas);
+    } else if (!canvas.style.height) {
         canvas.style.setProperty("height", `${rect.height}px`);
     }
 
@@ -526,6 +622,16 @@ export async function wrapElement(
     // Force 100% so the element matches the canvas's CSS dimensions.
     element.style.setProperty("width", "100%");
     element.style.setProperty("box-sizing", "border-box");
+
+    // The canvas now carries the insets, so the element just fills it.
+    if (insetSizing.width || insetSizing.height) {
+        savedPositions.set(element, element.style.position);
+        element.style.setProperty("position", "static");
+    }
+    if (insetSizing.height) {
+        savedHeights.set(element, element.style.height);
+        element.style.setProperty("height", "100%");
+    }
 
     // Cross-origin images
     const restore = await inlineCrossOriginImages(element);
@@ -579,5 +685,15 @@ export function unwrapElement(
     if (savedBS !== undefined) {
         element.style.boxSizing = savedBS;
         savedBoxSizing.delete(element);
+    }
+    const savedPosition = savedPositions.get(element);
+    if (savedPosition !== undefined) {
+        element.style.position = savedPosition;
+        savedPositions.delete(element);
+    }
+    const savedHeight = savedHeights.get(element);
+    if (savedHeight !== undefined) {
+        element.style.height = savedHeight;
+        savedHeights.delete(element);
     }
 }
