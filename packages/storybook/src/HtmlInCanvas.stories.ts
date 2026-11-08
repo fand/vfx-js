@@ -353,3 +353,36 @@ export const InsetSizedWithChildren: StoryObj = {
         setupHIC(qs(canvasElement, "#inset-children-target"), "none");
     },
 };
+
+// Percent vertical margins resolve against the containing block width.
+export const InsetSizedPercentMargin: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "margin: 96px 16px; font-family:sans-serif; color:white";
+
+        const targetCss =
+            "position:absolute; top:0; bottom:0; left:0; right:0; margin:5% 0; background:linear-gradient(90deg,#284,#28a); font-weight:bold; padding:8px";
+
+        for (const [id, label] of [
+            ["percent-margin-ref", "REFERENCE"],
+            ["percent-margin-target", "WITH addHTML"],
+        ]) {
+            const box = document.createElement("div");
+            box.style.cssText =
+                "position:relative; width:600px; height:200px; margin-bottom:32px; outline:1px solid #888";
+            const target = document.createElement("div");
+            target.id = id;
+            target.style.cssText = targetCss;
+            target.textContent = label;
+            box.appendChild(target);
+            container.appendChild(box);
+        }
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        setupHIC(qs(canvasElement, "#percent-margin-target"), solidShader);
+    },
+};
