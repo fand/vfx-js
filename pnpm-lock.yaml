@@ -269,15 +269,9 @@ importers:
       '@vfx-js/astro':
         specifier: workspace:*
         version: link:../../astro
-      '@vfx-js/core':
-        specifier: workspace:*
-        version: link:../../vfx-js
       '@vfx-js/testbed-shared':
         specifier: workspace:*
         version: link:../shared
-      '@vfx-js/transitions':
-        specifier: workspace:*
-        version: link:../../transitions
       astro:
         specifier: ^7.4.2
         version: 7.4.2(@types/node@26.6.5)(aws4fetch@1.0.20)(db0@0.3.4(better-sqlite3@13.0.3)(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261028.1)(better-sqlite3@13.0.3)(kysely@0.29.7)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1))(mysql2@3.24.6(@types/node@26.6.5)))(esbuild@0.28.2)(ioredis@5.11.1)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)

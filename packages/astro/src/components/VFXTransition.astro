@@ -1,0 +1,52 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import { type TransitionProps, toAttr } from "../client/props";
+
+type Props = TransitionProps &
+    HTMLAttributes<"div"> & {
+        /** Size the target to the viewport height. Default `true`; `false` leaves sizing to your CSS. */
+        fullscreen?: boolean;
+    };
+
+const {
+    transition,
+    params,
+    reverse,
+    duration,
+    overflow,
+    ease,
+    keepWrapped,
+    waitFor,
+    fullscreen = true,
+    style,
+    ...rest
+} = Astro.props;
+
+// Pages share one viewport-sized box and scroll inside it.
+const FILL_STYLE = "height:100dvh;overflow:hidden;";
+const spec = toAttr({
+    transition,
+    params,
+    reverse,
+    duration,
+    overflow,
+    ease,
+    keepWrapped,
+    waitFor,
+});
+---
+
+<div
+    {...rest}
+    data-vfx-transition-target={spec}
+    style={fullscreen ? `${FILL_STYLE}${style ?? ""}` : style}
+>
+    <slot />
+</div>
+
+<script>
+    import { swapFunctions } from "astro:transitions/client";
+    import { installTransition } from "../client/transition";
+
+    installTransition({ swapFunctions });
+</script>

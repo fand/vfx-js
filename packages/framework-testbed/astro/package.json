@@ -10,9 +10,7 @@
   },
   "dependencies": {
     "@vfx-js/astro": "workspace:*",
-    "@vfx-js/core": "workspace:*",
     "@vfx-js/testbed-shared": "workspace:*",
-    "@vfx-js/transitions": "workspace:*",
     "astro": "^7.4.2"
   },
   "devDependencies": {

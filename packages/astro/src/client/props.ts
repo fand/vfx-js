@@ -1,5 +1,16 @@
-import type { ShaderPreset, VFXProps } from "@vfx-js/core";
-import { resolveShader, resolveUniforms } from "./registry";
+import type {
+    AddTransitionOpts,
+    RunOpts,
+    ShaderPreset,
+    TransitionEase,
+    VFXProps,
+} from "@vfx-js/core";
+import {
+    resolveEase,
+    resolveShader,
+    resolveTransition,
+    resolveUniforms,
+} from "./registry";
 
 const LOG_PREFIX = "[@vfx-js/astro]";
 
@@ -39,7 +50,7 @@ export function splitProps<T extends ElementProps>(
 }
 
 /** The `data-vfx` value. Drops undefined fields. */
-export function toAttr(props: ElementProps): string {
+export function toAttr(props: ElementProps | TransitionProps): string {
     return JSON.stringify(props);
 }
 
@@ -92,4 +103,88 @@ export function fromAttr(attr: string): Parsed {
     }
 
     return { props };
+}
+
+/** A run spec that fits in an HTML attribute. */
+export type RunProps = {
+    /** A built-in name like `"swipe"`, or a registered one. */
+    transition?: string;
+    /** Constructor params of the transition class. */
+    params?: Record<string, unknown>;
+    reverse?: boolean;
+    /** Seconds. */
+    duration?: number;
+    overflow?: true | number;
+    /** `"smoothstep"`, `"linear"`, or a registered ease. */
+    ease?: string;
+};
+
+/** Options of `<VFXTransition>`. */
+export type TransitionProps = RunProps & {
+    keepWrapped?: boolean;
+    waitFor?: "media" | "none";
+};
+
+function toEase(name: string): TransitionEase | undefined {
+    if (name === "smoothstep" || name === "linear") {
+        return name;
+    }
+    const ease = resolveEase(name);
+    if (!ease) {
+        console.warn(`${LOG_PREFIX} Unknown ease: ${name}`);
+    }
+    return ease;
+}
+
+/**
+ * Parse a transition attribute: a JSON object or a bare transition name.
+ * Unknown names are dropped with a warning. Null when invalid.
+ */
+export function fromTransitionAttr(attr: string): AddTransitionOpts | null {
+    const text = attr.trim();
+    let parsed: unknown;
+    if (text.startsWith("{")) {
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            console.error(
+                `${LOG_PREFIX} Transition spec is not valid JSON:`,
+                attr,
+            );
+            return null;
+        }
+    } else {
+        parsed = { transition: text };
+    }
+    if (typeof parsed !== "object" || parsed === null) {
+        return null;
+    }
+
+    const { transition, ease, ...rest } = parsed as TransitionProps;
+    const opts: AddTransitionOpts = rest as AddTransitionOpts;
+    if (transition) {
+        const resolved = resolveTransition(transition);
+        if (resolved) {
+            opts.transition = resolved;
+        } else {
+            console.warn(`${LOG_PREFIX} Unknown transition: ${transition}`);
+        }
+    }
+    if (ease) {
+        const resolved = toEase(ease);
+        if (resolved) {
+            opts.ease = resolved;
+        }
+    }
+    return opts;
+}
+
+/** Link spec, else page spec, else none. Back navigation plays in reverse. */
+export function pickRunOpts(
+    link: RunOpts | null,
+    page: RunOpts | null,
+    back: boolean,
+): RunOpts {
+    const spec = link ?? page ?? {};
+    return back ? { ...spec, reverse: true } : spec;
 }
