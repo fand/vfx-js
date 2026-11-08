@@ -282,3 +282,74 @@ export const ReactVFXCanvas: StoryObj = {
         );
     },
 };
+
+// Inset-sized fixed/absolute target with abs children and a negative z-index layer.
+const insetChildrenCss = `
+.inset-box {
+    position: relative;
+    display: inline-block;
+    width: 360px;
+    height: 220px;
+    margin-right: 32px;
+    background: #333;
+}
+.inset-target {
+    position: absolute;
+    inset: 24px;
+    border: 8px solid #fc4;
+    border-radius: 24px;
+    overflow: hidden;
+    z-index: 1;
+    background: #246;
+    padding: 12px;
+    font-weight: bold;
+}
+.inset-target::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: repeating-linear-gradient(45deg, #f448 0 10px, transparent 10px 20px);
+}
+.inset-badge {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #e33;
+}
+`;
+
+export const InsetSizedWithChildren: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "margin: 96px 16px; font-family:sans-serif; color:white";
+        const style = document.createElement("style");
+        style.textContent = insetChildrenCss;
+        container.appendChild(style);
+
+        for (const [id, label] of [
+            ["inset-children-ref", "REFERENCE"],
+            ["inset-children-target", "WITH addHTML"],
+        ]) {
+            const box = document.createElement("div");
+            box.className = "inset-box";
+            box.innerHTML = `
+                <div id="${id}" class="inset-target">
+                    ${label}
+                    <div class="inset-badge"></div>
+                </div>
+            `;
+            container.appendChild(box);
+        }
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        setupHIC(qs(canvasElement, "#inset-children-target"), "none");
+    },
+};
