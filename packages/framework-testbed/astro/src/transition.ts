@@ -3,7 +3,8 @@ import {
     type TransitionBeforePreparationEvent,
     type TransitionBeforeSwapEvent,
 } from "astro:transitions/client";
-import { type RunOpts, VFX } from "@vfx-js/core";
+import { getVFX } from "@vfx-js/astro/client";
+import type { RunOpts } from "@vfx-js/core";
 import { presets } from "@vfx-js/testbed-shared/transitions";
 import { Swipe } from "@vfx-js/transitions";
 
@@ -15,9 +16,10 @@ const back = { transition: Swipe, reverse: true };
 // The swap only replaces `<nav>` and `<main>`, so the VFX canvas and the
 // transition target stay in the document.
 export function setupTransition() {
-    const vfx = new VFX();
+    // Share the VFX with the element effects.
+    const vfx = getVFX();
     const outlet = document.querySelector<HTMLElement>("main.outlet");
-    if (!outlet) {
+    if (!vfx || !outlet) {
         return;
     }
     const t = vfx.addTransition(outlet, {

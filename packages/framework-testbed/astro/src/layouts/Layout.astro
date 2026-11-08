@@ -34,7 +34,18 @@ const page = pages.find((p) => p.path === current);
             <slot />
         </main>
         <script>
+            import { registerVFX } from "@vfx-js/astro/client";
             import { setupTransition } from "../transition";
+
+            let pointer: [number, number] = [1, 1];
+            window.addEventListener("pointermove", (e) => {
+                pointer = [
+                    e.clientX / window.innerWidth,
+                    e.clientY / window.innerHeight,
+                ];
+            });
+            registerVFX({ uniforms: { pointer: { pointer: () => pointer } } });
+
             setupTransition();
         </script>
     </body>

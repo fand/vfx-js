@@ -1,4 +1,5 @@
 ---
+import { VFXImg } from "@vfx-js/astro";
 import { findPage } from "@vfx-js/testbed-shared";
 
 const page = findPage(Astro.props.path);
@@ -11,9 +12,15 @@ const page = findPage(Astro.props.path);
         page.images.length > 0 && (
             <div class="grid">
                 {page.images.map((src) => (
-                    <img src={src} alt="" crossorigin="anonymous" />
+                    <VFXImg
+                        src={src}
+                        alt=""
+                        crossorigin="anonymous"
+                        shader="rgbShift"
+                    />
                 ))}
             </div>
         )
     }
+    <slot />
 </section>

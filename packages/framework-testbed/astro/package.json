@@ -6,15 +6,17 @@
     "dev": "astro dev",
     "build:demo": "astro build",
     "preview": "astro preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "astro check"
   },
   "dependencies": {
+    "@vfx-js/astro": "workspace:*",
     "@vfx-js/core": "workspace:*",
     "@vfx-js/testbed-shared": "workspace:*",
     "@vfx-js/transitions": "workspace:*",
     "astro": "^7.4.2"
   },
   "devDependencies": {
+    "@astrojs/check": "0.9.12",
     "typescript": "6.0.3"
   }
 }
