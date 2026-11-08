@@ -58,14 +58,13 @@
     "test:watch": "vitest --dir src"
   },
   "peerDependencies": {
+    "@vfx-js/core": "workspace:^",
     "vue": "^3.5.0"
-  },
-  "dependencies": {
-    "@vfx-js/core": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
     "@types/node": "26.6.5",
+    "@vfx-js/core": "workspace:*",
     "happy-dom": "21.0.4",
     "lint-staged": "^17.6.0",
     "npm-run-all2": "^9.0.4",

@@ -64,7 +64,7 @@ const UsageSection: React.FC = () => (
     <>
         <section>
             <h2 id="install">Install</h2>
-            <code>npm i @vfx-js/react</code>
+            <code>npm i @vfx-js/core @vfx-js/react</code>
 
             <p>
                 See{" "}
