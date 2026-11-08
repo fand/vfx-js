@@ -656,7 +656,16 @@ export class EffectHost {
             texture.dispose();
         };
 
-        return makeEffectTexture(() => texture, getW, getH, dispose);
+        // Raw handles hold no source to re-upload from.
+        const update = isRawHandle
+            ? undefined
+            : () => {
+                  if (!disposed) {
+                      texture.needsUpdate = true;
+                  }
+              };
+
+        return makeEffectTexture(() => texture, getW, getH, dispose, update);
     }
 
     #perFrameAutoUpdate: (() => void)[] = [];
@@ -958,6 +967,7 @@ export function makeEffectTexture(
     width: () => number,
     height: () => number,
     dispose?: () => void,
+    update?: () => void,
 ): EffectTextureInternal {
     const handle = {
         __brand: "EffectTexture",
@@ -970,6 +980,9 @@ export function makeEffectTexture(
         // Framework-owned handles pass no disposer and ignore the call.
         dispose() {
             dispose?.();
+        },
+        update() {
+            update?.();
         },
     } as EffectTextureInternal;
     Object.defineProperty(handle, RESOLVE_TEXTURE, { value: resolve });

@@ -568,6 +568,13 @@ export type EffectTexture = {
     readonly height: number;
     readonly __brand: "EffectTexture";
     dispose(): void;
+
+    /**
+     * Re-upload from the source on the next draw.
+     * Use it with `autoUpdate: false` when the source changes now and then.
+     * No-op for framework-owned textures and wrapped `WebGLTexture`s.
+     */
+    update(): void;
 };
 
 /**
@@ -859,6 +866,7 @@ export type EffectContext = {
      * `autoUpdate` defaults to `true` for `HTMLVideoElement`,
      * `HTMLCanvasElement`, and `OffscreenCanvas`, and `false` for
      * everything else.
+     * With `autoUpdate: false`, call `texture.update()` after the source changes.
      */
     wrapTexture(
         source: EffectTextureSource,
