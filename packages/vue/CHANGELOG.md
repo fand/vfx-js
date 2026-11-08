@@ -1,5 +1,12 @@
 # @vfx-js/vue
 
+## 0.2.0
+
+### Minor Changes
+
+- 5019a24: Move `@vfx-js/core` to `peerDependencies`, so apps load only one copy of core.
+  Install `@vfx-js/core` with the binding: `npm i @vfx-js/core @vfx-js/vue`.
+
 ## 0.1.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @vfx-js/effects
 
+## 1.4.3
+
+### Patch Changes
+
+- 713dac9: Add `.js` to relative imports so Node can load the ESM build without a bundler.
+
 ## 1.4.2
 
 ### Patch Changes

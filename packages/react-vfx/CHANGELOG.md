@@ -1,5 +1,17 @@
 # react-vfx
 
+## 1.0.6
+
+### Patch Changes
+
+- 5019a24: Move `@vfx-js/core` to `peerDependencies`, so apps load only one copy of core.
+  Install `@vfx-js/core` with the binding: `npm i @vfx-js/core @vfx-js/react`.
+- Updated dependencies [5019a24]
+- Updated dependencies [6e91576]
+- Updated dependencies [6e91576]
+  - @vfx-js/react@1.4.0
+  - @vfx-js/core@1.5.0
+
 ## 1.0.5
 
 ### Patch Changes

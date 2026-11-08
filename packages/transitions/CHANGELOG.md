@@ -1,5 +1,13 @@
 # @vfx-js/transitions
 
+## 0.1.1
+
+### Patch Changes
+
+- 713dac9: Add `.js` to relative imports so Node can load the ESM build without a bundler.
+- Updated dependencies [713dac9]
+  - @vfx-js/effects@1.4.3
+
 ## 0.1.0
 
 ### Minor Changes

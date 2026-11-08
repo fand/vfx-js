@@ -1,5 +1,15 @@
 # react-vfx
 
+## 1.5.0
+
+### Minor Changes
+
+- 6e91576: Add `slideSpec` to `addTransition` to set how each slide enters with `show()`.
+
+### Patch Changes
+
+- 6e91576: Fix an error thrown when a wrapped element is hidden with `display: none`.
+
 ## 1.4.0
 
 ### Minor Changes
