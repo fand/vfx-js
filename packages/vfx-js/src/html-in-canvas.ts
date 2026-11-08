@@ -84,6 +84,19 @@ const MARGIN_PROPS = [
     "margin-left",
 ] as const;
 
+// Elements with an intrinsic size; insets don't stretch them.
+const REPLACED_TAGS = new Set([
+    "IMG",
+    "VIDEO",
+    "CANVAS",
+    "IFRAME",
+    "EMBED",
+    "OBJECT",
+    "INPUT",
+    "TEXTAREA",
+    "SELECT",
+]);
+
 const POSITION_FLOW_STYLES = [
     "position",
     "top",
@@ -436,7 +449,10 @@ interface InsetSizing {
  */
 function getInsetSizing(element: HTMLElement): InsetSizing {
     const none = { width: null, height: null };
-    if (typeof element.computedStyleMap !== "function") {
+    if (
+        typeof element.computedStyleMap !== "function" ||
+        REPLACED_TAGS.has(element.tagName)
+    ) {
         return none;
     }
     const styles = element.computedStyleMap();
@@ -476,6 +492,15 @@ function getInsetSizing(element: HTMLElement): InsetSizing {
         width: sizeFromInsets("width", "left", "right"),
         height: sizeFromInsets("height", "top", "bottom"),
     };
+}
+
+/** A replaced element with `width: auto` keeps its intrinsic width. */
+function hasIntrinsicWidth(element: HTMLElement): boolean {
+    return (
+        REPLACED_TAGS.has(element.tagName) &&
+        typeof element.computedStyleMap === "function" &&
+        element.computedStyleMap().get("width")?.toString() === "auto"
+    );
 }
 
 interface WrapOpts extends CaptureOpts {
@@ -547,9 +572,13 @@ export async function wrapElement(
     // Full-width target → 100% (tracks resizes); explicit px width → pinned
     // border-box (constant, reflow-safe). Content-sized unsupported (see docs).
     // Inset-sized target → size from the insets, since a canvas won't stretch.
+    // Intrinsic-width replaced element → pinned too.
     if (insetSizing.width) {
         canvas.style.setProperty("width", insetSizing.width);
-    } else if (element.style.width.endsWith("px")) {
+    } else if (
+        element.style.width.endsWith("px") ||
+        hasIntrinsicWidth(element)
+    ) {
         canvas.style.setProperty("width", `${rect.width}px`);
     } else {
         canvas.style.setProperty("width", "100%");

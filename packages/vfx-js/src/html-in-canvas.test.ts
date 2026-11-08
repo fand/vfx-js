@@ -112,6 +112,7 @@ function fakeNode(tag: string) {
     });
     const node = {
         tag,
+        tagName: tag.toUpperCase(),
         className: "",
         scrollTop: 0,
         scrollLeft: 0,
@@ -272,6 +273,29 @@ describe("wrapElement", () => {
         expect(canvasStyle().height).toBe(
             "calc(100% - 0px - 0px - 30px - 30px)",
         );
+    });
+
+    test("keeps a replaced element at its own size", () => {
+        element.tagName = "IMG";
+        stubComputed({
+            position: "absolute",
+            top: "0px",
+            right: "0px",
+            bottom: "0px",
+            left: "0px",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("10px");
+        expect(canvasStyle().height).toBe("10px");
+        expect(element.style.position).toBe("");
+        expect(element.style.height).toBe("");
+    });
+
+    test("keeps 100% for a replaced element with a set width", () => {
+        element.tagName = "IMG";
+        stubComputed({ position: "static", width: "100%" });
+        wrap({});
+        expect(canvasStyle().width).toBe("100%");
     });
 
     test("leaves a non-positioned element as is", () => {
