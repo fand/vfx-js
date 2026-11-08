@@ -1,12 +1,13 @@
 {
   "name": "@vfx-js/astro",
-  "description": "WebGL effects and page transitions for Astro",
+  "description": "WebGL page transitions and element effects for Astro",
   "version": "0.0.0",
   "files": [
     "package.json",
     "README.md",
     "env.d.ts",
-    "src/"
+    "src/",
+    "!src/**/*.test.ts"
   ],
   "type": "module",
   "exports": {
@@ -51,7 +52,9 @@
   },
   "keywords": [
     "astro",
+    "effects",
     "glsl",
+    "shader",
     "transition",
     "webgl"
   ],

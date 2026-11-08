@@ -14,7 +14,7 @@ This is a Turborepo monorepo with the following key packages:
 - `packages/react-vfx/` - Backward-compat wrapper re-exporting @vfx-js/react
 - `packages/vue/` - Vue bindings for transitions and element effects (@vfx-js/vue, with `@vfx-js/vue/nuxt`)
 - `packages/svelte/` - Svelte bindings for transitions and element effects (@vfx-js/svelte, with `@vfx-js/svelte/sveltekit`). Built with `svelte-package`, ESM only
-- `packages/astro/` - Astro components for element effects (@vfx-js/astro). Ships source, no build
+- `packages/astro/` - Astro components for transitions and element effects (@vfx-js/astro, with `@vfx-js/astro/client`). Ships source, no build
 - `packages/docs/` - Documentation website and demos
 - `packages/storybook/` - Component stories and visual tests
 - `packages/effects/` - Additional effect implementations
