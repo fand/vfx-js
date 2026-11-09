@@ -110,7 +110,7 @@ Then add a Glitch page transition to this app.
             </section>
 
             <section id="prompts" className="doc-section">
-                <h2>Prompts that work</h2>
+                <h2>Example prompts</h2>
                 <p className="lead">
                     Name the packages, the target element and the preset. Say
                     what should happen on back navigation.

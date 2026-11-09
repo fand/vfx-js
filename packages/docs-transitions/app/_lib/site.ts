@@ -32,7 +32,7 @@ export const nav: NavItem[] = [
         sections: [
             { id: "skill", label: "Install the skill" },
             { id: "llms", label: "Or use llms.txt" },
-            { id: "prompts", label: "Prompts that work" },
+            { id: "prompts", label: "Example prompts" },
             { id: "write", label: "Write a transition with AI" },
             { id: "check", label: "Check the result" },
         ],
