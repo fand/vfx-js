@@ -1534,8 +1534,8 @@ export class VFXPlayer {
             mouse: [relMouseX * pr, relMouseY * pr],
             mouseViewport: [this.#mouseX * pr, this.#mouseY * pr],
             intersection: hit.intersection,
-            enterTime: now - e.enterTime,
-            leaveTime: now - e.leaveTime,
+            enterTime: clampTime(now - e.enterTime),
+            leaveTime: clampTime(now - e.leaveTime),
             resolvedUniforms,
             canvasSize: [canvasW, canvasH],
             canvasBufferSize: [canvasW * pr, canvasH * pr],
@@ -1652,8 +1652,8 @@ export class VFXPlayer {
         if (isVisible && !e.chain && e.passes.length > 0) {
             const u = e.passes[0].uniforms;
             u["intersection"].value = intersection;
-            u["enterTime"].value = now - e.enterTime;
-            u["leaveTime"].value = now - e.leaveTime;
+            u["enterTime"].value = clampTime(now - e.enterTime);
+            u["leaveTime"].value = clampTime(now - e.leaveTime);
         }
 
         return { isVisible, intersection, rectWithOverflow };
@@ -2318,6 +2318,13 @@ function parseWrap(
 
 function clamp(x: number, xmin: number, xmax: number): number {
     return Math.max(xmin, Math.min(xmax, x));
+}
+
+// Infinity in uniforms is undefined in GLSL ES, so keep time finite.
+const MAX_UNIFORM_TIME = 1e6;
+
+function clampTime(t: number): number {
+    return clamp(t, -MAX_UNIFORM_TIME, MAX_UNIFORM_TIME);
 }
 
 /**

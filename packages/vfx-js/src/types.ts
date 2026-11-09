@@ -252,7 +252,7 @@ export type VFXProps = {
     shader?: ShaderPreset | string | VFXPass[];
 
     /**
-     * The release time for the element. (Default: `0`)
+     * The release time for the element. (Default: `Infinity`)
      *
      * Basically, VFX-JS starts rendering the element when the element entered the viewport,
      * and it stops rendering after it got out of the viewport by scroll etc.
