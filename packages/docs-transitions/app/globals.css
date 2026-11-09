@@ -1369,7 +1369,7 @@ em {
     display: grid;
     grid-template-columns: 1fr 1.15fr;
     gap: 56px;
-    align-items: center;
+    align-items: start;
     border-top: 1px solid var(--rule);
     padding: 64px 0;
 }
