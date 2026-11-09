@@ -4,10 +4,10 @@ import Jellyfish from "./assets/jellyfish.webp";
 import { initVFX } from "./utils";
 
 type Preset =
-    | "warpTransition"
-    | "slitScanTransition"
-    | "pixelateTransition"
-    | "focusTransition";
+    | "warpReveal"
+    | "slitScanReveal"
+    | "pixelateReveal"
+    | "focusReveal";
 
 type Step = {
     label: string;
@@ -54,10 +54,10 @@ function scene(opts: SceneOpts): StoryObj<{ preset: Preset }> {
             preset: {
                 control: "select",
                 options: [
-                    "warpTransition",
-                    "slitScanTransition",
-                    "pixelateTransition",
-                    "focusTransition",
+                    "warpReveal",
+                    "slitScanReveal",
+                    "pixelateReveal",
+                    "focusReveal",
                 ],
             },
         },
@@ -149,7 +149,7 @@ function scene(opts: SceneOpts): StoryObj<{ preset: Preset }> {
 }
 
 export default {
-    title: "Intersection Transition",
+    title: "Scroll Reveal",
 } satisfies Meta;
 
 const reset: Step = {
@@ -158,7 +158,7 @@ const reset: Step = {
 };
 
 export const ReverseMidLeave = scene({
-    preset: "warpTransition",
+    preset: "warpReveal",
     expected:
         "Scrolling back mid-leave plays the leave backward, so the image comes back from where it was.",
     steps: [
@@ -177,7 +177,7 @@ export const ReverseMidLeave = scene({
 });
 
 export const LeaveMidEnter = scene({
-    preset: "slitScanTransition",
+    preset: "slitScanReveal",
     expected:
         "Leaving mid-enter turns the wipe back from where it was, with no jump to the fully shown image.",
     steps: [
@@ -194,7 +194,7 @@ export const LeaveMidEnter = scene({
 });
 
 export const PixelateDivideByZero = scene({
-    preset: "pixelateTransition",
+    preset: "pixelateReveal",
     expected:
         "Right after enter, the image shows as one large block, with no broken frame. timeScale is slowed so this lasts about 3s.",
     timeScale: 0.005,
@@ -208,7 +208,7 @@ export const PixelateDivideByZero = scene({
 });
 
 export const TallElementThreshold = scene({
-    preset: "warpTransition",
+    preset: "warpReveal",
     expected:
         "The image is twice the viewport height. It still reaches threshold 0.6 and enters.",
     tall: true,
@@ -224,7 +224,7 @@ export const TallElementThreshold = scene({
 });
 
 export const TallElementFocus = scene({
-    preset: "focusTransition",
+    preset: "focusReveal",
     expected:
         "The image is twice the viewport height. It is sharp and bright when it fills the screen.",
     tall: true,

@@ -40,6 +40,13 @@ void main() {
 }
 `;
 
+/** Old names of the reveal presets. Use the `*Reveal` names instead. */
+type LegacyRevealPreset =
+    | "slitScanTransition"
+    | "warpTransition"
+    | "pixelateTransition"
+    | "focusTransition";
+
 export type ShaderPreset =
     | "none"
     | "uvGradient"
@@ -56,10 +63,11 @@ export type ShaderPreset =
     | "sinewave"
     | "pixelate"
     | "halftone"
-    | "slitScanTransition"
-    | "warpTransition"
-    | "pixelateTransition"
-    | "focusTransition"
+    | "slitScanReveal"
+    | "warpReveal"
+    | "pixelateReveal"
+    | "focusReveal"
+    | LegacyRevealPreset
     | "invert"
     | "grayscale"
     | "vignette"
@@ -81,16 +89,10 @@ const READ_TEX = `vec4 readTex(sampler2D tex, vec2 uv) {
     return texture(tex, uv);
 }`;
 
-/**
- * Shader code for presets.
- * Shaders in `shader` can be looked up with keys in `ShaderPreset`.
- *
- * ```ts
- * const shader = shaders["glitch"];
- * console.log(shader);
- * ```
- */
-export const shaders: Record<ShaderPreset, string> = {
+const presetShaders: Record<
+    Exclude<ShaderPreset, LegacyRevealPreset>,
+    string
+> = {
     none: COPY_FRAGMENT_SHADER,
     uvGradient: `
     ${COMMON_HEADER}
@@ -572,7 +574,7 @@ export const shaders: Record<ShaderPreset, string> = {
         outColor = color;
     }
     `,
-    warpTransition: `
+    warpReveal: `
     ${COMMON_HEADER}
     uniform float enterProgress;
     uniform float leaveProgress;
@@ -595,7 +597,7 @@ export const shaders: Record<ShaderPreset, string> = {
         outColor = readTex(src, uv);
     }
     `,
-    slitScanTransition: `
+    slitScanReveal: `
     ${COMMON_HEADER}
     ${READ_TEX}
 
@@ -623,7 +625,7 @@ export const shaders: Record<ShaderPreset, string> = {
         outColor = readTex(src, uv);
     }
     `,
-    pixelateTransition: `
+    pixelateReveal: `
     ${COMMON_HEADER}
     ${READ_TEX}
 
@@ -645,7 +647,7 @@ export const shaders: Record<ShaderPreset, string> = {
         outColor = readTex(src, uv);
     }
     `,
-    focusTransition: `
+    focusReveal: `
     ${COMMON_HEADER}
     ${READ_TEX}
 
@@ -736,4 +738,21 @@ export const shaders: Record<ShaderPreset, string> = {
         outColor = vec4(cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 3.0);
     }
     `,
+};
+
+/**
+ * Shader code for presets.
+ * Shaders in `shader` can be looked up with keys in `ShaderPreset`.
+ *
+ * ```ts
+ * const shader = shaders["glitch"];
+ * console.log(shader);
+ * ```
+ */
+export const shaders: Record<ShaderPreset, string> = {
+    ...presetShaders,
+    slitScanTransition: presetShaders.slitScanReveal,
+    warpTransition: presetShaders.warpReveal,
+    pixelateTransition: presetShaders.pixelateReveal,
+    focusTransition: presetShaders.focusReveal,
 };

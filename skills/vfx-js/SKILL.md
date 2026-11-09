@@ -50,7 +50,8 @@ await vfx.add(img, { shader: "rgbShift" });
 ```
 
 Shader presets: `uvGradient`, `rainbow`, `glitch`, `rgbGlitch`, `rgbShift`, `shine`, `blink`, `spring`, `duotone`, `tritone`, `hueShift`, `sinewave`, `pixelate`, `halftone`, `invert`, `grayscale`, `vignette`, `chromatic`.
-Presets that animate in when the element enters the viewport, and out when it leaves: `slitScanTransition`, `warpTransition`, `pixelateTransition`, `focusTransition`.
+Scroll reveal presets animate in when the element enters the viewport, and out when it leaves: `slitScanReveal`, `warpReveal`, `pixelateReveal`, `focusReveal`.
+The old names (`slitScanTransition`, `warpTransition`, `pixelateTransition`, `focusTransition`) still work.
 
 Without a bundler:
 
