@@ -345,7 +345,7 @@ import Layout from "../layouts/Layout.astro";
         id: "vanilla",
         name: "Vanilla",
         install: "npm i @vfx-js/core @vfx-js/transitions",
-        intro: "show(slide) switches between slides already in the DOM. For content built on the fly, run(cb) works like document.startViewTransition(cb): change the DOM in cb, and the shader does the rest.",
+        intro: "show(slide) switches between slides already in the DOM. For content built on the fly, run(cb) works like document.startViewTransition(cb): change the DOM in cb, and VFX-JS animates from the old content to the new.",
         snippets: [
             {
                 label: "index.html",

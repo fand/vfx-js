@@ -183,8 +183,7 @@ vec4 transition(vec2 uv, float t) {
             <section id="check" className="doc-section">
                 <h2>Check the result</h2>
                 <p className="lead">
-                    The agent writes the code but can't watch it run. Close
-                    the loop for it.
+                    The agent writes the code but can't watch it run.
                 </p>
                 <dl className="api-table">
                     {checks.map(([k, v]) => (
