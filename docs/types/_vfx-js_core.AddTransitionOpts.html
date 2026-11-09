@@ -11,7 +11,7 @@
 <li><a href="../modules/_vfx-js_core.html">@vfx-js/core</a></li>
 <li><a href="" aria-current="page">AddTransitionOpts</a></li></ul>
 <h1>Type Alias AddTransitionOpts&lt;T&gt;</h1></div>
-<div class="tsd-signature"><span class="tsd-kind-type-alias">AddTransitionOpts</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Partial</span><span class="tsd-signature-symbol">&lt;</span><a href="_vfx-js_core.TransitionSpec.html" class="tsd-signature-type tsd-kind-type-alias">TransitionSpec</a><span class="tsd-signature-symbol">&lt;</span><a class="tsd-signature-type tsd-kind-type-parameter" href="#t">T</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span> <span class="tsd-signature-symbol">&amp;</span> <span class="tsd-signature-symbol">{</span><br/>    <span class="tsd-kind-property">keepWrapped</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">slideSpec</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">slide</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">HTMLElement</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <a href="_vfx-js_core.RunOpts.html" class="tsd-signature-type tsd-kind-type-alias">RunOpts</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">waitFor</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.TransitionWaitFor.html" class="tsd-signature-type tsd-kind-type-alias">TransitionWaitFor</a><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div>
+<div class="tsd-signature"><span class="tsd-kind-type-alias">AddTransitionOpts</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Partial</span><span class="tsd-signature-symbol">&lt;</span><a href="_vfx-js_core.TransitionSpec.html" class="tsd-signature-type tsd-kind-type-alias">TransitionSpec</a><span class="tsd-signature-symbol">&lt;</span><a class="tsd-signature-type tsd-kind-type-parameter" href="#t">T</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span> <span class="tsd-signature-symbol">&amp;</span> <span class="tsd-signature-symbol">{</span><br/>    <span class="tsd-kind-property">autoReverse</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">keepWrapped</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">slideSpec</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">slide</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">HTMLElement</span><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <a href="_vfx-js_core.RunOpts.html" class="tsd-signature-type tsd-kind-type-alias">RunOpts</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">;</span><br/>    <span class="tsd-kind-property">waitFor</span><span class="tsd-signature-symbol">?:</span> <a href="_vfx-js_core.TransitionWaitFor.html" class="tsd-signature-type tsd-kind-type-alias">TransitionWaitFor</a><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div>
 <section class="tsd-panel">
 <h4>Type Parameters</h4>
 <ul class="tsd-type-parameter-list">
@@ -19,6 +19,11 @@
 <div class="tsd-type-declaration">
 <h4>Type Declaration</h4>
 <ul class="tsd-parameters">
+<li class="tsd-parameter">
+<h5><code class="tsd-tag">Optional</code><span class="tsd-kind-property">autoReverse</span><span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">boolean</span></h5>
+<div class="tsd-comment tsd-typography"><p>On back, play the spec that entered the page, reversed. On forward, play it again.<br>
+Needs the Navigation API. <code>show()</code> ignores it.</p>
+</div></li>
 <li class="tsd-parameter">
 <h5><code class="tsd-tag">Optional</code><span class="tsd-kind-property">keepWrapped</span><span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">boolean</span></h5>
 <div class="tsd-comment tsd-typography"><p>Keep the element wrapped between runs.</p>
@@ -31,7 +36,7 @@ Its fields go over the container's; <code>show()</code> opts go over it.</p>
 <li class="tsd-parameter">
 <h5><code class="tsd-tag">Optional</code><span class="tsd-kind-property">waitFor</span><span class="tsd-signature-symbol">?: </span><a href="_vfx-js_core.TransitionWaitFor.html" class="tsd-signature-type tsd-kind-type-alias">TransitionWaitFor</a></h5></li></ul></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/fand/vfx-js/blob/70bd7f4b4222879e10cc207e200fab1bdd05eca2/packages/vfx-js/src/transition/types.ts#L104">transition/types.ts:104</a></li></ul></aside></div>
+<li>Defined in <a href="https://github.com/fand/vfx-js/blob/e8f816d98a73ac81fa42ecba95577813a201f7f6/packages/vfx-js/src/transition/types.ts#L104">transition/types.ts:104</a></li></ul></aside></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
