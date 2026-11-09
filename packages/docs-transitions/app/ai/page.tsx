@@ -29,7 +29,7 @@ Keep all panels in the DOM and use show(). Swipe right when the new tab is to th
     },
     {
         label: "Other routers",
-        text: `Wire VFX-JS transitions to Astro's ClientRouter with core run(cb).
+        text: `Wire VFX-JS transitions to Turbo Drive with core run(cb).
 Hold the navigation until the snapshot is taken. Target the <main> outlet.`,
     },
 ];
@@ -76,7 +76,8 @@ export default function UseWithAI() {
                     </p>
                     <p>
                         It covers the presets, <code>show</code> and{" "}
-                        <code>run</code>, React, Vue and Svelte, custom transitions,
+                        <code>run</code>, React, Vue, Svelte and Astro, custom
+                        transitions,
                         and the pitfalls. The agent reads it when a task needs
                         it.
                     </p>
@@ -109,7 +110,7 @@ Then add a Glitch page transition to this app.
             </section>
 
             <section id="prompts" className="doc-section">
-                <h2>Prompts that work</h2>
+                <h2>Example prompts</h2>
                 <p className="lead">
                     Name the packages, the target element and the preset. Say
                     what should happen on back navigation.
@@ -182,8 +183,7 @@ vec4 transition(vec2 uv, float t) {
             <section id="check" className="doc-section">
                 <h2>Check the result</h2>
                 <p className="lead">
-                    The agent writes the code but can't watch it run. Close
-                    the loop for it.
+                    The agent writes the code but can't watch it run.
                 </p>
                 <dl className="api-table">
                     {checks.map(([k, v]) => (

@@ -1369,7 +1369,7 @@ em {
     display: grid;
     grid-template-columns: 1fr 1.15fr;
     gap: 56px;
-    align-items: center;
+    align-items: start;
     border-top: 1px solid var(--rule);
     padding: 64px 0;
 }
@@ -2182,4 +2182,9 @@ em {
 }
 .doc-prose h3 + p {
     margin-top: 8px;
+}
+.doc-prose ul {
+    padding-left: 20px;
+    line-height: 1.7;
+    color: var(--muted);
 }

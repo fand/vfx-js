@@ -12,6 +12,15 @@ export default function GettingStarted() {
             <PageTransition preset="swipe" />
             <section className="doc-title">
                 <h1>Getting Started</h1>
+                <p className="lead">
+                    Works in any browser with WebGL. Without HTML-in-Canvas,
+                    which is still experimental in Chrome, VFX-JS captures the
+                    page with a workaround that misses some content. See{" "}
+                    <Link href="/limitations#browsers">
+                        Browser support
+                    </Link>
+                    .
+                </p>
             </section>
 
             <section id="setup" className="doc-section">
