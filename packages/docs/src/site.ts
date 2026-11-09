@@ -77,7 +77,7 @@ export const nav: NavItem[] = [
         headerLabel: "Effects",
         sections: [
             { id: "presets", label: "Shader presets" },
-            { id: "parameters", label: "Parameters" },
+            { id: "parameters", label: "Preset uniforms" },
             { id: "gallery", label: "@vfx-js/effects" },
             { id: "chaining", label: "Chaining" },
             { id: "storybook", label: "Storybook" },

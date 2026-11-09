@@ -1,8 +1,377 @@
 ---
-import ComingSoon from "../components/ComingSoon.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import {
+    type DemoMedia,
+    effectDemos,
+    presetDemos,
+    transitionPresetDemos,
+} from "../effects-list";
 import Layout from "../layouts/Layout.astro";
+import { url } from "../site";
+
+const media: Record<DemoMedia, string> = {
+    logo: url("vfx-js-logo-no-padding.svg"),
+    pigeon: url("images/pigeon.webp"),
+    jellyfish: url("images/jellyfish.webp"),
+};
+
+const presetCode = `
+vfx.add(el, { shader: "rainbow" });
+
+// Some presets draw outside the element. Give them room with overflow.
+vfx.add(el, { shader: "glitch", overflow: 100 });
+`;
+
+const uniformsCode = `
+vfx.add(video, {
+    shader: "duotone",
+    uniforms: {
+        color1: [0, 0, 1, 1],
+        color2: [0, 1, 0, 1],
+        speed: 0.2,
+    },
+});
+`;
+
+const presetUniforms = [
+    { preset: "duotone", uniforms: "color1, color2 (vec4), speed" },
+    { preset: "tritone", uniforms: "color1, color2, color3 (vec4), speed" },
+    { preset: "hueShift", uniforms: "shift (0 to 1)" },
+    { preset: "vignette", uniforms: "intensity, radius, power" },
+    { preset: "chromatic", uniforms: "intensity, radius, power" },
+];
+
+const effectCode = `
+import { VFX } from "@vfx-js/core";
+import { BloomEffect } from "@vfx-js/effects";
+
+const vfx = new VFX();
+const bloom = new BloomEffect({ threshold: 0.2, intensity: 4 });
+await vfx.add(img, { effect: bloom });
+
+// Most effects read params every frame, so you can change them live.
+bloom.params.intensity = 2;
+`;
+
+const chainCode = `
+import { BloomEffect, PixelateEffect, ScanlineEffect } from "@vfx-js/effects";
+
+await vfx.add(video, {
+    effect: [
+        new PixelateEffect({ size: 10 }),
+        new ScanlineEffect({ spacing: 5 }),
+        new BloomEffect({ threshold: 0.01, intensity: 10, pad: 100 }),
+    ],
+});
+
+// Swap the chain in place. Instances already in it keep their state.
+await vfx.updateEffects(video, [new BloomEffect({ intensity: 8 })]);
+`;
 ---
 
-<Layout page="effects">
-    <ComingSoon page="effects" />
+<Layout
+    page="effects"
+    description="VFX-JS shader presets, preset uniforms, and the @vfx-js/effects gallery."
+>
+    <h1>Effects</h1>
+    <p>
+        There are two ways to style an element. Pass a preset name to
+        <code>shader</code>, or pass effect objects to <code>effect</code>. Use
+        one or the other, not both.
+    </p>
+
+    <section id="presets">
+        <h2>Shader presets</h2>
+        <p>
+            <code>@vfx-js/core</code> comes with these presets. Pass the name to
+            <code>shader</code>.
+        </p>
+        <CodeBlock code={presetCode} lang="ts" label="main.ts" />
+        <div class="DemoGrid">
+            {
+                presetDemos.map((demo) => (
+                    <figure class="DemoTile">
+                        <div class="DemoMedia">
+                            <img
+                                src={media[demo.media]}
+                                alt=""
+                                data-preset={demo.name}
+                            />
+                        </div>
+                        <figcaption>
+                            <code>{demo.name}</code>
+                        </figcaption>
+                    </figure>
+                ))
+            }
+        </div>
+
+        <h3>Transition presets</h3>
+        <p>
+            These play when the element enters the viewport, and play backward
+            when it leaves. Scroll them in and out to see it again.
+        </p>
+        <div class="DemoGrid">
+            {
+                transitionPresetDemos.map((demo) => (
+                    <figure class="DemoTile">
+                        <div class="DemoMedia">
+                            <img
+                                src={media[demo.media]}
+                                alt=""
+                                data-transition-preset={demo.name}
+                            />
+                        </div>
+                        <figcaption>
+                            <code>{demo.name}</code>
+                        </figcaption>
+                    </figure>
+                ))
+            }
+        </div>
+    </section>
+
+    <section id="parameters">
+        <h2>Preset uniforms</h2>
+        <p>
+            Some presets read values from <code>uniforms</code>. They have no
+            defaults, so pass all of them.
+        </p>
+        <table class="DocTable">
+            <thead>
+                <tr>
+                    <th>Preset</th>
+                    <th>Uniforms</th>
+                </tr>
+            </thead>
+            <tbody>
+                {
+                    presetUniforms.map((row) => (
+                        <tr>
+                            <td>
+                                <code>{row.preset}</code>
+                            </td>
+                            <td>{row.uniforms}</td>
+                        </tr>
+                    ))
+                }
+            </tbody>
+        </table>
+        <CodeBlock code={uniformsCode} lang="ts" label="main.ts" />
+        <div class="Demo">
+            <video
+                id="UniformsDemo"
+                src={url("jellyfish.mp4")}
+                autoplay
+                loop
+                muted
+                playsinline></video>
+        </div>
+    </section>
+
+    <section id="gallery">
+        <h2>@vfx-js/effects</h2>
+        <p>
+            <code>@vfx-js/effects</code> has ready-made effects. Each one is a
+            class. Make one instance per element.
+        </p>
+        <CodeBlock
+            code="npm i @vfx-js/core @vfx-js/effects"
+            lang="bash"
+            label="Terminal"
+        />
+        <CodeBlock code={effectCode} lang="ts" label="main.ts" />
+        <div class="DemoGrid">
+            {
+                effectDemos.map((demo) => (
+                    <figure class="DemoTile">
+                        <div class="DemoMedia" data-clickable={!!demo.onClick}>
+                            <img
+                                src={media[demo.media]}
+                                alt=""
+                                data-effect={demo.name}
+                            />
+                        </div>
+                        <figcaption>
+                            <code>{demo.name}</code>
+                            <span>{demo.text}</span>
+                            {demo.hint && (
+                                <span class="DemoHint">{demo.hint}</span>
+                            )}
+                        </figcaption>
+                    </figure>
+                ))
+            }
+        </div>
+    </section>
+
+    <section id="chaining">
+        <h2>Chaining</h2>
+        <p>
+            Pass an array to <code>effect</code>. Each effect reads the output of
+            the one before it.
+        </p>
+        <CodeBlock code={chainCode} lang="ts" label="main.ts" />
+        <div class="Demo">
+            <video
+                id="ChainDemo"
+                src={url("jellyfish.mp4")}
+                autoplay
+                loop
+                muted
+                playsinline></video>
+        </div>
+        <p>
+            <code>overflow</code> does not apply to effects. Effects that draw
+            outside the element, like <code>BloomEffect</code>, have their own
+            <code>pad</code> param.
+        </p>
+    </section>
+
+    <section id="storybook">
+        <h2>Storybook</h2>
+        <p>
+            The <a href={url("storybook/")}>Storybook</a> has every preset and
+            effect with live controls for their params.
+        </p>
+    </section>
 </Layout>
+
+<script>
+    import {
+        BloomEffect,
+        PixelateEffect,
+        ScanlineEffect,
+    } from "@vfx-js/effects";
+    import { lazyDemo } from "../demos/lazy";
+    import {
+        effectDemos,
+        presetDemos,
+        transitionPresetDemos,
+    } from "../effects-list";
+
+    for (const demo of [...presetDemos, ...transitionPresetDemos]) {
+        const img = document.querySelector<HTMLElement>(
+            `[data-preset="${demo.name}"], [data-transition-preset="${demo.name}"]`,
+        );
+        if (img) {
+            lazyDemo(img, () => ({ shader: demo.name, ...demo.props }));
+        }
+    }
+
+    for (const demo of effectDemos) {
+        const img = document.querySelector<HTMLElement>(
+            `[data-effect="${demo.name}"]`,
+        );
+        if (!img) {
+            continue;
+        }
+        let current: ReturnType<typeof demo.create> | undefined;
+        lazyDemo(img, () => {
+            current = demo.create();
+            return { effect: current, zIndex: demo.zIndex };
+        });
+        const onClick = demo.onClick;
+        if (onClick) {
+            img.addEventListener("click", () => {
+                if (current) {
+                    onClick(current);
+                }
+            });
+        }
+    }
+
+    const uniformsDemo = document.getElementById("UniformsDemo");
+    if (uniformsDemo) {
+        lazyDemo(uniformsDemo, () => ({
+            shader: "duotone",
+            uniforms: { color1: [0, 0, 1, 1], color2: [0, 1, 0, 1], speed: 0.2 },
+        }));
+    }
+
+    const chainDemo = document.getElementById("ChainDemo");
+    if (chainDemo) {
+        lazyDemo(chainDemo, () => ({
+            effect: [
+                new PixelateEffect({ size: 10 }),
+                new ScanlineEffect({ spacing: 5 }),
+                new BloomEffect({ threshold: 0.01, intensity: 10, pad: 100 }),
+            ],
+        }));
+    }
+</script>
+
+<style>
+    .DemoGrid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+        margin: 24px 0;
+    }
+    .DemoTile {
+        margin: 0;
+    }
+    .DemoMedia {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 3 / 2;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    .DemoMedia[data-clickable="true"] {
+        cursor: pointer;
+    }
+    .DemoMedia img {
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+    }
+    .DemoTile figcaption {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding-top: 8px;
+        font-size: 14px;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.7);
+    }
+    .DemoTile figcaption code {
+        align-self: start;
+        font-size: 14px;
+        color: white;
+    }
+    .DemoHint {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: white;
+    }
+    .Demo {
+        display: flex;
+        justify-content: center;
+        padding: 32px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+    }
+    .Demo video {
+        width: min(100%, 480px);
+    }
+    .DocTable {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+    .DocTable th,
+    .DocTable td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+    }
+    .DocTable th {
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+    }
+</style>
