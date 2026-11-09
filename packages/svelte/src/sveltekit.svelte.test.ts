@@ -207,11 +207,11 @@ describe("VFXTransition (sveltekit)", () => {
         expect(await go(makeNav("/about", "/"), Home)).toEqual({});
     });
 
-    it("adds reverse on back only", async () => {
+    it("does not reverse on back", async () => {
         render();
-        expect(await go(makeNav("/about", "/", "popstate", -1), Home)).toEqual({
-            reverse: true,
-        });
+        expect(await go(makeNav("/about", "/", "popstate", -1), Home)).toEqual(
+            {},
+        );
         expect(await go(makeNav("/", "/about", "popstate", 1), About)).toEqual({
             transition: Zoom,
         });

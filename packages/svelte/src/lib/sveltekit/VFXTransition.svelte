@@ -88,7 +88,6 @@
         if (!t || !nav.to || nav.to.url.pathname === nav.from?.url.pathname) {
             return;
         }
-        const back = nav.type === "popstate" && (nav.delta ?? 0) < 0;
         scope.reset();
         return new Promise<void>((snapshotTaken) => {
             t.run(
@@ -98,7 +97,7 @@
                     await nav.complete;
                 },
                 // Read once the new page is in, so its transitionIn counts.
-                () => scope.pick(back),
+                () => scope.pick(),
             ).catch(() => {});
         });
     });

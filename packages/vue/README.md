@@ -78,7 +78,7 @@ import { VFXTransition } from "@vfx-js/vue/router";
 2. The new page's `useTransitionIn(spec)`.
 3. The props of `<VFXTransition>`.
 
-Back and forward add `reverse: true` to the spec that wins.
+Back and forward use the same spec. Nothing is reversed for you.
 
 ## Element effects
 

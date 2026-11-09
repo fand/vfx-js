@@ -199,7 +199,7 @@ useTransitionIn({ transition: Glitch });
         ],
         notes: [
             'The target fills the viewport height and pages scroll inside it. Pass :fullscreen="false" to size it with your own CSS, e.g. under a header.',
-            "A link's v-transition spec wins over the page's useTransitionIn. Back plays the winning spec reversed.",
+            "A link's v-transition spec wins over the page's useTransitionIn.",
             "Navigate from code with setNextTransition({ transition }) before navigateTo().",
         ],
     },
@@ -247,7 +247,7 @@ useTransitionIn({ transition: Glitch });
         ],
         notes: [
             'The target fills the viewport height and pages scroll inside it. Pass :fullscreen="false" to size it with your own CSS, e.g. under a header.',
-            "A link's v-transition spec wins over the page's useTransitionIn. Back plays the winning spec reversed.",
+            "A link's v-transition spec wins over the page's useTransitionIn.",
             "A page with an async setup under your own <Suspense> may be captured before it resolves. Use waitFor on <VFXTransition> to wait for it.",
             "Navigate from code with setNextTransition({ transition }) before router.push().",
         ],
@@ -292,7 +292,7 @@ useTransitionIn({ transition: Glitch });
         ],
         notes: [
             "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
-            "A link's transition(spec) wins over the page's transitionIn. Back plays the winning spec reversed.",
+            "A link's transition(spec) wins over the page's transitionIn.",
             "Needs Svelte 5.29 or later for {@attach}. Navigate from code with setNextTransition({ transition }) before goto().",
         ],
     },
@@ -341,7 +341,7 @@ import Layout from "../layouts/Layout.astro";
         notes: [
             "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
             "Transitions are names: the class names from @vfx-js/transitions in lowercase. Register your own with registerVFX from @vfx-js/astro/client.",
-            "A link's data-vfx-transition wins over the page's <TransitionIn>. Back plays the winning spec reversed.",
+            "A link's data-vfx-transition wins over the page's <TransitionIn>.",
         ],
     },
     {

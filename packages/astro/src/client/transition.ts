@@ -103,7 +103,6 @@ function createTransitionRuntime(deps: TransitionDeps) {
                         .querySelector(PAGE_META)
                         ?.getAttribute("content"),
                 ),
-                ev.direction === "back",
             );
 
             const swapped = new Promise<void>((resolve) => {

@@ -104,16 +104,9 @@ describe("pickRunOpts", () => {
     it("takes the link, then the page, then nothing", () => {
         const link = { transition: Swipe };
         const page = { transition: Glitch };
-        expect(pickRunOpts(link, page, false)).toBe(link);
-        expect(pickRunOpts(null, page, false)).toBe(page);
-        expect(pickRunOpts(null, null, false)).toEqual({});
-    });
-
-    it("plays back navigation in reverse", () => {
-        expect(pickRunOpts(null, { transition: Glitch }, true)).toEqual({
-            transition: Glitch,
-            reverse: true,
-        });
+        expect(pickRunOpts(link, page)).toBe(link);
+        expect(pickRunOpts(null, page)).toBe(page);
+        expect(pickRunOpts(null, null)).toEqual({});
     });
 });
 
@@ -186,7 +179,7 @@ describe("installTransition", () => {
         });
     });
 
-    it("uses the page spec, reversed on back", async () => {
+    it("uses the page spec as is on back", async () => {
         installTransition({ swapFunctions });
         await navigate({
             direction: "back",
@@ -194,10 +187,7 @@ describe("installTransition", () => {
                 `<meta name="vfx-transition-in" content='{"transition":"glitch"}'>${target("{}", "new")}`,
             ),
         });
-        expect(mock.runs[0]?.opts).toEqual({
-            transition: Glitch,
-            reverse: true,
-        });
+        expect(mock.runs[0]?.opts).toEqual({ transition: Glitch });
     });
 
     it("prefers a registered transition and ease", async () => {

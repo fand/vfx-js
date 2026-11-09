@@ -200,11 +200,11 @@ describe("VFXTransition (router)", () => {
         expect(run.opts()).toEqual({});
     });
 
-    it("adds reverse on back", async () => {
+    it("does not reverse on back", async () => {
         window.history.replaceState({ position: 2 }, "");
         mount();
         const run = await go("/about", "/", Home, 1);
-        expect(run.opts()).toEqual({ reverse: true });
+        expect(run.opts()).toEqual({});
     });
 
     it("frees the run of a dropped navigation", async () => {
