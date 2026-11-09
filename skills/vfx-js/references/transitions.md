@@ -60,6 +60,7 @@ await t.run(() => {
 `run(cb, opts)` works like `document.startViewTransition(cb)`: the DOM must be updated when `cb` resolves.
 Both `show` and `run` resolve when the animation ends.
 A new `run` during a run drops the old one, but its callback still runs.
+If the browser already animated the navigation (a swipe back on a phone), `run` cuts. It reads `hasUAVisualTransition` from the Navigation API.
 
 ## Options
 

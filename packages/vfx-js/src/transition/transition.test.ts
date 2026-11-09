@@ -31,6 +31,7 @@ import type {
     TransitionEffectContext,
     TransitionRun,
 } from "./types";
+import type { UATransitions } from "./ua-transition";
 
 const shaderClass = (
     name: string,
@@ -514,6 +515,7 @@ function setup(
         captureTimesOut?: boolean;
         element?: HTMLElement;
         history?: HistorySpecs;
+        uaTransitions?: UATransitions;
     } = {},
 ) {
     const {
@@ -521,6 +523,7 @@ function setup(
         captureTimesOut = false,
         element = {} as HTMLElement,
         history = createHistorySpecs(() => undefined),
+        uaTransitions = { take: () => false },
         ...transitionOpts
     } = opts;
     const log: string[] = [];
@@ -613,6 +616,7 @@ function setup(
         onDestroy,
         stage,
         history,
+        uaTransitions,
     );
     return {
         transition,
@@ -1114,7 +1118,9 @@ describe("TransitionController", () => {
                 };
             return { A: make(`${name}-a`), B: make(`${name}-b`), runs };
         };
-        const autoReverseSetup = (opts: AddTransitionOpts = {}) => {
+        const autoReverseSetup = (
+            opts: AddTransitionOpts & { uaTransitions?: UATransitions } = {},
+        ) => {
             let index = 0;
             const history = createHistorySpecs(() => ({
                 index,
@@ -1138,7 +1144,15 @@ describe("TransitionController", () => {
                 (await started(starts, i)).end();
                 await done;
             };
-            return { transition, starts, step };
+            // Navigate to `next` in a run that cuts.
+            const cutTo = (
+                next: number,
+                opts: Parameters<TransitionController["run"]>[1],
+            ) =>
+                transition.run(() => {
+                    index = next;
+                }, opts);
+            return { transition, starts, step, cutTo };
         };
 
         test("static opts: back plays the stored spec reversed", async () => {
@@ -1165,6 +1179,30 @@ describe("TransitionController", () => {
             ]);
         });
 
+        test("a back the browser animated cuts and keeps history in step", async () => {
+            const { A, B, runs } = recorder("ua");
+            let animated = false;
+            const { starts, step, cutTo } = autoReverseSetup({
+                uaTransitions: {
+                    take: () => {
+                        const was = animated;
+                        animated = false;
+                        return was;
+                    },
+                },
+            });
+            await step(1, { transition: A });
+            animated = true;
+            await cutTo(0, { transition: B });
+            expect(starts).toHaveLength(1);
+            // Forward again plays the spec that entered page 1.
+            await step(1, { transition: B });
+            expect(runs).toEqual([
+                { name: "ua-a", reverse: false },
+                { name: "ua-a", reverse: false },
+            ]);
+        });
+
         test("empty run opts on back use the container opts reversed", async () => {
             const { A, runs } = recorder("container");
             const { step } = autoReverseSetup({ transition: A });
@@ -1175,6 +1213,32 @@ describe("TransitionController", () => {
                 { name: "container-a", reverse: true },
             ]);
         });
+    });
+
+    test("a navigation the browser animated cuts before the snapshot", async () => {
+        let animated = true;
+        const { transition, log, starts } = setup({
+            uaTransitions: {
+                take: () => {
+                    const was = animated;
+                    animated = false;
+                    return was;
+                },
+            },
+        });
+        const cb = vi.fn();
+        const opts = vi.fn(() => ({ transition: Crossfade }));
+        await transition.run(cb, opts);
+        expect(cb).toHaveBeenCalledOnce();
+        expect(log).not.toContain("snapshot");
+        expect(log).not.toContain("wrap");
+        expect(starts).toHaveLength(0);
+
+        // Only that navigation; the next run plays.
+        const next = transition.run(vi.fn(), opts);
+        await settle();
+        (await started(starts, 0)).end();
+        await next;
     });
 
     test("lazy duration 0 cuts after cb and unwraps", async () => {

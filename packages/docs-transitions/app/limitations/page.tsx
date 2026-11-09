@@ -121,6 +121,13 @@ const t = vfx.addTransition(el, {
                         entered the page, even after{" "}
                         <code>setNextTransition()</code>.
                     </p>
+                    <h3>Browser swipes cut</h3>
+                    <p>
+                        A phone animates a swipe back or forward on its own. The
+                        run then cuts to the new page instead of playing a
+                        second animation. Browsers without{" "}
+                        <code>hasUAVisualTransition</code> play it as usual.
+                    </p>
                     <h3>No multi-page navigation</h3>
                     <p>
                         Cross-document navigation isn't supported. With Turbo or

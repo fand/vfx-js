@@ -200,6 +200,10 @@ so the spec can depend on the new content. If it throws, the run
 cancels and `run` rejects, as with `cb`. With a function, the transition
 is set up and `start` runs after `cb`, not before the snapshot.
 
+If the browser already animated the navigation, like a swipe back on a
+phone, `run` cuts to the new content. It reads `hasUAVisualTransition`
+from the Navigation API.
+
 ### Spec resolution
 
 Each field comes from the first level that sets it:
