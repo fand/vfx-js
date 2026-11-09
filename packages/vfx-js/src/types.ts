@@ -320,9 +320,10 @@ export type VFXProps = {
 
         /**
          * The element leaves when the ratio falls below this value.
-         * Below `threshold`, it stops flicker at the edge.
+         * At or below `threshold`, it stops flicker at the edge.
          * Above `threshold`, the element enters at `threshold` when scrolling in
-         * and leaves at `leaveThreshold` when scrolling out. (Default: `threshold`)
+         * and leaves at `leaveThreshold` when scrolling out.
+         * Then small scrolls around `leaveThreshold` can flip enter and leave. (Default: `threshold`)
          */
         leaveThreshold?: number;
 
@@ -332,6 +333,7 @@ export type VFXProps = {
         /**
          * Seconds for the enter and leave transitions.
          * Drives the `enterProgress` / `leaveProgress` uniforms. (Default: `1`)
+         * Keep `release` at or above `duration`, or the leave stops before it finishes.
          */
         duration?: number;
     };

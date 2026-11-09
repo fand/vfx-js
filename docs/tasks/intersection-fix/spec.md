@@ -64,15 +64,18 @@ Values seen by shaders:
 A symmetric shader can use `t = enterProgress * (1. - leaveProgress)`.
 
 Each frame, the progress of the current phase moves by `direction * dt / duration` and is clamped to 0..1.
+A negative `dt` moves it by `dt / duration` instead, whatever the direction.
 A large `dt` (e.g. back from a hidden tab) just finishes the phase.
+A new enter or leave (leaving `hidden` or `shown`) starts at 0 and ignores that step's `dt`.
 
 ### Clock
 
 The state machine uses `dt` from the virtual clock, same as today.
 
 - `timeScale = 0` freezes progress.
-- Negative `timeScale` moves progress backward, so enter/leave rewind.
-- `setTime` back in time gives a large negative `dt`, so the phase rolls back to its start.
+- Negative `timeScale` or `setTime` back in time gives a negative `dt`.
+  Rewinding always rolls the current phase back toward its start, even when it plays backward.
+  A large negative `dt` rolls it back to the previous phase.
 
 ### Hysteresis
 

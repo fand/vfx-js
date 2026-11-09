@@ -69,6 +69,15 @@ export function nextIsIn(
 }
 
 /**
+ * Skip a frame without moving progress, e.g. while frozen.
+ * The next step then starts from `now`.
+ * @internal
+ */
+export function pauseIntersection(state: IntersectionState, now: number): void {
+    state.lastTime = now;
+}
+
+/**
  * Advance the state. Mutates and returns it.
  * `duration` must be above 0.
  * @internal
@@ -83,10 +92,15 @@ export function stepIntersection(
     state.lastTime = now;
     state.isIn = isIn;
 
-    applyIsIn(state, isIn);
+    // A new enter or leave starts at 0 on this step.
+    if (applyIsIn(state, isIn)) {
+        return state;
+    }
+
+    // Rewinding always rolls back toward the phase start.
+    const delta = (dt < 0 ? dt : state.direction * dt) / duration;
 
     if (state.phase === "entering") {
-        const delta = (state.direction * dt) / duration;
         const progress = state.enterProgress + delta;
         if (delta > 0 && progress >= 1) {
             setPhase(state, "shown");
@@ -96,7 +110,6 @@ export function stepIntersection(
             state.enterProgress = clamp01(progress);
         }
     } else if (state.phase === "leaving") {
-        const delta = (state.direction * dt) / duration;
         const progress = state.leaveProgress + delta;
         if (delta > 0 && progress >= 1) {
             setPhase(state, "hidden");
@@ -110,26 +123,29 @@ export function stepIntersection(
     return state;
 }
 
-function applyIsIn(state: IntersectionState, isIn: boolean): void {
+/** Returns true when it starts a new enter or leave. */
+function applyIsIn(state: IntersectionState, isIn: boolean): boolean {
     switch (state.phase) {
         case "hidden":
             if (isIn) {
                 state.phase = "entering";
                 state.direction = 1;
+                return true;
             }
-            break;
+            return false;
         case "shown":
             if (!isIn) {
                 state.phase = "leaving";
                 state.direction = 1;
+                return true;
             }
-            break;
+            return false;
         case "entering":
             state.direction = isIn ? 1 : -1;
-            break;
+            return false;
         case "leaving":
             state.direction = isIn ? -1 : 1;
-            break;
+            return false;
     }
 }
 

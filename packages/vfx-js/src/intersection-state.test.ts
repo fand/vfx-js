@@ -3,6 +3,7 @@ import {
     createIntersectionState,
     type IntersectionState,
     nextIsIn,
+    pauseIntersection,
     stepIntersection,
 } from "./intersection-state";
 
@@ -35,14 +36,16 @@ describe("createIntersectionState", () => {
 });
 
 describe("stepIntersection: transition table", () => {
-    test("hidden + in → entering forward", () => {
+    test("hidden + in → entering forward, starting at 0", () => {
         const s = stepIntersection(makeState({}), true, 0.25, 1);
         expect(pick(s)).toEqual({
             phase: "entering",
             direction: 1,
-            enterProgress: 0.25,
+            enterProgress: 0,
             leaveProgress: 0,
         });
+        stepIntersection(s, true, 0.5, 1);
+        expect(s.enterProgress).toBe(0.25);
     });
 
     test("hidden + out stays hidden", () => {
@@ -126,8 +129,10 @@ describe("stepIntersection: transition table", () => {
             phase: "leaving",
             direction: 1,
             enterProgress: 1,
-            leaveProgress: 0.25,
+            leaveProgress: 0,
         });
+        stepIntersection(s, false, 0.5, 1);
+        expect(s.leaveProgress).toBe(0.25);
     });
 
     test("shown + in stays shown", () => {
@@ -222,8 +227,85 @@ describe("stepIntersection: transition table", () => {
 
 describe("stepIntersection: timing", () => {
     test("uses duration", () => {
-        const s = stepIntersection(makeState({}), true, 0.5, 2);
+        const s = stepIntersection(
+            makeState({ phase: "entering" }),
+            true,
+            0.5,
+            2,
+        );
         expect(s.enterProgress).toBe(0.25);
+    });
+
+    test("a new enter or leave ignores a large dt", () => {
+        const entering = stepIntersection(makeState({}), true, 100, 1);
+        expect(pick(entering)).toEqual({
+            phase: "entering",
+            direction: 1,
+            enterProgress: 0,
+            leaveProgress: 0,
+        });
+
+        const leaving = stepIntersection(
+            makeState({ phase: "shown", enterProgress: 1 }),
+            false,
+            100,
+            1,
+        );
+        expect(pick(leaving)).toEqual({
+            phase: "leaving",
+            direction: 1,
+            enterProgress: 1,
+            leaveProgress: 0,
+        });
+    });
+
+    test("negative dt rolls back toward the phase start when reversed", () => {
+        const entering = stepIntersection(
+            makeState({
+                lastTime: 10,
+                phase: "entering",
+                direction: -1,
+                enterProgress: 0.5,
+            }),
+            false,
+            0,
+            1,
+        );
+        expect(entering.phase).toBe("hidden");
+
+        const leaving = stepIntersection(
+            makeState({
+                lastTime: 10,
+                phase: "leaving",
+                direction: -1,
+                enterProgress: 1,
+                leaveProgress: 0.5,
+            }),
+            true,
+            0,
+            1,
+        );
+        expect(leaving.phase).toBe("shown");
+
+        const partial = stepIntersection(
+            makeState({
+                lastTime: 1,
+                phase: "entering",
+                direction: -1,
+                enterProgress: 0.5,
+            }),
+            false,
+            0.75,
+            1,
+        );
+        expect(partial.enterProgress).toBe(0.25);
+    });
+
+    test("pauseIntersection skips the paused time", () => {
+        const s = makeState({ phase: "entering", enterProgress: 0.5 });
+        pauseIntersection(s, 10);
+        stepIntersection(s, true, 10.25, 1);
+        expect(s.enterProgress).toBe(0.75);
     });
 
     test("updates lastTime and isIn", () => {
@@ -234,6 +316,7 @@ describe("stepIntersection: timing", () => {
 
     test("reversal mid-enter keeps the progress", () => {
         const s = makeState({});
+        stepIntersection(s, true, 0, 1);
         stepIntersection(s, true, 0.5, 1);
         expect(s.enterProgress).toBe(0.5);
         stepIntersection(s, false, 0.5, 1);
@@ -248,6 +331,7 @@ describe("stepIntersection: timing", () => {
 
     test("reversal mid-leave keeps the progress", () => {
         const s = makeState({ phase: "shown", enterProgress: 1 });
+        stepIntersection(s, false, 0, 1);
         stepIntersection(s, false, 0.5, 1);
         expect(s.leaveProgress).toBe(0.5);
         stepIntersection(s, true, 0.5, 1);

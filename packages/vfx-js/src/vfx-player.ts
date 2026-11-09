@@ -22,6 +22,7 @@ import { getImageSourceUrl } from "./image-source.js";
 import {
     createIntersectionState,
     nextIsIn,
+    pauseIntersection,
     stepIntersection,
 } from "./intersection-state.js";
 import { PostEffectPass } from "./post-effect-pass.js";
@@ -1159,7 +1160,7 @@ export class VFXPlayer {
         for (const e of this.#elements) {
             if (e.frozen) {
                 // Resume without a jump when unfrozen.
-                e.intersectionState.lastTime = now;
+                pauseIntersection(e.intersectionState, now);
                 continue;
             }
             const domRect = e.element.getBoundingClientRect();
@@ -1643,32 +1644,13 @@ export class VFXPlayer {
             e.intersection.rootMargin,
         );
         const intersection = getIntersection(viewportWithMargin, rect);
-        const wasIn = e.intersectionState.isIn;
-        const isIn =
-            e.isFullScreen ||
-            nextIsIn(
-                e.intersectionState,
-                intersection,
-                isRectInViewport(viewportWithMargin, rect),
-                e.intersection.threshold,
-                e.intersection.leaveThreshold,
-            );
-
-        // Legacy enterTime / leaveTime uniforms
-        if (!wasIn && isIn) {
-            e.enterTime = now;
-            e.leaveTime = Number.POSITIVE_INFINITY;
-        }
-        if (wasIn && !isIn) {
-            e.leaveTime = now;
-        }
-
-        const { enterProgress, leaveProgress } = stepIntersection(
-            e.intersectionState,
-            isIn,
+        updateIntersection(
+            e,
+            intersection,
+            isRectInViewport(viewportWithMargin, rect),
             now,
-            e.intersection.duration,
         );
+        const { enterProgress, leaveProgress } = e.intersectionState;
 
         e.isInViewport = isInViewport;
 
@@ -1680,12 +1662,7 @@ export class VFXPlayer {
                 rect.bottom > rect.top);
 
         if (isVisible && !e.chain && e.passes.length > 0) {
-            const u = e.passes[0].uniforms;
-            u["intersection"].value = intersection;
-            u["enterTime"].value = clampTime(now - e.enterTime);
-            u["leaveTime"].value = clampTime(now - e.leaveTime);
-            u["enterProgress"].value = enterProgress;
-            u["leaveProgress"].value = leaveProgress;
+            setIntersectionUniforms(e.passes[0].uniforms, e, intersection, now);
         }
 
         return {
@@ -2281,6 +2258,63 @@ export function getIntermediatePassUniforms(
     };
 }
 
+/**
+ * Update in/out, the legacy `enterTime` / `leaveTime`, and the transition state.
+ * @internal
+ */
+export function updateIntersection(
+    e: Pick<
+        VFXElement,
+        | "intersectionState"
+        | "intersection"
+        | "isFullScreen"
+        | "enterTime"
+        | "leaveTime"
+    >,
+    ratio: number,
+    touching: boolean,
+    now: number,
+): void {
+    const state = e.intersectionState;
+    const wasIn = state.isIn;
+    const isIn =
+        e.isFullScreen ||
+        nextIsIn(
+            state,
+            ratio,
+            touching,
+            e.intersection.threshold,
+            e.intersection.leaveThreshold,
+        );
+
+    if (!wasIn && isIn) {
+        e.enterTime = now;
+        e.leaveTime = Number.POSITIVE_INFINITY;
+    }
+    if (wasIn && !isIn) {
+        e.leaveTime = now;
+    }
+
+    stepIntersection(state, isIn, now, e.intersection.duration);
+}
+
+/**
+ * Write the intersection uniforms of a shader-path element.
+ * @internal
+ */
+export function setIntersectionUniforms(
+    uniforms: Uniforms,
+    e: Pick<VFXElement, "intersectionState" | "enterTime" | "leaveTime">,
+    intersection: number,
+    now: number,
+): void {
+    uniforms["intersection"].value = intersection;
+    uniforms["enterTime"].value = clampTime(now - e.enterTime);
+    uniforms["leaveTime"].value = clampTime(now - e.leaveTime);
+    uniforms["enterProgress"].value = e.intersectionState.enterProgress;
+    uniforms["leaveProgress"].value = e.intersectionState.leaveProgress;
+}
+
 export function parseIntersectionOpts(
     intersectionOpts: VFXProps["intersection"],
 ): VFXElementIntersection {
@@ -2290,11 +2324,11 @@ export function parseIntersectionOpts(
     const leaveThreshold = intersectionOpts?.leaveThreshold ?? threshold;
 
     let duration = intersectionOpts?.duration ?? 1;
-    if (!(duration > 0)) {
+    if (!(Number.isFinite(duration) && duration > 0)) {
         if (!hasWarnedDuration) {
             hasWarnedDuration = true;
             console.warn(
-                `[VFX-JS] \`intersection.duration\` must be above 0, got ${duration}. Using 1 instead.`,
+                `[VFX-JS] \`intersection.duration\` must be a finite number above 0, got ${duration}. Using 1 instead.`,
             );
         }
         duration = 1;

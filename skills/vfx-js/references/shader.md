@@ -66,13 +66,14 @@ vfx.add(el, {
     intersection: {
         threshold: 0.5,      // enter when half of the element is in view
         leaveThreshold: 0.2, // leave when less than 20% is in view (default: threshold)
-        duration: 0.8,       // seconds for enter and leave (default: 1)
+        duration: 0.8,       // seconds for enter and leave (default: 1); keep `release` >= duration
     },
 });
 ```
 
 `leaveThreshold` can also be above `threshold`: the element enters at `threshold` when scrolling in, and leaves at `leaveThreshold` when scrolling out.
-The visible ratio uses the smaller of the element and viewport sizes, so an element taller than the viewport can reach 1.
+The visible ratio divides by the smaller of the element size and the viewport size (after `rootMargin`), on each axis.
+So an element taller than the viewport can reach 1, and with a negative `rootMargin` a smaller element reaches 1 sooner.
 Use `enterTime` / `leaveTime` for animations timed in seconds.
 
 ## Uniform values

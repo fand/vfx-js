@@ -57,10 +57,11 @@ function stepIntersection(
 
 - `dt = now - lastTime`, then set `lastTime = now`. `dt` may be negative.
 - Apply `isIn` first: set the phase and direction from the spec table.
-- Then move the current phase's progress by `direction * dt / duration`.
+- If that started a new enter or leave, stop here: progress starts at 0.
+- Else move the current phase's progress by `direction * dt / duration`, or by `dt / duration` when `dt` is negative.
 - Progress at 1 or more → next phase. At 0 or less → previous phase. Clamp to 0..1.
 - `leaving` reaching 1 → `hidden`, both progress values back to 0.
-- One phase change per step. Drop leftover `dt`.
+- One phase change per step, from `isIn` or from progress. Drop leftover `dt`.
 
 `intersection-state.test.ts`:
 

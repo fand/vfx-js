@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
+import type { Uniforms } from "./gl/program";
+import { createIntersectionState } from "./intersection-state";
 import { RECT_ZERO } from "./rect";
 import {
     getIntermediatePassUniforms,
     isRectInViewport,
     parseIntersectionOpts,
     parseOverflowOpts,
+    setIntersectionUniforms,
+    updateIntersection,
 } from "./vfx-player";
 
 describe("parseOverflowOpts", () => {
@@ -328,6 +332,113 @@ describe("parseIntersectionOpts", () => {
         expect(parse({ duration: 0 }).duration).toBe(1);
         expect(parse({ duration: -1 }).duration).toBe(1);
         expect(parse({ duration: Number.NaN }).duration).toBe(1);
+        expect(parse({ duration: Number.POSITIVE_INFINITY }).duration).toBe(1);
         expect(warn).toHaveBeenCalledOnce();
+    });
+});
+
+describe("updateIntersection", () => {
+    function makeElement(now: number) {
+        return {
+            intersectionState: createIntersectionState(now),
+            intersection: parseIntersectionOpts({ threshold: 0.5 }),
+            isFullScreen: false,
+            enterTime: now,
+            leaveTime: Number.NEGATIVE_INFINITY,
+        };
+    }
+
+    test("sets enterTime and resets leaveTime on enter", () => {
+        const e = makeElement(0);
+        updateIntersection(e, 1, true, 2);
+        expect(e.enterTime).toBe(2);
+        expect(e.leaveTime).toBe(Number.POSITIVE_INFINITY);
+        expect(e.intersectionState.phase).toBe("entering");
+    });
+
+    test("sets leaveTime on leave", () => {
+        const e = makeElement(0);
+        updateIntersection(e, 1, true, 0);
+        updateIntersection(e, 0, false, 3);
+        expect(e.enterTime).toBe(0);
+        expect(e.leaveTime).toBe(3);
+    });
+
+    test("resets leaveTime to +Infinity on re-enter", () => {
+        const e = makeElement(0);
+        updateIntersection(e, 1, true, 0);
+        updateIntersection(e, 0, false, 1);
+        updateIntersection(e, 1, true, 2);
+        expect(e.enterTime).toBe(2);
+        expect(e.leaveTime).toBe(Number.POSITIVE_INFINITY);
+    });
+
+    test("keeps the times while in/out does not change", () => {
+        const e = makeElement(0);
+        updateIntersection(e, 1, true, 1);
+        updateIntersection(e, 1, true, 2);
+        expect(e.enterTime).toBe(1);
+        expect(e.leaveTime).toBe(Number.POSITIVE_INFINITY);
+    });
+
+    test("moves the progress", () => {
+        const e = makeElement(0);
+        updateIntersection(e, 1, true, 0);
+        updateIntersection(e, 1, true, 0.25);
+        expect(e.intersectionState.enterProgress).toBe(0.25);
+    });
+
+    test("full screen is always in", () => {
+        const e = { ...makeElement(0), isFullScreen: true };
+        updateIntersection(e, 0, false, 0);
+        expect(e.intersectionState.isIn).toBe(true);
+    });
+});
+
+describe("setIntersectionUniforms", () => {
+    function makeUniforms(): Uniforms {
+        return {
+            intersection: { value: 0 },
+            enterTime: { value: 0 },
+            leaveTime: { value: 0 },
+            enterProgress: { value: 0 },
+            leaveProgress: { value: 0 },
+        };
+    }
+
+    test("writes the progress and times", () => {
+        const u = makeUniforms();
+        const state = {
+            ...createIntersectionState(0),
+            enterProgress: 1,
+            leaveProgress: 0.5,
+        };
+        setIntersectionUniforms(
+            u,
+            { intersectionState: state, enterTime: 1, leaveTime: 2 },
+            0.75,
+            3,
+        );
+        expect(u.intersection.value).toBe(0.75);
+        expect(u.enterTime.value).toBe(2);
+        expect(u.leaveTime.value).toBe(1);
+        expect(u.enterProgress.value).toBe(1);
+        expect(u.leaveProgress.value).toBe(0.5);
+    });
+
+    test("clamps infinite times", () => {
+        const u = makeUniforms();
+        setIntersectionUniforms(
+            u,
+            {
+                intersectionState: createIntersectionState(0),
+                enterTime: Number.NEGATIVE_INFINITY,
+                leaveTime: Number.POSITIVE_INFINITY,
+            },
+            0,
+            0,
+        );
+        expect(u.enterTime.value).toBe(1e6);
+        expect(u.leaveTime.value).toBe(-1e6);
     });
 });
