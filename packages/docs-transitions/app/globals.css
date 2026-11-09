@@ -2183,3 +2183,8 @@ em {
 .doc-prose h3 + p {
     margin-top: 8px;
 }
+.doc-prose ul {
+    padding-left: 20px;
+    line-height: 1.7;
+    color: var(--muted);
+}

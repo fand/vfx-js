@@ -45,7 +45,15 @@ export const nav: NavItem[] = [
             { id: "easing", label: "Easing" },
             { id: "size", label: "Fixed size, shared box" },
             { id: "precedence", label: "Which spec wins" },
-            { id: "limitations", label: "Limitations" },
+        ],
+    },
+    {
+        href: "/limitations",
+        label: "Limitations",
+        sections: [
+            { id: "browsers", label: "Browser support" },
+            { id: "motion", label: "Reduced motion" },
+            { id: "other", label: "Other limits" },
         ],
     },
     {
