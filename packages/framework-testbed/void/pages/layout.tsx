@@ -26,6 +26,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 className="outlet"
                 pageKey={path}
                 duration={0.8}
+                autoReverse
             >
                 <div style={{ height: "100%" }}>{children}</div>
             </VFXTransition>

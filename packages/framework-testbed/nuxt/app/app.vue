@@ -27,6 +27,7 @@ useHead(() => ({ title: `${findPage(route.path).label} | Nuxt` }));
         :fullscreen="false"
         :transition="Swipe"
         :duration="0.8"
+        auto-reverse
     >
         <NuxtPage />
     </VFXTransition>
