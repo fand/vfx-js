@@ -2166,15 +2166,9 @@ em {
     .tab-body {
         padding: 20px;
     }
-    .section {
-        padding-top: 80px;
-    }
     /* The next section's top padding is the gap. */
     .split {
         padding-bottom: 0;
-    }
-    .section-features {
-        padding-bottom: 80px;
     }
     /* Too narrow for 4 columns: name, type and default on one line, note below. */
     .preset-table thead {
