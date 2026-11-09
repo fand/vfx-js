@@ -464,27 +464,33 @@ class App {
         });
     }
 
-    // Click an item to apply its effect to the logo and the background.
+    // Click an item to apply its effect to the logo, the tagline and the background.
     initEffectMenu() {
-        const logo = $("#Logo");
         const bg = $("#BG");
         const list = $(".EffectList");
         const slider = $(".EffectSlider") as HTMLInputElement;
         const copy = $(".EffectCopy");
 
         // One effect instance can't be shared between elements, so each target gets its own.
-        const logoEffects = MENU_EFFECTS.map((item) => item.create?.());
+        // The logo and tagline start on their intro shader. They move to the effect path on first use.
+        const texts = [$("#Logo"), $("#LogoTagline")].map((element) => ({
+            element,
+            effects: MENU_EFFECTS.map((item) => item.create?.()),
+            onEffectPath: false,
+        }));
         const bgEffects = MENU_EFFECTS.map((item) => item.create?.());
         let selected = 0;
-        // The logo starts on its intro shader. Move it to the effect path on first use.
-        let logoOnEffectPath = false;
         let queue = Promise.resolve();
 
         const intensity = () => Number.parseFloat(slider.value);
 
         const applyIntensity = () => {
             const item = MENU_EFFECTS[selected];
-            for (const effect of [logoEffects[selected], bgEffects[selected]]) {
+            const effects = [
+                ...texts.map((t) => t.effects[selected]),
+                bgEffects[selected],
+            ];
+            for (const effect of effects) {
                 if (effect) {
                     item.setIntensity?.(effect, intensity());
                 }
@@ -494,29 +500,29 @@ class App {
         const select = (index: number) => {
             selected = index;
             applyIntensity();
-            const logoEffect = logoEffects[index];
             const bgEffect = bgEffects[index];
-            slider.disabled = !logoEffect;
+            slider.disabled = !bgEffect;
             // Run swaps in order so fast clicks can't interleave them.
             queue = queue.then(async () => {
                 if (selected !== index) {
                     return;
                 }
-                const logoChain = logoEffect ? [logoEffect] : [];
+                const updateText = async (text: (typeof texts)[number]) => {
+                    const effect = text.effects[index];
+                    const chain = effect ? [effect] : [];
+                    if (text.onEffectPath) {
+                        await this.vfx.updateEffects(text.element, chain);
+                    } else {
+                        text.onEffectPath = true;
+                        this.vfx.remove(text.element);
+                        await this.vfx.add(text.element, { effect: chain });
+                    }
+                };
                 const bgChain = bgEffect
                     ? [this.bgSpheres, bgEffect]
                     : [this.bgSpheres];
-                const updateLogo = async () => {
-                    if (logoOnEffectPath) {
-                        await this.vfx.updateEffects(logo, logoChain);
-                    } else {
-                        logoOnEffectPath = true;
-                        this.vfx.remove(logo);
-                        await this.vfx.add(logo, { effect: logoChain });
-                    }
-                };
                 await Promise.all([
-                    updateLogo(),
+                    ...texts.map(updateText),
                     this.vfx2.updateEffects(bg, bgChain),
                 ]);
             });
@@ -549,6 +555,26 @@ class App {
                 copy.innerHTML = label;
             }, 1500);
         });
+    }
+
+    // The header stays on top while scrolling. Clip the page and its WebGL layer at the header's
+    // bottom edge, so only the BG shows behind the header.
+    initHeaderClip() {
+        const header = $(".SiteHeader");
+        const page = $(".Page");
+        const canvas = this.vfx.canvas;
+
+        const clipBelow = (element: HTMLElement, edge: number) => {
+            const top = Math.max(0, edge - element.getBoundingClientRect().top);
+            element.style.clipPath = `inset(${top}px 0 0 0)`;
+        };
+        const loop = () => {
+            const edge = header.getBoundingClientRect().bottom;
+            clipBelow(page, edge);
+            clipBelow(canvas, edge);
+            requestAnimationFrame(loop);
+        };
+        loop();
     }
 
     hideMask() {
@@ -598,6 +624,7 @@ class App {
 
 window.addEventListener("load", async () => {
     const app = new App();
+    app.initHeaderClip();
     await app.initBG();
 
     await Promise.all([

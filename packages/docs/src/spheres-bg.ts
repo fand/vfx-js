@@ -115,6 +115,20 @@ void setupSpheres() {
             }
         }
     }
+
+    // Keep the set centered, so it doesn't drift to one side of the screen.
+    // Weight by size, so big spheres count more.
+    vec3 middle = vec3(0);
+    float weightSum = 0.;
+    for (int i = 0; i < SPHERES; i++) {
+        float weight = radii[i] * radii[i];
+        middle += centers[i] * weight;
+        weightSum += weight;
+    }
+    middle /= weightSum;
+    for (int i = 0; i < SPHERES; i++) {
+        centers[i] -= middle;
+    }
 }
 
 // Dark studio lit by 4 rotating light bands and an optional key light.
