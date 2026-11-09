@@ -574,19 +574,15 @@ export const shaders: Record<ShaderPreset, string> = {
     `,
     warpTransition: `
     ${COMMON_HEADER}
-    uniform float enterTime;
-    uniform float leaveTime;
+    uniform float enterProgress;
+    uniform float leaveProgress;
 
     ${READ_TEX}
-
-    #define DURATION 1.0
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        float t1 = enterTime / DURATION;
-        float t2 = leaveTime / DURATION;
-        float t = clamp(min(t1, 1. - t2), 0., 1.);
+        float t = enterProgress * (1. - leaveProgress);
 
         if (t == 0.) {
             discard;
@@ -603,29 +599,24 @@ export const shaders: Record<ShaderPreset, string> = {
     ${COMMON_HEADER}
     ${READ_TEX}
 
-    uniform float enterTime;
-    uniform float leaveTime;
-
-    #define DURATION 1.0
+    uniform float enterProgress;
+    uniform float leaveProgress;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        float t1 = enterTime / DURATION;
-        float t2 = leaveTime / DURATION;
-
-        // Do not render before enter or after leave
-        if (t1 < 0. || 1. < t2) {
+        // Hidden before enter and after leave
+        if (enterProgress == 0.) {
             discard;
         }
 
-        if (0. < t2) {
+        if (0. < leaveProgress) {
             // Leaving
-            float t = 1. - t2;
+            float t = 1. - leaveProgress;
             uv.y = uv.y < t ? uv.y : t;
-        } else if (t1 < 1.) {
+        } else if (enterProgress < 1.) {
             // Entering
-            float t = 1. - t1;
+            float t = 1. - enterProgress;
             uv.y = uv.y < t ? t : uv.y;
         }
 
@@ -636,22 +627,18 @@ export const shaders: Record<ShaderPreset, string> = {
     ${COMMON_HEADER}
     ${READ_TEX}
 
-    uniform float enterTime;
-    uniform float leaveTime;
-
-    #define DURATION 1.0
+    uniform float enterProgress;
+    uniform float leaveProgress;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        float t1 = enterTime / DURATION;
-        float t2 = leaveTime / DURATION;
-        float t = clamp(min(t1, 1. - t2), 0., 1.);
+        float t = enterProgress * (1. - leaveProgress);
 
         if (t == 0.) {
             discard;
         } else if (t < 1.) {
-            float b = floor(t * 64.);
+            float b = max(1., floor(t * 64.));
             uv = (floor(uv * b) + .5) / b;
         }
 
