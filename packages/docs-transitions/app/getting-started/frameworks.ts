@@ -51,6 +51,7 @@ export default function About() {
             "A Server Component can't pass onClick to Link. Wrap the link in a small client component.",
             'Preset classes cross from a Server Component as-is. Pass options as plain params, e.g. <TransitionIn transition={Swipe} params={{ direction: "up" }} />. Make instances with useTransitionInstance in a client component.',
             "loading.tsx shows its fallback as soon as the path changes, so the transition lands on the skeleton.",
+            "Back plays the same spec as forward. Pass autoReverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -105,6 +106,7 @@ export function Tabs() {
         notes: [
             "The old page keeps its own route while it animates out, but useLocation() inside it reads the new location.",
             "Navigate from code with setNextTransition({ transition }) before navigate().",
+            "Back plays the same spec as forward. Pass autoReverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -153,6 +155,7 @@ export default function About() {
         notes: [
             "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
             "This uses the React adapter (@void/react).",
+            "Back plays the same spec as forward. Pass autoReverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -201,6 +204,7 @@ useTransitionIn({ transition: Glitch });
             'The target fills the viewport height and pages scroll inside it. Pass :fullscreen="false" to size it with your own CSS, e.g. under a header.',
             "A link's v-transition spec wins over the page's useTransitionIn.",
             "Navigate from code with setNextTransition({ transition }) before navigateTo().",
+            "Back plays the same spec as forward. Pass auto-reverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -250,6 +254,7 @@ useTransitionIn({ transition: Glitch });
             "A link's v-transition spec wins over the page's useTransitionIn.",
             "A page with an async setup under your own <Suspense> may be captured before it resolves. Use waitFor on <VFXTransition> to wait for it.",
             "Navigate from code with setNextTransition({ transition }) before router.push().",
+            "Back plays the same spec as forward. Pass auto-reverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -294,6 +299,7 @@ useTransitionIn({ transition: Glitch });
             "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
             "A link's transition(spec) wins over the page's transitionIn.",
             "Needs Svelte 5.29 or later for {@attach}. Navigate from code with setNextTransition({ transition }) before goto().",
+            "Back plays the same spec as forward. Pass autoReverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -342,6 +348,7 @@ import Layout from "../layouts/Layout.astro";
             "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
             "Transitions are names: the class names from @vfx-js/transitions in lowercase. Register your own with registerVFX from @vfx-js/astro/client.",
             "A link's data-vfx-transition wins over the page's <TransitionIn>.",
+            "Back plays the same spec as forward. Pass autoReverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
