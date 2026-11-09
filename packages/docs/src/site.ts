@@ -38,7 +38,7 @@ export const nav: NavItem[] = [
         sections: [
             { id: "install", label: "Install" },
             { id: "first-effect", label: "Your first effect" },
-            { id: "data-attributes", label: "data-* attributes" },
+            { id: "options", label: "Options" },
             { id: "frameworks", label: "Frameworks" },
             { id: "next", label: "Next steps" },
         ],

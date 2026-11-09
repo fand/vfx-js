@@ -1,4 +1,5 @@
 ---
+import PageCards from "../components/PageCards.astro";
 import Layout from "../layouts/Layout.astro";
 import { nav, url } from "../site";
 import "../styles/top.css";
@@ -38,21 +39,14 @@ import "../styles/top.css";
         </div>
     </section>
 
-    <section class="PageCards" aria-label="Docs">
-        {
-            nav.map((item, i) => (
-                <a class="PageCard" href={url(`${item.slug}/`)}>
-                    <span class="PageCardNum">
-                        {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <span class="PageCardTitle">{item.label}</span>
-                    <span class="PageCardBlurb">{item.blurb}</span>
-                    <span class="PageCardArrow" aria-hidden="true">
-                        &#8594;
-                    </span>
-                </a>
-            ))
-        }
+    <section class="TopCards" aria-label="Docs">
+        <PageCards
+            items={nav.map((item) => ({
+                href: url(`${item.slug}/`),
+                label: item.label,
+                blurb: item.blurb,
+            }))}
+        />
     </section>
 
     <Fragment slot="overlay">

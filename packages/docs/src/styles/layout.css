@@ -120,9 +120,16 @@
 .DocMain h2 {
     font-size: 2rem;
 }
-.DocMain p {
+.DocMain p,
+.DocMain li {
     font-size: 1.125rem;
     line-height: 1.6;
+}
+.DocMain li + li {
+    margin-top: 6px;
+}
+.DocMain :not(pre) > code {
+    font-size: 0.9em;
 }
 
 .DocSidebar {
@@ -230,6 +237,14 @@
 }
 
 /*================ Fixed elements ================*/
+
+/* Dim the BG behind doc text. Opacity is cheap; a blur backdrop would redraw every frame. */
+.BGCanvas {
+    transition: opacity 0.5s;
+}
+.DocPage .BGCanvas {
+    opacity: 0.35;
+}
 
 #BG {
     position: fixed;

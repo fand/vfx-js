@@ -6,6 +6,8 @@ export const bgVFX = new VFX({
     zIndex: -2,
     scrollPadding: false,
 });
+// Doc pages dim it with CSS (see layout.css).
+bgVFX.canvas.classList.add("BGCanvas");
 
 // #BG covers the viewport. The spheres sit at 65% x.
 export const bgSpheres = new SpheresEffect({ center: [0.65, 0.5], zoom: 1.4 });

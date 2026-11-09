@@ -1,8 +1,270 @@
 ---
-import ComingSoon from "../components/ComingSoon.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+import FrameworkTabs from "../components/FrameworkTabs.astro";
+import PageCards from "../components/PageCards.astro";
 import Layout from "../layouts/Layout.astro";
+import { findNav, url } from "../site";
+
+const firstEffect = `
+import { VFX } from "@vfx-js/core";
+
+const vfx = new VFX();
+const img = document.querySelector("img");
+await vfx.add(img, { shader: "glitch", overflow: 100 });
+`;
+
+const cdn = `
+<script type="module">
+    import { VFX } from "https://esm.sh/@vfx-js/core";
+    // or: "https://cdn.jsdelivr.net/npm/@vfx-js/core/+esm"
+
+    const vfx = new VFX();
+    vfx.add(document.querySelector("img"), { shader: "glitch", overflow: 100 });
+</script>
+`;
+
+// Main VFXProps fields, from packages/vfx-js/src/types.ts.
+const options = [
+    {
+        name: "shader",
+        value: "preset name | GLSL | VFXPass[]",
+        text: "The shader to draw the element with.",
+    },
+    {
+        name: "effect",
+        value: "Effect | Effect[]",
+        text: "Effects from @vfx-js/effects or your own, in place of shader.",
+    },
+    {
+        name: "uniforms",
+        value: "{ name: value | () => value }",
+        text: "Values for your shader. A function runs every frame.",
+    },
+    {
+        name: "overflow",
+        value: "px | [top, right, bottom, left] | true",
+        text: "Draw outside the element. true is fullscreen. Shader only.",
+    },
+    {
+        name: "overlay",
+        value: "true | number",
+        text: "Keep the original element visible, or set its opacity.",
+    },
+    {
+        name: "intersection",
+        value: "{ threshold, rootMargin }",
+        text: "When the element counts as in the viewport.",
+    },
+    {
+        name: "zIndex",
+        value: "number",
+        text: "Draw order inside the canvas.",
+    },
+    {
+        name: "wrap",
+        value: '"repeat" | "clamp" | "mirror"',
+        text: "Texture wrap mode. Default is repeat.",
+    },
+];
+
+const nextSteps = ["how-it-works", "effects", "shaders", "custom-effects", "ai"]
+    .map(findNav)
+    .map((item) => ({
+        href: url(`${item.slug}/`),
+        label: item.label,
+        blurb: item.blurb,
+    }));
 ---
 
-<Layout page="getting-started">
-    <ComingSoon page="getting-started" />
+<Layout
+    page="getting-started"
+    description="Install VFX-JS and add your first WebGL effect to an HTML element."
+>
+    <h1>Getting Started</h1>
+    <p>
+        VFX-JS draws HTML elements with WebGL shaders. You pick an element and a
+        shader. The element keeps its place in the layout.
+    </p>
+
+    <section id="install">
+        <h2>Install</h2>
+        <p>Install the core package from npm:</p>
+        <CodeBlock code="npm i @vfx-js/core" lang="bash" label="Terminal" />
+        <p>
+            Without a bundler, load it from a CDN (<a
+                href="https://esm.sh/"
+                target="_blank"
+                rel="noreferrer">esm.sh</a
+            > or <a
+                href="https://www.jsdelivr.com/package/npm/@vfx-js/core"
+                target="_blank"
+                rel="noreferrer">jsDelivr</a
+            >). This works in CodePen too.
+        </p>
+        <CodeBlock code={cdn} lang="html" label="index.html" />
+    </section>
+
+    <section id="first-effect">
+        <h2>Your first effect</h2>
+        <p>
+            Make one <code>VFX</code> and pass an element to <code>vfx.add</code>.
+        </p>
+        <CodeBlock code={firstEffect} lang="ts" label="main.ts" />
+        <p>This is the result:</p>
+        <div class="Demo">
+            <img
+                id="FirstEffectDemo"
+                src={url("vfx-js-logo-no-padding.svg")}
+                alt="VFX-JS logo with a glitch effect"
+            />
+        </div>
+        <ul>
+            <li>
+                <code>shader</code> takes a preset name like <code>"glitch"</code>,
+                <code>"rgbShift"</code> or <code>"rainbow"</code>, or your own
+                GLSL. See <a href={url("effects/")}>Effects</a> for the full list.
+            </li>
+            <li>
+                <code>overflow</code> lets the effect draw outside the element, in
+                pixels.
+            </li>
+            <li>
+                Make one <code>VFX</code> per page and reuse it. Each one has its
+                own WebGL canvas.
+            </li>
+            <li>
+                <code>vfx.add</code> is async. Await it before you call
+                <code>vfx.remove</code> on the same element.
+            </li>
+            <li>
+                Text and other elements are captured once. Call
+                <code>vfx.update(el)</code> after their content changes.
+            </li>
+            <li>
+                <code>new VFX()</code> throws when WebGL is not available. Wrap it in
+                <code>try</code> / <code>catch</code> so the page still works as plain
+                HTML.
+            </li>
+        </ul>
+    </section>
+
+    <section id="options">
+        <h2>Options</h2>
+        <p>The second argument of <code>vfx.add</code> takes these options:</p>
+        <div class="TableScroll">
+            <table class="Options">
+                <thead>
+                    <tr>
+                        <th>Option</th>
+                        <th>Value</th>
+                        <th>What it does</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {
+                        options.map((option) => (
+                            <tr>
+                                <td>
+                                    <code>{option.name}</code>
+                                </td>
+                                <td class="OptionsValue">{option.value}</td>
+                                <td>{option.text}</td>
+                            </tr>
+                        ))
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p>
+            See <a href={url("docs/types/_vfx-js_core.VFXProps.html")}
+                >VFXProps in the API reference</a
+            > for all options and defaults.
+        </p>
+    </section>
+
+    <section id="frameworks">
+        <h2>Frameworks</h2>
+        <p>
+            Bindings for React, Vue, Svelte and Astro wrap the same
+            <code>vfx.add</code> options. Components on one page share one canvas.
+        </p>
+        <FrameworkTabs />
+    </section>
+
+    <section id="next">
+        <h2>Next steps</h2>
+        <PageCards items={nextSteps} />
+        <p>
+            Or read the <a href={url("docs/")}>API reference</a>.
+        </p>
+    </section>
 </Layout>
+
+<script>
+    import { getPageVFX } from "../page-vfx";
+
+    const img = document.getElementById("FirstEffectDemo");
+    if (img) {
+        try {
+            await getPageVFX().add(img, { shader: "glitch", overflow: 100 });
+        } catch (e) {
+            // No WebGL: the plain image stays.
+            console.warn(e);
+        }
+    }
+</script>
+
+<style>
+    .Demo {
+        display: flex;
+        justify-content: center;
+        padding: 48px 32px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+    }
+    .Demo img {
+        width: min(100%, 480px);
+    }
+    .TableScroll {
+        overflow-x: auto;
+    }
+    .Options {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+    .Options th,
+    .Options td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+    }
+    .Options th {
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+    }
+    .OptionsValue {
+        font-family: var(--mono);
+        font-size: 0.875rem;
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* One block per option on small screens. */
+    @media (max-width: 767px) {
+        .Options thead {
+            display: none;
+        }
+        .Options tr {
+            display: block;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--line);
+        }
+        .Options td {
+            display: block;
+            padding: 2px 0;
+            border: none;
+        }
+    }
+</style>

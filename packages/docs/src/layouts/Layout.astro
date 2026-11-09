@@ -60,7 +60,7 @@ const image = new URL(url("og_image.jpg"), siteUrl).href;
         <link rel="manifest" href={url("manifest.webmanifest")} />
     </head>
 
-    <body>
+    <body class:list={{ DocPage: page }}>
         <Background />
         <Header current={page} />
 

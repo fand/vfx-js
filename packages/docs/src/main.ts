@@ -1,4 +1,4 @@
-import { type Effect, VFX } from "@vfx-js/core";
+import type { Effect } from "@vfx-js/core";
 import {
     AsciiEffect,
     BloomEffect,
@@ -8,6 +8,7 @@ import {
 } from "@vfx-js/effects";
 
 import { bgSpheres, bgVFX, initBackground } from "./background";
+import { getPageVFX } from "./page-vfx";
 
 function $(selector: string, parent?: HTMLElement) {
     return (parent ?? document).querySelector(selector) as HTMLElement;
@@ -179,10 +180,7 @@ await vfx.add(document.querySelector("img"), {
 }
 
 class App {
-    vfx = new VFX({
-        pixelRatio: window.devicePixelRatio,
-        zIndex: -1,
-    });
+    vfx = getPageVFX();
 
     // Click an item to apply its effect to the logo, the tagline and the background.
     initEffectMenu() {
@@ -275,20 +273,6 @@ class App {
         });
     }
 
-    // The header stays on top while scrolling. Clip the WebGL layer at the header's bottom edge,
-    // like the page itself (see Header.astro).
-    initHeaderClip() {
-        const header = $(".SiteHeader");
-        const canvas = this.vfx.canvas;
-        const loop = () => {
-            const edge = header.getBoundingClientRect().bottom;
-            const top = Math.max(0, edge - canvas.getBoundingClientRect().top);
-            canvas.style.clipPath = `inset(${top}px 0 0 0)`;
-            requestAnimationFrame(loop);
-        };
-        loop();
-    }
-
     hideMask() {
         const maskTop = $("#MaskTop");
         maskTop.style.setProperty("height", "0");
@@ -336,7 +320,6 @@ class App {
 
 window.addEventListener("load", async () => {
     const app = new App();
-    app.initHeaderClip();
     await initBackground();
 
     app.initEffectMenu();
