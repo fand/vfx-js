@@ -11,7 +11,10 @@ The public transitions site lives in `packages/docs-transitions/`.
 | SvelteKit | `pnpm --filter @vfx-js/testbed-sveltekit dev` | 5004 |
 | Void | `pnpm --filter @vfx-js/testbed-void dev` | 5005 |
 
+`pnpm run dev:testbed` from the root starts all four, plus watchers for core, the bindings and the transitions.
+
 `shared/` holds the pages, presets and styles the apps share.
+The presets are Swipe and Zoom, so a reversed run is easy to spot.
 
 Each app has a `typecheck` script.
 The Astro one checks `.ts` files only, not `.astro` files.

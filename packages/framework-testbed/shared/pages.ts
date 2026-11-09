@@ -1,7 +1,7 @@
 export type DemoPage = {
     path: string;
     label: string;
-    transition: "crossfade" | "glitch" | "pixelsort";
+    transition: "swipe" | "zoom";
     title: string;
     lead: string;
     images: string[];
@@ -13,16 +13,16 @@ export const pages: [DemoPage, ...DemoPage[]] = [
     {
         path: "/",
         label: "Home",
-        transition: "crossfade",
+        transition: "swipe",
         title: "Shader page transitions",
-        lead: "Each link uses a different preset.",
+        lead: "Links use Swipe or Zoom, so you can see the direction on back.",
         images: [],
         theme: "#0f172a",
     },
     {
         path: "/gallery",
         label: "Gallery",
-        transition: "pixelsort",
+        transition: "zoom",
         title: "Gallery",
         lead: "Images load after the swap. The transition waits for them before it captures the new page.",
         images: [10, 20, 30, 40, 50, 60].map(
@@ -33,7 +33,7 @@ export const pages: [DemoPage, ...DemoPage[]] = [
     {
         path: "/about",
         label: "About",
-        transition: "glitch",
+        transition: "swipe",
         title: "About",
         lead: "The outlet has a fixed size, so old and new content share one box.",
         images: [],
