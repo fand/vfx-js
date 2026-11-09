@@ -76,10 +76,24 @@ The state machine uses `dt` from the virtual clock, same as today.
 
 ### Hysteresis
 
-- `threshold` is the enter threshold.
-- New `leaveThreshold` is the leave threshold. It defaults to `threshold`, so current behavior stays.
-- `isIn` turns true when the ratio reaches `threshold`, and false when it drops below `leaveThreshold`.
-- With `threshold: 0`, keep the current "adjacent counts as in" rule.
+- `threshold`: enter when the ratio rises to it.
+- New `leaveThreshold`: leave when the ratio falls below it. It defaults to `threshold`, so current behavior stays.
+- Each frame, check two conditions:
+  - `above`: ratio ≥ `threshold`
+  - `below`: ratio < `leaveThreshold`
+
+| `above` | `below` | `isIn` |
+|---|---|---|
+| true | false | true |
+| false | true | false |
+| false | false | keep |
+| true | true | keep, but true if `above` just turned true, false if `below` just turned true |
+
+- `leaveThreshold ≤ threshold` never hits the last row, so it is plain hysteresis.
+- `leaveThreshold > threshold` is allowed: scrolling in enters at `threshold`, scrolling out leaves at `leaveThreshold`. A ratio between them that stays still keeps the state.
+- "Just turned true" compares with the last frame, so a big jump across both lines is still caught.
+- On add, the last frame counts as both false.
+- With a threshold of `0`, "adjacent counts as in" stays: `above` is "touching", and `below` is "not touching".
 
 ### Visible ratio
 
@@ -139,7 +153,8 @@ Clamp them to a finite value (e.g. `±1e6`) before upload.
 - `step`: every row of the transition table.
 - Reversal mid-enter and mid-leave: progress continues from the same value, no jump.
 - Large `dt` finishes the phase.
-- Hysteresis: a ratio between `leaveThreshold` and `threshold` does not flip the state.
+- Hysteresis: a ratio between the two thresholds that stays still keeps the state, for both orders of the thresholds.
+- `leaveThreshold > threshold`: scrolling in enters at `threshold`, scrolling out leaves at `leaveThreshold`; a big jump across both lines is caught.
 - Visible ratio reaches 1 for an element taller than the viewport.
 - `timeScale = 0` freezes progress; negative `dt` moves it backward.
 

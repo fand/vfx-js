@@ -133,3 +133,20 @@ In `constants.ts`, all with `uniform float enterProgress; uniform float leavePro
   - `TallElementFocus`: sharp when it fills the screen.
 - Update each story's panel text from "Bug" to "Expected", or keep them as regression stories.
 - Existing "Presets" stories and docs-react examples still play enter on load.
+
+## 8. Edge-triggered thresholds
+
+Follow-up after step 7. See "Hysteresis" in spec.md.
+`leaveThreshold > threshold` is now allowed and means "enter at `threshold` when scrolling in, leave at `leaveThreshold` when scrolling out".
+
+- `intersection-state.ts`:
+  - Add `wasAbove` / `wasBelow` to `IntersectionState`, both false at creation.
+  - `nextIsIn` takes the state (or the two last flags) and follows the spec table; it updates the flags.
+  - A threshold of `0` uses `touching` for `above` and `!touching` for `below`.
+- `vfx-player.ts` `parseIntersectionOpts`: drop the `leaveThreshold` clamp and its warning flag.
+- `types.ts`: rewrite the `leaveThreshold` doc comment: leave when the ratio falls below it; may be above `threshold`.
+- Tests:
+  - `intersection-state.test.ts`: every row of the spec table; a still ratio in the band keeps the state for both threshold orders; scroll in / scroll out with `threshold 0.3`, `leaveThreshold 0.5`; a big jump across both lines; the `0` threshold rule.
+  - `vfx-player.test.ts`: replace the clamp test with "`leaveThreshold` above `threshold` is kept".
+- `skills/vfx-js/references/shader.md`: update the `leaveThreshold` line.
+- Changeset: no change needed unless it mentions the clamp.
