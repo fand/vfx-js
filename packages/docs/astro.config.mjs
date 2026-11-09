@@ -33,6 +33,8 @@ export default defineConfig({
     outDir: "dist",
     base: "/vfx-js",
     trailingSlash: "always",
+    // Compression drops the line break between text and an inline tag on the next line.
+    compressHTML: false,
     integrations: [mdx(), coreSource],
     server: { port: 3001, host: true },
     vite: {
