@@ -19,6 +19,11 @@ import { Vec2, Vec4 } from "./gl/vec.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import { isHicCanvas } from "./hic-canvas.js";
 import { getImageSourceUrl } from "./image-source.js";
+import {
+    createIntersectionState,
+    nextIsIn,
+    stepIntersection,
+} from "./intersection-state.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import { ProgramCache } from "./program-cache.js";
 import {
@@ -50,6 +55,10 @@ import type {
 } from "./types.js";
 
 const gifFor = new Map<HTMLElement, GIFData>();
+
+// Warn about bad intersection options once per page.
+let hasWarnedLeaveThreshold = false;
+let hasWarnedDuration = false;
 
 // The opacity that hides an element under its overlay, or null to leave it as is.
 function hiddenOpacityFor(
@@ -479,6 +488,8 @@ export class VFXPlayer {
             time: { value: 0.0 },
             enterTime: { value: -1.0 },
             leaveTime: { value: -1.0 },
+            enterProgress: { value: 0.0 },
+            leaveProgress: { value: 0.0 },
             mouse: { value: new Vec2() },
             intersection: { value: 0.0 },
             viewport: { value: new Vec4() },
@@ -642,7 +653,7 @@ export class VFXPlayer {
             type,
             element,
             isInViewport: false,
-            isInLogicalViewport: false,
+            intersectionState: createIntersectionState(now),
             // Match the (possibly-ceiled) rect so #resize's width/height
             // comparison stays in the same coordinate system.
             width: rect.right - rect.left,
@@ -770,7 +781,7 @@ export class VFXPlayer {
             type,
             element,
             isInViewport: false,
-            isInLogicalViewport: false,
+            intersectionState: createIntersectionState(now),
             // Match the (possibly-ceiled) rect so #resize's width/height
             // comparison stays in the same coordinate system.
             width: rect.right - rect.left,
@@ -1148,6 +1159,8 @@ export class VFXPlayer {
 
         for (const e of this.#elements) {
             if (e.frozen) {
+                // Resume without a jump when unfrozen.
+                e.intersectionState.lastTime = now;
                 continue;
             }
             const domRect = e.element.getBoundingClientRect();
@@ -1471,6 +1484,8 @@ export class VFXPlayer {
             rectWithOverflow: Rect;
             isVisible: boolean;
             intersection: number;
+            enterProgress: number;
+            leaveProgress: number;
         },
         now: number,
     ): void {
@@ -1536,6 +1551,8 @@ export class VFXPlayer {
             intersection: hit.intersection,
             enterTime: clampTime(now - e.enterTime),
             leaveTime: clampTime(now - e.leaveTime),
+            enterProgress: hit.enterProgress,
+            leaveProgress: hit.leaveProgress,
             resolvedUniforms,
             canvasSize: [canvasW, canvasH],
             canvasBufferSize: [canvasW * pr, canvasH * pr],
@@ -1603,7 +1620,13 @@ export class VFXPlayer {
         e: VFXElement,
         rect: Rect,
         now: number,
-    ): { rectWithOverflow: Rect; isVisible: boolean; intersection: number } {
+    ): {
+        rectWithOverflow: Rect;
+        isVisible: boolean;
+        intersection: number;
+        enterProgress: number;
+        leaveProgress: number;
+    } {
         // Effect path uses chain's max dst pad (device px → CSS
         // for growRect) instead of `e.overflow`, which is shader-only.
         // Lags the actual chain pad by one frame on entry; acceptable.
@@ -1621,26 +1644,34 @@ export class VFXPlayer {
             e.intersection.rootMargin,
         );
         const intersection = getIntersection(viewportWithMargin, rect);
-        const isInLogicalViewport =
+        const wasIn = e.intersectionState.isIn;
+        const isIn =
             e.isFullScreen ||
-            checkIntersection(
-                viewportWithMargin,
-                rect,
+            nextIsIn(
+                wasIn,
                 intersection,
+                isRectInViewport(viewportWithMargin, rect),
                 e.intersection.threshold,
+                e.intersection.leaveThreshold,
             );
 
-        // Update transition timing
-        if (!e.isInLogicalViewport && isInLogicalViewport /* out -> in */) {
+        // Legacy enterTime / leaveTime uniforms
+        if (!wasIn && isIn) {
             e.enterTime = now;
             e.leaveTime = Number.POSITIVE_INFINITY;
         }
-        if (e.isInLogicalViewport && !isInLogicalViewport /* in -> out */) {
+        if (wasIn && !isIn) {
             e.leaveTime = now;
         }
 
+        const { enterProgress, leaveProgress } = stepIntersection(
+            e.intersectionState,
+            isIn,
+            now,
+            e.intersection.duration,
+        );
+
         e.isInViewport = isInViewport;
-        e.isInLogicalViewport = isInLogicalViewport;
 
         // Quit if the element has left and the transition has ended
         const isVisible =
@@ -1654,9 +1685,17 @@ export class VFXPlayer {
             u["intersection"].value = intersection;
             u["enterTime"].value = clampTime(now - e.enterTime);
             u["leaveTime"].value = clampTime(now - e.leaveTime);
+            u["enterProgress"].value = enterProgress;
+            u["leaveProgress"].value = leaveProgress;
         }
 
-        return { isVisible, intersection, rectWithOverflow };
+        return {
+            isVisible,
+            intersection,
+            rectWithOverflow,
+            enterProgress,
+            leaveProgress,
+        };
     }
 
     #getShader(shaderNameOrCode: string): string {
@@ -1961,6 +2000,8 @@ export class VFXPlayer {
             intersection: 1,
             enterTime: 0,
             leaveTime: 0,
+            enterProgress: 1,
+            leaveProgress: 0,
             resolvedUniforms,
             canvasSize,
             canvasBufferSize,
@@ -2182,20 +2223,6 @@ export function isRectInViewport(viewport: Rect, rect: Rect): boolean {
     );
 }
 
-export function checkIntersection(
-    viewport: Rect,
-    rect: Rect,
-    intersection: number,
-    threshold: number,
-): boolean {
-    if (threshold === 0) {
-        // if threshold === 0, consider adjacent rects to be intersecting.
-        return isRectInViewport(viewport, rect);
-    } else {
-        return intersection >= threshold;
-    }
-}
-
 export function parseOverflowOpts(
     overflow: VFXProps["overflow"],
 ): [isFullScreen: boolean, Margin] {
@@ -2260,9 +2287,34 @@ export function parseIntersectionOpts(
 ): VFXElementIntersection {
     const threshold = intersectionOpts?.threshold ?? 0;
     const rootMargin = createMargin(intersectionOpts?.rootMargin ?? 0);
+
+    let leaveThreshold = intersectionOpts?.leaveThreshold ?? threshold;
+    if (leaveThreshold > threshold) {
+        if (!hasWarnedLeaveThreshold) {
+            hasWarnedLeaveThreshold = true;
+            console.warn(
+                `[VFX-JS] \`intersection.leaveThreshold\` (${leaveThreshold}) is above \`threshold\` (${threshold}). Using \`threshold\` instead.`,
+            );
+        }
+        leaveThreshold = threshold;
+    }
+
+    let duration = intersectionOpts?.duration ?? 1;
+    if (!(duration > 0)) {
+        if (!hasWarnedDuration) {
+            hasWarnedDuration = true;
+            console.warn(
+                `[VFX-JS] \`intersection.duration\` must be above 0, got ${duration}. Using 1 instead.`,
+            );
+        }
+        duration = 1;
+    }
+
     return {
         threshold,
+        leaveThreshold,
         rootMargin,
+        duration,
     };
 }
 

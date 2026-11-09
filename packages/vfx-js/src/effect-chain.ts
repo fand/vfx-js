@@ -31,6 +31,8 @@ export type ChainFrameInput = {
     intersection: number;
     enterTime: number;
     leaveTime: number;
+    enterProgress: number;
+    leaveProgress: number;
     resolvedUniforms: Record<string, EffectUniformValue>;
 
     /** Canvas size (= viewport-inner + scrollPadding on each side), CSS px. */
@@ -280,6 +282,8 @@ export class EffectChain {
                 intersection: input.intersection,
                 enterTime: input.enterTime,
                 leaveTime: input.leaveTime,
+                enterProgress: input.enterProgress,
+                leaveProgress: input.leaveProgress,
                 uniforms: input.resolvedUniforms,
             });
         }

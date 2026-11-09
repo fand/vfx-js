@@ -1,8 +1,9 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { RECT_ZERO } from "./rect";
 import {
     getIntermediatePassUniforms,
     isRectInViewport,
+    parseIntersectionOpts,
     parseOverflowOpts,
 } from "./vfx-player";
 
@@ -272,5 +273,62 @@ describe("getIntermediatePassUniforms", () => {
         });
         expect(toBuffer([0, 0], u, [60, 35])).toStrictEqual([0, 0]);
         expect(toBuffer([1, 1], u, [60, 35])).toStrictEqual([1, 1]);
+    });
+});
+
+describe("parseIntersectionOpts", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    // Fresh module, so the once-per-page warning flags start unset.
+    async function importFresh() {
+        vi.resetModules();
+        return (await import("./vfx-player")).parseIntersectionOpts;
+    }
+
+    test("defaults", () => {
+        expect(parseIntersectionOpts(undefined)).toEqual({
+            threshold: 0,
+            leaveThreshold: 0,
+            rootMargin: { top: 0, right: 0, bottom: 0, left: 0 },
+            duration: 1,
+        });
+    });
+
+    test("leaveThreshold defaults to threshold", () => {
+        expect(parseIntersectionOpts({ threshold: 0.5 }).leaveThreshold).toBe(
+            0.5,
+        );
+    });
+
+    test("keeps leaveThreshold below threshold", () => {
+        const opts = parseIntersectionOpts({
+            threshold: 0.5,
+            leaveThreshold: 0.2,
+        });
+        expect(opts.leaveThreshold).toBe(0.2);
+    });
+
+    test("clamps leaveThreshold above threshold, warns once", async () => {
+        const parse = await importFresh();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const opts = { threshold: 0.2, leaveThreshold: 0.5 };
+        expect(parse(opts).leaveThreshold).toBe(0.2);
+        expect(parse(opts).leaveThreshold).toBe(0.2);
+        expect(warn).toHaveBeenCalledOnce();
+    });
+
+    test("keeps a valid duration", () => {
+        expect(parseIntersectionOpts({ duration: 0.5 }).duration).toBe(0.5);
+    });
+
+    test("falls back to duration 1, warns once", async () => {
+        const parse = await importFresh();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        expect(parse({ duration: 0 }).duration).toBe(1);
+        expect(parse({ duration: -1 }).duration).toBe(1);
+        expect(parse({ duration: Number.NaN }).duration).toBe(1);
+        expect(warn).toHaveBeenCalledOnce();
     });
 });

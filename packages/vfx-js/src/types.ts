@@ -5,6 +5,7 @@ import type { Framebuffer } from "./gl/framebuffer.js";
 import type { Pass } from "./gl/pass.js";
 import type { GlslVersion, Uniforms } from "./gl/program.js";
 import type { Texture } from "./gl/texture.js";
+import type { IntersectionState } from "./intersection-state.js";
 import type { ElementRect, Margin, MarginOpts } from "./rect.js";
 
 export type { GlslVersion } from "./gl/program.js";
@@ -317,8 +318,21 @@ export type VFXProps = {
         /** Threshold for the element to be considered "entered" to the viewport. */
         threshold?: number;
 
+        /**
+         * Ratio below which the element is considered "left".
+         * Use a value below `threshold` to stop flicker at the edge.
+         * Values above `threshold` are clamped to it. (Default: `threshold`)
+         */
+        leaveThreshold?: number;
+
         /** Margin of the viewport to be used in intersection calculcation. */
         rootMargin?: MarginOpts;
+
+        /**
+         * Seconds for the enter and leave transitions.
+         * Drives the `enterProgress` / `leaveProgress` uniforms. (Default: `1`)
+         */
+        duration?: number;
     };
 
     /**
@@ -450,7 +464,8 @@ export type VFXElement = {
     type: VFXElementType;
     element: HTMLElement;
     isInViewport: boolean;
-    isInLogicalViewport: boolean;
+    /** Enter/leave state that drives `enterProgress` / `leaveProgress`. */
+    intersectionState: IntersectionState;
     width: number;
     height: number;
     passes: VFXElementPass[];
@@ -490,7 +505,9 @@ export type VFXElement = {
 
 export type VFXElementIntersection = {
     threshold: number;
+    leaveThreshold: number;
     rootMargin: Margin;
+    duration: number;
 };
 
 /** Configuration for post effects that are applied to the final canvas output. */
@@ -815,6 +832,12 @@ export type EffectContext = {
     readonly intersection: number;
     readonly enterTime: number;
     readonly leaveTime: number;
+
+    /** Enter transition progress, 0 to 1. Plays backward on reversal. */
+    readonly enterProgress: number;
+
+    /** Leave transition progress, 0 to 1. Stays 0 until enter finishes. */
+    readonly leaveProgress: number;
 
     /** Element capture texture (read-only input for the first stage). */
     readonly src: EffectTexture;
