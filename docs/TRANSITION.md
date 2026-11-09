@@ -15,7 +15,9 @@ A run works like this:
 
 The element is plain DOM at rest. VFX-JS wraps it only while a run is in
 flight. With html-in-canvas the capture uses `drawElementImage`;
-without it, VFX-JS falls back to dom-to-canvas, which is slower.
+without it, VFX-JS falls back to dom-to-canvas, a workaround that
+misses some content (pseudo-elements, web fonts, `<canvas>`, `<video>`,
+`<iframe>` and more).
 
 ## Examples
 
@@ -79,13 +81,15 @@ A new `pageKey` starts a run. The old page stays on screen until the
 transition has its snapshot. The incoming page can pick its own
 transition with `<TransitionIn>`.
 
-### Vue and Svelte
+### Vue, Svelte and Astro
 
-Nuxt, Vue Router and SvelteKit have their own `<VFXTransition>`:
-[`@vfx-js/vue/nuxt`, `@vfx-js/vue/router`](../packages/vue/README.md) and
-[`@vfx-js/svelte/sveltekit`](../packages/svelte/README.md).
+Nuxt, Vue Router, SvelteKit and Astro have their own `<VFXTransition>`:
+[`@vfx-js/vue/nuxt`, `@vfx-js/vue/router`](../packages/vue/README.md),
+[`@vfx-js/svelte/sveltekit`](../packages/svelte/README.md) and
+[`@vfx-js/astro`](../packages/astro/README.md).
 Each path is one page. Pages pick their transition with
-`useTransitionIn` (Vue) or `transitionIn` (Svelte).
+`useTransitionIn` (Vue), `transitionIn` (Svelte) or `<TransitionIn>`
+(Astro).
 
 ## Core API
 
