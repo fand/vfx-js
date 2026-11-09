@@ -201,11 +201,12 @@ export default function HowItWorks() {
                         reach the wrong class.
                     </p>
                     <p>
-                        In React the run&apos;s <code>RunOpts</code> is one
-                        whole spec: a <code>transition()</code> click or{" "}
-                        <code>setNextTransition()</code> if set, else the
-                        incoming page&apos;s <code>&lt;TransitionIn&gt;</code>.
-                        The two are not merged.
+                        With a router <code>&lt;VFXTransition&gt;</code>, the
+                        run&apos;s <code>RunOpts</code> is one whole spec: a
+                        link spec or <code>setNextTransition()</code> if set,
+                        else the incoming page&apos;s{" "}
+                        <code>&lt;TransitionIn&gt;</code>. The two are not
+                        merged.
                     </p>
                 </div>
                 <Code label="spec.ts">{`

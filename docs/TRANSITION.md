@@ -728,9 +728,9 @@ const fx = useTransitionInstance(Glitch, { speed: 2 });
 - Next.js `loading.tsx` shows its fallback as soon as the path changes,
   so the transition lands on the skeleton. Use `useVFXTransition` with
   your own ready signal instead.
-- `<VFXTransition>` does not support Astro ClientRouter, Turbo, htmx or
-  multi-page (cross-document) navigation. You can wire core `run(cb)` to
-  them by hand.
+- `<VFXTransition>` does not support Turbo, htmx or multi-page
+  (cross-document) navigation. You can wire core `run(cb)` to them by
+  hand. For Astro ClientRouter, use `@vfx-js/astro`.
 - `<body>` cannot be the target, since a canvas cannot wrap it. Target the
   router outlet (`#app`, `<main>`).
 - There is one pending click spec per page, shared by all

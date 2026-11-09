@@ -143,6 +143,12 @@ export default function Api() {
                 <p className="lead">
                     Core works on any element. The React bindings wrap it for
                     routers. Presets live in <code>@vfx-js/transitions</code>.
+                    Vue, Svelte and Astro have the same pieces under their own
+                    names; see{" "}
+                    <Link href="/getting-started" className="text-link">
+                        Getting Started
+                    </Link>
+                    .
                 </p>
             </section>
 

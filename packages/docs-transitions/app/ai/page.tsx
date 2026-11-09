@@ -29,7 +29,7 @@ Keep all panels in the DOM and use show(). Swipe right when the new tab is to th
     },
     {
         label: "Other routers",
-        text: `Wire VFX-JS transitions to Astro's ClientRouter with core run(cb).
+        text: `Wire VFX-JS transitions to Turbo Drive with core run(cb).
 Hold the navigation until the snapshot is taken. Target the <main> outlet.`,
     },
 ];
@@ -76,7 +76,8 @@ export default function UseWithAI() {
                     </p>
                     <p>
                         It covers the presets, <code>show</code> and{" "}
-                        <code>run</code>, React, Vue and Svelte, custom transitions,
+                        <code>run</code>, React, Vue, Svelte and Astro, custom
+                        transitions,
                         and the pitfalls. The agent reads it when a task needs
                         it.
                     </p>
