@@ -3,9 +3,6 @@ import type { VFX, VFXProps } from "@vfx-js/core";
 import Jellyfish from "./assets/jellyfish.webp";
 import { initVFX } from "./utils";
 
-// Cases where the enter/leave presets break today.
-// See docs/tasks/intersection-fix/spec.md.
-
 type Preset =
     | "warpTransition"
     | "slitScanTransition"
@@ -30,8 +27,8 @@ type SceneContext = {
 
 type SceneOpts = {
     preset: Preset;
-    /** What goes wrong, shown in the panel. */
-    bug: string;
+    /** What should happen, shown in the panel. */
+    expected: string;
     steps: Step[];
     tall?: boolean;
     intersection?: VFXProps["intersection"];
@@ -117,10 +114,10 @@ function scene(opts: SceneOpts): StoryObj<{ preset: Preset }> {
             const panel = document.createElement("div");
             panel.style.cssText =
                 "position:fixed;top:16px;left:16px;max-width:360px;padding:12px;background:#000c;color:white;font:13px/1.5 sans-serif;z-index:10001";
-            const bug = document.createElement("p");
-            bug.style.margin = "0 0 8px";
-            bug.textContent = `Bug: ${opts.bug}`;
-            panel.append(bug);
+            const expected = document.createElement("p");
+            expected.style.margin = "0 0 8px";
+            expected.textContent = `Expected: ${opts.expected}`;
+            panel.append(expected);
             for (const step of opts.steps) {
                 const button = document.createElement("button");
                 button.textContent = step.label;
@@ -162,7 +159,8 @@ const reset: Step = {
 
 export const ReverseMidLeave = scene({
     preset: "warpTransition",
-    bug: "Scrolling back mid-leave makes the image vanish at once, then enter from the start.",
+    expected:
+        "Scrolling back mid-leave plays the leave backward, so the image comes back from where it was.",
     steps: [
         reset,
         {
@@ -180,7 +178,8 @@ export const ReverseMidLeave = scene({
 
 export const LeaveMidEnter = scene({
     preset: "slitScanTransition",
-    bug: "Leaving mid-enter jumps to the fully shown image, then wipes out.",
+    expected:
+        "Leaving mid-enter turns the wipe back from where it was, with no jump to the fully shown image.",
     steps: [
         reset,
         {
@@ -196,7 +195,8 @@ export const LeaveMidEnter = scene({
 
 export const PixelateDivideByZero = scene({
     preset: "pixelateTransition",
-    bug: "Right after enter, t < 1/64 divides by zero. timeScale is slowed so the broken frame lasts about 3s.",
+    expected:
+        "Right after enter, the image shows as one large block, with no broken frame. timeScale is slowed so this lasts about 3s.",
     timeScale: 0.005,
     steps: [
         reset,
@@ -209,7 +209,8 @@ export const PixelateDivideByZero = scene({
 
 export const TallElementThreshold = scene({
     preset: "warpTransition",
-    bug: "The image is twice the viewport height, so the ratio never reaches threshold 0.6 and it never enters.",
+    expected:
+        "The image is twice the viewport height. It still reaches threshold 0.6 and enters.",
     tall: true,
     marginRatio: 0,
     intersection: { threshold: 0.6 },
@@ -224,7 +225,8 @@ export const TallElementThreshold = scene({
 
 export const TallElementFocus = scene({
     preset: "focusTransition",
-    bug: "The image is twice the viewport height, so intersection stays at 0.5: blurred and dim even when it fills the screen.",
+    expected:
+        "The image is twice the viewport height. It is sharp and bright when it fills the screen.",
     tall: true,
     marginRatio: 0,
     steps: [
