@@ -28,6 +28,8 @@ export type RunProps = {
 export type TransitionProps = RunProps & {
     keepWrapped?: boolean;
     waitFor?: "media" | "none";
+    /** On back, play the spec that entered the page, reversed. Needs the Navigation API. */
+    autoReverse?: boolean;
 };
 
 const ELEMENT_KEYS = [

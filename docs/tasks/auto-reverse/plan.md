@@ -50,7 +50,7 @@ function createHistorySpecs(getEntry?: () => HistoryEntry | undefined): HistoryS
 ```
 
 - One shared instance per document, at module level.
-  Not per handle: Astro makes a new handle on each navigation, since the target is swapped.
+  Not per handle: Astro makes a new handle when a page has no target, and the next page has one again.
   One page has one router, so sharing is fine.
 - In memory: `Map<string, RunOpts>` by entry key. Specs hold classes, so no `sessionStorage`.
 - `last` entry starts at `getEntry()` on first use.
@@ -91,8 +91,10 @@ Core reads the index right after `cb` resolves. The binding must change history 
 - Next.js: fine. **Checked** (16.4.3).
   `HistoryUpdater` pushes in `useInsertionEffect`, in the commit that changes the pathname.
   Our run starts later, in a passive effect.
-- Astro: ClientRouter pushes history right after the swap. Our `cb` resolves inside the swap. **Check.**
-  Fix if needed: resolve on `astro:after-swap`.
+- Astro: **Checked** (7.4.2), and fixed.
+  `updateDOM` runs `doSwap`, then `moveToLocation` (push), then fires `astro:after-swap`.
+  `cb` used to resolve inside the swap, racing the push.
+  It now resolves on `astro:after-swap`.
 - Popstate is always fine: the browser changes the entry first.
 
 ## Steps
@@ -116,9 +118,10 @@ Core reads the index right after `cb` resolves. The binding must change history 
 
 ## Verify after implementation
 
-- Astro remakes the handle on each navigation.
-  `bind()` calls `addTransition` again when the target leaves the DOM, and ClientRouter swaps the body.
-  Check in the testbed that it really does, and that the module-level store keeps specs across handles.
+- Astro keeps one handle across navigations.
+  `swapKeepingTarget` keeps the live target, so `bind()` reuses it.
+  A new handle comes only when a page has no target, then the next page has one.
+  Check in the testbed that specs survive that case too, via the module-level store.
 
 ## Open points
 
