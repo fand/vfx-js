@@ -2169,7 +2169,10 @@ em {
     .section {
         padding-top: 80px;
     }
-    .split,
+    /* The next section's top padding is the gap. */
+    .split {
+        padding-bottom: 0;
+    }
     .section-features {
         padding-bottom: 80px;
     }
