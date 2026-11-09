@@ -10,7 +10,7 @@ import {
 } from "@vfx-js/effects";
 
 import Prism from "prismjs";
-import { SpheresEffect } from "./spheres-bg";
+import { bgSpheres, bgVFX, initBackground } from "./background";
 
 Prism.manual = true;
 Prism.highlightAll();
@@ -233,37 +233,6 @@ class App {
         pixelRatio: window.devicePixelRatio,
         zIndex: -1,
     });
-    vfx2 = new VFX({
-        pixelRatio: 1,
-        zIndex: -2,
-        scrollPadding: false,
-    });
-
-    // #BG covers the viewport. The spheres sit at 65% x.
-    bgSpheres = new SpheresEffect({ center: [0.65, 0.5], zoom: 1.4 });
-
-    async initBG() {
-        const bg = $("#BG");
-
-        let scroll = 0;
-        function lerp(a: number, b: number, t: number): number {
-            return a * (1 - t) + b * t;
-        }
-
-        // Parallax moves the spheres in the shader. Moving #BG itself would crop them at its bottom edge.
-        const loop = () => {
-            scroll = lerp(scroll, window.scrollY, 0.03);
-            this.bgSpheres.center = [
-                0.65,
-                0.5 + (scroll * 0.1) / window.innerHeight,
-            ];
-
-            requestAnimationFrame(loop);
-        };
-        loop();
-
-        await this.vfx2.add(bg, { effect: [this.bgSpheres] });
-    }
 
     async initVFX() {
         await Promise.all(
@@ -329,7 +298,7 @@ class App {
             isMouseOn = true;
             target = [e.offsetX, e.offsetY];
         });
-        canvas.addEventListener("mouseleave", (e) => {
+        canvas.addEventListener("mouseleave", () => {
             isMouseOn = false;
         });
 
@@ -517,12 +486,10 @@ class App {
                         await this.vfx.add(text.element, { effect: chain });
                     }
                 };
-                const bgChain = bgEffect
-                    ? [this.bgSpheres, bgEffect]
-                    : [this.bgSpheres];
+                const bgChain = bgEffect ? [bgSpheres, bgEffect] : [bgSpheres];
                 await Promise.all([
                     ...texts.map(updateText),
-                    this.vfx2.updateEffects(bg, bgChain),
+                    bgVFX.updateEffects(bg, bgChain),
                 ]);
             });
         };
@@ -556,21 +523,15 @@ class App {
         });
     }
 
-    // The header stays on top while scrolling. Clip the page and its WebGL layer at the header's
-    // bottom edge, so only the BG shows behind the header.
+    // The header stays on top while scrolling. Clip the WebGL layer at the header's bottom edge,
+    // like the page itself (see Header.astro).
     initHeaderClip() {
         const header = $(".SiteHeader");
-        const page = $(".Page");
         const canvas = this.vfx.canvas;
-
-        const clipBelow = (element: HTMLElement, edge: number) => {
-            const top = Math.max(0, edge - element.getBoundingClientRect().top);
-            element.style.clipPath = `inset(${top}px 0 0 0)`;
-        };
         const loop = () => {
             const edge = header.getBoundingClientRect().bottom;
-            clipBelow(page, edge);
-            clipBelow(canvas, edge);
+            const top = Math.max(0, edge - canvas.getBoundingClientRect().top);
+            canvas.style.clipPath = `inset(${top}px 0 0 0)`;
             requestAnimationFrame(loop);
         };
         loop();
@@ -624,7 +585,7 @@ class App {
 window.addEventListener("load", async () => {
     const app = new App();
     app.initHeaderClip();
-    await app.initBG();
+    await initBackground();
 
     await Promise.all([
         await app.initVFX(),

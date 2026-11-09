@@ -1,124 +1,51 @@
 ---
-import "../index.css";
+import Layout from "../layouts/Layout.astro";
 import "prism-themes/themes/prism-nord.min.css";
+import "../styles/top.css";
 ---
 
-<!doctype html>
-<html lang="en">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+<Layout class="Top">
+    <noscript>You need to enable JavaScript to run this app.</noscript>
 
-        <title>VFX-JS - Visual Effects Framework for Web #VFXJS</title>
+    <section class="Hero">
+        <div class="HeroMain">
+            <img id="Logo" src="./vfx-js-logo-no-padding.svg" alt="VFX-JS" />
+            <p id="LogoTagline" class="HeroTagline">
+                WebGL effects for HTML.
+            </p>
+        </div>
 
-        <meta name="theme-color" content="#000000" />
-        <meta
-            name="description"
-            content="VFX-JS is a JavaScript library to add WebGL powered effects to your website."
-        />
+        <div class="EffectMenu">
+            <p class="EffectMenuTitle">TRY AN EFFECT</p>
+            <ol class="EffectList"></ol>
+            <label class="EffectIntensity">
+                <span>INTENSITY</span>
+                <input
+                    class="EffectSlider"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value="0.6"
+                />
+            </label>
+            <button class="EffectCopy" type="button">Copy code &#8599;</button>
+        </div>
 
-        <meta property="og:url" content="https://amagi.dev/vfx-js/" />
-        <meta property="og:type" content="website" />
-        <meta
-            property="og:title"
-            content="VFX-JS - Visual Effects Framework for Web #VFXJS"
-        />
-        <meta property="og:image" content="og_image.jpg" />
-        <meta
-            property="og:description"
-            content="VFX-JS is a JavaScript library to add WebGL powered effects to your website."
-        />
-        <meta
-            property="og:site_name"
-            content="VFX-JS - Visual Effects Framework for Web #VFXJS"
-        />
-        <meta property="og:locale" content="en_US" />
+        <div class="HeroFoot">
+            <span>SCROLL TO EXPLORE &#8595;</span>
+            <span>@vfx-js/effects</span>
+        </div>
+    </section>
 
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:site" content="@amagitakayosi" />
-        <meta name="twitter:creator" content="@amagitakayosi" />
-        <meta name="twitter:url" content="https://amagi.dev/vfx-js/" />
-        <meta
-            name="twitter:title"
-            content="VFX-JS - Visual Effects Framework for Web #VFXJS"
-        />
-        <meta
-            name="twitter:description"
-            content="VFX-JS is a JavaScript library to add WebGL powered effects to your website."
-        />
-        <meta
-            name="twitter:image"
-            content="https://amagi.dev/vfx-js/og_image.jpg"
-        />
+    <section class="UsageSection">
+        <h2>Usage</h2>
 
-        <!-- favicons -->
-        <link rel="icon" href="favicon/favicon.ico" sizes="32x32" />
-        <link rel="icon" href="favicon/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="favicon/favicon-180.png" />
-        <link rel="manifest" href="./manifest.webmanifest" />
+        <p>Install via npm:</p>
+        <pre is:raw><code class="language-bash">npm i @vfx-js/core</code></pre>
 
-    </head>
-
-    <body>
-        <noscript>You need to enable JavaScript to run this app.</noscript>
-
-        <div id="BG"></div>
-
-        <header class="SiteHeader">
-            <img
-                class="SiteHeaderLogo"
-                src="./vfx-js-logo-no-padding.svg"
-                alt="VFX-JS"
-            />
-            <nav>
-                <a href="#examples">Examples</a>
-                <a href="./docs/" target="_blank">Docs</a>
-                <a href="https://github.com/fand/vfx-js" target="_blank"
-                    >GitHub &#8599;</a
-                >
-            </nav>
-        </header>
-
-        <main class="Page">
-        <section class="Hero">
-            <div class="HeroMain">
-                <img id="Logo" src="./vfx-js-logo-no-padding.svg" alt="VFX-JS" />
-                <p id="LogoTagline" class="HeroTagline">
-                    WebGL effects for HTML.
-                </p>
-            </div>
-
-            <div class="EffectMenu">
-                <p class="EffectMenuTitle">TRY AN EFFECT</p>
-                <ol class="EffectList"></ol>
-                <label class="EffectIntensity">
-                    <span>INTENSITY</span>
-                    <input
-                        class="EffectSlider"
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value="0.6"
-                    />
-                </label>
-                <button class="EffectCopy" type="button">Copy code &#8599;</button>
-            </div>
-
-            <div class="HeroFoot">
-                <span>SCROLL TO EXPLORE &#8595;</span>
-                <span>@vfx-js/effects</span>
-            </div>
-        </section>
-
-        <section class="UsageSection">
-            <h2>Usage</h2>
-
-            <p>Install via npm:</p>
-            <pre is:raw><code class="language-bash">npm i @vfx-js/core</code></pre>
-
-            <p>Then create <code>VFX</code> object in your script:</p>
-            <pre is:raw><code class="language-javascript">
+        <p>Then create <code>VFX</code> object in your script:</p>
+        <pre is:raw><code class="language-javascript">
 import { VFX } from '@vfx-js/core';
 
 const img = document.querySelector('#img');
@@ -126,27 +53,27 @@ const img = document.querySelector('#img');
 const vfx = new VFX();
 vfx.add(img, { shader: "glitch", overflow: 100 });
             </code></pre>
-            <p>This will be rendered as follows:</p>
-            <img
-                src="./vfx-js-logo-no-padding.svg"
-                data-shader="glitch"
-                data-overflow="100"
-            />
+        <p>This will be rendered as follows:</p>
+        <img
+            src="./vfx-js-logo-no-padding.svg"
+            data-shader="glitch"
+            data-overflow="100"
+        />
 
-            <p>
-                VFX-JS is also available on CDNs (<a
-                    href="https://esm.sh/"
-                    target="_blank"
-                    >esm.sh</a
-                >
-                or
-                <a
-                    href="https://www.jsdelivr.com/package/npm/@vfx-js/core"
-                    target="_blank"
-                    >jsDeliver</a
-                >). So you can use VFX-JS in CodePen etc:
-            </p>
-            <pre is:raw><code class="language-javascript">
+        <p>
+            VFX-JS is also available on CDNs (<a
+                href="https://esm.sh/"
+                target="_blank"
+                >esm.sh</a
+            >
+            or
+            <a
+                href="https://www.jsdelivr.com/package/npm/@vfx-js/core"
+                target="_blank"
+                >jsDeliver</a
+            >). So you can use VFX-JS in CodePen etc:
+        </p>
+        <pre is:raw><code class="language-javascript">
 // Load VFX-JS from esm.sh
 import { VFX } from "https://esm.sh/@vfx-js/core";
 
@@ -158,98 +85,98 @@ const vfx = new VFX();
 vfx.add(img { shader: 'rgbShift' });
             </code></pre>
 
-            <iframe
-                height="300"
-                style="width: 100%"
-                scrolling="no"
-                title="VFX-JS minimal example"
-                src="https://codepen.io/fand/embed/preview/ZENvdEM?default-tab=result"
-                frameborder="no"
-                loading="lazy"
-                allowtransparency="true"
-                allowfullscreen="true"
+        <iframe
+            height="300"
+            style="width: 100%"
+            scrolling="no"
+            title="VFX-JS minimal example"
+            src="https://codepen.io/fand/embed/preview/ZENvdEM?default-tab=result"
+            frameborder="no"
+            loading="lazy"
+            allowtransparency="true"
+            allowfullscreen="true"
+        >
+            See the Pen
+            <a href="https://codepen.io/fand/pen/ZENvdEM">
+                VFX-JS minimal example</a
             >
-                See the Pen
-                <a href="https://codepen.io/fand/pen/ZENvdEM">
-                    VFX-JS minimal example</a
-                >
-                by fand (<a href="https://codepen.io/fand">@fand</a>) on
-                <a href="https://codepen.io">CodePen</a>.
-            </iframe>
-        </section>
+            by fand (<a href="https://codepen.io/fand">@fand</a>) on
+            <a href="https://codepen.io">CodePen</a>.
+        </iframe>
+    </section>
 
-        <section class="ExampleSection" id="examples">
-            <h2>Examples</h2>
+    <section class="ExampleSection" id="examples">
+        <h2>Examples</h2>
 
-            <section>
-                <div class="row">
-                    <div class="col">
-                        <p>Image</p>
-                        <pre is:raw><code class="language-html">
+        <section>
+            <div class="row">
+                <div class="col">
+                    <p>Image</p>
+                    <pre is:raw><code class="language-html">
 &lt;img src="example.png" /&gt;
                     </code></pre>
-                        <pre is:raw><code class="language-javascript">
+                    <pre is:raw><code class="language-javascript">
 vfx.add(img, { shader: "rgbShift" });
                     </code></pre>
-                    </div>
-                    <div class="col">
-                        <p>Output</p>
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="rgbShift"
-                        />
-                    </div>
                 </div>
+                <div class="col">
+                    <p>Output</p>
+                    <img
+                        src="./vfx-js-logo-no-padding.svg"
+                        data-shader="rgbShift"
+                    />
+                </div>
+            </div>
 
-                <div class="row">
-                    <div class="col">
-                        <p>GIF</p>
-                        <pre is:raw><code class="language-html">
+            <div class="row">
+                <div class="col">
+                    <p>GIF</p>
+                    <pre is:raw><code class="language-html">
 &lt;img src="example.gif" /&gt;
                     </code></pre>
-                        <pre is:raw><code class="language-javascript">
+                    <pre is:raw><code class="language-javascript">
 vfx.add(gif, { shader: "rainbow" });
                     </code></pre>
-                    </div>
-                    <div class="col">
-                        <p>Output</p>
-                        <img
-                            src="./nyancat.gif"
-                            data-shader="rainbow"
-                            style="
-                                transform: scale(0.5) translateY(-25%);
-                                margin-bottom: -25%;
-                            "
-                        />
-                    </div>
                 </div>
-                <div class="row">
-                    <div class="col">
-                        <p>Video</p>
-                        <pre is:raw><code class="language-html">
+                <div class="col">
+                    <p>Output</p>
+                    <img
+                        src="./nyancat.gif"
+                        data-shader="rainbow"
+                        style="
+                            transform: scale(0.5) translateY(-25%);
+                            margin-bottom: -25%;
+                        "
+                    />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <p>Video</p>
+                    <pre is:raw><code class="language-html">
 &lt;video src="example.mp4" autoplay loop muted/&gt;
                     </code></pre>
 
-                        <pre is:raw><code class="language-javascript">
+                    <pre is:raw><code class="language-javascript">
 vfx.add(video, { shader: "halftone" });
                     </code></pre>
-                    </div>
-                    <div class="col">
-                        <p>Output:</p>
-                        <video
-                            src="./jellyfish.mp4"
-                            autoplay
-                            loop
-                            muted
-                            data-shader="halftone"
-                        />
-                    </div>
                 </div>
+                <div class="col">
+                    <p>Output:</p>
+                    <video
+                        src="./jellyfish.mp4"
+                        autoplay
+                        loop
+                        muted
+                        data-shader="halftone"
+                    />
+                </div>
+            </div>
 
-                <div class="row">
-                    <div class="col">
-                        <p>Div (experimental)</p>
-                        <pre is:raw><code class="language-html">
+            <div class="row">
+                <div class="col">
+                    <p>Div (experimental)</p>
+                    <pre is:raw><code class="language-html">
 &lt;div id="div"&gt;
     &lt;p&gt;You can interact with these inputs.&lt;/p&gt;
     &lt;input type="text" value="Edit me" /&gt;
@@ -258,7 +185,7 @@ vfx.add(video, { shader: "halftone" });
 &lt;/div&gt;
                         </code></pre>
 
-                        <pre is:raw><code class="language-javascript">
+                    <pre is:raw><code class="language-javascript">
 vfx.add(div, { shader: "rgbShift", overflow: 100 });
 
 // Update on input
@@ -269,22 +196,22 @@ const mo = new MutationObserver(() => vfx.update(div));
 mo.observe(textarea, { attributes: true });
 
                     </code></pre>
-                    </div>
-                    <div class="col">
-                        <p>Output:</p>
-                        <div id="div">
-                            <p>You can interact with these inputs.</p>
-                            <input type="text" value="Edit me" />
-                            <input type="range" min="0" max="100" value="0" />
-                            <textarea>Edit me</textarea>
-                        </div>
+                </div>
+                <div class="col">
+                    <p>Output:</p>
+                    <div id="div">
+                        <p>You can interact with these inputs.</p>
+                        <input type="text" value="Edit me" />
+                        <input type="range" min="0" max="100" value="0" />
+                        <textarea>Edit me</textarea>
                     </div>
                 </div>
+            </div>
 
-                <div class="row">
-                    <div class="col">
-                        <p>Canvas</p>
-                        <pre is:raw><code class="language-html">
+            <div class="row">
+                <div class="col">
+                    <p>Canvas</p>
+                    <pre is:raw><code class="language-html">
 &lt;!--
   VFX-JS also supports HTMLCanvasElement as the input.
   You can draw 2D graphics and text in canvas,
@@ -293,7 +220,7 @@ mo.observe(textarea, { attributes: true });
 &lt;canvas id="canvas"/&gt;
                         </code></pre>
 
-                        <pre is:raw><code class="language-javascript">
+                    <pre is:raw><code class="language-javascript">
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
@@ -309,45 +236,45 @@ drawCanvas();
 
 vfx.add(canvas, { shader });
                     </code></pre>
-                    </div>
-                    <div class="col">
-                        <p>Output:</p>
-                        <canvas id="canvas" />
-                    </div>
                 </div>
-            </section>
+                <div class="col">
+                    <p>Output:</p>
+                    <canvas id="canvas" />
+                </div>
+            </div>
+        </section>
 
-            <div>
-                <h3>Presets</h3>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
+        <div>
+            <h3>Presets</h3>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
 vfx.add(el, { shader: "rainbow" });
                     </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="rainbow"
-                        />
-                    </div>
                 </div>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
+                <div class="col">
+                    <img
+                        src="./vfx-js-logo-no-padding.svg"
+                        data-shader="rainbow"
+                    />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
 vfx.add(el, { shader: "rgbShift" });
                         </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="rgbShift"
-                        />
-                    </div>
                 </div>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
+                <div class="col">
+                    <img
+                        src="./vfx-js-logo-no-padding.svg"
+                        data-shader="rgbShift"
+                    />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
 // Some shaders require "overflow" property
 // so that they can render beyond the original area.
 //
@@ -355,26 +282,26 @@ vfx.add(el, { shader: "rgbShift" });
 // outside the original element up to 100px.
 vfx.add(el, { shader: "glitch", overflow: 100 });
                         </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="glitch"
-                            data-overflow="100"
-                        />
-                    </div>
+                </div>
+                <div class="col">
+                    <img
+                        src="./vfx-js-logo-no-padding.svg"
+                        data-shader="glitch"
+                        data-overflow="100"
+                    />
                 </div>
             </div>
+        </div>
 
-            <div>
-                <h3>Parameters</h3>
-                <p>
-                    Some shaders take parameters (e.g. duotone). You can pass
-                    the params to the <code>uniforms</code> property.
-                </p>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
+        <div>
+            <h3>Parameters</h3>
+            <p>
+                Some shaders take parameters (e.g. duotone). You can pass
+                the params to the <code>uniforms</code> property.
+            </p>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
 vfx.add(el, {
     shader: "duotone",
     uniforms: {
@@ -384,93 +311,93 @@ vfx.add(el, {
     }
 });
                         </code></pre>
-                    </div>
-                    <div class="col">
-                        <video
-                            src="./jellyfish.mp4"
-                            autoplay
-                            loop
-                            muted
-                            data-shader="duotone"
-                            data-uniforms='{
-                                "color1": [0, 0, 1, 1],
-                                "color2": [0, 1, 0, 1],
-                                "speed": 0.5
-                            }'
-                        />
-                    </div>
+                </div>
+                <div class="col">
+                    <video
+                        src="./jellyfish.mp4"
+                        autoplay
+                        loop
+                        muted
+                        data-shader="duotone"
+                        data-uniforms='{
+                            "color1": [0, 0, 1, 1],
+                            "color2": [0, 1, 0, 1],
+                            "speed": 0.5
+                        }'
+                    />
                 </div>
             </div>
+        </div>
 
-            <div>
-                <h3>Transitions</h3>
-                <p>
-                    VFX-JS presets for transition animation. These animation
-                    start when the element gets in the viewport.
-                </p>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
+        <div>
+            <h3>Transitions</h3>
+            <p>
+                VFX-JS presets for transition animation. These animation
+                start when the element gets in the viewport.
+            </p>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
 vfx.add(el, { shader: "slitScanTransition" });
                         </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="slitScanTransition"
-                            data-threshold="1"
-                        />
-                    </div>
                 </div>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
-vfx.add(el, { shader: "warpTransition" });
-                        </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="warpTransition"
-                            data-threshold="1"
-                        />
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
-vfx.add(el, { shader: "pixelateTransition" });
-                        </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="pixelateTransition"
-                            data-threshold="1"
-                        />
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
-vfx.add(el, { shader: "focusTransition" });
-                        </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            src="./vfx-js-logo-no-padding.svg"
-                            data-shader="focusTransition"
-                        />
-                    </div>
+                <div class="col">
+                    <img
+                        src="./vfx-js-logo-no-padding.svg"
+                        data-shader="slitScanTransition"
+                        data-threshold="1"
+                    />
                 </div>
             </div>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
+vfx.add(el, { shader: "warpTransition" });
+                        </code></pre>
+                </div>
+                <div class="col">
+                    <img
+                        src="./vfx-js-logo-no-padding.svg"
+                        data-shader="warpTransition"
+                        data-threshold="1"
+                    />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
+vfx.add(el, { shader: "pixelateTransition" });
+                        </code></pre>
+                </div>
+                <div class="col">
+                    <img
+                        src="./vfx-js-logo-no-padding.svg"
+                        data-shader="pixelateTransition"
+                        data-threshold="1"
+                    />
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
+vfx.add(el, { shader: "focusTransition" });
+                        </code></pre>
+                </div>
+                <div class="col">
+                    <img
+                        src="./vfx-js-logo-no-padding.svg"
+                        data-shader="focusTransition"
+                    />
+                </div>
+            </div>
+        </div>
 
-            <div>
-                <h3>Custom Shaders</h3>
-                <p>You can write GLSL shader by yourself.</p>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
+        <div>
+            <h3>Custom Shaders</h3>
+            <p>You can write GLSL shader by yourself.</p>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
 const shader = `
 precision highp float;
 uniform vec2 resolution;
@@ -498,26 +425,26 @@ vfx.add(el, {
     }
 });
                         </code></pre>
-                    </div>
-                    <div class="col">
-                        <img id="custom" src="./vfx-js-logo-no-padding.svg" />
-                    </div>
+                </div>
+                <div class="col">
+                    <img id="custom" src="./vfx-js-logo-no-padding.svg" />
                 </div>
             </div>
+        </div>
 
-            <div>
-                <h3>Effects</h3>
-                <p>
-                    <code>@vfx-js/effects</code> ships ready-made
-                    <code>Effect</code> classes — bloom, halftone, pixelate,
-                    scanline, fluid, particles, voronoi. Each owns its own
-                    params; mutate <code>effect.params</code> (or call
-                    <code>effect.setParams</code>) to drive them live.
-                </p>
-                <pre is:raw><code class="language-bash">npm i @vfx-js/core @vfx-js/effects</code></pre>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
+        <div>
+            <h3>Effects</h3>
+            <p>
+                <code>@vfx-js/effects</code> ships ready-made
+                <code>Effect</code> classes — bloom, halftone, pixelate,
+                scanline, fluid, particles, voronoi. Each owns its own
+                params; mutate <code>effect.params</code> (or call
+                <code>effect.setParams</code>) to drive them live.
+            </p>
+            <pre is:raw><code class="language-bash">npm i @vfx-js/core @vfx-js/effects</code></pre>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
 import { VFX } from "@vfx-js/core";
 import { BloomEffect } from "@vfx-js/effects";
 
@@ -528,22 +455,22 @@ const effect = new BloomEffect({
 });
 await vfx.add(img, { effect });
                         </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            id="effect-bloom"
-                            src="./vfx-js-logo-no-padding.svg"
-                        />
-                    </div>
                 </div>
+                <div class="col">
+                    <img
+                        id="effect-bloom"
+                        src="./vfx-js-logo-no-padding.svg"
+                    />
+                </div>
+            </div>
 
-                <p>
-                    Chain effects by passing an array — each runs in order, the
-                    next reads the previous output as <code>src</code>.
-                </p>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
+            <p>
+                Chain effects by passing an array — each runs in order, the
+                next reads the previous output as <code>src</code>.
+            </p>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
 import {
     BloomEffect,
     PixelateEffect,
@@ -562,47 +489,47 @@ await vfx.add(img, {
     ],
 });
                         </code></pre>
-                    </div>
-                    <div class="col">
-                        <video
-                            id="effect-crt"
-                            src="./jellyfish.mp4"
-                            autoplay
-                            loop
-                            muted
-                        />
-                    </div>
                 </div>
-
-                <p>
-                    See the
-                    <a
-                        href="https://github.com/fand/vfx-js/tree/main/packages/effects#readme"
-                        target="_blank"
-                        >effects README</a
-                    >
-                    for the list of built-in effects, or the
-                    <a href="./storybook/" target="_blank">Storybook</a> for
-                    interactive demos. <br />
-                    To write your own effect, see the
-                    <a
-                        href="https://github.com/fand/vfx-js/blob/main/docs/EFFECT.md"
-                        target="_blank"
-                        >Effect API guide</a
-                    >.
-                </p>
+                <div class="col">
+                    <video
+                        id="effect-crt"
+                        src="./jellyfish.mp4"
+                        autoplay
+                        loop
+                        muted
+                    />
+                </div>
             </div>
 
-            <div>
-                <h3>Multipass Shaders</h3>
-                <p>
-                    You can chain multiple shader passes by passing an array
-                    of <code>VFXPass</code> objects. Each pass writes to a
-                    named buffer that subsequent passes can read.
-                </p>
-                <div class="row">
-                    <div class="col">
-                        <pre is:raw><code class="language-javascript">
+            <p>
+                See the
+                <a
+                    href="https://github.com/fand/vfx-js/tree/main/packages/effects#readme"
+                    target="_blank"
+                    >effects README</a
+                >
+                for the list of built-in effects, or the
+                <a href="./storybook/" target="_blank">Storybook</a> for
+                interactive demos. <br />
+                To write your own effect, see the
+                <a
+                    href="https://github.com/fand/vfx-js/blob/main/docs/EFFECT.md"
+                    target="_blank"
+                    >Effect API guide</a
+                >.
+            </p>
+        </div>
+
+        <div>
+            <h3>Multipass Shaders</h3>
+            <p>
+                You can chain multiple shader passes by passing an array
+                of <code>VFXPass</code> objects. Each pass writes to a
+                named buffer that subsequent passes can read.
+            </p>
+            <div class="row">
+                <div class="col">
+                    <pre is:raw><code class="language-javascript">
 // Pass 1: Blur the image into "blur" buffer
 const blurPass = {
     frag: `
@@ -649,72 +576,23 @@ vfx.add(el, {
     shader: [blurPass, glowPass],
 });
                         </code></pre>
-                    </div>
-                    <div class="col">
-                        <img
-                            id="multipass"
-                            src="./vfx-js-logo-no-padding.svg"
-                        />
-                    </div>
+                </div>
+                <div class="col">
+                    <img
+                        id="multipass"
+                        src="./vfx-js-logo-no-padding.svg"
+                    />
                 </div>
             </div>
-        </section>
+        </div>
+    </section>
 
-        <section class="AuthorSection">
-            <div id="profile" class="row">
-                <img class="icon" src="./amagi.png" />
-                <div class="column">
-                    <h2>Made by Amagi</h2>
-                    <div class="links">
-                        <a href="https://github.com/fand" target="_blank">
-                            <img
-                                class="link"
-                                src="./github.svg"
-                                alt="GitHub link"
-                            />
-                        </a>
-                        <a
-                            href="https://twitter.com/amagitakayosi"
-                            target="_blank"
-                        >
-                            <img
-                                class="link"
-                                src="./twitter.svg"
-                                alt="Twitter link"
-                            />
-                        </a>
-                        <a
-                            href="https://threads.net/amagitakayosi"
-                            target="_blank"
-                        >
-                            <img
-                                class="link"
-                                src="./threads.svg"
-                                alt="Threads link"
-                                style="margin-left: -8%"
-                            />
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </section>
-        </main>
-
+    <Fragment slot="overlay">
         <div id="MaskBottom"></div>
-        <div id="Frame"><div id="FrameBottom"></div></div>
         <div id="MaskTop"></div>
+    </Fragment>
+</Layout>
 
-        <script>
-            import "../main.ts";
-        </script>
-
-        <!-- Cloudflare Web Analytics -->
-        <script
-            is:inline
-            defer
-            src="https://static.cloudflareinsights.com/beacon.min.js"
-            data-cf-beacon='{"token": "b9c39aae9c304f1cbfa1e7bb3e84f078"}'
-        ></script>
-        <!-- End Cloudflare Web Analytics -->
-    </body>
-</html>
+<script>
+    import "../main.ts";
+</script>

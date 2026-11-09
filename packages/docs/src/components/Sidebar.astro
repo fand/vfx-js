@@ -1,0 +1,70 @@
+---
+import { nav, url } from "../site";
+
+type Props = {
+    current: string;
+};
+
+const { current } = Astro.props;
+---
+
+<nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        {
+            nav.map((item) => (
+                <li>
+                    <a
+                        href={url(`${item.slug}/`)}
+                        aria-current={item.slug === current ? "page" : undefined}
+                    >
+                        {item.label}
+                    </a>
+                    {item.slug === current && (
+                        <ul>
+                            {item.sections.map((section) => (
+                                <li>
+                                    <a
+                                        href={`#${section.id}`}
+                                        data-section={section.id}
+                                    >
+                                        {section.label}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </li>
+            ))
+        }
+    </ul>
+    <a class="DocSidebarExtra" href={url("docs/")}>API Reference &#8594;</a>
+</nav>
+
+<script>
+    // Mark the section that crossed the upper third of the viewport last.
+    const links = Array.from(
+        document.querySelectorAll<HTMLAnchorElement>(".DocSidebar [data-section]"),
+    );
+    const targets = links.map((link) =>
+        document.getElementById(link.dataset.section ?? ""),
+    );
+
+    const update = () => {
+        const line = window.innerHeight / 3;
+        let active = 0;
+        for (const [i, target] of targets.entries()) {
+            if (target && target.getBoundingClientRect().top < line) {
+                active = i;
+            }
+        }
+        for (const [i, link] of links.entries()) {
+            link.classList.toggle("active", i === active);
+        }
+    };
+
+    if (links.length > 0) {
+        window.addEventListener("scroll", update, { passive: true });
+        window.addEventListener("resize", update);
+        update();
+    }
+</script>

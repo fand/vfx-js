@@ -1,0 +1,35 @@
+---
+import { url } from "../site";
+---
+
+<footer class="SiteFooter">
+    <div id="profile" class="Author">
+        <img class="AuthorIcon" src={url("amagi.png")} alt="" />
+        <div class="AuthorColumn">
+            <h2>Made by Amagi</h2>
+            <div class="AuthorLinks">
+                <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                    <img src={url("github.svg")} alt="GitHub link" />
+                </a>
+                <a
+                    href="https://twitter.com/amagitakayosi"
+                    target="_blank"
+                    rel="noreferrer"
+                >
+                    <img src={url("twitter.svg")} alt="Twitter link" />
+                </a>
+                <a
+                    href="https://threads.net/amagitakayosi"
+                    target="_blank"
+                    rel="noreferrer"
+                >
+                    <img
+                        class="AuthorThreads"
+                        src={url("threads.svg")}
+                        alt="Threads link"
+                    />
+                </a>
+            </div>
+        </div>
+    </div>
+</footer>
