@@ -85,7 +85,8 @@ Core reads the index right after `cb` resolves. The binding must change history 
 - Vue: `cb` waits for the page to be ready, after `afterEach`. History is done. **Checked.**
   vue-router calls `routerHistory.push` in `finalizeNavigation`, before `triggerAfterEach`.
   Nuxt resolves on `page:finish`, later still.
-- SvelteKit: `cb` waits for `nav.complete`. History is done.
+- SvelteKit: `cb` waits for `nav.complete`. History is done. **Checked** (3.1.0).
+  `navigate()` calls `pushState` before the `onNavigate` callbacks, and `nav.complete` resolves later.
 - React Router: it pushes history before it renders. OK.
 - Next.js: fine. **Checked** (16.4.3).
   `HistoryUpdater` pushes in `useInsertionEffect`, in the commit that changes the pathname.

@@ -35,6 +35,7 @@
         ease,
         keepWrapped,
         waitFor,
+        autoReverse,
         ...attrs
     }: Props = $props();
 
@@ -57,6 +58,7 @@
             ease,
             keepWrapped,
             waitFor,
+            autoReverse,
         };
         for (const [key, value] of Object.entries(opts)) {
             if (value === undefined) {
