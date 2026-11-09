@@ -7,9 +7,6 @@ Fix the enter/leave presets (`warpTransition`, `slitScanTransition`, `pixelateTr
 - A reversal makes the picture jump.
   - Leave, then enter again mid-leave: `enterTime` resets to 0, so the element vanishes at once and enters from the start.
   - `slitScanTransition`: leave mid-enter jumps to the leave branch at `1 - t2`, so the element is almost fully shown for a frame.
-- The timing follows the virtual clock.
-  - `timeScale = 0` keeps `enterTime` at 0, so presets discard forever and the element stays hidden.
-  - Negative `timeScale` or `setTime` back in time make it negative, with the same result.
 - `pixelateTransition` divides by zero when `t < 1/64` (`b = 0`). On 120Hz+ screens one frame can show a broken picture right after enter and at the end of leave.
 - `intersection` cannot reach 1 when the element is taller (or wider) than the viewport.
   - `focusTransition` stays blurred and dim.
@@ -19,7 +16,10 @@ Fix the enter/leave presets (`warpTransition`, `slitScanTransition`, `pixelateTr
 - `enterTime` / `leaveTime` can be `±Infinity` in uniforms.
 - Presets hard-code `DURATION 1.0`.
 
-Out of scope: leave not showing with default options. With `intersection.rootMargin` set it works as intended.
+Out of scope:
+
+- Leave not showing with default options. With `intersection.rootMargin` set it works as intended.
+- Enter/leave following the virtual clock. With `timeScale = 0` an element that enters stays hidden, and `setTime` back in time hides it. This is intended: enter/leave pause, rewind and scrub with `time`.
 
 ## Design
 
@@ -50,6 +50,8 @@ A reversal plays the current phase backward from where it is. It never switches 
 | `leaving` forward | reaches 1 | `hidden`, both progress reset to 0 |
 | `leaving` backward | reaches 0 | `shown` |
 
+In short: progress reaching 1 moves to the next phase, reaching 0 to the previous one, whatever made it move.
+
 Values seen by shaders:
 
 | phase | `enterProgress` | `leaveProgress` |
@@ -66,8 +68,11 @@ A large `dt` (e.g. back from a hidden tab) just finishes the phase.
 
 ### Clock
 
-The state machine uses wall-clock `dt`, not the virtual clock.
-`timeScale` and `setTime` change only `time`, not enter/leave.
+The state machine uses `dt` from the virtual clock, same as today.
+
+- `timeScale = 0` freezes progress.
+- Negative `timeScale` moves progress backward, so enter/leave rewind.
+- `setTime` back in time gives a large negative `dt`, so the phase rolls back to its start.
 
 ### Hysteresis
 
@@ -136,10 +141,11 @@ Clamp them to a finite value (e.g. `±1e6`) before upload.
 - Large `dt` finishes the phase.
 - Hysteresis: a ratio between `leaveThreshold` and `threshold` does not flip the state.
 - Visible ratio reaches 1 for an element taller than the viewport.
-- `timeScale = 0` still runs enter/leave.
+- `timeScale = 0` freezes progress; negative `dt` moves it backward.
 
 ## Open questions
 
 - Option names: `leaveThreshold` vs `threshold: [enter, leave]`.
 - Separate durations for enter and leave (`duration: number | [enter, leave]`)?
+- Add `intersection.clock: "virtual" | "wall"` for pages that pause `time` but still want enter/leave? Not now.
 - Should an element already in view on `add` start in `shown` instead of `entering`? Keep `entering` for now (current behavior).
