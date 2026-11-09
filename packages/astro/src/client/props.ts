@@ -127,12 +127,10 @@ export function fromTransitionAttr(attr: string): AddTransitionOpts | null {
     return opts;
 }
 
-/** Link spec, else page spec, else none. Back navigation plays in reverse. */
+/** Link spec, else page spec, else none. */
 export function pickRunOpts(
     link: RunOpts | null,
     page: RunOpts | null,
-    back: boolean,
 ): RunOpts {
-    const spec = link ?? page ?? {};
-    return back ? { ...spec, reverse: true } : spec;
+    return link ?? page ?? {};
 }

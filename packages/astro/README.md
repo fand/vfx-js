@@ -69,7 +69,7 @@ import Layout from "../layouts/Layout.astro";
 2. The new page's `<TransitionIn>`.
 3. The props of `<VFXTransition>`.
 
-Back adds `reverse: true` to the spec that wins.
+Back and forward use the same spec. Nothing is reversed for you.
 
 ## Element effects
 

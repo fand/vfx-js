@@ -50,7 +50,7 @@ A page picks how it enters with `transitionIn`:
 2. The new page's `transitionIn(spec)`.
 3. The props of `<VFXTransition>`.
 
-Back adds `reverse: true` to the spec that wins.
+Back and forward use the same spec. Nothing is reversed for you.
 
 ## Element effects
 

@@ -354,7 +354,7 @@ useTransitionIn({ transition: Glitch });
 
 - Without Nuxt, import `VFXTransition` from `@vfx-js/vue/router` and wrap `<RouterView />`. It reads the router from `app.use(router)`.
 - Each path is one page. The first navigation does not run.
-- Which spec wins: the link's `v-transition`, then the page's `useTransitionIn`, then the `<VFXTransition>` props. Back and forward add `reverse: true`.
+- Which spec wins: the link's `v-transition`, then the page's `useTransitionIn`, then the `<VFXTransition>` props. Back does not reverse.
 - `setNextTransition(spec)` before `navigateTo()` / `router.push()`.
 - In templates use `v-transition`, not `@click="transition(spec)"`; Vue wraps the handler, so it never runs.
 - Props are the `addTransition` options plus `fullscreen`. `:fullscreen="false"` lets you size the target with CSS.
@@ -396,7 +396,7 @@ npm i @vfx-js/core @vfx-js/svelte @vfx-js/transitions
 ```
 
 - Needs Svelte 5.29 or later (`{@attach}`).
-- Which spec wins: the link's `transition(spec)`, then the page's `transitionIn`, then the `<VFXTransition>` props. Back adds `reverse: true`.
+- Which spec wins: the link's `transition(spec)`, then the page's `transitionIn`, then the `<VFXTransition>` props. Back does not reverse.
 - `setNextTransition(spec)` before `goto()`.
 - `fullscreen={false}` lets you size the target with CSS.
 
@@ -440,7 +440,7 @@ import { TransitionIn } from "@vfx-js/astro";
 - `transition:animate="none"` turns off the browser's view transition; the shader is the animation.
 - Transitions are names: lowercase class names from `@vfx-js/transitions` (`crossfade`, `swipe`, `glitch`, `pixelsort`, ...). Register others with `registerVFX({ transitions: { name: ClassOrInstance } })` from `@vfx-js/astro/client`. `ease` is `"smoothstep"`, `"linear"`, or a name from `registerVFX({ eases })`.
 - A link spec is a name or JSON: `data-vfx-transition='{"transition":"swipe","params":{"direction":"left"}}'`.
-- Which spec wins: the link's `data-vfx-transition`, then the page's `<TransitionIn>`, then the `<VFXTransition>` props. Back adds `reverse: true`.
+- Which spec wins: the link's `data-vfx-transition`, then the page's `<TransitionIn>`, then the `<VFXTransition>` props. Back does not reverse.
 - `fullscreen={false}` lets you size the target with CSS.
 - `installTransition({ swapFunctions })` from `@vfx-js/astro/client` is what `<VFXTransition>` calls. You rarely need it.
 

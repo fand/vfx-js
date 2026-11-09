@@ -277,10 +277,10 @@ describe("VFXTransition (nuxt)", () => {
         expect(await go("/about", "/", Home, 2)).toEqual({});
     });
 
-    it("adds reverse on back", async () => {
+    it("does not reverse on back", async () => {
         window.history.replaceState({ position: 2 }, "");
         mount();
-        expect(await go("/about", "/", Home, 1)).toEqual({ reverse: true });
+        expect(await go("/about", "/", Home, 1)).toEqual({});
         expect(await go("/", "/about", About, 1)).toEqual({
             transition: Zoom,
         });
