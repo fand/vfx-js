@@ -6,6 +6,7 @@ import {
     TransitionSlot,
     TransitionStage,
 } from "./effect.js";
+import { type HistorySpecs, historySpecs } from "./history.js";
 import type {
     AddTransitionOpts,
     RunOpts,
@@ -213,6 +214,7 @@ export class TransitionController implements TransitionHandle {
     #element: HTMLElement;
     #opts: AddTransitionOpts;
     #stage: TransitionStageLike;
+    #history: HistorySpecs;
     #keepWrapped: boolean;
     #onDestroy: (() => void) | undefined;
     #unfreezers: (() => void)[] = [];
@@ -251,12 +253,14 @@ export class TransitionController implements TransitionHandle {
         opts: AddTransitionOpts = {},
         onDestroy?: () => void,
         stage: TransitionStageLike = new TransitionStage(),
+        history: HistorySpecs = historySpecs,
     ) {
         this.#onDestroy = onDestroy;
         this.#vfx = vfx;
         this.#element = element;
         this.#opts = opts;
         this.#stage = stage;
+        this.#history = history;
         this.#keepWrapped = opts.keepWrapped ?? false;
     }
 
@@ -273,7 +277,7 @@ export class TransitionController implements TransitionHandle {
         }
         const slideSpec = this.#opts.slideSpec?.(target);
         const spec = slideSpec ? layerSpec(slideSpec, runOpts) : runOpts;
-        return this.run(() => {
+        return this.#start(() => {
             if (target.parentElement !== this.#element) {
                 this.#element.append(target);
             }
@@ -320,9 +324,23 @@ export class TransitionController implements TransitionHandle {
         );
     }
 
-    async run(
+    run(
         cb: () => void | Promise<void>,
         opts: RunOpts | (() => RunOpts) = {},
+    ): Promise<void> {
+        if (!this.#opts.autoReverse) {
+            return this.#start(cb, opts);
+        }
+        // Lazy, so the history entry has changed when the spec is picked.
+        return this.#start(cb, () =>
+            this.#history.pick(typeof opts === "function" ? opts() : opts),
+        );
+    }
+
+    // Slides do not change history, so `show()` comes here and skips autoReverse.
+    async #start(
+        cb: () => void | Promise<void>,
+        opts: RunOpts | (() => RunOpts),
     ): Promise<void> {
         if (this.#destroyed) {
             await cb();

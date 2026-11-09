@@ -23,40 +23,45 @@ const t = vfx.addTransition(main, { transition: Swipe, autoReverse: true });
 
 ## Design
 
-### Entry index
+### Entry
 
-Use the Navigation API: `navigation.currentEntry.index`.
+Use the Navigation API: `navigation.currentEntry`.
+The `key` names the entry, the `index` gives the direction.
 
 - One source for every framework, Next.js included. Next.js has no history index of its own.
-- No API, or `index` is `-1`: `autoReverse` does nothing.
+- No API, `index` is `-1`, or no `key`: `autoReverse` does nothing.
 - Do not use router direction flags. Compare the last index with the current one.
+- Store by `key`, not `index`. A push after back reuses the index but gets a new key.
+  A replace keeps the key.
 
 ### Store
 
-New module `transition/history.ts`, pure apart from the default `getIndex`:
+New module `transition/history.ts`, pure apart from the default `getEntry`:
 
 ```ts
+type HistoryEntry = { index: number; key: string };
+
 type HistorySpecs = {
     /** The spec for a run that just changed the history entry. `spec` is what the run would use without autoReverse. */
     pick(spec: RunOpts): RunOpts;
 };
 
-function createHistorySpecs(getIndex?: () => number | undefined): HistorySpecs;
+function createHistorySpecs(getEntry?: () => HistoryEntry | undefined): HistorySpecs;
 ```
 
 - One shared instance per document, at module level.
   Not per handle: Astro makes a new handle on each navigation, since the target is swapped.
   One page has one router, so sharing is fine.
-- In memory: `Map<number, RunOpts>`. Specs hold classes, so no `sessionStorage`.
-- `lastIndex` starts at `getIndex()` on first use.
+- In memory: `Map<string, RunOpts>` by entry key. Specs hold classes, so no `sessionStorage`.
+- `last` entry starts at `getEntry()` on first use.
 
 `pick(spec)`:
 
-- `index = getIndex()`. `undefined` → return `spec`.
-- `leaving = lastIndex`, then `lastIndex = index`.
-- `index < leaving` and a spec is stored at `leaving` → return `{ ...stored, reverse: true }`.
-- `index > leaving` and a spec is stored at `index` → return it.
-- Else store `spec` at `index` and return it. Covers push, replace, and no stored spec.
+- `entry = getEntry()`. `undefined` → return `spec`.
+- `leaving = last`, then `last = entry`.
+- `entry.index < leaving.index` and a spec is stored at `leaving.key` → return `{ ...stored, reverse: true }`.
+- `entry.index > leaving.index` and a spec is stored at `entry.key` → return it.
+- Else store `spec` at `entry.key` and return it. Covers push, replace, and no stored spec.
 
 A stored spec wins over the link or page spec on back.
 So `setNextTransition()` then `history.back()` plays the stored spec. Document it.
