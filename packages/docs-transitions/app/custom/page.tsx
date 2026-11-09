@@ -7,13 +7,19 @@ import { PageTransition } from "../_components/page-transition";
 export const metadata: Metadata = { title: "Custom transitions" };
 
 const prelude = [
-    ["readFrom(p)", "The content you leave. Transparent black outside [0, 1]."],
-    ["readTo(p)", "The content you enter."],
+    [
+        "readFrom(p)",
+        "The content you leave, with premultiplied alpha. Transparent black outside [0, 1].",
+    ],
+    [
+        "readTo(p)",
+        "The content you enter, with premultiplied alpha. Return premultiplied color too.",
+    ],
     [
         "inRange(p)",
         "Whether p is inside [0, 1]. Guard with it when you wrap or shift uv, so a container overflow doesn't draw outside the element.",
     ],
-    ["t", "Progress, 0 → 1, smoothstep eased."],
+    ["t", "Progress, 0 → 1, eased (smoothstep by default)."],
     ["resolution", "Element size in physical px."],
     ["time", "Seconds since VFX-JS started."],
     ["reverse", "1.0 when playing in reverse. You rarely need it."],
@@ -165,6 +171,8 @@ vec4 transition(vec2 uv, float t) {
                     </p>
                 </div>
                 <Code label="flash.ts">{`
+import { ShaderTransition, type TransitionRun } from "@vfx-js/core";
+
 export class Flash extends ShaderTransition {
   name = "flash";
   frag = \`

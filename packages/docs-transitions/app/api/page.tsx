@@ -274,7 +274,7 @@ router.push("/next");
                     <code>fx.params</code> on the instance.
                 </p>
                 <Code label="slider.tsx">{`
-const fx = useTransitionInstance(Glitch, { speed: 1 });
+const fx = useTransitionInstance(Glitch, { amount: 1 });
 
 <VFXTransition pageKey={pathname} transition={fx}>{children}</VFXTransition>
 <input type="range" onChange={(e) => (fx.params = { amount: +e.target.value })} />

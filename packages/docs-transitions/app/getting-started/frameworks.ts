@@ -86,13 +86,16 @@ import { useVFXTransition } from "@vfx-js/react";
 import { Swipe } from "@vfx-js/transitions";
 import { useState } from "react";
 
+const panels = [<p>One</p>, <p>Two</p>, <p>Three</p>];
+
 // For containers you render yourself, like tabs.
 export function Tabs() {
   const [tab, setTab] = useState(0);
   const { ref, run } = useVFXTransition({ transition: Swipe });
+  const next = () => setTab((tab + 1) % panels.length);
   return (
     <>
-      <button onClick={() => run(() => setTab(tab + 1))}>Next</button>
+      <button onClick={() => run(next)}>Next</button>
       <div ref={ref} style={{ height: 240 }}>{panels[tab]}</div>
     </>
   );
