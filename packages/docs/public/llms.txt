@@ -1,6 +1,6 @@
 # VFX-JS
 
-> VFX-JS is a JavaScript library that adds WebGL shader effects to HTML elements (images, videos, text, any element) and animates tab, carousel and page transitions. Packages: `@vfx-js/core` (the `VFX` class), `@vfx-js/react` (React, Next.js, React Router), `@vfx-js/vue` (Vue, Nuxt, Vue Router), `@vfx-js/svelte` (Svelte 5, SvelteKit), `@vfx-js/effects` (prebuilt effects), `@vfx-js/transitions` (transition presets).
+> VFX-JS is a JavaScript library that adds WebGL shader effects to HTML elements (images, videos, text, any element) and animates tab, carousel and page transitions. Packages: `@vfx-js/core` (the `VFX` class), `@vfx-js/react` (React, Next.js, React Router), `@vfx-js/vue` (Vue, Nuxt, Vue Router), `@vfx-js/svelte` (Svelte 5, SvelteKit), `@vfx-js/astro` (Astro, ClientRouter), `@vfx-js/effects` (prebuilt effects), `@vfx-js/transitions` (transition presets).
 
 Quick start:
 
