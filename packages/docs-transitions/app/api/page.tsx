@@ -39,6 +39,10 @@ const containerOpts: Row[] = [
         'What to wait for before the new capture. "media" waits for images, videos and fonts, up to about 300 ms.',
     ],
     [
+        "autoReverse: boolean",
+        "On back, play the spec that entered the page, reversed. Forward plays it again. Needs the Navigation API. show() ignores it.",
+    ],
+    [
         "slideSpec: (slide) => RunOpts | undefined",
         "How each slide enters with show(). Its fields go over the container's; show() opts go over it.",
     ],

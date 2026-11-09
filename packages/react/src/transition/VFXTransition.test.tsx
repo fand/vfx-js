@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { RunOpts, Transition } from "@vfx-js/core";
+import type { AddTransitionOpts, RunOpts, Transition } from "@vfx-js/core";
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,8 +20,14 @@ const mock = vi.hoisted(() => {
         destroy: () => {},
         running: false,
     };
-    const vfx = { addTransition: () => transition };
-    return { runs, vfx };
+    const added: { opts?: AddTransitionOpts } = {};
+    const vfx = {
+        addTransition: (_element: HTMLElement, opts: AddTransitionOpts) => {
+            added.opts = opts;
+            return transition;
+        },
+    };
+    return { runs, vfx, added };
 });
 
 vi.mock("../use-vfx-instance.js", () => ({
@@ -154,6 +160,19 @@ describe("VFXTransition", () => {
         render("a", <TransitionIn transition={Zoom} />);
         render("b", <p>b</p>);
         expect(await swap(mock.runs[0])).toEqual({});
+    });
+
+    it("passes autoReverse to core and follows prop changes", () => {
+        act(() => {
+            root.render(<VFXTransition autoReverse>x</VFXTransition>);
+        });
+        const opts = mock.added.opts;
+        expect(opts?.autoReverse).toBe(true);
+        act(() => {
+            root.render(<VFXTransition>x</VFXTransition>);
+        });
+        expect(mock.added.opts).toBe(opts);
+        expect(opts?.autoReverse).toBeUndefined();
     });
 
     it("a new key mounts the page fresh", async () => {

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { RunOpts } from "@vfx-js/core";
+import type { AddTransitionOpts, RunOpts } from "@vfx-js/core";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {
@@ -24,8 +24,14 @@ const mock = vi.hoisted(() => {
         destroy: () => {},
         running: false,
     };
-    const vfx = { addTransition: () => transition };
-    return { runs, vfx };
+    const added: { opts?: AddTransitionOpts } = {};
+    const vfx = {
+        addTransition: (_element: HTMLElement, opts: AddTransitionOpts) => {
+            added.opts = opts;
+            return transition;
+        },
+    };
+    return { runs, vfx, added };
 });
 
 vi.mock("../use-vfx-instance.js", () => ({
@@ -121,6 +127,17 @@ describe("VFXTransition (react-router)", () => {
         await navigate("/search?q=1");
         expect(mock.runs).toHaveLength(0);
         expect(container.textContent).toBe("search ?q=1");
+    });
+
+    it("passes autoReverse to core", () => {
+        router = createMemoryRouter(
+            [{ path: "/", element: <VFXTransition autoReverse /> }],
+            { initialEntries: ["/"] },
+        );
+        act(() => {
+            root.render(<RouterProvider router={router} />);
+        });
+        expect(mock.added.opts?.autoReverse).toBe(true);
     });
 
     it("uses pageKey over the pathname", async () => {

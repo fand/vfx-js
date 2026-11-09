@@ -212,6 +212,12 @@ describe("VFXTransition (nuxt)", () => {
         expect(opts).toEqual({ duration: 1 });
     });
 
+    it("passes autoReverse to core", () => {
+        mount({ autoReverse: true });
+        const opts = (mock.vfx.addTransition.mock.lastCall as unknown[])[1];
+        expect(opts).toEqual({ autoReverse: true });
+    });
+
     it("shares one VFX and destroys it a frame after the last unmount", async () => {
         mount();
         const second = createApp({ render: () => h(VFXTransition) });

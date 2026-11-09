@@ -108,6 +108,19 @@ const t = vfx.addTransition(el, {
                         All <code>&lt;VFXTransition&gt;</code>s on the page
                         share it.
                     </p>
+                    <h3>autoReverse needs the Navigation API</h3>
+                    <p>
+                        Without <code>navigation.currentEntry</code>, back plays
+                        like any other navigation, with no reverse. After a
+                        reload or in a new tab, no spec is stored yet, so the
+                        first back plays its own spec too.
+                    </p>
+                    <h3>On back, the stored spec wins</h3>
+                    <p>
+                        With <code>autoReverse</code>, back plays the spec that
+                        entered the page, even after{" "}
+                        <code>setNextTransition()</code>.
+                    </p>
                     <h3>No multi-page navigation</h3>
                     <p>
                         Cross-document navigation isn't supported. With Turbo or

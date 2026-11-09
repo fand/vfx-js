@@ -69,7 +69,8 @@ import Layout from "../layouts/Layout.astro";
 2. The new page's `<TransitionIn>`.
 3. The props of `<VFXTransition>`.
 
-Back and forward use the same spec. Nothing is reversed for you.
+Back and forward use the same spec. Pass `autoReverse` to play the spec
+that entered the page, reversed, on back. It needs the Navigation API.
 
 ## Element effects
 
@@ -145,7 +146,7 @@ Then refer to them by name:
 ### `<VFXTransition>`
 
 Props: `transition`, `params`, `reverse`, `duration`, `overflow`, `ease`,
-`waitFor` (`"media"` or `"none"`), `keepWrapped`, and `fullscreen`.
+`waitFor` (`"media"` or `"none"`), `keepWrapped`, `autoReverse`, and `fullscreen`.
 
 - The target fills the viewport height by default, and pages scroll
   inside it. Pass `fullscreen={false}` to size it with your own CSS,

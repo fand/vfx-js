@@ -108,6 +108,11 @@ export type AddTransitionOpts<
     keepWrapped?: boolean;
     waitFor?: TransitionWaitFor;
     /**
+     * On back, play the spec that entered the page, reversed. On forward, play it again.
+     * Needs the Navigation API. `show()` ignores it.
+     */
+    autoReverse?: boolean;
+    /**
      * How a slide enters with `show()`.
      * Its fields go over the container's; `show()` opts go over it.
      */

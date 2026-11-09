@@ -77,6 +77,7 @@ async function navigate(opts: {
     source?: Element;
     direction?: string;
     abort?: boolean;
+    afterSwap?: boolean;
 }) {
     const controller = new AbortController();
     const prep = Object.assign(new Event("astro:before-preparation"), {
@@ -98,6 +99,10 @@ async function navigate(opts: {
     });
     document.dispatchEvent(swap);
     swap.swap();
+    // Astro changes history here, then fires after-swap.
+    if (opts.afterSwap !== false) {
+        document.dispatchEvent(new Event("astro:after-swap"));
+    }
 }
 
 describe("pickRunOpts", () => {
@@ -149,6 +154,24 @@ describe("installTransition", () => {
         const [el, opts] = mock.vfx.addTransition.mock.calls[0] ?? [];
         expect(el).toBe(document.querySelector("[data-vfx-transition-target]"));
         expect(opts).toEqual({ transition: Crossfade, duration: 0.8 });
+    });
+
+    it("passes autoReverse from the target", () => {
+        document.body.innerHTML = target('{"autoReverse":true}', "<p>old</p>");
+        installTransition({ swapFunctions });
+        const [, opts] = mock.vfx.addTransition.mock.calls[0] ?? [];
+        expect(opts).toEqual({ autoReverse: true });
+    });
+
+    it("holds the run until after-swap, when history has changed", async () => {
+        installTransition({ swapFunctions });
+        await navigate({ doc: page(target("{}", "new")), afterSwap: false });
+        await flush();
+        expect(document.body.textContent).toContain("new");
+        expect(mock.runs[0]?.done).toBe(false);
+        document.dispatchEvent(new Event("astro:after-swap"));
+        await flush();
+        expect(mock.runs[0]?.done).toBe(true);
     });
 
     it("uses the link spec over the page spec", async () => {

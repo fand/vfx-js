@@ -264,6 +264,8 @@ function Layout() {
 - The old page keeps its own route while it animates out:
   `useParams`, `useMatches` and nested outlets stay on the old route.
   `useLocation()` inside the old page reads the new location.
+- Back plays the same spec as forward. Pass `autoReverse` to play the spec
+  that entered the page, reversed. It needs the Navigation API.
 - `react-router` 7 is an optional peer dependency.
 
 ## Future work

@@ -30,6 +30,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 className="outlet"
                 duration={0.9}
                 overflow={0}
+                autoReverse
             >
                 <div className="outlet-page">
                     <DocSidebar />
