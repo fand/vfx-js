@@ -1323,6 +1323,11 @@ em {
     font-size: 13px;
     line-height: 1.7;
 }
+/* Prose prompts wrap instead of scrolling sideways. */
+.code-plain pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
 .tk-c {
     color: #6b6b80;
     font-style: italic;
@@ -1388,6 +1393,22 @@ em {
     padding: 10px;
     border-bottom: 1px solid var(--rule);
     overflow-x: auto;
+}
+/* Fade the side with more tabs. */
+.tab-list[data-more="end"] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+}
+.tab-list[data-more="start"] {
+    mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent);
+}
+.tab-list[data-more="both"] {
+    mask-image: linear-gradient(
+        to right,
+        transparent,
+        #000 48px,
+        #000 calc(100% - 48px),
+        transparent
+    );
 }
 .tab-list button {
     flex: none;
@@ -2144,6 +2165,13 @@ em {
     }
     .tab-body {
         padding: 20px;
+    }
+    .section {
+        padding-top: 80px;
+    }
+    .split,
+    .section-features {
+        padding-bottom: 80px;
     }
     /* Too narrow for 4 columns: name, type and default on one line, note below. */
     .preset-table thead {

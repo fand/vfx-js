@@ -18,6 +18,38 @@ export function FrameworkTabs() {
 
     useEffect(() => () => clearTimeout(timer.current), []);
 
+    // Which side has tabs scrolled out of view.
+    const listRef = useRef<HTMLDivElement>(null);
+    const [more, setMore] = useState<"start" | "end" | "both">();
+    useEffect(() => {
+        const list = listRef.current;
+        if (!list) {
+            return;
+        }
+        const update = () => {
+            const start = list.scrollLeft > 1;
+            const end =
+                list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
+            setMore(
+                start && end
+                    ? "both"
+                    : start
+                      ? "start"
+                      : end
+                        ? "end"
+                        : undefined,
+            );
+        };
+        update();
+        list.addEventListener("scroll", update, { passive: true });
+        const observer = new ResizeObserver(update);
+        observer.observe(list);
+        return () => {
+            list.removeEventListener("scroll", update);
+            observer.disconnect();
+        };
+    }, []);
+
     // Fade out, swap the panel, then fade in.
     const select = (i: number) => {
         setSelected(i);
@@ -32,7 +64,12 @@ export function FrameworkTabs() {
 
     return (
         <div className="tabs">
-            <div className="tab-list" role="tablist">
+            <div
+                ref={listRef}
+                className="tab-list"
+                role="tablist"
+                data-more={more}
+            >
                 {frameworks.map((f, i) => (
                     <button
                         key={f.id}
