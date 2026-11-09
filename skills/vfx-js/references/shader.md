@@ -40,14 +40,14 @@ Declare only the ones you use.
 | `resolution` | `vec2` | Element size in physical px. |
 | `offset` | `vec2` | Element origin in the render target, physical px. |
 | `viewport` | `vec4` | Render target rect `(x, y, w, h)` in physical px. |
-| `time` | `float` | Seconds since VFX started. |
+| `time` | `float` | Seconds since the element was added. In a post effect, seconds since VFX started. |
 | `mouse` | `vec2` | Mouse position in render target px (same space as `gl_FragCoord`). |
 | `intersection` | `float` | How much of the element is in the viewport, 0..1. |
 | `enterTime` | `float` | Seconds since the element entered the viewport. |
 | `leaveTime` | `float` | Seconds since the element left the viewport. |
 | `autoCrop` | `bool` | The `autoCrop` prop (default true). |
 | `backbuffer` | `sampler2D` | Previous frame. Needs `backbuffer: true`. |
-| `passIndex` | `int` | Index of the current pass. |
+| `passIndex` | `int` | Index of the current pass. Post effects only. |
 
 Use `enterTime` for an intro animation that plays when the element scrolls in:
 
