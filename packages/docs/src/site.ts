@@ -93,6 +93,7 @@ export const nav: NavItem[] = [
             { id: "built-in-uniforms", label: "Built-in uniforms" },
             { id: "custom-uniforms", label: "Custom uniforms" },
             { id: "overflow", label: "Overflow" },
+            { id: "backbuffer", label: "Backbuffer" },
             { id: "multipass", label: "Multipass" },
             { id: "post-effects", label: "Post effects" },
         ],
