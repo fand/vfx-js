@@ -70,19 +70,10 @@ importers:
       astro:
         specifier: ^7.4.2
         version: 7.4.2(@types/node@26.6.5)(aws4fetch@1.0.20)(db0@0.3.4(better-sqlite3@13.0.3)(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261028.1)(better-sqlite3@13.0.3)(kysely@0.29.7)(mysql2@3.24.6(@types/node@26.6.5))(pg@8.23.1))(mysql2@3.24.6(@types/node@26.6.5)))(esbuild@0.28.2)(ioredis@5.11.1)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
-      prism-themes:
-        specifier: ^1.9.0
-        version: 1.9.0
-      prismjs:
-        specifier: ^1.30.0
-        version: 1.30.0
     devDependencies:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
-      '@types/prismjs':
-        specifier: 1.26.6
-        version: 1.26.6
       npm-run-all2:
         specifier: ^9.0.4
         version: 9.0.4
@@ -5717,9 +5708,6 @@ packages:
     resolution: {integrity: sha512-ey8Ls/+Di31eqzUxC46h8MksNuGx/n0AAC8uKpwFau4RPDYLuE3EXTp8N8G2vX2N7UC/+IXeNUnlWBGGcAG+Ig==}
     peerDependencies:
       react: '>=16.0.0'
-
-  prism-themes@1.9.0:
-    resolution: {integrity: sha512-tX2AYsehKDw1EORwBps+WhBFKc2kxfoFpQAjxBndbZKr4fRmMkv47XN0BghC/K1qwodB1otbe4oF23vUTFDokw==}
 
   prismjs@1.30.0:
     resolution: {integrity: sha512-DEvV2ZF2r2/63V+tK8hQvrR2ZGn10srHbXviTlcv7Kpzw8jWiNTqbVgjO3IY8RxrrOUF8VPMQQFysYYYv0YZxw==}
@@ -12147,8 +12135,6 @@ snapshots:
       '@types/prismjs': 1.26.6
       clsx: 2.1.1
       react: 19.3.1
-
-  prism-themes@1.9.0: {}
 
   prismjs@1.30.0: {}
 

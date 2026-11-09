@@ -4,16 +4,10 @@ import {
     BloomEffect,
     GlitchEffect,
     HalftoneEffect,
-    PixelateEffect,
     PixelSortEffect,
-    ScanlineEffect,
 } from "@vfx-js/effects";
 
-import Prism from "prismjs";
 import { bgSpheres, bgVFX, initBackground } from "./background";
-
-Prism.manual = true;
-Prism.highlightAll();
 
 function $(selector: string, parent?: HTMLElement) {
     return (parent ?? document).querySelector(selector) as HTMLElement;
@@ -23,8 +17,7 @@ function lerp(a: number, b: number, t: number) {
     return a * (1 - t) + b * t;
 }
 
-const shaders: Record<string, string> = {
-    logo: `
+const logoShader = `
     precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
@@ -104,50 +97,7 @@ const shaders: Record<string, string> = {
             outColor = glitch(uv);
         }
     }
-    `,
-    canvas: `
-precision highp float;
-uniform vec2 resolution;
-uniform vec2 offset;
-uniform float time;
-uniform sampler2D src;
-out vec4 outColor;
-
-#define ZOOM(uv, x) ((uv - .5) / x + .5)
-
-void main (void) {
-    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-
-    float r = sin(time) * 0.5 + 0.5;
-
-    float l = pow(length(uv - .5), 2.);
-    uv = (uv - .5) *  (1. - l * 0.3 * r) + .5;
-
-
-    float n = 0.02 + r * 0.03;
-    vec4 cr = texture(src, ZOOM(uv, 1.00));
-    vec4 cg = texture(src, ZOOM(uv, (1. + n)));
-    vec4 cb = texture(src, ZOOM(uv, (1. + n * 2.)));
-
-    outColor = vec4(cr.r, cg.g, cb.b, 1);
-}
-    `,
-    custom: `
-precision highp float;
-uniform vec2 resolution;
-uniform vec2 offset;
-uniform float time;
-uniform sampler2D src;
-uniform float scroll;
-out vec4 outColor;
-
-void main (void) {
-    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    uv.x = fract(uv.x + scroll + time * 0.2);
-    outColor = texture(src, uv);
-}
-    `,
-};
+`;
 
 // Each menu item builds one effect. The slider value t (0-1) drives its main param.
 type MenuEffect = {
@@ -233,204 +183,6 @@ class App {
         pixelRatio: window.devicePixelRatio,
         zIndex: -1,
     });
-
-    async initVFX() {
-        await Promise.all(
-            Array.from(document.querySelectorAll("*[data-shader]")).map((e) => {
-                const shader = e.getAttribute("data-shader") as string;
-
-                const uniformsJSON = e.getAttribute("data-uniforms");
-                const uniforms = uniformsJSON
-                    ? JSON.parse(uniformsJSON)
-                    : undefined;
-
-                return this.vfx.add(e as HTMLImageElement, {
-                    shader,
-                    overflow: Number.parseFloat(
-                        e.getAttribute("data-overflow") ?? "0",
-                    ),
-                    uniforms,
-                    intersection: {
-                        threshold: Number.parseFloat(
-                            e.getAttribute("data-threshold") ?? "0",
-                        ),
-                    },
-                });
-            }),
-        );
-    }
-
-    async initDiv() {
-        const div = $("#div");
-        await this.vfx.add(div, { shader: "rgbShift", overflow: 100 });
-
-        for (const input of div.querySelectorAll("input,textarea")) {
-            input.addEventListener("input", () => this.vfx.update(div));
-        }
-
-        const textarea = $("textarea", div);
-        const mo = new MutationObserver(() => this.vfx.update(div));
-        mo.observe(textarea, {
-            attributes: true,
-        });
-    }
-
-    async initCanvas() {
-        const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-            throw "Failed to get the canvas context";
-        }
-
-        const { width, height } = canvas.getBoundingClientRect();
-        const ratio = window.devicePixelRatio ?? 1;
-        canvas.width = width * ratio;
-        canvas.height = height * ratio;
-        ctx.scale(ratio, ratio);
-
-        let target = [width / 2, height / 2];
-        let p = target;
-        const ps = [p];
-        let isMouseOn = false;
-        const startTime = Date.now();
-
-        canvas.addEventListener("mousemove", (e) => {
-            isMouseOn = true;
-            target = [e.offsetX, e.offsetY];
-        });
-        canvas.addEventListener("mouseleave", () => {
-            isMouseOn = false;
-        });
-
-        let isInside = false;
-        const io = new IntersectionObserver(
-            (changes) => {
-                for (const c of changes) {
-                    isInside = c.intersectionRatio > 0.1;
-                }
-            },
-            { threshold: [0, 1, 0.2, 0.8] },
-        );
-        io.observe(canvas);
-
-        const drawMouseStalker = () => {
-            requestAnimationFrame(drawMouseStalker);
-
-            if (!isInside) {
-                return;
-            }
-
-            if (!isMouseOn) {
-                const t = Date.now() / 1000 - startTime;
-                target = [
-                    width * 0.5 + Math.sin(t * 1.3) * width * 0.3,
-                    height * 0.5 + Math.sin(t * 1.7) * height * 0.3,
-                ];
-            }
-            p = [lerp(p[0], target[0], 0.1), lerp(p[1], target[1], 0.1)];
-
-            ps.push(p);
-            ps.splice(0, ps.length - 30);
-
-            ctx.clearRect(0, 0, width, height);
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, width, height);
-
-            ctx.fillStyle = "white";
-            ctx.font = `bold ${width * 0.14}px sans-serif`;
-            ctx.fillText("HOVER ME", width / 2, height / 2);
-            ctx.textBaseline = "middle";
-            ctx.textAlign = "center";
-
-            for (let i = 0; i < ps.length; i++) {
-                const [x, y] = ps[i];
-                const t = (i / ps.length) * 255;
-                ctx.fillStyle = `rgba(${255 - t}, 255, ${t}, ${(i / ps.length) * 0.5 + 0.5})`;
-                ctx.beginPath();
-                ctx.arc(x, y, i + 20, 0, 2 * Math.PI);
-                ctx.fill();
-            }
-
-            this.vfx.update(canvas);
-        };
-        drawMouseStalker();
-
-        await this.vfx.add(canvas, { shader: shaders.canvas });
-    }
-
-    async initCustomShader() {
-        const e = $("#custom");
-        await this.vfx.add(e, {
-            shader: shaders.custom,
-            uniforms: { scroll: () => window.scrollY / window.innerHeight },
-        });
-    }
-
-    async initEffects() {
-        const bloom = $("#effect-bloom") as HTMLImageElement;
-        await this.vfx.add(bloom, {
-            effect: new BloomEffect({ threshold: 0.2, intensity: 5 }),
-        });
-
-        const crt = $("#effect-crt") as unknown as HTMLVideoElement;
-        await this.vfx.add(crt, {
-            effect: [
-                new PixelateEffect({ size: 10 }),
-                new ScanlineEffect({ spacing: 5 }),
-                new BloomEffect({
-                    threshold: 0.01,
-                    softness: 0.2,
-                    intensity: 10,
-                    scatter: 1,
-                    pad: 200,
-                }),
-            ],
-        });
-    }
-
-    async initMultipass() {
-        const e = $("#multipass");
-        await this.vfx.add(e, {
-            shader: [
-                {
-                    frag: `
-                        precision highp float;
-                        uniform sampler2D src;
-                        uniform vec2 resolution;
-                        uniform vec2 offset;
-                        out vec4 outColor;
-                        void main() {
-                            vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                            vec2 t = 4.0 / resolution;
-                            vec4 c = texture(src, uv) * 0.4;
-                            c += texture(src, uv + vec2(t.x, 0)) * 0.15;
-                            c += texture(src, uv - vec2(t.x, 0)) * 0.15;
-                            c += texture(src, uv + vec2(0, t.y)) * 0.15;
-                            c += texture(src, uv - vec2(0, t.y)) * 0.15;
-                            outColor = c;
-                        }
-                    `,
-                    target: "blur",
-                },
-                {
-                    frag: `
-                        precision highp float;
-                        uniform sampler2D src;
-                        uniform sampler2D blur;
-                        uniform vec2 resolution;
-                        uniform vec2 offset;
-                        out vec4 outColor;
-                        void main() {
-                            vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                            vec4 c = texture(src, uv);
-                            vec4 b = texture(blur, uv);
-                            outColor = c + b * 0.6;
-                        }
-                    `,
-                },
-            ],
-        });
-    }
 
     // Click an item to apply its effect to the logo, the tagline and the background.
     initEffectMenu() {
@@ -550,7 +302,7 @@ class App {
         const tagline = $("#LogoTagline");
         return Promise.all([
             this.vfx.add(logo, {
-                shader: shaders.logo,
+                shader: logoShader,
                 overflow: [0, 3000, 0, 100],
                 uniforms: { delay: 0 },
                 intersection: {
@@ -558,7 +310,7 @@ class App {
                 },
             }),
             this.vfx.add(tagline, {
-                shader: shaders.logo,
+                shader: logoShader,
                 overflow: [0, 3000, 0, 1000],
                 uniforms: { delay: 0.3 },
                 intersection: {
@@ -571,7 +323,7 @@ class App {
     async showProfile() {
         const profile = $("#profile");
         await this.vfx.add(profile, {
-            shader: shaders.logo,
+            shader: logoShader,
             overflow: [0, 3000, 0, 2000],
             uniforms: { delay: 0.5 },
             intersection: {
@@ -586,15 +338,6 @@ window.addEventListener("load", async () => {
     const app = new App();
     app.initHeaderClip();
     await initBackground();
-
-    await Promise.all([
-        await app.initVFX(),
-        app.initDiv(),
-        app.initCanvas(),
-        app.initCustomShader(),
-        app.initMultipass(),
-        app.initEffects(),
-    ]);
 
     app.initEffectMenu();
     app.hideMask();

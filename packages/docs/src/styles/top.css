@@ -10,20 +10,9 @@
 .Top > section {
     padding: 0 32px;
 }
-:where(.Top) section h2 {
-    font-size: 3rem;
-}
-:where(.Top) section h3 {
-    font-size: 2rem;
-}
 :where(.Top) section p {
     font-size: var(--font-size);
     line-height: 1.5;
-}
-
-:where(.Top) section img,
-:where(.Top) section video {
-    max-width: 100%;
 }
 
 /*================ Hero ================*/
@@ -160,54 +149,70 @@
     }
 }
 
-/*================ UsageSection ================*/
+/*================ Page cards ================*/
 
-.UsageSection img {
-    width: var(--column-size);
-}
-
-/*================ ExampleSection ================*/
-
-.ExampleSection .row {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 32px;
-    margin-bottom: 128px;
-    flex-direction: var(--flex-dir);
-}
-.ExampleSection .row .col {
-    flex: 1 0 0;
-    max-width: 100%;
-}
-.ExampleSection .row .col > img,
-.ExampleSection .row .col > video {
-    width: 100%;
-}
-
-#div {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
+.PageCards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
-    overflow: hidden;
 }
-#div p {
-    margin: 0;
+.PageCard {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-content: start;
+    column-gap: 8px;
+    row-gap: 12px;
+    padding: 24px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    text-decoration: none;
+    transition: background 0.2s;
 }
-#div input,
-#div textarea {
-    display: block;
-    width: 100%;
-    font-size: 1.5rem;
+.PageCard:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
-#div textarea {
-    resize: vertical;
+.PageCardNum {
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 26px;
+    color: rgba(255, 255, 255, 0.35);
+}
+.PageCardTitle {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+}
+.PageCardArrow {
+    grid-column: 3;
+    grid-row: 1;
+    font-size: 20px;
+    transition: transform 0.2s;
+}
+.PageCard:hover .PageCardArrow {
+    transform: translateX(4px);
+}
+.PageCardBlurb {
+    grid-column: 2 / 4;
+    grid-row: 2;
+    font-size: 15px;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.7);
 }
 
-#canvas {
-    width: 100%;
-    aspect-ratio: 4 / 3;
+@media (max-width: 1023px) {
+    .PageCards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 767px) {
+    .PageCards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .PageCard {
+        grid-template-columns: 40px minmax(0, 1fr) auto;
+        padding: 20px;
+    }
 }
 
 /*================ Intro masks ================*/

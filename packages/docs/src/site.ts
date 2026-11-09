@@ -22,6 +22,8 @@ export type NavSection = {
 export type NavItem = {
     slug: string;
     label: string;
+    /** One line for the top page cards. */
+    blurb: string;
     /** Label in the header. Pages without it show only in the mobile menu. */
     headerLabel?: string;
     sections: NavSection[];
@@ -31,6 +33,7 @@ export const nav: NavItem[] = [
     {
         slug: "getting-started",
         label: "Getting Started",
+        blurb: "Install VFX-JS and add your first effect.",
         headerLabel: "Getting Started",
         sections: [
             { id: "install", label: "Install" },
@@ -43,6 +46,7 @@ export const nav: NavItem[] = [
     {
         slug: "how-it-works",
         label: "How it Works",
+        blurb: "How VFX-JS draws DOM elements with WebGL.",
         headerLabel: "How it Works",
         sections: [
             { id: "dom", label: "The DOM stays DOM" },
@@ -56,6 +60,7 @@ export const nav: NavItem[] = [
     {
         slug: "ai",
         label: "Use with AI",
+        blurb: "Let your AI agent write effects and shaders.",
         headerLabel: "AI",
         sections: [
             { id: "skill", label: "Install the skill" },
@@ -68,6 +73,7 @@ export const nav: NavItem[] = [
     {
         slug: "effects",
         label: "Effects",
+        blurb: "Shader presets and the @vfx-js/effects gallery.",
         headerLabel: "Effects",
         sections: [
             { id: "presets", label: "Shader presets" },
@@ -80,6 +86,7 @@ export const nav: NavItem[] = [
     {
         slug: "shaders",
         label: "Custom Shaders",
+        blurb: "Write your own GLSL, with uniforms and multipass.",
         headerLabel: "Shaders",
         sections: [
             { id: "template", label: "GLSL template" },
@@ -93,6 +100,7 @@ export const nav: NavItem[] = [
     {
         slug: "custom-effects",
         label: "Custom Effects",
+        blurb: "Build effects with the Effect API and hooks.",
         sections: [
             { id: "effect-api", label: "Effect API" },
             { id: "hooks", label: "Lifecycle hooks" },
