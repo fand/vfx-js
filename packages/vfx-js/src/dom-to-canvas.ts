@@ -110,7 +110,7 @@ export default async function getCanvasFromElement(
     };
     draw();
 
-    // Safari leaves <img> in the SVG blank until a later draw.
+    // Workaround for Safari: it leaves <img> in the SVG blank until a later draw.
     if (decodesNestedImagesLate() && newElement.querySelector("img")) {
         for (let i = 0; i < LATE_DECODE_REDRAWS; i++) {
             await new Promise((r) => setTimeout(r, 16));
