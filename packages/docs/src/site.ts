@@ -103,10 +103,13 @@ export const nav: NavItem[] = [
         label: "Custom Effects",
         blurb: "Build effects with the Effect API and hooks.",
         sections: [
-            { id: "effect-api", label: "Effect API" },
+            { id: "effect-interface", label: "The Effect interface" },
             { id: "hooks", label: "Lifecycle hooks" },
-            { id: "effect-texture", label: "EffectTexture" },
-            { id: "examples", label: "Examples" },
+            { id: "drawing", label: "Drawing" },
+            { id: "textures", label: "Textures" },
+            { id: "params", label: "Params" },
+            { id: "post-effect", label: "As a post effect" },
+            { id: "tips", label: "Tips" },
         ],
     },
 ];
