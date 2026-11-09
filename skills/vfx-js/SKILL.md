@@ -75,7 +75,7 @@ vfx.add(el, {
     overlay: true,             // keep the original element visible (default hides it)
     zIndex: 0,                 // draw order inside the canvas
     wrap: "clamp",             // texture wrap: "repeat" (default) | "clamp" | "mirror"
-    intersection: { threshold: 0.5 },
+    intersection: { threshold: 0.5, duration: 1 }, // enter/leave timing; see references/shader.md
 });
 ```
 

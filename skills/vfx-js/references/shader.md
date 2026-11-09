@@ -45,15 +45,34 @@ Declare only the ones you use.
 | `intersection` | `float` | How much of the element is in the viewport, 0..1. |
 | `enterTime` | `float` | Seconds since the element entered the viewport. |
 | `leaveTime` | `float` | Seconds since the element left the viewport. |
+| `enterProgress` | `float` | Enter transition, 0..1. Plays backward if the element leaves mid-way. |
+| `leaveProgress` | `float` | Leave transition, 0..1. Stays 0 until enter finishes. |
 | `autoCrop` | `bool` | The `autoCrop` prop (default true). |
 | `backbuffer` | `sampler2D` | Previous frame. Needs `backbuffer: true`. |
 | `passIndex` | `int` | Index of the current pass. |
 
-Use `enterTime` for an intro animation that plays when the element scrolls in:
+Use `enterProgress` and `leaveProgress` for enter and leave animations.
+They turn back smoothly when the user scrolls back mid-way:
 
 ```glsl
-float t = clamp(enterTime / 1.0, 0.0, 1.0); // 0 → 1 over one second
+float t = enterProgress * (1.0 - leaveProgress); // 0 hidden, 1 fully shown
 ```
+
+Set the timing with `intersection`:
+
+```ts
+vfx.add(el, {
+    shader,
+    intersection: {
+        threshold: 0.5,      // enter when half of the element is in view
+        leaveThreshold: 0.2, // leave when less than 20% is in view (default: threshold)
+        duration: 0.8,       // seconds for enter and leave (default: 1)
+    },
+});
+```
+
+The visible ratio uses the smaller of the element and viewport sizes, so an element taller than the viewport can reach 1.
+Use `enterTime` / `leaveTime` for animations timed in seconds.
 
 ## Uniform values
 
