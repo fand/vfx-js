@@ -319,9 +319,10 @@ export type VFXProps = {
         threshold?: number;
 
         /**
-         * Ratio below which the element is considered "left".
-         * Use a value below `threshold` to stop flicker at the edge.
-         * Values above `threshold` are clamped to it. (Default: `threshold`)
+         * The element leaves when the ratio falls below this value.
+         * Below `threshold`, it stops flicker at the edge.
+         * Above `threshold`, the element enters at `threshold` when scrolling in
+         * and leaves at `leaveThreshold` when scrolling out. (Default: `threshold`)
          */
         leaveThreshold?: number;
 

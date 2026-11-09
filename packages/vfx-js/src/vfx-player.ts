@@ -57,7 +57,6 @@ import type {
 const gifFor = new Map<HTMLElement, GIFData>();
 
 // Warn about bad intersection options once per page.
-let hasWarnedLeaveThreshold = false;
 let hasWarnedDuration = false;
 
 // The opacity that hides an element under its overlay, or null to leave it as is.
@@ -1648,7 +1647,7 @@ export class VFXPlayer {
         const isIn =
             e.isFullScreen ||
             nextIsIn(
-                wasIn,
+                e.intersectionState,
                 intersection,
                 isRectInViewport(viewportWithMargin, rect),
                 e.intersection.threshold,
@@ -2288,16 +2287,7 @@ export function parseIntersectionOpts(
     const threshold = intersectionOpts?.threshold ?? 0;
     const rootMargin = createMargin(intersectionOpts?.rootMargin ?? 0);
 
-    let leaveThreshold = intersectionOpts?.leaveThreshold ?? threshold;
-    if (leaveThreshold > threshold) {
-        if (!hasWarnedLeaveThreshold) {
-            hasWarnedLeaveThreshold = true;
-            console.warn(
-                `[VFX-JS] \`intersection.leaveThreshold\` (${leaveThreshold}) is above \`threshold\` (${threshold}). Using \`threshold\` instead.`,
-            );
-        }
-        leaveThreshold = threshold;
-    }
+    const leaveThreshold = intersectionOpts?.leaveThreshold ?? threshold;
 
     let duration = intersectionOpts?.duration ?? 1;
     if (!(duration > 0)) {

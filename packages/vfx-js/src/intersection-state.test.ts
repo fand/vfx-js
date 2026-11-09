@@ -27,6 +27,8 @@ describe("createIntersectionState", () => {
             enterProgress: 0,
             leaveProgress: 0,
             isIn: false,
+            wasAbove: false,
+            wasBelow: false,
             lastTime: 5,
         });
     });
@@ -363,25 +365,169 @@ describe("stepIntersection: timing", () => {
 });
 
 describe("nextIsIn", () => {
-    test("enters at threshold", () => {
-        expect(nextIsIn(false, 0.5, true, 0.5, 0.2)).toBe(true);
-        expect(nextIsIn(false, 0.4, true, 0.5, 0.2)).toBe(false);
+    // Runs nextIsIn over a ratio sequence, the way the player does per frame.
+    function run(
+        ratios: number[],
+        threshold: number,
+        leaveThreshold: number,
+    ): boolean[] {
+        const state = createIntersectionState(0);
+        return ratios.map((ratio) => {
+            state.isIn = nextIsIn(
+                state,
+                ratio,
+                ratio > 0,
+                threshold,
+                leaveThreshold,
+            );
+            return state.isIn;
+        });
+    }
+
+    function stateWith(fields: Partial<IntersectionState>) {
+        return { ...createIntersectionState(0), ...fields };
+    }
+
+    describe("spec table", () => {
+        test("above, not below → in", () => {
+            const s = stateWith({});
+            expect(nextIsIn(s, 0.6, true, 0.5, 0.2)).toBe(true);
+        });
+
+        test("below, not above → out", () => {
+            const s = stateWith({ isIn: true, wasAbove: true });
+            expect(nextIsIn(s, 0.1, true, 0.5, 0.2)).toBe(false);
+        });
+
+        test("neither → keep", () => {
+            expect(
+                nextIsIn(stateWith({ isIn: true }), 0.3, true, 0.5, 0.2),
+            ).toBe(true);
+            expect(
+                nextIsIn(stateWith({ isIn: false }), 0.3, true, 0.5, 0.2),
+            ).toBe(false);
+        });
+
+        test("both, above just turned true → in", () => {
+            const s = stateWith({ wasBelow: true });
+            expect(nextIsIn(s, 0.4, true, 0.3, 0.5)).toBe(true);
+        });
+
+        test("both, below just turned true → out", () => {
+            const s = stateWith({ isIn: true, wasAbove: true });
+            expect(nextIsIn(s, 0.4, true, 0.3, 0.5)).toBe(false);
+        });
+
+        test("both, neither just turned true → keep", () => {
+            const flags = { wasAbove: true, wasBelow: true };
+            expect(
+                nextIsIn(
+                    stateWith({ ...flags, isIn: true }),
+                    0.4,
+                    true,
+                    0.3,
+                    0.5,
+                ),
+            ).toBe(true);
+            expect(
+                nextIsIn(
+                    stateWith({ ...flags, isIn: false }),
+                    0.4,
+                    true,
+                    0.3,
+                    0.5,
+                ),
+            ).toBe(false);
+        });
+
+        test("both on add → in", () => {
+            expect(nextIsIn(stateWith({}), 0.4, true, 0.3, 0.5)).toBe(true);
+        });
+
+        test("updates the flags", () => {
+            const s = stateWith({});
+            nextIsIn(s, 0.4, true, 0.3, 0.5);
+            expect(s.wasAbove).toBe(true);
+            expect(s.wasBelow).toBe(true);
+            nextIsIn(s, 0.6, true, 0.3, 0.5);
+            expect(s.wasAbove).toBe(true);
+            expect(s.wasBelow).toBe(false);
+        });
     });
 
-    test("leaves below leaveThreshold", () => {
-        expect(nextIsIn(true, 0.1, true, 0.5, 0.2)).toBe(false);
-        expect(nextIsIn(true, 0.2, true, 0.5, 0.2)).toBe(true);
+    test("still ratio in the band keeps the state, leaveThreshold below", () => {
+        expect(run([0.6, 0.3, 0.3, 0.3], 0.5, 0.2)).toEqual([
+            true,
+            true,
+            true,
+            true,
+        ]);
+        expect(run([0.1, 0.3, 0.3, 0.3], 0.5, 0.2)).toEqual([
+            false,
+            false,
+            false,
+            false,
+        ]);
     });
 
-    test("ratio between thresholds keeps the previous value", () => {
-        expect(nextIsIn(true, 0.3, true, 0.5, 0.2)).toBe(true);
-        expect(nextIsIn(false, 0.3, true, 0.5, 0.2)).toBe(false);
+    test("still ratio in the band keeps the state, leaveThreshold above", () => {
+        expect(run([0.1, 0.4, 0.4, 0.4], 0.3, 0.5)).toEqual([
+            false,
+            true,
+            true,
+            true,
+        ]);
+        expect(run([0.6, 0.4, 0.4, 0.4], 0.3, 0.5)).toEqual([
+            true,
+            false,
+            false,
+            false,
+        ]);
+    });
+
+    test("scroll in enters at threshold, scroll out leaves at leaveThreshold", () => {
+        // threshold 0.3, leaveThreshold 0.5
+        expect(run([0, 0.2, 0.3, 0.4, 0.6, 1], 0.3, 0.5)).toEqual([
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+        ]);
+        expect(run([1, 0.6, 0.5, 0.4, 0.2, 0], 0.3, 0.5)).toEqual([
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+        ]);
+    });
+
+    test("big jump across both lines", () => {
+        expect(run([0, 1], 0.3, 0.5)).toEqual([false, true]);
+        expect(run([1, 0], 0.3, 0.5)).toEqual([true, false]);
+        expect(run([0, 1], 0.5, 0.2)).toEqual([false, true]);
+        expect(run([1, 0], 0.5, 0.2)).toEqual([true, false]);
     });
 
     test("threshold 0 uses touching", () => {
-        expect(nextIsIn(false, 0, true, 0, 0)).toBe(true);
-        expect(nextIsIn(false, 0, false, 0, 0)).toBe(false);
-        expect(nextIsIn(true, 0, true, 0, 0)).toBe(true);
-        expect(nextIsIn(true, 0, false, 0, 0)).toBe(false);
+        const s = stateWith({});
+        expect(nextIsIn(s, 0, true, 0, 0)).toBe(true);
+        s.isIn = true;
+        expect(nextIsIn(s, 0, false, 0, 0)).toBe(false);
+        s.isIn = false;
+        expect(nextIsIn(s, 0, false, 0, 0)).toBe(false);
+    });
+
+    test("threshold 0 with a leaveThreshold above it", () => {
+        // touching enters, leaves below 0.5
+        expect(run([0, 0.1, 0.6, 0.4], 0, 0.5)).toEqual([
+            false,
+            true,
+            true,
+            false,
+        ]);
     });
 });

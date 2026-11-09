@@ -71,6 +71,7 @@ vfx.add(el, {
 });
 ```
 
+`leaveThreshold` can also be above `threshold`: the element enters at `threshold` when scrolling in, and leaves at `leaveThreshold` when scrolling out.
 The visible ratio uses the smaller of the element and viewport sizes, so an element taller than the viewport can reach 1.
 Use `enterTime` / `leaveTime` for animations timed in seconds.
 

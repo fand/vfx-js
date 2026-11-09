@@ -310,13 +310,12 @@ describe("parseIntersectionOpts", () => {
         expect(opts.leaveThreshold).toBe(0.2);
     });
 
-    test("clamps leaveThreshold above threshold, warns once", async () => {
-        const parse = await importFresh();
-        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-        const opts = { threshold: 0.2, leaveThreshold: 0.5 };
-        expect(parse(opts).leaveThreshold).toBe(0.2);
-        expect(parse(opts).leaveThreshold).toBe(0.2);
-        expect(warn).toHaveBeenCalledOnce();
+    test("keeps leaveThreshold above threshold", () => {
+        const opts = parseIntersectionOpts({
+            threshold: 0.2,
+            leaveThreshold: 0.5,
+        });
+        expect(opts.leaveThreshold).toBe(0.5);
     });
 
     test("keeps a valid duration", () => {

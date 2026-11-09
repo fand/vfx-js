@@ -9,6 +9,10 @@ export type IntersectionState = {
     leaveProgress: number;
     /** Logical in/out after hysteresis. */
     isIn: boolean;
+    /** Last frame's ratio was at or above `threshold`. */
+    wasAbove: boolean;
+    /** Last frame's ratio was below `leaveThreshold`. */
+    wasBelow: boolean;
     /** Virtual time of the last step. */
     lastTime: number;
 };
@@ -21,24 +25,47 @@ export function createIntersectionState(now: number): IntersectionState {
         enterProgress: 0,
         leaveProgress: 0,
         isIn: false,
+        wasAbove: false,
+        wasBelow: false,
         lastTime: now,
     };
 }
 
 /**
- * In/out with hysteresis.
+ * In/out with hysteresis. Updates `wasAbove` / `wasBelow`, not `isIn`.
  * A threshold of 0 counts a touching element as in.
  * @internal
  */
 export function nextIsIn(
-    wasIn: boolean,
+    state: IntersectionState,
     ratio: number,
     touching: boolean,
     threshold: number,
     leaveThreshold: number,
 ): boolean {
-    const limit = wasIn ? leaveThreshold : threshold;
-    return limit === 0 ? touching : ratio >= limit;
+    const above = threshold === 0 ? touching : ratio >= threshold;
+    const below = leaveThreshold === 0 ? !touching : ratio < leaveThreshold;
+    const justAbove = above && !state.wasAbove;
+    const justBelow = below && !state.wasBelow;
+    state.wasAbove = above;
+    state.wasBelow = below;
+
+    if (above && !below) {
+        return true;
+    }
+    if (below && !above) {
+        return false;
+    }
+    if (above && below) {
+        // Both turn true at once only on add; treat it as scrolling in.
+        if (justAbove) {
+            return true;
+        }
+        if (justBelow) {
+            return false;
+        }
+    }
+    return state.isIn;
 }
 
 /**
