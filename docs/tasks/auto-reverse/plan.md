@@ -82,10 +82,14 @@ In `TransitionController.run`:
 
 Core reads the index right after `cb` resolves. The binding must change history before that.
 
-- Vue: `cb` waits for the page to be ready, after `afterEach`. History is done.
+- Vue: `cb` waits for the page to be ready, after `afterEach`. History is done. **Checked.**
+  vue-router calls `routerHistory.push` in `finalizeNavigation`, before `triggerAfterEach`.
+  Nuxt resolves on `page:finish`, later still.
 - SvelteKit: `cb` waits for `nav.complete`. History is done.
 - React Router: it pushes history before it renders. OK.
-- Next.js: it may push history in an effect after commit. Our `cb` resolves in a layout effect. **Check.**
+- Next.js: fine. **Checked** (16.4.3).
+  `HistoryUpdater` pushes in `useInsertionEffect`, in the commit that changes the pathname.
+  Our run starts later, in a passive effect.
 - Astro: ClientRouter pushes history right after the swap. Our `cb` resolves inside the swap. **Check.**
   Fix if needed: resolve on `astro:after-swap`.
 - Popstate is always fine: the browser changes the entry first.

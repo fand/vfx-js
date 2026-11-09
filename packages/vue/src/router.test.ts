@@ -163,6 +163,12 @@ describe("VFXTransition (router)", () => {
         await new Promise((r) => requestAnimationFrame(r));
     });
 
+    it("passes autoReverse to core", () => {
+        mount({ autoReverse: true });
+        const opts = (mock.vfx.addTransition.mock.lastCall as unknown[])[1];
+        expect(opts).toEqual({ autoReverse: true });
+    });
+
     it("holds the navigation until the run calls cb", async () => {
         mount();
         let passed = false;
