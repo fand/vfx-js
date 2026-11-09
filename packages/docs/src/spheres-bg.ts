@@ -55,7 +55,17 @@ ${SPECTRAL_LIB}
 #define SPHERES 4
 vec3 centers[SPHERES];
 float radii[SPHERES];
-const float SIZES[SPHERES] = float[SPHERES](.47, .55, .72, .8);
+const float SIZES[SPHERES] = float[SPHERES](.3, .4, .7, .6);
+// Orbits loop every 120s: each axis moves at an integer multiple of the base speed.
+// These speeds and phases were picked by simulating one loop to keep the screen as covered as
+// possible at zoom 1.4: at least 40% of a 16:10 or 16:9 screen.
+const float ORBIT_BASE = 6.2831853 / 128.;
+const vec3 ORBIT_SPEED[SPHERES] = vec3[SPHERES](
+    vec3(2, 2, 3), vec3(3, 2, 2), vec3(3, 2, 2), vec3(7, 7, 7)
+);
+const vec3 ORBIT_PHASE[SPHERES] = vec3[SPHERES](
+    vec3(3.451, 4.592, 6.138), vec3(1.132, 5.169, .372), vec3(1.649, 1.475, 2.942), vec3(5.557, 1.123, 3.039)
+);
 vec3 bandAxes[4];
 
 mat3 rotation(vec3 axis, float a) {
@@ -83,12 +93,10 @@ void setupSpheres() {
         bandAxes[i] = rotation(spin, time * speed) * start;
     }
 
-    mat3 group = rotation(vec3(.3, 1, .2), time * .05) * rotation(vec3(1, 0, .3), time * .04);
+    // The whole set tumbles once per loop.
+    mat3 group = rotation(vec3(.3, 1, .2), time * ORBIT_BASE) * rotation(vec3(1, 0, .3), time * ORBIT_BASE);
     for (int i = 0; i < SPHERES; i++) {
-        float fi = float(i);
-        vec3 phase = vec3(random(fi * 3.), random(fi * 3. + 1.), random(fi * 3. + 2.)) * 6.2831;
-        vec3 speed = .08 + .12 * vec3(random(fi + 10.), random(fi + 11.), random(fi + 12.));
-        centers[i] = group * (sin(time * speed + phase) * .5);
+        centers[i] = group * (sin(time * ORBIT_SPEED[i] * ORBIT_BASE + ORBIT_PHASE[i]) * 0.7);
         radii[i] = SIZES[i];
     }
 
@@ -205,7 +213,7 @@ void main() {
         vec3 reflected = env(reflect(rd, n));
         vec3 c = vec3(0);
         vec3 total = vec3(0);
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i <4; i++) {
             float nm = mix(400., 700., (float(i) + jitter) / 4.);
             float um = nm / 1000.;
             float ior = 1.5 + dispersion * 1.5 * ((.55 * .55) / (um * um) - 1.);
@@ -278,9 +286,9 @@ export class SpheresEffect implements Effect {
                 time: ctx.time,
                 seed: this.#seed,
                 dispersion: 0.42,
-                chroma: 0.6,
+                chroma: 0.7,
                 blend: 0.15,
-                minOverlap: 0.3,
+                minOverlap: 0.2,
                 bandsFront: 1,
                 spot: 0,
                 bandWidth: 0.3,
