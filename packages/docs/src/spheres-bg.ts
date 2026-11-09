@@ -1,4 +1,4 @@
-import type { VFXPass } from "@vfx-js/core";
+import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 
 // Glass spheres for the docs background.
 // Wavelength sampling and color helpers shared by the glass shaders.
@@ -30,10 +30,13 @@ vec3 spectrum(float nm) {
 }
 `;
 
-export const spheresShader = `
+const spheresShader = `#version 300 es
 precision highp float;
+in vec2 uv;
 uniform vec2 resolution;
-uniform vec2 offset;
+uniform vec2 center;
+uniform float zoom;
+uniform float exposure;
 uniform float time;
 uniform float dispersion;
 uniform float seed;
@@ -180,15 +183,16 @@ vec3 trace(vec3 o, vec3 d, float ior) {
 
 void main() {
     setupSpheres();
-    vec2 frag = gl_FragCoord.xy - offset;
-    vec2 uv = frag / resolution;
+    vec2 frag = uv * resolution;
 
     // New random subpixel position and wavelengths every frame. Blending frames smooths edges and grain.
     vec2 seedPos = gl_FragCoord.xy + fract(time * vec2(61.7, 13.3)) * 100.;
     vec2 subpixel = vec2(hash(seedPos + 1.), hash(seedPos + 2.)) - .5;
     float jitter = hash(seedPos);
 
-    vec2 p = (frag + subpixel - resolution * vec2(.5)) / resolution.y;
+    // Zoom in more on wide screens so the spheres keep filling them.
+    float aspectZoom = max(zoom, zoom * resolution.x / resolution.y / 1.6);
+    vec2 p = (frag + subpixel - resolution * center) / (resolution.y * aspectZoom);
     vec3 ro = vec3(0, 0, 4.2);
     vec3 rd = normalize(vec3(p, -1.6));
     vec3 n;
@@ -211,7 +215,7 @@ void main() {
             c += mix(refracted, reflected, fresnel) * weight;
             total += weight;
         }
-        current = vec4(max(c / total, 0.) * .55, 1);
+        current = vec4(max(c / total, 0.) * exposure, 1);
     }
 
     vec4 previous = texture(accum, uv);
@@ -219,38 +223,79 @@ void main() {
 }
 `;
 
-// Fades the accumulated frames in pass 2, so opacity doesn't feed back into the blend.
-export const fadeShader = `
+const outputShader = `#version 300 es
 precision highp float;
-uniform vec2 resolution;
-uniform vec2 offset;
-uniform float opacity;
+in vec2 uv;
 uniform sampler2D accum;
 out vec4 outColor;
 
 void main() {
-    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    outColor = texture(accum, uv) * opacity;
+    outColor = texture(accum, uv);
 }
 `;
 
-export const spheresPasses = (opacity: number): VFXPass[] => [
-    {
-        frag: spheresShader,
-        target: "accum",
-        persistent: true,
-        float: true,
-        uniforms: {
-            dispersion: 0.42,
-            chroma: 0.6,
-            blend: 0.15,
-            minOverlap: 0.3,
-            bandsFront: 1,
-            spot: 0,
-            bandWidth: 0.3,
-            bandIntensity: 0.4,
-            seed: Math.random() * 100,
-        },
-    },
-    { frag: fadeShader, uniforms: { opacity } },
-];
+/**
+ * Glass spheres, ray-traced in the shader.
+ * Each frame blends into a persistent buffer to smooth edges and color grain.
+ * Ignores its source, so it works on an empty element.
+ */
+export class SpheresEffect implements Effect {
+    // Where the spheres sit in the element (0-1) and how large they are.
+    center: [number, number];
+    zoom: number;
+    exposure: number;
+    #accum: EffectRenderTarget | null = null;
+    #seed = Math.random() * 100;
+
+    constructor(
+        opts: {
+            center?: [number, number];
+            zoom?: number;
+            exposure?: number;
+        } = {},
+    ) {
+        this.center = opts.center ?? [0.5, 0.5];
+        this.zoom = opts.zoom ?? 1;
+        this.exposure = opts.exposure ?? 1;
+    }
+
+    init(ctx: EffectContext): void {
+        this.#accum = ctx.createRenderTarget({ float: true, persistent: true });
+    }
+
+    render(ctx: EffectContext): void {
+        if (!this.#accum) {
+            return;
+        }
+        ctx.draw({
+            frag: spheresShader,
+            uniforms: {
+                accum: this.#accum,
+                resolution: [...ctx.dims.elementPixel],
+                center: this.center,
+                zoom: this.zoom,
+                exposure: this.exposure,
+                time: ctx.time,
+                seed: this.#seed,
+                dispersion: 0.42,
+                chroma: 0.6,
+                blend: 0.15,
+                minOverlap: 0.3,
+                bandsFront: 1,
+                spot: 0,
+                bandWidth: 0.3,
+                bandIntensity: 0.4,
+            },
+            target: this.#accum,
+        });
+        ctx.draw({
+            frag: outputShader,
+            uniforms: { accum: this.#accum },
+            target: ctx.target,
+        });
+    }
+
+    dispose(): void {
+        this.#accum = null;
+    }
+}

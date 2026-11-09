@@ -58,31 +58,55 @@
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
 
-        <header>
-            <div class="HeaderTop GitHub">
-                <a href="https://github.com/fand/vfx-js" target="_blank"
-                    >GITHUB</a
-                >
-            </div>
-            <div class="HeaderTop API">
-                <a href="./docs/" target="_blank">API</a>
-            </div>
-            <!-- BG for legibility -->
-            <div class="HeaderBottom GitHub">GITHUB</div>
-            <div class="HeaderBottom API">API</div>
-        </header>
-
         <div id="BG"></div>
 
-        <section class="TopSection">
-            <img id="Logo" src="./vfx-js-logo-no-padding.svg" alt="VFX-JS" />
+        <header class="SiteHeader">
+            <img
+                class="SiteHeaderLogo"
+                src="./vfx-js-logo-no-padding.svg"
+                alt="VFX-JS"
+            />
+            <nav>
+                <a href="#examples">Examples</a>
+                <a href="./docs/" target="_blank">Docs</a>
+                <a href="https://github.com/fand/vfx-js" target="_blank"
+                    >GitHub &#8599;</a
+                >
+            </nav>
+        </header>
 
-            <p id="LogoTagline">
-                VFX-JS is a JavaScript library to add WebGL-powered effects to
-                your website. <br />You can easily attach it to normal
-                <code> &lt;img&gt;</code>, <code>&lt;video&gt;</code> elements
-                etc.
-            </p>
+        <section class="Hero">
+            <div class="HeroMain">
+                <img id="Logo" src="./vfx-js-logo-no-padding.svg" alt="VFX-JS" />
+                <div id="LogoTagline">
+                    <p class="HeroTagline">
+                        WebGL effects for images, videos, and HTML.
+                    </p>
+                    <p class="HeroHint">Hover to preview. Click to keep.</p>
+                </div>
+            </div>
+
+            <div class="EffectMenu">
+                <p class="EffectMenuTitle">TRY AN EFFECT</p>
+                <ol class="EffectList"></ol>
+                <label class="EffectIntensity">
+                    <span>INTENSITY</span>
+                    <input
+                        class="EffectSlider"
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value="0.6"
+                    />
+                </label>
+                <button class="EffectCopy" type="button">Copy code &#8599;</button>
+            </div>
+
+            <div class="HeroFoot">
+                <span>SCROLL TO EXPLORE &#8595;</span>
+                <span>@vfx-js/effects</span>
+            </div>
         </section>
 
         <section class="UsageSection">
@@ -152,7 +176,7 @@ vfx.add(img { shader: 'rgbShift' });
             </iframe>
         </section>
 
-        <section class="ExampleSection">
+        <section class="ExampleSection" id="examples">
             <h2>Examples</h2>
 
             <section>

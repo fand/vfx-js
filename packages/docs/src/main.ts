@@ -1,8 +1,16 @@
-import { VFX } from "@vfx-js/core";
-import { BloomEffect, PixelateEffect, ScanlineEffect } from "@vfx-js/effects";
+import { type Effect, VFX } from "@vfx-js/core";
+import {
+    AsciiEffect,
+    BloomEffect,
+    GlitchEffect,
+    HalftoneEffect,
+    PixelateEffect,
+    PixelSortEffect,
+    ScanlineEffect,
+} from "@vfx-js/effects";
 
 import Prism from "prismjs";
-import { spheresPasses } from "./spheres-bg";
+import { SpheresEffect } from "./spheres-bg";
 import "prism-themes/themes/prism-nord.min.css";
 
 Prism.manual = true;
@@ -142,6 +150,85 @@ void main (void) {
     `,
 };
 
+// Each menu item builds one effect. The slider value t (0-1) drives its main param.
+type MenuEffect = {
+    label: string;
+    className?: string;
+    create?: () => Effect;
+    setIntensity?: (effect: Effect, t: number) => void;
+    options?: (t: number) => string;
+};
+
+const round = (x: number) => Math.round(x * 100) / 100;
+
+const MENU_EFFECTS: MenuEffect[] = [
+    { label: "Original" },
+    {
+        label: "ASCII",
+        className: "AsciiEffect",
+        create: () => new AsciiEffect(),
+        setIntensity: (e, t) => {
+            (e as AsciiEffect).params.grid = Math.round(lerp(24, 6, t));
+        },
+        options: (t) => `{ grid: ${Math.round(lerp(24, 6, t))} }`,
+    },
+    {
+        label: "Bloom",
+        className: "BloomEffect",
+        create: () => new BloomEffect({ threshold: 0.2 }),
+        setIntensity: (e, t) => {
+            (e as BloomEffect).params.intensity = lerp(0.5, 4, t);
+        },
+        options: (t) =>
+            `{ threshold: 0.2, intensity: ${round(lerp(0.5, 4, t))} }`,
+    },
+    {
+        label: "Halftone",
+        className: "HalftoneEffect",
+        create: () => new HalftoneEffect(),
+        setIntensity: (e, t) => {
+            (e as HalftoneEffect).params.gridSize = lerp(4, 18, t);
+        },
+        options: (t) => `{ gridSize: ${round(lerp(4, 18, t))} }`,
+    },
+    {
+        label: "Pixel Sort",
+        className: "PixelSortEffect",
+        create: () => new PixelSortEffect(),
+        setIntensity: (e, t) => {
+            (e as PixelSortEffect).params.range = [lerp(0.9, 0.1, t), 1];
+        },
+        options: (t) => `{ range: [${round(lerp(0.9, 0.1, t))}, 1] }`,
+    },
+    {
+        label: "Glitch",
+        className: "GlitchEffect",
+        create: () => new GlitchEffect(),
+        setIntensity: (e, t) => {
+            (e as GlitchEffect).params.intensity = lerp(0.2, 3, t);
+        },
+        options: (t) => `{ intensity: ${round(lerp(0.2, 3, t))} }`,
+    },
+];
+
+function snippet(item: MenuEffect, t: number): string {
+    if (!item.className || !item.options) {
+        return `import { VFX } from "@vfx-js/core";
+
+const vfx = new VFX();
+await vfx.add(document.querySelector("img"), { shader: "none" });
+`;
+    }
+    return `import { VFX } from "@vfx-js/core";
+import { ${item.className} } from "@vfx-js/effects";
+
+const vfx = new VFX();
+await vfx.add(document.querySelector("img"), {
+    effect: new ${item.className}(${item.options(t)}),
+});
+`;
+}
+
 class App {
     vfx = new VFX({
         pixelRatio: window.devicePixelRatio,
@@ -153,6 +240,9 @@ class App {
         scrollPadding: false,
     });
 
+    // #BG covers the viewport. The spheres sit at 65% x.
+    bgSpheres = new SpheresEffect({ center: [0.65, 0.5], zoom: 1.4 });
+
     async initBG() {
         const bg = $("#BG");
 
@@ -161,15 +251,19 @@ class App {
             return a * (1 - t) + b * t;
         }
 
-        function loop() {
+        // Parallax moves the spheres in the shader. Moving #BG itself would crop them at its bottom edge.
+        const loop = () => {
             scroll = lerp(scroll, window.scrollY, 0.03);
-            bg.style.setProperty("transform", `translateY(-${scroll * 0.1}px)`);
+            this.bgSpheres.center = [
+                0.65,
+                0.5 + (scroll * 0.1) / window.innerHeight,
+            ];
 
             requestAnimationFrame(loop);
-        }
+        };
         loop();
 
-        await this.vfx2.add(bg, { shader: spheresPasses(1) });
+        await this.vfx2.add(bg, { effect: [this.bgSpheres] });
     }
 
     async initVFX() {
@@ -370,6 +464,93 @@ class App {
         });
     }
 
+    // Click an item to apply its effect to the logo and the background.
+    initEffectMenu() {
+        const logo = $("#Logo");
+        const bg = $("#BG");
+        const list = $(".EffectList");
+        const slider = $(".EffectSlider") as HTMLInputElement;
+        const copy = $(".EffectCopy");
+
+        // One effect instance can't be shared between elements, so each target gets its own.
+        const logoEffects = MENU_EFFECTS.map((item) => item.create?.());
+        const bgEffects = MENU_EFFECTS.map((item) => item.create?.());
+        let selected = 0;
+        // The logo starts on its intro shader. Move it to the effect path on first use.
+        let logoOnEffectPath = false;
+        let queue = Promise.resolve();
+
+        const intensity = () => Number.parseFloat(slider.value);
+
+        const applyIntensity = () => {
+            const item = MENU_EFFECTS[selected];
+            for (const effect of [logoEffects[selected], bgEffects[selected]]) {
+                if (effect) {
+                    item.setIntensity?.(effect, intensity());
+                }
+            }
+        };
+
+        const select = (index: number) => {
+            selected = index;
+            applyIntensity();
+            const logoEffect = logoEffects[index];
+            const bgEffect = bgEffects[index];
+            slider.disabled = !logoEffect;
+            // Run swaps in order so fast clicks can't interleave them.
+            queue = queue.then(async () => {
+                if (selected !== index) {
+                    return;
+                }
+                const logoChain = logoEffect ? [logoEffect] : [];
+                const bgChain = bgEffect
+                    ? [this.bgSpheres, bgEffect]
+                    : [this.bgSpheres];
+                const updateLogo = async () => {
+                    if (logoOnEffectPath) {
+                        await this.vfx.updateEffects(logo, logoChain);
+                    } else {
+                        logoOnEffectPath = true;
+                        this.vfx.remove(logo);
+                        await this.vfx.add(logo, { effect: logoChain });
+                    }
+                };
+                await Promise.all([
+                    updateLogo(),
+                    this.vfx2.updateEffects(bg, bgChain),
+                ]);
+            });
+        };
+
+        const items = MENU_EFFECTS.map((item, i) => {
+            const li = document.createElement("li");
+            li.innerHTML = `<span class="num">${String(i + 1).padStart(2, "0")}</span>${item.label}`;
+            li.addEventListener("click", () => {
+                for (const [j, other] of items.entries()) {
+                    other.classList.toggle("active", j === i);
+                }
+                select(i);
+            });
+            list.appendChild(li);
+            return li;
+        });
+        items[selected].classList.add("active");
+        slider.disabled = true;
+
+        slider.addEventListener("input", applyIntensity);
+
+        copy.addEventListener("click", async () => {
+            await navigator.clipboard.writeText(
+                snippet(MENU_EFFECTS[selected], intensity()),
+            );
+            const label = copy.innerHTML;
+            copy.textContent = "Copied ✓";
+            setTimeout(() => {
+                copy.innerHTML = label;
+            }, 1500);
+        });
+    }
+
     hideMask() {
         const maskTop = $("#MaskTop");
         maskTop.style.setProperty("height", "0");
@@ -428,6 +609,7 @@ window.addEventListener("load", async () => {
         app.initEffects(),
     ]);
 
+    app.initEffectMenu();
     app.hideMask();
     setTimeout(() => {
         app.showLogo();
