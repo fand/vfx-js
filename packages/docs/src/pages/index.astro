@@ -1,3 +1,8 @@
+---
+import "../index.css";
+import "prism-themes/themes/prism-nord.min.css";
+---
+
 <!doctype html>
 <html lang="en">
     <head>
@@ -52,7 +57,6 @@
         <link rel="apple-touch-icon" href="favicon/favicon-180.png" />
         <link rel="manifest" href="./manifest.webmanifest" />
 
-        <link rel="stylesheet" href="./index.css" />
     </head>
 
     <body>
@@ -111,10 +115,10 @@
             <h2>Usage</h2>
 
             <p>Install via npm:</p>
-            <pre><code class="language-bash">npm i @vfx-js/core</code></pre>
+            <pre is:raw><code class="language-bash">npm i @vfx-js/core</code></pre>
 
             <p>Then create <code>VFX</code> object in your script:</p>
-            <pre><code class="language-javascript">
+            <pre is:raw><code class="language-javascript">
 import { VFX } from '@vfx-js/core';
 
 const img = document.querySelector('#img');
@@ -142,7 +146,7 @@ vfx.add(img, { shader: "glitch", overflow: 100 });
                     >jsDeliver</a
                 >). So you can use VFX-JS in CodePen etc:
             </p>
-            <pre><code class="language-javascript">
+            <pre is:raw><code class="language-javascript">
 // Load VFX-JS from esm.sh
 import { VFX } from "https://esm.sh/@vfx-js/core";
 
@@ -181,10 +185,10 @@ vfx.add(img { shader: 'rgbShift' });
                 <div class="row">
                     <div class="col">
                         <p>Image</p>
-                        <pre><code class="language-html">
+                        <pre is:raw><code class="language-html">
 &lt;img src="example.png" /&gt;
                     </code></pre>
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(img, { shader: "rgbShift" });
                     </code></pre>
                     </div>
@@ -200,10 +204,10 @@ vfx.add(img, { shader: "rgbShift" });
                 <div class="row">
                     <div class="col">
                         <p>GIF</p>
-                        <pre><code class="language-html">
+                        <pre is:raw><code class="language-html">
 &lt;img src="example.gif" /&gt;
                     </code></pre>
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(gif, { shader: "rainbow" });
                     </code></pre>
                     </div>
@@ -222,11 +226,11 @@ vfx.add(gif, { shader: "rainbow" });
                 <div class="row">
                     <div class="col">
                         <p>Video</p>
-                        <pre><code class="language-html">
+                        <pre is:raw><code class="language-html">
 &lt;video src="example.mp4" autoplay loop muted/&gt;
                     </code></pre>
 
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(video, { shader: "halftone" });
                     </code></pre>
                     </div>
@@ -245,7 +249,7 @@ vfx.add(video, { shader: "halftone" });
                 <div class="row">
                     <div class="col">
                         <p>Div (experimental)</p>
-                        <pre><code class="language-html">
+                        <pre is:raw><code class="language-html">
 &lt;div id="div"&gt;
     &lt;p&gt;You can interact with these inputs.&lt;/p&gt;
     &lt;input type="text" value="Edit me" /&gt;
@@ -254,7 +258,7 @@ vfx.add(video, { shader: "halftone" });
 &lt;/div&gt;
                         </code></pre>
 
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(div, { shader: "rgbShift", overflow: 100 });
 
 // Update on input
@@ -280,7 +284,7 @@ mo.observe(textarea, { attributes: true });
                 <div class="row">
                     <div class="col">
                         <p>Canvas</p>
-                        <pre><code class="language-html">
+                        <pre is:raw><code class="language-html">
 &lt;!--
   VFX-JS also supports HTMLCanvasElement as the input.
   You can draw 2D graphics and text in canvas,
@@ -289,7 +293,7 @@ mo.observe(textarea, { attributes: true });
 &lt;canvas id="canvas"/&gt;
                         </code></pre>
 
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
@@ -317,7 +321,7 @@ vfx.add(canvas, { shader });
                 <h3>Presets</h3>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(el, { shader: "rainbow" });
                     </code></pre>
                     </div>
@@ -330,7 +334,7 @@ vfx.add(el, { shader: "rainbow" });
                 </div>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(el, { shader: "rgbShift" });
                         </code></pre>
                     </div>
@@ -343,7 +347,7 @@ vfx.add(el, { shader: "rgbShift" });
                 </div>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 // Some shaders require "overflow" property
 // so that they can render beyond the original area.
 //
@@ -370,7 +374,7 @@ vfx.add(el, { shader: "glitch", overflow: 100 });
                 </p>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(el, {
     shader: "duotone",
     uniforms: {
@@ -406,7 +410,7 @@ vfx.add(el, {
                 </p>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(el, { shader: "slitScanTransition" });
                         </code></pre>
                     </div>
@@ -420,7 +424,7 @@ vfx.add(el, { shader: "slitScanTransition" });
                 </div>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(el, { shader: "warpTransition" });
                         </code></pre>
                     </div>
@@ -434,7 +438,7 @@ vfx.add(el, { shader: "warpTransition" });
                 </div>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(el, { shader: "pixelateTransition" });
                         </code></pre>
                     </div>
@@ -448,7 +452,7 @@ vfx.add(el, { shader: "pixelateTransition" });
                 </div>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 vfx.add(el, { shader: "focusTransition" });
                         </code></pre>
                     </div>
@@ -466,7 +470,7 @@ vfx.add(el, { shader: "focusTransition" });
                 <p>You can write GLSL shader by yourself.</p>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 const shader = `
 precision highp float;
 uniform vec2 resolution;
@@ -510,10 +514,10 @@ vfx.add(el, {
                     params; mutate <code>effect.params</code> (or call
                     <code>effect.setParams</code>) to drive them live.
                 </p>
-                <pre><code class="language-bash">npm i @vfx-js/core @vfx-js/effects</code></pre>
+                <pre is:raw><code class="language-bash">npm i @vfx-js/core @vfx-js/effects</code></pre>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 import { VFX } from "@vfx-js/core";
 import { BloomEffect } from "@vfx-js/effects";
 
@@ -539,7 +543,7 @@ await vfx.add(img, { effect });
                 </p>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 import {
     BloomEffect,
     PixelateEffect,
@@ -598,7 +602,7 @@ await vfx.add(img, {
                 </p>
                 <div class="row">
                     <div class="col">
-                        <pre><code class="language-javascript">
+                        <pre is:raw><code class="language-javascript">
 // Pass 1: Blur the image into "blur" buffer
 const blurPass = {
     frag: `
@@ -700,10 +704,13 @@ vfx.add(el, {
         <div id="Frame"><div id="FrameBottom"></div></div>
         <div id="MaskTop"></div>
 
-        <script type="module" src="/src/main.ts"></script>
+        <script>
+            import "../main.ts";
+        </script>
 
         <!-- Cloudflare Web Analytics -->
         <script
+            is:inline
             defer
             src="https://static.cloudflareinsights.com/beacon.min.js"
             data-cf-beacon='{"token": "b9c39aae9c304f1cbfa1e7bb3e84f078"}'

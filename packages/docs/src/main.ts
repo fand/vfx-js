@@ -11,7 +11,6 @@ import {
 
 import Prism from "prismjs";
 import { SpheresEffect } from "./spheres-bg";
-import "prism-themes/themes/prism-nord.min.css";
 
 Prism.manual = true;
 Prism.highlightAll();

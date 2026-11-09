@@ -34,11 +34,16 @@ jobs:
             - name: Build
               run: pnpm run build
 
-            # Served under the same basePath as on amagi.dev.
+            # Served under the same paths as on amagi.dev.
             - name: Build transition demo
+              run: pnpm --filter docs-transitions run build:demo
+
+            - name: Collect preview files
               run: |
-                  pnpm --filter docs-transitions run build:demo
-                  cp -r packages/docs-transitions/out packages/docs/dist/vfx-js-transitions
+                  mkdir -p preview
+                  cp -r packages/docs/dist preview/vfx-js
+                  cp -r packages/docs-transitions/out preview/vfx-js-transitions
+                  echo "/ /vfx-js/ 302" > preview/_redirects
 
             - name: Deploy to Cloudflare Pages
               id: deploy
@@ -46,7 +51,7 @@ jobs:
               with:
                   apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
                   accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-                  command: pages deploy packages/docs/dist --project-name=vfx-js --branch=${{ github.head_ref }}
+                  command: pages deploy preview --project-name=vfx-js --branch=${{ github.head_ref }}
 
             - name: Comment preview URL on PR
               uses: marocchino/sticky-pull-request-comment@v3
@@ -57,10 +62,10 @@ jobs:
 
                       | Page | URL |
                       | --- | --- |
-                      | Top | ${{ steps.deploy.outputs.pages-deployment-alias-url }} |
-                      | Examples | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/examples/ |
-                      | Storybook | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/storybook/ |
-                      | Docs | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/docs/ |
+                      | Top | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/vfx-js/ |
+                      | Examples | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/vfx-js/examples/ |
+                      | Storybook | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/vfx-js/storybook/ |
+                      | Docs | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/vfx-js/docs/ |
                       | Transition | ${{ steps.deploy.outputs.pages-deployment-alias-url }}/vfx-js-transitions/ |
 
                       <sub>This branch URL stays the same across pushes. Latest deploy: ${{ steps.deploy.outputs.deployment-url }}</sub>

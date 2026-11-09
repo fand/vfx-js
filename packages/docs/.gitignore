@@ -20,3 +20,6 @@ storybook/
 
 # Examples static build
 examples/
+
+# Astro
+.astro/
