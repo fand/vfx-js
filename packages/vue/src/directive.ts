@@ -46,7 +46,8 @@ export const vTransition: ObjectDirective<HTMLElement, RunOpts> = {
             },
         };
         links.set(el, state);
-        el.addEventListener("click", state.onClick);
+        // Capture, so it runs before a link's own handler calls preventDefault (NuxtLink does).
+        el.addEventListener("click", state.onClick, true);
     },
     updated(el, binding) {
         const state = links.get(el);
@@ -57,7 +58,7 @@ export const vTransition: ObjectDirective<HTMLElement, RunOpts> = {
     beforeUnmount(el) {
         const state = links.get(el);
         if (state) {
-            el.removeEventListener("click", state.onClick);
+            el.removeEventListener("click", state.onClick, true);
             links.delete(el);
         }
     },

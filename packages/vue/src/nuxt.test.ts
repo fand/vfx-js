@@ -392,6 +392,16 @@ describe("vTransition", () => {
         expect(takePending()).toEqual({ transition: Zoom });
     });
 
+    // NuxtLink calls preventDefault in its own click handler.
+    it("runs before the link's own handler prevents the click", () => {
+        const a = mount(
+            '<a href="/" @click.prevent v-transition="spec">x</a>',
+            () => ({ spec: { transition: Swipe } }),
+        );
+        a.dispatchEvent(new MouseEvent("click", { cancelable: true }));
+        expect(takePending()).toEqual({ transition: Swipe });
+    });
+
     it("ignores modified clicks and other targets", () => {
         const a = mount(
             '<a href="/" target="_blank" v-transition="spec">x</a>',
