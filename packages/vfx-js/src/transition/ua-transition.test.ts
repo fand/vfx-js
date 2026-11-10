@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
     createUATransitions,
     type NavigationLike,
@@ -120,6 +120,18 @@ describe("createUATransitions without the Navigation API", () => {
         expect(ua.current()).toBeUndefined();
         popTo("https://a.test/b", true);
         expect(ua.current()).toBeDefined();
+    });
+
+    test("listens in the capture phase, ahead of a router's popstate", () => {
+        const win = fakeWindow();
+        const add = vi.spyOn(win, "addEventListener");
+        createUATransitions(undefined, win);
+        // Next.js calls run() from its own popstate listener.
+        expect(add).toHaveBeenCalledWith(
+            "popstate",
+            expect.any(Function),
+            true,
+        );
     });
 
     test("is undefined once the URL changes", () => {

@@ -38,12 +38,17 @@ export function createUATransitions(
         animated = key ? { id: ++seq, key } : undefined;
     });
     // Older Safari has the flag only on popstate.
+    // Capture, so it is set before a router's popstate listener calls run().
     if (!navigation && win) {
-        win.addEventListener("popstate", (e) => {
-            animated = (e as PopStateEventLike).hasUAVisualTransition
-                ? { id: ++seq, href: win.location.href }
-                : undefined;
-        });
+        win.addEventListener(
+            "popstate",
+            (e) => {
+                animated = (e as PopStateEventLike).hasUAVisualTransition
+                    ? { id: ++seq, href: win.location.href }
+                    : undefined;
+            },
+            true,
+        );
     }
     // A tap or key press after the navigation starts runs of its own.
     const clear = () => {
