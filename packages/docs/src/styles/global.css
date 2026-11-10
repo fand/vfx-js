@@ -8,7 +8,10 @@
     --column-size: calc(50% - 16px);
 
     --line: rgba(255, 255, 255, 0.25);
+    --frame: 8px;
     --header-height: 64px;
+    /* Header bottom edge: the frame plus the header. */
+    --header-bottom: calc(var(--frame) + var(--header-height));
     --mono: ui-monospace, Menlo, Consolas, monospace;
 
     --author-icon-size: 12rem;

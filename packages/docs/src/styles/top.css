@@ -23,7 +23,7 @@
     grid-template-columns: 1fr auto;
     align-items: center;
     gap: 32px;
-    min-height: calc(100lvh - var(--header-height));
+    min-height: calc(100lvh - var(--header-bottom));
     margin: 0 32px 10vh;
     padding: 0 8px 96px;
     border-bottom: 1px solid var(--line);

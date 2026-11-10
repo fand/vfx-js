@@ -3,9 +3,9 @@
 /* Fixed on top. The page is clipped below it, so only the BG shows through. */
 .SiteHeader {
     position: fixed;
-    top: 0;
-    left: 32px;
-    right: 32px;
+    top: var(--frame);
+    left: calc(var(--frame) + 32px);
+    right: calc(var(--frame) + 32px);
     z-index: 10;
     display: flex;
     align-items: center;
@@ -96,11 +96,11 @@
 .Page {
     box-sizing: border-box;
     height: 100%;
-    padding-top: var(--header-height);
+    padding-top: var(--header-bottom);
     overflow-y: auto;
     overscroll-behavior: contain;
     /* Only the BG shows behind the header. */
-    clip-path: inset(var(--header-height) 0 0 0);
+    clip-path: inset(var(--header-bottom) 0 0 0);
 }
 
 /*================ Doc layout ================*/
@@ -121,7 +121,7 @@
     font-size: 3rem;
 }
 .DocMain section {
-    scroll-margin-top: calc(var(--header-height) + 24px);
+    scroll-margin-top: calc(var(--header-bottom) + 24px);
     margin-bottom: 10vh;
 }
 .DocMain h2 {
@@ -141,7 +141,7 @@
 
 .DocSidebar {
     position: sticky;
-    top: calc(var(--header-height) + 48px);
+    top: calc(var(--header-bottom) + 48px);
     align-self: start;
     font-size: 15px;
 }
@@ -269,7 +269,7 @@
     width: 100%;
     height: 100lvh;
 
-    border: 16px solid #999;
+    border: var(--frame) solid #999;
     box-sizing: border-box;
     z-index: 20000;
     user-select: none;
@@ -282,6 +282,6 @@
     left: 0;
     bottom: 0;
     width: 100%;
-    height: 16px;
+    height: var(--frame);
     background-color: #999;
 }
