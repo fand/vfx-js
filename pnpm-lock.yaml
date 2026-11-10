@@ -83,6 +83,9 @@ importers:
       '@astrojs/check':
         specifier: 0.9.12
         version: 0.9.12(@emnapi/runtime@1.11.3)(prettier@3.9.10)(typescript@6.0.3)
+      '@biomejs/biome':
+        specifier: 2.6.3
+        version: 2.6.3
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5

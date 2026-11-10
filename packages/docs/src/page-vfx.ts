@@ -1,5 +1,5 @@
-import type { VFX } from "@vfx-js/core";
 import { getVFX, registerVFX } from "@vfx-js/astro/client";
+import type { VFX } from "@vfx-js/core";
 
 // Page demos and page transitions share one VFX.
 // It must be set up before <VFXTransition> makes it (see Layout.astro).

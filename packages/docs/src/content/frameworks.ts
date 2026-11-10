@@ -1,4 +1,8 @@
-export type Snippet = { label: string; lang: "tsx" | "vue" | "svelte" | "astro"; code: string };
+export type Snippet = {
+    label: string;
+    lang: "tsx" | "vue" | "svelte" | "astro";
+    code: string;
+};
 
 export type Framework = {
     id: string;

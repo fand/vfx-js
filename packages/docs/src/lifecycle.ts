@@ -4,7 +4,7 @@ type Cleanup = () => void;
  * Run `setup` on every page load, including ClientRouter navigations.
  * The cleanup it returns runs before the next page swaps in.
  */
-export function onPage(setup: () => Cleanup | undefined | void): void {
+export function onPage(setup: () => Cleanup | undefined): void {
     document.addEventListener("astro:page-load", () => {
         const cleanup = setup();
         if (cleanup) {
@@ -35,8 +35,7 @@ function entryKey(): string {
 
 function savedScroll(): number | undefined {
     return (
-        positions.get(entryKey()) ??
-        (history.state as ScrollState)?.pageScroll
+        positions.get(entryKey()) ?? (history.state as ScrollState)?.pageScroll
     );
 }
 
@@ -139,11 +138,9 @@ function installScrollRestore() {
     // A reload keeps history.state. Go back to where the user was.
     const top = savedScroll();
     if (top !== undefined) {
-        document.addEventListener(
-            "astro:page-load",
-            () => restoreScroll(top),
-            { once: true },
-        );
+        document.addEventListener("astro:page-load", () => restoreScroll(top), {
+            once: true,
+        });
     }
 }
 

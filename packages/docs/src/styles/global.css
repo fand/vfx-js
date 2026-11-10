@@ -71,8 +71,8 @@ a:visited {
 
 pre {
     color: white;
-    background: rgba(0, 0, 0, 0.8) !important;
-    border-radius: 2px !important;
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 2px;
     font-size: var(--code-size);
     font-family: monospace;
 }
@@ -83,6 +83,6 @@ code {
     font-size: var(--inline-code-size);
 }
 pre > code {
-    background: none !important;
+    background: none;
     font-size: var(--code-size);
 }

@@ -62,7 +62,11 @@ export const presetDemos: PresetDemo[] = [
         name: "duotone",
         media: "jellyfish",
         props: {
-            uniforms: { color1: [1, 0, 0, 1], color2: [0, 0, 1, 1], speed: 0.2 },
+            uniforms: {
+                color1: [1, 0, 0, 1],
+                color2: [0, 0, 1, 1],
+                speed: 0.2,
+            },
         },
     },
     {
@@ -77,7 +81,11 @@ export const presetDemos: PresetDemo[] = [
             },
         },
     },
-    { name: "hueShift", media: "jellyfish", props: { uniforms: { shift: 0.5 } } },
+    {
+        name: "hueShift",
+        media: "jellyfish",
+        props: { uniforms: { shift: 0.5 } },
+    },
     {
         name: "vignette",
         media: "pigeon",

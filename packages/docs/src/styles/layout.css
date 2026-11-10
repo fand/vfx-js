@@ -118,32 +118,6 @@
     margin: 0 auto;
     padding: 48px 32px 0;
 }
-.DocMain {
-    min-height: 100lvh;
-}
-.DocMain h1 {
-    margin-top: 0;
-    font-size: 3rem;
-}
-.DocMain section {
-    scroll-margin-top: calc(var(--header-bottom) + 24px);
-    margin-bottom: 10vh;
-}
-.DocMain h2 {
-    font-size: 2rem;
-}
-.DocMain p,
-.DocMain li {
-    font-size: 1.125rem;
-    line-height: 1.6;
-}
-.DocMain li + li {
-    margin-top: 6px;
-}
-.DocMain :not(pre) > code {
-    font-size: 0.9em;
-}
-
 .DocSidebar {
     position: sticky;
     top: calc(var(--header-bottom) + 48px);
@@ -184,6 +158,32 @@
 }
 .DocSidebarExtra + .DocSidebarExtra {
     margin-top: 8px;
+}
+
+.DocMain {
+    min-height: 100lvh;
+}
+.DocMain h1 {
+    margin-top: 0;
+    font-size: 3rem;
+}
+.DocMain section {
+    scroll-margin-top: calc(var(--header-bottom) + 24px);
+    margin-bottom: 10vh;
+}
+.DocMain h2 {
+    font-size: 2rem;
+}
+.DocMain p,
+.DocMain li {
+    font-size: 1.125rem;
+    line-height: 1.6;
+}
+.DocMain li + li {
+    margin-top: 6px;
+}
+.DocMain :not(pre) > code {
+    font-size: 0.9em;
 }
 
 @media (max-width: 767px) {

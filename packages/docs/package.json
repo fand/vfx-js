@@ -16,6 +16,8 @@
     "build:examples-dist": "rm -rf dist/examples && cp -a examples dist/examples",
     "build:llms": "node scripts/build-llms-full.mjs",
     "test": "node scripts/check-skill.mjs",
+    "lint": "biome check .",
+    "format": "biome check --write .",
     "preview": "astro preview",
     "clean": "rimraf dist storybook typedoc examples"
   },
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
+    "@biomejs/biome": "2.6.3",
     "@types/node": "26.6.5",
     "npm-run-all2": "^9.0.4",
     "rimraf": "^6.1.3",
