@@ -217,6 +217,8 @@ export class TransitionController implements TransitionHandle {
     #stage: TransitionStageLike;
     #history: HistorySpecs;
     #uaTransitions: UATransitions;
+    // The browser-animated navigation this handle cut last.
+    #uaCut: number | undefined;
     #keepWrapped: boolean;
     #onDestroy: (() => void) | undefined;
     #unfreezers: (() => void)[] = [];
@@ -333,15 +335,19 @@ export class TransitionController implements TransitionHandle {
         opts: RunOpts | (() => RunOpts) = {},
     ): Promise<void> {
         // The browser already animated this navigation, so cut before the snapshot.
-        if (this.#uaTransitions.take()) {
+        const animated = this.#destroyed
+            ? undefined
+            : this.#uaTransitions.current();
+        if (animated !== undefined && animated !== this.#uaCut) {
+            this.#uaCut = animated;
             return this.#start(
                 async () => {
                     await cb();
+                    // Lazy opts may consume state, like a pending link spec.
+                    const spec = typeof opts === "function" ? opts() : opts;
                     // Keep the history store in step for later runs.
                     if (this.#opts.autoReverse) {
-                        this.#history.pick(
-                            typeof opts === "function" ? opts() : opts,
-                        );
+                        this.#history.pick(spec);
                     }
                 },
                 { duration: 0 },

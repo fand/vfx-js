@@ -7,7 +7,8 @@ function setup() {
         currentEntry: { key: string };
     };
     navigation.currentEntry = { key: "k0" };
-    const ua = createUATransitions(navigation);
+    const input = new EventTarget();
+    const ua = createUATransitions(navigation, input);
     const navigate = (
         key: string,
         hasUAVisualTransition: boolean,
@@ -16,34 +17,32 @@ function setup() {
         const event = Object.assign(new Event("navigate"), {
             navigationType,
             hasUAVisualTransition,
-            destination: { key },
+            // Only a traverse has a destination key.
+            destination: { key: navigationType === "traverse" ? key : "" },
         });
         navigation.dispatchEvent(event);
         navigation.currentEntry = { key };
     };
-    return { ua, navigate, navigation };
+    return { ua, navigate, navigation, input };
 }
 
 describe("createUATransitions", () => {
-    test("is false without a navigation the browser animated", () => {
+    test("is undefined without a navigation the browser animated", () => {
         const { ua, navigate } = setup();
-        expect(ua.take()).toBe(false);
+        expect(ua.current()).toBeUndefined();
         navigate("k1", false);
-        expect(ua.take()).toBe(false);
+        expect(ua.current()).toBeUndefined();
     });
 
-    test("is true once for a navigation the browser animated", () => {
+    test("gives an id per navigation the browser animated", () => {
         const { ua, navigate } = setup();
         navigate("k1", true);
-        expect(ua.take()).toBe(true);
-        expect(ua.take()).toBe(false);
-    });
-
-    test("a later navigation clears it", () => {
-        const { ua, navigate } = setup();
+        const first = ua.current();
+        expect(first).toBeDefined();
+        expect(ua.current()).toBe(first);
+        navigate("k0", true);
         navigate("k1", true);
-        navigate("k2", false);
-        expect(ua.take()).toBe(false);
+        expect(ua.current()).not.toBe(first);
     });
 
     test("a replace on the same entry keeps it", () => {
@@ -51,17 +50,38 @@ describe("createUATransitions", () => {
         navigate("k1", true);
         // Next.js replaces the state right after a traverse.
         navigate("k1", false, "replace");
-        expect(ua.take()).toBe(true);
+        expect(ua.current()).toBeDefined();
     });
 
-    test("is false once the entry is no longer current", () => {
+    test("a later push or traverse clears it", () => {
+        const { ua, navigate } = setup();
+        navigate("k1", true);
+        navigate("k2", false, "push");
+        expect(ua.current()).toBeUndefined();
+        navigate("k3", true);
+        navigate("k2", false);
+        expect(ua.current()).toBeUndefined();
+    });
+
+    test("user input clears it", () => {
+        for (const type of ["pointerdown", "keydown"]) {
+            const { ua, navigate, input } = setup();
+            navigate("k1", true);
+            input.dispatchEvent(new Event(type));
+            expect(ua.current()).toBeUndefined();
+        }
+    });
+
+    test("is undefined once the entry is no longer current", () => {
         const { ua, navigate, navigation } = setup();
         navigate("k1", true);
         navigation.currentEntry = { key: "k2" };
-        expect(ua.take()).toBe(false);
+        expect(ua.current()).toBeUndefined();
     });
 
-    test("is false without the Navigation API", () => {
-        expect(createUATransitions(undefined).take()).toBe(false);
+    test("is undefined without the Navigation API", () => {
+        expect(
+            createUATransitions(undefined, new EventTarget()).current(),
+        ).toBeUndefined();
     });
 });

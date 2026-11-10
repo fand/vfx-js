@@ -523,7 +523,7 @@ function setup(
         captureTimesOut = false,
         element = {} as HTMLElement,
         history = createHistorySpecs(() => undefined),
-        uaTransitions = { take: () => false },
+        uaTransitions = { current: () => undefined },
         ...transitionOpts
     } = opts;
     const log: string[] = [];
@@ -1181,19 +1181,14 @@ describe("TransitionController", () => {
 
         test("a back the browser animated cuts and keeps history in step", async () => {
             const { A, B, runs } = recorder("ua");
-            let animated = false;
+            let animated: number | undefined;
             const { starts, step, cutTo } = autoReverseSetup({
-                uaTransitions: {
-                    take: () => {
-                        const was = animated;
-                        animated = false;
-                        return was;
-                    },
-                },
+                uaTransitions: { current: () => animated },
             });
             await step(1, { transition: A });
-            animated = true;
+            animated = 1;
             await cutTo(0, { transition: B });
+            animated = undefined;
             expect(starts).toHaveLength(1);
             // Forward again plays the spec that entered page 1.
             await step(1, { transition: B });
@@ -1216,29 +1211,48 @@ describe("TransitionController", () => {
     });
 
     test("a navigation the browser animated cuts before the snapshot", async () => {
-        let animated = true;
         const { transition, log, starts } = setup({
-            uaTransitions: {
-                take: () => {
-                    const was = animated;
-                    animated = false;
-                    return was;
-                },
-            },
+            uaTransitions: { current: () => 1 },
         });
         const cb = vi.fn();
+        // Lazy opts still run, since they may take a pending link spec.
         const opts = vi.fn(() => ({ transition: Crossfade }));
         await transition.run(cb, opts);
         expect(cb).toHaveBeenCalledOnce();
+        expect(opts).toHaveBeenCalledOnce();
         expect(log).not.toContain("snapshot");
         expect(log).not.toContain("wrap");
         expect(starts).toHaveLength(0);
+    });
 
-        // Only that navigation; the next run plays.
-        const next = transition.run(vi.fn(), opts);
+    test("a handle cuts once per browser-animated navigation", async () => {
+        let animated = 1;
+        const { transition, starts } = setup({
+            uaTransitions: { current: () => animated },
+        });
+        await transition.run(vi.fn());
+        expect(starts).toHaveLength(0);
+
+        // Same navigation: the next run plays.
+        const next = transition.run(vi.fn());
         await settle();
         (await started(starts, 0)).end();
         await next;
+
+        // A new one cuts again, even back to the same entry.
+        animated = 2;
+        await transition.run(vi.fn());
+        expect(starts).toHaveLength(1);
+    });
+
+    test("every handle cuts the same browser-animated navigation", async () => {
+        const uaTransitions = { current: () => 1 };
+        const a = setup({ uaTransitions });
+        const b = setup({ uaTransitions });
+        await a.transition.run(vi.fn());
+        await b.transition.run(vi.fn());
+        expect(a.starts).toHaveLength(0);
+        expect(b.starts).toHaveLength(0);
     });
 
     test("lazy duration 0 cuts after cb and unwraps", async () => {
