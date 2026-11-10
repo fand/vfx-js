@@ -11,7 +11,7 @@ const sans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans" });
 const serif = Instrument_Serif({
     subsets: ["latin"],
     weight: "400",
-    style: ["normal", "italic"],
+    style: "italic",
     variable: "--font-serif",
 });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
