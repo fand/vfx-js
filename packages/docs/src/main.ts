@@ -63,12 +63,8 @@ const logoShader = `
         vec4 cg = readTex(src, uvg);
         vec4 cb = readTex(src, uvb);
 
-        return vec4(
-            cr.r,
-            cg.g,
-            cb.b,
-            smoothstep(.0, 1., cr.a + cg.a + cb.a)
-        );
+        // Colors are premultiplied, so alpha must follow the strongest channel, not the sum.
+        return vec4(cr.r, cg.g, cb.b, max(cr.a, max(cg.a, cb.a)));
     }
     vec4 slitscan(vec2 uv) {
         float t = max(enterTime - delay, 0.) * speed;
@@ -85,9 +81,7 @@ const logoShader = `
         vec4 cg = readTex(src, uvg);
         vec4 cb = readTex(src, uvb);
 
-        return vec4(
-            cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 1.
-        );
+        return vec4(cr.r, cg.g, cb.b, max(cr.a, max(cg.a, cb.a)));
     }
 
     void main (void) {
