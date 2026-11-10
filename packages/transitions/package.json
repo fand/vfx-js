@@ -1,7 +1,7 @@
 {
   "name": "@vfx-js/transitions",
   "description": "Page transition presets for @vfx-js/core",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "files": [
     "package.json",
     "README.md",
@@ -38,7 +38,7 @@
     "lint-staged": "lint-staged"
   },
   "peerDependencies": {
-    "@vfx-js/core": ">=1.4.0"
+    "@vfx-js/core": ">=1.6.0"
   },
   "dependencies": {
     "@vfx-js/effects": "workspace:^"

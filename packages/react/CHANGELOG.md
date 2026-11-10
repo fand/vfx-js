@@ -1,5 +1,13 @@
 # react-vfx
 
+## 1.5.0
+
+### Minor Changes
+
+- e8f816d: Add `autoReverse` to `addTransition` and every `<VFXTransition>`.
+  On back it plays the spec that entered the page, reversed. Forward plays it again.
+  It needs the Navigation API.
+
 ## 1.4.0
 
 ### Minor Changes

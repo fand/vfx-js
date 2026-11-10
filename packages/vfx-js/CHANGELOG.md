@@ -1,5 +1,41 @@
 # react-vfx
 
+## 1.6.0
+
+### Minor Changes
+
+- e8f816d: Add `autoReverse` to `addTransition` and every `<VFXTransition>`.
+  On back it plays the spec that entered the page, reversed. Forward plays it again.
+  It needs the Navigation API.
+- f86bc71: Add `EffectTexture.update()` to re-upload a texture wrapped with `autoUpdate: false`.
+- df914c6: Rework enter/leave transitions as "scroll reveal".
+  
+  - Add `intersection.leaveThreshold` and `intersection.duration` options.
+  - Add `enterProgress` / `leaveProgress` shader uniforms and `EffectContext` fields.
+    They play backward when the element turns back mid-way.
+  - Rename `warpTransition`, `slitScanTransition`, `pixelateTransition` and `focusTransition` to `warpReveal`, `slitScanReveal`, `pixelateReveal` and `focusReveal`.
+    The old names still work.
+  - Fix `warpReveal`, `slitScanReveal` and `pixelateReveal`: no jump on reversal, and no divide by zero in `pixelateReveal`.
+  - The visible ratio now divides by the smaller of the element size and the viewport size (after `rootMargin`), on each axis.
+    An element larger than the viewport can now reach 1.
+    With a negative `rootMargin`, smaller elements can also reach 1 sooner.
+    This changes `intersection` values and `threshold` results.
+  - `enterTime` / `leaveTime` uniforms are now always finite.
+- 01cec71: Render nothing when the user prefers reduced motion.
+  Elements stay plain HTML, and transitions cut to the new content.
+
+### Patch Changes
+
+- 7397ab1: Shrink bundles.
+  Build to ES2022 so private fields stay native.
+  Mark effects and transitions as side-effect free so bundlers drop unused presets.
+- 13ba938: Keep scroll positions in the dom-to-canvas fallback capture.
+- 0361fb7: html-in-canvas: size the wrap canvas from insets for `position: fixed` / `absolute` targets with `auto` width or height, like `inset: 10px`.
+  Replaced elements like `<img>` keep their own size when wrapped.
+- 7e72991: Effect path: `ctx.src` is now premultiplied alpha in every stage. The first stage used to get straight alpha, so semi-transparent pixels were too bright.
+- 95fef40: Show `<img>` in the dom-to-canvas fallback capture on Safari.
+- 9abce97: Cut the run when the browser already animated the navigation, like a swipe back on a phone.
+
 ## 1.5.0
 
 ### Minor Changes

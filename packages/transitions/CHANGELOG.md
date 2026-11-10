@@ -1,5 +1,17 @@
 # @vfx-js/transitions
 
+## 0.1.2
+
+### Patch Changes
+
+- Require `@vfx-js/core` >=1.6.0, which passes premultiplied `ctx.src`.
+- 7397ab1: Shrink bundles.
+  Build to ES2022 so private fields stay native.
+  Mark effects and transitions as side-effect free so bundlers drop unused presets.
+- Updated dependencies [7397ab1]
+- Updated dependencies [7e72991]
+  - @vfx-js/effects@1.4.4
+
 ## 0.1.1
 
 ### Patch Changes

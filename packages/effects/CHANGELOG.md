@@ -1,5 +1,15 @@
 # @vfx-js/effects
 
+## 1.4.4
+
+### Patch Changes
+
+- Require `@vfx-js/core` >=1.6.0, which passes premultiplied `ctx.src`.
+- 7397ab1: Shrink bundles.
+  Build to ES2022 so private fields stay native.
+  Mark effects and transitions as side-effect free so bundlers drop unused presets.
+- 7e72991: Effect path: `ctx.src` is now premultiplied alpha in every stage. The first stage used to get straight alpha, so semi-transparent pixels were too bright.
+
 ## 1.4.3
 
 ### Patch Changes
