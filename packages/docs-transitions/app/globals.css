@@ -159,7 +159,7 @@ em {
 /* Fades out once full, before the cover leaves. */
 .loader-bar[data-done] {
     opacity: 0;
-    transition: opacity 0.2s 0.3s;
+    transition: opacity 0.1s 0.3s;
 }
 .loader-bar::after {
     content: "";
