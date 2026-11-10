@@ -72,26 +72,43 @@ vec3 env(vec3 d) {
     return vec3(c);
 }
 
-// Smooth noise from turned and warped sine waves, 2 octaves. No hash, so no grain.
+// Smooth noise from 4 octaves of turned and warped sine waves. No hash, so no grain.
 const mat3 OCTAVE_TURN = mat3(0, .8, .6, -.8, .36, -.48, -.6, -.48, .64);
 float cyclicNoise(vec3 p) {
-    p = OCTAVE_TURN * p;
-    p += sin(p.yzx) * .7;
-    float n = dot(sin(p), cos(p.zxy));
-    p = OCTAVE_TURN * p * 1.7;
-    p += sin(p.yzx) * .7;
-    n += dot(sin(p), cos(p.zxy)) * .55;
+    float n = 0.;
+    float amp = 1.;
+    for (int i = 0; i < 4; i++) {
+        p = OCTAVE_TURN * p;
+        p += sin(p.yzx) * .7;
+        n += dot(sin(p), cos(p.zxy)) * amp;
+        amp = .55;
+        p *= 1.7;
+    }
     return n / 1.55;
+}
+
+// Cheap rainbow: red at 0, blue at 1. Shifted toward blue.
+vec3 fakeSpectrum(float x) {
+    x = x * .8 + .2;
+    return cos((x - vec3(0, .5, 1)) * vec3(.6, 1, .5) * 3.14159265);
 }
 
 // Soft rainbow glow along the noise, like light split by glass.
 vec3 fringes(vec2 frag) {
     vec2 q = (frag - resolution * .5) / resolution.y * noiseScale;
     float t = time * noiseSpeed;
-    float v = cyclicNoise(vec3(q, t));
-    // Soft spectrum: the hue sweeps with the noise and fades out at both ends of each cycle.
-    float x = fract(v * 2. - t * .3);
-    vec3 color = max(spectrum(mix(400., 700., x)), 0.) * pow(sin(x * 3.14159), 2.);
+
+    // Drift, turn 45 degrees and stretch, so the bands run diagonally.
+    q.y -= t;
+    q = vec2(q.x - q.y, q.x + q.y);
+    q.x *= 2.;
+    q.y -= t * .7;
+
+    float v = cyclicNoise(vec3(q, t * .8));
+    float x = clamp(v * .6 + .5 + sin(t) * .2, 0., 1.);
+
+    // Fade out toward both ends of the spectrum.
+    vec3 color = max(fakeSpectrum(x), 0.) * smoothstep(.7, 0., abs(.5 - x));
     color = mix(vec3(dot(color, vec3(.3, .6, .1))), color, noiseChroma);
     return color * noiseIntensity;
 }
@@ -365,7 +382,7 @@ export class SpheresEffect implements Effect {
         this.noiseIntensity = opts.noiseIntensity ?? 0.2;
         this.noiseScale = opts.noiseScale ?? 0.4;
         this.noiseSpeed = opts.noiseSpeed ?? 0.05;
-        this.noiseChroma = opts.noiseChroma ?? 0.3;
+        this.noiseChroma = opts.noiseChroma ?? 0.6;
     }
 
     init(ctx: EffectContext): void {

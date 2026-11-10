@@ -21,7 +21,14 @@ document.addEventListener("astro:before-swap", (e) => {
 });
 
 // #BG covers the viewport. The spheres sit at 65% x.
-export const bgSpheres = new SpheresEffect({ center: [0.65, 0.5], zoom: 1.4 });
+export const bgSpheres = new SpheresEffect({
+    center: [0.65, 0.5],
+    zoom: 1.4,
+    noiseIntensity: 0.2,
+    noiseScale: 1,
+    noiseSpeed: 0.1,
+    noiseChroma: 0.4,
+});
 
 let ready: Promise<void> | undefined;
 
