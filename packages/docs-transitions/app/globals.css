@@ -128,47 +128,23 @@ em {
     width: 288px;
     height: 288px;
 }
+/* JS sets --p as the page loads. Before that, CSS draws the first step. */
 .loader .brand-mark path {
     stroke: var(--white);
     stroke-width: 2;
     stroke-dasharray: 1;
-    animation:
-        loader-trim 0.3s ease-in-out both,
-        loader-fill 0.5s 0.3s ease-out both;
+    stroke-dashoffset: calc(1 - var(--p, 0.25));
+    fill-opacity: 0;
+    transition: fill-opacity 0.5s ease-out;
+    animation: loader-trim 0.4s ease-out both;
+}
+.loader[data-done] .brand-mark path {
+    fill-opacity: 1;
 }
 @keyframes loader-trim {
     from {
         stroke-dashoffset: 1;
     }
-}
-@keyframes loader-fill {
-    from {
-        fill-opacity: 0;
-    }
-}
-.loader-bar {
-    position: absolute;
-    left: 50%;
-    top: calc(50% + 176px);
-    width: 160px;
-    height: 2px;
-    translate: -50% 0;
-    background: color-mix(in srgb, var(--white) 16%, transparent);
-    overflow: hidden;
-}
-/* Fades out once full, before the cover leaves. */
-.loader-bar[data-done] {
-    opacity: 0;
-    transition: opacity 0.2s 0.3s;
-}
-.loader-bar::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--white);
-    transform-origin: left;
-    scale: var(--p) 1;
-    transition: scale 0.3s ease-out;
 }
 :root[data-loading] .header {
     opacity: 0;
@@ -2219,9 +2195,7 @@ em {
     .scroll-cue::after,
     .tab-body.is-in,
     .dot,
-    .loader .brand-mark path,
-    .loader-bar,
-    .loader-bar::after {
+    .loader .brand-mark path {
         animation: none;
         transition: none;
     }

@@ -10,7 +10,7 @@ import { LoaderCover, useLoaded } from "./_components/loader";
 
 export function Shell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const { loaded, progress } = useLoaded();
+    const loaded = useLoaded();
     // The CSS switches some pages to system fonts without HTML-in-Canvas.
     useLayoutEffect(() => {
         if (!supportsHtmlInCanvas()) {
@@ -35,7 +35,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 <div className="outlet-page">
                     <DocSidebar />
                     {children}
-                    {!loaded && <LoaderCover progress={progress} />}
+                    {!loaded && <LoaderCover />}
                 </div>
             </VFXTransition>
         </>
