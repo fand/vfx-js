@@ -1,0 +1,166 @@
+---
+import CodeBlock from "../components/CodeBlock.astro";
+import { runDemos } from "../demos/top-demos";
+import { effectDemos, presetDemos } from "../effects-list";
+import Layout from "../layouts/Layout.astro";
+import { url } from "../site";
+import "../styles/top.css";
+
+const features = [
+    {
+        title: `${presetDemos.length} shader presets`,
+        text: "glitch, rgbShift, rainbow and more. One string to start.",
+        href: url("effects/#presets"),
+    },
+    {
+        title: "Any element",
+        text: "img, video, canvas, text, or a whole HTML subtree.",
+        href: url("how-it-works/#capture"),
+    },
+    {
+        title: `${effectDemos.length} effects`,
+        text: "Bloom, halftone, pixel sort and more. Chain them in any order.",
+        href: url("effects/#gallery"),
+    },
+    {
+        title: "Write GLSL",
+        text: "Built-in uniforms, multipass, backbuffer and post effects.",
+        href: url("shaders/"),
+    },
+    {
+        title: "Your framework",
+        text: "React, Vue, Svelte and Astro bindings share one canvas.",
+        href: url("getting-started/#frameworks"),
+    },
+    {
+        title: "Made for AI",
+        text: "Install the skill and let your agent write effects.",
+        href: url("ai/"),
+    },
+];
+---
+
+<Layout class="Top">
+    <!-- Old single-page anchors now live on their own pages. Replace, so Back skips the old URL. -->
+    <script is:inline define:vars={{ base: url() }}>
+        const pages = {
+            "#examples": "effects/",
+            "#custom": "shaders/",
+            "#multipass": "shaders/#multipass",
+            "#effect-bloom": "effects/#gallery",
+            "#effect-crt": "effects/#gallery",
+        };
+        const to = pages[location.hash];
+        if (to) {
+            location.replace(base + to);
+        }
+    </script>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+
+    <section class="Hero">
+        <!-- The first screen. The lead paragraph sits below it. -->
+        <div class="HeroTop">
+            <div class="HeroMain">
+                <img id="Logo" src={url("vfx-js-logo-no-padding.svg")} alt="VFX-JS" />
+                <p id="LogoTagline" class="HeroTagline">
+                    WebGL effects for HTML.
+                </p>
+            </div>
+        </div>
+
+        <!-- Stays in place while the hero is on screen. -->
+        <div class="EffectDock">
+            <div class="EffectMenu">
+                <p class="EffectMenuTitle">TRY EFFECTS</p>
+                <ol class="EffectList"></ol>
+                <button class="EffectCopy" type="button">Copy code &#8599;</button>
+            </div>
+        </div>
+
+        <!-- Plain HTML on purpose: the effect menu draws it through a shader. -->
+        <p id="HeroLead" class="HeroLead">
+            VFX-JS applies WebGL effects to any HTML element. Not just
+            <code>&lt;img&gt;</code> and <code>&lt;video&gt;</code>, but
+            also plain text, <a href={url("getting-started/")}>links</a>,
+            <input type="text" value="inputs" size="6" aria-label="Sample input" />,
+            <button type="button">buttons</button> and more.
+        </p>
+
+        <!-- Sticks to the viewport bottom until the hero ends. -->
+        <div class="HeroFoot">
+            <span>SCROLL TO EXPLORE &#8595;</span>
+            <span>@vfx-js/effects</span>
+        </div>
+    </section>
+
+    <section class="TopRun" aria-labelledby="RunTitle">
+        <p class="TopKicker">How it looks</p>
+        <h2 id="RunTitle" class="TopTitle">
+            Write a line. <em>See it run.</em>
+        </h2>
+        {
+            runDemos.map((demo) => (
+                <div class="RunRow">
+                    <div class="RunText">
+                        <span class="RunStep">{demo.step}</span>
+                        <h3>{demo.title}</h3>
+                        <CodeBlock code={demo.code} />
+                    </div>
+                    <div class="RunDemo">
+                        <img
+                            id={demo.id}
+                            src={demo.media.src}
+                            width={demo.media.width}
+                            height={demo.media.height}
+                            alt=""
+                            loading="lazy"
+                        />
+                        <span class="RunCaption">live · {demo.caption}</span>
+                    </div>
+                </div>
+            ))
+        }
+    </section>
+
+    <section class="TopWhy" aria-labelledby="WhyTitle">
+        <div class="WhyHead">
+            <div>
+                <p class="TopKicker">Why VFX-JS</p>
+                <h2 id="WhyTitle" class="TopTitle">
+                    Your real elements,<br />through a <em>shader</em>.
+                </h2>
+            </div>
+            <div class="WhyLead">
+                <p>
+                    Images, videos, text, any element. VFX-JS copies them into
+                    WebGL and draws them on one canvas over the page. Your
+                    markup stays, so layout, links and screen readers work as
+                    usual.
+                </p>
+                <a class="WhyLink" href={url("how-it-works/")}>How it works &#8594;</a>
+            </div>
+        </div>
+        <div class="Features">
+            {
+                features.map((feature, i) => (
+                    <a class="Feature" href={feature.href}>
+                        <span class="FeatureNum">
+                            {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <h3>{feature.title}</h3>
+                        <p>{feature.text}</p>
+                    </a>
+                ))
+            }
+        </div>
+    </section>
+
+    <Fragment slot="overlay">
+        <div id="MaskBottom"></div>
+        <div id="MaskTop"></div>
+    </Fragment>
+</Layout>
+
+<script>
+    import "../main.ts";
+</script>

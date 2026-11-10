@@ -1,0 +1,715 @@
+---
+import CodeBlock from "../components/CodeBlock.astro";
+import { scrollCode, scrollShader } from "../demos/scroll-shader";
+import Layout from "../layouts/Layout.astro";
+import { url } from "../site";
+
+const steps = [
+    {
+        title: "Capture",
+        body: "VFX-JS copies the element into a WebGL texture.",
+    },
+    {
+        title: "Hide",
+        body: "It sets the element's opacity to 0. The element keeps its box in the layout.",
+    },
+    {
+        title: "Track",
+        body: "Every frame, it reads the element's position and size.",
+    },
+    {
+        title: "Draw",
+        body: "It runs the shader in that box, on one canvas over the page.",
+    },
+];
+
+const overlayCode = `
+vfx.add(el, { shader: "rgbShift" });               // hide the element (default)
+vfx.add(el, { shader: "rgbShift", overlay: true }); // keep it visible
+vfx.add(el, { shader: "rgbShift", overlay: 0.5 });  // set its opacity
+
+vfx.remove(el); // stop drawing and restore the opacity
+`;
+
+// From VFXPlayer.addElement and VFX.update in packages/vfx-js/src.
+const captures = [
+    {
+        element: "<img>",
+        how: "Loaded once, after the image loads. A .gif URL plays frame by frame.",
+        update: "Call update(img) after you change src.",
+    },
+    {
+        element: "<video>",
+        how: "Read again every frame. VFX-JS waits for canplay first.",
+        update: "Nothing to do.",
+    },
+    {
+        element: "<canvas>",
+        how: "Copied once, when added.",
+        update: "Call update(canvas) after you draw.",
+    },
+    {
+        element: "Text and other elements",
+        plain: true,
+        how: "Drawn to an image through SVG <foreignObject>, once.",
+        update: "Call update(el) after the content changes. A window resize that changes its size captures it again.",
+    },
+    {
+        element: "addHTML(el)",
+        how: "html-in-canvas. The browser paints the element into a canvas each time it changes.",
+        update: "Live. Falls back to the text path where not supported.",
+    },
+];
+
+const captureCode = `
+import { supportsHtmlInCanvas } from "@vfx-js/core";
+
+// Text is a snapshot. Capture it again after a change.
+label.textContent = "Saved";
+await vfx.update(label);
+
+// html-in-canvas keeps the capture live: hover, inputs, CSS animations.
+if (supportsHtmlInCanvas()) {
+    await vfx.addHTML(card, { shader: "rgbShift" });
+}
+`;
+
+const overflowCode = `
+vfx.add(el, { shader, overflow: 50 });               // 50 px on every side
+vfx.add(el, { shader, overflow: [0, 100, 200, 0] }); // top, right, bottom, left
+vfx.add(el, { shader, overflow: true });             // the whole canvas
+
+// Effects ignore overflow. Some built-in effects, like BloomEffect, take a pad param.
+vfx.add(el, { effect: new BloomEffect({ pad: 100 }) });
+`;
+
+const uniforms = [
+    { name: "sampler2D src", text: "The element texture." },
+    { name: "vec2 resolution", text: "Element size in physical px." },
+    {
+        name: "vec2 offset",
+        text: "Element origin in the render target, physical px.",
+    },
+    {
+        name: "vec4 viewport",
+        text: "Render target rect (x, y, w, h) in physical px.",
+    },
+    { name: "float time", text: "Seconds since the element was added." },
+    {
+        name: "vec2 mouse",
+        text: "Mouse position in render target px, same space as gl_FragCoord.",
+    },
+    {
+        name: "float intersection",
+        text: "How much of the element is in the viewport, 0 to 1.",
+    },
+    {
+        name: "float enterTime",
+        text: "Seconds since the element entered the viewport.",
+    },
+    {
+        name: "float leaveTime",
+        text: "Seconds since the element left the viewport.",
+    },
+    {
+        name: "float enterProgress",
+        text: "Enter transition, 0 to 1. Plays backward if the element leaves mid-way.",
+    },
+    {
+        name: "float leaveProgress",
+        text: "Leave transition, 0 to 1. Stays 0 until enter finishes.",
+    },
+    { name: "bool autoCrop", text: "The autoCrop option. Default true." },
+    {
+        name: "sampler2D backbuffer",
+        text: "The previous frame. Needs backbuffer: true.",
+    },
+];
+
+const clockCode = `
+const vfx = new VFX({ autoplay: false });
+await vfx.add(el, { shader });
+
+vfx.setTime(1.5); // pin the clock to 1.5 s
+vfx.render();     // draw one frame
+
+vfx.timeScale = 0.5; // half speed. 0 pauses, negative runs backward.
+vfx.play();
+`;
+---
+
+<Layout
+    page="how-it-works"
+    description="How VFX-JS captures DOM elements, draws them with WebGL, and keeps the page usable."
+>
+    <h1>How it Works</h1>
+    <p>
+        VFX-JS draws your elements with WebGL, on one canvas over the page. When
+        you call <code>vfx.add(el)</code>:
+    </p>
+    <ol class="Steps">
+        {
+            steps.map((step) => (
+                <li>
+                    <strong>{step.title}.</strong> {step.body}
+                </li>
+            ))
+        }
+    </ol>
+
+    <section id="dom">
+        <h2>The DOM stays DOM</h2>
+        <figure class="Figure">
+            <svg
+                class="Diagram"
+                viewBox="0 0 600 320"
+                role="img"
+                aria-labelledby="OverlayTitle"
+            >
+                <title id="OverlayTitle">
+                    The VFX canvas sits over the page. The element stays in the
+                    page with opacity 0, and the canvas draws the effect at the
+                    same place.
+                </title>
+                <defs>
+                    <linearGradient id="EffectFill" x1="0" x2="1">
+                        <stop offset="0" stop-color="#ff3b8d"></stop>
+                        <stop offset="0.5" stop-color="#ffd93b"></stop>
+                        <stop offset="1" stop-color="#3bd5ff"></stop>
+                    </linearGradient>
+                    <marker
+                        id="OverlayArrow"
+                        viewBox="0 0 8 8"
+                        refX="4"
+                        refY="4"
+                        markerWidth="8"
+                        markerHeight="8"
+                        orient="auto"
+                    >
+                        <path d="M0,0 L8,4 L0,8 Z" fill="white"></path>
+                    </marker>
+                </defs>
+
+                <!-- Page layer -->
+                <g transform="matrix(1 0 -0.8 0.45 200 200)">
+                    <rect class="Layer" width="360" height="220"></rect>
+                    <rect class="LayoutLine" x="40" y="30" width="200" height="14"
+                    ></rect>
+                    <rect class="LayoutLine" x="40" y="180" width="280" height="14"
+                    ></rect>
+                    <rect
+                        class="Hidden"
+                        x="120"
+                        y="70"
+                        width="140"
+                        height="90"></rect>
+                </g>
+
+                <!-- Lines from the element to its drawing -->
+                <g class="Guide">
+                    <line x1="264" y1="71.5" x2="264" y2="231.5"></line>
+                    <line x1="404" y1="71.5" x2="404" y2="231.5"></line>
+                    <line x1="192" y1="112" x2="192" y2="272"></line>
+                    <line x1="332" y1="112" x2="332" y2="272"></line>
+                </g>
+
+                <!-- VFX canvas layer -->
+                <g transform="matrix(1 0 -0.8 0.45 200 40)">
+                    <rect class="Layer Canvas" width="360" height="220"></rect>
+                    <rect
+                        x="110"
+                        y="60"
+                        width="160"
+                        height="110"
+                        fill="url(#EffectFill)"
+                        opacity="0.85"></rect>
+                </g>
+
+                <!-- Pointer events pass through the canvas -->
+                <line
+                    class="Arrow"
+                    x1="300"
+                    y1="8"
+                    x2="300"
+                    y2="236"
+                    marker-end="url(#OverlayArrow)"></line>
+                <text x="310" y="20">click</text>
+
+                <text x="425" y="118">VFX canvas</text>
+                <text class="Mono" x="425" y="136">pointer-events: none</text>
+                <text x="425" y="278">Page</text>
+                <text class="Mono" x="425" y="296">element: opacity 0</text>
+            </svg>
+        </figure>
+        <ul>
+            <li>
+                <code>new VFX()</code> adds one <code>&lt;canvas&gt;</code> to
+                <code>&lt;body&gt;</code>, or to the <code>wrapper</code> you pass.
+                It has <code>pointer-events: none</code> and
+                <code>z-index: 9999</code> by default.
+            </li>
+            <li>
+                The element stays where it is. Only its <code>opacity</code> changes.
+                A video gets 0.0001, not 0, to avoid jank frames.
+                <code>addHTML</code> wraps the element in a canvas instead.
+            </li>
+            <li>
+                Clicks, links, text selection, focus and screen readers still use
+                the real element. CSS layout and animations still move it, and the
+                effect follows.
+            </li>
+        </ul>
+        <p>This button is drawn by a shader. Click it.</p>
+        <div class="Demo">
+            <button id="ClickDemo" class="DemoButton" type="button"
+                >Clicked 0 times</button
+            >
+        </div>
+        <p>
+            The click reaches the real button. The handler then calls
+            <code>vfx.update(button)</code>, because text is captured once.
+            See <a href="#capture">Element capture</a>.
+        </p>
+        <CodeBlock code={overlayCode} lang="ts" label="main.ts" />
+    </section>
+
+    <section id="capture">
+        <h2>Element capture</h2>
+        <p>
+            Each element type becomes a texture in its own way. This decides when
+            you need <code>vfx.update(el)</code>.
+        </p>
+        <div class="TableScroll">
+            <table class="DocTable Capture">
+                <thead>
+                    <tr>
+                        <th>Element</th>
+                        <th>How it is captured</th>
+                        <th>After a change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {
+                        captures.map((row) => (
+                            <tr>
+                                <td>
+                                    {row.plain ? (
+                                        row.element
+                                    ) : (
+                                        <code>{row.element}</code>
+                                    )}
+                                </td>
+                                <td>{row.how}</td>
+                                <td>{row.update}</td>
+                            </tr>
+                        ))
+                    }
+                </tbody>
+            </table>
+        </div>
+        <CodeBlock code={captureCode} lang="ts" label="main.ts" />
+        <ul>
+            <li>
+                html-in-canvas is a new browser API. Today it works only in Chrome
+                behind <code>chrome://flags/#canvas-draw-element</code>.
+                <code>addHTML</code> logs a warning and uses the text path where it
+                is missing.
+            </li>
+            <li>
+                <code>addHTML</code> wraps the element in a
+                <code>&lt;canvas&gt;</code>. The element must fill its parent's
+                width or have a fixed px width.
+            </li>
+            <li>
+                Images and videos from another origin need CORS, or WebGL cannot
+                read them.
+            </li>
+        </ul>
+    </section>
+
+    <section id="overflow">
+        <h2>Overflow</h2>
+        <p>
+            A shader draws only inside the element's box. To draw outside it, for
+            glow or glitch, give it more room.
+        </p>
+        <figure class="Figure">
+            <svg
+                class="Diagram"
+                viewBox="80 20 440 260"
+                role="img"
+                aria-labelledby="OverflowTitle"
+            >
+                <title id="OverflowTitle">
+                    The element box goes from uv 0 to 1. The overflow area around
+                    it is where uv is below 0 or above 1.
+                </title>
+                <defs>
+                    <radialGradient id="GlowFill">
+                        <stop offset="0.4" stop-color="#3bd5ff" stop-opacity="0.45"
+                        ></stop>
+                        <stop offset="1" stop-color="#3bd5ff" stop-opacity="0"
+                        ></stop>
+                    </radialGradient>
+                </defs>
+                <rect
+                    class="OverflowBox"
+                    x="90"
+                    y="30"
+                    width="420"
+                    height="240"
+                    fill="url(#GlowFill)"></rect>
+                <rect class="ElementBox" x="190" y="100" width="220" height="100"
+                ></rect>
+
+                <text x="300" y="146" text-anchor="middle">element</text>
+                <text class="Mono" x="300" y="166" text-anchor="middle"
+                    >uv 0..1</text
+                >
+                <text class="Mono Small" x="194" y="216">(0, 0)</text>
+                <text class="Mono Small" x="406" y="94" text-anchor="end"
+                    >(1, 1)</text
+                >
+                <text class="Mono Small" x="140" y="154" text-anchor="middle"
+                    >uv.x &lt; 0</text
+                >
+                <text class="Mono Small" x="460" y="154" text-anchor="middle"
+                    >uv.x &gt; 1</text
+                >
+                <text x="98" y="50">overflow / pad</text>
+
+                <g class="Measure">
+                    <line x1="410" y1="240" x2="510" y2="240"></line>
+                    <line x1="410" y1="234" x2="410" y2="246"></line>
+                    <line x1="510" y1="234" x2="510" y2="246"></line>
+                </g>
+                <text class="Mono Small" x="460" y="260" text-anchor="middle"
+                    >overflow px</text
+                >
+            </svg>
+        </figure>
+        <ul>
+            <li>
+                With a shader, set <code>overflow</code>. In the extra area,
+                <code>uv</code> goes below 0 and above 1.
+            </li>
+            <li>
+                The texture has nothing outside the element, but
+                <code>wrap</code> defaults to <code>"repeat"</code>. Check
+                <code>uv</code> before you read <code>src</code> there, or set
+                <code>wrap: "clamp"</code>.
+            </li>
+            <li>
+                Effects ignore <code>overflow</code>. Each effect sets its own room
+                with <code>outputRect</code>. In an effect, <code>uvContent</code>
+                is 0..1 over the element, and the rest is padding.
+            </li>
+        </ul>
+        <CodeBlock code={overflowCode} lang="ts" label="main.ts" />
+        <p>
+            Code that reads the extra area is in
+            <a href={url("shaders/")}>Custom Shaders</a> and <a href={url("custom-effects/")}>Custom Effects</a>.
+        </p>
+    </section>
+
+    <section id="scroll">
+        <h2>Scroll and visibility</h2>
+        <ul>
+            <li>
+                Every frame, VFX-JS checks each element's box, plus its overflow,
+                against the viewport. Elements out of view are skipped. They cost
+                no GPU time.
+            </li>
+            <li>
+                The canvas is a bit bigger than the viewport (10% on each side by
+                default) and moves with the page. So fast scrolling does not show
+                a gap. Set <code>scrollPadding</code> to change it, or
+                <code>false</code> for a fixed canvas.
+            </li>
+            <li>
+                The <code>intersection</code> option sets when the element counts
+                as "in view": <code>threshold</code> (0 to 1) and
+                <code>rootMargin</code>, like <code>IntersectionObserver</code>.
+                <code>leaveThreshold</code> sets when it leaves (default:
+                <code>threshold</code>). <code>duration</code> sets the enter and
+                leave time in seconds (default: 1).
+            </li>
+            <li>
+                The visible ratio divides by the smaller of the element size and
+                the viewport size, on each axis. So an element taller than the
+                viewport can still reach 1.
+            </li>
+            <li>
+                This drives the <code>intersection</code>,
+                <code>enterProgress</code>, <code>leaveProgress</code>,
+                <code>enterTime</code> and <code>leaveTime</code> uniforms.
+            </li>
+        </ul>
+        <p>
+            Scroll this image in and out. It fades in when it enters and out when
+            it leaves, and color fills in as more of it is in view.
+        </p>
+        <div class="Demo">
+            <img
+                id="ScrollDemo"
+                src={url("images/pigeon.webp")}
+                alt="Two pigeons by a river"
+            />
+        </div>
+        <CodeBlock code={scrollShader} lang="glsl" label="shader.frag" />
+        <CodeBlock code={scrollCode} lang="ts" label="main.ts" />
+    </section>
+
+    <section id="uniforms">
+        <h2>Uniforms and timing</h2>
+        <p>
+            VFX-JS sets these uniforms for each element. Declare only the ones you
+            use.
+        </p>
+        <table class="DocTable Uniforms">
+            <thead>
+                <tr>
+                    <th>Uniform</th>
+                    <th>Meaning</th>
+                </tr>
+            </thead>
+            <tbody>
+                {
+                    uniforms.map((row) => (
+                        <tr>
+                            <td>
+                                <code>{row.name}</code>
+                            </td>
+                            <td>{row.text}</td>
+                        </tr>
+                    ))
+                }
+            </tbody>
+        </table>
+        <ul>
+            <li>
+                <code>uv = (gl_FragCoord.xy - offset) / resolution</code> gives
+                element space: (0, 0) is bottom-left, (1, 1) is top-right.
+            </li>
+            <li>
+                Use <code>enterProgress</code> and <code>leaveProgress</code> for
+                enter and leave animations. They turn back smoothly when the user
+                scrolls back mid-way. Use <code>enterTime</code> and
+                <code>leaveTime</code> for animations timed in seconds.
+            </li>
+            <li>
+                Your own <code>uniforms</code> can be functions. They run every
+                frame, only while the element is drawn.
+            </li>
+            <li>
+                Effects get the same values on <code>ctx</code>:
+                <code>ctx.time</code>, <code>ctx.deltaTime</code>,
+                <code>ctx.mouse</code>, <code>ctx.intersection</code>,
+                <code>ctx.enterProgress</code>, <code>ctx.leaveProgress</code>,
+                <code>ctx.enterTime</code>, <code>ctx.leaveTime</code>.
+            </li>
+        </ul>
+        <p>
+            <code>time</code> comes from the VFX clock, not the wall clock. You
+            can pause it, slow it down, or pin it for stable screenshots.
+        </p>
+        <CodeBlock code={clockCode} lang="ts" label="main.ts" />
+    </section>
+
+    <section id="limits">
+        <h2>Limits</h2>
+        <ul>
+            <li>
+                Browser only, and WebGL is required. <code>new VFX()</code> throws
+                without it. <code>VFX.init()</code> returns <code>null</code> instead.
+                Either way the page stays plain HTML.
+            </li>
+            <li>
+                With <code>prefers-reduced-motion: reduce</code>, VFX-JS draws
+                nothing. Elements stay plain HTML, and transitions cut. It is
+                checked once, when <code>VFX</code> is created.
+            </li>
+            <li>
+                All effects draw on one canvas, at one z-index. Page content cannot
+                sit between two effects. Use the <code>zIndex</code> option to order
+                effects inside the canvas.
+            </li>
+            <li>
+                The canvas does not know about CSS clipping. An element hidden by a
+                parent's <code>overflow: hidden</code> or a scroll box is still
+                drawn.
+            </li>
+            <li>
+                VFX-JS owns the element's inline <code>opacity</code> while it is
+                added. Use <code>overlay</code> instead of setting it yourself.
+            </li>
+            <li>
+                Text, other elements and <code>&lt;canvas&gt;</code> are snapshots.
+                Call <code>vfx.update(el)</code> after they change.
+            </li>
+            <li>
+                Each <code>VFX</code> has its own WebGL context. Make one per page
+                and reuse it.
+            </li>
+            <li>
+                <code>shader</code> and <code>effect</code> can't be used together.
+                Make a new <code>Effect</code> instance for each element.
+            </li>
+        </ul>
+    </section>
+</Layout>
+
+<script>
+    import { lazyDemo } from "../demos/lazy";
+    import { scrollIntersection, scrollShader } from "../demos/scroll-shader";
+    import { getPageVFX } from "../page-vfx";
+    import { onPage } from "../lifecycle";
+
+    onPage(() => {
+        const button = document.getElementById("ClickDemo");
+        if (button) {
+            let count = 0;
+            lazyDemo(button, () => ({ shader: "rainbow" }));
+            button.addEventListener("click", () => {
+                count++;
+                button.textContent = `Clicked ${count} ${count === 1 ? "time" : "times"}`;
+                getPageVFX().update(button);
+            });
+        }
+
+        const scrollDemo = document.getElementById("ScrollDemo");
+        if (scrollDemo) {
+            lazyDemo(scrollDemo, () => ({
+                shader: scrollShader,
+                intersection: scrollIntersection,
+            }));
+        }
+    });
+</script>
+
+<style>
+    .Steps li {
+        margin-bottom: 4px;
+    }
+    .Figure {
+        margin: 24px 0;
+    }
+    .Diagram {
+        display: block;
+        width: 100%;
+        max-width: 640px;
+        height: auto;
+        margin: 0 auto;
+        font-size: 15px;
+        fill: white;
+    }
+    .Diagram .Mono {
+        font-family: var(--mono);
+        font-size: 13px;
+        fill: rgba(255, 255, 255, 0.7);
+    }
+    .Diagram .Small {
+        font-size: 12px;
+    }
+    .Layer {
+        fill: rgba(255, 255, 255, 0.04);
+        stroke: rgba(255, 255, 255, 0.6);
+        stroke-width: 2;
+        vector-effect: non-scaling-stroke;
+    }
+    .Layer.Canvas {
+        fill: rgba(255, 255, 255, 0.08);
+    }
+    .LayoutLine {
+        fill: rgba(255, 255, 255, 0.25);
+    }
+    .Hidden {
+        fill: none;
+        stroke: white;
+        stroke-width: 1.5;
+        stroke-dasharray: 6 5;
+        vector-effect: non-scaling-stroke;
+    }
+    .Guide line {
+        stroke: rgba(255, 255, 255, 0.35);
+        stroke-dasharray: 3 4;
+    }
+    .Arrow {
+        stroke: white;
+        stroke-width: 1.5;
+    }
+    .OverflowBox {
+        stroke: rgba(255, 255, 255, 0.6);
+        stroke-width: 1.5;
+        stroke-dasharray: 6 5;
+    }
+    .ElementBox {
+        fill: rgba(0, 0, 0, 0.6);
+        stroke: white;
+        stroke-width: 2;
+    }
+    .Measure line {
+        stroke: rgba(255, 255, 255, 0.7);
+    }
+    .Demo {
+        display: flex;
+        justify-content: center;
+        padding: 48px 32px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+    }
+    .Demo img {
+        width: min(100%, 480px);
+    }
+    .DemoButton {
+        padding: 12px 24px;
+        border: 2px solid white;
+        border-radius: 4px;
+        background: black;
+        color: white;
+        font: inherit;
+        font-size: 1.25rem;
+        cursor: pointer;
+    }
+    .TableScroll {
+        overflow-x: auto;
+    }
+    .DocTable {
+        width: 100%;
+        margin: 24px 0;
+        border-collapse: collapse;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+    .DocTable th,
+    .DocTable td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+    }
+    .DocTable th {
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+    }
+    .DocTable td:first-child {
+        white-space: nowrap;
+    }
+
+    /* One block per row on small screens. */
+    @media (max-width: 767px) {
+        .DocTable thead {
+            display: none;
+        }
+        .DocTable tr {
+            display: block;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--line);
+        }
+        .DocTable td {
+            display: block;
+            padding: 2px 0;
+            border: none;
+        }
+    }
+</style>

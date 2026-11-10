@@ -1,0 +1,78 @@
+---
+import { links, nav, url } from "../site";
+
+type Props = {
+    current?: string;
+};
+
+const { current } = Astro.props;
+---
+
+<header class="SiteHeader">
+    <a class="SiteHeaderBrand" href={url()}>
+        <img src={url("vfx-js-logo-no-padding.svg")} alt="VFX-JS" />
+    </a>
+    <button
+        class="SiteHeaderMenuButton"
+        type="button"
+        aria-label="Menu"
+        aria-expanded="false"
+        aria-controls="SiteHeaderNav"
+    >
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a
+            class="SiteHeaderDesktopOnly"
+            href={url("getting-started/")}
+            aria-current={current ? "page" : undefined}
+        >
+            Docs
+        </a>
+        {
+            nav.map((item) => (
+                <a
+                    class="SiteHeaderMenuOnly"
+                    href={url(`${item.slug}/`)}
+                    aria-current={item.slug === current ? "page" : undefined}
+                >
+                    {item.label}
+                </a>
+            ))
+        }
+        <a href={url("examples/")} target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href={links.github} target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script>
+    import { onPage } from "../lifecycle";
+
+    const setOpen = (open: boolean) => {
+        const header = document.querySelector<HTMLElement>(".SiteHeader");
+        header?.setAttribute("data-open", String(open));
+        header
+            ?.querySelector(".SiteHeaderMenuButton")
+            ?.setAttribute("aria-expanded", String(open));
+    };
+
+    // Page swaps replace the header, so bind the button on every page.
+    onPage(() => {
+        const header = document.querySelector<HTMLElement>(".SiteHeader");
+        header
+            ?.querySelector(".SiteHeaderMenuButton")
+            ?.addEventListener("click", () => {
+                setOpen(header.dataset.open !== "true");
+            });
+    });
+
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            setOpen(false);
+        }
+    });
+</script>

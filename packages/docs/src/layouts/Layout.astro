@@ -1,0 +1,126 @@
+---
+import { VFXTransition } from "@vfx-js/astro";
+import { ClientRouter } from "astro:transitions";
+import Background from "../components/Background.astro";
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+import Sidebar from "../components/Sidebar.astro";
+import { findNav, siteDescription, siteTitle, siteUrl, url } from "../site";
+import "../styles/global.css";
+import "../styles/layout.css";
+
+type Props = {
+    /** Nav slug of a doc page. Doc pages get the sidebar. */
+    page?: string;
+    title?: string;
+    description?: string;
+    /** Class for <main>. */
+    class?: string;
+    /** Keep the page out of search results, e.g. 404. */
+    noindex?: boolean;
+};
+
+const { page, class: mainClass, noindex } = Astro.props;
+const description =
+    Astro.props.description ?? (page ? findNav(page).blurb : siteDescription);
+const title =
+    Astro.props.title ?? (page ? `${findNav(page).label} - VFX-JS` : siteTitle);
+const pageUrl = new URL(Astro.url.pathname, siteUrl).href;
+const image = new URL(url("og_image.jpg"), siteUrl).href;
+---
+
+<!doctype html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html lang="en" transition:animate="none">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <title>{title}</title>
+
+        <meta name="theme-color" content="#000000" />
+        <meta name="description" content={description} />
+        {
+            noindex ? (
+                <meta name="robots" content="noindex" />
+            ) : (
+                <link rel="canonical" href={pageUrl} />
+            )
+        }
+
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={title} />
+        <meta property="og:image" content={image} />
+        <meta property="og:description" content={description} />
+        <meta property="og:site_name" content={siteTitle} />
+        <meta property="og:locale" content="en_US" />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@amagitakayosi" />
+        <meta name="twitter:creator" content="@amagitakayosi" />
+        <meta name="twitter:url" content={pageUrl} />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+        <meta name="twitter:image" content={image} />
+
+        <link rel="icon" href={url("favicon/favicon.ico")} sizes="32x32" />
+        <link
+            rel="icon"
+            href={url("favicon/favicon.svg")}
+            type="image/svg+xml"
+        />
+        <link rel="apple-touch-icon" href={url("favicon/favicon-180.png")} />
+        <link rel="manifest" href={url("manifest.webmanifest")} />
+
+        <ClientRouter />
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script
+            is:inline
+            defer
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon='{"token": "b9c39aae9c304f1cbfa1e7bb3e84f078"}'
+        ></script>
+        <!-- End Cloudflare Web Analytics -->
+    </head>
+
+    <body class:list={{ DocPage: page }}>
+        <Background />
+        <Header current={page} />
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script>
+            import "../transition-setup";
+        </script>
+        <!-- Back plays the slit scan reversed. -->
+        <VFXTransition transition="slitscan" duration={0.6} autoReverse>
+            <div class="Page">
+                {
+                    page ? (
+                        <div class="DocLayout">
+                            <Sidebar current={page} />
+                            <main class:list={["DocMain", mainClass]}>
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                <slot />
+                            </main>
+                        </div>
+                    ) : (
+                        <main class={mainClass}>
+                            <slot />
+                        </main>
+                    )
+                }
+                <Footer />
+            </div>
+        </VFXTransition>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        <slot name="overlay" />
+
+    </body>
+</html>

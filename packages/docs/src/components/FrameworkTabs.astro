@@ -1,0 +1,124 @@
+---
+import { frameworks } from "../content/frameworks";
+import CodeBlock from "./CodeBlock.astro";
+---
+
+<div class="Tabs">
+    <div class="TabList" role="tablist" aria-label="Frameworks">
+        {
+            frameworks.map((framework, i) => (
+                <button
+                    type="button"
+                    role="tab"
+                    id={`tab-${framework.id}`}
+                    aria-controls={`panel-${framework.id}`}
+                    aria-selected={i === 0 ? "true" : "false"}
+                    tabindex={i === 0 ? 0 : -1}
+                >
+                    {framework.name}
+                </button>
+            ))
+        }
+    </div>
+    {
+        frameworks.map((framework, i) => (
+            <div
+                class="TabPanel"
+                role="tabpanel"
+                id={`panel-${framework.id}`}
+                aria-labelledby={`tab-${framework.id}`}
+                hidden={i !== 0}
+            >
+                <CodeBlock code={framework.install} lang="bash" label="Install" />
+                <CodeBlock
+                    code={framework.snippet.code}
+                    lang={framework.snippet.lang}
+                    label={framework.snippet.label}
+                />
+                <ul>
+                    {framework.notes.map((note) => (
+                        <li>{note}</li>
+                    ))}
+                </ul>
+            </div>
+        ))
+    }
+</div>
+
+<script>
+    function select(tab: HTMLElement) {
+        const tabs = tab.closest(".Tabs");
+        if (!tabs) {
+            return;
+        }
+        for (const other of tabs.querySelectorAll<HTMLElement>('[role="tab"]')) {
+            const selected = other === tab;
+            other.setAttribute("aria-selected", String(selected));
+            other.tabIndex = selected ? 0 : -1;
+            const panel = document.getElementById(
+                other.getAttribute("aria-controls") ?? "",
+            );
+            if (panel) {
+                panel.hidden = !selected;
+            }
+        }
+    }
+
+    // Delegated, so it also works after page swaps.
+    document.addEventListener("click", (e) => {
+        const tab = (e.target as Element).closest<HTMLElement>(
+            '.Tabs [role="tab"]',
+        );
+        if (tab) {
+            select(tab);
+        }
+    });
+
+    // Arrow keys move between tabs.
+    document.addEventListener("keydown", (e) => {
+        const tab = (e.target as Element).closest<HTMLElement>(
+            '.Tabs [role="tab"]',
+        );
+        if (!tab || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) {
+            return;
+        }
+        const tabs = Array.from(
+            tab.parentElement?.querySelectorAll<HTMLElement>('[role="tab"]') ??
+                [],
+        );
+        const step = e.key === "ArrowRight" ? 1 : -1;
+        const next = tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length];
+        select(next);
+        next.focus();
+    });
+</script>
+
+<style>
+    .TabList {
+        display: flex;
+        gap: 4px;
+        border-bottom: 1px solid var(--line);
+        overflow-x: auto;
+    }
+    .TabList button {
+        padding: 10px 16px;
+        border: none;
+        border-bottom: 2px solid transparent;
+        background: none;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 15px;
+        cursor: pointer;
+    }
+    .TabList button:hover {
+        color: white;
+    }
+    .TabList button[aria-selected="true"] {
+        border-bottom-color: white;
+        color: white;
+        font-weight: 600;
+    }
+    .TabPanel ul {
+        padding-left: 20px;
+        line-height: 1.6;
+    }
+</style>

@@ -1,0 +1,601 @@
+---
+import CodeBlock from "../components/CodeBlock.astro";
+import tileSource from "../demos/tile-effect.ts?raw";
+import trailSource from "../demos/trail-effect.ts?raw";
+import waveSource from "../demos/wave-effect.ts?raw";
+import Layout from "../layouts/Layout.astro";
+import { url } from "../site";
+
+const effectInterface = `
+interface Effect {
+    enabled?: boolean;
+    init?(ctx: EffectContext): void | Promise<void>;
+    update?(ctx: EffectContext): void;
+    render?(ctx: EffectContext): void;
+    dispose?(): void;
+    outputRect?(dims: EffectDims): [x, y, w, h] | undefined;
+}
+`;
+
+const addCode = `
+import { VFX } from "@vfx-js/core";
+import { WaveEffect } from "./wave-effect";
+
+const vfx = new VFX();
+await vfx.add(img, { effect: new WaveEffect() });
+
+// An array runs as a chain. Each effect reads the one before.
+await vfx.add(img, { effect: [new WaveEffect(), new TrailEffect()] });
+`;
+
+const hooks = [
+    {
+        name: "init(ctx)",
+        text: "Once, when the effect is added. Make render targets and wrap textures here. Can be async; vfx.add waits for it.",
+    },
+    {
+        name: "update(ctx)",
+        text: "Every frame, before render. Change state here. ctx.draw does nothing here.",
+    },
+    {
+        name: "render(ctx)",
+        text: "Every frame. Draw with ctx.draw and ctx.blit. Without render, the input passes through.",
+    },
+    {
+        name: "dispose()",
+        text: "Once, when the element is removed. Drop your references.",
+    },
+    {
+        name: "outputRect(dims)",
+        text: "The rect this effect draws into. Omit it to keep the input size.",
+    },
+    {
+        name: "enabled",
+        text: "Set false to skip render. Checked every frame. init and update still run.",
+    },
+];
+
+const contextFields = [
+    { name: "time, deltaTime", text: "Seconds since start, and since the last frame." },
+    { name: "src", text: "The input texture: the element, or the effect before." },
+    { name: "target", text: "This effect's output. null means the canvas." },
+    { name: "dims", text: "Sizes in px. See below." },
+    { name: "mouse, mouseViewport", text: "Mouse in element px and canvas px, bottom-left origin." },
+    { name: "intersection, enterProgress, leaveProgress, enterTime, leaveTime", text: "Scroll position and timing, like in shaders." },
+    { name: "uniforms", text: "The uniforms option of vfx.add, evaluated every frame." },
+    { name: "resolution, pixelRatio", text: "Canvas size in physical px, and the pixel ratio." },
+    { name: "gl", text: "The raw WebGL2 context." },
+];
+
+const drawCode = `
+ctx.draw({
+    frag,                // GLSL ES 3.0 fragment shader
+    vert,                // optional; the default gives uv, uvContent, uvSrc
+    uniforms,            // numbers, arrays, textures, render targets
+    target,              // ctx.target, or a render target
+    blend,               // "premultiplied" | "none" | "additive" | "normal"
+    geometry,            // ctx.quad (default) or your own geometry
+    swap,                // persistent targets: false keeps the same buffer
+});
+
+ctx.blit(source, target); // copy a texture
+ctx.clear(target);        // clear a render target
+`;
+
+const varyings = [
+    { name: "uvSrc", text: "0..1 over src. Use it to read src as is." },
+    { name: "uvContent", text: "0..1 over the element. Outside 0..1 is the padding." },
+    { name: "uv", text: "0..1 over the whole output, padding included." },
+];
+
+const readTexCode = `
+uniform vec4 srcRectUv; // set for you
+
+vec4 readSrc(vec2 p) { // p: element uv
+    if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return vec4(0);
+    return texture(src, srcRectUv.xy + p * srcRectUv.zw);
+}
+`;
+
+const renderTargetCode = `
+ctx.createRenderTarget({
+    size,        // [w, h] physical px; omit to follow the output size
+    float,       // float buffer, for values outside 0..1
+    persistent,  // two buffers: read the last frame, write the next
+    wrap,        // "clamp" (default) | "repeat" | "mirror"
+    filter,      // "linear" (default) | "nearest"
+    mipmap,      // true | "manual"
+});
+`;
+
+const dimsFields = [
+    { name: "element, elementPixel", text: "Element size in CSS px and physical px." },
+    { name: "canvas, canvasPixel", text: "Canvas size in CSS px and physical px." },
+    { name: "pixelRatio", text: "Device pixel ratio." },
+    { name: "contentRect", text: "The element rect: [0, 0, w, h]." },
+    { name: "srcRect", text: "The rect of src: the output rect of the effect before." },
+    { name: "canvasRect", text: "The canvas rect, relative to the element." },
+];
+
+const wrapCode = `
+init(ctx: EffectContext) {
+    this.image = ctx.wrapTexture(imageElement);
+    this.video = ctx.wrapTexture(videoElement); // updates every frame
+}
+
+render(ctx: EffectContext) {
+    ctx.draw({ frag, uniforms: { src: ctx.src, image: this.image }, target: ctx.target });
+}
+`;
+
+const paramsCode = `
+export class WaveEffect implements Effect {
+    params: WaveParams;
+
+    constructor(params: Partial<WaveParams> = {}) {
+        this.params = { amount: 1, ...params };
+    }
+
+    render(ctx: EffectContext) {
+        // Read params every frame.
+        ctx.draw({ frag, uniforms: { amount: this.params.amount /* ... */ } });
+    }
+}
+
+const wave = new WaveEffect({ amount: 0.5 });
+await vfx.add(img, { effect: wave });
+
+slider.oninput = () => {
+    wave.params.amount = slider.valueAsNumber;
+};
+`;
+
+const chainCode = `
+// Turn one effect off and on. It keeps its buffers.
+wave.enabled = false;
+
+// Swap the chain. Effects you keep keep their state.
+await vfx.updateEffects(img, [wave, new TrailEffect()]);
+`;
+
+const postEffectCode = `
+import { VFX } from "@vfx-js/core";
+import { VignetteEffect } from "@vfx-js/effects";
+
+const vfx = new VFX({
+    postEffect: { effect: new VignetteEffect({ intensity: 0.8 }) },
+});
+
+// An array works too.
+new VFX({ postEffect: { effect: [new WaveEffect(), new VignetteEffect()] } });
+`;
+
+const factoryCode = `
+// One instance per element.
+const makeEffect = () => new WaveEffect({ amount: 0.5 });
+
+for (const img of document.querySelectorAll("img")) {
+    vfx.add(img, { effect: makeEffect() });
+}
+`;
+---
+
+<Layout
+    page="custom-effects"
+    description="Write your own VFX-JS effects with the Effect API: lifecycle hooks, draws, render targets, textures and params."
+>
+    <h1>Custom Effects</h1>
+    <p>
+        An effect is a class with a few hooks. It can draw many passes, keep
+        buffers across frames, use your own textures, and draw outside the
+        element. Every effect in
+        <a href={url("effects/#gallery")}>@vfx-js/effects</a> is built this way.
+    </p>
+    <p>
+        For a single shader, <a href={url("shaders/")}>Custom Shaders</a> is
+        simpler. Use an effect when you want to reuse it, chain it, or share it as
+        a package.
+    </p>
+
+    <section id="effect-interface">
+        <h2>The Effect interface</h2>
+        <p>Every member is optional.</p>
+        <CodeBlock code={effectInterface} lang="ts" label="Effect" />
+        <p>
+            Pass an instance as <code>effect</code> to <code>vfx.add</code>. The
+            types come from <code>@vfx-js/core</code>.
+        </p>
+        <CodeBlock code={addCode} lang="ts" label="main.ts" />
+        <p>
+            <code>shader</code> and <code>effect</code> don't mix. If you set both,
+            <code>effect</code> wins.
+        </p>
+    </section>
+
+    <section id="hooks">
+        <h2>Lifecycle hooks</h2>
+        <div class="TableScroll">
+            <table class="DocTable">
+                <thead>
+                    <tr>
+                        <th>Hook</th>
+                        <th>When and what</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {
+                        hooks.map((row) => (
+                            <tr>
+                                <td>
+                                    <code>{row.name}</code>
+                                </td>
+                                <td>{row.text}</td>
+                            </tr>
+                        ))
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p>
+            Every hook gets the same <code>ctx</code>. Its fields change every
+            frame:
+        </p>
+        <div class="TableScroll">
+            <table class="DocTable">
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {
+                        contextFields.map((row) => (
+                            <tr>
+                                <td>
+                                    <code>{row.name}</code>
+                                </td>
+                                <td>{row.text}</td>
+                            </tr>
+                        ))
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p>
+            This effect uses <code>update</code> and <code>render</code>.
+            <code>update</code> eases a value toward <code>params.amount</code>.
+            <code>render</code> draws a wave with it. Move the slider:
+        </p>
+        <CodeBlock code={waveSource} lang="ts" label="wave-effect.ts" />
+        <div class="Demo">
+            <img
+                id="WaveDemo"
+                src={url("vfx-js-logo-no-padding.svg")}
+                alt="VFX-JS logo with a wave"
+            />
+            <label class="DemoControl">
+                <span>amount</span>
+                <input id="WaveAmount" type="range" min="0" max="3" step="0.01" value="1" />
+            </label>
+        </div>
+    </section>
+
+    <section id="drawing">
+        <h2>Drawing</h2>
+        <p>
+            Draw in <code>render</code> with <code>ctx.draw</code>. It runs a
+            fragment shader over a quad. Pass <code>ctx.src</code> as a uniform to
+            read the input, and set <code>target: ctx.target</code> to write the
+            output.
+        </p>
+        <CodeBlock code={drawCode} lang="ts" label="EffectContext" />
+        <p>
+            The default vertex shader gives three <code>in vec2</code> values,
+            all 0..1:
+        </p>
+        <div class="TableScroll">
+            <table class="DocTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Range</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {
+                        varyings.map((row) => (
+                            <tr>
+                                <td>
+                                    <code>{row.name}</code>
+                                </td>
+                                <td>{row.text}</td>
+                            </tr>
+                        ))
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p>
+            In a chain, <code>src</code> can be bigger than the element, when the
+            effect before has padding. To move pixels around, work in
+            <code>uvContent</code> and map it to src with <code>srcRectUv</code>,
+            like the effects in <code>@vfx-js/effects</code> do:
+        </p>
+        <CodeBlock code={readTexCode} lang="glsl" label="GLSL" />
+
+        <h3>Render targets</h3>
+        <p>
+            Make render targets in <code>init</code> and reuse them every frame.
+            Draw to one, then pass it as a uniform to read it in the next draw.
+            VFX-JS frees them when the effect is removed.
+        </p>
+        <CodeBlock code={renderTargetCode} lang="ts" label="EffectContext" />
+        <p>
+            A <code>persistent</code> target has two buffers. As a uniform, it
+            reads the last frame. As a target, it writes the next one. They swap
+            after each draw.
+        </p>
+
+        <h3>Drawing outside the element</h3>
+        <p>
+            The <code>overflow</code> option does not apply to effects. Return a
+            bigger rect from <code>outputRect</code> instead. It is
+            <code>[x, y, w, h]</code> in physical px, relative to the element's
+            bottom-left corner. Return <code>dims.canvasRect</code> to cover the
+            whole canvas.
+        </p>
+        <div class="TableScroll">
+            <table class="DocTable">
+                <thead>
+                    <tr>
+                        <th>dims</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {
+                        dimsFields.map((row) => (
+                            <tr>
+                                <td>
+                                    <code>{row.name}</code>
+                                </td>
+                                <td>{row.text}</td>
+                            </tr>
+                        ))
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p>
+            This effect keeps a trail in a persistent target, and pads its output
+            by 60px so the trail can leave the element:
+        </p>
+        <CodeBlock code={trailSource} lang="ts" label="trail-effect.ts" />
+        <div class="Demo Wide">
+            <img
+                id="TrailDemo"
+                src={url("vfx-js-logo-no-padding.svg")}
+                alt="VFX-JS logo moving in a circle with a trail"
+            />
+        </div>
+    </section>
+
+    <section id="textures">
+        <h2>Textures</h2>
+        <p>
+            <code>ctx.src</code> and your own textures are
+            <code>EffectTexture</code> handles. Pass them as uniforms. Use
+            <code>width</code> and <code>height</code> for their size in px.
+        </p>
+        <p>
+            <code>ctx.wrapTexture</code> turns an image, canvas, video,
+            <code>ImageBitmap</code>, <code>OffscreenCanvas</code> or
+            <code>WebGLTexture</code> into a texture. Call it once in
+            <code>init</code>.
+        </p>
+        <CodeBlock code={wrapCode} lang="ts" label="my-effect.ts" />
+        <ul>
+            <li>
+                Videos and canvases upload every frame. Other sources upload once.
+                Change this with <code>autoUpdate</code>.
+            </li>
+            <li>
+                With <code>autoUpdate: false</code>, call
+                <code>texture.update()</code> after the source changes. It uploads
+                again on the next draw.
+            </li>
+            <li>
+                Call <code>texture.dispose()</code> when you replace a texture.
+                The rest are freed when the effect is removed.
+            </li>
+            <li>
+                A <code>WebGLTexture</code> needs <code>size</code>, and
+                <code>update()</code> does nothing for it.
+            </li>
+        </ul>
+        <p>
+            This effect tints the element with an 8×4 canvas. The canvas changes
+            only on click, so it skips the upload on other frames. Click the logo:
+        </p>
+        <CodeBlock code={tileSource} lang="ts" label="tile-effect.ts" />
+        <div class="Demo">
+            <img
+                id="TileDemo"
+                class="Clickable"
+                src={url("vfx-js-logo-no-padding.svg")}
+                alt="VFX-JS logo tinted with color tiles. Click to change them."
+            />
+        </div>
+    </section>
+
+    <section id="params">
+        <h2>Params</h2>
+        <p>
+            Keep settings in a public <code>params</code> object and read it in
+            <code>render</code>. Then you can change them any time, with no
+            re-init. The effects in <code>@vfx-js/effects</code> work this way. The
+            slider in the <a href="#hooks">wave demo</a> sets
+            <code>params.amount</code>.
+        </p>
+        <CodeBlock code={paramsCode} lang="ts" label="main.ts" />
+        <p>
+            To change the chain itself, toggle <code>enabled</code> or call
+            <code>vfx.updateEffects</code>:
+        </p>
+        <CodeBlock code={chainCode} lang="ts" label="main.ts" />
+    </section>
+
+    <section id="post-effect">
+        <h2>As a post effect</h2>
+        <p>
+            Effects also run over the whole canvas, after all elements are drawn.
+            Pass them as <code>postEffect.effect</code> to <code>new VFX()</code>.
+        </p>
+        <CodeBlock code={postEffectCode} lang="ts" label="main.ts" />
+        <ul>
+            <li>
+                <code>src</code> is the whole canvas.
+            </li>
+            <li>
+                There is no element, so <code>dims.element</code> is the canvas
+                size and <code>contentRect</code> is <code>canvasRect</code>.
+            </li>
+            <li>
+                No live demo here, since it would change every demo on this page.
+            </li>
+        </ul>
+    </section>
+
+    <section id="tips">
+        <h2>Tips</h2>
+        <ul>
+            <li>
+                Effects keep state, so don't share one instance between elements.
+                Use a factory.
+            </li>
+        </ul>
+        <CodeBlock code={factoryCode} lang="ts" label="main.ts" />
+        <ul>
+            <li>
+                Render targets, wrapped textures and geometries are freed for you.
+                In <code>dispose</code>, drop your references.
+            </li>
+            <li>
+                Things you make with <code>ctx.gl</code> are yours. Free them in
+                <code>dispose</code>, and rebuild them in
+                <code>ctx.onContextRestored(cb)</code>.
+            </li>
+            <li>
+                Use <code>ctx.dims</code> for sizes. Don't read DOM sizes in
+                <code>render</code>.
+            </li>
+            <li>
+                <code>ctx.draw</code> in <code>update</code> is ignored. Draw in
+                <code>render</code>.
+            </li>
+            <li>
+                For bigger examples, read
+                <a href="https://github.com/fand/vfx-js/tree/main/packages/effects/src" target="_blank" rel="noreferrer">packages/effects/src</a>.
+                <code>hue-shift.ts</code> and <code>pixelate.ts</code> are short.
+                <code>bloom.ts</code> uses render targets and
+                <code>outputRect</code>.
+            </li>
+        </ul>
+    </section>
+</Layout>
+
+<script>
+    import { lazyDemo } from "../demos/lazy";
+    import { TileEffect } from "../demos/tile-effect";
+    import { TrailEffect } from "../demos/trail-effect";
+    import { WaveEffect } from "../demos/wave-effect";
+    import { onPage } from "../lifecycle";
+
+    onPage(() => {
+        const waveDemo = document.getElementById("WaveDemo");
+        const waveAmount = document.getElementById(
+            "WaveAmount",
+        ) as HTMLInputElement | null;
+        if (waveDemo && waveAmount) {
+            let wave: WaveEffect | undefined;
+            lazyDemo(waveDemo, () => {
+                wave = new WaveEffect({ amount: waveAmount.valueAsNumber });
+                return { effect: wave };
+            });
+            waveAmount.addEventListener("input", () => {
+                if (wave) {
+                    wave.params.amount = waveAmount.valueAsNumber;
+                }
+            });
+        }
+
+        const trailDemo = document.getElementById("TrailDemo");
+        if (trailDemo) {
+            lazyDemo(trailDemo, () => ({ effect: new TrailEffect() }));
+        }
+
+        const tileDemo = document.getElementById("TileDemo");
+        if (tileDemo) {
+            let tile: TileEffect | undefined;
+            lazyDemo(tileDemo, () => {
+                tile = new TileEffect();
+                return { effect: tile };
+            });
+            tileDemo.addEventListener("click", () => tile?.shuffle());
+        }
+    });
+</script>
+
+<style>
+    .Demo {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        padding: 64px 32px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+    }
+    .Demo.Wide {
+        padding: 96px 32px;
+    }
+    .Demo img {
+        width: min(100%, 400px);
+    }
+    /* Room for the 60px padding on narrow screens. */
+    .Demo.Wide img {
+        width: min(70%, 400px);
+    }
+    .Demo .Clickable {
+        cursor: pointer;
+    }
+    .DemoControl {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: var(--mono);
+        font-size: 14px;
+    }
+    .TableScroll {
+        overflow-x: auto;
+    }
+    .DocTable {
+        width: 100%;
+        margin: 24px 0;
+        border-collapse: collapse;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+    .DocTable th,
+    .DocTable td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+    }
+    .DocTable th {
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+    }
+</style>

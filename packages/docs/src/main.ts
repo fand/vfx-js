@@ -1,26 +1,24 @@
-import { VFX } from "@vfx-js/core";
+import type { VFX } from "@vfx-js/core";
+
+import { bgSpheres, bgVFX, initBackground } from "./background";
+import { lazyDemo } from "./demos/lazy";
+import { runDemos } from "./demos/top-demos";
 import {
-    BloomEffect,
-    PixelateEffect,
-    ScanlineEffect,
-} from "@vfx-js/effects";
-
-import Prism from "prismjs";
-import "prism-themes/themes/prism-nord.min.css";
-
-Prism.manual = true;
-Prism.highlightAll();
+    type Control,
+    createChain,
+    MENU_EFFECTS,
+    type ParamValue,
+    snippet,
+    type Values,
+} from "./effect-menu";
+import { onPage, scrollRoot } from "./lifecycle";
+import { getPageVFX } from "./page-vfx";
 
 function $(selector: string, parent?: HTMLElement) {
     return (parent ?? document).querySelector(selector) as HTMLElement;
 }
 
-function lerp(a: number, b: number, t: number) {
-    return a * (1 - t) + b * t;
-}
-
-const shaders: Record<string, string> = {
-    logo: `
+const logoShader = `
     precision highp float;
     uniform vec2 resolution;
     uniform vec2 offset;
@@ -62,12 +60,8 @@ const shaders: Record<string, string> = {
         vec4 cg = readTex(src, uvg);
         vec4 cb = readTex(src, uvb);
 
-        return vec4(
-            cr.r,
-            cg.g,
-            cb.b,
-            smoothstep(.0, 1., cr.a + cg.a + cb.a)
-        );
+        // Colors are premultiplied, so alpha must follow the strongest channel, not the sum.
+        return vec4(cr.r, cg.g, cb.b, max(cr.a, max(cg.a, cb.a)));
     }
     vec4 slitscan(vec2 uv) {
         float t = max(enterTime - delay, 0.) * speed;
@@ -84,9 +78,7 @@ const shaders: Record<string, string> = {
         vec4 cg = readTex(src, uvg);
         vec4 cb = readTex(src, uvb);
 
-        return vec4(
-            cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 1.
-        );
+        return vec4(cr.r, cg.g, cb.b, max(cr.a, max(cg.a, cb.a)));
     }
 
     void main (void) {
@@ -100,364 +92,245 @@ const shaders: Record<string, string> = {
             outColor = glitch(uv);
         }
     }
-    `,
-    blob: `
-    precision highp float;
-    uniform vec2 resolution;
-    uniform vec2 offset;
-    uniform float time;
-    uniform sampler2D src;
-    out vec4 outColor;
+`;
 
-    vec3 hsv2rgb(vec3 c) {
-        vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-        vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-        return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+/** Build the param controls for one menu item. */
+function paramsPanel(
+    controls: Control[],
+    values: Record<string, ParamValue>,
+    onChange: (control: Control, value: ParamValue) => void,
+): HTMLElement {
+    const panel = document.createElement("div");
+    panel.className = "EffectParams";
+    for (const control of controls) {
+        const row = document.createElement("label");
+        row.className = "EffectParam";
+        const name = document.createElement("span");
+        name.textContent = control.label ?? control.key;
+        const output = document.createElement("span");
+        output.className = "EffectParamValue";
+        const show = (v: ParamValue) => {
+            output.textContent = control.type === "range" ? String(v) : "";
+        };
+        let input: HTMLInputElement | HTMLSelectElement;
+        if (control.type === "select") {
+            input = document.createElement("select");
+            for (const option of control.options) {
+                input.add(new Option(option, option));
+            }
+        } else {
+            input = document.createElement("input");
+            input.type = control.type;
+            if (control.type === "range") {
+                input.min = String(control.min);
+                input.max = String(control.max);
+                input.step = String(control.step);
+            }
+        }
+        if (input instanceof HTMLInputElement && control.type === "checkbox") {
+            input.checked = values[control.key] as boolean;
+        } else {
+            input.value = String(values[control.key]);
+        }
+        show(values[control.key]);
+        input.addEventListener("input", () => {
+            const v =
+                control.type === "range"
+                    ? Number(input.value)
+                    : input instanceof HTMLInputElement &&
+                        control.type === "checkbox"
+                      ? input.checked
+                      : input.value;
+            show(v);
+            onChange(control, v);
+        });
+        if (control.type === "checkbox") {
+            row.classList.add("EffectParamToggle");
+            row.append(name, input);
+        } else {
+            row.append(name, output, input);
+        }
+        panel.appendChild(row);
     }
-
-    vec3 rgb2hsv(vec3 c) {
-        vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-        vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
-        vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
-
-        float d = q.x - min(q.w, q.y);
-        float e = 1.0e-10;
-        return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
-    }
-
-    vec3 hueShift(vec3 rgb, float t) {
-        vec3 hsv = rgb2hsv(rgb);
-        hsv.x = fract(hsv.x + t);
-        return hsv2rgb(hsv);
-    }
-
-    vec4 readTex(vec2 uv) {
-        vec2 d = 3. / resolution.xy;
-        vec4 c = vec4(0);
-        c += texture(src, uv + vec2(1, 0) * d);
-        c += texture(src, uv - vec2(1, 0) * d);
-        c += texture(src, uv + vec2(0, 1) * d);
-        c += texture(src, uv - vec2(0, 1) * d);
-        return c / 4.;
-    }
-
-    void main() {
-        vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-
-        vec4 img = texture(src, uv);
-
-        float gray = dot(img.rgb, vec3(0.2, 0.7, 0.1));
-
-        vec2 d = (uv - .5) * vec2(resolution.x / resolution.y, 1);
-        float l = length(d);
-
-        // Colorize
-        img.rgb = mix(img.rgb, vec3(.8, .4, .4), sin(gray * 3. - time));
-
-        // Hue shift
-        float shift = fract(gray + l - time * 0.2);
-        img.rgb = hueShift(img.rgb, shift);
-
-        img.a *= 0.5;
-        outColor = img;
-    }
-    `,
-    canvas: `
-precision highp float;
-uniform vec2 resolution;
-uniform vec2 offset;
-uniform float time;
-uniform sampler2D src;
-out vec4 outColor;
-
-#define ZOOM(uv, x) ((uv - .5) / x + .5)
-
-void main (void) {
-    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-
-    float r = sin(time) * 0.5 + 0.5;
-
-    float l = pow(length(uv - .5), 2.);
-    uv = (uv - .5) *  (1. - l * 0.3 * r) + .5;
-
-
-    float n = 0.02 + r * 0.03;
-    vec4 cr = texture(src, ZOOM(uv, 1.00));
-    vec4 cg = texture(src, ZOOM(uv, (1. + n)));
-    vec4 cb = texture(src, ZOOM(uv, (1. + n * 2.)));
-
-    outColor = vec4(cr.r, cg.g, cb.b, 1);
+    return panel;
 }
-    `,
-    custom: `
-precision highp float;
-uniform vec2 resolution;
-uniform vec2 offset;
-uniform float time;
-uniform sampler2D src;
-uniform float scroll;
-out vec4 outColor;
-
-void main (void) {
-    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-    uv.x = fract(uv.x + scroll + time * 0.2);
-    outColor = texture(src, uv);
-}
-    `,
-};
 
 class App {
-    vfx = new VFX({
-        pixelRatio: window.devicePixelRatio,
-        zIndex: -1,
-    });
-    vfx2 = new VFX({
-        pixelRatio: 1,
-        zIndex: -2,
-        scrollPadding: false,
-    });
+    vfx = getPageVFX();
+    /** False once the page is swapped out. Late async work checks it. */
+    alive = true;
+    added: HTMLElement[] = [];
 
-    async initBG() {
+    // Click an item to apply its effect to the logo, the tagline and the background.
+    // Its params show under the item.
+    initEffectMenu() {
         const bg = $("#BG");
+        const list = $(".EffectList");
+        const copy = $(".EffectCopy");
 
-        let scroll = 0;
-        function lerp(a: number, b: number, t: number): number {
-            return a * (1 - t) + b * t;
-        }
+        // Current control values, per menu item.
+        const values: Values[] = MENU_EFFECTS.map((item) =>
+            Object.fromEntries(
+                (item.controls ?? []).map((c) => [c.key, c.value]),
+            ),
+        );
 
-        function loop() {
-            scroll = lerp(scroll, window.scrollY, 0.03);
-            bg.style.setProperty("transform", `translateY(-${scroll * 0.1}px)`);
-
-            requestAnimationFrame(loop);
-        }
-        loop();
-
-        await this.vfx2.add(bg, { shader: shaders.blob });
-    }
-
-    async initVFX() {
-        await Promise.all(
-            Array.from(document.querySelectorAll("*[data-shader]")).map((e) => {
-                const shader = e.getAttribute("data-shader") as string;
-
-                const uniformsJSON = e.getAttribute("data-uniforms");
-                const uniforms = uniformsJSON
-                    ? JSON.parse(uniformsJSON)
-                    : undefined;
-
-                return this.vfx.add(e as HTMLImageElement, {
-                    shader,
-                    overflow: Number.parseFloat(
-                        e.getAttribute("data-overflow") ?? "0",
-                    ),
-                    uniforms,
-                    intersection: {
-                        threshold: Number.parseFloat(
-                            e.getAttribute("data-threshold") ?? "0",
-                        ),
-                    },
-                });
+        // One effect instance can't be shared between elements, so each target gets its own.
+        // The logo and tagline start on their intro shader. They move to the effect path on first use.
+        const createAll = (isBG: boolean) =>
+            MENU_EFFECTS.map((item, i) => createChain(item, values[i], isBG));
+        const texts = [$("#Logo"), $("#LogoTagline"), $("#HeroLead")].map(
+            (element) => ({
+                element,
+                chains: createAll(false),
+                onEffectPath: false,
             }),
         );
-    }
+        const bgChains = createAll(true);
+        let selected = 0;
+        let queue = Promise.resolve();
 
-    async initDiv() {
-        const div = $("#div");
-        await this.vfx.add(div, { shader: "rgbShift", overflow: 100 });
-
-        for (const input of div.querySelectorAll("input,textarea")) {
-            input.addEventListener("input", () => this.vfx.update(div));
-        }
-
-        const textarea = $("textarea", div);
-        const mo = new MutationObserver(() => this.vfx.update(div));
-        mo.observe(textarea, {
-            attributes: true,
-        });
-    }
-
-    async initCanvas() {
-        const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-            throw "Failed to get the canvas context";
-        }
-
-        const { width, height } = canvas.getBoundingClientRect();
-        const ratio = window.devicePixelRatio ?? 1;
-        canvas.width = width * ratio;
-        canvas.height = height * ratio;
-        ctx.scale(ratio, ratio);
-
-        let target = [width / 2, height / 2];
-        let p = target;
-        const ps = [p];
-        let isMouseOn = false;
-        const startTime = Date.now();
-
-        canvas.addEventListener("mousemove", (e) => {
-            isMouseOn = true;
-            target = [e.offsetX, e.offsetY];
-        });
-        canvas.addEventListener("mouseleave", (e) => {
-            isMouseOn = false;
-        });
-
-        let isInside = false;
-        const io = new IntersectionObserver(
-            (changes) => {
-                for (const c of changes) {
-                    isInside = c.intersectionRatio > 0.1;
-                }
-            },
-            { threshold: [0, 1, 0.2, 0.8] },
-        );
-        io.observe(canvas);
-
-        const drawMouseStalker = () => {
-            requestAnimationFrame(drawMouseStalker);
-
-            if (!isInside) {
-                return;
+        const setParam = (
+            index: number,
+            control: Control,
+            value: ParamValue,
+        ) => {
+            values[index][control.key] = value;
+            for (const chains of [...texts.map((t) => t.chains), bgChains]) {
+                chains[index].set(control, value);
             }
-
-            if (!isMouseOn) {
-                const t = Date.now() / 1000 - startTime;
-                target = [
-                    width * 0.5 + Math.sin(t * 1.3) * width * 0.3,
-                    height * 0.5 + Math.sin(t * 1.7) * height * 0.3,
-                ];
-            }
-            p = [lerp(p[0], target[0], 0.1), lerp(p[1], target[1], 0.1)];
-
-            ps.push(p);
-            ps.splice(0, ps.length - 30);
-
-            ctx.clearRect(0, 0, width, height);
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, width, height);
-
-            ctx.fillStyle = "white";
-            ctx.font = `bold ${width * 0.14}px sans-serif`;
-            ctx.fillText("HOVER ME", width / 2, height / 2);
-            ctx.textBaseline = "middle";
-            ctx.textAlign = "center";
-
-            for (let i = 0; i < ps.length; i++) {
-                const [x, y] = ps[i];
-                const t = (i / ps.length) * 255;
-                ctx.fillStyle = `rgba(${255 - t}, 255, ${t}, ${(i / ps.length) * 0.5 + 0.5})`;
-                ctx.beginPath();
-                ctx.arc(x, y, i + 20, 0, 2 * Math.PI);
-                ctx.fill();
-            }
-
-            this.vfx.update(canvas);
         };
-        drawMouseStalker();
 
-        await this.vfx.add(canvas, { shader: shaders.canvas });
-    }
+        // Past the hero, the BG drops its effect and dims, so text stays readable.
+        let inHero = true;
+        const syncBG = () => {
+            const bgEffects = inHero ? bgChains[selected].effects : [];
+            const bgChain = [bgSpheres, ...bgEffects];
+            return bgVFX.updateEffects(bg, bgChain);
+        };
 
-    async initCustomShader() {
-        const e = $("#custom");
-        await this.vfx.add(e, {
-            shader: shaders.custom,
-            uniforms: { scroll: () => window.scrollY / window.innerHeight },
+        const select = (index: number) => {
+            selected = index;
+            // Run swaps in order so fast clicks can't interleave them.
+            queue = queue.then(async () => {
+                if (selected !== index || !this.alive) {
+                    return;
+                }
+                const updateText = async (text: (typeof texts)[number]) => {
+                    const chain = text.chains[index].effects;
+                    if (text.onEffectPath) {
+                        await this.vfx.updateEffects(text.element, chain);
+                    } else {
+                        text.onEffectPath = true;
+                        this.vfx.remove(text.element);
+                        await this.add(text.element, { effect: chain });
+                    }
+                };
+                await Promise.all([...texts.map(updateText), syncBG()]);
+            });
+        };
+
+        const hero = $(".Hero");
+        const heroObserver = new IntersectionObserver(
+            ([entry]) => {
+                inHero = entry.isIntersecting;
+                document.body.classList.toggle("BGDim", !inHero);
+                queue = queue.then(() => {
+                    if (this.alive) {
+                        return syncBG();
+                    }
+                });
+            },
+            { root: scrollRoot(), threshold: 0.25 },
+        );
+        heroObserver.observe(hero);
+
+        const items = MENU_EFFECTS.map((item, i) => {
+            const li = document.createElement("li");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "EffectItem";
+            button.innerHTML = `<span class="num">${String(i + 1).padStart(2, "0")}</span>${item.label}`;
+            button.addEventListener("click", () => {
+                for (const [j, other] of items.entries()) {
+                    other.classList.toggle("active", j === i);
+                }
+                select(i);
+            });
+            li.appendChild(button);
+            if (item.controls) {
+                li.appendChild(
+                    paramsPanel(item.controls, values[i], (c, v) =>
+                        setParam(i, c, v),
+                    ),
+                );
+            }
+            list.appendChild(li);
+            return li;
         });
-    }
+        items[selected].classList.add("active");
 
-    async initEffects() {
-        const bloom = $("#effect-bloom") as HTMLImageElement;
-        await this.vfx.add(bloom, {
-            effect: new BloomEffect({ threshold: 0.2, intensity: 5 }),
+        copy.addEventListener("click", async () => {
+            await navigator.clipboard.writeText(
+                snippet(MENU_EFFECTS[selected], values[selected]),
+            );
+            const label = copy.innerHTML;
+            copy.textContent = "Copied ✓";
+            setTimeout(() => {
+                copy.innerHTML = label;
+            }, 1500);
         });
 
-        const crt = $("#effect-crt") as unknown as HTMLVideoElement;
-        await this.vfx.add(crt, {
-            effect: [
-                new PixelateEffect({ size: 10 }),
-                new ScanlineEffect({ spacing: 5 }),
-                new BloomEffect({
-                    threshold: 0.01,
-                    softness: 0.2,
-                    intensity: 10,
-                    scatter: 1,
-                    pad: 200,
-                }),
-            ],
-        });
-    }
-
-    async initMultipass() {
-        const e = $("#multipass");
-        await this.vfx.add(e, {
-            shader: [
-                {
-                    frag: `
-                        precision highp float;
-                        uniform sampler2D src;
-                        uniform vec2 resolution;
-                        uniform vec2 offset;
-                        out vec4 outColor;
-                        void main() {
-                            vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                            vec2 t = 4.0 / resolution;
-                            vec4 c = texture(src, uv) * 0.4;
-                            c += texture(src, uv + vec2(t.x, 0)) * 0.15;
-                            c += texture(src, uv - vec2(t.x, 0)) * 0.15;
-                            c += texture(src, uv + vec2(0, t.y)) * 0.15;
-                            c += texture(src, uv - vec2(0, t.y)) * 0.15;
-                            outColor = c;
-                        }
-                    `,
-                    target: "blur",
-                },
-                {
-                    frag: `
-                        precision highp float;
-                        uniform sampler2D src;
-                        uniform sampler2D blur;
-                        uniform vec2 resolution;
-                        uniform vec2 offset;
-                        out vec4 outColor;
-                        void main() {
-                            vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-                            vec4 c = texture(src, uv);
-                            vec4 b = texture(blur, uv);
-                            outColor = c + b * 0.6;
-                        }
-                    `,
-                },
-            ],
-        });
+        // Other pages show the plain spheres.
+        return () => {
+            heroObserver.disconnect();
+            document.body.classList.remove("BGDim");
+            queue = queue.then(() => bgVFX.updateEffects(bg, [bgSpheres]));
+        };
     }
 
     hideMask() {
-        const maskTop = $("#MaskTop");
-        maskTop.style.setProperty("height", "0");
+        document.getElementById("MaskTop")?.style.setProperty("height", "0");
+        document
+            .getElementById("MaskBottom")
+            ?.style.setProperty("opacity", "0");
+    }
 
-        const maskBottom = $("#MaskBottom");
-        maskBottom.style.setProperty("opacity", "0");
+    /** Add to the page VFX, unless the page is already gone. */
+    async add(element: HTMLElement, props: Parameters<VFX["add"]>[1]) {
+        await this.vfx.add(element, props);
+        if (this.alive) {
+            this.added.push(element);
+        } else {
+            this.vfx.remove(element);
+        }
     }
 
     async showLogo() {
         const logo = $("#Logo");
         const tagline = $("#LogoTagline");
+        const lead = $("#HeroLead");
         return Promise.all([
-            this.vfx.add(logo, {
-                shader: shaders.logo,
+            this.add(logo, {
+                shader: logoShader,
                 overflow: [0, 3000, 0, 100],
                 uniforms: { delay: 0 },
                 intersection: {
                     threshold: 1,
                 },
             }),
-            this.vfx.add(tagline, {
-                shader: shaders.logo,
+            this.add(tagline, {
+                shader: logoShader,
                 overflow: [0, 3000, 0, 1000],
                 uniforms: { delay: 0.3 },
+                intersection: {
+                    threshold: 1,
+                },
+            }),
+            this.add(lead, {
+                shader: logoShader,
+                overflow: [0, 3000, 0, 1000],
+                uniforms: { delay: 0.6 },
                 intersection: {
                     threshold: 1,
                 },
@@ -465,36 +338,73 @@ class App {
         ]);
     }
 
-    async showProfile() {
-        const profile = $("#profile");
-        await this.vfx.add(profile, {
-            shader: shaders.logo,
-            overflow: [0, 3000, 0, 2000],
-            uniforms: { delay: 0.5 },
-            intersection: {
-                rootMargin: [-100, 0, -100, 0],
-                threshold: 1,
-            },
-        });
+    dispose() {
+        this.alive = false;
+        for (const element of this.added) {
+            this.vfx.remove(element);
+        }
+        this.added = [];
     }
 }
 
-window.addEventListener("load", async () => {
+/**
+ * Start the code demos on the first scroll, or after a while.
+ * This keeps their WebGL work out of the first load.
+ */
+function startRunDemos(): () => void {
+    const root = scrollRoot();
+    let started = false;
+    const stop = () => {
+        started = true;
+        clearTimeout(timer);
+        root?.removeEventListener("scroll", start);
+    };
+    const start = () => {
+        if (started) {
+            return;
+        }
+        stop();
+        for (const demo of runDemos) {
+            const element = document.getElementById(demo.id);
+            if (element) {
+                lazyDemo(element, demo.props);
+            }
+        }
+    };
+    const timer = setTimeout(start, 5000);
+    root?.addEventListener("scroll", start, { passive: true });
+    return stop;
+}
+
+onPage(() => {
+    if (!document.getElementById("Logo")) {
+        return;
+    }
     const app = new App();
-    await app.initBG();
+    // A full load plays the intro behind the masks. Page swaps drop the masks.
+    const intro = document.getElementById("MaskTop") !== null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopMenu: (() => void) | undefined;
+    const stopRunDemos = startRunDemos();
 
-    await Promise.all([
-        await app.initVFX(),
-        app.initDiv(),
-        app.initCanvas(),
-        app.initCustomShader(),
-        app.initMultipass(),
-        app.initEffects(),
-    ]);
+    initBackground().then(() => {
+        if (!app.alive) {
+            return;
+        }
+        stopMenu = app.initEffectMenu();
+        app.hideMask();
+        timer = setTimeout(
+            () => {
+                app.showLogo();
+            },
+            intro ? 2000 : 0,
+        );
+    });
 
-    app.hideMask();
-    setTimeout(() => {
-        app.showLogo();
-        app.showProfile();
-    }, 2000);
+    return () => {
+        clearTimeout(timer);
+        stopRunDemos();
+        stopMenu?.();
+        app.dispose();
+    };
 });

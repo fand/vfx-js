@@ -4,35 +4,40 @@
   "version": "0.0.25",
   "type": "module",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "astro dev",
     "build": "npm-run-all -p build:typedoc build:storybook build:examples build:tsc -s build:docs build:typedoc-dist build:storybook-dist build:examples-dist build:llms",
-    "build:tsc": "tsc",
+    "build:tsc": "astro check",
     "build:typedoc": "rm -rf typedoc && cp -a ../vfx-js/docs-build typedoc",
     "build:storybook": "rm -rf storybook && cp -a ../storybook/docs-build storybook",
     "build:examples": "rm -rf examples && cp -a ../examples/docs-build examples",
-    "build:docs": "vite build",
+    "build:docs": "astro build",
     "build:typedoc-dist": "rm -rf dist/docs && cp -a typedoc dist/docs",
     "build:storybook-dist": "rm -rf dist/storybook && cp -a storybook dist/storybook",
     "build:examples-dist": "rm -rf dist/examples && cp -a examples dist/examples",
     "build:llms": "node scripts/build-llms-full.mjs",
     "test": "node scripts/check-skill.mjs",
-    "preview": "vite preview",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "preview": "astro preview",
     "clean": "rimraf dist storybook typedoc examples"
   },
   "dependencies": {
+    "@astrojs/mdx": "^8.1.2",
+    "@astrojs/sitemap": "3.7.4",
+    "@vfx-js/astro": "workspace:*",
     "@vfx-js/core": "workspace:*",
     "@vfx-js/effects": "workspace:*",
     "@vfx-js/examples": "workspace:*",
     "@vfx-js/storybook": "workspace:*",
-    "prism-themes": "^1.9.0",
-    "prismjs": "^1.30.0"
+    "@vfx-js/transitions": "workspace:*",
+    "astro": "^7.4.2"
   },
   "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "@biomejs/biome": "2.6.3",
     "@types/node": "26.6.5",
-    "@types/prismjs": "1.26.6",
     "npm-run-all2": "^9.0.4",
     "rimraf": "^6.1.3",
-    "typescript": "6.0.3",
-    "vite": "8.3.5"
+    "typescript": "6.0.3"
   }
 }

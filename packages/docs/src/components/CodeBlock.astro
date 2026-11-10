@@ -1,0 +1,84 @@
+---
+import type { ComponentProps } from "astro/types";
+import { Code } from "astro:components";
+
+type Props = {
+    code: string;
+    lang?: ComponentProps<typeof Code>["lang"];
+    /** File name or a short label. Defaults to the language. */
+    label?: string;
+};
+
+const { code, lang = "ts" } = Astro.props;
+const label = Astro.props.label ?? String(lang);
+---
+
+<figure class="CodeBlock">
+    <figcaption class="CodeBlockHead">
+        <span>{label}</span>
+        <button class="CodeBlockCopy" type="button">Copy</button>
+    </figcaption>
+    <Code code={code.trim()} lang={lang} theme="github-dark" />
+</figure>
+
+<script>
+    // Delegated, so it also works for blocks added after page swaps.
+    document.addEventListener("click", async (e) => {
+        const button = (e.target as Element).closest(".CodeBlockCopy");
+        const code = button?.closest(".CodeBlock")?.querySelector("pre");
+        if (!button || !code) {
+            return;
+        }
+        await navigator.clipboard.writeText(code.textContent ?? "");
+        button.textContent = "Copied";
+        setTimeout(() => {
+            button.textContent = "Copy";
+        }, 1500);
+    });
+</script>
+
+<style>
+    .CodeBlock {
+        margin: 24px 0;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.8);
+        overflow: hidden;
+    }
+    .CodeBlockHead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--line);
+        font-family: var(--mono);
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.6);
+    }
+    .CodeBlockCopy {
+        padding: 0;
+        border: none;
+        background: none;
+        color: white;
+        font-family: var(--mono);
+        font-size: 13px;
+        cursor: pointer;
+    }
+    .CodeBlockCopy:hover {
+        text-decoration: underline;
+    }
+    .CodeBlock :global(pre) {
+        margin: 0;
+        padding: 16px;
+        background: none !important;
+        font-family: var(--mono);
+        font-size: 14px;
+        line-height: 1.6;
+        overflow-x: auto;
+    }
+    .CodeBlock :global(pre > code) {
+        display: block;
+        padding: 0;
+        font-size: inherit;
+    }
+</style>

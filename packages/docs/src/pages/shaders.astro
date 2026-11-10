@@ -1,0 +1,450 @@
+---
+import CodeBlock from "../components/CodeBlock.astro";
+import {
+    backbufferShader,
+    multipassFrags,
+    uniformsShader,
+} from "../demos/shader-demos";
+import Layout from "../layouts/Layout.astro";
+import { url } from "../site";
+
+const template = `
+const shader = \`
+precision highp float;
+uniform sampler2D src;   // the element
+uniform vec2 resolution; // element size, physical px
+uniform vec2 offset;     // element origin, physical px
+uniform float time;      // seconds
+out vec4 outColor;
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    uv.x += sin(uv.y * 20.0 + time) * 0.02;
+    outColor = texture(src, uv);
+}
+\`;
+
+await vfx.add(el, { shader }).catch(console.error);
+`;
+
+const glsl100 = `
+// GLSL ES 1.0 is found from gl_FragColor, texture2D, varying or attribute.
+// Or set it yourself:
+await vfx.add(el, { shader: oldShader, glslVersion: "100" });
+`;
+
+const builtIns = [
+    { name: "src", text: "The element texture." },
+    {
+        name: "resolution, offset",
+        text: "Element size and origin in physical px. Use them to get uv.",
+    },
+    { name: "time", text: "Seconds since the element was added." },
+    { name: "mouse", text: "Mouse position, same space as gl_FragCoord." },
+    {
+        name: "intersection",
+        text: "How much of the element is in the viewport, 0 to 1.",
+    },
+    {
+        name: "enterProgress, leaveProgress",
+        text: "Enter and leave transitions, 0 to 1. Good for scroll reveals.",
+    },
+    {
+        name: "enterTime, leaveTime",
+        text: "Seconds since the element entered or left the viewport.",
+    },
+];
+
+const uniformTypes = [
+    { js: "1", glsl: "float" },
+    { js: "[1, 2]", glsl: "vec2" },
+    { js: "[1, 0, 0]", glsl: "vec3" },
+    { js: "[1, 0, 0, 1]", glsl: "vec4" },
+    { js: "new Float32Array(16)", glsl: "vec4 arr[4] or float arr[16]" },
+];
+
+const uniformsCode = `
+vfx.add(logo, {
+    shader,
+    uniforms: {
+        tint: [1, 0.4, 0.8],                           // static vec3
+        scroll: () => window.scrollY / window.innerHeight, // every frame
+    },
+});
+`;
+
+const overflowCode = `
+vfx.add(el, { shader, overflow: 50, wrap: "clamp" });
+`;
+
+const backbufferCode = `
+vfx.add(logo, { shader, backbuffer: true, overflow: 60 });
+`;
+
+const multipassCode = `
+vfx.add(img, {
+    shader: [
+        { frag: copyFrag, target: "image" }, // keep the element as "image"
+        { frag: blurFrag, target: "blur" },  // src here is the previous pass
+        { frag: glowFrag },                  // the last pass draws to the screen
+    ],
+});
+`;
+
+const passType = `
+type VFXPass = {
+    frag: string;
+    vert?: string;
+    target?: string;          // buffer name; later passes read uniform sampler2D <target>
+    persistent?: boolean;     // keep across frames; read the last frame by its name
+    float?: boolean;          // 32-bit float buffer, for data outside 0..1
+    size?: [number, number];  // fixed buffer size in px
+    uniforms?: VFXUniforms;   // per-pass uniforms
+    glslVersion?: "100" | "300 es";
+};
+`;
+
+const trailCode = `
+// A persistent pass reads its own last frame by its target name.
+shader: [
+    { frag: trailFrag, target: "trail", persistent: true },
+    { frag: displayFrag },
+]
+`;
+
+const trailFrag = `
+// Other declarations as in the template.
+uniform sampler2D src;
+uniform sampler2D trail; // last frame of this pass
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    outColor = max(texture(src, uv), texture(trail, uv) * 0.95);
+}
+`;
+
+const postEffectCode = `
+const vfx = new VFX({
+    postEffect: { shader: "grayscale" },
+});
+
+// Your own shader. src is the whole canvas, and offset is 0.
+const vfx2 = new VFX({
+    postEffect: {
+        shader: \`
+precision highp float;
+uniform sampler2D src;
+uniform vec2 resolution;
+uniform vec2 offset;
+uniform float amount;
+out vec4 outColor;
+
+void main() {
+    vec2 uv = (gl_FragCoord.xy - offset) / resolution;
+    vec4 color = texture(src, uv);
+    outColor = vec4(mix(color.rgb, 1.0 - color.rgb, amount), color.a);
+}
+\`,
+        uniforms: { amount: () => mouseX / window.innerWidth },
+    },
+});
+`;
+
+const postEffectPasses = `
+// Multipass works the same way.
+new VFX({ postEffect: [{ frag: passA, target: "a" }, { frag: passB }] });
+
+// Or use effects from @vfx-js/effects.
+new VFX({ postEffect: { effect: new BloomEffect() } });
+`;
+---
+
+<Layout
+    page="shaders"
+    description="Write your own GLSL shaders for VFX-JS: uniforms, overflow, backbuffer, multipass and post effects."
+>
+    <h1>Custom Shaders</h1>
+    <p>
+        Pass a GLSL fragment shader as <code>shader</code>. VFX-JS runs it over the
+        element's box, every frame.
+    </p>
+
+    <section id="template">
+        <h2>GLSL template</h2>
+        <CodeBlock code={template} lang="ts" label="main.ts" />
+        <ul>
+            <li>
+                <code>uv</code> is element space: (0, 0) is bottom-left, (1, 1) is
+                top-right.
+            </li>
+            <li>
+                Shaders are GLSL ES 3.0 by default. VFX-JS adds
+                <code>#version 300 es</code> for you. Write <code>out vec4</code> and
+                <code>texture()</code>.
+            </li>
+            <li>
+                Output is premultiplied alpha. For transparent pixels, multiply
+                <code>rgb</code> by <code>a</code>.
+            </li>
+            <li>
+                A shader that fails to compile makes <code>vfx.add</code> reject
+                with the GL error log and the full source.
+            </li>
+        </ul>
+        <p>Older GLSL ES 1.0 shaders still work:</p>
+        <CodeBlock code={glsl100} lang="ts" label="main.ts" />
+    </section>
+
+    <section id="built-in-uniforms">
+        <h2>Built-in uniforms</h2>
+        <p>
+            VFX-JS sets these for you. Declare only the ones you use. The full list
+            is in <a href={url("how-it-works/#uniforms")}>Uniforms and timing</a>.
+        </p>
+        <table class="DocTable">
+            <thead>
+                <tr>
+                    <th>Uniform</th>
+                    <th>Use it for</th>
+                </tr>
+            </thead>
+            <tbody>
+                {
+                    builtIns.map((row) => (
+                        <tr>
+                            <td>
+                                <code>{row.name}</code>
+                            </td>
+                            <td>{row.text}</td>
+                        </tr>
+                    ))
+                }
+            </tbody>
+        </table>
+    </section>
+
+    <section id="custom-uniforms">
+        <h2>Custom uniforms</h2>
+        <p>
+            Pass your own values in <code>uniforms</code>. A function runs every
+            frame while the element is drawn, so use one for values that change.
+        </p>
+        <table class="DocTable">
+            <thead>
+                <tr>
+                    <th>JS value</th>
+                    <th>GLSL type</th>
+                </tr>
+            </thead>
+            <tbody>
+                {
+                    uniformTypes.map((row) => (
+                        <tr>
+                            <td>
+                                <code>{row.js}</code>
+                            </td>
+                            <td>
+                                <code>{row.glsl}</code>
+                            </td>
+                        </tr>
+                    ))
+                }
+            </tbody>
+        </table>
+        <p>
+            Booleans are not supported. Use <code>0</code> and <code>1</code>.
+        </p>
+        <CodeBlock code={uniformsCode} lang="ts" label="main.ts" />
+        <CodeBlock code={uniformsShader} lang="glsl" label="GLSL" />
+        <p>Scroll the page. The logo slides with it:</p>
+        <div class="Demo">
+            <img
+                id="UniformsDemo"
+                src={url("vfx-js-logo-no-padding.svg")}
+                alt="VFX-JS logo that slides as you scroll"
+            />
+        </div>
+    </section>
+
+    <section id="overflow">
+        <h2>Overflow</h2>
+        <p>
+            A shader draws only inside the element unless you set
+            <code>overflow</code>. There, <code>uv</code> goes below 0 and above 1.
+            The texture is empty outside the element, but <code>wrap</code> defaults
+            to <code>"repeat"</code>. Check <code>uv</code> before you read
+            <code>src</code>, or set <code>wrap: "clamp"</code>.
+        </p>
+        <CodeBlock code={overflowCode} lang="ts" label="main.ts" />
+        <p>
+            See <a href={url("how-it-works/#overflow")}>Overflow</a> in How it
+            Works for a diagram.
+        </p>
+    </section>
+
+    <section id="backbuffer">
+        <h2>Backbuffer</h2>
+        <p>
+            Set <code>backbuffer: true</code> to read the previous frame as
+            <code>uniform sampler2D backbuffer</code>. Use it for trails and other
+            feedback effects.
+        </p>
+        <CodeBlock code={backbufferCode} lang="ts" label="main.ts" />
+        <CodeBlock code={backbufferShader} lang="glsl" label="GLSL" />
+        <p>
+            The backbuffer covers the element plus its overflow, so read it with
+            <code>viewport</code>, not <code>offset</code> and
+            <code>resolution</code>.
+        </p>
+        <div class="Demo">
+            <img
+                id="BackbufferDemo"
+                src={url("vfx-js-logo-no-padding.svg")}
+                alt="VFX-JS logo moving in a circle with a trail"
+            />
+        </div>
+    </section>
+
+    <section id="multipass">
+        <h2>Multipass</h2>
+        <p>
+            Pass an array of passes to <code>shader</code>. Each pass writes to a
+            buffer named by <code>target</code>. Later passes read it as
+            <code>uniform sampler2D &lt;target&gt;</code>. The last pass draws to the
+            screen.
+        </p>
+        <CodeBlock code={multipassCode} lang="ts" label="main.ts" />
+        <CodeBlock code={multipassFrags.glowFrag} lang="glsl" label="glowFrag" />
+        <div class="Demo">
+            <img
+                id="MultipassDemo"
+                src={url("vfx-js-logo-no-padding.svg")}
+                alt="VFX-JS logo with a glow"
+            />
+        </div>
+        <ul>
+            <li>
+                In the first pass, <code>src</code> is the element. In later
+                passes, it is the previous pass. Give a pass a
+                <code>target</code> to read it again later.
+            </li>
+            <li>
+                A middle pass without <code>target</code> gets <code>pass0</code>,
+                <code>pass1</code>, and so on.
+            </li>
+            <li>
+                <code>persistent: true</code> keeps a buffer across frames. The
+                pass reads its own last frame by its target name.
+            </li>
+            <li>
+                <code>float: true</code> stores values outside 0..1, like velocity.
+                <code>size</code> fixes the buffer size, for small simulations.
+            </li>
+        </ul>
+        <CodeBlock code={passType} lang="ts" label="VFXPass" />
+        <CodeBlock code={trailCode} lang="ts" label="main.ts" />
+        <CodeBlock code={trailFrag} lang="glsl" label="trailFrag" />
+        <p>
+            With <code>overflow</code>, buffers cover more than the element. See
+            <a href="https://github.com/fand/vfx-js/blob/main/docs/MULTIPASS.md" target="_blank" rel="noreferrer">MULTIPASS.md</a>
+            for how to read them, and for more examples.
+        </p>
+    </section>
+
+    <section id="post-effects">
+        <h2>Post effects</h2>
+        <p>
+            A post effect runs over the whole VFX canvas, after all elements are
+            drawn. Set it with the <code>postEffect</code> option of
+            <code>new VFX()</code>. It takes a preset, your own GLSL, passes, or
+            effects.
+        </p>
+        <CodeBlock code={postEffectCode} lang="ts" label="main.ts" />
+        <CodeBlock code={postEffectPasses} lang="ts" label="main.ts" />
+        <ul>
+            <li>
+                <code>src</code> is the whole canvas. <code>time</code> counts from
+                when the VFX started.
+            </li>
+            <li>
+                <code>persistent: true</code> gives the previous output as
+                <code>backbuffer</code>.
+            </li>
+            <li>
+                It only sees what VFX-JS draws, not the rest of the page. There is
+                no live demo here, since it would change every demo on this page.
+            </li>
+        </ul>
+    </section>
+</Layout>
+
+<script>
+    import { lazyDemo } from "../demos/lazy";
+    import {
+        backbufferShader,
+        multipassPasses,
+        uniformsShader,
+    } from "../demos/shader-demos";
+    import { onPage, scrollRoot } from "../lifecycle";
+
+    onPage(() => {
+        const uniformsDemo = document.getElementById("UniformsDemo");
+        if (uniformsDemo) {
+            lazyDemo(uniformsDemo, () => ({
+                shader: uniformsShader,
+                uniforms: {
+                    tint: [1, 0.4, 0.8],
+                    // The docs page scrolls inside its own box.
+                    scroll: () =>
+                        (scrollRoot()?.scrollTop ?? 0) / window.innerHeight,
+                },
+            }));
+        }
+
+        const backbufferDemo = document.getElementById("BackbufferDemo");
+        if (backbufferDemo) {
+            lazyDemo(backbufferDemo, () => ({
+                shader: backbufferShader,
+                backbuffer: true,
+                overflow: 60,
+            }));
+        }
+
+        const multipassDemo = document.getElementById("MultipassDemo");
+        if (multipassDemo) {
+            lazyDemo(multipassDemo, () => ({ shader: multipassPasses }));
+        }
+    });
+</script>
+
+<style>
+    .Demo {
+        display: flex;
+        justify-content: center;
+        padding: 64px 32px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+    }
+    .Demo img {
+        width: min(100%, 400px);
+    }
+    .DocTable {
+        width: 100%;
+        margin: 24px 0;
+        border-collapse: collapse;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+    .DocTable th,
+    .DocTable td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+    }
+    .DocTable th {
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+</style>

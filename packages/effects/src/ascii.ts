@@ -174,11 +174,13 @@ void main() {
     // same either way: tile coverage x color.a (global opacity) x the
     // cell's source alpha, so transparent regions (e.g. text captures)
     // fall back to the background.
+    // acc is premultiplied. Un-premultiply it, since fgA applies the alpha below.
+    vec3 srcRgb = acc.a > 0.0 ? acc.rgb / acc.a : vec3(0.0);
     vec3 fg;
     if (tileColor == 1) {
         fg = tile.rgb;
     } else {
-        fg = colorFromSource == 1 ? acc.rgb : color.rgb;
+        fg = colorFromSource == 1 ? srcRgb : color.rgb;
     }
     float fgA = tile.a * color.a * acc.a;
 

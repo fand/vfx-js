@@ -1,0 +1,252 @@
+---
+import CodeBlock from "../components/CodeBlock.astro";
+import { rippleShader } from "../demos/ripple-shader";
+import Layout from "../layouts/Layout.astro";
+import { siteUrl, url } from "../site";
+
+const llmsFull = new URL(url("llms-full.txt"), siteUrl).href;
+
+const llmsPrompt = `
+Read ${llmsFull} first.
+Then add a glitch effect to the hero image with @vfx-js/core.
+`;
+
+const prompts = [
+    {
+        label: "Image hover",
+        text: `Use @vfx-js/react to add an rgbShift effect to the product images in ProductCard.
+Make the shift stronger while the mouse is over the image. Use a uniform function that reads a ref.`,
+    },
+    {
+        label: "Text intro",
+        text: `Make the h1 on the landing page glitch in when it scrolls into view, then settle.
+Use @vfx-js/core with a custom shader driven by enterProgress. Give it 50 px of overflow.`,
+    },
+    {
+        label: "Effect chain",
+        text: `Add PixelateEffect, then BloomEffect from @vfx-js/effects to the background video.
+Make one VFX for the page and new Effect instances per element.`,
+    },
+    {
+        label: "Vue / Nuxt",
+        text: `In this Nuxt app, put a halftone effect on every image in the blog post body with the v-vfx directive from @vfx-js/vue.
+Images come from our CDN; make sure CORS works.`,
+    },
+];
+
+const writePrompt = `
+Write a VFX-JS custom shader for vfx.add.
+The image ripples like water around the mouse.
+Use the built-in mouse and time uniforms. GLSL ES 3.0.
+`;
+
+const addCode = `
+// rippleShader holds the GLSL above as a string.
+await vfx.add(img, { shader: rippleShader, wrap: "clamp" });
+`;
+
+const checks = [
+    {
+        title: "Console errors",
+        body: "A shader that fails to compile makes vfx.add reject with the GL error log and the full source. Catch it with .catch(console.error) and paste the log back to the agent.",
+    },
+    {
+        title: "A blank element",
+        body: "Usually the shader failed, the image is blocked by CORS, or the element has zero size.",
+    },
+    {
+        title: "Cut-off effect",
+        body: "A shader draws only inside the element unless you set overflow. Effects set their own room with outputRect, or a pad param on built-in ones.",
+        link: { href: "how-it-works/#overflow", label: "Overflow" },
+    },
+    {
+        title: "Stale text",
+        body: "Text and other elements are captured once. The agent must call vfx.update(el) after the content changes.",
+        link: { href: "how-it-works/#capture", label: "Element capture" },
+    },
+    {
+        title: "Many VFX instances",
+        body: "Each VFX has its own WebGL context. Ask for one per page, made in client code.",
+        link: { href: "how-it-works/#limits", label: "Limits" },
+    },
+    {
+        title: "Screenshots",
+        body: "Agents can't see the canvas. Ask for a Playwright script that takes a screenshot. Headless browsers need WebGL on.",
+    },
+];
+---
+
+<Layout
+    page="ai"
+    description="Let your AI agent add VFX-JS effects and write shaders, with the VFX-JS skill or llms.txt."
+>
+    <h1>Use with AI</h1>
+    <p>
+        Coding agents can add VFX-JS effects and write shaders for you. Give them
+        the docs first, so they use the current API.
+    </p>
+
+    <section id="skill">
+        <h2>Install the skill</h2>
+        <p>
+            The VFX-JS skill works with Claude Code, Codex, Cursor and other agents
+            that read skills. Run this in your project:
+        </p>
+        <CodeBlock code="npx skills add fand/vfx-js" lang="bash" label="Terminal" />
+        <p>
+            The agent reads it when a task needs it. It covers every package (core,
+            React, Vue, Svelte, Astro, effects, transitions), the shader presets,
+            custom shaders, the Effect API, transitions, and common pitfalls.
+            The source is
+            <a href="https://github.com/fand/vfx-js/tree/main/skills/vfx-js" target="_blank" rel="noreferrer">skills/vfx-js</a>
+            on GitHub.
+        </p>
+    </section>
+
+    <section id="llms">
+        <h2>llms.txt</h2>
+        <p>No skill support? Give the agent one of these files.</p>
+        <ul>
+            <li>
+                <a href={url("llms.txt")}>llms.txt</a>: a short overview, a quick
+                start, and links to each part of the docs.
+            </li>
+            <li>
+                <a href={url("llms-full.txt")}>llms-full.txt</a>: the whole skill in
+                one file. Paste it into a chat, or point the agent to the URL.
+            </li>
+        </ul>
+        <CodeBlock code={llmsPrompt} lang="plaintext" label="Prompt" />
+    </section>
+
+    <section id="prompts">
+        <h2>Prompts that work</h2>
+        <p>
+            Name the package, the element, and the effect. Say what should happen
+            on scroll or hover.
+        </p>
+        <div class="Prompts">
+            {
+                prompts.map((prompt) => (
+                    <CodeBlock
+                        code={prompt.text}
+                        lang="plaintext"
+                        label={prompt.label}
+                    />
+                ))
+            }
+        </div>
+    </section>
+
+    <section id="write">
+        <h2>Write a shader with AI</h2>
+        <ol>
+            <li>Describe the look in words. Ask for a VFX-JS custom shader.</li>
+            <li>
+                Paste the GLSL into <code>vfx.add(el, &#123; shader &#125;)</code>.
+            </li>
+            <li>Look at it in the browser. Tell the agent what to change.</li>
+        </ol>
+        <div class="Prompts">
+            <CodeBlock code={writePrompt} lang="plaintext" label="Prompt" />
+        </div>
+        <p>The agent returns something like this:</p>
+        <CodeBlock code={rippleShader} lang="glsl" label="GLSL" />
+        <CodeBlock code={addCode} lang="ts" label="main.ts" />
+        <p>Move the mouse over the image:</p>
+        <div class="Demo">
+            <img
+                id="RippleDemo"
+                src={url("images/jellyfish.webp")}
+                alt="A jellyfish that ripples around the mouse"
+            />
+        </div>
+        <p>
+            The agent can use <code>time</code>, <code>mouse</code>,
+            <code>resolution</code>, <code>offset</code>,
+            <code>intersection</code>, <code>enterProgress</code> and more. See
+            <a href={url("how-it-works/#uniforms")}>Uniforms and timing</a> for the
+            full list, and <a href={url("shaders/")}>Custom Shaders</a> for
+            multipass and post effects.
+        </p>
+    </section>
+
+    <section id="check">
+        <h2>Check the result</h2>
+        <p>The agent writes the code but can't watch it run. Look for these.</p>
+        <dl class="Checks">
+            {
+                checks.map((check) => (
+                    <div>
+                        <dt>{check.title}</dt>
+                        <dd>
+                            {check.body}
+                            {check.link && (
+                                <>
+                                    {" "}
+                                    See <a href={url(check.link.href)}>{check.link.label}</a>.
+                                </>
+                            )}
+                        </dd>
+                    </div>
+                ))
+            }
+        </dl>
+    </section>
+</Layout>
+
+<script>
+    import { lazyDemo } from "../demos/lazy";
+    import { rippleShader } from "../demos/ripple-shader";
+    import { onPage } from "../lifecycle";
+
+    onPage(() => {
+        const ripple = document.getElementById("RippleDemo");
+        if (ripple) {
+            lazyDemo(ripple, () => ({ shader: rippleShader, wrap: "clamp" }));
+        }
+    });
+</script>
+
+<style>
+    /* Prompts are prose. Wrap them instead of scrolling. */
+    .Prompts :global(pre) {
+        white-space: pre-wrap;
+    }
+    .Demo {
+        display: flex;
+        justify-content: center;
+        padding: 48px 32px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+    }
+    .Demo img {
+        width: min(100%, 480px);
+    }
+    .Checks {
+        margin: 24px 0;
+    }
+    .Checks div {
+        display: grid;
+        grid-template-columns: 200px minmax(0, 1fr);
+        gap: 16px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+    }
+    .Checks dt {
+        font-weight: 600;
+    }
+    .Checks dt,
+    .Checks dd {
+        margin: 0;
+        font-size: 1.125rem;
+        line-height: 1.6;
+    }
+
+    @media (max-width: 767px) {
+        .Checks div {
+            grid-template-columns: 1fr;
+            gap: 4px;
+        }
+    }
+</style>

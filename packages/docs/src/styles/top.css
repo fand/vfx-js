@@ -1,0 +1,508 @@
+/*================ Section ================*/
+
+:where(.Top) section {
+    width: 100%;
+
+    margin-bottom: 10vh;
+    box-sizing: border-box;
+    /* clip, not hidden: hidden makes a scroll box and breaks sticky. */
+    overflow-x: clip;
+}
+.Top > section {
+    padding: 0 32px;
+}
+:where(.Top) section p {
+    font-size: var(--font-size);
+    line-height: 1.5;
+}
+
+/*================ Hero ================*/
+
+.Top > section.Hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 32px;
+    margin: 0 32px 10vh;
+    padding: 0 8px 32px;
+    border-bottom: 1px solid var(--line);
+    width: auto;
+}
+/* The first screen. The logo sits in its vertical center. */
+.HeroTop,
+.EffectDock {
+    display: flex;
+    min-height: calc(100lvh - var(--header-bottom));
+    box-sizing: border-box;
+}
+.HeroTop {
+    flex-direction: column;
+    justify-content: center;
+}
+/* 32px shorter at the bottom, so it leaves with the footer. The menu stays in the same place. */
+.EffectDock {
+    min-height: calc(100lvh - var(--header-bottom) - 32px);
+    padding-bottom: 64px;
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: start;
+    align-items: center;
+    position: sticky;
+    /* The page scroller has the header as top padding, so 0 is below the header. */
+    top: 0;
+}
+.Hero #Logo {
+    opacity: 0;
+    display: block;
+    width: min(80%, 1080px);
+}
+.Hero #LogoTagline {
+    opacity: 0;
+    margin-top: 32px;
+}
+.Hero #HeroLead {
+    grid-column: 1;
+    opacity: 0;
+    margin: 64px 0 160px;
+}
+/* VFX-JS draws nothing with reduced motion, so show the plain text. */
+@media (prefers-reduced-motion: reduce) {
+    .Hero #Logo,
+    .Hero #LogoTagline,
+    .Hero #HeroLead {
+        opacity: 1;
+    }
+    #MaskTop,
+    #MaskBottom {
+        display: none;
+    }
+}
+.Hero p {
+    margin: 0;
+}
+.Hero .HeroTagline {
+    font-size: clamp(18px, 2.2vw, 30px);
+    line-height: 1.3;
+}
+.HeroLead {
+    max-width: 920px;
+    font-size: clamp(22px, 2.4vw, 34px);
+    line-height: 1.5;
+    /* Opaque for the same reason as code below. */
+    color: #d9d9d9;
+}
+.HeroLead a {
+    color: white;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+.HeroLead code {
+    padding: 0 0.25em;
+    border-radius: 4px;
+    /* Opaque on purpose: effects show translucent colors too bright (fand/vfx-js#253). */
+    background: #2a2a2a;
+    font-family: var(--mono);
+    font-size: 0.85em;
+}
+.HeroLead input,
+.HeroLead button {
+    padding: 0 0.5em;
+    border: 1px solid white;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.85em;
+    line-height: 1.4;
+    vertical-align: baseline;
+}
+.HeroLead input {
+    /* Opaque for the same reason as code. */
+    background: #1a1a1a;
+    color: white;
+}
+.HeroLead button {
+    border-radius: 999px;
+    background: white;
+    color: black;
+    cursor: pointer;
+}
+
+.EffectMenu {
+    position: relative;
+    z-index: 10;
+    width: 220px;
+    padding: 24px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    font-family: var(--mono);
+}
+.EffectMenu .EffectMenuTitle {
+    margin-bottom: 16px;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+}
+.EffectList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.EffectItem {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 32px;
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.55);
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+}
+.EffectItem .num {
+    flex: none;
+    width: 40px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.35);
+}
+.EffectItem:hover,
+.EffectList li.active .EffectItem {
+    color: white;
+}
+.EffectList li.active .EffectItem {
+    font-weight: 600;
+}
+.EffectList li.active .num {
+    color: white;
+}
+.EffectList li.active .EffectItem::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    margin-left: 16px;
+    background: white;
+}
+
+/* Params of the selected effect. */
+.EffectParams {
+    display: none;
+    margin: 4px 0 12px 40px;
+}
+.EffectList li.active .EffectParams {
+    display: grid;
+    gap: 10px;
+}
+.EffectParam {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    row-gap: 4px;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.6);
+}
+.EffectParamValue {
+    color: white;
+}
+.EffectParam input,
+.EffectParam select {
+    grid-column: 1 / -1;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    accent-color: white;
+}
+.EffectParamToggle {
+    align-items: center;
+    cursor: pointer;
+}
+.EffectParam.EffectParamToggle input {
+    grid-column: 2;
+    width: auto;
+}
+.EffectParam select {
+    padding: 2px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    background: black;
+    color: white;
+    font-family: var(--mono);
+    font-size: 12px;
+}
+.EffectParam input[type="color"] {
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+.EffectCopy {
+    margin-top: 32px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: white;
+    font-family: var(--mono);
+    font-size: 14px;
+    cursor: pointer;
+}
+.EffectCopy:hover {
+    text-decoration: underline;
+}
+
+.HeroFoot {
+    grid-column: 1 / -1;
+    position: sticky;
+    bottom: 32px;
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 14px;
+}
+
+@media (max-width: 767px) {
+    .Top > section.Hero {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .HeroTop {
+        min-height: 0;
+        padding: 64px 0 32px;
+    }
+    .Hero #Logo {
+        width: 100%;
+    }
+    .EffectDock {
+        position: static;
+        grid-column: 1;
+        grid-row: auto;
+        min-height: 0;
+        padding: 0;
+    }
+    .EffectMenu {
+        box-sizing: border-box;
+        width: 100%;
+    }
+}
+
+/*================ Shared headings ================*/
+
+/* Line up with the hero content. */
+.Top > section.TopRun,
+.Top > section.TopWhy {
+    /* Content is at most 1600px wide, like the footer links. */
+    max-width: calc(1600px + 80px);
+    margin-inline: auto;
+    padding: 0 40px;
+}
+.Top .TopKicker {
+    margin: 0 0 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+}
+.TopTitle {
+    margin: 0;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: clamp(36px, 5vw, 64px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+}
+.TopTitle em {
+    font-family: Georgia, serif;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/*================ Code and demo rows ================*/
+
+#RunTitle {
+    margin-bottom: 64px;
+}
+/* The text parts sit in the row grid, so the demo starts at the code block's top. */
+.RunRow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto 1fr;
+    gap: 16px 40px;
+    margin-bottom: 96px;
+}
+.RunText {
+    display: contents;
+}
+.RunText > * {
+    grid-column: 1;
+    align-self: start;
+    min-width: 0;
+}
+.RunText h3 {
+    margin: 0;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 24px;
+}
+.RunStep {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+}
+.TopRun .RunText .CodeBlock {
+    margin: 0;
+}
+.RunDemo {
+    display: flex;
+    flex-direction: column;
+    grid-column: 2;
+    grid-row: 3;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+}
+.RunDemo img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.RunCaption {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+}
+/* Every other row puts the demo first. */
+.RunRow:nth-of-type(even) .RunText > * {
+    grid-column: 2;
+}
+.RunRow:nth-of-type(even) .RunDemo {
+    grid-column: 1;
+}
+
+@media (max-width: 767px) {
+    .RunRow {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: none;
+        margin-bottom: 48px;
+    }
+    .RunDemo {
+        grid-row: auto;
+        margin-top: 8px;
+    }
+    .RunRow:nth-of-type(n) .RunText > *,
+    .RunRow:nth-of-type(n) .RunDemo {
+        grid-column: 1;
+    }
+}
+
+/*================ Features ================*/
+
+.WhyHead {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 40px;
+    align-items: end;
+}
+.Top .WhyLead p {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.8);
+}
+.WhyLink {
+    display: inline-block;
+    margin-top: 24px;
+    font-family: var(--mono);
+    font-size: 14px;
+}
+.Features {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 64px;
+    border-top: 1px solid var(--line);
+}
+.Feature {
+    padding: 28px;
+    border-bottom: 1px solid var(--line);
+    border-left: 1px solid var(--line);
+    text-decoration: none;
+    transition: background 0.2s;
+}
+.Feature:nth-child(3n + 1) {
+    border-left: none;
+}
+.Feature:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+.FeatureNum {
+    display: block;
+    margin-bottom: 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5);
+}
+.Feature h3 {
+    margin: 0 0 8px;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 22px;
+}
+.Top .Feature p {
+    margin: 0;
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 1023px) {
+    .Features {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .Feature:nth-child(3n + 1) {
+        border-left: 1px solid var(--line);
+    }
+    .Feature:nth-child(2n + 1) {
+        border-left: none;
+    }
+}
+@media (max-width: 767px) {
+    .WhyHead {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+    }
+    .Features {
+        grid-template-columns: minmax(0, 1fr);
+        margin-top: 40px;
+    }
+    .Feature,
+    .Feature:nth-child(3n + 1) {
+        padding: 24px 0;
+        border-left: none;
+    }
+    .Feature:hover {
+        background: none;
+    }
+}
+
+/*================ Intro masks ================*/
+
+#MaskTop,
+#MaskBottom {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    user-select: none;
+    background: black;
+    transition: height 0.5s linear;
+}
+
+#MaskTop {
+    z-index: 20001;
+    transition: height 0.5s 0.5s;
+}
+
+#MaskBottom {
+    z-index: 19999;
+    transition: opacity 1s 1.5s linear;
+    background: #000;
+    pointer-events: none;
+}

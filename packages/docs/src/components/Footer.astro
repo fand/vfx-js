@@ -1,0 +1,102 @@
+---
+import { links, nav, url } from "../site";
+
+type FooterLink = { label: string; href: string; external?: boolean };
+
+const columns: { title: string; items: FooterLink[] }[] = [
+    {
+        title: "Docs",
+        items: nav.map((item) => ({
+            label: item.label,
+            href: url(`${item.slug}/`),
+        })),
+    },
+    {
+        title: "Resources",
+        items: [
+            { label: "API Reference", href: url("docs/") },
+            { label: "Examples", href: url("examples/"), external: true },
+            { label: "Storybook", href: url("storybook/"), external: true },
+            { label: "llms.txt", href: url("llms.txt"), external: true },
+        ],
+    },
+    {
+        title: "Project",
+        items: [
+            { label: "GitHub", href: links.github, external: true },
+            { label: "npm", href: links.npm, external: true },
+            { label: "Transitions", href: links.transitions, external: true },
+            { label: "Issues", href: `${links.github}/issues`, external: true },
+        ],
+    },
+];
+---
+
+<footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href={url()}>
+            <img src={url("vfx-js-logo-no-padding.svg")} alt="VFX-JS" />
+        </a>
+        {
+            columns.map((col) => (
+                <div class="SiteFooterCol">
+                    <h4>{col.title}</h4>
+                    <ul class="SiteFooterList">
+                        {col.items.map((item) =>
+                            item.external ? (
+                                <li>
+                                    <a
+                                        href={item.href}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        {item.label} <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                            ) : (
+                                <li>
+                                    <a
+                                        href={item.href}
+                                        data-astro-reload={
+                                            item.href.startsWith(url("docs/")) || undefined
+                                        }
+                                    >
+                                        {item.label}
+                                    </a>
+                                </li>
+                            ),
+                        )}
+                    </ul>
+                </div>
+            ))
+        }
+    </div>
+    <div class="Author">
+        <img
+            class="AuthorIcon"
+            src={url("amagi.png")}
+            alt="Amagi"
+            loading="lazy"
+            decoding="async"
+        />
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src={url("github.svg")} alt="GitHub" />
+            </a>
+            <a
+                href="https://twitter.com/amagitakayosi"
+                target="_blank"
+                rel="noreferrer"
+            >
+                <img src={url("twitter.svg")} alt="Twitter" />
+            </a>
+            <a
+                href="https://bsky.app/profile/amagi.dev"
+                target="_blank"
+                rel="noreferrer"
+            >
+                <img src={url("bluesky.svg")} alt="Bluesky" />
+            </a>
+        </div>
+    </div>
+</footer>

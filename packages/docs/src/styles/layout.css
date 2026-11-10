@@ -1,0 +1,356 @@
+/*================ Header ================*/
+
+/* Fixed on top. The page is clipped below it, so only the BG shows through. */
+.SiteHeader {
+    position: fixed;
+    top: var(--frame);
+    left: calc(var(--frame) + 8px);
+    right: calc(var(--frame) + 8px);
+    padding: 0 8px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--header-height);
+    border-bottom: 1px solid var(--line);
+}
+.SiteHeaderBrand img {
+    display: block;
+    height: 22px;
+}
+.SiteHeaderNav {
+    display: flex;
+    gap: 28px;
+    font-size: 15px;
+}
+.SiteHeaderNav a {
+    text-decoration: none;
+}
+.SiteHeaderNav a:hover,
+.SiteHeaderNav a[aria-current="page"] {
+    text-decoration: underline;
+}
+.SiteHeaderMenuButton,
+.SiteHeaderNav .SiteHeaderMenuOnly {
+    display: none;
+}
+
+/* Below this width the sidebar is hidden, so the menu lists the doc pages. */
+@media (max-width: 767px) {
+    .SiteHeaderMenuButton {
+        display: block;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+    }
+    .SiteHeaderMenuButton span,
+    .SiteHeaderMenuButton span::before {
+        display: block;
+        width: 20px;
+        height: 1px;
+        margin: 0 auto;
+        background: white;
+        transition: transform 0.2s;
+    }
+    .SiteHeaderMenuButton span {
+        position: relative;
+        transform: translateY(-3px);
+    }
+    .SiteHeaderMenuButton span::before {
+        content: "";
+        position: absolute;
+        top: 6px;
+    }
+    .SiteHeader[data-open="true"] .SiteHeaderMenuButton span {
+        transform: translateY(0) rotate(45deg);
+    }
+    .SiteHeader[data-open="true"] .SiteHeaderMenuButton span::before {
+        transform: translateY(-6px) rotate(-90deg);
+    }
+    .SiteHeaderNav {
+        display: none;
+        position: absolute;
+        top: var(--header-height);
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        gap: 0;
+        padding: 8px 16px;
+        background: black;
+        font-size: 18px;
+    }
+    .SiteHeaderNav a,
+    .SiteHeaderNav .SiteHeaderMenuOnly {
+        display: block;
+        padding: 10px 0;
+    }
+    .SiteHeader[data-open="true"] .SiteHeaderNav {
+        display: flex;
+    }
+    .SiteHeaderNav .SiteHeaderDesktopOnly {
+        display: none;
+    }
+}
+
+/*================ Page ================*/
+
+/* The page scrolls inside the transition target, so old and new pages share one box. */
+.Page {
+    box-sizing: border-box;
+    height: 100%;
+    padding-top: var(--header-bottom);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Only the BG shows behind the header. */
+    clip-path: inset(var(--header-bottom) 0 0 0);
+}
+
+/*================ Doc layout ================*/
+
+.DocLayout {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 64px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 48px 32px 0;
+}
+.DocSidebar {
+    position: sticky;
+    top: calc(var(--header-bottom) + 48px);
+    align-self: start;
+    font-size: 15px;
+}
+.DocSidebar ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.DocSidebar li {
+    margin: 8px 0;
+}
+.DocSidebar ul ul {
+    margin: 8px 0 16px;
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+    font-size: 14px;
+}
+.DocSidebar a {
+    color: rgba(255, 255, 255, 0.6);
+    text-decoration: none;
+}
+.DocSidebar a:hover,
+.DocSidebar a.active,
+.DocSidebar a[aria-current="page"] {
+    color: white;
+}
+.DocSidebar a[aria-current="page"] {
+    font-weight: 600;
+}
+.DocSidebarExtra {
+    display: block;
+    margin-top: 24px;
+    font-family: var(--mono);
+    font-size: 13px;
+}
+.DocSidebarExtra + .DocSidebarExtra {
+    margin-top: 8px;
+}
+
+.DocMain {
+    min-height: 100lvh;
+}
+.DocMain h1 {
+    margin-top: 0;
+    font-size: 3rem;
+}
+.DocMain section {
+    scroll-margin-top: calc(var(--header-bottom) + 24px);
+    margin-bottom: 10vh;
+}
+.DocMain h2 {
+    font-size: 2rem;
+}
+.DocMain p,
+.DocMain li {
+    font-size: 1.125rem;
+    line-height: 1.6;
+}
+.DocMain li + li {
+    margin-top: 6px;
+}
+/* Shown only when VFX-JS draws nothing. */
+.MotionNote {
+    display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    .DocMain .MotionNote {
+        display: block;
+        padding: 0.5em 1em;
+        border: 1px solid var(--line);
+        opacity: 0.7;
+    }
+}
+
+.DocMain :not(pre) > code {
+    font-size: 0.9em;
+}
+
+@media (max-width: 767px) {
+    .DocLayout {
+        display: block;
+        padding: 32px 32px 0;
+    }
+    /* The header menu covers page links on small screens. */
+    .DocSidebar {
+        display: none;
+    }
+    .DocMain h1 {
+        font-size: 2rem;
+    }
+}
+
+/*================ Footer ================*/
+
+.SiteFooter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12vh;
+    /* Inset like the header, so the border lines up with the header's. */
+    margin: 80px calc(var(--frame) + 8px) 0;
+    padding: 96px 24px 12vh;
+    border-top: 1px solid var(--line);
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+.SiteFooterNav {
+    display: grid;
+    grid-template-columns: 3fr 1fr 1fr 1fr;
+    width: 100%;
+    max-width: 1600px;
+}
+.SiteFooterLogo {
+    align-self: start;
+}
+/* Big on wide screens, never tiny in a narrow column, capped on huge screens. */
+.SiteFooterLogo img {
+    display: block;
+    width: clamp(140px, calc(100% - 128px), 560px);
+}
+.SiteFooterCol h4 {
+    margin: 0 0 16px;
+    font: 12px var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+}
+.SiteFooterList {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.SiteFooterCol a {
+    font-size: 15px;
+    text-decoration: none;
+}
+.SiteFooterCol a:hover {
+    text-decoration: underline;
+}
+.SiteFooterCol a span {
+    opacity: 0.5;
+}
+@media (max-width: 1023px) {
+    .SiteFooterNav {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+}
+@media (max-width: 1023px) {
+    .SiteFooterLogo {
+        grid-column: 1 / -1;
+        margin-bottom: 48px;
+    }
+    .SiteFooterLogo img {
+        width: 200px;
+    }
+}
+@media (max-width: 767px) {
+    .SiteFooterNav {
+        grid-template-columns: 1fr 1fr;
+        row-gap: 32px;
+    }
+    .SiteFooterLogo {
+        margin-bottom: 16px;
+    }
+    .SiteFooterLogo img {
+        width: 160px;
+    }
+}
+.Author {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+.AuthorIcon {
+    width: 128px;
+    height: 128px;
+}
+.AuthorLinks {
+    display: flex;
+    justify-content: space-between;
+    width: 108px;
+}
+.AuthorLinks img {
+    width: 24px;
+    height: 24px;
+}
+
+/*================ Fixed elements ================*/
+
+/* Dim the BG behind doc text. Opacity is cheap; a blur backdrop would redraw every frame. */
+.BGCanvas {
+    transition: opacity 0.5s;
+}
+.DocPage .BGCanvas,
+.BGDim .BGCanvas {
+    opacity: 0.35;
+}
+
+#BG {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100lvh;
+    z-index: -1;
+}
+
+#Frame {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100lvh;
+
+    border: var(--frame) solid #999;
+    box-sizing: border-box;
+    z-index: 20000;
+    user-select: none;
+    pointer-events: none;
+
+    mix-blend-mode: difference;
+}
+#FrameBottom {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: var(--frame);
+    background-color: #999;
+}

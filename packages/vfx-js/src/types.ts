@@ -517,7 +517,7 @@ export type VFXElementIntersection = {
 export type VFXPostEffect = {
     /**
      * Fragment shader code or preset name to be applied as a post effect.
-     * You can pass a preset name from ShaderPreset (e.g., "invert", "grayscale", "sepia")
+     * You can pass a preset name from ShaderPreset (e.g., "invert", "grayscale")
      * or provide custom shader code.
      *
      * The shader will receive the whole canvas as `sampler2D src`.
