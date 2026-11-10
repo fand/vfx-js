@@ -103,7 +103,6 @@ function createTransitionRuntime(deps: TransitionDeps) {
                         .querySelector(PAGE_META)
                         ?.getAttribute("content"),
                 ),
-                ev.direction === "back",
             );
 
             const swapped = new Promise<void>((resolve) => {
@@ -134,11 +133,6 @@ function createTransitionRuntime(deps: TransitionDeps) {
         const ev = e as SwapEvent;
         const target = bound?.target;
         if (!target?.isConnected) {
-            const swap = ev.swap;
-            ev.swap = () => {
-                swap();
-                release();
-            };
             return;
         }
         ev.swap = () => {
@@ -148,8 +142,8 @@ function createTransitionRuntime(deps: TransitionDeps) {
                 getVFX()?.canvas ?? null,
                 deps.swapFunctions,
             );
-            release();
             if (!kept) {
+                release();
                 unbind();
             }
         };
@@ -157,6 +151,9 @@ function createTransitionRuntime(deps: TransitionDeps) {
 
     document.addEventListener("astro:before-preparation", onPreparation);
     document.addEventListener("astro:before-swap", onSwap);
+    // Astro changes history between the swap and this event.
+    // Core reads the history entry for autoReverse, so free the run here.
+    document.addEventListener("astro:after-swap", release);
     // Make the VFX now, so the first navigation does not wait for it.
     bind();
 
@@ -167,6 +164,7 @@ function createTransitionRuntime(deps: TransitionDeps) {
                 onPreparation,
             );
             document.removeEventListener("astro:before-swap", onSwap);
+            document.removeEventListener("astro:after-swap", release);
             release();
             unbind();
         },

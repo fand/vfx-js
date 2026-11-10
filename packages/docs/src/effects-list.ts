@@ -98,12 +98,12 @@ export const presetDemos: PresetDemo[] = [
     },
 ];
 
-// These play when the element enters the viewport, and reverse when it leaves.
-export const transitionPresetDemos: PresetDemo[] = [
-    "slitScanTransition",
-    "warpTransition",
-    "pixelateTransition",
-    "focusTransition",
+// These animate in when the element enters the viewport, and out when it leaves.
+export const revealPresetDemos: PresetDemo[] = [
+    "slitScanReveal",
+    "warpReveal",
+    "pixelateReveal",
+    "focusReveal",
 ].map((name) => ({
     name: name as ShaderPreset,
     media: "logo",

@@ -5,6 +5,7 @@ import type { Framebuffer } from "./gl/framebuffer.js";
 import type { Pass } from "./gl/pass.js";
 import type { GlslVersion, Uniforms } from "./gl/program.js";
 import type { Texture } from "./gl/texture.js";
+import type { IntersectionState } from "./intersection-state.js";
 import type { ElementRect, Margin, MarginOpts } from "./rect.js";
 
 export type { GlslVersion } from "./gl/program.js";
@@ -252,7 +253,7 @@ export type VFXProps = {
     shader?: ShaderPreset | string | VFXPass[];
 
     /**
-     * The release time for the element. (Default: `0`)
+     * The release time for the element. (Default: `Infinity`)
      *
      * Basically, VFX-JS starts rendering the element when the element entered the viewport,
      * and it stops rendering after it got out of the viewport by scroll etc.
@@ -317,8 +318,24 @@ export type VFXProps = {
         /** Threshold for the element to be considered "entered" to the viewport. */
         threshold?: number;
 
+        /**
+         * The element leaves when the ratio falls below this value.
+         * At or below `threshold`, it stops flicker at the edge.
+         * Above `threshold`, the element enters at `threshold` when scrolling in
+         * and leaves at `leaveThreshold` when scrolling out.
+         * Then small scrolls around `leaveThreshold` can flip enter and leave. (Default: `threshold`)
+         */
+        leaveThreshold?: number;
+
         /** Margin of the viewport to be used in intersection calculcation. */
         rootMargin?: MarginOpts;
+
+        /**
+         * Seconds for the enter and leave transitions.
+         * Drives the `enterProgress` / `leaveProgress` uniforms. (Default: `1`)
+         * Keep `release` at or above `duration`, or the leave stops before it finishes.
+         */
+        duration?: number;
     };
 
     /**
@@ -450,7 +467,8 @@ export type VFXElement = {
     type: VFXElementType;
     element: HTMLElement;
     isInViewport: boolean;
-    isInLogicalViewport: boolean;
+    /** Enter/leave state that drives `enterProgress` / `leaveProgress`. */
+    intersectionState: IntersectionState;
     width: number;
     height: number;
     passes: VFXElementPass[];
@@ -490,7 +508,9 @@ export type VFXElement = {
 
 export type VFXElementIntersection = {
     threshold: number;
+    leaveThreshold: number;
     rootMargin: Margin;
+    duration: number;
 };
 
 /** Configuration for post effects that are applied to the final canvas output. */
@@ -815,6 +835,12 @@ export type EffectContext = {
     readonly intersection: number;
     readonly enterTime: number;
     readonly leaveTime: number;
+
+    /** Enter transition progress, 0 to 1. Plays backward on reversal. */
+    readonly enterProgress: number;
+
+    /** Leave transition progress, 0 to 1. Stays 0 until enter finishes. */
+    readonly leaveProgress: number;
 
     /** Element capture texture (read-only input for the first stage). */
     readonly src: EffectTexture;

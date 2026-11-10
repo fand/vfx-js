@@ -15,7 +15,7 @@ const steps = [
     },
     {
         title: "Swap",
-        body: "Your callback changes the DOM. A router swap, a setState, innerHTML — anything. With slides already in the DOM, show(slide) writes it for you.",
+        body: "Your callback changes the DOM. Any change works: a router swap, setState, innerHTML. With slides already in the DOM, show(slide) writes it for you.",
     },
     {
         title: "Capture",
@@ -106,7 +106,12 @@ export default function HowItWorks() {
                     <p>
                         With html-in-canvas the capture uses{" "}
                         <code>drawElementImage</code>. Without it, VFX-JS falls
-                        back to dom-to-canvas, which is slower.
+                        back to dom-to-canvas, a workaround that misses some
+                        content. See{" "}
+                        <Link href="/limitations#browsers">
+                            Browser support
+                        </Link>
+                        .
                     </p>
                 </div>
             </section>
@@ -201,11 +206,12 @@ export default function HowItWorks() {
                         reach the wrong class.
                     </p>
                     <p>
-                        In React the run&apos;s <code>RunOpts</code> is one
-                        whole spec: a <code>transition()</code> click or{" "}
-                        <code>setNextTransition()</code> if set, else the
-                        incoming page&apos;s <code>&lt;TransitionIn&gt;</code>.
-                        The two are not merged.
+                        With a router <code>&lt;VFXTransition&gt;</code>, the
+                        run&apos;s <code>RunOpts</code> is one whole spec: a
+                        link spec or <code>setNextTransition()</code> if set,
+                        else the incoming page&apos;s{" "}
+                        <code>&lt;TransitionIn&gt;</code>. The two are not
+                        merged.
                     </p>
                 </div>
                 <Code label="spec.ts">{`
@@ -219,43 +225,10 @@ t.run(swap, { duration: 2 }); // Crossfade, 2 s
 `}</Code>
             </section>
 
-            <section id="limitations" className="doc-section doc-prose">
-                <div>
-                    <h2>Limitations</h2>
-                    <h3>Nested VFX elements freeze</h3>
-                    <p>
-                        VFX elements inside the container stop during a run and
-                        show their plain content.
-                    </p>
-                    <h3>
-                        <code>&lt;body&gt;</code> can't be the target
-                    </h3>
-                    <p>
-                        Target the router outlet instead, like{" "}
-                        <code>&lt;main&gt;</code>.
-                    </p>
-                    <h3>Size changes aren't animated</h3>
-                    <p>
-                        If the new content has a different size, the box stays
-                        at the old size during the run and jumps afterwards.
-                    </p>
-                    <h3>One pending click spec per page</h3>
-                    <p>
-                        All <code>&lt;VFXTransition&gt;</code>s on the page
-                        share it.
-                    </p>
-                    <h3>No multi-page navigation</h3>
-                    <p>
-                        Cross-document navigation isn't supported. With Turbo or
-                        htmx, call core <code>run(cb)</code> by hand.
-                    </p>
-                </div>
-            </section>
-
             <section className="doc-section doc-next">
-                <Link href="/presets" className="next-card">
+                <Link href="/limitations" className="next-card">
                     <span>Next</span>
-                    <strong>All presets →</strong>
+                    <strong>Limitations →</strong>
                 </Link>
                 {/* A click spec beats the page's own (glitch). */}
                 <TLink

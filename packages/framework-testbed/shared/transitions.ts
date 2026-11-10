@@ -1,8 +1,8 @@
-import { Crossfade, Glitch, Pixelsort } from "@vfx-js/transitions";
+import { Swipe, Zoom } from "@vfx-js/transitions";
 
 // Maps the `transition` field of a page to a preset.
+// Swipe and Zoom show their direction, so a reversed run is easy to spot.
 export const presets = {
-    crossfade: Crossfade,
-    glitch: Glitch,
-    pixelsort: Pixelsort,
+    swipe: Swipe,
+    zoom: Zoom,
 };

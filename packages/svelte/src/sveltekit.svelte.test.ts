@@ -154,6 +154,15 @@ describe("VFXTransition (sveltekit)", () => {
         expect(opts).toEqual({ duration: 1 });
     });
 
+    it("passes autoReverse to core and follows prop changes", () => {
+        render({ autoReverse: true });
+        const opts = mock.vfx.addTransition.mock.calls[0][1];
+        expect(opts).toEqual({ autoReverse: true });
+        props.autoReverse = false;
+        flushSync();
+        expect(opts).toEqual({ autoReverse: false });
+    });
+
     it("shares one VFX and destroys it a frame after the last unmount", async () => {
         render();
         const other = document.createElement("div");
@@ -207,11 +216,11 @@ describe("VFXTransition (sveltekit)", () => {
         expect(await go(makeNav("/about", "/"), Home)).toEqual({});
     });
 
-    it("adds reverse on back only", async () => {
+    it("does not reverse on back", async () => {
         render();
-        expect(await go(makeNav("/about", "/", "popstate", -1), Home)).toEqual({
-            reverse: true,
-        });
+        expect(await go(makeNav("/about", "/", "popstate", -1), Home)).toEqual(
+            {},
+        );
         expect(await go(makeNav("/", "/about", "popstate", 1), About)).toEqual({
             transition: Zoom,
         });

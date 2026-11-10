@@ -1191,6 +1191,32 @@ describe("EffectHost.onContextRestored", () => {
 // dispose
 // ---------------------------------------------------------------------------
 
+describe("EffectHost.setFrameState", () => {
+    it("defaults enterProgress / leaveProgress to 0", () => {
+        const { host } = makeHost();
+        expect(host.ctx.enterProgress).toBe(0);
+        expect(host.ctx.leaveProgress).toBe(0);
+    });
+
+    it("writes enterProgress / leaveProgress to ctx", () => {
+        const { host } = makeHost();
+        host.setFrameState({
+            time: 0,
+            deltaTime: 0,
+            mouse: [0, 0],
+            mouseViewport: [0, 0],
+            intersection: 0,
+            enterTime: 0,
+            leaveTime: 0,
+            enterProgress: 0.25,
+            leaveProgress: 0.5,
+            uniforms: {},
+        });
+        expect(host.ctx.enterProgress).toBe(0.25);
+        expect(host.ctx.leaveProgress).toBe(0.5);
+    });
+});
+
 describe("EffectHost.dispose", () => {
     it("releases owned Framebuffers / Backbuffers / Textures (not Programs — those live on the shared cache)", () => {
         const { host } = makeHost();

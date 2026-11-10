@@ -185,6 +185,8 @@ function makeInput(overrides: Partial<ChainFrameInput> = {}): ChainFrameInput {
         intersection: 1,
         enterTime: 0,
         leaveTime: 0,
+        enterProgress: 1,
+        leaveProgress: 0,
         resolvedUniforms: {},
         canvasSize: [50, 50],
         canvasBufferSize: [100, 100],
@@ -1164,6 +1166,21 @@ describe("EffectChain: frame state", () => {
         const state = call[1] as { mouse: unknown; mouseViewport: unknown };
         expect(state.mouse).toEqual([100, 200]);
         expect(state.mouseViewport).toEqual([50, 75]);
+    });
+
+    it("passes enterProgress / leaveProgress as given", () => {
+        const chain = makeChain([{ render: () => {} }]);
+        chain.run(makeInput({ enterProgress: 0.25, leaveProgress: 0.75 }));
+        const call = hosts[0]._calls.find((c) => c[0] === "setFrameState");
+        if (!call) {
+            throw new Error("setFrameState not called");
+        }
+        const state = call[1] as {
+            enterProgress: unknown;
+            leaveProgress: unknown;
+        };
+        expect(state.enterProgress).toBe(0.25);
+        expect(state.leaveProgress).toBe(0.75);
     });
 });
 

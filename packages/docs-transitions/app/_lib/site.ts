@@ -32,7 +32,7 @@ export const nav: NavItem[] = [
         sections: [
             { id: "skill", label: "Install the skill" },
             { id: "llms", label: "Or use llms.txt" },
-            { id: "prompts", label: "Prompts that work" },
+            { id: "prompts", label: "Example prompts" },
             { id: "write", label: "Write a transition with AI" },
             { id: "check", label: "Check the result" },
         ],
@@ -45,7 +45,15 @@ export const nav: NavItem[] = [
             { id: "easing", label: "Easing" },
             { id: "size", label: "Fixed size, shared box" },
             { id: "precedence", label: "Which spec wins" },
-            { id: "limitations", label: "Limitations" },
+        ],
+    },
+    {
+        href: "/limitations",
+        label: "Limitations",
+        sections: [
+            { id: "browsers", label: "Browser support" },
+            { id: "motion", label: "Reduced motion" },
+            { id: "other", label: "Other limits" },
         ],
     },
     {

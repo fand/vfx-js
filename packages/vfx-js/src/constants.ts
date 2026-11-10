@@ -40,6 +40,13 @@ void main() {
 }
 `;
 
+/** Old names of the reveal presets. Use the `*Reveal` names instead. */
+type LegacyRevealPreset =
+    | "slitScanTransition"
+    | "warpTransition"
+    | "pixelateTransition"
+    | "focusTransition";
+
 export type ShaderPreset =
     | "none"
     | "uvGradient"
@@ -56,10 +63,11 @@ export type ShaderPreset =
     | "sinewave"
     | "pixelate"
     | "halftone"
-    | "slitScanTransition"
-    | "warpTransition"
-    | "pixelateTransition"
-    | "focusTransition"
+    | "slitScanReveal"
+    | "warpReveal"
+    | "pixelateReveal"
+    | "focusReveal"
+    | LegacyRevealPreset
     | "invert"
     | "grayscale"
     | "vignette"
@@ -81,16 +89,10 @@ const READ_TEX = `vec4 readTex(sampler2D tex, vec2 uv) {
     return texture(tex, uv);
 }`;
 
-/**
- * Shader code for presets.
- * Shaders in `shader` can be looked up with keys in `ShaderPreset`.
- *
- * ```ts
- * const shader = shaders["glitch"];
- * console.log(shader);
- * ```
- */
-export const shaders: Record<ShaderPreset, string> = {
+const presetShaders: Record<
+    Exclude<ShaderPreset, LegacyRevealPreset>,
+    string
+> = {
     none: COPY_FRAGMENT_SHADER,
     uvGradient: `
     ${COMMON_HEADER}
@@ -572,21 +574,17 @@ export const shaders: Record<ShaderPreset, string> = {
         outColor = color;
     }
     `,
-    warpTransition: `
+    warpReveal: `
     ${COMMON_HEADER}
-    uniform float enterTime;
-    uniform float leaveTime;
+    uniform float enterProgress;
+    uniform float leaveProgress;
 
     ${READ_TEX}
-
-    #define DURATION 1.0
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        float t1 = enterTime / DURATION;
-        float t2 = leaveTime / DURATION;
-        float t = clamp(min(t1, 1. - t2), 0., 1.);
+        float t = enterProgress * (1. - leaveProgress);
 
         if (t == 0.) {
             discard;
@@ -599,66 +597,57 @@ export const shaders: Record<ShaderPreset, string> = {
         outColor = readTex(src, uv);
     }
     `,
-    slitScanTransition: `
+    slitScanReveal: `
     ${COMMON_HEADER}
     ${READ_TEX}
 
-    uniform float enterTime;
-    uniform float leaveTime;
-
-    #define DURATION 1.0
+    uniform float enterProgress;
+    uniform float leaveProgress;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        float t1 = enterTime / DURATION;
-        float t2 = leaveTime / DURATION;
-
-        // Do not render before enter or after leave
-        if (t1 < 0. || 1. < t2) {
+        // Hidden before enter and after leave
+        if (enterProgress == 0.) {
             discard;
         }
 
-        if (0. < t2) {
+        if (0. < leaveProgress) {
             // Leaving
-            float t = 1. - t2;
+            float t = 1. - leaveProgress;
             uv.y = uv.y < t ? uv.y : t;
-        } else if (t1 < 1.) {
+        } else if (enterProgress < 1.) {
             // Entering
-            float t = 1. - t1;
+            float t = 1. - enterProgress;
             uv.y = uv.y < t ? t : uv.y;
         }
 
         outColor = readTex(src, uv);
     }
     `,
-    pixelateTransition: `
+    pixelateReveal: `
     ${COMMON_HEADER}
     ${READ_TEX}
 
-    uniform float enterTime;
-    uniform float leaveTime;
-
-    #define DURATION 1.0
+    uniform float enterProgress;
+    uniform float leaveProgress;
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
-        float t1 = enterTime / DURATION;
-        float t2 = leaveTime / DURATION;
-        float t = clamp(min(t1, 1. - t2), 0., 1.);
+        float t = enterProgress * (1. - leaveProgress);
 
         if (t == 0.) {
             discard;
         } else if (t < 1.) {
-            float b = floor(t * 64.);
+            float b = max(1., floor(t * 64.));
             uv = (floor(uv * b) + .5) / b;
         }
 
         outColor = readTex(src, uv);
     }
     `,
-    focusTransition: `
+    focusReveal: `
     ${COMMON_HEADER}
     ${READ_TEX}
 
@@ -749,4 +738,21 @@ export const shaders: Record<ShaderPreset, string> = {
         outColor = vec4(cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 3.0);
     }
     `,
+};
+
+/**
+ * Shader code for presets.
+ * Shaders in `shader` can be looked up with keys in `ShaderPreset`.
+ *
+ * ```ts
+ * const shader = shaders["glitch"];
+ * console.log(shader);
+ * ```
+ */
+export const shaders: Record<ShaderPreset, string> = {
+    ...presetShaders,
+    slitScanTransition: presetShaders.slitScanReveal,
+    warpTransition: presetShaders.warpReveal,
+    pixelateTransition: presetShaders.pixelateReveal,
+    focusTransition: presetShaders.focusReveal,
 };

@@ -44,6 +44,8 @@ export const transitionProps = {
     /** Keep the element wrapped between runs. Read on mount. */
     keepWrapped: { type: Boolean, default: undefined },
     waitFor: [String, Function] as PropType<TransitionWaitFor>,
+    /** On back, play the spec that entered the page, reversed. Needs the Navigation API. */
+    autoReverse: { type: Boolean, default: undefined },
     /** Size the target to the viewport height. Default `true`; `false` leaves sizing to your CSS. */
     fullscreen: { type: Boolean, default: true },
 } as const;
@@ -57,6 +59,7 @@ const OPT_KEYS = [
     "ease",
     "keepWrapped",
     "waitFor",
+    "autoReverse",
 ] as const;
 
 export type RouterContext = {

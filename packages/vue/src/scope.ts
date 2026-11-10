@@ -7,8 +7,8 @@ export type TransitionScope = {
     register(spec: RunOpts): () => void;
     /** Forget the page spec before a navigation. */
     reset(): void;
-    /** The spec for the run: link spec, then page spec, then `{}`. Back adds `reverse`. */
-    pick(back: boolean): RunOpts;
+    /** The spec for the run: link spec, then page spec, then `{}`. */
+    pick(): RunOpts;
 };
 
 export const TransitionScopeKey: InjectionKey<TransitionScope> = Symbol(
@@ -29,9 +29,8 @@ export function createScope(): TransitionScope {
         reset() {
             incoming = null;
         },
-        pick(back) {
-            const spec = takePending() ?? incoming ?? {};
-            return back ? { ...spec, reverse: true } : spec;
+        pick() {
+            return takePending() ?? incoming ?? {};
         },
     };
 }

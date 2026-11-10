@@ -127,11 +127,50 @@ describe("getIntersection", () => {
             getIntersection(createRect([0, 2, 1, 0]), createRect([0, 1, 1, 0])),
         ).toBe(1); // target is fully covered by container
         expect(
-            getIntersection(createRect([0, 1, 1, 0]), createRect([0, 2, 1, 0])),
-        ).toBe(0.5); // 50% of target is covered by container
+            getIntersection(createRect([0, 2, 2, 0]), createRect([1, 3, 2, 1])),
+        ).toBe(0.5); // right half of target is out
         expect(
-            getIntersection(createRect([1, 2, 2, 1]), createRect([0, 2, 2, 0])),
-        ).toBe(0.25); // 25%
+            getIntersection(createRect([0, 2, 2, 0]), createRect([1, 3, 3, 1])),
+        ).toBe(0.25); // top-left quarter of target is in
+    });
+    test("target smaller than container, fully in view", () => {
+        expect(
+            getIntersection(
+                createRect([0, 10, 10, 0]),
+                createRect([2, 4, 4, 2]),
+            ),
+        ).toBe(1);
+    });
+    test("target larger than container, fully in view", () => {
+        const container = createRect([0, 10, 10, 0]);
+        // taller
+        expect(getIntersection(container, createRect([-5, 8, 15, 2]))).toBe(1);
+        // wider
+        expect(getIntersection(container, createRect([2, 15, 8, -5]))).toBe(1);
+        // both
+        expect(getIntersection(container, createRect([-5, 15, 15, -5]))).toBe(
+            1,
+        );
+    });
+    test("target larger than container, partly in view", () => {
+        // 20px tall target, 5px of the 10px viewport covered
+        expect(
+            getIntersection(
+                createRect([0, 10, 10, 0]),
+                createRect([5, 10, 25, 0]),
+            ),
+        ).toBe(0.5);
+    });
+    test("zero size", () => {
+        expect(
+            getIntersection(
+                createRect([0, 10, 10, 0]),
+                createRect([5, 5, 5, 5]),
+            ),
+        ).toBe(0);
+        expect(
+            getIntersection(createRect([0, 0, 0, 0]), createRect([0, 1, 1, 0])),
+        ).toBe(0);
     });
 });
 

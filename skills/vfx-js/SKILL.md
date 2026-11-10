@@ -50,7 +50,8 @@ await vfx.add(img, { shader: "rgbShift" });
 ```
 
 Shader presets: `uvGradient`, `rainbow`, `glitch`, `rgbGlitch`, `rgbShift`, `shine`, `blink`, `spring`, `duotone`, `tritone`, `hueShift`, `sinewave`, `pixelate`, `halftone`, `invert`, `grayscale`, `vignette`, `chromatic`.
-Presets that animate in when the element enters the viewport, and out when it leaves: `slitScanTransition`, `warpTransition`, `pixelateTransition`, `focusTransition`.
+Scroll reveal presets animate in when the element enters the viewport, and out when it leaves: `slitScanReveal`, `warpReveal`, `pixelateReveal`, `focusReveal`.
+The old names (`slitScanTransition`, `warpTransition`, `pixelateTransition`, `focusTransition`) still work.
 
 Without a bundler:
 
@@ -75,7 +76,7 @@ vfx.add(el, {
     overlay: true,             // keep the original element visible (default hides it)
     zIndex: 0,                 // draw order inside the canvas
     wrap: "clamp",             // texture wrap: "repeat" (default) | "clamp" | "mirror"
-    intersection: { threshold: 0.5 },
+    intersection: { threshold: 0.5, duration: 1 }, // enter/leave timing; see references/shader.md
 });
 ```
 
@@ -195,6 +196,7 @@ registerVFX({
 ## Rules and pitfalls
 
 - Browser only. `new VFX()` throws without `window`, and throws when WebGL is not available. Create it in client code (`useEffect`, `onMount`, `"use client"`), and wrap it in `try` / `catch` so the page still works as plain HTML.
+- With `prefers-reduced-motion: reduce`, `VFX` renders nothing. `add` does nothing, and elements stay plain HTML. It is checked once, when `VFX` is created.
 - Make one `VFX` instance per page and reuse it.
 - `add` is async. `await` it before you call `updateEffects` or `remove` on the same element.
 - Text and plain elements are captured once. Call `vfx.update(el)` after their content changes, or after you change `img.src`.

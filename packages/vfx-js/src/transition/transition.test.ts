@@ -13,6 +13,7 @@ import {
     type TransitionStartOpts,
 } from "./effect";
 import { BODY_OFFSET, describeGlslError } from "./glsl";
+import { createHistorySpecs, type HistorySpecs } from "./history";
 import { ShaderTransition } from "./shader";
 import {
     layerSpec,
@@ -30,6 +31,7 @@ import type {
     TransitionEffectContext,
     TransitionRun,
 } from "./types";
+import type { UATransitions } from "./ua-transition";
 
 const shaderClass = (
     name: string,
@@ -512,12 +514,18 @@ function setup(
         snapshotStalls?: boolean;
         captureTimesOut?: boolean;
         element?: HTMLElement;
+        history?: HistorySpecs;
+        uaTransitions?: UATransitions;
+        reducedMotion?: boolean;
     } = {},
 ) {
     const {
         snapshotStalls = false,
         captureTimesOut = false,
         element = {} as HTMLElement,
+        history = createHistorySpecs(() => undefined),
+        uaTransitions = { current: () => undefined },
+        reducedMotion = false,
         ...transitionOpts
     } = opts;
     const log: string[] = [];
@@ -601,6 +609,7 @@ function setup(
                 log.push("unforceRender");
             };
         },
+        reducedMotion,
     };
     const onDestroy = vi.fn();
     const transition = new TransitionController(
@@ -609,6 +618,8 @@ function setup(
         { waitFor: "none", ...transitionOpts },
         onDestroy,
         stage,
+        history,
+        uaTransitions,
     );
     return {
         transition,
@@ -1097,6 +1108,156 @@ describe("TransitionController", () => {
         expect(log.filter((s) => s === "updateEffects")).toHaveLength(1);
     });
 
+    describe("autoReverse", () => {
+        const recorder = (name: string) => {
+            const runs: { name: string; reverse: boolean }[] = [];
+            const make = (n: string) =>
+                class implements Transition {
+                    readonly name = n;
+                    render() {}
+                    start(run: TransitionRun) {
+                        runs.push({ name: n, reverse: run.reverse });
+                    }
+                };
+            return { A: make(`${name}-a`), B: make(`${name}-b`), runs };
+        };
+        const autoReverseSetup = (
+            opts: AddTransitionOpts & { uaTransitions?: UATransitions } = {},
+        ) => {
+            let index = 0;
+            const history = createHistorySpecs(() => ({
+                index,
+                key: `k${index}`,
+            }));
+            const { transition, starts } = setup({
+                autoReverse: true,
+                history,
+                ...opts,
+            });
+            // Navigate to `next` in the run's callback.
+            const step = async (
+                next: number,
+                opts: Parameters<TransitionController["run"]>[1],
+            ) => {
+                const i = starts.length;
+                const done = transition.run(() => {
+                    index = next;
+                }, opts);
+                await settle();
+                (await started(starts, i)).end();
+                await done;
+            };
+            // Navigate to `next` in a run that cuts.
+            const cutTo = (
+                next: number,
+                opts: Parameters<TransitionController["run"]>[1],
+            ) =>
+                transition.run(() => {
+                    index = next;
+                }, opts);
+            return { transition, starts, step, cutTo };
+        };
+
+        test("static opts: back plays the stored spec reversed", async () => {
+            const { A, B, runs } = recorder("static");
+            const { step } = autoReverseSetup();
+            await step(1, { transition: A });
+            await step(0, { transition: B });
+            expect(runs).toEqual([
+                { name: "static-a", reverse: false },
+                { name: "static-a", reverse: true },
+            ]);
+        });
+
+        test("lazy opts: forward plays the stored spec again", async () => {
+            const { A, B, runs } = recorder("lazy");
+            const { step } = autoReverseSetup();
+            await step(1, () => ({ transition: A }));
+            await step(0, () => ({ transition: B }));
+            await step(1, () => ({ transition: B }));
+            expect(runs).toEqual([
+                { name: "lazy-a", reverse: false },
+                { name: "lazy-a", reverse: true },
+                { name: "lazy-a", reverse: false },
+            ]);
+        });
+
+        test("a back the browser animated cuts and keeps history in step", async () => {
+            const { A, B, runs } = recorder("ua");
+            let animated: number | undefined;
+            const { starts, step, cutTo } = autoReverseSetup({
+                uaTransitions: { current: () => animated },
+            });
+            await step(1, { transition: A });
+            animated = 1;
+            await cutTo(0, { transition: B });
+            animated = undefined;
+            expect(starts).toHaveLength(1);
+            // Forward again plays the spec that entered page 1.
+            await step(1, { transition: B });
+            expect(runs).toEqual([
+                { name: "ua-a", reverse: false },
+                { name: "ua-a", reverse: false },
+            ]);
+        });
+
+        test("empty run opts on back use the container opts reversed", async () => {
+            const { A, runs } = recorder("container");
+            const { step } = autoReverseSetup({ transition: A });
+            await step(1, {});
+            await step(0, {});
+            expect(runs).toEqual([
+                { name: "container-a", reverse: false },
+                { name: "container-a", reverse: true },
+            ]);
+        });
+    });
+
+    test("a navigation the browser animated cuts before the snapshot", async () => {
+        const { transition, log, starts } = setup({
+            uaTransitions: { current: () => 1 },
+        });
+        const cb = vi.fn();
+        // Lazy opts still run, since they may take a pending link spec.
+        const opts = vi.fn(() => ({ transition: Crossfade }));
+        await transition.run(cb, opts);
+        expect(cb).toHaveBeenCalledOnce();
+        expect(opts).toHaveBeenCalledOnce();
+        expect(log).not.toContain("snapshot");
+        expect(log).not.toContain("wrap");
+        expect(starts).toHaveLength(0);
+    });
+
+    test("a handle cuts once per browser-animated navigation", async () => {
+        let animated = 1;
+        const { transition, starts } = setup({
+            uaTransitions: { current: () => animated },
+        });
+        await transition.run(vi.fn());
+        expect(starts).toHaveLength(0);
+
+        // Same navigation: the next run plays.
+        const next = transition.run(vi.fn());
+        await settle();
+        (await started(starts, 0)).end();
+        await next;
+
+        // A new one cuts again, even back to the same entry.
+        animated = 2;
+        await transition.run(vi.fn());
+        expect(starts).toHaveLength(1);
+    });
+
+    test("every handle cuts the same browser-animated navigation", async () => {
+        const uaTransitions = { current: () => 1 };
+        const a = setup({ uaTransitions });
+        const b = setup({ uaTransitions });
+        await a.transition.run(vi.fn());
+        await b.transition.run(vi.fn());
+        expect(a.starts).toHaveLength(0);
+        expect(b.starts).toHaveLength(0);
+    });
+
     test("lazy duration 0 cuts after cb and unwraps", async () => {
         const { transition, log, starts } = setup();
         const cb = vi.fn(() => {
@@ -1235,6 +1396,21 @@ describe("TransitionController.show", () => {
         expect(dom.container.children).toHaveLength(3);
     });
 
+    test("ignores autoReverse", async () => {
+        const dom = slides("a", "b");
+        const pick = vi.fn((spec) => spec);
+        const { transition, starts } = setup({
+            element: dom.element,
+            autoReverse: true,
+            history: { pick },
+        });
+        const done = transition.show(1);
+        (await started(starts, 0)).end();
+        await done;
+        expect(dom.shown()).toEqual(["b"]);
+        expect(pick).not.toHaveBeenCalled();
+    });
+
     test("resolves an index or a selector", async () => {
         const dom = slides("a", "b", "c");
         const { transition, starts } = setup({ element: dom.element });
@@ -1368,5 +1544,51 @@ describe("TransitionController.show", () => {
         const { transition } = setup({ element: dom.element, slideSpec });
         await transition.show(0);
         expect(slideSpec).not.toHaveBeenCalled();
+    });
+});
+
+describe("reduced motion", () => {
+    test("run cuts without touching VFX", async () => {
+        const cb = vi.fn();
+        const { transition, log, starts } = setup({
+            transition: Crossfade,
+            duration: 1,
+            reducedMotion: true,
+        });
+        await transition.run(cb);
+        expect(cb).toHaveBeenCalledOnce();
+        expect(log).toEqual([]);
+        expect(starts).toEqual([]);
+        expect(transition.running).toBe(false);
+    });
+
+    test("run picks the history spec after cb", async () => {
+        const order: string[] = [];
+        const pick = vi.fn((spec) => {
+            order.push("pick");
+            return spec;
+        });
+        const { transition } = setup({
+            autoReverse: true,
+            history: { pick },
+            reducedMotion: true,
+        });
+        await transition.run(() => {
+            order.push("cb");
+        });
+        expect(order).toEqual(["cb", "pick"]);
+    });
+
+    test("show cuts", async () => {
+        const dom = slides("a", "b");
+        const { transition, starts } = setup({
+            element: dom.element,
+            transition: Crossfade,
+            duration: 1,
+            reducedMotion: true,
+        });
+        await transition.show(1);
+        expect(dom.shown()).toEqual(["b"]);
+        expect(starts).toEqual([]);
     });
 });

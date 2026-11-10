@@ -314,6 +314,8 @@ export class EffectHost {
             intersection: 0,
             enterTime: 0,
             leaveTime: 0,
+            enterProgress: 0,
+            leaveProgress: 0,
             src: initialSrc,
             target: null,
             uniforms: {},
@@ -373,6 +375,8 @@ export class EffectHost {
         intersection: number;
         enterTime: number;
         leaveTime: number;
+        enterProgress: number;
+        leaveProgress: number;
         uniforms: Record<string, EffectUniformValue>;
     }): void {
         const c = this.#mutCtx;
@@ -383,6 +387,8 @@ export class EffectHost {
         c.intersection = state.intersection;
         c.enterTime = state.enterTime;
         c.leaveTime = state.leaveTime;
+        c.enterProgress = state.enterProgress;
+        c.leaveProgress = state.leaveProgress;
         c.uniforms = state.uniforms;
     }
 

@@ -77,6 +77,7 @@ async function navigate(opts: {
     source?: Element;
     direction?: string;
     abort?: boolean;
+    afterSwap?: boolean;
 }) {
     const controller = new AbortController();
     const prep = Object.assign(new Event("astro:before-preparation"), {
@@ -98,22 +99,19 @@ async function navigate(opts: {
     });
     document.dispatchEvent(swap);
     swap.swap();
+    // Astro changes history here, then fires after-swap.
+    if (opts.afterSwap !== false) {
+        document.dispatchEvent(new Event("astro:after-swap"));
+    }
 }
 
 describe("pickRunOpts", () => {
     it("takes the link, then the page, then nothing", () => {
         const link = { transition: Swipe };
         const page = { transition: Glitch };
-        expect(pickRunOpts(link, page, false)).toBe(link);
-        expect(pickRunOpts(null, page, false)).toBe(page);
-        expect(pickRunOpts(null, null, false)).toEqual({});
-    });
-
-    it("plays back navigation in reverse", () => {
-        expect(pickRunOpts(null, { transition: Glitch }, true)).toEqual({
-            transition: Glitch,
-            reverse: true,
-        });
+        expect(pickRunOpts(link, page)).toBe(link);
+        expect(pickRunOpts(null, page)).toBe(page);
+        expect(pickRunOpts(null, null)).toEqual({});
     });
 });
 
@@ -158,6 +156,24 @@ describe("installTransition", () => {
         expect(opts).toEqual({ transition: Crossfade, duration: 0.8 });
     });
 
+    it("passes autoReverse from the target", () => {
+        document.body.innerHTML = target('{"autoReverse":true}', "<p>old</p>");
+        installTransition({ swapFunctions });
+        const [, opts] = mock.vfx.addTransition.mock.calls[0] ?? [];
+        expect(opts).toEqual({ autoReverse: true });
+    });
+
+    it("holds the run until after-swap, when history has changed", async () => {
+        installTransition({ swapFunctions });
+        await navigate({ doc: page(target("{}", "new")), afterSwap: false });
+        await flush();
+        expect(document.body.textContent).toContain("new");
+        expect(mock.runs[0]?.done).toBe(false);
+        document.dispatchEvent(new Event("astro:after-swap"));
+        await flush();
+        expect(mock.runs[0]?.done).toBe(true);
+    });
+
     it("uses the link spec over the page spec", async () => {
         installTransition({ swapFunctions });
         const link = document.createElement("a");
@@ -186,7 +202,7 @@ describe("installTransition", () => {
         });
     });
 
-    it("uses the page spec, reversed on back", async () => {
+    it("uses the page spec as is on back", async () => {
         installTransition({ swapFunctions });
         await navigate({
             direction: "back",
@@ -194,10 +210,7 @@ describe("installTransition", () => {
                 `<meta name="vfx-transition-in" content='{"transition":"glitch"}'>${target("{}", "new")}`,
             ),
         });
-        expect(mock.runs[0]?.opts).toEqual({
-            transition: Glitch,
-            reverse: true,
-        });
+        expect(mock.runs[0]?.opts).toEqual({ transition: Glitch });
     });
 
     it("prefers a registered transition and ease", async () => {

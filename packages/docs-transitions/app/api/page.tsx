@@ -39,6 +39,10 @@ const containerOpts: Row[] = [
         'What to wait for before the new capture. "media" waits for images, videos and fonts, up to about 300 ms.',
     ],
     [
+        "autoReverse: boolean",
+        "On back, play the spec that entered the page, reversed. Forward plays it again. Needs the Navigation API. show() ignores it.",
+    ],
+    [
         "slideSpec: (slide) => RunOpts | undefined",
         "How each slide enters with show(). Its fields go over the container's; show() opts go over it.",
     ],
@@ -143,6 +147,12 @@ export default function Api() {
                 <p className="lead">
                     Core works on any element. The React bindings wrap it for
                     routers. Presets live in <code>@vfx-js/transitions</code>.
+                    Vue, Svelte and Astro have the same pieces under their own
+                    names; see{" "}
+                    <Link href="/getting-started" className="text-link">
+                        Getting Started
+                    </Link>
+                    .
                 </p>
             </section>
 
@@ -268,7 +278,7 @@ router.push("/next");
                     <code>fx.params</code> on the instance.
                 </p>
                 <Code label="slider.tsx">{`
-const fx = useTransitionInstance(Glitch, { speed: 1 });
+const fx = useTransitionInstance(Glitch, { amount: 1 });
 
 <VFXTransition pageKey={pathname} transition={fx}>{children}</VFXTransition>
 <input type="range" onChange={(e) => (fx.params = { amount: +e.target.value })} />

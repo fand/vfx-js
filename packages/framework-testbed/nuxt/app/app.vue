@@ -22,12 +22,12 @@ useHead(() => ({ title: `${findPage(route.path).label} | Nuxt` }));
         </NuxtLink>
         <span class="framework">Nuxt</span>
     </nav>
-    <!-- Back plays the default, Swipe, reversed. -->
     <VFXTransition
         class="outlet"
         :fullscreen="false"
         :transition="Swipe"
         :duration="0.8"
+        auto-reverse
     >
         <NuxtPage />
     </VFXTransition>

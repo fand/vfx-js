@@ -6,6 +6,7 @@ import {
     TransitionSlot,
     TransitionStage,
 } from "./effect.js";
+import { type HistorySpecs, historySpecs } from "./history.js";
 import type {
     AddTransitionOpts,
     RunOpts,
@@ -17,6 +18,7 @@ import type {
     TransitionHandle,
     TransitionRun,
 } from "./types.js";
+import { sharedUATransitions, type UATransitions } from "./ua-transition.js";
 
 const DEFAULT_DURATION = 0.6;
 const MEDIA_TIMEOUT_MS = 300;
@@ -177,6 +179,7 @@ export type TransitionHost = Pick<
     | "freezeInside"
     | "lockSize"
     | "forceRender"
+    | "reducedMotion"
 >;
 
 export type TransitionStageLike = Effect &
@@ -213,6 +216,10 @@ export class TransitionController implements TransitionHandle {
     #element: HTMLElement;
     #opts: AddTransitionOpts;
     #stage: TransitionStageLike;
+    #history: HistorySpecs;
+    #uaTransitions: UATransitions;
+    // The browser-animated navigation this handle cut last.
+    #uaCut: number | undefined;
     #keepWrapped: boolean;
     #onDestroy: (() => void) | undefined;
     #unfreezers: (() => void)[] = [];
@@ -251,12 +258,16 @@ export class TransitionController implements TransitionHandle {
         opts: AddTransitionOpts = {},
         onDestroy?: () => void,
         stage: TransitionStageLike = new TransitionStage(),
+        history: HistorySpecs = historySpecs,
+        uaTransitions: UATransitions = sharedUATransitions(),
     ) {
         this.#onDestroy = onDestroy;
         this.#vfx = vfx;
         this.#element = element;
         this.#opts = opts;
         this.#stage = stage;
+        this.#history = history;
+        this.#uaTransitions = uaTransitions;
         this.#keepWrapped = opts.keepWrapped ?? false;
     }
 
@@ -273,7 +284,7 @@ export class TransitionController implements TransitionHandle {
         }
         const slideSpec = this.#opts.slideSpec?.(target);
         const spec = slideSpec ? layerSpec(slideSpec, runOpts) : runOpts;
-        return this.run(() => {
+        return this.#start(() => {
             if (target.parentElement !== this.#element) {
                 this.#element.append(target);
             }
@@ -320,9 +331,42 @@ export class TransitionController implements TransitionHandle {
         );
     }
 
-    async run(
+    run(
         cb: () => void | Promise<void>,
         opts: RunOpts | (() => RunOpts) = {},
+    ): Promise<void> {
+        // The browser already animated this navigation, so cut before the snapshot.
+        const animated = this.#destroyed
+            ? undefined
+            : this.#uaTransitions.current();
+        if (animated !== undefined && animated !== this.#uaCut) {
+            this.#uaCut = animated;
+            return this.#start(
+                async () => {
+                    await cb();
+                    // Lazy opts may consume state, like a pending link spec.
+                    const spec = typeof opts === "function" ? opts() : opts;
+                    // Keep the history store in step for later runs.
+                    if (this.#opts.autoReverse) {
+                        this.#history.pick(spec);
+                    }
+                },
+                { duration: 0 },
+            );
+        }
+        if (!this.#opts.autoReverse) {
+            return this.#start(cb, opts);
+        }
+        // Lazy, so the history entry has changed when the spec is picked.
+        return this.#start(cb, () =>
+            this.#history.pick(typeof opts === "function" ? opts() : opts),
+        );
+    }
+
+    // Slides do not change history, so `show()` comes here and skips autoReverse.
+    async #start(
+        cb: () => void | Promise<void>,
+        opts: RunOpts | (() => RunOpts),
     ): Promise<void> {
         if (this.#destroyed) {
             await cb();
@@ -358,6 +402,15 @@ export class TransitionController implements TransitionHandle {
                 await cb();
             }
         };
+        // Nothing renders, so a snapshot would only stall.
+        if (this.#vfx.reducedMotion) {
+            await update();
+            // Lazy opts may consume state, like a pending link spec.
+            if (typeof opts === "function") {
+                opts();
+            }
+            return;
+        }
         const cut = async () => {
             this.#endActive();
             this.#stage.cancel();

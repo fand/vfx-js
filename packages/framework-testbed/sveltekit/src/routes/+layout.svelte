@@ -26,7 +26,6 @@
     {/each}
     <span class="framework">SvelteKit</span>
 </nav>
-<!-- Back plays the default, Swipe, reversed. -->
-<VFXTransition class="outlet" fullscreen={false} transition={Swipe} duration={0.8}>
+<VFXTransition class="outlet" fullscreen={false} transition={Swipe} duration={0.8} autoReverse>
     {@render children()}
 </VFXTransition>

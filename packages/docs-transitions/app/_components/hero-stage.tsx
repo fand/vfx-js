@@ -392,7 +392,8 @@ export function HeroStage() {
             </div>
             <p className="hero-tagline">
                 Next-level page transitions with HTML-in-Canvas. Your live pages
-                go through WebGL shaders, in a few lines of React or plain JS.
+                go through WebGL shaders, in a few lines of React, Vue, Svelte,
+                Astro or plain JS.
             </p>
             <div className="hero-cta">
                 <Link href="/getting-started" className="btn btn-primary">

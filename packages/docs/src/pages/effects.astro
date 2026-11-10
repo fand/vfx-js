@@ -4,7 +4,7 @@ import {
     type DemoMedia,
     effectDemos,
     presetDemos,
-    transitionPresetDemos,
+    revealPresetDemos,
 } from "../effects-list";
 import Layout from "../layouts/Layout.astro";
 import { url } from "../site";
@@ -106,20 +106,20 @@ await vfx.updateEffects(video, [new BloomEffect({ intensity: 8 })]);
             }
         </div>
 
-        <h3>Transition presets</h3>
+        <h3>Scroll reveal presets</h3>
         <p>
-            These play when the element enters the viewport, and play backward
-            when it leaves. Scroll them in and out to see it again.
+            These animate in when the element enters the viewport, and out when
+            it leaves. Scroll them in and out to see it again.
         </p>
         <div class="DemoGrid">
             {
-                transitionPresetDemos.map((demo) => (
+                revealPresetDemos.map((demo) => (
                     <figure class="DemoTile">
                         <div class="DemoMedia">
                             <img
                                 src={media[demo.media]}
                                 alt=""
-                                data-transition-preset={demo.name}
+                                data-reveal-preset={demo.name}
                             />
                         </div>
                         <figcaption>
@@ -247,14 +247,14 @@ await vfx.updateEffects(video, [new BloomEffect({ intensity: 8 })]);
     import {
         effectDemos,
         presetDemos,
-        transitionPresetDemos,
+        revealPresetDemos,
     } from "../effects-list";
     import { onPage } from "../lifecycle";
 
     onPage(() => {
-        for (const demo of [...presetDemos, ...transitionPresetDemos]) {
+        for (const demo of [...presetDemos, ...revealPresetDemos]) {
             const img = document.querySelector<HTMLElement>(
-                `[data-preset="${demo.name}"], [data-transition-preset="${demo.name}"]`,
+                `[data-preset="${demo.name}"], [data-reveal-preset="${demo.name}"]`,
             );
             if (img) {
                 lazyDemo(img, () => ({ shader: demo.name, ...demo.props }));

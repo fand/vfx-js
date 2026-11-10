@@ -15,7 +15,9 @@ A run works like this:
 
 The element is plain DOM at rest. VFX-JS wraps it only while a run is in
 flight. With html-in-canvas the capture uses `drawElementImage`;
-without it, VFX-JS falls back to dom-to-canvas, which is slower.
+without it, VFX-JS falls back to dom-to-canvas, a workaround that
+misses some content (pseudo-elements, web fonts, `<canvas>`, `<video>`,
+`<iframe>` and more).
 
 ## Examples
 
@@ -79,13 +81,15 @@ A new `pageKey` starts a run. The old page stays on screen until the
 transition has its snapshot. The incoming page can pick its own
 transition with `<TransitionIn>`.
 
-### Vue and Svelte
+### Vue, Svelte and Astro
 
-Nuxt, Vue Router and SvelteKit have their own `<VFXTransition>`:
-[`@vfx-js/vue/nuxt`, `@vfx-js/vue/router`](../packages/vue/README.md) and
-[`@vfx-js/svelte/sveltekit`](../packages/svelte/README.md).
+Nuxt, Vue Router, SvelteKit and Astro have their own `<VFXTransition>`:
+[`@vfx-js/vue/nuxt`, `@vfx-js/vue/router`](../packages/vue/README.md),
+[`@vfx-js/svelte/sveltekit`](../packages/svelte/README.md) and
+[`@vfx-js/astro`](../packages/astro/README.md).
 Each path is one page. Pages pick their transition with
-`useTransitionIn` (Vue) or `transitionIn` (Svelte).
+`useTransitionIn` (Vue), `transitionIn` (Svelte) or `<TransitionIn>`
+(Astro).
 
 ## Core API
 
@@ -117,6 +121,7 @@ const t = vfx.addTransition(el, {
     overflow: undefined,     // true (whole canvas) | px on every side
     keepWrapped: false,      // keep the element wrapped between runs
     waitFor: "media",        // "media" | "none" | (el) => Promise<void>
+    autoReverse: false,      // on back, replay the spec that entered, reversed
     slideSpec: undefined,    // (slide) => RunOpts | undefined, for show()
 });
 ```
@@ -195,6 +200,13 @@ so the spec can depend on the new content. If it throws, the run
 cancels and `run` rejects, as with `cb`. With a function, the transition
 is set up and `start` runs after `cb`, not before the snapshot.
 
+When the user prefers reduced motion, `run` and `show` always cut.
+
+If the browser already animated the navigation, like a swipe back on a
+phone, `run` cuts to the new content. It reads `hasUAVisualTransition`
+from the `navigate` event, or from `popstate` in older Safari. Each handle cuts once per such navigation, and
+a tap or key press after it lets later runs play.
+
 ### Spec resolution
 
 Each field comes from the first level that sets it:
@@ -263,6 +275,29 @@ Runs after `cb` and before the new capture.
 By default the element is unwrapped after each run. Set
 `keepWrapped: true` to keep it wrapped, which saves the wrap cost on
 frequent runs.
+
+### `autoReverse`
+
+With `autoReverse: true`, each run remembers the spec that entered the
+current history entry.
+
+- Back plays the spec of the entry you leave, with `reverse: true`.
+- Forward (the browser button) plays the spec of the entry you enter, as is.
+- A push or replace plays its own spec and stores it.
+- With nothing stored (after a reload, in a new tab), it plays its own spec.
+
+On back, the stored spec wins over the run's spec, including
+`setNextTransition()`. A jump like `history.go(-2)` plays the spec of
+the top entry, reversed.
+
+It reads the entry from the Navigation API (`navigation.currentEntry`).
+Without it, `autoReverse` does nothing. The history entry must change
+before `cb` resolves; every binding does this. `show()` ignores
+`autoReverse`, since slides do not change history.
+
+```ts
+const t = vfx.addTransition(main, { transition: Swipe, autoReverse: true });
+```
 
 ## Custom transitions
 
@@ -540,7 +575,8 @@ The swap runs in a React transition, so a page that suspends keeps the
 old page on screen until it is ready.
 
 Browser back runs like any other navigation: with the page spec, or the
-props when the page sets none.
+props when the page sets none. Pass `autoReverse` to play the spec that
+entered the page, reversed. See [`autoReverse`](#autoreverse).
 
 React Router reads the route from context, like Next does. Pass
 `useOutlet()` as the children, so the old page keeps its own route:
@@ -728,9 +764,11 @@ const fx = useTransitionInstance(Glitch, { speed: 2 });
 - Next.js `loading.tsx` shows its fallback as soon as the path changes,
   so the transition lands on the skeleton. Use `useVFXTransition` with
   your own ready signal instead.
-- `<VFXTransition>` does not support Astro ClientRouter, Turbo, htmx or
-  multi-page (cross-document) navigation. You can wire core `run(cb)` to
-  them by hand.
+- `<VFXTransition>` does not support Turbo, htmx or multi-page
+  (cross-document) navigation. You can wire core `run(cb)` to them by
+  hand. For Astro ClientRouter, use `@vfx-js/astro`.
+- `autoReverse` needs the Navigation API. Without it, back plays like
+  any other navigation.
 - `<body>` cannot be the target, since a canvas cannot wrap it. Target the
   router outlet (`#app`, `<main>`).
 - There is one pending click spec per page, shared by all

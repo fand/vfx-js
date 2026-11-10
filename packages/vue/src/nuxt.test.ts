@@ -212,6 +212,12 @@ describe("VFXTransition (nuxt)", () => {
         expect(opts).toEqual({ duration: 1 });
     });
 
+    it("passes autoReverse to core", () => {
+        mount({ autoReverse: true });
+        const opts = (mock.vfx.addTransition.mock.lastCall as unknown[])[1];
+        expect(opts).toEqual({ autoReverse: true });
+    });
+
     it("shares one VFX and destroys it a frame after the last unmount", async () => {
         mount();
         const second = createApp({ render: () => h(VFXTransition) });
@@ -277,10 +283,10 @@ describe("VFXTransition (nuxt)", () => {
         expect(await go("/about", "/", Home, 2)).toEqual({});
     });
 
-    it("adds reverse on back", async () => {
+    it("does not reverse on back", async () => {
         window.history.replaceState({ position: 2 }, "");
         mount();
-        expect(await go("/about", "/", Home, 1)).toEqual({ reverse: true });
+        expect(await go("/about", "/", Home, 1)).toEqual({});
         expect(await go("/", "/about", About, 1)).toEqual({
             transition: Zoom,
         });
@@ -384,6 +390,16 @@ describe("vTransition", () => {
         await nextTick();
         a.dispatchEvent(new MouseEvent("click"));
         expect(takePending()).toEqual({ transition: Zoom });
+    });
+
+    // NuxtLink calls preventDefault in its own click handler.
+    it("runs before the link's own handler prevents the click", () => {
+        const a = mount(
+            '<a href="/" @click.prevent v-transition="spec">x</a>',
+            () => ({ spec: { transition: Swipe } }),
+        );
+        a.dispatchEvent(new MouseEvent("click", { cancelable: true }));
+        expect(takePending()).toEqual({ transition: Swipe });
     });
 
     it("ignores modified clicks and other targets", () => {

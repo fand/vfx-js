@@ -132,6 +132,7 @@ Always declare `#version 300 es` in `ctx.draw` shaders.
 | `resolution` | Canvas size, physical px. |
 | `mouse`, `mouseViewport` | Element-local / canvas-local px, bottom-left origin. |
 | `intersection` | 0..1 viewport overlap. |
+| `enterProgress`, `leaveProgress` | 0..1 enter / leave transition. Timing comes from the `intersection` option ([shader.md](shader.md#built-in-uniforms)). |
 | `src`, `target` | Input texture / output for this stage. `target: null` is the canvas. |
 | `uniforms` | User `uniforms` from `vfx.add`, evaluated each frame. |
 | `dims` | Sizes: `elementPixel`, `canvasPixel`, `pixelRatio`, `contentRect`, `srcRect`, `canvasRect`. |

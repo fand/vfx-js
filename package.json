@@ -5,6 +5,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --ui tui --filter=docs --filter=docs-react --filter=docs-transitions --filter=@vfx-js/core --filter=@vfx-js/effects --filter=@vfx-js/react --filter=@vfx-js/transitions",
+    "dev:testbed": "turbo run dev --ui tui --filter=\"@vfx-js/testbed-*...\"",
     "clean": "turbo run clean",
     "lint": "turbo run lint",
     "prepare": "husky",

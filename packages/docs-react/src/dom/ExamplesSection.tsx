@@ -102,16 +102,16 @@ const ExamplesSection: React.FC = () => {
                 </VFX.VFXSpan>
             </section>
             {/* <section>
-                <h3>... and make Transition Effects!</h3>
+                <h3>... and make Scroll Reveal Effects!</h3>
                 <VFX.VFXImg
-                    shader="warpTransition"
+                    shader="warpReveal"
                     src={pub("logo.png")}
                     overflow={[0, 1000, 0, 1000]}
                 />
                 <br />
-                <VFX.VFXImg shader="slitScanTransition" src={pub("logo.png")} />
+                <VFX.VFXImg shader="slitScanReveal" src={pub("logo.png")} />
                 <br />
-                <VFX.VFXImg shader="pixelateTransition" src={pub("logo.png")} />
+                <VFX.VFXImg shader="pixelateReveal" src={pub("logo.png")} />
                 <br />
             </section> */}
         </section>

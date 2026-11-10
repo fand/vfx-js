@@ -156,17 +156,40 @@ export function rectInRect(
 }
 
 /**
- * Calculate the ratio of the intersection between two Rect objects.
- * It returns a number between 0 and 1.
+ * Calculate how much of `target` is visible in `container`, from 0 to 1.
+ * Each axis divides by the smaller of the two sizes,
+ * so a target larger than the container can still reach 1.
  */
 export function getIntersection(container: Rect, target: Rect): number {
-    const targetL = clamp(target.left, container.left, container.right);
-    const targetR = clamp(target.right, container.left, container.right);
-    const w = (targetR - targetL) / (target.right - target.left);
-
-    const targetT = clamp(target.top, container.top, container.bottom);
-    const targetB = clamp(target.bottom, container.top, container.bottom);
-    const h = (targetB - targetT) / (target.bottom - target.top);
-
+    const w = getAxisRatio(
+        container.left,
+        container.right,
+        target.left,
+        target.right,
+    );
+    const h = getAxisRatio(
+        container.top,
+        container.bottom,
+        target.top,
+        target.bottom,
+    );
     return w * h;
+}
+
+function getAxisRatio(
+    containerStart: number,
+    containerEnd: number,
+    targetStart: number,
+    targetEnd: number,
+): number {
+    const size = Math.min(
+        targetEnd - targetStart,
+        containerEnd - containerStart,
+    );
+    if (size <= 0) {
+        return 0;
+    }
+    const start = clamp(targetStart, containerStart, containerEnd);
+    const end = clamp(targetEnd, containerStart, containerEnd);
+    return (end - start) / size;
 }

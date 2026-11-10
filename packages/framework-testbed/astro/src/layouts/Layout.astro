@@ -31,12 +31,12 @@ const page = pages.find((p) => p.path === current);
             }
             <span class="framework">Astro</span>
         </nav>
-        <!-- Back plays the default, crossfade, reversed. -->
         <VFXTransition
             class="outlet"
             fullscreen={false}
-            transition="crossfade"
+            transition="swipe"
             duration={0.8}
+            autoReverse
         >
             <slot />
         </VFXTransition>

@@ -7,6 +7,7 @@ import {
     wrapElement,
 } from "./html-in-canvas.js";
 import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
+import { prefersReducedMotion } from "./reduced-motion.js";
 import { TransitionController } from "./transition/transition.js";
 import type {
     AddTransitionOpts,
@@ -54,6 +55,7 @@ export class VFX {
     #canvas: HTMLCanvasElement;
     #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
     #transitions = new Set<TransitionHandle>();
+    #reducedMotion: boolean;
 
     /**
      * Create a VFX instance if WebGL is available, or return `null`.
@@ -68,6 +70,8 @@ export class VFX {
 
     /**
      * Creates VFX instance and start playing immediately.
+     * When the user prefers reduced motion, it renders nothing:
+     * elements stay plain HTML and transitions cut to the new content.
      * @throws When WebGL is not available in the current environment.
      */
     constructor(options: VFXOpts = {}) {
@@ -80,6 +84,7 @@ export class VFX {
         }
 
         const opts = getVFXOpts(options);
+        this.#reducedMotion = prefersReducedMotion();
 
         // Setup canvas
         const canvas = document.createElement("canvas");
@@ -96,7 +101,7 @@ export class VFX {
         this.#player = new VFXPlayer(opts, canvas);
 
         if (opts.autoplay) {
-            this.#player.play();
+            this.play();
         }
     }
 
@@ -108,6 +113,9 @@ export class VFX {
         opts: VFXProps,
         initialCapture?: OffscreenCanvas,
     ): Promise<void> {
+        if (this.#reducedMotion) {
+            return;
+        }
         if (element instanceof HTMLImageElement) {
             await this.#addImage(element, opts);
         } else if (element instanceof HTMLVideoElement) {
@@ -132,6 +140,14 @@ export class VFX {
         offscreen: OffscreenCanvas,
     ): void {
         this.#player.updateHICTexture(canvas, offscreen);
+    }
+
+    /**
+     * True when the user prefers reduced motion, checked once at creation.
+     * @internal Used by transitions.
+     */
+    get reducedMotion(): boolean {
+        return this.#reducedMotion;
     }
 
     get maxTextureSize(): number {
@@ -165,6 +181,9 @@ export class VFX {
         opts: VFXProps,
         withStill: boolean,
     ): Promise<void> {
+        if (this.#reducedMotion) {
+            return;
+        }
         if (!supportsHtmlInCanvas()) {
             console.warn(
                 "html-in-canvas not supported, falling back to dom-to-canvas",
@@ -294,6 +313,9 @@ export class VFX {
         element: HTMLElement,
         effect: Effect | readonly Effect[],
     ): Promise<void> {
+        if (this.#reducedMotion) {
+            return Promise.resolve();
+        }
         const target = this.#wrapperCanvases.get(element) ?? element;
         return this.#player.updateElementEffects(target, effect);
     }
@@ -342,6 +364,9 @@ export class VFX {
      * Start rendering VFX.
      */
     play(): void {
+        if (this.#reducedMotion) {
+            return;
+        }
         this.#player.play();
     }
 
@@ -358,6 +383,9 @@ export class VFX {
      * This is useful when you want to control the rendering timings manually by combining with `autoplay: false`.
      */
     render(): void {
+        if (this.#reducedMotion) {
+            return;
+        }
         this.#player.render();
     }
 

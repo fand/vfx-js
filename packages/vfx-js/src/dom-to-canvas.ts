@@ -87,28 +87,47 @@ export default async function getCanvasFromElement(
         `<svg xmlns="http://www.w3.org/2000/svg" width="${fullW}" height="${fullH}">` +
         `<foreignObject width="100%" height="100%">${xml}</foreignObject></svg>`;
 
-    return new Promise((resolve, reject) => {
+    const img = await new Promise<HTMLImageElement>((resolve) => {
         const img = new Image();
-        img.onload = () => {
-            const ctx = canvas.getContext(
-                "2d",
-            ) as OffscreenCanvasRenderingContext2D | null;
-            if (ctx === null) {
-                return reject();
-            }
-
-            ctx.clearRect(0, 0, canvasW, canvasH);
-            // DPR × clampScale so the SVG content fills the clamped canvas.
-            const drawScale = ratio * clampScale;
-            ctx.scale(drawScale, drawScale);
-            ctx.drawImage(img, 0, 0, fullW, fullH);
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-            resolve(canvas);
-        };
-
+        img.onload = () => resolve(img);
         img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     });
+
+    const ctx = canvas.getContext(
+        "2d",
+    ) as OffscreenCanvasRenderingContext2D | null;
+    if (ctx === null) {
+        throw new Error("[VFX-JS] Failed to get 2D context");
+    }
+
+    const draw = () => {
+        ctx.clearRect(0, 0, canvasW, canvasH);
+        // DPR × clampScale so the SVG content fills the clamped canvas.
+        const drawScale = ratio * clampScale;
+        ctx.scale(drawScale, drawScale);
+        ctx.drawImage(img, 0, 0, fullW, fullH);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+    };
+    draw();
+
+    // Workaround for Safari: it leaves <img> in the SVG blank until a later draw.
+    if (decodesNestedImagesLate() && newElement.querySelector("img")) {
+        for (let i = 0; i < LATE_DECODE_REDRAWS; i++) {
+            await new Promise((r) => setTimeout(r, 16));
+            draw();
+        }
+    }
+
+    return canvas;
+}
+
+/** Images showed on the 3rd draw in Safari 18; one more for margin. */
+const LATE_DECODE_REDRAWS = 3;
+
+/** Safari and every iOS browser (all WebKit). */
+function decodesNestedImagesLate(): boolean {
+    const ua = navigator.userAgent;
+    return /AppleWebKit/.test(ua) && !/Chrome\/|Chromium\//.test(ua);
 }
 
 async function syncStylesOfTree(

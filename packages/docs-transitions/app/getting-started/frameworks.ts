@@ -51,6 +51,7 @@ export default function About() {
             "A Server Component can't pass onClick to Link. Wrap the link in a small client component.",
             'Preset classes cross from a Server Component as-is. Pass options as plain params, e.g. <TransitionIn transition={Swipe} params={{ direction: "up" }} />. Make instances with useTransitionInstance in a client component.',
             "loading.tsx shows its fallback as soon as the path changes, so the transition lands on the skeleton.",
+            "Back plays the same spec as forward. Pass autoReverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -86,13 +87,16 @@ import { useVFXTransition } from "@vfx-js/react";
 import { Swipe } from "@vfx-js/transitions";
 import { useState } from "react";
 
+const panels = [<p>One</p>, <p>Two</p>, <p>Three</p>];
+
 // For containers you render yourself, like tabs.
 export function Tabs() {
   const [tab, setTab] = useState(0);
   const { ref, run } = useVFXTransition({ transition: Swipe });
+  const next = () => setTab((tab + 1) % panels.length);
   return (
     <>
-      <button onClick={() => run(() => setTab(tab + 1))}>Next</button>
+      <button onClick={() => run(next)}>Next</button>
       <div ref={ref} style={{ height: 240 }}>{panels[tab]}</div>
     </>
   );
@@ -102,6 +106,7 @@ export function Tabs() {
         notes: [
             "The old page keeps its own route while it animates out, but useLocation() inside it reads the new location.",
             "Navigate from code with setNextTransition({ transition }) before navigate().",
+            "Back plays the same spec as forward. Pass autoReverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -150,6 +155,7 @@ export default function About() {
         notes: [
             "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
             "This uses the React adapter (@void/react).",
+            "Back plays the same spec as forward. Pass autoReverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -196,8 +202,9 @@ useTransitionIn({ transition: Glitch });
         ],
         notes: [
             'The target fills the viewport height and pages scroll inside it. Pass :fullscreen="false" to size it with your own CSS, e.g. under a header.',
-            "A link's v-transition spec wins over the page's useTransitionIn. Back plays the winning spec reversed.",
+            "A link's v-transition spec wins over the page's useTransitionIn.",
             "Navigate from code with setNextTransition({ transition }) before navigateTo().",
+            "Back plays the same spec as forward. Pass auto-reverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -244,9 +251,10 @@ useTransitionIn({ transition: Glitch });
         ],
         notes: [
             'The target fills the viewport height and pages scroll inside it. Pass :fullscreen="false" to size it with your own CSS, e.g. under a header.',
-            "A link's v-transition spec wins over the page's useTransitionIn. Back plays the winning spec reversed.",
+            "A link's v-transition spec wins over the page's useTransitionIn.",
             "A page with an async setup under your own <Suspense> may be captured before it resolves. Use waitFor on <VFXTransition> to wait for it.",
             "Navigate from code with setNextTransition({ transition }) before router.push().",
+            "Back plays the same spec as forward. Pass auto-reverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -289,8 +297,9 @@ useTransitionIn({ transition: Glitch });
         ],
         notes: [
             "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
-            "A link's transition(spec) wins over the page's transitionIn. Back plays the winning spec reversed.",
+            "A link's transition(spec) wins over the page's transitionIn.",
             "Needs Svelte 5.29 or later for {@attach}. Navigate from code with setNextTransition({ transition }) before goto().",
+            "Back plays the same spec as forward. Pass autoReverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
@@ -338,14 +347,15 @@ import Layout from "../layouts/Layout.astro";
         notes: [
             "The target fills the viewport height and pages scroll inside it. Pass fullscreen={false} to size it with your own CSS, e.g. under a header.",
             "Transitions are names: the class names from @vfx-js/transitions in lowercase. Register your own with registerVFX from @vfx-js/astro/client.",
-            "A link's data-vfx-transition wins over the page's <TransitionIn>. Back plays the winning spec reversed.",
+            "A link's data-vfx-transition wins over the page's <TransitionIn>.",
+            "Back plays the same spec as forward. Pass autoReverse to play the spec that entered the page, reversed. It needs the Navigation API.",
         ],
     },
     {
         id: "vanilla",
         name: "Vanilla",
         install: "npm i @vfx-js/core @vfx-js/transitions",
-        intro: "show(slide) switches between slides already in the DOM. For content built on the fly, run(cb) works like document.startViewTransition(cb): change the DOM in cb, and the shader does the rest.",
+        intro: "show(slide) switches between slides already in the DOM. For content built on the fly, run(cb) works like document.startViewTransition(cb): change the DOM in cb, and VFX-JS animates from the old content to the new.",
         snippets: [
             {
                 label: "index.html",

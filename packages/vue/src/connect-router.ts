@@ -11,12 +11,6 @@ export type RouterLike = {
     ): () => void;
 };
 
-function historyPosition(): number | undefined {
-    const position = (window.history.state as { position?: unknown } | null)
-        ?.position;
-    return typeof position === "number" ? position : undefined;
-}
-
 /**
  * Run a transition for each navigation of `router`.
  * `onPageReady` calls its callback once the new page is in, and returns its cleanup.
@@ -32,7 +26,6 @@ export function connectRouter(
         finish?.();
         finish = null;
     };
-    let position = historyPosition() ?? 0;
 
     const offBefore = router.beforeEach((to, from) => {
         const t = ctx.handle();
@@ -43,8 +36,6 @@ export function connectRouter(
         }
         // A newer navigation drops this one, so free its run.
         free();
-        // On back/forward the history entry has already changed.
-        const back = (historyPosition() ?? position) < position;
         ctx.scope.reset();
         // Hold the navigation until the old page is captured.
         return new Promise<void>((snapshotTaken) => {
@@ -56,14 +47,13 @@ export function connectRouter(
                     });
                 },
                 // Read once the new page is in, so its useTransitionIn counts.
-                () => ctx.scope.pick(back),
+                () => ctx.scope.pick(),
             ).catch((err: unknown) => {
                 console.error("[@vfx-js/vue] VFXTransition run failed:", err);
             });
         });
     });
     const offAfter = router.afterEach((_to, _from, failure) => {
-        position = historyPosition() ?? position;
         // The page did not change, so end the run without animating.
         if (failure && finish) {
             ctx.handle()?.cancel();

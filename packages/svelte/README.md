@@ -50,7 +50,8 @@ A page picks how it enters with `transitionIn`:
 2. The new page's `transitionIn(spec)`.
 3. The props of `<VFXTransition>`.
 
-Back adds `reverse: true` to the spec that wins.
+Back and forward use the same spec. Pass `autoReverse` to play the spec
+that entered the page, reversed, on back. It needs the Navigation API.
 
 ## Element effects
 
@@ -173,7 +174,7 @@ alive.
 ### `<VFXTransition>` (`@vfx-js/svelte/sveltekit`)
 
 Props: `transition`, `params`, `reverse`, `duration`, `overflow`, `ease`,
-`waitFor`, `keepWrapped`, and `fullscreen`.
+`waitFor`, `keepWrapped`, `autoReverse`, and `fullscreen`.
 
 - The target fills the viewport height by default, and pages scroll
   inside it. Pass `fullscreen={false}` to size it with your own CSS,
