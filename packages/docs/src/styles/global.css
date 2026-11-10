@@ -3,7 +3,6 @@
     --link-size: 2rem;
     --code-size: 1rem;
     --inline-code-size: 1.2rem;
-    --flex-dir: row;
 
     --column-size: calc(50% - 16px);
 
@@ -13,13 +12,6 @@
     /* Header bottom edge: the frame plus the header. */
     --header-bottom: calc(var(--frame) + var(--header-height));
     --mono: ui-monospace, Menlo, Consolas, monospace;
-
-    --author-icon-size: 12rem;
-    --author-icon-margin: 0;
-    --author-text-size: 3rem;
-    --author-link-size: 2rem;
-    --author-link-margin-top: 0.5rem;
-    --author-link-margin-bottom: 1rem;
 }
 
 @media (max-width: 767px) {
@@ -28,16 +20,8 @@
         --link-size: 1.2rem;
         --code-size: 0.84rem;
         --inline-code-size: 1rem;
-        --flex-dir: column;
 
         --column-size: 100%;
-
-        --author-icon-size: 8rem;
-        --author-icon-margin: -0.25rem;
-        --author-text-size: 2rem;
-        --author-link-size: 1.5rem;
-        --author-link-margin-top: 0;
-        --author-link-margin-bottom: 0;
     }
 }
 

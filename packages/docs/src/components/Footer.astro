@@ -71,39 +71,32 @@ const columns: { title: string; items: FooterLink[] }[] = [
             ))
         }
     </div>
-    <div id="profile" class="Author">
+    <div class="Author">
         <img
             class="AuthorIcon"
             src={url("amagi.png")}
-            alt=""
+            alt="Amagi"
             loading="lazy"
             decoding="async"
         />
-        <div class="AuthorColumn">
-            <h2>Made by Amagi</h2>
-            <div class="AuthorLinks">
-                <a href="https://github.com/fand" target="_blank" rel="noreferrer">
-                    <img src={url("github.svg")} alt="GitHub link" />
-                </a>
-                <a
-                    href="https://twitter.com/amagitakayosi"
-                    target="_blank"
-                    rel="noreferrer"
-                >
-                    <img src={url("twitter.svg")} alt="Twitter link" />
-                </a>
-                <a
-                    href="https://threads.net/amagitakayosi"
-                    target="_blank"
-                    rel="noreferrer"
-                >
-                    <img
-                        class="AuthorThreads"
-                        src={url("threads.svg")}
-                        alt="Threads link"
-                    />
-                </a>
-            </div>
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src={url("github.svg")} alt="GitHub" />
+            </a>
+            <a
+                href="https://twitter.com/amagitakayosi"
+                target="_blank"
+                rel="noreferrer"
+            >
+                <img src={url("twitter.svg")} alt="Twitter" />
+            </a>
+            <a
+                href="https://bsky.app/profile/amagi.dev"
+                target="_blank"
+                rel="noreferrer"
+            >
+                <img src={url("bluesky.svg")} alt="Bluesky" />
+            </a>
         </div>
     </div>
 </footer>

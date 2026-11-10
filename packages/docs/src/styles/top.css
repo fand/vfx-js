@@ -154,6 +154,9 @@
 /* Line up with the hero content. */
 .Top > section.TopRun,
 .Top > section.TopWhy {
+    /* Content is at most 1600px wide, like the footer links. */
+    max-width: calc(1600px + 80px);
+    margin-inline: auto;
     padding: 0 40px;
 }
 .Top .TopKicker {

@@ -338,19 +338,6 @@ class App {
         ]);
     }
 
-    async showProfile() {
-        const profile = $("#profile");
-        await this.add(profile, {
-            shader: logoShader,
-            overflow: [0, 3000, 0, 2000],
-            uniforms: { delay: 0.5 },
-            intersection: {
-                rootMargin: [-100, 0, -100, 0],
-                threshold: 1,
-            },
-        });
-    }
-
     dispose() {
         this.alive = false;
         for (const element of this.added) {
@@ -409,7 +396,6 @@ onPage(() => {
         timer = setTimeout(
             () => {
                 app.showLogo();
-                app.showProfile();
             },
             intro ? 2000 : 0,
         );
