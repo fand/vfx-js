@@ -1,10 +1,9 @@
 ---
 import CodeBlock from "../components/CodeBlock.astro";
-import PageCards from "../components/PageCards.astro";
 import { runDemos } from "../demos/top-demos";
 import { effectDemos, presetDemos } from "../effects-list";
 import Layout from "../layouts/Layout.astro";
-import { nav, url } from "../site";
+import { url } from "../site";
 import "../styles/top.css";
 
 const features = [
@@ -149,16 +148,6 @@ const features = [
                 ))
             }
         </div>
-    </section>
-
-    <section class="TopCards" aria-label="Docs">
-        <PageCards
-            items={nav.map((item) => ({
-                href: url(`${item.slug}/`),
-                label: item.label,
-                blurb: item.blurb,
-            }))}
-        />
     </section>
 
     <Fragment slot="overlay">

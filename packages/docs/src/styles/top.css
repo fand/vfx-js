@@ -337,13 +337,6 @@
     }
 }
 
-/*================ Page cards ================*/
-
-/* Line up with the hero content. */
-.Top > section.TopCards {
-    padding: 0 40px;
-}
-
 /*================ Intro masks ================*/
 
 #MaskTop,
