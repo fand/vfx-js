@@ -93,13 +93,19 @@ const image = new URL(url("og_image.jpg"), siteUrl).href;
         <script>
             import "../transition-setup";
         </script>
-        <VFXTransition transition="slitscan" duration={0.6}>
+        <!-- Back plays the slit scan reversed. -->
+        <VFXTransition transition="slitscan" duration={0.6} autoReverse>
             <div class="Page">
                 {
                     page ? (
                         <div class="DocLayout">
                             <Sidebar current={page} />
                             <main class:list={["DocMain", mainClass]}>
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
                                 <slot />
                             </main>
                         </div>

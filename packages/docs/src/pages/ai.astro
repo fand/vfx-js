@@ -20,12 +20,12 @@ Make the shift stronger while the mouse is over the image. Use a uniform functio
     {
         label: "Text intro",
         text: `Make the h1 on the landing page glitch in when it scrolls into view, then settle.
-Use @vfx-js/core with a custom shader driven by enterTime. Give it 50 px of overflow.`,
+Use @vfx-js/core with a custom shader driven by enterProgress. Give it 50 px of overflow.`,
     },
     {
         label: "Effect chain",
         text: `Add PixelateEffect, then BloomEffect from @vfx-js/effects to the background video.
-Make one VFX for the page and new Effect instances per element. Skip it when prefers-reduced-motion matches.`,
+Make one VFX for the page and new Effect instances per element.`,
     },
     {
         label: "Vue / Nuxt",
@@ -123,7 +123,7 @@ const checks = [
         <h2>Prompts that work</h2>
         <p>
             Name the package, the element, and the effect. Say what should happen
-            on scroll, hover, or reduced motion.
+            on scroll or hover.
         </p>
         <div class="Prompts">
             {
@@ -164,7 +164,7 @@ const checks = [
         <p>
             The agent can use <code>time</code>, <code>mouse</code>,
             <code>resolution</code>, <code>offset</code>,
-            <code>intersection</code>, <code>enterTime</code> and more. See
+            <code>intersection</code>, <code>enterProgress</code> and more. See
             <a href={url("how-it-works/#uniforms")}>Uniforms and timing</a> for the
             full list, and <a href={url("shaders/")}>Custom Shaders</a> for
             multipass and post effects.

@@ -42,8 +42,16 @@ const builtIns = [
     { name: "time", text: "Seconds since the element was added." },
     { name: "mouse", text: "Mouse position, same space as gl_FragCoord." },
     {
-        name: "intersection, enterTime, leaveTime",
-        text: "Scroll position and timing. Good for intro animations.",
+        name: "intersection",
+        text: "How much of the element is in the viewport, 0 to 1.",
+    },
+    {
+        name: "enterProgress, leaveProgress",
+        text: "Enter and leave transitions, 0 to 1. Good for scroll reveals.",
+    },
+    {
+        name: "enterTime, leaveTime",
+        text: "Seconds since the element entered or left the viewport.",
     },
 ];
 

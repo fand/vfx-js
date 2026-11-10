@@ -4,8 +4,9 @@ precision highp float;
 uniform sampler2D src;
 uniform vec2 resolution;
 uniform vec2 offset;
-uniform float intersection; // 0..1, how much of the element is in view
-uniform float enterTime;    // seconds since it entered
+uniform float intersection;  // 0..1, how much of the element is in view
+uniform float enterProgress; // 0..1 after it enters
+uniform float leaveProgress; // 0..1 after it leaves
 out vec4 outColor;
 
 void main() {
@@ -17,7 +18,18 @@ void main() {
     float colored = step(uv.x, intersection);
     color.rgb = mix(vec3(gray), color.rgb, colored);
 
-    // Fade in over 1 second after entering.
-    outColor = color * clamp(enterTime, 0.0, 1.0);
+    // Fade in on enter, out on leave. Turns back if you scroll back mid-way.
+    outColor = color * enterProgress * (1.0 - leaveProgress);
 }
+`;
+
+/** The `intersection` option for the demo. */
+export const scrollIntersection = { threshold: 0.5, duration: 0.8 };
+
+export const scrollCode = `
+vfx.add(img, {
+    shader,
+    // Enter when half of it is in view, and leave when less than half is.
+    intersection: { threshold: 0.5, duration: 0.8 },
+});
 `;

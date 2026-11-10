@@ -38,6 +38,17 @@
     opacity: 0;
     margin-top: 32px;
 }
+/* VFX-JS draws nothing with reduced motion, so show the plain text. */
+@media (prefers-reduced-motion: reduce) {
+    .Hero #Logo,
+    .Hero #LogoTagline {
+        opacity: 1;
+    }
+    #MaskTop,
+    #MaskBottom {
+        display: none;
+    }
+}
 .Hero p {
     margin: 0;
 }

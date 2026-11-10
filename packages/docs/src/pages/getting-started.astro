@@ -52,8 +52,8 @@ const options = [
     },
     {
         name: "intersection",
-        value: "{ threshold, rootMargin }",
-        text: "When the element counts as in the viewport.",
+        value: "{ threshold, leaveThreshold, rootMargin, duration }",
+        text: "When the element enters and leaves the viewport, and how long the enter and leave take.",
     },
     {
         name: "zIndex",
@@ -144,6 +144,10 @@ const nextSteps = ["how-it-works", "effects", "shaders", "custom-effects", "ai"]
                 <code>new VFX()</code> throws when WebGL is not available. Wrap it in
                 <code>try</code> / <code>catch</code> so the page still works as plain
                 HTML.
+            </li>
+            <li>
+                When the user prefers reduced motion, VFX-JS draws nothing. They see
+                the plain HTML.
             </li>
         </ul>
     </section>

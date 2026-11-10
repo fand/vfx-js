@@ -182,6 +182,19 @@
 .DocMain li + li {
     margin-top: 6px;
 }
+/* Shown only when VFX-JS draws nothing. */
+.MotionNote {
+    display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    .DocMain .MotionNote {
+        display: block;
+        padding: 0.5em 1em;
+        border: 1px solid var(--line);
+        opacity: 0.7;
+    }
+}
+
 .DocMain :not(pre) > code {
     font-size: 0.9em;
 }

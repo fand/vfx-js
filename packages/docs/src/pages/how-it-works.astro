@@ -1,6 +1,6 @@
 ---
 import CodeBlock from "../components/CodeBlock.astro";
-import { scrollShader } from "../demos/scroll-shader";
+import { scrollCode, scrollShader } from "../demos/scroll-shader";
 import Layout from "../layouts/Layout.astro";
 import { url } from "../site";
 
@@ -110,6 +110,14 @@ const uniforms = [
     {
         name: "float leaveTime",
         text: "Seconds since the element left the viewport.",
+    },
+    {
+        name: "float enterProgress",
+        text: "Enter transition, 0 to 1. Plays backward if the element leaves mid-way.",
+    },
+    {
+        name: "float leaveProgress",
+        text: "Leave transition, 0 to 1. Stays 0 until enter finishes.",
     },
     { name: "bool autoCrop", text: "The autoCrop option. Default true." },
     {
@@ -422,13 +430,24 @@ vfx.play();
                 The <code>intersection</code> option sets when the element counts
                 as "in view": <code>threshold</code> (0 to 1) and
                 <code>rootMargin</code>, like <code>IntersectionObserver</code>.
-                This drives the <code>enterTime</code>, <code>leaveTime</code> and
-                <code>intersection</code> uniforms.
+                <code>leaveThreshold</code> sets when it leaves (default:
+                <code>threshold</code>). <code>duration</code> sets the enter and
+                leave time in seconds (default: 1).
+            </li>
+            <li>
+                The visible ratio divides by the smaller of the element size and
+                the viewport size, on each axis. So an element taller than the
+                viewport can still reach 1.
+            </li>
+            <li>
+                This drives the <code>intersection</code>,
+                <code>enterProgress</code>, <code>leaveProgress</code>,
+                <code>enterTime</code> and <code>leaveTime</code> uniforms.
             </li>
         </ul>
         <p>
-            Scroll this image in and out. It fades in when it enters, and color
-            fills in as more of it is in view.
+            Scroll this image in and out. It fades in when it enters and out when
+            it leaves, and color fills in as more of it is in view.
         </p>
         <div class="Demo">
             <img
@@ -438,6 +457,7 @@ vfx.play();
             />
         </div>
         <CodeBlock code={scrollShader} lang="glsl" label="shader.frag" />
+        <CodeBlock code={scrollCode} lang="ts" label="main.ts" />
     </section>
 
     <section id="uniforms">
@@ -472,8 +492,10 @@ vfx.play();
                 element space: (0, 0) is bottom-left, (1, 1) is top-right.
             </li>
             <li>
-                <code>enterTime</code> restarts each time the element enters.
-                Use it for intro animations.
+                Use <code>enterProgress</code> and <code>leaveProgress</code> for
+                enter and leave animations. They turn back smoothly when the user
+                scrolls back mid-way. Use <code>enterTime</code> and
+                <code>leaveTime</code> for animations timed in seconds.
             </li>
             <li>
                 Your own <code>uniforms</code> can be functions. They run every
@@ -483,6 +505,7 @@ vfx.play();
                 Effects get the same values on <code>ctx</code>:
                 <code>ctx.time</code>, <code>ctx.deltaTime</code>,
                 <code>ctx.mouse</code>, <code>ctx.intersection</code>,
+                <code>ctx.enterProgress</code>, <code>ctx.leaveProgress</code>,
                 <code>ctx.enterTime</code>, <code>ctx.leaveTime</code>.
             </li>
         </ul>
@@ -500,6 +523,11 @@ vfx.play();
                 Browser only, and WebGL is required. <code>new VFX()</code> throws
                 without it. <code>VFX.init()</code> returns <code>null</code> instead.
                 Either way the page stays plain HTML.
+            </li>
+            <li>
+                With <code>prefers-reduced-motion: reduce</code>, VFX-JS draws
+                nothing. Elements stay plain HTML, and transitions cut. It is
+                checked once, when <code>VFX</code> is created.
             </li>
             <li>
                 All effects draw on one canvas, at one z-index. Page content cannot
@@ -533,7 +561,7 @@ vfx.play();
 
 <script>
     import { lazyDemo } from "../demos/lazy";
-    import { scrollShader } from "../demos/scroll-shader";
+    import { scrollIntersection, scrollShader } from "../demos/scroll-shader";
     import { getPageVFX } from "../page-vfx";
     import { onPage } from "../lifecycle";
 
@@ -551,7 +579,10 @@ vfx.play();
 
         const scrollDemo = document.getElementById("ScrollDemo");
         if (scrollDemo) {
-            lazyDemo(scrollDemo, () => ({ shader: scrollShader }));
+            lazyDemo(scrollDemo, () => ({
+                shader: scrollShader,
+                intersection: scrollIntersection,
+            }));
         }
     });
 </script>
