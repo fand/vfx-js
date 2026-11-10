@@ -32,7 +32,7 @@ import type {
 import { captureContent } from "./_capture.js";
 
 // Passthrough of the live source to the canvas (used until the first
-// glitch result is ready). Premultiplied for the canvas blend.
+// glitch result is ready). `src` is already premultiplied.
 const FRAG_PASSTHROUGH = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
@@ -45,8 +45,7 @@ void main() {
         outColor = vec4(0.0);
         return;
     }
-    vec4 c = texture(src, uvSrc);
-    outColor = vec4(c.rgb * c.a, c.a);
+    outColor = texture(src, uvSrc);
 }
 `;
 

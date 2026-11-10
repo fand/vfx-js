@@ -25,7 +25,8 @@ vec4 readTex(vec2 c) {
 void main (void) {
     vec4 color = readTex(uvContent);
 
-    float gray = dot(color.rgb, vec3(0.2, 0.7, 0.08));
+    vec3 rgb = color.a > 0.0 ? color.rgb / color.a : vec3(0.0);
+    float gray = dot(rgb, vec3(0.2, 0.7, 0.08));
     float t = mod(gray * 2.0 + time * speed, 2.0);
 
     if (t < 1.) {

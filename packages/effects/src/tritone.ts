@@ -24,7 +24,9 @@ vec4 readTex(vec2 c) {
 void main (void) {
     vec4 color = readTex(uvContent);
 
-    float gray = dot(color.rgb, vec3(0.2, 0.7, 0.08));
+    // src is premultiplied; un-premultiply for luminance.
+    vec3 rgb = color.a > 0.0 ? color.rgb / color.a : vec3(0.0);
+    float gray = dot(rgb, vec3(0.2, 0.7, 0.08));
     float t = mod(gray * 3.0 + time * speed, 3.0);
 
     if (t < 1.) {

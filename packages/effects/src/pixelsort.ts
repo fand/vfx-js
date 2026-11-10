@@ -173,8 +173,7 @@ void main() {
     float myKey = key(texelFetch(src, lowP, 0).rgb, keyMode);
     if (!runActive(src, lowA, b, axis, keyMode, threshold, thresholdHigh, masked, lowSize, boxSize, imgSize, rot)) {
         // padding / out-of-band pixels skip the low-res buffer entirely.
-        vec4 c = texture(srcHi, hiUv);
-        outColor = vec4(c.rgb * c.a, c.a);
+        outColor = texture(srcHi, hiUv);
         return;
     }
     int segStart, segEnd;
@@ -185,32 +184,25 @@ void main() {
         if (r == targetRank) {
             // unmoved pixels keep the hi-res source; moved pixels take the low-res sorted color
             if (i == lowA) {
-                vec4 c = texture(srcHi, hiUv);
-                outColor = vec4(c.rgb * c.a, c.a);
+                outColor = texture(srcHi, hiUv);
             } else {
-                vec4 c = texelFetch(src, toXY(i, b, axis), 0);
-                outColor = vec4(c.rgb * c.a, c.a);
+                outColor = texelFetch(src, toXY(i, b, axis), 0);
             }
             return;
         }
     }
-    vec4 c = texture(srcHi, hiUv);
-    outColor = vec4(c.rgb * c.a, c.a);
+    outColor = texture(srcHi, hiUv);
 }
 `;
 
-// VFX-JS writes to a `premultipliedAlpha: true` canvas. Captured textures
-// upload as straight alpha, so pre-multiply at output — semi-transparent
-// pixels (text-shadow halos, anti-aliased edges) then composite at the
-// intended alpha instead of bleeding through at full RGB intensity.
+// `src` is premultiplied, so it composites as-is.
 const BYPASS_FRAG = `#version 300 es
 precision highp float;
 in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
 void main() {
-    vec4 c = texture(src, uvSrc);
-    outColor = vec4(c.rgb * c.a, c.a);
+    outColor = texture(src, uvSrc);
 }
 `;
 

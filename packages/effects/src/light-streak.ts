@@ -13,7 +13,7 @@ import type {
 } from "@vfx-js/core";
 import { padOutputRect } from "./_pad.js";
 
-// Premultiplied base copy, hard-masked to the inner rect so the pad
+// Base copy, hard-masked to the inner rect so the pad
 // region doesn't clamp-replicate the capture's edge texels.
 const FRAG_BASE = `#version 300 es
 precision highp float;
@@ -26,8 +26,7 @@ void main() {
     vec2 inS = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
     vec2 inC = step(vec2(0.0), uvContent) * step(uvContent, vec2(1.0));
     float m = inS.x * inS.y * inC.x * inC.y;
-    vec4 base = texture(src, clamp(uvSrc, 0.0, 1.0)) * m;
-    outColor = vec4(base.rgb * base.a, base.a);
+    outColor = texture(src, clamp(uvSrc, 0.0, 1.0)) * m;
 }
 `;
 

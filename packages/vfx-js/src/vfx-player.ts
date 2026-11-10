@@ -383,6 +383,7 @@ export class VFXPlayer {
             const texture = new Texture(this.#ctx, canvas);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
+            texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
             texture.needsUpdate = true;
             // Effect-path uses a resolver-form EffectTexture that reads
             // `e.srcTexture` each frame, so updating the field alone is
@@ -769,6 +770,8 @@ export class VFXPlayer {
         const [wrapS, wrapT] = parseWrap(opts.wrap);
         texture.wrapS = wrapS;
         texture.wrapT = wrapT;
+        // Effects read `ctx.src` as premultiplied, like later stages.
+        texture.premultiplyAlpha = true;
         texture.needsUpdate = true;
 
         const autoCrop = opts.autoCrop ?? true;
@@ -985,6 +988,7 @@ export class VFXPlayer {
         const texture = new Texture(this.#ctx, img);
         texture.wrapS = oldTexture.wrapS;
         texture.wrapT = oldTexture.wrapT;
+        texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
         texture.needsUpdate = true;
         // Effect path reads `e.srcTexture` each frame via a resolver, so
         // the field swap suffices; shader path also needs the src uniform.
@@ -1002,6 +1006,7 @@ export class VFXPlayer {
             const texture = new Texture(this.#ctx, element);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
+            texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
             texture.needsUpdate = true;
             if (!e.chain && e.passes.length > 0) {
                 e.passes[0].uniforms["src"].value = texture;
@@ -1031,6 +1036,7 @@ export class VFXPlayer {
             const texture = new Texture(this.#ctx, offscreen);
             texture.wrapS = oldTexture.wrapS;
             texture.wrapT = oldTexture.wrapT;
+            texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
             texture.needsUpdate = true;
             if (!e.chain && e.passes.length > 0) {
                 e.passes[0].uniforms["src"].value = texture;

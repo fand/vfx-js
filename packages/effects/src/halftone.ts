@@ -156,6 +156,8 @@ void main() {
             )) continue;
 
             vec4 dotColor = sampleSrcNearest(renderDotLoc);
+            // Ink amounts use straight color.
+            dotColor.rgb = dotColor.a > 0.0 ? dotColor.rgb / dotColor.a : vec3(0.0);
             float channelAmount = isRgb
                 ? dotColor[i]
                 : cmykChannel(dotColor.rgb, i);

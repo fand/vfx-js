@@ -4,7 +4,8 @@ import type { GLContext, Restorable } from "./context.js";
  * Texture wrapper over a WebGL2 `TEXTURE_2D`.
  *
  * Matches the behaviour of the Three.js texture types previously used
- * by VFX-JS: Y-flipped unpack, non-premultiplied alpha, linear filter,
+ * by VFX-JS: Y-flipped unpack, non-premultiplied alpha (unless
+ * {@link premultiplyAlpha}), linear filter,
  * and RGBA format. Use {@link needsUpdate} to re-upload from a live
  * canvas/video source on the next bind.
  *
@@ -49,6 +50,9 @@ export class Texture implements Restorable {
     minFilter: TextureFilter = "linear";
     magFilter: TextureFilter = "linear";
     needsUpdate = true;
+
+    /** Premultiply alpha on upload. Effect-path sources use this. */
+    premultiplyAlpha = false;
 
     /** Source image/canvas/video; exposed for identity comparison. */
     source: TextureSource | null = null;
@@ -115,7 +119,10 @@ export class Texture implements Restorable {
         const gl = this.gl;
         const src = this.source;
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.pixelStorei(
+            gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,
+            this.premultiplyAlpha,
+        );
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
         if (src) {
             try {

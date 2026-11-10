@@ -195,7 +195,9 @@ void main() {
     float aa = fwidth(edgePx);
     float visibleMask = smoothstep(-aa, 0.0, wallDist);
 
-    outColor = mix(bgColor, base, visibleMask);
+    // src is premultiplied; premultiply bgColor to match.
+    vec4 bg = vec4(bgColor.rgb * bgColor.a, bgColor.a);
+    outColor = mix(bg, base, visibleMask);
 }
 `;
 

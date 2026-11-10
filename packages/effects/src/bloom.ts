@@ -216,6 +216,8 @@ void main() {
     vec2 insideSrc = step(vec2(0.0), uvSrc) * step(uvSrc, vec2(1.0));
     float srcMask = insideSrc.x * insideSrc.y;
     vec4 baseColor = texture(src, clamp(uvSrc, 0.0, 1.0)) * srcMask;
+    // src is premultiplied; decode the straight color.
+    baseColor.rgb = baseColor.a > 0.0 ? baseColor.rgb / baseColor.a : vec3(0.0);
     vec2 outside = max(vec2(0.0), max(-uvContent, uvContent - 1.0));
     float outDist = max(outside.x, outside.y);
     float baseMask = 1.0 - smoothstep(0.0, edgeFade, outDist);
