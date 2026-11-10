@@ -377,31 +377,36 @@ new VFX({ postEffect: { effect: new BloomEffect() } });
         multipassPasses,
         uniformsShader,
     } from "../demos/shader-demos";
+    import { onPage, scrollRoot } from "../lifecycle";
 
-    const uniformsDemo = document.getElementById("UniformsDemo");
-    if (uniformsDemo) {
-        lazyDemo(uniformsDemo, () => ({
-            shader: uniformsShader,
-            uniforms: {
-                tint: [1, 0.4, 0.8],
-                scroll: () => window.scrollY / window.innerHeight,
-            },
-        }));
-    }
+    onPage(() => {
+        const uniformsDemo = document.getElementById("UniformsDemo");
+        if (uniformsDemo) {
+            lazyDemo(uniformsDemo, () => ({
+                shader: uniformsShader,
+                uniforms: {
+                    tint: [1, 0.4, 0.8],
+                    // The docs page scrolls inside its own box.
+                    scroll: () =>
+                        (scrollRoot()?.scrollTop ?? 0) / window.innerHeight,
+                },
+            }));
+        }
 
-    const backbufferDemo = document.getElementById("BackbufferDemo");
-    if (backbufferDemo) {
-        lazyDemo(backbufferDemo, () => ({
-            shader: backbufferShader,
-            backbuffer: true,
-            overflow: 60,
-        }));
-    }
+        const backbufferDemo = document.getElementById("BackbufferDemo");
+        if (backbufferDemo) {
+            lazyDemo(backbufferDemo, () => ({
+                shader: backbufferShader,
+                backbuffer: true,
+                overflow: 60,
+            }));
+        }
 
-    const multipassDemo = document.getElementById("MultipassDemo");
-    if (multipassDemo) {
-        lazyDemo(multipassDemo, () => ({ shader: multipassPasses }));
-    }
+        const multipassDemo = document.getElementById("MultipassDemo");
+        if (multipassDemo) {
+            lazyDemo(multipassDemo, () => ({ shader: multipassPasses }));
+        }
+    });
 </script>
 
 <style>

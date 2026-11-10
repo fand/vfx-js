@@ -198,11 +198,14 @@ const checks = [
 <script>
     import { lazyDemo } from "../demos/lazy";
     import { rippleShader } from "../demos/ripple-shader";
+    import { onPage } from "../lifecycle";
 
-    const ripple = document.getElementById("RippleDemo");
-    if (ripple) {
-        lazyDemo(ripple, () => ({ shader: rippleShader, wrap: "clamp" }));
-    }
+    onPage(() => {
+        const ripple = document.getElementById("RippleDemo");
+        if (ripple) {
+            lazyDemo(ripple, () => ({ shader: rippleShader, wrap: "clamp" }));
+        }
+    });
 </script>
 
 <style>

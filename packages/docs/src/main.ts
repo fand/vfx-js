@@ -1,4 +1,4 @@
-import type { Effect } from "@vfx-js/core";
+import type { Effect, VFX } from "@vfx-js/core";
 import {
     AsciiEffect,
     BloomEffect,
@@ -8,6 +8,7 @@ import {
 } from "@vfx-js/effects";
 
 import { bgSpheres, bgVFX, initBackground } from "./background";
+import { onPage } from "./lifecycle";
 import { getPageVFX } from "./page-vfx";
 
 function $(selector: string, parent?: HTMLElement) {
@@ -181,6 +182,9 @@ await vfx.add(document.querySelector("img"), {
 
 class App {
     vfx = getPageVFX();
+    /** False once the page is swapped out. Late async work checks it. */
+    alive = true;
+    added: HTMLElement[] = [];
 
     // Click an item to apply its effect to the logo, the tagline and the background.
     initEffectMenu() {
@@ -222,7 +226,7 @@ class App {
             slider.disabled = !bgEffect;
             // Run swaps in order so fast clicks can't interleave them.
             queue = queue.then(async () => {
-                if (selected !== index) {
+                if (selected !== index || !this.alive) {
                     return;
                 }
                 const updateText = async (text: (typeof texts)[number]) => {
@@ -233,7 +237,7 @@ class App {
                     } else {
                         text.onEffectPath = true;
                         this.vfx.remove(text.element);
-                        await this.vfx.add(text.element, { effect: chain });
+                        await this.add(text.element, { effect: chain });
                     }
                 };
                 const bgChain = bgEffect ? [bgSpheres, bgEffect] : [bgSpheres];
@@ -271,21 +275,35 @@ class App {
                 copy.innerHTML = label;
             }, 1500);
         });
+
+        // Other pages show the plain spheres.
+        return () => {
+            queue = queue.then(() => bgVFX.updateEffects(bg, [bgSpheres]));
+        };
     }
 
     hideMask() {
-        const maskTop = $("#MaskTop");
-        maskTop.style.setProperty("height", "0");
+        document.getElementById("MaskTop")?.style.setProperty("height", "0");
+        document
+            .getElementById("MaskBottom")
+            ?.style.setProperty("opacity", "0");
+    }
 
-        const maskBottom = $("#MaskBottom");
-        maskBottom.style.setProperty("opacity", "0");
+    /** Add to the page VFX, unless the page is already gone. */
+    async add(element: HTMLElement, props: Parameters<VFX["add"]>[1]) {
+        await this.vfx.add(element, props);
+        if (this.alive) {
+            this.added.push(element);
+        } else {
+            this.vfx.remove(element);
+        }
     }
 
     async showLogo() {
         const logo = $("#Logo");
         const tagline = $("#LogoTagline");
         return Promise.all([
-            this.vfx.add(logo, {
+            this.add(logo, {
                 shader: logoShader,
                 overflow: [0, 3000, 0, 100],
                 uniforms: { delay: 0 },
@@ -293,7 +311,7 @@ class App {
                     threshold: 1,
                 },
             }),
-            this.vfx.add(tagline, {
+            this.add(tagline, {
                 shader: logoShader,
                 overflow: [0, 3000, 0, 1000],
                 uniforms: { delay: 0.3 },
@@ -306,7 +324,7 @@ class App {
 
     async showProfile() {
         const profile = $("#profile");
-        await this.vfx.add(profile, {
+        await this.add(profile, {
             shader: logoShader,
             overflow: [0, 3000, 0, 2000],
             uniforms: { delay: 0.5 },
@@ -316,16 +334,44 @@ class App {
             },
         });
     }
+
+    dispose() {
+        this.alive = false;
+        for (const element of this.added) {
+            this.vfx.remove(element);
+        }
+        this.added = [];
+    }
 }
 
-window.addEventListener("load", async () => {
+onPage(() => {
+    if (!document.getElementById("Logo")) {
+        return;
+    }
     const app = new App();
-    await initBackground();
+    // A full load plays the intro behind the masks. Page swaps drop the masks.
+    const intro = document.getElementById("MaskTop") !== null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopMenu: (() => void) | undefined;
 
-    app.initEffectMenu();
-    app.hideMask();
-    setTimeout(() => {
-        app.showLogo();
-        app.showProfile();
-    }, 2000);
+    initBackground().then(() => {
+        if (!app.alive) {
+            return;
+        }
+        stopMenu = app.initEffectMenu();
+        app.hideMask();
+        timer = setTimeout(
+            () => {
+                app.showLogo();
+                app.showProfile();
+            },
+            intro ? 2000 : 0,
+        );
+    });
+
+    return () => {
+        clearTimeout(timer);
+        stopMenu?.();
+        app.dispose();
+    };
 });

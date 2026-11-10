@@ -21,10 +21,12 @@
   },
   "dependencies": {
     "@astrojs/mdx": "^8.1.2",
+    "@vfx-js/astro": "workspace:*",
     "@vfx-js/core": "workspace:*",
     "@vfx-js/effects": "workspace:*",
     "@vfx-js/examples": "workspace:*",
     "@vfx-js/storybook": "workspace:*",
+    "@vfx-js/transitions": "workspace:*",
     "astro": "^7.4.2"
   },
   "devDependencies": {

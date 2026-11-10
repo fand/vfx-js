@@ -535,22 +535,25 @@ vfx.play();
     import { lazyDemo } from "../demos/lazy";
     import { scrollShader } from "../demos/scroll-shader";
     import { getPageVFX } from "../page-vfx";
+    import { onPage } from "../lifecycle";
 
-    const button = document.getElementById("ClickDemo");
-    if (button) {
-        let count = 0;
-        lazyDemo(button, () => ({ shader: "rainbow" }));
-        button.addEventListener("click", () => {
-            count++;
-            button.textContent = `Clicked ${count} ${count === 1 ? "time" : "times"}`;
-            getPageVFX().update(button);
-        });
-    }
+    onPage(() => {
+        const button = document.getElementById("ClickDemo");
+        if (button) {
+            let count = 0;
+            lazyDemo(button, () => ({ shader: "rainbow" }));
+            button.addEventListener("click", () => {
+                count++;
+                button.textContent = `Clicked ${count} ${count === 1 ? "time" : "times"}`;
+                getPageVFX().update(button);
+            });
+        }
 
-    const scrollDemo = document.getElementById("ScrollDemo");
-    if (scrollDemo) {
-        lazyDemo(scrollDemo, () => ({ shader: scrollShader }));
-    }
+        const scrollDemo = document.getElementById("ScrollDemo");
+        if (scrollDemo) {
+            lazyDemo(scrollDemo, () => ({ shader: scrollShader }));
+        }
+    });
 </script>
 
 <style>

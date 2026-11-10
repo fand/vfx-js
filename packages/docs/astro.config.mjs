@@ -39,5 +39,7 @@ export default defineConfig({
     server: { port: 3001, host: true },
     vite: {
         server: { allowedHosts: [".ts.net"] },
+        // Inline module scripts run again on every page swap. Keep them as files, which run once.
+        build: { assetsInlineLimit: 0 },
     },
 });

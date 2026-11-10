@@ -92,8 +92,15 @@
 
 /*================ Page ================*/
 
+/* The page scrolls inside the transition target, so old and new pages share one box. */
 .Page {
+    box-sizing: border-box;
+    height: 100%;
     padding-top: var(--header-height);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Only the BG shows behind the header. */
+    clip-path: inset(var(--header-height) 0 0 0);
 }
 
 /*================ Doc layout ================*/

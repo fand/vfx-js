@@ -249,56 +249,59 @@ await vfx.updateEffects(video, [new BloomEffect({ intensity: 8 })]);
         presetDemos,
         transitionPresetDemos,
     } from "../effects-list";
+    import { onPage } from "../lifecycle";
 
-    for (const demo of [...presetDemos, ...transitionPresetDemos]) {
-        const img = document.querySelector<HTMLElement>(
-            `[data-preset="${demo.name}"], [data-transition-preset="${demo.name}"]`,
-        );
-        if (img) {
-            lazyDemo(img, () => ({ shader: demo.name, ...demo.props }));
+    onPage(() => {
+        for (const demo of [...presetDemos, ...transitionPresetDemos]) {
+            const img = document.querySelector<HTMLElement>(
+                `[data-preset="${demo.name}"], [data-transition-preset="${demo.name}"]`,
+            );
+            if (img) {
+                lazyDemo(img, () => ({ shader: demo.name, ...demo.props }));
+            }
         }
-    }
 
-    for (const demo of effectDemos) {
-        const img = document.querySelector<HTMLElement>(
-            `[data-effect="${demo.name}"]`,
-        );
-        if (!img) {
-            continue;
-        }
-        let current: ReturnType<typeof demo.create> | undefined;
-        lazyDemo(img, () => {
-            current = demo.create();
-            return { effect: current, zIndex: demo.zIndex };
-        });
-        const onClick = demo.onClick;
-        if (onClick) {
-            img.addEventListener("click", () => {
-                if (current) {
-                    onClick(current);
-                }
+        for (const demo of effectDemos) {
+            const img = document.querySelector<HTMLElement>(
+                `[data-effect="${demo.name}"]`,
+            );
+            if (!img) {
+                continue;
+            }
+            let current: ReturnType<typeof demo.create> | undefined;
+            lazyDemo(img, () => {
+                current = demo.create();
+                return { effect: current, zIndex: demo.zIndex };
             });
+            const onClick = demo.onClick;
+            if (onClick) {
+                img.addEventListener("click", () => {
+                    if (current) {
+                        onClick(current);
+                    }
+                });
+            }
         }
-    }
 
-    const uniformsDemo = document.getElementById("UniformsDemo");
-    if (uniformsDemo) {
-        lazyDemo(uniformsDemo, () => ({
-            shader: "duotone",
-            uniforms: { color1: [0, 0, 1, 1], color2: [0, 1, 0, 1], speed: 0.2 },
-        }));
-    }
+        const uniformsDemo = document.getElementById("UniformsDemo");
+        if (uniformsDemo) {
+            lazyDemo(uniformsDemo, () => ({
+                shader: "duotone",
+                uniforms: { color1: [0, 0, 1, 1], color2: [0, 1, 0, 1], speed: 0.2 },
+            }));
+        }
 
-    const chainDemo = document.getElementById("ChainDemo");
-    if (chainDemo) {
-        lazyDemo(chainDemo, () => ({
-            effect: [
-                new PixelateEffect({ size: 10 }),
-                new ScanlineEffect({ spacing: 5 }),
-                new BloomEffect({ threshold: 0.01, intensity: 10, pad: 100 }),
-            ],
-        }));
-    }
+        const chainDemo = document.getElementById("ChainDemo");
+        if (chainDemo) {
+            lazyDemo(chainDemo, () => ({
+                effect: [
+                    new PixelateEffect({ size: 10 }),
+                    new ScanlineEffect({ spacing: 5 }),
+                    new BloomEffect({ threshold: 0.01, intensity: 10, pad: 100 }),
+                ],
+            }));
+        }
+    });
 </script>
 
 <style>

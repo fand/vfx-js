@@ -201,17 +201,15 @@ const nextSteps = ["how-it-works", "effects", "shaders", "custom-effects", "ai"]
 </Layout>
 
 <script>
-    import { getPageVFX } from "../page-vfx";
+    import { lazyDemo } from "../demos/lazy";
+    import { onPage } from "../lifecycle";
 
-    const img = document.getElementById("FirstEffectDemo");
-    if (img) {
-        try {
-            await getPageVFX().add(img, { shader: "glitch", overflow: 100 });
-        } catch (e) {
-            // No WebGL: the plain image stays.
-            console.warn(e);
+    onPage(() => {
+        const img = document.getElementById("FirstEffectDemo");
+        if (img) {
+            lazyDemo(img, () => ({ shader: "glitch", overflow: 100 }));
         }
-    }
+    });
 </script>
 
 <style>

@@ -1,4 +1,6 @@
 ---
+import { VFXTransition } from "@vfx-js/astro";
+import { ClientRouter } from "astro:transitions";
 import Background from "../components/Background.astro";
 import Footer from "../components/Footer.astro";
 import Header from "../components/Header.astro";
@@ -24,7 +26,8 @@ const image = new URL(url("og_image.jpg"), siteUrl).href;
 ---
 
 <!doctype html>
-<html lang="en">
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html lang="en" transition:animate="none">
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -58,34 +61,10 @@ const image = new URL(url("og_image.jpg"), siteUrl).href;
         />
         <link rel="apple-touch-icon" href={url("favicon/favicon-180.png")} />
         <link rel="manifest" href={url("manifest.webmanifest")} />
-    </head>
 
-    <body class:list={{ DocPage: page }}>
-        <Background />
-        <Header current={page} />
+        <ClientRouter />
 
-        <div class="Page">
-            {
-                page ? (
-                    <div class="DocLayout">
-                        <Sidebar current={page} />
-                        <main class:list={["DocMain", mainClass]}>
-                            <slot />
-                        </main>
-                    </div>
-                ) : (
-                    <main class={mainClass}>
-                        <slot />
-                    </main>
-                )
-            }
-            <Footer />
-        </div>
-
-        <div id="Frame"><div id="FrameBottom"></div></div>
-        <slot name="overlay" />
-
-        <!-- Cloudflare Web Analytics -->
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
         <script
             is:inline
             defer
@@ -93,5 +72,38 @@ const image = new URL(url("og_image.jpg"), siteUrl).href;
             data-cf-beacon='{"token": "b9c39aae9c304f1cbfa1e7bb3e84f078"}'
         ></script>
         <!-- End Cloudflare Web Analytics -->
+    </head>
+
+    <body class:list={{ DocPage: page }}>
+        <Background />
+        <Header current={page} />
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script>
+            import "../transition-setup";
+        </script>
+        <VFXTransition transition="distortfade" duration={0.6}>
+            <div class="Page">
+                {
+                    page ? (
+                        <div class="DocLayout">
+                            <Sidebar current={page} />
+                            <main class:list={["DocMain", mainClass]}>
+                                <slot />
+                            </main>
+                        </div>
+                    ) : (
+                        <main class={mainClass}>
+                            <slot />
+                        </main>
+                    )
+                }
+                <Footer />
+            </div>
+        </VFXTransition>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        <slot name="overlay" />
+
     </body>
 </html>

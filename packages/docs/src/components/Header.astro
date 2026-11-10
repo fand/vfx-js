@@ -41,31 +41,29 @@ const { current } = Astro.props;
 </header>
 
 <script>
-    const header = document.querySelector(".SiteHeader") as HTMLElement;
-    const button = header.querySelector(
-        ".SiteHeaderMenuButton",
-    ) as HTMLButtonElement;
+    import { onPage } from "../lifecycle";
 
     const setOpen = (open: boolean) => {
-        header.dataset.open = String(open);
-        button.setAttribute("aria-expanded", String(open));
+        const header = document.querySelector<HTMLElement>(".SiteHeader");
+        header?.setAttribute("data-open", String(open));
+        header
+            ?.querySelector(".SiteHeaderMenuButton")
+            ?.setAttribute("aria-expanded", String(open));
     };
-    button.addEventListener("click", () => {
-        setOpen(header.dataset.open !== "true");
+
+    // Page swaps replace the header, so bind the button on every page.
+    onPage(() => {
+        const header = document.querySelector<HTMLElement>(".SiteHeader");
+        header
+            ?.querySelector(".SiteHeaderMenuButton")
+            ?.addEventListener("click", () => {
+                setOpen(header.dataset.open !== "true");
+            });
     });
+
     window.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
             setOpen(false);
         }
     });
-
-    // Clip the page at the header's bottom edge, so only the BG shows behind the header.
-    const page = document.querySelector(".Page") as HTMLElement;
-    const loop = () => {
-        const edge = header.getBoundingClientRect().bottom;
-        const top = Math.max(0, edge - page.getBoundingClientRect().top);
-        page.style.clipPath = `inset(${top}px 0 0 0)`;
-        requestAnimationFrame(loop);
-    };
-    loop();
 </script>

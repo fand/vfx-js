@@ -510,38 +510,41 @@ for (const img of document.querySelectorAll("img")) {
     import { TileEffect } from "../demos/tile-effect";
     import { TrailEffect } from "../demos/trail-effect";
     import { WaveEffect } from "../demos/wave-effect";
+    import { onPage } from "../lifecycle";
 
-    const waveDemo = document.getElementById("WaveDemo");
-    const waveAmount = document.getElementById(
-        "WaveAmount",
-    ) as HTMLInputElement | null;
-    if (waveDemo && waveAmount) {
-        let wave: WaveEffect | undefined;
-        lazyDemo(waveDemo, () => {
-            wave = new WaveEffect({ amount: waveAmount.valueAsNumber });
-            return { effect: wave };
-        });
-        waveAmount.addEventListener("input", () => {
-            if (wave) {
-                wave.params.amount = waveAmount.valueAsNumber;
-            }
-        });
-    }
+    onPage(() => {
+        const waveDemo = document.getElementById("WaveDemo");
+        const waveAmount = document.getElementById(
+            "WaveAmount",
+        ) as HTMLInputElement | null;
+        if (waveDemo && waveAmount) {
+            let wave: WaveEffect | undefined;
+            lazyDemo(waveDemo, () => {
+                wave = new WaveEffect({ amount: waveAmount.valueAsNumber });
+                return { effect: wave };
+            });
+            waveAmount.addEventListener("input", () => {
+                if (wave) {
+                    wave.params.amount = waveAmount.valueAsNumber;
+                }
+            });
+        }
 
-    const trailDemo = document.getElementById("TrailDemo");
-    if (trailDemo) {
-        lazyDemo(trailDemo, () => ({ effect: new TrailEffect() }));
-    }
+        const trailDemo = document.getElementById("TrailDemo");
+        if (trailDemo) {
+            lazyDemo(trailDemo, () => ({ effect: new TrailEffect() }));
+        }
 
-    const tileDemo = document.getElementById("TileDemo");
-    if (tileDemo) {
-        let tile: TileEffect | undefined;
-        lazyDemo(tileDemo, () => {
-            tile = new TileEffect();
-            return { effect: tile };
-        });
-        tileDemo.addEventListener("click", () => tile?.shuffle());
-    }
+        const tileDemo = document.getElementById("TileDemo");
+        if (tileDemo) {
+            let tile: TileEffect | undefined;
+            lazyDemo(tileDemo, () => {
+                tile = new TileEffect();
+                return { effect: tile };
+            });
+            tileDemo.addEventListener("click", () => tile?.shuffle());
+        }
+    });
 </script>
 
 <style>

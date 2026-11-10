@@ -41,30 +41,39 @@ const { current } = Astro.props;
 </nav>
 
 <script>
+    import { onPage, scrollRoot } from "../lifecycle";
+
     // Mark the section that crossed the upper third of the viewport last.
-    const links = Array.from(
-        document.querySelectorAll<HTMLAnchorElement>(".DocSidebar [data-section]"),
-    );
-    const targets = links.map((link) =>
-        document.getElementById(link.dataset.section ?? ""),
-    );
+    onPage(() => {
+        const links = Array.from(
+            document.querySelectorAll<HTMLAnchorElement>(
+                ".DocSidebar [data-section]",
+            ),
+        );
+        const root = scrollRoot();
+        if (links.length === 0 || !root) {
+            return;
+        }
+        const targets = links.map((link) =>
+            document.getElementById(link.dataset.section ?? ""),
+        );
 
-    const update = () => {
-        const line = window.innerHeight / 3;
-        let active = 0;
-        for (const [i, target] of targets.entries()) {
-            if (target && target.getBoundingClientRect().top < line) {
-                active = i;
+        const update = () => {
+            const line = window.innerHeight / 3;
+            let active = 0;
+            for (const [i, target] of targets.entries()) {
+                if (target && target.getBoundingClientRect().top < line) {
+                    active = i;
+                }
             }
-        }
-        for (const [i, link] of links.entries()) {
-            link.classList.toggle("active", i === active);
-        }
-    };
+            for (const [i, link] of links.entries()) {
+                link.classList.toggle("active", i === active);
+            }
+        };
 
-    if (links.length > 0) {
-        window.addEventListener("scroll", update, { passive: true });
+        root.addEventListener("scroll", update, { passive: true });
         window.addEventListener("resize", update);
         update();
-    }
+        return () => window.removeEventListener("resize", update);
+    });
 </script>
