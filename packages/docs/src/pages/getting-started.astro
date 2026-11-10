@@ -3,7 +3,7 @@ import CodeBlock from "../components/CodeBlock.astro";
 import FrameworkTabs from "../components/FrameworkTabs.astro";
 import PageCards from "../components/PageCards.astro";
 import Layout from "../layouts/Layout.astro";
-import { findNav, url } from "../site";
+import { findNav, links, url } from "../site";
 
 const firstEffect = `
 import { VFX } from "@vfx-js/core";
@@ -195,7 +195,9 @@ const nextSteps = ["how-it-works", "effects", "shaders", "custom-effects", "ai"]
         <h2>Next steps</h2>
         <PageCards items={nextSteps} />
         <p>
-            Or read the <a href={url("docs/")}>API reference</a>.
+            Or read the <a href={url("docs/")}>API reference</a>, browse the
+            <a href={url("examples/")}>examples</a>, or see tab and page
+            transitions in the <a href={links.transitions}>transition demo</a>.
         </p>
     </section>
 </Layout>

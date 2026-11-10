@@ -59,37 +59,37 @@ Transitions:
 
 ## Steps
 
-1. Astro scaffold
+1. Astro scaffold (done)
    - Replace Vite setup in `packages/docs` with Astro; keep `scripts/` and `public/`.
    - Build scripts: `astro build`, then copy TypeDoc / Storybook / examples into `dist/`, then `build:llms`.
    - Check `pnpm --filter docs build` output matches today's `dist/` layout.
    - Update the Cloudflare preview workflow (see Preview).
-2. Layout
+2. Layout (done)
    - `Layout.astro`: head / OG tags per page, header (Getting Started, How it Works, AI, Effects, Shaders, API, GitHub), sidebar with scroll spy.
    - Footer with the author section from the current `AuthorSection`.
    - Split `index.css` into global / layout / page styles.
    - Move `spheres-bg.ts` into a persisted BG component.
-3. Top page
+3. Top page (done)
    - Port hero and effect menu from `src/main.ts`.
    - Remove Usage / Examples / Author sections; add cards linking to each docs page.
-4. Getting Started page
-5. Effects page
+4. Getting Started page (done)
+5. Effects page (done)
    - Live demos with one shared `VFX` instance; lazy-init demos when in view.
    - Effect gallery driven by a list in `src/effects-list.ts`.
-6. How it Works page
+6. How it Works page (done)
    - Inline SVG diagrams for overlay canvas and overflow. Reuse `docs/effect-dims.svg`.
-7. AI page
-8. Custom Shaders page
+7. AI page (done)
+8. Custom Shaders page (done)
    - One live demo per topic (uniforms, overflow, multipass).
-9. Custom Effects page
+9. Custom Effects page (done)
    - Port examples from `docs/EFFECT.md`; one live demo per hook.
-10. Page transitions
+10. Page transitions (done)
    - Add `<VFXTransition>` to the layout; pick a preset; set back = `reverse`.
    - Check that demos inside `<main>` freeze only during the run and restart after.
-11. Wiring
+11. Wiring (done)
    - Old `#examples` anchor → redirect script to `/effects/`.
    - Update `public/llms.txt` with page URLs if useful.
-12. Check
+12. Check (done)
     - `pnpm --filter docs build` and `preview`; check all pages, TypeDoc / Storybook / examples links.
     - Transitions in Chrome, Safari, Firefox (Safari / Firefox have no `moveBefore`; not checked yet).
     - Cloudflare preview works under `/vfx-js/` (see Preview below).
@@ -98,6 +98,28 @@ Transitions:
     - `pnpm --filter docs test` still passes.
 
 Each step = one commit. Steps 4–9 can go in any order.
+
+## Status
+
+Steps 1–12 done. Step 12 checked Chrome only (Playwright, 1440 and 375). Safari and Firefox transitions are not checked yet.
+
+## Follow-ups
+
+- `ParticleExplodeEffect` burst wipes earlier elements (`packages/effects/src/particle-explode.ts`).
+- Core JSDoc does not match the code: `release` default (0 vs Infinity), `EffectRenderTargetOpts.size`, `EffectDrawOpts.target`.
+- `ElementRect` is not exported from core.
+- Skill blit feedback example may map wrong with padded buffers.
+- Rethink the `time` uniform spec.
+- Move scroll restore into `@vfx-js/astro`. `lifecycle.ts` wraps the swap of `<VFXTransition>` by listener order, which is fragile.
+- GitHub Pages reads `404.html` and `robots.txt` only at the domain root, so `/vfx-js/404.html` and the sitemap line in `/vfx-js/robots.txt` do nothing there.
+- `@vfx-js/transitions` ESM build warns about `"use client"` when bundled.
+- Trail demo on Custom Effects is clipped at 375px.
+- Check transitions in Safari and Firefox (no `moveBefore`).
+- `examples/` page floods the console with `GL_INVALID_FRAMEBUFFER_OPERATION` (zero-size attachment), then WebGL stops reporting. Lives in `packages/examples`.
+- Top page Lighthouse: CLS 0.65 from the intro masks (`#MaskTop`) and `.EffectMenu` moving in; TBT about 1 s, mostly `background.ts` and core init.
+- Unused files in `public/`: `cat.gif`, `logo.png`, `nyancat.gif`, `octocat.gif`, `vfx-js-blob.webp`, `vfx-js-logo-white.svg`, `vfx-js-logo.svg`, `vfx-js-top-blob.png`. Old links may point at them, so check before removing.
+- `amagi.png` is 960px for a small icon; a smaller WebP saves about 80 KB.
+- 404 page sets `og:url` to `/vfx-js/404/`. Harmless, since it is `noindex`.
 
 ## Preview
 
