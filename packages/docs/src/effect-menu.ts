@@ -65,8 +65,6 @@ export type MenuEffect = {
     adjust?: Record<string, unknown>;
     /** Add a Bloom after the effect, with these options. */
     glow?: Record<string, unknown>;
-    /** Extra options for the code snippet, as source text. */
-    code?: Record<string, string>;
     controls?: Control[];
 };
 
@@ -153,24 +151,6 @@ export function toParam(control: Control, value: ParamValue): unknown {
     return value;
 }
 
-// Dots that grow from dark to light, each with its own hue.
-function dotTiles(count: number): HTMLCanvasElement[] {
-    return Array.from({ length: count }, (_, i) => {
-        const canvas = document.createElement("canvas");
-        canvas.width = 64;
-        canvas.height = 64;
-        const g = canvas.getContext("2d");
-        if (g) {
-            const t = i / (count - 1);
-            g.fillStyle = `hsl(${(i / count) * 360}, 85%, 60%)`;
-            g.beginPath();
-            g.arc(32, 32, 3 + t * 27, 0, Math.PI * 2);
-            g.fill();
-        }
-        return canvas;
-    });
-}
-
 // Bloom intensity for items with a glow.
 const GLOW_CONTROL: Control = {
     type: "range",
@@ -189,7 +169,7 @@ export const MENU_EFFECTS: MenuEffect[] = [
         label: "ASCII",
         className: "AsciiEffect",
         create: (p) => new AsciiEffect({ ...p, fontWeight: 900 }),
-        adjust: { gamma: 1.5, saturation: 1.5 },
+        adjust: { gamma: 1.7, saturation: 2 },
         controls: [
             { type: "range", key: "grid", min: 6, max: 24, step: 1, value: 8 },
             {
@@ -201,15 +181,6 @@ export const MENU_EFFECTS: MenuEffect[] = [
                 value: 0.8,
             },
             { type: "checkbox", key: "colorFromSource", value: true },
-        ],
-    },
-    {
-        label: "ASCII Tiles",
-        className: "AsciiEffect",
-        create: (p) => new AsciiEffect({ ...p, tiles: dotTiles(6) }),
-        code: { tiles: "[/* images, dark to light */]" },
-        controls: [
-            { type: "range", key: "grid", min: 6, max: 32, step: 1, value: 14 },
         ],
     },
     {
@@ -420,17 +391,17 @@ export const MENU_EFFECTS: MenuEffect[] = [
                 type: "range",
                 key: "intensity",
                 min: 0,
-                max: 3,
+                max: 1,
                 step: 0.01,
-                value: 1.9,
+                value: 0.5,
             },
             {
                 type: "range",
                 key: "speed",
                 min: 0,
-                max: 3,
+                max: 1,
                 step: 0.01,
-                value: 1,
+                value: 0.5,
             },
         ],
     },
@@ -472,15 +443,8 @@ function format(value: unknown): string {
     return String(value);
 }
 
-function options(
-    params: Record<string, unknown>,
-    indent: string,
-    code: Record<string, string> = {},
-): string {
-    const lines = [
-        ...Object.entries(params).map(([k, v]) => `${k}: ${format(v)}`),
-        ...Object.entries(code).map(([k, v]) => `${k}: ${v}`),
-    ];
+function options(params: Record<string, unknown>, indent: string): string {
+    const lines = Object.entries(params).map(([k, v]) => `${k}: ${format(v)}`);
     return lines.length
         ? `{\n${lines.map((l) => `${indent}    ${l},`).join("\n")}\n${indent}}`
         : "";
@@ -497,7 +461,6 @@ await vfx.add(document.querySelector("img"), { shader: "none" });
     const main = options(
         paramsFor(item, values),
         item.glow ? "        " : "    ",
-        item.code,
     );
     if (!item.glow) {
         return `import { VFX } from "@vfx-js/core";

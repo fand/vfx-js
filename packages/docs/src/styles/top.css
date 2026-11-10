@@ -27,12 +27,11 @@
     border-bottom: 1px solid var(--line);
     width: auto;
 }
-/* The first screen. Same height as the menu dock, so both center alike. */
+/* The first screen. The logo sits in its vertical center. */
 .HeroTop,
 .EffectDock {
     display: flex;
     min-height: calc(100lvh - var(--header-bottom));
-    padding-bottom: 96px;
     box-sizing: border-box;
 }
 .HeroTop {
@@ -54,7 +53,7 @@
 .Hero #Logo {
     opacity: 0;
     display: block;
-    width: min(100%, 680px);
+    width: min(80%, 1080px);
 }
 .Hero #LogoTagline {
     opacity: 0;
@@ -88,7 +87,8 @@
     max-width: 920px;
     font-size: clamp(22px, 2.4vw, 34px);
     line-height: 1.5;
-    color: rgba(255, 255, 255, 0.85);
+    /* Opaque for the same reason as code below. */
+    color: #d9d9d9;
 }
 .HeroLead a {
     color: white;
@@ -98,7 +98,8 @@
 .HeroLead code {
     padding: 0 0.25em;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.12);
+    /* Opaque on purpose: effects show translucent colors too bright (fand/vfx-js#253). */
+    background: #2a2a2a;
     font-family: var(--mono);
     font-size: 0.85em;
 }
@@ -113,7 +114,8 @@
     vertical-align: baseline;
 }
 .HeroLead input {
-    background: rgba(255, 255, 255, 0.08);
+    /* Opaque for the same reason as code. */
+    background: #1a1a1a;
     color: white;
 }
 .HeroLead button {
@@ -266,6 +268,9 @@
     .HeroTop {
         min-height: 0;
         padding: 64px 0 32px;
+    }
+    .Hero #Logo {
+        width: 100%;
     }
     .EffectDock {
         position: static;
