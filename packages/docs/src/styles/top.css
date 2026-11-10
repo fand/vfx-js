@@ -149,6 +149,194 @@
     }
 }
 
+/*================ Shared headings ================*/
+
+/* Line up with the hero content. */
+.Top > section.TopRun,
+.Top > section.TopWhy {
+    padding: 0 40px;
+}
+.Top .TopKicker {
+    margin: 0 0 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+}
+.TopTitle {
+    margin: 0;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: clamp(36px, 5vw, 64px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+}
+.TopTitle em {
+    font-family: Georgia, serif;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/*================ Code and demo rows ================*/
+
+.RunRow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 40px;
+    margin-top: 64px;
+}
+.RunText {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
+    min-width: 0;
+}
+.RunText h3 {
+    margin: 0;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 24px;
+}
+.RunStep {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+}
+.TopRun .RunText .CodeBlock {
+    margin: 0;
+}
+.RunDemo {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    padding: 48px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+.RunDemo img {
+    display: block;
+    width: 100%;
+    max-width: 520px;
+    height: auto;
+}
+.RunCaption {
+    position: absolute;
+    left: 12px;
+    bottom: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+}
+/* Every other row puts the demo first. */
+.RunRow:nth-of-type(even) .RunDemo {
+    order: -1;
+}
+
+@media (max-width: 767px) {
+    .RunRow {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+        margin-top: 48px;
+    }
+    .RunDemo {
+        min-height: 0;
+        padding: 32px 24px;
+    }
+    .RunRow:nth-of-type(even) .RunDemo {
+        order: 0;
+    }
+}
+
+/*================ Features ================*/
+
+.WhyHead {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 40px;
+    align-items: end;
+}
+.Top .WhyLead p {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.8);
+}
+.WhyLink {
+    display: inline-block;
+    margin-top: 24px;
+    font-family: var(--mono);
+    font-size: 14px;
+}
+.Features {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 64px;
+    border-top: 1px solid var(--line);
+}
+.Feature {
+    padding: 28px;
+    border-bottom: 1px solid var(--line);
+    border-left: 1px solid var(--line);
+    text-decoration: none;
+    transition: background 0.2s;
+}
+.Feature:nth-child(3n + 1) {
+    border-left: none;
+}
+.Feature:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+.FeatureNum {
+    display: block;
+    margin-bottom: 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5);
+}
+.Feature h3 {
+    margin: 0 0 8px;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 22px;
+}
+.Top .Feature p {
+    margin: 0;
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 1023px) {
+    .Features {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .Feature:nth-child(3n + 1) {
+        border-left: 1px solid var(--line);
+    }
+    .Feature:nth-child(2n + 1) {
+        border-left: none;
+    }
+}
+@media (max-width: 767px) {
+    .WhyHead {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+    }
+    .Features {
+        grid-template-columns: minmax(0, 1fr);
+        margin-top: 40px;
+    }
+    .Feature,
+    .Feature:nth-child(3n + 1) {
+        padding: 24px 0;
+        border-left: none;
+    }
+    .Feature:hover {
+        background: none;
+    }
+}
+
 /*================ Page cards ================*/
 
 /* Line up with the hero content. */

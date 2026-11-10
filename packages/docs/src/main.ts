@@ -8,7 +8,9 @@ import {
 } from "@vfx-js/effects";
 
 import { bgSpheres, bgVFX, initBackground } from "./background";
-import { onPage } from "./lifecycle";
+import { lazyDemo } from "./demos/lazy";
+import { runDemos } from "./demos/top-demos";
+import { onPage, scrollRoot } from "./lifecycle";
 import { getPageVFX } from "./page-vfx";
 
 function $(selector: string, parent?: HTMLElement) {
@@ -344,6 +346,35 @@ class App {
     }
 }
 
+/**
+ * Start the code demos on the first scroll, or after a while.
+ * This keeps their WebGL work out of the first load.
+ */
+function startRunDemos(): () => void {
+    const root = scrollRoot();
+    let started = false;
+    const stop = () => {
+        started = true;
+        clearTimeout(timer);
+        root?.removeEventListener("scroll", start);
+    };
+    const start = () => {
+        if (started) {
+            return;
+        }
+        stop();
+        for (const demo of runDemos) {
+            const element = document.getElementById(demo.id);
+            if (element) {
+                lazyDemo(element, demo.props);
+            }
+        }
+    };
+    const timer = setTimeout(start, 5000);
+    root?.addEventListener("scroll", start, { passive: true });
+    return stop;
+}
+
 onPage(() => {
     if (!document.getElementById("Logo")) {
         return;
@@ -353,6 +384,7 @@ onPage(() => {
     const intro = document.getElementById("MaskTop") !== null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let stopMenu: (() => void) | undefined;
+    const stopRunDemos = startRunDemos();
 
     initBackground().then(() => {
         if (!app.alive) {
@@ -371,6 +403,7 @@ onPage(() => {
 
     return () => {
         clearTimeout(timer);
+        stopRunDemos();
         stopMenu?.();
         app.dispose();
     };
