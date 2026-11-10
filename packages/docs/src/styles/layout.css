@@ -182,6 +182,9 @@
     font-family: var(--mono);
     font-size: 13px;
 }
+.DocSidebarExtra + .DocSidebarExtra {
+    margin-top: 8px;
+}
 
 @media (max-width: 767px) {
     .DocLayout {
