@@ -1323,6 +1323,11 @@ em {
     font-size: 13px;
     line-height: 1.7;
 }
+/* Prose prompts wrap instead of scrolling sideways. */
+.code-plain pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
 .tk-c {
     color: #6b6b80;
     font-style: italic;
@@ -1388,6 +1393,22 @@ em {
     padding: 10px;
     border-bottom: 1px solid var(--rule);
     overflow-x: auto;
+}
+/* Fade the side with more tabs. */
+.tab-list[data-more="end"] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+}
+.tab-list[data-more="start"] {
+    mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent);
+}
+.tab-list[data-more="both"] {
+    mask-image: linear-gradient(
+        to right,
+        transparent,
+        #000 48px,
+        #000 calc(100% - 48px),
+        transparent
+    );
 }
 .tab-list button {
     flex: none;
@@ -2104,7 +2125,7 @@ em {
     .lab,
     .doc-next,
     .footer-inner {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
     .dom-fig {
         grid-template-columns: 1fr;
@@ -2139,28 +2160,34 @@ em {
     .doc-section,
     .doc-title,
     .footer-inner,
-    .footer-logo {
-        display: block;
-        width: calc(100% - 48px);
-        margin: 160px auto 0;
-        overflow: visible;
-        fill: currentColor;
-        font: 600 100px var(--sans);
-        letter-spacing: -0.04em;
-    }
-    .footer-logo {
-        width: 94%;
-        margin: 80px auto 40px;
-    }
-    .footer-logo-slash {
-        fill: var(--acid);
-    }
-
     .footer-simple {
         width: calc(100% - 32px);
     }
     .tab-body {
         padding: 20px;
+    }
+    /* The next section's top padding is the gap. */
+    .split {
+        padding-bottom: 0;
+    }
+    /* Too narrow for 4 columns: name, type and default on one line, note below. */
+    .preset-table thead {
+        display: none;
+    }
+    .preset-table tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 6px 8px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--rule);
+    }
+    .preset-body .preset-table td {
+        padding: 0;
+        border: 0;
+    }
+    .preset-table td:last-child {
+        flex-basis: 100%;
     }
 }
 @media (prefers-reduced-motion: reduce) {

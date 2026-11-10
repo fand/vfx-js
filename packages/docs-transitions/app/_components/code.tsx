@@ -22,7 +22,7 @@ export function Code({
         });
     };
     return (
-        <div className="code">
+        <div className={plain ? "code code-plain" : "code"}>
             <div className="code-bar">
                 <span>{label}</span>
                 <button type="button" onClick={copy}>
