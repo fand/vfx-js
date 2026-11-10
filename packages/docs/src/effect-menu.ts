@@ -214,18 +214,12 @@ export const MENU_EFFECTS: MenuEffect[] = [
         create: (p) => new HalftoneEffect(p),
         controls: [
             {
-                type: "select",
-                key: "mode",
-                options: ["rgb", "cmyk"],
-                value: "rgb",
-            },
-            {
                 type: "range",
                 key: "gridSize",
                 min: 4,
                 max: 24,
                 step: 0.1,
-                value: 12,
+                value: 5,
             },
             {
                 type: "range",
