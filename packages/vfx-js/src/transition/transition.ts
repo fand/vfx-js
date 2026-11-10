@@ -179,6 +179,7 @@ export type TransitionHost = Pick<
     | "freezeInside"
     | "lockSize"
     | "forceRender"
+    | "reducedMotion"
 >;
 
 export type TransitionStageLike = Effect &
@@ -401,6 +402,15 @@ export class TransitionController implements TransitionHandle {
                 await cb();
             }
         };
+        // Nothing renders, so a snapshot would only stall.
+        if (this.#vfx.reducedMotion) {
+            await update();
+            // Lazy opts may consume state, like a pending link spec.
+            if (typeof opts === "function") {
+                opts();
+            }
+            return;
+        }
         const cut = async () => {
             this.#endActive();
             this.#stage.cancel();

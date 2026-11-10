@@ -200,6 +200,8 @@ so the spec can depend on the new content. If it throws, the run
 cancels and `run` rejects, as with `cb`. With a function, the transition
 is set up and `start` runs after `cb`, not before the snapshot.
 
+When the user prefers reduced motion, `run` and `show` always cut.
+
 If the browser already animated the navigation, like a swipe back on a
 phone, `run` cuts to the new content. It reads `hasUAVisualTransition`
 from the `navigate` event, or from `popstate` in older Safari. Each handle cuts once per such navigation, and

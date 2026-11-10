@@ -121,6 +121,11 @@ const t = vfx.addTransition(el, {
                         entered the page, even after{" "}
                         <code>setNextTransition()</code>.
                     </p>
+                    <h3>Reduced motion cuts</h3>
+                    <p>
+                        With <code>prefers-reduced-motion: reduce</code>, every
+                        run cuts to the new content.
+                    </p>
                     <h3>Browser swipes cut</h3>
                     <p>
                         A phone animates a swipe back or forward on its own. The
