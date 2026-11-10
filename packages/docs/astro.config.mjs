@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import mdx from "@astrojs/mdx";
+import sitemap from "@astrojs/sitemap";
 import { defineConfig } from "astro/config";
 
 // Use core source in dev for hot reload.
@@ -29,13 +30,14 @@ const coreSource = {
 };
 
 export default defineConfig({
+    site: "https://amagi.dev",
     output: "static",
     outDir: "dist",
     base: "/vfx-js",
     trailingSlash: "always",
     // Compression drops the line break between text and an inline tag on the next line.
     compressHTML: false,
-    integrations: [mdx(), coreSource],
+    integrations: [mdx(), sitemap(), coreSource],
     server: { port: 3001, host: true },
     vite: {
         server: { allowedHosts: [".ts.net"] },

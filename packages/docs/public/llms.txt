@@ -21,6 +21,15 @@ VFX-JS runs in the browser only and needs WebGL. Create the `VFX` instance in cl
 - [Effects](https://raw.githubusercontent.com/fand/vfx-js/main/skills/vfx-js/references/effects.md): prebuilt effects and the Effect API
 - [Transitions](https://raw.githubusercontent.com/fand/vfx-js/main/skills/vfx-js/references/transitions.md): `addTransition`, presets, custom transitions, React, Next.js, Vue, Nuxt and SvelteKit
 
+## Guides
+
+- [Getting Started](https://amagi.dev/vfx-js/getting-started/): install VFX-JS and add your first effect
+- [How it Works](https://amagi.dev/vfx-js/how-it-works/): how VFX-JS draws DOM elements with WebGL
+- [Use with AI](https://amagi.dev/vfx-js/ai/): the agent skill, llms.txt and prompts
+- [Effects](https://amagi.dev/vfx-js/effects/): shader presets and the `@vfx-js/effects` gallery
+- [Custom Shaders](https://amagi.dev/vfx-js/shaders/): GLSL template, uniforms, overflow, backbuffer, multipass, post effects
+- [Custom Effects](https://amagi.dev/vfx-js/custom-effects/): the Effect API and lifecycle hooks
+
 ## Agent skill
 
 - [vfx-js skill](https://github.com/fand/vfx-js/tree/main/skills/vfx-js): install with `npx skills add fand/vfx-js`

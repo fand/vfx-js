@@ -6,6 +6,20 @@ import "../styles/top.css";
 ---
 
 <Layout class="Top">
+    <!-- Old single-page anchors now live on their own pages. Replace, so Back skips the old URL. -->
+    <script is:inline define:vars={{ base: url() }}>
+        const pages = {
+            "#examples": "effects/",
+            "#custom": "shaders/",
+            "#multipass": "shaders/#multipass",
+            "#effect-bloom": "effects/#gallery",
+            "#effect-crt": "effects/#gallery",
+        };
+        const to = pages[location.hash];
+        if (to) {
+            location.replace(base + to);
+        }
+    </script>
     <noscript>You need to enable JavaScript to run this app.</noscript>
 
     <section class="Hero">

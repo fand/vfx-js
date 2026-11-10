@@ -1,0 +1,35 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { url } from "../site";
+---
+
+<Layout
+    title="Page not found - VFX-JS"
+    description="This page does not exist."
+    class="NotFound"
+    noindex
+>
+    <h1>Page not found</h1>
+    <p>This page does not exist, or it moved.</p>
+    <p>
+        <a href={url("getting-started/")}>Getting Started &#8594;</a>
+        <br />
+        <a href={url()}>Top page &#8594;</a>
+    </p>
+</Layout>
+
+<style>
+    :global(.NotFound) {
+        min-height: 100lvh;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 96px 32px 0;
+    }
+    h1 {
+        font-size: 3rem;
+    }
+    p {
+        font-size: 1.125rem;
+        line-height: 1.6;
+    }
+</style>

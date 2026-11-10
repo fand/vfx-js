@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@astrojs/mdx": "^8.1.2",
+    "@astrojs/sitemap": "3.7.4",
     "@vfx-js/astro": "workspace:*",
     "@vfx-js/core": "workspace:*",
     "@vfx-js/effects": "workspace:*",

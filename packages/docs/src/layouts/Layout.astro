@@ -16,9 +16,13 @@ type Props = {
     description?: string;
     /** Class for <main>. */
     class?: string;
+    /** Keep the page out of search results, e.g. 404. */
+    noindex?: boolean;
 };
 
-const { page, description = siteDescription, class: mainClass } = Astro.props;
+const { page, class: mainClass, noindex } = Astro.props;
+const description =
+    Astro.props.description ?? (page ? findNav(page).blurb : siteDescription);
 const title =
     Astro.props.title ?? (page ? `${findNav(page).label} - VFX-JS` : siteTitle);
 const pageUrl = new URL(Astro.url.pathname, siteUrl).href;
@@ -36,6 +40,13 @@ const image = new URL(url("og_image.jpg"), siteUrl).href;
 
         <meta name="theme-color" content="#000000" />
         <meta name="description" content={description} />
+        {
+            noindex ? (
+                <meta name="robots" content="noindex" />
+            ) : (
+                <link rel="canonical" href={pageUrl} />
+            )
+        }
 
         <meta property="og:url" content={pageUrl} />
         <meta property="og:type" content="website" />
