@@ -516,6 +516,7 @@ function setup(
         element?: HTMLElement;
         history?: HistorySpecs;
         uaTransitions?: UATransitions;
+        reducedMotion?: boolean;
     } = {},
 ) {
     const {
@@ -524,6 +525,7 @@ function setup(
         element = {} as HTMLElement,
         history = createHistorySpecs(() => undefined),
         uaTransitions = { current: () => undefined },
+        reducedMotion = false,
         ...transitionOpts
     } = opts;
     const log: string[] = [];
@@ -607,6 +609,7 @@ function setup(
                 log.push("unforceRender");
             };
         },
+        reducedMotion,
     };
     const onDestroy = vi.fn();
     const transition = new TransitionController(
@@ -1541,5 +1544,51 @@ describe("TransitionController.show", () => {
         const { transition } = setup({ element: dom.element, slideSpec });
         await transition.show(0);
         expect(slideSpec).not.toHaveBeenCalled();
+    });
+});
+
+describe("reduced motion", () => {
+    test("run cuts without touching VFX", async () => {
+        const cb = vi.fn();
+        const { transition, log, starts } = setup({
+            transition: Crossfade,
+            duration: 1,
+            reducedMotion: true,
+        });
+        await transition.run(cb);
+        expect(cb).toHaveBeenCalledOnce();
+        expect(log).toEqual([]);
+        expect(starts).toEqual([]);
+        expect(transition.running).toBe(false);
+    });
+
+    test("run picks the history spec after cb", async () => {
+        const order: string[] = [];
+        const pick = vi.fn((spec) => {
+            order.push("pick");
+            return spec;
+        });
+        const { transition } = setup({
+            autoReverse: true,
+            history: { pick },
+            reducedMotion: true,
+        });
+        await transition.run(() => {
+            order.push("cb");
+        });
+        expect(order).toEqual(["cb", "pick"]);
+    });
+
+    test("show cuts", async () => {
+        const dom = slides("a", "b");
+        const { transition, starts } = setup({
+            element: dom.element,
+            transition: Crossfade,
+            duration: 1,
+            reducedMotion: true,
+        });
+        await transition.show(1);
+        expect(dom.shown()).toEqual(["b"]);
+        expect(starts).toEqual([]);
     });
 });
