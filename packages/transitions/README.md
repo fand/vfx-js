@@ -1,6 +1,8 @@
 # @vfx-js/transitions
 
 Page transition presets for [`@vfx-js/core`](https://www.npmjs.com/package/@vfx-js/core).
+See every preset, framework setup and a playground on the
+[transitions site](https://amagi.dev/vfx-js-transitions/).
 
 > **Experimental.** The API may change in any 0.x release.
 
