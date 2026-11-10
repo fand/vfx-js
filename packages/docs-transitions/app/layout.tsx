@@ -24,6 +24,10 @@ const ogImage = {
     alt: "VFX-JS Transitions: Shader transitions for the DOM",
 };
 
+// HTML-in-Canvas origin trial for https://amagi.dev. Expires 2027-03-01.
+const originTrialToken =
+    "Aq07hgHuOPLTTcC5I5833AV8SEY0KSy7K3t3eOAOpRrAQf2BQIWGtBVXelF8sHCp1mydQ8uDvro6xwA0UMSEIgsAAABPeyJvcmlnaW4iOiJodHRwczovL2FtYWdpLmRldjo0NDMiLCJmZWF0dXJlIjoiSFRNTEluQ2FudmFzIiwiZXhwaXJ5IjoxODAzOTQ1NjAwfQ==";
+
 export const metadata: Metadata = {
     metadataBase: new URL("https://amagi.dev/vfx-js-transitions"),
     alternates: { canonical: "./" },
@@ -58,6 +62,10 @@ export default function RootLayout({
             data-loading=""
             className={`${sans.variable} ${serif.variable} ${mono.variable}`}
         >
+            <head>
+                {/* Metadata API only emits name=, but Chrome needs http-equiv. */}
+                <meta httpEquiv="origin-trial" content={originTrialToken} />
+            </head>
             <body>
                 <Shell>{children}</Shell>
             </body>
