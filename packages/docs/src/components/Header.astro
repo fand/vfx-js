@@ -22,18 +22,25 @@ const { current } = Astro.props;
         <span aria-hidden="true"></span>
     </button>
     <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a
+            class="SiteHeaderDesktopOnly"
+            href={url("getting-started/")}
+            aria-current={current ? "page" : undefined}
+        >
+            Docs
+        </a>
         {
             nav.map((item) => (
                 <a
-                    class:list={{ SiteHeaderMenuOnly: !item.headerLabel }}
+                    class="SiteHeaderMenuOnly"
                     href={url(`${item.slug}/`)}
                     aria-current={item.slug === current ? "page" : undefined}
                 >
-                    {item.headerLabel ?? item.label}
+                    {item.label}
                 </a>
             ))
         }
-        <a href={url("docs/")} data-astro-reload>API</a>
+        <a href={url("examples/")} data-astro-reload>Examples</a>
         <a href={links.github} target="_blank" rel="noreferrer">
             GitHub &#8599;
         </a>

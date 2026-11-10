@@ -4,8 +4,9 @@
 .SiteHeader {
     position: fixed;
     top: var(--frame);
-    left: calc(var(--frame) + 32px);
-    right: calc(var(--frame) + 32px);
+    left: calc(var(--frame) + 8px);
+    right: calc(var(--frame) + 8px);
+    padding: 0 8px;
     z-index: 10;
     display: flex;
     align-items: center;
@@ -34,7 +35,8 @@
     display: none;
 }
 
-@media (max-width: 1023px) {
+/* Below this width the sidebar is hidden, so the menu lists the doc pages. */
+@media (max-width: 767px) {
     .SiteHeaderMenuButton {
         display: block;
         width: 32px;
@@ -87,6 +89,9 @@
     }
     .SiteHeader[data-open="true"] .SiteHeaderNav {
         display: flex;
+    }
+    .SiteHeaderNav .SiteHeaderDesktopOnly {
+        display: none;
     }
 }
 

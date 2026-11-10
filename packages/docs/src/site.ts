@@ -24,8 +24,6 @@ export type NavItem = {
     label: string;
     /** One line for the top page cards. */
     blurb: string;
-    /** Label in the header. Pages without it show only in the mobile menu. */
-    headerLabel?: string;
     sections: NavSection[];
 };
 
@@ -34,7 +32,6 @@ export const nav: NavItem[] = [
         slug: "getting-started",
         label: "Getting Started",
         blurb: "Install VFX-JS and add your first effect.",
-        headerLabel: "Getting Started",
         sections: [
             { id: "install", label: "Install" },
             { id: "first-effect", label: "Your first effect" },
@@ -47,7 +44,6 @@ export const nav: NavItem[] = [
         slug: "how-it-works",
         label: "How it Works",
         blurb: "How VFX-JS draws DOM elements with WebGL.",
-        headerLabel: "How it Works",
         sections: [
             { id: "dom", label: "The DOM stays DOM" },
             { id: "capture", label: "Element capture" },
@@ -61,7 +57,6 @@ export const nav: NavItem[] = [
         slug: "ai",
         label: "Use with AI",
         blurb: "Let your AI agent write effects and shaders.",
-        headerLabel: "AI",
         sections: [
             { id: "skill", label: "Install the skill" },
             { id: "llms", label: "llms.txt" },
@@ -74,7 +69,6 @@ export const nav: NavItem[] = [
         slug: "effects",
         label: "Effects",
         blurb: "Shader presets and the @vfx-js/effects gallery.",
-        headerLabel: "Effects",
         sections: [
             { id: "presets", label: "Shader presets" },
             { id: "parameters", label: "Preset uniforms" },
@@ -87,7 +81,6 @@ export const nav: NavItem[] = [
         slug: "shaders",
         label: "Custom Shaders",
         blurb: "Write your own GLSL, with uniforms and multipass.",
-        headerLabel: "Shaders",
         sections: [
             { id: "template", label: "GLSL template" },
             { id: "built-in-uniforms", label: "Built-in uniforms" },
