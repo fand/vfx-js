@@ -1,1 +1,0 @@
-import{t as e}from"./page-vfx.X5X3yH_u.js";try{e()}catch(e){console.warn(e)}document.addEventListener(`astro:before-swap`,e=>{for(let t of[`MaskTop`,`MaskBottom`])e.newDocument.getElementById(t)?.remove()});
