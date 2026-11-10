@@ -3,7 +3,6 @@ import type { VFX } from "@vfx-js/core";
 import { bgSpheres, bgVFX, initBackground } from "./background";
 import { lazyDemo } from "./demos/lazy";
 import { runDemos } from "./demos/top-demos";
-import { DropShadowEffect, SHADOW_GLSL } from "./drop-shadow-effect";
 import {
     type Control,
     createChain,
@@ -30,11 +29,6 @@ const logoShader = `
 
     uniform float delay;
     #define speed 2.0
-
-    // Shadow offset and blur in physical px. Opacity 0 turns it off.
-    uniform vec2 shadowOffset;
-    uniform float shadowBlur;
-    uniform float shadowOpacity;
 
     out vec4 outColor;
 
@@ -87,38 +81,18 @@ const logoShader = `
         return vec4(cr.r, cg.g, cb.b, max(cr.a, max(cg.a, cb.a)));
     }
 
-    vec4 read(vec2 uv) {
-        return readTex(src, uv);
-    }
-    ${SHADOW_GLSL}
-
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        // How much of the shadow shows, so it follows the intro and the fade out.
-        float shown = 1.;
         if (leaveTime > 0.) {
             float t = clamp(leaveTime - 0.5, 0., 1.);
             outColor = glitch(uv) * (1. - t);
-            shown = 1. - t;
         } else if (enterTime < 1.0) {
             outColor = slitscan(uv);
-            shown = step(uv.x, max(enterTime - delay, 0.) * speed);
         } else {
             outColor = glitch(uv);
         }
-        if (shadowOpacity > 0.) {
-            float a = shadowAlpha(uv - shadowOffset / resolution, vec2(shadowBlur) / resolution);
-            outColor += vec4(0., 0., 0., a * shadowOpacity * shown) * (1. - outColor.a);
-        }
     }
 `;
-
-// Logo shadow, in CSS px.
-const LOGO_SHADOW = {
-    offset: [0, -2] as [number, number],
-    blur: 4,
-    opacity: 0.5,
-};
 
 /** Build the param controls for one menu item. */
 function paramsPanel(
@@ -206,13 +180,9 @@ class App {
         const createAll = (isBG: boolean) =>
             MENU_EFFECTS.map((item, i) => createChain(item, values[i], isBG));
         const texts = [$("#Logo"), $("#LogoTagline"), $("#HeroLead")].map(
-            (element, i) => ({
+            (element) => ({
                 element,
                 chains: createAll(false),
-                // The logo keeps its shadow under every effect. One instance per menu item.
-                shadows: MENU_EFFECTS.map(() =>
-                    i === 0 ? new DropShadowEffect(LOGO_SHADOW) : undefined,
-                ),
                 onEffectPath: false,
             }),
         );
@@ -247,10 +217,7 @@ class App {
                     return;
                 }
                 const updateText = async (text: (typeof texts)[number]) => {
-                    const shadow = text.shadows[index];
-                    const chain = shadow
-                        ? [...text.chains[index].effects, shadow]
-                        : text.chains[index].effects;
+                    const chain = text.chains[index].effects;
                     if (text.onEffectPath) {
                         await this.vfx.updateEffects(text.element, chain);
                     } else {
@@ -346,16 +313,8 @@ class App {
         return Promise.all([
             this.add(logo, {
                 shader: logoShader,
-                // Top and bottom room for the shadow.
-                overflow: [24, 3000, 40, 100],
-                uniforms: {
-                    delay: 0,
-                    shadowOffset: LOGO_SHADOW.offset.map(
-                        (v) => v * window.devicePixelRatio,
-                    ),
-                    shadowBlur: LOGO_SHADOW.blur * window.devicePixelRatio,
-                    shadowOpacity: LOGO_SHADOW.opacity,
-                },
+                overflow: [0, 3000, 0, 100],
+                uniforms: { delay: 0 },
                 intersection: {
                     threshold: 1,
                 },
