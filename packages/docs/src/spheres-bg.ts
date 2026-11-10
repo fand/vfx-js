@@ -39,9 +39,7 @@ uniform float zoom;
 uniform float exposure;
 uniform float time;
 uniform float dispersion;
-uniform float seed;
 uniform float blend;
-uniform float minOverlap;
 uniform float bandsFront;
 uniform float bandWidth;
 uniform float bandIntensity;
@@ -58,83 +56,9 @@ out vec4 outColor;
 ${SPECTRAL_LIB}
 
 #define SPHERES 4
-vec3 centers[SPHERES];
-float radii[SPHERES];
-const float SIZES[SPHERES] = float[SPHERES](.3, .4, .7, .6);
-// Orbits loop every 120s: each axis moves at an integer multiple of the base speed.
-// These speeds and phases were picked by simulating one loop to keep the screen as covered as
-// possible at zoom 1.4: at least 40% of a 16:10 or 16:9 screen.
-const float ORBIT_BASE = 6.2831853 / 128.;
-const vec3 ORBIT_SPEED[SPHERES] = vec3[SPHERES](
-    vec3(2, 2, 3), vec3(3, 2, 2), vec3(3, 2, 2), vec3(7, 7, 7)
-);
-const vec3 ORBIT_PHASE[SPHERES] = vec3[SPHERES](
-    vec3(3.451, 4.592, 6.138), vec3(1.132, 5.169, .372), vec3(1.649, 1.475, 2.942), vec3(5.557, 1.123, 3.039)
-);
-vec3 bandAxes[4];
-
-mat3 rotation(vec3 axis, float a) {
-    axis = normalize(axis);
-    float s = sin(a), c = cos(a), oc = 1. - c;
-    return mat3(
-        oc * axis.x * axis.x + c, oc * axis.x * axis.y + axis.z * s, oc * axis.z * axis.x - axis.y * s,
-        oc * axis.x * axis.y - axis.z * s, oc * axis.y * axis.y + c, oc * axis.y * axis.z + axis.x * s,
-        oc * axis.z * axis.x + axis.y * s, oc * axis.y * axis.z - axis.x * s, oc * axis.z * axis.z + c
-    );
-}
-
-float random(float n) {
-    return fract(sin(n * 127.1 + seed * 311.7) * 43758.5453);
-}
-
-// Spheres drift on random paths while the whole set turns.
-void setupSpheres() {
-    // Each light band is a great circle around the scene. Its axis turns around a random axis.
-    for (int i = 0; i < 4; i++) {
-        float fi = float(i) + 30.;
-        vec3 start = normalize(vec3(random(fi), random(fi + .1), random(fi + .2)) - .5);
-        vec3 spin = normalize(vec3(random(fi + .3), random(fi + .4), random(fi + .5)) - .5);
-        float speed = (.05 + .1 * random(fi + .6)) * (random(fi + .7) < .5 ? -1. : 1.);
-        bandAxes[i] = rotation(spin, time * speed) * start;
-    }
-
-    // The whole set tumbles once per loop.
-    mat3 group = rotation(vec3(.3, 1, .2), time * ORBIT_BASE) * rotation(vec3(1, 0, .3), time * ORBIT_BASE);
-    for (int i = 0; i < SPHERES; i++) {
-        centers[i] = group * (sin(time * ORBIT_SPEED[i] * ORBIT_BASE + ORBIT_PHASE[i]) * 0.7);
-        radii[i] = SIZES[i];
-    }
-
-    // Pull pairs together until every pair overlaps by minOverlap of the smaller sphere's diameter.
-    for (int iter = 0; iter < 8; iter++) {
-        for (int i = 0; i < SPHERES; i++) {
-            for (int j = i + 1; j < SPHERES; j++) {
-                vec3 delta = centers[j] - centers[i];
-                float dist = length(delta);
-                float maxDist = radii[i] + radii[j] - minOverlap * 2. * min(radii[i], radii[j]);
-                if (dist > maxDist) {
-                    vec3 shift = delta / dist * (dist - maxDist) * .5;
-                    centers[i] += shift;
-                    centers[j] -= shift;
-                }
-            }
-        }
-    }
-
-    // Keep the set centered, so it doesn't drift to one side of the screen.
-    // Weight by size, so big spheres count more.
-    vec3 middle = vec3(0);
-    float weightSum = 0.;
-    for (int i = 0; i < SPHERES; i++) {
-        float weight = radii[i] * radii[i];
-        middle += centers[i] * weight;
-        weightSum += weight;
-    }
-    middle /= weightSum;
-    for (int i = 0; i < SPHERES; i++) {
-        centers[i] -= middle;
-    }
-}
+// Sphere layout and light bands change once per frame, so the CPU computes them (see layoutSpheres).
+uniform vec4 spheres[SPHERES];
+uniform vec3 bandAxes[4];
 
 // Dark studio lit by 4 rotating light bands and an optional key light.
 vec3 env(vec3 d) {
@@ -176,7 +100,7 @@ vec3 fringes(vec2 frag) {
 bool inside(vec3 p) {
     bool odd = false;
     for (int i = 0; i < SPHERES; i++) {
-        if (length(p - centers[i]) < radii[i]) odd = !odd;
+        if (length(p - spheres[i].xyz) < spheres[i].w) odd = !odd;
     }
     return odd;
 }
@@ -186,9 +110,9 @@ float nextBoundary(vec3 o, vec3 d, float tMin, out int hitIndex) {
     float best = 1e9;
     hitIndex = -1;
     for (int i = 0; i < SPHERES; i++) {
-        vec3 oc = o - centers[i];
+        vec3 oc = o - spheres[i].xyz;
         float b = dot(oc, d);
-        float h = b * b - dot(oc, oc) + radii[i] * radii[i];
+        float h = b * b - dot(oc, oc) + spheres[i].w * spheres[i].w;
         if (h < 0.) continue;
         h = sqrt(h);
         if (-b - h > tMin && -b - h < best) { best = -b - h; hitIndex = i; }
@@ -208,7 +132,7 @@ float nextSurface(vec3 o, vec3 d, out vec3 n) {
         if (hitIndex < 0) return -1.;
         vec3 p = o + d * t;
         if (inside(p + d * 1e-3) != startInside) {
-            n = normalize(p - centers[hitIndex]);
+            n = normalize(p - spheres[hitIndex].xyz);
             if (inside(p + n * 1e-3)) n = -n;
             return t;
         }
@@ -233,7 +157,6 @@ vec3 trace(vec3 o, vec3 d, float ior) {
 }
 
 void main() {
-    setupSpheres();
     vec2 frag = uv * resolution;
 
     // New random subpixel position and wavelengths every frame. Blending frames smooths edges and grain.
@@ -294,6 +217,119 @@ void main() {
  * Each frame blends into a persistent buffer to smooth edges and color grain.
  * Ignores its source, so it works on an empty element.
  */
+type Vec3 = [number, number, number];
+
+const SPHERES = 4;
+const SIZES = [0.3, 0.4, 0.7, 0.6];
+// Orbits loop every 128s: each axis moves at an integer multiple of the base speed.
+// These speeds and phases were picked by simulating one loop to keep the screen as covered as
+// possible at zoom 1.4: at least 40% of a 16:10 or 16:9 screen.
+const ORBIT_BASE = (Math.PI * 2) / 128;
+const ORBIT_SPEED: Vec3[] = [
+    [2, 2, 3],
+    [3, 2, 2],
+    [3, 2, 2],
+    [7, 7, 7],
+];
+const ORBIT_PHASE: Vec3[] = [
+    [3.451, 4.592, 6.138],
+    [1.132, 5.169, 0.372],
+    [1.649, 1.475, 2.942],
+    [5.557, 1.123, 3.039],
+];
+const MIN_OVERLAP = 0.2;
+
+function normalize([x, y, z]: Vec3): Vec3 {
+    const length = Math.hypot(x, y, z);
+    return [x / length, y / length, z / length];
+}
+
+/** Turn v around axis by angle a (right hand). */
+function rotate(axis: Vec3, a: number, v: Vec3): Vec3 {
+    const [x, y, z] = normalize(axis);
+    const s = Math.sin(a);
+    const c = Math.cos(a);
+    const along = (x * v[0] + y * v[1] + z * v[2]) * (1 - c);
+    return [
+        v[0] * c + (y * v[2] - z * v[1]) * s + x * along,
+        v[1] * c + (z * v[0] - x * v[2]) * s + y * along,
+        v[2] * c + (x * v[1] - y * v[0]) * s + z * along,
+    ];
+}
+
+function random(n: number, seed: number): number {
+    const v = Math.sin(n * 127.1 + seed * 311.7) * 43758.5453;
+    return v - Math.floor(v);
+}
+
+/** Light band axes. Each band is a great circle; its axis turns around a random axis. */
+function bandMotions(seed: number) {
+    return [0, 1, 2, 3].map((i) => {
+        const n = i + 30;
+        const r = (k: number) => random(n + k, seed) - 0.5;
+        return {
+            start: normalize([r(0), r(0.1), r(0.2)]),
+            spin: normalize([r(0.3), r(0.4), r(0.5)]) as Vec3,
+            speed:
+                (0.05 + 0.1 * random(n + 0.6, seed)) *
+                (random(n + 0.7, seed) < 0.5 ? -1 : 1),
+        };
+    });
+}
+
+/** Spheres drift on looping paths while the whole set turns. Writes xyz + radius per sphere. */
+function layoutSpheres(time: number, out: Float32Array): void {
+    const turn = time * ORBIT_BASE;
+    const centers = SIZES.map((_, i) => {
+        const p = ORBIT_SPEED[i].map(
+            (speed, k) =>
+                Math.sin(time * speed * ORBIT_BASE + ORBIT_PHASE[i][k]) * 0.7,
+        ) as Vec3;
+        // The whole set tumbles once per loop.
+        return rotate([0.3, 1, 0.2], turn, rotate([1, 0, 0.3], turn, p));
+    });
+
+    // Pull pairs together until every pair overlaps by MIN_OVERLAP of the smaller sphere's diameter.
+    for (let iter = 0; iter < 8; iter++) {
+        for (let i = 0; i < SPHERES; i++) {
+            for (let j = i + 1; j < SPHERES; j++) {
+                const a = centers[i];
+                const b = centers[j];
+                const delta = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+                const dist = Math.hypot(delta[0], delta[1], delta[2]);
+                const maxDist =
+                    SIZES[i] +
+                    SIZES[j] -
+                    MIN_OVERLAP * 2 * Math.min(SIZES[i], SIZES[j]);
+                if (dist > maxDist) {
+                    const k = ((dist - maxDist) * 0.5) / dist;
+                    for (let c = 0; c < 3; c++) {
+                        a[c] += delta[c] * k;
+                        b[c] -= delta[c] * k;
+                    }
+                }
+            }
+        }
+    }
+
+    // Keep the set centered, weighted by size, so it doesn't drift to one side of the screen.
+    const middle = [0, 0, 0];
+    let weightSum = 0;
+    for (let i = 0; i < SPHERES; i++) {
+        const weight = SIZES[i] * SIZES[i];
+        for (let c = 0; c < 3; c++) {
+            middle[c] += centers[i][c] * weight;
+        }
+        weightSum += weight;
+    }
+    for (let i = 0; i < SPHERES; i++) {
+        for (let c = 0; c < 3; c++) {
+            out[i * 4 + c] = centers[i][c] - middle[c] / weightSum;
+        }
+        out[i * 4 + 3] = SIZES[i];
+    }
+}
+
 export class SpheresEffect implements Effect {
     // Where the spheres sit in the element (0-1) and how large they are.
     center: [number, number];
@@ -306,7 +342,9 @@ export class SpheresEffect implements Effect {
     noiseSpeed: number;
     noiseChroma: number;
     #accum: EffectRenderTarget | null = null;
-    #seed = Math.random() * 100;
+    #bands = bandMotions(Math.random() * 100);
+    #spheres = new Float32Array(SPHERES * 4);
+    #bandAxes = new Float32Array(4 * 3);
 
     constructor(
         opts: {
@@ -338,6 +376,13 @@ export class SpheresEffect implements Effect {
         if (!this.#accum) {
             return;
         }
+        layoutSpheres(ctx.time, this.#spheres);
+        for (const [i, band] of this.#bands.entries()) {
+            this.#bandAxes.set(
+                rotate(band.spin, ctx.time * band.speed, band.start),
+                i * 3,
+            );
+        }
         ctx.draw({
             frag: spheresShader,
             uniforms: {
@@ -347,11 +392,11 @@ export class SpheresEffect implements Effect {
                 zoom: this.zoom,
                 exposure: this.exposure,
                 time: ctx.time,
-                seed: this.#seed,
+                spheres: this.#spheres,
+                bandAxes: this.#bandAxes,
                 dispersion: 0.42,
                 chroma: 0.7,
                 blend: 0.15,
-                minOverlap: 0.2,
                 bandsFront: 1,
                 spot: 0,
                 bandWidth: 0.3,
