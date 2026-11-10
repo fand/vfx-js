@@ -16,9 +16,24 @@ const serif = Instrument_Serif({
 });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
+// In public/, since the file convention adds basePath twice.
+const ogImage = {
+    url: "/og-image.png",
+    width: 1200,
+    height: 630,
+    alt: "VFX-JS Transitions: Shader transitions for the DOM",
+};
+
 export const metadata: Metadata = {
-    metadataBase: new URL("https://amagi.dev"),
-    twitter: { card: "summary_large_image" },
+    metadataBase: new URL("https://amagi.dev/vfx-js-transitions"),
+    alternates: { canonical: "./" },
+    openGraph: {
+        type: "website",
+        siteName: "VFX-JS Transitions",
+        url: "./",
+        images: [ogImage],
+    },
+    twitter: { card: "summary_large_image", images: [ogImage] },
     title: {
         default: "VFX-JS Transitions — shader transitions for the DOM",
         template: "%s — VFX-JS Transitions",
