@@ -33,7 +33,12 @@ export const metadata: Metadata = {
         url: "./",
         images: [ogImage],
     },
-    twitter: { card: "summary_large_image", images: [ogImage] },
+    twitter: {
+        card: "summary_large_image",
+        site: "@amagitakayosi",
+        creator: "@amagitakayosi",
+        images: [ogImage],
+    },
     title: {
         default: "VFX-JS Transitions — shader transitions for the DOM",
         template: "%s — VFX-JS Transitions",
