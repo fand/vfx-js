@@ -257,7 +257,8 @@
 .BGCanvas {
     transition: opacity 0.5s;
 }
-.DocPage .BGCanvas {
+.DocPage .BGCanvas,
+.BGDim .BGCanvas {
     opacity: 0.35;
 }
 

@@ -221,11 +221,18 @@ class App {
             }
         };
 
+        // Past the hero, the BG drops its effect and dims, so text stays readable.
+        let inHero = true;
+        const syncBG = () => {
+            const bgEffect = inHero ? bgEffects[selected] : undefined;
+            const bgChain = bgEffect ? [bgSpheres, bgEffect] : [bgSpheres];
+            return bgVFX.updateEffects(bg, bgChain);
+        };
+
         const select = (index: number) => {
             selected = index;
             applyIntensity();
-            const bgEffect = bgEffects[index];
-            slider.disabled = !bgEffect;
+            slider.disabled = !bgEffects[index];
             // Run swaps in order so fast clicks can't interleave them.
             queue = queue.then(async () => {
                 if (selected !== index || !this.alive) {
@@ -242,13 +249,24 @@ class App {
                         await this.add(text.element, { effect: chain });
                     }
                 };
-                const bgChain = bgEffect ? [bgSpheres, bgEffect] : [bgSpheres];
-                await Promise.all([
-                    ...texts.map(updateText),
-                    bgVFX.updateEffects(bg, bgChain),
-                ]);
+                await Promise.all([...texts.map(updateText), syncBG()]);
             });
         };
+
+        const hero = $(".Hero");
+        const heroObserver = new IntersectionObserver(
+            ([entry]) => {
+                inHero = entry.isIntersecting;
+                document.body.classList.toggle("BGDim", !inHero);
+                queue = queue.then(() => {
+                    if (this.alive) {
+                        return syncBG();
+                    }
+                });
+            },
+            { root: scrollRoot(), threshold: 0.25 },
+        );
+        heroObserver.observe(hero);
 
         const items = MENU_EFFECTS.map((item, i) => {
             const li = document.createElement("li");
@@ -280,6 +298,8 @@ class App {
 
         // Other pages show the plain spheres.
         return () => {
+            heroObserver.disconnect();
+            document.body.classList.remove("BGDim");
             queue = queue.then(() => bgVFX.updateEffects(bg, [bgSpheres]));
         };
     }
