@@ -1,8 +1,8 @@
 {
     "compilerOptions": {
-        "target": "es2020",
+        "target": "es2022",
         "module": "CommonJS",
-        "lib": ["es2020", "dom"],
+        "lib": ["es2022", "dom"],
         "sourceMap": true,
         "outDir": "lib/cjs",
         "rootDir": "src",
