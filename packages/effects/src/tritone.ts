@@ -35,7 +35,7 @@ void main (void) {
         outColor = mix(color3, color1, fract(t));
     }
 
-    outColor.a *= color.a;
+    outColor *= color.a;
 }
 `;
 

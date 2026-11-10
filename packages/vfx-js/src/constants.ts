@@ -509,7 +509,7 @@ const presetShaders: Record<
             outColor = mix(color2, color1, fract(t));
         }
 
-        outColor.a *= color.a;
+        outColor *= color.a;
     }
     `,
     tritone: `
@@ -536,7 +536,7 @@ const presetShaders: Record<
             outColor = mix(color3, color1, fract(t));
         }
 
-        outColor.a *= color.a;
+        outColor *= color.a;
     }
     `,
     hueShift: `
