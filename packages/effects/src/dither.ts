@@ -57,7 +57,8 @@ void main(void) {
     // Sample once per cell so each cell is a single flat color.
     vec2 cellUv = ((cell + 0.5) * cellSize) / resolution + 0.5;
     vec4 tex = texture(src, srcRectUv.xy + cellUv * srcRectUv.zw);
-    vec3 c = tex.rgb;
+    // Quantize straight color.
+    vec3 c = tex.a > 0.0 ? tex.rgb / tex.a : vec3(0.0);
     c = (c - 0.5) * contrast + 0.5;
     c *= brightness;
 
@@ -67,10 +68,11 @@ void main(void) {
     if (mono > 0.5) {
         float l = dot(c, vec3(0.299, 0.587, 0.114));
         float q = clamp(floor(l * steps + th) / steps, 0.0, 1.0);
-        outColor = vec4(monoColor.rgb * q, tex.a * monoColor.a);
+        float a = tex.a * monoColor.a;
+        outColor = vec4(monoColor.rgb * q * a, a);
     } else {
         vec3 q = clamp(floor(c * steps + th) / steps, 0.0, 1.0);
-        outColor = vec4(q, tex.a);
+        outColor = vec4(q * tex.a, tex.a);
     }
 }
 `;

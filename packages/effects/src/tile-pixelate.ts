@@ -104,7 +104,9 @@ void main(void) {
 
     // Color trim: posterize to fewer levels (more trim = fewer colors).
     float steps = max(1.0, 256.0 / exp2(colorTrim));
-    col.rgb = floor(col.rgb * steps) / steps;
+    // src is premultiplied; posterize straight color, then premultiply.
+    vec3 straight = col.a > 0.0 ? col.rgb / col.a : vec3(0.0);
+    col.rgb = floor(straight * steps) / steps * col.a;
 
     // Dissolve: drop cells by hash, with falloff biasing toward the top.
     float bias = mix(1.0, smoothstep(0.0, 1.0, centerUv.y), falloff);

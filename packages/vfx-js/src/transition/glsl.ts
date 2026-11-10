@@ -20,16 +20,13 @@ uniform float time;
 bool inRange(vec2 p) {
   return all(greaterThanEqual(p, vec2(0.0))) && all(lessThanEqual(p, vec2(1.0)));
 }
-vec4 premultiply(vec4 c) {
-  return vec4(c.rgb * c.a, c.a);
-}
 vec4 readFrom(vec2 p) {
   if (!inRange(p)) return vec4(0.0);
-  return premultiply(reverse > 0.5 ? texture(src, srcRectUv.xy + p * srcRectUv.zw) : texture(from, p));
+  return reverse > 0.5 ? texture(src, srcRectUv.xy + p * srcRectUv.zw) : texture(from, p);
 }
 vec4 readTo(vec2 p) {
   if (!inRange(p)) return vec4(0.0);
-  return premultiply(reverse > 0.5 ? texture(from, p) : texture(src, srcRectUv.xy + p * srcRectUv.zw));
+  return reverse > 0.5 ? texture(from, p) : texture(src, srcRectUv.xy + p * srcRectUv.zw);
 }
 `;
 

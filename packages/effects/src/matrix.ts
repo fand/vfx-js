@@ -252,7 +252,9 @@ void main() {
         }
     }
     acc /= float(TAPS * TAPS);
-    float lum = dot(acc.rgb, vec3(0.299, 0.587, 0.114));
+    // src is premultiplied; take luminance of the straight colour.
+    vec3 accRgb = acc.a > 0.0 ? acc.rgb / acc.a : vec3(0.0);
+    float lum = dot(accRgb, vec3(0.299, 0.587, 0.114));
     // Contrast about mid-grey: < 1 flattens, > 1 deepens.
     lum = clamp((lum - 0.5) * contrast + 0.5, 0.0, 1.0);
     if (invert == 1) {

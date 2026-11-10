@@ -39,11 +39,10 @@ const BLOCK = `
   ivec2 l   = p - b;
 `;
 
-/* straight-alpha capture -> premultiplied low-res raster */
+/* premultiplied capture -> low-res raster */
 const PRE = `${HEADER}
 void main(){
-  vec4 c = texture(src, uvSrc);
-  outColor = vec4(c.rgb * c.a, c.a);
+  outColor = texture(src, uvSrc);
 }`;
 
 /* forward DCT, rows: RGB->YCbCr, level-shift, 1D DCT across x */
@@ -221,7 +220,7 @@ export class BadJpegEffect implements Effect {
         const lh = Math.max(1, Math.floor(H * ds));
         const lowRes = this.ensureLowRes(ctx, lw, lh);
 
-        // premultiply + shrink source onto the low-res raster
+        // shrink source onto the low-res raster
         ctx.draw({ frag: PRE, uniforms: { src: ctx.src }, target: lowRes.a });
         let input: EffectRenderTarget = lowRes.a;
 

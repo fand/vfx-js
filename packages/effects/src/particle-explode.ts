@@ -130,7 +130,9 @@ void main() {
     );
     vec2 sampleUv = srcRectUv.xy + spawnUv * srcRectUv.zw;
     vec4 c = texture(src, sampleUv);
-    outColor = vec4(mix(c.rgb, color, colorMix), c.a);
+    // Un-premultiply; the particle shader multiplies by alpha.
+    vec3 rgb = c.a > 0.0 ? c.rgb / c.a : vec3(0.0);
+    outColor = vec4(mix(rgb, color, colorMix), c.a);
 }
 `;
 

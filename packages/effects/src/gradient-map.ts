@@ -85,7 +85,9 @@ vec3 sampleGradient(float t) {
 
 void main(void) {
     vec4 tex = texture(src, srcRectUv.xy + uvContent * srcRectUv.zw);
-    float l = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+    // src is premultiplied; take luma of the straight color.
+    vec3 rgb = tex.a > 0.0 ? tex.rgb / tex.a : vec3(0.0);
+    float l = dot(rgb, vec3(0.299, 0.587, 0.114));
     // Hash in pixel space (gl_FragCoord); hash12 degenerates on tiny
     // [0,1] uv inputs.
     l += scatter * (hash12(gl_FragCoord.xy) - 0.5);

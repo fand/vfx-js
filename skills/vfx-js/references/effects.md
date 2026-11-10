@@ -133,7 +133,7 @@ Always declare `#version 300 es` in `ctx.draw` shaders.
 | `mouse`, `mouseViewport` | Element-local / canvas-local px, bottom-left origin. |
 | `intersection` | 0..1 viewport overlap. |
 | `enterProgress`, `leaveProgress` | 0..1 enter / leave transition. Timing comes from the `intersection` option ([shader.md](shader.md#built-in-uniforms)). |
-| `src`, `target` | Input texture / output for this stage. `target: null` is the canvas. |
+| `src`, `target` | Input texture / output for this stage. `target: null` is the canvas. Both are premultiplied alpha. |
 | `uniforms` | User `uniforms` from `vfx.add`, evaluated each frame. |
 | `dims` | Sizes: `elementPixel`, `canvasPixel`, `pixelRatio`, `contentRect`, `srcRect`, `canvasRect`. |
 | `createRenderTarget(opts)` | `{ size?, float?, persistent?, wrap?, filter?, mipmap? }`. Call in `init`. |

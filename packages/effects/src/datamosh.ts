@@ -24,7 +24,7 @@
 import type { Effect, EffectContext, EffectRenderTarget } from "@vfx-js/core";
 import { captureContent } from "./_capture.js";
 
-// Premultiplied copy of an internal RT to the canvas. `uvContent` maps
+// Copy of an internal RT (premultiplied) to the canvas. `uvContent` maps
 // the content rect into the target buffer.
 // Transparent outside the content, so a padded target doesn't stretch the edges.
 const FRAG_DISPLAY = `#version 300 es
@@ -37,8 +37,7 @@ void main() {
         outColor = vec4(0.0);
         return;
     }
-    vec4 c = texture(tex, uvContent);
-    outColor = vec4(c.rgb * c.a, c.a);
+    outColor = texture(tex, uvContent);
 }
 `;
 

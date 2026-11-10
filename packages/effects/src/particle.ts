@@ -296,7 +296,9 @@ void main() {
     vec4 c = texture(src, clamp(vSpawn.yz, 0.0, 1.0));
     float h = hash21(vSpawn.yz + vec2(vSpawn.x) * 1.7);
     float lifeJitter = mix(lifeJitterRange.x, lifeJitterRange.y, h);
-    outColor = vec4(mix(c.rgb, color, colorMix), lifeJitter);
+    // Un-premultiply; the particle shader multiplies by alpha.
+    vec3 rgb = c.a > 0.0 ? c.rgb / c.a : vec3(0.0);
+    outColor = vec4(mix(rgb, color, colorMix), lifeJitter);
 }
 `;
 
