@@ -190,6 +190,7 @@ registerVFX({
 ## Rules and pitfalls
 
 - Browser only. `new VFX()` throws without `window`, and throws when WebGL is not available. Create it in client code (`useEffect`, `onMount`, `"use client"`), and wrap it in `try` / `catch` so the page still works as plain HTML.
+- With `prefers-reduced-motion: reduce`, `VFX` renders nothing. `add` does nothing, and elements stay plain HTML. It is checked once, when `VFX` is created.
 - Make one `VFX` instance per page and reuse it.
 - `add` is async. `await` it before you call `updateEffects` or `remove` on the same element.
 - Text and plain elements are captured once. Call `vfx.update(el)` after their content changes, or after you change `img.src`.
@@ -682,6 +683,8 @@ await t.run(() => {
 `run(cb, opts)` works like `document.startViewTransition(cb)`: the DOM must be updated when `cb` resolves.
 Both `show` and `run` resolve when the animation ends.
 A new `run` during a run drops the old one, but its callback still runs.
+With `prefers-reduced-motion: reduce`, `run` and `show` always cut.
+
 If the browser already animated the navigation (a swipe back on a phone), `run` cuts. It reads `hasUAVisualTransition` from the `navigate` event, or from `popstate` in older Safari.
 Each handle cuts once per such navigation; a tap or key press after it lets later runs play.
 
