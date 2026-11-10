@@ -8,8 +8,13 @@ function setup() {
     };
     navigation.currentEntry = { key: "k0" };
     const ua = createUATransitions(navigation);
-    const navigate = (key: string, hasUAVisualTransition: boolean) => {
+    const navigate = (
+        key: string,
+        hasUAVisualTransition: boolean,
+        navigationType = "traverse",
+    ) => {
         const event = Object.assign(new Event("navigate"), {
+            navigationType,
             hasUAVisualTransition,
             destination: { key },
         });
@@ -39,6 +44,14 @@ describe("createUATransitions", () => {
         navigate("k1", true);
         navigate("k2", false);
         expect(ua.take()).toBe(false);
+    });
+
+    test("a replace on the same entry keeps it", () => {
+        const { ua, navigate } = setup();
+        navigate("k1", true);
+        // Next.js replaces the state right after a traverse.
+        navigate("k1", false, "replace");
+        expect(ua.take()).toBe(true);
     });
 
     test("is false once the entry is no longer current", () => {

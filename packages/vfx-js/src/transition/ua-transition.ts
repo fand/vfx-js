@@ -5,6 +5,7 @@ export type UATransitions = {
 };
 
 type NavigateEventLike = Event & {
+    navigationType?: string;
     hasUAVisualTransition?: boolean;
     destination?: { key?: string | null };
 };
@@ -22,6 +23,10 @@ export function createUATransitions(
     let animatedKey: string | undefined;
     navigation?.addEventListener("navigate", (e) => {
         const event = e as NavigateEventLike;
+        // Routers like Next.js replace the state right after a traverse; the entry stays.
+        if (event.navigationType === "replace") {
+            return;
+        }
         animatedKey = event.hasUAVisualTransition
             ? (event.destination?.key ?? undefined)
             : undefined;
