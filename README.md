@@ -1,10 +1,6 @@
 <div align="center">
   <a href="https://amagi.dev/vfx-js/" target="_blank"><img alt="VFX-JS effects preview" src="docs/readme-hero.png" width="100%"/></a>
-  <br/>
-  <br/>
-  <img alt="VFX-JS" src="packages/docs/public/vfx-js-logo.svg" width="80%"/>
-  <br/>
-  <br/>
+  <h1>VFX-JS: WebGL effects for HTML.</h1>
   <a href="https://www.npmjs.com/package/@vfx-js/core"><img src="https://img.shields.io/npm/v/@vfx-js/core" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/npm/l/@vfx-js/core" alt="MIT License"></a>
   <a href="https://github.com/fand/vfx-js" target="_blank"><img src="https://img.shields.io/github/stars/fand/vfx-js" alt="Star on GitHub"></a>
