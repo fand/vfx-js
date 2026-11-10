@@ -108,6 +108,15 @@ export class VFX {
     /**
      * Register an element to track the position and render visual effects in the area.
      */
+    add(element: HTMLElement, opts: VFXProps): Promise<void>;
+    /**
+     * @internal Used by VFXCanvas (@vfx-js/react) to pass the first html-in-canvas capture.
+     */
+    add(
+        element: HTMLElement,
+        opts: VFXProps,
+        initialCapture?: OffscreenCanvas,
+    ): Promise<void>;
     async add(
         element: HTMLElement,
         opts: VFXProps,
