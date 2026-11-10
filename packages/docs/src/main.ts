@@ -1,24 +1,20 @@
-import type { Effect, VFX } from "@vfx-js/core";
-import {
-    AsciiEffect,
-    BloomEffect,
-    GlitchEffect,
-    HalftoneEffect,
-    PixelSortEffect,
-} from "@vfx-js/effects";
+import type { VFX } from "@vfx-js/core";
 
 import { bgSpheres, bgVFX, initBackground } from "./background";
 import { lazyDemo } from "./demos/lazy";
 import { runDemos } from "./demos/top-demos";
+import {
+    type Control,
+    MENU_EFFECTS,
+    type ParamValue,
+    snippet,
+    toParam,
+} from "./effect-menu";
 import { onPage, scrollRoot } from "./lifecycle";
 import { getPageVFX } from "./page-vfx";
 
 function $(selector: string, parent?: HTMLElement) {
     return (parent ?? document).querySelector(selector) as HTMLElement;
-}
-
-function lerp(a: number, b: number, t: number) {
-    return a * (1 - t) + b * t;
 }
 
 const logoShader = `
@@ -97,83 +93,51 @@ const logoShader = `
     }
 `;
 
-// Each menu item builds one effect. The slider value t (0-1) drives its main param.
-type MenuEffect = {
-    label: string;
-    className?: string;
-    create?: () => Effect;
-    setIntensity?: (effect: Effect, t: number) => void;
-    options?: (t: number) => string;
-};
-
-const round = (x: number) => Math.round(x * 100) / 100;
-
-const MENU_EFFECTS: MenuEffect[] = [
-    { label: "Original" },
-    {
-        label: "ASCII",
-        className: "AsciiEffect",
-        create: () => new AsciiEffect(),
-        setIntensity: (e, t) => {
-            (e as AsciiEffect).params.grid = Math.round(lerp(24, 6, t));
-        },
-        options: (t) => `{ grid: ${Math.round(lerp(24, 6, t))} }`,
-    },
-    {
-        label: "Bloom",
-        className: "BloomEffect",
-        create: () => new BloomEffect({ threshold: 0.2 }),
-        setIntensity: (e, t) => {
-            (e as BloomEffect).params.intensity = lerp(0.5, 4, t);
-        },
-        options: (t) =>
-            `{ threshold: 0.2, intensity: ${round(lerp(0.5, 4, t))} }`,
-    },
-    {
-        label: "Halftone",
-        className: "HalftoneEffect",
-        create: () => new HalftoneEffect(),
-        setIntensity: (e, t) => {
-            (e as HalftoneEffect).params.gridSize = lerp(4, 18, t);
-        },
-        options: (t) => `{ gridSize: ${round(lerp(4, 18, t))} }`,
-    },
-    {
-        label: "Pixel Sort",
-        className: "PixelSortEffect",
-        create: () => new PixelSortEffect(),
-        setIntensity: (e, t) => {
-            (e as PixelSortEffect).params.range = [lerp(0.9, 0.1, t), 1];
-        },
-        options: (t) => `{ range: [${round(lerp(0.9, 0.1, t))}, 1] }`,
-    },
-    {
-        label: "Glitch",
-        className: "GlitchEffect",
-        create: () => new GlitchEffect(),
-        setIntensity: (e, t) => {
-            (e as GlitchEffect).params.intensity = lerp(0.2, 3, t);
-        },
-        options: (t) => `{ intensity: ${round(lerp(0.2, 3, t))} }`,
-    },
-];
-
-function snippet(item: MenuEffect, t: number): string {
-    if (!item.className || !item.options) {
-        return `import { VFX } from "@vfx-js/core";
-
-const vfx = new VFX();
-await vfx.add(document.querySelector("img"), { shader: "none" });
-`;
+/** Build the param controls for one menu item. */
+function paramsPanel(
+    controls: Control[],
+    values: Record<string, ParamValue>,
+    onChange: (control: Control, value: ParamValue) => void,
+): HTMLElement {
+    const panel = document.createElement("div");
+    panel.className = "EffectParams";
+    for (const control of controls) {
+        const row = document.createElement("label");
+        row.className = "EffectParam";
+        const name = document.createElement("span");
+        name.textContent = control.label ?? control.key;
+        const output = document.createElement("span");
+        output.className = "EffectParamValue";
+        const show = (v: ParamValue) => {
+            output.textContent = control.type === "range" ? String(v) : "";
+        };
+        let input: HTMLInputElement | HTMLSelectElement;
+        if (control.type === "select") {
+            input = document.createElement("select");
+            for (const option of control.options) {
+                input.add(new Option(option, option));
+            }
+        } else {
+            input = document.createElement("input");
+            input.type = control.type;
+            if (control.type === "range") {
+                input.min = String(control.min);
+                input.max = String(control.max);
+                input.step = String(control.step);
+            }
+        }
+        input.value = String(values[control.key]);
+        show(values[control.key]);
+        input.addEventListener("input", () => {
+            const v =
+                control.type === "range" ? Number(input.value) : input.value;
+            show(v);
+            onChange(control, v);
+        });
+        row.append(name, output, input);
+        panel.appendChild(row);
     }
-    return `import { VFX } from "@vfx-js/core";
-import { ${item.className} } from "@vfx-js/effects";
-
-const vfx = new VFX();
-await vfx.add(document.querySelector("img"), {
-    effect: new ${item.className}(${item.options(t)}),
-});
-`;
+    return panel;
 }
 
 class App {
@@ -183,35 +147,54 @@ class App {
     added: HTMLElement[] = [];
 
     // Click an item to apply its effect to the logo, the tagline and the background.
+    // Its params show under the item.
     initEffectMenu() {
         const bg = $("#BG");
         const list = $(".EffectList");
-        const slider = $(".EffectSlider") as HTMLInputElement;
         const copy = $(".EffectCopy");
+
+        // Current control values, per menu item.
+        const values = MENU_EFFECTS.map((item) =>
+            Object.fromEntries(
+                (item.controls ?? []).map((c) => [
+                    c.key,
+                    c.value as ParamValue,
+                ]),
+            ),
+        );
+        const params = (index: number) =>
+            Object.fromEntries(
+                (MENU_EFFECTS[index].controls ?? []).map((c) => [
+                    c.key,
+                    toParam(c, values[index][c.key]),
+                ]),
+            );
 
         // One effect instance can't be shared between elements, so each target gets its own.
         // The logo and tagline start on their intro shader. They move to the effect path on first use.
+        const createAll = () =>
+            MENU_EFFECTS.map((item, i) => item.create?.(params(i)));
         const texts = [$("#Logo"), $("#LogoTagline")].map((element) => ({
             element,
-            effects: MENU_EFFECTS.map((item) => item.create?.()),
+            effects: createAll(),
             onEffectPath: false,
         }));
-        const bgEffects = MENU_EFFECTS.map((item) => item.create?.());
+        const bgEffects = createAll();
         let selected = 0;
         let queue = Promise.resolve();
 
-        const intensity = () => Number.parseFloat(slider.value);
-
-        const applyIntensity = () => {
-            const item = MENU_EFFECTS[selected];
-            const effects = [
-                ...texts.map((t) => t.effects[selected]),
-                bgEffects[selected],
-            ];
-            for (const effect of effects) {
-                if (effect) {
-                    item.setIntensity?.(effect, intensity());
-                }
+        const setParam = (
+            index: number,
+            control: Control,
+            value: ParamValue,
+        ) => {
+            values[index][control.key] = value;
+            const update = { [control.key]: toParam(control, value) };
+            for (const effect of [
+                ...texts.map((t) => t.effects[index]),
+                bgEffects[index],
+            ]) {
+                effect?.setParams(update);
             }
         };
 
@@ -225,8 +208,6 @@ class App {
 
         const select = (index: number) => {
             selected = index;
-            applyIntensity();
-            slider.disabled = !bgEffects[index];
             // Run swaps in order so fast clicks can't interleave them.
             queue = queue.then(async () => {
                 if (selected !== index || !this.alive) {
@@ -264,24 +245,32 @@ class App {
 
         const items = MENU_EFFECTS.map((item, i) => {
             const li = document.createElement("li");
-            li.innerHTML = `<span class="num">${String(i + 1).padStart(2, "0")}</span>${item.label}`;
-            li.addEventListener("click", () => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "EffectItem";
+            button.innerHTML = `<span class="num">${String(i + 1).padStart(2, "0")}</span>${item.label}`;
+            button.addEventListener("click", () => {
                 for (const [j, other] of items.entries()) {
                     other.classList.toggle("active", j === i);
                 }
                 select(i);
             });
+            li.appendChild(button);
+            if (item.controls) {
+                li.appendChild(
+                    paramsPanel(item.controls, values[i], (c, v) =>
+                        setParam(i, c, v),
+                    ),
+                );
+            }
             list.appendChild(li);
             return li;
         });
         items[selected].classList.add("active");
-        slider.disabled = true;
-
-        slider.addEventListener("input", applyIntensity);
 
         copy.addEventListener("click", async () => {
             await navigator.clipboard.writeText(
-                snippet(MENU_EFFECTS[selected], intensity()),
+                snippet(MENU_EFFECTS[selected], params(selected)),
             );
             const label = copy.innerHTML;
             copy.textContent = "Copied ✓";

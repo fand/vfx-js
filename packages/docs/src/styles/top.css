@@ -60,7 +60,7 @@
 .EffectMenu {
     position: relative;
     z-index: 10;
-    width: 180px;
+    width: 220px;
     padding: 24px;
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.8);
@@ -77,52 +77,89 @@
     margin: 0;
     padding: 0;
 }
-.EffectList li {
+.EffectItem {
     display: flex;
     align-items: center;
-    height: 40px;
+    width: 100%;
+    height: 32px;
+    padding: 0;
+    border: none;
+    background: none;
     font-family: "Helvetica Neue", Arial, sans-serif;
-    font-size: 20px;
+    font-size: 18px;
     color: rgba(255, 255, 255, 0.55);
+    text-align: left;
     cursor: pointer;
     user-select: none;
 }
-.EffectList li .num {
-    width: 48px;
+.EffectItem .num {
+    flex: none;
+    width: 40px;
+    font-family: var(--mono);
+    font-size: 13px;
     color: rgba(255, 255, 255, 0.35);
 }
-.EffectList li:hover,
-.EffectList li.active {
+.EffectItem:hover,
+.EffectList li.active .EffectItem {
     color: white;
 }
-.EffectList li.active {
+.EffectList li.active .EffectItem {
     font-weight: 600;
 }
 .EffectList li.active .num {
     color: white;
 }
-.EffectList li.active::after {
+.EffectList li.active .EffectItem::after {
     content: "";
     flex: 1;
     height: 1px;
     margin-left: 16px;
     background: white;
 }
-.EffectIntensity {
-    display: block;
-    margin-top: 16px;
-    font-size: 12px;
+
+/* Params of the selected effect. */
+.EffectParams {
+    display: none;
+    margin: 4px 0 12px 40px;
+}
+.EffectList li.active .EffectParams {
+    display: grid;
+    gap: 10px;
+}
+.EffectParam {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    row-gap: 4px;
+    font-size: 11px;
     letter-spacing: 0.05em;
     color: rgba(255, 255, 255, 0.6);
 }
-.EffectSlider {
-    display: block;
+.EffectParamValue {
+    color: white;
+}
+.EffectParam input,
+.EffectParam select {
+    grid-column: 1 / -1;
+    box-sizing: border-box;
     width: 100%;
-    margin: 12px 0 0;
+    margin: 0;
     accent-color: white;
 }
-.EffectSlider:disabled {
-    opacity: 0.3;
+.EffectParam select {
+    padding: 2px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    background: black;
+    color: white;
+    font-family: var(--mono);
+    font-size: 12px;
+}
+.EffectParam input[type="color"] {
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
 }
 .EffectCopy {
     margin-top: 32px;
@@ -193,17 +230,23 @@
 
 /*================ Code and demo rows ================*/
 
+#RunTitle {
+    margin-bottom: 64px;
+}
+/* The text parts sit in the row grid, so the demo starts at the code block's top. */
 .RunRow {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 40px;
-    margin-top: 64px;
+    grid-template-rows: auto auto 1fr;
+    gap: 16px 40px;
+    margin-bottom: 96px;
 }
 .RunText {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 16px;
+    display: contents;
+}
+.RunText > * {
+    grid-column: 1;
+    align-self: start;
     min-width: 0;
 }
 .RunText h3 {
@@ -220,47 +263,46 @@
     margin: 0;
 }
 .RunDemo {
-    position: relative;
     display: flex;
+    flex-direction: column;
+    grid-column: 2;
+    grid-row: 3;
     align-items: center;
-    justify-content: center;
-    min-height: 300px;
-    padding: 48px;
-    border: 1px solid var(--line);
-    border-radius: 4px;
+    gap: 12px;
     box-sizing: border-box;
 }
 .RunDemo img {
     display: block;
     width: 100%;
-    max-width: 520px;
     height: auto;
 }
 .RunCaption {
-    position: absolute;
-    left: 12px;
-    bottom: 10px;
+    width: 100%;
     font-family: var(--mono);
     font-size: 12px;
     color: rgba(255, 255, 255, 0.6);
 }
 /* Every other row puts the demo first. */
+.RunRow:nth-of-type(even) .RunText > * {
+    grid-column: 2;
+}
 .RunRow:nth-of-type(even) .RunDemo {
-    order: -1;
+    grid-column: 1;
 }
 
 @media (max-width: 767px) {
     .RunRow {
         grid-template-columns: minmax(0, 1fr);
-        gap: 24px;
-        margin-top: 48px;
+        grid-template-rows: none;
+        margin-bottom: 48px;
     }
     .RunDemo {
-        min-height: 0;
-        padding: 32px 24px;
+        grid-row: auto;
+        margin-top: 8px;
     }
-    .RunRow:nth-of-type(even) .RunDemo {
-        order: 0;
+    .RunRow:nth-of-type(n) .RunText > *,
+    .RunRow:nth-of-type(n) .RunDemo {
+        grid-column: 1;
     }
 }
 
