@@ -17,6 +17,8 @@ const serif = Instrument_Serif({
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
+    metadataBase: new URL("https://amagi.dev"),
+    twitter: { card: "summary_large_image" },
     title: {
         default: "VFX-JS Transitions — shader transitions for the DOM",
         template: "%s — VFX-JS Transitions",
