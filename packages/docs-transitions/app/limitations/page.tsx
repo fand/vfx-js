@@ -125,8 +125,8 @@ const t = vfx.addTransition(el, {
                     <p>
                         A phone animates a swipe back or forward on its own. The
                         run then cuts to the new page instead of playing a
-                        second animation. Browsers without the Navigation API
-                        play it as usual.
+                        second animation. Browsers without{" "}
+                        <code>hasUAVisualTransition</code> play it as usual.
                     </p>
                     <h3>No multi-page navigation</h3>
                     <p>

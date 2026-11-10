@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { createUATransitions, type NavigationLike } from "./ua-transition";
+import {
+    createUATransitions,
+    type NavigationLike,
+    type WindowLike,
+} from "./ua-transition";
+
+const fakeWindow = (href = "https://a.test/"): WindowLike =>
+    Object.assign(new EventTarget(), { location: { href } });
 
 // A fake Navigation API: fire a navigate event, then move to its entry.
 function setup() {
@@ -7,7 +14,7 @@ function setup() {
         currentEntry: { key: string };
     };
     navigation.currentEntry = { key: "k0" };
-    const input = new EventTarget();
+    const input = fakeWindow();
     const ua = createUATransitions(navigation, input);
     const navigate = (
         key: string,
@@ -79,9 +86,60 @@ describe("createUATransitions", () => {
         expect(ua.current()).toBeUndefined();
     });
 
-    test("is undefined without the Navigation API", () => {
+    test("ignores popstate when the Navigation API is there", () => {
+        const { ua, input } = setup();
+        input.dispatchEvent(
+            Object.assign(new Event("popstate"), {
+                hasUAVisualTransition: true,
+            }),
+        );
+        expect(ua.current()).toBeUndefined();
+    });
+});
+
+describe("createUATransitions without the Navigation API", () => {
+    // Older Safari: the flag is only on popstate.
+    const setup = () => {
+        const win = fakeWindow("https://a.test/b");
+        const ua = createUATransitions(undefined, win);
+        const popTo = (href: string, hasUAVisualTransition: boolean) => {
+            win.location.href = href;
+            win.dispatchEvent(
+                Object.assign(new Event("popstate"), {
+                    hasUAVisualTransition,
+                }),
+            );
+        };
+        return { ua, win, popTo };
+    };
+
+    test("reads the flag from popstate", () => {
+        const { ua, popTo } = setup();
+        expect(ua.current()).toBeUndefined();
+        popTo("https://a.test/a", false);
+        expect(ua.current()).toBeUndefined();
+        popTo("https://a.test/b", true);
+        expect(ua.current()).toBeDefined();
+    });
+
+    test("is undefined once the URL changes", () => {
+        const { ua, win, popTo } = setup();
+        popTo("https://a.test/a", true);
+        // A pushState fires no event.
+        win.location.href = "https://a.test/c";
+        expect(ua.current()).toBeUndefined();
+    });
+
+    test("user input clears it", () => {
+        const { ua, win, popTo } = setup();
+        popTo("https://a.test/a", true);
+        win.dispatchEvent(new Event("pointerdown"));
+        expect(ua.current()).toBeUndefined();
+    });
+
+    test("is undefined without a window", () => {
         expect(
-            createUATransitions(undefined, new EventTarget()).current(),
+            createUATransitions(undefined, undefined).current(),
         ).toBeUndefined();
     });
 });
