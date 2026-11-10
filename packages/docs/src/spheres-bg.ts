@@ -47,6 +47,11 @@ uniform float bandWidth;
 uniform float bandIntensity;
 uniform float spot;
 uniform float chroma;
+uniform float noise;
+uniform float noiseIntensity;
+uniform float noiseScale;
+uniform float noiseSpeed;
+uniform float noiseChroma;
 uniform sampler2D accum;
 out vec4 outColor;
 
@@ -141,6 +146,30 @@ vec3 env(vec3 d) {
     }
     c += smoothstep(.9, .97, dot(d, normalize(vec3(-.5, .7, .4)))) * 4. * spot;
     return vec3(c);
+}
+
+// Smooth noise from turned and warped sine waves, 2 octaves. No hash, so no grain.
+const mat3 OCTAVE_TURN = mat3(0, .8, .6, -.8, .36, -.48, -.6, -.48, .64);
+float cyclicNoise(vec3 p) {
+    p = OCTAVE_TURN * p;
+    p += sin(p.yzx) * .7;
+    float n = dot(sin(p), cos(p.zxy));
+    p = OCTAVE_TURN * p * 1.7;
+    p += sin(p.yzx) * .7;
+    n += dot(sin(p), cos(p.zxy)) * .55;
+    return n / 1.55;
+}
+
+// Soft rainbow glow along the noise, like light split by glass.
+vec3 fringes(vec2 frag) {
+    vec2 q = (frag - resolution * .5) / resolution.y * noiseScale;
+    float t = time * noiseSpeed;
+    float v = cyclicNoise(vec3(q, t));
+    // Soft spectrum: the hue sweeps with the noise and fades out at both ends of each cycle.
+    float x = fract(v * 2. - t * .3);
+    vec3 color = max(spectrum(mix(400., 700., x)), 0.) * pow(sin(x * 3.14159), 2.);
+    color = mix(vec3(dot(color, vec3(.3, .6, .1))), color, noiseChroma);
+    return color * noiseIntensity;
 }
 
 // XOR: a point is solid when it sits inside an odd number of spheres.
@@ -238,6 +267,10 @@ void main() {
             total += weight;
         }
         current = vec4(max(c / total, 0.) * exposure, 1);
+    } else if (noise > .5) {
+        // Premultiplied alpha, so the page pattern still shows through the dark parts.
+        vec3 c = fringes(frag);
+        current = vec4(c, max(c.r, max(c.g, c.b)));
     }
 
     vec4 previous = texture(accum, uv);
@@ -266,6 +299,12 @@ export class SpheresEffect implements Effect {
     center: [number, number];
     zoom: number;
     exposure: number;
+    // Soft rainbow glow where the spheres aren't.
+    noise: boolean;
+    noiseIntensity: number;
+    noiseScale: number;
+    noiseSpeed: number;
+    noiseChroma: number;
     #accum: EffectRenderTarget | null = null;
     #seed = Math.random() * 100;
 
@@ -274,11 +313,21 @@ export class SpheresEffect implements Effect {
             center?: [number, number];
             zoom?: number;
             exposure?: number;
+            noise?: boolean;
+            noiseIntensity?: number;
+            noiseScale?: number;
+            noiseSpeed?: number;
+            noiseChroma?: number;
         } = {},
     ) {
         this.center = opts.center ?? [0.5, 0.5];
         this.zoom = opts.zoom ?? 1;
         this.exposure = opts.exposure ?? 1;
+        this.noise = opts.noise ?? true;
+        this.noiseIntensity = opts.noiseIntensity ?? 0.2;
+        this.noiseScale = opts.noiseScale ?? 0.4;
+        this.noiseSpeed = opts.noiseSpeed ?? 0.05;
+        this.noiseChroma = opts.noiseChroma ?? 0.3;
     }
 
     init(ctx: EffectContext): void {
@@ -307,6 +356,11 @@ export class SpheresEffect implements Effect {
                 spot: 0,
                 bandWidth: 0.3,
                 bandIntensity: 0.4,
+                noise: this.noise ? 1 : 0,
+                noiseIntensity: this.noiseIntensity,
+                noiseScale: this.noiseScale,
+                noiseSpeed: this.noiseSpeed,
+                noiseChroma: this.noiseChroma,
             },
             target: this.#accum,
         });
