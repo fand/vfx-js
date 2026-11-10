@@ -67,7 +67,7 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 ### Build System
 - Turborepo manages the monorepo builds and caching
 - Each package builds to both ESM and CJS formats
-- Documentation is auto-generated with TypeDoc for the core package
+- The API reference (`/vfx-js/docs/`) is part of the docs site. `@vfx-js/core`'s build writes TypeDoc JSON for core and effects to `packages/vfx-js/docs-build/api.json`, and `packages/docs/src/api/` renders it with Astro. Build core before running the docs site
 
 ### Testing
 - Packages use Vitest for testing

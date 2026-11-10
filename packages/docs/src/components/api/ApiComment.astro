@@ -1,0 +1,34 @@
+---
+import { loadApi } from "../../api/model";
+import { blockTags, markdownHtml } from "../../api/render";
+import type { Comment } from "../../api/types";
+
+type Props = {
+    comment?: Comment;
+};
+
+const api = loadApi();
+const { comment } = Astro.props;
+const summary = markdownHtml(api, comment?.summary);
+const tags = blockTags(api, comment);
+const badges = (comment?.modifierTags ?? []).map((t) => t.replace(/^@/, ""));
+---
+
+{
+    badges.length > 0 && (
+        <p class="ApiBadges">
+            {badges.map((b) => (
+                <span class="ApiBadge">{b}</span>
+            ))}
+        </p>
+    )
+}
+{summary && <div class="ApiText" set:html={summary} />}
+{
+    tags.map((tag) => (
+        <div class="ApiTag">
+            <h4>{tag.title}</h4>
+            <div class="ApiText" set:html={tag.html} />
+        </div>
+    ))
+}

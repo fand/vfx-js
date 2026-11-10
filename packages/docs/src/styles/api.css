@@ -1,0 +1,329 @@
+/*================ API Reference ================*/
+
+.DocMain.ApiPage {
+    --api-code-bg: rgba(0, 0, 0, 0.8);
+    --api-dim: rgba(255, 255, 255, 0.55);
+}
+
+.DocMain.ApiPage h1 {
+    margin-bottom: 0;
+    overflow-wrap: anywhere;
+}
+.DocMain.ApiPage h2 {
+    margin: 64px 0 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: 1.5rem;
+}
+.DocMain.ApiPage section {
+    margin-bottom: 0;
+}
+.DocMain.ApiPage h4 {
+    margin: 20px 0 8px;
+    font: 12px var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--api-dim);
+}
+
+/* Inline code in prose. The global style is sized for the big top page. */
+.DocMain.ApiPage :not(pre) > code {
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    font-family: var(--mono);
+    font-size: 0.85em;
+}
+.DocMain.ApiPage pre {
+    margin: 16px 0;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--api-code-bg);
+    color: #e1e4e8;
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.6;
+    overflow-x: auto;
+}
+.DocMain.ApiPage pre > code {
+    display: block;
+    padding: 0;
+    background: none;
+    font-size: inherit;
+}
+
+/*---------------- Header ----------------*/
+
+.ApiCrumbs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    font: 13px var(--mono);
+    color: var(--api-dim);
+}
+.ApiCrumbs a {
+    color: var(--api-dim);
+    text-decoration: none;
+}
+.ApiCrumbs a:hover {
+    color: white;
+}
+.ApiKind {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font: 12px var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--api-dim);
+}
+.ApiHead h1 .ApiTypeParams {
+    padding: 0;
+    background: none;
+    font-size: 0.45em;
+    vertical-align: middle;
+}
+.DocMain.ApiPage a.ApiSource {
+    display: inline-block;
+    margin-top: 12px;
+    font: 13px var(--mono);
+    color: var(--api-dim);
+    text-decoration: none;
+}
+.DocMain.ApiPage a.ApiSource:hover {
+    color: white;
+}
+.DocMain.ApiPage .ApiImport pre {
+    margin: 24px 0;
+}
+.ApiNote {
+    padding: 8px 16px;
+    border-left: 2px solid var(--line);
+    color: var(--api-dim);
+}
+.DocMain.ApiPage .ApiNote {
+    font-size: 1rem;
+}
+.ApiLead {
+    max-width: 40em;
+}
+
+/*---------------- Badges ----------------*/
+
+.ApiBadges {
+    margin: 8px 0;
+}
+.ApiBadge {
+    display: inline-block;
+    padding: 1px 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font: 11px / 1.6 var(--mono);
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+    color: var(--api-dim);
+    vertical-align: middle;
+}
+.ApiBadge + .ApiBadge {
+    margin-left: 4px;
+}
+
+/*---------------- Text ----------------*/
+
+.ApiText > :first-child {
+    margin-top: 0;
+}
+.ApiText > :last-child {
+    margin-bottom: 0;
+}
+.ApiText {
+    margin: 16px 0;
+    max-width: 48em;
+}
+.DocMain.ApiPage .ApiText p,
+.DocMain.ApiPage .ApiText li {
+    font-size: 1rem;
+}
+.ApiText a {
+    text-decoration-color: rgba(255, 255, 255, 0.4);
+}
+/* Links to API pages: the underline goes through the code box. */
+.DocMain.ApiPage a > code {
+    display: inline;
+    color: #ffa657;
+}
+
+/*---------------- Relations ----------------*/
+
+.ApiRelations {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 8px 24px;
+    margin: 24px 0;
+}
+.ApiRelations dt {
+    font: 12px / 1.9 var(--mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--api-dim);
+}
+.ApiRelations dd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+}
+
+/*---------------- Members ----------------*/
+
+.ApiMember {
+    padding: 32px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    scroll-margin-top: calc(var(--header-bottom) + 24px);
+}
+.ApiMember:last-child {
+    border-bottom: none;
+}
+.ApiMember h3 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font: 600 1.125rem var(--mono);
+}
+.ApiAnchor {
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+.ApiAnchor:hover::after {
+    content: " #";
+    color: var(--api-dim);
+}
+.ApiInherited {
+    font: 400 12px var(--mono);
+    color: var(--api-dim);
+}
+.ApiInherited a {
+    color: var(--api-dim);
+}
+.ApiSignature + .ApiSignature {
+    margin-top: 32px;
+}
+.ApiDefault {
+    font-size: 0.9rem;
+    color: var(--api-dim);
+}
+.DocMain.ApiPage .ApiDefault {
+    font-size: 0.9rem;
+}
+
+.ApiParams {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.DocMain.ApiPage .ApiParams li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    margin: 8px 0;
+    font-size: 1rem;
+}
+.ApiParamText {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* Code in a list or table: no box, wraps if it must. */
+.DocMain.ApiPage code.ApiInline {
+    display: inline;
+    padding: 1px 5px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/*---------------- Index ----------------*/
+
+.ApiIndexPackage {
+    scroll-margin-top: calc(var(--header-bottom) + 24px);
+}
+.DocMain.ApiPage .ApiIndexPackage > p {
+    color: var(--api-dim);
+}
+.ApiIndexGroup h3 {
+    margin: 32px 0 8px;
+    font: 12px var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--api-dim);
+}
+.ApiIndexList {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.DocMain.ApiPage .ApiIndexList li {
+    display: grid;
+    grid-template-columns: minmax(0, 16em) minmax(0, 1fr);
+    gap: 16px;
+    margin: 0;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+.ApiIndexList li > a {
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+.ApiIndexList li > a:hover code {
+    background: rgba(255, 255, 255, 0.25);
+}
+.ApiIndexList li > span {
+    color: rgba(255, 255, 255, 0.7);
+}
+@media (max-width: 767px) {
+    .ApiPage .ApiIndexList li {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+}
+
+/*---------------- Type tokens (github-dark) ----------------*/
+
+.DocMain.ApiPage .tk {
+    color: #ff7b72;
+}
+.DocMain.ApiPage .ts {
+    color: #a5d6ff;
+}
+.DocMain.ApiPage .tn {
+    color: #79c0ff;
+}
+.DocMain.ApiPage .tf {
+    color: #d2a8ff;
+}
+.DocMain.ApiPage .tr {
+    color: #ffa657;
+}
+.DocMain.ApiPage a.tr {
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 166, 87, 0.4);
+    text-underline-offset: 2px;
+}
+.DocMain.ApiPage a.tr:hover {
+    text-decoration-color: currentColor;
+}
+.DocMain.ApiPage .tt {
+    color: #ffa657;
+    font-style: italic;
+}
+.DocMain.ApiPage .tm {
+    color: #e6edf3;
+}
+.DocMain.ApiPage .tp {
+    color: rgba(230, 237, 243, 0.6);
+}

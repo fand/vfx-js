@@ -14,7 +14,6 @@ const columns: { title: string; items: FooterLink[] }[] = [
     {
         title: "Resources",
         items: [
-            { label: "API Reference", href: url("docs/") },
             { label: "Examples", href: url("examples/"), external: true },
             { label: "Storybook", href: url("storybook/"), external: true },
             { label: "llms.txt", href: url("llms.txt"), external: true },
@@ -55,14 +54,7 @@ const columns: { title: string; items: FooterLink[] }[] = [
                                 </li>
                             ) : (
                                 <li>
-                                    <a
-                                        href={item.href}
-                                        data-astro-reload={
-                                            item.href.startsWith(url("docs/")) || undefined
-                                        }
-                                    >
-                                        {item.label}
-                                    </a>
+                                    <a href={item.href}>{item.label}</a>
                                 </li>
                             ),
                         )}

@@ -1,0 +1,67 @@
+---
+import "../../styles/api.css";
+import Layout from "../../layouts/Layout.astro";
+import { commentOf, loadApi } from "../../api/model";
+import { inlineMarkdownHtml } from "../../api/render";
+import { url } from "../../site";
+
+const api = loadApi();
+
+const blurbs: Record<string, string> = {
+    core: "The VFX class, its options, and the types for custom effects and transitions.",
+    effects: "Ready-made effects to pass to the effect option, and their parameters.",
+};
+
+/** First paragraph of a comment, on one line. */
+function summaryHtml(parts: Parameters<typeof inlineMarkdownHtml>[1]) {
+    const text = parts ?? [];
+    const end = text.findIndex((p) => p.kind === "text" && /\n\s*\n/.test(p.text));
+    if (end < 0) {
+        return inlineMarkdownHtml(api, text);
+    }
+    const cut = text[end];
+    const head = { ...cut, text: cut.text.split(/\n\s*\n/)[0] };
+    return inlineMarkdownHtml(api, [...text.slice(0, end), head]);
+}
+---
+
+<Layout page="docs" class="ApiPage">
+    <h1>API Reference</h1>
+    <p class="ApiLead">
+        Every class, function and type in <code>@vfx-js/core</code> and
+        <code>@vfx-js/effects</code>, generated from the source. New to VFX-JS?
+        Start with <a href={url("getting-started/")}>Getting Started</a>.
+    </p>
+
+    {
+        api.packages.map((pkg) => (
+            <section id={pkg.slug} class="ApiIndexPackage">
+                <h2>{pkg.name}</h2>
+                {blurbs[pkg.slug] && <p>{blurbs[pkg.slug]}</p>}
+                {pkg.groups.map((group) => (
+                    <div class="ApiIndexGroup">
+                        <h3>{group.title}</h3>
+                        {group.internal && (
+                            <p class="ApiNote">
+                                Exported APIs use these types, but {pkg.name} does
+                                not export them.
+                            </p>
+                        )}
+                        <ul class="ApiIndexList">
+                            {group.pages.map((page) => (
+                                <li>
+                                    <a href={url(page.path)}>
+                                        <code>{page.decl.name}</code>
+                                    </a>
+                                    <span
+                                        set:html={summaryHtml(commentOf(page.decl)?.summary)}
+                                    />
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ))}
+            </section>
+        ))
+    }
+</Layout>

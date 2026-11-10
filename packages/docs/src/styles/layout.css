@@ -122,6 +122,11 @@
     position: sticky;
     top: calc(var(--header-bottom) + 48px);
     align-self: start;
+    /* The API list is long. Scroll it on its own. */
+    max-height: calc(100lvh - var(--header-bottom) - 96px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
     font-size: 15px;
 }
 .DocSidebar ul {
@@ -150,6 +155,64 @@
 .DocSidebar a[aria-current="page"] {
     font-weight: 600;
 }
+.DocSidebarApi {
+    margin: 12px 0 16px;
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+    font-size: 14px;
+}
+.DocSidebarApi > div + div {
+    margin-top: 16px;
+}
+.DocSidebar .DocSidebarPackage {
+    display: block;
+    margin-bottom: 4px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: white;
+}
+.DocSidebarApi summary {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    list-style: none;
+}
+.DocSidebarApi summary::-webkit-details-marker {
+    display: none;
+}
+.DocSidebarApi summary::before {
+    content: "+";
+    width: 1em;
+    font-family: var(--mono);
+}
+.DocSidebarApi details[open] > summary::before {
+    content: "\2212";
+}
+.DocSidebarApi summary span {
+    margin-left: auto;
+    padding-right: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    opacity: 0.5;
+}
+.DocSidebarApi summary:hover {
+    color: white;
+}
+.DocSidebar .DocSidebarApi ul {
+    margin: 4px 0 8px;
+    padding-left: 1em;
+    border-left: none;
+    font-family: var(--mono);
+    font-size: 13px;
+}
+.DocSidebarApi li {
+    margin: 4px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .DocSidebarExtra {
     display: block;
     margin-top: 24px;

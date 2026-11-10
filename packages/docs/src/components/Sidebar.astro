@@ -1,4 +1,5 @@
 ---
+import { loadApi } from "../api/model";
 import { nav, url } from "../site";
 
 type Props = {
@@ -6,6 +7,10 @@ type Props = {
 };
 
 const { current } = Astro.props;
+
+// API pages list the packages and their declarations.
+const apiPath = Astro.url.pathname.replace(url(), "");
+const api = current === "docs" ? loadApi() : undefined;
 ---
 
 <nav class="DocSidebar" aria-label="Docs">
@@ -19,7 +24,51 @@ const { current } = Astro.props;
                     >
                         {item.label}
                     </a>
-                    {item.slug === current && (
+                    {item.slug === current && api && (
+                        <div class="DocSidebarApi">
+                            {api.packages.map((pkg) => (
+                                <div>
+                                    <a
+                                        class="DocSidebarPackage"
+                                        href={url(`docs/#${pkg.slug}`)}
+                                    >
+                                        {pkg.name}
+                                    </a>
+                                    {pkg.groups.map((group) => (
+                                        <details
+                                            open={
+                                                group.pages.some(
+                                                    (p) => p.path === apiPath,
+                                                ) || undefined
+                                            }
+                                        >
+                                            <summary>
+                                                {group.title}
+                                                <span>{group.pages.length}</span>
+                                            </summary>
+                                            <ul>
+                                                {group.pages.map((p) => (
+                                                    <li>
+                                                        <a
+                                                            href={url(p.path)}
+                                                            aria-current={
+                                                                p.path === apiPath
+                                                                    ? "page"
+                                                                    : undefined
+                                                            }
+                                                        >
+                                                            {p.decl.name}
+                                                        </a>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </details>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {item.slug === current && item.sections.length > 0 && (
                         <ul>
                             {item.sections.map((section) => (
                                 <li>
@@ -37,7 +86,6 @@ const { current } = Astro.props;
             ))
         }
     </ul>
-    <a class="DocSidebarExtra" href={url("docs/")} data-astro-reload>API Reference &#8594;</a>
     <a
         class="DocSidebarExtra"
         href={url("examples/")}

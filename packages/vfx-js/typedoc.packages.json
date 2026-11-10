@@ -4,31 +4,8 @@
     "entryPointStrategy": "packages",
     "entryPoints": ["./", "../effects"],
     "plugin": ["typedoc-plugin-missing-exports"],
-    "customCss": "./typedoc.css",
-    "readme": "docs/home.md",
+    "readme": "none",
     "sort": ["kind"],
     "kindSortOrder": ["Class", "Function"],
-    "categorizeByGroup": false,
-    "searchGroupBoosts": {
-        "Classes": 1.5
-    },
-    "navigationLinks": {
-        "Home": "https://amagi.dev/vfx-js",
-        "GitHub": "https://github.com/fand/vfx-js"
-    },
-    "highlightLanguages": [
-        "javascript",
-        "typescript",
-        "tsx",
-        "json",
-        "jsonc",
-        "html",
-        "glsl",
-        "bash"
-    ],
-    "markdownItOptions": {
-        "html": true,
-        "linkify": true,
-        "breaks": true
-    }
+    "categorizeByGroup": false
 }

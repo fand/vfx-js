@@ -32,7 +32,7 @@ const coreSource = {
 };
 
 // The build copies these folders into dist. Serve them in dev too.
-const copiedDirs = { docs: "typedoc", storybook: "storybook", examples: "examples" };
+const copiedDirs = { storybook: "storybook", examples: "examples" };
 const mimeTypes = {
     ".html": "text/html",
     ".js": "text/javascript",
@@ -55,7 +55,7 @@ const copiedDirsInDev = {
                 const path = decodeURIComponent((req.url ?? "").split("?")[0]);
                 // Vite may strip the base before this runs.
                 const match = path.match(
-                    /^(?:\/vfx-js)?\/(docs|storybook|examples)(\/.*)?$/,
+                    /^(?:\/vfx-js)?\/(storybook|examples)(\/.*)?$/,
                 );
                 if (!match) {
                     return next();
