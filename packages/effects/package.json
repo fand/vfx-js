@@ -9,6 +9,7 @@
   ],
   "type": "module",
   "main": "./lib/esm/index.js",
+  "sideEffects": false,
   "types": "lib/esm/index.d.ts",
   "exports": {
     "require": {
