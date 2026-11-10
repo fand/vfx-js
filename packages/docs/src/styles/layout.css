@@ -204,11 +204,56 @@
 
 .SiteFooter {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    min-height: 60lvh;
-    padding: 10vh 32px;
+    gap: 12vh;
+    margin-top: 80px;
+    padding: 96px 40px 12vh;
+    border-top: 1px solid var(--line);
     box-sizing: border-box;
     overflow-x: hidden;
+}
+.SiteFooterNav {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 40px;
+    width: 100%;
+}
+.SiteFooterLogo img {
+    display: block;
+    width: 160px;
+}
+.SiteFooterCol h4 {
+    margin: 0 0 16px;
+    font: 12px var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+}
+.SiteFooterList {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.SiteFooterCol a {
+    font-size: 15px;
+    text-decoration: none;
+}
+.SiteFooterCol a:hover {
+    text-decoration: underline;
+}
+.SiteFooterCol a span {
+    opacity: 0.5;
+}
+@media (max-width: 767px) {
+    .SiteFooterNav {
+        grid-template-columns: 1fr 1fr;
+    }
+    .SiteFooterLogo {
+        grid-column: 1 / -1;
+    }
 }
 .Author {
     display: flex;
