@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html data-astro-transition-scope="astro-yztbsuuz-1" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Custom Shaders - VFX-JS</title>
+
+        <meta name="theme-color" content="#000000">
+        <meta name="description" content="Write your own GLSL shaders for VFX-JS: uniforms, overflow, backbuffer, multipass and post effects.">
+        <link rel="canonical" href="https://amagi.dev/vfx-js/shaders/">
+
+        <meta property="og:url" content="https://amagi.dev/vfx-js/shaders/">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="Custom Shaders - VFX-JS">
+        <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+        <meta property="og:description" content="Write your own GLSL shaders for VFX-JS: uniforms, overflow, backbuffer, multipass and post effects.">
+        <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
+        <meta property="og:locale" content="en_US">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@amagitakayosi">
+        <meta name="twitter:creator" content="@amagitakayosi">
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/shaders/">
+        <meta name="twitter:title" content="Custom Shaders - VFX-JS">
+        <meta name="twitter:description" content="Write your own GLSL shaders for VFX-JS: uniforms, overflow, backbuffer, multipass and post effects.">
+        <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+
+        <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/vfx-js/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/vfx-js/favicon/favicon-180.png">
+        <link rel="manifest" href="/vfx-js/manifest.webmanifest">
+
+        <meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
+<script type="module" src="/vfx-js/_astro/ClientRouter.astro_astro_type_script_index_0_lang.C2j_ZdXg.js"></script>
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;b9c39aae9c304f1cbfa1e7bb3e84f078&quot;}"></script>
+        <!-- End Cloudflare Web Analytics -->
+    <link rel="stylesheet" href="/vfx-js/_astro/CodeBlock.LNdCJ4k7.css">
+<link rel="stylesheet" href="/vfx-js/_astro/shaders.gshl6w7F.css">
+<link rel="stylesheet" href="/vfx-js/_astro/Layout.7Dg6_FOh.css"><style>[data-astro-transition-scope="astro-yztbsuuz-1"] { view-transition-name: astro-yztbsuuz-1; }@layer astro { ::view-transition-old(astro-yztbsuuz-1) { animation: none; opacity: 0; mix-blend-mode: normal; }::view-transition-new(astro-yztbsuuz-1) { animation: none; mix-blend-mode: normal; }::view-transition-group(astro-yztbsuuz-1) { animation: none } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }</style></head>
+
+    <body class="DocPage">
+        <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
+
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.BNPinfg6.js"></script>
+        <header class="SiteHeader">
+    <a class="SiteHeaderBrand" href="/vfx-js/">
+        <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+    </a>
+    <button class="SiteHeaderMenuButton" type="button" aria-label="Menu" aria-expanded="false" aria-controls="SiteHeaderNav">
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a class="SiteHeaderDesktopOnly" href="/vfx-js/getting-started/" aria-current="page">
+            Docs
+        </a>
+        <a class="SiteHeaderMenuOnly" href="/vfx-js/getting-started/">
+                    Getting Started
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/how-it-works/">
+                    How it Works
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/ai/">
+                    Use with AI
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/effects/">
+                    Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/shaders/" aria-current="page">
+                    Custom Shaders
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/custom-effects/">
+                    Custom Effects
+                </a>
+        <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.DbdCPj2I.js"></script>
+        <!-- Back plays the slit scan reversed. -->
+        <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
+    
+            <div class="Page">
+                <div class="DocLayout">
+                            <nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        <li>
+                    <a href="/vfx-js/getting-started/">
+                        Getting Started
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/how-it-works/">
+                        How it Works
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/ai/">
+                        Use with AI
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/effects/">
+                        Effects
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/shaders/" aria-current="page">
+                        Custom Shaders
+                    </a>
+                    <ul>
+                            <li>
+                                    <a href="#template" data-section="template">
+                                        GLSL template
+                                    </a>
+                                </li><li>
+                                    <a href="#built-in-uniforms" data-section="built-in-uniforms">
+                                        Built-in uniforms
+                                    </a>
+                                </li><li>
+                                    <a href="#custom-uniforms" data-section="custom-uniforms">
+                                        Custom uniforms
+                                    </a>
+                                </li><li>
+                                    <a href="#overflow" data-section="overflow">
+                                        Overflow
+                                    </a>
+                                </li><li>
+                                    <a href="#backbuffer" data-section="backbuffer">
+                                        Backbuffer
+                                    </a>
+                                </li><li>
+                                    <a href="#multipass" data-section="multipass">
+                                        Multipass
+                                    </a>
+                                </li><li>
+                                    <a href="#post-effects" data-section="post-effects">
+                                        Post effects
+                                    </a>
+                                </li>
+                        </ul>
+                </li><li>
+                    <a href="/vfx-js/custom-effects/">
+                        Custom Effects
+                    </a>
+                    
+                </li>
+    </ul>
+    <a class="DocSidebarExtra" href="/vfx-js/docs/" data-astro-reload>API Reference &#8594;</a>
+    <a class="DocSidebarExtra" href="/vfx-js/examples/" target="_blank" rel="noreferrer">Examples &#8599;</a>
+</nav>
+
+<script type="module" src="/vfx-js/_astro/Sidebar.astro_astro_type_script_index_0_lang.B94Lg-ip.js"></script>
+                            <main class="DocMain">
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                
+    <h1 data-astro-cid-lom4rrbi>Custom Shaders</h1>
+    <p data-astro-cid-lom4rrbi>
+        Pass a GLSL fragment shader as <code data-astro-cid-lom4rrbi>shader</code>. VFX-JS runs it over the
+        element's box, every frame.
+    </p>
+
+    <section id="template" data-astro-cid-lom4rrbi>
+        <h2 data-astro-cid-lom4rrbi>GLSL template</h2>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> shader</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `</span></span>
+<span class="line"><span style="color:#9ECBFF">precision highp float;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform sampler2D src;   // the element</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform vec2 resolution; // element size, physical px</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform vec2 offset;     // element origin, physical px</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform float time;      // seconds</span></span>
+<span class="line"><span style="color:#9ECBFF">out vec4 outColor;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">void main() {</span></span>
+<span class="line"><span style="color:#9ECBFF">    vec2 uv = (gl_FragCoord.xy - offset) / resolution;</span></span>
+<span class="line"><span style="color:#9ECBFF">    uv.x += sin(uv.y * 20.0 + time) * 0.02;</span></span>
+<span class="line"><span style="color:#9ECBFF">    outColor = texture(src, uv);</span></span>
+<span class="line"><span style="color:#9ECBFF">}</span></span>
+<span class="line"><span style="color:#9ECBFF">`</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader }).</span><span style="color:#B392F0">catch</span><span style="color:#E1E4E8">(console.error);</span></span></code></pre>
+</figure>
+
+<script type="module" src="/vfx-js/_astro/CodeBlock.astro_astro_type_script_index_0_lang.CctPIf_N.js"></script>
+        <ul data-astro-cid-lom4rrbi>
+            <li data-astro-cid-lom4rrbi>
+                <code data-astro-cid-lom4rrbi>uv</code> is element space: (0, 0) is bottom-left, (1, 1) is
+                top-right.
+            </li>
+            <li data-astro-cid-lom4rrbi>
+                Shaders are GLSL ES 3.0 by default. VFX-JS adds
+                <code data-astro-cid-lom4rrbi>#version 300 es</code> for you. Write <code data-astro-cid-lom4rrbi>out vec4</code> and
+                <code data-astro-cid-lom4rrbi>texture()</code>.
+            </li>
+            <li data-astro-cid-lom4rrbi>
+                Output is premultiplied alpha. For transparent pixels, multiply
+                <code data-astro-cid-lom4rrbi>rgb</code> by <code data-astro-cid-lom4rrbi>a</code>.
+            </li>
+            <li data-astro-cid-lom4rrbi>
+                A shader that fails to compile makes <code data-astro-cid-lom4rrbi>vfx.add</code> reject
+                with the GL error log and the full source.
+            </li>
+        </ul>
+        <p data-astro-cid-lom4rrbi>Older GLSL ES 1.0 shaders still work:</p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#6A737D">// GLSL ES 1.0 is found from gl_FragColor, texture2D, varying or attribute.</span></span>
+<span class="line"><span style="color:#6A737D">// Or set it yourself:</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader: oldShader, glslVersion: </span><span style="color:#9ECBFF">"100"</span><span style="color:#E1E4E8"> });</span></span></code></pre>
+</figure>
+
+
+    </section>
+
+    <section id="built-in-uniforms" data-astro-cid-lom4rrbi>
+        <h2 data-astro-cid-lom4rrbi>Built-in uniforms</h2>
+        <p data-astro-cid-lom4rrbi>
+            VFX-JS sets these for you. Declare only the ones you use. The full list
+            is in <a href="/vfx-js/how-it-works/#uniforms" data-astro-cid-lom4rrbi>Uniforms and timing</a>.
+        </p>
+        <table class="DocTable" data-astro-cid-lom4rrbi>
+            <thead data-astro-cid-lom4rrbi>
+                <tr data-astro-cid-lom4rrbi>
+                    <th data-astro-cid-lom4rrbi>Uniform</th>
+                    <th data-astro-cid-lom4rrbi>Use it for</th>
+                </tr>
+            </thead>
+            <tbody data-astro-cid-lom4rrbi>
+                <tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>src</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>The element texture.</td>
+                        </tr><tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>resolution, offset</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>Element size and origin in physical px. Use them to get uv.</td>
+                        </tr><tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>time</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>Seconds since the element was added.</td>
+                        </tr><tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>mouse</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>Mouse position, same space as gl_FragCoord.</td>
+                        </tr><tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>intersection</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>How much of the element is in the viewport, 0 to 1.</td>
+                        </tr><tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>enterProgress, leaveProgress</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>Enter and leave transitions, 0 to 1. Good for scroll reveals.</td>
+                        </tr><tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>enterTime, leaveTime</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>Seconds since the element entered or left the viewport.</td>
+                        </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section id="custom-uniforms" data-astro-cid-lom4rrbi>
+        <h2 data-astro-cid-lom4rrbi>Custom uniforms</h2>
+        <p data-astro-cid-lom4rrbi>
+            Pass your own values in <code data-astro-cid-lom4rrbi>uniforms</code>. A function runs every
+            frame while the element is drawn, so use one for values that change.
+        </p>
+        <table class="DocTable" data-astro-cid-lom4rrbi>
+            <thead data-astro-cid-lom4rrbi>
+                <tr data-astro-cid-lom4rrbi>
+                    <th data-astro-cid-lom4rrbi>JS value</th>
+                    <th data-astro-cid-lom4rrbi>GLSL type</th>
+                </tr>
+            </thead>
+            <tbody data-astro-cid-lom4rrbi>
+                <tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>1</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>float</code>
+                            </td>
+                        </tr><tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>[1, 2]</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>vec2</code>
+                            </td>
+                        </tr><tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>[1, 0, 0]</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>vec3</code>
+                            </td>
+                        </tr><tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>[1, 0, 0, 1]</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>vec4</code>
+                            </td>
+                        </tr><tr data-astro-cid-lom4rrbi>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>new Float32Array(16)</code>
+                            </td>
+                            <td data-astro-cid-lom4rrbi>
+                                <code data-astro-cid-lom4rrbi>vec4 arr[4] or float arr[16]</code>
+                            </td>
+                        </tr>
+            </tbody>
+        </table>
+        <p data-astro-cid-lom4rrbi>
+            Booleans are not supported. Use <code data-astro-cid-lom4rrbi>0</code> and <code data-astro-cid-lom4rrbi>1</code>.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(logo, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    shader,</span></span>
+<span class="line"><span style="color:#E1E4E8">    uniforms: {</span></span>
+<span class="line"><span style="color:#E1E4E8">        tint: [</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.4</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.8</span><span style="color:#E1E4E8">],                           </span><span style="color:#6A737D">// static vec3</span></span>
+<span class="line"><span style="color:#B392F0">        scroll</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> window.scrollY </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> window.innerHeight, </span><span style="color:#6A737D">// every frame</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+</figure>
+
+
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>GLSL</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="glsl"><code><span class="line"><span style="color:#E1E4E8">precision highp </span><span style="color:#F97583">float</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> sampler2D</span><span style="color:#E1E4E8"> src;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec2</span><span style="color:#E1E4E8"> resolution;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec2</span><span style="color:#E1E4E8"> offset;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> float</span><span style="color:#E1E4E8"> time;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> float</span><span style="color:#E1E4E8"> scroll;</span><span style="color:#6A737D"> // from a function, every frame</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec3</span><span style="color:#E1E4E8"> tint;</span><span style="color:#6A737D">    // a static value</span></span>
+<span class="line"><span style="color:#F97583">out</span><span style="color:#F97583"> vec4</span><span style="color:#E1E4E8"> outColor;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">void</span><span style="color:#B392F0"> main</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec2 uv </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (gl_FragCoord.xy </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> offset) </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> resolution;</span></span>
+<span class="line"><span style="color:#E1E4E8">    uv.x </span><span style="color:#F97583">=</span><span style="color:#B392F0"> fract</span><span style="color:#E1E4E8">(uv.x </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> scroll </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> time </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 0.1</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec4 color </span><span style="color:#F97583">=</span><span style="color:#B392F0"> texture</span><span style="color:#E1E4E8">(src, uv);</span></span>
+<span class="line"><span style="color:#E1E4E8">    outColor </span><span style="color:#F97583">=</span><span style="color:#B392F0"> vec4</span><span style="color:#E1E4E8">(color.rgb </span><span style="color:#F97583">*</span><span style="color:#E1E4E8"> tint, color.a);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-lom4rrbi>Scroll the page. The logo slides with it:</p>
+        <div class="Demo" data-astro-cid-lom4rrbi>
+            <img id="UniformsDemo" src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS logo that slides as you scroll" data-astro-cid-lom4rrbi>
+        </div>
+    </section>
+
+    <section id="overflow" data-astro-cid-lom4rrbi>
+        <h2 data-astro-cid-lom4rrbi>Overflow</h2>
+        <p data-astro-cid-lom4rrbi>
+            A shader draws only inside the element unless you set
+            <code data-astro-cid-lom4rrbi>overflow</code>. There, <code data-astro-cid-lom4rrbi>uv</code> goes below 0 and above 1.
+            The texture is empty outside the element, but <code data-astro-cid-lom4rrbi>wrap</code> defaults
+            to <code data-astro-cid-lom4rrbi>"repeat"</code>. Check <code data-astro-cid-lom4rrbi>uv</code> before you read
+            <code data-astro-cid-lom4rrbi>src</code>, or set <code data-astro-cid-lom4rrbi>wrap: "clamp"</code>.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader, overflow: </span><span style="color:#79B8FF">50</span><span style="color:#E1E4E8">, wrap: </span><span style="color:#9ECBFF">"clamp"</span><span style="color:#E1E4E8"> });</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-lom4rrbi>
+            See <a href="/vfx-js/how-it-works/#overflow" data-astro-cid-lom4rrbi>Overflow</a> in How it
+            Works for a diagram.
+        </p>
+    </section>
+
+    <section id="backbuffer" data-astro-cid-lom4rrbi>
+        <h2 data-astro-cid-lom4rrbi>Backbuffer</h2>
+        <p data-astro-cid-lom4rrbi>
+            Set <code data-astro-cid-lom4rrbi>backbuffer: true</code> to read the previous frame as
+            <code data-astro-cid-lom4rrbi>uniform sampler2D backbuffer</code>. Use it for trails and other
+            feedback effects.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(logo, { shader, backbuffer: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">, overflow: </span><span style="color:#79B8FF">60</span><span style="color:#E1E4E8"> });</span></span></code></pre>
+</figure>
+
+
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>GLSL</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="glsl"><code><span class="line"><span style="color:#E1E4E8">precision highp </span><span style="color:#F97583">float</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> sampler2D</span><span style="color:#E1E4E8"> src;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> sampler2D</span><span style="color:#E1E4E8"> backbuffer;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec2</span><span style="color:#E1E4E8"> resolution;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec2</span><span style="color:#E1E4E8"> offset;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec4</span><span style="color:#E1E4E8"> viewport;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> float</span><span style="color:#E1E4E8"> time;</span></span>
+<span class="line"><span style="color:#F97583">out</span><span style="color:#F97583"> vec4</span><span style="color:#E1E4E8"> outColor;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">vec4</span><span style="color:#B392F0"> readSrc</span><span style="color:#E1E4E8">(vec2 </span><span style="color:#FFAB70">uv</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (uv.x </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 0.</span><span style="color:#F97583"> ||</span><span style="color:#E1E4E8"> uv.x </span><span style="color:#F97583">></span><span style="color:#79B8FF"> 1.</span><span style="color:#F97583"> ||</span><span style="color:#E1E4E8"> uv.y </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 0.</span><span style="color:#F97583"> ||</span><span style="color:#E1E4E8"> uv.y </span><span style="color:#F97583">></span><span style="color:#79B8FF"> 1.</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">return</span><span style="color:#B392F0"> vec4</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#B392F0"> texture</span><span style="color:#E1E4E8">(src, uv);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">void</span><span style="color:#B392F0"> main</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec2 uv </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (gl_FragCoord.xy </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> offset) </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> resolution;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Move the element in a circle.</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec2 shift </span><span style="color:#F97583">=</span><span style="color:#B392F0"> vec2</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">cos</span><span style="color:#E1E4E8">(time </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 2.0</span><span style="color:#E1E4E8">), </span><span style="color:#B392F0">sin</span><span style="color:#E1E4E8">(time </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 2.0</span><span style="color:#E1E4E8">)) </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 0.12</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec4 color </span><span style="color:#F97583">=</span><span style="color:#B392F0"> readSrc</span><span style="color:#E1E4E8">(uv </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> shift);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // The backbuffer covers the element plus overflow.</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec2 bufferUv </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (gl_FragCoord.xy </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> viewport.xy) </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> viewport.zw;</span></span>
+<span class="line"><span style="color:#6A737D">    // Fade the last frame and shift its color.</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec4 prev </span><span style="color:#F97583">=</span><span style="color:#B392F0"> texture</span><span style="color:#E1E4E8">(backbuffer, bufferUv) </span><span style="color:#F97583">*</span><span style="color:#B392F0"> vec4</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0.9</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.8</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.96</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.96</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    outColor </span><span style="color:#F97583">=</span><span style="color:#B392F0"> max</span><span style="color:#E1E4E8">(color, prev);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-lom4rrbi>
+            The backbuffer covers the element plus its overflow, so read it with
+            <code data-astro-cid-lom4rrbi>viewport</code>, not <code data-astro-cid-lom4rrbi>offset</code> and
+            <code data-astro-cid-lom4rrbi>resolution</code>.
+        </p>
+        <div class="Demo" data-astro-cid-lom4rrbi>
+            <img id="BackbufferDemo" src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS logo moving in a circle with a trail" data-astro-cid-lom4rrbi>
+        </div>
+    </section>
+
+    <section id="multipass" data-astro-cid-lom4rrbi>
+        <h2 data-astro-cid-lom4rrbi>Multipass</h2>
+        <p data-astro-cid-lom4rrbi>
+            Pass an array of passes to <code data-astro-cid-lom4rrbi>shader</code>. Each pass writes to a
+            buffer named by <code data-astro-cid-lom4rrbi>target</code>. Later passes read it as
+            <code data-astro-cid-lom4rrbi>uniform sampler2D &lt;target&gt;</code>. The last pass draws to the
+            screen.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    shader: [</span></span>
+<span class="line"><span style="color:#E1E4E8">        { frag: copyFrag, target: </span><span style="color:#9ECBFF">"image"</span><span style="color:#E1E4E8"> }, </span><span style="color:#6A737D">// keep the element as "image"</span></span>
+<span class="line"><span style="color:#E1E4E8">        { frag: blurFrag, target: </span><span style="color:#9ECBFF">"blur"</span><span style="color:#E1E4E8"> },  </span><span style="color:#6A737D">// src here is the previous pass</span></span>
+<span class="line"><span style="color:#E1E4E8">        { frag: glowFrag },                  </span><span style="color:#6A737D">// the last pass draws to the screen</span></span>
+<span class="line"><span style="color:#E1E4E8">    ],</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+</figure>
+
+
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>glowFrag</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="glsl"><code><span class="line"><span style="color:#E1E4E8">precision highp </span><span style="color:#F97583">float</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> sampler2D</span><span style="color:#E1E4E8"> image;</span><span style="color:#6A737D"> // the "image" target</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> sampler2D</span><span style="color:#E1E4E8"> blur;</span><span style="color:#6A737D">  // the "blur" target</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec2</span><span style="color:#E1E4E8"> resolution;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec2</span><span style="color:#E1E4E8"> offset;</span></span>
+<span class="line"><span style="color:#F97583">out</span><span style="color:#F97583"> vec4</span><span style="color:#E1E4E8"> outColor;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">void</span><span style="color:#B392F0"> main</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec2 uv </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (gl_FragCoord.xy </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> offset) </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> resolution;</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec4 glow </span><span style="color:#F97583">=</span><span style="color:#B392F0"> texture</span><span style="color:#E1E4E8">(blur, uv) </span><span style="color:#F97583">*</span><span style="color:#B392F0"> vec4</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0.3</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.8</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">1.0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">1.0</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 2.0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    outColor </span><span style="color:#F97583">=</span><span style="color:#B392F0"> texture</span><span style="color:#E1E4E8">(image, uv) </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> glow;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <div class="Demo" data-astro-cid-lom4rrbi>
+            <img id="MultipassDemo" src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS logo with a glow" data-astro-cid-lom4rrbi>
+        </div>
+        <ul data-astro-cid-lom4rrbi>
+            <li data-astro-cid-lom4rrbi>
+                In the first pass, <code data-astro-cid-lom4rrbi>src</code> is the element. In later
+                passes, it is the previous pass. Give a pass a
+                <code data-astro-cid-lom4rrbi>target</code> to read it again later.
+            </li>
+            <li data-astro-cid-lom4rrbi>
+                A middle pass without <code data-astro-cid-lom4rrbi>target</code> gets <code data-astro-cid-lom4rrbi>pass0</code>,
+                <code data-astro-cid-lom4rrbi>pass1</code>, and so on.
+            </li>
+            <li data-astro-cid-lom4rrbi>
+                <code data-astro-cid-lom4rrbi>persistent: true</code> keeps a buffer across frames. The
+                pass reads its own last frame by its target name.
+            </li>
+            <li data-astro-cid-lom4rrbi>
+                <code data-astro-cid-lom4rrbi>float: true</code> stores values outside 0..1, like velocity.
+                <code data-astro-cid-lom4rrbi>size</code> fixes the buffer size, for small simulations.
+            </li>
+        </ul>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>VFXPass</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">type</span><span style="color:#B392F0"> VFXPass</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">    frag</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#FFAB70">    vert</span><span style="color:#F97583">?:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#FFAB70">    target</span><span style="color:#F97583">?:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">;          </span><span style="color:#6A737D">// buffer name; later passes read uniform sampler2D &#x3C;target></span></span>
+<span class="line"><span style="color:#FFAB70">    persistent</span><span style="color:#F97583">?:</span><span style="color:#79B8FF"> boolean</span><span style="color:#E1E4E8">;     </span><span style="color:#6A737D">// keep across frames; read the last frame by its name</span></span>
+<span class="line"><span style="color:#FFAB70">    float</span><span style="color:#F97583">?:</span><span style="color:#79B8FF"> boolean</span><span style="color:#E1E4E8">;          </span><span style="color:#6A737D">// 32-bit float buffer, for data outside 0..1</span></span>
+<span class="line"><span style="color:#FFAB70">    size</span><span style="color:#F97583">?:</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">number</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">number</span><span style="color:#E1E4E8">];  </span><span style="color:#6A737D">// fixed buffer size in px</span></span>
+<span class="line"><span style="color:#FFAB70">    uniforms</span><span style="color:#F97583">?:</span><span style="color:#B392F0"> VFXUniforms</span><span style="color:#E1E4E8">;   </span><span style="color:#6A737D">// per-pass uniforms</span></span>
+<span class="line"><span style="color:#FFAB70">    glslVersion</span><span style="color:#F97583">?:</span><span style="color:#9ECBFF"> "100"</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> "300 es"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">};</span></span></code></pre>
+</figure>
+
+
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#6A737D">// A persistent pass reads its own last frame by its target name.</span></span>
+<span class="line"><span style="color:#B392F0">shader</span><span style="color:#E1E4E8">: [</span></span>
+<span class="line"><span style="color:#E1E4E8">    { frag: trailFrag, target: </span><span style="color:#9ECBFF">"trail"</span><span style="color:#E1E4E8">, persistent: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8"> },</span></span>
+<span class="line"><span style="color:#E1E4E8">    { frag: displayFrag },</span></span>
+<span class="line"><span style="color:#E1E4E8">]</span></span></code></pre>
+</figure>
+
+
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>trailFrag</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="glsl"><code><span class="line"><span style="color:#6A737D">// Other declarations as in the template.</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> sampler2D</span><span style="color:#E1E4E8"> src;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> sampler2D</span><span style="color:#E1E4E8"> trail;</span><span style="color:#6A737D"> // last frame of this pass</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">void</span><span style="color:#B392F0"> main</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec2 uv </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (gl_FragCoord.xy </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> offset) </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> resolution;</span></span>
+<span class="line"><span style="color:#E1E4E8">    outColor </span><span style="color:#F97583">=</span><span style="color:#B392F0"> max</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">texture</span><span style="color:#E1E4E8">(src, uv), </span><span style="color:#B392F0">texture</span><span style="color:#E1E4E8">(trail, uv) </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 0.95</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-lom4rrbi>
+            With <code data-astro-cid-lom4rrbi>overflow</code>, buffers cover more than the element. See
+            <a href="https://github.com/fand/vfx-js/blob/main/docs/MULTIPASS.md" target="_blank" rel="noreferrer" data-astro-cid-lom4rrbi>MULTIPASS.md</a>
+            for how to read them, and for more examples.
+        </p>
+    </section>
+
+    <section id="post-effects" data-astro-cid-lom4rrbi>
+        <h2 data-astro-cid-lom4rrbi>Post effects</h2>
+        <p data-astro-cid-lom4rrbi>
+            A post effect runs over the whole VFX canvas, after all elements are
+            drawn. Set it with the <code data-astro-cid-lom4rrbi>postEffect</code> option of
+            <code data-astro-cid-lom4rrbi>new VFX()</code>. It takes a preset, your own GLSL, passes, or
+            effects.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">    postEffect: { shader: </span><span style="color:#9ECBFF">"grayscale"</span><span style="color:#E1E4E8"> },</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Your own shader. src is the whole canvas, and offset is 0.</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx2</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">    postEffect: {</span></span>
+<span class="line"><span style="color:#E1E4E8">        shader: </span><span style="color:#9ECBFF">`</span></span>
+<span class="line"><span style="color:#9ECBFF">precision highp float;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform sampler2D src;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform vec2 resolution;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform vec2 offset;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform float amount;</span></span>
+<span class="line"><span style="color:#9ECBFF">out vec4 outColor;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">void main() {</span></span>
+<span class="line"><span style="color:#9ECBFF">    vec2 uv = (gl_FragCoord.xy - offset) / resolution;</span></span>
+<span class="line"><span style="color:#9ECBFF">    vec4 color = texture(src, uv);</span></span>
+<span class="line"><span style="color:#9ECBFF">    outColor = vec4(mix(color.rgb, 1.0 - color.rgb, amount), color.a);</span></span>
+<span class="line"><span style="color:#9ECBFF">}</span></span>
+<span class="line"><span style="color:#9ECBFF">`</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        uniforms: { </span><span style="color:#B392F0">amount</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> mouseX </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> window.innerWidth },</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+</figure>
+
+
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#6A737D">// Multipass works the same way.</span></span>
+<span class="line"><span style="color:#F97583">new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">({ postEffect: [{ frag: passA, target: </span><span style="color:#9ECBFF">"a"</span><span style="color:#E1E4E8"> }, { frag: passB }] });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Or use effects from @vfx-js/effects.</span></span>
+<span class="line"><span style="color:#F97583">new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">({ postEffect: { effect: </span><span style="color:#F97583">new</span><span style="color:#B392F0"> BloomEffect</span><span style="color:#E1E4E8">() } });</span></span></code></pre>
+</figure>
+
+
+        <ul data-astro-cid-lom4rrbi>
+            <li data-astro-cid-lom4rrbi>
+                <code data-astro-cid-lom4rrbi>src</code> is the whole canvas. <code data-astro-cid-lom4rrbi>time</code> counts from
+                when the VFX started.
+            </li>
+            <li data-astro-cid-lom4rrbi>
+                <code data-astro-cid-lom4rrbi>persistent: true</code> gives the previous output as
+                <code data-astro-cid-lom4rrbi>backbuffer</code>.
+            </li>
+            <li data-astro-cid-lom4rrbi>
+                It only sees what VFX-JS draws, not the rest of the page. There is
+                no live demo here, since it would change every demo on this page.
+            </li>
+        </ul>
+    </section>
+
+                            </main>
+                        </div>
+                <footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href="/vfx-js/">
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+        </a>
+        <div class="SiteFooterCol">
+                    <h4>Docs</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/getting-started/">
+                                        Getting Started
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/how-it-works/">
+                                        How it Works
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/ai/">
+                                        Use with AI
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/">
+                                        Effects
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/shaders/">
+                                        Custom Shaders
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/custom-effects/">
+                                        Custom Effects
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Resources</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/docs/" data-astro-reload="true">
+                                        API Reference
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+                                        Examples <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/storybook/" target="_blank" rel="noreferrer">
+                                        Storybook <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/llms.txt" target="_blank" rel="noreferrer">
+                                        llms.txt <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Project</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+                                        GitHub <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://www.npmjs.com/package/@vfx-js/core" target="_blank" rel="noreferrer">
+                                        npm <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://amagi.dev/vfx-js-transitions/" target="_blank" rel="noreferrer">
+                                        Transitions <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://github.com/fand/vfx-js/issues" target="_blank" rel="noreferrer">
+                                        Issues <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div>
+    </div>
+    <div class="Author">
+        <img class="AuthorIcon" src="/vfx-js/amagi.png" alt="Amagi" loading="lazy" decoding="async">
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/github.svg" alt="GitHub">
+            </a>
+            <a href="https://twitter.com/amagitakayosi" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/twitter.svg" alt="Twitter">
+            </a>
+            <a href="https://bsky.app/profile/amagi.dev" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/bluesky.svg" alt="Bluesky">
+            </a>
+        </div>
+    </div>
+</footer>
+            </div>
+        
+</div>
+
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.CYyl-y44.js"></script>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        
+
+    </body>
+</html>
+
+<script type="module" src="/vfx-js/_astro/shaders.astro_astro_type_script_index_0_lang.D9R7Wm8p.js"></script>

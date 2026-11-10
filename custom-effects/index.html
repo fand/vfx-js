@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html data-astro-transition-scope="astro-yztbsuuz-1" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Custom Effects - VFX-JS</title>
+
+        <meta name="theme-color" content="#000000">
+        <meta name="description" content="Write your own VFX-JS effects with the Effect API: lifecycle hooks, draws, render targets, textures and params.">
+        <link rel="canonical" href="https://amagi.dev/vfx-js/custom-effects/">
+
+        <meta property="og:url" content="https://amagi.dev/vfx-js/custom-effects/">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="Custom Effects - VFX-JS">
+        <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+        <meta property="og:description" content="Write your own VFX-JS effects with the Effect API: lifecycle hooks, draws, render targets, textures and params.">
+        <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
+        <meta property="og:locale" content="en_US">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@amagitakayosi">
+        <meta name="twitter:creator" content="@amagitakayosi">
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/custom-effects/">
+        <meta name="twitter:title" content="Custom Effects - VFX-JS">
+        <meta name="twitter:description" content="Write your own VFX-JS effects with the Effect API: lifecycle hooks, draws, render targets, textures and params.">
+        <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+
+        <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/vfx-js/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/vfx-js/favicon/favicon-180.png">
+        <link rel="manifest" href="/vfx-js/manifest.webmanifest">
+
+        <meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
+<script type="module" src="/vfx-js/_astro/ClientRouter.astro_astro_type_script_index_0_lang.C2j_ZdXg.js"></script>
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;b9c39aae9c304f1cbfa1e7bb3e84f078&quot;}"></script>
+        <!-- End Cloudflare Web Analytics -->
+    <link rel="stylesheet" href="/vfx-js/_astro/CodeBlock.LNdCJ4k7.css">
+<link rel="stylesheet" href="/vfx-js/_astro/custom-effects.BEpCrT2U.css">
+<link rel="stylesheet" href="/vfx-js/_astro/Layout.7Dg6_FOh.css"><style>[data-astro-transition-scope="astro-yztbsuuz-1"] { view-transition-name: astro-yztbsuuz-1; }@layer astro { ::view-transition-old(astro-yztbsuuz-1) { animation: none; opacity: 0; mix-blend-mode: normal; }::view-transition-new(astro-yztbsuuz-1) { animation: none; mix-blend-mode: normal; }::view-transition-group(astro-yztbsuuz-1) { animation: none } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }</style></head>
+
+    <body class="DocPage">
+        <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
+
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.BNPinfg6.js"></script>
+        <header class="SiteHeader">
+    <a class="SiteHeaderBrand" href="/vfx-js/">
+        <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+    </a>
+    <button class="SiteHeaderMenuButton" type="button" aria-label="Menu" aria-expanded="false" aria-controls="SiteHeaderNav">
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a class="SiteHeaderDesktopOnly" href="/vfx-js/getting-started/" aria-current="page">
+            Docs
+        </a>
+        <a class="SiteHeaderMenuOnly" href="/vfx-js/getting-started/">
+                    Getting Started
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/how-it-works/">
+                    How it Works
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/ai/">
+                    Use with AI
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/effects/">
+                    Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/shaders/">
+                    Custom Shaders
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/custom-effects/" aria-current="page">
+                    Custom Effects
+                </a>
+        <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.DbdCPj2I.js"></script>
+        <!-- Back plays the slit scan reversed. -->
+        <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
+    
+            <div class="Page">
+                <div class="DocLayout">
+                            <nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        <li>
+                    <a href="/vfx-js/getting-started/">
+                        Getting Started
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/how-it-works/">
+                        How it Works
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/ai/">
+                        Use with AI
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/effects/">
+                        Effects
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/shaders/">
+                        Custom Shaders
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/custom-effects/" aria-current="page">
+                        Custom Effects
+                    </a>
+                    <ul>
+                            <li>
+                                    <a href="#effect-interface" data-section="effect-interface">
+                                        The Effect interface
+                                    </a>
+                                </li><li>
+                                    <a href="#hooks" data-section="hooks">
+                                        Lifecycle hooks
+                                    </a>
+                                </li><li>
+                                    <a href="#drawing" data-section="drawing">
+                                        Drawing
+                                    </a>
+                                </li><li>
+                                    <a href="#textures" data-section="textures">
+                                        Textures
+                                    </a>
+                                </li><li>
+                                    <a href="#params" data-section="params">
+                                        Params
+                                    </a>
+                                </li><li>
+                                    <a href="#post-effect" data-section="post-effect">
+                                        As a post effect
+                                    </a>
+                                </li><li>
+                                    <a href="#tips" data-section="tips">
+                                        Tips
+                                    </a>
+                                </li>
+                        </ul>
+                </li>
+    </ul>
+    <a class="DocSidebarExtra" href="/vfx-js/docs/" data-astro-reload>API Reference &#8594;</a>
+    <a class="DocSidebarExtra" href="/vfx-js/examples/" target="_blank" rel="noreferrer">Examples &#8599;</a>
+</nav>
+
+<script type="module" src="/vfx-js/_astro/Sidebar.astro_astro_type_script_index_0_lang.B94Lg-ip.js"></script>
+                            <main class="DocMain">
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                
+    <h1 data-astro-cid-empkddct>Custom Effects</h1>
+    <p data-astro-cid-empkddct>
+        An effect is a class with a few hooks. It can draw many passes, keep
+        buffers across frames, use your own textures, and draw outside the
+        element. Every effect in
+        <a href="/vfx-js/effects/#gallery" data-astro-cid-empkddct>@vfx-js/effects</a> is built this way.
+    </p>
+    <p data-astro-cid-empkddct>
+        For a single shader, <a href="/vfx-js/shaders/" data-astro-cid-empkddct>Custom Shaders</a> is
+        simpler. Use an effect when you want to reuse it, chain it, or share it as
+        a package.
+    </p>
+
+    <section id="effect-interface" data-astro-cid-empkddct>
+        <h2 data-astro-cid-empkddct>The Effect interface</h2>
+        <p data-astro-cid-empkddct>Every member is optional.</p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>Effect</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">interface</span><span style="color:#B392F0"> Effect</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">    enabled</span><span style="color:#F97583">?:</span><span style="color:#79B8FF"> boolean</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#B392F0">    init</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectContext</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> void</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#79B8FF">void</span><span style="color:#E1E4E8">>;</span></span>
+<span class="line"><span style="color:#B392F0">    update</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectContext</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> void</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#B392F0">    render</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectContext</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> void</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#B392F0">    dispose</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> void</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#B392F0">    outputRect</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">dims</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectDims</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> [</span><span style="color:#B392F0">x</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">y</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">w</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">h</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">|</span><span style="color:#79B8FF"> undefined</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+<script type="module" src="/vfx-js/_astro/CodeBlock.astro_astro_type_script_index_0_lang.CctPIf_N.js"></script>
+        <p data-astro-cid-empkddct>
+            Pass an instance as <code data-astro-cid-empkddct>effect</code> to <code data-astro-cid-empkddct>vfx.add</code>. The
+            types come from <code data-astro-cid-empkddct>@vfx-js/core</code>.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VFX } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { WaveEffect } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "./wave-effect"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect: </span><span style="color:#F97583">new</span><span style="color:#B392F0"> WaveEffect</span><span style="color:#E1E4E8">() });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// An array runs as a chain. Each effect reads the one before.</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect: [</span><span style="color:#F97583">new</span><span style="color:#B392F0"> WaveEffect</span><span style="color:#E1E4E8">(), </span><span style="color:#F97583">new</span><span style="color:#B392F0"> TrailEffect</span><span style="color:#E1E4E8">()] });</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-empkddct>
+            <code data-astro-cid-empkddct>shader</code> and <code data-astro-cid-empkddct>effect</code> don't mix. If you set both,
+            <code data-astro-cid-empkddct>effect</code> wins.
+        </p>
+    </section>
+
+    <section id="hooks" data-astro-cid-empkddct>
+        <h2 data-astro-cid-empkddct>Lifecycle hooks</h2>
+        <div class="TableScroll" data-astro-cid-empkddct>
+            <table class="DocTable" data-astro-cid-empkddct>
+                <thead data-astro-cid-empkddct>
+                    <tr data-astro-cid-empkddct>
+                        <th data-astro-cid-empkddct>Hook</th>
+                        <th data-astro-cid-empkddct>When and what</th>
+                    </tr>
+                </thead>
+                <tbody data-astro-cid-empkddct>
+                    <tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>init(ctx)</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Once, when the effect is added. Make render targets and wrap textures here. Can be async; vfx.add waits for it.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>update(ctx)</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Every frame, before render. Change state here. ctx.draw does nothing here.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>render(ctx)</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Every frame. Draw with ctx.draw and ctx.blit. Without render, the input passes through.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>dispose()</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Once, when the element is removed. Drop your references.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>outputRect(dims)</code>
+                                </td>
+                                <td data-astro-cid-empkddct>The rect this effect draws into. Omit it to keep the input size.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>enabled</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Set false to skip render. Checked every frame. init and update still run.</td>
+                            </tr>
+                </tbody>
+            </table>
+        </div>
+        <p data-astro-cid-empkddct>
+            Every hook gets the same <code data-astro-cid-empkddct>ctx</code>. Its fields change every
+            frame:
+        </p>
+        <div class="TableScroll" data-astro-cid-empkddct>
+            <table class="DocTable" data-astro-cid-empkddct>
+                <thead data-astro-cid-empkddct>
+                    <tr data-astro-cid-empkddct>
+                        <th data-astro-cid-empkddct>Field</th>
+                        <th data-astro-cid-empkddct>Value</th>
+                    </tr>
+                </thead>
+                <tbody data-astro-cid-empkddct>
+                    <tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>time, deltaTime</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Seconds since start, and since the last frame.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>src</code>
+                                </td>
+                                <td data-astro-cid-empkddct>The input texture: the element, or the effect before.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>target</code>
+                                </td>
+                                <td data-astro-cid-empkddct>This effect&#39;s output. null means the canvas.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>dims</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Sizes in px. See below.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>mouse, mouseViewport</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Mouse in element px and canvas px, bottom-left origin.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>intersection, enterProgress, leaveProgress, enterTime, leaveTime</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Scroll position and timing, like in shaders.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>uniforms</code>
+                                </td>
+                                <td data-astro-cid-empkddct>The uniforms option of vfx.add, evaluated every frame.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>resolution, pixelRatio</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Canvas size in physical px, and the pixel ratio.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>gl</code>
+                                </td>
+                                <td data-astro-cid-empkddct>The raw WebGL2 context.</td>
+                            </tr>
+                </tbody>
+            </table>
+        </div>
+        <p data-astro-cid-empkddct>
+            This effect uses <code data-astro-cid-empkddct>update</code> and <code data-astro-cid-empkddct>render</code>.
+            <code data-astro-cid-empkddct>update</code> eases a value toward <code data-astro-cid-empkddct>params.amount</code>.
+            <code data-astro-cid-empkddct>render</code> draws a wave with it. Move the slider:
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>wave-effect.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#F97583"> type</span><span style="color:#E1E4E8"> { Effect, EffectContext } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> frag</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `#version 300 es</span></span>
+<span class="line"><span style="color:#9ECBFF">precision highp float;</span></span>
+<span class="line"><span style="color:#9ECBFF">in vec2 uvContent;</span></span>
+<span class="line"><span style="color:#9ECBFF">out vec4 outColor;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform sampler2D src;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform vec4 srcRectUv;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform float time;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform float amount;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">void main() {</span></span>
+<span class="line"><span style="color:#9ECBFF">    vec2 uv = uvContent;</span></span>
+<span class="line"><span style="color:#9ECBFF">    uv.x += sin(uv.y * 12.0 + time * 3.0) * 0.04 * amount;</span></span>
+<span class="line"><span style="color:#9ECBFF">    if (uv.x &#x3C; 0.0 || uv.x > 1.0) {</span></span>
+<span class="line"><span style="color:#9ECBFF">        outColor = vec4(0);</span></span>
+<span class="line"><span style="color:#9ECBFF">        return;</span></span>
+<span class="line"><span style="color:#9ECBFF">    }</span></span>
+<span class="line"><span style="color:#9ECBFF">    // Map element uv to src uv.</span></span>
+<span class="line"><span style="color:#9ECBFF">    outColor = texture(src, srcRectUv.xy + uv * srcRectUv.zw);</span></span>
+<span class="line"><span style="color:#9ECBFF">}</span></span>
+<span class="line"><span style="color:#9ECBFF">`</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> type</span><span style="color:#B392F0"> WaveParams</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">    amount</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">};</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> WaveEffect</span><span style="color:#F97583"> implements</span><span style="color:#B392F0"> Effect</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">    params</span><span style="color:#F97583">:</span><span style="color:#B392F0"> WaveParams</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#FFAB70">    #amount</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    constructor</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">params</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Partial</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">WaveParams</span><span style="color:#E1E4E8">> </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {}) {</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.params </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> { amount: </span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">...</span><span style="color:#E1E4E8">params };</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    update</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectContext</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">        // Ease toward params.amount, so changes look smooth.</span></span>
+<span class="line"><span style="color:#F97583">        const</span><span style="color:#79B8FF"> k</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 1</span><span style="color:#F97583"> -</span><span style="color:#E1E4E8"> Math.</span><span style="color:#B392F0">exp</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">-</span><span style="color:#E1E4E8">ctx.deltaTime </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 8</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.#amount </span><span style="color:#F97583">+=</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.params.amount </span><span style="color:#F97583">-</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.#amount) </span><span style="color:#F97583">*</span><span style="color:#E1E4E8"> k;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    render</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectContext</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">        ctx.</span><span style="color:#B392F0">draw</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">            frag,</span></span>
+<span class="line"><span style="color:#E1E4E8">            uniforms: { src: ctx.src, time: ctx.time, amount: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.#amount },</span></span>
+<span class="line"><span style="color:#E1E4E8">            target: ctx.target,</span></span>
+<span class="line"><span style="color:#E1E4E8">        });</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <div class="Demo" data-astro-cid-empkddct>
+            <img id="WaveDemo" src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS logo with a wave" data-astro-cid-empkddct>
+            <label class="DemoControl" data-astro-cid-empkddct>
+                <span data-astro-cid-empkddct>amount</span>
+                <input id="WaveAmount" type="range" min="0" max="3" step="0.01" value="1" data-astro-cid-empkddct>
+            </label>
+        </div>
+    </section>
+
+    <section id="drawing" data-astro-cid-empkddct>
+        <h2 data-astro-cid-empkddct>Drawing</h2>
+        <p data-astro-cid-empkddct>
+            Draw in <code data-astro-cid-empkddct>render</code> with <code data-astro-cid-empkddct>ctx.draw</code>. It runs a
+            fragment shader over a quad. Pass <code data-astro-cid-empkddct>ctx.src</code> as a uniform to
+            read the input, and set <code data-astro-cid-empkddct>target: ctx.target</code> to write the
+            output.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>EffectContext</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">ctx.</span><span style="color:#B392F0">draw</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">    frag,                </span><span style="color:#6A737D">// GLSL ES 3.0 fragment shader</span></span>
+<span class="line"><span style="color:#E1E4E8">    vert,                </span><span style="color:#6A737D">// optional; the default gives uv, uvContent, uvSrc</span></span>
+<span class="line"><span style="color:#E1E4E8">    uniforms,            </span><span style="color:#6A737D">// numbers, arrays, textures, render targets</span></span>
+<span class="line"><span style="color:#E1E4E8">    target,              </span><span style="color:#6A737D">// ctx.target, or a render target</span></span>
+<span class="line"><span style="color:#E1E4E8">    blend,               </span><span style="color:#6A737D">// "premultiplied" | "none" | "additive" | "normal"</span></span>
+<span class="line"><span style="color:#E1E4E8">    geometry,            </span><span style="color:#6A737D">// ctx.quad (default) or your own geometry</span></span>
+<span class="line"><span style="color:#E1E4E8">    swap,                </span><span style="color:#6A737D">// persistent targets: false keeps the same buffer</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">ctx.</span><span style="color:#B392F0">blit</span><span style="color:#E1E4E8">(source, target); </span><span style="color:#6A737D">// copy a texture</span></span>
+<span class="line"><span style="color:#E1E4E8">ctx.</span><span style="color:#B392F0">clear</span><span style="color:#E1E4E8">(target);        </span><span style="color:#6A737D">// clear a render target</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-empkddct>
+            The default vertex shader gives three <code data-astro-cid-empkddct>in vec2</code> values,
+            all 0..1:
+        </p>
+        <div class="TableScroll" data-astro-cid-empkddct>
+            <table class="DocTable" data-astro-cid-empkddct>
+                <thead data-astro-cid-empkddct>
+                    <tr data-astro-cid-empkddct>
+                        <th data-astro-cid-empkddct>Name</th>
+                        <th data-astro-cid-empkddct>Range</th>
+                    </tr>
+                </thead>
+                <tbody data-astro-cid-empkddct>
+                    <tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>uvSrc</code>
+                                </td>
+                                <td data-astro-cid-empkddct>0..1 over src. Use it to read src as is.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>uvContent</code>
+                                </td>
+                                <td data-astro-cid-empkddct>0..1 over the element. Outside 0..1 is the padding.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>uv</code>
+                                </td>
+                                <td data-astro-cid-empkddct>0..1 over the whole output, padding included.</td>
+                            </tr>
+                </tbody>
+            </table>
+        </div>
+        <p data-astro-cid-empkddct>
+            In a chain, <code data-astro-cid-empkddct>src</code> can be bigger than the element, when the
+            effect before has padding. To move pixels around, work in
+            <code data-astro-cid-empkddct>uvContent</code> and map it to src with <code data-astro-cid-empkddct>srcRectUv</code>,
+            like the effects in <code data-astro-cid-empkddct>@vfx-js/effects</code> do:
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>GLSL</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="glsl"><code><span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec4</span><span style="color:#E1E4E8"> srcRectUv;</span><span style="color:#6A737D"> // set for you</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">vec4</span><span style="color:#B392F0"> readSrc</span><span style="color:#E1E4E8">(vec2 </span><span style="color:#FFAB70">p</span><span style="color:#E1E4E8">) {</span><span style="color:#6A737D"> // p: element uv</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (p.x </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 0.0</span><span style="color:#F97583"> ||</span><span style="color:#E1E4E8"> p.x </span><span style="color:#F97583">></span><span style="color:#79B8FF"> 1.0</span><span style="color:#F97583"> ||</span><span style="color:#E1E4E8"> p.y </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 0.0</span><span style="color:#F97583"> ||</span><span style="color:#E1E4E8"> p.y </span><span style="color:#F97583">></span><span style="color:#79B8FF"> 1.0</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">return</span><span style="color:#B392F0"> vec4</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#B392F0"> texture</span><span style="color:#E1E4E8">(src, srcRectUv.xy </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> p </span><span style="color:#F97583">*</span><span style="color:#E1E4E8"> srcRectUv.zw);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+
+        <h3 data-astro-cid-empkddct>Render targets</h3>
+        <p data-astro-cid-empkddct>
+            Make render targets in <code data-astro-cid-empkddct>init</code> and reuse them every frame.
+            Draw to one, then pass it as a uniform to read it in the next draw.
+            VFX-JS frees them when the effect is removed.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>EffectContext</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">ctx.</span><span style="color:#B392F0">createRenderTarget</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">    size,        </span><span style="color:#6A737D">// [w, h] physical px; omit to follow the output size</span></span>
+<span class="line"><span style="color:#E1E4E8">    float,       </span><span style="color:#6A737D">// float buffer, for values outside 0..1</span></span>
+<span class="line"><span style="color:#E1E4E8">    persistent,  </span><span style="color:#6A737D">// two buffers: read the last frame, write the next</span></span>
+<span class="line"><span style="color:#E1E4E8">    wrap,        </span><span style="color:#6A737D">// "clamp" (default) | "repeat" | "mirror"</span></span>
+<span class="line"><span style="color:#E1E4E8">    filter,      </span><span style="color:#6A737D">// "linear" (default) | "nearest"</span></span>
+<span class="line"><span style="color:#E1E4E8">    mipmap,      </span><span style="color:#6A737D">// true | "manual"</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-empkddct>
+            A <code data-astro-cid-empkddct>persistent</code> target has two buffers. As a uniform, it
+            reads the last frame. As a target, it writes the next one. They swap
+            after each draw.
+        </p>
+
+        <h3 data-astro-cid-empkddct>Drawing outside the element</h3>
+        <p data-astro-cid-empkddct>
+            The <code data-astro-cid-empkddct>overflow</code> option does not apply to effects. Return a
+            bigger rect from <code data-astro-cid-empkddct>outputRect</code> instead. It is
+            <code data-astro-cid-empkddct>[x, y, w, h]</code> in physical px, relative to the element's
+            bottom-left corner. Return <code data-astro-cid-empkddct>dims.canvasRect</code> to cover the
+            whole canvas.
+        </p>
+        <div class="TableScroll" data-astro-cid-empkddct>
+            <table class="DocTable" data-astro-cid-empkddct>
+                <thead data-astro-cid-empkddct>
+                    <tr data-astro-cid-empkddct>
+                        <th data-astro-cid-empkddct>dims</th>
+                        <th data-astro-cid-empkddct>Value</th>
+                    </tr>
+                </thead>
+                <tbody data-astro-cid-empkddct>
+                    <tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>element, elementPixel</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Element size in CSS px and physical px.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>canvas, canvasPixel</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Canvas size in CSS px and physical px.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>pixelRatio</code>
+                                </td>
+                                <td data-astro-cid-empkddct>Device pixel ratio.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>contentRect</code>
+                                </td>
+                                <td data-astro-cid-empkddct>The element rect: [0, 0, w, h].</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>srcRect</code>
+                                </td>
+                                <td data-astro-cid-empkddct>The rect of src: the output rect of the effect before.</td>
+                            </tr><tr data-astro-cid-empkddct>
+                                <td data-astro-cid-empkddct>
+                                    <code data-astro-cid-empkddct>canvasRect</code>
+                                </td>
+                                <td data-astro-cid-empkddct>The canvas rect, relative to the element.</td>
+                            </tr>
+                </tbody>
+            </table>
+        </div>
+        <p data-astro-cid-empkddct>
+            This effect keeps a trail in a persistent target, and pads its output
+            by 60px so the trail can leave the element:
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>trail-effect.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#F97583"> type</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    Effect,</span></span>
+<span class="line"><span style="color:#E1E4E8">    EffectContext,</span></span>
+<span class="line"><span style="color:#E1E4E8">    EffectDims,</span></span>
+<span class="line"><span style="color:#E1E4E8">    EffectRenderTarget,</span></span>
+<span class="line"><span style="color:#E1E4E8">} </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> trailFrag</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `#version 300 es</span></span>
+<span class="line"><span style="color:#9ECBFF">precision highp float;</span></span>
+<span class="line"><span style="color:#9ECBFF">in vec2 uv;</span></span>
+<span class="line"><span style="color:#9ECBFF">in vec2 uvContent;</span></span>
+<span class="line"><span style="color:#9ECBFF">out vec4 outColor;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform sampler2D src;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform sampler2D prev;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform vec4 srcRectUv;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform vec2 shift;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">vec4 readSrc(vec2 p) {</span></span>
+<span class="line"><span style="color:#9ECBFF">    if (p.x &#x3C; 0.0 || p.x > 1.0 || p.y &#x3C; 0.0 || p.y > 1.0) return vec4(0);</span></span>
+<span class="line"><span style="color:#9ECBFF">    return texture(src, srcRectUv.xy + p * srcRectUv.zw);</span></span>
+<span class="line"><span style="color:#9ECBFF">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">void main() {</span></span>
+<span class="line"><span style="color:#9ECBFF">    vec4 color = readSrc(uvContent - shift);</span></span>
+<span class="line"><span style="color:#9ECBFF">    // Fade the last frame and shift its color.</span></span>
+<span class="line"><span style="color:#9ECBFF">    vec4 last = texture(prev, uv) * vec4(0.9, 0.8, 0.96, 0.96);</span></span>
+<span class="line"><span style="color:#9ECBFF">    outColor = max(color, last);</span></span>
+<span class="line"><span style="color:#9ECBFF">}</span></span>
+<span class="line"><span style="color:#9ECBFF">`</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> copyFrag</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `#version 300 es</span></span>
+<span class="line"><span style="color:#9ECBFF">precision highp float;</span></span>
+<span class="line"><span style="color:#9ECBFF">in vec2 uv;</span></span>
+<span class="line"><span style="color:#9ECBFF">out vec4 outColor;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform sampler2D buffer;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">void main() {</span></span>
+<span class="line"><span style="color:#9ECBFF">    outColor = texture(buffer, uv);</span></span>
+<span class="line"><span style="color:#9ECBFF">}</span></span>
+<span class="line"><span style="color:#9ECBFF">`</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> TrailEffect</span><span style="color:#F97583"> implements</span><span style="color:#B392F0"> Effect</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">    #buffer</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectRenderTarget</span><span style="color:#F97583"> |</span><span style="color:#79B8FF"> null</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    init</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectContext</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">        // Keeps the last frame. Follows the output size.</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.#buffer </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> ctx.</span><span style="color:#B392F0">createRenderTarget</span><span style="color:#E1E4E8">({ persistent: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    render</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectContext</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.#buffer) {</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#F97583">        const</span><span style="color:#79B8FF"> t</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> ctx.time </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 2</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        ctx.</span><span style="color:#B392F0">draw</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">            frag: trailFrag,</span></span>
+<span class="line"><span style="color:#E1E4E8">            uniforms: {</span></span>
+<span class="line"><span style="color:#E1E4E8">                src: ctx.src,</span></span>
+<span class="line"><span style="color:#E1E4E8">                prev: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.#buffer, </span><span style="color:#6A737D">// read: last frame</span></span>
+<span class="line"><span style="color:#E1E4E8">                shift: [Math.</span><span style="color:#B392F0">cos</span><span style="color:#E1E4E8">(t) </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 0.12</span><span style="color:#E1E4E8">, Math.</span><span style="color:#B392F0">sin</span><span style="color:#E1E4E8">(t) </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 0.12</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">            },</span></span>
+<span class="line"><span style="color:#E1E4E8">            target: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.#buffer, </span><span style="color:#6A737D">// write: this frame</span></span>
+<span class="line"><span style="color:#E1E4E8">        });</span></span>
+<span class="line"><span style="color:#E1E4E8">        ctx.</span><span style="color:#B392F0">draw</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">            frag: copyFrag,</span></span>
+<span class="line"><span style="color:#E1E4E8">            uniforms: { buffer: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.#buffer },</span></span>
+<span class="line"><span style="color:#E1E4E8">            target: ctx.target,</span></span>
+<span class="line"><span style="color:#E1E4E8">        });</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Draw 60 CSS px outside the element on every side.</span></span>
+<span class="line"><span style="color:#B392F0">    outputRect</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">dims</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectDims</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">        const</span><span style="color:#79B8FF"> pad</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 60</span><span style="color:#F97583"> *</span><span style="color:#E1E4E8"> dims.pixelRatio;</span></span>
+<span class="line"><span style="color:#F97583">        const</span><span style="color:#E1E4E8"> [, , </span><span style="color:#79B8FF">w</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">h</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> dims.contentRect;</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> [</span><span style="color:#F97583">-</span><span style="color:#E1E4E8">pad, </span><span style="color:#F97583">-</span><span style="color:#E1E4E8">pad, w </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> pad </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 2</span><span style="color:#E1E4E8">, h </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> pad </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 2</span><span style="color:#E1E4E8">] </span><span style="color:#F97583">as</span><span style="color:#F97583"> const</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    dispose</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.#buffer </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <div class="Demo Wide" data-astro-cid-empkddct>
+            <img id="TrailDemo" src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS logo moving in a circle with a trail" data-astro-cid-empkddct>
+        </div>
+    </section>
+
+    <section id="textures" data-astro-cid-empkddct>
+        <h2 data-astro-cid-empkddct>Textures</h2>
+        <p data-astro-cid-empkddct>
+            <code data-astro-cid-empkddct>ctx.src</code> and your own textures are
+            <code data-astro-cid-empkddct>EffectTexture</code> handles. Pass them as uniforms. Use
+            <code data-astro-cid-empkddct>width</code> and <code data-astro-cid-empkddct>height</code> for their size in px.
+        </p>
+        <p data-astro-cid-empkddct>
+            <code data-astro-cid-empkddct>ctx.wrapTexture</code> turns an image, canvas, video,
+            <code data-astro-cid-empkddct>ImageBitmap</code>, <code data-astro-cid-empkddct>OffscreenCanvas</code> or
+            <code data-astro-cid-empkddct>WebGLTexture</code> into a texture. Call it once in
+            <code data-astro-cid-empkddct>init</code>.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>my-effect.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#B392F0">init</span><span style="color:#E1E4E8">(ctx: EffectContext) {</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.image </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> ctx.</span><span style="color:#B392F0">wrapTexture</span><span style="color:#E1E4E8">(imageElement);</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.video </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> ctx.</span><span style="color:#B392F0">wrapTexture</span><span style="color:#E1E4E8">(videoElement); </span><span style="color:#6A737D">// updates every frame</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">render</span><span style="color:#E1E4E8">(ctx: EffectContext) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    ctx.</span><span style="color:#B392F0">draw</span><span style="color:#E1E4E8">({ frag, uniforms: { src: ctx.src, image: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.image }, target: ctx.target });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <ul data-astro-cid-empkddct>
+            <li data-astro-cid-empkddct>
+                Videos and canvases upload every frame. Other sources upload once.
+                Change this with <code data-astro-cid-empkddct>autoUpdate</code>.
+            </li>
+            <li data-astro-cid-empkddct>
+                With <code data-astro-cid-empkddct>autoUpdate: false</code>, call
+                <code data-astro-cid-empkddct>texture.update()</code> after the source changes. It uploads
+                again on the next draw.
+            </li>
+            <li data-astro-cid-empkddct>
+                Call <code data-astro-cid-empkddct>texture.dispose()</code> when you replace a texture.
+                The rest are freed when the effect is removed.
+            </li>
+            <li data-astro-cid-empkddct>
+                A <code data-astro-cid-empkddct>WebGLTexture</code> needs <code data-astro-cid-empkddct>size</code>, and
+                <code data-astro-cid-empkddct>update()</code> does nothing for it.
+            </li>
+        </ul>
+        <p data-astro-cid-empkddct>
+            This effect tints the element with an 8×4 canvas. The canvas changes
+            only on click, so it skips the upload on other frames. Click the logo:
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>tile-effect.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#F97583"> type</span><span style="color:#E1E4E8"> { Effect, EffectContext, EffectTexture } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> frag</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `#version 300 es</span></span>
+<span class="line"><span style="color:#9ECBFF">precision highp float;</span></span>
+<span class="line"><span style="color:#9ECBFF">in vec2 uvSrc;</span></span>
+<span class="line"><span style="color:#9ECBFF">in vec2 uvContent;</span></span>
+<span class="line"><span style="color:#9ECBFF">out vec4 outColor;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform sampler2D src;</span></span>
+<span class="line"><span style="color:#9ECBFF">uniform sampler2D tiles;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#9ECBFF">void main() {</span></span>
+<span class="line"><span style="color:#9ECBFF">    vec4 color = texture(src, uvSrc);</span></span>
+<span class="line"><span style="color:#9ECBFF">    vec3 tint = texture(tiles, uvContent).rgb;</span></span>
+<span class="line"><span style="color:#9ECBFF">    outColor = vec4(color.rgb * tint, color.a);</span></span>
+<span class="line"><span style="color:#9ECBFF">}</span></span>
+<span class="line"><span style="color:#9ECBFF">`</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> TileEffect</span><span style="color:#F97583"> implements</span><span style="color:#B392F0"> Effect</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">    #canvas</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> document.</span><span style="color:#B392F0">createElement</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"canvas"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#FFAB70">    #texture</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectTexture</span><span style="color:#F97583"> |</span><span style="color:#79B8FF"> null</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    constructor</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.#canvas.width </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 8</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.#canvas.height </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 4</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">#paint</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    init</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectContext</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">        // A canvas updates every frame by default. Turn it off.</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.#texture </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> ctx.</span><span style="color:#B392F0">wrapTexture</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.#canvas, {</span></span>
+<span class="line"><span style="color:#E1E4E8">            autoUpdate: </span><span style="color:#79B8FF">false</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">            filter: </span><span style="color:#9ECBFF">"nearest"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        });</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    /** Paint new colors, then upload them once. */</span></span>
+<span class="line"><span style="color:#B392F0">    shuffle</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">#paint</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.#texture?.</span><span style="color:#B392F0">update</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    render</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectContext</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.#texture) {</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">        ctx.</span><span style="color:#B392F0">draw</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">            frag,</span></span>
+<span class="line"><span style="color:#E1E4E8">            uniforms: { src: ctx.src, tiles: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.#texture },</span></span>
+<span class="line"><span style="color:#E1E4E8">            target: ctx.target,</span></span>
+<span class="line"><span style="color:#E1E4E8">        });</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    dispose</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.#texture?.</span><span style="color:#B392F0">dispose</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.#texture </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> null</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">    #</span><span style="color:#B392F0">paint</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">        const</span><span style="color:#79B8FF"> c</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.#canvas.</span><span style="color:#B392F0">getContext</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"2d"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">c) {</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#F97583">        for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">let</span><span style="color:#E1E4E8"> x </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">; x </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.#canvas.width; x</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">            for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">let</span><span style="color:#E1E4E8"> y </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">; y </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.#canvas.height; y</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#E1E4E8">                c.fillStyle </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> `hsl(${</span><span style="color:#E1E4E8">Math</span><span style="color:#9ECBFF">.</span><span style="color:#B392F0">random</span><span style="color:#9ECBFF">() </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 360</span><span style="color:#9ECBFF">} 90% 65%)`</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">                c.</span><span style="color:#B392F0">fillRect</span><span style="color:#E1E4E8">(x, y, </span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <div class="Demo" data-astro-cid-empkddct>
+            <img id="TileDemo" class="Clickable" src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS logo tinted with color tiles. Click to change them." data-astro-cid-empkddct>
+        </div>
+    </section>
+
+    <section id="params" data-astro-cid-empkddct>
+        <h2 data-astro-cid-empkddct>Params</h2>
+        <p data-astro-cid-empkddct>
+            Keep settings in a public <code data-astro-cid-empkddct>params</code> object and read it in
+            <code data-astro-cid-empkddct>render</code>. Then you can change them any time, with no
+            re-init. The effects in <code data-astro-cid-empkddct>@vfx-js/effects</code> work this way. The
+            slider in the <a href="#hooks" data-astro-cid-empkddct>wave demo</a> sets
+            <code data-astro-cid-empkddct>params.amount</code>.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> class</span><span style="color:#B392F0"> WaveEffect</span><span style="color:#F97583"> implements</span><span style="color:#B392F0"> Effect</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">    params</span><span style="color:#F97583">:</span><span style="color:#B392F0"> WaveParams</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    constructor</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">params</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Partial</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">WaveParams</span><span style="color:#E1E4E8">> </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {}) {</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.params </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> { amount: </span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">...</span><span style="color:#E1E4E8">params };</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">    render</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">ctx</span><span style="color:#F97583">:</span><span style="color:#B392F0"> EffectContext</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">        // Read params every frame.</span></span>
+<span class="line"><span style="color:#E1E4E8">        ctx.</span><span style="color:#B392F0">draw</span><span style="color:#E1E4E8">({ frag, uniforms: { amount: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.params.amount </span><span style="color:#6A737D">/* ... */</span><span style="color:#E1E4E8"> } });</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> wave</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> WaveEffect</span><span style="color:#E1E4E8">({ amount: </span><span style="color:#79B8FF">0.5</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect: wave });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">slider.</span><span style="color:#B392F0">oninput</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    wave.params.amount </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> slider.valueAsNumber;</span></span>
+<span class="line"><span style="color:#E1E4E8">};</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-empkddct>
+            To change the chain itself, toggle <code data-astro-cid-empkddct>enabled</code> or call
+            <code data-astro-cid-empkddct>vfx.updateEffects</code>:
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#6A737D">// Turn one effect off and on. It keeps its buffers.</span></span>
+<span class="line"><span style="color:#E1E4E8">wave.enabled </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Swap the chain. Effects you keep keep their state.</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">updateEffects</span><span style="color:#E1E4E8">(img, [wave, </span><span style="color:#F97583">new</span><span style="color:#B392F0"> TrailEffect</span><span style="color:#E1E4E8">()]);</span></span></code></pre>
+</figure>
+
+
+    </section>
+
+    <section id="post-effect" data-astro-cid-empkddct>
+        <h2 data-astro-cid-empkddct>As a post effect</h2>
+        <p data-astro-cid-empkddct>
+            Effects also run over the whole canvas, after all elements are drawn.
+            Pass them as <code data-astro-cid-empkddct>postEffect.effect</code> to <code data-astro-cid-empkddct>new VFX()</code>.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VFX } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VignetteEffect } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/effects"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">    postEffect: { effect: </span><span style="color:#F97583">new</span><span style="color:#B392F0"> VignetteEffect</span><span style="color:#E1E4E8">({ intensity: </span><span style="color:#79B8FF">0.8</span><span style="color:#E1E4E8"> }) },</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// An array works too.</span></span>
+<span class="line"><span style="color:#F97583">new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">({ postEffect: { effect: [</span><span style="color:#F97583">new</span><span style="color:#B392F0"> WaveEffect</span><span style="color:#E1E4E8">(), </span><span style="color:#F97583">new</span><span style="color:#B392F0"> VignetteEffect</span><span style="color:#E1E4E8">()] } });</span></span></code></pre>
+</figure>
+
+
+        <ul data-astro-cid-empkddct>
+            <li data-astro-cid-empkddct>
+                <code data-astro-cid-empkddct>src</code> is the whole canvas.
+            </li>
+            <li data-astro-cid-empkddct>
+                There is no element, so <code data-astro-cid-empkddct>dims.element</code> is the canvas
+                size and <code data-astro-cid-empkddct>contentRect</code> is <code data-astro-cid-empkddct>canvasRect</code>.
+            </li>
+            <li data-astro-cid-empkddct>
+                No live demo here, since it would change every demo on this page.
+            </li>
+        </ul>
+    </section>
+
+    <section id="tips" data-astro-cid-empkddct>
+        <h2 data-astro-cid-empkddct>Tips</h2>
+        <ul data-astro-cid-empkddct>
+            <li data-astro-cid-empkddct>
+                Effects keep state, so don't share one instance between elements.
+                Use a factory.
+            </li>
+        </ul>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#6A737D">// One instance per element.</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#B392F0"> makeEffect</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#F97583"> new</span><span style="color:#B392F0"> WaveEffect</span><span style="color:#E1E4E8">({ amount: </span><span style="color:#79B8FF">0.5</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> img</span><span style="color:#F97583"> of</span><span style="color:#E1E4E8"> document.</span><span style="color:#B392F0">querySelectorAll</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"img"</span><span style="color:#E1E4E8">)) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect: </span><span style="color:#B392F0">makeEffect</span><span style="color:#E1E4E8">() });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <ul data-astro-cid-empkddct>
+            <li data-astro-cid-empkddct>
+                Render targets, wrapped textures and geometries are freed for you.
+                In <code data-astro-cid-empkddct>dispose</code>, drop your references.
+            </li>
+            <li data-astro-cid-empkddct>
+                Things you make with <code data-astro-cid-empkddct>ctx.gl</code> are yours. Free them in
+                <code data-astro-cid-empkddct>dispose</code>, and rebuild them in
+                <code data-astro-cid-empkddct>ctx.onContextRestored(cb)</code>.
+            </li>
+            <li data-astro-cid-empkddct>
+                Use <code data-astro-cid-empkddct>ctx.dims</code> for sizes. Don't read DOM sizes in
+                <code data-astro-cid-empkddct>render</code>.
+            </li>
+            <li data-astro-cid-empkddct>
+                <code data-astro-cid-empkddct>ctx.draw</code> in <code data-astro-cid-empkddct>update</code> is ignored. Draw in
+                <code data-astro-cid-empkddct>render</code>.
+            </li>
+            <li data-astro-cid-empkddct>
+                For bigger examples, read
+                <a href="https://github.com/fand/vfx-js/tree/main/packages/effects/src" target="_blank" rel="noreferrer" data-astro-cid-empkddct>packages/effects/src</a>.
+                <code data-astro-cid-empkddct>hue-shift.ts</code> and <code data-astro-cid-empkddct>pixelate.ts</code> are short.
+                <code data-astro-cid-empkddct>bloom.ts</code> uses render targets and
+                <code data-astro-cid-empkddct>outputRect</code>.
+            </li>
+        </ul>
+    </section>
+
+                            </main>
+                        </div>
+                <footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href="/vfx-js/">
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+        </a>
+        <div class="SiteFooterCol">
+                    <h4>Docs</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/getting-started/">
+                                        Getting Started
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/how-it-works/">
+                                        How it Works
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/ai/">
+                                        Use with AI
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/">
+                                        Effects
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/shaders/">
+                                        Custom Shaders
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/custom-effects/">
+                                        Custom Effects
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Resources</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/docs/" data-astro-reload="true">
+                                        API Reference
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+                                        Examples <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/storybook/" target="_blank" rel="noreferrer">
+                                        Storybook <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/llms.txt" target="_blank" rel="noreferrer">
+                                        llms.txt <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Project</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+                                        GitHub <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://www.npmjs.com/package/@vfx-js/core" target="_blank" rel="noreferrer">
+                                        npm <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://amagi.dev/vfx-js-transitions/" target="_blank" rel="noreferrer">
+                                        Transitions <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://github.com/fand/vfx-js/issues" target="_blank" rel="noreferrer">
+                                        Issues <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div>
+    </div>
+    <div class="Author">
+        <img class="AuthorIcon" src="/vfx-js/amagi.png" alt="Amagi" loading="lazy" decoding="async">
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/github.svg" alt="GitHub">
+            </a>
+            <a href="https://twitter.com/amagitakayosi" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/twitter.svg" alt="Twitter">
+            </a>
+            <a href="https://bsky.app/profile/amagi.dev" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/bluesky.svg" alt="Bluesky">
+            </a>
+        </div>
+    </div>
+</footer>
+            </div>
+        
+</div>
+
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.CYyl-y44.js"></script>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        
+
+    </body>
+</html>
+
+<script type="module" src="/vfx-js/_astro/custom-effects.astro_astro_type_script_index_0_lang.P5A9doYX.js"></script>

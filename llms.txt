@@ -1,6 +1,6 @@
 # VFX-JS
 
-> VFX-JS is a JavaScript library that adds WebGL shader effects to HTML elements (images, videos, text, any element) and animates tab, carousel and page transitions. Packages: `@vfx-js/core` (the `VFX` class), `@vfx-js/react` (React, Next.js, React Router), `@vfx-js/vue` (Vue, Nuxt, Vue Router), `@vfx-js/svelte` (Svelte 5, SvelteKit), `@vfx-js/effects` (prebuilt effects), `@vfx-js/transitions` (transition presets).
+> VFX-JS is a JavaScript library that adds WebGL shader effects to HTML elements (images, videos, text, any element) and animates tab, carousel and page transitions. Packages: `@vfx-js/core` (the `VFX` class), `@vfx-js/react` (React, Next.js, React Router), `@vfx-js/vue` (Vue, Nuxt, Vue Router), `@vfx-js/svelte` (Svelte 5, SvelteKit), `@vfx-js/astro` (Astro, ClientRouter), `@vfx-js/effects` (prebuilt effects), `@vfx-js/transitions` (transition presets).
 
 Quick start:
 
@@ -20,6 +20,15 @@ VFX-JS runs in the browser only and needs WebGL. Create the `VFX` instance in cl
 - [Custom shaders](https://raw.githubusercontent.com/fand/vfx-js/main/skills/vfx-js/references/shader.md): GLSL template, built-in uniforms, overflow, multipass, post effects
 - [Effects](https://raw.githubusercontent.com/fand/vfx-js/main/skills/vfx-js/references/effects.md): prebuilt effects and the Effect API
 - [Transitions](https://raw.githubusercontent.com/fand/vfx-js/main/skills/vfx-js/references/transitions.md): `addTransition`, presets, custom transitions, React, Next.js, Vue, Nuxt and SvelteKit
+
+## Guides
+
+- [Getting Started](https://amagi.dev/vfx-js/getting-started/): install VFX-JS and add your first effect
+- [How it Works](https://amagi.dev/vfx-js/how-it-works/): how VFX-JS draws DOM elements with WebGL
+- [Use with AI](https://amagi.dev/vfx-js/ai/): the agent skill, llms.txt and prompts
+- [Effects](https://amagi.dev/vfx-js/effects/): shader presets and the `@vfx-js/effects` gallery
+- [Custom Shaders](https://amagi.dev/vfx-js/shaders/): GLSL template, uniforms, overflow, backbuffer, multipass, post effects
+- [Custom Effects](https://amagi.dev/vfx-js/custom-effects/): the Effect API and lifecycle hooks
 
 ## Agent skill
 

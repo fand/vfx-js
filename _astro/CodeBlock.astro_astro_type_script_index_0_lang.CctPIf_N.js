@@ -1,0 +1,1 @@
+document.addEventListener(`click`,async e=>{let t=e.target.closest(`.CodeBlockCopy`),n=t?.closest(`.CodeBlock`)?.querySelector(`pre`);t&&n&&(await navigator.clipboard.writeText(n.textContent??``),t.textContent=`Copied`,setTimeout(()=>{t.textContent=`Copy`},1500))});

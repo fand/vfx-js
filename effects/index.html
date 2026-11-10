@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html data-astro-transition-scope="astro-yztbsuuz-1" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Effects - VFX-JS</title>
+
+        <meta name="theme-color" content="#000000">
+        <meta name="description" content="VFX-JS shader presets, preset uniforms, and the @vfx-js/effects gallery.">
+        <link rel="canonical" href="https://amagi.dev/vfx-js/effects/">
+
+        <meta property="og:url" content="https://amagi.dev/vfx-js/effects/">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="Effects - VFX-JS">
+        <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+        <meta property="og:description" content="VFX-JS shader presets, preset uniforms, and the @vfx-js/effects gallery.">
+        <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
+        <meta property="og:locale" content="en_US">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@amagitakayosi">
+        <meta name="twitter:creator" content="@amagitakayosi">
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/effects/">
+        <meta name="twitter:title" content="Effects - VFX-JS">
+        <meta name="twitter:description" content="VFX-JS shader presets, preset uniforms, and the @vfx-js/effects gallery.">
+        <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+
+        <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/vfx-js/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/vfx-js/favicon/favicon-180.png">
+        <link rel="manifest" href="/vfx-js/manifest.webmanifest">
+
+        <meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
+<script type="module" src="/vfx-js/_astro/ClientRouter.astro_astro_type_script_index_0_lang.C2j_ZdXg.js"></script>
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;b9c39aae9c304f1cbfa1e7bb3e84f078&quot;}"></script>
+        <!-- End Cloudflare Web Analytics -->
+    <link rel="stylesheet" href="/vfx-js/_astro/CodeBlock.LNdCJ4k7.css">
+<link rel="stylesheet" href="/vfx-js/_astro/effects.DOZDIhw6.css">
+<link rel="stylesheet" href="/vfx-js/_astro/Layout.7Dg6_FOh.css"><style>[data-astro-transition-scope="astro-yztbsuuz-1"] { view-transition-name: astro-yztbsuuz-1; }@layer astro { ::view-transition-old(astro-yztbsuuz-1) { animation: none; opacity: 0; mix-blend-mode: normal; }::view-transition-new(astro-yztbsuuz-1) { animation: none; mix-blend-mode: normal; }::view-transition-group(astro-yztbsuuz-1) { animation: none } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }</style></head>
+
+    <body class="DocPage">
+        <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
+
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.BNPinfg6.js"></script>
+        <header class="SiteHeader">
+    <a class="SiteHeaderBrand" href="/vfx-js/">
+        <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+    </a>
+    <button class="SiteHeaderMenuButton" type="button" aria-label="Menu" aria-expanded="false" aria-controls="SiteHeaderNav">
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a class="SiteHeaderDesktopOnly" href="/vfx-js/getting-started/" aria-current="page">
+            Docs
+        </a>
+        <a class="SiteHeaderMenuOnly" href="/vfx-js/getting-started/">
+                    Getting Started
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/how-it-works/">
+                    How it Works
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/ai/">
+                    Use with AI
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/effects/" aria-current="page">
+                    Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/shaders/">
+                    Custom Shaders
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/custom-effects/">
+                    Custom Effects
+                </a>
+        <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.DbdCPj2I.js"></script>
+        <!-- Back plays the slit scan reversed. -->
+        <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
+    
+            <div class="Page">
+                <div class="DocLayout">
+                            <nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        <li>
+                    <a href="/vfx-js/getting-started/">
+                        Getting Started
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/how-it-works/">
+                        How it Works
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/ai/">
+                        Use with AI
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/effects/" aria-current="page">
+                        Effects
+                    </a>
+                    <ul>
+                            <li>
+                                    <a href="#presets" data-section="presets">
+                                        Shader presets
+                                    </a>
+                                </li><li>
+                                    <a href="#parameters" data-section="parameters">
+                                        Preset uniforms
+                                    </a>
+                                </li><li>
+                                    <a href="#gallery" data-section="gallery">
+                                        @vfx-js/effects
+                                    </a>
+                                </li><li>
+                                    <a href="#chaining" data-section="chaining">
+                                        Chaining
+                                    </a>
+                                </li><li>
+                                    <a href="#storybook" data-section="storybook">
+                                        Storybook
+                                    </a>
+                                </li>
+                        </ul>
+                </li><li>
+                    <a href="/vfx-js/shaders/">
+                        Custom Shaders
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/custom-effects/">
+                        Custom Effects
+                    </a>
+                    
+                </li>
+    </ul>
+    <a class="DocSidebarExtra" href="/vfx-js/docs/" data-astro-reload>API Reference &#8594;</a>
+    <a class="DocSidebarExtra" href="/vfx-js/examples/" target="_blank" rel="noreferrer">Examples &#8599;</a>
+</nav>
+
+<script type="module" src="/vfx-js/_astro/Sidebar.astro_astro_type_script_index_0_lang.B94Lg-ip.js"></script>
+                            <main class="DocMain">
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                
+    <h1 data-astro-cid-7x5iumkd>Effects</h1>
+    <p data-astro-cid-7x5iumkd>
+        There are two ways to style an element. Pass a preset name to
+        <code data-astro-cid-7x5iumkd>shader</code>, or pass effect objects to <code data-astro-cid-7x5iumkd>effect</code>. Use
+        one or the other, not both.
+    </p>
+
+    <section id="presets" data-astro-cid-7x5iumkd>
+        <h2 data-astro-cid-7x5iumkd>Shader presets</h2>
+        <p data-astro-cid-7x5iumkd>
+            <code data-astro-cid-7x5iumkd>@vfx-js/core</code> comes with these presets. Pass the name to
+            <code data-astro-cid-7x5iumkd>shader</code>.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader: </span><span style="color:#9ECBFF">"rainbow"</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Some presets draw outside the element. Give them room with overflow.</span></span>
+<span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader: </span><span style="color:#9ECBFF">"glitch"</span><span style="color:#E1E4E8">, overflow: </span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8"> });</span></span></code></pre>
+</figure>
+
+<script type="module" src="/vfx-js/_astro/CodeBlock.astro_astro_type_script_index_0_lang.CctPIf_N.js"></script>
+        <div class="DemoGrid" data-astro-cid-7x5iumkd>
+            <figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-preset="uvGradient" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>uvGradient</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-preset="rainbow" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>rainbow</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-preset="glitch" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>glitch</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-preset="rgbGlitch" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>rgbGlitch</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-preset="rgbShift" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>rgbShift</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-preset="shine" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>shine</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-preset="blink" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>blink</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-preset="spring" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>spring</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-preset="sinewave" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>sinewave</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-preset="pixelate" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>pixelate</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/jellyfish.webp" alt="" data-preset="halftone" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>halftone</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-preset="invert" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>invert</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-preset="grayscale" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>grayscale</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/jellyfish.webp" alt="" data-preset="duotone" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>duotone</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/jellyfish.webp" alt="" data-preset="tritone" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>tritone</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/jellyfish.webp" alt="" data-preset="hueShift" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>hueShift</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-preset="vignette" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>vignette</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-preset="chromatic" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>chromatic</code>
+                        </figcaption>
+                    </figure>
+        </div>
+
+        <h3 data-astro-cid-7x5iumkd>Scroll reveal presets</h3>
+        <p data-astro-cid-7x5iumkd>
+            These animate in when the element enters the viewport, and out when
+            it leaves. Scroll them in and out to see it again.
+        </p>
+        <div class="DemoGrid" data-astro-cid-7x5iumkd>
+            <figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-reveal-preset="slitScanReveal" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>slitScanReveal</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-reveal-preset="warpReveal" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>warpReveal</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-reveal-preset="pixelateReveal" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>pixelateReveal</code>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="" data-reveal-preset="focusReveal" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>focusReveal</code>
+                        </figcaption>
+                    </figure>
+        </div>
+    </section>
+
+    <section id="parameters" data-astro-cid-7x5iumkd>
+        <h2 data-astro-cid-7x5iumkd>Preset uniforms</h2>
+        <p data-astro-cid-7x5iumkd>
+            Some presets read values from <code data-astro-cid-7x5iumkd>uniforms</code>. They have no
+            defaults, so pass all of them.
+        </p>
+        <table class="DocTable" data-astro-cid-7x5iumkd>
+            <thead data-astro-cid-7x5iumkd>
+                <tr data-astro-cid-7x5iumkd>
+                    <th data-astro-cid-7x5iumkd>Preset</th>
+                    <th data-astro-cid-7x5iumkd>Uniforms</th>
+                </tr>
+            </thead>
+            <tbody data-astro-cid-7x5iumkd>
+                <tr data-astro-cid-7x5iumkd>
+                            <td data-astro-cid-7x5iumkd>
+                                <code data-astro-cid-7x5iumkd>duotone</code>
+                            </td>
+                            <td data-astro-cid-7x5iumkd>color1, color2 (vec4), speed</td>
+                        </tr><tr data-astro-cid-7x5iumkd>
+                            <td data-astro-cid-7x5iumkd>
+                                <code data-astro-cid-7x5iumkd>tritone</code>
+                            </td>
+                            <td data-astro-cid-7x5iumkd>color1, color2, color3 (vec4), speed</td>
+                        </tr><tr data-astro-cid-7x5iumkd>
+                            <td data-astro-cid-7x5iumkd>
+                                <code data-astro-cid-7x5iumkd>hueShift</code>
+                            </td>
+                            <td data-astro-cid-7x5iumkd>shift (0 to 1)</td>
+                        </tr><tr data-astro-cid-7x5iumkd>
+                            <td data-astro-cid-7x5iumkd>
+                                <code data-astro-cid-7x5iumkd>vignette</code>
+                            </td>
+                            <td data-astro-cid-7x5iumkd>intensity, radius, power</td>
+                        </tr><tr data-astro-cid-7x5iumkd>
+                            <td data-astro-cid-7x5iumkd>
+                                <code data-astro-cid-7x5iumkd>chromatic</code>
+                            </td>
+                            <td data-astro-cid-7x5iumkd>intensity, radius, power</td>
+                        </tr>
+            </tbody>
+        </table>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(video, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    shader: </span><span style="color:#9ECBFF">"duotone"</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    uniforms: {</span></span>
+<span class="line"><span style="color:#E1E4E8">        color1: [</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">        color2: [</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">        speed: </span><span style="color:#79B8FF">0.2</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    },</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+</figure>
+
+
+        <div class="Demo" data-astro-cid-7x5iumkd>
+            <video id="UniformsDemo" src="/vfx-js/jellyfish.mp4" autoplay loop muted playsinline data-astro-cid-7x5iumkd></video>
+        </div>
+    </section>
+
+    <section id="gallery" data-astro-cid-7x5iumkd>
+        <h2 data-astro-cid-7x5iumkd>@vfx-js/effects</h2>
+        <p data-astro-cid-7x5iumkd>
+            <code data-astro-cid-7x5iumkd>@vfx-js/effects</code> has ready-made effects. Each one is a
+            class. Make one instance per element.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>Terminal</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="bash"><code><span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> i</span><span style="color:#9ECBFF"> @vfx-js/core</span><span style="color:#9ECBFF"> @vfx-js/effects</span></span></code></pre>
+</figure>
+
+
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VFX } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { BloomEffect } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/effects"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> bloom</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> BloomEffect</span><span style="color:#E1E4E8">({ threshold: </span><span style="color:#79B8FF">0.2</span><span style="color:#E1E4E8">, intensity: </span><span style="color:#79B8FF">4</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { effect: bloom });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Most effects read params every frame, so you can change them live.</span></span>
+<span class="line"><span style="color:#E1E4E8">bloom.params.intensity </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 2</span><span style="color:#E1E4E8">;</span></span></code></pre>
+</figure>
+
+
+        <div class="DemoGrid" data-astro-cid-7x5iumkd>
+            <figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="AsciiEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>AsciiEffect</code>
+                            <span data-astro-cid-7x5iumkd>ASCII mosaic from a dark-to-light character ramp.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="BadJpegEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>BadJpegEffect</code>
+                            <span data-astro-cid-7x5iumkd>JPEG damage: chroma subsampling and blocky DCT.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/jellyfish.webp" alt="" data-effect="BloomEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>BloomEffect</code>
+                            <span data-astro-cid-7x5iumkd>Bloom with a soft threshold. Draws outside the element.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="ChromaticEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>ChromaticEffect</code>
+                            <span data-astro-cid-7x5iumkd>Chromatic aberration.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="ColoredEdgesEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>ColoredEdgesEffect</code>
+                            <span data-astro-cid-7x5iumkd>Edge detection with two edge colors.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="true" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/jellyfish.webp" alt="" data-effect="DatamoshEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>DatamoshEffect</code>
+                            <span data-astro-cid-7x5iumkd>Fake datamosh.</span>
+                            <span class="DemoHint" data-astro-cid-7x5iumkd>Click to start or stop.</span>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="DitherEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>DitherEffect</code>
+                            <span data-astro-cid-7x5iumkd>Bayer or blue-noise dither with few colors.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="DuotoneEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>DuotoneEffect</code>
+                            <span data-astro-cid-7x5iumkd>Two-color map.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="FluidEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>FluidEffect</code>
+                            <span data-astro-cid-7x5iumkd>Fluid simulation driven by the pointer.</span>
+                            <span class="DemoHint" data-astro-cid-7x5iumkd>Move the pointer over it.</span>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="GlitchEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>GlitchEffect</code>
+                            <span data-astro-cid-7x5iumkd>Block shift and aberration glitch.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="GradientMapEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>GradientMapEffect</code>
+                            <span data-astro-cid-7x5iumkd>Map brightness to a color gradient.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="HalftoneEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>HalftoneEffect</code>
+                            <span data-astro-cid-7x5iumkd>RGB or CMYK halftone screen.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="HueShiftEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>HueShiftEffect</code>
+                            <span data-astro-cid-7x5iumkd>Rotate the hue.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="JPEGGlitchEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>JPEGGlitchEffect</code>
+                            <span data-astro-cid-7x5iumkd>Real JPEG glitch: breaks the encoded bytes.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/jellyfish.webp" alt="" data-effect="LightStreakEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>LightStreakEffect</code>
+                            <span data-astro-cid-7x5iumkd>Anamorphic flare and starburst streaks.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="MatrixEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>MatrixEffect</code>
+                            <span data-astro-cid-7x5iumkd>Digital rain of glyphs over the image.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="ParticleEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>ParticleEffect</code>
+                            <span data-astro-cid-7x5iumkd>GPU particles from the pointer.</span>
+                            <span class="DemoHint" data-astro-cid-7x5iumkd>Move the pointer over it.</span>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="true" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="ParticleExplodeEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>ParticleExplodeEffect</code>
+                            <span data-astro-cid-7x5iumkd>One burst that shatters the element.</span>
+                            <span class="DemoHint" data-astro-cid-7x5iumkd>Click to burst.</span>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="PatternRefractionEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>PatternRefractionEffect</code>
+                            <span data-astro-cid-7x5iumkd>Refraction through ribbed glass.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="PixelateEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>PixelateEffect</code>
+                            <span data-astro-cid-7x5iumkd>Pixelation. size is in CSS px.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="PixelSortEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>PixelSortEffect</code>
+                            <span data-astro-cid-7x5iumkd>Threshold pixel sort at any angle.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="PixelStretchEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>PixelStretchEffect</code>
+                            <span data-astro-cid-7x5iumkd>Smear one line across a band of the image.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="RainbowEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>RainbowEffect</code>
+                            <span data-astro-cid-7x5iumkd>Moving rainbow gradient.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="RgbGlitchEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>RgbGlitchEffect</code>
+                            <span data-astro-cid-7x5iumkd>Block glitch with RGB split.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="RgbShiftEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>RgbShiftEffect</code>
+                            <span data-astro-cid-7x5iumkd>RGB channel shift.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="ScanlineEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>ScanlineEffect</code>
+                            <span data-astro-cid-7x5iumkd>CRT scanlines.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="SinewaveEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>SinewaveEffect</code>
+                            <span data-astro-cid-7x5iumkd>Sine wave distortion.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="SliceShiftEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>SliceShiftEffect</code>
+                            <span data-astro-cid-7x5iumkd>Split into strips and shift each one.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="TilePixelateEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>TilePixelateEffect</code>
+                            <span data-astro-cid-7x5iumkd>Pixelate into shaped tiles.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="TritoneEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>TritoneEffect</code>
+                            <span data-astro-cid-7x5iumkd>Three-color map.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="VignetteEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>VignetteEffect</code>
+                            <span data-astro-cid-7x5iumkd>Vignette.</span>
+                            
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="VoronoiEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>VoronoiEffect</code>
+                            <span data-astro-cid-7x5iumkd>Voronoi cells around the pointer.</span>
+                            <span class="DemoHint" data-astro-cid-7x5iumkd>Move the pointer over it.</span>
+                        </figcaption>
+                    </figure><figure class="DemoTile" data-astro-cid-7x5iumkd>
+                        <div class="DemoMedia" data-clickable="false" data-astro-cid-7x5iumkd>
+                            <img src="/vfx-js/images/pigeon.webp" alt="" data-effect="WarpEffect" data-astro-cid-7x5iumkd>
+                        </div>
+                        <figcaption data-astro-cid-7x5iumkd>
+                            <code data-astro-cid-7x5iumkd>WarpEffect</code>
+                            <span data-astro-cid-7x5iumkd>Sine wave, twist or ripple warp.</span>
+                            
+                        </figcaption>
+                    </figure>
+        </div>
+    </section>
+
+    <section id="chaining" data-astro-cid-7x5iumkd>
+        <h2 data-astro-cid-7x5iumkd>Chaining</h2>
+        <p data-astro-cid-7x5iumkd>
+            Pass an array to <code data-astro-cid-7x5iumkd>effect</code>. Each effect reads the output of
+            the one before it.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { BloomEffect, PixelateEffect, ScanlineEffect } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/effects"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(video, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    effect: [</span></span>
+<span class="line"><span style="color:#F97583">        new</span><span style="color:#B392F0"> PixelateEffect</span><span style="color:#E1E4E8">({ size: </span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8"> }),</span></span>
+<span class="line"><span style="color:#F97583">        new</span><span style="color:#B392F0"> ScanlineEffect</span><span style="color:#E1E4E8">({ spacing: </span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8"> }),</span></span>
+<span class="line"><span style="color:#F97583">        new</span><span style="color:#B392F0"> BloomEffect</span><span style="color:#E1E4E8">({ threshold: </span><span style="color:#79B8FF">0.01</span><span style="color:#E1E4E8">, intensity: </span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">, pad: </span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8"> }),</span></span>
+<span class="line"><span style="color:#E1E4E8">    ],</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Swap the chain in place. Instances already in it keep their state.</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">updateEffects</span><span style="color:#E1E4E8">(video, [</span><span style="color:#F97583">new</span><span style="color:#B392F0"> BloomEffect</span><span style="color:#E1E4E8">({ intensity: </span><span style="color:#79B8FF">8</span><span style="color:#E1E4E8"> })]);</span></span></code></pre>
+</figure>
+
+
+        <div class="Demo" data-astro-cid-7x5iumkd>
+            <video id="ChainDemo" src="/vfx-js/jellyfish.mp4" autoplay loop muted playsinline data-astro-cid-7x5iumkd></video>
+        </div>
+        <p data-astro-cid-7x5iumkd>
+            <code data-astro-cid-7x5iumkd>overflow</code> does not apply to effects. Effects that draw
+            outside the element, like <code data-astro-cid-7x5iumkd>BloomEffect</code>, have their own
+            <code data-astro-cid-7x5iumkd>pad</code> param.
+        </p>
+    </section>
+
+    <section id="storybook" data-astro-cid-7x5iumkd>
+        <h2 data-astro-cid-7x5iumkd>Storybook</h2>
+        <p data-astro-cid-7x5iumkd>
+            The <a href="/vfx-js/storybook/" data-astro-reload data-astro-cid-7x5iumkd>Storybook</a> has every preset and
+            effect with live controls for their params.
+        </p>
+    </section>
+
+                            </main>
+                        </div>
+                <footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href="/vfx-js/">
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+        </a>
+        <div class="SiteFooterCol">
+                    <h4>Docs</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/getting-started/">
+                                        Getting Started
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/how-it-works/">
+                                        How it Works
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/ai/">
+                                        Use with AI
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/">
+                                        Effects
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/shaders/">
+                                        Custom Shaders
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/custom-effects/">
+                                        Custom Effects
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Resources</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/docs/" data-astro-reload="true">
+                                        API Reference
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+                                        Examples <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/storybook/" target="_blank" rel="noreferrer">
+                                        Storybook <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/llms.txt" target="_blank" rel="noreferrer">
+                                        llms.txt <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Project</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+                                        GitHub <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://www.npmjs.com/package/@vfx-js/core" target="_blank" rel="noreferrer">
+                                        npm <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://amagi.dev/vfx-js-transitions/" target="_blank" rel="noreferrer">
+                                        Transitions <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://github.com/fand/vfx-js/issues" target="_blank" rel="noreferrer">
+                                        Issues <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div>
+    </div>
+    <div class="Author">
+        <img class="AuthorIcon" src="/vfx-js/amagi.png" alt="Amagi" loading="lazy" decoding="async">
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/github.svg" alt="GitHub">
+            </a>
+            <a href="https://twitter.com/amagitakayosi" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/twitter.svg" alt="Twitter">
+            </a>
+            <a href="https://bsky.app/profile/amagi.dev" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/bluesky.svg" alt="Bluesky">
+            </a>
+        </div>
+    </div>
+</footer>
+            </div>
+        
+</div>
+
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.CYyl-y44.js"></script>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        
+
+    </body>
+</html>
+
+<script type="module" src="/vfx-js/_astro/effects.astro_astro_type_script_index_0_lang.Dd-rmUs-.js"></script>

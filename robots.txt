@@ -1,2 +1,4 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
+
+Sitemap: https://amagi.dev/vfx-js/sitemap-index.xml

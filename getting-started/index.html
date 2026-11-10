@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html data-astro-transition-scope="astro-yztbsuuz-1" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>Getting Started - VFX-JS</title>
+
+        <meta name="theme-color" content="#000000">
+        <meta name="description" content="Install VFX-JS and add your first WebGL effect to an HTML element.">
+        <link rel="canonical" href="https://amagi.dev/vfx-js/getting-started/">
+
+        <meta property="og:url" content="https://amagi.dev/vfx-js/getting-started/">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="Getting Started - VFX-JS">
+        <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+        <meta property="og:description" content="Install VFX-JS and add your first WebGL effect to an HTML element.">
+        <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
+        <meta property="og:locale" content="en_US">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@amagitakayosi">
+        <meta name="twitter:creator" content="@amagitakayosi">
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/getting-started/">
+        <meta name="twitter:title" content="Getting Started - VFX-JS">
+        <meta name="twitter:description" content="Install VFX-JS and add your first WebGL effect to an HTML element.">
+        <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+
+        <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/vfx-js/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/vfx-js/favicon/favicon-180.png">
+        <link rel="manifest" href="/vfx-js/manifest.webmanifest">
+
+        <meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
+<script type="module" src="/vfx-js/_astro/ClientRouter.astro_astro_type_script_index_0_lang.C2j_ZdXg.js"></script>
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;b9c39aae9c304f1cbfa1e7bb3e84f078&quot;}"></script>
+        <!-- End Cloudflare Web Analytics -->
+    <link rel="stylesheet" href="/vfx-js/_astro/getting-started.BCXDxENB.css">
+<link rel="stylesheet" href="/vfx-js/_astro/CodeBlock.LNdCJ4k7.css">
+<link rel="stylesheet" href="/vfx-js/_astro/Layout.7Dg6_FOh.css"><style>[data-astro-transition-scope="astro-yztbsuuz-1"] { view-transition-name: astro-yztbsuuz-1; }@layer astro { ::view-transition-old(astro-yztbsuuz-1) { animation: none; opacity: 0; mix-blend-mode: normal; }::view-transition-new(astro-yztbsuuz-1) { animation: none; mix-blend-mode: normal; }::view-transition-group(astro-yztbsuuz-1) { animation: none } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }</style></head>
+
+    <body class="DocPage">
+        <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
+
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.BNPinfg6.js"></script>
+        <header class="SiteHeader">
+    <a class="SiteHeaderBrand" href="/vfx-js/">
+        <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+    </a>
+    <button class="SiteHeaderMenuButton" type="button" aria-label="Menu" aria-expanded="false" aria-controls="SiteHeaderNav">
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a class="SiteHeaderDesktopOnly" href="/vfx-js/getting-started/" aria-current="page">
+            Docs
+        </a>
+        <a class="SiteHeaderMenuOnly" href="/vfx-js/getting-started/" aria-current="page">
+                    Getting Started
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/how-it-works/">
+                    How it Works
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/ai/">
+                    Use with AI
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/effects/">
+                    Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/shaders/">
+                    Custom Shaders
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/custom-effects/">
+                    Custom Effects
+                </a>
+        <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.DbdCPj2I.js"></script>
+        <!-- Back plays the slit scan reversed. -->
+        <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
+    
+            <div class="Page">
+                <div class="DocLayout">
+                            <nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        <li>
+                    <a href="/vfx-js/getting-started/" aria-current="page">
+                        Getting Started
+                    </a>
+                    <ul>
+                            <li>
+                                    <a href="#install" data-section="install">
+                                        Install
+                                    </a>
+                                </li><li>
+                                    <a href="#first-effect" data-section="first-effect">
+                                        Your first effect
+                                    </a>
+                                </li><li>
+                                    <a href="#options" data-section="options">
+                                        Options
+                                    </a>
+                                </li><li>
+                                    <a href="#frameworks" data-section="frameworks">
+                                        Frameworks
+                                    </a>
+                                </li><li>
+                                    <a href="#next" data-section="next">
+                                        Next steps
+                                    </a>
+                                </li>
+                        </ul>
+                </li><li>
+                    <a href="/vfx-js/how-it-works/">
+                        How it Works
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/ai/">
+                        Use with AI
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/effects/">
+                        Effects
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/shaders/">
+                        Custom Shaders
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/custom-effects/">
+                        Custom Effects
+                    </a>
+                    
+                </li>
+    </ul>
+    <a class="DocSidebarExtra" href="/vfx-js/docs/" data-astro-reload>API Reference &#8594;</a>
+    <a class="DocSidebarExtra" href="/vfx-js/examples/" target="_blank" rel="noreferrer">Examples &#8599;</a>
+</nav>
+
+<script type="module" src="/vfx-js/_astro/Sidebar.astro_astro_type_script_index_0_lang.B94Lg-ip.js"></script>
+                            <main class="DocMain">
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                
+    <h1 data-astro-cid-jxrezxle>Getting Started</h1>
+    <p data-astro-cid-jxrezxle>
+        VFX-JS draws HTML elements with WebGL shaders. You pick an element and a
+        shader. The element keeps its place in the layout.
+    </p>
+
+    <section id="install" data-astro-cid-jxrezxle>
+        <h2 data-astro-cid-jxrezxle>Install</h2>
+        <p data-astro-cid-jxrezxle>Install the core package from npm:</p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>Terminal</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="bash"><code><span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> i</span><span style="color:#9ECBFF"> @vfx-js/core</span></span></code></pre>
+</figure>
+
+<script type="module" src="/vfx-js/_astro/CodeBlock.astro_astro_type_script_index_0_lang.CctPIf_N.js"></script>
+        <p data-astro-cid-jxrezxle>
+            Without a bundler, load it from a CDN (<a href="https://esm.sh/" target="_blank" rel="noreferrer" data-astro-cid-jxrezxle>esm.sh</a> or <a href="https://www.jsdelivr.com/package/npm/@vfx-js/core" target="_blank" rel="noreferrer" data-astro-cid-jxrezxle>jsDelivr</a>). This works in CodePen too.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>index.html</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="html"><code><span class="line"><span style="color:#E1E4E8">&#x3C;</span><span style="color:#85E89D">script</span><span style="color:#B392F0"> type</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"module"</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#F97583">    import</span><span style="color:#E1E4E8"> { VFX } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "https://esm.sh/@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">    // or: "https://cdn.jsdelivr.net/npm/@vfx-js/core/+esm"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">    vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(document.</span><span style="color:#B392F0">querySelector</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"img"</span><span style="color:#E1E4E8">), { shader: </span><span style="color:#9ECBFF">"glitch"</span><span style="color:#E1E4E8">, overflow: </span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;/</span><span style="color:#85E89D">script</span><span style="color:#E1E4E8">></span></span></code></pre>
+</figure>
+
+
+    </section>
+
+    <section id="first-effect" data-astro-cid-jxrezxle>
+        <h2 data-astro-cid-jxrezxle>Your first effect</h2>
+        <p data-astro-cid-jxrezxle>
+            Make one <code data-astro-cid-jxrezxle>VFX</code> and pass an element to <code data-astro-cid-jxrezxle>vfx.add</code>.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VFX } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> img</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> document.</span><span style="color:#B392F0">querySelector</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"img"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, { shader: </span><span style="color:#9ECBFF">"glitch"</span><span style="color:#E1E4E8">, overflow: </span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8"> });</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-jxrezxle>This is the result:</p>
+        <div class="Demo" data-astro-cid-jxrezxle>
+            <img id="FirstEffectDemo" src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS logo with a glitch effect" data-astro-cid-jxrezxle>
+        </div>
+        <ul data-astro-cid-jxrezxle>
+            <li data-astro-cid-jxrezxle>
+                <code data-astro-cid-jxrezxle>shader</code> takes a preset name like <code data-astro-cid-jxrezxle>"glitch"</code>,
+                <code data-astro-cid-jxrezxle>"rgbShift"</code> or <code data-astro-cid-jxrezxle>"rainbow"</code>, or your own
+                GLSL. See <a href="/vfx-js/effects/" data-astro-cid-jxrezxle>Effects</a> for the full list.
+            </li>
+            <li data-astro-cid-jxrezxle>
+                <code data-astro-cid-jxrezxle>overflow</code> lets the effect draw outside the element, in
+                pixels.
+            </li>
+            <li data-astro-cid-jxrezxle>
+                Make one <code data-astro-cid-jxrezxle>VFX</code> per page and reuse it. Each one has its
+                own WebGL canvas.
+            </li>
+            <li data-astro-cid-jxrezxle>
+                <code data-astro-cid-jxrezxle>vfx.add</code> is async. Await it before you call
+                <code data-astro-cid-jxrezxle>vfx.remove</code> on the same element.
+            </li>
+            <li data-astro-cid-jxrezxle>
+                Text and other elements are captured once. Call
+                <code data-astro-cid-jxrezxle>vfx.update(el)</code> after their content changes.
+            </li>
+            <li data-astro-cid-jxrezxle>
+                <code data-astro-cid-jxrezxle>new VFX()</code> throws when WebGL is not available. Wrap it in
+                <code data-astro-cid-jxrezxle>try</code> / <code data-astro-cid-jxrezxle>catch</code> so the page still works as plain
+                HTML.
+            </li>
+            <li data-astro-cid-jxrezxle>
+                When the user prefers reduced motion, VFX-JS draws nothing. They see
+                the plain HTML.
+            </li>
+        </ul>
+    </section>
+
+    <section id="options" data-astro-cid-jxrezxle>
+        <h2 data-astro-cid-jxrezxle>Options</h2>
+        <p data-astro-cid-jxrezxle>The second argument of <code data-astro-cid-jxrezxle>vfx.add</code> takes these options:</p>
+        <div class="TableScroll" data-astro-cid-jxrezxle>
+            <table class="Options" data-astro-cid-jxrezxle>
+                <thead data-astro-cid-jxrezxle>
+                    <tr data-astro-cid-jxrezxle>
+                        <th data-astro-cid-jxrezxle>Option</th>
+                        <th data-astro-cid-jxrezxle>Value</th>
+                        <th data-astro-cid-jxrezxle>What it does</th>
+                    </tr>
+                </thead>
+                <tbody data-astro-cid-jxrezxle>
+                    <tr data-astro-cid-jxrezxle>
+                                <td data-astro-cid-jxrezxle>
+                                    <code data-astro-cid-jxrezxle>shader</code>
+                                </td>
+                                <td class="OptionsValue" data-astro-cid-jxrezxle>preset name | GLSL | VFXPass[]</td>
+                                <td data-astro-cid-jxrezxle>The shader to draw the element with.</td>
+                            </tr><tr data-astro-cid-jxrezxle>
+                                <td data-astro-cid-jxrezxle>
+                                    <code data-astro-cid-jxrezxle>effect</code>
+                                </td>
+                                <td class="OptionsValue" data-astro-cid-jxrezxle>Effect | Effect[]</td>
+                                <td data-astro-cid-jxrezxle>Effects from @vfx-js/effects or your own, in place of shader.</td>
+                            </tr><tr data-astro-cid-jxrezxle>
+                                <td data-astro-cid-jxrezxle>
+                                    <code data-astro-cid-jxrezxle>uniforms</code>
+                                </td>
+                                <td class="OptionsValue" data-astro-cid-jxrezxle>{ name: value | () =&gt; value }</td>
+                                <td data-astro-cid-jxrezxle>Values for your shader. A function runs every frame.</td>
+                            </tr><tr data-astro-cid-jxrezxle>
+                                <td data-astro-cid-jxrezxle>
+                                    <code data-astro-cid-jxrezxle>overflow</code>
+                                </td>
+                                <td class="OptionsValue" data-astro-cid-jxrezxle>px | [top, right, bottom, left] | true</td>
+                                <td data-astro-cid-jxrezxle>Draw outside the element. true is fullscreen. Shader only.</td>
+                            </tr><tr data-astro-cid-jxrezxle>
+                                <td data-astro-cid-jxrezxle>
+                                    <code data-astro-cid-jxrezxle>overlay</code>
+                                </td>
+                                <td class="OptionsValue" data-astro-cid-jxrezxle>true | number</td>
+                                <td data-astro-cid-jxrezxle>Keep the original element visible, or set its opacity.</td>
+                            </tr><tr data-astro-cid-jxrezxle>
+                                <td data-astro-cid-jxrezxle>
+                                    <code data-astro-cid-jxrezxle>intersection</code>
+                                </td>
+                                <td class="OptionsValue" data-astro-cid-jxrezxle>{ threshold, leaveThreshold, rootMargin, duration }</td>
+                                <td data-astro-cid-jxrezxle>When the element enters and leaves the viewport, and how long the enter and leave take.</td>
+                            </tr><tr data-astro-cid-jxrezxle>
+                                <td data-astro-cid-jxrezxle>
+                                    <code data-astro-cid-jxrezxle>zIndex</code>
+                                </td>
+                                <td class="OptionsValue" data-astro-cid-jxrezxle>number</td>
+                                <td data-astro-cid-jxrezxle>Draw order inside the canvas.</td>
+                            </tr><tr data-astro-cid-jxrezxle>
+                                <td data-astro-cid-jxrezxle>
+                                    <code data-astro-cid-jxrezxle>wrap</code>
+                                </td>
+                                <td class="OptionsValue" data-astro-cid-jxrezxle>&quot;repeat&quot; | &quot;clamp&quot; | &quot;mirror&quot;</td>
+                                <td data-astro-cid-jxrezxle>Texture wrap mode. Default is repeat.</td>
+                            </tr>
+                </tbody>
+            </table>
+        </div>
+        <p data-astro-cid-jxrezxle>
+            See <a href="/vfx-js/docs/types/_vfx-js_core.VFXProps.html" data-astro-reload data-astro-cid-jxrezxle>VFXProps in the API reference</a> for all options and defaults.
+        </p>
+    </section>
+
+    <section id="frameworks" data-astro-cid-jxrezxle>
+        <h2 data-astro-cid-jxrezxle>Frameworks</h2>
+        <p data-astro-cid-jxrezxle>
+            Bindings for React, Vue, Svelte and Astro wrap the same
+            <code data-astro-cid-jxrezxle>vfx.add</code> options. Components on one page share one canvas.
+        </p>
+        <div class="Tabs" data-astro-cid-p6qoyxaj>
+    <div class="TabList" role="tablist" aria-label="Frameworks" data-astro-cid-p6qoyxaj>
+        <button type="button" role="tab" id="tab-react" aria-controls="panel-react" aria-selected="true" tabindex="0" data-astro-cid-p6qoyxaj>
+                    React
+                </button><button type="button" role="tab" id="tab-vue" aria-controls="panel-vue" aria-selected="false" tabindex="-1" data-astro-cid-p6qoyxaj>
+                    Vue
+                </button><button type="button" role="tab" id="tab-svelte" aria-controls="panel-svelte" aria-selected="false" tabindex="-1" data-astro-cid-p6qoyxaj>
+                    Svelte
+                </button><button type="button" role="tab" id="tab-astro" aria-controls="panel-astro" aria-selected="false" tabindex="-1" data-astro-cid-p6qoyxaj>
+                    Astro
+                </button>
+    </div>
+    <div class="TabPanel" role="tabpanel" id="panel-react" aria-labelledby="tab-react" data-astro-cid-p6qoyxaj>
+                <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>Install</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="bash"><code><span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> i</span><span style="color:#9ECBFF"> @vfx-js/core</span><span style="color:#9ECBFF"> @vfx-js/react</span></span></code></pre>
+</figure>
+
+
+                <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>App.tsx</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="tsx"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VFXImg, VFXSpan, VFXVideo } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/react"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> App</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">        &#x3C;></span></span>
+<span class="line"><span style="color:#E1E4E8">            &#x3C;</span><span style="color:#79B8FF">VFXImg</span><span style="color:#B392F0"> src</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"cat.png"</span><span style="color:#B392F0"> alt</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">""</span><span style="color:#B392F0"> shader</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"rgbShift"</span><span style="color:#E1E4E8"> /></span></span>
+<span class="line"><span style="color:#E1E4E8">            &#x3C;</span><span style="color:#79B8FF">VFXVideo</span><span style="color:#B392F0"> src</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"clip.mp4"</span><span style="color:#B392F0"> autoPlay</span><span style="color:#B392F0"> muted</span><span style="color:#B392F0"> loop</span><span style="color:#B392F0"> playsInline</span><span style="color:#B392F0"> shader</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"halftone"</span><span style="color:#E1E4E8"> /></span></span>
+<span class="line"><span style="color:#E1E4E8">            &#x3C;</span><span style="color:#79B8FF">VFXSpan</span><span style="color:#B392F0"> shader</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">"rainbow"</span><span style="color:#E1E4E8">>Hello&#x3C;/</span><span style="color:#79B8FF">VFXSpan</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">        &#x3C;/></span></span>
+<span class="line"><span style="color:#E1E4E8">    );</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+                <ul data-astro-cid-p6qoyxaj>
+                    <li data-astro-cid-p6qoyxaj>Every vfx.add option is a prop: shader, effect, uniforms, overflow, ...</li><li data-astro-cid-p6qoyxaj>No provider needed. All components share one canvas.</li><li data-astro-cid-p6qoyxaj>Works with Next.js App Router and React Router.</li>
+                </ul>
+            </div><div class="TabPanel" role="tabpanel" id="panel-vue" aria-labelledby="tab-vue" hidden data-astro-cid-p6qoyxaj>
+                <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>Install</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="bash"><code><span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> i</span><span style="color:#9ECBFF"> @vfx-js/core</span><span style="color:#9ECBFF"> @vfx-js/vue</span></span></code></pre>
+</figure>
+
+
+                <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>App.vue</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="vue"><code><span class="line"><span style="color:#E1E4E8">&#x3C;</span><span style="color:#85E89D">script</span><span style="color:#B392F0"> setup</span><span style="color:#B392F0"> lang</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"ts"</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { vVfx } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/vue"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;/</span><span style="color:#85E89D">script</span><span style="color:#E1E4E8">></span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;</span><span style="color:#85E89D">template</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">    &#x3C;</span><span style="color:#85E89D">img</span><span style="color:#B392F0"> v-vfx</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"{ shader: 'rgbShift' }"</span><span style="color:#B392F0"> src</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"cat.png"</span><span style="color:#B392F0"> alt</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">""</span><span style="color:#E1E4E8"> /></span></span>
+<span class="line"><span style="color:#E1E4E8">    &#x3C;</span><span style="color:#85E89D">h1</span><span style="color:#B392F0"> v-vfx</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"{ shader: 'glitch', overflow: 30 }"</span><span style="color:#E1E4E8">>Hello&#x3C;/</span><span style="color:#85E89D">h1</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;/</span><span style="color:#85E89D">template</span><span style="color:#E1E4E8">></span></span></code></pre>
+</figure>
+
+
+                <ul data-astro-cid-p6qoyxaj>
+                    <li data-astro-cid-p6qoyxaj>The directive value is the same object as vfx.add options. null removes the effect.</li><li data-astro-cid-p6qoyxaj>Register it for the whole app with app.directive(&quot;vfx&quot;, vVfx).</li><li data-astro-cid-p6qoyxaj>Works with SSR (Nuxt). No &lt;ClientOnly&gt; needed.</li>
+                </ul>
+            </div><div class="TabPanel" role="tabpanel" id="panel-svelte" aria-labelledby="tab-svelte" hidden data-astro-cid-p6qoyxaj>
+                <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>Install</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="bash"><code><span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> i</span><span style="color:#9ECBFF"> @vfx-js/core</span><span style="color:#9ECBFF"> @vfx-js/svelte</span></span></code></pre>
+</figure>
+
+
+                <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>App.svelte</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="svelte"><code><span class="line"><span style="color:#E1E4E8">&#x3C;</span><span style="color:#85E89D">script</span><span style="color:#B392F0"> lang</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"ts"</span><span style="color:#E1E4E8">></span></span>
+<span class="line"><span style="color:#F97583">    import</span><span style="color:#E1E4E8"> { vfx } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/svelte"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    let</span><span style="color:#E1E4E8"> shader </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> $</span><span style="color:#B392F0">state</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">"rgbShift"</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;/</span><span style="color:#85E89D">script</span><span style="color:#E1E4E8">></span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;</span><span style="color:#85E89D">img</span><span style="color:#B392F0"> {@attach vfx</span><span style="color:#E1E4E8">({ shader: </span><span style="color:#9ECBFF">"rgbShift"</span><span style="color:#E1E4E8"> })</span><span style="color:#B392F0">}</span><span style="color:#B392F0"> src</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"cat.png"</span><span style="color:#B392F0"> alt</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">""</span><span style="color:#E1E4E8"> /></span></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;</span><span style="color:#85E89D">h1</span><span style="color:#B392F0"> {@attach vfx</span><span style="color:#E1E4E8">(() </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> ({ shader }))</span><span style="color:#B392F0">}</span><span style="color:#E1E4E8">>Hello&#x3C;/</span><span style="color:#85E89D">h1</span><span style="color:#E1E4E8">></span></span></code></pre>
+</figure>
+
+
+                <ul data-astro-cid-p6qoyxaj>
+                    <li data-astro-cid-p6qoyxaj>Needs Svelte 5.29 or later.</li><li data-astro-cid-p6qoyxaj>Pass a getter for options that change.</li><li data-astro-cid-p6qoyxaj>Works with SvelteKit.</li>
+                </ul>
+            </div><div class="TabPanel" role="tabpanel" id="panel-astro" aria-labelledby="tab-astro" hidden data-astro-cid-p6qoyxaj>
+                <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>Install</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="bash"><code><span class="line"><span style="color:#B392F0">npm</span><span style="color:#9ECBFF"> i</span><span style="color:#9ECBFF"> @vfx-js/core</span><span style="color:#9ECBFF"> @vfx-js/astro</span></span></code></pre>
+</figure>
+
+
+                <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>index.astro</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="astro"><code><span class="line"><span style="color:#6A737D">---</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { VFXImg, VFXSpan } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/astro"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">---</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;</span><span style="color:#79B8FF">VFXImg</span><span style="color:#B392F0"> src</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"/cat.png"</span><span style="color:#B392F0"> alt</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">""</span><span style="color:#B392F0"> shader</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"rgbShift"</span><span style="color:#E1E4E8"> /></span></span>
+<span class="line"><span style="color:#E1E4E8">&#x3C;</span><span style="color:#79B8FF">VFXSpan</span><span style="color:#B392F0"> shader</span><span style="color:#E1E4E8">=</span><span style="color:#9ECBFF">"glitch"</span><span style="color:#B392F0"> overflow</span><span style="color:#E1E4E8">={</span><span style="color:#79B8FF">30</span><span style="color:#E1E4E8">}>Hello&#x3C;/</span><span style="color:#79B8FF">VFXSpan</span><span style="color:#E1E4E8">></span></span></code></pre>
+</figure>
+
+
+                <ul data-astro-cid-p6qoyxaj>
+                    <li data-astro-cid-p6qoyxaj>Needs Astro 5 or later. No framework island.</li><li data-astro-cid-p6qoyxaj>Props must fit in HTML: preset names, GLSL strings, plain numbers.</li><li data-astro-cid-p6qoyxaj>Register functions and multipass shaders with registerVFX from @vfx-js/astro/client.</li>
+                </ul>
+            </div>
+</div>
+
+<script type="module" src="/vfx-js/_astro/FrameworkTabs.astro_astro_type_script_index_0_lang.DqEDQ37Q.js"></script>
+    </section>
+
+    <section id="next" data-astro-cid-jxrezxle>
+        <h2 data-astro-cid-jxrezxle>Next steps</h2>
+        <div class="PageCards" data-astro-cid-6ewpbdov>
+    <a class="PageCard" href="/vfx-js/how-it-works/" data-astro-cid-6ewpbdov>
+                <span class="PageCardNum" data-astro-cid-6ewpbdov>
+                    01
+                </span>
+                <span class="PageCardTitle" data-astro-cid-6ewpbdov>How it Works</span>
+                <span class="PageCardBlurb" data-astro-cid-6ewpbdov>How VFX-JS draws DOM elements with WebGL.</span>
+                <span class="PageCardArrow" aria-hidden="true" data-astro-cid-6ewpbdov>
+                    &#8594;
+                </span>
+            </a><a class="PageCard" href="/vfx-js/effects/" data-astro-cid-6ewpbdov>
+                <span class="PageCardNum" data-astro-cid-6ewpbdov>
+                    02
+                </span>
+                <span class="PageCardTitle" data-astro-cid-6ewpbdov>Effects</span>
+                <span class="PageCardBlurb" data-astro-cid-6ewpbdov>Shader presets and the @vfx-js/effects gallery.</span>
+                <span class="PageCardArrow" aria-hidden="true" data-astro-cid-6ewpbdov>
+                    &#8594;
+                </span>
+            </a><a class="PageCard" href="/vfx-js/shaders/" data-astro-cid-6ewpbdov>
+                <span class="PageCardNum" data-astro-cid-6ewpbdov>
+                    03
+                </span>
+                <span class="PageCardTitle" data-astro-cid-6ewpbdov>Custom Shaders</span>
+                <span class="PageCardBlurb" data-astro-cid-6ewpbdov>Write your own GLSL, with uniforms and multipass.</span>
+                <span class="PageCardArrow" aria-hidden="true" data-astro-cid-6ewpbdov>
+                    &#8594;
+                </span>
+            </a><a class="PageCard" href="/vfx-js/custom-effects/" data-astro-cid-6ewpbdov>
+                <span class="PageCardNum" data-astro-cid-6ewpbdov>
+                    04
+                </span>
+                <span class="PageCardTitle" data-astro-cid-6ewpbdov>Custom Effects</span>
+                <span class="PageCardBlurb" data-astro-cid-6ewpbdov>Build effects with the Effect API and hooks.</span>
+                <span class="PageCardArrow" aria-hidden="true" data-astro-cid-6ewpbdov>
+                    &#8594;
+                </span>
+            </a><a class="PageCard" href="/vfx-js/ai/" data-astro-cid-6ewpbdov>
+                <span class="PageCardNum" data-astro-cid-6ewpbdov>
+                    05
+                </span>
+                <span class="PageCardTitle" data-astro-cid-6ewpbdov>Use with AI</span>
+                <span class="PageCardBlurb" data-astro-cid-6ewpbdov>Let your AI agent write effects and shaders.</span>
+                <span class="PageCardArrow" aria-hidden="true" data-astro-cid-6ewpbdov>
+                    &#8594;
+                </span>
+            </a>
+</div>
+        <p data-astro-cid-jxrezxle>
+            Or read the <a href="/vfx-js/docs/" data-astro-reload data-astro-cid-jxrezxle>API reference</a>, browse the
+            <a href="/vfx-js/examples/" data-astro-reload data-astro-cid-jxrezxle>examples</a>, or see tab and page
+            transitions in the <a href="https://amagi.dev/vfx-js-transitions/" data-astro-cid-jxrezxle>transition demo</a>.
+        </p>
+    </section>
+
+                            </main>
+                        </div>
+                <footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href="/vfx-js/">
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+        </a>
+        <div class="SiteFooterCol">
+                    <h4>Docs</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/getting-started/">
+                                        Getting Started
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/how-it-works/">
+                                        How it Works
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/ai/">
+                                        Use with AI
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/">
+                                        Effects
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/shaders/">
+                                        Custom Shaders
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/custom-effects/">
+                                        Custom Effects
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Resources</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/docs/" data-astro-reload="true">
+                                        API Reference
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+                                        Examples <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/storybook/" target="_blank" rel="noreferrer">
+                                        Storybook <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/llms.txt" target="_blank" rel="noreferrer">
+                                        llms.txt <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Project</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+                                        GitHub <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://www.npmjs.com/package/@vfx-js/core" target="_blank" rel="noreferrer">
+                                        npm <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://amagi.dev/vfx-js-transitions/" target="_blank" rel="noreferrer">
+                                        Transitions <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://github.com/fand/vfx-js/issues" target="_blank" rel="noreferrer">
+                                        Issues <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div>
+    </div>
+    <div class="Author">
+        <img class="AuthorIcon" src="/vfx-js/amagi.png" alt="Amagi" loading="lazy" decoding="async">
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/github.svg" alt="GitHub">
+            </a>
+            <a href="https://twitter.com/amagitakayosi" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/twitter.svg" alt="Twitter">
+            </a>
+            <a href="https://bsky.app/profile/amagi.dev" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/bluesky.svg" alt="Bluesky">
+            </a>
+        </div>
+    </div>
+</footer>
+            </div>
+        
+</div>
+
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.CYyl-y44.js"></script>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        
+
+    </body>
+</html>
+
+<script type="module" src="/vfx-js/_astro/getting-started.astro_astro_type_script_index_0_lang.UjKLcFFF.js"></script>

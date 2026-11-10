@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html data-astro-transition-scope="astro-yztbsuuz-1" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <title>How it Works - VFX-JS</title>
+
+        <meta name="theme-color" content="#000000">
+        <meta name="description" content="How VFX-JS captures DOM elements, draws them with WebGL, and keeps the page usable.">
+        <link rel="canonical" href="https://amagi.dev/vfx-js/how-it-works/">
+
+        <meta property="og:url" content="https://amagi.dev/vfx-js/how-it-works/">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="How it Works - VFX-JS">
+        <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+        <meta property="og:description" content="How VFX-JS captures DOM elements, draws them with WebGL, and keeps the page usable.">
+        <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
+        <meta property="og:locale" content="en_US">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@amagitakayosi">
+        <meta name="twitter:creator" content="@amagitakayosi">
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/how-it-works/">
+        <meta name="twitter:title" content="How it Works - VFX-JS">
+        <meta name="twitter:description" content="How VFX-JS captures DOM elements, draws them with WebGL, and keeps the page usable.">
+        <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+
+        <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/vfx-js/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/vfx-js/favicon/favicon-180.png">
+        <link rel="manifest" href="/vfx-js/manifest.webmanifest">
+
+        <meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
+<script type="module" src="/vfx-js/_astro/ClientRouter.astro_astro_type_script_index_0_lang.C2j_ZdXg.js"></script>
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;b9c39aae9c304f1cbfa1e7bb3e84f078&quot;}"></script>
+        <!-- End Cloudflare Web Analytics -->
+    <link rel="stylesheet" href="/vfx-js/_astro/CodeBlock.LNdCJ4k7.css">
+<link rel="stylesheet" href="/vfx-js/_astro/how-it-works.BzaebL2F.css">
+<link rel="stylesheet" href="/vfx-js/_astro/Layout.7Dg6_FOh.css"><style>[data-astro-transition-scope="astro-yztbsuuz-1"] { view-transition-name: astro-yztbsuuz-1; }@layer astro { ::view-transition-old(astro-yztbsuuz-1) { animation: none; opacity: 0; mix-blend-mode: normal; }::view-transition-new(astro-yztbsuuz-1) { animation: none; mix-blend-mode: normal; }::view-transition-group(astro-yztbsuuz-1) { animation: none } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }</style></head>
+
+    <body class="DocPage">
+        <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
+
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.BNPinfg6.js"></script>
+        <header class="SiteHeader">
+    <a class="SiteHeaderBrand" href="/vfx-js/">
+        <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+    </a>
+    <button class="SiteHeaderMenuButton" type="button" aria-label="Menu" aria-expanded="false" aria-controls="SiteHeaderNav">
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a class="SiteHeaderDesktopOnly" href="/vfx-js/getting-started/" aria-current="page">
+            Docs
+        </a>
+        <a class="SiteHeaderMenuOnly" href="/vfx-js/getting-started/">
+                    Getting Started
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/how-it-works/" aria-current="page">
+                    How it Works
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/ai/">
+                    Use with AI
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/effects/">
+                    Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/shaders/">
+                    Custom Shaders
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/custom-effects/">
+                    Custom Effects
+                </a>
+        <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.DbdCPj2I.js"></script>
+        <!-- Back plays the slit scan reversed. -->
+        <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
+    
+            <div class="Page">
+                <div class="DocLayout">
+                            <nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        <li>
+                    <a href="/vfx-js/getting-started/">
+                        Getting Started
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/how-it-works/" aria-current="page">
+                        How it Works
+                    </a>
+                    <ul>
+                            <li>
+                                    <a href="#dom" data-section="dom">
+                                        The DOM stays DOM
+                                    </a>
+                                </li><li>
+                                    <a href="#capture" data-section="capture">
+                                        Element capture
+                                    </a>
+                                </li><li>
+                                    <a href="#overflow" data-section="overflow">
+                                        Overflow
+                                    </a>
+                                </li><li>
+                                    <a href="#scroll" data-section="scroll">
+                                        Scroll and visibility
+                                    </a>
+                                </li><li>
+                                    <a href="#uniforms" data-section="uniforms">
+                                        Uniforms and timing
+                                    </a>
+                                </li><li>
+                                    <a href="#limits" data-section="limits">
+                                        Limits
+                                    </a>
+                                </li>
+                        </ul>
+                </li><li>
+                    <a href="/vfx-js/ai/">
+                        Use with AI
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/effects/">
+                        Effects
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/shaders/">
+                        Custom Shaders
+                    </a>
+                    
+                </li><li>
+                    <a href="/vfx-js/custom-effects/">
+                        Custom Effects
+                    </a>
+                    
+                </li>
+    </ul>
+    <a class="DocSidebarExtra" href="/vfx-js/docs/" data-astro-reload>API Reference &#8594;</a>
+    <a class="DocSidebarExtra" href="/vfx-js/examples/" target="_blank" rel="noreferrer">Examples &#8599;</a>
+</nav>
+
+<script type="module" src="/vfx-js/_astro/Sidebar.astro_astro_type_script_index_0_lang.B94Lg-ip.js"></script>
+                            <main class="DocMain">
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                
+    <h1 data-astro-cid-ikooipj4>How it Works</h1>
+    <p data-astro-cid-ikooipj4>
+        VFX-JS draws your elements with WebGL, on one canvas over the page. When
+        you call <code data-astro-cid-ikooipj4>vfx.add(el)</code>:
+    </p>
+    <ol class="Steps" data-astro-cid-ikooipj4>
+        <li data-astro-cid-ikooipj4>
+                    <strong data-astro-cid-ikooipj4>Capture.</strong> VFX-JS copies the element into a WebGL texture.
+                </li><li data-astro-cid-ikooipj4>
+                    <strong data-astro-cid-ikooipj4>Hide.</strong> It sets the element&#39;s opacity to 0. The element keeps its box in the layout.
+                </li><li data-astro-cid-ikooipj4>
+                    <strong data-astro-cid-ikooipj4>Track.</strong> Every frame, it reads the element&#39;s position and size.
+                </li><li data-astro-cid-ikooipj4>
+                    <strong data-astro-cid-ikooipj4>Draw.</strong> It runs the shader in that box, on one canvas over the page.
+                </li>
+    </ol>
+
+    <section id="dom" data-astro-cid-ikooipj4>
+        <h2 data-astro-cid-ikooipj4>The DOM stays DOM</h2>
+        <figure class="Figure" data-astro-cid-ikooipj4>
+            <svg class="Diagram" viewBox="0 0 600 320" role="img" aria-labelledby="OverlayTitle" data-astro-cid-ikooipj4>
+                <title id="OverlayTitle">
+                    The VFX canvas sits over the page. The element stays in the
+                    page with opacity 0, and the canvas draws the effect at the
+                    same place.
+                </title>
+                <defs data-astro-cid-ikooipj4>
+                    <linearGradient id="EffectFill" x1="0" x2="1" data-astro-cid-ikooipj4>
+                        <stop offset="0" stop-color="#ff3b8d" data-astro-cid-ikooipj4></stop>
+                        <stop offset="0.5" stop-color="#ffd93b" data-astro-cid-ikooipj4></stop>
+                        <stop offset="1" stop-color="#3bd5ff" data-astro-cid-ikooipj4></stop>
+                    </linearGradient>
+                    <marker id="OverlayArrow" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="8" markerHeight="8" orient="auto" data-astro-cid-ikooipj4>
+                        <path d="M0,0 L8,4 L0,8 Z" fill="white" data-astro-cid-ikooipj4></path>
+                    </marker>
+                </defs>
+
+                <!-- Page layer -->
+                <g transform="matrix(1 0 -0.8 0.45 200 200)" data-astro-cid-ikooipj4>
+                    <rect class="Layer" width="360" height="220" data-astro-cid-ikooipj4></rect>
+                    <rect class="LayoutLine" x="40" y="30" width="200" height="14" data-astro-cid-ikooipj4></rect>
+                    <rect class="LayoutLine" x="40" y="180" width="280" height="14" data-astro-cid-ikooipj4></rect>
+                    <rect class="Hidden" x="120" y="70" width="140" height="90" data-astro-cid-ikooipj4></rect>
+                </g>
+
+                <!-- Lines from the element to its drawing -->
+                <g class="Guide" data-astro-cid-ikooipj4>
+                    <line x1="264" y1="71.5" x2="264" y2="231.5" data-astro-cid-ikooipj4></line>
+                    <line x1="404" y1="71.5" x2="404" y2="231.5" data-astro-cid-ikooipj4></line>
+                    <line x1="192" y1="112" x2="192" y2="272" data-astro-cid-ikooipj4></line>
+                    <line x1="332" y1="112" x2="332" y2="272" data-astro-cid-ikooipj4></line>
+                </g>
+
+                <!-- VFX canvas layer -->
+                <g transform="matrix(1 0 -0.8 0.45 200 40)" data-astro-cid-ikooipj4>
+                    <rect class="Layer Canvas" width="360" height="220" data-astro-cid-ikooipj4></rect>
+                    <rect x="110" y="60" width="160" height="110" fill="url(#EffectFill)" opacity="0.85" data-astro-cid-ikooipj4></rect>
+                </g>
+
+                <!-- Pointer events pass through the canvas -->
+                <line class="Arrow" x1="300" y1="8" x2="300" y2="236" marker-end="url(#OverlayArrow)" data-astro-cid-ikooipj4></line>
+                <text x="310" y="20" data-astro-cid-ikooipj4>click</text>
+
+                <text x="425" y="118" data-astro-cid-ikooipj4>VFX canvas</text>
+                <text class="Mono" x="425" y="136" data-astro-cid-ikooipj4>pointer-events: none</text>
+                <text x="425" y="278" data-astro-cid-ikooipj4>Page</text>
+                <text class="Mono" x="425" y="296" data-astro-cid-ikooipj4>element: opacity 0</text>
+            </svg>
+        </figure>
+        <ul data-astro-cid-ikooipj4>
+            <li data-astro-cid-ikooipj4>
+                <code data-astro-cid-ikooipj4>new VFX()</code> adds one <code data-astro-cid-ikooipj4>&lt;canvas&gt;</code> to
+                <code data-astro-cid-ikooipj4>&lt;body&gt;</code>, or to the <code data-astro-cid-ikooipj4>wrapper</code> you pass.
+                It has <code data-astro-cid-ikooipj4>pointer-events: none</code> and
+                <code data-astro-cid-ikooipj4>z-index: 9999</code> by default.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                The element stays where it is. Only its <code data-astro-cid-ikooipj4>opacity</code> changes.
+                A video gets 0.0001, not 0, to avoid jank frames.
+                <code data-astro-cid-ikooipj4>addHTML</code> wraps the element in a canvas instead.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                Clicks, links, text selection, focus and screen readers still use
+                the real element. CSS layout and animations still move it, and the
+                effect follows.
+            </li>
+        </ul>
+        <p data-astro-cid-ikooipj4>This button is drawn by a shader. Click it.</p>
+        <div class="Demo" data-astro-cid-ikooipj4>
+            <button id="ClickDemo" class="DemoButton" type="button" data-astro-cid-ikooipj4>Clicked 0 times</button>
+        </div>
+        <p data-astro-cid-ikooipj4>
+            The click reaches the real button. The handler then calls
+            <code data-astro-cid-ikooipj4>vfx.update(button)</code>, because text is captured once.
+            See <a href="#capture" data-astro-cid-ikooipj4>Element capture</a>.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader: </span><span style="color:#9ECBFF">"rgbShift"</span><span style="color:#E1E4E8"> });               </span><span style="color:#6A737D">// hide the element (default)</span></span>
+<span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader: </span><span style="color:#9ECBFF">"rgbShift"</span><span style="color:#E1E4E8">, overlay: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8"> }); </span><span style="color:#6A737D">// keep it visible</span></span>
+<span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader: </span><span style="color:#9ECBFF">"rgbShift"</span><span style="color:#E1E4E8">, overlay: </span><span style="color:#79B8FF">0.5</span><span style="color:#E1E4E8"> });  </span><span style="color:#6A737D">// set its opacity</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">remove</span><span style="color:#E1E4E8">(el); </span><span style="color:#6A737D">// stop drawing and restore the opacity</span></span></code></pre>
+</figure>
+
+<script type="module" src="/vfx-js/_astro/CodeBlock.astro_astro_type_script_index_0_lang.CctPIf_N.js"></script>
+    </section>
+
+    <section id="capture" data-astro-cid-ikooipj4>
+        <h2 data-astro-cid-ikooipj4>Element capture</h2>
+        <p data-astro-cid-ikooipj4>
+            Each element type becomes a texture in its own way. This decides when
+            you need <code data-astro-cid-ikooipj4>vfx.update(el)</code>.
+        </p>
+        <div class="TableScroll" data-astro-cid-ikooipj4>
+            <table class="DocTable Capture" data-astro-cid-ikooipj4>
+                <thead data-astro-cid-ikooipj4>
+                    <tr data-astro-cid-ikooipj4>
+                        <th data-astro-cid-ikooipj4>Element</th>
+                        <th data-astro-cid-ikooipj4>How it is captured</th>
+                        <th data-astro-cid-ikooipj4>After a change</th>
+                    </tr>
+                </thead>
+                <tbody data-astro-cid-ikooipj4>
+                    <tr data-astro-cid-ikooipj4>
+                                <td data-astro-cid-ikooipj4>
+                                    <code data-astro-cid-ikooipj4>&lt;img&gt;</code>
+                                </td>
+                                <td data-astro-cid-ikooipj4>Loaded once, after the image loads. A .gif URL plays frame by frame.</td>
+                                <td data-astro-cid-ikooipj4>Call update(img) after you change src.</td>
+                            </tr><tr data-astro-cid-ikooipj4>
+                                <td data-astro-cid-ikooipj4>
+                                    <code data-astro-cid-ikooipj4>&lt;video&gt;</code>
+                                </td>
+                                <td data-astro-cid-ikooipj4>Read again every frame. VFX-JS waits for canplay first.</td>
+                                <td data-astro-cid-ikooipj4>Nothing to do.</td>
+                            </tr><tr data-astro-cid-ikooipj4>
+                                <td data-astro-cid-ikooipj4>
+                                    <code data-astro-cid-ikooipj4>&lt;canvas&gt;</code>
+                                </td>
+                                <td data-astro-cid-ikooipj4>Copied once, when added.</td>
+                                <td data-astro-cid-ikooipj4>Call update(canvas) after you draw.</td>
+                            </tr><tr data-astro-cid-ikooipj4>
+                                <td data-astro-cid-ikooipj4>
+                                    Text and other elements
+                                </td>
+                                <td data-astro-cid-ikooipj4>Drawn to an image through SVG &lt;foreignObject&gt;, once.</td>
+                                <td data-astro-cid-ikooipj4>Call update(el) after the content changes. A window resize that changes its size captures it again.</td>
+                            </tr><tr data-astro-cid-ikooipj4>
+                                <td data-astro-cid-ikooipj4>
+                                    <code data-astro-cid-ikooipj4>addHTML(el)</code>
+                                </td>
+                                <td data-astro-cid-ikooipj4>html-in-canvas. The browser paints the element into a canvas each time it changes.</td>
+                                <td data-astro-cid-ikooipj4>Live. Falls back to the text path where not supported.</td>
+                            </tr>
+                </tbody>
+            </table>
+        </div>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { supportsHtmlInCanvas } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/core"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Text is a snapshot. Capture it again after a change.</span></span>
+<span class="line"><span style="color:#E1E4E8">label.textContent </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> "Saved"</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">update</span><span style="color:#E1E4E8">(label);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// html-in-canvas keeps the capture live: hover, inputs, CSS animations.</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">supportsHtmlInCanvas</span><span style="color:#E1E4E8">()) {</span></span>
+<span class="line"><span style="color:#F97583">    await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">addHTML</span><span style="color:#E1E4E8">(card, { shader: </span><span style="color:#9ECBFF">"rgbShift"</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <ul data-astro-cid-ikooipj4>
+            <li data-astro-cid-ikooipj4>
+                html-in-canvas is a new browser API. Today it works only in Chrome
+                behind <code data-astro-cid-ikooipj4>chrome://flags/#canvas-draw-element</code>.
+                <code data-astro-cid-ikooipj4>addHTML</code> logs a warning and uses the text path where it
+                is missing.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                <code data-astro-cid-ikooipj4>addHTML</code> wraps the element in a
+                <code data-astro-cid-ikooipj4>&lt;canvas&gt;</code>. The element must fill its parent's
+                width or have a fixed px width.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                Images and videos from another origin need CORS, or WebGL cannot
+                read them.
+            </li>
+        </ul>
+    </section>
+
+    <section id="overflow" data-astro-cid-ikooipj4>
+        <h2 data-astro-cid-ikooipj4>Overflow</h2>
+        <p data-astro-cid-ikooipj4>
+            A shader draws only inside the element's box. To draw outside it, for
+            glow or glitch, give it more room.
+        </p>
+        <figure class="Figure" data-astro-cid-ikooipj4>
+            <svg class="Diagram" viewBox="80 20 440 260" role="img" aria-labelledby="OverflowTitle" data-astro-cid-ikooipj4>
+                <title id="OverflowTitle">
+                    The element box goes from uv 0 to 1. The overflow area around
+                    it is where uv is below 0 or above 1.
+                </title>
+                <defs data-astro-cid-ikooipj4>
+                    <radialGradient id="GlowFill" data-astro-cid-ikooipj4>
+                        <stop offset="0.4" stop-color="#3bd5ff" stop-opacity="0.45" data-astro-cid-ikooipj4></stop>
+                        <stop offset="1" stop-color="#3bd5ff" stop-opacity="0" data-astro-cid-ikooipj4></stop>
+                    </radialGradient>
+                </defs>
+                <rect class="OverflowBox" x="90" y="30" width="420" height="240" fill="url(#GlowFill)" data-astro-cid-ikooipj4></rect>
+                <rect class="ElementBox" x="190" y="100" width="220" height="100" data-astro-cid-ikooipj4></rect>
+
+                <text x="300" y="146" text-anchor="middle" data-astro-cid-ikooipj4>element</text>
+                <text class="Mono" x="300" y="166" text-anchor="middle" data-astro-cid-ikooipj4>uv 0..1</text>
+                <text class="Mono Small" x="194" y="216" data-astro-cid-ikooipj4>(0, 0)</text>
+                <text class="Mono Small" x="406" y="94" text-anchor="end" data-astro-cid-ikooipj4>(1, 1)</text>
+                <text class="Mono Small" x="140" y="154" text-anchor="middle" data-astro-cid-ikooipj4>uv.x &lt; 0</text>
+                <text class="Mono Small" x="460" y="154" text-anchor="middle" data-astro-cid-ikooipj4>uv.x &gt; 1</text>
+                <text x="98" y="50" data-astro-cid-ikooipj4>overflow / pad</text>
+
+                <g class="Measure" data-astro-cid-ikooipj4>
+                    <line x1="410" y1="240" x2="510" y2="240" data-astro-cid-ikooipj4></line>
+                    <line x1="410" y1="234" x2="410" y2="246" data-astro-cid-ikooipj4></line>
+                    <line x1="510" y1="234" x2="510" y2="246" data-astro-cid-ikooipj4></line>
+                </g>
+                <text class="Mono Small" x="460" y="260" text-anchor="middle" data-astro-cid-ikooipj4>overflow px</text>
+            </svg>
+        </figure>
+        <ul data-astro-cid-ikooipj4>
+            <li data-astro-cid-ikooipj4>
+                With a shader, set <code data-astro-cid-ikooipj4>overflow</code>. In the extra area,
+                <code data-astro-cid-ikooipj4>uv</code> goes below 0 and above 1.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                The texture has nothing outside the element, but
+                <code data-astro-cid-ikooipj4>wrap</code> defaults to <code data-astro-cid-ikooipj4>"repeat"</code>. Check
+                <code data-astro-cid-ikooipj4>uv</code> before you read <code data-astro-cid-ikooipj4>src</code> there, or set
+                <code data-astro-cid-ikooipj4>wrap: "clamp"</code>.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                Effects ignore <code data-astro-cid-ikooipj4>overflow</code>. Each effect sets its own room
+                with <code data-astro-cid-ikooipj4>outputRect</code>. In an effect, <code data-astro-cid-ikooipj4>uvContent</code>
+                is 0..1 over the element, and the rest is padding.
+            </li>
+        </ul>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader, overflow: </span><span style="color:#79B8FF">50</span><span style="color:#E1E4E8"> });               </span><span style="color:#6A737D">// 50 px on every side</span></span>
+<span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader, overflow: [</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">200</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">] }); </span><span style="color:#6A737D">// top, right, bottom, left</span></span>
+<span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader, overflow: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8"> });             </span><span style="color:#6A737D">// the whole canvas</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// Effects ignore overflow. Some built-in effects, like BloomEffect, take a pad param.</span></span>
+<span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { effect: </span><span style="color:#F97583">new</span><span style="color:#B392F0"> BloomEffect</span><span style="color:#E1E4E8">({ pad: </span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8"> }) });</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-ikooipj4>
+            Code that reads the extra area is in
+            <a href="/vfx-js/shaders/" data-astro-cid-ikooipj4>Custom Shaders</a> and <a href="/vfx-js/custom-effects/" data-astro-cid-ikooipj4>Custom Effects</a>.
+        </p>
+    </section>
+
+    <section id="scroll" data-astro-cid-ikooipj4>
+        <h2 data-astro-cid-ikooipj4>Scroll and visibility</h2>
+        <ul data-astro-cid-ikooipj4>
+            <li data-astro-cid-ikooipj4>
+                Every frame, VFX-JS checks each element's box, plus its overflow,
+                against the viewport. Elements out of view are skipped. They cost
+                no GPU time.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                The canvas is a bit bigger than the viewport (10% on each side by
+                default) and moves with the page. So fast scrolling does not show
+                a gap. Set <code data-astro-cid-ikooipj4>scrollPadding</code> to change it, or
+                <code data-astro-cid-ikooipj4>false</code> for a fixed canvas.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                The <code data-astro-cid-ikooipj4>intersection</code> option sets when the element counts
+                as "in view": <code data-astro-cid-ikooipj4>threshold</code> (0 to 1) and
+                <code data-astro-cid-ikooipj4>rootMargin</code>, like <code data-astro-cid-ikooipj4>IntersectionObserver</code>.
+                <code data-astro-cid-ikooipj4>leaveThreshold</code> sets when it leaves (default:
+                <code data-astro-cid-ikooipj4>threshold</code>). <code data-astro-cid-ikooipj4>duration</code> sets the enter and
+                leave time in seconds (default: 1).
+            </li>
+            <li data-astro-cid-ikooipj4>
+                The visible ratio divides by the smaller of the element size and
+                the viewport size, on each axis. So an element taller than the
+                viewport can still reach 1.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                This drives the <code data-astro-cid-ikooipj4>intersection</code>,
+                <code data-astro-cid-ikooipj4>enterProgress</code>, <code data-astro-cid-ikooipj4>leaveProgress</code>,
+                <code data-astro-cid-ikooipj4>enterTime</code> and <code data-astro-cid-ikooipj4>leaveTime</code> uniforms.
+            </li>
+        </ul>
+        <p data-astro-cid-ikooipj4>
+            Scroll this image in and out. It fades in when it enters and out when
+            it leaves, and color fills in as more of it is in view.
+        </p>
+        <div class="Demo" data-astro-cid-ikooipj4>
+            <img id="ScrollDemo" src="/vfx-js/images/pigeon.webp" alt="Two pigeons by a river" data-astro-cid-ikooipj4>
+        </div>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>shader.frag</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="glsl"><code><span class="line"><span style="color:#E1E4E8">precision highp </span><span style="color:#F97583">float</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> sampler2D</span><span style="color:#E1E4E8"> src;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec2</span><span style="color:#E1E4E8"> resolution;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> vec2</span><span style="color:#E1E4E8"> offset;</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> float</span><span style="color:#E1E4E8"> intersection;</span><span style="color:#6A737D">  // 0..1, how much of the element is in view</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> float</span><span style="color:#E1E4E8"> enterProgress;</span><span style="color:#6A737D"> // 0..1 after it enters</span></span>
+<span class="line"><span style="color:#F97583">uniform</span><span style="color:#F97583"> float</span><span style="color:#E1E4E8"> leaveProgress;</span><span style="color:#6A737D"> // 0..1 after it leaves</span></span>
+<span class="line"><span style="color:#F97583">out</span><span style="color:#F97583"> vec4</span><span style="color:#E1E4E8"> outColor;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">void</span><span style="color:#B392F0"> main</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec2 uv </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (gl_FragCoord.xy </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> offset) </span><span style="color:#F97583">/</span><span style="color:#E1E4E8"> resolution;</span></span>
+<span class="line"><span style="color:#E1E4E8">    vec4 color </span><span style="color:#F97583">=</span><span style="color:#B392F0"> texture</span><span style="color:#E1E4E8">(src, uv);</span></span>
+<span class="line"><span style="color:#F97583">    float</span><span style="color:#E1E4E8"> gray </span><span style="color:#F97583">=</span><span style="color:#B392F0"> dot</span><span style="color:#E1E4E8">(color.rgb, </span><span style="color:#B392F0">vec3</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0.299</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.587</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">0.114</span><span style="color:#E1E4E8">));</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Color fills in from the left as more of the element is in view.</span></span>
+<span class="line"><span style="color:#F97583">    float</span><span style="color:#E1E4E8"> colored </span><span style="color:#F97583">=</span><span style="color:#B392F0"> step</span><span style="color:#E1E4E8">(uv.x, intersection);</span></span>
+<span class="line"><span style="color:#E1E4E8">    color.rgb </span><span style="color:#F97583">=</span><span style="color:#B392F0"> mix</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">vec3</span><span style="color:#E1E4E8">(gray), color.rgb, colored);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">    // Fade in on enter, out on leave. Turns back if you scroll back mid-way.</span></span>
+<span class="line"><span style="color:#E1E4E8">    outColor </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> color </span><span style="color:#F97583">*</span><span style="color:#E1E4E8"> enterProgress </span><span style="color:#F97583">*</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">1.0</span><span style="color:#F97583"> -</span><span style="color:#E1E4E8"> leaveProgress);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(img, {</span></span>
+<span class="line"><span style="color:#E1E4E8">    shader,</span></span>
+<span class="line"><span style="color:#6A737D">    // Enter when half of it is in view, and leave when less than half is.</span></span>
+<span class="line"><span style="color:#E1E4E8">    intersection: { threshold: </span><span style="color:#79B8FF">0.5</span><span style="color:#E1E4E8">, duration: </span><span style="color:#79B8FF">0.8</span><span style="color:#E1E4E8"> },</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+</figure>
+
+
+    </section>
+
+    <section id="uniforms" data-astro-cid-ikooipj4>
+        <h2 data-astro-cid-ikooipj4>Uniforms and timing</h2>
+        <p data-astro-cid-ikooipj4>
+            VFX-JS sets these uniforms for each element. Declare only the ones you
+            use.
+        </p>
+        <table class="DocTable Uniforms" data-astro-cid-ikooipj4>
+            <thead data-astro-cid-ikooipj4>
+                <tr data-astro-cid-ikooipj4>
+                    <th data-astro-cid-ikooipj4>Uniform</th>
+                    <th data-astro-cid-ikooipj4>Meaning</th>
+                </tr>
+            </thead>
+            <tbody data-astro-cid-ikooipj4>
+                <tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>sampler2D src</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>The element texture.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>vec2 resolution</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>Element size in physical px.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>vec2 offset</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>Element origin in the render target, physical px.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>vec4 viewport</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>Render target rect (x, y, w, h) in physical px.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>float time</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>Seconds since the element was added.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>vec2 mouse</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>Mouse position in render target px, same space as gl_FragCoord.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>float intersection</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>How much of the element is in the viewport, 0 to 1.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>float enterTime</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>Seconds since the element entered the viewport.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>float leaveTime</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>Seconds since the element left the viewport.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>float enterProgress</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>Enter transition, 0 to 1. Plays backward if the element leaves mid-way.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>float leaveProgress</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>Leave transition, 0 to 1. Stays 0 until enter finishes.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>bool autoCrop</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>The autoCrop option. Default true.</td>
+                        </tr><tr data-astro-cid-ikooipj4>
+                            <td data-astro-cid-ikooipj4>
+                                <code data-astro-cid-ikooipj4>sampler2D backbuffer</code>
+                            </td>
+                            <td data-astro-cid-ikooipj4>The previous frame. Needs backbuffer: true.</td>
+                        </tr>
+            </tbody>
+        </table>
+        <ul data-astro-cid-ikooipj4>
+            <li data-astro-cid-ikooipj4>
+                <code data-astro-cid-ikooipj4>uv = (gl_FragCoord.xy - offset) / resolution</code> gives
+                element space: (0, 0) is bottom-left, (1, 1) is top-right.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                Use <code data-astro-cid-ikooipj4>enterProgress</code> and <code data-astro-cid-ikooipj4>leaveProgress</code> for
+                enter and leave animations. They turn back smoothly when the user
+                scrolls back mid-way. Use <code data-astro-cid-ikooipj4>enterTime</code> and
+                <code data-astro-cid-ikooipj4>leaveTime</code> for animations timed in seconds.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                Your own <code data-astro-cid-ikooipj4>uniforms</code> can be functions. They run every
+                frame, only while the element is drawn.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                Effects get the same values on <code data-astro-cid-ikooipj4>ctx</code>:
+                <code data-astro-cid-ikooipj4>ctx.time</code>, <code data-astro-cid-ikooipj4>ctx.deltaTime</code>,
+                <code data-astro-cid-ikooipj4>ctx.mouse</code>, <code data-astro-cid-ikooipj4>ctx.intersection</code>,
+                <code data-astro-cid-ikooipj4>ctx.enterProgress</code>, <code data-astro-cid-ikooipj4>ctx.leaveProgress</code>,
+                <code data-astro-cid-ikooipj4>ctx.enterTime</code>, <code data-astro-cid-ikooipj4>ctx.leaveTime</code>.
+            </li>
+        </ul>
+        <p data-astro-cid-ikooipj4>
+            <code data-astro-cid-ikooipj4>time</code> comes from the VFX clock, not the wall clock. You
+            can pause it, slow it down, or pin it for stable screenshots.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>main.ts</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> vfx</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> VFX</span><span style="color:#E1E4E8">({ autoplay: </span><span style="color:#79B8FF">false</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#F97583">await</span><span style="color:#E1E4E8"> vfx.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(el, { shader });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">setTime</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">1.5</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// pin the clock to 1.5 s</span></span>
+<span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">render</span><span style="color:#E1E4E8">();     </span><span style="color:#6A737D">// draw one frame</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">vfx.timeScale </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0.5</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// half speed. 0 pauses, negative runs backward.</span></span>
+<span class="line"><span style="color:#E1E4E8">vfx.</span><span style="color:#B392F0">play</span><span style="color:#E1E4E8">();</span></span></code></pre>
+</figure>
+
+
+    </section>
+
+    <section id="limits" data-astro-cid-ikooipj4>
+        <h2 data-astro-cid-ikooipj4>Limits</h2>
+        <ul data-astro-cid-ikooipj4>
+            <li data-astro-cid-ikooipj4>
+                Browser only, and WebGL is required. <code data-astro-cid-ikooipj4>new VFX()</code> throws
+                without it. <code data-astro-cid-ikooipj4>VFX.init()</code> returns <code data-astro-cid-ikooipj4>null</code> instead.
+                Either way the page stays plain HTML.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                With <code data-astro-cid-ikooipj4>prefers-reduced-motion: reduce</code>, VFX-JS draws
+                nothing. Elements stay plain HTML, and transitions cut. It is
+                checked once, when <code data-astro-cid-ikooipj4>VFX</code> is created.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                All effects draw on one canvas, at one z-index. Page content cannot
+                sit between two effects. Use the <code data-astro-cid-ikooipj4>zIndex</code> option to order
+                effects inside the canvas.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                The canvas does not know about CSS clipping. An element hidden by a
+                parent's <code data-astro-cid-ikooipj4>overflow: hidden</code> or a scroll box is still
+                drawn.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                VFX-JS owns the element's inline <code data-astro-cid-ikooipj4>opacity</code> while it is
+                added. Use <code data-astro-cid-ikooipj4>overlay</code> instead of setting it yourself.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                Text, other elements and <code data-astro-cid-ikooipj4>&lt;canvas&gt;</code> are snapshots.
+                Call <code data-astro-cid-ikooipj4>vfx.update(el)</code> after they change.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                Each <code data-astro-cid-ikooipj4>VFX</code> has its own WebGL context. Make one per page
+                and reuse it.
+            </li>
+            <li data-astro-cid-ikooipj4>
+                <code data-astro-cid-ikooipj4>shader</code> and <code data-astro-cid-ikooipj4>effect</code> can't be used together.
+                Make a new <code data-astro-cid-ikooipj4>Effect</code> instance for each element.
+            </li>
+        </ul>
+    </section>
+
+                            </main>
+                        </div>
+                <footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href="/vfx-js/">
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+        </a>
+        <div class="SiteFooterCol">
+                    <h4>Docs</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/getting-started/">
+                                        Getting Started
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/how-it-works/">
+                                        How it Works
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/ai/">
+                                        Use with AI
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/">
+                                        Effects
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/shaders/">
+                                        Custom Shaders
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/custom-effects/">
+                                        Custom Effects
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Resources</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/docs/" data-astro-reload="true">
+                                        API Reference
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+                                        Examples <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/storybook/" target="_blank" rel="noreferrer">
+                                        Storybook <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/llms.txt" target="_blank" rel="noreferrer">
+                                        llms.txt <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Project</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+                                        GitHub <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://www.npmjs.com/package/@vfx-js/core" target="_blank" rel="noreferrer">
+                                        npm <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://amagi.dev/vfx-js-transitions/" target="_blank" rel="noreferrer">
+                                        Transitions <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://github.com/fand/vfx-js/issues" target="_blank" rel="noreferrer">
+                                        Issues <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div>
+    </div>
+    <div class="Author">
+        <img class="AuthorIcon" src="/vfx-js/amagi.png" alt="Amagi" loading="lazy" decoding="async">
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/github.svg" alt="GitHub">
+            </a>
+            <a href="https://twitter.com/amagitakayosi" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/twitter.svg" alt="Twitter">
+            </a>
+            <a href="https://bsky.app/profile/amagi.dev" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/bluesky.svg" alt="Bluesky">
+            </a>
+        </div>
+    </div>
+</footer>
+            </div>
+        
+</div>
+
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.CYyl-y44.js"></script>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        
+
+    </body>
+</html>
+
+<script type="module" src="/vfx-js/_astro/how-it-works.astro_astro_type_script_index_0_lang.CIEvVo48.js"></script>
