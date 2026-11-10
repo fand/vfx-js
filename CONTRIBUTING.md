@@ -27,16 +27,22 @@ To work on a single package, use `pnpm --filter <package> run <command>`.
 
 ## Packages
 
-| Package                 | Description                              |
-| ----------------------- | ---------------------------------------- |
-| `packages/vfx-js`       | `@vfx-js/core` — core library            |
-| `packages/react`        | `@vfx-js/react` — React bindings         |
-| `packages/react-vfx`    | `react-vfx` — compat wrapper             |
-| `packages/effects`      | `@vfx-js/effects` — prebuilt effects     |
-| `packages/docs`         | Documentation website                    |
-| `packages/docs-react`   | Documentation website for React bindings |
-| `packages/examples`     | Example gallery                          |
-| `packages/storybook`    | Component stories                        |
+| Package                      | Description                                |
+| ---------------------------- | ------------------------------------------ |
+| `packages/vfx-js`            | `@vfx-js/core` — core library              |
+| `packages/effects`           | `@vfx-js/effects` — prebuilt effects       |
+| `packages/transitions`       | `@vfx-js/transitions` — transition presets |
+| `packages/react`             | `@vfx-js/react` — React bindings           |
+| `packages/react-vfx`         | `react-vfx` — compat wrapper               |
+| `packages/vue`               | `@vfx-js/vue` — Vue bindings               |
+| `packages/svelte`            | `@vfx-js/svelte` — Svelte bindings         |
+| `packages/astro`             | `@vfx-js/astro` — Astro components         |
+| `packages/docs`              | Documentation website                      |
+| `packages/docs-react`        | Documentation website for React bindings   |
+| `packages/docs-transitions`  | Transitions website                        |
+| `packages/examples`          | Example gallery                            |
+| `packages/storybook`         | Component stories                          |
+| `packages/framework-testbed` | Test apps for the framework bindings       |
 
 ## Code Style
 
