@@ -5,10 +5,11 @@ import { lazyDemo } from "./demos/lazy";
 import { runDemos } from "./demos/top-demos";
 import {
     type Control,
+    createChain,
     MENU_EFFECTS,
     type ParamValue,
     snippet,
-    toParam,
+    type Values,
 } from "./effect-menu";
 import { onPage, scrollRoot } from "./lifecycle";
 import { getPageVFX } from "./page-vfx";
@@ -126,15 +127,29 @@ function paramsPanel(
                 input.step = String(control.step);
             }
         }
-        input.value = String(values[control.key]);
+        if (input instanceof HTMLInputElement && control.type === "checkbox") {
+            input.checked = values[control.key] as boolean;
+        } else {
+            input.value = String(values[control.key]);
+        }
         show(values[control.key]);
         input.addEventListener("input", () => {
             const v =
-                control.type === "range" ? Number(input.value) : input.value;
+                control.type === "range"
+                    ? Number(input.value)
+                    : input instanceof HTMLInputElement &&
+                        control.type === "checkbox"
+                      ? input.checked
+                      : input.value;
             show(v);
             onChange(control, v);
         });
-        row.append(name, output, input);
+        if (control.type === "checkbox") {
+            row.classList.add("EffectParamToggle");
+            row.append(name, input);
+        } else {
+            row.append(name, output, input);
+        }
         panel.appendChild(row);
     }
     return panel;
@@ -154,32 +169,24 @@ class App {
         const copy = $(".EffectCopy");
 
         // Current control values, per menu item.
-        const values = MENU_EFFECTS.map((item) =>
+        const values: Values[] = MENU_EFFECTS.map((item) =>
             Object.fromEntries(
-                (item.controls ?? []).map((c) => [
-                    c.key,
-                    c.value as ParamValue,
-                ]),
+                (item.controls ?? []).map((c) => [c.key, c.value]),
             ),
         );
-        const params = (index: number) =>
-            Object.fromEntries(
-                (MENU_EFFECTS[index].controls ?? []).map((c) => [
-                    c.key,
-                    toParam(c, values[index][c.key]),
-                ]),
-            );
 
         // One effect instance can't be shared between elements, so each target gets its own.
         // The logo and tagline start on their intro shader. They move to the effect path on first use.
-        const createAll = () =>
-            MENU_EFFECTS.map((item, i) => item.create?.(params(i)));
-        const texts = [$("#Logo"), $("#LogoTagline")].map((element) => ({
-            element,
-            effects: createAll(),
-            onEffectPath: false,
-        }));
-        const bgEffects = createAll();
+        const createAll = (isBG: boolean) =>
+            MENU_EFFECTS.map((item, i) => createChain(item, values[i], isBG));
+        const texts = [$("#Logo"), $("#LogoTagline"), $("#HeroLead")].map(
+            (element) => ({
+                element,
+                chains: createAll(false),
+                onEffectPath: false,
+            }),
+        );
+        const bgChains = createAll(true);
         let selected = 0;
         let queue = Promise.resolve();
 
@@ -189,20 +196,16 @@ class App {
             value: ParamValue,
         ) => {
             values[index][control.key] = value;
-            const update = { [control.key]: toParam(control, value) };
-            for (const effect of [
-                ...texts.map((t) => t.effects[index]),
-                bgEffects[index],
-            ]) {
-                effect?.setParams(update);
+            for (const chains of [...texts.map((t) => t.chains), bgChains]) {
+                chains[index].set(control, value);
             }
         };
 
         // Past the hero, the BG drops its effect and dims, so text stays readable.
         let inHero = true;
         const syncBG = () => {
-            const bgEffect = inHero ? bgEffects[selected] : undefined;
-            const bgChain = bgEffect ? [bgSpheres, bgEffect] : [bgSpheres];
+            const bgEffects = inHero ? bgChains[selected].effects : [];
+            const bgChain = [bgSpheres, ...bgEffects];
             return bgVFX.updateEffects(bg, bgChain);
         };
 
@@ -214,8 +217,7 @@ class App {
                     return;
                 }
                 const updateText = async (text: (typeof texts)[number]) => {
-                    const effect = text.effects[index];
-                    const chain = effect ? [effect] : [];
+                    const chain = text.chains[index].effects;
                     if (text.onEffectPath) {
                         await this.vfx.updateEffects(text.element, chain);
                     } else {
@@ -270,7 +272,7 @@ class App {
 
         copy.addEventListener("click", async () => {
             await navigator.clipboard.writeText(
-                snippet(MENU_EFFECTS[selected], params(selected)),
+                snippet(MENU_EFFECTS[selected], values[selected]),
             );
             const label = copy.innerHTML;
             copy.textContent = "Copied ✓";
@@ -307,6 +309,7 @@ class App {
     async showLogo() {
         const logo = $("#Logo");
         const tagline = $("#LogoTagline");
+        const lead = $("#HeroLead");
         return Promise.all([
             this.add(logo, {
                 shader: logoShader,
@@ -320,6 +323,14 @@ class App {
                 shader: logoShader,
                 overflow: [0, 3000, 0, 1000],
                 uniforms: { delay: 0.3 },
+                intersection: {
+                    threshold: 1,
+                },
+            }),
+            this.add(lead, {
+                shader: logoShader,
+                overflow: [0, 3000, 0, 1000],
+                uniforms: { delay: 0.6 },
                 intersection: {
                     threshold: 1,
                 },

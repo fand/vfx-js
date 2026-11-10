@@ -58,19 +58,35 @@ const features = [
     <noscript>You need to enable JavaScript to run this app.</noscript>
 
     <section class="Hero">
-        <div class="HeroMain">
-            <img id="Logo" src={url("vfx-js-logo-no-padding.svg")} alt="VFX-JS" />
-            <p id="LogoTagline" class="HeroTagline">
-                WebGL effects for HTML.
-            </p>
+        <!-- The first screen. The lead paragraph sits below it. -->
+        <div class="HeroTop">
+            <div class="HeroMain">
+                <img id="Logo" src={url("vfx-js-logo-no-padding.svg")} alt="VFX-JS" />
+                <p id="LogoTagline" class="HeroTagline">
+                    WebGL effects for HTML.
+                </p>
+            </div>
         </div>
 
-        <div class="EffectMenu">
-            <p class="EffectMenuTitle">TRY EFFECTS</p>
-            <ol class="EffectList"></ol>
-            <button class="EffectCopy" type="button">Copy code &#8599;</button>
+        <!-- Stays in place while the hero is on screen. -->
+        <div class="EffectDock">
+            <div class="EffectMenu">
+                <p class="EffectMenuTitle">TRY EFFECTS</p>
+                <ol class="EffectList"></ol>
+                <button class="EffectCopy" type="button">Copy code &#8599;</button>
+            </div>
         </div>
 
+        <!-- Plain HTML on purpose: the effect menu draws it through a shader. -->
+        <p id="HeroLead" class="HeroLead">
+            VFX-JS applies WebGL effects to any HTML element. Not just
+            <code>&lt;img&gt;</code> and <code>&lt;video&gt;</code>, but
+            also plain text, <a href={url("getting-started/")}>links</a>,
+            <input type="text" value="inputs" size="6" aria-label="Sample input" />,
+            <button type="button">buttons</button> and more.
+        </p>
+
+        <!-- Sticks to the viewport bottom until the hero ends. -->
         <div class="HeroFoot">
             <span>SCROLL TO EXPLORE &#8595;</span>
             <span>@vfx-js/effects</span>

@@ -5,7 +5,8 @@
 
     margin-bottom: 10vh;
     box-sizing: border-box;
-    overflow-x: hidden;
+    /* clip, not hidden: hidden makes a scroll box and breaks sticky. */
+    overflow-x: clip;
 }
 .Top > section {
     padding: 0 32px;
@@ -18,16 +19,37 @@
 /*================ Hero ================*/
 
 .Top > section.Hero {
-    position: relative;
     display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    gap: 32px;
-    min-height: calc(100lvh - var(--header-bottom));
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 32px;
     margin: 0 32px 10vh;
-    padding: 0 8px 96px;
+    padding: 0 8px 32px;
     border-bottom: 1px solid var(--line);
     width: auto;
+}
+/* The first screen. Same height as the menu dock, so both center alike. */
+.HeroTop,
+.EffectDock {
+    display: flex;
+    min-height: calc(100lvh - var(--header-bottom));
+    padding-bottom: 96px;
+    box-sizing: border-box;
+}
+.HeroTop {
+    flex-direction: column;
+    justify-content: center;
+}
+/* 32px shorter at the bottom, so it leaves with the footer. The menu stays in the same place. */
+.EffectDock {
+    min-height: calc(100lvh - var(--header-bottom) - 32px);
+    padding-bottom: 64px;
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: start;
+    align-items: center;
+    position: sticky;
+    /* The page scroller has the header as top padding, so 0 is below the header. */
+    top: 0;
 }
 .Hero #Logo {
     opacity: 0;
@@ -38,10 +60,16 @@
     opacity: 0;
     margin-top: 32px;
 }
+.Hero #HeroLead {
+    grid-column: 1;
+    opacity: 0;
+    margin: 64px 0 160px;
+}
 /* VFX-JS draws nothing with reduced motion, so show the plain text. */
 @media (prefers-reduced-motion: reduce) {
     .Hero #Logo,
-    .Hero #LogoTagline {
+    .Hero #LogoTagline,
+    .Hero #HeroLead {
         opacity: 1;
     }
     #MaskTop,
@@ -55,6 +83,44 @@
 .Hero .HeroTagline {
     font-size: clamp(18px, 2.2vw, 30px);
     line-height: 1.3;
+}
+.HeroLead {
+    max-width: 920px;
+    font-size: clamp(22px, 2.4vw, 34px);
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.85);
+}
+.HeroLead a {
+    color: white;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+.HeroLead code {
+    padding: 0 0.25em;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.12);
+    font-family: var(--mono);
+    font-size: 0.85em;
+}
+.HeroLead input,
+.HeroLead button {
+    padding: 0 0.5em;
+    border: 1px solid white;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.85em;
+    line-height: 1.4;
+    vertical-align: baseline;
+}
+.HeroLead input {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+}
+.HeroLead button {
+    border-radius: 999px;
+    background: white;
+    color: black;
+    cursor: pointer;
 }
 
 .EffectMenu {
@@ -145,6 +211,14 @@
     margin: 0;
     accent-color: white;
 }
+.EffectParamToggle {
+    align-items: center;
+    cursor: pointer;
+}
+.EffectParam.EffectParamToggle input {
+    grid-column: 2;
+    width: auto;
+}
 .EffectParam select {
     padding: 2px 4px;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -176,9 +250,8 @@
 }
 
 .HeroFoot {
-    position: absolute;
-    left: 8px;
-    right: 8px;
+    grid-column: 1 / -1;
+    position: sticky;
     bottom: 32px;
     display: flex;
     justify-content: space-between;
@@ -188,8 +261,18 @@
 
 @media (max-width: 767px) {
     .Top > section.Hero {
-        grid-template-columns: 1fr;
-        align-content: center;
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .HeroTop {
+        min-height: 0;
+        padding: 64px 0 32px;
+    }
+    .EffectDock {
+        position: static;
+        grid-column: 1;
+        grid-row: auto;
+        min-height: 0;
+        padding: 0;
     }
     .EffectMenu {
         box-sizing: border-box;
