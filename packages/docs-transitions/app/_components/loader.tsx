@@ -28,101 +28,37 @@ const animationsDone = (selector: string) =>
         ).map((a) => a.finished.catch(() => {})),
     );
 
-// Two frames, so the new style is rendered and its transition has started.
+// The CSS logo animation starts at first paint, before hydration.
+// So wait for it to end, not for a timer.
+const logoDrawn = () => animationsDone(".loader .brand-mark");
+
+// Two frames, so the full bar is rendered and its transition has started.
 const nextPaint = () =>
     new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-// Hydration is the first step, so the logo starts at 1 / STEPS.
-const WAIT_COUNT = 3;
-const STEPS = WAIT_COUNT + 1;
-const step = (done: number) => (done + 1) / STEPS;
-
-// How far the logo creeps toward the next step while it waits.
-const CREEP = 0.9;
-// Time constants in seconds: catch up to a finished step, and creep.
-const CATCH_UP = 0.1;
-const CREEP_TIME = 1.5;
-
 /**
- * Draws the logo stroke as the waits finish.
- * Between steps it creeps on, so it never looks stuck.
- * Resolves when the stroke is full.
- */
-function drawProgress(
-    loader: HTMLElement,
-    getDone: () => number,
-    isCancelled: () => boolean,
-): Promise<void> {
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let shown = step(0);
-    let last = performance.now();
-    return new Promise((resolve) => {
-        const frame = (now: number) => {
-            if (isCancelled()) {
-                return;
-            }
-            const dt = (now - last) / 1000;
-            last = now;
-            const done = getDone();
-            const reached = step(done);
-            const full = done === WAIT_COUNT;
-            const target =
-                full || reduced
-                    ? reached
-                    : reached + (step(done + 1) - reached) * CREEP;
-            const tau = shown < reached || full ? CATCH_UP : CREEP_TIME;
-            shown = reduced
-                ? target
-                : shown + (target - shown) * (1 - Math.exp(-dt / tau));
-            if (full && 1 - shown < 0.002) {
-                loader.style.setProperty("--p", "1");
-                resolve();
-                return;
-            }
-            loader.style.setProperty("--p", String(shown));
-            requestAnimationFrame(frame);
-        };
-        requestAnimationFrame(frame);
-    });
-}
-
-/**
- * False until fonts and images are in.
+ * `loaded` is false until fonts and images are in.
  * Then the next outlet run goes from the cover to the page:
  * lensDistortion on the top page, a short crossfade elsewhere.
+ * `progress` is the share of waits done, 0 to 1.
  */
-export function useLoaded(): boolean {
+export function useLoaded(): { loaded: boolean; progress: number } {
     const [loaded, setLoaded] = useState(false);
+    const [done, setDone] = useState(0);
     // The path at mount; the cover only shows on the first page.
     const isTop = useRef(usePathname() === "/");
     useEffect(() => {
-        const loader = document.querySelector<HTMLElement>(".loader");
-        if (!loader) {
-            return;
-        }
         let cancelled = false;
         let timer: number | undefined;
-        let done = 0;
-        for (const wait of [
+        const waits = [
             document.fonts.ready,
             pageLoaded(),
+            logoDrawn(),
             new Promise((r) => setTimeout(r, MIN_SHOW_MS)),
-        ]) {
-            wait.then(() => {
-                done++;
-            });
-        }
-        drawProgress(
-            loader,
-            () => done,
-            () => cancelled,
-        )
-            .then(() => {
-                // Fill the logo, then leave.
-                loader.dataset.done = "";
-            })
+        ].map((p) => p.then(() => !cancelled && setDone((n) => n + 1)));
+        Promise.all(waits)
             .then(nextPaint)
-            .then(() => animationsDone(".loader .brand-mark"))
+            .then(() => animationsDone(".loader-bar"))
             .then(() => {
                 if (cancelled) {
                     return;
@@ -147,14 +83,22 @@ export function useLoaded(): boolean {
             window.clearTimeout(timer);
         };
     }, []);
-    return loaded;
+    // Hydration counts as the first step.
+    return { loaded, progress: (done + 1) / (WAIT_COUNT + 1) };
 }
 
+const WAIT_COUNT = 4;
+
 /** Black screen with the logo, over the page until it is ready. */
-export function LoaderCover() {
+export function LoaderCover({ progress }: { progress: number }) {
     return (
         <div className="loader" aria-hidden>
             <BrandMark />
+            <div
+                className="loader-bar"
+                data-done={progress >= 1 || undefined}
+                style={{ "--p": progress } as React.CSSProperties}
+            />
         </div>
     );
 }
