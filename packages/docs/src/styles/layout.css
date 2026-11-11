@@ -165,7 +165,7 @@
     mix-blend-mode: difference;
     transform: scaleX(0);
     transform-origin: left;
-    transition: transform 0.3s ease-out;
+    transition: transform 0.1s ease-out;
     pointer-events: none;
 }
 /* The deepest current item keeps the box: the open API page, or the section in view. */
