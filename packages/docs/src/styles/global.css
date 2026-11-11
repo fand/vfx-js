@@ -22,6 +22,8 @@
         --inline-code-size: 1rem;
 
         --column-size: 100%;
+
+        --frame: 4px;
     }
 }
 
