@@ -1,5 +1,6 @@
 import type {
     AddTransitionOpts,
+    RunContext,
     RunOpts,
     Transition,
     TransitionClass,
@@ -18,12 +19,17 @@ import { useLiveOpts } from "./live-opts.js";
 
 export type UseVFXTransition = {
     ref: (element: HTMLElement | null) => void;
-    /** Run `cb` inside `startTransition` and animate once React has committed. */
+    /**
+     * Run `cb` inside `startTransition` and animate once React has committed.
+     * With `liveFrom`, call `ctx.keepPrev` in `cb` to keep the old content playing.
+     */
     run: <T extends Transition | TransitionClass>(
-        cb: () => void | Promise<void>,
+        cb: (ctx: RunContext) => void | Promise<void>,
         opts?: RunOpts<T>,
     ) => Promise<void>;
 };
+
+const IDLE_CONTEXT: RunContext = { keepPrev: () => {} };
 
 export function useVFXTransition<T extends Transition | TransitionClass>(
     opts: AddTransitionOpts<T> = {},
@@ -80,13 +86,16 @@ export function useVFXTransition<T extends Transition | TransitionClass>(
     );
 
     const run = useCallback(
-        async (cb: () => void | Promise<void>, runOpts?: RunOpts) => {
+        async (
+            cb: (ctx: RunContext) => void | Promise<void>,
+            runOpts?: RunOpts,
+        ) => {
             const transition = transitionRef.current;
             if (!transition) {
-                await settle(cb);
+                await settle(() => cb(IDLE_CONTEXT));
                 return;
             }
-            await transition.run(() => settle(cb), runOpts);
+            await transition.run((ctx) => settle(() => cb(ctx)), runOpts);
         },
         [settle],
     );

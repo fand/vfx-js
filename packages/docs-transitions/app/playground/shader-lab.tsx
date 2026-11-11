@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+    RunContext,
     Transition,
     TransitionEase,
     TransitionUniforms,
@@ -87,6 +88,12 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
     const [duration, setDuration] = useState(1.2);
     const [progress, setProgress] = useState(0);
     const [playing, setPlaying] = useState(false);
+    const [liveFrom, setLiveFrom] = useState(false);
+    // Old scenes that core keeps playing in its hidden canvas.
+    const [kept, setKept] = useState<number[]>([]);
+    const sceneRef = useRef(scene);
+    sceneRef.current = scene;
+    const boxes = useRef(new Map<number, HTMLElement>());
     const { ref, run } = useVFXTransition();
     // A held run reads its t from here every frame, so Play, Pause and the slider all drive it.
     const clock = useRef<{
@@ -159,6 +166,24 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
     // Effect presets like datamosh follow real time, not t, so they play a normal run.
     const timed = Boolean(source.effect);
 
+    // Hand the shown scene to core, and keep rendering it until core gives it back.
+    const nextScene = (ctx: RunContext) => {
+        const shown = sceneRef.current;
+        const box = boxes.current.get(shown);
+        const parent = box?.parentNode;
+        if (box) {
+            ctx.keepPrev(box, (node) => {
+                (node as HTMLElement).style.display = "none";
+                setKept((k) => k.filter((i) => i !== shown));
+            });
+        }
+        // Core leaves the box in place without liveFrom.
+        if (box && box.parentNode !== parent) {
+            setKept((k) => [...k, shown]);
+        }
+        setScene(shown + 1);
+    };
+
     /** Starts a run held at the clock. A new transition starts a new one. */
     const hold = (next: Transition) => {
         const c = clock.current;
@@ -167,8 +192,9 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         }
         c.active = true;
         c.transition = next;
-        run(() => setScene((s) => s + 1), {
+        run(nextScene, {
             transition: next,
+            liveFrom,
             duration: 3600,
             ease: () => c.ease(c.x),
         });
@@ -182,8 +208,9 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         if (isTimed) {
             c.active = false;
             c.x = 0;
-            run(() => setScene((s) => s + 1), {
+            run(nextScene, {
                 transition: next,
+                liveFrom,
                 duration,
                 ease: eases[easeIndex].ease,
             });
@@ -263,7 +290,22 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
             <div className="lab-preview">
                 {head}
                 <div className="lab-stage" ref={ref}>
-                    <LabScene index={scene} />
+                    {/* Each scene sits in a box that core can move, so React never loses one. */}
+                    {[...kept, scene].map((i) => (
+                        <div
+                            key={i}
+                            style={{ display: "contents" }}
+                            ref={(box) => {
+                                if (box) {
+                                    boxes.current.set(i, box);
+                                } else {
+                                    boxes.current.delete(i);
+                                }
+                            }}
+                        >
+                            <LabScene index={i} />
+                        </div>
+                    ))}
                 </div>
                 <div className="lab-controls">
                     <div className="lab-transport">
@@ -290,6 +332,20 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                             onChange={(e) => scrub(Number(e.target.value))}
                         />
                     </div>
+                    <label className="pg-check">
+                        <input
+                            type="checkbox"
+                            checked={liveFrom}
+                            onChange={(e) => {
+                                setLiveFrom(e.target.checked);
+                                // A held run uses the old setting, so start a new one.
+                                clock.current.active = false;
+                            }}
+                        />
+                        <span>
+                            liveFrom <i>keep the old side moving</i>
+                        </span>
+                    </label>
                     <label className="pg-range">
                         <span>ease</span>
                         <select

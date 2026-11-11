@@ -111,7 +111,7 @@ await t.run((ctx) => {
 - `ctx.keepPrev(nodes)` moves the nodes out of the container. VFX-JS removes them when the run ends. `show()` puts its slides back, hidden or removed.
 - `ctx.keepPrev(nodes, onReturn)` puts each node back in its old place when the run ends, then calls `onReturn(node)`. Use it when a framework still owns the nodes.
 - Without `keepPrev`, or without `liveFrom`, the run uses the snapshot. Without html-in-canvas too.
-- `<VFXTransition>` for React (Next.js, React Router), Nuxt, SvelteKit and Astro takes `liveFrom`. `@vfx-js/vue/router` and `useVFXTransition` do not use it yet.
+- `<VFXTransition>` for React (Next.js, React Router), Nuxt, SvelteKit and Astro takes `liveFrom`. `useVFXTransition` passes `ctx` to `cb`, so call `ctx.keepPrev` yourself. `@vfx-js/vue/router` does not use it yet.
 
 ## Presets
 
@@ -347,6 +347,8 @@ const { ref, run } = useVFXTransition({ transition: Swipe });
 
 await run(() => setTab(next), { reverse: true });
 ```
+
+- `run(cb)` passes the run `ctx` to `cb`. For `liveFrom`, call `ctx.keepPrev(box, onReturn)` there and keep rendering the old content until `onReturn` runs. Put it in its own box so React never inserts next to it.
 
 ## Vue: Nuxt and Vue Router
 
