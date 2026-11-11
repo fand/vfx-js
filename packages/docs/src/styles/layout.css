@@ -155,26 +155,32 @@
 .DocSidebar a[aria-current="page"] {
     font-weight: 600;
 }
+/* Every row is 20px tall with an 8px gap, so the list reads evenly. */
 .DocSidebarApi {
+    display: grid;
+    gap: 16px;
     margin: 12px 0 16px;
     padding-left: 12px;
     border-left: 1px solid var(--line);
     font-size: 14px;
+    line-height: 20px;
 }
-.DocSidebarApi > div + div {
-    margin-top: 16px;
+.DocSidebarApi > div,
+.DocSidebarApi details[open] {
+    display: grid;
+    gap: 8px;
 }
 .DocSidebar .DocSidebarPackage {
     display: block;
-    margin-bottom: 8px;
     font-family: var(--mono);
     font-size: 13px;
     color: white;
 }
 .DocSidebarApi summary {
     display: flex;
-    justify-content: space-between;
-    padding: 4px 0;
+    align-items: baseline;
+    /* The smaller count on the same baseline would add 1px. */
+    height: 20px;
     color: rgba(255, 255, 255, 0.6);
     cursor: pointer;
     list-style: none;
@@ -201,16 +207,19 @@
     color: white;
 }
 .DocSidebar .DocSidebarApi ul {
-    margin: 4px 0 8px;
+    display: grid;
+    gap: 8px;
+    margin: 0;
     padding-left: 1em;
     border-left: none;
     font-family: var(--mono);
     font-size: 13px;
 }
 .DocSidebarApi li {
-    margin: 8px 0;
+    margin: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .DocSidebarExtra {
