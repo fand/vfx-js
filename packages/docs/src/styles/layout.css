@@ -143,14 +143,25 @@
     border-left: 1px solid var(--line);
     font-size: 14px;
 }
-.DocSidebar a {
-    color: rgba(255, 255, 255, 0.6);
+.DocSidebar a,
+.DocSidebarApi summary {
+    color: white;
     text-decoration: none;
 }
+/* Same colors as the spectral bands in the background shader. */
 .DocSidebar a:hover,
-.DocSidebar a.active,
-.DocSidebar a[aria-current="page"] {
-    color: white;
+.DocSidebarApi summary:hover .DocSidebarGroup {
+    background: linear-gradient(
+        90deg,
+        #e5af5e,
+        #baf396,
+        #7efac4,
+        #36c4e7,
+        #007bf7
+    );
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
 }
 .DocSidebar a[aria-current="page"] {
     font-weight: 600;
@@ -181,7 +192,6 @@
     align-items: baseline;
     /* The smaller count on the same baseline would add 1px. */
     height: 20px;
-    color: rgba(255, 255, 255, 0.6);
     cursor: pointer;
     list-style: none;
 }
@@ -196,15 +206,12 @@
 .DocSidebarApi details[open] > summary::before {
     content: "\2212";
 }
-.DocSidebarApi summary span {
+.DocSidebarApi .DocSidebarCount {
     margin-left: auto;
     padding-right: 8px;
     font-family: var(--mono);
     font-size: 12px;
     opacity: 0.5;
-}
-.DocSidebarApi summary:hover {
-    color: white;
 }
 .DocSidebar .DocSidebarApi ul {
     display: grid;

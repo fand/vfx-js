@@ -43,8 +43,8 @@ const api = current === "docs" ? loadApi() : undefined;
                                             }
                                         >
                                             <summary>
-                                                {group.title}
-                                                <span>{group.pages.length}</span>
+                                                <span class="DocSidebarGroup">{group.title}</span>
+                                                <span class="DocSidebarCount">{group.pages.length}</span>
                                             </summary>
                                             <ul>
                                                 {group.pages.map((p) => (
