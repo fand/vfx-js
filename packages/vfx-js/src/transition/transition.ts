@@ -47,17 +47,9 @@ type Bound = {
     liveFrom: boolean;
 };
 
-// `show()` also puts the old slides back when the run ends.
-type StartContext = {
-    keepPrev(
-        nodes: Node | Iterable<Node>,
-        onReturn?: (node: Node) => void,
-    ): void;
-};
+type StartCallback = (ctx: RunContext) => void | Promise<void>;
 
-type StartCallback = (ctx: StartContext) => void | Promise<void>;
-
-const IDLE_CONTEXT: StartContext = { keepPrev: () => {} };
+const IDLE_CONTEXT: RunContext = { keepPrev: () => {} };
 
 const isIterable = (nodes: Node | Iterable<Node>): nodes is Iterable<Node> =>
     typeof (nodes as Iterable<Node>)[Symbol.iterator] === "function";
@@ -441,7 +433,7 @@ export class TransitionController implements TransitionHandle {
         const isCurrent = () => id === this.#seq;
         // Only the animated update of the current run keeps the old nodes.
         let canKeep = false;
-        const ctx: StartContext = {
+        const ctx: RunContext = {
             keepPrev: (nodes, onReturn) => {
                 if (canKeep && isCurrent()) {
                     this.#keepPrev(id, nodes, onReturn);

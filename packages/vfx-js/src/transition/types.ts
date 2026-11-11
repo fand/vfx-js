@@ -134,10 +134,15 @@ export type RunContext = {
     /**
      * Hand the old nodes over before you drop them, so `liveFrom` can keep them playing.
      * VFX-JS moves them into a hidden canvas and removes them when the run ends.
+     * With `onReturn`, it moves each node back to its old place instead, then calls `onReturn`.
+     * Use it when a framework still owns the nodes.
      * No-op unless the run may use `liveFrom`.
      * With function opts it keeps them until the spec is known.
      */
-    keepPrev(nodes: Node | Iterable<Node>): void;
+    keepPrev(
+        nodes: Node | Iterable<Node>,
+        onReturn?: (node: Node) => void,
+    ): void;
 };
 
 /** A direct child of the container, its index, or a selector inside it. */

@@ -32,7 +32,7 @@ const containerOpts: Row[] = [
     ],
     [
         "liveFrom: boolean",
-        "Keep capturing the old content during the run, so its animations and videos keep playing. show() hands the old slide over; with run(), call ctx.keepPrev() in cb. Defaults to false.",
+        "Keep capturing the old content during the run, so its animations and videos keep playing. show() and <VFXTransition> (React, Astro) hand the old content over; with run(), call ctx.keepPrev() in cb. Defaults to false.",
     ],
     [
         "keepWrapped: boolean",
@@ -59,7 +59,7 @@ const handle: Row[] = [
     ],
     [
         "run(cb, opts?)",
-        "Snapshots the element, calls cb to change the DOM, and plays the transition. Resolves when the animation ends. cb gets a ctx; with liveFrom, call ctx.keepPrev(oldNodes) before you drop them.",
+        "Snapshots the element, calls cb to change the DOM, and plays the transition. Resolves when the animation ends. cb gets a ctx; with liveFrom, call ctx.keepPrev(oldNodes) before you drop them. ctx.keepPrev(nodes, onReturn) puts them back when the run ends instead of removing them.",
     ],
     ["cancel()", "Ends the current run and shows the live content."],
     ["destroy()", "Cancels and stops tracking the element."],

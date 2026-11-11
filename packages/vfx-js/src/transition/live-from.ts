@@ -47,6 +47,8 @@ export class LiveFrom implements LiveFromLike {
         const canvas = document.createElement("canvas");
         canvas.inert = true;
         canvas.setAttribute("aria-hidden", "true");
+        // Routers that swap the body look for it to carry it over.
+        canvas.setAttribute("data-vfx-live-from", "");
         const style = canvas.style;
         style.setProperty("position", "absolute");
         style.setProperty("left", "0px");

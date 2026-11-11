@@ -2,6 +2,7 @@
 
 import type {
     AddTransitionOpts,
+    RunContext,
     RunOpts,
     Transition,
     TransitionClass,
@@ -35,9 +36,19 @@ export type VFXTransitionOwnProps = {
     fullscreen?: boolean;
 };
 
-type Shown = { key: string | number | undefined; node: React.ReactNode };
+type Shown = {
+    key: string | number | undefined;
+    node: React.ReactNode;
+    // New per page, so a kept old page never shares a key with the new one.
+    id: number;
+};
+
+// Old pages that core keeps playing, then the shown page.
+type Pages = { kept: Shown[]; shown: Shown };
 
 const OUTER_STYLE: React.CSSProperties = { display: "contents" };
+// With liveFrom, each page sits in its own box that core can move.
+const PAGE_STYLE: React.CSSProperties = { display: "contents" };
 // Pages share one viewport-sized box and scroll inside it.
 const FILL_STYLE: React.CSSProperties = {
     height: "100dvh",
@@ -66,10 +77,13 @@ export function VFXTransition<T extends Transition | TransitionClass>(
     const ref = useRef<HTMLDivElement>(null);
     const transitionRef = useRef<TransitionHandle | null>(null);
 
-    const [shown, setShown] = useState<Shown>({
-        key: pageKey,
-        node: children,
-    });
+    const [pages, setPages] = useState<Pages>(() => ({
+        kept: [],
+        shown: { key: pageKey, node: children, id: 0 },
+    }));
+    const { shown } = pages;
+    const nextId = useRef(1);
+    const pageBoxes = useRef(new Map<number, HTMLElement>());
     const requestedKey = useRef(pageKey);
     const commitWaiters = useRef<(() => void)[]>([]);
 
@@ -113,22 +127,28 @@ export function VFXTransition<T extends Transition | TransitionClass>(
             return;
         }
         requestedKey.current = key;
-        const next: Shown = { key, node: children };
+        const next: Shown = { key, node: children, id: nextId.current++ };
         const transition = transitionRef.current;
         if (!transition || key === undefined) {
-            startTransition(() => setShown(next));
+            startTransition(() => setPages((p) => ({ ...p, shown: next })));
             return;
         }
-        const swap = () =>
+        const swap = (ctx: RunContext) =>
             new Promise<void>((resolve) => {
                 // A newer key took over, so this page never shows.
                 if (requestedKey.current !== key) {
                     resolve();
                     return;
                 }
+                const kept = keepOldPage(ctx);
                 commitWaiters.current.push(resolve);
                 // A page that suspends keeps the old page instead of a fallback.
-                startTransition(() => setShown(next));
+                startTransition(() =>
+                    setPages((p) => ({
+                        kept: kept ? [...p.kept, kept] : p.kept,
+                        shown: next,
+                    })),
+                );
             });
         incoming.current = null;
         transition
@@ -139,15 +159,38 @@ export function VFXTransition<T extends Transition | TransitionClass>(
             });
     });
 
+    // Hand the shown page's box to core, and keep rendering it until core gives it back.
+    // React never inserts before it or removes it while core holds it:
+    // new pages go after it, and it leaves the tree only after it is back.
+    const keepOldPage = (ctx: RunContext): Shown | null => {
+        const page = latestShown.current;
+        const { id } = page;
+        const box = pageBoxes.current.get(id);
+        if (!liveOpts.liveFrom || !box) {
+            return null;
+        }
+        const parent = box.parentNode;
+        ctx.keepPrev(box, (node) => {
+            (node as HTMLElement).style.display = "none";
+            setPages((p) => ({
+                ...p,
+                kept: p.kept.filter((page) => page.id !== id),
+            }));
+        });
+        // Core leaves the box in place when the run does not use liveFrom.
+        return box.parentNode !== parent ? page : null;
+    };
+
     // New key: keep the latest children of the old page until the run swaps.
     const latestShown = useRef(shown);
-    if (latestShown.current.key !== shown.key) {
+    if (latestShown.current.id !== shown.id) {
         latestShown.current = shown;
     }
     if (pageKey === undefined || pageKey === shown.key) {
-        latestShown.current = { key: shown.key, node: children };
+        latestShown.current = { ...shown, node: children };
     }
-    const rendered = latestShown.current;
+    const rendered = [...pages.kept, latestShown.current];
+    const live = Boolean(opts.liveFrom);
 
     // Core moves the inner div into a canvas during a run.
     // React removes the outer div on unmount, and that one never moves.
@@ -159,7 +202,25 @@ export function VFXTransition<T extends Transition | TransitionClass>(
                 style={fullscreen ? { ...FILL_STYLE, ...style } : style}
             >
                 <TransitionScopeContext.Provider value={scope}>
-                    <Fragment key={rendered.key}>{rendered.node}</Fragment>
+                    {rendered.map((page) =>
+                        live ? (
+                            <div
+                                key={page.id}
+                                style={PAGE_STYLE}
+                                ref={(box) => {
+                                    if (box) {
+                                        pageBoxes.current.set(page.id, box);
+                                    } else {
+                                        pageBoxes.current.delete(page.id);
+                                    }
+                                }}
+                            >
+                                {page.node}
+                            </div>
+                        ) : (
+                            <Fragment key={page.id}>{page.node}</Fragment>
+                        ),
+                    )}
                 </TransitionScopeContext.Provider>
             </div>
         </div>

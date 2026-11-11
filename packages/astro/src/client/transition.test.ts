@@ -8,14 +8,28 @@ import { installTransition, uninstallTransition } from "./transition";
 
 const mock = vi.hoisted(() => {
     const runs: { opts: unknown; done: boolean }[] = [];
+    // Records the old nodes and what the target held when they were handed over.
+    const kept: { nodes: Node[]; html: string }[] = [];
+    const keepPrev = vi.fn((nodes: Node | Iterable<Node>) => {
+        const list = Array.from(nodes as Iterable<Node>);
+        const parent = list[0]?.parentElement;
+        kept.push({ nodes: list, html: parent?.innerHTML ?? "" });
+    });
     const handle = {
         // Calls `cb` at once, as if the snapshot were taken.
-        run: vi.fn(async (cb: () => Promise<void> | void, opts: unknown) => {
-            const run = { opts, done: false };
-            runs.push(run);
-            await cb();
-            run.done = true;
-        }),
+        run: vi.fn(
+            async (
+                cb: (ctx: {
+                    keepPrev: typeof keepPrev;
+                }) => Promise<void> | void,
+                opts: unknown,
+            ) => {
+                const run = { opts, done: false };
+                runs.push(run);
+                await cb({ keepPrev });
+                run.done = true;
+            },
+        ),
         destroy: vi.fn(),
         running: false,
     };
@@ -26,7 +40,7 @@ const mock = vi.hoisted(() => {
             return canvas.current;
         },
     };
-    return { runs, handle, vfx, canvas, init: vi.fn(() => vfx) };
+    return { runs, kept, handle, vfx, canvas, init: vi.fn(() => vfx) };
 });
 
 vi.mock("@vfx-js/core", async (importOriginal) => ({
@@ -121,6 +135,7 @@ describe("installTransition", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mock.runs.length = 0;
+        mock.kept.length = 0;
         document.head.innerHTML = "";
         meta = document.createElement("meta");
         meta.name = "astro-view-transitions-enabled";
@@ -291,5 +306,60 @@ describe("installTransition", () => {
         await navigate({ doc: page("<p>plain</p>") });
         expect(mock.handle.destroy).toHaveBeenCalled();
         expect(document.body.textContent).toBe("plain");
+    });
+
+    describe("liveFrom", () => {
+        it("hands the old children to core right before the swap", async () => {
+            document.body.innerHTML = target(
+                '{"liveFrom":true}',
+                `<p>old</p><div ${PERSIST}="island">island</div>`,
+            );
+            installTransition({ swapFunctions });
+            const old = document.querySelector("p");
+            await navigate({
+                doc: page(
+                    target(
+                        "{}",
+                        `<p>new</p><div ${PERSIST}="island">fresh</div>`,
+                    ),
+                ),
+            });
+            expect(mock.kept).toHaveLength(1);
+            expect(mock.kept[0].nodes).toEqual([old]);
+            // The persisted island goes to the new page, not to core.
+            expect(mock.kept[0].html).toBe("<p>old</p>");
+        });
+
+        it("carries core's hidden canvas over to the new page", async () => {
+            installTransition({ swapFunctions });
+            const live = document.querySelector(
+                "[data-vfx-transition-target]",
+            ) as HTMLElement;
+            const wrapper = document.createElement("canvas");
+            wrapper.setAttribute("layoutsubtree", "");
+            live.replaceWith(wrapper);
+            wrapper.append(live);
+            const ghost = document.createElement("canvas");
+            ghost.setAttribute("data-vfx-live-from", "");
+            wrapper.after(ghost);
+            await navigate({ doc: page(target("{}", "<p>new</p>")) });
+            expect(ghost.isConnected).toBe(true);
+            expect(wrapper.nextElementSibling).toBe(ghost);
+            expect(ghost.hasAttribute(PERSIST)).toBe(false);
+        });
+
+        it("takes liveFrom from the link", async () => {
+            installTransition({ swapFunctions });
+            const link = document.createElement("a");
+            link.setAttribute("data-vfx-transition", '{"liveFrom":true}');
+            await navigate({ source: link, doc: page(target("{}", "new")) });
+            expect(mock.kept).toHaveLength(1);
+        });
+
+        it("hands nothing over without liveFrom", async () => {
+            installTransition({ swapFunctions });
+            await navigate({ doc: page(target("{}", "new")) });
+            expect(mock.kept).toHaveLength(0);
+        });
     });
 });

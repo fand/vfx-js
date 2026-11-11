@@ -1776,6 +1776,23 @@ describe("liveFrom", () => {
         expect(liveSource()).toBeNull();
     });
 
+    test("onReturn puts the nodes back when the run ends", async () => {
+        const dom = slides("a", "b");
+        const onReturn = vi.fn();
+        const { transition, starts } = setup({ liveFrom: true });
+        const a = dom.byId("a");
+        const run = transition.run((ctx) =>
+            ctx.keepPrev(a as unknown as Node, onReturn),
+        );
+        const start = await started(starts, 0);
+        expect(a.parentElement).toBeNull();
+        expect(onReturn).not.toHaveBeenCalled();
+        start.end();
+        await run;
+        expect(dom.container.children.map((c) => c.id)).toEqual(["a", "b"]);
+        expect(onReturn).toHaveBeenCalledWith(a);
+    });
+
     test("takes a single node and the container's liveFrom", async () => {
         const { transition, starts, lives } = setup({ liveFrom: true });
         const old = node("a");

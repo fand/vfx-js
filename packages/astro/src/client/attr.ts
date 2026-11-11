@@ -22,6 +22,8 @@ export type RunProps = {
     overflow?: true | number;
     /** `"smoothstep"`, `"linear"`, or a registered ease. */
     ease?: string;
+    /** Keep the old page playing during the run. */
+    liveFrom?: boolean;
 };
 
 /** Options of `<VFXTransition>`. */

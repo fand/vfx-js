@@ -109,8 +109,9 @@ await t.run((ctx) => {
 ```
 
 - `ctx.keepPrev(nodes)` moves the nodes out of the container. VFX-JS removes them when the run ends. `show()` puts its slides back, hidden or removed.
-- Without `keepPrev`, or without `liveFrom`, the run uses the snapshot.
-- Without html-in-canvas, the run uses the snapshot. `<VFXTransition>` in the framework bindings does not use it yet.
+- `ctx.keepPrev(nodes, onReturn)` puts each node back in its old place when the run ends, then calls `onReturn(node)`. Use it when a framework still owns the nodes.
+- Without `keepPrev`, or without `liveFrom`, the run uses the snapshot. Without html-in-canvas too.
+- `<VFXTransition>` for React (Next.js, React Router) and Astro takes `liveFrom`. Vue and Svelte do not use it yet.
 
 ## Presets
 
@@ -238,7 +239,7 @@ export class BlurFade implements Transition {
 }
 ```
 
-- `ctx.src` is the new content (read with `uvSrc`). `ctx.from` is the old snapshot (read with `uvContent`).
+- `ctx.src` is the new content (read with `uvSrc`). `ctx.from` is the old content (read with `uvContent`): a snapshot, or updated every frame with `liveFrom`.
 - `ctx.progress.t` is eased, `ctx.progress.x` linear. Both 0..1 and ignore `reverse`; check `ctx.reverse` yourself.
 - `start(run)` runs once per run, `end()` once when it ends or is cancelled.
 - `ctx.cut()` ends the run and shows the new content.
@@ -279,6 +280,7 @@ export function Layout() {
 - The target fills the viewport (`height: 100dvh; overflow: hidden`). Pages scroll inside it. Use a CSS reset (`body { margin: 0 }`).
 - `fullscreen={false}` drops the default size; size it with `className` / `style`, e.g. `height: calc(100dvh - 64px)` under a header.
 - React Router: the old page keeps its own route while it animates out, but `useLocation()` inside it reads the new location.
+- `liveFrom` on `<VFXTransition>` keeps the old page mounted and playing during the run, with its state. Each page then sits in a `display: contents` div, so a `.target > .page` selector needs `.target > div > .page`. Set it on `<VFXTransition>`: a page or link spec can turn it off but not on.
 
 ### Next.js App Router
 
@@ -471,6 +473,7 @@ import { TransitionIn } from "@vfx-js/astro";
 - A link spec is a name or JSON: `data-vfx-transition='{"transition":"swipe","params":{"direction":"left"}}'`.
 - Which spec wins: the link's `data-vfx-transition`, then the page's `<TransitionIn>`, then the `<VFXTransition>` props. Back does not reverse unless `autoReverse` is set.
 - `fullscreen={false}` lets you size the target with CSS.
+- `liveFrom` (on `<VFXTransition>`, `<TransitionIn>` or the link) keeps the old page's animations and videos playing during the run.
 - `installTransition({ swapFunctions })` from `@vfx-js/astro/client` is what `<VFXTransition>` calls. You rarely need it.
 
 ## Other routers
