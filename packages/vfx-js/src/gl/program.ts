@@ -25,7 +25,7 @@ export type Uniforms = { [name: string]: Uniform };
 
 /**
  * GLSL ES version of a shader. When omitted on a VFX prop, it is
- * auto-detected from the fragment shader via {@link detectGlslVersion}:
+ * auto-detected from the fragment shader:
  * GLSL 100 markers (`gl_FragColor`, `texture2D`, `varying`, `attribute`)
  * pick `"100"`, otherwise `"300 es"`.
  */

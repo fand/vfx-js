@@ -38,6 +38,7 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 - `skills/vfx-js/` is the agent skill. `llms-full.txt` on the docs site is built from it.
 - When you add, rename or remove a public export, subpath or shader preset, update `skills/vfx-js/` in the same change.
 - `pnpm --filter docs test` fails when the skill misses a public export.
+- `pnpm --filter docs test` also fails when a public API uses a type its package does not export, or a doc comment has a `{@link}` that does not resolve. The API reference only lists exported types, so export the type (or add it to `ignored` in `packages/docs/scripts/check-api.mjs`).
 
 ### Testing
 - `pnpm test` - Run tests in every package that has them (core, transitions, react, react-vfx, vue, svelte, astro)

@@ -127,9 +127,28 @@ const punct = (text: string) => span("tp", text);
 /** Signatures longer than this put each parameter on its own line. */
 const maxLineLength = 80;
 
+/** Visible characters on the first line of our own type HTML. */
 function textLength(html: string): number {
-    const firstLine = html.split("\n")[0];
-    return firstLine.replace(/<[^>]+>/g, "").replace(/&\w+;/g, "x").length;
+    let length = 0;
+    let inTag = false;
+    let inEntity = false;
+    for (const c of html) {
+        if (c === "\n") {
+            break;
+        }
+        if (inTag) {
+            inTag = c !== ">";
+        } else if (c === "<") {
+            inTag = true;
+        } else if (inEntity) {
+            inEntity = c !== ";";
+        } else {
+            // An entity like &lt; is one character.
+            inEntity = c === "&";
+            length++;
+        }
+    }
+    return length;
 }
 
 /** Object types with more members than this go on several lines. */
