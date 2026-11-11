@@ -168,8 +168,11 @@
     transition: transform 0.3s ease-out;
     pointer-events: none;
 }
+/* The deepest current item keeps the box: the open API page, or the section in view. */
 .DocSidebar a:hover::after,
-.DocSidebarApi summary:hover .DocSidebarGroup::after {
+.DocSidebarApi summary:hover .DocSidebarGroup::after,
+.DocSidebarApi a[aria-current="page"]::after,
+.DocSidebar a.active::after {
     transform: scaleX(1);
 }
 @media (prefers-reduced-motion: reduce) {
