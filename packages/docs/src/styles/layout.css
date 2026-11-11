@@ -148,20 +148,14 @@
     color: white;
     text-decoration: none;
 }
-/* Same colors as the spectral bands in the background shader. */
+/* Hover: a white box that negates what is under it, text included. */
 .DocSidebar a:hover,
 .DocSidebarApi summary:hover .DocSidebarGroup {
-    background: linear-gradient(
-        90deg,
-        #e5af5e,
-        #baf396,
-        #7efac4,
-        #36c4e7,
-        #007bf7
-    );
-    background-clip: text;
-    -webkit-background-clip: text;
-    color: transparent;
+    margin: 0 -3px;
+    padding: 0 3px;
+    background: white;
+    color: black;
+    mix-blend-mode: difference;
 }
 .DocSidebar a[aria-current="page"] {
     font-weight: 600;
@@ -223,7 +217,9 @@
     font-size: 13px;
 }
 .DocSidebarApi li {
-    margin: 0;
+    /* Room for the hover box, which the ellipsis clip would cut. */
+    margin: 0 -3px;
+    padding: 0 3px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
