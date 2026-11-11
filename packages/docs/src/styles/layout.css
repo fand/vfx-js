@@ -148,14 +148,35 @@
     color: white;
     text-decoration: none;
 }
-/* Hover: a white box that negates what is under it, text included. */
-.DocSidebar a:hover,
-.DocSidebarApi summary:hover .DocSidebarGroup {
-    margin: 0 -3px;
-    padding: 0 3px;
+/* Hover: a white box grows from the left and negates the text under it. */
+.DocSidebar a,
+.DocSidebarGroup {
+    position: relative;
+    isolation: isolate;
+    margin-inline: -3px;
+    padding-inline: 3px;
+}
+.DocSidebar a::after,
+.DocSidebarGroup::after {
+    content: "";
+    position: absolute;
+    inset: 0;
     background: white;
-    color: black;
     mix-blend-mode: difference;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease-out;
+    pointer-events: none;
+}
+.DocSidebar a:hover::after,
+.DocSidebarApi summary:hover .DocSidebarGroup::after {
+    transform: scaleX(1);
+}
+@media (prefers-reduced-motion: reduce) {
+    .DocSidebar a::after,
+    .DocSidebarGroup::after {
+        transition: none;
+    }
 }
 .DocSidebar a[aria-current="page"] {
     font-weight: 600;
