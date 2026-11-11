@@ -22,7 +22,7 @@ const api = current === "docs" ? loadApi() : undefined;
                         href={url(`${item.slug}/`)}
                         aria-current={item.slug === current ? "page" : undefined}
                     >
-                        {item.label}
+                        <span class="DocSidebarLabel">{item.label}</span>
                     </a>
                     {item.slug === current && api && (
                         <div class="DocSidebarApi">
@@ -32,7 +32,7 @@ const api = current === "docs" ? loadApi() : undefined;
                                         class="DocSidebarPackage"
                                         href={url(`docs/#${pkg.slug}`)}
                                     >
-                                        {pkg.name}
+                                        <span class="DocSidebarLabel">{pkg.name}</span>
                                     </a>
                                     {pkg.groups.map((group) => (
                                         <details
@@ -43,7 +43,7 @@ const api = current === "docs" ? loadApi() : undefined;
                                             }
                                         >
                                             <summary>
-                                                <span class="DocSidebarGroup">{group.title}</span>
+                                                <span class="DocSidebarLabel">{group.title}</span>
                                                 <span class="DocSidebarCount">{group.pages.length}</span>
                                             </summary>
                                             <ul>
@@ -57,7 +57,9 @@ const api = current === "docs" ? loadApi() : undefined;
                                                                     : undefined
                                                             }
                                                         >
-                                                            {p.decl.name}
+                                                            <span class="DocSidebarLabel">
+                                                                {p.decl.name}
+                                                            </span>
                                                         </a>
                                                     </li>
                                                 ))}
@@ -76,7 +78,7 @@ const api = current === "docs" ? loadApi() : undefined;
                                         href={`#${section.id}`}
                                         data-section={section.id}
                                     >
-                                        {section.label}
+                                        <span class="DocSidebarLabel">{section.label}</span>
                                     </a>
                                 </li>
                             ))}
@@ -90,7 +92,7 @@ const api = current === "docs" ? loadApi() : undefined;
         class="DocSidebarExtra"
         href={url("examples/")}
         target="_blank"
-        rel="noreferrer">Examples &#8599;</a
+        rel="noreferrer"><span class="DocSidebarLabel">Examples &#8599;</span></a
     >
 </nav>
 

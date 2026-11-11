@@ -135,29 +135,33 @@
     padding: 0;
 }
 .DocSidebar li {
-    margin: 8px 0;
+    margin: 0;
 }
 .DocSidebar ul ul {
-    margin: 8px 0 16px;
+    margin: 4px 0 12px;
     padding-left: 12px;
     border-left: 1px solid var(--line);
     font-size: 14px;
 }
-.DocSidebar a,
-.DocSidebarApi summary {
+/* Links fill the row and use padding for spacing, so the whole row is clickable. */
+.DocSidebar a {
+    display: block;
+    padding: 4px 0;
     color: white;
     text-decoration: none;
 }
-/* Hover: a white box grows from the left and negates the text under it. */
-.DocSidebar a,
-.DocSidebarGroup {
+.DocSidebar a[aria-current="page"] {
+    font-weight: 600;
+}
+
+/* Hover: a white box grows from the left and negates the label under it. */
+.DocSidebarLabel {
     position: relative;
     isolation: isolate;
     margin-inline: -3px;
     padding-inline: 3px;
 }
-.DocSidebar a::after,
-.DocSidebarGroup::after {
+.DocSidebarLabel::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -169,47 +173,40 @@
     pointer-events: none;
 }
 /* The deepest current item keeps the box: the open API page, or the section in view. */
-.DocSidebar a:hover::after,
-.DocSidebarApi summary:hover .DocSidebarGroup::after,
-.DocSidebarApi a[aria-current="page"]::after,
-.DocSidebar a.active::after {
+.DocSidebar a:hover .DocSidebarLabel::after,
+.DocSidebarApi summary:hover .DocSidebarLabel::after,
+.DocSidebarApi a[aria-current="page"] .DocSidebarLabel::after,
+.DocSidebar a.active .DocSidebarLabel::after {
     transform: scaleX(1);
 }
 @media (prefers-reduced-motion: reduce) {
-    .DocSidebar a::after,
-    .DocSidebarGroup::after {
+    .DocSidebarLabel::after {
         transition: none;
     }
 }
-.DocSidebar a[aria-current="page"] {
-    font-weight: 600;
-}
-/* Every row is 20px tall with an 8px gap, so the list reads evenly. */
+
+/* Every row is 28px: a 20px line and 4px padding above and below. */
 .DocSidebarApi {
     display: grid;
-    gap: 16px;
-    margin: 12px 0 16px;
+    gap: 8px;
+    margin: 8px 0 12px;
     padding-left: 12px;
     border-left: 1px solid var(--line);
     font-size: 14px;
     line-height: 20px;
 }
-.DocSidebarApi > div,
-.DocSidebarApi details[open] {
-    display: grid;
-    gap: 8px;
-}
 .DocSidebar .DocSidebarPackage {
-    display: block;
     font-family: var(--mono);
     font-size: 13px;
-    color: white;
 }
 .DocSidebarApi summary {
     display: flex;
     align-items: baseline;
-    /* The smaller count on the same baseline would add 1px. */
-    height: 20px;
+    box-sizing: border-box;
+    /* Fixed, since the smaller count on the same baseline would add 1px. */
+    height: 28px;
+    padding: 4px 0;
+    color: white;
     cursor: pointer;
     list-style: none;
 }
@@ -232,31 +229,25 @@
     opacity: 0.5;
 }
 .DocSidebar .DocSidebarApi ul {
-    display: grid;
-    gap: 8px;
     margin: 0;
     padding-left: 1em;
     border-left: none;
     font-family: var(--mono);
     font-size: 13px;
 }
-.DocSidebarApi li {
-    /* Room for the hover box, which the ellipsis clip would cut. */
-    margin: 0 -3px;
-    padding: 0 3px;
+.DocSidebarApi a {
+    /* Room for the label box, which the ellipsis clip would cut. */
+    margin-inline: -3px;
+    padding-inline: 3px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .DocSidebarExtra {
-    display: block;
-    margin-top: 24px;
+    margin-top: 20px;
     font-family: var(--mono);
     font-size: 13px;
-}
-.DocSidebarExtra + .DocSidebarExtra {
-    margin-top: 8px;
 }
 
 .DocMain {
