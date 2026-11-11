@@ -7,8 +7,10 @@ import {
     TransitionStage,
 } from "./effect.js";
 import { type HistorySpecs, historySpecs } from "./history.js";
+import { LiveFrom, type LiveFromLike } from "./live-from.js";
 import type {
     AddTransitionOpts,
+    RunContext,
     RunOpts,
     ShowOpts,
     SlideRef,
@@ -34,6 +36,7 @@ export type ResolvedSpec = {
     /** The spec's own; the transition's fills in later. */
     overflow: true | number | undefined;
     ease: TransitionEase | undefined;
+    liveFrom: boolean;
 };
 
 // A run's settings with the transition in its slot.
@@ -41,7 +44,23 @@ type Bound = {
     run: TransitionRun;
     ease: TransitionEase;
     slots: TransitionSlot[];
+    liveFrom: boolean;
 };
+
+// `show()` also puts the old slides back when the run ends.
+type StartContext = {
+    keepPrev(
+        nodes: Node | Iterable<Node>,
+        onReturn?: (node: Node) => void,
+    ): void;
+};
+
+type StartCallback = (ctx: StartContext) => void | Promise<void>;
+
+const IDLE_CONTEXT: StartContext = { keepPrev: () => {} };
+
+const isIterable = (nodes: Node | Iterable<Node>): nodes is Iterable<Node> =>
+    typeof (nodes as Iterable<Node>)[Symbol.iterator] === "function";
 
 /**
  * Put `top` over `base`, field by field.
@@ -61,6 +80,7 @@ export function layerSpec(base: RunOpts, top: RunOpts): RunOpts {
         duration: top.duration ?? base.duration,
         overflow: top.overflow ?? base.overflow,
         ease: top.ease ?? base.ease,
+        liveFrom: top.liveFrom ?? base.liveFrom,
     };
 }
 
@@ -77,6 +97,7 @@ export function resolveSpec(
         duration: spec.duration ?? DEFAULT_DURATION,
         overflow: spec.overflow,
         ease: spec.ease,
+        liveFrom: spec.liveFrom ?? false,
     };
 }
 
@@ -180,10 +201,14 @@ export type TransitionHost = Pick<
     | "lockSize"
     | "forceRender"
     | "reducedMotion"
+    | "captureLive"
 >;
 
 export type TransitionStageLike = Effect &
-    Pick<TransitionStage, "snapshot" | "start" | "cancel" | "cut"> & {
+    Pick<
+        TransitionStage,
+        "snapshot" | "start" | "cancel" | "cut" | "setLiveSource"
+    > & {
         readonly frame: TransitionFrame | null;
     };
 
@@ -251,6 +276,9 @@ export class TransitionController implements TransitionHandle {
     #claimed: Transition | null = null;
     // The run that owns the effects right now.
     #active: { id: number; slots: TransitionSlot[] } | null = null;
+    // The old content a run keeps playing.
+    #live: { id: number; from: LiveFromLike } | null = null;
+    #createLiveFrom: (element: HTMLElement) => LiveFromLike;
 
     constructor(
         vfx: TransitionHost,
@@ -260,7 +288,10 @@ export class TransitionController implements TransitionHandle {
         stage: TransitionStageLike = new TransitionStage(),
         history: HistorySpecs = historySpecs,
         uaTransitions: UATransitions = sharedUATransitions(),
+        createLiveFrom: (element: HTMLElement) => LiveFromLike = (el) =>
+            new LiveFrom(vfx, el),
     ) {
+        this.#createLiveFrom = createLiveFrom;
         this.#onDestroy = onDestroy;
         this.#vfx = vfx;
         this.#element = element;
@@ -276,6 +307,8 @@ export class TransitionController implements TransitionHandle {
     }
 
     show(slide: SlideRef, opts: ShowOpts = {}): Promise<void> {
+        // Put back the slides a live run holds, so they resolve.
+        this.#dropLive();
         const target = this.#resolveSlide(slide);
         const { remove = false, ...runOpts } = opts;
         // A pending run may still change the slides, so only skip when idle.
@@ -284,7 +317,17 @@ export class TransitionController implements TransitionHandle {
         }
         const slideSpec = this.#opts.slideSpec?.(target);
         const spec = slideSpec ? layerSpec(slideSpec, runOpts) : runOpts;
-        return this.#start(() => {
+        return this.#start((ctx) => {
+            const shown = Array.from(this.#element.children).filter(
+                (child) => child !== target && !(child as HTMLElement).hidden,
+            );
+            ctx.keepPrev(shown, (node) => {
+                if (remove) {
+                    (node as HTMLElement).remove();
+                } else {
+                    (node as HTMLElement).hidden = true;
+                }
+            });
             if (target.parentElement !== this.#element) {
                 this.#element.append(target);
             }
@@ -332,7 +375,7 @@ export class TransitionController implements TransitionHandle {
     }
 
     run(
-        cb: () => void | Promise<void>,
+        cb: (ctx: RunContext) => void | Promise<void>,
         opts: RunOpts | (() => RunOpts) = {},
     ): Promise<void> {
         // The browser already animated this navigation, so cut before the snapshot.
@@ -342,8 +385,8 @@ export class TransitionController implements TransitionHandle {
         if (animated !== undefined && animated !== this.#uaCut) {
             this.#uaCut = animated;
             return this.#start(
-                async () => {
-                    await cb();
+                async (ctx) => {
+                    await cb(ctx);
                     // Lazy opts may consume state, like a pending link spec.
                     const spec = typeof opts === "function" ? opts() : opts;
                     // Keep the history store in step for later runs.
@@ -365,13 +408,14 @@ export class TransitionController implements TransitionHandle {
 
     // Slides do not change history, so `show()` comes here and skips autoReverse.
     async #start(
-        cb: () => void | Promise<void>,
+        cb: StartCallback,
         opts: RunOpts | (() => RunOpts),
     ): Promise<void> {
         if (this.#destroyed) {
-            await cb();
+            await cb(IDLE_CONTEXT);
             return;
         }
+        this.#dropLive();
         const id = ++this.#seq;
         this.#runningId = id;
         try {
@@ -381,6 +425,7 @@ export class TransitionController implements TransitionHandle {
                 this.#runningId = null;
             }
             if (this.#seq === id) {
+                this.#dropLive(id);
                 this.#unfreeze();
                 this.#unlock();
                 this.#release();
@@ -390,16 +435,25 @@ export class TransitionController implements TransitionHandle {
 
     async #run(
         id: number,
-        cb: () => void | Promise<void>,
+        cb: StartCallback,
         opts: RunOpts | (() => RunOpts),
     ): Promise<void> {
         const isCurrent = () => id === this.#seq;
+        // Only the animated update of the current run keeps the old nodes.
+        let canKeep = false;
+        const ctx: StartContext = {
+            keepPrev: (nodes, onReturn) => {
+                if (canKeep && isCurrent()) {
+                    this.#keepPrev(id, nodes, onReturn);
+                }
+            },
+        };
         // A stale run still applies its DOM change, just without animating.
         let called = false;
         const update = async () => {
             if (!called) {
                 called = true;
-                await cb();
+                await cb(ctx);
             }
         };
         // Nothing renders, so a snapshot would only stall.
@@ -413,6 +467,7 @@ export class TransitionController implements TransitionHandle {
         }
         const cut = async () => {
             this.#endActive();
+            this.#dropLive(id);
             this.#stage.cancel();
             await update();
             if (isCurrent()) {
@@ -471,6 +526,8 @@ export class TransitionController implements TransitionHandle {
         }
 
         let lazyOpts: RunOpts | undefined;
+        // A lazy spec is not known yet, so keep the nodes and drop them later if needed.
+        canKeep = bound?.liveFrom ?? true;
         try {
             await update();
             if (typeof opts === "function" && isCurrent()) {
@@ -479,10 +536,13 @@ export class TransitionController implements TransitionHandle {
         } catch (err) {
             if (isCurrent()) {
                 this.#endActive();
+                this.#dropLive(id);
                 this.#stage.cancel();
                 this.#releaseWrap(id);
             }
             throw err;
+        } finally {
+            canKeep = false;
         }
         if (!isCurrent()) {
             return;
@@ -495,6 +555,9 @@ export class TransitionController implements TransitionHandle {
             }
             if (bound === null) {
                 return cut();
+            }
+            if (!bound.liveFrom) {
+                this.#dropLive(id);
             }
             // The transition effect stays first, so the held snapshot survives the swap.
             try {
@@ -540,7 +603,10 @@ export class TransitionController implements TransitionHandle {
         const started = this.#stage.start({
             duration: bound.run.duration,
             ease: bound.ease,
-            onEnd: () => this.#endActive(id),
+            onEnd: () => {
+                this.#endActive(id);
+                this.#dropLive(id);
+            },
         });
         const ended = await settlesWithin(
             started,
@@ -584,7 +650,7 @@ export class TransitionController implements TransitionHandle {
             run.overflow = overflow;
         }
         const ease = spec.ease ?? transition.ease ?? "smoothstep";
-        return { run, ease, slots };
+        return { run, ease, slots, liveFrom: spec.liveFrom };
     }
 
     // False when another live handle runs this instance.
@@ -633,6 +699,7 @@ export class TransitionController implements TransitionHandle {
             );
         }
         this.#endActive();
+        this.#dropLive();
         this.#stage.cancel();
     }
 
@@ -640,6 +707,7 @@ export class TransitionController implements TransitionHandle {
         const id = ++this.#seq;
         this.#runningId = null;
         this.#endActive();
+        this.#dropLive();
         this.#stage.cancel();
         this.#unfreeze();
         this.#unlock();
@@ -697,6 +765,44 @@ export class TransitionController implements TransitionHandle {
         const slots = [new TransitionSlot(transition, this.#stage)];
         this.#cache = { key: { source, params }, transition, slots };
         return { transition, slots };
+    }
+
+    // Move the nodes into a hidden canvas that keeps capturing them.
+    #keepPrev(
+        id: number,
+        nodes: Node | Iterable<Node>,
+        onReturn?: (node: Node) => void,
+    ): void {
+        const list = isIterable(nodes) ? Array.from(nodes) : [nodes];
+        if (list.length === 0) {
+            return;
+        }
+        try {
+            if (this.#live?.id !== id) {
+                this.#dropLive();
+                const from = this.#createLiveFrom(this.#element);
+                this.#live = { id, from };
+                this.#stage.setLiveSource(() => from.texture);
+            }
+            this.#live.from.keep(list, onReturn);
+        } catch (err) {
+            console.error(
+                "[VFX-JS] transition failed to keep the old content; using a snapshot.",
+                err,
+            );
+            this.#dropLive(id);
+        }
+    }
+
+    // Stop capturing the old content and put back what `show()` moved.
+    #dropLive(id?: number): void {
+        const live = this.#live;
+        if (!live || (id !== undefined && live.id !== id)) {
+            return;
+        }
+        this.#live = null;
+        this.#stage.setLiveSource(null);
+        live.from.dispose();
     }
 
     #endActive(id?: number): void {

@@ -75,6 +75,7 @@ const t = vfx.addTransition(el, {
     reverse: false,        // play backwards, old and new swapped
     ease: "smoothstep",    // "smoothstep" | "linear" | (x) => t
     overflow: undefined,   // true (whole canvas) | CSS px on every side
+    liveFrom: false,       // keep the old content playing during the run (see below)
     keepWrapped: false,    // keep the canvas wrapper between runs
     waitFor: "media",      // wait for images / videos / fonts (~300 ms max) | "none" | (el) => Promise
     autoReverse: false,    // on back, replay the spec that entered, reversed (needs the Navigation API)
@@ -92,6 +93,24 @@ Every `<VFXTransition>` takes it as a prop (`auto-reverse` in Vue templates).
 A run's fields win over the container's. A run that sets its own `transition` drops the container's `params`.
 
 Handle: `show(slide, opts)`, `run(cb, opts)`, `cancel()`, `destroy()`, `running`.
+
+## Live old content: `liveFrom`
+
+By default the old content is a still snapshot, so its CSS animations, videos and GIFs stop during the run.
+With `liveFrom: true`, VFX-JS keeps the old nodes alive in a hidden canvas and captures them every frame.
+
+```ts
+await t.show("#about", { liveFrom: true }); // show() hands the old slide over for you
+
+await t.run((ctx) => {
+    ctx.keepPrev([...panel.children]); // hand the old nodes over before you drop them
+    panel.replaceChildren(renderPage(next));
+}, { liveFrom: true });
+```
+
+- `ctx.keepPrev(nodes)` moves the nodes out of the container. VFX-JS removes them when the run ends. `show()` puts its slides back, hidden or removed.
+- Without `keepPrev`, or without `liveFrom`, the run uses the snapshot.
+- Without html-in-canvas, the run uses the snapshot. `<VFXTransition>` in the framework bindings does not use it yet.
 
 ## Presets
 

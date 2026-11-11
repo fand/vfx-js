@@ -41,6 +41,7 @@ import {
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
 import type {
     Effect,
+    EffectTexture,
     EffectUniformValue,
     EffectVFXProps,
     VFXElement,
@@ -54,6 +55,13 @@ import type {
     VFXUniformValue,
     VFXWrap,
 } from "./types.js";
+
+/** See `VFXPlayer.liveTexture`. */
+export type LiveTexture = {
+    readonly texture: EffectTexture | null;
+    update(offscreen: OffscreenCanvas): void;
+    dispose(): void;
+};
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -1029,21 +1037,63 @@ export class VFXPlayer {
         }
 
         const oldTexture = e.srcTexture;
-
-        if (oldTexture.source === offscreen) {
-            oldTexture.needsUpdate = true;
-        } else {
-            const texture = new Texture(this.#ctx, offscreen);
-            texture.wrapS = oldTexture.wrapS;
-            texture.wrapT = oldTexture.wrapT;
-            texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
-            texture.needsUpdate = true;
+        const texture = this.#textureFromCapture(oldTexture, offscreen);
+        if (texture !== oldTexture) {
             if (!e.chain && e.passes.length > 0) {
                 e.passes[0].uniforms["src"].value = texture;
             }
             e.srcTexture = texture;
-            oldTexture.dispose();
         }
+    }
+
+    // Re-upload the capture, or replace and dispose the texture when the capture canvas changed.
+    #textureFromCapture(
+        oldTexture: Texture,
+        offscreen: OffscreenCanvas,
+    ): Texture {
+        if (oldTexture.source === offscreen) {
+            oldTexture.needsUpdate = true;
+            return oldTexture;
+        }
+        const texture = new Texture(this.#ctx, offscreen);
+        texture.wrapS = oldTexture.wrapS;
+        texture.wrapT = oldTexture.wrapT;
+        texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
+        texture.needsUpdate = true;
+        oldTexture.dispose();
+        return texture;
+    }
+
+    /**
+     * A texture that follows the captures of a canvas that is not on screen.
+     * `texture` is null until the first capture.
+     */
+    liveTexture(): LiveTexture {
+        let current: Texture | null = null;
+        const handle = makeEffectTexture(
+            () => current as Texture,
+            () => (current ? readTextureSourceDim(current, "w") : 0),
+            () => (current ? readTextureSourceDim(current, "h") : 0),
+        );
+        return {
+            get texture() {
+                return current ? handle : null;
+            },
+            update: (offscreen) => {
+                if (current) {
+                    current = this.#textureFromCapture(current, offscreen);
+                    return;
+                }
+                current = new Texture(this.#ctx, offscreen);
+                // Effects read `ctx.src` as premultiplied; match it.
+                current.premultiplyAlpha = true;
+                current.needsUpdate = true;
+            },
+            dispose: () => {
+                current?.dispose();
+                current = null;
+            },
+        };
     }
 
     /**

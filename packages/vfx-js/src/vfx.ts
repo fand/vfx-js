@@ -3,6 +3,8 @@ import {
     lockCanvasSize,
     releaseFirstCapture,
     requestCapture,
+    setupCapture,
+    teardownCapture,
     unwrapElement,
     wrapElement,
 } from "./html-in-canvas.js";
@@ -17,6 +19,7 @@ import type {
 } from "./transition/types.js";
 import {
     type Effect,
+    type EffectTexture,
     getVFXOpts,
     type VFXOpts,
     type VFXProps,
@@ -273,6 +276,51 @@ export class VFX {
      */
     freezeInside(root: HTMLElement): () => void {
         return this.#player.freezeInside(root);
+    }
+
+    /**
+     * Capture an html-in-canvas canvas into a texture on every paint.
+     * The canvas is not rendered on screen. `texture` is null until the first capture.
+     * @internal Used by transitions.
+     */
+    captureLive(canvas: HTMLCanvasElement): {
+        readonly texture: EffectTexture | null;
+        dispose(): void;
+    } {
+        if (!supportsHtmlInCanvas()) {
+            return { texture: null, dispose: () => {} };
+        }
+        const live = this.#player.liveTexture();
+        let disposed = false;
+        setupCapture(canvas, {
+            onCapture: (offscreen) => live.update(offscreen),
+            maxSize: this.#player.maxTextureSize,
+        }).then(
+            (first) => {
+                if (disposed) {
+                    return;
+                }
+                // The first capture stays on the canvas; clear it so it never shows.
+                canvas
+                    .getContext("2d")
+                    ?.clearRect(0, 0, canvas.width, canvas.height);
+                live.update(first);
+            },
+            (err) => console.error("[VFX-JS] live capture failed:", err),
+        );
+        return {
+            get texture() {
+                return live.texture;
+            },
+            dispose: () => {
+                if (disposed) {
+                    return;
+                }
+                disposed = true;
+                teardownCapture(canvas);
+                live.dispose();
+            },
+        };
     }
 
     /**

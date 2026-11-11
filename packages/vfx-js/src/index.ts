@@ -13,6 +13,7 @@ export { Crossfade } from "./transition/crossfade.js";
 export { ShaderTransition } from "./transition/shader.js";
 export type {
     AddTransitionOpts,
+    RunContext,
     RunOpts,
     ShowOpts,
     SlideRef,

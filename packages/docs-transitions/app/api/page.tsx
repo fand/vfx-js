@@ -31,6 +31,10 @@ const containerOpts: Row[] = [
         "Room to draw outside the element. true for the whole canvas, a number for CSS px on every side. Defaults to the transition's overflow.",
     ],
     [
+        "liveFrom: boolean",
+        "Keep capturing the old content during the run, so its animations and videos keep playing. show() hands the old slide over; with run(), call ctx.keepPrev() in cb. Defaults to false.",
+    ],
+    [
         "keepWrapped: boolean",
         "Keep the element wrapped between runs. Saves the wrap cost on frequent runs.",
     ],
@@ -55,7 +59,7 @@ const handle: Row[] = [
     ],
     [
         "run(cb, opts?)",
-        "Snapshots the element, calls cb to change the DOM, and plays the transition. Resolves when the animation ends.",
+        "Snapshots the element, calls cb to change the DOM, and plays the transition. Resolves when the animation ends. cb gets a ctx; with liveFrom, call ctx.keepPrev(oldNodes) before you drop them.",
     ],
     ["cancel()", "Ends the current run and shows the live content."],
     ["destroy()", "Cancels and stops tracking the element."],
@@ -64,7 +68,7 @@ const handle: Row[] = [
 
 const runOpts: Row[] = [
     [
-        "transition, params, duration, reverse, ease, overflow",
+        "transition, params, duration, reverse, ease, overflow, liveFrom",
         "Same as the container options. A run's value wins.",
     ],
     [
@@ -192,6 +196,10 @@ const t = vfx.addTransition(el, { transition: Swipe, duration: 0.6 });
                 <Code label="run">{`
 t.run(() => render(next), { transition: Glitch, reverse: true });
 t.run(() => render(next), { transition: Swipe, params: { direction: "up" } });
+t.run((ctx) => {
+  ctx.keepPrev([...el.children]);
+  render(next);
+}, { liveFrom: true });
 `}</Code>
                 <Table rows={runOpts} />
             </section>

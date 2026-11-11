@@ -90,6 +90,12 @@ export type TransitionSpec<
     overflow?: true | number;
     /** How `t` follows progress. Overrides the transition's own. */
     ease?: TransitionEase;
+    /**
+     * Keep capturing the old content during the run, so its animations and videos keep playing.
+     * Hand the old nodes over with `ctx.keepPrev()` in the `run()` callback; `show()` does it for you.
+     * Default false.
+     */
+    liveFrom?: boolean;
 };
 
 /**
@@ -123,6 +129,17 @@ export type RunOpts<
     T extends Transition | TransitionClass = Transition | TransitionClass,
 > = Partial<TransitionSpec<T>>;
 
+/** Passed to the `run()` callback. */
+export type RunContext = {
+    /**
+     * Hand the old nodes over before you drop them, so `liveFrom` can keep them playing.
+     * VFX-JS moves them into a hidden canvas and removes them when the run ends.
+     * No-op unless the run may use `liveFrom`.
+     * With function opts it keeps them until the spec is known.
+     */
+    keepPrev(nodes: Node | Iterable<Node>): void;
+};
+
 /** A direct child of the container, its index, or a selector inside it. */
 export type SlideRef = HTMLElement | number | string;
 
@@ -149,9 +166,10 @@ export interface TransitionHandle {
      * Change the DOM in `cb` and animate from the old content to the new.
      * `opts` can be a function, called once right after `cb` resolves.
      * Use it when the spec depends on the new content.
+     * With `liveFrom`, call `ctx.keepPrev()` in `cb` before you drop the old nodes.
      */
     run<T extends Transition | TransitionClass>(
-        cb: () => void | Promise<void>,
+        cb: (ctx: RunContext) => void | Promise<void>,
         opts?: RunOpts<T> | (() => RunOpts<T>),
     ): Promise<void>;
     /** End the current run and show the live content. */
