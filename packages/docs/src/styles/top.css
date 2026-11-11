@@ -262,8 +262,15 @@
 }
 
 @media (max-width: 767px) {
+    /* Content starts 24px from the screen edge, like the doc pages. */
+    .Top > section {
+        padding-inline: 24px;
+    }
+    /* The border lines up with the header's; the padding adds the rest. */
     .Top > section.Hero {
         grid-template-columns: minmax(0, 1fr);
+        margin-inline: 16px;
+        padding-inline: 8px;
     }
     .HeroTop {
         min-height: 0;
@@ -379,6 +386,10 @@
 }
 
 @media (max-width: 767px) {
+    .Top > section.TopRun,
+    .Top > section.TopWhy {
+        padding-inline: 24px;
+    }
     .RunRow {
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: none;
