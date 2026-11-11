@@ -12,9 +12,6 @@ dist
 !.vscode/extensions.json
 .DS_Store
 
-# Typedoc outputs
-typedoc/
-
 # Storybook static build
 storybook/
 

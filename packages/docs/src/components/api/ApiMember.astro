@@ -1,0 +1,94 @@
+---
+import { hrefOf, loadApi } from "../../api/model";
+import {
+    indexSignatureHtml,
+    propertyHtml,
+    signatureHtml,
+} from "../../api/render";
+import { Kind, type Reflection } from "../../api/types";
+import ApiComment from "./ApiComment.astro";
+import ApiSignature from "./ApiSignature.astro";
+
+type Props = {
+    member: Reflection;
+    /** Class name, shown for constructors. */
+    owner: string;
+};
+
+const api = loadApi();
+const { member: m, owner } = Astro.props;
+
+// readonly and optional show in the signature.
+const flags = [
+    m.flags.isStatic && "static",
+    m.flags.isAbstract && "abstract",
+].filter(Boolean) as string[];
+
+const inherited =
+    m.inheritedFrom?.type === "reference" ? m.inheritedFrom : undefined;
+const inheritedHref =
+    inherited && typeof inherited.target === "number"
+        ? hrefOf(api, inherited.target)
+        : undefined;
+const inheritedName = inherited?.name.split(".")[0];
+
+const isCtor = m.kind === Kind.Constructor;
+const sigName = isCtor ? owner : `${m.name}${m.flags.isOptional ? "?" : ""}`;
+const title = isCtor ? `new ${owner}()` : m.name;
+const accessors = [m.getSignature, m.setSignature]
+    .filter((s): s is Reflection => Boolean(s))
+    .map((s) => ({
+        s,
+        html: `<span class="tk">${s.kind === Kind.GetSignature ? "get" : "set"} </span>${signatureHtml(api, s, { name: m.name })}`,
+    }));
+---
+
+<section class="ApiMember" id={m.name}>
+    <h3>
+        <a class="ApiAnchor" href={`#${m.name}`}>{title}</a>
+        {flags.map((f) => <span class="ApiBadge">{f}</span>)}
+        {
+            inheritedName && (
+                <span class="ApiInherited">
+                    from{" "}
+                    {inheritedHref ? (
+                        <a href={inheritedHref}>{inheritedName}</a>
+                    ) : (
+                        inheritedName
+                    )}
+                </span>
+            )
+        }
+    </h3>
+    {
+        m.signatures?.map((s) => (
+            <ApiSignature signature={s} name={sigName} />
+        ))
+    }
+    {
+        accessors.map(({ s, html }) => (
+            <div class="ApiSignature">
+                <pre class="ApiCode"><code set:html={html} /></pre>
+                <ApiComment comment={s.comment} />
+            </div>
+        ))
+    }
+    {
+        m.kind === Kind.IndexSignature && (
+            <pre class="ApiCode"><code set:html={indexSignatureHtml(api, m)} /></pre>
+        )
+    }
+    {
+        !m.signatures && accessors.length === 0 && m.kind !== Kind.IndexSignature && (
+            <>
+                <pre class="ApiCode"><code set:html={propertyHtml(api, m)} /></pre>
+                {m.defaultValue !== undefined && (
+                    <p class="ApiDefault">
+                        Default: <code class="ApiInline">{m.defaultValue}</code>
+                    </p>
+                )}
+            </>
+        )
+    }
+    <ApiComment comment={m.comment} />
+</section>

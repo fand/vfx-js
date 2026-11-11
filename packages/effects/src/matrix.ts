@@ -361,7 +361,7 @@ export type MatrixParams = {
     /**
      * Random seed for the rain pattern (per-column speed/phase and the glyph
      * sequence). Any number; the same seed always reproduces the same
-     * pattern, so pin it (with {@link VFX.setTime}) for deterministic
+     * pattern, so pin it (with `VFX.setTime`) for deterministic
      * snapshots / visual regression tests. `0` is the default look.
      */
     seed: number;

@@ -1,0 +1,70 @@
+---
+import { loadApi } from "../../api/model";
+import {
+    escapeHtml,
+    inlineMarkdownHtml,
+    returnsHtml,
+    signatureHtml,
+    typeHtml,
+} from "../../api/render";
+import { Kind, type Reflection } from "../../api/types";
+import ApiComment from "./ApiComment.astro";
+
+type Props = {
+    signature: Reflection;
+    /** Name to show, e.g. the class name for constructors. */
+    name?: string;
+};
+
+const api = loadApi();
+const { signature: s, name } = Astro.props;
+const sig = signatureHtml(api, s, { name });
+const params = (s.parameters ?? []).map((p) => ({
+    code: [
+        `<span class="tm">${p.flags.isRest ? "..." : ""}${escapeHtml(p.name)}</span>`,
+        `<span class="tp">${p.flags.isOptional || p.defaultValue !== undefined ? "?: " : ": "}</span>`,
+        typeHtml(api, p.type),
+        p.defaultValue !== undefined
+            ? `<span class="tp"> = ${escapeHtml(p.defaultValue)}</span>`
+            : "",
+    ].join(""),
+    text: inlineMarkdownHtml(api, p.comment?.summary),
+}));
+const isCtor = s.kind === Kind.ConstructorSignature;
+const returns = returnsHtml(api, s.comment);
+// The signature already shows names, types and defaults. List parameters
+// and the return type only when they have docs.
+const showParams = params.some((p) => p.text);
+const showReturns = !isCtor && Boolean(returns);
+---
+
+<div class="ApiSignature">
+    <pre class="ApiCode"><code set:html={sig} /></pre>
+    <ApiComment comment={s.comment} />
+    {
+        showParams && (
+            <div class="ApiTag">
+                <h4>Parameters</h4>
+                <ul class="ApiParams">
+                    {params.map((p) => (
+                        <li>
+                            <code class="ApiInline" set:html={p.code} />
+                            {p.text && <span class="ApiParamText" set:html={p.text} />}
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        )
+    }
+    {
+        showReturns && (
+            <div class="ApiTag">
+                <h4>Returns</h4>
+                <p>
+                    <code class="ApiInline" set:html={typeHtml(api, s.type)} />
+                </p>
+                {returns && <div class="ApiText" set:html={returns} />}
+            </div>
+        )
+    }
+</div>

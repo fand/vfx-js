@@ -8,6 +8,7 @@ export { isHicCanvas, markHicCanvas } from "./hic-canvas.js";
 export type { CaptureOpts } from "./html-in-canvas.js";
 export { setupCapture, teardownCapture } from "./html-in-canvas.js";
 export { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
+export type { MarginOpts } from "./rect.js";
 export { Crossfade } from "./transition/crossfade.js";
 export { ShaderTransition } from "./transition/shader.js";
 export type {
@@ -31,6 +32,7 @@ export type {
     Effect,
     EffectAttributeDescriptor,
     EffectAttributeTypedArray,
+    EffectBlendMode,
     EffectBlitOpts,
     EffectContext,
     EffectDims,
@@ -51,5 +53,8 @@ export type {
     VFXPass,
     VFXPostEffect,
     VFXProps,
+    VFXUniforms,
+    VFXUniformValue,
+    VFXWrap,
 } from "./types.js";
 export * from "./vfx.js";

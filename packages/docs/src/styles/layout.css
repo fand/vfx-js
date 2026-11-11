@@ -16,7 +16,7 @@
 }
 .SiteHeaderBrand img {
     display: block;
-    height: 22px;
+    height: 28px;
 }
 .SiteHeaderNav {
     display: flex;
@@ -122,6 +122,11 @@
     position: sticky;
     top: calc(var(--header-bottom) + 48px);
     align-self: start;
+    /* The API list is long. Scroll it on its own. */
+    max-height: calc(100lvh - var(--header-bottom) - 96px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
     font-size: 15px;
 }
 .DocSidebar ul {
@@ -130,34 +135,119 @@
     padding: 0;
 }
 .DocSidebar li {
-    margin: 8px 0;
+    margin: 0;
 }
 .DocSidebar ul ul {
-    margin: 8px 0 16px;
+    margin: 4px 0 12px;
     padding-left: 12px;
     border-left: 1px solid var(--line);
     font-size: 14px;
 }
+/* Links fill the row and use padding for spacing, so the whole row is clickable. */
 .DocSidebar a {
-    color: rgba(255, 255, 255, 0.6);
-    text-decoration: none;
-}
-.DocSidebar a:hover,
-.DocSidebar a.active,
-.DocSidebar a[aria-current="page"] {
+    display: block;
+    padding: 4px 0;
     color: white;
+    text-decoration: none;
 }
 .DocSidebar a[aria-current="page"] {
     font-weight: 600;
 }
-.DocSidebarExtra {
-    display: block;
-    margin-top: 24px;
+
+/* Hover: a white box grows from the left and negates the label under it. */
+.DocSidebarLabel {
+    position: relative;
+    isolation: isolate;
+    margin-inline: -3px;
+    padding-inline: 3px;
+}
+.DocSidebarLabel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: white;
+    mix-blend-mode: difference;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.1s ease-out;
+    pointer-events: none;
+}
+/* The deepest current item keeps the box: the open API page, or the section in view. */
+.DocSidebar a:hover .DocSidebarLabel::after,
+.DocSidebarApi summary:hover .DocSidebarLabel::after,
+.DocSidebarApi a[aria-current="page"] .DocSidebarLabel::after,
+.DocSidebar a.active .DocSidebarLabel::after {
+    transform: scaleX(1);
+}
+@media (prefers-reduced-motion: reduce) {
+    .DocSidebarLabel::after {
+        transition: none;
+    }
+}
+
+/* Every row is 28px: a 20px line and 4px padding above and below. */
+.DocSidebarApi {
+    display: grid;
+    gap: 8px;
+    margin: 8px 0 12px;
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+    font-size: 14px;
+    line-height: 20px;
+}
+.DocSidebar .DocSidebarPackage {
     font-family: var(--mono);
     font-size: 13px;
 }
-.DocSidebarExtra + .DocSidebarExtra {
-    margin-top: 8px;
+.DocSidebarApi summary {
+    display: flex;
+    align-items: baseline;
+    box-sizing: border-box;
+    /* Fixed, since the smaller count on the same baseline would add 1px. */
+    height: 28px;
+    padding: 4px 0;
+    color: white;
+    cursor: pointer;
+    list-style: none;
+}
+.DocSidebarApi summary::-webkit-details-marker {
+    display: none;
+}
+.DocSidebarApi summary::before {
+    content: "+";
+    width: 1em;
+    font-family: var(--mono);
+}
+.DocSidebarApi details[open] > summary::before {
+    content: "\2212";
+}
+.DocSidebarApi .DocSidebarCount {
+    margin-left: auto;
+    padding-right: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    opacity: 0.5;
+}
+.DocSidebar .DocSidebarApi ul {
+    margin: 0;
+    padding-left: 1em;
+    border-left: none;
+    font-family: var(--mono);
+    font-size: 13px;
+}
+.DocSidebarApi a {
+    /* Room for the label box, which the ellipsis clip would cut. */
+    margin-inline: -3px;
+    padding-inline: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.DocSidebarExtra {
+    margin-top: 20px;
+    font-family: var(--mono);
+    font-size: 13px;
 }
 
 .DocMain {
@@ -202,7 +292,7 @@
 @media (max-width: 767px) {
     .DocLayout {
         display: block;
-        padding: 32px 32px 0;
+        padding: 32px 16px 0;
     }
     /* The header menu covers page links on small screens. */
     .DocSidebar {
@@ -280,6 +370,10 @@
     }
 }
 @media (max-width: 767px) {
+    /* Content starts 16px from the screen edge, like the pages above. */
+    .SiteFooter {
+        padding-inline: calc(8px - var(--frame));
+    }
     .SiteFooterNav {
         grid-template-columns: 1fr 1fr;
         row-gap: 32px;

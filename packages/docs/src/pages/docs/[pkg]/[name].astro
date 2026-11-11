@@ -1,0 +1,181 @@
+---
+import "../../../styles/api.css";
+import ApiComment from "../../../components/api/ApiComment.astro";
+import ApiMember from "../../../components/api/ApiMember.astro";
+import ApiSignature from "../../../components/api/ApiSignature.astro";
+import Layout from "../../../layouts/Layout.astro";
+import {
+    type ApiPage,
+    hrefOf,
+    isInterfaceCopy,
+    kindLabel,
+    loadApi,
+    membersOf,
+    plainSummary,
+} from "../../../api/model";
+import {
+    highlight,
+    typeAliasHtml,
+    typeHtml,
+    typeParamsHtml,
+} from "../../../api/render";
+import { Kind, type Reflection, type Type } from "../../../api/types";
+import { url } from "../../../site";
+
+export function getStaticPaths() {
+    return loadApi().pages.map((page) => ({
+        params: { pkg: page.pkg.slug, name: page.decl.name },
+        props: { page },
+    }));
+}
+
+type Props = { page: ApiPage };
+
+const api = loadApi();
+const { page } = Astro.props;
+const { decl, pkg } = page;
+
+const kind = kindLabel(decl.kind);
+const isTypeOnly = decl.kind === Kind.Interface || decl.kind === Kind.TypeAlias;
+const importCode = `import ${isTypeOnly ? "type " : ""}{ ${decl.name} } from "${pkg.name}";`;
+
+const source = decl.sources?.[0];
+const sourceUrl = source?.url;
+// "https://github.com/fand/vfx-js/blob/<sha>/packages/vfx-js/src/vfx.ts#L53" → "vfx-js/src/vfx.ts:53"
+const sourceLabel = sourceUrl
+    ? `${sourceUrl.replace(/^.*\/blob\/[^/]+\/(packages\/)?/, "").replace(/#L\d+$/, "")}:${source?.line}`
+    : undefined;
+
+// Hierarchy
+const relations = [
+    { label: "Extends", types: decl.extendedTypes },
+    { label: "Implements", types: decl.implementedTypes },
+    { label: "Extended by", types: decl.extendedBy },
+    { label: "Implemented by", types: decl.implementedBy },
+].filter((r): r is { label: string; types: Type[] } => Boolean(r.types?.length));
+
+// Members, grouped like TypeDoc groups them: Constructors, Properties, Methods, ...
+const members = membersOf(decl);
+const memberGroups: { title: string; members: Reflection[] }[] = [];
+// Members that only repeat an interface's docs. Listed by name only.
+const interfaceCopies = members.filter((m) => isInterfaceCopy(api, m));
+if (decl.kind === Kind.Class || decl.kind === Kind.Interface) {
+    for (const g of decl.groups ?? []) {
+        const shown = g.children
+            .map((id) => members.find((m) => m.id === id))
+            .filter((m): m is Reflection => Boolean(m))
+            .filter((m) => !interfaceCopies.includes(m));
+        if (shown.length > 0) {
+            memberGroups.push({ title: g.title, members: shown });
+        }
+    }
+} else if (members.length > 0) {
+    memberGroups.push({ title: "Properties", members });
+}
+
+// The declaration line for types and variables.
+// Object types: TypeDoc puts the properties on the declaration itself.
+const objectType =
+    members.length > 0 && (!decl.type || decl.type.type === "reflection");
+let declaration: string | undefined;
+if (decl.kind === Kind.TypeAlias && !objectType) {
+    declaration = typeAliasHtml(api, decl);
+} else if (decl.kind === Kind.Variable) {
+    declaration = `<span class="tk">${decl.flags.isConst ? "const" : "let"} </span><span class="tm">${decl.name}</span><span class="tp">: </span>${typeHtml(api, decl.type)}`;
+}
+const typeParams =
+    decl.kind !== Kind.Function && (decl.kind !== Kind.TypeAlias || objectType)
+        ? typeParamsHtml(api, decl.typeParameters)
+        : "";
+
+/** Link to the interface member a hidden class member copies. */
+function memberLinkHtml(m: Reflection): string {
+    const href = hrefOf(api, m.id);
+    return href ? `<a class="tr" href="${href}">${m.name}</a>` : m.name;
+}
+
+const description = plainSummary(decl) || `${decl.name} in ${pkg.name}.`;
+---
+
+<Layout
+    page="docs"
+    title={`${decl.name} - API Reference - VFX-JS`}
+    description={description}
+    class="ApiPage"
+>
+    <nav class="ApiCrumbs" aria-label="Breadcrumb">
+        <a href={url("docs/")}>API Reference</a>
+        <span aria-hidden="true">/</span>
+        <a href={url(`docs/#${pkg.slug}`)}>{pkg.name}</a>
+    </nav>
+
+    <header class="ApiHead">
+        <p class="ApiKind">
+            {kind}
+        </p>
+        <h1>
+            {decl.name}{
+                typeParams && (
+                    <code class="ApiTypeParams" set:html={typeParams} />
+                )
+            }
+        </h1>
+        {
+            sourceUrl && (
+                <a class="ApiSource" href={sourceUrl} target="_blank" rel="noreferrer">
+                    {sourceLabel} &#8599;
+                </a>
+            )
+        }
+    </header>
+
+    {importCode && <div class="ApiImport" set:html={highlight(importCode)} />}
+
+    <ApiComment comment={decl.comment} />
+
+    {
+        relations.length > 0 && (
+            <dl class="ApiRelations">
+                {relations.map((r) => (
+                    <>
+                        <dt>{r.label}</dt>
+                        <dd>
+                            {r.types.map((t) => (
+                                <code class="ApiInline" set:html={typeHtml(api, t)} />
+                            ))}
+                        </dd>
+                    </>
+                ))}
+                {interfaceCopies.length > 0 && (
+                    <>
+                        <dt>Interface members</dt>
+                        <dd class="ApiAlso">
+                            {interfaceCopies.map((m) => (
+                                <code class="ApiInline" set:html={memberLinkHtml(m)} />
+                            ))}
+                        </dd>
+                    </>
+                )}
+            </dl>
+        )
+    }
+
+    {declaration && <pre class="ApiCode"><code set:html={declaration} /></pre>}
+
+    {
+        decl.signatures?.map((s) => (
+            <ApiSignature signature={s} name={decl.name} />
+        ))
+    }
+
+    {
+        memberGroups.map((g) => (
+            <section class="ApiGroup">
+                <h2>{g.title}</h2>
+                {g.members.map((m) => (
+                    <ApiMember member={m} owner={decl.name} />
+                ))}
+            </section>
+        ))
+    }
+</Layout>

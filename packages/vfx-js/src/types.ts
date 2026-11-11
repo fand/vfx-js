@@ -245,7 +245,7 @@ export type VFXProps = {
     /**
      * Shader code or preset name.
      *
-     * You can pass the preset name listed in [ShaderPreset](./ShaderPreset),
+     * You can pass the preset name listed in {@link ShaderPreset},
      * then VFX-JS will use the corresponding shader preset.
      *
      * You can also write the shader by yourself, and pass the shader code here.
@@ -292,7 +292,7 @@ export type VFXProps = {
      * }});
      * ```
      *
-     * Supported uniform types are defined as [`VFXUniformValue`](./VFXUniformValue).
+     * Supported uniform types are defined as {@link VFXUniformValue}.
      */
     uniforms?: VFXUniforms;
 
@@ -417,7 +417,6 @@ export type VFXProps = {
  * This corresponds to `gl.CLAMP_TO_EDGE`, `gl.REPEAT` and `gl.MIRRORED_REPEAT` in WebGL API.
  *
  * ref. https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_textures_in_WebGL
- * @notExported
  */
 export type VFXWrap = "clamp" | "repeat" | "mirror";
 

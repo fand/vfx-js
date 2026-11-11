@@ -105,6 +105,13 @@ export const nav: NavItem[] = [
             { id: "tips", label: "Tips" },
         ],
     },
+    {
+        slug: "docs",
+        label: "API Reference",
+        blurb: "Every class, function and type, generated from the source.",
+        // The sidebar lists the API pages instead.
+        sections: [],
+    },
 ];
 
 export function findNav(slug: string): NavItem {
