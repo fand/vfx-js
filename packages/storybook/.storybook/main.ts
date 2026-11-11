@@ -64,6 +64,10 @@ const config: StorybookConfig = {
                     __dirname,
                     "../src/stories/svelte/story-navigation.ts",
                 ),
+                "$app/state": join(
+                    __dirname,
+                    "../src/stories/svelte/story-state.svelte.ts",
+                ),
             },
         },
     }),

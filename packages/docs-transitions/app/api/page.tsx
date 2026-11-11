@@ -32,7 +32,7 @@ const containerOpts: Row[] = [
     ],
     [
         "liveFrom: boolean",
-        "Keep capturing the old content during the run, so its animations and videos keep playing. show() and <VFXTransition> (React, Astro) hand the old content over; with run(), call ctx.keepPrev() in cb. Defaults to false.",
+        "Keep capturing the old content during the run, so its animations and videos keep playing. show() and <VFXTransition> (React, Nuxt, SvelteKit, Astro) hand the old content over; with run(), call ctx.keepPrev() in cb. Defaults to false.",
     ],
     [
         "keepWrapped: boolean",

@@ -1,22 +1,27 @@
-import type { RunOpts } from "@vfx-js/core";
+import type { RunContext, RunOpts } from "@vfx-js/core";
 import { type Component, flushSync, mount, unmount } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setNextTransition, takePending, transition } from "./lib/pending.js";
 import About from "./test/About.svelte";
 import type { OnNavigate } from "./test/app-navigation.js";
 import { callbacks } from "./test/app-navigation.js";
+import { page } from "./test/app-state.svelte.js";
 import Harness from "./test/Harness.svelte";
 import Home from "./test/Home.svelte";
 import { Swipe, Zoom } from "./test/presets.js";
 
 type Run = {
-    cb: () => void | Promise<void>;
+    cb: (ctx: RunContext) => void | Promise<void>;
     opts: () => RunOpts;
     done: Promise<void>;
 };
 
 const mock = vi.hoisted(() => {
     const runs: Run[] = [];
+    // Core's hand-over; a test swaps in its own.
+    const keep: { keepPrev: RunContext["keepPrev"] } = {
+        keepPrev: () => {},
+    };
     const handle = {
         run(cb: Run["cb"], opts: Run["opts"]) {
             let resolve!: () => void;
@@ -26,7 +31,9 @@ const mock = vi.hoisted(() => {
             runs.push({ cb, opts, done });
             // Like core: call cb (after the snapshot); a throwing cb ends the run.
             return Promise.resolve()
-                .then(cb)
+                .then(() =>
+                    cb({ keepPrev: (...args) => keep.keepPrev(...args) }),
+                )
                 .finally(() => resolve());
         },
         cancel: vi.fn(),
@@ -39,7 +46,7 @@ const mock = vi.hoisted(() => {
         destroy: vi.fn(),
     };
     const init = vi.fn(() => vfx);
-    return { runs, handle, vfx, init };
+    return { runs, keep, handle, vfx, init };
 });
 
 vi.mock("@vfx-js/core", () => ({ VFX: { init: mock.init } }));
@@ -121,6 +128,78 @@ describe("VFXTransition (sveltekit)", () => {
         container.remove();
         // Let the shared VFX go, so each test starts without one.
         await new Promise((r) => requestAnimationFrame(r));
+    });
+
+    describe("liveFrom", () => {
+        // Moves the nodes into a detached box, and back on `giveBack`.
+        function fakeKeep() {
+            const ghost = document.createElement("div");
+            let giveBack = () => {};
+            mock.keep.keepPrev = vi.fn((nodes, onReturn) => {
+                const node = nodes as Node;
+                const marker = document.createComment("");
+                node.parentNode?.insertBefore(marker, node);
+                ghost.append(node);
+                giveBack = () => {
+                    marker.parentNode?.insertBefore(node, marker);
+                    marker.remove();
+                    onReturn?.(node);
+                };
+            });
+            return { ghost, giveBack: () => giveBack() };
+        }
+        const inner = () =>
+            container.firstElementChild?.firstElementChild as HTMLElement;
+
+        // Start a navigation and swap the page, but leave the run held.
+        async function swap(path: string, next: Component) {
+            const nav = makeNav(page.url.pathname, path);
+            await navigate(nav);
+            page.url = new URL(path, "http://localhost");
+            props.page = next;
+            flushSync();
+            return nav;
+        }
+
+        beforeEach(() => {
+            page.url = new URL("http://localhost/");
+            mock.keep.keepPrev = () => {};
+        });
+
+        it("hands the old page to core and drops it once it is back", async () => {
+            render({ liveFrom: true });
+            const keep = fakeKeep();
+            const nav = await swap("/about", About);
+            expect(mock.keep.keepPrev).toHaveBeenCalledOnce();
+            expect(keep.ghost.textContent).toBe("home");
+            expect(inner().textContent).toBe("about");
+            nav.complete();
+            keep.giveBack();
+            await vi.waitFor(() => {
+                expect(inner().children).toHaveLength(1);
+            });
+            expect(inner().textContent).toBe("about");
+        });
+
+        it("drops the old page at once when core keeps nothing", async () => {
+            render({ liveFrom: true });
+            mock.keep.keepPrev = vi.fn();
+            const nav = await swap("/about", About);
+            expect(mock.keep.keepPrev).toHaveBeenCalledOnce();
+            expect(inner().children).toHaveLength(1);
+            expect(inner().textContent).toBe("about");
+            nav.complete();
+        });
+
+        it("hands nothing over without liveFrom", async () => {
+            render();
+            const keep = fakeKeep();
+            const nav = await swap("/about", About);
+            expect(mock.keep.keepPrev).not.toHaveBeenCalled();
+            expect(keep.ghost.textContent).toBe("");
+            expect(inner().textContent).toBe("about");
+            nav.complete();
+        });
     });
 
     it("renders the target inside a display: contents div", () => {

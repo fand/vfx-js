@@ -111,7 +111,7 @@ await t.run((ctx) => {
 - `ctx.keepPrev(nodes)` moves the nodes out of the container. VFX-JS removes them when the run ends. `show()` puts its slides back, hidden or removed.
 - `ctx.keepPrev(nodes, onReturn)` puts each node back in its old place when the run ends, then calls `onReturn(node)`. Use it when a framework still owns the nodes.
 - Without `keepPrev`, or without `liveFrom`, the run uses the snapshot. Without html-in-canvas too.
-- `<VFXTransition>` for React (Next.js, React Router) and Astro takes `liveFrom`. Vue and Svelte do not use it yet.
+- `<VFXTransition>` for React (Next.js, React Router), Nuxt, SvelteKit and Astro takes `liveFrom`. `@vfx-js/vue/router` and `useVFXTransition` do not use it yet.
 
 ## Presets
 
@@ -390,6 +390,7 @@ useTransitionIn({ transition: Glitch });
 - In templates use `v-transition`, not `@click="transition(spec)"`; Vue wraps the handler, so it never runs.
 - Props are the `addTransition` options plus `fullscreen`. `:fullscreen="false"` lets you size the target with CSS.
 - A page with an async `setup` under your own `<Suspense>` may be captured early. Use `waitFor`.
+- Nuxt: `live-from` on `<VFXTransition>` keeps the old page's DOM (CSS animations, videos) playing during the run. It gives `<NuxtPage>` a page transition, so `<NuxtPage>` must be a direct child, and the page needs one root element. It sets `css: false` and `mode: "default"` over your own page transition. Vue unmounts the old page as usual, so its Vue state stops updating.
 
 ## Svelte: SvelteKit
 
@@ -430,6 +431,7 @@ npm i @vfx-js/core @vfx-js/svelte @vfx-js/transitions
 - Which spec wins: the link's `transition(spec)`, then the page's `transitionIn`, then the `<VFXTransition>` props. Back does not reverse unless `autoReverse` is set.
 - `setNextTransition(spec)` before `goto()`.
 - `fullscreen={false}` lets you size the target with CSS.
+- `liveFrom` keeps the old page's DOM (CSS animations, videos) playing during the run. Pages then sit in a `display: contents` div inside `{#key}` on the pathname, so a page remounts on each path change. The old page's Svelte updates pause while it leaves.
 
 ## Astro: ClientRouter
 
