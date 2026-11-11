@@ -166,7 +166,7 @@
 }
 .DocSidebar .DocSidebarPackage {
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
     font-family: var(--mono);
     font-size: 13px;
     color: white;
@@ -208,7 +208,7 @@
     font-size: 13px;
 }
 .DocSidebarApi li {
-    margin: 4px 0;
+    margin: 8px 0;
     overflow: hidden;
     text-overflow: ellipsis;
 }
