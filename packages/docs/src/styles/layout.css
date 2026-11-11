@@ -370,6 +370,10 @@
     }
 }
 @media (max-width: 767px) {
+    /* Content starts 16px from the screen edge, like the pages above. */
+    .SiteFooter {
+        padding-inline: calc(8px - var(--frame));
+    }
     .SiteFooterNav {
         grid-template-columns: 1fr 1fr;
         row-gap: 32px;
