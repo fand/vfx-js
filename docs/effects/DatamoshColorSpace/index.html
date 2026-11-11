@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<!-- The shader is the animation, so turn off the browser's view transition. -->
+<html data-astro-transition-scope="astro-yztbsuuz-1" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- HTML-in-Canvas origin trial for https://amagi.dev. Expires 2027-03-01. -->
+        <meta http-equiv="origin-trial" content="Aq07hgHuOPLTTcC5I5833AV8SEY0KSy7K3t3eOAOpRrAQf2BQIWGtBVXelF8sHCp1mydQ8uDvro6xwA0UMSEIgsAAABPeyJvcmlnaW4iOiJodHRwczovL2FtYWdpLmRldjo0NDMiLCJmZWF0dXJlIjoiSFRNTEluQ2FudmFzIiwiZXhwaXJ5IjoxODAzOTQ1NjAwfQ==">
+
+        <title>DatamoshColorSpace - API Reference - VFX-JS</title>
+
+        <meta name="theme-color" content="#000000">
+        <meta name="description" content="DatamoshColorSpace in @vfx-js/effects.">
+        <link rel="canonical" href="https://amagi.dev/vfx-js/docs/effects/DatamoshColorSpace/">
+
+        <meta property="og:url" content="https://amagi.dev/vfx-js/docs/effects/DatamoshColorSpace/">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="DatamoshColorSpace - API Reference - VFX-JS">
+        <meta property="og:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+        <meta property="og:description" content="DatamoshColorSpace in @vfx-js/effects.">
+        <meta property="og:site_name" content="VFX-JS - Visual Effects Framework for Web #VFXJS">
+        <meta property="og:locale" content="en_US">
+
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@amagitakayosi">
+        <meta name="twitter:creator" content="@amagitakayosi">
+        <meta name="twitter:url" content="https://amagi.dev/vfx-js/docs/effects/DatamoshColorSpace/">
+        <meta name="twitter:title" content="DatamoshColorSpace - API Reference - VFX-JS">
+        <meta name="twitter:description" content="DatamoshColorSpace in @vfx-js/effects.">
+        <meta name="twitter:image" content="https://amagi.dev/vfx-js/og_image.jpg">
+
+        <link rel="icon" href="/vfx-js/favicon/favicon.ico" sizes="32x32">
+        <link rel="icon" href="/vfx-js/favicon/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/vfx-js/favicon/favicon-180.png">
+        <link rel="manifest" href="/vfx-js/manifest.webmanifest">
+
+        <meta name="astro-view-transitions-enabled" content="true">
+<meta name="astro-view-transitions-fallback" content="animate">
+<script type="module" src="/vfx-js/_astro/ClientRouter.astro_astro_type_script_index_0_lang.C2j_ZdXg.js"></script>
+
+        <!-- Cloudflare Web Analytics. In the head, so page swaps keep it and do not run it again. -->
+        <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;: &quot;b9c39aae9c304f1cbfa1e7bb3e84f078&quot;}"></script>
+        <!-- End Cloudflare Web Analytics -->
+    <link rel="stylesheet" href="/vfx-js/_astro/render.B6oLkqIe.css">
+<link rel="stylesheet" href="/vfx-js/_astro/Layout.DO3UWs0j.css"><style>[data-astro-transition-scope="astro-yztbsuuz-1"] { view-transition-name: astro-yztbsuuz-1; }@layer astro { ::view-transition-old(astro-yztbsuuz-1) { animation: none; opacity: 0; mix-blend-mode: normal; }::view-transition-new(astro-yztbsuuz-1) { animation: none; mix-blend-mode: normal; }::view-transition-group(astro-yztbsuuz-1) { animation: none } }[data-astro-transition-fallback="old"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="old"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }[data-astro-transition-fallback="new"] [data-astro-transition-scope="astro-yztbsuuz-1"],
+			[data-astro-transition-fallback="new"][data-astro-transition-scope="astro-yztbsuuz-1"] { animation: none; mix-blend-mode: normal; }</style></head>
+
+    <body class="DocPage">
+        <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
+
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.Dlzljl_G.js"></script>
+        <header class="SiteHeader">
+    <a class="SiteHeaderBrand" href="/vfx-js/">
+        <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+    </a>
+    <button class="SiteHeaderMenuButton" type="button" aria-label="Menu" aria-expanded="false" aria-controls="SiteHeaderNav">
+        <span aria-hidden="true"></span>
+    </button>
+    <nav id="SiteHeaderNav" class="SiteHeaderNav">
+        <a class="SiteHeaderDesktopOnly" href="/vfx-js/getting-started/" aria-current="page">
+            Docs
+        </a>
+        <a class="SiteHeaderMenuOnly" href="/vfx-js/getting-started/">
+                    Getting Started
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/how-it-works/">
+                    How it Works
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/ai/">
+                    Use with AI
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/effects/">
+                    Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/shaders/">
+                    Custom Shaders
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/custom-effects/">
+                    Custom Effects
+                </a><a class="SiteHeaderMenuOnly" href="/vfx-js/docs/" aria-current="page">
+                    API Reference
+                </a>
+        <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+            Examples &#8599;
+        </a>
+        <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+            GitHub &#8599;
+        </a>
+    </nav>
+</header>
+
+<script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
+
+        <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.Dte8s5GJ.js"></script>
+        <!-- Back plays the slit scan reversed. -->
+        <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
+    
+            <div class="Page">
+                <div class="DocLayout">
+                            <nav class="DocSidebar" aria-label="Docs">
+    <ul>
+        <li>
+                    <a href="/vfx-js/getting-started/">
+                        <span class="DocSidebarLabel">Getting Started</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/how-it-works/">
+                        <span class="DocSidebarLabel">How it Works</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/ai/">
+                        <span class="DocSidebarLabel">Use with AI</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/effects/">
+                        <span class="DocSidebarLabel">Effects</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/shaders/">
+                        <span class="DocSidebarLabel">Custom Shaders</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/custom-effects/">
+                        <span class="DocSidebarLabel">Custom Effects</span>
+                    </a>
+                    
+                    
+                </li><li>
+                    <a href="/vfx-js/docs/" aria-current="page">
+                        <span class="DocSidebarLabel">API Reference</span>
+                    </a>
+                    <div class="DocSidebarApi">
+                            <div>
+                                    <a class="DocSidebarPackage" href="/vfx-js/docs/#core">
+                                        <span class="DocSidebarLabel">@vfx-js/core</span>
+                                    </a>
+                                    <details>
+                                            <summary>
+                                                <span class="DocSidebarLabel">Classes</span>
+                                                <span class="DocSidebarCount">3</span>
+                                            </summary>
+                                            <ul>
+                                                <li>
+                                                        <a href="/vfx-js/docs/core/Crossfade/">
+                                                            <span class="DocSidebarLabel">
+                                                                Crossfade
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/ShaderTransition/">
+                                                            <span class="DocSidebarLabel">
+                                                                ShaderTransition
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/VFX/">
+                                                            <span class="DocSidebarLabel">
+                                                                VFX
+                                                            </span>
+                                                        </a>
+                                                    </li>
+                                            </ul>
+                                        </details><details>
+                                            <summary>
+                                                <span class="DocSidebarLabel">Functions</span>
+                                                <span class="DocSidebarCount">5</span>
+                                            </summary>
+                                            <ul>
+                                                <li>
+                                                        <a href="/vfx-js/docs/core/isHicCanvas/">
+                                                            <span class="DocSidebarLabel">
+                                                                isHicCanvas
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/markHicCanvas/">
+                                                            <span class="DocSidebarLabel">
+                                                                markHicCanvas
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/setupCapture/">
+                                                            <span class="DocSidebarLabel">
+                                                                setupCapture
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/supportsHtmlInCanvas/">
+                                                            <span class="DocSidebarLabel">
+                                                                supportsHtmlInCanvas
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/teardownCapture/">
+                                                            <span class="DocSidebarLabel">
+                                                                teardownCapture
+                                                            </span>
+                                                        </a>
+                                                    </li>
+                                            </ul>
+                                        </details><details>
+                                            <summary>
+                                                <span class="DocSidebarLabel">Interfaces</span>
+                                                <span class="DocSidebarCount">5</span>
+                                            </summary>
+                                            <ul>
+                                                <li>
+                                                        <a href="/vfx-js/docs/core/CaptureOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                CaptureOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/Effect/">
+                                                            <span class="DocSidebarLabel">
+                                                                Effect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/Transition/">
+                                                            <span class="DocSidebarLabel">
+                                                                Transition
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/TransitionEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                TransitionEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/TransitionHandle/">
+                                                            <span class="DocSidebarLabel">
+                                                                TransitionHandle
+                                                            </span>
+                                                        </a>
+                                                    </li>
+                                            </ul>
+                                        </details><details>
+                                            <summary>
+                                                <span class="DocSidebarLabel">Types</span>
+                                                <span class="DocSidebarCount">40</span>
+                                            </summary>
+                                            <ul>
+                                                <li>
+                                                        <a href="/vfx-js/docs/core/AddTransitionOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                AddTransitionOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectAttributeDescriptor/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectAttributeDescriptor
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectAttributeTypedArray/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectAttributeTypedArray
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectBlendMode/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectBlendMode
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectBlitOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectBlitOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectContext/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectContext
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectDims/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectDims
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectDrawOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectDrawOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectGeometry/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectGeometry
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectQuad/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectQuad
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectRenderTarget/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectRenderTarget
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectRenderTargetOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectRenderTargetOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectTexture/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectTexture
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectTextureFilter/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectTextureFilter
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectTextureSource/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectTextureSource
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectTextureWrap/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectTextureWrap
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectUniforms/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectUniforms
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectUniformValue/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectUniformValue
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectVFXProps/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectVFXProps
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/GlslVersion/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlslVersion
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/MarginOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                MarginOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/RunOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                RunOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/ShaderPreset/">
+                                                            <span class="DocSidebarLabel">
+                                                                ShaderPreset
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/ShowOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                ShowOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/SlideRef/">
+                                                            <span class="DocSidebarLabel">
+                                                                SlideRef
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/TransitionClass/">
+                                                            <span class="DocSidebarLabel">
+                                                                TransitionClass
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/TransitionEase/">
+                                                            <span class="DocSidebarLabel">
+                                                                TransitionEase
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/TransitionEffectContext/">
+                                                            <span class="DocSidebarLabel">
+                                                                TransitionEffectContext
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/TransitionProgress/">
+                                                            <span class="DocSidebarLabel">
+                                                                TransitionProgress
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/TransitionRun/">
+                                                            <span class="DocSidebarLabel">
+                                                                TransitionRun
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/TransitionSpec/">
+                                                            <span class="DocSidebarLabel">
+                                                                TransitionSpec
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/TransitionUniforms/">
+                                                            <span class="DocSidebarLabel">
+                                                                TransitionUniforms
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/TransitionWaitFor/">
+                                                            <span class="DocSidebarLabel">
+                                                                TransitionWaitFor
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/VFXOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                VFXOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/VFXPass/">
+                                                            <span class="DocSidebarLabel">
+                                                                VFXPass
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/VFXPostEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                VFXPostEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/VFXProps/">
+                                                            <span class="DocSidebarLabel">
+                                                                VFXProps
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/VFXUniforms/">
+                                                            <span class="DocSidebarLabel">
+                                                                VFXUniforms
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/VFXUniformValue/">
+                                                            <span class="DocSidebarLabel">
+                                                                VFXUniformValue
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/VFXWrap/">
+                                                            <span class="DocSidebarLabel">
+                                                                VFXWrap
+                                                            </span>
+                                                        </a>
+                                                    </li>
+                                            </ul>
+                                        </details><details>
+                                            <summary>
+                                                <span class="DocSidebarLabel">Variables</span>
+                                                <span class="DocSidebarCount">1</span>
+                                            </summary>
+                                            <ul>
+                                                <li>
+                                                        <a href="/vfx-js/docs/core/shaders/">
+                                                            <span class="DocSidebarLabel">
+                                                                shaders
+                                                            </span>
+                                                        </a>
+                                                    </li>
+                                            </ul>
+                                        </details>
+                                </div><div>
+                                    <a class="DocSidebarPackage" href="/vfx-js/docs/#effects">
+                                        <span class="DocSidebarLabel">@vfx-js/effects</span>
+                                    </a>
+                                    <details>
+                                            <summary>
+                                                <span class="DocSidebarLabel">Classes</span>
+                                                <span class="DocSidebarCount">33</span>
+                                            </summary>
+                                            <ul>
+                                                <li>
+                                                        <a href="/vfx-js/docs/effects/AsciiEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                AsciiEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BadJpegEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                BadJpegEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BloomEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                BloomEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/ChromaticEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                ChromaticEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/ColoredEdgesEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                ColoredEdgesEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/DatamoshEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                DatamoshEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/DitherEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                DitherEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/DuotoneEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                DuotoneEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/FluidEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                FluidEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlitchEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlitchEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GradientMapEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                GradientMapEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/HalftoneEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                HalftoneEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/HueShiftEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                HueShiftEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/JPEGGlitchEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                JPEGGlitchEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/LightStreakEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                LightStreakEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/MatrixEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                MatrixEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/ParticleEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                ParticleEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/ParticleExplodeEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                ParticleExplodeEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/PatternRefractionEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                PatternRefractionEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/PixelateEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                PixelateEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/PixelSortEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                PixelSortEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/PixelStretchEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                PixelStretchEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/RainbowEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                RainbowEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/RgbGlitchEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                RgbGlitchEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/RgbShiftEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                RgbShiftEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/ScanlineEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                ScanlineEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/SinewaveEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                SinewaveEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/SliceShiftEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                SliceShiftEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/TilePixelateEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                TilePixelateEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/TritoneEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                TritoneEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/VignetteEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                VignetteEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/VoronoiEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                VoronoiEffect
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/WarpEffect/">
+                                                            <span class="DocSidebarLabel">
+                                                                WarpEffect
+                                                            </span>
+                                                        </a>
+                                                    </li>
+                                            </ul>
+                                        </details><details open>
+                                            <summary>
+                                                <span class="DocSidebarLabel">Types</span>
+                                                <span class="DocSidebarCount">56</span>
+                                            </summary>
+                                            <ul>
+                                                <li>
+                                                        <a href="/vfx-js/docs/effects/AsciiCharRamp/">
+                                                            <span class="DocSidebarLabel">
+                                                                AsciiCharRamp
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/AsciiColor/">
+                                                            <span class="DocSidebarLabel">
+                                                                AsciiColor
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/AsciiImageSource/">
+                                                            <span class="DocSidebarLabel">
+                                                                AsciiImageSource
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/AsciiParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                AsciiParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/AsciiPresetName/">
+                                                            <span class="DocSidebarLabel">
+                                                                AsciiPresetName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BadJpegEffectOptions/">
+                                                            <span class="DocSidebarLabel">
+                                                                BadJpegEffectOptions
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/BloomParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                BloomParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/ChromaticParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                ChromaticParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/ColoredEdgesParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                ColoredEdgesParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/DatamoshColorSpace/" aria-current="page">
+                                                            <span class="DocSidebarLabel">
+                                                                DatamoshColorSpace
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/DatamoshParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                DatamoshParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/DatamoshView/">
+                                                            <span class="DocSidebarLabel">
+                                                                DatamoshView
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/DitherParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                DitherParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/DitherStyle/">
+                                                            <span class="DocSidebarLabel">
+                                                                DitherStyle
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/DuotoneParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                DuotoneParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/FluidParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                FluidParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GlitchParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                GlitchParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GradientMapMixSpace/">
+                                                            <span class="DocSidebarLabel">
+                                                                GradientMapMixSpace
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GradientMapParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                GradientMapParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/GradientMapRepeat/">
+                                                            <span class="DocSidebarLabel">
+                                                                GradientMapRepeat
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/HalftoneInk/">
+                                                            <span class="DocSidebarLabel">
+                                                                HalftoneInk
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/HalftoneInkPalette/">
+                                                            <span class="DocSidebarLabel">
+                                                                HalftoneInkPalette
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/HalftoneInkPresetName/">
+                                                            <span class="DocSidebarLabel">
+                                                                HalftoneInkPresetName
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/HalftoneMode/">
+                                                            <span class="DocSidebarLabel">
+                                                                HalftoneMode
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/HalftoneParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                HalftoneParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/HueShiftParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                HueShiftParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/JPEGGlitchParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                JPEGGlitchParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/LightStreakParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                LightStreakParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/MatrixColor/">
+                                                            <span class="DocSidebarLabel">
+                                                                MatrixColor
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/MatrixGlyphs/">
+                                                            <span class="DocSidebarLabel">
+                                                                MatrixGlyphs
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/MatrixParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                MatrixParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/MatrixTrailColor/">
+                                                            <span class="DocSidebarLabel">
+                                                                MatrixTrailColor
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/ParticleExplodeParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                ParticleExplodeParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/ParticleParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                ParticleParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/PatternRefractionParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                PatternRefractionParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/PixelateParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                PixelateParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/PixelSortDirection/">
+                                                            <span class="DocSidebarLabel">
+                                                                PixelSortDirection
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/PixelSortKey/">
+                                                            <span class="DocSidebarLabel">
+                                                                PixelSortKey
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/PixelSortParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                PixelSortParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/PixelStretchParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                PixelStretchParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/RainbowParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                RainbowParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/RefractionEdgeWrap/">
+                                                            <span class="DocSidebarLabel">
+                                                                RefractionEdgeWrap
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/RefractionPattern/">
+                                                            <span class="DocSidebarLabel">
+                                                                RefractionPattern
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/Rgba/">
+                                                            <span class="DocSidebarLabel">
+                                                                Rgba
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/RgbGlitchParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                RgbGlitchParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/RgbShiftParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                RgbShiftParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/ScanlineParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                ScanlineParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/SinewaveParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                SinewaveParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/SliceShiftParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                SliceShiftParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/TilePixelateParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                TilePixelateParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/TilePixelateShape/">
+                                                            <span class="DocSidebarLabel">
+                                                                TilePixelateShape
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/TritoneParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                TritoneParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/VignetteParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                VignetteParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/VoronoiParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                VoronoiParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/WarpParams/">
+                                                            <span class="DocSidebarLabel">
+                                                                WarpParams
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/WarpType/">
+                                                            <span class="DocSidebarLabel">
+                                                                WarpType
+                                                            </span>
+                                                        </a>
+                                                    </li>
+                                            </ul>
+                                        </details><details>
+                                            <summary>
+                                                <span class="DocSidebarLabel">Variables</span>
+                                                <span class="DocSidebarCount">2</span>
+                                            </summary>
+                                            <ul>
+                                                <li>
+                                                        <a href="/vfx-js/docs/effects/ASCII_PRESETS/">
+                                                            <span class="DocSidebarLabel">
+                                                                ASCII_PRESETS
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/effects/MATRIX_GLYPHS/">
+                                                            <span class="DocSidebarLabel">
+                                                                MATRIX_GLYPHS
+                                                            </span>
+                                                        </a>
+                                                    </li>
+                                            </ul>
+                                        </details>
+                                </div>
+                        </div>
+                    
+                </li>
+    </ul>
+    <a class="DocSidebarExtra" href="/vfx-js/examples/" target="_blank" rel="noreferrer"><span class="DocSidebarLabel">Examples &#8599;</span></a>
+</nav>
+
+<script type="module" src="/vfx-js/_astro/Sidebar.astro_astro_type_script_index_0_lang.B94Lg-ip.js"></script>
+                            <main class="DocMain ApiPage">
+                                <p class="MotionNote">
+                                    Your system asks for reduced motion, so
+                                    VFX-JS draws nothing. Demos on this site
+                                    show plain HTML.
+                                </p>
+                                
+    <nav class="ApiCrumbs" aria-label="Breadcrumb">
+        <a href="/vfx-js/docs/">API Reference</a>
+        <span aria-hidden="true">/</span>
+        <a href="/vfx-js/docs/#effects">@vfx-js/effects</a>
+    </nav>
+
+    <header class="ApiHead">
+        <p class="ApiKind">
+            Type
+        </p>
+        <h1>
+            DatamoshColorSpace
+        </h1>
+        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/83b6e1a2971c516a2e07cfb3cfa7228db6cc4b93/packages/effects/src/datamosh.ts#L293" target="_blank" rel="noreferrer">
+                    effects/src/datamosh.ts:293 &#8599;
+                </a>
+    </header>
+
+    <div class="ApiImport"><pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#F97583">import</span><span style="color:#F97583"> type</span><span style="color:#E1E4E8"> { DatamoshColorSpace } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> "@vfx-js/effects"</span><span style="color:#E1E4E8">;</span></span></code></pre></div>
+
+
+
+    <pre class="ApiCode"><code><span class="tk">type </span><span class="tr">DatamoshColorSpace</span><span class="tp"> =</span> <span class="ts">&quot;rgb&quot;</span><span class="tp"> | </span><span class="ts">&quot;ycbcr&quot;</span></code></pre>
+                            </main>
+                        </div>
+                <footer class="SiteFooter">
+    <div class="SiteFooterNav">
+        <a class="SiteFooterLogo" href="/vfx-js/">
+            <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
+        </a>
+        <div class="SiteFooterCol">
+                    <h4>Docs</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/getting-started/">Getting Started</a>
+                                </li><li>
+                                    <a href="/vfx-js/how-it-works/">How it Works</a>
+                                </li><li>
+                                    <a href="/vfx-js/ai/">Use with AI</a>
+                                </li><li>
+                                    <a href="/vfx-js/effects/">Effects</a>
+                                </li><li>
+                                    <a href="/vfx-js/shaders/">Custom Shaders</a>
+                                </li><li>
+                                    <a href="/vfx-js/custom-effects/">Custom Effects</a>
+                                </li><li>
+                                    <a href="/vfx-js/docs/">API Reference</a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Resources</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="/vfx-js/examples/" target="_blank" rel="noreferrer">
+                                        Examples <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/storybook/" target="_blank" rel="noreferrer">
+                                        Storybook <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="/vfx-js/llms.txt" target="_blank" rel="noreferrer">
+                                        llms.txt <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div><div class="SiteFooterCol">
+                    <h4>Project</h4>
+                    <ul class="SiteFooterList">
+                        <li>
+                                    <a href="https://github.com/fand/vfx-js" target="_blank" rel="noreferrer">
+                                        GitHub <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://www.npmjs.com/package/@vfx-js/core" target="_blank" rel="noreferrer">
+                                        npm <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://amagi.dev/vfx-js-transitions/" target="_blank" rel="noreferrer">
+                                        Transitions <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li><li>
+                                    <a href="https://github.com/fand/vfx-js/issues" target="_blank" rel="noreferrer">
+                                        Issues <span aria-hidden="true">&#8599;</span>
+                                    </a>
+                                </li>
+                    </ul>
+                </div>
+    </div>
+    <div class="Author">
+        <img class="AuthorIcon" src="/vfx-js/amagi.png" alt="Amagi" loading="lazy" decoding="async">
+        <div class="AuthorLinks">
+            <a href="https://github.com/fand" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/github.svg" alt="GitHub">
+            </a>
+            <a href="https://twitter.com/amagitakayosi" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/twitter.svg" alt="Twitter">
+            </a>
+            <a href="https://bsky.app/profile/amagi.dev" target="_blank" rel="noreferrer">
+                <img src="/vfx-js/bluesky.svg" alt="Bluesky">
+            </a>
+        </div>
+    </div>
+</footer>
+            </div>
+        
+</div>
+
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.CBp0mVnn.js"></script>
+
+        <div id="Frame"><div id="FrameBottom"></div></div>
+        
+
+    </body>
+</html>
