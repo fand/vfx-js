@@ -119,6 +119,7 @@ export type Reflection = {
     extendedBy?: Type[];
     implementedBy?: Type[];
     inheritedFrom?: Type;
+    implementationOf?: Type;
     sources?: Source[];
 };
 

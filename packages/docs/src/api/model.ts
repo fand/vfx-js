@@ -19,15 +19,12 @@ export type ApiPackage = {
 
 export type ApiGroup = {
     title: string;
-    /** Types that exported APIs use, but the package does not export. */
-    internal: boolean;
     pages: ApiPage[];
 };
 
 export type ApiPage = {
     pkg: ApiPackage;
     decl: Reflection;
-    internal: boolean;
     /** Site path without the base, e.g. "docs/core/VFX/". */
     path: string;
 };
@@ -41,8 +38,6 @@ export type Api = {
     byId: Map<number, Reflection>;
 };
 
-const internalGroup = "Not exported";
-
 const groupOrder = [
     "Classes",
     "Functions",
@@ -50,7 +45,6 @@ const groupOrder = [
     "Type Aliases",
     "Variables",
     "Other",
-    internalGroup,
 ];
 
 const groupTitles: Record<string, string> = {
@@ -118,7 +112,9 @@ function buildApi(project: Project): Api {
     // them again under effects. Show them once, under core.
     const core = project.children.find((m) => m.name === "@vfx-js/core");
     const coreByName = new Map(
-        (core ? declarationsOf(core) : []).map(({ decl }) => [decl.name, decl]),
+        (core ? declarationsOf(core) : [])
+            .filter((d) => !d.internal)
+            .map(({ decl }) => [decl.name, decl]),
     );
     const aliases = new Map<number, number>();
 
@@ -127,7 +123,9 @@ function buildApi(project: Project): Api {
         const pkg: ApiPackage = { slug, name: module.name, module, groups: [] };
 
         const byGroup = new Map<string, Reflection[]>();
-        for (const { decl, title } of declarationsOf(module)) {
+        for (const { decl, title, internal } of declarationsOf(module)) {
+            // Indexed for lookups, e.g. the interface a class implements.
+            index(decl);
             const original = coreByName.get(decl.name);
             if (
                 module !== core &&
@@ -135,6 +133,9 @@ function buildApi(project: Project): Api {
                 decl.sources?.[0]?.fileName.includes("vfx-js/lib/")
             ) {
                 aliasTree(decl, original, aliases);
+                continue;
+            }
+            if (internal) {
                 continue;
             }
             byGroup.set(title, [...(byGroup.get(title) ?? []), decl]);
@@ -146,7 +147,6 @@ function buildApi(project: Project): Api {
         for (const title of titles) {
             const group: ApiGroup = {
                 title: groupTitles[title] ?? title,
-                internal: title === internalGroup,
                 pages: [],
             };
             const decls = (byGroup.get(title) ?? []).sort((a, b) =>
@@ -156,12 +156,10 @@ function buildApi(project: Project): Api {
                 const page: ApiPage = {
                     pkg,
                     decl,
-                    internal: group.internal,
                     path: `docs/${slug}/${decl.name}/`,
                 };
                 group.pages.push(page);
                 pages.push(page);
-                index(decl);
                 assignPaths(decl, page.path, paths);
             }
             pkg.groups.push(group);
@@ -176,32 +174,45 @@ function buildApi(project: Project): Api {
         }
     }
 
-    return { packages, pages, paths, byId };
+    const api = { packages, pages, paths, byId };
+
+    // Hidden members link to the interface member they copy.
+    for (const page of pages) {
+        for (const m of membersOf(page.decl)) {
+            const original = interfaceMemberOf(api, m);
+            const path = original && paths.get(original.id);
+            if (path) {
+                walk(m, (r) => paths.set(r.id, path));
+            }
+        }
+    }
+
+    return api;
 }
 
 /**
  * Top-level declarations of a package with their group title.
- * Types the package uses but does not export are in TypeDoc's `<internal>`
- * namespace; they get their own group.
+ * TypeDoc puts types that exported APIs use, but the package does not
+ * export, in an `<internal>` namespace. Those get no page.
  */
-function declarationsOf(
-    module: Reflection,
-): { decl: Reflection; title: string }[] {
-    const out: { decl: Reflection; title: string }[] = [];
+type Declaration = { decl: Reflection; title: string; internal: boolean };
+
+function declarationsOf(module: Reflection): Declaration[] {
+    const out: Declaration[] = [];
     for (const decl of module.children ?? []) {
         if (
             decl.name === "<internal>" &&
             decl.kind & (Kind.Module | Kind.Namespace)
         ) {
             for (const inner of decl.children ?? []) {
-                out.push({ decl: inner, title: internalGroup });
+                out.push({ decl: inner, title: "", internal: true });
             }
             continue;
         }
         const title =
             module.groups?.find((g) => g.children.includes(decl.id))?.title ??
             "Other";
-        out.push({ decl, title });
+        out.push({ decl, title, internal: false });
     }
     return out;
 }
@@ -280,6 +291,58 @@ function aliasTree(
             walk(m, (r) => out.set(r.id, o.id));
         }
     }
+}
+
+/**
+ * Class members that only implement an interface member and repeat its
+ * docs, e.g. `render()` on every effect. The interface page documents them.
+ */
+export function isInterfaceCopy(api: Api, member: Reflection): boolean {
+    return interfaceMemberOf(api, member) !== undefined;
+}
+
+/** The interface member that a hidden class member copies. */
+export function interfaceMemberOf(
+    api: Api,
+    member: Reflection,
+): Reflection | undefined {
+    // Inherited from a member that is hidden itself, e.g. Crossfade gets
+    // `render()` from ShaderTransition, which gets it from Transition.
+    const parent = member.inheritedFrom;
+    if (parent?.type === "reference" && typeof parent.target === "number") {
+        const original = api.byId.get(parent.target);
+        if (original && ownerOf(api, original)) {
+            return interfaceMemberOf(api, original);
+        }
+    }
+    const impl = member.implementationOf;
+    if (impl?.type !== "reference" || typeof impl.target !== "number") {
+        return undefined;
+    }
+    const original = api.byId.get(impl.target);
+    return original && docsOf(member) === docsOf(original)
+        ? original
+        : undefined;
+}
+
+/** The class or interface a member belongs to. */
+function ownerOf(api: Api, member: Reflection): Reflection | undefined {
+    for (const page of api.pages) {
+        if (membersOf(page.decl).includes(member)) {
+            return page.decl;
+        }
+    }
+    return undefined;
+}
+
+function docsOf(r: Reflection): string {
+    const comments = [
+        r.comment,
+        ...(r.signatures ?? []).map((s) => s.comment),
+        r.getSignature?.comment,
+        r.setSignature?.comment,
+    ];
+    return JSON.stringify(comments.find(Boolean) ?? null);
 }
 
 /** Site URL (with base) of a reflection, if it has a page. */

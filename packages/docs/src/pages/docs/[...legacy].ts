@@ -1,8 +1,7 @@
 // Redirects from the old TypeDoc site, e.g. docs/classes/_vfx-js_core.VFX.html → docs/core/VFX/.
 // GitHub Pages has no server redirects, so these are small HTML pages.
 import type { APIRoute, GetStaticPaths } from "astro";
-import { hrefOf, legacyFolders, loadApi, walk } from "../../api/model";
-import { Kind } from "../../api/types";
+import { hrefOf, legacyFolders, loadApi } from "../../api/model";
 import { siteUrl, url } from "../../site";
 
 export const getStaticPaths = (() => {
@@ -17,14 +16,20 @@ export const getStaticPaths = (() => {
         paths.set(`modules/${prefix}.html`, `${docs}#${pkg.slug}`);
         // Every declaration TypeDoc made a page for, including the copies
         // of core types under effects.
-        walk(pkg.module, (r) => {
-            const folder = legacyFolders[r.kind];
-            const href = hrefOf(api, r.id);
-            if (!folder || !href || r.kind === Kind.Module) {
-                return;
+        // Types that are no longer listed (not exported) go to the package.
+        for (const decl of pkg.module.children ?? []) {
+            const inner =
+                decl.name === "<internal>" ? (decl.children ?? []) : [decl];
+            for (const r of inner) {
+                const folder = legacyFolders[r.kind];
+                if (!folder) {
+                    continue;
+                }
+                const href =
+                    hrefOf(api, r.id)?.split("#")[0] ?? `${docs}#${pkg.slug}`;
+                paths.set(`${folder}/${prefix}.${r.name}.html`, href);
             }
-            paths.set(`${folder}/${prefix}.${r.name}.html`, href.split("#")[0]);
-        });
+        }
     }
 
     return [...paths].map(([legacy, to]) => ({

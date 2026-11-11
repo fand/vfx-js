@@ -41,12 +41,6 @@ function summaryHtml(parts: Parameters<typeof inlineMarkdownHtml>[1]) {
                 {pkg.groups.map((group) => (
                     <div class="ApiIndexGroup">
                         <h3>{group.title}</h3>
-                        {group.internal && (
-                            <p class="ApiNote">
-                                Exported APIs use these types, but {pkg.name} does
-                                not export them.
-                            </p>
-                        )}
                         <ul class="ApiIndexList">
                             {group.pages.map((page) => (
                                 <li>

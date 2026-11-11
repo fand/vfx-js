@@ -6,6 +6,8 @@ import ApiSignature from "../../../components/api/ApiSignature.astro";
 import Layout from "../../../layouts/Layout.astro";
 import {
     type ApiPage,
+    hrefOf,
+    isInterfaceCopy,
     kindLabel,
     loadApi,
     membersOf,
@@ -35,9 +37,7 @@ const { decl, pkg } = page;
 
 const kind = kindLabel(decl.kind);
 const isTypeOnly = decl.kind === Kind.Interface || decl.kind === Kind.TypeAlias;
-const importCode = page.internal
-    ? undefined
-    : `import ${isTypeOnly ? "type " : ""}{ ${decl.name} } from "${pkg.name}";`;
+const importCode = `import ${isTypeOnly ? "type " : ""}{ ${decl.name} } from "${pkg.name}";`;
 
 const source = decl.sources?.[0];
 const sourceUrl = source?.url;
@@ -57,14 +57,17 @@ const relations = [
 // Members, grouped like TypeDoc groups them: Constructors, Properties, Methods, ...
 const members = membersOf(decl);
 const memberGroups: { title: string; members: Reflection[] }[] = [];
+// Members that only repeat an interface's docs. Listed by name only.
+const interfaceCopies = members.filter((m) => isInterfaceCopy(api, m));
 if (decl.kind === Kind.Class || decl.kind === Kind.Interface) {
     for (const g of decl.groups ?? []) {
-        memberGroups.push({
-            title: g.title,
-            members: g.children
-                .map((id) => members.find((m) => m.id === id))
-                .filter((m): m is Reflection => Boolean(m)),
-        });
+        const shown = g.children
+            .map((id) => members.find((m) => m.id === id))
+            .filter((m): m is Reflection => Boolean(m))
+            .filter((m) => !interfaceCopies.includes(m));
+        if (shown.length > 0) {
+            memberGroups.push({ title: g.title, members: shown });
+        }
     }
 } else if (members.length > 0) {
     memberGroups.push({ title: "Properties", members });
@@ -85,6 +88,12 @@ const typeParams =
         ? typeParamsHtml(api, decl.typeParameters)
         : "";
 
+/** Link to the interface member a hidden class member copies. */
+function memberLinkHtml(m: Reflection): string {
+    const href = hrefOf(api, m.id);
+    return href ? `<a class="tr" href="${href}">${m.name}</a>` : m.name;
+}
+
 const description = plainSummary(decl) || `${decl.name} in ${pkg.name}.`;
 ---
 
@@ -103,7 +112,6 @@ const description = plainSummary(decl) || `${decl.name} in ${pkg.name}.`;
     <header class="ApiHead">
         <p class="ApiKind">
             {kind}
-            {page.internal && <span class="ApiBadge">not exported</span>}
         </p>
         <h1>
             {decl.name}{
@@ -122,14 +130,6 @@ const description = plainSummary(decl) || `${decl.name} in ${pkg.name}.`;
     </header>
 
     {importCode && <div class="ApiImport" set:html={highlight(importCode)} />}
-    {
-        page.internal && (
-            <p class="ApiNote">
-                {pkg.name} does not export this type. It is listed because
-                exported APIs use it.
-            </p>
-        )
-    }
 
     <ApiComment comment={decl.comment} />
 
@@ -146,6 +146,16 @@ const description = plainSummary(decl) || `${decl.name} in ${pkg.name}.`;
                         </dd>
                     </>
                 ))}
+                {interfaceCopies.length > 0 && (
+                    <>
+                        <dt>Interface members</dt>
+                        <dd class="ApiAlso">
+                            {interfaceCopies.map((m) => (
+                                <code class="ApiInline" set:html={memberLinkHtml(m)} />
+                            ))}
+                        </dd>
+                    </>
+                )}
             </dl>
         )
     }

@@ -427,6 +427,10 @@ export function signatureHtml(
                     : ": ",
             ),
             typeHtml(api, p.type, indent),
+            // Defaults show in the page's signatures, not in inline types.
+            p.defaultValue !== undefined && !opts.arrow
+                ? punct(` = ${p.defaultValue}`)
+                : "",
         ].join(""),
     );
     const head = opts.arrow
