@@ -152,14 +152,21 @@ const t = vfx.addTransition(el, {
                             own page transition.
                         </li>
                         <li>
+                            Vue Router: each page needs one root element, and{" "}
+                            <code>&lt;RouterView&gt;</code> must be a direct
+                            child of <code>&lt;VFXTransition&gt;</code>. Each
+                            path change remounts the page, even with the same
+                            component. It replaces your own{" "}
+                            <code>&lt;Transition&gt;</code>.
+                        </li>
+                        <li>
                             SvelteKit: each path change remounts the page and
                             its nested layouts.
                         </li>
                         <li>
-                            Vue Router (without Nuxt) and{" "}
-                            <code>useVFXTransition</code> don't hand the old
-                            page over. With <code>useVFXTransition</code>, call{" "}
-                            <code>ctx.keepPlaying()</code> yourself.
+                            <code>useVFXTransition</code> doesn&apos;t hand the
+                            old page over. Call <code>ctx.keepPlaying()</code>{" "}
+                            yourself.
                         </li>
                     </ul>
                 </div>

@@ -1,6 +1,7 @@
 import { cloneVNode, type VNode } from "vue";
 import { defineVFXTransition, type RouterContext } from "../base.js";
 import { connectRouter, type RouterLike } from "../connect-router.js";
+import { keepingTransition } from "../keep-playing.js";
 
 // Read from the app, not imported, so a second copy of `nuxt`
 // in the bundle never gets a different instance.
@@ -8,38 +9,12 @@ type NuxtAppLike = {
     hook(name: "page:finish", fn: () => void): () => void;
 };
 
-// A page transition that hands the leaving page to core and ends when core gives it back.
-function keepingTransition(ctx: RouterContext) {
-    return {
-        css: false,
-        // Both pages are in the DOM at once, so the new one is captured during the run.
-        mode: "default",
-        onLeave(el: Element, done: () => void) {
-            const parent = el.parentNode;
-            ctx.held?.keepPlaying(el, () => done());
-            // Core keeps nothing when the run does not use keepPlaying.
-            if (el.parentNode === parent) {
-                done();
-            }
-        },
-    };
-}
-
-const transitions = new WeakMap<
-    RouterContext,
-    ReturnType<typeof keepingTransition>
->();
-
 // <NuxtPage> needs the transition from its first render, so its first leave runs it.
 function withKeepingTransition(nodes: VNode[], ctx: RouterContext): VNode[] {
     if (!ctx.keepPlaying()) {
         return nodes;
     }
-    let transition = transitions.get(ctx);
-    if (!transition) {
-        transition = keepingTransition(ctx);
-        transitions.set(ctx, transition);
-    }
+    const transition = keepingTransition(ctx);
     return nodes.map((node) =>
         (node.type as { name?: string }).name === "NuxtPage"
             ? cloneVNode(node, { transition })

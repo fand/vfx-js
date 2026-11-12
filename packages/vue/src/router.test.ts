@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { RunOpts, Transition } from "@vfx-js/core";
+import type { RunContext, RunOpts, Transition } from "@vfx-js/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     type App,
@@ -7,14 +7,16 @@ import {
     createApp,
     defineComponent,
     h,
+    nextTick,
     ref,
+    type VNode,
 } from "vue";
 import { setNextTransition, takePending } from "./pending.js";
 import { VFXTransition } from "./router/index.js";
 import { useTransitionIn } from "./use-transition-in.js";
 
 type Run = {
-    cb: () => void | Promise<void>;
+    cb: (ctx: Pick<RunContext, "keepPlaying">) => void | Promise<void>;
     opts: () => RunOpts;
     done: Promise<void>;
     // What the page showed when the run let go.
@@ -23,6 +25,9 @@ type Run = {
 
 const mock = vi.hoisted(() => {
     const runs: Run[] = [];
+    const keep: { keepPlaying: RunContext["keepPlaying"] } = {
+        keepPlaying: () => {},
+    };
     const handle = {
         run(cb: Run["cb"], opts: Run["opts"]) {
             let resolve!: () => void;
@@ -33,7 +38,9 @@ const mock = vi.hoisted(() => {
             runs.push(run);
             // Like core: call cb (after the snapshot), then read opts.
             return Promise.resolve()
-                .then(cb)
+                .then(() =>
+                    cb({ keepPlaying: (...args) => keep.keepPlaying(...args) }),
+                )
                 .then(() => {
                     run.endText = document.body.textContent;
                     resolve();
@@ -49,7 +56,7 @@ const mock = vi.hoisted(() => {
         destroy: vi.fn(),
     };
     const init = vi.fn(() => vfx);
-    return { runs, handle, vfx, init };
+    return { runs, keep, handle, vfx, init };
 });
 
 vi.mock("@vfx-js/core", () => ({ VFX: { init: mock.init } }));
@@ -75,7 +82,7 @@ const About = defineComponent({
 
 // Like vue-router: guards, then the route changes, then afterEach.
 // <RouterView> renders the new page on the next flush.
-function fakeRouter(page: { value: Component }) {
+function fakeRouter(page: { value: Component }, path: { value: string }) {
     const before = new Set<Guard>();
     const after = new Set<AfterGuard>();
     return {
@@ -101,6 +108,7 @@ function fakeRouter(page: { value: Component }) {
             }
             await Promise.all([...before].map((g) => g(to, from)));
             page.value = next;
+            path.value = to.path;
             for (const g of after) {
                 g(to, from);
             }
@@ -123,6 +131,7 @@ describe("VFXTransition (router)", () => {
     let app: App | null;
     let router: ReturnType<typeof fakeRouter>;
     const page = ref<Component>(Home);
+    const path = ref("/");
 
     function mount(props: Record<string, unknown> = {}, withRouter = true) {
         app = createApp({
@@ -150,7 +159,8 @@ describe("VFXTransition (router)", () => {
         mock.handle.cancel.mockClear();
         takePending();
         page.value = Home;
-        router = fakeRouter(page);
+        path.value = "/";
+        router = fakeRouter(page, path);
         window.history.replaceState({ position: 0 }, "");
         container = document.createElement("div");
         document.body.appendChild(container);
@@ -279,5 +289,125 @@ describe("VFXTransition (router)", () => {
         );
         expect(container.textContent).toBe("home");
         warn.mockRestore();
+    });
+
+    describe("keepPlaying", () => {
+        type ViewSlot = (props: {
+            Component: VNode;
+            route: { path: string };
+        }) => unknown;
+        let slotted = false;
+        // Like vue-router's <RouterView>: the slot gets the page vnode and the route.
+        const RouterView = defineComponent({
+            name: "RouterView",
+            setup(_, { slots }) {
+                return () => {
+                    const Component = h(page.value);
+                    slotted = slots.default !== undefined;
+                    return slots.default
+                        ? slots.default({
+                              Component,
+                              route: { path: path.value },
+                          })
+                        : Component;
+                };
+            },
+        });
+        const mountView = (props: Record<string, unknown>, slot?: ViewSlot) => {
+            app = createApp({
+                render: () =>
+                    h(VFXTransition, props, {
+                        default: () =>
+                            h(RouterView, null, slot ? { default: slot } : {}),
+                    }),
+            });
+            app.config.globalProperties.$router = router.router;
+            app.mount(container);
+        };
+        // Like core: move the node out, and give it back with onReturn.
+        const handOver = () => {
+            const kept: { node: Node; giveBack: () => void }[] = [];
+            mock.keep.keepPlaying = vi.fn((nodes, onReturn) => {
+                const node = nodes as Node;
+                const parent = node.parentNode;
+                const next = node.nextSibling;
+                (node as ChildNode).remove();
+                kept.push({
+                    node,
+                    giveBack: () => {
+                        parent?.insertBefore(node, next);
+                        onReturn?.(node);
+                    },
+                });
+            });
+            return kept;
+        };
+
+        beforeEach(() => {
+            slotted = false;
+            mock.keep.keepPlaying = () => {};
+        });
+
+        it("leaves <RouterView> alone without keepPlaying", () => {
+            mountView({});
+            expect(slotted).toBe(false);
+            expect(container.textContent).toBe("home");
+        });
+
+        it("hands the old page to core and removes it when core gives it back", async () => {
+            mountView({ keepPlaying: true });
+            const old = container.querySelector("p");
+            const kept = handOver();
+            const run = await go("/", "/about", About);
+            expect(kept.map((k) => k.node)).toEqual([old]);
+            expect(run.endText).toBe("about");
+            // Vue waits for core before it unmounts the old page.
+            kept[0].giveBack();
+            await nextTick();
+            expect(container.textContent).toBe("about");
+            expect(old?.isConnected).toBe(false);
+        });
+
+        it("hands the page over when only the path changes", async () => {
+            mountView({ keepPlaying: true });
+            const old = container.querySelector("p");
+            const kept = handOver();
+            await go("/a", "/b", Home);
+            expect(kept.map((k) => k.node)).toEqual([old]);
+            kept[0].giveBack();
+            await nextTick();
+            expect(container.querySelectorAll("p")).toHaveLength(1);
+        });
+
+        it("wraps the page from your own <RouterView> slot", async () => {
+            mountView({ keepPlaying: true }, ({ Component }) =>
+                h("section", [Component]),
+            );
+            const old = container.querySelector("section");
+            const kept = handOver();
+            await go("/", "/about", About);
+            expect(kept.map((k) => k.node)).toEqual([old]);
+        });
+
+        it("removes the old page at once when core keeps nothing", async () => {
+            mountView({ keepPlaying: true });
+            mock.keep.keepPlaying = vi.fn();
+            await go("/", "/about", About);
+            expect(mock.keep.keepPlaying).toHaveBeenCalledOnce();
+            expect(container.textContent).toBe("about");
+        });
+
+        it("warns when the slot renders more than one node", () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            mountView({ keepPlaying: true }, ({ Component }) => [
+                Component,
+                h("p", "footer"),
+            ]);
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining("one page"),
+            );
+            expect(container.textContent).toBe("homefooter");
+            warn.mockRestore();
+        });
     });
 });

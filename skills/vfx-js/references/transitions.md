@@ -114,7 +114,7 @@ await t.run((ctx) => {
 - With function opts (and with `autoReverse`, unless the run's opts are an object), set `keepPlaying` on the container. The function can turn it off but not on.
 - The hidden canvas holds a copy of the container without its `id`, outside its parent. Rules that reach the old content through `#id`, ancestors or siblings don't apply during the run. The canvas sits next to the container, so sibling selectors like `main + footer` can break for a moment.
 - It costs one more html-in-canvas capture per frame during the run.
-- `<VFXTransition>` for React (Next.js, React Router), Nuxt, SvelteKit and Astro takes `keepPlaying`. `useVFXTransition` passes `ctx` to `cb`, so call `ctx.keepPlaying` yourself. `@vfx-js/vue/router` does not use it yet.
+- `<VFXTransition>` for React (Next.js, React Router), Nuxt, Vue Router, SvelteKit and Astro takes `keepPlaying`. `useVFXTransition` passes `ctx` to `cb`, so call `ctx.keepPlaying` yourself.
 
 ## Presets
 
@@ -396,6 +396,7 @@ useTransitionIn({ transition: Glitch });
 - Props are the `addTransition` options plus `fullscreen`. `:fullscreen="false"` lets you size the target with CSS.
 - A page with an async `setup` under your own `<Suspense>` may be captured early. Use `waitFor`.
 - Nuxt: `keep-playing` on `<VFXTransition>` keeps the old page's DOM (CSS animations, videos) playing during the run. It gives `<NuxtPage>` a page transition, so `<NuxtPage>` must be a direct child, and the page needs one root element. It sets `css: false` and `mode: "default"` over your own page transition. Vue unmounts the old page as usual, so its Vue state stops updating. Set it on `<VFXTransition>`: a page or link spec can turn it off but not on.
+- Vue Router: `keep-playing` works the same way. `<RouterView>` must be a direct child of `<VFXTransition>`. It renders the page in a `<Transition>` keyed by path, so a page remounts on each path change, even with the same component. With your own `<RouterView v-slot>`, the slot must render one root node; it replaces your own `<Transition>`.
 
 ## Svelte: SvelteKit
 
