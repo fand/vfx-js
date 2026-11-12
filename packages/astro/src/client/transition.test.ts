@@ -375,6 +375,47 @@ describe("installTransition", () => {
             expect(ghost.hasAttribute(PERSIST)).toBe(false);
         });
 
+        it("an aborted navigation hands nothing over, then or later", async () => {
+            document.body.innerHTML = target(
+                '{"keepPlaying":true}',
+                "<p>old</p>",
+            );
+            installTransition({ swapFunctions });
+            await navigate({ doc: page(target("{}", "new")), abort: true });
+            await flush();
+            expect(mock.runs[0]?.done).toBe(true);
+            expect(mock.kept).toHaveLength(0);
+            expect(document.body.textContent).toContain("old");
+            // A later navigation that turns keepPlaying off must not use the freed run.
+            const link = document.createElement("a");
+            link.setAttribute("data-vfx-transition", '{"keepPlaying":false}');
+            await navigate({ source: link, doc: page(target("{}", "newer")) });
+            expect(mock.kept).toHaveLength(0);
+            expect(document.body.textContent).toContain("newer");
+        });
+
+        it("a newer navigation hands over with its own run", async () => {
+            document.body.innerHTML = target(
+                '{"keepPlaying":true}',
+                "<p>old</p>",
+            );
+            installTransition({ swapFunctions });
+            const doc = page(target("{}", "new"));
+            const prep = Object.assign(new Event("astro:before-preparation"), {
+                loader: async () => {},
+                newDocument: doc,
+                direction: "forward",
+                signal: new AbortController().signal,
+            });
+            document.dispatchEvent(prep);
+            await prep.loader();
+            await navigate({ doc: page(target("{}", "newer")) });
+            await flush();
+            expect(mock.runs.map((r) => r.done)).toEqual([true, true]);
+            expect(mock.kept).toHaveLength(1);
+            expect(document.body.textContent).toContain("newer");
+        });
+
         it("takes keepPlaying from the link", async () => {
             installTransition({ swapFunctions });
             const link = document.createElement("a");

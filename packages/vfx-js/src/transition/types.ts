@@ -94,6 +94,7 @@ export type TransitionSpec<
      * Keep capturing the old content during the run, so its animations and videos keep playing.
      * It costs one more capture per frame.
      * Hand the old nodes over with `ctx.keepPlaying()` in the `run()` callback; `show()` does it for you.
+     * Function opts can turn it off but not on; set it on the container then.
      * Default false.
      */
     keepPlaying?: boolean;
@@ -137,8 +138,8 @@ export type RunContext = {
      * VFX-JS moves them into a hidden canvas and removes them when the run ends.
      * With `onReturn`, it moves each node back to its old place instead, then calls `onReturn`.
      * Use it when a framework still owns the nodes.
-     * No-op unless the run may use `keepPlaying`.
-     * With function opts it keeps them until the spec is known.
+     * No-op unless the run uses `keepPlaying`.
+     * With function opts, only the container's `keepPlaying` turns it on.
      */
     keepPlaying(
         nodes: Node | Iterable<Node>,

@@ -41,6 +41,7 @@ export class KeepPlaying implements KeepPlayingLike {
     #returning: Returning[] = [];
     // The element's scroll offset, read before its nodes move out.
     #scroll: readonly [number, number];
+    #resizeObserver: ResizeObserver | null = null;
 
     constructor(host: KeepPlayingHost, element: HTMLElement) {
         this.#host = host;
@@ -62,15 +63,11 @@ export class KeepPlaying implements KeepPlayingLike {
         style.setProperty("padding", "0");
         style.setProperty("border", "none");
         style.setProperty("pointer-events", "none");
-        style.setProperty("width", `${rect.width}px`);
-        style.setProperty("height", `${rect.height}px`);
 
         const box = element.cloneNode(false) as HTMLElement;
         box.removeAttribute("id");
         box.style.setProperty("margin", "0");
         box.style.setProperty("box-sizing", "border-box");
-        box.style.setProperty("width", `${rect.width}px`);
-        box.style.setProperty("height", `${rect.height}px`);
         // Clip, so the box can scroll like the element even if its own rules no longer match.
         box.style.setProperty("overflow", "hidden");
         canvas.append(box);
@@ -91,7 +88,24 @@ export class KeepPlaying implements KeepPlayingLike {
 
         this.#canvas = canvas;
         this.#box = box;
+        this.#setSize(rect.width, rect.height);
         this.#unfreeze = host.freezeInside(canvas);
+
+        // Follow the wrapper's size, so `from` never stretches.
+        if (anchor !== element && typeof ResizeObserver !== "undefined") {
+            this.#resizeObserver = new ResizeObserver(() => {
+                const { width, height } = anchor.getBoundingClientRect();
+                this.#setSize(width, height);
+            });
+            this.#resizeObserver.observe(anchor);
+        }
+    }
+
+    #setSize(width: number, height: number): void {
+        for (const target of [this.#canvas, this.#box]) {
+            target.style.setProperty("width", `${width}px`);
+            target.style.setProperty("height", `${height}px`);
+        }
     }
 
     get texture(): EffectTexture | null {
@@ -135,6 +149,7 @@ export class KeepPlaying implements KeepPlayingLike {
                 }
             }
         } finally {
+            this.#resizeObserver?.disconnect();
             this.#canvas.remove();
             this.#unfreeze();
         }

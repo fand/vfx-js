@@ -111,6 +111,7 @@ await t.run((ctx) => {
 - `ctx.keepPlaying(nodes)` moves the nodes out of the container. VFX-JS removes them when the run ends. `show()` puts its slides back, hidden or removed.
 - `ctx.keepPlaying(nodes, onReturn)` puts each node back in its old place when the run ends, then calls `onReturn(node)`. Use it when a framework still owns the nodes.
 - Without `keepPlaying`, or when no nodes are handed over, the run uses the snapshot. Without html-in-canvas too.
+- With function opts (and with `autoReverse`, unless the run's opts are an object), set `keepPlaying` on the container. The function can turn it off but not on.
 - The hidden canvas holds a copy of the container without its `id`, outside its parent. Rules that reach the old content through `#id`, ancestors or siblings don't apply during the run. The canvas sits next to the container, so sibling selectors like `main + footer` can break for a moment.
 - It costs one more html-in-canvas capture per frame during the run.
 - `<VFXTransition>` for React (Next.js, React Router), Nuxt, SvelteKit and Astro takes `keepPlaying`. `useVFXTransition` passes `ctx` to `cb`, so call `ctx.keepPlaying` yourself. `@vfx-js/vue/router` does not use it yet.

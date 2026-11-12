@@ -25,6 +25,7 @@ import {
     pauseIntersection,
     stepIntersection,
 } from "./intersection-state.js";
+import { createLiveTexture, type LiveTexture } from "./live-capture.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import { ProgramCache } from "./program-cache.js";
 import {
@@ -41,7 +42,6 @@ import {
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
 import type {
     Effect,
-    EffectTexture,
     EffectUniformValue,
     EffectVFXProps,
     VFXElement,
@@ -55,13 +55,6 @@ import type {
     VFXUniformValue,
     VFXWrap,
 } from "./types.js";
-
-/** See `VFXPlayer.liveTexture`. */
-export type LiveTexture = {
-    readonly texture: EffectTexture | null;
-    update(offscreen: OffscreenCanvas): void;
-    dispose(): void;
-};
 
 const gifFor = new Map<HTMLElement, GIFData>();
 
@@ -1069,31 +1062,18 @@ export class VFXPlayer {
      * `texture` is null until the first capture.
      */
     liveTexture(): LiveTexture {
-        let current: Texture | null = null;
-        const handle = makeEffectTexture(
-            () => current as Texture,
-            () => (current ? readTextureSourceDim(current, "w") : 0),
-            () => (current ? readTextureSourceDim(current, "h") : 0),
-        );
-        return {
-            get texture() {
-                return current ? handle : null;
-            },
-            update: (offscreen) => {
-                if (current) {
-                    current = this.#textureFromCapture(current, offscreen);
-                    return;
-                }
-                current = new Texture(this.#ctx, offscreen);
+        return createLiveTexture(
+            (offscreen) => {
+                const texture = new Texture(this.#ctx, offscreen);
                 // Effects read `ctx.src` as premultiplied; match it.
-                current.premultiplyAlpha = true;
-                current.needsUpdate = true;
+                texture.premultiplyAlpha = true;
+                texture.needsUpdate = true;
+                return texture;
             },
-            dispose: () => {
-                current?.dispose();
-                current = null;
-            },
-        };
+            (texture, offscreen) =>
+                this.#textureFromCapture(texture, offscreen),
+            readTextureSourceDim,
+        );
     }
 
     /**

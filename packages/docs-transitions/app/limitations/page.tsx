@@ -125,6 +125,13 @@ const t = vfx.addTransition(el, {
                             running as they are.
                         </li>
                     </ul>
+                    <h3>Function opts can't turn it on</h3>
+                    <p>
+                        With <code>run(cb, () =&gt; opts)</code>, the spec is
+                        known only after <code>cb</code>, which is too late to
+                        keep the old nodes. Set <code>keepPlaying</code> on the
+                        container; the function can still turn it off.
+                    </p>
                     <h3>Set it on the component</h3>
                     <p>
                         In React, Nuxt and SvelteKit, set{" "}

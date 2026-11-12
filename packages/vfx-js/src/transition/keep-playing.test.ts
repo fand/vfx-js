@@ -92,4 +92,61 @@ describe("KeepPlaying", () => {
         expect(box.style.overflow).toBe("hidden");
         expect([box.scrollLeft, box.scrollTop]).toEqual([30, 120]);
     });
+
+    test("follows the wrapper's size during the run", () => {
+        const observers: { fire(): void; disconnect: () => void }[] = [];
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                #callback: () => void;
+                disconnect = vi.fn();
+                constructor(callback: () => void) {
+                    this.#callback = callback;
+                    observers.push(this);
+                }
+                observe() {}
+                fire() {
+                    this.#callback();
+                }
+            },
+        );
+        try {
+            const wrapper = document.createElement("canvas");
+            const element = document.createElement("div");
+            wrapper.append(element);
+            document.body.append(wrapper);
+            let size = { width: 100, height: 50 };
+            wrapper.getBoundingClientRect = () =>
+                ({ left: 0, top: 0, ...size }) as DOMRect;
+            const keep = new KeepPlaying(
+                {
+                    captureLive: () => ({ texture: null, dispose: () => {} }),
+                    freezeInside: () => () => {},
+                },
+                element,
+            );
+            const canvas = document.querySelector(
+                "[data-vfx-keep-playing]",
+            ) as HTMLElement;
+            const box = canvas.firstElementChild as HTMLElement;
+            expect([canvas.style.width, box.style.height]).toEqual([
+                "100px",
+                "50px",
+            ]);
+            size = { width: 300, height: 120 };
+            observers[0].fire();
+            expect([canvas.style.width, canvas.style.height]).toEqual([
+                "300px",
+                "120px",
+            ]);
+            expect([box.style.width, box.style.height]).toEqual([
+                "300px",
+                "120px",
+            ]);
+            keep.dispose();
+            expect(observers[0].disconnect).toHaveBeenCalledOnce();
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
 });

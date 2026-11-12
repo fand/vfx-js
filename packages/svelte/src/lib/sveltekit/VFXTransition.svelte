@@ -117,6 +117,19 @@
         });
     });
 
+    // A new key per path change, never one used before.
+    // Svelte revives a leaving block whose key comes back, and a held page must not come back.
+    let pageCount = 0;
+    let keyPath = page.url.pathname;
+    const pageKey = $derived.by(() => {
+        const path = page.url.pathname;
+        if (path !== keyPath) {
+            keyPath = path;
+            pageCount++;
+        }
+        return pageCount;
+    });
+
     // Longer than any run; the outro ends when core gives the page back.
     const HOLD_MS = 60 * 60 * 1000;
 
@@ -161,7 +174,7 @@
     >
         {#if keepPlaying}
             <!-- A new path makes a new block, so the old page stays while it leaves. -->
-            {#key page.url.pathname}
+            {#key pageKey}
                 <div style="display: contents" out:keepOldPage>
                     {@render children?.()}
                 </div>

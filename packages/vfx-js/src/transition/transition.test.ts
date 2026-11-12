@@ -1834,11 +1834,24 @@ describe("keepPlaying", () => {
         expect(lives).toHaveLength(0);
     });
 
-    test("a lazy spec without keepPlaying drops the nodes after cb", async () => {
-        const { transition, starts, lives, liveSource } = setup();
+    test("a lazy spec keeps nothing unless the container turns keepPlaying on", async () => {
+        const { transition, starts, lives } = setup();
         const run = transition.run(
             (ctx) => ctx.keepPlaying(node("a")),
-            () => ({}),
+            () => ({ keepPlaying: true }),
+        );
+        (await started(starts, 0)).end();
+        await run;
+        expect(lives).toHaveLength(0);
+    });
+
+    test("a lazy spec can turn the container's keepPlaying off", async () => {
+        const { transition, starts, lives, liveSource } = setup({
+            keepPlaying: true,
+        });
+        const run = transition.run(
+            (ctx) => ctx.keepPlaying(node("a")),
+            () => ({ keepPlaying: false }),
         );
         const start = await started(starts, 0);
         expect(lives[0].disposed).toBe(true);
@@ -1847,11 +1860,11 @@ describe("keepPlaying", () => {
         await run;
     });
 
-    test("a lazy spec with keepPlaying keeps the nodes", async () => {
-        const { transition, starts, lives } = setup();
+    test("a lazy spec keeps the nodes with the container's keepPlaying", async () => {
+        const { transition, starts, lives } = setup({ keepPlaying: true });
         const run = transition.run(
             (ctx) => ctx.keepPlaying(node("a")),
-            () => ({ keepPlaying: true }),
+            () => ({}),
         );
         const start = await started(starts, 0);
         expect(lives[0].disposed).toBe(false);
@@ -1860,11 +1873,22 @@ describe("keepPlaying", () => {
         expect(lives[0].disposed).toBe(true);
     });
 
+    test("autoReverse with a static spec keeps the nodes it asks for", async () => {
+        const { transition, starts, lives } = setup({ autoReverse: true });
+        const run = transition.run((ctx) => ctx.keepPlaying(node("a")), {
+            keepPlaying: true,
+        });
+        const start = await started(starts, 0);
+        expect(lives[0].disposed).toBe(false);
+        start.end();
+        await run;
+    });
+
     test("a lazy duration 0 drops the nodes", async () => {
-        const { transition, lives, liveSource } = setup();
+        const { transition, lives, liveSource } = setup({ keepPlaying: true });
         await transition.run(
             (ctx) => ctx.keepPlaying(node("a")),
-            () => ({ duration: 0, keepPlaying: true }),
+            () => ({ duration: 0 }),
         );
         expect(lives[0].disposed).toBe(true);
         expect(liveSource()).toBeNull();

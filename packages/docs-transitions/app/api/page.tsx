@@ -77,7 +77,7 @@ const runOpts: Row[] = [
     ],
     [
         "opts as a function",
-        "Called once after cb resolves, so the spec can depend on the new content.",
+        "Called once after cb resolves, so the spec can depend on the new content. It can turn keepPlaying off but not on; set keepPlaying on the container.",
     ],
 ];
 

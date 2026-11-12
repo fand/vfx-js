@@ -3,12 +3,11 @@ import {
     lockCanvasSize,
     releaseFirstCapture,
     requestCapture,
-    setupCapture,
-    teardownCapture,
     unwrapElement,
     wrapElement,
 } from "./html-in-canvas.js";
 import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
+import { captureLive, type LiveCapture } from "./live-capture.js";
 import { prefersReducedMotion } from "./reduced-motion.js";
 import { TransitionController } from "./transition/transition.js";
 import type {
@@ -19,7 +18,6 @@ import type {
 } from "./transition/types.js";
 import {
     type Effect,
-    type EffectTexture,
     getVFXOpts,
     type VFXOpts,
     type VFXProps,
@@ -283,44 +281,15 @@ export class VFX {
      * The canvas is not rendered on screen. `texture` is null until the first capture.
      * @internal Used by transitions.
      */
-    captureLive(canvas: HTMLCanvasElement): {
-        readonly texture: EffectTexture | null;
-        dispose(): void;
-    } {
+    captureLive(canvas: HTMLCanvasElement): LiveCapture {
         if (!supportsHtmlInCanvas()) {
             return { texture: null, dispose: () => {} };
         }
-        const live = this.#player.liveTexture();
-        let disposed = false;
-        setupCapture(canvas, {
-            onCapture: (offscreen) => live.update(offscreen),
-            maxSize: this.#player.maxTextureSize,
-        }).then(
-            (first) => {
-                if (disposed) {
-                    return;
-                }
-                // The first capture stays on the canvas; clear it so it never shows.
-                canvas
-                    .getContext("2d")
-                    ?.clearRect(0, 0, canvas.width, canvas.height);
-                live.update(first);
-            },
-            (err) => console.error("[VFX-JS] live capture failed:", err),
+        return captureLive(
+            canvas,
+            this.#player.liveTexture(),
+            this.#player.maxTextureSize,
         );
-        return {
-            get texture() {
-                return live.texture;
-            },
-            dispose: () => {
-                if (disposed) {
-                    return;
-                }
-                disposed = true;
-                teardownCapture(canvas);
-                live.dispose();
-            },
-        };
     }
 
     /**

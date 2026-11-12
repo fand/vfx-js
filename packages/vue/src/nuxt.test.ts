@@ -410,6 +410,33 @@ describe("VFXTransition (nuxt)", () => {
             nuxt.pageFinish();
         });
 
+        it("a second navigation while the old page is held hands its page over too", async () => {
+            mountWithPage({ keepPlaying: true });
+            const giveBacks = new Map<Node, () => void>();
+            mock.keep.keepPlaying = vi.fn((node, onReturn) => {
+                (node as Element).remove();
+                giveBacks.set(node as Node, () => onReturn?.(node as Node));
+            });
+            await nuxt.navigate("/", "/about");
+            const first = leaving();
+            const firstDone = vi.fn();
+            seen.transition?.onLeave(first, firstDone);
+            // The page has not finished, so the first run still holds its page.
+            await nuxt.navigate("/about", "/");
+            const second = leaving();
+            const secondDone = vi.fn();
+            seen.transition?.onLeave(second, secondDone);
+            expect(mock.keep.keepPlaying).toHaveBeenCalledTimes(2);
+            // Core gives the first page back when the newer run starts.
+            giveBacks.get(first)?.();
+            expect(firstDone).toHaveBeenCalledOnce();
+            expect(secondDone).not.toHaveBeenCalled();
+            giveBacks.get(second)?.();
+            expect(secondDone).toHaveBeenCalledOnce();
+            expect(firstDone).toHaveBeenCalledOnce();
+            nuxt.pageFinish();
+        });
+
         it("ends the leave at once when core keeps nothing", async () => {
             mountWithPage({ keepPlaying: true });
             mock.keep.keepPlaying = vi.fn();

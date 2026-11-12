@@ -393,8 +393,16 @@ export class TransitionController implements TransitionHandle {
             return this.#start(cb, opts);
         }
         // Lazy, so the history entry has changed when the spec is picked.
-        return this.#start(cb, () =>
-            this.#history.pick(typeof opts === "function" ? opts() : opts),
+        // A static spec still says up front whether to keep the old nodes.
+        const keep =
+            typeof opts === "function"
+                ? undefined
+                : (opts.keepPlaying ?? this.#opts.keepPlaying);
+        return this.#start(
+            cb,
+            () =>
+                this.#history.pick(typeof opts === "function" ? opts() : opts),
+            keep,
         );
     }
 
@@ -402,6 +410,7 @@ export class TransitionController implements TransitionHandle {
     async #start(
         cb: StartCallback,
         opts: RunOpts | (() => RunOpts),
+        keep?: boolean,
     ): Promise<void> {
         if (this.#destroyed) {
             await cb(IDLE_CONTEXT);
@@ -411,7 +420,7 @@ export class TransitionController implements TransitionHandle {
         const id = ++this.#seq;
         this.#runningId = id;
         try {
-            await this.#run(id, cb, opts);
+            await this.#run(id, cb, opts, keep);
         } finally {
             if (this.#runningId === id) {
                 this.#runningId = null;
@@ -425,10 +434,12 @@ export class TransitionController implements TransitionHandle {
         }
     }
 
+    // `keep` says whether a lazy spec may keep the old nodes; it defaults to the container's.
     async #run(
         id: number,
         cb: StartCallback,
         opts: RunOpts | (() => RunOpts),
+        keep?: boolean,
     ): Promise<void> {
         const isCurrent = () => id === this.#seq;
         // Only the animated update of the current run keeps the old nodes.
@@ -518,8 +529,10 @@ export class TransitionController implements TransitionHandle {
         }
 
         let lazyOpts: RunOpts | undefined;
-        // A lazy spec is not known yet, so keep the nodes and drop them later if needed.
-        canKeep = bound?.keepPlaying ?? true;
+        // A lazy spec can turn keepPlaying off, but not on.
+        canKeep = bound
+            ? bound.keepPlaying
+            : (keep ?? this.#opts.keepPlaying ?? false);
         try {
             await update();
             if (typeof opts === "function" && isCurrent()) {

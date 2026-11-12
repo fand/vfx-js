@@ -181,6 +181,38 @@ describe("VFXTransition (sveltekit)", () => {
             expect(inner().textContent).toBe("about");
         });
 
+        it("a second navigation while the old page is held hands its page over too", async () => {
+            render({ keepPlaying: true });
+            const ghost = document.createElement("div");
+            const giveBacks: (() => void)[] = [];
+            mock.keep.keepPlaying = vi.fn((nodes, onReturn) => {
+                const node = nodes as Node;
+                const marker = document.createComment("");
+                node.parentNode?.insertBefore(marker, node);
+                ghost.append(node);
+                giveBacks.push(() => {
+                    marker.parentNode?.insertBefore(node, marker);
+                    marker.remove();
+                    onReturn?.(node);
+                });
+            });
+            const first = await swap("/about", About);
+            // A newer navigation drops the first one before it completes.
+            const second = await swap("/", Home);
+            first.fail();
+            expect(mock.keep.keepPlaying).toHaveBeenCalledTimes(2);
+            expect(ghost.textContent).toBe("homeabout");
+            expect(inner().textContent).toBe("home");
+            // Core gives the first page back when the newer run starts.
+            giveBacks[0]();
+            second.complete();
+            giveBacks[1]();
+            await vi.waitFor(() => {
+                expect(inner().children).toHaveLength(1);
+            });
+            expect(inner().textContent).toBe("home");
+        });
+
         it("drops the old page at once when core keeps nothing", async () => {
             render({ keepPlaying: true });
             mock.keep.keepPlaying = vi.fn();
