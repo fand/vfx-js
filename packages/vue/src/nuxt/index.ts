@@ -16,8 +16,8 @@ function keepingTransition(ctx: RouterContext) {
         mode: "default",
         onLeave(el: Element, done: () => void) {
             const parent = el.parentNode;
-            ctx.held?.keepPrev(el, () => done());
-            // Core keeps nothing when the run does not use liveFrom.
+            ctx.held?.keepPlaying(el, () => done());
+            // Core keeps nothing when the run does not use keepPlaying.
             if (el.parentNode === parent) {
                 done();
             }
@@ -32,7 +32,7 @@ const transitions = new WeakMap<
 
 // <NuxtPage> needs the transition from its first render, so its first leave runs it.
 function withKeepingTransition(nodes: VNode[], ctx: RouterContext): VNode[] {
-    if (!ctx.liveFrom()) {
+    if (!ctx.keepPlaying()) {
         return nodes;
     }
     let transition = transitions.get(ctx);

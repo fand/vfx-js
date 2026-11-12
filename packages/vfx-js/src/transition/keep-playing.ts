@@ -2,10 +2,10 @@ import { moveNode } from "../html-in-canvas.js";
 import type { EffectTexture } from "../types.js";
 import type { VFX } from "../vfx.js";
 
-export type LiveFromHost = Pick<VFX, "captureLive" | "freezeInside">;
+export type KeepPlayingHost = Pick<VFX, "captureLive" | "freezeInside">;
 
 /** Holds the old content of a run and captures it every frame. */
-export type LiveFromLike = {
+export type KeepPlayingLike = {
     /** The latest capture, or null before the first one. */
     readonly texture: EffectTexture | null;
     /**
@@ -27,8 +27,8 @@ type Returning = {
  * A hidden html-in-canvas canvas next to the element's wrapper.
  * It holds a shallow copy of the element, so selectors for its children still match.
  */
-export class LiveFrom implements LiveFromLike {
-    #host: LiveFromHost;
+export class KeepPlaying implements KeepPlayingLike {
+    #host: KeepPlayingHost;
     #canvas: HTMLCanvasElement;
     #box: HTMLElement;
     #capture: {
@@ -38,7 +38,7 @@ export class LiveFrom implements LiveFromLike {
     #unfreeze: () => void;
     #returning: Returning[] = [];
 
-    constructor(host: LiveFromHost, element: HTMLElement) {
+    constructor(host: KeepPlayingHost, element: HTMLElement) {
         this.#host = host;
         // While a run is in flight, the parent is the wrapper canvas.
         const anchor = element.parentElement ?? element;
@@ -48,7 +48,7 @@ export class LiveFrom implements LiveFromLike {
         canvas.inert = true;
         canvas.setAttribute("aria-hidden", "true");
         // Routers that swap the body look for it to carry it over.
-        canvas.setAttribute("data-vfx-live-from", "");
+        canvas.setAttribute("data-vfx-keep-playing", "");
         const style = canvas.style;
         style.setProperty("position", "absolute");
         style.setProperty("left", "0px");

@@ -7,7 +7,7 @@ import {
     TransitionStage,
 } from "./effect.js";
 import { type HistorySpecs, historySpecs } from "./history.js";
-import { LiveFrom, type LiveFromLike } from "./live-from.js";
+import { KeepPlaying, type KeepPlayingLike } from "./keep-playing.js";
 import type {
     AddTransitionOpts,
     RunContext,
@@ -36,7 +36,7 @@ export type ResolvedSpec = {
     /** The spec's own; the transition's fills in later. */
     overflow: true | number | undefined;
     ease: TransitionEase | undefined;
-    liveFrom: boolean;
+    keepPlaying: boolean;
 };
 
 // A run's settings with the transition in its slot.
@@ -44,12 +44,12 @@ type Bound = {
     run: TransitionRun;
     ease: TransitionEase;
     slots: TransitionSlot[];
-    liveFrom: boolean;
+    keepPlaying: boolean;
 };
 
 type StartCallback = (ctx: RunContext) => void | Promise<void>;
 
-const IDLE_CONTEXT: RunContext = { keepPrev: () => {} };
+const IDLE_CONTEXT: RunContext = { keepPlaying: () => {} };
 
 const isIterable = (nodes: Node | Iterable<Node>): nodes is Iterable<Node> =>
     typeof (nodes as Iterable<Node>)[Symbol.iterator] === "function";
@@ -72,7 +72,7 @@ export function layerSpec(base: RunOpts, top: RunOpts): RunOpts {
         duration: top.duration ?? base.duration,
         overflow: top.overflow ?? base.overflow,
         ease: top.ease ?? base.ease,
-        liveFrom: top.liveFrom ?? base.liveFrom,
+        keepPlaying: top.keepPlaying ?? base.keepPlaying,
     };
 }
 
@@ -89,7 +89,7 @@ export function resolveSpec(
         duration: spec.duration ?? DEFAULT_DURATION,
         overflow: spec.overflow,
         ease: spec.ease,
-        liveFrom: spec.liveFrom ?? false,
+        keepPlaying: spec.keepPlaying ?? false,
     };
 }
 
@@ -269,8 +269,8 @@ export class TransitionController implements TransitionHandle {
     // The run that owns the effects right now.
     #active: { id: number; slots: TransitionSlot[] } | null = null;
     // The old content a run keeps playing.
-    #live: { id: number; from: LiveFromLike } | null = null;
-    #createLiveFrom: (element: HTMLElement) => LiveFromLike;
+    #live: { id: number; from: KeepPlayingLike } | null = null;
+    #createKeepPlaying: (element: HTMLElement) => KeepPlayingLike;
 
     constructor(
         vfx: TransitionHost,
@@ -280,10 +280,10 @@ export class TransitionController implements TransitionHandle {
         stage: TransitionStageLike = new TransitionStage(),
         history: HistorySpecs = historySpecs,
         uaTransitions: UATransitions = sharedUATransitions(),
-        createLiveFrom: (element: HTMLElement) => LiveFromLike = (el) =>
-            new LiveFrom(vfx, el),
+        createKeepPlaying: (element: HTMLElement) => KeepPlayingLike = (el) =>
+            new KeepPlaying(vfx, el),
     ) {
-        this.#createLiveFrom = createLiveFrom;
+        this.#createKeepPlaying = createKeepPlaying;
         this.#onDestroy = onDestroy;
         this.#vfx = vfx;
         this.#element = element;
@@ -313,7 +313,7 @@ export class TransitionController implements TransitionHandle {
             const shown = Array.from(this.#element.children).filter(
                 (child) => child !== target && !(child as HTMLElement).hidden,
             );
-            ctx.keepPrev(shown, (node) => {
+            ctx.keepPlaying(shown, (node) => {
                 if (remove) {
                     (node as HTMLElement).remove();
                 } else {
@@ -434,9 +434,9 @@ export class TransitionController implements TransitionHandle {
         // Only the animated update of the current run keeps the old nodes.
         let canKeep = false;
         const ctx: RunContext = {
-            keepPrev: (nodes, onReturn) => {
+            keepPlaying: (nodes, onReturn) => {
                 if (canKeep && isCurrent()) {
-                    this.#keepPrev(id, nodes, onReturn);
+                    this.#keepPlaying(id, nodes, onReturn);
                 }
             },
         };
@@ -519,7 +519,7 @@ export class TransitionController implements TransitionHandle {
 
         let lazyOpts: RunOpts | undefined;
         // A lazy spec is not known yet, so keep the nodes and drop them later if needed.
-        canKeep = bound?.liveFrom ?? true;
+        canKeep = bound?.keepPlaying ?? true;
         try {
             await update();
             if (typeof opts === "function" && isCurrent()) {
@@ -548,7 +548,7 @@ export class TransitionController implements TransitionHandle {
             if (bound === null) {
                 return cut();
             }
-            if (!bound.liveFrom) {
+            if (!bound.keepPlaying) {
                 this.#dropLive(id);
             }
             // The transition effect stays first, so the held snapshot survives the swap.
@@ -642,7 +642,7 @@ export class TransitionController implements TransitionHandle {
             run.overflow = overflow;
         }
         const ease = spec.ease ?? transition.ease ?? "smoothstep";
-        return { run, ease, slots, liveFrom: spec.liveFrom };
+        return { run, ease, slots, keepPlaying: spec.keepPlaying };
     }
 
     // False when another live handle runs this instance.
@@ -760,7 +760,7 @@ export class TransitionController implements TransitionHandle {
     }
 
     // Move the nodes into a hidden canvas that keeps capturing them.
-    #keepPrev(
+    #keepPlaying(
         id: number,
         nodes: Node | Iterable<Node>,
         onReturn?: (node: Node) => void,
@@ -772,7 +772,7 @@ export class TransitionController implements TransitionHandle {
         try {
             if (this.#live?.id !== id) {
                 this.#dropLive();
-                const from = this.#createLiveFrom(this.#element);
+                const from = this.#createKeepPlaying(this.#element);
                 this.#live = { id, from };
                 this.#stage.setLiveSource(() => from.texture);
             }

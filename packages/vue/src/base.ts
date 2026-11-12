@@ -49,7 +49,7 @@ export const transitionProps = {
     /** On back, play the spec that entered the page, reversed. Needs the Navigation API. */
     autoReverse: { type: Boolean, default: undefined },
     /** Keep the old page playing during the run. Nuxt only. */
-    liveFrom: { type: Boolean, default: undefined },
+    keepPlaying: { type: Boolean, default: undefined },
     /** Size the target to the viewport height. Default `true`; `false` leaves sizing to your CSS. */
     fullscreen: { type: Boolean, default: true },
 } as const;
@@ -64,7 +64,7 @@ const OPT_KEYS = [
     "keepWrapped",
     "waitFor",
     "autoReverse",
-    "liveFrom",
+    "keepPlaying",
 ] as const;
 
 export type RouterContext = {
@@ -73,8 +73,8 @@ export type RouterContext = {
     scope: TransitionScope;
     /** The Vue app this component is mounted in. */
     app: App;
-    /** Whether the `liveFrom` prop is set. */
-    liveFrom(): boolean;
+    /** Whether the `keepPlaying` prop is set. */
+    keepPlaying(): boolean;
     /** The run that waits for the new page, while it waits. */
     held: RunContext | null;
 };
@@ -118,7 +118,7 @@ export function defineVFXTransition(
                 handle: () => handle,
                 scope,
                 app,
-                liveFrom: () => props.liveFrom === true,
+                keepPlaying: () => props.keepPlaying === true,
                 held: null,
             };
             let disconnect: (() => void) | null = null;

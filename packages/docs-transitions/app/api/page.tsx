@@ -31,8 +31,8 @@ const containerOpts: Row[] = [
         "Room to draw outside the element. true for the whole canvas, a number for CSS px on every side. Defaults to the transition's overflow.",
     ],
     [
-        "liveFrom: boolean",
-        "Keep capturing the old content during the run, so its animations and videos keep playing. show() and <VFXTransition> (React, Nuxt, SvelteKit, Astro) hand the old content over; with run(), call ctx.keepPrev() in cb. Defaults to false.",
+        "keepPlaying: boolean",
+        "Keep capturing the old content during the run, so its animations and videos keep playing. show() and <VFXTransition> (React, Nuxt, SvelteKit, Astro) hand the old content over; with run(), call ctx.keepPlaying() in cb. Defaults to false.",
     ],
     [
         "keepWrapped: boolean",
@@ -59,7 +59,7 @@ const handle: Row[] = [
     ],
     [
         "run(cb, opts?)",
-        "Snapshots the element, calls cb to change the DOM, and plays the transition. Resolves when the animation ends. cb gets a ctx; with liveFrom, call ctx.keepPrev(oldNodes) before you drop them. ctx.keepPrev(nodes, onReturn) puts them back when the run ends instead of removing them.",
+        "Snapshots the element, calls cb to change the DOM, and plays the transition. Resolves when the animation ends. cb gets a ctx; with keepPlaying, call ctx.keepPlaying(oldNodes) before you drop them. ctx.keepPlaying(nodes, onReturn) puts them back when the run ends instead of removing them.",
     ],
     ["cancel()", "Ends the current run and shows the live content."],
     ["destroy()", "Cancels and stops tracking the element."],
@@ -68,7 +68,7 @@ const handle: Row[] = [
 
 const runOpts: Row[] = [
     [
-        "transition, params, duration, reverse, ease, overflow, liveFrom",
+        "transition, params, duration, reverse, ease, overflow, keepPlaying",
         "Same as the container options. A run's value wins.",
     ],
     [
@@ -197,9 +197,9 @@ const t = vfx.addTransition(el, { transition: Swipe, duration: 0.6 });
 t.run(() => render(next), { transition: Glitch, reverse: true });
 t.run(() => render(next), { transition: Swipe, params: { direction: "up" } });
 t.run((ctx) => {
-  ctx.keepPrev([...el.children]);
+  ctx.keepPlaying([...el.children]);
   render(next);
-}, { liveFrom: true });
+}, { keepPlaying: true });
 `}</Code>
                 <Table rows={runOpts} />
             </section>

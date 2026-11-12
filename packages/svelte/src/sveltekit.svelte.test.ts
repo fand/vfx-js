@@ -19,8 +19,8 @@ type Run = {
 const mock = vi.hoisted(() => {
     const runs: Run[] = [];
     // Core's hand-over; a test swaps in its own.
-    const keep: { keepPrev: RunContext["keepPrev"] } = {
-        keepPrev: () => {},
+    const keep: { keepPlaying: RunContext["keepPlaying"] } = {
+        keepPlaying: () => {},
     };
     const handle = {
         run(cb: Run["cb"], opts: Run["opts"]) {
@@ -32,7 +32,7 @@ const mock = vi.hoisted(() => {
             // Like core: call cb (after the snapshot); a throwing cb ends the run.
             return Promise.resolve()
                 .then(() =>
-                    cb({ keepPrev: (...args) => keep.keepPrev(...args) }),
+                    cb({ keepPlaying: (...args) => keep.keepPlaying(...args) }),
                 )
                 .finally(() => resolve());
         },
@@ -130,12 +130,12 @@ describe("VFXTransition (sveltekit)", () => {
         await new Promise((r) => requestAnimationFrame(r));
     });
 
-    describe("liveFrom", () => {
+    describe("keepPlaying", () => {
         // Moves the nodes into a detached box, and back on `giveBack`.
         function fakeKeep() {
             const ghost = document.createElement("div");
             let giveBack = () => {};
-            mock.keep.keepPrev = vi.fn((nodes, onReturn) => {
+            mock.keep.keepPlaying = vi.fn((nodes, onReturn) => {
                 const node = nodes as Node;
                 const marker = document.createComment("");
                 node.parentNode?.insertBefore(marker, node);
@@ -163,14 +163,14 @@ describe("VFXTransition (sveltekit)", () => {
 
         beforeEach(() => {
             page.url = new URL("http://localhost/");
-            mock.keep.keepPrev = () => {};
+            mock.keep.keepPlaying = () => {};
         });
 
         it("hands the old page to core and drops it once it is back", async () => {
-            render({ liveFrom: true });
+            render({ keepPlaying: true });
             const keep = fakeKeep();
             const nav = await swap("/about", About);
-            expect(mock.keep.keepPrev).toHaveBeenCalledOnce();
+            expect(mock.keep.keepPlaying).toHaveBeenCalledOnce();
             expect(keep.ghost.textContent).toBe("home");
             expect(inner().textContent).toBe("about");
             nav.complete();
@@ -182,20 +182,20 @@ describe("VFXTransition (sveltekit)", () => {
         });
 
         it("drops the old page at once when core keeps nothing", async () => {
-            render({ liveFrom: true });
-            mock.keep.keepPrev = vi.fn();
+            render({ keepPlaying: true });
+            mock.keep.keepPlaying = vi.fn();
             const nav = await swap("/about", About);
-            expect(mock.keep.keepPrev).toHaveBeenCalledOnce();
+            expect(mock.keep.keepPlaying).toHaveBeenCalledOnce();
             expect(inner().children).toHaveLength(1);
             expect(inner().textContent).toBe("about");
             nav.complete();
         });
 
-        it("hands nothing over without liveFrom", async () => {
+        it("hands nothing over without keepPlaying", async () => {
             render();
             const keep = fakeKeep();
             const nav = await swap("/about", About);
-            expect(mock.keep.keepPrev).not.toHaveBeenCalled();
+            expect(mock.keep.keepPlaying).not.toHaveBeenCalled();
             expect(keep.ghost.textContent).toBe("");
             expect(inner().textContent).toBe("about");
             nav.complete();

@@ -88,7 +88,7 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
     const [duration, setDuration] = useState(1.2);
     const [progress, setProgress] = useState(0);
     const [playing, setPlaying] = useState(false);
-    const [liveFrom, setLiveFrom] = useState(false);
+    const [keepPlaying, setKeepPlaying] = useState(false);
     // Old scenes that core keeps playing in its hidden canvas.
     const [kept, setKept] = useState<number[]>([]);
     const sceneRef = useRef(scene);
@@ -172,12 +172,12 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         const box = boxes.current.get(shown);
         const parent = box?.parentNode;
         if (box) {
-            ctx.keepPrev(box, (node) => {
+            ctx.keepPlaying(box, (node) => {
                 (node as HTMLElement).style.display = "none";
                 setKept((k) => k.filter((i) => i !== shown));
             });
         }
-        // Core leaves the box in place without liveFrom.
+        // Core leaves the box in place without keepPlaying.
         if (box && box.parentNode !== parent) {
             setKept((k) => [...k, shown]);
         }
@@ -194,7 +194,7 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
         c.transition = next;
         run(nextScene, {
             transition: next,
-            liveFrom,
+            keepPlaying,
             duration: 3600,
             ease: () => c.ease(c.x),
         });
@@ -210,7 +210,7 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
             c.x = 0;
             run(nextScene, {
                 transition: next,
-                liveFrom,
+                keepPlaying,
                 duration,
                 ease: eases[easeIndex].ease,
             });
@@ -335,15 +335,15 @@ export function ShaderLab({ head }: { head?: React.ReactNode }) {
                     <label className="pg-check">
                         <input
                             type="checkbox"
-                            checked={liveFrom}
+                            checked={keepPlaying}
                             onChange={(e) => {
-                                setLiveFrom(e.target.checked);
+                                setKeepPlaying(e.target.checked);
                                 // A held run uses the old setting, so start a new one.
                                 clock.current.active = false;
                             }}
                         />
                         <span>
-                            liveFrom <i>keep the old side moving</i>
+                            keepPlaying <i>keep the old side moving</i>
                         </span>
                     </label>
                     <label className="pg-range">

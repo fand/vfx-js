@@ -21,7 +21,7 @@ export type UseVFXTransition = {
     ref: (element: HTMLElement | null) => void;
     /**
      * Run `cb` inside `startTransition` and animate once React has committed.
-     * With `liveFrom`, call `ctx.keepPrev` in `cb` to keep the old content playing.
+     * With `keepPlaying`, call `ctx.keepPlaying` in `cb` to keep the old content playing.
      */
     run: <T extends Transition | TransitionClass>(
         cb: (ctx: RunContext) => void | Promise<void>,
@@ -29,7 +29,7 @@ export type UseVFXTransition = {
     ) => Promise<void>;
 };
 
-const IDLE_CONTEXT: RunContext = { keepPrev: () => {} };
+const IDLE_CONTEXT: RunContext = { keepPlaying: () => {} };
 
 export function useVFXTransition<T extends Transition | TransitionClass>(
     opts: AddTransitionOpts<T> = {},

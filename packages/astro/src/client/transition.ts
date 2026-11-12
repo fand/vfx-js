@@ -60,12 +60,12 @@ function createTransitionRuntime(deps: TransitionDeps) {
     let bound: Bound | null = null;
     // Resolves the held run once the new page is in.
     let hold: (() => void) | null = null;
-    // Hands the old page to core during the held run, with liveFrom.
-    let keepPrev: RunContext["keepPrev"] | null = null;
+    // Hands the old page to core during the held run, with keepPlaying.
+    let handOver: RunContext["keepPlaying"] | null = null;
     const release = () => {
         hold?.();
         hold = null;
-        keepPrev = null;
+        handOver = null;
     };
 
     const unbind = () => {
@@ -112,7 +112,8 @@ function createTransitionRuntime(deps: TransitionDeps) {
                 ),
             );
 
-            const liveFrom = opts.liveFrom ?? current.live.liveFrom ?? false;
+            const keepPlaying =
+                opts.keepPlaying ?? current.live.keepPlaying ?? false;
             const swapped = new Promise<void>((resolve) => {
                 hold = resolve;
             });
@@ -126,8 +127,8 @@ function createTransitionRuntime(deps: TransitionDeps) {
             await new Promise<void>((snapshotTaken) => {
                 current.handle
                     .run((ctx) => {
-                        if (liveFrom && hold === held) {
-                            keepPrev = ctx.keepPrev;
+                        if (keepPlaying && hold === held) {
+                            handOver = ctx.keepPlaying;
                         }
                         snapshotTaken();
                         return swapped;
@@ -152,7 +153,7 @@ function createTransitionRuntime(deps: TransitionDeps) {
                 target,
                 getVFX()?.canvas ?? null,
                 deps.swapFunctions,
-                keepPrev ?? undefined,
+                handOver ?? undefined,
             );
             if (!kept) {
                 release();

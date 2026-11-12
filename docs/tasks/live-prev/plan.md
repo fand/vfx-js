@@ -23,16 +23,16 @@ Add one field to `TransitionSpec`.
  * Keep capturing the old content during the run, so its animations and videos keep playing.
  * Default false.
  */
-liveFrom?: boolean;
+keepPlaying?: boolean;
 ```
 
 ```ts
-const t = vfx.addTransition(main, { liveFrom: true });
-await t.run(() => renderNext(), { liveFrom: true });
-await t.show(2, { liveFrom: true });
+const t = vfx.addTransition(main, { keepPlaying: true });
+await t.run(() => renderNext(), { keepPlaying: true });
+await t.show(2, { keepPlaying: true });
 ```
 
-- The name is a placeholder. Revisit it before release.
+- Renamed from `liveFrom` to `keepPlaying`: the old content already plays, and the flag stops VFX-JS from freezing it.
 - Transition code does not change. `ctx.from` just updates every frame.
 - Check `@vfx-js/transitions` presets for code that assumes `from` stays the same during a run.
 
@@ -41,9 +41,9 @@ Sketch:
 
 ```ts
 t.run((ctx) => {
-    ctx.keepPrev(oldNodes);
+    ctx.keepPlaying(oldNodes);
     swap();
-}, { liveFrom: true });
+}, { keepPlaying: true });
 ```
 
 The exact shape is open.
@@ -51,7 +51,7 @@ Callers that swap the DOM themselves (`show()`, Astro, React `VFXTransition`) us
 
 ## Core
 
-### Ghost capture (`transition/live-from.ts`, new)
+### Ghost capture (`transition/keep-playing.ts`, new)
 
 - Build a `<canvas layoutsubtree>` ("ghost") that holds the old nodes.
   - Put it next to the wrapper canvas, at the same rect and size.
@@ -82,7 +82,7 @@ Callers that swap the DOM themselves (`show()`, Astro, React `VFXTransition`) us
 
 ### Controller (`transition/transition.ts`)
 
-- With `liveFrom`, build the ghost after the snapshot, from the nodes the caller hands over, and call `stage.setLiveSource`.
+- With `keepPlaying`, build the ghost after the snapshot, from the nodes the caller hands over, and call `stage.setLiveSource`.
 - `show()`: hand the old slide over to the ghost.
   Apply `hidden` / `remove` when the run ends, after moving the slide back to its place.
 - Clean up on every exit: `#endActive`, `cancel`, `#cutAfterStall`, `destroy`.
@@ -117,7 +117,7 @@ Decide later, based on demand.
 
 ## Steps
 
-1. Core: ghost capture, the hand-over entry, `liveFrom`. Use it in `show()`.
+1. Core: ghost capture, the hand-over entry, `keepPlaying`. Use it in `show()`.
 2. React `BaseVFXTransition` (covers Next.js and React Router), and Astro.
 3. Prototype Nuxt (`pageTransition`) and SvelteKit (`{#key}` + `out:`).
 4. Decide on the clone fallback for plain Vue and `useVFXTransition`.
@@ -127,5 +127,5 @@ Decide later, based on demand.
 - Stage: `from` updates every frame with a live source. It uses the snapshot until the first ghost frame.
 - Controller: the ghost is cleaned up on every exit. `show()` slides return to their place and order. An interrupting run does not leak a ghost.
 - A demo with CSS animations and a video in the old content (framework-testbed or docs-transitions).
-- Add `liveFrom` to `skills/vfx-js/` and the transition docs. `pnpm --filter docs test` must pass.
+- Add `keepPlaying` to `skills/vfx-js/` and the transition docs. `pnpm --filter docs test` must pass.
 - Add a changeset.

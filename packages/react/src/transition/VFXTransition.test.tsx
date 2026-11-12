@@ -25,7 +25,7 @@ function fakeLive(keeps = true) {
         marker: Comment;
         onReturn?: (node: Node) => void;
     }[] = [];
-    const keepPrev = vi.fn<RunContext["keepPrev"]>((nodes, onReturn) => {
+    const keepPlaying = vi.fn<RunContext["keepPlaying"]>((nodes, onReturn) => {
         if (!keeps) {
             return;
         }
@@ -43,7 +43,7 @@ function fakeLive(keeps = true) {
             onReturn?.(node);
         }
     };
-    return { ghost, ctx: { keepPrev }, keepPrev, giveBack };
+    return { ghost, ctx: { keepPlaying }, keepPlaying, giveBack };
 }
 
 const mock = vi.hoisted(() => {
@@ -228,7 +228,7 @@ describe("VFXTransition", () => {
         expect(container.textContent).toBe("0");
     });
 
-    describe("liveFrom", () => {
+    describe("keepPlaying", () => {
         let bump = () => {};
         function Counter(props: { name: string }) {
             const [count, setCount] = useState(0);
@@ -243,7 +243,7 @@ describe("VFXTransition", () => {
         const renderLive = (pageKey: string, page: React.ReactNode) =>
             act(() => {
                 root.render(
-                    <VFXTransition pageKey={pageKey} liveFrom>
+                    <VFXTransition pageKey={pageKey} keepPlaying>
                         {page}
                     </VFXTransition>,
                 );
@@ -256,7 +256,7 @@ describe("VFXTransition", () => {
             const live = fakeLive();
             renderLive("b", <Counter name="b" />);
             await swap(mock.runs[0], live.ctx);
-            expect(live.keepPrev).toHaveBeenCalledOnce();
+            expect(live.keepPlaying).toHaveBeenCalledOnce();
             expect(target().textContent).toBe("b0");
             expect(live.ghost.textContent).toBe("a0");
             act(() => bump());
@@ -291,16 +291,16 @@ describe("VFXTransition", () => {
             const live = fakeLive(false);
             renderLive("b", <p>b</p>);
             await swap(mock.runs[0], live.ctx);
-            expect(live.keepPrev).toHaveBeenCalledOnce();
+            expect(live.keepPlaying).toHaveBeenCalledOnce();
             expect(target().textContent).toBe("b");
         });
 
-        it("hands nothing over without liveFrom", async () => {
+        it("hands nothing over without keepPlaying", async () => {
             render("a", <p>a</p>);
             const live = fakeLive();
             render("b", <p>b</p>);
             await swap(mock.runs[0], live.ctx);
-            expect(live.keepPrev).not.toHaveBeenCalled();
+            expect(live.keepPlaying).not.toHaveBeenCalled();
             expect(target().textContent).toBe("b");
         });
 

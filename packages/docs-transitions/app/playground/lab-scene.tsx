@@ -16,7 +16,7 @@ const scenes = [
         body: (
             <>
                 The shapes and the spinner keep moving during the run. Turn on{" "}
-                <code>liveFrom</code> and the old side keeps moving too.
+                <code>keepPlaying</code> and the old side keeps moving too.
             </>
         ),
         action: "How it works",

@@ -75,7 +75,7 @@ const t = vfx.addTransition(el, {
     reverse: false,        // play backwards, old and new swapped
     ease: "smoothstep",    // "smoothstep" | "linear" | (x) => t
     overflow: undefined,   // true (whole canvas) | CSS px on every side
-    liveFrom: false,       // keep the old content playing during the run (see below)
+    keepPlaying: false,       // keep the old content playing during the run (see below)
     keepWrapped: false,    // keep the canvas wrapper between runs
     waitFor: "media",      // wait for images / videos / fonts (~300 ms max) | "none" | (el) => Promise
     autoReverse: false,    // on back, replay the spec that entered, reversed (needs the Navigation API)
@@ -94,24 +94,25 @@ A run's fields win over the container's. A run that sets its own `transition` dr
 
 Handle: `show(slide, opts)`, `run(cb, opts)`, `cancel()`, `destroy()`, `running`.
 
-## Live old content: `liveFrom`
+## Keep the old content playing: `keepPlaying`
 
 By default the old content is a still snapshot, so its CSS animations, videos and GIFs stop during the run.
-With `liveFrom: true`, VFX-JS keeps the old nodes alive in a hidden canvas and captures them every frame.
+With `keepPlaying: true`, VFX-JS keeps the old nodes alive in a hidden canvas and captures them every frame.
 
 ```ts
-await t.show("#about", { liveFrom: true }); // show() hands the old slide over for you
+await t.show("#about", { keepPlaying: true }); // show() hands the old slide over for you
 
 await t.run((ctx) => {
-    ctx.keepPrev([...panel.children]); // hand the old nodes over before you drop them
+    ctx.keepPlaying([...panel.children]); // hand the old nodes over before you drop them
     panel.replaceChildren(renderPage(next));
-}, { liveFrom: true });
+}, { keepPlaying: true });
 ```
 
-- `ctx.keepPrev(nodes)` moves the nodes out of the container. VFX-JS removes them when the run ends. `show()` puts its slides back, hidden or removed.
-- `ctx.keepPrev(nodes, onReturn)` puts each node back in its old place when the run ends, then calls `onReturn(node)`. Use it when a framework still owns the nodes.
-- Without `keepPrev`, or without `liveFrom`, the run uses the snapshot. Without html-in-canvas too.
-- `<VFXTransition>` for React (Next.js, React Router), Nuxt, SvelteKit and Astro takes `liveFrom`. `useVFXTransition` passes `ctx` to `cb`, so call `ctx.keepPrev` yourself. `@vfx-js/vue/router` does not use it yet.
+- `ctx.keepPlaying(nodes)` moves the nodes out of the container. VFX-JS removes them when the run ends. `show()` puts its slides back, hidden or removed.
+- `ctx.keepPlaying(nodes, onReturn)` puts each node back in its old place when the run ends, then calls `onReturn(node)`. Use it when a framework still owns the nodes.
+- Without `keepPlaying`, or when no nodes are handed over, the run uses the snapshot. Without html-in-canvas too.
+- It costs one more html-in-canvas capture per frame during the run.
+- `<VFXTransition>` for React (Next.js, React Router), Nuxt, SvelteKit and Astro takes `keepPlaying`. `useVFXTransition` passes `ctx` to `cb`, so call `ctx.keepPlaying` yourself. `@vfx-js/vue/router` does not use it yet.
 
 ## Presets
 
@@ -239,7 +240,7 @@ export class BlurFade implements Transition {
 }
 ```
 
-- `ctx.src` is the new content (read with `uvSrc`). `ctx.from` is the old content (read with `uvContent`): a snapshot, or updated every frame with `liveFrom`.
+- `ctx.src` is the new content (read with `uvSrc`). `ctx.from` is the old content (read with `uvContent`): a snapshot, or updated every frame with `keepPlaying`.
 - `ctx.progress.t` is eased, `ctx.progress.x` linear. Both 0..1 and ignore `reverse`; check `ctx.reverse` yourself.
 - `start(run)` runs once per run, `end()` once when it ends or is cancelled.
 - `ctx.cut()` ends the run and shows the new content.
@@ -280,7 +281,7 @@ export function Layout() {
 - The target fills the viewport (`height: 100dvh; overflow: hidden`). Pages scroll inside it. Use a CSS reset (`body { margin: 0 }`).
 - `fullscreen={false}` drops the default size; size it with `className` / `style`, e.g. `height: calc(100dvh - 64px)` under a header.
 - React Router: the old page keeps its own route while it animates out, but `useLocation()` inside it reads the new location.
-- `liveFrom` on `<VFXTransition>` keeps the old page mounted and playing during the run, with its state. Each page then sits in a `display: contents` div, so a `.target > .page` selector needs `.target > div > .page`. Set it on `<VFXTransition>`: a page or link spec can turn it off but not on.
+- `keepPlaying` on `<VFXTransition>` keeps the old page mounted and playing during the run, with its state. Each page then sits in a `display: contents` div, so a `.target > .page` selector needs `.target > div > .page`. Set it on `<VFXTransition>`: a page or link spec can turn it off but not on.
 
 ### Next.js App Router
 
@@ -348,7 +349,7 @@ const { ref, run } = useVFXTransition({ transition: Swipe });
 await run(() => setTab(next), { reverse: true });
 ```
 
-- `run(cb)` passes the run `ctx` to `cb`. For `liveFrom`, call `ctx.keepPrev(box, onReturn)` there and keep rendering the old content until `onReturn` runs. Put it in its own box so React never inserts next to it.
+- `run(cb)` passes the run `ctx` to `cb`. For `keepPlaying`, call `ctx.keepPlaying(box, onReturn)` there and keep rendering the old content until `onReturn` runs. Put it in its own box so React never inserts next to it.
 
 ## Vue: Nuxt and Vue Router
 
@@ -392,7 +393,7 @@ useTransitionIn({ transition: Glitch });
 - In templates use `v-transition`, not `@click="transition(spec)"`; Vue wraps the handler, so it never runs.
 - Props are the `addTransition` options plus `fullscreen`. `:fullscreen="false"` lets you size the target with CSS.
 - A page with an async `setup` under your own `<Suspense>` may be captured early. Use `waitFor`.
-- Nuxt: `live-from` on `<VFXTransition>` keeps the old page's DOM (CSS animations, videos) playing during the run. It gives `<NuxtPage>` a page transition, so `<NuxtPage>` must be a direct child, and the page needs one root element. It sets `css: false` and `mode: "default"` over your own page transition. Vue unmounts the old page as usual, so its Vue state stops updating.
+- Nuxt: `keep-playing` on `<VFXTransition>` keeps the old page's DOM (CSS animations, videos) playing during the run. It gives `<NuxtPage>` a page transition, so `<NuxtPage>` must be a direct child, and the page needs one root element. It sets `css: false` and `mode: "default"` over your own page transition. Vue unmounts the old page as usual, so its Vue state stops updating.
 
 ## Svelte: SvelteKit
 
@@ -433,7 +434,7 @@ npm i @vfx-js/core @vfx-js/svelte @vfx-js/transitions
 - Which spec wins: the link's `transition(spec)`, then the page's `transitionIn`, then the `<VFXTransition>` props. Back does not reverse unless `autoReverse` is set.
 - `setNextTransition(spec)` before `goto()`.
 - `fullscreen={false}` lets you size the target with CSS.
-- `liveFrom` keeps the old page's DOM (CSS animations, videos) playing during the run. Pages then sit in a `display: contents` div inside `{#key}` on the pathname, so a page remounts on each path change. The old page's Svelte updates pause while it leaves.
+- `keepPlaying` keeps the old page's DOM (CSS animations, videos) playing during the run. Pages then sit in a `display: contents` div inside `{#key}` on the pathname, so a page remounts on each path change. The old page's Svelte updates pause while it leaves.
 
 ## Astro: ClientRouter
 
@@ -477,7 +478,7 @@ import { TransitionIn } from "@vfx-js/astro";
 - A link spec is a name or JSON: `data-vfx-transition='{"transition":"swipe","params":{"direction":"left"}}'`.
 - Which spec wins: the link's `data-vfx-transition`, then the page's `<TransitionIn>`, then the `<VFXTransition>` props. Back does not reverse unless `autoReverse` is set.
 - `fullscreen={false}` lets you size the target with CSS.
-- `liveFrom` (on `<VFXTransition>`, `<TransitionIn>` or the link) keeps the old page's animations and videos playing during the run.
+- `keepPlaying` (on `<VFXTransition>`, `<TransitionIn>` or the link) keeps the old page's animations and videos playing during the run.
 - `installTransition({ swapFunctions })` from `@vfx-js/astro/client` is what `<VFXTransition>` calls. You rarely need it.
 
 ## Other routers

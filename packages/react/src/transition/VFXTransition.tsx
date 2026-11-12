@@ -47,7 +47,7 @@ type Shown = {
 type Pages = { kept: Shown[]; shown: Shown };
 
 const OUTER_STYLE: React.CSSProperties = { display: "contents" };
-// With liveFrom, each page sits in its own box that core can move.
+// With keepPlaying, each page sits in its own box that core can move.
 const PAGE_STYLE: React.CSSProperties = { display: "contents" };
 // Pages share one viewport-sized box and scroll inside it.
 const FILL_STYLE: React.CSSProperties = {
@@ -166,18 +166,18 @@ export function VFXTransition<T extends Transition | TransitionClass>(
         const page = latestShown.current;
         const { id } = page;
         const box = pageBoxes.current.get(id);
-        if (!liveOpts.liveFrom || !box) {
+        if (!liveOpts.keepPlaying || !box) {
             return null;
         }
         const parent = box.parentNode;
-        ctx.keepPrev(box, (node) => {
+        ctx.keepPlaying(box, (node) => {
             (node as HTMLElement).style.display = "none";
             setPages((p) => ({
                 ...p,
                 kept: p.kept.filter((page) => page.id !== id),
             }));
         });
-        // Core leaves the box in place when the run does not use liveFrom.
+        // Core leaves the box in place when the run does not use keepPlaying.
         return box.parentNode !== parent ? page : null;
     };
 
@@ -190,7 +190,7 @@ export function VFXTransition<T extends Transition | TransitionClass>(
         latestShown.current = { ...shown, node: children };
     }
     const rendered = [...pages.kept, latestShown.current];
-    const live = Boolean(opts.liveFrom);
+    const live = Boolean(opts.keepPlaying);
 
     // Core moves the inner div into a canvas during a run.
     // React removes the outer div on unmount, and that one never moves.

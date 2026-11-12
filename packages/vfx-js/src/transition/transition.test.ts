@@ -15,7 +15,7 @@ import {
 } from "./effect";
 import { BODY_OFFSET, describeGlslError } from "./glsl";
 import { createHistorySpecs, type HistorySpecs } from "./history";
-import type { LiveFromLike } from "./live-from";
+import type { KeepPlayingLike } from "./keep-playing";
 import { ShaderTransition } from "./shader";
 import {
     layerSpec,
@@ -59,7 +59,7 @@ describe("resolveSpec", () => {
             duration: 0.6,
             overflow: undefined,
             ease: undefined,
-            liveFrom: false,
+            keepPlaying: false,
         });
     });
 
@@ -1386,7 +1386,7 @@ describe("TransitionController", () => {
 });
 
 // Moves fake nodes out, and back to the same index on dispose.
-class FakeLive implements LiveFromLike {
+class FakeLive implements KeepPlayingLike {
     readonly texture = null;
     kept: unknown[] = [];
     disposed = false;
@@ -1737,7 +1737,7 @@ describe("reduced motion", () => {
     });
 });
 
-describe("liveFrom", () => {
+describe("keepPlaying", () => {
     beforeEach(() => {
         vi.stubGlobal("requestAnimationFrame", (fn: () => void) =>
             setTimeout(fn, 0),
@@ -1762,9 +1762,9 @@ describe("liveFrom", () => {
         const old = [node("a"), node("b")];
         const run = transition.run(
             (ctx) => {
-                ctx.keepPrev(old);
+                ctx.keepPlaying(old);
             },
-            { liveFrom: true },
+            { keepPlaying: true },
         );
         const start = await started(starts, 0);
         expect(lives).toHaveLength(1);
@@ -1779,10 +1779,10 @@ describe("liveFrom", () => {
     test("onReturn puts the nodes back when the run ends", async () => {
         const dom = slides("a", "b");
         const onReturn = vi.fn();
-        const { transition, starts } = setup({ liveFrom: true });
+        const { transition, starts } = setup({ keepPlaying: true });
         const a = dom.byId("a");
         const run = transition.run((ctx) =>
-            ctx.keepPrev(a as unknown as Node, onReturn),
+            ctx.keepPlaying(a as unknown as Node, onReturn),
         );
         const start = await started(starts, 0);
         expect(a.parentElement).toBeNull();
@@ -1793,35 +1793,35 @@ describe("liveFrom", () => {
         expect(onReturn).toHaveBeenCalledWith(a);
     });
 
-    test("takes a single node and the container's liveFrom", async () => {
-        const { transition, starts, lives } = setup({ liveFrom: true });
+    test("takes a single node and the container's keepPlaying", async () => {
+        const { transition, starts, lives } = setup({ keepPlaying: true });
         const old = node("a");
-        const run = transition.run((ctx) => ctx.keepPrev(old));
+        const run = transition.run((ctx) => ctx.keepPlaying(old));
         (await started(starts, 0)).end();
         await run;
         expect(lives[0].kept).toEqual([old]);
     });
 
-    test("keepPrev does nothing without liveFrom", async () => {
+    test("keepPlaying does nothing without keepPlaying", async () => {
         const { transition, starts, lives } = setup();
-        const run = transition.run((ctx) => ctx.keepPrev(node("a")));
+        const run = transition.run((ctx) => ctx.keepPlaying(node("a")));
         (await started(starts, 0)).end();
         await run;
         expect(lives).toHaveLength(0);
     });
 
-    test("keepPrev does nothing when the run cuts", async () => {
-        const { transition, lives } = setup({ liveFrom: true });
-        await transition.run((ctx) => ctx.keepPrev(node("a")), {
+    test("keepPlaying does nothing when the run cuts", async () => {
+        const { transition, lives } = setup({ keepPlaying: true });
+        await transition.run((ctx) => ctx.keepPlaying(node("a")), {
             duration: 0,
         });
         expect(lives).toHaveLength(0);
     });
 
-    test("a lazy spec without liveFrom drops the nodes after cb", async () => {
+    test("a lazy spec without keepPlaying drops the nodes after cb", async () => {
         const { transition, starts, lives, liveSource } = setup();
         const run = transition.run(
-            (ctx) => ctx.keepPrev(node("a")),
+            (ctx) => ctx.keepPlaying(node("a")),
             () => ({}),
         );
         const start = await started(starts, 0);
@@ -1831,11 +1831,11 @@ describe("liveFrom", () => {
         await run;
     });
 
-    test("a lazy spec with liveFrom keeps the nodes", async () => {
+    test("a lazy spec with keepPlaying keeps the nodes", async () => {
         const { transition, starts, lives } = setup();
         const run = transition.run(
-            (ctx) => ctx.keepPrev(node("a")),
-            () => ({ liveFrom: true }),
+            (ctx) => ctx.keepPlaying(node("a")),
+            () => ({ keepPlaying: true }),
         );
         const start = await started(starts, 0);
         expect(lives[0].disposed).toBe(false);
@@ -1847,8 +1847,8 @@ describe("liveFrom", () => {
     test("a lazy duration 0 drops the nodes", async () => {
         const { transition, lives, liveSource } = setup();
         await transition.run(
-            (ctx) => ctx.keepPrev(node("a")),
-            () => ({ duration: 0, liveFrom: true }),
+            (ctx) => ctx.keepPlaying(node("a")),
+            () => ({ duration: 0, keepPlaying: true }),
         );
         expect(lives[0].disposed).toBe(true);
         expect(liveSource()).toBeNull();
@@ -1856,8 +1856,8 @@ describe("liveFrom", () => {
 
     test("cancel drops the nodes", async () => {
         const { transition, starts, lives, liveSource } = setup();
-        const run = transition.run((ctx) => ctx.keepPrev(node("a")), {
-            liveFrom: true,
+        const run = transition.run((ctx) => ctx.keepPlaying(node("a")), {
+            keepPlaying: true,
         });
         await started(starts, 0);
         transition.cancel();
@@ -1868,8 +1868,8 @@ describe("liveFrom", () => {
 
     test("destroy drops the nodes", async () => {
         const { transition, starts, lives } = setup();
-        const run = transition.run((ctx) => ctx.keepPrev(node("a")), {
-            liveFrom: true,
+        const run = transition.run((ctx) => ctx.keepPlaying(node("a")), {
+            keepPlaying: true,
         });
         await started(starts, 0);
         transition.destroy();
@@ -1881,10 +1881,10 @@ describe("liveFrom", () => {
         const { transition, lives } = setup();
         const run = transition.run(
             (ctx) => {
-                ctx.keepPrev(node("a"));
+                ctx.keepPlaying(node("a"));
                 throw new Error("nope");
             },
-            { liveFrom: true },
+            { keepPlaying: true },
         );
         await expect(run).rejects.toThrow("nope");
         expect(lives[0].disposed).toBe(true);
@@ -1895,8 +1895,8 @@ describe("liveFrom", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
         try {
             const { transition, lives, liveSource } = setup();
-            const run = transition.run((ctx) => ctx.keepPrev(node("a")), {
-                liveFrom: true,
+            const run = transition.run((ctx) => ctx.keepPlaying(node("a")), {
+                keepPlaying: true,
                 duration: 0.5,
             });
             await vi.advanceTimersByTimeAsync(1600);
@@ -1910,10 +1910,10 @@ describe("liveFrom", () => {
     });
 
     test("a newer run drops the old nodes at once", async () => {
-        const { transition, starts, lives } = setup({ liveFrom: true });
-        const runA = transition.run((ctx) => ctx.keepPrev(node("a")));
+        const { transition, starts, lives } = setup({ keepPlaying: true });
+        const runA = transition.run((ctx) => ctx.keepPlaying(node("a")));
         await started(starts, 0);
-        const runB = transition.run((ctx) => ctx.keepPrev(node("b")));
+        const runB = transition.run((ctx) => ctx.keepPlaying(node("b")));
         expect(lives[0].disposed).toBe(true);
         await runA;
         (await started(starts, 1)).end();
@@ -1923,7 +1923,7 @@ describe("liveFrom", () => {
     });
 
     test("a stale run keeps nothing", async () => {
-        const { transition, starts, lives } = setup({ liveFrom: true });
+        const { transition, starts, lives } = setup({ keepPlaying: true });
         let releaseA = () => {};
         const gate = new Promise<void>((resolve) => {
             releaseA = resolve;
@@ -1932,7 +1932,7 @@ describe("liveFrom", () => {
         const runA = transition.run(async (ctx) => {
             enteredA();
             await gate;
-            ctx.keepPrev(node("a"));
+            ctx.keepPlaying(node("a"));
         });
         await vi.waitFor(() => expect(enteredA).toHaveBeenCalled());
         const runB = transition.run(() => {});
@@ -1953,7 +1953,7 @@ describe("liveFrom", () => {
             (await started(starts, 0)).end();
             await first;
             const b = dom.byId("b");
-            const done = transition.show(2, { liveFrom: true });
+            const done = transition.show(2, { keepPlaying: true });
             const start = await started(starts, 1);
             expect(lives[0].kept).toEqual([b]);
             expect(dom.container.children.map((c) => c.id)).toEqual(["a", "c"]);
@@ -1970,7 +1970,10 @@ describe("liveFrom", () => {
         test("remove: true removes the old slide after putting it back", async () => {
             const dom = slides("a", "b", "c");
             const { transition, starts } = setup({ element: dom.element });
-            const done = transition.show(1, { remove: true, liveFrom: true });
+            const done = transition.show(1, {
+                remove: true,
+                keepPlaying: true,
+            });
             (await started(starts, 0)).end();
             await done;
             expect(dom.container.children.map((c) => c.id)).toEqual(["b"]);
@@ -1980,7 +1983,7 @@ describe("liveFrom", () => {
             const dom = slides("a", "b", "c");
             const { transition, starts, lives } = setup({
                 element: dom.element,
-                liveFrom: true,
+                keepPlaying: true,
             });
             const a = dom.byId("a");
             const first = transition.show(1);
@@ -2003,7 +2006,7 @@ describe("liveFrom", () => {
             const dom = slides("a", "b");
             const { transition, starts } = setup({
                 element: dom.element,
-                liveFrom: true,
+                keepPlaying: true,
             });
             const done = transition.show(1);
             await started(starts, 0);

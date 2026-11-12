@@ -24,8 +24,8 @@ type Run = {
 const mock = vi.hoisted(() => {
     const runs: Run[] = [];
     // Core's hand-over; a test swaps in its own.
-    const keep: { keepPrev: RunContext["keepPrev"] } = {
-        keepPrev: () => {},
+    const keep: { keepPlaying: RunContext["keepPlaying"] } = {
+        keepPlaying: () => {},
     };
     const handle = {
         run(cb: Run["cb"], opts: Run["opts"]) {
@@ -37,7 +37,7 @@ const mock = vi.hoisted(() => {
             // Like core: call cb (after the snapshot), then read opts.
             return Promise.resolve()
                 .then(() =>
-                    cb({ keepPrev: (...args) => keep.keepPrev(...args) }),
+                    cb({ keepPlaying: (...args) => keep.keepPlaying(...args) }),
                 )
                 .then(() => {
                     resolve();
@@ -338,7 +338,7 @@ describe("VFXTransition (nuxt)", () => {
         warn.mockRestore();
     });
 
-    describe("liveFrom", () => {
+    describe("keepPlaying", () => {
         type PageTransition = {
             css: boolean;
             mode: string;
@@ -373,26 +373,26 @@ describe("VFXTransition (nuxt)", () => {
 
         beforeEach(() => {
             seen = {};
-            mock.keep.keepPrev = () => {};
+            mock.keep.keepPlaying = () => {};
         });
 
         it("gives <NuxtPage> a page transition from the first render", () => {
-            mountWithPage({ liveFrom: true });
+            mountWithPage({ keepPlaying: true });
             expect(seen.transition).toMatchObject({
                 css: false,
                 mode: "default",
             });
         });
 
-        it("leaves <NuxtPage> alone without liveFrom", () => {
+        it("leaves <NuxtPage> alone without keepPlaying", () => {
             mountWithPage({});
             expect(seen.transition).toBeUndefined();
         });
 
         it("hands the leaving page to the held run and ends the leave when it is back", async () => {
-            mountWithPage({ liveFrom: true });
+            mountWithPage({ keepPlaying: true });
             let giveBack = () => {};
-            mock.keep.keepPrev = vi.fn((node, onReturn) => {
+            mock.keep.keepPlaying = vi.fn((node, onReturn) => {
                 (node as Element).remove();
                 giveBack = () => onReturn?.(node as Node);
             });
@@ -400,7 +400,7 @@ describe("VFXTransition (nuxt)", () => {
             const el = leaving();
             const done = vi.fn();
             seen.transition?.onLeave(el, done);
-            expect(mock.keep.keepPrev).toHaveBeenCalledWith(
+            expect(mock.keep.keepPlaying).toHaveBeenCalledWith(
                 el,
                 expect.any(Function),
             );
@@ -411,8 +411,8 @@ describe("VFXTransition (nuxt)", () => {
         });
 
         it("ends the leave at once when core keeps nothing", async () => {
-            mountWithPage({ liveFrom: true });
-            mock.keep.keepPrev = vi.fn();
+            mountWithPage({ keepPlaying: true });
+            mock.keep.keepPlaying = vi.fn();
             await nuxt.navigate("/", "/about");
             const done = vi.fn();
             seen.transition?.onLeave(leaving(), done);
@@ -421,7 +421,7 @@ describe("VFXTransition (nuxt)", () => {
         });
 
         it("ends the leave at once outside a run", () => {
-            mountWithPage({ liveFrom: true });
+            mountWithPage({ keepPlaying: true });
             const done = vi.fn();
             seen.transition?.onLeave(leaving(), done);
             expect(done).toHaveBeenCalledOnce();

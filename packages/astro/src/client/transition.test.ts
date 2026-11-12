@@ -10,7 +10,7 @@ const mock = vi.hoisted(() => {
     const runs: { opts: unknown; done: boolean }[] = [];
     // Records the old nodes and what the target held when they were handed over.
     const kept: { nodes: Node[]; html: string }[] = [];
-    const keepPrev = vi.fn((nodes: Node | Iterable<Node>) => {
+    const keepPlaying = vi.fn((nodes: Node | Iterable<Node>) => {
         const list = Array.from(nodes as Iterable<Node>);
         const parent = list[0]?.parentElement;
         kept.push({ nodes: list, html: parent?.innerHTML ?? "" });
@@ -20,13 +20,13 @@ const mock = vi.hoisted(() => {
         run: vi.fn(
             async (
                 cb: (ctx: {
-                    keepPrev: typeof keepPrev;
+                    keepPlaying: typeof keepPlaying;
                 }) => Promise<void> | void,
                 opts: unknown,
             ) => {
                 const run = { opts, done: false };
                 runs.push(run);
-                await cb({ keepPrev });
+                await cb({ keepPlaying });
                 run.done = true;
             },
         ),
@@ -308,10 +308,10 @@ describe("installTransition", () => {
         expect(document.body.textContent).toBe("plain");
     });
 
-    describe("liveFrom", () => {
+    describe("keepPlaying", () => {
         it("hands the old children to core right before the swap", async () => {
             document.body.innerHTML = target(
-                '{"liveFrom":true}',
+                '{"keepPlaying":true}',
                 `<p>old</p><div ${PERSIST}="island">island</div>`,
             );
             installTransition({ swapFunctions });
@@ -340,7 +340,7 @@ describe("installTransition", () => {
             live.replaceWith(wrapper);
             wrapper.append(live);
             const ghost = document.createElement("canvas");
-            ghost.setAttribute("data-vfx-live-from", "");
+            ghost.setAttribute("data-vfx-keep-playing", "");
             wrapper.after(ghost);
             await navigate({ doc: page(target("{}", "<p>new</p>")) });
             expect(ghost.isConnected).toBe(true);
@@ -348,15 +348,15 @@ describe("installTransition", () => {
             expect(ghost.hasAttribute(PERSIST)).toBe(false);
         });
 
-        it("takes liveFrom from the link", async () => {
+        it("takes keepPlaying from the link", async () => {
             installTransition({ swapFunctions });
             const link = document.createElement("a");
-            link.setAttribute("data-vfx-transition", '{"liveFrom":true}');
+            link.setAttribute("data-vfx-transition", '{"keepPlaying":true}');
             await navigate({ source: link, doc: page(target("{}", "new")) });
             expect(mock.kept).toHaveLength(1);
         });
 
-        it("hands nothing over without liveFrom", async () => {
+        it("hands nothing over without keepPlaying", async () => {
             installTransition({ swapFunctions });
             await navigate({ doc: page(target("{}", "new")) });
             expect(mock.kept).toHaveLength(0);

@@ -38,7 +38,7 @@
         keepWrapped,
         waitFor,
         autoReverse,
-        liveFrom,
+        keepPlaying,
         ...attrs
     }: Props = $props();
 
@@ -62,7 +62,7 @@
             keepWrapped,
             waitFor,
             autoReverse,
-            liveFrom,
+            keepPlaying,
         };
         for (const [key, value] of Object.entries(opts)) {
             if (value === undefined) {
@@ -123,11 +123,11 @@
     // The leaving page's outro: hand it to core and keep it until core gives it back.
     function keepOldPage(node: HTMLElement) {
         const parent = node.parentNode;
-        held?.keepPrev(node, () => {
+        held?.keepPlaying(node, () => {
             node.style.display = "none";
             endOutro(node);
         });
-        // Core keeps nothing when the run does not use liveFrom.
+        // Core keeps nothing when the run does not use keepPlaying.
         return { duration: node.parentNode === parent ? 0 : HOLD_MS };
     }
 
@@ -159,7 +159,7 @@
         bind:this={target}
         style={fullscreen ? `${FILL_STYLE}${style ?? ""}` : style}
     >
-        {#if liveFrom}
+        {#if keepPlaying}
             <!-- A new path makes a new block, so the old page stays while it leaves. -->
             {#key page.url.pathname}
                 <div style="display: contents" out:keepOldPage>

@@ -92,10 +92,11 @@ export type TransitionSpec<
     ease?: TransitionEase;
     /**
      * Keep capturing the old content during the run, so its animations and videos keep playing.
-     * Hand the old nodes over with `ctx.keepPrev()` in the `run()` callback; `show()` does it for you.
+     * It costs one more capture per frame.
+     * Hand the old nodes over with `ctx.keepPlaying()` in the `run()` callback; `show()` does it for you.
      * Default false.
      */
-    liveFrom?: boolean;
+    keepPlaying?: boolean;
 };
 
 /**
@@ -132,14 +133,14 @@ export type RunOpts<
 /** Passed to the `run()` callback. */
 export type RunContext = {
     /**
-     * Hand the old nodes over before you drop them, so `liveFrom` can keep them playing.
+     * Hand the old nodes over before you drop them, so `keepPlaying` can keep them playing.
      * VFX-JS moves them into a hidden canvas and removes them when the run ends.
      * With `onReturn`, it moves each node back to its old place instead, then calls `onReturn`.
      * Use it when a framework still owns the nodes.
-     * No-op unless the run may use `liveFrom`.
+     * No-op unless the run may use `keepPlaying`.
      * With function opts it keeps them until the spec is known.
      */
-    keepPrev(
+    keepPlaying(
         nodes: Node | Iterable<Node>,
         onReturn?: (node: Node) => void,
     ): void;
@@ -171,7 +172,7 @@ export interface TransitionHandle {
      * Change the DOM in `cb` and animate from the old content to the new.
      * `opts` can be a function, called once right after `cb` resolves.
      * Use it when the spec depends on the new content.
-     * With `liveFrom`, call `ctx.keepPrev()` in `cb` before you drop the old nodes.
+     * With `keepPlaying`, call `ctx.keepPlaying()` in `cb` before you drop the old nodes.
      */
     run<T extends Transition | TransitionClass>(
         cb: (ctx: RunContext) => void | Promise<void>,

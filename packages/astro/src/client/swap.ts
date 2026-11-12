@@ -11,8 +11,8 @@ export type SwapFunctions = {
 
 export const TARGET_ATTR = "data-vfx-transition-target";
 const PERSIST_ATTR = "data-astro-transition-persist";
-// Core's hidden canvas that holds the old page during a run with liveFrom.
-const LIVE_FROM_ATTR = "data-vfx-live-from";
+// Core's hidden canvas that holds the old page during a run with keepPlaying.
+const KEEP_PLAYING_ATTR = "data-vfx-keep-playing";
 
 // Let Astro carry `live` over to where `placeholder` sits in the new page.
 function persist(live: Element, placeholder: Element, id: string): void {
@@ -49,7 +49,7 @@ export function swapKeepingTarget(
     live: HTMLElement,
     canvas: HTMLCanvasElement | null,
     fns: SwapFunctions,
-    keepPrev?: (nodes: Node[]) => void,
+    keepPlaying?: (nodes: Node[]) => void,
 ): boolean {
     fns.deselectScripts(doc);
     fns.swapRootAttributes(doc);
@@ -61,7 +61,7 @@ export function swapKeepingTarget(
     if (next) {
         // Take persisted elements first, so they go to the new page.
         const children = takeChildren(live, next);
-        keepPrev?.(Array.from(live.childNodes));
+        keepPlaying?.(Array.from(live.childNodes));
         live.replaceChildren(children);
         live.setAttribute(TARGET_ATTR, next.getAttribute(TARGET_ATTR) ?? "");
         // During a run core wraps the target in a canvas; keep that too.
@@ -70,12 +70,12 @@ export function swapKeepingTarget(
         persist(outer, next, "vfx-transition-target");
         kept.push(outer);
         const ghosts = outer.parentElement?.querySelectorAll(
-            `:scope > [${LIVE_FROM_ATTR}]`,
+            `:scope > [${KEEP_PLAYING_ATTR}]`,
         );
         for (const [i, ghost] of Array.from(ghosts ?? []).entries()) {
             const placeholder = doc.createElement("div");
             next.after(placeholder);
-            persist(ghost, placeholder, `vfx-live-from-${i}`);
+            persist(ghost, placeholder, `vfx-keep-playing-${i}`);
             kept.push(ghost);
         }
     }
