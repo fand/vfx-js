@@ -302,6 +302,8 @@ describe("VFXTransition", () => {
             await swap(mock.runs[0], live.ctx);
             expect(live.keepPlaying).not.toHaveBeenCalled();
             expect(target().textContent).toBe("b");
+            // Pages render straight into the target, with no box.
+            expect(target().firstElementChild?.tagName).toBe("P");
         });
 
         it("turning keepPlaying off while core holds a page keeps the DOM whole", async () => {
@@ -317,13 +319,14 @@ describe("VFXTransition", () => {
                     </VFXTransition>,
                 );
             });
-            // The shown page keeps its state.
-            expect(target().textContent).toBe("b1");
+            // The shown page loses its box, so it remounts.
+            expect(target().textContent).toBe("b0");
             act(() => {
                 live.giveBack();
             });
-            expect(target().textContent).toBe("b1");
-            expect(target().children).toHaveLength(1);
+            expect(target().textContent).toBe("b0");
+            // No box is left; the page renders without one again.
+            expect(target().querySelector("div")).toBeNull();
         });
 
         it("a page core gives back while it is still shown stays visible", async () => {

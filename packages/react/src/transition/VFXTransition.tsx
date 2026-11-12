@@ -10,6 +10,7 @@ import type {
 } from "@vfx-js/core";
 import type * as React from "react";
 import {
+    Fragment,
     startTransition,
     useEffect,
     useLayoutEffect,
@@ -46,7 +47,7 @@ type Shown = {
 type Pages = { kept: Shown[]; shown: Shown };
 
 const OUTER_STYLE: React.CSSProperties = { display: "contents" };
-// Each page sits in its own box, so core can move it with keepPlaying.
+// With keepPlaying, each page sits in its own box that core can move.
 const PAGE_STYLE: React.CSSProperties = { display: "contents" };
 // Pages share one viewport-sized box and scroll inside it.
 const FILL_STYLE: React.CSSProperties = {
@@ -195,6 +196,9 @@ export function VFXTransition<T extends Transition | TransitionClass>(
         latestShown.current = { ...shown, node: children };
     }
     const rendered = [...pages.kept, latestShown.current];
+    // A page core holds keeps its box even if keepPlaying turns off mid-run.
+    const boxed = (page: Shown) =>
+        Boolean(opts.keepPlaying) || page !== latestShown.current;
 
     // Core moves the inner div into a canvas during a run.
     // React removes the outer div on unmount, and that one never moves.
@@ -206,21 +210,25 @@ export function VFXTransition<T extends Transition | TransitionClass>(
                 style={fullscreen ? { ...FILL_STYLE, ...style } : style}
             >
                 <TransitionScopeContext.Provider value={scope}>
-                    {rendered.map((page) => (
-                        <div
-                            key={page.id}
-                            style={PAGE_STYLE}
-                            ref={(box) => {
-                                if (box) {
-                                    pageBoxes.current.set(page.id, box);
-                                } else {
-                                    pageBoxes.current.delete(page.id);
-                                }
-                            }}
-                        >
-                            {page.node}
-                        </div>
-                    ))}
+                    {rendered.map((page) =>
+                        boxed(page) ? (
+                            <div
+                                key={page.id}
+                                style={PAGE_STYLE}
+                                ref={(box) => {
+                                    if (box) {
+                                        pageBoxes.current.set(page.id, box);
+                                    } else {
+                                        pageBoxes.current.delete(page.id);
+                                    }
+                                }}
+                            >
+                                {page.node}
+                            </div>
+                        ) : (
+                            <Fragment key={page.id}>{page.node}</Fragment>
+                        ),
+                    )}
                 </TransitionScopeContext.Provider>
             </div>
         </div>

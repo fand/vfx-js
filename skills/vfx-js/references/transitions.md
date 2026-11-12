@@ -281,8 +281,7 @@ export function Layout() {
 - The target fills the viewport (`height: 100dvh; overflow: hidden`). Pages scroll inside it. Use a CSS reset (`body { margin: 0 }`).
 - `fullscreen={false}` drops the default size; size it with `className` / `style`, e.g. `height: calc(100dvh - 64px)` under a header.
 - React Router: the old page keeps its own route while it animates out, but `useLocation()` inside it reads the new location.
-- Each page sits in a `display: contents` div, so a `.target > .page` selector needs `.target > div > .page`.
-- `keepPlaying` on `<VFXTransition>` keeps the old page mounted and playing during the run, with its state. Set it on `<VFXTransition>`: a page or link spec can turn it off but not on.
+- `keepPlaying` on `<VFXTransition>` keeps the old page mounted and playing during the run, with its state. Each page then sits in a `display: contents` div, so a `.target > .page` selector needs `.target > div > .page`. Set it on `<VFXTransition>`: a page or link spec can turn it off but not on. Turning it on or off remounts the shown page.
 
 ### Next.js App Router
 
