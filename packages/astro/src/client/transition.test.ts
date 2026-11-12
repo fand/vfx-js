@@ -9,12 +9,18 @@ import { installTransition, uninstallTransition } from "./transition";
 const mock = vi.hoisted(() => {
     const runs: { opts: unknown; done: boolean }[] = [];
     // Records the old nodes and what the target held when they were handed over.
-    const kept: { nodes: Node[]; html: string }[] = [];
-    const keepPlaying = vi.fn((nodes: Node | Iterable<Node>) => {
-        const list = Array.from(nodes as Iterable<Node>);
-        const parent = list[0]?.parentElement;
-        kept.push({ nodes: list, html: parent?.innerHTML ?? "" });
-    });
+    const kept: {
+        nodes: Node[];
+        html: string;
+        onReturn?: (node: Node) => void;
+    }[] = [];
+    const keepPlaying = vi.fn(
+        (nodes: Node | Iterable<Node>, onReturn?: (node: Node) => void) => {
+            const list = Array.from(nodes as Iterable<Node>);
+            const parent = list[0]?.parentElement;
+            kept.push({ nodes: list, html: parent?.innerHTML ?? "", onReturn });
+        },
+    );
     const handle = {
         // Calls `cb` at once, as if the snapshot were taken.
         run: vi.fn(
@@ -328,6 +334,27 @@ describe("installTransition", () => {
             expect(mock.kept[0].nodes).toEqual([old]);
             // The persisted island goes to the new page, not to core.
             expect(mock.kept[0].html).toBe("<p>old</p>");
+        });
+
+        it("unmounts the old islands when core drops the old page", async () => {
+            document.body.innerHTML = target(
+                '{"keepPlaying":true}',
+                "<astro-island><p>old</p></astro-island><div><astro-island></astro-island></div>",
+            );
+            installTransition({ swapFunctions });
+            const islands = [...document.querySelectorAll("astro-island")];
+            const unmounts = islands.map((island) => {
+                const unmount = vi.fn();
+                island.addEventListener("astro:unmount", unmount);
+                return unmount;
+            });
+            await navigate({ doc: page(target("{}", "<p>new</p>")) });
+            const { nodes, onReturn } = mock.kept[0];
+            expect(unmounts.every((u) => u.mock.calls.length === 0)).toBe(true);
+            for (const node of nodes) {
+                onReturn?.(node);
+            }
+            expect(unmounts.map((u) => u.mock.calls.length)).toEqual([1, 1]);
         });
 
         it("carries core's hidden canvas over to the new page", async () => {
