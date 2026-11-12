@@ -243,6 +243,22 @@ describe("TransitionStage", () => {
         expect(seen.every((x) => x >= 0 && x <= 1)).toBe(true);
     });
 
+    test("a throwing onEnd still settles the run", async () => {
+        const stage = new TransitionStage();
+        void stage.snapshot();
+        stage.render(frameCtx(0));
+        const ended = stage.start({
+            duration: 1,
+            onEnd: () => {
+                throw new Error("nope");
+            },
+        });
+        stage.update(frameCtx(10));
+        expect(() => stage.update(frameCtx(11))).toThrow("nope");
+        await ended;
+        expect(stage.frame).toBeNull();
+    });
+
     test("cut ends the playing run at once", async () => {
         const stage = new TransitionStage();
         void stage.snapshot();

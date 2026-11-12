@@ -39,6 +39,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
     "@types/node": "26.6.5",
+    "happy-dom": "21.0.4",
     "lint-staged": "^17.6.0",
     "npm-run-all2": "^9.0.4",
     "rimraf": "^6.1.3",

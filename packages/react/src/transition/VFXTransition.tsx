@@ -10,7 +10,6 @@ import type {
 } from "@vfx-js/core";
 import type * as React from "react";
 import {
-    Fragment,
     startTransition,
     useEffect,
     useLayoutEffect,
@@ -47,7 +46,7 @@ type Shown = {
 type Pages = { kept: Shown[]; shown: Shown };
 
 const OUTER_STYLE: React.CSSProperties = { display: "contents" };
-// With keepPlaying, each page sits in its own box that core can move.
+// Each page sits in its own box, so core can move it with keepPlaying.
 const PAGE_STYLE: React.CSSProperties = { display: "contents" };
 // Pages share one viewport-sized box and scroll inside it.
 const FILL_STYLE: React.CSSProperties = {
@@ -113,7 +112,10 @@ export function VFXTransition<T extends Transition | TransitionClass>(
         };
     }, [vfx, liveOpts]);
 
+    // The page on screen; a pending page that suspends is not it yet.
+    const committedId = useRef(shown.id);
     useLayoutEffect(() => {
+        committedId.current = shown.id;
         const waiters = commitWaiters.current;
         commitWaiters.current = [];
         for (const resolve of waiters) {
@@ -171,7 +173,10 @@ export function VFXTransition<T extends Transition | TransitionClass>(
         }
         const parent = box.parentNode;
         ctx.keepPlaying(box, (node) => {
-            (node as HTMLElement).style.display = "none";
+            // Still the shown page when the new one has not come in; keep it visible then.
+            if (committedId.current !== id) {
+                (node as HTMLElement).style.display = "none";
+            }
             setPages((p) => ({
                 ...p,
                 kept: p.kept.filter((page) => page.id !== id),
@@ -190,7 +195,6 @@ export function VFXTransition<T extends Transition | TransitionClass>(
         latestShown.current = { ...shown, node: children };
     }
     const rendered = [...pages.kept, latestShown.current];
-    const live = Boolean(opts.keepPlaying);
 
     // Core moves the inner div into a canvas during a run.
     // React removes the outer div on unmount, and that one never moves.
@@ -202,25 +206,21 @@ export function VFXTransition<T extends Transition | TransitionClass>(
                 style={fullscreen ? { ...FILL_STYLE, ...style } : style}
             >
                 <TransitionScopeContext.Provider value={scope}>
-                    {rendered.map((page) =>
-                        live ? (
-                            <div
-                                key={page.id}
-                                style={PAGE_STYLE}
-                                ref={(box) => {
-                                    if (box) {
-                                        pageBoxes.current.set(page.id, box);
-                                    } else {
-                                        pageBoxes.current.delete(page.id);
-                                    }
-                                }}
-                            >
-                                {page.node}
-                            </div>
-                        ) : (
-                            <Fragment key={page.id}>{page.node}</Fragment>
-                        ),
-                    )}
+                    {rendered.map((page) => (
+                        <div
+                            key={page.id}
+                            style={PAGE_STYLE}
+                            ref={(box) => {
+                                if (box) {
+                                    pageBoxes.current.set(page.id, box);
+                                } else {
+                                    pageBoxes.current.delete(page.id);
+                                }
+                            }}
+                        >
+                            {page.node}
+                        </div>
+                    ))}
                 </TransitionScopeContext.Provider>
             </div>
         </div>

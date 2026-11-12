@@ -69,11 +69,14 @@ export class TransitionStage implements Effect {
     /** End the current run: call `spec.onEnd` and settle the promise from `start()`. */
     #end(): void {
         const onEnd = this.#onEnd;
-        this.#onEnd = null;
-        onEnd?.();
         const resolve = this.#resolveEnd;
+        this.#onEnd = null;
         this.#resolveEnd = null;
-        resolve?.();
+        try {
+            onEnd?.();
+        } finally {
+            resolve?.();
+        }
     }
 
     /** Copy the current capture into `from` on the next frame and hold it on screen. */

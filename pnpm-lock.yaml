@@ -651,6 +651,9 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
+      happy-dom:
+        specifier: 21.0.4
+        version: 21.0.4
       lint-staged:
         specifier: ^17.6.0
         version: 17.6.0

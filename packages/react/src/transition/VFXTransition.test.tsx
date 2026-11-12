@@ -304,6 +304,64 @@ describe("VFXTransition", () => {
             expect(target().textContent).toBe("b");
         });
 
+        it("turning keepPlaying off while core holds a page keeps the DOM whole", async () => {
+            renderLive("a", <Counter name="a" />);
+            const live = fakeLive();
+            renderLive("b", <Counter name="b" />);
+            await swap(mock.runs[0], live.ctx);
+            act(() => bump());
+            act(() => {
+                root.render(
+                    <VFXTransition pageKey="b">
+                        {<Counter name="b" />}
+                    </VFXTransition>,
+                );
+            });
+            // The shown page keeps its state.
+            expect(target().textContent).toBe("b1");
+            act(() => {
+                live.giveBack();
+            });
+            expect(target().textContent).toBe("b1");
+            expect(target().children).toHaveLength(1);
+        });
+
+        it("a page core gives back while it is still shown stays visible", async () => {
+            let release = () => {};
+            const pending = new Promise<void>((resolve) => {
+                release = resolve;
+            });
+            let ready = false;
+            function Slow() {
+                if (!ready) {
+                    throw pending;
+                }
+                return <p>b</p>;
+            }
+            renderLive("a", <p>a</p>);
+            const live = fakeLive();
+            renderLive("b", <Slow />);
+            // The new page suspends, so the old one stays the shown page.
+            await act(async () => {
+                void mock.runs[0].cb(live.ctx);
+            });
+            expect(live.keepPlaying).toHaveBeenCalledOnce();
+            // A newer run gives the page back before the new one is in.
+            act(() => {
+                live.giveBack();
+            });
+            const shownBox = target().firstElementChild as HTMLElement;
+            expect(shownBox.textContent).toBe("a");
+            expect(shownBox.style.display).not.toBe("none");
+            ready = true;
+            await act(async () => {
+                release();
+                await pending;
+            });
+            expect(target().textContent).toBe("b");
+            expect(target().children).toHaveLength(1);
+        });
+
         it("a page that comes back mounts fresh next to the kept one", async () => {
             renderLive("a", <Counter name="a" />);
             act(() => bump());
