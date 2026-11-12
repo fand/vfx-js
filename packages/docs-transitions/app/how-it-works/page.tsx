@@ -74,7 +74,9 @@ export default function HowItWorks() {
                             The snapshot of A is <code>readFrom</code>, the live
                             capture of B is <code>readTo</code>. The shader
                             mixes them on the VFX canvas while the real DOM is
-                            already B.
+                            already B. With <code>keepPlaying</code>, A keeps
+                            playing: its nodes move to a hidden canvas that is
+                            captured every frame.
                         </p>
                     </div>
                     <span className="dom-arrow">t = 1</span>

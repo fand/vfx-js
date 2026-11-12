@@ -7,6 +7,7 @@ import {
     wrapElement,
 } from "./html-in-canvas.js";
 import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
+import { captureLive, type LiveCapture } from "./live-capture.js";
 import { prefersReducedMotion } from "./reduced-motion.js";
 import { TransitionController } from "./transition/transition.js";
 import type {
@@ -273,6 +274,22 @@ export class VFX {
      */
     freezeInside(root: HTMLElement): () => void {
         return this.#player.freezeInside(root);
+    }
+
+    /**
+     * Capture an html-in-canvas canvas into a texture on every paint.
+     * The canvas is not rendered on screen. `texture` is null until the first capture.
+     * @internal Used by transitions.
+     */
+    captureLive(canvas: HTMLCanvasElement): LiveCapture {
+        if (!supportsHtmlInCanvas()) {
+            return { texture: null, dispose: () => {} };
+        }
+        return captureLive(
+            canvas,
+            this.#player.liveTexture(),
+            this.#player.maxTextureSize,
+        );
     }
 
     /**

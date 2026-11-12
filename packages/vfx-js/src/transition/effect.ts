@@ -4,6 +4,7 @@ import type {
     EffectContext,
     EffectDims,
     EffectRenderTarget,
+    EffectTexture,
 } from "../types.js";
 import type {
     TransitionEase,
@@ -41,11 +42,15 @@ function applyEase(ease: TransitionEase | undefined, x: number): number {
 
 const HELD: TransitionProgress = { t: 0, x: 0 };
 
+/** The live old content for this frame, or null before its first capture. */
+export type LiveSource = () => EffectTexture | null;
+
 /**
  * First effect of every transition chain. States:
  * - idle: disabled, the chain passes the capture through.
  * - hold: shows the snapshot of the old content while the new one is captured.
  * - playing: disabled, so the live capture goes to the transition effects; it only keeps time.
+ * With a live source, `from` follows the old content each frame, and the stage stays enabled to copy it.
  */
 export class TransitionStage implements Effect {
     enabled = false;
@@ -59,20 +64,25 @@ export class TransitionStage implements Effect {
     #progress: TransitionProgress = HELD;
     #resolveEnd: (() => void) | null = null;
     #onEnd: (() => void) | null = null;
+    #liveSource: LiveSource | null = null;
 
     /** End the current run: call `spec.onEnd` and settle the promise from `start()`. */
     #end(): void {
         const onEnd = this.#onEnd;
-        this.#onEnd = null;
-        onEnd?.();
         const resolve = this.#resolveEnd;
+        this.#onEnd = null;
         this.#resolveEnd = null;
-        resolve?.();
+        try {
+            onEnd?.();
+        } finally {
+            resolve?.();
+        }
     }
 
     /** Copy the current capture into `from` on the next frame and hold it on screen. */
     snapshot(): Promise<void> {
         this.#end();
+        this.#liveSource = null;
         this.#spec = null;
         this.enabled = true;
         return new Promise((resolve) => this.#snapshotWaiters.push(resolve));
@@ -86,7 +96,7 @@ export class TransitionStage implements Effect {
         this.#startTime = null;
         this.#progress = HELD;
         this.#hold = false;
-        this.enabled = false;
+        this.enabled = this.#liveSource !== null;
         return new Promise((resolve) => {
             this.#resolveEnd = resolve;
         });
@@ -95,6 +105,7 @@ export class TransitionStage implements Effect {
     /** Stop any transition, drop a pending snapshot and pass the capture through. */
     cancel(): void {
         this.#end();
+        this.#liveSource = null;
         this.#spec = null;
         this.#hold = false;
         this.enabled = false;
@@ -106,6 +117,14 @@ export class TransitionStage implements Effect {
         this.#snapshotWaiters = [];
         for (const w of waiters) {
             w();
+        }
+    }
+
+    /** Copy the live old content into `from` each frame; null goes back to the last copy. */
+    setLiveSource(source: LiveSource | null): void {
+        this.#liveSource = source;
+        if (source && (this.#hold || this.#spec)) {
+            this.enabled = true;
         }
     }
 
@@ -164,8 +183,17 @@ export class TransitionStage implements Effect {
             this.#hold = true;
             this.#resolveSnapshotWaiters();
         }
+        const live = this.#liveSource?.() ?? null;
+        if (live && (this.#hold || this.#spec)) {
+            ctx.blit(live, this.#ensureFrom(ctx));
+        }
         if (this.#from && this.#hold) {
             ctx.blit(this.#from);
+            return;
+        }
+        // Stay enabled to copy the live content as it comes.
+        if (this.#liveSource && this.#spec) {
+            ctx.blit(ctx.src);
             return;
         }
         this.enabled = false;
@@ -173,6 +201,7 @@ export class TransitionStage implements Effect {
     }
 
     dispose(): void {
+        this.#liveSource = null;
         this.#from = null;
         this.#fromSize = [0, 0];
         this.#end();

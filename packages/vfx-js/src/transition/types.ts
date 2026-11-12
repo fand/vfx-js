@@ -90,6 +90,14 @@ export type TransitionSpec<
     overflow?: true | number;
     /** How `t` follows progress. Overrides the transition's own. */
     ease?: TransitionEase;
+    /**
+     * Keep capturing the old content during the run, so its animations and videos keep playing.
+     * It costs one more capture per frame.
+     * Hand the old nodes over with `ctx.keepPlaying()` in the `run()` callback; `show()` does it for you.
+     * Function opts can turn it off but not on; set it on the container then.
+     * Default false.
+     */
+    keepPlaying?: boolean;
 };
 
 /**
@@ -123,6 +131,22 @@ export type RunOpts<
     T extends Transition | TransitionClass = Transition | TransitionClass,
 > = Partial<TransitionSpec<T>>;
 
+/** Passed to the `run()` callback. */
+export type RunContext = {
+    /**
+     * Hand the old nodes over before you drop them, so `keepPlaying` can keep them playing.
+     * VFX-JS moves them into a hidden canvas and removes them when the run ends.
+     * With `onReturn`, it moves each node back to its old place instead, then calls `onReturn`.
+     * Use it when a framework still owns the nodes.
+     * No-op unless the run uses `keepPlaying`.
+     * With function opts, only the container's `keepPlaying` turns it on.
+     */
+    keepPlaying(
+        nodes: Node | Iterable<Node>,
+        onReturn?: (node: Node) => void,
+    ): void;
+};
+
 /** A direct child of the container, its index, or a selector inside it. */
 export type SlideRef = HTMLElement | number | string;
 
@@ -149,9 +173,10 @@ export interface TransitionHandle {
      * Change the DOM in `cb` and animate from the old content to the new.
      * `opts` can be a function, called once right after `cb` resolves.
      * Use it when the spec depends on the new content.
+     * With `keepPlaying`, call `ctx.keepPlaying()` in `cb` before you drop the old nodes.
      */
     run<T extends Transition | TransitionClass>(
-        cb: () => void | Promise<void>,
+        cb: (ctx: RunContext) => void | Promise<void>,
         opts?: RunOpts<T> | (() => RunOpts<T>),
     ): Promise<void>;
     /** End the current run and show the live content. */

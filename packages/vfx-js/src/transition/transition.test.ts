@@ -4,6 +4,7 @@ import type {
     EffectContext,
     EffectDims,
     EffectRenderTarget,
+    EffectTexture,
 } from "../types";
 import { Crossfade } from "./crossfade";
 import {
@@ -14,6 +15,7 @@ import {
 } from "./effect";
 import { BODY_OFFSET, describeGlslError } from "./glsl";
 import { createHistorySpecs, type HistorySpecs } from "./history";
+import type { KeepPlayingLike } from "./keep-playing";
 import { ShaderTransition } from "./shader";
 import {
     layerSpec,
@@ -57,6 +59,7 @@ describe("resolveSpec", () => {
             duration: 0.6,
             overflow: undefined,
             ease: undefined,
+            keepPlaying: false,
         });
     });
 
@@ -240,6 +243,22 @@ describe("TransitionStage", () => {
         expect(seen.every((x) => x >= 0 && x <= 1)).toBe(true);
     });
 
+    test("a throwing onEnd still settles the run", async () => {
+        const stage = new TransitionStage();
+        void stage.snapshot();
+        stage.render(frameCtx(0));
+        const ended = stage.start({
+            duration: 1,
+            onEnd: () => {
+                throw new Error("nope");
+            },
+        });
+        stage.update(frameCtx(10));
+        expect(() => stage.update(frameCtx(11))).toThrow("nope");
+        await ended;
+        expect(stage.frame).toBeNull();
+    });
+
     test("cut ends the playing run at once", async () => {
         const stage = new TransitionStage();
         void stage.snapshot();
@@ -264,6 +283,86 @@ describe("TransitionStage", () => {
         await ended;
         expect(onEnd).toHaveBeenCalledOnce();
         expect(stage.frame).toBeNull();
+    });
+
+    describe("live source", () => {
+        const texture = { __brand: "EffectTexture" } as EffectTexture;
+
+        test("uses the snapshot until the first live frame", () => {
+            const stage = new TransitionStage();
+            void stage.snapshot();
+            stage.render(frameCtx(0));
+            stage.setLiveSource(() => null);
+            const ctx = frameCtx(1);
+            stage.render(ctx);
+            const from = stage.frame?.from;
+            expect(ctx.blit).toHaveBeenCalledOnce();
+            expect(ctx.blit).toHaveBeenCalledWith(from);
+        });
+
+        test("copies the live frame into from while holding", () => {
+            const stage = new TransitionStage();
+            void stage.snapshot();
+            stage.render(frameCtx(0));
+            stage.setLiveSource(() => texture);
+            const ctx = frameCtx(1);
+            stage.render(ctx);
+            const from = stage.frame?.from;
+            expect(vi.mocked(ctx.blit).mock.calls).toEqual([
+                [texture, from],
+                [from],
+            ]);
+        });
+
+        test("updates from every frame and stays enabled while playing", () => {
+            const stage = new TransitionStage();
+            void stage.snapshot();
+            stage.render(frameCtx(0));
+            let live: EffectTexture | null = null;
+            stage.setLiveSource(() => live);
+            void stage.start({ duration: 1 });
+            expect(stage.enabled).toBe(true);
+            const from = stage.frame?.from;
+            for (const time of [10, 10.1, 10.2]) {
+                stage.update(frameCtx(time));
+                const ctx = frameCtx(time);
+                stage.render(ctx);
+                const calls = vi.mocked(ctx.blit).mock.calls;
+                expect(calls).toEqual(
+                    live ? [[live, from], [ctx.src]] : [[ctx.src]],
+                );
+                expect(stage.enabled).toBe(true);
+                live = texture;
+            }
+            expect(stage.frame?.from).toBe(from);
+        });
+
+        test("no source goes back to passing the capture through", () => {
+            const stage = new TransitionStage();
+            void stage.snapshot();
+            stage.render(frameCtx(0));
+            stage.setLiveSource(() => texture);
+            void stage.start({ duration: 1 });
+            stage.setLiveSource(null);
+            const ctx = frameCtx(10);
+            stage.render(ctx);
+            expect(vi.mocked(ctx.blit).mock.calls).toEqual([[ctx.src]]);
+            expect(stage.enabled).toBe(false);
+        });
+
+        test("cancel and a new snapshot drop the source", () => {
+            const source = vi.fn(() => texture);
+            const stage = new TransitionStage();
+            void stage.snapshot();
+            stage.render(frameCtx(0));
+            stage.setLiveSource(source);
+            stage.cancel();
+            stage.render(frameCtx(1));
+            stage.setLiveSource(source);
+            void stage.snapshot();
+            stage.render(frameCtx(2));
+            expect(source).not.toHaveBeenCalled();
+        });
     });
 });
 
@@ -536,10 +635,14 @@ function setup(
         endCurrent = null;
         f?.();
     };
+    let liveSource: (() => unknown) | null = null;
     const stage: TransitionStageLike = {
         frame: null,
         cut: () => {},
         render: () => {},
+        setLiveSource: (source) => {
+            liveSource = source;
+        },
         snapshot: () => {
             end();
             log.push("snapshot");
@@ -610,8 +713,10 @@ function setup(
             };
         },
         reducedMotion,
+        captureLive: () => ({ texture: null, dispose: () => {} }),
     };
     const onDestroy = vi.fn();
+    const lives: FakeLive[] = [];
     const transition = new TransitionController(
         vfx,
         element,
@@ -620,6 +725,11 @@ function setup(
         stage,
         history,
         uaTransitions,
+        () => {
+            const live = new FakeLive();
+            lives.push(live);
+            return live;
+        },
     );
     return {
         transition,
@@ -628,6 +738,8 @@ function setup(
         onDestroy,
         disposed,
         chain: () => chain,
+        lives,
+        liveSource: () => liveSource,
     };
 }
 
@@ -1289,6 +1401,48 @@ describe("TransitionController", () => {
     });
 });
 
+// Moves fake nodes out, and back to the same index on dispose.
+class FakeLive implements KeepPlayingLike {
+    readonly texture = null;
+    kept: unknown[] = [];
+    disposed = false;
+    #returning: {
+        node: FakeElement;
+        parent: FakeElement;
+        index: number;
+        onReturn: (node: Node) => void;
+    }[] = [];
+
+    keep(nodes: readonly Node[], onReturn?: (node: Node) => void): void {
+        for (const node of nodes) {
+            this.kept.push(node);
+            const element = node as unknown as FakeElement;
+            const parent = element.parentElement;
+            if (onReturn && parent) {
+                const index = parent.children.indexOf(element);
+                this.#returning.push({
+                    node: element,
+                    parent,
+                    index,
+                    onReturn,
+                });
+            }
+            element.remove?.();
+        }
+    }
+
+    dispose(): void {
+        this.disposed = true;
+        for (const { node, parent, index, onReturn } of this.#returning
+            .slice()
+            .reverse()) {
+            parent.insertAt(node, index);
+            onReturn(node as unknown as Node);
+        }
+        this.#returning = [];
+    }
+}
+
 // Just enough DOM for show(). Selectors match by id, like "#b".
 class FakeElement {
     id: string;
@@ -1309,6 +1463,12 @@ class FakeElement {
         child.remove();
         child.parentElement = this;
         this.children.push(child);
+    }
+
+    insertAt(child: FakeElement, index: number): void {
+        child.remove();
+        child.parentElement = this;
+        this.children.splice(index, 0, child);
     }
 
     remove(): void {
@@ -1590,5 +1750,310 @@ describe("reduced motion", () => {
         await transition.show(1);
         expect(dom.shown()).toEqual(["b"]);
         expect(starts).toEqual([]);
+    });
+});
+
+describe("keepPlaying", () => {
+    beforeEach(() => {
+        vi.stubGlobal("requestAnimationFrame", (fn: () => void) =>
+            setTimeout(fn, 0),
+        );
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    const started = async <T>(starts: T[], i: number): Promise<T> => {
+        await vi.waitFor(() => {
+            if (!starts[i]) {
+                throw new Error(`run ${i} has not started`);
+            }
+        }, 5000);
+        return starts[i];
+    };
+    const node = (id: string) => new FakeElement(id) as unknown as Node;
+
+    test("keeps the handed-over nodes until the run ends", async () => {
+        const { transition, starts, lives, liveSource } = setup();
+        const old = [node("a"), node("b")];
+        const run = transition.run(
+            (ctx) => {
+                ctx.keepPlaying(old);
+            },
+            { keepPlaying: true },
+        );
+        const start = await started(starts, 0);
+        expect(lives).toHaveLength(1);
+        expect(lives[0].kept).toEqual(old);
+        expect(liveSource()).not.toBeNull();
+        start.end();
+        await run;
+        expect(lives[0].disposed).toBe(true);
+        expect(liveSource()).toBeNull();
+    });
+
+    test("onReturn puts the nodes back when the run ends", async () => {
+        const dom = slides("a", "b");
+        const onReturn = vi.fn();
+        const { transition, starts } = setup({ keepPlaying: true });
+        const a = dom.byId("a");
+        const run = transition.run((ctx) =>
+            ctx.keepPlaying(a as unknown as Node, onReturn),
+        );
+        const start = await started(starts, 0);
+        expect(a.parentElement).toBeNull();
+        expect(onReturn).not.toHaveBeenCalled();
+        start.end();
+        await run;
+        expect(dom.container.children.map((c) => c.id)).toEqual(["a", "b"]);
+        expect(onReturn).toHaveBeenCalledWith(a);
+    });
+
+    test("takes a single node and the container's keepPlaying", async () => {
+        const { transition, starts, lives } = setup({ keepPlaying: true });
+        const old = node("a");
+        const run = transition.run((ctx) => ctx.keepPlaying(old));
+        (await started(starts, 0)).end();
+        await run;
+        expect(lives[0].kept).toEqual([old]);
+    });
+
+    test("keepPlaying does nothing without keepPlaying", async () => {
+        const { transition, starts, lives } = setup();
+        const run = transition.run((ctx) => ctx.keepPlaying(node("a")));
+        (await started(starts, 0)).end();
+        await run;
+        expect(lives).toHaveLength(0);
+    });
+
+    test("keepPlaying does nothing when the run cuts", async () => {
+        const { transition, lives } = setup({ keepPlaying: true });
+        await transition.run((ctx) => ctx.keepPlaying(node("a")), {
+            duration: 0,
+        });
+        expect(lives).toHaveLength(0);
+    });
+
+    test("a lazy spec keeps nothing unless the container turns keepPlaying on", async () => {
+        const { transition, starts, lives } = setup();
+        const run = transition.run(
+            (ctx) => ctx.keepPlaying(node("a")),
+            () => ({ keepPlaying: true }),
+        );
+        (await started(starts, 0)).end();
+        await run;
+        expect(lives).toHaveLength(0);
+    });
+
+    test("a lazy spec can turn the container's keepPlaying off", async () => {
+        const { transition, starts, lives, liveSource } = setup({
+            keepPlaying: true,
+        });
+        const run = transition.run(
+            (ctx) => ctx.keepPlaying(node("a")),
+            () => ({ keepPlaying: false }),
+        );
+        const start = await started(starts, 0);
+        expect(lives[0].disposed).toBe(true);
+        expect(liveSource()).toBeNull();
+        start.end();
+        await run;
+    });
+
+    test("a lazy spec keeps the nodes with the container's keepPlaying", async () => {
+        const { transition, starts, lives } = setup({ keepPlaying: true });
+        const run = transition.run(
+            (ctx) => ctx.keepPlaying(node("a")),
+            () => ({}),
+        );
+        const start = await started(starts, 0);
+        expect(lives[0].disposed).toBe(false);
+        start.end();
+        await run;
+        expect(lives[0].disposed).toBe(true);
+    });
+
+    test("autoReverse with a static spec keeps the nodes it asks for", async () => {
+        const { transition, starts, lives } = setup({ autoReverse: true });
+        const run = transition.run((ctx) => ctx.keepPlaying(node("a")), {
+            keepPlaying: true,
+        });
+        const start = await started(starts, 0);
+        expect(lives[0].disposed).toBe(false);
+        start.end();
+        await run;
+    });
+
+    test("a lazy duration 0 drops the nodes", async () => {
+        const { transition, lives, liveSource } = setup({ keepPlaying: true });
+        await transition.run(
+            (ctx) => ctx.keepPlaying(node("a")),
+            () => ({ duration: 0 }),
+        );
+        expect(lives[0].disposed).toBe(true);
+        expect(liveSource()).toBeNull();
+    });
+
+    test("cancel drops the nodes", async () => {
+        const { transition, starts, lives, liveSource } = setup();
+        const run = transition.run((ctx) => ctx.keepPlaying(node("a")), {
+            keepPlaying: true,
+        });
+        await started(starts, 0);
+        transition.cancel();
+        expect(lives[0].disposed).toBe(true);
+        expect(liveSource()).toBeNull();
+        await run;
+    });
+
+    test("destroy drops the nodes", async () => {
+        const { transition, starts, lives } = setup();
+        const run = transition.run((ctx) => ctx.keepPlaying(node("a")), {
+            keepPlaying: true,
+        });
+        await started(starts, 0);
+        transition.destroy();
+        expect(lives[0].disposed).toBe(true);
+        await run;
+    });
+
+    test("a cb that throws drops the nodes", async () => {
+        const { transition, lives } = setup();
+        const run = transition.run(
+            (ctx) => {
+                ctx.keepPlaying(node("a"));
+                throw new Error("nope");
+            },
+            { keepPlaying: true },
+        );
+        await expect(run).rejects.toThrow("nope");
+        expect(lives[0].disposed).toBe(true);
+    });
+
+    test("a run that never ends drops the nodes", async () => {
+        vi.useFakeTimers();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            const { transition, lives, liveSource } = setup();
+            const run = transition.run((ctx) => ctx.keepPlaying(node("a")), {
+                keepPlaying: true,
+                duration: 0.5,
+            });
+            await vi.advanceTimersByTimeAsync(1600);
+            await run;
+            expect(lives[0].disposed).toBe(true);
+            expect(liveSource()).toBeNull();
+        } finally {
+            warn.mockRestore();
+            vi.useRealTimers();
+        }
+    });
+
+    test("a newer run drops the old nodes at once", async () => {
+        const { transition, starts, lives } = setup({ keepPlaying: true });
+        const runA = transition.run((ctx) => ctx.keepPlaying(node("a")));
+        await started(starts, 0);
+        const runB = transition.run((ctx) => ctx.keepPlaying(node("b")));
+        expect(lives[0].disposed).toBe(true);
+        await runA;
+        (await started(starts, 1)).end();
+        await runB;
+        expect(lives).toHaveLength(2);
+        expect(lives.every((live) => live.disposed)).toBe(true);
+    });
+
+    test("a stale run keeps nothing", async () => {
+        const { transition, starts, lives } = setup({ keepPlaying: true });
+        let releaseA = () => {};
+        const gate = new Promise<void>((resolve) => {
+            releaseA = resolve;
+        });
+        const enteredA = vi.fn();
+        const runA = transition.run(async (ctx) => {
+            enteredA();
+            await gate;
+            ctx.keepPlaying(node("a"));
+        });
+        await vi.waitFor(() => expect(enteredA).toHaveBeenCalled());
+        const runB = transition.run(() => {});
+        releaseA();
+        await runA;
+        (await started(starts, 0)).end();
+        await runB;
+        expect(lives).toHaveLength(0);
+    });
+
+    describe("show", () => {
+        test("puts the old slide back in place, hidden", async () => {
+            const dom = slides("a", "b", "c");
+            const { transition, starts, lives } = setup({
+                element: dom.element,
+            });
+            const first = transition.show(1);
+            (await started(starts, 0)).end();
+            await first;
+            const b = dom.byId("b");
+            const done = transition.show(2, { keepPlaying: true });
+            const start = await started(starts, 1);
+            expect(lives[0].kept).toEqual([b]);
+            expect(dom.container.children.map((c) => c.id)).toEqual(["a", "c"]);
+            start.end();
+            await done;
+            expect(dom.container.children.map((c) => c.id)).toEqual([
+                "a",
+                "b",
+                "c",
+            ]);
+            expect(dom.shown()).toEqual(["c"]);
+        });
+
+        test("remove: true removes the old slide after putting it back", async () => {
+            const dom = slides("a", "b", "c");
+            const { transition, starts } = setup({ element: dom.element });
+            const done = transition.show(1, {
+                remove: true,
+                keepPlaying: true,
+            });
+            (await started(starts, 0)).end();
+            await done;
+            expect(dom.container.children.map((c) => c.id)).toEqual(["b"]);
+        });
+
+        test("a newer show can pick the slide a run holds", async () => {
+            const dom = slides("a", "b", "c");
+            const { transition, starts, lives } = setup({
+                element: dom.element,
+                keepPlaying: true,
+            });
+            const a = dom.byId("a");
+            const first = transition.show(1);
+            await started(starts, 0);
+            expect(a.parentElement).toBeNull();
+            const second = transition.show(0);
+            expect(lives[0].disposed).toBe(true);
+            await first;
+            (await started(starts, 1)).end();
+            await second;
+            expect(dom.container.children.map((c) => c.id)).toEqual([
+                "a",
+                "b",
+                "c",
+            ]);
+            expect(dom.shown()).toEqual(["a"]);
+        });
+
+        test("cancel puts the old slide back", async () => {
+            const dom = slides("a", "b");
+            const { transition, starts } = setup({
+                element: dom.element,
+                keepPlaying: true,
+            });
+            const done = transition.show(1);
+            await started(starts, 0);
+            transition.cancel();
+            await done;
+            expect(dom.container.children.map((c) => c.id)).toEqual(["a", "b"]);
+            expect(dom.shown()).toEqual(["b"]);
+        });
     });
 });

@@ -8,14 +8,34 @@ import { installTransition, uninstallTransition } from "./transition";
 
 const mock = vi.hoisted(() => {
     const runs: { opts: unknown; done: boolean }[] = [];
+    // Records the old nodes and what the target held when they were handed over.
+    const kept: {
+        nodes: Node[];
+        html: string;
+        onReturn?: (node: Node) => void;
+    }[] = [];
+    const keepPlaying = vi.fn(
+        (nodes: Node | Iterable<Node>, onReturn?: (node: Node) => void) => {
+            const list = Array.from(nodes as Iterable<Node>);
+            const parent = list[0]?.parentElement;
+            kept.push({ nodes: list, html: parent?.innerHTML ?? "", onReturn });
+        },
+    );
     const handle = {
         // Calls `cb` at once, as if the snapshot were taken.
-        run: vi.fn(async (cb: () => Promise<void> | void, opts: unknown) => {
-            const run = { opts, done: false };
-            runs.push(run);
-            await cb();
-            run.done = true;
-        }),
+        run: vi.fn(
+            async (
+                cb: (ctx: {
+                    keepPlaying: typeof keepPlaying;
+                }) => Promise<void> | void,
+                opts: unknown,
+            ) => {
+                const run = { opts, done: false };
+                runs.push(run);
+                await cb({ keepPlaying });
+                run.done = true;
+            },
+        ),
         destroy: vi.fn(),
         running: false,
     };
@@ -26,7 +46,7 @@ const mock = vi.hoisted(() => {
             return canvas.current;
         },
     };
-    return { runs, handle, vfx, canvas, init: vi.fn(() => vfx) };
+    return { runs, kept, handle, vfx, canvas, init: vi.fn(() => vfx) };
 });
 
 vi.mock("@vfx-js/core", async (importOriginal) => ({
@@ -121,6 +141,7 @@ describe("installTransition", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mock.runs.length = 0;
+        mock.kept.length = 0;
         document.head.innerHTML = "";
         meta = document.createElement("meta");
         meta.name = "astro-view-transitions-enabled";
@@ -291,5 +312,122 @@ describe("installTransition", () => {
         await navigate({ doc: page("<p>plain</p>") });
         expect(mock.handle.destroy).toHaveBeenCalled();
         expect(document.body.textContent).toBe("plain");
+    });
+
+    describe("keepPlaying", () => {
+        it("hands the old children to core right before the swap", async () => {
+            document.body.innerHTML = target(
+                '{"keepPlaying":true}',
+                `<p>old</p><div ${PERSIST}="island">island</div>`,
+            );
+            installTransition({ swapFunctions });
+            const old = document.querySelector("p");
+            await navigate({
+                doc: page(
+                    target(
+                        "{}",
+                        `<p>new</p><div ${PERSIST}="island">fresh</div>`,
+                    ),
+                ),
+            });
+            expect(mock.kept).toHaveLength(1);
+            expect(mock.kept[0].nodes).toEqual([old]);
+            // The persisted island goes to the new page, not to core.
+            expect(mock.kept[0].html).toBe("<p>old</p>");
+        });
+
+        it("unmounts the old islands when core drops the old page", async () => {
+            document.body.innerHTML = target(
+                '{"keepPlaying":true}',
+                "<astro-island><p>old</p></astro-island><div><astro-island></astro-island></div>",
+            );
+            installTransition({ swapFunctions });
+            const islands = [...document.querySelectorAll("astro-island")];
+            const unmounts = islands.map((island) => {
+                const unmount = vi.fn();
+                island.addEventListener("astro:unmount", unmount);
+                return unmount;
+            });
+            await navigate({ doc: page(target("{}", "<p>new</p>")) });
+            const { nodes, onReturn } = mock.kept[0];
+            expect(unmounts.every((u) => u.mock.calls.length === 0)).toBe(true);
+            for (const node of nodes) {
+                onReturn?.(node);
+            }
+            expect(unmounts.map((u) => u.mock.calls.length)).toEqual([1, 1]);
+        });
+
+        it("carries core's hidden canvas over to the new page", async () => {
+            installTransition({ swapFunctions });
+            const live = document.querySelector(
+                "[data-vfx-transition-target]",
+            ) as HTMLElement;
+            const wrapper = document.createElement("canvas");
+            wrapper.setAttribute("layoutsubtree", "");
+            live.replaceWith(wrapper);
+            wrapper.append(live);
+            const ghost = document.createElement("canvas");
+            ghost.setAttribute("data-vfx-keep-playing", "");
+            wrapper.after(ghost);
+            await navigate({ doc: page(target("{}", "<p>new</p>")) });
+            expect(ghost.isConnected).toBe(true);
+            expect(wrapper.nextElementSibling).toBe(ghost);
+            expect(ghost.hasAttribute(PERSIST)).toBe(false);
+        });
+
+        it("an aborted navigation hands nothing over, then or later", async () => {
+            document.body.innerHTML = target(
+                '{"keepPlaying":true}',
+                "<p>old</p>",
+            );
+            installTransition({ swapFunctions });
+            await navigate({ doc: page(target("{}", "new")), abort: true });
+            await flush();
+            expect(mock.runs[0]?.done).toBe(true);
+            expect(mock.kept).toHaveLength(0);
+            expect(document.body.textContent).toContain("old");
+            // A later navigation that turns keepPlaying off must not use the freed run.
+            const link = document.createElement("a");
+            link.setAttribute("data-vfx-transition", '{"keepPlaying":false}');
+            await navigate({ source: link, doc: page(target("{}", "newer")) });
+            expect(mock.kept).toHaveLength(0);
+            expect(document.body.textContent).toContain("newer");
+        });
+
+        it("a newer navigation hands over with its own run", async () => {
+            document.body.innerHTML = target(
+                '{"keepPlaying":true}',
+                "<p>old</p>",
+            );
+            installTransition({ swapFunctions });
+            const doc = page(target("{}", "new"));
+            const prep = Object.assign(new Event("astro:before-preparation"), {
+                loader: async () => {},
+                newDocument: doc,
+                direction: "forward",
+                signal: new AbortController().signal,
+            });
+            document.dispatchEvent(prep);
+            await prep.loader();
+            await navigate({ doc: page(target("{}", "newer")) });
+            await flush();
+            expect(mock.runs.map((r) => r.done)).toEqual([true, true]);
+            expect(mock.kept).toHaveLength(1);
+            expect(document.body.textContent).toContain("newer");
+        });
+
+        it("takes keepPlaying from the link", async () => {
+            installTransition({ swapFunctions });
+            const link = document.createElement("a");
+            link.setAttribute("data-vfx-transition", '{"keepPlaying":true}');
+            await navigate({ source: link, doc: page(target("{}", "new")) });
+            expect(mock.kept).toHaveLength(1);
+        });
+
+        it("hands nothing over without keepPlaying", async () => {
+            installTransition({ swapFunctions });
+            await navigate({ doc: page(target("{}", "new")) });
+            expect(mock.kept).toHaveLength(0);
+        });
     });
 });

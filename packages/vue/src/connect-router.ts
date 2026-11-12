@@ -25,6 +25,7 @@ export function connectRouter(
     const free = () => {
         finish?.();
         finish = null;
+        ctx.held = null;
     };
 
     const offBefore = router.beforeEach((to, from) => {
@@ -40,7 +41,8 @@ export function connectRouter(
         // Hold the navigation until the old page is captured.
         return new Promise<void>((snapshotTaken) => {
             t.run(
-                () => {
+                (run) => {
+                    ctx.held = run;
                     snapshotTaken();
                     return new Promise<void>((done) => {
                         finish = done;

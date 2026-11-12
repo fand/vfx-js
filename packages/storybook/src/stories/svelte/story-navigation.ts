@@ -2,6 +2,7 @@
 // Storybook aliases `$app/navigation` to this file.
 
 import { onMount, tick } from "svelte";
+import { page } from "./story-state.svelte.js";
 
 type Navigation = {
     from: { url: URL };
@@ -40,6 +41,7 @@ export async function storyNavigate(
         }),
     };
     await Promise.all([...callbacks].map((fn) => fn(nav)));
+    page.url = nav.to.url;
     swap();
     await tick();
     complete();

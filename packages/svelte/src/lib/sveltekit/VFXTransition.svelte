@@ -5,8 +5,10 @@
 -->
 <script lang="ts" generics="T extends Transition | TransitionClass">
     import { onNavigate } from "$app/navigation";
+    import { page } from "$app/state";
     import type {
         AddTransitionOpts,
+        RunContext,
         Transition,
         TransitionClass,
         TransitionHandle,
@@ -36,6 +38,7 @@
         keepWrapped,
         waitFor,
         autoReverse,
+        keepPlaying,
         ...attrs
     }: Props = $props();
 
@@ -59,6 +62,7 @@
             keepWrapped,
             waitFor,
             autoReverse,
+            keepPlaying,
         };
         for (const [key, value] of Object.entries(opts)) {
             if (value === undefined) {
@@ -71,6 +75,8 @@
 
     let target: HTMLDivElement;
     let handle: TransitionHandle | null = null;
+    // The run that waits for the new page, while it waits.
+    let held: RunContext | null = null;
 
     // A config change replaces the VFX; a run on the old one is cut.
     onMount(() =>
@@ -93,16 +99,67 @@
         scope.reset();
         return new Promise<void>((snapshotTaken) => {
             t.run(
-                async () => {
+                async (run) => {
+                    held = run;
                     snapshotTaken();
-                    // Rejects when the navigation fails; core then ends the run.
-                    await nav.complete;
+                    try {
+                        // Rejects when the navigation fails; core then ends the run.
+                        await nav.complete;
+                    } finally {
+                        if (held === run) {
+                            held = null;
+                        }
+                    }
                 },
                 // Read once the new page is in, so its transitionIn counts.
                 () => scope.pick(),
             ).catch(() => {});
         });
     });
+
+    // A new key per path change, never one used before.
+    // Svelte revives a leaving block whose key comes back, and a held page must not come back.
+    let pageCount = 0;
+    let keyPath = page.url.pathname;
+    const pageKey = $derived.by(() => {
+        const path = page.url.pathname;
+        if (path !== keyPath) {
+            keyPath = path;
+            pageCount++;
+        }
+        return pageCount;
+    });
+
+    // Longer than any run; the outro ends when core gives the page back.
+    const HOLD_MS = 60 * 60 * 1000;
+
+    // The leaving page's outro: hand it to core and keep it until core gives it back.
+    function keepOldPage(node: HTMLElement) {
+        const parent = node.parentNode;
+        held?.keepPlaying(node, () => {
+            node.style.display = "none";
+            endOutro(node);
+        });
+        // Core keeps nothing when the run does not use keepPlaying.
+        return { duration: node.parentNode === parent ? 0 : HOLD_MS };
+    }
+
+    // Svelte removes the page once its outro animation ends.
+    // The animation may not exist yet, so retry each frame until it ends.
+    function endOutro(node: HTMLElement) {
+        let ended = false;
+        node.addEventListener("outroend", () => (ended = true), { once: true });
+        const finish = () => {
+            if (ended || !node.isConnected) {
+                return;
+            }
+            for (const animation of node.getAnimations()) {
+                animation.finish();
+            }
+            requestAnimationFrame(finish);
+        };
+        finish();
+    }
 </script>
 
 <!--
@@ -115,6 +172,15 @@
         bind:this={target}
         style={fullscreen ? `${FILL_STYLE}${style ?? ""}` : style}
     >
-        {@render children?.()}
+        {#if keepPlaying}
+            <!-- A new path makes a new block, so the old page stays while it leaves. -->
+            {#key pageKey}
+                <div style="display: contents" out:keepOldPage>
+                    {@render children?.()}
+                </div>
+            {/key}
+        {:else}
+            {@render children?.()}
+        {/if}
     </div>
 </div>

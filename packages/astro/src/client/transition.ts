@@ -1,4 +1,8 @@
-import type { AddTransitionOpts, TransitionHandle } from "@vfx-js/core";
+import type {
+    AddTransitionOpts,
+    RunContext,
+    TransitionHandle,
+} from "@vfx-js/core";
 import { fromTransitionAttr, pickRunOpts } from "./props";
 import { type SwapFunctions, swapKeepingTarget, TARGET_ATTR } from "./swap";
 import { getVFX } from "./vfx";
@@ -56,9 +60,12 @@ function createTransitionRuntime(deps: TransitionDeps) {
     let bound: Bound | null = null;
     // Resolves the held run once the new page is in.
     let hold: (() => void) | null = null;
+    // Hands the old page to core during the held run, with keepPlaying.
+    let handOver: RunContext["keepPlaying"] | null = null;
     const release = () => {
         hold?.();
         hold = null;
+        handOver = null;
     };
 
     const unbind = () => {
@@ -105,6 +112,8 @@ function createTransitionRuntime(deps: TransitionDeps) {
                 ),
             );
 
+            const keepPlaying =
+                opts.keepPlaying ?? current.live.keepPlaying ?? false;
             const swapped = new Promise<void>((resolve) => {
                 hold = resolve;
             });
@@ -117,7 +126,10 @@ function createTransitionRuntime(deps: TransitionDeps) {
             // Let Astro go on once the old page is captured.
             await new Promise<void>((snapshotTaken) => {
                 current.handle
-                    .run(() => {
+                    .run((ctx) => {
+                        if (keepPlaying && hold === held) {
+                            handOver = ctx.keepPlaying;
+                        }
                         snapshotTaken();
                         return swapped;
                     }, opts)
@@ -141,6 +153,7 @@ function createTransitionRuntime(deps: TransitionDeps) {
                 target,
                 getVFX()?.canvas ?? null,
                 deps.swapFunctions,
+                handOver ?? undefined,
             );
             if (!kept) {
                 release();

@@ -13,6 +13,9 @@ export default defineConfig({
             "$app/navigation": fileURLToPath(
                 new URL("./src/test/app-navigation.ts", import.meta.url),
             ),
+            "$app/state": fileURLToPath(
+                new URL("./src/test/app-state.svelte.ts", import.meta.url),
+            ),
         },
     },
 });

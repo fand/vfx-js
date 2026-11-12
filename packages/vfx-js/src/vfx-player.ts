@@ -25,6 +25,7 @@ import {
     pauseIntersection,
     stepIntersection,
 } from "./intersection-state.js";
+import { createLiveTexture, type LiveTexture } from "./live-capture.js";
 import { PostEffectPass } from "./post-effect-pass.js";
 import { ProgramCache } from "./program-cache.js";
 import {
@@ -1029,21 +1030,50 @@ export class VFXPlayer {
         }
 
         const oldTexture = e.srcTexture;
-
-        if (oldTexture.source === offscreen) {
-            oldTexture.needsUpdate = true;
-        } else {
-            const texture = new Texture(this.#ctx, offscreen);
-            texture.wrapS = oldTexture.wrapS;
-            texture.wrapT = oldTexture.wrapT;
-            texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
-            texture.needsUpdate = true;
+        const texture = this.#textureFromCapture(oldTexture, offscreen);
+        if (texture !== oldTexture) {
             if (!e.chain && e.passes.length > 0) {
                 e.passes[0].uniforms["src"].value = texture;
             }
             e.srcTexture = texture;
-            oldTexture.dispose();
         }
+    }
+
+    // Re-upload the capture, or replace and dispose the texture when the capture canvas changed.
+    #textureFromCapture(
+        oldTexture: Texture,
+        offscreen: OffscreenCanvas,
+    ): Texture {
+        if (oldTexture.source === offscreen) {
+            oldTexture.needsUpdate = true;
+            return oldTexture;
+        }
+        const texture = new Texture(this.#ctx, offscreen);
+        texture.wrapS = oldTexture.wrapS;
+        texture.wrapT = oldTexture.wrapT;
+        texture.premultiplyAlpha = oldTexture.premultiplyAlpha;
+        texture.needsUpdate = true;
+        oldTexture.dispose();
+        return texture;
+    }
+
+    /**
+     * A texture that follows the captures of a canvas that is not on screen.
+     * `texture` is null until the first capture.
+     */
+    liveTexture(): LiveTexture {
+        return createLiveTexture(
+            (offscreen) => {
+                const texture = new Texture(this.#ctx, offscreen);
+                // Effects read `ctx.src` as premultiplied; match it.
+                texture.premultiplyAlpha = true;
+                texture.needsUpdate = true;
+                return texture;
+            },
+            (texture, offscreen) =>
+                this.#textureFromCapture(texture, offscreen),
+            readTextureSourceDim,
+        );
     }
 
     /**

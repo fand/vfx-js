@@ -1679,6 +1679,21 @@ em {
     width: 100%;
     accent-color: var(--em);
 }
+.pg-check {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg);
+}
+.pg-check input {
+    accent-color: var(--em);
+}
+.pg-check i {
+    color: var(--muted);
+    font-style: normal;
+}
 .pg-select {
     width: 100%;
     padding: 8px 10px;

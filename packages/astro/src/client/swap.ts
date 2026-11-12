@@ -11,6 +11,9 @@ export type SwapFunctions = {
 
 export const TARGET_ATTR = "data-vfx-transition-target";
 const PERSIST_ATTR = "data-astro-transition-persist";
+// Core's hidden canvas that holds the old page during a run with keepPlaying.
+const KEEP_PLAYING_ATTR = "data-vfx-keep-playing";
+const ISLAND = "astro-island";
 
 // Let Astro carry `live` over to where `placeholder` sits in the new page.
 function persist(live: Element, placeholder: Element, id: string): void {
@@ -37,6 +40,20 @@ function takeChildren(live: HTMLElement, next: HTMLElement): DocumentFragment {
     return fragment;
 }
 
+// Core drops the old page when the run ends, after this navigation's unmount.
+// Unmount its islands then, so their framework roots do not outlive the run.
+function unmountIslands(node: Node): void {
+    if (!(node instanceof Element)) {
+        return;
+    }
+    const islands = node.matches(ISLAND)
+        ? [node, ...node.querySelectorAll(ISLAND)]
+        : node.querySelectorAll(ISLAND);
+    for (const island of islands) {
+        island.dispatchEvent(new CustomEvent("astro:unmount"));
+    }
+}
+
 /**
  * Astro's swap, but the live transition target and the VFX canvas stay.
  * The target takes the children of the new page's target.
@@ -47,6 +64,7 @@ export function swapKeepingTarget(
     live: HTMLElement,
     canvas: HTMLCanvasElement | null,
     fns: SwapFunctions,
+    keepPlaying?: (nodes: Node[], onReturn?: (node: Node) => void) => void,
 ): boolean {
     fns.deselectScripts(doc);
     fns.swapRootAttributes(doc);
@@ -56,13 +74,25 @@ export function swapKeepingTarget(
     const kept: Element[] = [];
     const next = doc.querySelector<HTMLElement>(`[${TARGET_ATTR}]`);
     if (next) {
-        live.replaceChildren(takeChildren(live, next));
+        // Take persisted elements first, so they go to the new page.
+        const children = takeChildren(live, next);
+        keepPlaying?.(Array.from(live.childNodes), unmountIslands);
+        live.replaceChildren(children);
         live.setAttribute(TARGET_ATTR, next.getAttribute(TARGET_ATTR) ?? "");
         // During a run core wraps the target in a canvas; keep that too.
         const parent = live.parentElement;
         const outer = parent && isHicCanvas(parent) ? parent : live;
         persist(outer, next, "vfx-transition-target");
         kept.push(outer);
+        const ghosts = outer.parentElement?.querySelectorAll(
+            `:scope > [${KEEP_PLAYING_ATTR}]`,
+        );
+        for (const [i, ghost] of Array.from(ghosts ?? []).entries()) {
+            const placeholder = doc.createElement("div");
+            next.after(placeholder);
+            persist(ghost, placeholder, `vfx-keep-playing-${i}`);
+            kept.push(ghost);
+        }
     }
     if (canvas?.parentElement === document.body) {
         const placeholder = doc.createElement("div");

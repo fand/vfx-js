@@ -1,5 +1,6 @@
 import type {
     AddTransitionOpts,
+    RunContext,
     TransitionEase,
     TransitionHandle,
     TransitionWaitFor,
@@ -16,6 +17,7 @@ import {
     type PropType,
     provide,
     ref,
+    type VNode,
     watchEffect,
 } from "vue";
 import {
@@ -46,6 +48,8 @@ export const transitionProps = {
     waitFor: [String, Function] as PropType<TransitionWaitFor>,
     /** On back, play the spec that entered the page, reversed. Needs the Navigation API. */
     autoReverse: { type: Boolean, default: undefined },
+    /** Keep the old page playing during the run. Nuxt only. */
+    keepPlaying: { type: Boolean, default: undefined },
     /** Size the target to the viewport height. Default `true`; `false` leaves sizing to your CSS. */
     fullscreen: { type: Boolean, default: true },
 } as const;
@@ -60,6 +64,7 @@ const OPT_KEYS = [
     "keepWrapped",
     "waitFor",
     "autoReverse",
+    "keepPlaying",
 ] as const;
 
 export type RouterContext = {
@@ -68,6 +73,10 @@ export type RouterContext = {
     scope: TransitionScope;
     /** The Vue app this component is mounted in. */
     app: App;
+    /** Whether the `keepPlaying` prop is set. */
+    keepPlaying(): boolean;
+    /** The run that waits for the new page, while it waits. */
+    held: RunContext | null;
 };
 
 /**
@@ -77,6 +86,8 @@ export type RouterContext = {
 export function defineVFXTransition(
     name: string,
     connect: (ctx: RouterContext) => () => void,
+    /** Change the slot content, e.g. to pass props to the router view. */
+    mapSlot?: (nodes: VNode[], ctx: RouterContext) => VNode[],
 ) {
     return defineComponent({
         name,
@@ -103,6 +114,13 @@ export function defineVFXTransition(
             });
 
             let handle: TransitionHandle | null = null;
+            const ctx: RouterContext = {
+                handle: () => handle,
+                scope,
+                app,
+                keepPlaying: () => props.keepPlaying === true,
+                held: null,
+            };
             let disconnect: (() => void) | null = null;
             let release: (() => void) | null = null;
 
@@ -122,7 +140,7 @@ export function defineVFXTransition(
                         handle = null;
                     };
                 });
-                disconnect = connect({ handle: () => handle, scope, app });
+                disconnect = connect(ctx);
             });
 
             onBeforeUnmount(() => {
@@ -143,7 +161,9 @@ export function defineVFXTransition(
                             attrs,
                             { ref: el },
                         ),
-                        slots.default?.(),
+                        mapSlot
+                            ? mapSlot(slots.default?.() ?? [], ctx)
+                            : slots.default?.(),
                     ),
                 ]);
         },
