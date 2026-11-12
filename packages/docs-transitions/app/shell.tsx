@@ -31,7 +31,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 duration={0.9}
                 overflow={0}
                 autoReverse
-                liveFrom
             >
                 <div className="outlet-page">
                     <DocSidebar />
