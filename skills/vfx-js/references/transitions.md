@@ -111,6 +111,7 @@ await t.run((ctx) => {
 - `ctx.keepPlaying(nodes)` moves the nodes out of the container. VFX-JS removes them when the run ends. `show()` puts its slides back, hidden or removed.
 - `ctx.keepPlaying(nodes, onReturn)` puts each node back in its old place when the run ends, then calls `onReturn(node)`. Use it when a framework still owns the nodes.
 - Without `keepPlaying`, or when no nodes are handed over, the run uses the snapshot. Without html-in-canvas too.
+- The hidden canvas holds a copy of the container without its `id`, outside its parent. Rules that reach the old content through `#id`, ancestors or siblings don't apply during the run. The canvas sits next to the container, so sibling selectors like `main + footer` can break for a moment.
 - It costs one more html-in-canvas capture per frame during the run.
 - `<VFXTransition>` for React (Next.js, React Router), Nuxt, SvelteKit and Astro takes `keepPlaying`. `useVFXTransition` passes `ctx` to `cb`, so call `ctx.keepPlaying` yourself. `@vfx-js/vue/router` does not use it yet.
 
@@ -393,7 +394,7 @@ useTransitionIn({ transition: Glitch });
 - In templates use `v-transition`, not `@click="transition(spec)"`; Vue wraps the handler, so it never runs.
 - Props are the `addTransition` options plus `fullscreen`. `:fullscreen="false"` lets you size the target with CSS.
 - A page with an async `setup` under your own `<Suspense>` may be captured early. Use `waitFor`.
-- Nuxt: `keep-playing` on `<VFXTransition>` keeps the old page's DOM (CSS animations, videos) playing during the run. It gives `<NuxtPage>` a page transition, so `<NuxtPage>` must be a direct child, and the page needs one root element. It sets `css: false` and `mode: "default"` over your own page transition. Vue unmounts the old page as usual, so its Vue state stops updating.
+- Nuxt: `keep-playing` on `<VFXTransition>` keeps the old page's DOM (CSS animations, videos) playing during the run. It gives `<NuxtPage>` a page transition, so `<NuxtPage>` must be a direct child, and the page needs one root element. It sets `css: false` and `mode: "default"` over your own page transition. Vue unmounts the old page as usual, so its Vue state stops updating. Set it on `<VFXTransition>`: a page or link spec can turn it off but not on.
 
 ## Svelte: SvelteKit
 
@@ -434,7 +435,7 @@ npm i @vfx-js/core @vfx-js/svelte @vfx-js/transitions
 - Which spec wins: the link's `transition(spec)`, then the page's `transitionIn`, then the `<VFXTransition>` props. Back does not reverse unless `autoReverse` is set.
 - `setNextTransition(spec)` before `goto()`.
 - `fullscreen={false}` lets you size the target with CSS.
-- `keepPlaying` keeps the old page's DOM (CSS animations, videos) playing during the run. Pages then sit in a `display: contents` div inside `{#key}` on the pathname, so a page remounts on each path change. The old page's Svelte updates pause while it leaves.
+- `keepPlaying` keeps the old page's DOM (CSS animations, videos) playing during the run. Pages then sit in a `display: contents` div inside `{#key}` on the pathname, so a page remounts on each path change. The old page's Svelte updates pause while it leaves. Set it on `<VFXTransition>`: a page or link spec can turn it off but not on.
 
 ## Astro: ClientRouter
 

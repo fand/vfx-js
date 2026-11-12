@@ -56,11 +56,11 @@ export default function Limitations() {
                         <li>Content inside shadow roots.</li>
                     </ul>
                     <p>
-                        The SVG renderer can also draw some CSS differently
-                        from the page. Safari, for example, draws{" "}
-                        <code>box-shadow</code> wrong in the capture. These
-                        gaps show only during a run; the page itself is plain
-                        DOM before and after.
+                        The SVG renderer can also draw some CSS differently from
+                        the page. Safari, for example, draws{" "}
+                        <code>box-shadow</code> wrong in the capture. These gaps
+                        show only during a run; the page itself is plain DOM
+                        before and after.
                     </p>
                 </div>
             </section>
@@ -81,6 +81,81 @@ const t = vfx.addTransition(el, {
   duration: reduce ? 0 : 0.6,
 });
 `}</Code>
+            </section>
+
+            <section id="keep-playing" className="doc-section doc-prose">
+                <div>
+                    <h2>keepPlaying</h2>
+                    <p>
+                        With <code>keepPlaying</code>, VFX-JS moves the old
+                        content into a hidden canvas next to the container and
+                        captures it every frame. That has costs and side
+                        effects.
+                    </p>
+                    <h3>One more capture per frame</h3>
+                    <p>
+                        The old and new content are both captured during the
+                        run. Without HTML-in-Canvas, the run uses a snapshot as
+                        usual.
+                    </p>
+                    <h3>Some selectors stop matching the old content</h3>
+                    <p>
+                        The hidden canvas holds a copy of the container without
+                        its <code>id</code>, outside its parent. Rules that
+                        reach the old content through <code>#id</code>,
+                        ancestors (<code>.layout &gt; main .card</code>) or
+                        siblings don't apply during the run, so it may look
+                        different. The hidden canvas also sits next to the
+                        container, which can break sibling selectors like{" "}
+                        <code>main + footer</code> for a moment.
+                    </p>
+                    <h3>What keeps running depends on the framework</h3>
+                    <ul>
+                        <li>
+                            React: the old page stays mounted, with its state
+                            and effects.
+                        </li>
+                        <li>
+                            Nuxt and SvelteKit: the old page's DOM keeps playing
+                            (CSS animations, videos), but Vue and Svelte stop
+                            updating it.
+                        </li>
+                        <li>
+                            Astro and <code>show()</code>: the old nodes keep
+                            running as they are.
+                        </li>
+                    </ul>
+                    <h3>Set it on the component</h3>
+                    <p>
+                        In React, Nuxt and SvelteKit, set{" "}
+                        <code>keepPlaying</code> on{" "}
+                        <code>&lt;VFXTransition&gt;</code>. A page or link spec
+                        can turn it off but not on. The pages then sit in a{" "}
+                        <code>display: contents</code> div, so{" "}
+                        <code>.target &gt; .page</code> needs{" "}
+                        <code>.target &gt; div &gt; .page</code>. Turning it on
+                        or off remounts the shown page.
+                    </p>
+                    <h3>Framework notes</h3>
+                    <ul>
+                        <li>
+                            Nuxt: <code>&lt;NuxtPage&gt;</code> must be a direct
+                            child of <code>&lt;VFXTransition&gt;</code>, and
+                            each page needs one root element. It replaces your
+                            own page transition.
+                        </li>
+                        <li>
+                            SvelteKit: each path change remounts the page and
+                            its nested layouts.
+                        </li>
+                        <li>
+                            Vue Router (without Nuxt) and{" "}
+                            <code>useVFXTransition</code> don't hand the old
+                            page over. With <code>useVFXTransition</code>, call{" "}
+                            <code>ctx.keepPlaying()</code> yourself.
+                        </li>
+                    </ul>
+                </div>
             </section>
 
             <section id="other" className="doc-section doc-prose">
