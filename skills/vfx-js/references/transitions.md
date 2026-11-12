@@ -480,7 +480,8 @@ import { TransitionIn } from "@vfx-js/astro";
 - A link spec is a name or JSON: `data-vfx-transition='{"transition":"swipe","params":{"direction":"left"}}'`.
 - Which spec wins: the link's `data-vfx-transition`, then the page's `<TransitionIn>`, then the `<VFXTransition>` props. Back does not reverse unless `autoReverse` is set.
 - `fullscreen={false}` lets you size the target with CSS.
-- `keepPlaying` (on `<VFXTransition>`, `<TransitionIn>` or the link) keeps the old page's animations and videos playing during the run. Islands on the old page stay mounted until the run ends, then unmount.
+- `keepPlaying` (on `<VFXTransition>`, `<TransitionIn>` or the link) keeps the old page's animations and videos playing during the run. Islands on the old page stay mounted until the run ends, then unmount (`astro:unmount`).
+- Islands in the target are moved during a run (by Astro's swap, and by VFX-JS wrapping the target for html-in-canvas), so Astro may start and hydrate them again. The official renderers skip a repeat hydrate on the same element. A custom renderer must treat it as a no-op or a re-render, not a new mount.
 - `installTransition({ swapFunctions })` from `@vfx-js/astro/client` is what `<VFXTransition>` calls. You rarely need it.
 
 ## Other routers

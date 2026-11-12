@@ -40,6 +40,12 @@ function takeChildren(live: HTMLElement, next: HTMLElement): DocumentFragment {
     return fragment;
 }
 
+// Astro unmounts an island again on the next swap after it leaves the page.
+// The island is unmounted already, so that event stops here.
+function stopUnmount(e: Event): void {
+    e.stopImmediatePropagation();
+}
+
 // Core drops the old page when the run ends, after this navigation's unmount.
 // Unmount its islands then, so their framework roots do not outlive the run.
 function unmountIslands(node: Node): void {
@@ -51,6 +57,10 @@ function unmountIslands(node: Node): void {
         : node.querySelectorAll(ISLAND);
     for (const island of islands) {
         island.dispatchEvent(new CustomEvent("astro:unmount"));
+        // A capture listener on the target runs before the renderer's own.
+        island.addEventListener("astro:unmount", stopUnmount, {
+            capture: true,
+        });
     }
 }
 

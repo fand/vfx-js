@@ -63,6 +63,17 @@ import Layout from "../layouts/Layout.astro";
   `<VFXTransition>` then warns once and does nothing.
 - Nav, footer and `transition:persist` elements outside the target work as in plain Astro.
 
+### Islands in the target
+
+Islands inside the target get moved during a run: Astro's swap moves the target,
+and so does VFX-JS when it wraps the target to capture it with html-in-canvas.
+Astro may start and hydrate a moved island again.
+The official renderers skip a repeat hydrate on the same element, so the island keeps one root.
+A custom renderer must do the same: treat a repeat hydrate as a no-op or a re-render, not a new mount.
+
+With `keepPlaying`, islands on the old page stay mounted during the run.
+They unmount (`astro:unmount`) when the run ends, not at the swap.
+
 ### Which spec wins
 
 1. The link's `data-vfx-transition`, for that click.
@@ -146,7 +157,7 @@ Then refer to them by name:
 ### `<VFXTransition>`
 
 Props: `transition`, `params`, `reverse`, `duration`, `overflow`, `ease`,
-`waitFor` (`"media"` or `"none"`), `keepWrapped`, `autoReverse`, and `fullscreen`.
+`keepPlaying`, `waitFor` (`"media"` or `"none"`), `keepWrapped`, `autoReverse`, and `fullscreen`.
 
 - The target fills the viewport height by default, and pages scroll
   inside it. Pass `fullscreen={false}` to size it with your own CSS,
@@ -158,7 +169,7 @@ Props: `transition`, `params`, `reverse`, `duration`, `overflow`, `ease`,
 
 ### `<TransitionIn>`
 
-Props: `transition`, `params`, `reverse`, `duration`, `overflow`, `ease`.
+Props: `transition`, `params`, `reverse`, `duration`, `overflow`, `ease`, `keepPlaying`.
 Put it anywhere in a page.
 
 ### `VFXImg`, `VFXVideo`, `VFXSpan`, `VFXDiv`, `VFXP`

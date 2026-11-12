@@ -355,6 +355,12 @@ describe("installTransition", () => {
                 onReturn?.(node);
             }
             expect(unmounts.map((u) => u.mock.calls.length)).toEqual([1, 1]);
+            // Astro fires it again on the next swap after the island leaves the page.
+            for (const island of islands) {
+                island.remove();
+                island.dispatchEvent(new CustomEvent("astro:unmount"));
+            }
+            expect(unmounts.map((u) => u.mock.calls.length)).toEqual([1, 1]);
         });
 
         it("carries core's hidden canvas over to the new page", async () => {
