@@ -3,6 +3,7 @@ import "@vfx-js/testbed-shared/style.css";
 import { VFXTransition } from "@vfx-js/astro";
 import { pages } from "@vfx-js/testbed-shared";
 import { ClientRouter } from "astro:transitions";
+import IslandLog from "../components/IslandLog.astro";
 
 const current = Astro.url.pathname.replace(/\/$/, "") || "/";
 const page = pages.find((p) => p.path === current);
@@ -14,6 +15,7 @@ const page = pages.find((p) => p.path === current);
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width" />
         <title>{page?.label ?? "Demo"} | Astro</title>
+        <IslandLog />
         <ClientRouter />
     </head>
     <body>
