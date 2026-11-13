@@ -1,0 +1,25 @@
+{
+    "name": "@vfx-js/testbed-vue-router",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build:demo": "vite build",
+        "preview": "vite preview",
+        "typecheck": "vue-tsc --noEmit"
+    },
+    "dependencies": {
+        "@vfx-js/core": "workspace:*",
+        "@vfx-js/testbed-shared": "workspace:*",
+        "@vfx-js/transitions": "workspace:*",
+        "@vfx-js/vue": "workspace:*",
+        "vue": "3.5.44",
+        "vue-router": "5.4.0"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-vue": "6.0.10",
+        "typescript": "6.0.3",
+        "vite": "8.3.5",
+        "vue-tsc": "3.3.13"
+    }
+}

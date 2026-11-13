@@ -32,7 +32,7 @@ const containerOpts: Row[] = [
     ],
     [
         "keepPlaying: boolean",
-        "Keep capturing the old content during the run, so its animations and videos keep playing. Costs one more capture per frame. show() and <VFXTransition> (React, Nuxt, SvelteKit, Astro) hand the old content over; with run(), call ctx.keepPlaying() in cb. See Limitations for caveats. Defaults to false.",
+        "Keep capturing the old content during the run, so its animations and videos keep playing. Costs one more capture per frame. show() and <VFXTransition> (React, Nuxt, Vue Router, SvelteKit, Astro) hand the old content over; with run(), call ctx.keepPlaying() in cb. See Limitations for caveats. Defaults to false.",
     ],
     [
         "keepWrapped: boolean",
