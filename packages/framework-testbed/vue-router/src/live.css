@@ -1,0 +1,37 @@
+.nav .keep {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-left: 24px;
+    color: #94a3b8;
+    font-size: 14px;
+}
+.live {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-top: 24px;
+}
+.spinner {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #f472b6, #38bdf8);
+    animation: spin 1.2s linear infinite;
+}
+.live .label {
+    margin-right: 24px;
+    color: #94a3b8;
+    font-size: 14px;
+}
+.clock {
+    font:
+        600 32px ui-monospace,
+        monospace;
+    font-variant-numeric: tabular-nums;
+}
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
