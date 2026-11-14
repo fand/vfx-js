@@ -65,6 +65,44 @@ export default function Limitations() {
                 </div>
             </section>
 
+            <section id="layout" className="doc-section doc-prose">
+                <div>
+                    <h2>Layout of the target</h2>
+                    <p>
+                        With HTML-in-Canvas, VFX-JS wraps the target in a{" "}
+                        <code>&lt;canvas&gt;</code> during a run and copies the
+                        target&apos;s box onto it once. The target needs a
+                        layout that the canvas can copy:
+                    </p>
+                    <ul>
+                        <li>
+                            Its width doesn&apos;t depend on its content. It
+                            fills its parent or has a fixed width. A{" "}
+                            <code>width: auto</code> target held in by{" "}
+                            <code>max-width</code> is not supported.
+                        </li>
+                        <li>
+                            Its height comes from its content or its own CSS,
+                            not from a stretching flex or grid parent.
+                        </li>
+                        <li>
+                            The styles that size or place it don&apos;t change
+                            during the run.
+                        </li>
+                        <li>
+                            Its styles don&apos;t depend on its parent or its
+                            element type. Rules like{" "}
+                            <code>.layout &gt; main</code> or{" "}
+                            <code>:nth-child()</code> stop matching while it is
+                            wrapped.
+                        </li>
+                    </ul>
+                    <p>
+                        If the target can&apos;t meet these, put the layout on a
+                        plain wrapper and let the target fill it.
+                    </p>
+                </div>
+            </section>
             <section id="motion" className="doc-section two-col">
                 <div>
                     <h2>Reduced motion</h2>

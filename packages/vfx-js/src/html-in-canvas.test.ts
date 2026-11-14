@@ -151,6 +151,7 @@ describe("wrapElement", () => {
         vi.stubGlobal("window", { devicePixelRatio: 1 });
         vi.stubGlobal("getComputedStyle", () => ({
             display: "block",
+            width: "10px",
             getPropertyValue: () => "",
         }));
         inserted = [];
@@ -275,9 +276,21 @@ describe("wrapElement", () => {
         );
     });
 
+    // A content-box element without padding or border.
+    const plainBox = {
+        position: "static",
+        "box-sizing": "content-box",
+        "padding-left": "0px",
+        "padding-right": "0px",
+        "border-left-width": "0px",
+        "border-right-width": "0px",
+        "max-width": "none",
+    };
+
     test("keeps a replaced element at its own size", () => {
         element.tagName = "IMG";
         stubComputed({
+            ...plainBox,
             position: "absolute",
             top: "0px",
             right: "0px",
@@ -296,6 +309,218 @@ describe("wrapElement", () => {
         stubComputed({ position: "static", width: "100%" });
         wrap({});
         expect(canvasStyle().width).toBe("100%");
+    });
+
+    // #264: a width from a stylesheet rule, not the style attribute.
+    test("keeps a px width that comes from a stylesheet", () => {
+        stubComputed({ ...plainBox, width: "600px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("600px");
+        expect(canvasStyle().minWidth).toBe("auto");
+        expect(canvasStyle().maxWidth).toBe("none");
+        expect(element.style.width).toBe("100%");
+    });
+
+    test("keeps a px width from the style attribute", () => {
+        element.style.width = "600px";
+        stubComputed({ ...plainBox, width: "600px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("600px");
+    });
+
+    // The rect is scaled by a transformed ancestor; computed values aren't.
+    test("takes the width from computed values, not the rect", () => {
+        element.getBoundingClientRect = () => ({
+            left: 0,
+            top: 0,
+            width: 300,
+            height: 10,
+        });
+        stubComputed({ ...plainBox, width: "600px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("600px");
+    });
+
+    test("adds padding and border to a content-box width", () => {
+        vi.stubGlobal("getComputedStyle", () => ({
+            display: "block",
+            width: "10px",
+            getPropertyValue: (prop: string) =>
+                prop === "border-left-width" ? "1px" : "0px",
+        }));
+        stubComputed({
+            ...plainBox,
+            width: "600px",
+            "padding-left": "20px",
+            "padding-right": "5%",
+            "min-width": "100px",
+            "max-width": "100%",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("calc(600px + 20px + 5% + 1px)");
+        expect(canvasStyle().minWidth).toBe("calc(100px + 20px + 5% + 1px)");
+        expect(canvasStyle().maxWidth).toBe("calc(100% + 20px + 5% + 1px)");
+    });
+
+    // `width: 1200px; max-width: 100%` keeps tracking the parent.
+    test("copies min/max-width of a border-box element as is", () => {
+        stubComputed({
+            ...plainBox,
+            "box-sizing": "border-box",
+            "padding-left": "20px",
+            width: "1200px",
+            "max-width": "100%",
+        });
+        wrap({});
+        // A border box can't be narrower than its padding and border.
+        expect(canvasStyle().width).toBe("max(1200px, 20px)");
+        expect(canvasStyle().maxWidth).toBe("max(100%, 20px)");
+    });
+
+    test("keeps the rect width of an inline element", () => {
+        stubComputed({ ...plainBox, display: "inline", width: "600px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("10px");
+    });
+
+    test("keeps 100% for an auto width", () => {
+        stubComputed({ ...plainBox, width: "auto" });
+        wrap({});
+        expect(canvasStyle().width).toBe("100%");
+        expect(canvasStyle().maxWidth).toBeFalsy();
+    });
+
+    test("keeps 100% for a percent or calc width", () => {
+        stubComputed({ ...plainBox, width: "50%" });
+        wrap({});
+        expect(canvasStyle().width).toBe("100%");
+
+        inserted = [];
+        stubComputed({ ...plainBox, width: "calc(100% - 20px)" });
+        wrap({});
+        expect(canvasStyle().width).toBe("100%");
+    });
+
+    test("copies auto and % margins as computed values", () => {
+        stubComputed({
+            ...plainBox,
+            width: "600px",
+            "margin-top": "10%",
+            "margin-right": "auto",
+            "margin-bottom": "0px",
+            "margin-left": "auto",
+        });
+        wrap({});
+        expect(canvasStyle().marginTop).toBe("10%");
+        expect(canvasStyle().marginRight).toBe("auto");
+        expect(canvasStyle().marginBottom).toBe("0px");
+        expect(canvasStyle().marginLeft).toBe("auto");
+    });
+
+    test("copies auto and % insets as computed values", () => {
+        stubComputed({
+            ...plainBox,
+            position: "fixed",
+            width: "300px",
+            top: "auto",
+            right: "0px",
+            bottom: "0px",
+            left: "50%",
+        });
+        wrap({});
+        expect(canvasStyle().top).toBe("auto");
+        expect(canvasStyle().right).toBe("0px");
+        expect(canvasStyle().bottom).toBe("0px");
+        expect(canvasStyle().left).toBe("50%");
+    });
+
+    // Resolved values (getComputedStyle) as the browser gives them.
+    const stubResolved = (values: Record<string, string>) => {
+        vi.stubGlobal("getComputedStyle", () => ({
+            display: "block",
+            width: "10px",
+            ...values,
+            getPropertyValue: (prop: string) => values[prop] ?? "",
+        }));
+    };
+
+    test("keeps px side margins when the canvas width is 100%", () => {
+        stubResolved({ "margin-left": "940px", "margin-right": "0px" });
+        stubComputed({
+            ...plainBox,
+            width: "auto",
+            "margin-top": "auto",
+            "margin-left": "auto",
+            "margin-right": "auto",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("100%");
+        expect(canvasStyle().marginLeft).toBe("940px");
+        expect(canvasStyle().marginRight).toBe("0px");
+        expect(canvasStyle().marginTop).toBe("auto");
+    });
+
+    test("keeps px insets on an axis at its static position", () => {
+        stubResolved({ position: "absolute", left: "54px", top: "30px" });
+        stubComputed({
+            ...plainBox,
+            position: "absolute",
+            width: "100px",
+            top: "auto",
+            bottom: "auto",
+            left: "auto",
+            right: "auto",
+        });
+        wrap({});
+        expect(canvasStyle().left).toBe("54px");
+        expect(canvasStyle().top).toBe("30px");
+    });
+
+    test("keeps auto on the other axis when one axis has an inset", () => {
+        stubResolved({ position: "absolute", left: "54px", top: "30px" });
+        stubComputed({
+            ...plainBox,
+            position: "absolute",
+            width: "100px",
+            top: "auto",
+            bottom: "0px",
+            left: "auto",
+            right: "auto",
+        });
+        wrap({});
+        expect(canvasStyle().top).toBe("auto");
+        expect(canvasStyle().bottom).toBe("0px");
+        expect(canvasStyle().left).toBe("54px");
+    });
+
+    test("keeps the used width of a table", () => {
+        stubResolved({ width: "300px", boxSizing: "content-box" });
+        stubComputed({ ...plainBox, display: "table", width: "100px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("300px");
+    });
+
+    test("keeps the used width with a keyword min-width", () => {
+        stubResolved({ width: "300px", boxSizing: "content-box" });
+        stubComputed({
+            ...plainBox,
+            width: "100px",
+            "min-width": "min-content",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("300px");
+        expect(canvasStyle().minWidth).toBe("auto");
+    });
+
+    test("falls back to resolved margins without computedStyleMap", () => {
+        vi.stubGlobal("getComputedStyle", () => ({
+            display: "block",
+            width: "10px",
+            getPropertyValue: (prop: string) =>
+                prop === "margin-left" ? "200px" : "",
+        }));
+        wrap({});
+        expect(canvasStyle().marginLeft).toBe("200px");
     });
 
     test("leaves a non-positioned element as is", () => {

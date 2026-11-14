@@ -121,6 +121,19 @@ const POSITION_FLOW_STYLES = [
     "grid-area",
 ] as const;
 
+const INSET_PROPS = new Set<string>(["top", "right", "bottom", "left"]);
+
+// Inline styles `lockCanvasSize` sets and restores.
+const LOCKED_PROPS = [
+    "width",
+    "height",
+    "flex-grow",
+    "flex-shrink",
+    "min-width",
+    "max-width",
+    "overflow",
+] as const;
+
 export interface CaptureOpts {
     onCapture: (offscreen: OffscreenCanvas) => void;
     maxSize?: number;
@@ -143,6 +156,8 @@ const lockedCanvases = new WeakSet<HTMLCanvasElement>();
 const insetHeightCanvases = new WeakSet<HTMLCanvasElement>();
 
 const CAPTURE_TIMEOUT_MS = 300;
+
+const PX_LENGTH = /^[\d.e+-]+px$/;
 
 /**
  * Add a waiter to the set and resolve when it is called or on timeout.
@@ -220,10 +235,25 @@ export function lockCanvasSize(canvas: HTMLCanvasElement): () => void {
         return () => {};
     }
     lockedCanvases.add(canvas);
-    const { width, height, overflow } = canvas.style;
+    const saved = LOCKED_PROPS.map(
+        (prop) => [prop, canvas.style.getPropertyValue(prop)] as const,
+    );
+    // Resolved values are the used size, untransformed. The rect is scaled
+    // by a transformed ancestor. The canvas has no padding or border.
+    // Without a box (e.g. under `display: none`) they read `auto`.
+    const size = getComputedStyle(canvas);
     const rect = canvas.getBoundingClientRect();
-    canvas.style.setProperty("width", `${rect.width}px`);
-    canvas.style.setProperty("height", `${rect.height}px`);
+    const px = (v: string, fallback: number) =>
+        PX_LENGTH.test(v) ? v : `${fallback}px`;
+    const width = px(size.width, rect.width);
+    canvas.style.setProperty("width", width);
+    canvas.style.setProperty("height", px(size.height, rect.height));
+    // The locked width would become the flex base, and a flex item shrunk
+    // from it would shrink again. min/max-width would also clamp it.
+    canvas.style.setProperty("flex-grow", "0");
+    canvas.style.setProperty("flex-shrink", "0");
+    canvas.style.setProperty("min-width", width);
+    canvas.style.setProperty("max-width", width);
     // Taller new content must not spill out of the box; the capture is canvas-sized anyway.
     canvas.style.setProperty("overflow", "hidden");
 
@@ -232,9 +262,9 @@ export function lockCanvasSize(canvas: HTMLCanvasElement): () => void {
             return;
         }
         lockedCanvases.delete(canvas);
-        canvas.style.width = width;
-        canvas.style.height = height;
-        canvas.style.overflow = overflow;
+        for (const [prop, value] of saved) {
+            canvas.style.setProperty(prop, value);
+        }
         const child = canvas.firstElementChild;
         if (child && !insetHeightCanvases.has(canvas)) {
             const childHeight = Math.round(
@@ -494,13 +524,120 @@ function getInsetSizing(element: HTMLElement): InsetSizing {
     };
 }
 
-/** A replaced element with `width: auto` keeps its intrinsic width. */
-function hasIntrinsicWidth(element: HTMLElement): boolean {
+// Added to a content-box width to get the border-box width. Padding comes
+// from the computed style map to keep %; border widths from
+// getComputedStyle, since the map gives `medium` (3px) for a border with
+// style `none`.
+const WIDTH_PADDINGS = ["padding-left", "padding-right"] as const;
+const WIDTH_BORDERS = ["border-left-width", "border-right-width"] as const;
+
+interface FixedWidth {
+    width: string;
+    minWidth: string;
+    maxWidth: string;
+}
+
+/**
+ * Canvas width for an element whose width doesn't follow its containing
+ * block, or null if it does. Covers a set length from any rule, not only
+ * the style attribute (em/vw compute to px), and `auto` on a replaced
+ * element, which keeps its intrinsic width.
+ *
+ * Built from computed values rather than the rect, so a transformed
+ * ancestor doesn't scale it, and a % min/max-width keeps tracking the
+ * parent (the canvas sits in the same containing block).
+ */
+function getFixedWidth(element: HTMLElement, rect: DOMRect): FixedWidth | null {
+    const pinned = (width: number): FixedWidth => ({
+        width: `${width}px`,
+        minWidth: "auto",
+        maxWidth: "none",
+    });
+    if (typeof element.computedStyleMap !== "function") {
+        return element.style.width.endsWith("px") ? pinned(rect.width) : null;
+    }
+    const styles = element.computedStyleMap();
+    const value = (prop: string) => styles.get(prop)?.toString() ?? "auto";
+    const replaced = REPLACED_TAGS.has(element.tagName);
+    const resolved = getComputedStyle(element);
+
+    let width = value("width");
+    if (width === "auto") {
+        if (!replaced) {
+            return null;
+        }
+        // Intrinsic width. The resolved value is the used one, untransformed.
+        width = resolved.width;
+    }
+    if (!PX_LENGTH.test(width)) {
+        return null;
+    }
+    const display = value("display");
+    // `width` doesn't apply to an inline box; keep the size it has.
+    if (!replaced && display === "inline") {
+        return pinned(rect.width);
+    }
+
+    const minWidth = value("min-width");
+    const maxWidth = value("max-width");
+    // A table grows to fit its content, and a keyword min/max-width
+    // (`min-content`, `fit-content`) can't go in calc() and means something
+    // else on a canvas. Keep the used width, untransformed.
+    if (
+        display === "table" ||
+        display === "inline-table" ||
+        !isLengthLike(minWidth, "auto") ||
+        !isLengthLike(maxWidth, "none")
+    ) {
+        return pinned(usedBorderBoxWidth(resolved));
+    }
+
+    // The canvas has no padding or border, so its content box takes the
+    // element's border box. A content-box size gets them added. A border-box
+    // size can't go below them.
+    const paddingAndBorder = [
+        ...WIDTH_PADDINGS.map(value),
+        ...WIDTH_BORDERS.map((prop) => resolved.getPropertyValue(prop)),
+    ].filter((v) => v !== "" && !/^0(px)?$/.test(v));
+    const toBorderBox = (v: string) => {
+        if (paddingAndBorder.length === 0) {
+            return v;
+        }
+        const sum = [v, ...paddingAndBorder].join(" + ");
+        if (value("box-sizing") === "border-box") {
+            return `max(${v}, ${sum.slice(v.length + 3)})`;
+        }
+        return `calc(${sum})`;
+    };
+
+    return {
+        width: toBorderBox(width),
+        minWidth: minWidth === "auto" ? "auto" : toBorderBox(minWidth),
+        maxWidth: maxWidth === "none" ? "none" : toBorderBox(maxWidth),
+    };
+}
+
+/** A length, %, or math function, or the property's initial keyword. */
+function isLengthLike(v: string, initial: string): boolean {
     return (
-        REPLACED_TAGS.has(element.tagName) &&
-        typeof element.computedStyleMap === "function" &&
-        element.computedStyleMap().get("width")?.toString() === "auto"
+        v === initial ||
+        PX_LENGTH.test(v) ||
+        /^[\d.e+-]+%$/.test(v) ||
+        /^(calc|min|max|clamp)\(/.test(v)
     );
+}
+
+/** Used border-box width from resolved values, which transforms don't scale. */
+function usedBorderBoxWidth(resolved: CSSStyleDeclaration): number {
+    const px = (prop: string) =>
+        Number.parseFloat(resolved.getPropertyValue(prop)) || 0;
+    let width = Number.parseFloat(resolved.width) || 0;
+    if (resolved.boxSizing !== "border-box") {
+        for (const prop of [...WIDTH_PADDINGS, ...WIDTH_BORDERS]) {
+            width += px(prop);
+        }
+    }
+    return width;
 }
 
 interface WrapOpts extends CaptureOpts {
@@ -534,6 +671,7 @@ export async function wrapElement(
 ): Promise<WrapResult> {
     const rect = element.getBoundingClientRect();
     const insetSizing = getInsetSizing(element);
+    const fixedWidth = insetSizing.width ? null : getFixedWidth(element, rect);
 
     const canvas = document.createElement("canvas");
     if (!element.hasAttribute("drawable")) {
@@ -562,24 +700,62 @@ export async function wrapElement(
     const display = cs.display === "inline" ? "block" : cs.display;
     canvas.style.setProperty("display", display);
 
+    // Margins and insets come from computed values, which keep `auto` and %,
+    // so `margin: 0 auto`, `left: 50%` or `bottom: 0` keep tracking the
+    // containing block. getComputedStyle resolves them to px at wrap time,
+    // and a px top on a `bottom: 0` element makes the canvas grow downward.
+    // Read before the DOM swap: the map is live and the swap zeroes margins.
+    const styleMap =
+        typeof element.computedStyleMap === "function"
+            ? element.computedStyleMap()
+            : null;
+    const computed = (prop: string) =>
+        styleMap?.get(prop)?.toString() ?? cs.getPropertyValue(prop);
+    const resolved = (prop: string) => cs.getPropertyValue(prop);
+
+    // Auto side margins need a definite canvas width. Against `width: 100%`
+    // they resolve to 0, which would stretch a flex item that `margin: auto`
+    // sized and placed, so keep the px it has now.
+    const definiteWidth = Boolean(insetSizing.width || fixedWidth);
     for (const prop of MARGIN_PROPS) {
-        canvas.style.setProperty(prop, cs.getPropertyValue(prop));
-    }
-    for (const prop of POSITION_FLOW_STYLES) {
-        canvas.style.setProperty(prop, cs.getPropertyValue(prop));
+        const side = prop === "margin-left" || prop === "margin-right";
+        const keep = !side || definiteWidth;
+        canvas.style.setProperty(prop, keep ? computed(prop) : resolved(prop));
     }
 
-    // Full-width target → 100% (tracks resizes); explicit px width → pinned
-    // border-box (constant, reflow-safe). Content-sized unsupported (see docs).
+    // An abs/fixed element with both insets `auto` on an axis sits at its
+    // static position. The canvas is a block, so its static position can
+    // differ (an inline-level element sits after the text before it). Keep
+    // the px it has now on that axis.
+    const positioned = cs.position === "absolute" || cs.position === "fixed";
+    const staticAxis = (start: string, end: string) =>
+        positioned && computed(start) === "auto" && computed(end) === "auto";
+    const staticX = staticAxis("left", "right");
+    const staticY = staticAxis("top", "bottom");
+    for (const prop of POSITION_FLOW_STYLES) {
+        let value = resolved(prop);
+        if (INSET_PROPS.has(prop)) {
+            const horizontal = prop === "left" || prop === "right";
+            value = (horizontal ? staticX : staticY)
+                ? resolved(prop)
+                : computed(prop);
+        }
+        canvas.style.setProperty(prop, value);
+    }
+
+    // Full-width target → 100% (tracks resizes); explicit length width →
+    // the same width as a border box, with its min/max-width (a % max-width
+    // still tracks the parent). The inline 100% would beat a width from the
+    // copied class, so it must not apply then.
+    // Content-sized unsupported (see docs).
     // Inset-sized target → size from the insets, since a canvas won't stretch.
     // Intrinsic-width replaced element → pinned too.
     if (insetSizing.width) {
         canvas.style.setProperty("width", insetSizing.width);
-    } else if (
-        element.style.width.endsWith("px") ||
-        hasIntrinsicWidth(element)
-    ) {
-        canvas.style.setProperty("width", `${rect.width}px`);
+    } else if (fixedWidth) {
+        canvas.style.setProperty("width", fixedWidth.width);
+        canvas.style.setProperty("min-width", fixedWidth.minWidth);
+        canvas.style.setProperty("max-width", fixedWidth.maxWidth);
     } else {
         canvas.style.setProperty("width", "100%");
     }
