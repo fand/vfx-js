@@ -221,7 +221,7 @@ page.dispose();      // free it and restore the element
 - Post effect `uniforms` can't take it (the capture needs the `VFX` first). Set the capture on the post effect instance after `await vfx.capture()`.
 - One capture per element. `capture` rejects for an element `addHTML` or a transition wraps, and the other way round.
 - The texture belongs to its `VFX`; drawing it in another instance throws.
-- To map `rect` in a post effect, use `new VFX({ scrollPadding: false })`. With scroll padding, an effect can't tell where the viewport is in the canvas.
+- To map `rect` in a post effect, add the scroll padding: the canvas is the viewport plus the same padding on each side, so `pad = (ctx.dims.canvas - [clientWidth, clientHeight]) / 2` with the size of `document.documentElement`, and the canvas position is `rect.xy + pad` (CSS px, top-left origin).
 
 ### Rules
 

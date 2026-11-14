@@ -200,7 +200,7 @@ Other cases:
 - `addHTML` built on `capture`, and `addHTML` returning the handle.
 - Options: `maxSize`, `wrap`, `filter`, pause while off screen.
 - A helper that maps `rect` to canvas UV or px.
-  Known gap: with scroll padding on (the default), an effect cannot tell where the viewport is inside the canvas. `rect` is in viewport px, `ctx.dims.canvasRect` includes the padding, and no effect API gives the padding. The stories use `scrollPadding: false`.
+  It is plain rect math today: the canvas is the viewport plus the same scroll padding on each side, so `pad = (ctx.dims.canvas - viewport size) / 2` and the canvas position is `rect.xy + pad`. The HiddenSource story does this.
 - Components / composables in the React, Vue, Svelte and Astro bindings. They can call `vfx.capture` on the instance.
 - Capturing an element nested in another wrapped element (`addHTML` inside `capture`, or the reverse).
 

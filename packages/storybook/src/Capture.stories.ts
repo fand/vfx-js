@@ -25,13 +25,10 @@ const rectOf = ({ rect }: VFXCapture): [number, number, number, number] => [
     rect.height,
 ];
 
-/**
- * The viewport size in CSS px, from `ctx.dims`.
- * The stories use `scrollPadding: false`, so the canvas is the viewport.
- */
-const viewportOf = (ctx: EffectContext): [number, number] => [
-    ctx.dims.canvasRect[2] / ctx.dims.pixelRatio,
-    ctx.dims.canvasRect[3] / ctx.dims.pixelRatio,
+/** The viewport size in CSS px, without scrollbars. */
+const viewportSize = (): [number, number] => [
+    document.documentElement.clientWidth,
+    document.documentElement.clientHeight,
 ];
 
 export default {
@@ -90,7 +87,7 @@ class MinimapEffect implements Effect {
                 page: this.page.texture,
                 size: [ctx.dims.element[0], ctx.dims.element[1]],
                 pageRect: rectOf(this.page),
-                viewport: viewportOf(ctx),
+                viewport: viewportSize(),
             },
         });
     }
@@ -148,8 +145,7 @@ export const Minimap: StoryObj = {
         const box = qs<HTMLElement>(canvasElement, "#capture-box");
         const toggle = qs(canvasElement, "#capture-toggle");
 
-        // The frame needs the viewport size; see viewportOf.
-        const vfx = initVFX({ scrollPadding: false });
+        const vfx = initVFX();
         const page = await vfx.capture(article);
 
         // Live updates: a ticking clock, and a box that changes on click.
@@ -185,12 +181,15 @@ in vec2 uvSrc;
 out vec4 outColor;
 uniform sampler2D src;
 uniform sampler2D page;
+uniform vec2 canvas;    // VFX canvas, CSS px
 uniform vec2 viewport;  // CSS px
 uniform vec4 pageRect;  // captured element in the viewport, CSS px
 uniform float time;
 void main() {
     vec4 base = texture(src, uvSrc);
-    vec2 p = vec2(uv.x, 1.0 - uv.y) * viewport;
+    // The canvas is the viewport plus the same scroll padding on each side.
+    vec2 pad = (canvas - viewport) * 0.5;
+    vec2 p = vec2(uv.x, 1.0 - uv.y) * canvas - pad;
     vec2 l = (p - pageRect.xy) / pageRect.zw;
     l.x += sin(l.y * 24.0 + time * 3.0) * 0.015;
     vec4 c = vec4(0.0);
@@ -221,7 +220,8 @@ class WavyPageEffect implements Effect {
             uniforms: {
                 src: ctx.src,
                 page: this.page.texture,
-                viewport: viewportOf(ctx),
+                canvas: [ctx.dims.canvas[0], ctx.dims.canvas[1]],
+                viewport: viewportSize(),
                 pageRect: rectOf(this.page),
                 time: ctx.time,
             },
@@ -276,10 +276,7 @@ export const HiddenSource: StoryObj = {
         });
         input.addEventListener("input", report);
 
-        const vfx = initVFX({
-            scrollPadding: false,
-            postEffect: { effect },
-        });
+        const vfx = initVFX({ postEffect: { effect } });
         effect.page = await vfx.capture(card, { hide: true });
     },
 };
