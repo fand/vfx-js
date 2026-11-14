@@ -61,7 +61,6 @@ export class PostEffectPass {
             fragmentShader,
             uniforms: this.#uniforms,
             renderingToBuffer: hasBufferTarget ?? false,
-            premultipliedAlpha: true,
             glslVersion,
         });
     }

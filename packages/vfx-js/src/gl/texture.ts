@@ -51,7 +51,7 @@ export class Texture implements Restorable {
     magFilter: TextureFilter = "linear";
     needsUpdate = true;
 
-    /** Premultiply alpha on upload. Effect-path sources use this. */
+    /** Premultiply alpha on upload. Element sources use this. */
     premultiplyAlpha = false;
 
     /** Source image/canvas/video; exposed for identity comparison. */

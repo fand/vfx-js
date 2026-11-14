@@ -476,6 +476,8 @@ export class VFXPlayer {
         const [wrapS, wrapT] = parseWrap(opts.wrap);
         texture.wrapS = wrapS;
         texture.wrapT = wrapT;
+        // Shaders read `src` as premultiplied, like effects do.
+        texture.premultiplyAlpha = true;
         texture.needsUpdate = true;
 
         const autoCrop = opts.autoCrop ?? true;

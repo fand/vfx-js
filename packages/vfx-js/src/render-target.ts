@@ -25,11 +25,9 @@ export function createRenderTarget(
 }
 
 /**
- * Create a {@link Pass} for a fullscreen render. Maps the old
- * `createPassMaterial` behaviour:
- *   - Rendering to an intermediate buffer → NoBlending.
- *   - Rendering to the screen with `premultipliedAlpha` → premultiplied blend.
- *   - Otherwise (element passes) → non-premultiplied normal blend.
+ * Create a {@link Pass} for a fullscreen render.
+ *   - Rendering to an intermediate buffer → no blending.
+ *   - Otherwise → premultiplied blend.
  * @internal
  */
 export function createPassMaterial(
@@ -41,19 +39,10 @@ export function createPassMaterial(
 
         /** True when this pass renders into an intermediate RT. */
         renderingToBuffer?: boolean;
-        premultipliedAlpha?: boolean;
         glslVersion?: GlslVersion;
     },
 ): Pass {
-    const renderingToBuffer = opts.renderingToBuffer ?? false;
-    let blend: BlendMode;
-    if (renderingToBuffer) {
-        blend = "none";
-    } else if (opts.premultipliedAlpha) {
-        blend = "premultiplied";
-    } else {
-        blend = "normal";
-    }
+    const blend: BlendMode = opts.renderingToBuffer ? "none" : "premultiplied";
     const glslVersion =
         opts.glslVersion ?? detectGlslVersion(opts.fragmentShader);
     const vertexShader =

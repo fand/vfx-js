@@ -89,6 +89,21 @@ const READ_TEX = `vec4 readTex(sampler2D tex, vec2 uv) {
     return texture(tex, uv);
 }`;
 
+// `src` and `outColor` are premultiplied alpha. Presets that change colors or
+// build their own alpha work on straight colors between these two.
+const STRAIGHT_ALPHA = `vec4 unpremultiply(vec4 c) {
+    return c.a > 0. ? vec4(c.rgb / c.a, c.a) : vec4(0);
+}
+
+vec4 premultiply(vec4 c) {
+    c = clamp(c, 0., 1.);
+    return vec4(c.rgb * c.a, c.a);
+}
+
+vec4 readStraight(sampler2D tex, vec2 uv) {
+    return unpremultiply(readTex(tex, uv));
+}`;
+
 const presetShaders: Record<
     Exclude<ShaderPreset, LegacyRevealPreset>,
     string
@@ -109,6 +124,7 @@ const presetShaders: Record<
     rainbow: `
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     vec3 hsv2rgb(vec3 c) {
         vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -139,17 +155,18 @@ const presetShaders: Record<
 
         float x = (uv2.x - uv2.y) - fract(time);
 
-        vec4 img = readTex(src, uv);
+        vec4 img = readStraight(src, uv);
         float gray = length(img.rgb);
 
         img.rgb = vec3(hueShift(vec3(1,0,0), x) * gray);
 
-        outColor = img;
+        outColor = premultiply(img);
     }
     `,
     glitch: `
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     float nn(float y, float t) {
         float n = (
@@ -165,7 +182,7 @@ const presetShaders: Record<
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = readTex(src, uv);
+        vec4 color = readStraight(src, uv);
 
         float t = mod(time, 3.14 * 10.);
 
@@ -196,21 +213,21 @@ const presetShaders: Record<
             // RGB Shift
             v = pow(v * 1.5, 2.) * 0.15;
             color.rgb *= 0.3;
-            color.r += readTex(src, vec2(uv.x + sin(t * 123.45) * v, uv.y)).r;
-            color.g += readTex(src, vec2(uv.x + sin(t * 157.67) * v, uv.y)).g;
-            color.b += readTex(src, vec2(uv.x + sin(t * 143.67) * v, uv.y)).b;
+            color.r += readStraight(src, vec2(uv.x + sin(t * 123.45) * v, uv.y)).r;
+            color.g += readStraight(src, vec2(uv.x + sin(t * 157.67) * v, uv.y)).g;
+            color.b += readStraight(src, vec2(uv.x + sin(t * 143.67) * v, uv.y)).b;
         }
 
         // Compose Chromatic Abbreveation
         if (abs(nn(uv.y, t)) > 1.1) {
-            color.r = color.r * 0.5 + color.r * texture(src, ruv).r;
-            color.g = color.g * 0.5 + color.g * texture(src, guv).g;
-            color.b = color.b * 0.5 + color.b * texture(src, buv).b;
+            color.r = color.r * 0.5 + color.r * unpremultiply(texture(src, ruv)).r;
+            color.g = color.g * 0.5 + color.g * unpremultiply(texture(src, guv)).g;
+            color.b = color.b * 0.5 + color.b * unpremultiply(texture(src, buv)).b;
             color *= 2.;
         }
 
-        outColor = color;
-        outColor.a = smoothstep(0.0, 0.8, max(color.r, max(color.g, color.b)));
+        color.a = smoothstep(0.0, 0.8, max(color.r, max(color.g, color.b)));
+        outColor = premultiply(color);
     }
     `,
     pixelate: `
@@ -228,6 +245,7 @@ const presetShaders: Record<
     rgbGlitch: `
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     float random(vec2 st) {
         return fract(sin(dot(st, vec2(948.,824.))) * 30284.);
@@ -257,21 +275,22 @@ const presetShaders: Record<
             }
         }
 
-        vec4 cr = readTex(src, uvr);
-        vec4 cg = readTex(src, uvg);
-        vec4 cb = readTex(src, uvb);
+        vec4 cr = readStraight(src, uvr);
+        vec4 cg = readStraight(src, uvg);
+        vec4 cb = readStraight(src, uvb);
 
-        outColor = vec4(
+        outColor = premultiply(vec4(
             cr.r,
             cg.g,
             cb.b,
             step(.1, cr.a + cg.a + cb.a)
-        );
+        ));
     }
     `,
     rgbShift: `
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     float nn(float y, float t) {
         float n = (
@@ -303,16 +322,16 @@ const presetShaders: Record<
             uvb.x += nn(uv.y, t + 20.) * amp;
         }
 
-        vec4 cr = readTex(src, uvr);
-        vec4 cg = readTex(src, uvg);
-        vec4 cb = readTex(src, uvb);
+        vec4 cr = readStraight(src, uvr);
+        vec4 cg = readStraight(src, uvg);
+        vec4 cb = readStraight(src, uvb);
 
-        outColor = vec4(
+        outColor = premultiply(vec4(
             cr.r,
             cg.g,
             cb.b,
             smoothstep(.0, 1., cr.a + cg.a + cb.a)
-        );
+        ));
     }
     `,
     halftone: `
@@ -321,6 +340,7 @@ const presetShaders: Record<
 
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     // TODO: uniform
     #define gridSize 10.0
@@ -328,7 +348,7 @@ const presetShaders: Record<
     #define smoothing 0.15
     #define speed 1.0
 
-    #define IMG_PIXEL(x, y) readTex(x, (y - offset) / resolution);
+    #define IMG_PIXEL(x, y) readStraight(x, (y - offset) / resolution);
 
     vec4 gridRot = vec4(15.0, 45.0, 75.0, 0.0);
 
@@ -413,12 +433,13 @@ const presetShaders: Record<
         vec4 original = readTex(src, uv);
         float alpha = step(.1, rgbAmounts[0] + rgbAmounts[1] + rgbAmounts[2] + original.a);
 
-        outColor = vec4(rgbAmounts[0], rgbAmounts[1], rgbAmounts[2], alpha);
+        outColor = premultiply(vec4(rgbAmounts[0], rgbAmounts[1], rgbAmounts[2], alpha));
     }
     `,
     sinewave: `
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     vec4 draw(vec2 uv) {
         vec2 uvr = uv, uvg = uv, uvb = uv;
@@ -429,9 +450,9 @@ const presetShaders: Record<
         uvg.x += sin(uv.y * 7. + time * 3. + .4) * amp;
         uvb.x += sin(uv.y * 7. + time * 3. + .8) * amp;
 
-        vec4 cr = readTex(src, uvr);
-        vec4 cg = readTex(src, uvg);
-        vec4 cb = readTex(src, uvb);
+        vec4 cr = readStraight(src, uvr);
+        vec4 cg = readStraight(src, uvg);
+        vec4 cb = readStraight(src, uvb);
 
         return vec4(
             cr.r,
@@ -446,12 +467,13 @@ const presetShaders: Record<
 
         // x blur
         vec2 dx = vec2(2, 0) / resolution.x;
-        outColor = (draw(uv) * 2. + draw(uv + dx) + draw(uv - dx)) / 4.;
+        outColor = premultiply((draw(uv) * 2. + draw(uv + dx) + draw(uv - dx)) / 4.);
     }
     `,
     shine: `
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
@@ -464,7 +486,7 @@ const presetShaders: Record<
 
         float level = 1. + sin(a * 10. + time * 3.) * 0.2;
 
-        outColor = vec4(1, 1, .5, col.a) * level;
+        outColor = premultiply(vec4(1, 1, .5, col.a) * level);
     }
     `,
     blink: `
@@ -491,6 +513,7 @@ const presetShaders: Record<
     duotone: `
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     uniform vec4 color1;
     uniform vec4 color2;
@@ -498,7 +521,7 @@ const presetShaders: Record<
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = readTex(src, uv);
+        vec4 color = readStraight(src, uv);
 
         float gray = dot(color.rgb, vec3(0.2, 0.7, 0.08));
         float t = mod(gray * 2.0 + time * speed, 2.0);
@@ -509,12 +532,13 @@ const presetShaders: Record<
             outColor = mix(color2, color1, fract(t));
         }
 
-        outColor *= color.a;
+        outColor = premultiply(outColor * color.a);
     }
     `,
     tritone: `
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     uniform vec4 color1;
     uniform vec4 color2;
@@ -523,7 +547,7 @@ const presetShaders: Record<
 
     void main (void) {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = readTex(src, uv);
+        vec4 color = readStraight(src, uv);
 
         float gray = dot(color.rgb, vec3(0.2, 0.7, 0.08));
         float t = mod(gray * 3.0 + time * speed, 3.0);
@@ -536,7 +560,7 @@ const presetShaders: Record<
             outColor = mix(color3, color1, fract(t));
         }
 
-        outColor *= color.a;
+        outColor = premultiply(outColor * color.a);
     }
     `,
     hueShift: `
@@ -667,11 +691,12 @@ const presetShaders: Record<
     invert: `
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     void main() {
         vec2 uv = (gl_FragCoord.xy - offset) / resolution;
-        vec4 color = readTex(src, uv);
-        outColor = vec4(1.0 - color.rgb, color.a);
+        vec4 color = readStraight(src, uv);
+        outColor = premultiply(vec4(1.0 - color.rgb, color.a));
     }
     `,
     grayscale: `
@@ -707,6 +732,7 @@ const presetShaders: Record<
     chromatic: `
     ${COMMON_HEADER}
     ${READ_TEX}
+    ${STRAIGHT_ALPHA}
 
     uniform float intensity;
     uniform float radius;
@@ -715,7 +741,7 @@ const presetShaders: Record<
 
     vec4 mirrorTex(sampler2D tex, vec2 uv) {
         vec2 uv2 = 1. - abs(1. - mod(uv, 2.0));
-        return texture(tex, uv2);
+        return unpremultiply(texture(tex, uv2));
     }
 
     void main() {
@@ -735,7 +761,7 @@ const presetShaders: Record<
         vec4 cg = mirrorTex(src, uvG);
         vec4 cb = mirrorTex(src, uvB);
 
-        outColor = vec4(cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 3.0);
+        outColor = premultiply(vec4(cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a) / 3.0));
     }
     `,
 };
