@@ -34,6 +34,7 @@ const defaultDom: CaptureDom = {
 
 /** What the player gives `createCapture`. */
 export type CaptureDeps = {
+    /** A new texture, premultiplied like `ctx.src`. */
     createTexture(source: TextureSource): Texture;
     /**
      * Re-upload `offscreen` into `old`, or return a new texture with the
@@ -195,15 +196,6 @@ function createDriver(
     return snapshotDriver(deps, dom, source, opts, slot);
 }
 
-function setSlotTexture(slot: CaptureSlot, texture: Texture): void {
-    texture.premultiplyAlpha = true;
-    texture.wrapS = "clamp";
-    texture.wrapT = "clamp";
-    texture.minFilter = "linear";
-    texture.magFilter = "linear";
-    slot.texture = texture;
-}
-
 function setSlotSize(slot: CaptureSlot, box: Element): void {
     const r = box.getBoundingClientRect();
     slot.width = r.width;
@@ -229,7 +221,7 @@ async function mediaDriver(
     }
 
     const setTexture = () => {
-        setSlotTexture(slot, deps.createTexture(source));
+        slot.texture = deps.createTexture(source);
         setSlotSize(slot, source);
     };
 
@@ -297,7 +289,7 @@ async function hicDriver(
         throw err;
     }
 
-    setSlotTexture(slot, deps.createTexture(initialCapture));
+    slot.texture = deps.createTexture(initialCapture);
     setSlotSize(slot, wrapper);
     // With hide, clear the first capture too. Without it, keep it and only drop the still copy.
     dom.releaseFirstCapture(wrapper, !opts.hide);
@@ -339,7 +331,7 @@ async function snapshotDriver(
     if (first.width === 0 || first.height === 0) {
         throw new Error("[VFX-JS] capture() got an empty snapshot.");
     }
-    setSlotTexture(slot, deps.createTexture(first));
+    slot.texture = deps.createTexture(first);
     setSlotSize(slot, source);
     if (opts.hide) {
         source.style.setProperty("opacity", "0");

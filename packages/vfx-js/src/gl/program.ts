@@ -1,3 +1,4 @@
+import type { EffectTexture } from "../types.js";
 import type { GLContext, Restorable } from "./context.js";
 import { Texture } from "./texture.js";
 import { Vec2, Vec4 } from "./vec.js";
@@ -15,7 +16,9 @@ export type UniformValue =
     | number[]
     | Float32Array
     | Int32Array
-    | Uint32Array;
+    | Uint32Array
+    // Effect-path handle. Effects resolve it; the shader path skips it.
+    | EffectTexture;
 
 /** @internal */
 export type Uniform = { value: UniformValue | null };
@@ -174,6 +177,9 @@ export class Program implements Restorable {
             if (value === null || value === undefined) {
                 continue;
             }
+            if (skipTextureHandle(value)) {
+                continue;
+            }
 
             if (isSamplerType(info.type)) {
                 if (value instanceof Texture) {
@@ -194,6 +200,26 @@ export class Program implements Restorable {
         this.#ctx.removeResource(this);
         this.gl.deleteProgram(this.program);
     }
+}
+
+let warnedTextureHandle = false;
+
+/**
+ * True for an `EffectTexture` handle, which only the effect path can bind.
+ * Warns once per page.
+ * @internal
+ */
+export function skipTextureHandle(value: UniformValue): boolean {
+    if (typeof value !== "object" || !("__brand" in value)) {
+        return false;
+    }
+    if (!warnedTextureHandle) {
+        warnedTextureHandle = true;
+        console.warn(
+            "[VFX-JS] Texture uniforms work with `effect` only, not with `shader`. Ignoring the value.",
+        );
+    }
+    return true;
 }
 
 function compileShader(

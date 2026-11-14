@@ -65,7 +65,6 @@ function fakeDeps(dom?: Partial<CaptureDom>) {
             }
             old.dispose();
             const texture = createTexture(offscreen);
-            texture.premultiplyAlpha = old.premultiplyAlpha;
             return texture;
         },
         textureSize: (_, axis) => (axis === "w" ? 60 : 80),
@@ -113,7 +112,6 @@ describe("createCapture: sources", () => {
         const { capture } = await pending;
         expect(made).toHaveLength(1);
         expect(made[0].source).toBe(img);
-        expect(made[0].premultiplyAlpha).toBe(true);
         expect(resolveTexture(capture.texture)).toBe(made[0]);
         expect([capture.texture.width, capture.texture.height]).toEqual([
             60, 80,
@@ -319,7 +317,6 @@ describe("createCapture: html-in-canvas", () => {
             true,
         );
         expect(made[0].source).toBe(hic.first);
-        expect(made[0].premultiplyAlpha).toBe(true);
         expect(resolveTexture(capture.texture)).toBe(made[0]);
         expect(capture.rect).toEqual({ x: 3, y: 4, width: 50, height: 20 });
     });
@@ -398,7 +395,6 @@ describe("createCapture: html-in-canvas", () => {
         hic.wrapOpts().onCapture(offscreen(140, 60));
         expect(made).toHaveLength(2);
         expect(made[0].dispose).toHaveBeenCalledOnce();
-        expect(made[1].premultiplyAlpha).toBe(true);
         expect(capture.texture).toBe(handle);
         expect(resolveTexture(handle)).toBe(made[1]);
     });
@@ -513,7 +509,6 @@ describe("createCapture: snapshot", () => {
             4096,
         );
         expect(made[0].source).toBeInstanceOf(FakeOffscreen);
-        expect(made[0].premultiplyAlpha).toBe(true);
         expect(snap.el.style.opacity).toBe("0");
         expect(capture.rect).toEqual({ x: 1, y: 2, width: 30, height: 40 });
         capture.dispose();

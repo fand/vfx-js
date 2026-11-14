@@ -60,8 +60,8 @@ export class VFX {
     // Elements that addHTML is still wrapping.
     #wrapping = new Set<HTMLElement>();
     #transitions = new Set<TransitionHandle>();
-    // Null while the first capture is pending.
-    #captures = new Map<HTMLElement, VFXCapture | null>();
+    // Includes captures whose first capture is pending.
+    #captures = new Set<HTMLElement>();
     #reducedMotion: boolean;
     #destroyed = false;
 
@@ -300,7 +300,7 @@ export class VFX {
         }
 
         // Register now, so a second call cannot wrap the element too.
-        this.#captures.set(source, null);
+        this.#captures.add(source);
         let capture: VFXCapture;
         try {
             capture = await this.#player.addCapture(
@@ -319,7 +319,6 @@ export class VFX {
                 "[VFX-JS] This VFX instance was destroyed during capture().",
             );
         }
-        this.#captures.set(source, capture);
         return capture;
     }
 
@@ -575,11 +574,8 @@ export class VFX {
      * Destroy VFX and stop rendering.
      */
     destroy(): void {
+        // The player disposes the captures.
         this.#destroyed = true;
-        for (const capture of [...this.#captures.values()]) {
-            capture?.dispose();
-        }
-        this.#captures.clear();
 
         for (const transition of this.#transitions) {
             transition.destroy();

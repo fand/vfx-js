@@ -11,6 +11,7 @@ type Pending = {
 
 const pending: Pending[] = [];
 const wrapped: unknown[] = [];
+const players: { destroy: () => void }[] = [];
 
 vi.mock("./webgl-support.js", () => ({ isWebGLAvailable: () => true }));
 vi.mock("./html-in-canvas-support.js", () => ({
@@ -30,7 +31,10 @@ vi.mock("./vfx-player.js", () => ({
     VFXPlayer: class {
         maxTextureSize = 4096;
         play() {}
-        destroy() {}
+        destroy = vi.fn();
+        constructor() {
+            players.push(this);
+        }
         addElement() {}
         isFrozen() {
             return false;
@@ -166,17 +170,14 @@ describe("VFX.capture", () => {
         expect(wrapped).toEqual([]);
     });
 
-    test("destroy() disposes captures", async () => {
+    test("destroy() leaves the captures to the player", async () => {
         const vfx = createVFX();
-        const a = vfx.capture(element());
-        const captureA = settle();
-        await a;
-        const b = vfx.capture(element());
-        const captureB = settle();
-        (await b).dispose();
+        const result = vfx.capture(element());
+        const capture = settle();
+        await result;
         vfx.destroy();
-        expect(captureA.dispose).toHaveBeenCalledOnce();
-        expect(captureB.dispose).toHaveBeenCalledOnce();
+        expect(capture.dispose).not.toHaveBeenCalled();
+        expect(players[players.length - 1].destroy).toHaveBeenCalledOnce();
     });
 
     test("destroy() while pending disposes the capture and rejects", async () => {

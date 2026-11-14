@@ -1,12 +1,10 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
-import { createShaderUniformFilter } from "./shader-uniform";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type {
     EffectTexture,
     VFXCapture,
     VFXPass,
     VFXPostEffect,
     VFXProps,
-    VFXUniformValue,
 } from "./types";
 
 const texture = {
@@ -19,34 +17,37 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe("createShaderUniformFilter", () => {
-    test("passes other values through", () => {
+describe("skipTextureHandle", () => {
+    beforeEach(() => {
+        vi.resetModules();
+    });
+
+    test("keeps other values", async () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-        const filter = createShaderUniformFilter();
-        const values: VFXUniformValue[] = [
+        const { skipTextureHandle } = await import("./gl/program");
+        const { Vec2 } = await import("./gl/vec");
+        const values = [
             1,
+            true,
             [1, 2],
-            [1, 2, 3, 4],
+            new Vec2(),
             new Float32Array(4),
             new Int32Array(1),
             new Uint32Array(1),
         ];
         for (const value of values) {
-            expect(filter(value)).toBe(value);
+            expect(skipTextureHandle(value)).toBe(false);
         }
         expect(warn).not.toHaveBeenCalled();
     });
 
-    test("drops textures and warns once per filter", () => {
+    test("skips a texture handle and warns once", async () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-        const filter = createShaderUniformFilter();
-        expect(filter(texture)).toBeNull();
-        expect(filter(texture)).toBeNull();
+        const { skipTextureHandle } = await import("./gl/program");
+        expect(skipTextureHandle(texture)).toBe(true);
+        expect(skipTextureHandle(texture)).toBe(true);
         expect(warn).toHaveBeenCalledOnce();
         expect(warn.mock.calls[0][0]).toMatch(/effect/);
-
-        createShaderUniformFilter()(texture);
-        expect(warn).toHaveBeenCalledTimes(2);
     });
 });
 

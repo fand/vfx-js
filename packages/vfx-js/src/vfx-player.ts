@@ -15,7 +15,12 @@ import type { Framebuffer } from "./gl/framebuffer.js";
 import { type Pass, renderPass } from "./gl/pass.js";
 import type { Uniform, Uniforms } from "./gl/program.js";
 import { Quad } from "./gl/quad.js";
-import { loadImage, Texture, type TextureWrap } from "./gl/texture.js";
+import {
+    loadImage,
+    Texture,
+    type TextureSource,
+    type TextureWrap,
+} from "./gl/texture.js";
 import { Vec2, Vec4 } from "./gl/vec.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import { isHicCanvas } from "./hic-canvas.js";
@@ -41,7 +46,6 @@ import {
     toRect,
 } from "./rect.js";
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
-import { createShaderUniformFilter } from "./shader-uniform.js";
 import type {
     Effect,
     EffectTexture,
@@ -186,8 +190,6 @@ export class VFXPlayer {
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
     #captures = new Set<CaptureEntry>();
-    // Drops texture uniforms on the shader path, with one warning.
-    #shaderUniform = createShaderUniformFilter();
     /** What a disposed capture samples: transparent 1×1. */
     #emptyTexture: Texture;
 
@@ -525,11 +527,11 @@ export class VFXPlayer {
             for (const [key, value] of Object.entries(opts.uniforms)) {
                 if (typeof value === "function") {
                     sharedUniforms[key] = {
-                        value: this.#shaderUniform(value()),
+                        value: value(),
                     };
                     sharedUniformGenerators[key] = value;
                 } else {
-                    sharedUniforms[key] = { value: this.#shaderUniform(value) };
+                    sharedUniforms[key] = { value: value };
                 }
             }
         }
@@ -639,12 +641,12 @@ export class VFXPlayer {
                 for (const [key, value] of Object.entries(p.uniforms)) {
                     if (typeof value === "function") {
                         passUniforms[key] = {
-                            value: this.#shaderUniform(value()),
+                            value: value(),
                         };
                         passUniformGenerators[key] = value;
                     } else {
                         passUniforms[key] = {
-                            value: this.#shaderUniform(value),
+                            value: value,
                         };
                     }
                 }
@@ -1094,7 +1096,7 @@ export class VFXPlayer {
     ): Promise<VFXCapture> {
         const entry = await createCapture(
             {
-                createTexture: (src) => new Texture(this.#ctx, src),
+                createTexture: (src) => this.#premultipliedTexture(src),
                 refreshTexture: (old, offscreen) =>
                     this.#textureFromCapture(old, offscreen),
                 textureSize: readTextureSourceDim,
@@ -1113,6 +1115,13 @@ export class VFXPlayer {
         return entry.capture;
     }
 
+    // Effects read `ctx.src` as premultiplied; match it.
+    #premultipliedTexture(source: TextureSource): Texture {
+        const texture = new Texture(this.#ctx, source);
+        texture.premultiplyAlpha = true;
+        return texture;
+    }
+
     /** A transparent texture handle, for captures that render nothing. */
     emptyTexture(): EffectTexture {
         return makeEffectTexture(
@@ -1128,13 +1137,7 @@ export class VFXPlayer {
      */
     liveTexture(): LiveTexture {
         return createLiveTexture(
-            (offscreen) => {
-                const texture = new Texture(this.#ctx, offscreen);
-                // Effects read `ctx.src` as premultiplied; match it.
-                texture.premultiplyAlpha = true;
-                texture.needsUpdate = true;
-                return texture;
-            },
+            (offscreen) => this.#premultipliedTexture(offscreen),
             (texture, offscreen) =>
                 this.#textureFromCapture(texture, offscreen),
             readTextureSourceDim,
@@ -1304,7 +1307,7 @@ export class VFXPlayer {
                 for (const [key, gen] of Object.entries(
                     pass.uniformGenerators,
                 )) {
-                    pass.uniforms[key].value = this.#shaderUniform(gen());
+                    pass.uniforms[key].value = gen();
                 }
             }
 
@@ -1393,7 +1396,7 @@ export class VFXPlayer {
                     pass.uniformGenerators,
                 )) {
                     if (pass.uniforms[key]) {
-                        pass.uniforms[key].value = this.#shaderUniform(gen());
+                        pass.uniforms[key].value = gen();
                     }
                 }
 
@@ -1480,7 +1483,7 @@ export class VFXPlayer {
                 finalPass.uniformGenerators,
             )) {
                 if (finalPass.uniforms[key]) {
-                    finalPass.uniforms[key].value = this.#shaderUniform(gen());
+                    finalPass.uniforms[key].value = gen();
                 }
             }
 
@@ -1888,7 +1891,6 @@ export class VFXPlayer {
                     pe.size,
                     pe.target !== undefined,
                     pe.glslVersion,
-                    this.#shaderUniform,
                 );
                 target = pe.target;
             } else {
@@ -1907,7 +1909,6 @@ export class VFXPlayer {
                     undefined,
                     false,
                     pe.glslVersion,
-                    this.#shaderUniform,
                 );
                 if (pe.persistent) {
                     pass.registerBufferUniform("backbuffer");
