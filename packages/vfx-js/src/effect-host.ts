@@ -809,8 +809,10 @@ export class EffectHost {
         gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
         gl.disable(gl.SAMPLE_COVERAGE);
 
-        // Masks and fixed-function settings.
+        // Masks and fixed-function settings. The player's per-frame
+        // clears rely on clearColor without setting it.
         gl.depthMask(true);
+        gl.clearColor(0, 0, 0, 0);
         gl.depthFunc(gl.LESS);
         gl.colorMask(true, true, true, true);
         gl.stencilMask(0xffffffff);

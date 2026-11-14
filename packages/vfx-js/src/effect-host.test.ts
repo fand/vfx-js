@@ -1337,6 +1337,7 @@ describe("EffectHost.resetState", () => {
             "POLYGON_OFFSET_FILL",
             "RASTERIZER_DISCARD",
             "SAMPLE_ALPHA_TO_COVERAGE",
+            "SAMPLE_COVERAGE",
         ]) {
             expect(gl.disable).toHaveBeenCalledWith(cap);
         }
@@ -1352,6 +1353,46 @@ describe("EffectHost.resetState", () => {
         expect(gl.pixelStorei).toHaveBeenCalledWith(
             "UNPACK_FLIP_Y_WEBGL",
             false,
+        );
+        expect(gl.readBuffer).toHaveBeenCalledWith("BACK");
+        expect(gl.depthFunc).toHaveBeenCalledWith("LESS");
+        expect(gl.stencilMask).toHaveBeenCalledWith(0xffffffff);
+        expect(gl.cullFace).toHaveBeenCalledWith("BACK");
+        expect(gl.clearColor).toHaveBeenCalledWith(0, 0, 0, 0);
+        expect(gl.bindTransformFeedback).toHaveBeenCalledWith(
+            "TRANSFORM_FEEDBACK",
+            null,
+        );
+        for (const target of [
+            "PIXEL_PACK_BUFFER",
+            "UNIFORM_BUFFER",
+            "COPY_READ_BUFFER",
+            "COPY_WRITE_BUFFER",
+        ]) {
+            expect(gl.bindBuffer).toHaveBeenCalledWith(target, null);
+        }
+        expect(gl.pixelStorei).toHaveBeenCalledWith(
+            "UNPACK_COLORSPACE_CONVERSION_WEBGL",
+            "BROWSER_DEFAULT_WEBGL",
+        );
+        for (const [param, value] of [
+            ["UNPACK_PREMULTIPLY_ALPHA_WEBGL", false],
+            ["UNPACK_ALIGNMENT", 4],
+            ["UNPACK_IMAGE_HEIGHT", 0],
+            ["UNPACK_SKIP_PIXELS", 0],
+            ["UNPACK_SKIP_ROWS", 0],
+            ["UNPACK_SKIP_IMAGES", 0],
+            ["PACK_ALIGNMENT", 4],
+            ["PACK_ROW_LENGTH", 0],
+            ["PACK_SKIP_PIXELS", 0],
+            ["PACK_SKIP_ROWS", 0],
+        ] as const) {
+            expect(gl.pixelStorei).toHaveBeenCalledWith(param, value);
+        }
+        // Only the one-time texture unit query.
+        expect(gl.getParameter).toHaveBeenCalledTimes(1);
+        expect(gl.getParameter).toHaveBeenCalledWith(
+            "MAX_COMBINED_TEXTURE_IMAGE_UNITS",
         );
         expect(gl.activeTexture).toHaveBeenCalledWith("TEXTURE0");
         // Stub reports 4 units.
@@ -1372,6 +1413,22 @@ describe("EffectHost.resetState", () => {
         const { host, gl } = makeResetHost();
         host.setPhase("update");
         host.ctx.resetState();
+        expect(gl.useProgram).toHaveBeenCalledWith(null);
+    });
+
+    it("is a no-op after dispose", () => {
+        const { host, gl } = makeResetHost();
+        const ctx = host.ctx;
+        host.dispose();
+        ctx.resetState();
+        expect(gl.bindFramebuffer).not.toHaveBeenCalled();
+        expect(gl.disable).not.toHaveBeenCalled();
+    });
+
+    it("survives an object spread of the context", () => {
+        const { host, gl } = makeResetHost();
+        const spread = { ...host.ctx };
+        spread.resetState();
         expect(gl.useProgram).toHaveBeenCalledWith(null);
     });
 

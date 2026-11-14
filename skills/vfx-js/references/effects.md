@@ -195,5 +195,5 @@ Return `dims.canvasRect` to cover the whole canvas.
 - One instance per element. Use a factory: `const make = () => new MyEffect()`.
 - `shader` and `effect` are mutually exclusive.
 - Free anything you allocate with raw `ctx.gl` in `dispose`, and rebuild it in `ctx.onContextRestored(cb)`.
-- After drawing with raw `ctx.gl` (depth test, culling, own framebuffers, pixel store), call `ctx.resetState()` before the next `ctx.draw` / `ctx.blit` / `ctx.clear`.
+- After drawing with raw `ctx.gl` (depth test, culling, own framebuffers, pixel store), call `ctx.resetState()` before the next `ctx.draw` / `ctx.blit` / `ctx.clear`, and before `render` returns. End transform feedback first.
 - Use `ctx.dims` for pixel sizes. Don't read DOM sizes in `render`.
