@@ -256,7 +256,8 @@ export class VFX {
      * `<img>`, `<video>` and `<canvas>` are uploaded as they are.
      * Other elements are captured with html-in-canvas when the browser
      * supports it (like {@link VFX.addHTML}), or else with one DOM snapshot
-     * (like {@link VFX.add}).
+     * (like {@link VFX.add}). Call `update()` on the snapshot after the
+     * element changes.
      *
      * ```ts
      * const page = await vfx.capture(article, { hide: true });
@@ -268,9 +269,12 @@ export class VFX {
      * page.dispose();
      * ```
      *
+     * The texture works on the effect path (`effect`) only, and only in
+     * this VFX instance.
+     *
      * Rejects when the element already has a capture in this instance,
-     * when `addHTML` or a transition has wrapped it, or when the first
-     * capture fails.
+     * when `addHTML` or a transition wraps it, or when the first capture
+     * fails.
      * When the user prefers reduced motion, it resolves to a handle that
      * leaves the element alone and samples as transparent.
      */

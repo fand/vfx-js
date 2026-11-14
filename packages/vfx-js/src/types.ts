@@ -545,8 +545,9 @@ export type VFXPostEffect = {
 
     /**
      * Custom uniform values to be passed to the post effect shader.
-     * Works the same way as element uniforms, including that a texture
-     * (e.g. `capture.texture`) works with `effect` only.
+     * Works the same way as element uniforms.
+     * A capture cannot come through here, since `VFX.capture` needs the
+     * VFX instance first. Give the capture to the effect itself instead.
      */
     uniforms?: VFXUniforms;
 
@@ -575,6 +576,10 @@ export type VFXCaptureOpts = {
     /**
      * Hide the source element. (Default: `false`)
      * A hidden element keeps its layout and stays interactive.
+     *
+     * With html-in-canvas, the element is always moved into a wrapper
+     * canvas. Without `hide`, the canvas shows the latest capture, so the
+     * element looks unchanged.
      */
     hide?: boolean;
 };
@@ -605,7 +610,11 @@ export type VFXCapture = {
     /** Where the element is. The same object for the life of the capture; its fields change. */
     readonly rect: VFXCaptureRect;
 
-    /** Capture again. Resolves when the new pixels are in `texture`. */
+    /**
+     * Capture again. Resolves when the new pixels are in `texture`.
+     * With the DOM snapshot fallback (no html-in-canvas), and for images,
+     * the texture changes only when you call this.
+     */
     update(): Promise<void>;
 
     /** Stop capturing, free the texture and restore the element. Idempotent. */

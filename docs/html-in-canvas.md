@@ -17,6 +17,21 @@ await vfx.addHTML(element, { shader: "rainbow" });
 if (supportsHtmlInCanvas()) { ... }
 ```
 
+### Capture without drawing (`vfx.capture`)
+
+`vfx.capture(element, { hide })` wraps the element the same way, but draws nothing. Effects read the capture as a texture.
+
+```ts
+const page = await vfx.capture(element, { hide: true });
+// page.texture, page.rect, page.update(), page.dispose()
+```
+
+- `hide: false` (default): the wrapper canvas keeps the latest capture drawn, so the element looks unchanged. What you see is the canvas's drawing of the element, updated on every repaint.
+- `hide: true`: the wrapper canvas is cleared after each capture. The element is invisible and still interactive.
+- `dispose()` unwraps the element, like `vfx.remove` after `addHTML`.
+- Without html-in-canvas, `capture` takes one DOM snapshot instead. Call `update()` after the element changes.
+- An element can't be passed to both `capture` and `addHTML`.
+
 ### React (`@vfx-js/react`)
 
 ```tsx

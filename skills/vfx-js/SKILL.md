@@ -85,6 +85,7 @@ vfx.add(el, {
 - `add(el, props)` → `Promise<void>`. Start rendering an element.
 - `addHTML(el, props)` → render any HTML subtree, with live updates (html-in-canvas, Chrome only, falls back to a slower capture). Check support with `supportsHtmlInCanvas()`.
 - `remove(el)`, `update(el)` (re-capture after the content changes), `updateEffects(el, effects)`.
+- `capture(el, { hide })` → `Promise<VFXCapture>`. Capture an element as a texture without drawing it, for effects to read. See [references/effects.md](references/effects.md).
 - Video and GIF update every frame. A `<canvas>` is copied once on `add`; call `update(canvas)` after you draw to it.
 - `addTransition(el, opts)` → `TransitionHandle`. See [references/transitions.md](references/transitions.md).
 - `play()`, `stop()`, `render()`, `destroy()`, `setTime(t)`, `timeScale`.

@@ -189,6 +189,40 @@ outputRect(dims: EffectDims) {
 
 Return `dims.canvasRect` to cover the whole canvas.
 
+### Sharing a texture between elements
+
+`vfx.capture(el)` turns an element into a texture that any effect of the same `VFX` can read.
+It works with `<img>`, `<video>`, `<canvas>` and any HTML (html-in-canvas, or one DOM snapshot as fallback).
+
+```ts
+const page = await vfx.capture(article, { hide: false });
+
+class Minimap implements Effect {
+    constructor(private page: VFXCapture) {}
+    render(ctx: EffectContext) {
+        const { texture, rect } = this.page;
+        ctx.draw({ frag: MINIMAP, uniforms: { page: texture, pageRect: [rect.x, rect.y, rect.width, rect.height] } });
+    }
+}
+await vfx.add(minimapEl, { effect: new Minimap(page) });
+
+// A reusable effect takes the texture as a uniform and reads ctx.uniforms.page.
+await vfx.add(other, { effect: new MyEffect(), uniforms: { page: page.texture } });
+
+await page.update(); // capture again
+page.dispose();      // free it and restore the element
+```
+
+- Pass the `VFXCapture` to the effect when it needs `rect`. Pass `capture.texture` in `uniforms` for a reusable effect.
+- `hide: true` hides the element; it keeps its layout and stays interactive. Default `false` leaves it visible.
+- `rect` is in viewport CSS px. `x` / `y` are measured every frame; `width` / `height` are the size when the texture was captured.
+- Videos and canvases refresh every frame. html-in-canvas refreshes on every repaint. Images and the DOM snapshot fallback change only on `update()`.
+- Effect path only: with `shader`, a texture uniform is ignored with a warning.
+- Post effect `uniforms` can't take it (the capture needs the `VFX` first). Set the capture on the post effect instance after `await vfx.capture()`.
+- One capture per element. `capture` rejects for an element `addHTML` or a transition wraps, and the other way round.
+- The texture belongs to its `VFX`; drawing it in another instance throws.
+- To map `rect` in a post effect, use `new VFX({ scrollPadding: false })`. With scroll padding, an effect can't tell where the viewport is in the canvas.
+
 ### Rules
 
 - One instance per element. Use a factory: `const make = () => new MyEffect()`.
