@@ -159,10 +159,11 @@ Two ways. Both already work with any `EffectTexture`.
 
     ```ts
     vfx.add(target, { effect, uniforms: { page: page.texture } });
-    new VFX({ postEffect: { effect, uniforms: { page: page.texture } } });
     ```
 
     The effect reads `ctx.uniforms.page` and passes it on to `ctx.draw`.
+
+    This does not reach a post effect: its `uniforms` are fixed in the `VFX` constructor, before any capture can exist. A post effect takes the capture the first way, set on the effect after `await vfx.capture()`.
 
 Type change for (2): `VFXUniformValue` gains `EffectTexture`. It already works at runtime on the effect path; only the type rejects it today.
 
@@ -199,6 +200,7 @@ Other cases:
 - `addHTML` built on `capture`, and `addHTML` returning the handle.
 - Options: `maxSize`, `wrap`, `filter`, pause while off screen.
 - A helper that maps `rect` to canvas UV or px.
+  Known gap: with scroll padding on (the default), an effect cannot tell where the viewport is inside the canvas. `rect` is in viewport px, `ctx.dims.canvasRect` includes the padding, and no effect API gives the padding. The stories use `scrollPadding: false`.
 - Components / composables in the React, Vue, Svelte and Astro bindings. They can call `vfx.capture` on the instance.
 - Capturing an element nested in another wrapped element (`addHTML` inside `capture`, or the reverse).
 

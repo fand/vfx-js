@@ -168,5 +168,6 @@ For the other kinds, slot size is written wherever the texture is: at setup, in 
 - **`paint` event timing.** The spec's timing rule assumes the paint event runs after `requestAnimationFrame` callbacks.
   Confirmed in Chrome 153 (headless, `--enable-blink-features=CanvasDrawElement`): within one frame the order is rAF, then `ResizeObserver`, then `paint`.
   A style change, a resize or `requestPaint()` made in a rAF callback fires `paint` in the same frame, and the next rAF sees the new pixels.
-  Not checked on Chrome 159+ (`content="drawable"`); check it again in step 6.
+  Not checked on Chrome 159+ (`content="drawable"`): only Chrome 153 was available for step 6.
+- **Checked in step 6 (Chrome 153, html-in-canvas on and off):** the three stories draw; a resize with `hide: false` shows no blank frame; the still copy lasts one frame; a hidden source takes clicks and typing; captures come back after a context loss.
 - **Many captures.** Each one is a `getBoundingClientRect()` per frame. The issue's demo did the same by hand, so it is no worse; pausing off-screen captures is listed as a later option.
