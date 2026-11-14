@@ -416,6 +416,23 @@ describe("wrapElement", () => {
         expect(canvasStyle().marginLeft).toBe("auto");
     });
 
+    test("copies auto and % insets as computed values", () => {
+        stubComputed({
+            ...plainBox,
+            position: "fixed",
+            width: "300px",
+            top: "auto",
+            right: "0px",
+            bottom: "0px",
+            left: "50%",
+        });
+        wrap({});
+        expect(canvasStyle().top).toBe("auto");
+        expect(canvasStyle().right).toBe("0px");
+        expect(canvasStyle().bottom).toBe("0px");
+        expect(canvasStyle().left).toBe("50%");
+    });
+
     test("falls back to resolved margins without computedStyleMap", () => {
         vi.stubGlobal("getComputedStyle", () => ({
             display: "block",

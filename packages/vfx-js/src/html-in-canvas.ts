@@ -121,6 +121,8 @@ const POSITION_FLOW_STYLES = [
     "grid-area",
 ] as const;
 
+const INSET_PROPS = new Set<string>(["top", "right", "bottom", "left"]);
+
 export interface CaptureOpts {
     onCapture: (offscreen: OffscreenCanvas) => void;
     maxSize?: number;
@@ -637,19 +639,25 @@ export async function wrapElement(
     const display = cs.display === "inline" ? "block" : cs.display;
     canvas.style.setProperty("display", display);
 
-    // Computed values keep `auto` and %, so `margin: 0 auto` keeps centering
-    // the canvas after a resize. getComputedStyle resolves them to px.
+    // Margins and insets come from computed values, which keep `auto` and %,
+    // so `margin: 0 auto`, `left: 50%` or `bottom: 0` keep tracking the
+    // containing block. getComputedStyle resolves them to px at wrap time,
+    // and a px top on a `bottom: 0` element makes the canvas grow downward.
+    // Read before the DOM swap: the map is live and the swap zeroes margins.
     const styleMap =
         typeof element.computedStyleMap === "function"
             ? element.computedStyleMap()
             : null;
+    const computed = (prop: string) =>
+        styleMap?.get(prop)?.toString() ?? cs.getPropertyValue(prop);
     for (const prop of MARGIN_PROPS) {
-        const margin =
-            styleMap?.get(prop)?.toString() ?? cs.getPropertyValue(prop);
-        canvas.style.setProperty(prop, margin);
+        canvas.style.setProperty(prop, computed(prop));
     }
     for (const prop of POSITION_FLOW_STYLES) {
-        canvas.style.setProperty(prop, cs.getPropertyValue(prop));
+        const value = INSET_PROPS.has(prop)
+            ? computed(prop)
+            : cs.getPropertyValue(prop);
+        canvas.style.setProperty(prop, value);
     }
 
     // Full-width target → 100% (tracks resizes); explicit length width →

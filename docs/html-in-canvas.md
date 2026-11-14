@@ -175,7 +175,7 @@ Canvas is a **replaced element**. It does NOT auto-fit height to children, even 
 - `max-width: 100%` stays a percentage. The canvas sits in the element's containing block, so `width: 1200px; max-width: 100%` keeps tracking the parent.
 - Computed values are used instead of `getBoundingClientRect()`, which a transformed ancestor scales.
 - A length in `em` or `vw` computes to px, so it is fixed at wrap time and does not follow later resizes.
-- Margins are copied as computed values too, so `auto` and `%` stay as they are and `margin: 0 auto` keeps centering the canvas after a resize. `getComputedStyle` would resolve them to px at wrap time.
+- Margins and insets (`top`/`right`/`bottom`/`left`) are copied as computed values too, so `auto` and `%` stay as they are. `margin: 0 auto`, `left: 50%` and `right: 0` keep tracking the containing block after a resize. `getComputedStyle` would resolve them to px at wrap time, and a px `top` on a `bottom: 0` element would also make the canvas grow downward when the content gets taller.
 - Border widths come from `getComputedStyle`: the computed style map gives `medium` (3px) for a border whose style is `none`.
 
 **Height**: A child ResizeObserver watches the wrapped element and sets the canvas CSS height to match `borderBoxSize.blockSize`. This triggers the canvas ResizeObserver, which syncs the pixel buffer and calls `requestPaint`.
