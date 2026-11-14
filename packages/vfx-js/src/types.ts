@@ -945,8 +945,79 @@ export type EffectContext = {
      *
      * Resources allocated here are the caller's responsibility: free in
      * `dispose()`, rebuild in `onContextRestored(cb)`.
+     *
+     * VFX-JS sets the framebuffer, viewport, program, VAO, texture
+     * bindings, blend and scissor itself before each draw. It does not
+     * set the rest of the GL state, and assumes it is at the WebGL
+     * defaults: `DEPTH_TEST`, `CULL_FACE`, `STENCIL_TEST`,
+     * `POLYGON_OFFSET_FILL`, `RASTERIZER_DISCARD` and
+     * `SAMPLE_ALPHA_TO_COVERAGE` disabled, `depthMask(true)`,
+     * `colorMask(true, true, true, true)`, `frontFace(CCW)`, no sampler
+     * objects bound, no `PIXEL_UNPACK_BUFFER` bound, and
+     * `UNPACK_ROW_LENGTH`, `UNPACK_SKIP_*` and `UNPACK_IMAGE_HEIGHT`
+     * at 0. (Texture uploads set `UNPACK_FLIP_Y_WEBGL`,
+     * `UNPACK_PREMULTIPLY_ALPHA_WEBGL` and `UNPACK_ALIGNMENT`
+     * themselves, so don't rely on their values in raw uploads.)
+     *
+     * If you change any of this, call {@link EffectContext.resetState}
+     * before the next `ctx.draw()` / `ctx.blit()` / `ctx.clear()`, or
+     * wrap the raw calls in {@link EffectContext.rawGL}.
      */
     readonly gl: WebGL2RenderingContext;
+
+    /**
+     * Put the GL state back to the baseline VFX-JS's pipeline assumes,
+     * whatever raw `ctx.gl` calls changed. It only writes state; it
+     * never queries it.
+     *
+     * Resets:
+     * - Draw and read framebuffer to the canvas, `drawBuffers([BACK])`,
+     *   and the viewport to the whole canvas.
+     * - `DEPTH_TEST`, `CULL_FACE`, `STENCIL_TEST`, `SCISSOR_TEST`,
+     *   `BLEND`, `POLYGON_OFFSET_FILL`, `RASTERIZER_DISCARD`,
+     *   `SAMPLE_ALPHA_TO_COVERAGE` and `SAMPLE_COVERAGE` disabled.
+     * - `depthMask(true)`, `depthFunc(LESS)`, `colorMask(true × 4)`,
+     *   `stencilMask(~0)`, `frontFace(CCW)`, `cullFace(BACK)`.
+     * - Program, VAO and the `ARRAY_BUFFER`, `PIXEL_PACK_BUFFER`,
+     *   `PIXEL_UNPACK_BUFFER`, `UNIFORM_BUFFER`, `COPY_READ_BUFFER`,
+     *   `COPY_WRITE_BUFFER` bindings unbound. Transform feedback unbound.
+     * - Sampler objects unbound on every texture unit, and the active
+     *   texture unit set to `TEXTURE0`.
+     * - Pixel store parameters set to the WebGL defaults.
+     *
+     * Call it after raw `ctx.gl` drawing in `render()`, before the next
+     * `ctx.draw()` / `ctx.blit()` / `ctx.clear()`. Calling it in `init()`
+     * or `update()` is allowed but rarely needed, since nothing is drawn
+     * there. It does nothing while the WebGL context is lost.
+     *
+     * @example
+     * ```ts
+     * render(ctx) {
+     *     const gl = ctx.gl;
+     *     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+     *     gl.enable(gl.DEPTH_TEST);
+     *     // ... custom drawing ...
+     *     ctx.resetState();
+     *     ctx.blit(this.result);
+     * }
+     * ```
+     */
+    resetState(): void;
+
+    /**
+     * Run `fn` with the raw WebGL2 context, then call
+     * {@link EffectContext.resetState}, even if `fn` throws.
+     * Returns what `fn` returns.
+     *
+     * @example
+     * ```ts
+     * ctx.rawGL((gl) => {
+     *     gl.enable(gl.DEPTH_TEST);
+     *     // ... custom drawing ...
+     * }); // the GL state is back to the baseline here
+     * ```
+     */
+    rawGL<T>(fn: (gl: WebGL2RenderingContext) => T): T;
 
     /**
      * Subscribe to `webglcontextrestored` to rebuild resources allocated

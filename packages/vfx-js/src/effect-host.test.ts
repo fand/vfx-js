@@ -1255,3 +1255,151 @@ describe("EffectHost.dispose", () => {
         expect(programs.filter((p) => p.disposed).length).toBe(disposedCount);
     });
 });
+
+// ---------------------------------------------------------------------------
+// resetState / rawGL
+// ---------------------------------------------------------------------------
+
+describe("EffectHost.resetState", () => {
+    /** GL stub where every method is a spy and every constant is its name. */
+    function makeFullGlStub() {
+        const fns = new Map<string, ReturnType<typeof vi.fn>>();
+        const target = {
+            drawingBufferWidth: 320,
+            drawingBufferHeight: 240,
+        } as Record<string, unknown>;
+        return new Proxy(target, {
+            get(t, prop: string) {
+                if (prop in t) {
+                    return t[prop];
+                }
+                if (/^[A-Z0-9_]+$/.test(prop)) {
+                    return prop;
+                }
+                if (prop === "getParameter") {
+                    let fn = fns.get(prop);
+                    if (!fn) {
+                        fn = vi.fn(() => 4);
+                        fns.set(prop, fn);
+                    }
+                    return fn;
+                }
+                let fn = fns.get(prop);
+                if (!fn) {
+                    fn = vi.fn();
+                    fns.set(prop, fn);
+                }
+                return fn;
+            },
+        }) as unknown as WebGL2RenderingContext & {
+            [k: string]: ReturnType<typeof vi.fn>;
+        };
+    }
+
+    function makeResetHost(opts: { lost?: boolean } = {}) {
+        const gl = makeFullGlStub();
+        const glCtx = {
+            gl,
+            isContextLost: opts.lost ?? false,
+            addResource: () => {},
+            removeResource: () => {},
+            onContextRestored: () => () => {},
+        } as unknown as GLContext;
+        const host = new EffectHost(
+            glCtx,
+            {} as Quad,
+            1,
+            {
+                __brand: "EffectTexture",
+                width: 1,
+                height: 1,
+            } as unknown as EffectTexture,
+            { autoCrop: true, glslVersion: "300 es" },
+            new ProgramCache(glCtx),
+        );
+        host.setPhase("render");
+        return { host, gl };
+    }
+
+    it("writes the pipeline baseline without querying state", () => {
+        const { host, gl } = makeResetHost();
+        host.ctx.resetState();
+
+        expect(gl.bindFramebuffer).toHaveBeenCalledWith("FRAMEBUFFER", null);
+        expect(gl.drawBuffers).toHaveBeenCalledWith(["BACK"]);
+        expect(gl.viewport).toHaveBeenCalledWith(0, 0, 320, 240);
+        for (const cap of [
+            "DEPTH_TEST",
+            "CULL_FACE",
+            "STENCIL_TEST",
+            "SCISSOR_TEST",
+            "BLEND",
+            "POLYGON_OFFSET_FILL",
+            "RASTERIZER_DISCARD",
+            "SAMPLE_ALPHA_TO_COVERAGE",
+        ]) {
+            expect(gl.disable).toHaveBeenCalledWith(cap);
+        }
+        expect(gl.enable).not.toHaveBeenCalled();
+        expect(gl.depthMask).toHaveBeenCalledWith(true);
+        expect(gl.colorMask).toHaveBeenCalledWith(true, true, true, true);
+        expect(gl.frontFace).toHaveBeenCalledWith("CCW");
+        expect(gl.useProgram).toHaveBeenCalledWith(null);
+        expect(gl.bindVertexArray).toHaveBeenCalledWith(null);
+        expect(gl.bindBuffer).toHaveBeenCalledWith("ARRAY_BUFFER", null);
+        expect(gl.bindBuffer).toHaveBeenCalledWith("PIXEL_UNPACK_BUFFER", null);
+        expect(gl.pixelStorei).toHaveBeenCalledWith("UNPACK_ROW_LENGTH", 0);
+        expect(gl.pixelStorei).toHaveBeenCalledWith(
+            "UNPACK_FLIP_Y_WEBGL",
+            false,
+        );
+        expect(gl.activeTexture).toHaveBeenCalledWith("TEXTURE0");
+        // Stub reports 4 units.
+        expect(gl.bindSampler).toHaveBeenCalledTimes(4);
+        for (let i = 0; i < 4; i++) {
+            expect(gl.bindSampler).toHaveBeenCalledWith(i, null);
+        }
+    });
+
+    it("queries the texture unit count only once", () => {
+        const { host, gl } = makeResetHost();
+        host.ctx.resetState();
+        host.ctx.resetState();
+        expect(gl.getParameter).toHaveBeenCalledTimes(1);
+    });
+
+    it("works outside render() too", () => {
+        const { host, gl } = makeResetHost();
+        host.setPhase("update");
+        host.ctx.resetState();
+        expect(gl.useProgram).toHaveBeenCalledWith(null);
+    });
+
+    it("is a no-op while the context is lost", () => {
+        const { host, gl } = makeResetHost({ lost: true });
+        host.ctx.resetState();
+        expect(gl.bindFramebuffer).not.toHaveBeenCalled();
+        expect(gl.disable).not.toHaveBeenCalled();
+    });
+
+    it("rawGL passes gl, returns fn's value, then resets", () => {
+        const { host, gl } = makeResetHost();
+        const ret = host.ctx.rawGL((g) => {
+            expect(g).toBe(gl);
+            expect(gl.useProgram).not.toHaveBeenCalled();
+            return 42;
+        });
+        expect(ret).toBe(42);
+        expect(gl.useProgram).toHaveBeenCalledWith(null);
+    });
+
+    it("rawGL resets even if fn throws", () => {
+        const { host, gl } = makeResetHost();
+        expect(() =>
+            host.ctx.rawGL(() => {
+                throw new Error("boom");
+            }),
+        ).toThrow("boom");
+        expect(gl.disable).toHaveBeenCalledWith("DEPTH_TEST");
+    });
+});
