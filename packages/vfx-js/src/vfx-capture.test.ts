@@ -146,6 +146,15 @@ describe("VFX.capture", () => {
         expect(pending).toHaveLength(0);
     });
 
+    test("rejects an element that addHTML is still wrapping", async () => {
+        const vfx = createVFX();
+        const el = element();
+        const adding = vfx.addHTML(el, { shader: "rainbow" });
+        await expect(vfx.capture(el)).rejects.toThrow("wrapped");
+        expect(pending).toHaveLength(0);
+        await adding;
+    });
+
     test("addHTML rejects a captured element, pending or not", async () => {
         const vfx = createVFX();
         const el = element();

@@ -57,6 +57,8 @@ export class VFX {
     #player: VFXPlayer;
     #canvas: HTMLCanvasElement;
     #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
+    // Elements that addHTML is still wrapping.
+    #wrapping = new Set<HTMLElement>();
     #transitions = new Set<TransitionHandle>();
     // Null while the first capture is pending.
     #captures = new Map<HTMLElement, VFXCapture | null>();
@@ -224,15 +226,24 @@ export class VFX {
             this.#player.removeElement(wrapper);
         }
 
-        const { canvas, initialCapture } = await wrapElement(element, {
-            onCapture: (offscreen) => {
-                this.#player.updateHICTexture(canvas, offscreen);
-            },
-            maxSize: this.#player.maxTextureSize,
-            stillCover: withStill ? { zIndex: this.#stillZIndex() } : undefined,
-        });
-        wrapper = canvas;
-        this.#wrapperCanvases.set(element, wrapper);
+        this.#wrapping.add(element);
+        let initialCapture: OffscreenCanvas;
+        try {
+            const wrapped = await wrapElement(element, {
+                onCapture: (offscreen) => {
+                    this.#player.updateHICTexture(wrapped.canvas, offscreen);
+                },
+                maxSize: this.#player.maxTextureSize,
+                stillCover: withStill
+                    ? { zIndex: this.#stillZIndex() }
+                    : undefined,
+            });
+            wrapper = wrapped.canvas;
+            initialCapture = wrapped.initialCapture;
+            this.#wrapperCanvases.set(element, wrapper);
+        } finally {
+            this.#wrapping.delete(element);
+        }
 
         await this.#addHICCanvas(wrapper, hicOpts, initialCapture);
     }
@@ -278,7 +289,7 @@ export class VFX {
                 "[VFX-JS] This element is already captured. Share the capture instead.",
             );
         }
-        if (this.#wrapperCanvases.has(source)) {
+        if (this.#wrapperCanvases.has(source) || this.#wrapping.has(source)) {
             throw new Error(
                 "[VFX-JS] capture() cannot take an element that addHTML or a transition has wrapped.",
             );
