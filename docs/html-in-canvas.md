@@ -51,7 +51,7 @@ The canvas's content-box must equal the wrapped element's border-box. Since the 
 | Element width | Canvas width | Responsive? |
 | --- | --- | --- |
 | Fills its containing block (`width: auto` block, or `width: 100%`) | `100%` | ✅ tracks parent |
-| Explicit **px** width (`width: 400px`) | pinned `rect.width` | constant (reflow-safe) |
+| Explicit length width (`width: 400px`, from the style attribute or any CSS rule; `em`/`vw` too) | pinned `rect.width` | constant (reflow-safe) |
 | Sized by insets (`position: fixed`/`absolute`, `inset: 10px`, `auto` width/height) | `calc(100% - <insets> - <margins>)`, height too | ✅ tracks containing block |
 | **Content-sized** (`inline`/`inline-block`, `float`, `fit-content`, binding `max-width`, or width + centering margins) | — | ❌ **unsupported** |
 
@@ -65,6 +65,10 @@ The litmus test: **does the target's border-box equal its parent's content-box w
 
 <!-- explicit fixed width (inline px) -->
 <article style="width: 600px; padding: 32px">…</article>
+
+<!-- explicit fixed width from a stylesheet or #id rule -->
+<style>.slides { width: 600px; margin: 40px; }</style>
+<div class="slides">…</div>
 ```
 
 Padding/border on the target is fine in both cases — the canvas content-box is sized to the element's border-box.
@@ -156,7 +160,7 @@ Canvas is a **replaced element**. It does NOT auto-fit height to children, even 
 
 #### Current approach
 
-**Width**: Set per the [Sizing policy](#sizing-policy) — `width: 100%` for full-width targets (tracks parent resizes), or a pinned `rect.width` for elements with an explicit px width.
+**Width**: Set per the [Sizing policy](#sizing-policy) — `width: 100%` for full-width targets (tracks parent resizes), or a pinned `rect.width` for elements with an explicit length width. The width is read from the computed style, so a width set by a class or `#id` rule counts too. A length in `em` or `vw` is pinned at wrap time and does not follow later resizes.
 
 **Height**: A child ResizeObserver watches the wrapped element and sets the canvas CSS height to match `borderBoxSize.blockSize`. This triggers the canvas ResizeObserver, which syncs the pixel buffer and calls `requestPaint`.
 

@@ -494,13 +494,20 @@ function getInsetSizing(element: HTMLElement): InsetSizing {
     };
 }
 
-/** A replaced element with `width: auto` keeps its intrinsic width. */
-function hasIntrinsicWidth(element: HTMLElement): boolean {
-    return (
-        REPLACED_TAGS.has(element.tagName) &&
-        typeof element.computedStyleMap === "function" &&
-        element.computedStyleMap().get("width")?.toString() === "auto"
-    );
+/**
+ * Whether the element's width doesn't follow its containing block: a set
+ * length (from any rule, not only the style attribute; em/vw compute to
+ * px), or `auto` on a replaced element, which keeps its intrinsic width.
+ */
+function hasFixedWidth(element: HTMLElement): boolean {
+    if (typeof element.computedStyleMap !== "function") {
+        return element.style.width.endsWith("px");
+    }
+    const width = element.computedStyleMap().get("width")?.toString();
+    if (width === undefined || width === "auto") {
+        return REPLACED_TAGS.has(element.tagName);
+    }
+    return /^[\d.e+-]+px$/.test(width);
 }
 
 interface WrapOpts extends CaptureOpts {
@@ -569,16 +576,15 @@ export async function wrapElement(
         canvas.style.setProperty(prop, cs.getPropertyValue(prop));
     }
 
-    // Full-width target → 100% (tracks resizes); explicit px width → pinned
-    // border-box (constant, reflow-safe). Content-sized unsupported (see docs).
+    // Full-width target → 100% (tracks resizes); explicit length width →
+    // pinned border-box (constant, reflow-safe). The inline 100% would beat a
+    // width from the copied class, so it must not apply then.
+    // Content-sized unsupported (see docs).
     // Inset-sized target → size from the insets, since a canvas won't stretch.
     // Intrinsic-width replaced element → pinned too.
     if (insetSizing.width) {
         canvas.style.setProperty("width", insetSizing.width);
-    } else if (
-        element.style.width.endsWith("px") ||
-        hasIntrinsicWidth(element)
-    ) {
+    } else if (hasFixedWidth(element)) {
         canvas.style.setProperty("width", `${rect.width}px`);
     } else {
         canvas.style.setProperty("width", "100%");

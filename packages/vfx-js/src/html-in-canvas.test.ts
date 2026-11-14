@@ -298,6 +298,38 @@ describe("wrapElement", () => {
         expect(canvasStyle().width).toBe("100%");
     });
 
+    // #264: a width from a stylesheet rule, not the style attribute.
+    test("pins a px width that comes from a stylesheet", () => {
+        stubComputed({ position: "static", width: "600px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("10px");
+        expect(element.style.width).toBe("100%");
+    });
+
+    test("pins a px width from the style attribute", () => {
+        element.style.width = "600px";
+        stubComputed({ position: "static", width: "600px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("10px");
+    });
+
+    test("keeps 100% for an auto width", () => {
+        stubComputed({ position: "static", width: "auto" });
+        wrap({});
+        expect(canvasStyle().width).toBe("100%");
+    });
+
+    test("keeps 100% for a percent or calc width", () => {
+        stubComputed({ position: "static", width: "50%" });
+        wrap({});
+        expect(canvasStyle().width).toBe("100%");
+
+        inserted = [];
+        stubComputed({ position: "static", width: "calc(100% - 20px)" });
+        wrap({});
+        expect(canvasStyle().width).toBe("100%");
+    });
+
     test("leaves a non-positioned element as is", () => {
         stubComputed({ position: "static", top: "10px", bottom: "10px" });
         wrap({});
