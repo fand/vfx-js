@@ -50,6 +50,28 @@ function getCanvasStyle(fixed: boolean) {
     };
 }
 
+/** A captured element, including one whose first capture is pending. */
+type CaptureRecord = {
+    hide: boolean;
+    abort: AbortController;
+};
+
+function isMediaElement(element: HTMLElement): boolean {
+    return (
+        element instanceof HTMLImageElement ||
+        element instanceof HTMLVideoElement ||
+        element instanceof HTMLCanvasElement
+    );
+}
+
+/**
+ * Whether `add` and `capture` would both own the element's look: both hide
+ * an HTML element, and both set a media element's opacity with `hide`.
+ */
+function addConflictsWithCapture(element: HTMLElement, hide: boolean): boolean {
+    return hide || !isMediaElement(element);
+}
+
 /**
  * The main interface of VFX-JS.
  */
@@ -60,8 +82,7 @@ export class VFX {
     // Elements that addHTML is still wrapping.
     #wrapping = new Set<HTMLElement>();
     #transitions = new Set<TransitionHandle>();
-    // Includes captures whose first capture is pending.
-    #captures = new Set<HTMLElement>();
+    #captures = new Map<HTMLElement, CaptureRecord>();
     #reducedMotion: boolean;
     #destroyed = false;
 
@@ -132,6 +153,12 @@ export class VFX {
     ): Promise<void> {
         if (this.#reducedMotion) {
             return;
+        }
+        const captured = this.#captures.get(element);
+        if (captured && addConflictsWithCapture(element, captured.hide)) {
+            throw new Error(
+                "[VFX-JS] This element is captured. Dispose the capture before add.",
+            );
         }
         if (element instanceof HTMLImageElement) {
             await this.#addImage(element, opts);
@@ -273,8 +300,10 @@ export class VFX {
      * this VFX instance.
      *
      * Rejects when the element already has a capture in this instance,
-     * when `addHTML` or a transition wraps it, or when the first capture
-     * fails.
+     * when `addHTML` or a transition wraps it, when `add` has it (unless it
+     * is an `<img>`, `<video>` or `<canvas>` captured without `hide`), or
+     * when the first capture fails. `add` rejects a captured element under
+     * the same rule.
      * When the user prefers reduced motion, it resolves to a handle that
      * leaves the element alone and samples as transparent.
      */
@@ -298,9 +327,22 @@ export class VFX {
                 "[VFX-JS] capture() cannot take an element that addHTML or a transition has wrapped.",
             );
         }
+        const hide = opts.hide ?? false;
+        if (
+            this.#player.hasElement(source) &&
+            addConflictsWithCapture(source, hide)
+        ) {
+            throw new Error(
+                "[VFX-JS] capture() cannot take an element added with add(). Remove it first.",
+            );
+        }
 
         // Register now, so a second call cannot wrap the element too.
-        this.#captures.add(source);
+        const record: CaptureRecord = {
+            hide,
+            abort: new AbortController(),
+        };
+        this.#captures.set(source, record);
         let capture: VFXCapture;
         try {
             capture = await this.#player.addCapture(
@@ -308,9 +350,15 @@ export class VFX {
                 opts,
                 this.#stillZIndex(),
                 () => this.#captures.delete(source),
+                record.abort.signal,
             );
         } catch (err) {
             this.#captures.delete(source);
+            if (this.#destroyed) {
+                throw new Error(
+                    "[VFX-JS] This VFX instance was destroyed during capture().",
+                );
+            }
             throw err;
         }
         if (this.#destroyed) {
@@ -576,6 +624,11 @@ export class VFX {
     destroy(): void {
         // The player disposes the captures.
         this.#destroyed = true;
+        // A pending capture restores the element when aborted. The player
+        // disposes the ones that are done.
+        for (const { abort } of this.#captures.values()) {
+            abort.abort();
+        }
 
         for (const transition of this.#transitions) {
             transition.destroy();

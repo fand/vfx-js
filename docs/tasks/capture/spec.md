@@ -179,7 +179,7 @@ Answers to the open questions of the issue.
    After `dispose()` the handle stays safe to use: it samples as transparent, `width` / `height` are `0`, and a dev warning is logged once per capture when it is sampled.
 2. **One capture per element.** A second `capture()` of an element that has a live capture in the same VFX instance rejects. Share the handle instead.
    `capture()` also rejects for an element that `addHTML` or a transition has wrapped, and `addHTML` (so also a transition run) rejects for a captured element: all of them wrap the element.
-   `vfx.add` on a captured `<img>` / `<video>` / `<canvas>` is allowed.
+   `add` and `capture` on one element both set its opacity, so they exclude each other (`add` rejects a captured element, `capture` rejects an added one) for HTML elements, and for `<img>` / `<video>` / `<canvas>` when `hide` is set. A media element without `hide` can be both.
 3. **Context.** A capture belongs to the VFX instance that made it. Passing its texture to a draw in another instance throws an error that names the problem. The effect chain reports it like any other `render()` error.
 4. **Context loss.** Captures come back by themselves. The upload sources are kept, and the textures are re-uploaded after `webglcontextrestored`.
 5. **Timing.** Effects never see a capture change in the middle of a frame.
@@ -192,7 +192,8 @@ Other cases:
 
 - **Reduced motion.** VFX renders nothing in this mode. `capture()` resolves to an inert handle: the element is not wrapped or hidden, `texture` is a transparent 1×1 texture, `rect` is measured once, `update()` and `dispose()` do nothing.
 - **Element removed from the DOM.** The capture keeps its last pixels. Call `dispose()`.
-- **`capture()` rejects** when the first capture fails (broken image, element without a box). The element is restored before the promise rejects.
+- **`capture()` rejects** when the first capture fails (broken image, a video that fails to load, an HTML element with no box or a 0 width or height). The element is left as it was. `hide` applies only once the first capture is in.
+- **`vfx.destroy()` during a pending `capture()`** aborts it: the element is restored and the promise rejects.
 
 ## Out of scope
 

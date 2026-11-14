@@ -220,7 +220,8 @@ page.dispose();      // free it and restore the element
 - Videos and canvases refresh every frame. html-in-canvas refreshes on every repaint. Images and the DOM snapshot fallback change only on `update()`.
 - Effect path only: with `shader`, a texture uniform is ignored with a warning.
 - Post effect `uniforms` can't take it (the capture needs the `VFX` first). Set the capture on the post effect instance after `await vfx.capture()`.
-- One capture per element. `capture` rejects for an element `addHTML` or a transition wraps, and the other way round.
+- One capture per element. `capture` rejects for an element `addHTML` or a transition wraps, and the other way round. It also excludes `add` on the same element (both ways), except for an `<img>` / `<video>` / `<canvas>` captured without `hide`.
+- An HTML element needs a width and height when captured; an empty one rejects.
 - The texture belongs to its `VFX`; drawing it in another instance throws.
 - To map `rect` in a post effect, add the scroll padding: the canvas is the viewport plus the same padding on each side, so `pad = (ctx.dims.canvas - [clientWidth, clientHeight]) / 2` with the size of `document.documentElement`, and the canvas position is `rect.xy + pad` (CSS px, top-left origin).
 

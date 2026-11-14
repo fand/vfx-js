@@ -85,15 +85,17 @@ type MutableRect = { -readonly [K in keyof VFXCaptureRect]: VFXCaptureRect[K] };
  * Capture `source` into a texture that effects can read.
  * Resolves after the first capture is in the texture.
  * `onDispose` is called once, when the capture is disposed.
+ * Aborting `signal` before that rejects and restores the element.
  */
 export async function createCapture(
     deps: CaptureDeps,
     source: HTMLElement,
     opts: VFXCaptureOpts,
     onDispose?: () => void,
+    signal?: AbortSignal,
 ): Promise<CaptureEntry> {
     const slot = { width: 0, height: 0 } as CaptureSlot;
-    const driver = await createDriver(deps, source, opts, slot);
+    const driver = await createDriver(deps, source, opts, slot, signal);
 
     let disposed = false;
     let warned = false;
@@ -130,7 +132,7 @@ export async function createCapture(
         () => (disposed ? 0 : deps.textureSize(slot.texture, "h")),
         undefined,
         () => {
-            update();
+            update().catch((err) => console.error(err));
         },
     );
 
@@ -175,6 +177,7 @@ function createDriver(
     source: HTMLElement,
     opts: VFXCaptureOpts,
     slot: CaptureSlot,
+    signal: AbortSignal | undefined,
 ): Promise<CaptureDriver> {
     const dom = { ...defaultDom, ...deps.dom };
     if (
@@ -182,18 +185,82 @@ function createDriver(
         source instanceof HTMLVideoElement ||
         source instanceof HTMLCanvasElement
     ) {
-        return mediaDriver(deps, source, opts, slot);
+        return mediaDriver(deps, source, opts, slot, signal);
     }
-    // drawElementImage throws on an element without a box, and dom2canvas draws nothing.
-    if (source.getClientRects().length === 0) {
+    // drawElementImage throws on an element without a box, and dom2canvas
+    // draws nothing. A wrapper of 0 width or height never paints, so the
+    // first capture would never come.
+    const r = source.getBoundingClientRect();
+    if (
+        source.getClientRects().length === 0 ||
+        r.width === 0 ||
+        r.height === 0
+    ) {
         return Promise.reject(
-            new Error("[VFX-JS] capture() needs an element with a box."),
+            new Error("[VFX-JS] capture() needs an element with a size."),
         );
     }
     if (dom.supportsHtmlInCanvas()) {
-        return hicDriver(deps, dom, source, opts, slot);
+        return hicDriver(deps, dom, source, opts, slot, signal);
     }
     return snapshotDriver(deps, dom, source, opts, slot);
+}
+
+function abortError(): Error {
+    return new Error("[VFX-JS] capture() was aborted.");
+}
+
+/** Reject when `signal` aborts before `promise` settles. */
+function abortable<T>(
+    promise: Promise<T>,
+    signal: AbortSignal | undefined,
+): Promise<T> {
+    if (!signal) {
+        return promise;
+    }
+    if (signal.aborted) {
+        return Promise.reject(abortError());
+    }
+    return new Promise<T>((resolve, reject) => {
+        const onAbort = () => reject(abortError());
+        signal.addEventListener("abort", onAbort, { once: true });
+        promise
+            .then(resolve, reject)
+            .finally(() => signal.removeEventListener("abort", onAbort));
+    });
+}
+
+/** Resolve on `canplay`, reject on `error` or abort. */
+function waitForVideo(
+    video: HTMLVideoElement,
+    signal: AbortSignal | undefined,
+): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        const cleanup = () => {
+            video.removeEventListener("canplay", onCanPlay);
+            video.removeEventListener("error", onError);
+            signal?.removeEventListener("abort", onAbort);
+        };
+        const onCanPlay = () => {
+            cleanup();
+            resolve();
+        };
+        const onError = () => {
+            cleanup();
+            reject(new Error("[VFX-JS] capture() could not load the video."));
+        };
+        const onAbort = () => {
+            cleanup();
+            reject(abortError());
+        };
+        if (signal?.aborted) {
+            reject(abortError());
+            return;
+        }
+        video.addEventListener("canplay", onCanPlay);
+        video.addEventListener("error", onError);
+        signal?.addEventListener("abort", onAbort);
+    });
 }
 
 function setSlotSize(slot: CaptureSlot, box: Element): void {
@@ -202,62 +269,58 @@ function setSlotSize(slot: CaptureSlot, box: Element): void {
     slot.height = r.height;
 }
 
+/** CSS size that dom2canvas captures: it ceils to whole pixels. */
+function snapshotSize(box: Element): [number, number] {
+    const r = box.getBoundingClientRect();
+    return [Math.ceil(r.width), Math.ceil(r.height)];
+}
+
 async function mediaDriver(
     deps: CaptureDeps,
     source: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
     opts: VFXCaptureOpts,
     slot: CaptureSlot,
+    signal: AbortSignal | undefined,
 ): Promise<CaptureDriver> {
-    const isVideo = source instanceof HTMLVideoElement;
+    if (source instanceof HTMLImageElement) {
+        await abortable(source.decode(), signal);
+    } else if (source instanceof HTMLVideoElement && source.readyState < 3) {
+        await waitForVideo(source, signal);
+    }
+    slot.texture = deps.createTexture(source);
+    setSlotSize(slot, source);
+
+    // Hide only once the texture exists, so a failed setup leaves the element alone.
     const savedOpacity = source.style.opacity;
+    if (opts.hide) {
+        // Don't hide a video completely, to keep frames decoding.
+        const isVideo = source instanceof HTMLVideoElement;
+        source.style.setProperty("opacity", isVideo ? "0.0001" : "0");
+    }
     const restoreOpacity = () => {
         if (opts.hide) {
             source.style.opacity = savedOpacity;
         }
     };
-    if (opts.hide) {
-        // Don't hide a video completely, to keep frames decoding.
-        source.style.setProperty("opacity", isVideo ? "0.0001" : "0");
-    }
 
-    const setTexture = () => {
-        slot.texture = deps.createTexture(source);
-        setSlotSize(slot, source);
-    };
-
-    try {
-        if (source instanceof HTMLImageElement) {
-            await source.decode();
-            setTexture();
-            return {
-                box: source,
-                everyFrame: false,
-                async update() {
-                    await source.decode();
-                    slot.texture.needsUpdate = true;
-                    setSlotSize(slot, source);
-                },
-                dispose: restoreOpacity,
-            };
-        }
-        if (source instanceof HTMLVideoElement && source.readyState < 3) {
-            await new Promise<void>((resolve) => {
-                source.addEventListener("canplay", () => resolve(), {
-                    once: true,
-                });
-            });
-        }
-        setTexture();
+    if (source instanceof HTMLImageElement) {
         return {
             box: source,
-            everyFrame: true,
-            update: () => Promise.resolve(),
+            everyFrame: false,
+            async update() {
+                await source.decode();
+                slot.texture.needsUpdate = true;
+                setSlotSize(slot, source);
+            },
             dispose: restoreOpacity,
         };
-    } catch (err) {
-        restoreOpacity();
-        throw err;
     }
+    return {
+        box: source,
+        everyFrame: true,
+        update: () => Promise.resolve(),
+        dispose: restoreOpacity,
+    };
 }
 
 async function hicDriver(
@@ -266,12 +329,13 @@ async function hicDriver(
     source: HTMLElement,
     opts: VFXCaptureOpts,
     slot: CaptureSlot,
+    signal: AbortSignal | undefined,
 ): Promise<CaptureDriver> {
     const parent = source.parentNode;
     let wrapper: HTMLCanvasElement;
     let initialCapture: OffscreenCanvas;
     try {
-        ({ canvas: wrapper, initialCapture } = await dom.wrapElement(source, {
+        const wrapping = dom.wrapElement(source, {
             onCapture: (offscreen) => {
                 slot.texture = deps.refreshTexture(slot.texture, offscreen);
                 setSlotSize(slot, wrapper);
@@ -279,9 +343,14 @@ async function hicDriver(
             maxSize: deps.maxTextureSize,
             keepDrawn: !opts.hide,
             stillCover: opts.hide ? undefined : { zIndex: deps.stillZIndex },
-        }));
+        });
+        ({ canvas: wrapper, initialCapture } = await abortable(
+            wrapping,
+            signal,
+        ));
     } catch (err) {
-        // wrapElement has already moved the element when its capture setup fails.
+        // wrapElement has already moved the element when its capture setup
+        // fails or is aborted.
         const canvas = source.parentNode;
         if (canvas !== parent && canvas instanceof HTMLCanvasElement) {
             dom.unwrapElement(canvas, source);
@@ -322,6 +391,7 @@ async function snapshotDriver(
     const originalOpacity =
         savedOpacity === "" ? 1 : Number.parseFloat(savedOpacity);
 
+    const [firstW, firstH] = snapshotSize(source);
     const first = await dom.dom2canvas(
         source,
         originalOpacity,
@@ -332,7 +402,8 @@ async function snapshotDriver(
         throw new Error("[VFX-JS] capture() got an empty snapshot.");
     }
     slot.texture = deps.createTexture(first);
-    setSlotSize(slot, source);
+    slot.width = firstW;
+    slot.height = firstH;
     if (opts.hide) {
         source.style.setProperty("opacity", "0");
     }
@@ -342,6 +413,8 @@ async function snapshotDriver(
     let queued: Promise<void> | null = null;
     const snapshot = async () => {
         const old = slot.texture.source;
+        // dom2canvas sizes the snapshot from the box at its start.
+        const [w, h] = snapshotSize(source);
         const canvas = await dom.dom2canvas(
             source,
             originalOpacity,
@@ -353,7 +426,8 @@ async function snapshotDriver(
             return;
         }
         slot.texture = deps.refreshTexture(slot.texture, canvas);
-        setSlotSize(slot, source);
+        slot.width = w;
+        slot.height = h;
     };
     // One snapshot at a time. A call during a snapshot queues one more,
     // which every call until it starts shares, so its DOM changes are kept.
@@ -381,8 +455,8 @@ async function snapshotDriver(
         everyFrame: false,
         update,
         resize() {
-            const r = source.getBoundingClientRect();
-            if (r.width !== slot.width || r.height !== slot.height) {
+            const [w, h] = snapshotSize(source);
+            if (w !== slot.width || h !== slot.height) {
                 update().catch((err) => console.error(err));
             }
         },

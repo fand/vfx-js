@@ -1049,7 +1049,7 @@ function toInternalUniform(
             return { value: resolveRt(value).getReadTexture() };
         }
         const texture = resolveTexture(value);
-        if (texture.gl !== gl) {
+        if (texture && texture.gl !== gl) {
             throw new Error(
                 "[VFX-JS] This texture belongs to another VFX instance.",
             );

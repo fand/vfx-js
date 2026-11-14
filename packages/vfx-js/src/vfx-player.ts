@@ -1093,6 +1093,7 @@ export class VFXPlayer {
         opts: VFXCaptureOpts,
         stillZIndex: number,
         onDispose?: () => void,
+        signal?: AbortSignal,
     ): Promise<VFXCapture> {
         const entry = await createCapture(
             {
@@ -1110,6 +1111,7 @@ export class VFXPlayer {
                 this.#captures.delete(entry);
                 onDispose?.();
             },
+            signal,
         );
         this.#captures.add(entry);
         return entry.capture;
@@ -1120,6 +1122,11 @@ export class VFXPlayer {
         const texture = new Texture(this.#ctx, source);
         texture.premultiplyAlpha = true;
         return texture;
+    }
+
+    /** Whether `element` is registered with `addElement`. */
+    hasElement(element: HTMLElement): boolean {
+        return this.#elements.some((e) => e.element === element);
     }
 
     /** A transparent texture handle, for captures that render nothing. */

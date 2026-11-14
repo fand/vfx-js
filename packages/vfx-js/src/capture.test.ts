@@ -25,6 +25,11 @@ class FakeElement {
     addEventListener(type: string, fn: () => void) {
         this.listeners[type] = fn;
     }
+    removeEventListener(type: string, fn: () => void) {
+        if (this.listeners[type] === fn) {
+            delete this.listeners[type];
+        }
+    }
 }
 class FakeImage extends FakeElement {
     decode = vi.fn(() => Promise.resolve());
@@ -119,16 +124,68 @@ describe("createCapture: sources", () => {
         expect(capture.rect).toEqual({ x: 1, y: 2, width: 30, height: 40 });
     });
 
-    test("rejects when decode() rejects and restores the opacity", async () => {
+    test("rejects when decode() rejects and leaves the element", async () => {
         const { deps, made } = fakeDeps();
         const img = new FakeImage();
         img.style.opacity = "0.5";
         img.decode.mockRejectedValueOnce(new Error("broken"));
         const pending = createCapture(deps, asElement(img), { hide: true });
-        expect(img.style.opacity).toBe("0");
+        expect(img.style.opacity).toBe("0.5");
         await expect(pending).rejects.toThrow("broken");
         expect(img.style.opacity).toBe("0.5");
         expect(made).toHaveLength(0);
+    });
+
+    test("hides a video only once it has a frame", async () => {
+        const { deps } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 1;
+        const pending = createCapture(deps, asElement(video), { hide: true });
+        await Promise.resolve();
+        expect(video.style.opacity).toBe("");
+        video.listeners.canplay();
+        await pending;
+        expect(video.style.opacity).toBe("0.0001");
+    });
+
+    test("rejects when the video fails to load and leaves it", async () => {
+        const { deps, made } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        const pending = createCapture(deps, asElement(video), { hide: true });
+        video.listeners.error();
+        await expect(pending).rejects.toThrow("could not load the video");
+        expect(video.style.opacity).toBe("");
+        expect(made).toHaveLength(0);
+        expect(Object.keys(video.listeners)).toEqual([]);
+    });
+
+    test("rejects when aborted while waiting for the video", async () => {
+        const { deps } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        const abort = new AbortController();
+        const pending = createCapture(
+            deps,
+            asElement(video),
+            {},
+            undefined,
+            abort.signal,
+        );
+        abort.abort();
+        await expect(pending).rejects.toThrow("aborted");
+        expect(Object.keys(video.listeners)).toEqual([]);
+    });
+
+    test("texture.update() reports a failed update instead of throwing", async () => {
+        const { deps } = fakeDeps();
+        const img = new FakeImage();
+        const { capture } = await createCapture(deps, asElement(img), {});
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        img.decode.mockRejectedValueOnce(new Error("broken"));
+        capture.texture.update();
+        await new Promise((r) => setTimeout(r));
+        expect(error).toHaveBeenCalledWith(new Error("broken"));
     });
 
     test("waits for canplay when the video has no frame yet", async () => {
@@ -422,6 +479,38 @@ describe("createCapture: html-in-canvas", () => {
         capture.dispose();
         expect(hic.dom.unwrapElement).toHaveBeenCalledWith(hic.wrapper, hic.el);
         expect(made[0].dispose).toHaveBeenCalledOnce();
+    });
+
+    test("rejects an element with no height before wrapping", async () => {
+        const hic = fakeHic();
+        hic.el.box = { left: 0, top: 0, width: 100, height: 0 };
+        const { deps } = fakeDeps(hic.dom);
+        await expect(
+            createCapture(deps, asElement(hic.el), {}),
+        ).rejects.toThrow("needs an element with a size");
+        expect(hic.dom.wrapElement).not.toHaveBeenCalled();
+    });
+
+    test("unwraps when aborted while waiting for the first capture", async () => {
+        const hic = fakeHic();
+        hic.dom.wrapElement.mockImplementationOnce(() => {
+            hic.el.parentNode = hic.wrapper;
+            return new Promise(() => {});
+        });
+        const { deps, made } = fakeDeps(hic.dom);
+        const abort = new AbortController();
+        const pending = createCapture(
+            deps,
+            asElement(hic.el),
+            {},
+            undefined,
+            abort.signal,
+        );
+        await Promise.resolve();
+        abort.abort();
+        await expect(pending).rejects.toThrow("aborted");
+        expect(hic.dom.unwrapElement).toHaveBeenCalledWith(hic.wrapper, hic.el);
+        expect(made).toHaveLength(0);
     });
 
     test("rejects an element without a box before wrapping", async () => {
