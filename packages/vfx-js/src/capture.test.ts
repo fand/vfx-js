@@ -78,6 +78,7 @@ function fakeDeps(dom?: Partial<CaptureDom>) {
 }
 
 const asElement = (el: FakeElement) => el as unknown as HTMLElement;
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
     vi.stubGlobal("HTMLImageElement", FakeImage);
@@ -291,6 +292,7 @@ function fakeHic() {
                 }),
         ),
         releaseFirstCapture: vi.fn(),
+        nextFrame: vi.fn(() => Promise.resolve()),
     };
     return {
         el,
@@ -333,6 +335,44 @@ describe("createCapture: html-in-canvas", () => {
             false,
         );
         expect(hic.el.style.opacity).toBe("");
+    });
+
+    test("without hide, waits a frame after releasing the still copy", async () => {
+        const hic = fakeHic();
+        let frame!: () => void;
+        hic.dom.nextFrame.mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve) => {
+                    frame = resolve;
+                }),
+        );
+        const { deps, made } = fakeDeps(hic.dom);
+        let done = false;
+        const pending = createCapture(deps, asElement(hic.el), {}).then(
+            (entry) => {
+                done = true;
+                return entry;
+            },
+        );
+        await flush();
+        expect(hic.dom.releaseFirstCapture).toHaveBeenCalledOnce();
+        expect(hic.dom.nextFrame).toHaveBeenCalledOnce();
+        expect(done).toBe(false);
+
+        // A paint during the wait still reaches the slot.
+        hic.wrapOpts().onCapture(offscreen(140, 60));
+        expect(made).toHaveLength(2);
+
+        frame();
+        const { capture } = await pending;
+        expect(resolveTexture(capture.texture)).toBe(made[1]);
+    });
+
+    test("with hide, does not wait a frame", async () => {
+        const hic = fakeHic();
+        const { deps } = fakeDeps(hic.dom);
+        await createCapture(deps, asElement(hic.el), { hide: true });
+        expect(hic.dom.nextFrame).not.toHaveBeenCalled();
     });
 
     test("a capture goes through refreshTexture and sets the size", async () => {
@@ -544,12 +584,95 @@ describe("createCapture: snapshot", () => {
         expect(resolveTexture(capture.texture)).toBe(made[0]);
     });
 
-    test("runs one snapshot at a time", async () => {
-        const snap = fakeSnapshot();
+    // After setup, each dom2canvas call waits until the test settles it.
+    async function overlapping(snap: ReturnType<typeof fakeSnapshot>) {
         const { deps } = fakeDeps(snap.dom);
-        const { capture } = await createCapture(deps, asElement(snap.el), {});
-        await Promise.all([capture.update(), capture.update()]);
-        expect(snap.dom.dom2canvas).toHaveBeenCalledTimes(2);
+        const entry = await createCapture(deps, asElement(snap.el), {});
+        const runs: { resolve: () => void; reject: (e: Error) => void }[] = [];
+        let inFlight = 0;
+        let maxInFlight = 0;
+        snap.dom.dom2canvas.mockImplementation(
+            (_el, _opacity, old) =>
+                new Promise<OffscreenCanvas>((resolve, reject) => {
+                    inFlight++;
+                    maxInFlight = Math.max(maxInFlight, inFlight);
+                    const done = () => inFlight--;
+                    runs.push({
+                        resolve: () => {
+                            done();
+                            resolve(old ?? offscreen(60, 80));
+                        },
+                        reject: (e) => {
+                            done();
+                            reject(e);
+                        },
+                    });
+                }),
+        );
+        return { ...entry, runs, maxInFlight: () => maxInFlight };
+    }
+
+    test("update() during a snapshot queues one more after it", async () => {
+        const snap = fakeSnapshot();
+        const { capture, runs, maxInFlight } = await overlapping(snap);
+        const settled: string[] = [];
+        const p1 = capture.update().then(() => settled.push("p1"));
+        const p2 = capture.update().then(() => settled.push("p2"));
+        await flush();
+        expect(runs).toHaveLength(1);
+
+        runs[0].resolve();
+        await p1;
+        await flush();
+        expect(runs).toHaveLength(2);
+        expect(settled).toEqual(["p1"]);
+
+        runs[1].resolve();
+        await p2;
+        expect(settled).toEqual(["p1", "p2"]);
+        expect(maxInFlight()).toBe(1);
+    });
+
+    test("overlapping calls share one queued snapshot", async () => {
+        const snap = fakeSnapshot();
+        const { capture, runs } = await overlapping(snap);
+        const p1 = capture.update();
+        const p2 = capture.update();
+        const p3 = capture.update();
+        expect(p3).toBe(p2);
+        await flush();
+        runs[0].resolve();
+        await flush();
+        runs[1].resolve();
+        await Promise.all([p1, p2, p3]);
+        await flush();
+        expect(runs).toHaveLength(2);
+    });
+
+    test("a failed snapshot does not block the queued one", async () => {
+        const snap = fakeSnapshot();
+        const { capture, runs } = await overlapping(snap);
+        const p1 = capture.update();
+        const p2 = capture.update();
+        await flush();
+        runs[0].reject(new Error("first"));
+        await expect(p1).rejects.toThrow("first");
+        await flush();
+        expect(runs).toHaveLength(2);
+        runs[1].resolve();
+        await expect(p2).resolves.toBeUndefined();
+    });
+
+    test("a queued snapshot does not run after dispose", async () => {
+        const snap = fakeSnapshot();
+        const { capture, runs } = await overlapping(snap);
+        capture.update();
+        const p2 = capture.update();
+        await flush();
+        capture.dispose();
+        runs[0].resolve();
+        await expect(p2).resolves.toBeUndefined();
+        expect(runs).toHaveLength(1);
     });
 
     test("resize() snapshots again only when the size changed", async () => {
@@ -566,7 +689,7 @@ describe("createCapture: snapshot", () => {
         snap.el.box = { left: 1, top: 2, width: 31, height: 40 };
         resize();
         expect(snap.dom.dom2canvas).toHaveBeenCalledTimes(2);
-        await capture.update();
+        await flush();
 
         snap.el.box = { left: 1, top: 2, width: 32, height: 40 };
         capture.dispose();

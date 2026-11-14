@@ -18,6 +18,8 @@ export type CaptureDom = {
     requestCapture: typeof requestCapture;
     releaseFirstCapture: typeof releaseFirstCapture;
     dom2canvas: typeof dom2canvas;
+    /** Resolves on the next animation frame. */
+    nextFrame: () => Promise<void>;
 };
 
 const defaultDom: CaptureDom = {
@@ -27,6 +29,7 @@ const defaultDom: CaptureDom = {
     requestCapture,
     releaseFirstCapture,
     dom2canvas,
+    nextFrame: () => new Promise((r) => requestAnimationFrame(() => r())),
 };
 
 /** What the player gives `createCapture`. */
@@ -298,6 +301,11 @@ async function hicDriver(
     setSlotSize(slot, wrapper);
     // With hide, clear the first capture too. Without it, keep it and only drop the still copy.
     dom.releaseFirstCapture(wrapper, !opts.hide);
+    if (!opts.hide) {
+        // releaseFirstCapture drops the still copy in a frame it has already
+        // requested. Wait for it, so no copy with the same ids is left.
+        await dom.nextFrame();
+    }
 
     return {
         box: wrapper,
@@ -338,7 +346,8 @@ async function snapshotDriver(
     }
 
     let disposed = false;
-    let pending: Promise<void> | null = null;
+    let running: Promise<void> | null = null;
+    let queued: Promise<void> | null = null;
     const snapshot = async () => {
         const old = slot.texture.source;
         const canvas = await dom.dom2canvas(
@@ -354,12 +363,25 @@ async function snapshotDriver(
         slot.texture = deps.refreshTexture(slot.texture, canvas);
         setSlotSize(slot, source);
     };
-    const update = () => {
-        // One snapshot at a time, like the player's text elements.
-        pending ??= snapshot().finally(() => {
-            pending = null;
-        });
-        return pending;
+    // One snapshot at a time. A call during a snapshot queues one more,
+    // which every call until it starts shares, so its DOM changes are kept.
+    const update = (): Promise<void> => {
+        if (disposed) {
+            return Promise.resolve();
+        }
+        if (!running) {
+            running = snapshot().finally(() => {
+                running = null;
+            });
+            return running;
+        }
+        queued ??= running
+            .catch(() => {})
+            .then(() => {
+                queued = null;
+                return update();
+            });
+        return queued;
     };
 
     return {
