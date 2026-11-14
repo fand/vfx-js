@@ -162,5 +162,8 @@ Slot size is written wherever the texture is: at setup, in `onCapture` (html-in-
 ## Risks
 
 - **`hide: false` on html-in-canvas shows a canvas drawing, not the live element.** Between a DOM change and the next paint event the drawing can be one frame old, and anything the capture cannot draw (see html-in-canvas.md) is missing. If this is not good enough, `hide: false` needs another approach; check it by hand in a scratch page right after step 1, before building the rest.
-- **`paint` event timing.** The spec's timing rule assumes the paint event runs after `requestAnimationFrame` callbacks. Confirm in Chrome during step 6 and fix the spec text if it differs.
+- **`paint` event timing.** The spec's timing rule assumes the paint event runs after `requestAnimationFrame` callbacks.
+  Confirmed in Chrome 153 (headless, `--enable-blink-features=CanvasDrawElement`): within one frame the order is rAF, then `ResizeObserver`, then `paint`.
+  A style change, a resize or `requestPaint()` made in a rAF callback fires `paint` in the same frame, and the next rAF sees the new pixels.
+  Not checked on Chrome 159+ (`content="drawable"`); check it again in step 6.
 - **Many captures.** Each one is a `getBoundingClientRect()` per frame. The issue's demo did the same by hand, so it is no worse; pausing off-screen captures is listed as a later option.
