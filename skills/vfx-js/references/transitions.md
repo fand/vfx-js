@@ -502,7 +502,7 @@ router.beforeNavigate(() =>
 ## Rules and pitfalls
 
 - Give the target a fixed size (explicit height, or the viewport). Content of a different size does not animate between sizes; the box jumps after the run.
-- Width rules: the target must fill its parent's width or have an inline px width. Put `max-width` or centering on a wrapper, not on the target.
+- With html-in-canvas the target is wrapped in a `<canvas>` during a run, so it must meet the `addHTML` layout requirements (see SKILL.md). Width: fill the parent's width or have a fixed width (from any CSS rule). A `width: auto` target held in by `max-width` is not supported; put that `max-width` on a wrapper.
 - A `display` rule on a slide beats `hidden`. Add `[hidden] { display: none !important }`.
 - `<body>` cannot be the target. Use the router outlet (`<main>`, `#app`).
 - VFX elements inside the target freeze during a run.

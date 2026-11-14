@@ -84,6 +84,7 @@ vfx.add(el, {
 
 - `add(el, props)` → `Promise<void>`. Start rendering an element.
 - `addHTML(el, props)` → render any HTML subtree, with live updates (html-in-canvas, Chrome only, falls back to a slower capture). Check support with `supportsHtmlInCanvas()`.
+  - It wraps the element in a `<canvas>` and copies the element's box onto it once. Layout requirements: the width doesn't depend on the content (fills the parent, a fixed width, or insets); the height comes from the content or the element's own CSS, not a stretching parent; the styles that size or place it don't change while wrapped (media queries, class toggles; `em`/`vw` are fixed at wrap time); its styles don't use parent/sibling combinators, `:nth-child`, or element-type/id selectors for the box. Otherwise put the layout on a plain wrapper and let the element fill it. Call `remove` then `addHTML` again to pick up new styles.
 - `remove(el)`, `update(el)` (re-capture after the content changes), `updateEffects(el, effects)`.
 - Video and GIF update every frame. A `<canvas>` is copied once on `add`; call `update(canvas)` after you draw to it.
 - `addTransition(el, opts)` → `TransitionHandle`. See [references/transitions.md](references/transitions.md).
