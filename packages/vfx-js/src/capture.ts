@@ -1,14 +1,50 @@
+import dom2canvas from "./dom-to-canvas.js";
 import { makeEffectTexture } from "./effect-host.js";
 import type { Texture, TextureSource } from "./gl/texture.js";
+import {
+    releaseFirstCapture,
+    requestCapture,
+    unwrapElement,
+    wrapElement,
+} from "./html-in-canvas.js";
+import { supportsHtmlInCanvas } from "./html-in-canvas-support.js";
 import type { VFXCapture, VFXCaptureOpts, VFXCaptureRect } from "./types.js";
+
+/** The DOM functions the drivers use. Replaced in tests. */
+export type CaptureDom = {
+    supportsHtmlInCanvas: typeof supportsHtmlInCanvas;
+    wrapElement: typeof wrapElement;
+    unwrapElement: typeof unwrapElement;
+    requestCapture: typeof requestCapture;
+    releaseFirstCapture: typeof releaseFirstCapture;
+    dom2canvas: typeof dom2canvas;
+};
+
+const defaultDom: CaptureDom = {
+    supportsHtmlInCanvas,
+    wrapElement,
+    unwrapElement,
+    requestCapture,
+    releaseFirstCapture,
+    dom2canvas,
+};
 
 /** What the player gives `createCapture`. */
 export type CaptureDeps = {
     createTexture(source: TextureSource): Texture;
+    /**
+     * Re-upload `offscreen` into `old`, or return a new texture with the
+     * same settings and dispose `old` when the capture canvas changed.
+     */
+    refreshTexture(old: Texture, offscreen: OffscreenCanvas): Texture;
     /** Native size of a texture's source, in physical px. */
     textureSize(texture: Texture, axis: "w" | "h"): number;
     /** Transparent texture that a disposed handle resolves to. */
     emptyTexture: Texture;
+    maxTextureSize: number;
+    /** z-index of the still copy that covers an html-in-canvas wrap. */
+    stillZIndex: number;
+    dom?: Partial<CaptureDom>;
 };
 
 /** What a source kind has to provide. */
@@ -18,6 +54,8 @@ type CaptureDriver = {
     /** Upload on every frame (video, canvas). */
     readonly everyFrame: boolean;
     update(): Promise<void>;
+    /** Called on a window resize. */
+    resize?(): void;
     dispose(): void;
 };
 
@@ -33,6 +71,8 @@ export type CaptureEntry = {
     readonly capture: VFXCapture;
     /** Called by the player at the start of each rendered frame. */
     tick(): void;
+    /** Called by the player on a window resize. */
+    resize(): void;
 };
 
 type MutableRect = { -readonly [K in keyof VFXCaptureRect]: VFXCaptureRect[K] };
@@ -118,27 +158,62 @@ export async function createCapture(
                 slot.texture.needsUpdate = true;
             }
         },
+        resize() {
+            if (!disposed) {
+                driver.resize?.();
+            }
+        },
     };
 }
 
-async function createDriver(
+function createDriver(
     deps: CaptureDeps,
     source: HTMLElement,
     opts: VFXCaptureOpts,
     slot: CaptureSlot,
 ): Promise<CaptureDriver> {
-    const isVideo = source instanceof HTMLVideoElement;
+    const dom = { ...defaultDom, ...deps.dom };
     if (
-        !(source instanceof HTMLImageElement) &&
-        !isVideo &&
-        !(source instanceof HTMLCanvasElement)
+        source instanceof HTMLImageElement ||
+        source instanceof HTMLVideoElement ||
+        source instanceof HTMLCanvasElement
     ) {
-        // TODO(capture step 3): html-in-canvas and snapshot drivers.
-        throw new Error(
-            "[VFX-JS] capture() supports only img, video and canvas.",
+        return mediaDriver(deps, source, opts, slot);
+    }
+    // drawElementImage throws on an element without a box, and dom2canvas draws nothing.
+    if (source.getClientRects().length === 0) {
+        return Promise.reject(
+            new Error("[VFX-JS] capture() needs an element with a box."),
         );
     }
+    if (dom.supportsHtmlInCanvas()) {
+        return hicDriver(deps, dom, source, opts, slot);
+    }
+    return snapshotDriver(deps, dom, source, opts, slot);
+}
 
+function setSlotTexture(slot: CaptureSlot, texture: Texture): void {
+    texture.premultiplyAlpha = true;
+    texture.wrapS = "clamp";
+    texture.wrapT = "clamp";
+    texture.minFilter = "linear";
+    texture.magFilter = "linear";
+    slot.texture = texture;
+}
+
+function setSlotSize(slot: CaptureSlot, box: Element): void {
+    const r = box.getBoundingClientRect();
+    slot.width = r.width;
+    slot.height = r.height;
+}
+
+async function mediaDriver(
+    deps: CaptureDeps,
+    source: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
+    opts: VFXCaptureOpts,
+    slot: CaptureSlot,
+): Promise<CaptureDriver> {
+    const isVideo = source instanceof HTMLVideoElement;
     const savedOpacity = source.style.opacity;
     const restoreOpacity = () => {
         if (opts.hide) {
@@ -151,19 +226,8 @@ async function createDriver(
     }
 
     const setTexture = () => {
-        const texture = deps.createTexture(source);
-        texture.premultiplyAlpha = true;
-        texture.wrapS = "clamp";
-        texture.wrapT = "clamp";
-        texture.minFilter = "linear";
-        texture.magFilter = "linear";
-        slot.texture = texture;
-        setSlotSize();
-    };
-    const setSlotSize = () => {
-        const r = source.getBoundingClientRect();
-        slot.width = r.width;
-        slot.height = r.height;
+        setSlotTexture(slot, deps.createTexture(source));
+        setSlotSize(slot, source);
     };
 
     try {
@@ -176,7 +240,7 @@ async function createDriver(
                 async update() {
                     await source.decode();
                     slot.texture.needsUpdate = true;
-                    setSlotSize();
+                    setSlotSize(slot, source);
                 },
                 dispose: restoreOpacity,
             };
@@ -199,4 +263,120 @@ async function createDriver(
         restoreOpacity();
         throw err;
     }
+}
+
+async function hicDriver(
+    deps: CaptureDeps,
+    dom: CaptureDom,
+    source: HTMLElement,
+    opts: VFXCaptureOpts,
+    slot: CaptureSlot,
+): Promise<CaptureDriver> {
+    const parent = source.parentNode;
+    let wrapper: HTMLCanvasElement;
+    let initialCapture: OffscreenCanvas;
+    try {
+        ({ canvas: wrapper, initialCapture } = await dom.wrapElement(source, {
+            onCapture: (offscreen) => {
+                slot.texture = deps.refreshTexture(slot.texture, offscreen);
+                setSlotSize(slot, wrapper);
+            },
+            maxSize: deps.maxTextureSize,
+            keepDrawn: !opts.hide,
+            stillCover: opts.hide ? undefined : { zIndex: deps.stillZIndex },
+        }));
+    } catch (err) {
+        // wrapElement has already moved the element when its capture setup fails.
+        const canvas = source.parentNode;
+        if (canvas !== parent && canvas instanceof HTMLCanvasElement) {
+            dom.unwrapElement(canvas, source);
+        }
+        throw err;
+    }
+
+    setSlotTexture(slot, deps.createTexture(initialCapture));
+    setSlotSize(slot, wrapper);
+    // With hide, clear the first capture too. Without it, keep it and only drop the still copy.
+    dom.releaseFirstCapture(wrapper, !opts.hide);
+
+    return {
+        box: wrapper,
+        everyFrame: false,
+        async update() {
+            await dom.requestCapture(wrapper);
+        },
+        dispose() {
+            dom.unwrapElement(wrapper, source);
+        },
+    };
+}
+
+async function snapshotDriver(
+    deps: CaptureDeps,
+    dom: CaptureDom,
+    source: HTMLElement,
+    opts: VFXCaptureOpts,
+    slot: CaptureSlot,
+): Promise<CaptureDriver> {
+    const savedOpacity = source.style.opacity;
+    const originalOpacity =
+        savedOpacity === "" ? 1 : Number.parseFloat(savedOpacity);
+
+    const first = await dom.dom2canvas(
+        source,
+        originalOpacity,
+        undefined,
+        deps.maxTextureSize,
+    );
+    if (first.width === 0 || first.height === 0) {
+        throw new Error("[VFX-JS] capture() got an empty snapshot.");
+    }
+    setSlotTexture(slot, deps.createTexture(first));
+    setSlotSize(slot, source);
+    if (opts.hide) {
+        source.style.setProperty("opacity", "0");
+    }
+
+    let disposed = false;
+    let pending: Promise<void> | null = null;
+    const snapshot = async () => {
+        const old = slot.texture.source;
+        const canvas = await dom.dom2canvas(
+            source,
+            originalOpacity,
+            old instanceof OffscreenCanvas ? old : undefined,
+            deps.maxTextureSize,
+        );
+        // Not laid out (0-size canvas): keep the previous texture.
+        if (disposed || canvas.width === 0 || canvas.height === 0) {
+            return;
+        }
+        slot.texture = deps.refreshTexture(slot.texture, canvas);
+        setSlotSize(slot, source);
+    };
+    const update = () => {
+        // One snapshot at a time, like the player's text elements.
+        pending ??= snapshot().finally(() => {
+            pending = null;
+        });
+        return pending;
+    };
+
+    return {
+        box: source,
+        everyFrame: false,
+        update,
+        resize() {
+            const r = source.getBoundingClientRect();
+            if (r.width !== slot.width || r.height !== slot.height) {
+                update().catch((err) => console.error(err));
+            }
+        },
+        dispose() {
+            disposed = true;
+            if (opts.hide) {
+                source.style.opacity = savedOpacity;
+            }
+        },
+    };
 }
