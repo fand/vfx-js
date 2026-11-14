@@ -195,7 +195,7 @@ Other cases:
 
 ## Out of scope
 
-- Shader-path support (`uniform sampler2D page;` in `shader` / `VFXPass`). Those shaders expect straight alpha; capture textures are premultiplied. Needs its own decision.
+- Shader-path support (`uniform sampler2D page;` in `shader` / `VFXPass`). Element shaders still work in straight alpha; capture textures are premultiplied. It can follow once the shader path is premultiplied too ([#271](https://github.com/fand/vfx-js/issues/271)).
 - `addHTML` built on `capture`, and `addHTML` returning the handle.
 - Options: `maxSize`, `wrap`, `filter`, pause while off screen.
 - A helper that maps `rect` to canvas UV or px.
@@ -209,5 +209,5 @@ These are the points where this spec picks one side. Please check them before th
 1. `rect` is a hybrid: position per frame, size per capture. (The issue said "the rect at the moment of this capture".)
 2. `uniforms` accepts `capture.texture` only, not the `VFXCapture` object.
 3. A second `capture()` of the same element rejects, instead of returning the same handle.
-4. No shader-path support in v1.
+4. ~~No shader-path support in v1.~~ Confirmed. The premultiplied shader path is a separate PR ([#271](https://github.com/fand/vfx-js/issues/271)).
 5. Reduced motion returns an inert handle, instead of `null` or a rejection.
