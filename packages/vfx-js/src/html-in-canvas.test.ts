@@ -372,8 +372,9 @@ describe("wrapElement", () => {
             "max-width": "100%",
         });
         wrap({});
-        expect(canvasStyle().width).toBe("1200px");
-        expect(canvasStyle().maxWidth).toBe("100%");
+        // A border box can't be narrower than its padding and border.
+        expect(canvasStyle().width).toBe("max(1200px, 20px)");
+        expect(canvasStyle().maxWidth).toBe("max(100%, 20px)");
     });
 
     test("keeps the rect width of an inline element", () => {
@@ -431,6 +432,84 @@ describe("wrapElement", () => {
         expect(canvasStyle().right).toBe("0px");
         expect(canvasStyle().bottom).toBe("0px");
         expect(canvasStyle().left).toBe("50%");
+    });
+
+    // Resolved values (getComputedStyle) as the browser gives them.
+    const stubResolved = (values: Record<string, string>) => {
+        vi.stubGlobal("getComputedStyle", () => ({
+            display: "block",
+            width: "10px",
+            ...values,
+            getPropertyValue: (prop: string) => values[prop] ?? "",
+        }));
+    };
+
+    test("keeps px side margins when the canvas width is 100%", () => {
+        stubResolved({ "margin-left": "940px", "margin-right": "0px" });
+        stubComputed({
+            ...plainBox,
+            width: "auto",
+            "margin-top": "auto",
+            "margin-left": "auto",
+            "margin-right": "auto",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("100%");
+        expect(canvasStyle().marginLeft).toBe("940px");
+        expect(canvasStyle().marginRight).toBe("0px");
+        expect(canvasStyle().marginTop).toBe("auto");
+    });
+
+    test("keeps px insets on an axis at its static position", () => {
+        stubResolved({ position: "absolute", left: "54px", top: "30px" });
+        stubComputed({
+            ...plainBox,
+            position: "absolute",
+            width: "100px",
+            top: "auto",
+            bottom: "auto",
+            left: "auto",
+            right: "auto",
+        });
+        wrap({});
+        expect(canvasStyle().left).toBe("54px");
+        expect(canvasStyle().top).toBe("30px");
+    });
+
+    test("keeps auto on the other axis when one axis has an inset", () => {
+        stubResolved({ position: "absolute", left: "54px", top: "30px" });
+        stubComputed({
+            ...plainBox,
+            position: "absolute",
+            width: "100px",
+            top: "auto",
+            bottom: "0px",
+            left: "auto",
+            right: "auto",
+        });
+        wrap({});
+        expect(canvasStyle().top).toBe("auto");
+        expect(canvasStyle().bottom).toBe("0px");
+        expect(canvasStyle().left).toBe("54px");
+    });
+
+    test("keeps the used width of a table", () => {
+        stubResolved({ width: "300px", boxSizing: "content-box" });
+        stubComputed({ ...plainBox, display: "table", width: "100px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("300px");
+    });
+
+    test("keeps the used width with a keyword min-width", () => {
+        stubResolved({ width: "300px", boxSizing: "content-box" });
+        stubComputed({
+            ...plainBox,
+            width: "100px",
+            "min-width": "min-content",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("300px");
+        expect(canvasStyle().minWidth).toBe("auto");
     });
 
     test("falls back to resolved margins without computedStyleMap", () => {

@@ -171,11 +171,15 @@ Canvas is a **replaced element**. It does NOT auto-fit height to children, even 
 
 **Width**: Set per the [Sizing policy](#sizing-policy) — `width: 100%` for full-width targets (tracks parent resizes), or the element's own width for elements with an explicit length width. The width is read from the computed style, so a width set by a class or `#id` rule counts too.
 
-- The canvas has no padding or border, so for a `content-box` element the padding and border widths are added: `calc(600px + 20px + 20px)`. `min-width` and `max-width` get the same treatment.
+- The canvas has no padding or border, so for a `content-box` element the padding and border widths are added: `calc(600px + 20px + 20px)`. For a `border-box` element they are a floor, since a border box can't be narrower than them: `max(100px, 160px)`. `min-width` and `max-width` get the same treatment.
+- A `display: table` element, or one whose `min-width`/`max-width` is a keyword such as `min-content`, keeps its used width at wrap time instead. A table grows to fit its content, and the keywords can't go in `calc()` and mean something else on a canvas.
 - `max-width: 100%` stays a percentage. The canvas sits in the element's containing block, so `width: 1200px; max-width: 100%` keeps tracking the parent.
 - Computed values are used instead of `getBoundingClientRect()`, which a transformed ancestor scales.
 - A length in `em` or `vw` computes to px, so it is fixed at wrap time and does not follow later resizes.
-- Margins and insets (`top`/`right`/`bottom`/`left`) are copied as computed values too, so `auto` and `%` stay as they are. `margin: 0 auto`, `left: 50%` and `right: 0` keep tracking the containing block after a resize. `getComputedStyle` would resolve them to px at wrap time, and a px `top` on a `bottom: 0` element would also make the canvas grow downward when the content gets taller.
+- Margins and insets (`top`/`right`/`bottom`/`left`) are copied as computed values too, so `auto` and `%` stay as they are. `margin: 0 auto`, `left: 50%` and `right: 0` keep tracking the containing block after a resize. `getComputedStyle` would resolve them to px at wrap time, and a px `top` on a `bottom: 0` element would also make the canvas grow downward when the content gets taller. Two exceptions keep the px from wrap time:
+  - Left and right margins when the canvas width is `100%`. Auto margins against `100%` resolve to 0, which would stretch a flex item placed with `margin-left: auto` or `margin: auto`.
+  - Both insets on an axis where they are `auto` on an absolute/fixed element. It sits at its static position, and the canvas, being a block, can have a different one (an inline-level element sits after the text before it).
+- `lockCanvasSize` pins the width and height to the used size during a transition, and also sets `flex-grow`/`flex-shrink` to 0 and `min-width`/`max-width` to that width. Otherwise the locked width would become the flex base, and a flex item shrunk from it would shrink again.
 - Border widths come from `getComputedStyle`: the computed style map gives `medium` (3px) for a border whose style is `none`.
 
 **Height**: A child ResizeObserver watches the wrapped element and sets the canvas CSS height to match `borderBoxSize.blockSize`. This triggers the canvas ResizeObserver, which syncs the pixel buffer and calls `requestPaint`.
