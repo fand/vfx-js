@@ -960,8 +960,7 @@ export type EffectContext = {
      * themselves, so don't rely on their values in raw uploads.)
      *
      * If you change any of this, call {@link EffectContext.resetState}
-     * before the next `ctx.draw()` / `ctx.blit()` / `ctx.clear()`, or
-     * wrap the raw calls in {@link EffectContext.rawGL}.
+     * before the next `ctx.draw()` / `ctx.blit()` / `ctx.clear()`.
      */
     readonly gl: WebGL2RenderingContext;
 
@@ -1003,21 +1002,6 @@ export type EffectContext = {
      * ```
      */
     resetState(): void;
-
-    /**
-     * Run `fn` with the raw WebGL2 context, then call
-     * {@link EffectContext.resetState}, even if `fn` throws.
-     * Returns what `fn` returns.
-     *
-     * @example
-     * ```ts
-     * ctx.rawGL((gl) => {
-     *     gl.enable(gl.DEPTH_TEST);
-     *     // ... custom drawing ...
-     * }); // the GL state is back to the baseline here
-     * ```
-     */
-    rawGL<T>(fn: (gl: WebGL2RenderingContext) => T): T;
 
     /**
      * Subscribe to `webglcontextrestored` to rebuild resources allocated

@@ -1257,7 +1257,7 @@ describe("EffectHost.dispose", () => {
 });
 
 // ---------------------------------------------------------------------------
-// resetState / rawGL
+// resetState
 // ---------------------------------------------------------------------------
 
 describe("EffectHost.resetState", () => {
@@ -1380,26 +1380,5 @@ describe("EffectHost.resetState", () => {
         host.ctx.resetState();
         expect(gl.bindFramebuffer).not.toHaveBeenCalled();
         expect(gl.disable).not.toHaveBeenCalled();
-    });
-
-    it("rawGL passes gl, returns fn's value, then resets", () => {
-        const { host, gl } = makeResetHost();
-        const ret = host.ctx.rawGL((g) => {
-            expect(g).toBe(gl);
-            expect(gl.useProgram).not.toHaveBeenCalled();
-            return 42;
-        });
-        expect(ret).toBe(42);
-        expect(gl.useProgram).toHaveBeenCalledWith(null);
-    });
-
-    it("rawGL resets even if fn throws", () => {
-        const { host, gl } = makeResetHost();
-        expect(() =>
-            host.ctx.rawGL(() => {
-                throw new Error("boom");
-            }),
-        ).toThrow("boom");
-        expect(gl.disable).toHaveBeenCalledWith("DEPTH_TEST");
     });
 });

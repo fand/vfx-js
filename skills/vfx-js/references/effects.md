@@ -143,7 +143,6 @@ Always declare `#version 300 es` in `ctx.draw` shaders.
 | `clear(target?)` | Clear a render target. |
 | `gl` | Raw `WebGL2RenderingContext`. |
 | `resetState()` | Restore the GL state VFX-JS assumes after raw `ctx.gl` calls. Write-only, no queries. |
-| `rawGL(fn)` | Run `fn(gl)`, then `resetState()` (even if `fn` throws). Returns `fn`'s value. |
 
 ### Two passes
 
@@ -196,5 +195,5 @@ Return `dims.canvasRect` to cover the whole canvas.
 - One instance per element. Use a factory: `const make = () => new MyEffect()`.
 - `shader` and `effect` are mutually exclusive.
 - Free anything you allocate with raw `ctx.gl` in `dispose`, and rebuild it in `ctx.onContextRestored(cb)`.
-- After drawing with raw `ctx.gl` (depth test, culling, own framebuffers, pixel store), call `ctx.resetState()` before the next `ctx.draw` / `ctx.blit` / `ctx.clear`, or wrap the raw calls in `ctx.rawGL((gl) => { ... })`.
+- After drawing with raw `ctx.gl` (depth test, culling, own framebuffers, pixel store), call `ctx.resetState()` before the next `ctx.draw` / `ctx.blit` / `ctx.clear`.
 - Use `ctx.dims` for pixel sizes. Don't read DOM sizes in `render`.

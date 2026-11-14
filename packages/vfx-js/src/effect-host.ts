@@ -331,13 +331,6 @@ export class EffectHost {
             blit: (source, target, opts) => this.#blit(source, target, opts),
             clear: (target) => this.#clear(target),
             resetState: () => this.#resetState(),
-            rawGL: (fn) => {
-                try {
-                    return fn(this.#gl);
-                } finally {
-                    this.#resetState();
-                }
-            },
             onContextRestored: (cb) => {
                 const unsub = this.#glCtx.onContextRestored(cb);
                 this.#restoredUnsubs.push(unsub);
