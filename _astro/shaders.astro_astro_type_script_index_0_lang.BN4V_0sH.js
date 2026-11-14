@@ -1,4 +1,4 @@
-import{n as e,t}from"./lifecycle.v3sQOfPt.js";import{t as n}from"./lazy.D1Bm5Zq-.js";var r=`
+import{n as e,t}from"./lifecycle.v3sQOfPt.js";import{t as n}from"./lazy.mCYleO_1.js";var r=`
 precision highp float;
 uniform sampler2D src;
 uniform vec2 resolution;

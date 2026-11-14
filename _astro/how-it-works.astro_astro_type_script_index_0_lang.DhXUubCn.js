@@ -1,4 +1,4 @@
-import{t as e}from"./lifecycle.v3sQOfPt.js";import{t}from"./page-vfx.BmXFWMzi.js";import{t as n}from"./lazy.D1Bm5Zq-.js";var r=`
+import{t as e}from"./lifecycle.v3sQOfPt.js";import{t}from"./page-vfx.P77-y5nw.js";import{t as n}from"./lazy.mCYleO_1.js";var r=`
 precision highp float;
 uniform sampler2D src;
 uniform vec2 resolution;

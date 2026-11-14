@@ -1,4 +1,4 @@
-import{c as e}from"./vfx.Dg2tGaef.js";import{a as t,d as n,f as r,i,n as a,o,r as s,s as c,t as l,u}from"./pixelate.B388fLGj.js";import{n as d,t as f}from"./lifecycle.v3sQOfPt.js";import{n as p,r as m,t as h}from"./background.DJ8KXuuv.js";import{t as g}from"./page-vfx.BmXFWMzi.js";import{t as _}from"./lazy.D1Bm5Zq-.js";function v(e=``){return`${`/vfx-js/`.replace(/\/$/,``)}/${e}`}var y=`
+import{c as e}from"./vfx.Dg2tGaef.js";import{a as t,d as n,f as r,i,n as a,o,r as s,s as c,t as l,u}from"./pixelate.B388fLGj.js";import{n as d,t as f}from"./lifecycle.v3sQOfPt.js";import{n as p,r as m,t as h}from"./background.DJ8KXuuv.js";import{t as g}from"./page-vfx.P77-y5nw.js";import{t as _}from"./lazy.mCYleO_1.js";function v(e=``){return`${`/vfx-js/`.replace(/\/$/,``)}/${e}`}var y=`
 precision highp float;
 uniform sampler2D src;
 uniform vec2 resolution;
