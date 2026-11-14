@@ -151,6 +151,7 @@ describe("wrapElement", () => {
         vi.stubGlobal("window", { devicePixelRatio: 1 });
         vi.stubGlobal("getComputedStyle", () => ({
             display: "block",
+            width: "10px",
             getPropertyValue: () => "",
         }));
         inserted = [];
@@ -275,9 +276,21 @@ describe("wrapElement", () => {
         );
     });
 
+    // A content-box element without padding or border.
+    const plainBox = {
+        position: "static",
+        "box-sizing": "content-box",
+        "padding-left": "0px",
+        "padding-right": "0px",
+        "border-left-width": "0px",
+        "border-right-width": "0px",
+        "max-width": "none",
+    };
+
     test("keeps a replaced element at its own size", () => {
         element.tagName = "IMG";
         stubComputed({
+            ...plainBox,
             position: "absolute",
             top: "0px",
             right: "0px",
@@ -299,33 +312,90 @@ describe("wrapElement", () => {
     });
 
     // #264: a width from a stylesheet rule, not the style attribute.
-    test("pins a px width that comes from a stylesheet", () => {
-        stubComputed({ position: "static", width: "600px" });
+    test("keeps a px width that comes from a stylesheet", () => {
+        stubComputed({ ...plainBox, width: "600px" });
         wrap({});
-        expect(canvasStyle().width).toBe("10px");
+        expect(canvasStyle().width).toBe("600px");
+        expect(canvasStyle().minWidth).toBe("auto");
+        expect(canvasStyle().maxWidth).toBe("none");
         expect(element.style.width).toBe("100%");
     });
 
-    test("pins a px width from the style attribute", () => {
+    test("keeps a px width from the style attribute", () => {
         element.style.width = "600px";
-        stubComputed({ position: "static", width: "600px" });
+        stubComputed({ ...plainBox, width: "600px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("600px");
+    });
+
+    // The rect is scaled by a transformed ancestor; computed values aren't.
+    test("takes the width from computed values, not the rect", () => {
+        element.getBoundingClientRect = () => ({
+            left: 0,
+            top: 0,
+            width: 300,
+            height: 10,
+        });
+        stubComputed({ ...plainBox, width: "600px" });
+        wrap({});
+        expect(canvasStyle().width).toBe("600px");
+    });
+
+    test("adds padding and border to a content-box width", () => {
+        vi.stubGlobal("getComputedStyle", () => ({
+            display: "block",
+            width: "10px",
+            getPropertyValue: (prop: string) =>
+                prop === "border-left-width" ? "1px" : "0px",
+        }));
+        stubComputed({
+            ...plainBox,
+            width: "600px",
+            "padding-left": "20px",
+            "padding-right": "5%",
+            "min-width": "100px",
+            "max-width": "100%",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("calc(600px + 20px + 5% + 1px)");
+        expect(canvasStyle().minWidth).toBe("calc(100px + 20px + 5% + 1px)");
+        expect(canvasStyle().maxWidth).toBe("calc(100% + 20px + 5% + 1px)");
+    });
+
+    // `width: 1200px; max-width: 100%` keeps tracking the parent.
+    test("copies min/max-width of a border-box element as is", () => {
+        stubComputed({
+            ...plainBox,
+            "box-sizing": "border-box",
+            "padding-left": "20px",
+            width: "1200px",
+            "max-width": "100%",
+        });
+        wrap({});
+        expect(canvasStyle().width).toBe("1200px");
+        expect(canvasStyle().maxWidth).toBe("100%");
+    });
+
+    test("keeps the rect width of an inline element", () => {
+        stubComputed({ ...plainBox, display: "inline", width: "600px" });
         wrap({});
         expect(canvasStyle().width).toBe("10px");
     });
 
     test("keeps 100% for an auto width", () => {
-        stubComputed({ position: "static", width: "auto" });
+        stubComputed({ ...plainBox, width: "auto" });
         wrap({});
         expect(canvasStyle().width).toBe("100%");
+        expect(canvasStyle().maxWidth).toBeFalsy();
     });
 
     test("keeps 100% for a percent or calc width", () => {
-        stubComputed({ position: "static", width: "50%" });
+        stubComputed({ ...plainBox, width: "50%" });
         wrap({});
         expect(canvasStyle().width).toBe("100%");
 
         inserted = [];
-        stubComputed({ position: "static", width: "calc(100% - 20px)" });
+        stubComputed({ ...plainBox, width: "calc(100% - 20px)" });
         wrap({});
         expect(canvasStyle().width).toBe("100%");
     });

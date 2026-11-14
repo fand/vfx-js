@@ -51,7 +51,7 @@ The canvas's content-box must equal the wrapped element's border-box. Since the 
 | Element width | Canvas width | Responsive? |
 | --- | --- | --- |
 | Fills its containing block (`width: auto` block, or `width: 100%`) | `100%` | ✅ tracks parent |
-| Explicit length width (`width: 400px`, from the style attribute or any CSS rule; `em`/`vw` too) | pinned `rect.width` | constant (reflow-safe) |
+| Explicit length width (`width: 400px`, from the style attribute or any CSS rule; `em`/`vw` too) | the same width as a border box, plus its `min-width`/`max-width` | constant, except a `%` `max-width`/`min-width` tracks the parent |
 | Sized by insets (`position: fixed`/`absolute`, `inset: 10px`, `auto` width/height) | `calc(100% - <insets> - <margins>)`, height too | ✅ tracks containing block |
 | **Content-sized** (`inline`/`inline-block`, `float`, `fit-content`, binding `max-width`, or width + centering margins) | — | ❌ **unsupported** |
 
@@ -160,7 +160,13 @@ Canvas is a **replaced element**. It does NOT auto-fit height to children, even 
 
 #### Current approach
 
-**Width**: Set per the [Sizing policy](#sizing-policy) — `width: 100%` for full-width targets (tracks parent resizes), or a pinned `rect.width` for elements with an explicit length width. The width is read from the computed style, so a width set by a class or `#id` rule counts too. A length in `em` or `vw` is pinned at wrap time and does not follow later resizes.
+**Width**: Set per the [Sizing policy](#sizing-policy) — `width: 100%` for full-width targets (tracks parent resizes), or the element's own width for elements with an explicit length width. The width is read from the computed style, so a width set by a class or `#id` rule counts too.
+
+- The canvas has no padding or border, so for a `content-box` element the padding and border widths are added: `calc(600px + 20px + 20px)`. `min-width` and `max-width` get the same treatment.
+- `max-width: 100%` stays a percentage. The canvas sits in the element's containing block, so `width: 1200px; max-width: 100%` keeps tracking the parent.
+- Computed values are used instead of `getBoundingClientRect()`, which a transformed ancestor scales.
+- A length in `em` or `vw` computes to px, so it is fixed at wrap time and does not follow later resizes.
+- Border widths come from `getComputedStyle`: the computed style map gives `medium` (3px) for a border whose style is `none`.
 
 **Height**: A child ResizeObserver watches the wrapped element and sets the canvas CSS height to match `borderBoxSize.blockSize`. This triggers the canvas ResizeObserver, which syncs the pixel buffer and calls `requestPaint`.
 
