@@ -50,7 +50,7 @@
     <body class="DocPage">
         <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
 
-<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.BAsEGkx_.js"></script>
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.Cc6QlKYK.js"></script>
         <header class="SiteHeader">
     <a class="SiteHeaderBrand" href="/vfx-js/">
         <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
@@ -89,7 +89,7 @@
 <script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
 
         <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
-        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.Dph4dJoz.js"></script>
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.CojHIjtD.js"></script>
         <!-- Back plays the slit scan reversed. -->
         <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
     
@@ -366,8 +366,14 @@
             </li>
             <li data-astro-cid-ikooipj4>
                 <code data-astro-cid-ikooipj4>addHTML</code> wraps the element in a
-                <code data-astro-cid-ikooipj4>&lt;canvas&gt;</code>. The element must fill its parent's
-                width or have a fixed px width.
+                <code data-astro-cid-ikooipj4>&lt;canvas&gt;</code> and copies its box onto it once. The
+                element's width must not depend on its content: it fills its
+                parent or has a fixed width. Its height must come from its
+                content or its own CSS, not from a stretching parent. The styles
+                that size or place it must not change while it is wrapped, and
+                its styles must not depend on its parent or element type. If an
+                element can't meet these, put the layout on a plain wrapper and
+                let the element fill it.
             </li>
             <li data-astro-cid-ikooipj4>
                 Images and videos from another origin need CORS, or WebGL cannot
@@ -788,7 +794,7 @@
         
 </div>
 
-<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DW4vw8uc.js"></script>
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DrI4GXe2.js"></script>
 
         <div id="Frame"><div id="FrameBottom"></div></div>
         
@@ -796,4 +802,4 @@
     </body>
 </html>
 
-<script type="module" src="/vfx-js/_astro/how-it-works.astro_astro_type_script_index_0_lang.DhXUubCn.js"></script>
+<script type="module" src="/vfx-js/_astro/how-it-works.astro_astro_type_script_index_0_lang.OjknqKJx.js"></script>

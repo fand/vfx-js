@@ -1,0 +1,1 @@
+import{r as e}from"./client.C9D1CcSv.js";import{t}from"./transition.BPTycQdj.js";t({swapFunctions:e});
