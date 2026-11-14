@@ -75,7 +75,8 @@ export type VFXPass = {
 
     /**
      * Uniform values to be passed to this pass's shader.
-     * Works the same way as element uniforms.
+     * Works the same way as element uniforms. Texture values are ignored
+     * here, since passes are on the shader path.
      */
     uniforms?: VFXUniforms;
 
@@ -293,6 +294,8 @@ export type VFXProps = {
      * ```
      *
      * Supported uniform types are defined as {@link VFXUniformValue}.
+     * A texture (e.g. `capture.texture`) works with `effect` only; the
+     * effect reads it from `ctx.uniforms`.
      */
     uniforms?: VFXUniforms;
 
@@ -429,6 +432,10 @@ export type VFXUniforms = {
  * Scalars/tuples map to GLSL `float`/`vec2`/`vec3`/`vec4`. Flat numeric
  * arrays (e.g. `Float32Array`) map to array uniforms — a `Float32Array`
  * of length `N*4` feeds `uniform vec4 foo[N]` (or `uniform float foo[N*4]`).
+ *
+ * An {@link EffectTexture} (e.g. `capture.texture` from `VFX.capture`) is
+ * passed to the effect as `ctx.uniforms[name]`. It works with `effect`
+ * only: with `shader`, it is ignored with a warning.
  */
 export type VFXUniformValue =
     | number // float
@@ -438,7 +445,8 @@ export type VFXUniformValue =
     | number[]
     | Float32Array
     | Int32Array
-    | Uint32Array;
+    | Uint32Array
+    | EffectTexture;
 
 /**
  * @internal
@@ -537,7 +545,8 @@ export type VFXPostEffect = {
 
     /**
      * Custom uniform values to be passed to the post effect shader.
-     * Works the same way as element uniforms.
+     * Works the same way as element uniforms, including that a texture
+     * (e.g. `capture.texture`) works with `effect` only.
      */
     uniforms?: VFXUniforms;
 

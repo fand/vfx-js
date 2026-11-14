@@ -41,6 +41,7 @@ import {
     toRect,
 } from "./rect.js";
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
+import { createShaderUniformFilter } from "./shader-uniform.js";
 import type {
     Effect,
     EffectTexture,
@@ -185,6 +186,8 @@ export class VFXPlayer {
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
     #captures = new Set<CaptureEntry>();
+    // Drops texture uniforms on the shader path, with one warning.
+    #shaderUniform = createShaderUniformFilter();
     /** What a disposed capture samples: transparent 1×1. */
     #emptyTexture: Texture;
 
@@ -521,10 +524,12 @@ export class VFXPlayer {
         if (opts.uniforms !== undefined) {
             for (const [key, value] of Object.entries(opts.uniforms)) {
                 if (typeof value === "function") {
-                    sharedUniforms[key] = { value: value() };
+                    sharedUniforms[key] = {
+                        value: this.#shaderUniform(value()),
+                    };
                     sharedUniformGenerators[key] = value;
                 } else {
-                    sharedUniforms[key] = { value };
+                    sharedUniforms[key] = { value: this.#shaderUniform(value) };
                 }
             }
         }
@@ -633,10 +638,14 @@ export class VFXPlayer {
             if (p.uniforms) {
                 for (const [key, value] of Object.entries(p.uniforms)) {
                     if (typeof value === "function") {
-                        passUniforms[key] = { value: value() };
+                        passUniforms[key] = {
+                            value: this.#shaderUniform(value()),
+                        };
                         passUniformGenerators[key] = value;
                     } else {
-                        passUniforms[key] = { value };
+                        passUniforms[key] = {
+                            value: this.#shaderUniform(value),
+                        };
                     }
                 }
             }
@@ -838,10 +847,10 @@ export class VFXPlayer {
         if (opts.uniforms) {
             for (const [k, v] of Object.entries(opts.uniforms)) {
                 if (typeof v === "function") {
-                    gens[k] = v as () => EffectUniformValue;
-                    staticUniforms[k] = v() as EffectUniformValue;
+                    gens[k] = v;
+                    staticUniforms[k] = v();
                 } else {
-                    staticUniforms[k] = v as EffectUniformValue;
+                    staticUniforms[k] = v;
                 }
             }
         }
@@ -1295,7 +1304,7 @@ export class VFXPlayer {
                 for (const [key, gen] of Object.entries(
                     pass.uniformGenerators,
                 )) {
-                    pass.uniforms[key].value = gen();
+                    pass.uniforms[key].value = this.#shaderUniform(gen());
                 }
             }
 
@@ -1384,7 +1393,7 @@ export class VFXPlayer {
                     pass.uniformGenerators,
                 )) {
                     if (pass.uniforms[key]) {
-                        pass.uniforms[key].value = gen();
+                        pass.uniforms[key].value = this.#shaderUniform(gen());
                     }
                 }
 
@@ -1471,7 +1480,7 @@ export class VFXPlayer {
                 finalPass.uniformGenerators,
             )) {
                 if (finalPass.uniforms[key]) {
-                    finalPass.uniforms[key].value = gen();
+                    finalPass.uniforms[key].value = this.#shaderUniform(gen());
                 }
             }
 
@@ -1604,7 +1613,7 @@ export class VFXPlayer {
         };
         if (e.effectUniformGenerators) {
             for (const [k, gen] of Object.entries(e.effectUniformGenerators)) {
-                resolvedUniforms[k] = gen() as EffectUniformValue;
+                resolvedUniforms[k] = gen();
             }
         }
 
@@ -1879,6 +1888,7 @@ export class VFXPlayer {
                     pe.size,
                     pe.target !== undefined,
                     pe.glslVersion,
+                    this.#shaderUniform,
                 );
                 target = pe.target;
             } else {
@@ -1897,6 +1907,7 @@ export class VFXPlayer {
                     undefined,
                     false,
                     pe.glslVersion,
+                    this.#shaderUniform,
                 );
                 if (pe.persistent) {
                     pass.registerBufferUniform("backbuffer");
@@ -1994,13 +2005,10 @@ export class VFXPlayer {
         if (pe.uniforms) {
             for (const [k, v] of Object.entries(pe.uniforms)) {
                 if (typeof v === "function") {
-                    this.#postEffectChainGenerators[k] =
-                        v as () => EffectUniformValue;
-                    this.#postEffectChainStaticUniforms[k] =
-                        v() as EffectUniformValue;
+                    this.#postEffectChainGenerators[k] = v;
+                    this.#postEffectChainStaticUniforms[k] = v();
                 } else {
-                    this.#postEffectChainStaticUniforms[k] =
-                        v as EffectUniformValue;
+                    this.#postEffectChainStaticUniforms[k] = v;
                 }
             }
         }

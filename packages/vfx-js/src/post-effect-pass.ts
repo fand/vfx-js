@@ -6,6 +6,7 @@ import type { Texture } from "./gl/texture.js";
 import { Vec2, Vec4 } from "./gl/vec.js";
 import type { GLRect } from "./gl-rect.js";
 import { createPassMaterial } from "./render-target.js";
+import type { ShaderUniformValue } from "./shader-uniform.js";
 import type { VFXUniforms, VFXUniformValue } from "./types.js";
 
 /**
@@ -17,6 +18,7 @@ export class PostEffectPass {
     pass: Pass;
     #uniforms: Uniforms;
     #uniformGenerators: { [name: string]: () => VFXUniformValue };
+    #toShaderValue: (value: VFXUniformValue) => ShaderUniformValue | null;
     #backbuffer?: Backbuffer;
     #persistent: boolean;
     #float: boolean;
@@ -25,13 +27,15 @@ export class PostEffectPass {
     constructor(
         ctx: GLContext,
         fragmentShader: string,
-        uniforms?: VFXUniforms,
-        persistent?: boolean,
-        float?: boolean,
-        size?: [number, number],
-        hasBufferTarget?: boolean,
-        glslVersion?: GlslVersion,
+        uniforms: VFXUniforms | undefined,
+        persistent: boolean | undefined,
+        float: boolean | undefined,
+        size: [number, number] | undefined,
+        hasBufferTarget: boolean | undefined,
+        glslVersion: GlslVersion | undefined,
+        toShaderValue: (value: VFXUniformValue) => ShaderUniformValue | null,
     ) {
+        this.#toShaderValue = toShaderValue;
         this.#persistent = persistent ?? false;
         this.#float = float ?? false;
         this.#size = size;
@@ -50,9 +54,9 @@ export class PostEffectPass {
             for (const [key, value] of Object.entries(uniforms)) {
                 if (typeof value === "function") {
                     this.#uniformGenerators[key] = value;
-                    this.#uniforms[key] = { value: value() };
+                    this.#uniforms[key] = { value: toShaderValue(value()) };
                 } else {
-                    this.#uniforms[key] = { value };
+                    this.#uniforms[key] = { value: toShaderValue(value) };
                 }
             }
         }
@@ -101,13 +105,15 @@ export class PostEffectPass {
             this.#uniformGenerators,
         )) {
             if (this.#uniforms[key]) {
-                this.#uniforms[key].value = generator();
+                this.#uniforms[key].value = this.#toShaderValue(generator());
             }
         }
         if (uniformGenerators) {
             for (const [key, generator] of Object.entries(uniformGenerators)) {
                 if (this.#uniforms[key]) {
-                    this.#uniforms[key].value = generator();
+                    this.#uniforms[key].value = this.#toShaderValue(
+                        generator(),
+                    );
                 }
             }
         }
