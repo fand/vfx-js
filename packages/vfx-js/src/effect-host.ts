@@ -262,6 +262,7 @@ export class EffectHost {
     #restoredUnsubs: (() => void)[] = [];
     #phase: Phase = "init";
     #warnedDrawInUpdate = false;
+    #textureUnitCount: number | undefined;
     #dims: HostFrameDims;
 
     /**
@@ -329,6 +330,7 @@ export class EffectHost {
             draw: (opts) => this.#draw(opts),
             blit: (source, target, opts) => this.#blit(source, target, opts),
             clear: (target) => this.#clear(target),
+            resetState: () => this.#resetState(),
             onContextRestored: (cb) => {
                 const unsub = this.#glCtx.onContextRestored(cb);
                 this.#restoredUnsubs.push(unsub);
@@ -776,6 +778,92 @@ export class EffectHost {
             resolver.swap();
         }
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
+    /**
+     * Write the GL baseline the pipeline assumes (see
+     * `EffectContext.resetState`). Write-only: no `getParameter` per
+     * call. VFX-JS keeps no GL state cache, so there is nothing else to
+     * invalidate.
+     */
+    #resetState(): void {
+        if (this.#phase === "disposed" || this.#glCtx.isContextLost) {
+            return;
+        }
+        const gl = this.#gl;
+
+        // Framebuffer + viewport.
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.drawBuffers([gl.BACK]);
+        gl.readBuffer(gl.BACK);
+        gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+
+        // Capabilities.
+        gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.CULL_FACE);
+        gl.disable(gl.STENCIL_TEST);
+        gl.disable(gl.SCISSOR_TEST);
+        gl.disable(gl.BLEND);
+        gl.disable(gl.POLYGON_OFFSET_FILL);
+        gl.disable(gl.RASTERIZER_DISCARD);
+        gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
+        gl.disable(gl.SAMPLE_COVERAGE);
+
+        // Masks and fixed-function settings. The player's per-frame
+        // clears rely on clearColor without setting it.
+        gl.depthMask(true);
+        gl.clearColor(0, 0, 0, 0);
+        gl.depthFunc(gl.LESS);
+        gl.colorMask(true, true, true, true);
+        gl.stencilMask(0xffffffff);
+        gl.frontFace(gl.CCW);
+        gl.cullFace(gl.BACK);
+
+        // Program, VAO and buffer bindings.
+        gl.useProgram(null);
+        gl.bindVertexArray(null);
+        gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
+        gl.bindBuffer(gl.UNIFORM_BUFFER, null);
+        gl.bindBuffer(gl.COPY_READ_BUFFER, null);
+        gl.bindBuffer(gl.COPY_WRITE_BUFFER, null);
+
+        // Samplers override texture params, so unbind them on every unit.
+        const units = this.#getTextureUnitCount();
+        for (let i = 0; i < units; i++) {
+            gl.bindSampler(i, null);
+        }
+        gl.activeTexture(gl.TEXTURE0);
+
+        // Pixel store (WebGL defaults).
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.pixelStorei(
+            gl.UNPACK_COLORSPACE_CONVERSION_WEBGL,
+            gl.BROWSER_DEFAULT_WEBGL,
+        );
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+        gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
+        gl.pixelStorei(gl.UNPACK_IMAGE_HEIGHT, 0);
+        gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0);
+        gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
+        gl.pixelStorei(gl.UNPACK_SKIP_IMAGES, 0);
+        gl.pixelStorei(gl.PACK_ALIGNMENT, 4);
+        gl.pixelStorei(gl.PACK_ROW_LENGTH, 0);
+        gl.pixelStorei(gl.PACK_SKIP_PIXELS, 0);
+        gl.pixelStorei(gl.PACK_SKIP_ROWS, 0);
+    }
+
+    /** `MAX_COMBINED_TEXTURE_IMAGE_UNITS`, queried once. */
+    #getTextureUnitCount(): number {
+        if (this.#textureUnitCount === undefined) {
+            const gl = this.#gl;
+            const n = gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
+            this.#textureUnitCount = typeof n === "number" && n > 0 ? n : 16;
+        }
+        return this.#textureUnitCount;
     }
 
     #doDraw(opts: EffectDrawOpts): void {

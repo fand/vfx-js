@@ -189,6 +189,103 @@ export const CanvasSizeWithPadding: StoryObj = {
     },
 };
 
+/**
+ * The wrapper canvas copies the target's box from its computed style (#264).
+ * Each gradient box (addHTML) should cover the dashed reference above it,
+ * which has the same CSS. Resize the window: the boxes should keep matching.
+ */
+const cssSizeCases = [
+    {
+        key: "class",
+        label: "Width from a class (.slides { width: 600px; margin: 0 40px })",
+        css: ".hic-css-class { width: 600px; margin: 0 40px; }",
+    },
+    {
+        key: "id",
+        label: "Width from an #id rule (480px)",
+        css: "#hic-css-id-ref, #hic-css-id-target { width: 480px; }",
+    },
+    {
+        key: "center",
+        label: "Centered with margin: 0 auto (480px)",
+        css: ".hic-css-center { width: 480px; margin: 0 auto; }",
+    },
+    {
+        key: "scaled",
+        label: "Inside a transform: scale(0.75) parent (600px)",
+        css: ".hic-css-scaled { width: 600px; }",
+        stage: "transform: scale(0.75); transform-origin: 0 0; height: 60px",
+    },
+    {
+        key: "right",
+        label: "position: absolute; right: 0 (300px)",
+        css: ".hic-css-right { position: absolute; top: 0; right: 0; width: 300px; }",
+        stage: "position: relative; height: 80px",
+    },
+    {
+        key: "half",
+        label: "position: absolute; left: 50% (300px)",
+        css: ".hic-css-half { position: absolute; top: 0; left: 50%; width: 300px; }",
+        stage: "position: relative; height: 80px",
+    },
+] as const;
+
+export const CanvasSizeFromCSS: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "margin: 96px 16px; font-family:sans-serif; color:#222; display:flex; flex-direction:column; gap:12px";
+
+        const style = document.createElement("style");
+        style.textContent = `
+            .hic-css-box {
+                box-sizing: border-box; height: 80px; display: flex;
+                align-items: center; justify-content: center; font-weight: bold;
+            }
+            .hic-css-ref { border: 2px dashed #888; color: #888; }
+            .hic-css-target { background: #345; color: white; }
+            ${cssSizeCases.map((c) => c.css).join("\n")}
+        `;
+        container.appendChild(style);
+
+        for (const c of cssSizeCases) {
+            const label = document.createElement("div");
+            label.textContent = c.label;
+            label.style.cssText = "font-size:0.9rem; margin-top:12px";
+            container.appendChild(label);
+
+            for (const role of ["ref", "target"] as const) {
+                const stage = document.createElement("div");
+                stage.style.cssText = "stage" in c ? c.stage : "";
+                const box = document.createElement("div");
+                box.className = `hic-css-box hic-css-${role} hic-css-${c.key}`;
+                box.id = `hic-css-${c.key}-${role}`;
+                box.textContent = role === "ref" ? "REFERENCE" : "addHTML";
+                stage.appendChild(box);
+                container.appendChild(stage);
+            }
+        }
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await new Promise((r) => requestAnimationFrame(r));
+        const timer = new Timer(0, [0, 10]);
+        document.body.append(timer.element);
+        const vfx = initVFX();
+        for (const c of cssSizeCases) {
+            const target = qs<HTMLElement>(
+                canvasElement,
+                `#hic-css-${c.key}-target`,
+            );
+            vfx.addHTML(target, {
+                shader: solidShader,
+                uniforms: { time: () => timer.time },
+            });
+        }
+    },
+};
+
 export const CanvasSizeWithReflow: StoryObj = {
     render: () => {
         fullscreenRoot();

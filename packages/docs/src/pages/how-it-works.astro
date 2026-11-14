@@ -317,8 +317,14 @@ vfx.play();
             </li>
             <li>
                 <code>addHTML</code> wraps the element in a
-                <code>&lt;canvas&gt;</code>. The element must fill its parent's
-                width or have a fixed px width.
+                <code>&lt;canvas&gt;</code> and copies its box onto it once. The
+                element's width must not depend on its content: it fills its
+                parent or has a fixed width. Its height must come from its
+                content or its own CSS, not from a stretching parent. The styles
+                that size or place it must not change while it is wrapped, and
+                its styles must not depend on its parent or element type. If an
+                element can't meet these, put the layout on a plain wrapper and
+                let the element fill it.
             </li>
             <li>
                 Images and videos from another origin need CORS, or WebGL cannot

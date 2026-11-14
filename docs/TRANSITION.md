@@ -103,8 +103,8 @@ only mixes pixels.
 When the content changes the box's size, VFX-JS locks the box at its old
 size for the run and lets it jump to the new size afterwards. That keeps
 the textures the same size, but the jump is visible. Fix the size on the
-target instead of relying on this. The width rules of the
-[html-in-canvas sizing policy](./html-in-canvas.md#sizing-policy) apply
+target instead of relying on this. The
+[html-in-canvas requirements](./html-in-canvas.md#requirements) apply
 too.
 
 ### `vfx.addTransition(element, opts?)`
