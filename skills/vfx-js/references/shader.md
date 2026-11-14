@@ -28,7 +28,8 @@ await vfx.add(el, { shader, uniforms: { amount: 1 } });
 - `uv` is element space: (0, 0) bottom-left, (1, 1) top-right.
 - GLSL ES 3.0 by default. VFX-JS adds `#version 300 es`. Write `out vec4 outColor` and `texture()`.
 - A shader with `gl_FragColor` or `texture2D` is compiled as GLSL ES 1.0. Don't mix the two.
-- Output is premultiplied alpha. For transparent pixels, scale `rgb` by `a`.
+- `src` and the output are premultiplied alpha. For transparent pixels, scale `rgb` by `a`.
+- For non-linear color math (invert, `pow`, thresholds), un-premultiply first: `vec3 rgb = c.a > 0.0 ? c.rgb / c.a : vec3(0.0);`, then output `vec4(rgb * c.a, c.a)`.
 
 ## Built-in uniforms
 

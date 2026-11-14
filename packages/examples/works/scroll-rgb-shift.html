@@ -57,8 +57,12 @@ uniform float scroll;
 float inside(vec2 uv) {
   return step(abs(uv.x - 0.5), 0.5) * step(abs(uv.y - 0.5), 0.5);
 }
+// src is premultiplied alpha. Returns the straight color.
+vec4 straight(vec4 c) {
+  return c.a > 0. ? vec4(c.rgb / c.a, c.a) : vec4(0);
+}
 vec4 readTex(vec2 uv) {
-  return texture2D(src, uv) * inside(uv);
+  return straight(texture2D(src, uv)) * inside(uv);
 }
 
 void main() {
@@ -78,6 +82,10 @@ void main() {
   gl_FragColor = vec4(
     cr.r, cg.g, cb.b, (cr.a + cg.a + cb.a)
   );
+
+  // The math above is in straight alpha. Output is premultiplied.
+  gl_FragColor = clamp(gl_FragColor, 0., 1.);
+  gl_FragColor.rgb *= gl_FragColor.a;
 }
 `;
 

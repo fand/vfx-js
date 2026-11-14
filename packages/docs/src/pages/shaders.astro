@@ -142,7 +142,10 @@ out vec4 outColor;
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     vec4 color = texture(src, uv);
-    outColor = vec4(mix(color.rgb, 1.0 - color.rgb, amount), color.a);
+    // Invert. Un-premultiply first, then multiply by alpha again.
+    vec3 rgb = color.a > 0.0 ? color.rgb / color.a : vec3(0.0);
+    rgb = mix(rgb, 1.0 - rgb, amount);
+    outColor = vec4(rgb * color.a, color.a);
 }
 \`,
         uniforms: { amount: () => mouseX / window.innerWidth },
@@ -183,8 +186,10 @@ new VFX({ postEffect: { effect: new BloomEffect() } });
                 <code>texture()</code>.
             </li>
             <li>
-                Output is premultiplied alpha. For transparent pixels, multiply
-                <code>rgb</code> by <code>a</code>.
+                <code>src</code> and the output are premultiplied alpha. For
+                transparent pixels, multiply <code>rgb</code> by <code>a</code>.
+                For non-linear color math (invert, <code>pow</code>, thresholds),
+                divide <code>rgb</code> by <code>a</code> first.
             </li>
             <li>
                 A shader that fails to compile makes <code>vfx.add</code> reject

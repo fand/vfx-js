@@ -30,6 +30,7 @@ out vec4 outColor;
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     outColor = texture(src, uv);
+    if (outColor.a > 0.) outColor.rgb /= outColor.a;
 
     // Show the UV coordinate
     outColor += vec4(fract(uv), 0, 0.25);
@@ -38,6 +39,10 @@ void main() {
     vec2 p = uv * 2. - 1.;
     p.x *= resolution.x / resolution.y;
     outColor += (fract(length(p)) * .5 + .5) * 0.25;
+
+    // The overlay math is in straight alpha. Output is premultiplied.
+    outColor = clamp(outColor, 0., 1.);
+    outColor.rgb *= outColor.a;
 }
 `;
 
@@ -56,7 +61,8 @@ void main() {
     p.x -= (time / 30. * 2.) - 1.;
 
     outColor = vec4(step(length(p), .3));
-    outColor += texture(backbuffer, uv) * vec4(.9, .95, 1, .995);
+    // Premultiplied: the alpha decay scales rgb too.
+    outColor += texture(backbuffer, uv) * vec4(.9, .95, 1, 1) * .995;
 }
 `;
 
@@ -76,6 +82,7 @@ void main() {
 
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     outColor = texture(src, uv);
+    if (outColor.a > 0.) outColor.rgb /= outColor.a;
 
     // Show the UV coordinate
     outColor += vec4(gl_FragCoord.xy / viewport.zw, 1, 0.5);
@@ -83,6 +90,10 @@ void main() {
     vec2 p = gl_FragCoord.xy / viewport.zw * 2. - 1.;
     p.x *= viewport.z / viewport.w;
     outColor += smoothstep(.1, .0, abs(sin(length(p) * 30.))) * 0.1;
+
+    // The overlay math is in straight alpha. Output is premultiplied.
+    outColor = clamp(outColor, 0., 1.);
+    outColor.rgb *= outColor.a;
 }
 `;
 

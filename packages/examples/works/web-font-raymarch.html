@@ -185,8 +185,9 @@ void main() {
   c += vec4(0, 0, 0, pow(length(p), 2.) * 0.04);
   c += rand(uv * 2.) * 0.1;
 
-  c.rgb /= c.a;
-  gl_FragColor = c;
+  // Output is premultiplied alpha.
+  c = clamp(c, 0., 1.);
+  gl_FragColor = vec4(min(c.rgb, c.a), c.a);
 }
 `;
 

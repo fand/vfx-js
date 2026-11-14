@@ -45,11 +45,16 @@ uniform vec4 mouse2;
 #define mouse (mouse2.xy)
 #define move (mouse2.zw * vec2(resolution.y/resolution.x, 1.))
 
+// src is premultiplied alpha. Returns the straight color.
+vec4 straight(vec4 c) {
+  return c.a > 0. ? vec4(c.rgb / c.a, c.a) : vec4(0);
+}
+
 vec4 tex(vec2 uv) {
   float y = floor(uv.y);
   float ys = sin(y+0.7);
   uv.x += ys + time * 0.05 * ys;
-  return texture2D(src, fract(uv) * 0.98 + 0.01);
+  return straight(texture2D(src, fract(uv) * 0.98 + 0.01));
 }
 
 void main() {
@@ -82,6 +87,10 @@ void main() {
 
   gl_FragColor = vec4(cr.r, cg.g, cb.b, cr.a + cg.a + cb.a);
   gl_FragColor.rgb = pow(gl_FragColor.rgb, vec3(.4));
+
+  // The math above is in straight alpha. Output is premultiplied.
+  gl_FragColor = clamp(gl_FragColor, 0., 1.);
+  gl_FragColor.rgb *= gl_FragColor.a;
 }
 `;
 

@@ -16,6 +16,7 @@ out vec4 outColor;
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     outColor = texture(src, uv);
+    if (outColor.a > 0.) outColor.rgb /= outColor.a;
 
     // Show the UV coordinate
     outColor += vec4(fract(uv), 0, 0.25);
@@ -24,6 +25,10 @@ void main() {
     vec2 p = uv * 2. - 1.;
     p.x *= resolution.x / resolution.y;
     outColor += (fract(length(p)) * .5 + .5) * 0.25;
+
+    // The overlay math is in straight alpha. Output is premultiplied.
+    outColor = clamp(outColor, 0., 1.);
+    outColor.rgb *= outColor.a;
 }
 `;
 
@@ -184,7 +189,12 @@ out vec4 outColor;
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     outColor = texture(src, uv);
+    if (outColor.a > 0.) outColor.rgb /= outColor.a;
     outColor += vec4(bg, 0.5);
+
+    // The overlay math is in straight alpha. Output is premultiplied.
+    outColor = clamp(outColor, 0., 1.);
+    outColor.rgb *= outColor.a;
 }
     `;
 

@@ -52,8 +52,13 @@ vec3 spectrum(float x) {
   return cos((x - vec3(0, .5, 1)) * vec3(.6, 1., .5) * PI);
 }
 
+// src is premultiplied alpha. Returns the straight color.
+vec4 straight(vec4 c) {
+  return c.a > 0. ? vec4(c.rgb / c.a, c.a) : vec4(0);
+}
+
 float get(vec2 uv) {
-  return texture2D(src, uv).r;
+  return straight(texture2D(src, uv)).r;
 }
 
 mat2 rot(float t) {
@@ -156,6 +161,10 @@ void trace(vec2 uv, vec2 p) {
   gl_FragColor.rgb *= 0.7 + spectrum(sin(l) * .5 + .5) * 0.5;
   gl_FragColor -= pow(l, 3.) * 0.5;
   gl_FragColor -= sin((uv.x - uv.y) * 1500. + time * 40.) * 0.02;
+
+  // The math above is in straight alpha. Output is premultiplied.
+  gl_FragColor = clamp(gl_FragColor, 0., 1.);
+  gl_FragColor.rgb *= gl_FragColor.a;
 }
 
 void main() {

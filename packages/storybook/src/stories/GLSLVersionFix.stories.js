@@ -18,7 +18,7 @@ uniform sampler2D src;
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     vec4 color = texture2D(src, uv);
-    color.rgb = 1.0 - color.rgb; // invert RGB
+    color.rgb = color.a - color.rgb; // invert RGB (premultiplied)
     gl_FragColor = color;
 }
 `;
@@ -33,7 +33,7 @@ out vec4 outColor;
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     vec4 color = texture(src, uv);
-    color.rgb = 1.0 - color.rgb; // invert RGB
+    color.rgb = color.a - color.rgb; // invert RGB (premultiplied)
     outColor = color;
 }
 `;

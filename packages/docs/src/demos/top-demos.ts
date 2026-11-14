@@ -19,9 +19,10 @@ void main() {
     vec4 color = texture(src, uv);
 
     // Map brightness to two colors.
-    float l = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+    // Colors are premultiplied: divide by alpha to read, multiply to write.
+    float l = dot(color.rgb, vec3(0.299, 0.587, 0.114)) / max(color.a, 0.0001);
     vec3 duo = mix(vec3(0.15, 0.0, 0.35), vec3(1.0, 0.55, 0.95), l);
-    outColor = vec4(duo, color.a);
+    outColor = vec4(duo * color.a, color.a);
 }
 `;
 

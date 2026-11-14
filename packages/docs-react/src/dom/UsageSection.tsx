@@ -34,8 +34,8 @@ void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     outColor = texture(src, uv);
 
-    // Fade alpha by enterTime
-    outColor.a *= smoothstep(0.0, 3.0, enterTime);
+    // Fade by enterTime. Colors are premultiplied, so scale all channels.
+    outColor *= smoothstep(0.0, 3.0, enterTime);
 }
 `;
 
@@ -208,8 +208,8 @@ const UsageSection: React.FC = () => (
                 vec2 uv = (gl_FragCoord.xy - offset) / resolution;
                 outColor = texture(src, uv);
 
-                // Fade alpha by enterTime
-                outColor.a *= smoothstep(0.0, 3.0, enterTime);
+                // Fade by enterTime. Colors are premultiplied, so scale all channels.
+                outColor *= smoothstep(0.0, 3.0, enterTime);
             }
             \`;
 

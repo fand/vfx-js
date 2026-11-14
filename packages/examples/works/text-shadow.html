@@ -49,9 +49,13 @@ float hash(vec3 p) {
 vec2 hash2(vec3 p) {
   return vec2(hash(p), hash(p + 1.));
 }
+// src is premultiplied alpha. Returns the straight color.
+vec4 straight(vec4 c) {
+  return c.a > 0. ? vec4(c.rgb / c.a, c.a) : vec4(0);
+}
 vec4 readTex(vec2 uv) {
   if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) { return vec4(0); }
-  return texture2D(src, uv);
+  return straight(texture2D(src, uv));
 }
 vec3 spectrum(float x) {
   return cos((x - vec3(0, .5, 1)) * vec3(.6, 1., .5) * PI);
@@ -87,6 +91,10 @@ void main() {
   c += vec4((spectrum(cos(acc * 3.5))), 1) * acc * 2.5;
   c -= hash(vec3(uv.xyy)) * 0.01;
   gl_FragColor = c;
+
+  // The math above is in straight alpha. Output is premultiplied.
+  gl_FragColor = clamp(gl_FragColor, 0., 1.);
+  gl_FragColor.rgb *= gl_FragColor.a;
 }
 `;
 

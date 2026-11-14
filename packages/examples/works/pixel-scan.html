@@ -78,11 +78,16 @@ uniform float width;
 #define W width
 #define LAYERS 3.
 
+// src is premultiplied alpha. Returns the straight color.
+vec4 straight(vec4 c) {
+  return c.a > 0. ? vec4(c.rgb / c.a, c.a) : vec4(0);
+}
+
 vec4 readTex(vec2 uv) {
   if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) {
     return vec4(0);
   }
-  return texture2D(src, uv);
+  return straight(texture2D(src, uv));
 }
 
 float hash(vec2 p) {
@@ -183,6 +188,10 @@ void main() {
   }
   gl_FragColor /= LAYERS;
   gl_FragColor *= smoothstep(0., 0.01, t);
+
+  // The math above is in straight alpha. Output is premultiplied.
+  gl_FragColor = clamp(gl_FragColor, 0., 1.);
+  gl_FragColor.rgb *= gl_FragColor.a;
 }
 `;
 

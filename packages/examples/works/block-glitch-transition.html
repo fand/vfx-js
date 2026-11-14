@@ -75,11 +75,16 @@ uniform float leaveTime;
 uniform sampler2D src;
 #define PI 3.141593
 
+// src is premultiplied alpha. Returns the straight color.
+vec4 straight(vec4 c) {
+  return c.a > 0. ? vec4(c.rgb / c.a, c.a) : vec4(0);
+}
+
 vec4 readTex(vec2 uv) {
   if (uv.x < 0. || uv.x > 1. || uv.y < 0. || uv.y > 1.) {
     discard;
   }
-  return texture2D(src, uv);
+  return straight(texture2D(src, uv));
 }
 
 float rand(vec3 p) {
@@ -156,6 +161,10 @@ void main() {
     if (leaveTime > 0.) {
       gl_FragColor.a *= clamp(1. - leaveTime, 0., 1.);
     }
+
+    // The math above is in straight alpha. Output is premultiplied.
+    gl_FragColor = clamp(gl_FragColor, 0., 1.);
+    gl_FragColor.rgb *= gl_FragColor.a;
 }
 `;
 

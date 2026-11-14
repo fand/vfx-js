@@ -33,6 +33,12 @@ vec2 focus(vec2 uv, vec2 c, float z) {
     );
 }
 
+// src is premultiplied. Returns the straight color.
+vec4 readTex(vec2 uv) {
+    vec4 c = texture(src, uv);
+    return c.a > 0. ? vec4(c.rgb / c.a, c.a) : vec4(0);
+}
+
 void main (void) {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
 
@@ -57,16 +63,13 @@ void main (void) {
         uvb.x += noise(uv.y, t + 20.) * amp;
     }
 
-    vec4 cr = texture(src, uvr);
-    vec4 cg = texture(src, uvg);
-    vec4 cb = texture(src, uvb);
+    vec4 cr = readTex(uvr);
+    vec4 cg = readTex(uvg);
+    vec4 cb = readTex(uvb);
 
-    outColor = vec4(
-        cr.r,
-        cg.g,
-        cb.b,
-        step(.1, cr.a + cg.a + cb.a)
-    );
+    // Output is premultiplied alpha.
+    float a = step(.1, cr.a + cg.a + cb.a);
+    outColor = vec4(vec3(cr.r, cg.g, cb.b) * a, a);
 }
 `;
 

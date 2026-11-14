@@ -29,7 +29,7 @@ out vec4 outColor;
 void main() {
     vec2 uv = (gl_FragCoord.xy - offset) / resolution;
     vec3 col = 0.5 + 0.5 * cos(time + uv.xyx * 3.0 + vec3(0, 2, 4));
-    outColor = vec4(col, 0.85);
+    outColor = vec4(col * 0.85, 0.85);
 }
 `;
 
