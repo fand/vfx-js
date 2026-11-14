@@ -1,1 +1,0 @@
-import{t as e}from"./lifecycle.v3sQOfPt.js";import{t}from"./lazy.Bm3P0C81.js";e(()=>{let e=document.getElementById(`FirstEffectDemo`);e&&t(e,()=>({shader:`glitch`,overflow:100}))});

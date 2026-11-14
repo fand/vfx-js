@@ -49,7 +49,7 @@
     <body class="DocPage">
         <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
 
-<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.Cc6QlKYK.js"></script>
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.BGLkXt18.js"></script>
         <header class="SiteHeader">
     <a class="SiteHeaderBrand" href="/vfx-js/">
         <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
@@ -88,7 +88,7 @@
 <script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
 
         <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
-        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.CojHIjtD.js"></script>
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.4hPtyg6C.js"></script>
         <!-- Back plays the slit scan reversed. -->
         <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
     
@@ -1116,7 +1116,7 @@
         <h1>
             EffectContext
         </h1>
-        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/5fa14877eda9e2096bb11255b514294d2b1a196a/packages/vfx-js/src/types.ts#L820" target="_blank" rel="noreferrer">
+        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/1c4c7d797ff859aabdb31303f28f75751bd6b955/packages/vfx-js/src/types.ts#L820" target="_blank" rel="noreferrer">
                     vfx-js/src/types.ts:820 &#8599;
                 </a>
     </header>
@@ -1215,6 +1215,30 @@ holds placeholder values until the first frame resolves.</p>
 (DataTexture upload, extensions, MRT, etc).</p>
 <p>Resources allocated here are the caller's responsibility: free in
 <code>dispose()</code>, rebuild in <code>onContextRestored(cb)</code>.</p>
+<p>Every draw sets its own framebuffer, viewport, program, VAO,
+texture bindings and blend state. <code>ctx.draw()</code>, <code>ctx.blit()</code> and
+<code>ctx.clear()</code> also turn off <code>SCISSOR_TEST</code>, but the rest of the
+frame (other elements, post effects, the per-frame canvas clear)
+does not touch scissor.</p>
+<p>The rest of the GL state is never set per draw. VFX-JS assumes:</p>
+<ul>
+<li><code>SCISSOR_TEST</code>, <code>DEPTH_TEST</code>, <code>CULL_FACE</code>, <code>STENCIL_TEST</code>,
+<code>POLYGON_OFFSET_FILL</code>, <code>RASTERIZER_DISCARD</code> and
+<code>SAMPLE_ALPHA_TO_COVERAGE</code> disabled.</li>
+<li><code>depthMask(true)</code>, <code>colorMask(true, true, true, true)</code>,
+<code>frontFace(CCW)</code> and <code>clearColor(0, 0, 0, 0)</code>.</li>
+<li>No sampler objects, <code>PIXEL_UNPACK_BUFFER</code> or transform feedback
+bound.</li>
+<li><code>UNPACK_ROW_LENGTH</code>, <code>UNPACK_SKIP_*</code> and <code>UNPACK_IMAGE_HEIGHT</code>
+at 0, and <code>UNPACK_COLORSPACE_CONVERSION_WEBGL</code> at
+<code>BROWSER_DEFAULT_WEBGL</code>. Texture uploads set
+<code>UNPACK_FLIP_Y_WEBGL</code>, <code>UNPACK_PREMULTIPLY_ALPHA_WEBGL</code> and
+<code>UNPACK_ALIGNMENT</code> themselves, so don't rely on their values in
+raw uploads.</li>
+</ul>
+<p>If you change any of this, call <a href="/vfx-js/docs/core/EffectContext/#resetState"><code>EffectContext.resetState</code></a>
+when you are done: before the next <code>ctx.draw()</code> / <code>ctx.blit()</code> /
+<code>ctx.clear()</code>, and before <code>render()</code> returns.</p>
 </div>
 
 </section><section class="ApiMember" id="intersection">
@@ -1582,6 +1606,65 @@ chain is disposed.</p>
     
 
 
+</section><section class="ApiMember" id="resetState">
+    <h3>
+        <a class="ApiAnchor" href="#resetState">resetState</a>
+        
+        
+    </h3>
+    <div class="ApiSignature">
+    <pre class="ApiCode"><code><span class="tf">resetState</span><span class="tp">(</span><span class="tp">)</span><span class="tp">: </span><span class="tk">void</span></code></pre>
+    
+<div class="ApiText"><p>Put the GL state back to the baseline VFX-JS's pipeline assumes,
+whatever raw <code>ctx.gl</code> calls changed. It only writes state; it
+never queries it.</p>
+<p>Resets:</p>
+<ul>
+<li>Draw and read framebuffer to the canvas, <code>drawBuffers([BACK])</code>,
+and the viewport to the whole canvas.</li>
+<li><code>DEPTH_TEST</code>, <code>CULL_FACE</code>, <code>STENCIL_TEST</code>, <code>SCISSOR_TEST</code>,
+<code>BLEND</code>, <code>POLYGON_OFFSET_FILL</code>, <code>RASTERIZER_DISCARD</code>,
+<code>SAMPLE_ALPHA_TO_COVERAGE</code> and <code>SAMPLE_COVERAGE</code> disabled.</li>
+<li><code>depthMask(true)</code>, <code>depthFunc(LESS)</code>, <code>colorMask(true × 4)</code>,
+<code>stencilMask(~0)</code>, <code>frontFace(CCW)</code>, <code>cullFace(BACK)</code>,
+<code>clearColor(0, 0, 0, 0)</code>.</li>
+<li>Program, VAO and the <code>ARRAY_BUFFER</code>, <code>PIXEL_PACK_BUFFER</code>,
+<code>PIXEL_UNPACK_BUFFER</code>, <code>UNIFORM_BUFFER</code>, <code>COPY_READ_BUFFER</code>,
+<code>COPY_WRITE_BUFFER</code> bindings unbound. Transform feedback unbound.</li>
+<li>Sampler objects unbound on every texture unit, and the active
+texture unit set to <code>TEXTURE0</code>.</li>
+<li>Pixel store parameters set to the WebGL defaults.</li>
+</ul>
+<p>Call it after raw <code>ctx.gl</code> work in <code>render()</code>: before the next
+<code>ctx.draw()</code> / <code>ctx.blit()</code> / <code>ctx.clear()</code>, and before <code>render()</code>
+returns. Calling it in <code>init()</code> or <code>update()</code> is allowed but rarely
+needed, since nothing is drawn there. It does nothing while the
+WebGL context is lost, or after the effect is disposed.</p>
+<p>If you use transform feedback, call <code>gl.endTransformFeedback()</code>
+first. While transform feedback is active, unbinding it and the
+program is an <code>INVALID_OPERATION</code>.</p>
+</div>
+<div class="ApiTag">
+            <h4>Example</h4>
+            <div class="ApiText"><pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#B392F0">render</span><span style="color:#E1E4E8">(ctx) {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> gl</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> ctx.gl;</span></span>
+<span class="line"><span style="color:#E1E4E8">    gl.</span><span style="color:#B392F0">bindFramebuffer</span><span style="color:#E1E4E8">(gl.</span><span style="color:#79B8FF">FRAMEBUFFER</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.fbo);</span></span>
+<span class="line"><span style="color:#E1E4E8">    gl.</span><span style="color:#B392F0">enable</span><span style="color:#E1E4E8">(gl.</span><span style="color:#79B8FF">DEPTH_TEST</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">    // ... custom drawing ...</span></span>
+<span class="line"><span style="color:#E1E4E8">    ctx.</span><span style="color:#B392F0">resetState</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">    ctx.</span><span style="color:#B392F0">blit</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.result);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</div>
+        </div>
+    
+    
+</div>
+    
+    
+    
+    
+
+
 </section><section class="ApiMember" id="wrapTexture">
     <h3>
         <a class="ApiAnchor" href="#wrapTexture">wrapTexture</a>
@@ -1707,7 +1790,7 @@ With <code>autoUpdate: false</code>, call <code>texture.update()</code> after th
         
 </div>
 
-<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DrI4GXe2.js"></script>
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DTjnsGw4.js"></script>
 
         <div id="Frame"><div id="FrameBottom"></div></div>
         
