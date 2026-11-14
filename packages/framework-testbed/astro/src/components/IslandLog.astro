@@ -1,0 +1,70 @@
+---
+// Counts how often Astro starts and hydrates each island, on `window.__islandLog`.
+// It wraps the `client:load` directive, so it must run before the first island.
+---
+
+<script is:inline>
+    (() => {
+        if (window.__islandLog) {
+            return;
+        }
+        const log = (window.__islandLog = {});
+        window.__islandEntry = (page) =>
+            (log[page] ??= {
+                elements: 0,
+                starts: 0,
+                hydrates: 0,
+                roots: 0,
+                unmounts: 0,
+                renders: 0,
+                mounts: 0,
+                effects: 0,
+                cleanups: 0,
+            });
+        const entryOf = (el) => {
+            const props = JSON.parse(el.getAttribute("props") || "{}");
+            return window.__islandEntry(props.page?.[1] ?? "?");
+        };
+        // React keeps the root on the element; its stateNode is the FiberRoot.
+        const rootOf = (el) => {
+            const key = Object.keys(el).find((k) =>
+                k.startsWith("__reactContainer"),
+            );
+            return key ? el[key]?.stateNode : undefined;
+        };
+        const seenRoots = new WeakSet();
+        const seenIslands = new WeakSet();
+        let load;
+        const astro = (self.Astro ??= {});
+        Object.defineProperty(astro, "load", {
+            configurable: true,
+            get: () => load,
+            set(directive) {
+                load = (getHydrate, opts, el) => {
+                    const entry = entryOf(el);
+                    entry.starts++;
+                    if (!seenIslands.has(el)) {
+                        seenIslands.add(el);
+                        entry.elements++;
+                        el.addEventListener("astro:unmount", () => {
+                            entry.unmounts++;
+                        });
+                    }
+                    const wrapped = async () => {
+                        const hydrate = await getHydrate();
+                        return async () => {
+                            entry.hydrates++;
+                            await hydrate();
+                            const root = rootOf(el);
+                            if (root && !seenRoots.has(root)) {
+                                seenRoots.add(root);
+                                entry.roots++;
+                            }
+                        };
+                    };
+                    return directive(wrapped, opts, el);
+                };
+            },
+        });
+    })();
+</script>

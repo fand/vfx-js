@@ -1,6 +1,7 @@
 ---
 import { VFXImg } from "@vfx-js/astro";
 import { findPage } from "@vfx-js/testbed-shared";
+import IslandProbe from "./IslandProbe";
 
 const page = findPage(Astro.props.path);
 ---
@@ -22,5 +23,6 @@ const page = findPage(Astro.props.path);
             </div>
         )
     }
+    <IslandProbe client:load page={page.path} />
     <slot />
 </section>
