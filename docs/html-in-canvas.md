@@ -46,16 +46,16 @@ They render the `<div>` on the server and on the first client render, then switc
 
 ## Sizing policy
 
-The canvas's content-box must equal the wrapped element's border-box. Since the canvas is a replaced element, width can't be derived from its children, so it comes from one of two supported cases — anything else is unsupported:
+The canvas's content-box must equal the wrapped element's border-box. Since the canvas is a replaced element, width can't be derived from its children, so it comes from one of the supported cases below — anything else is unsupported:
 
 | Element width | Canvas width | Responsive? |
 | --- | --- | --- |
 | Fills its containing block (`width: auto` block, or `width: 100%`) | `100%` | ✅ tracks parent |
 | Explicit length width (`width: 400px`, from the style attribute or any CSS rule; `em`/`vw` too) | the same width as a border box, plus its `min-width`/`max-width` | constant, except a `%` `max-width`/`min-width` tracks the parent |
 | Sized by insets (`position: fixed`/`absolute`, `inset: 10px`, `auto` width/height) | `calc(100% - <insets> - <margins>)`, height too | ✅ tracks containing block |
-| **Content-sized** (`inline`/`inline-block`, `float`, `fit-content`, binding `max-width`, or width + centering margins) | — | ❌ **unsupported** |
+| **Content-sized** (`inline`/`inline-block`, `float`, `fit-content`, or `width: auto` held in by `max-width`) | — | ❌ **unsupported** |
 
-The litmus test: **does the target's border-box equal its parent's content-box width?** If yes, or if it has a fixed px width, it works. Otherwise it's content-sized and must be wrapped.
+The litmus test: **does the target's border-box equal its parent's content-box width?** If yes, or if it has an explicit length width, it works. Otherwise it's content-sized and must be wrapped.
 
 ### ✅ OK
 
@@ -69,24 +69,30 @@ The litmus test: **does the target's border-box equal its parent's content-box w
 <!-- explicit fixed width from a stylesheet or #id rule -->
 <style>.slides { width: 600px; margin: 40px; }</style>
 <div class="slides">…</div>
+
+<!-- fixed width with max-width: tracks the parent -->
+<div style="width: 1200px; max-width: 100%">…</div>
+
+<!-- fixed width centered by a flex parent -->
+<div style="display: flex; justify-content: center">
+  <article style="width: 600px">…</article>
+</div>
 ```
+
+Width, margins, position and flex properties are copied from the element's computed style, so they apply whatever selector set them.
 
 Padding/border on the target is fine in both cases — the canvas content-box is sized to the element's border-box.
 
 ### ❌ NG → wrap it
 
-Put the width constraint (fixed width, `max-width`, centering margins) on a **wrapper**, and let the addHTML target fill that wrapper with `width: 100%`. Keep padding/background on the target so the effect still covers them.
+Put the width constraint (`max-width` on an `auto` width, `fit-content`, ...) on a **wrapper**, and let the addHTML target fill that wrapper with `width: 100%`. Keep padding/background on the target so the effect still covers them.
 
 ```html
-<!-- centered fixed-width card -->
-<div style="display: flex; justify-content: center">
-  <div style="width: 600px">                                     <!-- wrapper: width only -->
-    <article style="width: 100%; padding: 32px; background: #fff">…</article>  <!-- addHTML target -->
-  </div>
+<!-- card held in by max-width only -->
+<div style="max-width: 600px; margin: 0 auto">              <!-- wrapper: width only -->
+  <article style="padding: 32px; background: #fff">…</article>  <!-- addHTML target -->
 </div>
 ```
-
-> Class-declared widths are not detected (only inline `style="width:…px"` is). Declare fixed widths inline, or wrap the element.
 
 
 ## How It Works
@@ -188,8 +194,8 @@ The current approach uses per-element wrapper canvases with `drawElementImage` �
 
 - **Chrome only, behind a flag** — requires `drawElementImage` and `requestPaint` (Chrome 156 with `chrome://flags/#canvas-draw-element`, or Canary).
 - **Nested canvases** — redrawn by a workaround with the limits above; see [Nested canvases](#nested-canvases).
-- **Content-sized targets unsupported** — the element must fill its container or have an explicit px width; see [Sizing policy](#sizing-policy).
+- **Content-sized targets unsupported** — the element must fill its container or have an explicit length width; see [Sizing policy](#sizing-policy).
 - **No overlay mode** — `layoutsubtree` hides children visually; `overlay` option is stripped.
-- **Element-type selectors** (`div.foo`) won't match the canvas wrapper. Class selectors (`.foo`) work.
+- **Element-type selectors** (`div.foo`) won't match the canvas wrapper. Class selectors (`.foo`) work. This doesn't affect width, margins, position or flex properties, which are copied from the computed style, but it does affect other properties on the canvas, such as `transform`, `z-index` or `border-radius`.
 - **Structure selectors** (`:nth-child`, `parent > div`) may break since the DOM structure changes.
 - **Cross-origin images** are replaced with blob URLs before capture. CORS-blocked images are silently skipped.
