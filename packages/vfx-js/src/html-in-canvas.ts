@@ -637,8 +637,16 @@ export async function wrapElement(
     const display = cs.display === "inline" ? "block" : cs.display;
     canvas.style.setProperty("display", display);
 
+    // Computed values keep `auto` and %, so `margin: 0 auto` keeps centering
+    // the canvas after a resize. getComputedStyle resolves them to px.
+    const styleMap =
+        typeof element.computedStyleMap === "function"
+            ? element.computedStyleMap()
+            : null;
     for (const prop of MARGIN_PROPS) {
-        canvas.style.setProperty(prop, cs.getPropertyValue(prop));
+        const margin =
+            styleMap?.get(prop)?.toString() ?? cs.getPropertyValue(prop);
+        canvas.style.setProperty(prop, margin);
     }
     for (const prop of POSITION_FLOW_STYLES) {
         canvas.style.setProperty(prop, cs.getPropertyValue(prop));

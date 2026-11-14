@@ -73,6 +73,9 @@ The litmus test: **does the target's border-box equal its parent's content-box w
 <!-- fixed width with max-width: tracks the parent -->
 <div style="width: 1200px; max-width: 100%">…</div>
 
+<!-- fixed width centered by auto margins -->
+<div style="width: 600px; margin: 0 auto">…</div>
+
 <!-- fixed width centered by a flex parent -->
 <div style="display: flex; justify-content: center">
   <article style="width: 600px">…</article>
@@ -172,6 +175,7 @@ Canvas is a **replaced element**. It does NOT auto-fit height to children, even 
 - `max-width: 100%` stays a percentage. The canvas sits in the element's containing block, so `width: 1200px; max-width: 100%` keeps tracking the parent.
 - Computed values are used instead of `getBoundingClientRect()`, which a transformed ancestor scales.
 - A length in `em` or `vw` computes to px, so it is fixed at wrap time and does not follow later resizes.
+- Margins are copied as computed values too, so `auto` and `%` stay as they are and `margin: 0 auto` keeps centering the canvas after a resize. `getComputedStyle` would resolve them to px at wrap time.
 - Border widths come from `getComputedStyle`: the computed style map gives `medium` (3px) for a border whose style is `none`.
 
 **Height**: A child ResizeObserver watches the wrapped element and sets the canvas CSS height to match `borderBoxSize.blockSize`. This triggers the canvas ResizeObserver, which syncs the pixel buffer and calls `requestPaint`.

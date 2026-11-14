@@ -400,6 +400,33 @@ describe("wrapElement", () => {
         expect(canvasStyle().width).toBe("100%");
     });
 
+    test("copies auto and % margins as computed values", () => {
+        stubComputed({
+            ...plainBox,
+            width: "600px",
+            "margin-top": "10%",
+            "margin-right": "auto",
+            "margin-bottom": "0px",
+            "margin-left": "auto",
+        });
+        wrap({});
+        expect(canvasStyle().marginTop).toBe("10%");
+        expect(canvasStyle().marginRight).toBe("auto");
+        expect(canvasStyle().marginBottom).toBe("0px");
+        expect(canvasStyle().marginLeft).toBe("auto");
+    });
+
+    test("falls back to resolved margins without computedStyleMap", () => {
+        vi.stubGlobal("getComputedStyle", () => ({
+            display: "block",
+            width: "10px",
+            getPropertyValue: (prop: string) =>
+                prop === "margin-left" ? "200px" : "",
+        }));
+        wrap({});
+        expect(canvasStyle().marginLeft).toBe("200px");
+    });
+
     test("leaves a non-positioned element as is", () => {
         stubComputed({ position: "static", top: "10px", bottom: "10px" });
         wrap({});
