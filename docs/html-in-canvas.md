@@ -44,58 +44,96 @@ Both have a `VFXCanvas` component with the same props and markup as React's.
 
 They render the `<div>` on the server and on the first client render, then switch to the `<canvas>` after mount when html-in-canvas is supported. The children mount again once at that point. `v-model:element` (Vue) or `bind:element` (Svelte) gives the element the effect is on, and `null` until then.
 
-## Sizing policy
+## Requirements
 
-The canvas's content-box must equal the wrapped element's border-box. Since the canvas is a replaced element, width can't be derived from its children, so it comes from one of the supported cases below — anything else is unsupported:
+`addHTML` replaces the element with a `<canvas>` and moves the element inside it (see [Wrapping](#wrapping)). A canvas is a replaced element, so its size can't come from its children. Instead, VFX-JS copies the element's outer box onto the canvas once, at wrap time. The element then lays out at the canvas's width, and a ResizeObserver copies the element's height back to the canvas. Information only flows one way: width → content layout → height.
 
-| Element width | Canvas width | Responsive? |
+The element must meet four requirements for this to work. They are not checked at runtime: an element that breaks one is wrapped anyway, and its box changes size or position while the effect runs.
+
+1. [Its width doesn't depend on its content.](#1-its-width-doesnt-depend-on-its-content)
+2. [Its height comes from its content or its own CSS.](#2-its-height-comes-from-its-content-or-its-own-css)
+3. [The styles that size or place it don't change while it's wrapped.](#3-the-styles-that-size-or-place-it-dont-change-while-its-wrapped)
+4. [Its styles don't depend on its parent or its element type.](#4-its-styles-dont-depend-on-its-parent-or-its-element-type)
+
+If an element can't meet them, use the [pattern that always works](#the-pattern-that-always-works).
+
+### 1. Its width doesn't depend on its content
+
+The width must come from the containing block or from the element's own CSS. These are supported:
+
+| Element width | Canvas width | Follows a resize? |
 | --- | --- | --- |
-| Fills its containing block (`width: auto` block, or `width: 100%`) | `100%` | ✅ tracks parent |
-| Explicit length width (`width: 400px`, from the style attribute or any CSS rule; `em`/`vw` too) | the same width as a border box, plus its `min-width`/`max-width` | constant, except a `%` `max-width`/`min-width` tracks the parent |
-| Sized by insets (`position: fixed`/`absolute`, `inset: 10px`, `auto` width/height) | `calc(100% - <insets> - <margins>)`, height too | ✅ tracks containing block |
-| **Content-sized** (`inline`/`inline-block`, `float`, `fit-content`, or `width: auto` held in by `max-width`) | — | ❌ **unsupported** |
+| Fills its containing block (`width: auto` block, or `width: 100%`) | `100%` | ✅ |
+| Explicit length (`width: 400px`, from the style attribute or any CSS rule; `em`/`vw` too) | the same width as a border box, plus its `min-width`/`max-width` | Only a `%` `min-width`/`max-width` follows |
+| Sized by insets (`position: fixed`/`absolute`, `inset: 10px`, `auto` width/height) | `calc(100% - <insets> - <margins>)`, height too | ✅ |
 
-The litmus test: **does the target's border-box equal its parent's content-box width?** If yes, or if it has an explicit length width, it works. Otherwise it's content-sized and must be wrapped.
+A width that comes from the content isn't supported: `display: inline`/`inline-block`, `float`, `fit-content`, or `width: auto` held in by `max-width`.
 
-### ✅ OK
+Padding and borders on the element are fine: the canvas is sized to the element's border box.
+
+✅ OK:
 
 ```html
 <!-- full-width block (padding is fine) -->
 <section style="padding: 64px 40px">…</section>
 
-<!-- explicit fixed width (inline px) -->
-<article style="width: 600px; padding: 32px">…</article>
-
-<!-- explicit fixed width from a stylesheet or #id rule -->
+<!-- fixed width, from the style attribute, a class or an #id rule -->
 <style>.slides { width: 600px; margin: 40px; }</style>
 <div class="slides">…</div>
 
-<!-- fixed width with max-width: tracks the parent -->
+<!-- fixed width with max-width: follows the parent -->
 <div style="width: 1200px; max-width: 100%">…</div>
 
-<!-- fixed width centered by auto margins -->
+<!-- fixed width centered by auto margins or by a flex parent -->
 <div style="width: 600px; margin: 0 auto">…</div>
-
-<!-- fixed width centered by a flex parent -->
 <div style="display: flex; justify-content: center">
   <article style="width: 600px">…</article>
 </div>
 ```
 
-Width, margins, position and flex properties are copied from the element's computed style, so they apply whatever selector set them.
-
-Padding/border on the target is fine in both cases — the canvas content-box is sized to the element's border-box.
-
-### ❌ NG → wrap it
-
-Put the width constraint (`max-width` on an `auto` width, `fit-content`, ...) on a **wrapper**, and let the addHTML target fill that wrapper with `width: 100%`. Keep padding/background on the target so the effect still covers them.
+❌ NG: a card held in by `max-width` only. Its width comes from its content when the content is narrower than 600px.
 
 ```html
-<!-- card held in by max-width only -->
-<div style="max-width: 600px; margin: 0 auto">              <!-- wrapper: width only -->
-  <article style="padding: 32px; background: #fff">…</article>  <!-- addHTML target -->
+<article style="max-width: 600px; margin: 0 auto">…</article>
+```
+
+### 2. Its height comes from its content or its own CSS
+
+The canvas height follows the element's height, which it gets inside the canvas, not in its original place. A height set by the element's own CSS (`height: 340px`, `aspect-ratio`) or by its content works. A height from top/bottom insets works too (see the table above).
+
+A height that comes from the parent doesn't work:
+
+- A flex or grid item stretched by `align-items: stretch` to a taller sibling. Inside the canvas nothing stretches it, so the canvas shrinks to the content height.
+- `height: 100%`, or `flex-grow` in a column. The canvas keeps the height it had at wrap time and no longer follows the parent.
+
+### 3. The styles that size or place it don't change while it's wrapped
+
+The width, margins and insets are copied onto the canvas once, at wrap time. Values that refer to the containing block keep following it: `100%`, `%` margins and insets, `margin: auto`, a `%` `max-width`. Everything else stays as it was at wrap time:
+
+- A media query or container query that changes the width or position.
+- A class or inline style that your code changes on the element.
+- `em`, `rem` and `vw` lengths: they are converted to px at wrap time.
+
+A transition wraps the element only during a run, so this rarely matters there. `addHTML` keeps the element wrapped until `vfx.remove(element)`. To apply new styles, call `vfx.remove(element)` and then `vfx.addHTML(element, opts)` again.
+
+### 4. Its styles don't depend on its parent or its element type
+
+After wrapping, the element's parent is the canvas, and the canvas copies only the element's `class` and `style` attributes.
+
+- **The element's own rules**: rules that select it through its parent or siblings stop matching, and the element loses those styles. These include `.list > .item`, `.a + .b`, `.a ~ .b` and `:nth-child()`. Descendant selectors (`.list .item`) still match.
+- **The canvas's rules**: rules that select by element type or id (`div.card`, `#hero`) don't match the canvas. Width, margins, insets and flex/grid placement are copied from the element's computed style, so they apply whatever selector set them. Other properties on the element's box, such as `transform`, `z-index`, `opacity` or `border-radius`, reach the canvas only through class selectors or the style attribute.
+
+### The pattern that always works
+
+Give the layout to a plain wrapper element that VFX-JS doesn't touch. Make the `addHTML` target a block that fills the wrapper and carries only visual styles (padding, background, border):
+
+```html
+<div class="card-slot">                 <!-- wrapper: width, margins, position -->
+  <article class="card">…</article>     <!-- addHTML target: block, width auto -->
 </div>
 ```
+
+The wrapper sizes and places the box, and keeps following media queries and resizes. The target meets requirements 1 and 3. Let the target's content set its height (requirement 2), and style it with its own class (requirement 4).
 
 
 ## How It Works
@@ -122,7 +160,7 @@ VFX-JS sets all of them and listens to both `onpaint` and the `paint` event (one
 
 Hit testing: on Chrome 156 clicks reach the wrapper's children only with `chrome://flags/#enable-experimental-web-platform-features`; without it, `elementFromPoint` returns the wrapper canvas. On 159 drawable children are hit-tested without that flag.
 
-The canvas copies the element's CSS identity (class + style attributes) so the cascade resolves its layout box; width follows the [Sizing policy](#sizing-policy). `layoutsubtree` makes children participate in layout (for hit testing, accessibility) but not paint — only the canvas's `onpaint` handler produces visual output.
+The canvas copies the element's CSS identity (class + style attributes) so the cascade resolves its layout box; width follows [Requirements](#1-its-width-doesnt-depend-on-its-content). `layoutsubtree` makes children participate in layout (for hit testing, accessibility) but not paint — only the canvas's `onpaint` handler produces visual output.
 
 ### Capture Pipeline
 
@@ -169,7 +207,7 @@ Canvas is a **replaced element**. It does NOT auto-fit height to children, even 
 
 #### Current approach
 
-**Width**: Set per the [Sizing policy](#sizing-policy) — `width: 100%` for full-width targets (tracks parent resizes), or the element's own width for elements with an explicit length width. The width is read from the computed style, so a width set by a class or `#id` rule counts too.
+**Width**: Set per [requirement 1](#1-its-width-doesnt-depend-on-its-content) — `width: 100%` for full-width targets (tracks parent resizes), or the element's own width for elements with an explicit length width. The width is read from the computed style, so a width set by a class or `#id` rule counts too.
 
 - The canvas has no padding or border, so for a `content-box` element the padding and border widths are added: `calc(600px + 20px + 20px)`. For a `border-box` element they are a floor, since a border box can't be narrower than them: `max(100px, 160px)`. `min-width` and `max-width` get the same treatment.
 - A `display: table` element, or one whose `min-width`/`max-width` is a keyword such as `min-content`, keeps its used width at wrap time instead. A table grows to fit its content, and the keywords can't go in `calc()` and mean something else on a canvas.
@@ -202,8 +240,6 @@ The current approach uses per-element wrapper canvases with `drawElementImage` �
 
 - **Chrome only, behind a flag** — requires `drawElementImage` and `requestPaint` (Chrome 156 with `chrome://flags/#canvas-draw-element`, or Canary).
 - **Nested canvases** — redrawn by a workaround with the limits above; see [Nested canvases](#nested-canvases).
-- **Content-sized targets unsupported** — the element must fill its container or have an explicit length width; see [Sizing policy](#sizing-policy).
+- **Layout requirements** — the element's width must not depend on its content, its height must come from its content or its own CSS, the styles that size or place it must not change while it's wrapped, and its styles must not depend on its parent or element type. See [Requirements](#requirements).
 - **No overlay mode** — `layoutsubtree` hides children visually; `overlay` option is stripped.
-- **Element-type selectors** (`div.foo`) won't match the canvas wrapper. Class selectors (`.foo`) work. This doesn't affect width, margins, position or flex properties, which are copied from the computed style, but it does affect other properties on the canvas, such as `transform`, `z-index` or `border-radius`.
-- **Structure selectors** (`:nth-child`, `parent > div`) may break since the DOM structure changes.
 - **Cross-origin images** are replaced with blob URLs before capture. CORS-blocked images are silently skipped.
