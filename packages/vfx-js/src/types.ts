@@ -561,6 +561,48 @@ export type VFXPostEffect = {
     effect?: Effect | readonly Effect[];
 };
 
+/** Options for `VFX.capture`. */
+export type VFXCaptureOpts = {
+    /**
+     * Hide the source element. (Default: `false`)
+     * A hidden element keeps its layout and stays interactive.
+     */
+    hide?: boolean;
+};
+
+/**
+ * Where a captured element is.
+ * CSS px, relative to the viewport, like `getBoundingClientRect()`.
+ *
+ * `x` / `y` are measured at the start of every rendered frame.
+ * `width` / `height` are the element's size when the current texture
+ * was captured, so the texture is never stretched after a resize.
+ */
+export type VFXCaptureRect = {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+};
+
+/**
+ * An element captured as a texture by `VFX.capture`, without drawing it.
+ * Pass `texture` to any effect of the same VFX instance.
+ */
+export type VFXCapture = {
+    /** The captured pixels. The same object for the life of the capture. */
+    readonly texture: EffectTexture;
+
+    /** Where the element is. The same object for the life of the capture; its fields change. */
+    readonly rect: VFXCaptureRect;
+
+    /** Capture again. Resolves when the new pixels are in `texture`. */
+    update(): Promise<void>;
+
+    /** Stop capturing, free the texture and restore the element. Idempotent. */
+    dispose(): void;
+};
+
 // ---------------------------------------------------------------------------
 // Effect API (public)
 // ---------------------------------------------------------------------------

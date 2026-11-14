@@ -47,10 +47,10 @@ type CaptureEntry = {
     tick(): void;
 };
 
-function createCapture(deps: CaptureDeps, source: HTMLElement, opts: VFXCaptureOpts): Promise<CaptureEntry>;
+function createCapture(deps: CaptureDeps, source: HTMLElement, opts: VFXCaptureOpts, onDispose?: () => void): Promise<CaptureEntry>;
 ```
 
-`CaptureDeps` is what the player gives: `createTexture(source)`, `refreshTexture(old, offscreen)` (= `#textureFromCapture`), `emptyTexture`, `maxTextureSize`, and the html-in-canvas / `dom2canvas` functions (overridable in tests).
+`CaptureDeps` is what the player gives: `createTexture(source)`, `textureSize(texture, axis)` (= `readTextureSourceDim`), `refreshTexture(old, offscreen)` (= `#textureFromCapture`), `emptyTexture`, `maxTextureSize`, and the html-in-canvas / `dom2canvas` functions (overridable in tests).
 
 Drivers, picked in `createCapture`:
 
@@ -71,7 +71,8 @@ The handle:
 - `tick()` also sets `slot.texture.needsUpdate = true` when `everyFrame`. The upload itself is lazy (on bind), so an unused capture costs nothing.
 - `dispose()`: driver dispose, `slot.texture.dispose()`, tell the owner (callback) to drop the entry.
 
-Slot size is written wherever the texture is: at setup, in `onCapture` (html-in-canvas; layout is clean inside the paint handler, so one `getBoundingClientRect()` on the wrapper is cheap), and after a snapshot / image update.
+Video and canvas upload every frame, so `tick()` also copies their box size into the slot.
+For the other kinds, slot size is written wherever the texture is: at setup, in `onCapture` (html-in-canvas; layout is clean inside the paint handler, so one `getBoundingClientRect()` on the wrapper is cheap), and after a snapshot / image update.
 
 ### Changes to existing files
 
