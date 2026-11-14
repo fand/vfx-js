@@ -1,4 +1,5 @@
 import { Backbuffer } from "./backbuffer.js";
+import { type CaptureEntry, createCapture } from "./capture.js";
 import { shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
@@ -42,8 +43,11 @@ import {
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
 import type {
     Effect,
+    EffectTexture,
     EffectUniformValue,
     EffectVFXProps,
+    VFXCapture,
+    VFXCaptureOpts,
     VFXElement,
     VFXElementIntersection,
     VFXElementPass,
@@ -180,6 +184,10 @@ export class VFXPlayer {
 
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
+    #captures = new Set<CaptureEntry>();
+    /** What a disposed capture samples: transparent 1×1. */
+    #emptyTexture: Texture;
+
     constructor(opts: VFXOptsInner, canvas: HTMLCanvasElement) {
         this.#opts = opts;
 
@@ -193,6 +201,7 @@ export class VFXPlayer {
 
         this.#quad = new Quad(this.#ctx);
         this.#programCache = new ProgramCache(this.#ctx);
+        this.#emptyTexture = new Texture(this.#ctx);
 
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.#resize);
@@ -230,6 +239,10 @@ export class VFXPlayer {
             this.#postEffectChain = null;
             this.#postEffectChainReady = false;
         }
+        for (const entry of [...this.#captures]) {
+            entry.capture.dispose();
+        }
+        this.#emptyTexture.dispose();
         this.#copyPass.dispose();
         this.#programCache.dispose();
         this.#quad.dispose();
@@ -320,6 +333,9 @@ export class VFXPlayer {
 
     #resize = async (): Promise<void> => {
         if (typeof window !== "undefined") {
+            for (const entry of this.#captures) {
+                entry.resize();
+            }
             // Update dom2canvas result.
             // Render elements in viewport first, then render elements outside of the viewport.
             for (const e of this.#elements) {
@@ -1058,6 +1074,46 @@ export class VFXPlayer {
     }
 
     /**
+     * Capture `source` into a texture without drawing it.
+     * Resolves after the first capture is in the texture.
+     */
+    async addCapture(
+        source: HTMLElement,
+        opts: VFXCaptureOpts,
+        stillZIndex: number,
+        onDispose?: () => void,
+    ): Promise<VFXCapture> {
+        const entry = await createCapture(
+            {
+                createTexture: (src) => new Texture(this.#ctx, src),
+                refreshTexture: (old, offscreen) =>
+                    this.#textureFromCapture(old, offscreen),
+                textureSize: readTextureSourceDim,
+                emptyTexture: this.#emptyTexture,
+                maxTextureSize: this.maxTextureSize,
+                stillZIndex,
+            },
+            source,
+            opts,
+            () => {
+                this.#captures.delete(entry);
+                onDispose?.();
+            },
+        );
+        this.#captures.add(entry);
+        return entry.capture;
+    }
+
+    /** A transparent texture handle, for captures that render nothing. */
+    emptyTexture(): EffectTexture {
+        return makeEffectTexture(
+            () => this.#emptyTexture,
+            () => 0,
+            () => 0,
+        );
+    }
+
+    /**
      * A texture that follows the captures of a canvas that is not on screen.
      * `texture` is null until the first capture.
      */
@@ -1191,6 +1247,10 @@ export class VFXPlayer {
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             }
+        }
+
+        for (const entry of this.#captures) {
+            entry.tick();
         }
 
         for (const e of this.#elements) {

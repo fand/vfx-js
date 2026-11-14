@@ -19,6 +19,8 @@ import type {
 import {
     type Effect,
     getVFXOpts,
+    type VFXCapture,
+    type VFXCaptureOpts,
     type VFXOpts,
     type VFXProps,
 } from "./types.js";
@@ -56,7 +58,10 @@ export class VFX {
     #canvas: HTMLCanvasElement;
     #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
     #transitions = new Set<TransitionHandle>();
+    // Null while the first capture is pending.
+    #captures = new Map<HTMLElement, VFXCapture | null>();
     #reducedMotion: boolean;
+    #destroyed = false;
 
     /**
      * Create a VFX instance if WebGL is available, or return `null`.
@@ -194,6 +199,11 @@ export class VFX {
         if (this.#reducedMotion) {
             return;
         }
+        if (this.#captures.has(element)) {
+            throw new Error(
+                "[VFX-JS] This element is captured. Dispose the capture before addHTML.",
+            );
+        }
         if (!supportsHtmlInCanvas()) {
             console.warn(
                 "html-in-canvas not supported, falling back to dom-to-canvas",
@@ -225,6 +235,87 @@ export class VFX {
         this.#wrapperCanvases.set(element, wrapper);
 
         await this.#addHICCanvas(wrapper, hicOpts, initialCapture);
+    }
+
+    /**
+     * Capture an element as a texture without drawing it.
+     * Any effect of this VFX instance can read the texture.
+     * Resolves after the first capture is in the texture.
+     *
+     * `<img>`, `<video>` and `<canvas>` are uploaded as they are.
+     * Other elements are captured with html-in-canvas when the browser
+     * supports it (like {@link VFX.addHTML}), or else with one DOM snapshot
+     * (like {@link VFX.add}).
+     *
+     * ```ts
+     * const page = await vfx.capture(article, { hide: true });
+     * await vfx.add(minimap, {
+     *     effect: myEffect,
+     *     uniforms: { page: page.texture },
+     * });
+     * // Later:
+     * page.dispose();
+     * ```
+     *
+     * Rejects when the element already has a capture in this instance,
+     * when `addHTML` or a transition has wrapped it, or when the first
+     * capture fails.
+     * When the user prefers reduced motion, it resolves to a handle that
+     * leaves the element alone and samples as transparent.
+     */
+    async capture(
+        source: HTMLElement,
+        opts: VFXCaptureOpts = {},
+    ): Promise<VFXCapture> {
+        if (this.#reducedMotion) {
+            return this.#inertCapture(source);
+        }
+        if (this.#destroyed) {
+            throw new Error("[VFX-JS] This VFX instance is destroyed.");
+        }
+        if (this.#captures.has(source)) {
+            throw new Error(
+                "[VFX-JS] This element is already captured. Share the capture instead.",
+            );
+        }
+        if (this.#wrapperCanvases.has(source)) {
+            throw new Error(
+                "[VFX-JS] capture() cannot take an element that addHTML or a transition has wrapped.",
+            );
+        }
+
+        // Register now, so a second call cannot wrap the element too.
+        this.#captures.set(source, null);
+        let capture: VFXCapture;
+        try {
+            capture = await this.#player.addCapture(
+                source,
+                opts,
+                this.#stillZIndex(),
+                () => this.#captures.delete(source),
+            );
+        } catch (err) {
+            this.#captures.delete(source);
+            throw err;
+        }
+        if (this.#destroyed) {
+            capture.dispose();
+            throw new Error(
+                "[VFX-JS] This VFX instance was destroyed during capture().",
+            );
+        }
+        this.#captures.set(source, capture);
+        return capture;
+    }
+
+    #inertCapture(source: HTMLElement): VFXCapture {
+        const r = source.getBoundingClientRect();
+        return {
+            texture: this.#player.emptyTexture(),
+            rect: { x: r.left, y: r.top, width: r.width, height: r.height },
+            update: () => Promise.resolve(),
+            dispose: () => {},
+        };
     }
 
     // One below the VFX canvas.
@@ -469,6 +560,12 @@ export class VFX {
      * Destroy VFX and stop rendering.
      */
     destroy(): void {
+        this.#destroyed = true;
+        for (const capture of [...this.#captures.values()]) {
+            capture?.dispose();
+        }
+        this.#captures.clear();
+
         for (const transition of this.#transitions) {
             transition.destroy();
         }

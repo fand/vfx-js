@@ -874,7 +874,7 @@ export class EffectHost {
             return out;
         }
         for (const [name, value] of Object.entries(userUniforms)) {
-            out[name] = toInternalUniform(value);
+            out[name] = toInternalUniform(value, this.#gl);
         }
         return out;
     }
@@ -952,12 +952,21 @@ function normalizeWrap(
     return [w[0], w[1]];
 }
 
-function toInternalUniform(value: EffectUniformValue): Uniform {
+function toInternalUniform(
+    value: EffectUniformValue,
+    gl: WebGL2RenderingContext,
+): Uniform {
     if (typeof value === "object" && value !== null && "__brand" in value) {
         if (value.__brand === "EffectRenderTarget") {
             return { value: resolveRt(value).getReadTexture() };
         }
-        return { value: resolveTexture(value) };
+        const texture = resolveTexture(value);
+        if (texture.gl !== gl) {
+            throw new Error(
+                "[VFX-JS] This texture belongs to another VFX instance.",
+            );
+        }
+        return { value: texture };
     }
     return { value };
 }

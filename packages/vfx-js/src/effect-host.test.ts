@@ -125,6 +125,7 @@ const textureCtorCalls: Array<{
 
 vi.mock("./gl/texture.js", () => {
     class Texture {
+        gl: unknown;
         source: unknown;
         wrapS = "clamp";
         wrapT = "clamp";
@@ -146,6 +147,7 @@ vi.mock("./gl/texture.js", () => {
             this.source = source ?? null;
             this.externalHandle = opts?.externalHandle;
             this.autoRegister = opts?.autoRegister !== false;
+            this.gl = (_ctx as { gl: unknown }).gl;
             textureCtorCalls.push({ source, opts });
             textures.push(this as unknown as MockTexture);
         }
@@ -1028,6 +1030,25 @@ describe("EffectHost.draw", () => {
         host.ctx.draw({ frag: FRAG, target: rt });
         // No backbuffer at all; nothing to assert beyond "did not throw".
         expect(backbuffers).toHaveLength(0);
+    });
+
+    it("draws with a texture from the same context", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const tex = host.ctx.wrapTexture(new HTMLCanvasElementStub() as never);
+        host.ctx.draw({ frag: FRAG, uniforms: { tex } });
+        expect(programs[0].uploads[0]["tex"].value).toBe(textures[0]);
+    });
+
+    it("throws on a texture from another context", () => {
+        const { host } = makeHost();
+        const { host: other } = makeHost();
+        other.setPhase("render");
+        const tex = other.ctx.wrapTexture(new HTMLCanvasElementStub() as never);
+        host.setPhase("render");
+        expect(() => host.ctx.draw({ frag: FRAG, uniforms: { tex } })).toThrow(
+            "[VFX-JS] This texture belongs to another VFX instance.",
+        );
     });
 });
 
