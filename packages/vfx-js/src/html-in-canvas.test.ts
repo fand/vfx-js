@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
     moveNode,
+    setupCapture,
+    teardownCapture,
     unwrapElement,
     waitForFlush,
     wrapElement,
@@ -305,5 +307,83 @@ describe("wrapElement", () => {
         expect(canvasStyle().height).toBe("10px");
         expect(element.style.position).toBe("");
         expect(element.style.height).toBe("");
+    });
+});
+
+function fakeHicCanvas() {
+    const ops: string[] = [];
+    const ctx = {
+        clearRect: () => ops.push("clear"),
+        drawElementImage: () => ops.push("draw"),
+    };
+    const child = fakeNode("div");
+    const canvas = {
+        width: 10,
+        height: 10,
+        firstElementChild: Object.assign(child, {
+            getClientRects: () => [{}],
+        }),
+        onpaint: null as ((e?: Event) => void) | null,
+        setAttribute: () => {},
+        getContext: () => ctx,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        requestPaint: () => {},
+    };
+    return { canvas, ops };
+}
+
+describe("setupCapture", () => {
+    beforeEach(() => {
+        vi.stubGlobal(
+            "OffscreenCanvas",
+            class {
+                constructor(
+                    public width: number,
+                    public height: number,
+                ) {}
+                getContext() {
+                    return { clearRect: () => {}, drawImage: () => {} };
+                }
+            },
+        );
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                observe() {}
+                disconnect() {}
+            },
+        );
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    const paintTwice = async (keepDrawn?: boolean) => {
+        const { canvas, ops } = fakeHicCanvas();
+        const onCapture = vi.fn();
+        const el = canvas as unknown as HTMLCanvasElement;
+        const first = setupCapture(el, { onCapture, keepDrawn });
+        canvas.onpaint?.();
+        await first;
+        const afterFirst = [...ops];
+        ops.length = 0;
+        canvas.onpaint?.();
+        teardownCapture(el);
+        return { afterFirst, afterLater: ops, onCapture };
+    };
+
+    test("clears the canvas after a later capture by default", async () => {
+        const { afterFirst, afterLater, onCapture } = await paintTwice();
+        expect(afterFirst).toEqual(["clear", "draw"]);
+        expect(afterLater).toEqual(["clear", "draw", "clear"]);
+        expect(onCapture).toHaveBeenCalledOnce();
+    });
+
+    test("keeps the drawing after a later capture with keepDrawn", async () => {
+        const { afterFirst, afterLater, onCapture } = await paintTwice(true);
+        expect(afterFirst).toEqual(["clear", "draw"]);
+        expect(afterLater).toEqual(["clear", "draw"]);
+        expect(onCapture).toHaveBeenCalledOnce();
     });
 });
