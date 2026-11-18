@@ -164,6 +164,8 @@ export function resetDrawState(gl: WebGL2RenderingContext): void {
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
     gl.depthMask(true);
+    gl.depthFunc(gl.LESS);
+    gl.cullFace(gl.BACK);
 }
 
 function depthFuncEnum(gl: WebGL2RenderingContext, func: DepthFunc): number {

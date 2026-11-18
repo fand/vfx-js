@@ -65,7 +65,7 @@ type RenderTargetResolver = {
     getWriteFbo(): Framebuffer;
 
     /** Current read-side depth texture. Present only for RTs with depth. */
-    getDepthTexture?: () => Texture | null;
+    getDepthTexture?: () => Texture;
 
     /** Called after a draw that wrote to the RT. `persistent: true` only. */
     swap?: () => void;
@@ -516,9 +516,10 @@ export class EffectHost {
                 resolver.mipmapAutoRegen = mipmapAutoRegen;
             }
             if (depth) {
+                // Each side owns a depth texture; return the read side's.
                 resolver.getDepthTexture = () => {
                     bb.read.resolveDepth();
-                    return bb.read.depthTexture;
+                    return bb.read.depthTexture as Texture;
                 };
             }
             getW = () => bb.target.width;
@@ -547,10 +548,11 @@ export class EffectHost {
                 resolver.regenerateMipmaps = () => fb.generateMipmaps();
                 resolver.mipmapAutoRegen = mipmapAutoRegen;
             }
-            if (depth) {
+            const depthTexture = fb.depthTexture;
+            if (depthTexture) {
                 resolver.getDepthTexture = () => {
                     fb.resolveDepth();
-                    return fb.depthTexture;
+                    return depthTexture;
                 };
             }
             getW = () => fb.width;
@@ -1012,13 +1014,10 @@ export class EffectHost {
             : this.#geometries.resolve(geometry as EffectGeometry, program);
         if (drawState) {
             applyDrawState(gl, drawState);
-            try {
-                compiled.draw();
-            } finally {
-                resetDrawState(gl);
-            }
-        } else {
-            compiled.draw();
+        }
+        compiled.draw();
+        if (drawState) {
+            resetDrawState(gl);
         }
         writeFb?.markDirty();
 
@@ -1220,35 +1219,16 @@ export function makeEffectRenderTarget(
         // No-op when the underlying RT has no mip storage.
         generateMipmaps: () => resolver.regenerateMipmaps?.(),
     } as Mutable<EffectRenderTargetInternal>;
-    const depthTexture = makeDepthTexture(resolver, width, height);
-    if (depthTexture) {
-        handle.depthTexture = depthTexture;
+    // Follows swaps. The RT owns the texture, so its dispose is a no-op.
+    if (resolver.getDepthTexture) {
+        handle.depthTexture = makeEffectTexture(
+            resolver.getDepthTexture,
+            width,
+            height,
+        );
     }
     Object.defineProperty(handle, RESOLVE_RT, { value: resolver });
     return handle;
-}
-
-/**
- * Depth handle that follows swaps.
- * The RT owns the texture, so dispose is a no-op.
- */
-function makeDepthTexture(
-    resolver: RenderTargetResolver,
-    width: () => number,
-    height: () => number,
-): EffectTexture | undefined {
-    const getDepthTexture = resolver.getDepthTexture;
-    if (!getDepthTexture) {
-        return undefined;
-    }
-    const resolve = () => {
-        const texture = getDepthTexture();
-        if (!texture) {
-            throw new Error("[VFX-JS] Render target has no depth texture.");
-        }
-        return texture;
-    };
-    return makeEffectTexture(resolve, width, height);
 }
 
 /**

@@ -59,11 +59,6 @@ export class Backbuffer {
         return this.#buffers[0].texture;
     }
 
-    /** Read-side depth texture, or null without `depth: true`. */
-    get depthTexture(): Texture | null {
-        return this.#buffers[0].depthTexture;
-    }
-
     /** Write target for the current frame. */
     get target(): Framebuffer {
         return this.#buffers[1];

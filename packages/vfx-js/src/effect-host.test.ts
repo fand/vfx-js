@@ -273,6 +273,8 @@ vi.mock("./backbuffer.js", () => {
                 resolveDepth: () => {},
                 opts: undefined,
             };
+            // The write side starts as the other side, like the real one.
+            this.target.depthTexture = this.readSides[1].depthTexture;
             backbuffers.push(this as unknown as MockBackbuffer);
         }
         // Read side follows swaps.
@@ -346,10 +348,10 @@ vi.mock("./effect-geometry.js", async () => {
                     this.quadDrawCount += 1;
                 },
             };
-            resolve(geometry: { onDraw?: () => void }) {
+            resolve() {
                 this.customResolveCount += 1;
                 return {
-                    draw: () => geometry.onDraw?.(),
+                    draw: () => {},
                 };
             }
             dispose() {
@@ -1196,6 +1198,8 @@ describe("EffectHost depth", () => {
         const disables = m.disable.mock.calls.map((c) => c[0]);
         expect(disables.slice(-2)).toEqual([gl.DEPTH_TEST, gl.CULL_FACE]);
         expect(m.depthMask.mock.calls.at(-1)).toEqual([true]);
+        expect(m.depthFunc.mock.calls.at(-1)).toEqual([gl.LESS]);
+        expect(m.cullFace.mock.calls.at(-1)).toEqual([gl.BACK]);
     }
 
     function drawWithDepth(
@@ -1323,28 +1327,6 @@ describe("EffectHost depth", () => {
             host.setPhase("render");
             host.ctx.draw({ frag: FRAG, cull: "back" });
             expect(glMocks(gl).enable).toHaveBeenCalledWith(gl.CULL_FACE);
-            expectBaselineAfterDraw(gl);
-        });
-
-        it("state is reset even when the draw throws", () => {
-            const { host, gl } = makeHost();
-            host.setPhase("render");
-            const rt = host.ctx.createRenderTarget({ depth: true });
-            const geometry = {
-                attributes: {},
-                onDraw: () => {
-                    throw new Error("draw failed");
-                },
-            };
-            expect(() =>
-                host.ctx.draw({
-                    frag: FRAG,
-                    target: rt,
-                    geometry,
-                    depthTest: true,
-                    cull: "back",
-                }),
-            ).toThrow("draw failed");
             expectBaselineAfterDraw(gl);
         });
 
