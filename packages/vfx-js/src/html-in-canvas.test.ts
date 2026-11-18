@@ -166,6 +166,7 @@ describe("wrapElement", () => {
     });
     afterEach(() => {
         vi.unstubAllGlobals();
+        vi.restoreAllMocks();
     });
 
     // The clone goes in before the first await, so no capture is needed.
@@ -252,6 +253,94 @@ describe("wrapElement", () => {
         );
         expect(element.style.position).toBe("fixed");
         expect(element.style.height).toBe("auto");
+    });
+
+    test("unwrap moves the element back while it is in the canvas", () => {
+        wrap({});
+        const canvas = inserted[0];
+        const moved: unknown[] = [];
+        canvas.parentNode = {
+            insertBefore: (node: unknown) => moved.push(node),
+        };
+        element.parentNode = canvas;
+        unwrapElement(
+            canvas as unknown as HTMLCanvasElement,
+            element as unknown as HTMLElement,
+        );
+        expect(moved).toEqual([element]);
+    });
+
+    test("unwrap leaves an element the page took out of the canvas", () => {
+        element.style.width = "50%";
+        wrap({});
+        const canvas = inserted[0];
+        const moved: unknown[] = [];
+        canvas.parentNode = {
+            insertBefore: (node: unknown) => moved.push(node),
+        };
+        canvas.remove = vi.fn();
+        // The page removed it.
+        element.parentNode = null;
+        unwrapElement(
+            canvas as unknown as HTMLCanvasElement,
+            element as unknown as HTMLElement,
+        );
+        expect(moved).toEqual([]);
+        expect(canvas.remove).toHaveBeenCalledOnce();
+        expect(element.style.width).toBe("50%");
+    });
+
+    test("an abort during the image swap restores the images and stops", async () => {
+        vi.stubGlobal("location", {
+            href: "https://site.example/",
+            origin: "https://site.example",
+        });
+        let fetched!: () => void;
+        vi.stubGlobal(
+            "fetch",
+            () =>
+                new Promise((resolve) => {
+                    fetched = () => resolve({ blob: async () => ({}) });
+                }),
+        );
+        vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:1");
+        const revoke = vi
+            .spyOn(URL, "revokeObjectURL")
+            .mockImplementation(() => {});
+        const original = "https://other.example/a.png";
+        let src = original;
+        let onLoad = () => {};
+        const img = {
+            complete: true,
+            naturalWidth: 10,
+            currentSrc: "",
+            get src() {
+                return src;
+            },
+            set src(value: string) {
+                src = value;
+                onLoad();
+            },
+            addEventListener: (_: string, fn: () => void) => {
+                onLoad = fn;
+            },
+        };
+        element.querySelectorAll = () => [img] as never[];
+
+        const abort = new AbortController();
+        const wrapping = wrapElement(
+            element as unknown as HTMLElement,
+            { onCapture: () => {} },
+            abort.signal,
+        );
+        abort.abort();
+        await Promise.resolve();
+        fetched();
+        await expect(wrapping).rejects.toThrow("aborted");
+        expect(src).toBe(original);
+        expect(revoke).toHaveBeenCalledWith("blob:1");
+        // No capture setup on the canvas.
+        expect("onpaint" in inserted[0]).toBe(false);
     });
 
     test("uses px for percent vertical margins in the height", () => {

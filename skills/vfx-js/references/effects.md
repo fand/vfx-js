@@ -217,8 +217,8 @@ page.dispose();      // free it and restore the element
 
 - Pass the `VFXCapture` to the effect when it needs `rect`. Pass `capture.texture` in `uniforms` for a reusable effect.
 - `hide: true` hides the element; it keeps its layout and stays interactive. Default `false` leaves it visible.
-- `rect` is in viewport CSS px. `x` / `y` are measured every frame; `width` / `height` are the size when the texture was captured.
-- `rect` is `null` while the element has no layout (not in the document, or `display: none`). Check it before you use it. The texture works either way.
+- `rect` is in viewport CSS px. `x` / `y` are measured every frame. `width` / `height` are too for `<img>` / `<video>` / `<canvas>`; for other elements they are the size when the texture was captured.
+- `rect` is `null` while the element has no layout (not in the document, `display: none`, or removed from its html-in-canvas wrapper). Check it before you use it. The texture works either way.
 - No URL loading. Make the element yourself; it does not have to be in the document (`rect` is then `null`):
 
     ```ts
@@ -227,11 +227,15 @@ page.dispose();      // free it and restore the element
     img.src = url;
     const pic = await vfx.capture(img); // waits for decode()
     ```
+- A WebGL `<canvas>` source needs `preserveDrawingBuffer: true`, or it may capture an empty buffer.
+- With html-in-canvas, capture moves the element into a wrapper canvas like `addHTML`, so the same layout rules apply (CSS that depends on the parent may change, inline elements become blocks).
+- While wrapped, the element's parent is the wrapper canvas, so a framework's `parent.removeChild(el)` throws. Dispose the capture before the element unmounts.
 - Videos and canvases refresh every frame. html-in-canvas refreshes on every repaint. Images and the DOM snapshot fallback change only on `update()`.
 - Effect path only: with `shader`, a texture uniform is ignored with a warning.
 - Post effect `uniforms` can't take it (the capture needs the `VFX` first). Set the capture on the post effect instance after `await vfx.capture()`.
-- One capture per element. `capture` rejects for an element `addHTML` or a transition wraps, and the other way round. It also excludes `add` on the same element (both ways), except for an `<img>` / `<video>` / `<canvas>` captured without `hide`.
-- An HTML element needs a width and height when captured; an empty one rejects.
+- One capture per element, across all `VFX` instances. `capture` rejects for an element `addHTML` or a transition wraps, and the other way round. It also excludes `add` on the same element (both ways, even before `add` resolves), except for an `<img>` / `<video>` / `<canvas>` captured without `hide`.
+- An HTML element needs a width and height when captured; an empty one rejects. So does a source with no pixels, one larger than `vfx.maxTextureSize`, or one WebGL can't read (a cross-origin image without CORS).
+- `capture` rejects `<html>`, `<body>` and any element that contains a VFX canvas.
 - The texture belongs to its `VFX`; drawing it in another instance throws.
 - For a `position: fixed` target (e.g. a minimap), draw it with its own `new VFX({ scrollPadding: false })`. With scroll padding the canvas moves with the page and a fixed drawing lags on scroll. Capture the source in that instance too: capture draws nothing, and the texture only works in its own instance.
 - To map `rect` in a post effect, add the scroll padding: the canvas is the viewport plus the same padding on each side, so `pad = (ctx.dims.canvas - [clientWidth, clientHeight]) / 2` with the size of `document.documentElement`, and the canvas position is `rect.xy + pad` (CSS px, top-left origin).

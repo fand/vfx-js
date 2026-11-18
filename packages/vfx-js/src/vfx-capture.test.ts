@@ -13,6 +13,7 @@ type Pending = {
 const pending: Pending[] = [];
 const wrapped: unknown[] = [];
 const players: { destroy: () => void }[] = [];
+const instances: VFX[] = [];
 
 vi.mock("./webgl-support.js", () => ({ isWebGLAvailable: () => true }));
 vi.mock("./html-in-canvas-support.js", () => ({
@@ -32,7 +33,9 @@ vi.mock("./vfx-player.js", () => ({
     VFXPlayer: class {
         maxTextureSize = 4096;
         added = new Set<unknown>();
-        addElement(element: unknown) {
+        // Like the player, register after an await.
+        async addElement(element: unknown) {
+            await Promise.resolve();
             this.added.add(element);
         }
         hasElement(element: unknown) {
@@ -63,6 +66,9 @@ vi.mock("./vfx-player.js", () => ({
     },
 }));
 
+const body = { appendChild: () => {} };
+const html = {};
+
 function createVFX() {
     const canvas = {
         style: { zIndex: "", setProperty: () => {} },
@@ -70,9 +76,12 @@ function createVFX() {
     };
     vi.stubGlobal("document", {
         createElement: () => canvas,
-        body: { appendChild: () => {} },
+        body,
+        documentElement: html,
     });
-    return new VFX();
+    const vfx = new VFX();
+    instances.push(vfx);
+    return vfx;
 }
 
 function fakeCapture(entry: Pending) {
@@ -96,6 +105,7 @@ function settle() {
 const element = () =>
     ({
         style: { opacity: "" },
+        contains: () => false,
         getBoundingClientRect: () => ({
             left: 1,
             top: 2,
@@ -117,6 +127,9 @@ beforeEach(() => {
     }
 });
 afterEach(() => {
+    for (const vfx of instances.splice(0)) {
+        vfx.destroy();
+    }
     vi.unstubAllGlobals();
     pending.length = 0;
     wrapped.length = 0;
@@ -297,5 +310,109 @@ describe("VFX.capture with reduced motion", () => {
         } as unknown as HTMLElement;
         const capture = await vfx.capture(el);
         expect(capture.rect).toBeNull();
+    });
+});
+
+describe("VFX.capture across instances", () => {
+    test("a second instance cannot capture the same element", async () => {
+        const v1 = createVFX();
+        const v2 = createVFX();
+        const el = element();
+        const first = v1.capture(el);
+        await expect(v2.capture(el)).rejects.toThrow("another VFX instance");
+        settle();
+        const capture = await first;
+        await expect(v2.capture(el)).rejects.toThrow("another VFX instance");
+        expect(pending).toHaveLength(1);
+
+        capture.dispose();
+        const second = v2.capture(el);
+        settle();
+        await expect(second).resolves.toBeDefined();
+    });
+
+    test("addHTML and add reject an element another instance captured", async () => {
+        const v1 = createVFX();
+        const v2 = createVFX();
+        const el = element();
+        const capture = v1.capture(el);
+        settle();
+        await capture;
+        await expect(v2.addHTML(el, {})).rejects.toThrow("captured");
+        await expect(v2.add(el, {})).rejects.toThrow("captured");
+        expect(wrapped).toEqual([]);
+    });
+
+    test("capture rejects an element another instance wrapped or added", async () => {
+        const v1 = createVFX();
+        const v2 = createVFX();
+        const wrappedEl = element();
+        await v1.addHTML(wrappedEl, {});
+        await expect(v2.capture(wrappedEl)).rejects.toThrow("wrapped");
+
+        const addedEl = element();
+        await v1.add(addedEl, {});
+        await expect(v2.capture(addedEl)).rejects.toThrow("add()");
+
+        // A media element without hide is fine, like in one instance.
+        const img = image();
+        await v1.add(img, {});
+        const capture = v2.capture(img);
+        settle();
+        await expect(capture).resolves.toBeDefined();
+        expect(pending).toHaveLength(1);
+    });
+
+    test("a destroyed instance no longer owns its elements", async () => {
+        const v1 = createVFX();
+        const v2 = createVFX();
+        const el = element();
+        await v1.add(el, {});
+        v1.destroy();
+        const capture = v2.capture(el);
+        settle();
+        await expect(capture).resolves.toBeDefined();
+    });
+});
+
+describe("VFX.capture while add is loading", () => {
+    test("rejects an element whose add has not resolved", async () => {
+        const vfx = createVFX();
+        const el = element();
+        const adding = vfx.add(el, {});
+        await expect(vfx.capture(el, { hide: true })).rejects.toThrow("add()");
+        await adding;
+        expect(pending).toHaveLength(0);
+    });
+
+    test("another instance sees the pending add too", async () => {
+        const v1 = createVFX();
+        const v2 = createVFX();
+        const el = element();
+        const adding = v1.add(el, {});
+        await expect(v2.capture(el)).rejects.toThrow("add()");
+        await adding;
+    });
+});
+
+describe("VFX.capture rejects unsafe roots", () => {
+    test.each([
+        ["<body>", () => body],
+        ["<html>", () => html],
+    ])("rejects %s", async (_, root) => {
+        const vfx = createVFX();
+        const el = Object.assign(root(), element());
+        await expect(vfx.capture(el)).rejects.toThrow("<html>, <body>");
+        expect(pending).toHaveLength(0);
+    });
+
+    test("rejects an element that contains a VFX canvas", async () => {
+        const vfx = createVFX();
+        const other = createVFX();
+        const el = Object.assign(element(), {
+            contains: (node: unknown) => node === other.canvas,
+        });
+        await expect(vfx.capture(el)).rejects.toThrow("VFX canvas");
+        expect(pending).toHaveLength(0);
     });
 });

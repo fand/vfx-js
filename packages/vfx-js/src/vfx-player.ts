@@ -1098,6 +1098,7 @@ export class VFXPlayer {
         const entry = await createCapture(
             {
                 createTexture: (src) => this.#premultipliedTexture(src),
+                uploadTexture: (texture) => this.#uploadNow(texture),
                 refreshTexture: (old, offscreen) =>
                     this.#textureFromCapture(old, offscreen),
                 textureSize: readTextureSourceDim,
@@ -1115,6 +1116,23 @@ export class VFXPlayer {
         );
         this.#captures.add(entry);
         return entry.capture;
+    }
+
+    // Throws when the upload throws or leaves a GL error.
+    #uploadNow(texture: Texture): void {
+        const gl = this.#gl;
+        // Drop errors left by earlier calls.
+        for (let i = 0; i < 8 && gl.getError() !== gl.NO_ERROR; i++) {}
+        try {
+            texture.upload(0);
+        } catch (err) {
+            throw new Error(
+                `[VFX-JS] capture() could not upload the source: ${err}`,
+            );
+        }
+        if (gl.getError() !== gl.NO_ERROR) {
+            throw new Error("[VFX-JS] capture() could not upload the source.");
+        }
     }
 
     // Effects read `ctx.src` as premultiplied; match it.

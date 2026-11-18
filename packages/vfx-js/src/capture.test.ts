@@ -33,11 +33,18 @@ class FakeElement {
 }
 class FakeImage extends FakeElement {
     decode = vi.fn(() => Promise.resolve());
+    naturalWidth = 60;
+    naturalHeight = 80;
 }
 class FakeVideo extends FakeElement {
     readyState = 4;
+    videoWidth = 60;
+    videoHeight = 80;
 }
-class FakeCanvas extends FakeElement {}
+class FakeCanvas extends FakeElement {
+    width = 60;
+    height = 80;
+}
 class FakeDiv extends FakeElement {}
 class FakeOffscreen {
     constructor(
@@ -60,8 +67,10 @@ function fakeDeps(dom?: Partial<CaptureDom>) {
         made.push(texture);
         return texture;
     };
-    const deps: CaptureDeps = {
+    const uploadTexture = vi.fn((_: Texture) => {});
+    const deps = {
         createTexture,
+        uploadTexture,
         // Like the player: re-upload the same canvas, replace on a new one.
         refreshTexture: (old, offscreen) => {
             if (old.source === offscreen) {
@@ -77,7 +86,7 @@ function fakeDeps(dom?: Partial<CaptureDom>) {
         maxTextureSize: 4096,
         stillZIndex: 41,
         dom,
-    };
+    } satisfies CaptureDeps;
     return { deps, made, emptyTexture };
 }
 
@@ -303,18 +312,30 @@ describe("createCapture: tick", () => {
         expect(capture.rect).toEqual({ x: 3, y: 4, width: 0, height: 0 });
     });
 
-    test("image size follows update(), not tick()", async () => {
+    test("image size follows the box on tick(), the upload waits for update()", async () => {
         const { deps, made } = fakeDeps();
         const img = new FakeImage();
         const { capture, tick } = await createCapture(deps, asElement(img), {});
         img.box = { left: 1, top: 2, width: 50, height: 60 };
         tick();
-        expect([capture.rect?.width, capture.rect?.height]).toEqual([30, 40]);
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([50, 60]);
+        expect(made[0].needsUpdate).toBe(false);
         await capture.update();
         expect(img.decode).toHaveBeenCalledTimes(2);
         expect(made[0].needsUpdate).toBe(true);
+    });
+
+    test("an image captured before it is in the document gets its size once inserted", async () => {
+        const { deps } = fakeDeps();
+        const img = new FakeImage();
+        img.box = { left: 0, top: 0, width: 0, height: 0 };
+        img.hasBox = false;
+        const { capture, tick } = await createCapture(deps, asElement(img), {});
+        expect(capture.rect).toBeNull();
+        img.box = { left: 5, top: 6, width: 30, height: 40 };
+        img.hasBox = true;
         tick();
-        expect([capture.rect?.width, capture.rect?.height]).toEqual([50, 60]);
+        expect(capture.rect).toEqual({ x: 5, y: 6, width: 30, height: 40 });
     });
 });
 
@@ -376,14 +397,16 @@ function fakeHic() {
     let captured!: () => void;
     const dom = {
         supportsHtmlInCanvas: () => true,
-        wrapElement: vi.fn(async (_: HTMLElement, opts: WrapOpts) => {
-            wrapOpts = opts;
-            el.parentNode = wrapper;
-            return {
-                canvas: wrapper as unknown as HTMLCanvasElement,
-                initialCapture: first,
-            };
-        }),
+        wrapElement: vi.fn(
+            async (_: HTMLElement, opts: WrapOpts, _signal?: AbortSignal) => {
+                wrapOpts = opts;
+                el.parentNode = wrapper;
+                return {
+                    canvas: wrapper as unknown as HTMLCanvasElement,
+                    initialCapture: first,
+                };
+            },
+        ),
         unwrapElement: vi.fn(() => {
             el.parentNode = parent;
         }),
@@ -826,5 +849,118 @@ describe("createCapture: snapshot", () => {
         capture.dispose();
         resize();
         expect(snap.dom.dom2canvas).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("createCapture: sources WebGL can't read", () => {
+    test.each([
+        [
+            "a 0×0 canvas",
+            () => Object.assign(new FakeCanvas(), { width: 0, height: 0 }),
+        ],
+        [
+            "an image with no natural size",
+            () =>
+                Object.assign(new FakeImage(), {
+                    naturalWidth: 0,
+                    naturalHeight: 0,
+                }),
+        ],
+        [
+            "a video with no frame size",
+            () =>
+                Object.assign(new FakeVideo(), {
+                    videoWidth: 0,
+                    videoHeight: 0,
+                }),
+        ],
+    ])("rejects %s and leaves it", async (_, make) => {
+        const { deps, made } = fakeDeps();
+        const el = make();
+        el.style.opacity = "0.5";
+        await expect(
+            createCapture(deps, asElement(el), { hide: true }),
+        ).rejects.toThrow("no pixels");
+        expect(el.style.opacity).toBe("0.5");
+        expect(made).toHaveLength(0);
+    });
+
+    test("rejects a source larger than maxTextureSize", async () => {
+        const { deps, made } = fakeDeps();
+        const img = new FakeImage();
+        img.naturalWidth = 4097;
+        await expect(
+            createCapture(deps, asElement(img), { hide: true }),
+        ).rejects.toThrow("max texture size");
+        expect(img.style.opacity).toBe("");
+        expect(made).toHaveLength(0);
+    });
+
+    test("uploads the first capture during setup", async () => {
+        const { deps, made } = fakeDeps();
+        await createCapture(deps, asElement(new FakeImage()), {});
+        expect(deps.uploadTexture).toHaveBeenCalledWith(made[0]);
+    });
+
+    test("rejects when the first upload fails and restores the element", async () => {
+        const { deps, made } = fakeDeps();
+        deps.uploadTexture.mockImplementationOnce(() => {
+            throw new Error("tainted");
+        });
+        const img = new FakeImage();
+        img.style.opacity = "0.5";
+        const onDispose = vi.fn();
+        await expect(
+            createCapture(deps, asElement(img), { hide: true }, onDispose),
+        ).rejects.toThrow("tainted");
+        expect(img.style.opacity).toBe("0.5");
+        expect(made[0].dispose).toHaveBeenCalledOnce();
+        expect(onDispose).not.toHaveBeenCalled();
+    });
+
+    test("unwraps when the first html-in-canvas upload fails", async () => {
+        const hic = fakeHic();
+        const { deps, made } = fakeDeps(hic.dom);
+        deps.uploadTexture.mockImplementationOnce(() => {
+            throw new Error("lost");
+        });
+        await expect(
+            createCapture(deps, asElement(hic.el), {}),
+        ).rejects.toThrow("lost");
+        expect(hic.dom.unwrapElement).toHaveBeenCalledWith(hic.wrapper, hic.el);
+        expect(made[0].dispose).toHaveBeenCalledOnce();
+    });
+});
+
+describe("createCapture: the page moves a wrapped element", () => {
+    test("rect is null while the element is out of its wrapper", async () => {
+        const hic = fakeHic();
+        const { deps } = fakeDeps(hic.dom);
+        const { capture, tick } = await createCapture(
+            deps,
+            asElement(hic.el),
+            {},
+        );
+        expect(capture.rect).not.toBeNull();
+        hic.el.parentNode = null;
+        tick();
+        expect(capture.rect).toBeNull();
+        hic.el.parentNode = hic.wrapper;
+        tick();
+        expect(capture.rect).toEqual({ x: 3, y: 4, width: 50, height: 20 });
+    });
+
+    test("passes the abort signal to wrapElement", async () => {
+        const hic = fakeHic();
+        const { deps } = fakeDeps(hic.dom);
+        const abort = new AbortController();
+        await createCapture(
+            deps,
+            asElement(hic.el),
+            {},
+            undefined,
+            abort.signal,
+        );
+        expect(hic.dom.wrapElement.mock.calls[0][2]).toBe(abort.signal);
     });
 });

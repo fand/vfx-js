@@ -672,10 +672,14 @@ interface WrapResult {
  * sizing policy in docs/html-in-canvas.md.
  *
  * Delegates onpaint + ROs to `setupCapture`.
+ *
+ * When `signal` aborts, it undoes its image swap and capture setup after
+ * the step in progress, and rejects. The caller unwraps.
  */
 export async function wrapElement(
     element: HTMLElement,
     opts: WrapOpts,
+    signal?: AbortSignal,
 ): Promise<WrapResult> {
     const rect = element.getBoundingClientRect();
     const insetSizing = getInsetSizing(element);
@@ -819,9 +823,17 @@ export async function wrapElement(
 
     // Cross-origin images
     const restore = await inlineCrossOriginImages(element);
+    if (signal?.aborted) {
+        restore();
+        throw new Error("[VFX-JS] Wrapping was aborted.");
+    }
     imageRestorers.set(canvas, restore);
 
     const initialCapture = await setupCapture(canvas, opts);
+    if (signal?.aborted) {
+        teardownCapture(canvas);
+        throw new Error("[VFX-JS] Wrapping was aborted.");
+    }
 
     return { canvas, initialCapture };
 }
@@ -843,9 +855,10 @@ export function unwrapElement(
         imageRestorers.delete(canvas);
     }
 
-    // Move element back before canvas, then remove canvas
+    // Move element back before canvas, then remove canvas. Leave it
+    // where it is when the page has removed or moved it.
     const parent = canvas.parentNode;
-    if (parent) {
+    if (parent && element.parentNode === canvas) {
         moveNode(parent, element, canvas);
     }
     canvas.remove();

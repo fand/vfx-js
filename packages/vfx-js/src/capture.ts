@@ -36,6 +36,8 @@ const defaultDom: CaptureDom = {
 export type CaptureDeps = {
     /** A new texture, premultiplied like `ctx.src`. */
     createTexture(source: TextureSource): Texture;
+    /** Upload now. Throws when the upload fails. */
+    uploadTexture(texture: Texture): void;
     /**
      * Re-upload `offscreen` into `old`, or return a new texture with the
      * same settings and dispose `old` when the capture canvas changed.
@@ -55,8 +57,12 @@ export type CaptureDeps = {
 type CaptureDriver = {
     /** The element whose rect is measured. */
     readonly box: Element;
+    /** False when the source has left the box, so it has no layout. */
+    inBox?(): boolean;
+    /** The slot size follows the box on every frame (image, video, canvas). */
+    readonly sizeFollowsBox: boolean;
     /** Upload on every frame (video, canvas). */
-    readonly everyFrame: boolean;
+    readonly uploadEveryFrame: boolean;
     update(): Promise<void>;
     /** Called on a window resize. */
     resize?(): void;
@@ -109,6 +115,14 @@ export async function createCapture(
 ): Promise<CaptureEntry> {
     const slot = { width: 0, height: 0 } as CaptureSlot;
     const driver = await createDriver(deps, source, opts, slot, signal);
+    // Upload now, so a source WebGL can't read rejects here.
+    try {
+        deps.uploadTexture(slot.texture);
+    } catch (err) {
+        driver.dispose();
+        slot.texture.dispose();
+        throw err;
+    }
 
     let disposed = false;
     let warned = false;
@@ -116,15 +130,14 @@ export async function createCapture(
     let hasLayout = false;
 
     const measure = () => {
-        const r = layoutRect(driver.box);
+        const r = driver.inBox?.() === false ? null : layoutRect(driver.box);
         hasLayout = r !== null;
         if (!r) {
             return;
         }
         rect.x = r.left;
         rect.y = r.top;
-        // Video and canvas are captured every frame, so their size follows the box.
-        if (driver.everyFrame) {
+        if (driver.sizeFollowsBox) {
             slot.width = r.width;
             slot.height = r.height;
         }
@@ -180,7 +193,7 @@ export async function createCapture(
                 return;
             }
             measure();
-            if (driver.everyFrame) {
+            if (driver.uploadEveryFrame) {
                 slot.texture.needsUpdate = true;
             }
         },
@@ -295,6 +308,19 @@ function snapshotSize(box: Element): [number, number] {
     return [Math.ceil(r.width), Math.ceil(r.height)];
 }
 
+/** Pixel size of a media source. */
+function sourceSize(
+    source: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
+): [number, number] {
+    if (source instanceof HTMLImageElement) {
+        return [source.naturalWidth, source.naturalHeight];
+    }
+    if (source instanceof HTMLVideoElement) {
+        return [source.videoWidth, source.videoHeight];
+    }
+    return [source.width, source.height];
+}
+
 async function mediaDriver(
     deps: CaptureDeps,
     source: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
@@ -307,8 +333,16 @@ async function mediaDriver(
     } else if (source instanceof HTMLVideoElement && source.readyState < 3) {
         await waitForVideo(source, signal);
     }
+    const [w, h] = sourceSize(source);
+    if (w === 0 || h === 0) {
+        throw new Error("[VFX-JS] capture() got a source with no pixels.");
+    }
+    if (w > deps.maxTextureSize || h > deps.maxTextureSize) {
+        throw new Error(
+            `[VFX-JS] capture() got a source larger than the max texture size (${deps.maxTextureSize}px).`,
+        );
+    }
     slot.texture = deps.createTexture(source);
-    setSlotSize(slot, source);
 
     // Hide only once the texture exists, so a failed setup leaves the element alone.
     const savedOpacity = source.style.opacity;
@@ -326,18 +360,19 @@ async function mediaDriver(
     if (source instanceof HTMLImageElement) {
         return {
             box: source,
-            everyFrame: false,
+            sizeFollowsBox: true,
+            uploadEveryFrame: false,
             async update() {
                 await source.decode();
                 slot.texture.needsUpdate = true;
-                setSlotSize(slot, source);
             },
             dispose: restoreOpacity,
         };
     }
     return {
         box: source,
-        everyFrame: true,
+        sizeFollowsBox: true,
+        uploadEveryFrame: true,
         update: () => Promise.resolve(),
         dispose: restoreOpacity,
     };
@@ -355,15 +390,21 @@ async function hicDriver(
     let wrapper: HTMLCanvasElement;
     let initialCapture: OffscreenCanvas;
     try {
-        const wrapping = dom.wrapElement(source, {
-            onCapture: (offscreen) => {
-                slot.texture = deps.refreshTexture(slot.texture, offscreen);
-                setSlotSize(slot, wrapper);
+        const wrapping = dom.wrapElement(
+            source,
+            {
+                onCapture: (offscreen) => {
+                    slot.texture = deps.refreshTexture(slot.texture, offscreen);
+                    setSlotSize(slot, wrapper);
+                },
+                maxSize: deps.maxTextureSize,
+                keepDrawn: !opts.hide,
+                stillCover: opts.hide
+                    ? undefined
+                    : { zIndex: deps.stillZIndex },
             },
-            maxSize: deps.maxTextureSize,
-            keepDrawn: !opts.hide,
-            stillCover: opts.hide ? undefined : { zIndex: deps.stillZIndex },
-        });
+            signal,
+        );
         ({ canvas: wrapper, initialCapture } = await abortable(
             wrapping,
             signal,
@@ -390,7 +431,10 @@ async function hicDriver(
 
     return {
         box: wrapper,
-        everyFrame: false,
+        // The page may remove or move the element out of the wrapper.
+        inBox: () => source.parentNode === wrapper,
+        sizeFollowsBox: false,
+        uploadEveryFrame: false,
         async update() {
             await dom.requestCapture(wrapper);
         },
@@ -472,7 +516,8 @@ async function snapshotDriver(
 
     return {
         box: source,
-        everyFrame: false,
+        sizeFollowsBox: false,
+        uploadEveryFrame: false,
         update,
         resize() {
             const [w, h] = snapshotSize(source);

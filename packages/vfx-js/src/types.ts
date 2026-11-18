@@ -580,6 +580,10 @@ export type VFXCaptureOpts = {
      * With html-in-canvas, the element is always moved into a wrapper
      * canvas. Without `hide`, the canvas shows the latest capture, so the
      * element looks unchanged.
+     * The wrap is the same as `addHTML`'s, so the same layout rules apply:
+     * CSS that depends on the parent may change, and an inline element becomes a block.
+     * While wrapped, the element's parent is the wrapper canvas, so a
+     * framework's `parent.removeChild(el)` throws. Dispose the capture first.
      */
     hide?: boolean;
 };
@@ -590,8 +594,9 @@ export type VFXCaptureOpts = {
  * See {@link VFXCapture.rect} for when there is none.
  *
  * `x` / `y` are measured at the start of every rendered frame.
- * `width` / `height` are the element's size when the current texture
- * was captured, so the texture is never stretched after a resize.
+ * For `<img>`, `<video>` and `<canvas>`, so are `width` / `height`.
+ * For other elements, `width` / `height` are the size when the current
+ * texture was captured, so the texture is never stretched after a resize.
  */
 export type VFXCaptureRect = {
     readonly x: number;
@@ -611,7 +616,8 @@ export type VFXCapture = {
     /**
      * Where the element is, or `null` while it has no layout: it is not in
      * the document (e.g. an `<img>` made with `new Image()` and never
-     * inserted), or it is `display: none`. Checked every frame.
+     * inserted), or it is `display: none`, or the page removed it from its
+     * html-in-canvas wrapper. Checked every frame.
      *
      * While it is not `null` it is the same object, and its fields change.
      * The texture works either way.
