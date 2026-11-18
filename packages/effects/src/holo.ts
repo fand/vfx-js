@@ -343,7 +343,7 @@ export class HoloEffect implements Effect {
         };
         this.#conv = ctx.createRenderTarget(tableOpts);
         this.#cum = ctx.createRenderTarget(tableOpts);
-        this.#hdr = ctx.createRenderTarget({ float: true, filter: "nearest" });
+        this.#ensureHdr(ctx);
         this.#black = ctx.createRenderTarget({ size: [1, 1], float: true });
         const ltcCanvas = this.#makeCanvas(LTC_IMAGE.width, LTC_IMAGE.height);
         this.#ctx2d(ltcCanvas)?.putImageData(
@@ -367,6 +367,23 @@ export class HoloEffect implements Effect {
             float: true,
             filter: "linear",
         });
+    }
+
+    #hdrSamples = 0;
+
+    /** The card target: float, sized to the element, with the tier's MSAA (holospot: 4× half float). */
+    #ensureHdr(ctx: EffectContext): void {
+        const samples = (TIERS[this.params.quality] ?? TIERS.medium).msaa;
+        if (this.#hdr && this.#hdrSamples === samples) {
+            return;
+        }
+        this.#hdr?.dispose();
+        this.#hdr = ctx.createRenderTarget({
+            float: true,
+            filter: "nearest",
+            samples,
+        });
+        this.#hdrSamples = samples;
     }
 
     #makeCanvas(w: number, h: number): HTMLCanvasElement | OffscreenCanvas {
@@ -545,6 +562,7 @@ export class HoloEffect implements Effect {
             ctx.blit(ctx.src, ctx.target);
             return;
         }
+        this.#ensureHdr(ctx);
         if (!this.#blackReady) {
             ctx.draw({
                 frag: FRAG_ZERO,

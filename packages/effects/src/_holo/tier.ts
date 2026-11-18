@@ -1,10 +1,12 @@
 // Quality tiers (holospot engine/render/tier.ts, MIT © 2026 Dmitry Kurash): defines and loop trip counts of the
-// material programs. MSAA, DPR caps and memory budgets do not apply to an element effect.
+// material programs, and the card target's MSAA (4 samples, half float, as holospot's HDR target). DPR caps and memory
+// budgets do not apply to an element effect.
 import type { Tier, TierConfig } from "./types.js";
 
 export const TIERS: Readonly<Record<Tier, TierConfig>> = {
     high: {
         tier: "high",
+        msaa: 4,
         glareLevels: 5,
         glareStartDiv: 2,
         waves: { board: 8, coat: 16 },
@@ -30,6 +32,7 @@ export const TIERS: Readonly<Record<Tier, TierConfig>> = {
     },
     medium: {
         tier: "medium",
+        msaa: 4,
         glareLevels: 4,
         glareStartDiv: 2,
         waves: { board: 6, coat: 8 },
@@ -55,6 +58,7 @@ export const TIERS: Readonly<Record<Tier, TierConfig>> = {
     },
     low: {
         tier: "low",
+        msaa: 4,
         glareLevels: 3,
         glareStartDiv: 4,
         waves: { board: 2, coat: 2 },
