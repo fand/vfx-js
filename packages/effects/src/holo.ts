@@ -13,10 +13,24 @@ import type {
 import outputFrag from "./_holo/glsl/output.js";
 import type { MaterialDef, Uniforms } from "./_holo/materials/build.js";
 import { prism } from "./_holo/materials/prism.js";
-import { eulerXYZ, framingDistance } from "./_holo/physics/geometry.js";
+import {
+    type EnvLevels,
+    envLevels,
+    eulerXYZ,
+    framingDistance,
+} from "./_holo/physics/geometry.js";
 import { etaFrame } from "./_holo/physics/grating.js";
+import {
+    cameraSideBlobs,
+    ENV_LEVELS,
+    ENV_SIZE,
+    envRotation,
+    FRAG_ENV_PREFILTER,
+    sameLevels,
+} from "./_holo/scene/env.js";
 import { computeLights, emptyLightSet } from "./_holo/scene/lights.js";
 import { PoseSpring, wobbleOffset } from "./_holo/scene/pose.js";
+import { buildWaves, type WaveSet } from "./_holo/scene/relief.js";
 import {
     backgroundTone,
     exposureMultiplier,
@@ -208,6 +222,10 @@ export class HoloEffect implements Effect {
     #cum: EffectRenderTarget | null = null;
     #hdr: EffectRenderTarget | null = null;
     #black: EffectRenderTarget | null = null;
+    #env: EffectRenderTarget | null = null;
+    #envDrawn: EnvLevels | null = null;
+    #blobs = cameraSideBlobs();
+    #waves: WaveSet | null = null;
     #blackReady = false;
 
     #pose = new PoseSpring();
@@ -262,6 +280,11 @@ export class HoloEffect implements Effect {
         this.#cum = ctx.createRenderTarget(tableOpts);
         this.#hdr = ctx.createRenderTarget({ float: true, filter: "nearest" });
         this.#black = ctx.createRenderTarget({ size: [1, 1], float: true });
+        this.#env = ctx.createRenderTarget({
+            size: [ENV_SIZE, ENV_SIZE * ENV_LEVELS],
+            float: true,
+            filter: "linear",
+        });
     }
 
     #resolve(): void {
@@ -279,6 +302,17 @@ export class HoloEffect implements Effect {
         this.#matUniforms = def.uniforms(this.#resolved.values);
         this.#atlas?.setTint(def.gratingSummary(this.#resolved.values).tint);
         const tier = TIERS[p.quality] ?? TIERS.medium;
+        const c = this.#scene.card;
+        this.#waves = buildWaves(
+            def.relief(this.#resolved.values),
+            {
+                emboss: c.emboss,
+                pitchMm: c.embossPitchMm,
+                heightUm: c.embossHeightUm,
+                layer: c.embossLayer,
+            },
+            tier.waves,
+        );
         this.#frag = assembleMaterial(
             {
                 ...tier.defines,
@@ -421,6 +455,27 @@ export class HoloEffect implements Effect {
         if (this.#atlasUploaded !== atlas.version) {
             this.#uploadAtlas(ctx, atlas);
         }
+        const tone = backgroundTone(s.background, s.bgColor);
+        const levels = envLevels(s.studio.ambient, tone);
+        if (this.#env && !sameLevels(this.#envDrawn, levels)) {
+            ctx.draw({
+                frag: FRAG_ENV_PREFILTER,
+                vert: PLAIN_VERT,
+                target: this.#env,
+                uniforms: {
+                    uRims: levels.rims,
+                    uFill: levels.fill,
+                    uScrim: levels.scrim,
+                    uCameraSide: levels.cameraSide,
+                    uCameraTexture: levels.cameraTexture,
+                    uBehind: levels.behind,
+                    uBlobs: this.#blobs.blobs,
+                    uBlobNorm: this.#blobs.norm,
+                },
+            });
+            this.#envDrawn = levels;
+        }
+        const waves = this.#waves;
 
         const tier = TIERS[this.params.quality] ?? TIERS.medium;
         const tr = tier.trips;
@@ -430,7 +485,6 @@ export class HoloEffect implements Effect {
         binLam.set(bins.lambda);
         const binW = new Float32Array(72);
         binW.set(bins.W);
-        const tone = backgroundTone(s.background, s.bgColor);
 
         ctx.draw({
             frag: this.#frag,
@@ -466,10 +520,10 @@ export class HoloEffect implements Effect {
                 uBCells: tr.bCells,
                 uBBins: tr.bBins,
                 uBLevels: tr.bLevels,
-                uEnv: this.#black,
-                uEnvMaxLod: 0,
+                uEnv: this.#env ?? this.#black,
+                uEnvMaxLod: ENV_LEVELS - 1,
                 uEnvIntensity: 1,
-                uEnvRot: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
+                uEnvRot: envRotation(s.studio.ambient.rotationDeg),
                 uEnvUniform: 0,
                 uCmfConv: this.#conv,
                 uCmfCum: this.#cum,
@@ -479,9 +533,9 @@ export class HoloEffect implements Effect {
                 uBinWidth: bins.width,
                 uLtc1: this.#black,
                 uLtc2: this.#black,
-                uWave: new Float32Array(128),
-                uWaveBoard: [0, 0],
-                uWaveCoat: [0, 0],
+                uWave: waves?.data ?? new Float32Array(128),
+                uWaveBoard: waves?.board ?? [0, 0],
+                uWaveCoat: waves?.coat ?? [0, 0],
                 uBumpMode: 0,
                 uBumpMom: this.#black,
                 uBumpCross: this.#black,

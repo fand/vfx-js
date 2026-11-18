@@ -75,15 +75,29 @@ vec3 octDecode(vec2 uv) {
 }
 `;
 
+/** Tiles of the environment atlas (= uEnvMaxLod + 1) and their size [texels] (scene/env.ts). */
+export const ENV_LEVELS = 7;
+export const ENV_SIZE = 128;
+
 const IBL = replaceExact(
     replaceExact(
         ibl,
         "uniform samplerCube uEnv;",
-        `uniform sampler2D uEnv;${GLSL_OCT}`,
+        `uniform sampler2D uEnv;${GLSL_OCT}
+// vfx-js port: uEnv is an octahedral atlas of ENV_LEVELS prefiltered tiles stacked vertically (scene/env.ts); the
+// level blends the two nearest tiles, like a trilinear lookup of the PMREM mips.
+vec3 envOctLod(vec3 d, float lod) {
+  const float N = ${ENV_LEVELS.toFixed(1)}, S = ${ENV_SIZE.toFixed(1)};
+  vec2 uv = clamp(octEncode(d), 0.5 / S, 1.0 - 0.5 / S);
+  float l = clamp(lod, 0.0, N - 1.0), l0 = floor(l), l1 = min(l0 + 1.0, N - 1.0);
+  vec3 a = textureLod(uEnv, vec2(uv.x, (l0 + uv.y) / N), 0.0).rgb;
+  vec3 b = textureLod(uEnv, vec2(uv.x, (l1 + uv.y) / N), 0.0).rgb;
+  return mix(a, b, l - l0);
+}`,
         "ibl sampler",
     ),
-    "textureLod(uEnv, uEnvRot * dirW, ",
-    "textureLod(uEnv, octEncode(uEnvRot * dirW), ",
+    "textureLod(uEnv, uEnvRot * dirW, uEnvMaxLod * r * (2.0 - r)).rgb",
+    "envOctLod(uEnvRot * dirW, uEnvMaxLod * r * (2.0 - r))",
     "ibl lookup",
 );
 
