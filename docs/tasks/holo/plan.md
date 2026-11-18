@@ -214,3 +214,30 @@ Phase 2 (same PR, after the above works): Foil Emboss with an image param.
 - **Bundle size.** The data tables and shader sources add roughly 150–250 KB of
   source to the package. The package is `sideEffects: false`, so apps that do
   not import `HoloEffect` do not pay for it.
+
+## Status
+
+Milestones 1–20 are done. Phase 2 (Foil Emboss) is next.
+
+Parity against holospot `dist/holo.js` (the card at pose (0, 0), same lights and camera, holospot's `bump.strength`
+0, grain and glare off unless noted). Mean absolute difference per channel, 0–255:
+
+| Case | Difference |
+|---|---|
+| Prism, card look, medium | 1.7 |
+| Prism, panel mirror (LTC) | 0.8 |
+| Prism, plain look, low / high | 1.6 / 1.2 |
+| Prism with glare 0.1 | 0.6 |
+| Shatter | ≈ 9 per pixel, only along shard edges (holospot renders with 4× MSAA); interiors identical |
+| Nebula, Sparkle | per-pixel glints differ (MSAA); means within 1.5, blurred (σ 6 px) difference ≤ 1.7 |
+| Vortex | 2.3 |
+
+Deviations found while porting:
+
+- The foil mask is applied in the material pass (the card target's alpha), as holospot's coverage is, so the
+  glare only sees visible foil.
+- Glare spill stays inside the element rect (no `outputRect` growth yet).
+- No MSAA: shard edges and glints are filtered by the shaders only.
+- The environment is prefiltered with an importance-sampled GGX lobe per tile instead of three's PMREM.
+- The pose is this port's: spring toward rest pose + pointer tilt (`motion.tiltRange`), idle wobble as a slow
+  Lissajous. holospot's site pose controller is not part of its kit.
