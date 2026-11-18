@@ -25,6 +25,8 @@ export class Backbuffer {
             wrap?: TextureWrap | readonly [TextureWrap, TextureWrap];
             filter?: TextureFilter;
             mipmap?: boolean;
+            depth?: boolean;
+            samples?: 1 | 4;
         } = {},
     ) {
         this.#width = width;
@@ -38,11 +40,18 @@ export class Backbuffer {
             wrap: opts.wrap,
             filter: opts.filter,
             mipmap: opts.mipmap,
+            depth: opts.depth,
+            samples: opts.samples,
         };
         this.#buffers = [
             new Framebuffer(ctx, pwidth, pheight, fbOpts),
             new Framebuffer(ctx, pwidth, pheight, fbOpts),
         ];
+    }
+
+    /** Read side (the previous frame's output). */
+    get read(): Framebuffer {
+        return this.#buffers[0];
     }
 
     /** Read texture (the previous frame's output). */

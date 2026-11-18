@@ -31,6 +31,7 @@ Docs: https://amagi.dev/vfx-js/ Â· Examples: https://amagi.dev/vfx-js/examples Â
 | Your own one-pass shader | `vfx.add(el, { shader: glslString })` | [references/shader.md](references/shader.md) |
 | Multi-pass, feedback, simulation | `shader: VFXPass[]` | [references/shader.md](references/shader.md) |
 | Prebuilt effects, chains, or reusable effect classes | `vfx.add(el, { effect })` | [references/effects.md](references/effects.md) |
+| 3D meshes with depth test and MSAA | `createRenderTarget({ depth: true, samples: 4 })` + `ctx.draw({ depthTest: true })` | [references/effects.md](references/effects.md#3d-geometry-depth-and-msaa) |
 | Effect over the whole page | `new VFX({ postEffect })` | [references/shader.md](references/shader.md) |
 | Tabs, carousels, page transitions | `vfx.addTransition(el)` / `<VFXTransition>` | [references/transitions.md](references/transitions.md) |
 | Your own transition | `class X extends ShaderTransition` | [references/transitions.md](references/transitions.md) |

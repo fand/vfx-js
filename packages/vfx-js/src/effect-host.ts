@@ -6,7 +6,12 @@ import {
 } from "./effect-geometry.js";
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
-import { applyBlend } from "./gl/pass.js";
+import {
+    applyBlend,
+    applyDrawState,
+    type DrawState,
+    resetDrawState,
+} from "./gl/pass.js";
 import type { Uniform, Uniforms } from "./gl/program.js";
 import type { Quad } from "./gl/quad.js";
 import { Texture, type TextureWrap } from "./gl/texture.js";
@@ -14,6 +19,7 @@ import type { ProgramCache } from "./program-cache.js";
 import type {
     Effect,
     EffectBlitOpts,
+    EffectClearOpts,
     EffectContext,
     EffectDims,
     EffectDrawOpts,
@@ -49,11 +55,17 @@ export type EffectRenderTargetInternal = EffectRenderTarget & {
 
 /** @internal */
 type RenderTargetResolver = {
-    /** Current read texture (for sampling the RT as a uniform). */
+    /**
+     * Current read texture (for sampling the RT as a uniform).
+     * May resolve multisampled pixels, which changes framebuffer bindings.
+     */
     getReadTexture(): Texture;
 
     /** Current write target (for `bindFramebuffer`). */
     getWriteFbo(): Framebuffer;
+
+    /** Current read-side depth texture. Present only for RTs with depth. */
+    getDepthTexture?: () => Texture;
 
     /** Called after a draw that wrote to the RT. `persistent: true` only. */
     swap?: () => void;
@@ -262,6 +274,8 @@ export class EffectHost {
     #restoredUnsubs: (() => void)[] = [];
     #phase: Phase = "init";
     #warnedDrawInUpdate = false;
+    #warnedDepthWithoutBuffer = false;
+    #warnedInvalidSamples = false;
     #textureUnitCount: number | undefined;
     #dims: HostFrameDims;
 
@@ -329,7 +343,7 @@ export class EffectHost {
             wrapTexture: (source, opts) => this.#wrapTexture(source, opts),
             draw: (opts) => this.#draw(opts),
             blit: (source, target, opts) => this.#blit(source, target, opts),
-            clear: (target) => this.#clear(target),
+            clear: (target, opts) => this.#clear(target, opts),
             resetState: () => this.#resetState(),
             onContextRestored: (cb) => {
                 const unsub = this.#glCtx.onContextRestored(cb);
@@ -459,6 +473,8 @@ export class EffectHost {
         const mipmapOpt = opts?.mipmap ?? false;
         const mipmap = mipmapOpt !== false;
         const mipmapAutoRegen = mipmapOpt === true;
+        const depth = opts?.depth ?? false;
+        const samples = this.#resolveSamples(opts?.samples);
         const explicitSize = opts?.size;
         const sizeW = explicitSize ? explicitSize[0] : this.#dims.outputBufferW;
         const sizeH = explicitSize ? explicitSize[1] : this.#dims.outputBufferH;
@@ -475,9 +491,14 @@ export class EffectHost {
                 wrap,
                 filter,
                 mipmap,
+                depth,
+                samples,
             });
             resolver = {
-                getReadTexture: () => bb.texture,
+                getReadTexture: () => {
+                    bb.read.resolveColor();
+                    return bb.read.texture;
+                },
                 getWriteFbo: () => bb.target,
                 swap: () => bb.swap(),
                 resize: explicitSize
@@ -494,6 +515,13 @@ export class EffectHost {
                 resolver.regenerateMipmaps = () => bb.target.generateMipmaps();
                 resolver.mipmapAutoRegen = mipmapAutoRegen;
             }
+            if (depth) {
+                // Each side owns a depth texture; return the read side's.
+                resolver.getDepthTexture = () => {
+                    bb.read.resolveDepth();
+                    return bb.read.depthTexture as Texture;
+                };
+            }
             getW = () => bb.target.width;
             getH = () => bb.target.height;
         } else {
@@ -502,9 +530,14 @@ export class EffectHost {
                 wrap,
                 filter,
                 mipmap,
+                depth,
+                samples,
             });
             resolver = {
-                getReadTexture: () => fb.texture,
+                getReadTexture: () => {
+                    fb.resolveColor();
+                    return fb.texture;
+                },
                 getWriteFbo: () => fb,
                 resize: explicitSize
                     ? undefined
@@ -514,6 +547,13 @@ export class EffectHost {
             if (mipmap) {
                 resolver.regenerateMipmaps = () => fb.generateMipmaps();
                 resolver.mipmapAutoRegen = mipmapAutoRegen;
+            }
+            const depthTexture = fb.depthTexture;
+            if (depthTexture) {
+                resolver.getDepthTexture = () => {
+                    fb.resolveDepth();
+                    return depthTexture;
+                };
             }
             getW = () => fb.width;
             getH = () => fb.height;
@@ -528,6 +568,19 @@ export class EffectHost {
             this.#autoResizeRTs.push(owned);
         }
         return handle;
+    }
+
+    #resolveSamples(samples: number | undefined): 1 | 4 {
+        if (samples === undefined || samples === 1 || samples === 4) {
+            return samples ?? 1;
+        }
+        if (!this.#warnedInvalidSamples) {
+            this.#warnedInvalidSamples = true;
+            console.warn(
+                "[VFX-JS] createRenderTarget() samples must be 1 or 4; using 1.",
+            );
+        }
+        return 1;
     }
 
     #disposeOwnedRT(owned: OwnedRT): void {
@@ -727,7 +780,10 @@ export class EffectHost {
         });
     }
 
-    #clear(target: EffectRenderTarget | null | undefined): void {
+    #clear(
+        target: EffectRenderTarget | null | undefined,
+        opts: EffectClearOpts | undefined,
+    ): void {
         if (this.#phase !== "render") {
             if (this.#phase === "update" && !this.#warnedDrawInUpdate) {
                 this.#warnedDrawInUpdate = true;
@@ -743,21 +799,34 @@ export class EffectHost {
         const rawTarget =
             target === undefined || target === null ? ctxOutput : target;
         const isStageOutput = rawTarget === null || rawTarget === ctxOutput;
+        const resolver = rawTarget === null ? null : resolveRt(rawTarget);
+        const hasDepth = !isStageOutput && !!resolver?.getDepthTexture;
+        const clearColor = opts?.color ?? true;
+        const clearDepth = (opts?.depth ?? true) && hasDepth;
+        if (!clearColor && !clearDepth) {
+            return;
+        }
 
-        gl.clearColor(0, 0, 0, 0);
+        let bits = 0;
+        if (clearColor) {
+            gl.clearColor(0, 0, 0, 0);
+            bits |= gl.COLOR_BUFFER_BIT;
+        }
+        if (clearDepth) {
+            gl.clearDepth(1);
+            bits |= gl.DEPTH_BUFFER_BIT;
+        }
 
-        if (isStageOutput) {
+        if (isStageOutput || resolver === null) {
             // Stage output (canvas or intermediate RT). Scissor to this
             // stage's viewport so we don't wipe neighbors sharing the FB.
-            const fbo =
-                rawTarget === null
-                    ? null
-                    : resolveRt(rawTarget).getWriteFbo().fbo;
+            const fbo = resolver === null ? null : resolver.getWriteFbo().fbo;
             const vp = this.#dims.outputViewport;
             gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
             gl.enable(gl.SCISSOR_TEST);
             gl.scissor(vp.x, vp.y, vp.w, vp.h);
-            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.clear(bits);
+            resolver?.getWriteFbo().markDirty();
             gl.disable(gl.SCISSOR_TEST);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             return;
@@ -765,11 +834,12 @@ export class EffectHost {
 
         // User RT: clear the whole buffer. Zero both sides of a ping-pong
         // so the next read side is cleared too.
-        const resolver = resolveRt(rawTarget);
         gl.disable(gl.SCISSOR_TEST);
         const clearWrite = () => {
-            gl.bindFramebuffer(gl.FRAMEBUFFER, resolver.getWriteFbo().fbo);
-            gl.clear(gl.COLOR_BUFFER_BIT);
+            const writeFb = resolver.getWriteFbo();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, writeFb.fbo);
+            gl.clear(bits);
+            writeFb.markDirty();
         };
         clearWrite();
         if (resolver.swap) {
@@ -889,22 +959,26 @@ export class EffectHost {
         // user-allocated RT get full-RT dims.
         const isStageOutput = rawTarget === null || rawTarget === ctxOutput;
 
-        let fbo: WebGLFramebuffer | null;
+        // Sampling a multisampled RT resolves it, which rebinds framebuffers.
+        // So build uniforms before binding the draw target.
+        const uniforms = this.#buildUniforms(opts.uniforms);
+
+        let writeFb: Framebuffer | null = null;
         let vpX: number;
         let vpY: number;
         let vpW: number;
         let vpH: number;
         let swap: (() => void) | undefined;
         let regenerateMipmaps: (() => void) | undefined;
+        let hasDepth = false;
         if (rawTarget === null) {
-            fbo = null;
             vpX = this.#dims.outputViewport.x;
             vpY = this.#dims.outputViewport.y;
             vpW = this.#dims.outputViewport.w;
             vpH = this.#dims.outputViewport.h;
         } else {
             const resolver = resolveRt(rawTarget);
-            fbo = resolver.getWriteFbo().fbo;
+            writeFb = resolver.getWriteFbo();
             if (isStageOutput) {
                 vpX = this.#dims.outputViewport.x;
                 vpY = this.#dims.outputViewport.y;
@@ -917,32 +991,35 @@ export class EffectHost {
                 vpH = rawTarget.height;
             }
             swap = resolver.swap;
+            hasDepth = !isStageOutput && !!resolver.getDepthTexture;
             if (resolver.mipmapAutoRegen) {
                 regenerateMipmaps = resolver.regenerateMipmaps;
             }
         }
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, writeFb ? writeFb.fbo : null);
         gl.viewport(vpX, vpY, vpW, vpH);
         gl.disable(gl.SCISSOR_TEST);
         const blend =
             opts.blend ?? (rawTarget === null ? "premultiplied" : "none");
         applyBlend(gl, blend);
+        const drawState = this.#resolveDrawState(opts, hasDepth);
 
         program.use();
-        const uniforms = this.#buildUniforms(opts.uniforms);
         program.uploadUniforms(uniforms);
 
         const geometry = opts.geometry ?? EFFECT_QUAD_TOKEN;
-        if (isEffectQuad(geometry)) {
-            this.#geometries.quad.draw();
-        } else {
-            const compiled = this.#geometries.resolve(
-                geometry as EffectGeometry,
-                program,
-            );
-            compiled.draw();
+        const compiled = isEffectQuad(geometry)
+            ? this.#geometries.quad
+            : this.#geometries.resolve(geometry as EffectGeometry, program);
+        if (drawState) {
+            applyDrawState(gl, drawState);
         }
+        compiled.draw();
+        if (drawState) {
+            resetDrawState(gl);
+        }
+        writeFb?.markDirty();
 
         // Regen pre-swap: getWriteFbo() returned the buffer we just
         // drew to. After swap, that buffer rotates to the read side
@@ -951,6 +1028,35 @@ export class EffectHost {
         if (swap && opts.swap !== false) {
             swap();
         }
+    }
+
+    /** Depth and cull state for a draw, or null when it needs none. */
+    #resolveDrawState(
+        opts: EffectDrawOpts,
+        hasDepth: boolean,
+    ): DrawState | null {
+        let depthTest = opts.depthTest ?? false;
+        let depthWrite = opts.depthWrite ?? depthTest;
+        const cull = opts.cull ?? "none";
+        if ((depthTest || depthWrite) && !hasDepth) {
+            if (!this.#warnedDepthWithoutBuffer) {
+                this.#warnedDepthWithoutBuffer = true;
+                console.warn(
+                    "[VFX-JS] ctx.draw() depthTest / depthWrite needs a target created with depth: true; ignored.",
+                );
+            }
+            depthTest = false;
+            depthWrite = false;
+        }
+        if (!depthTest && !depthWrite && cull === "none") {
+            return null;
+        }
+        return {
+            depthTest,
+            depthWrite,
+            depthFunc: opts.depthFunc ?? "lequal",
+            cull,
+        };
     }
 
     #buildUniforms(userUniforms: EffectUniforms | undefined): Uniforms {
@@ -1112,7 +1218,15 @@ export function makeEffectRenderTarget(
         dispose: dispose ?? (() => {}),
         // No-op when the underlying RT has no mip storage.
         generateMipmaps: () => resolver.regenerateMipmaps?.(),
-    } as EffectRenderTargetInternal;
+    } as Mutable<EffectRenderTargetInternal>;
+    // Follows swaps. The RT owns the texture, so its dispose is a no-op.
+    if (resolver.getDepthTexture) {
+        handle.depthTexture = makeEffectTexture(
+            resolver.getDepthTexture,
+            width,
+            height,
+        );
+    }
     Object.defineProperty(handle, RESOLVE_RT, { value: resolver });
     return handle;
 }
