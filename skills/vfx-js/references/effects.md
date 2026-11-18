@@ -202,6 +202,7 @@ class Minimap implements Effect {
     constructor(private page: VFXCapture) {}
     render(ctx: EffectContext) {
         const { texture, rect } = this.page;
+        if (!rect) return; // the article has no layout right now
         ctx.draw({ frag: MINIMAP, uniforms: { page: texture, pageRect: [rect.x, rect.y, rect.width, rect.height] } });
     }
 }
@@ -217,6 +218,15 @@ page.dispose();      // free it and restore the element
 - Pass the `VFXCapture` to the effect when it needs `rect`. Pass `capture.texture` in `uniforms` for a reusable effect.
 - `hide: true` hides the element; it keeps its layout and stays interactive. Default `false` leaves it visible.
 - `rect` is in viewport CSS px. `x` / `y` are measured every frame; `width` / `height` are the size when the texture was captured.
+- `rect` is `null` while the element has no layout (not in the document, or `display: none`). Check it before you use it. The texture works either way.
+- No URL loading. Make the element yourself; it does not have to be in the document (`rect` is then `null`):
+
+    ```ts
+    const img = new Image();
+    img.crossOrigin = "anonymous"; // for another origin, before src
+    img.src = url;
+    const pic = await vfx.capture(img); // waits for decode()
+    ```
 - Videos and canvases refresh every frame. html-in-canvas refreshes on every repaint. Images and the DOM snapshot fallback change only on `update()`.
 - Effect path only: with `shader`, a texture uniform is ignored with a warning.
 - Post effect `uniforms` can't take it (the capture needs the `VFX` first). Set the capture on the post effect instance after `await vfx.capture()`.

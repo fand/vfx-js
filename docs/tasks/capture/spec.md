@@ -114,12 +114,16 @@ type VFXCaptureRect = {
 
 `rect` answers "where do I draw this texture so it matches the element?".
 
+It is `VFXCaptureRect | null`: `null` while the element has no layout (not in the document, e.g. a `new Image()` that was never inserted, or `display: none`). It is checked every frame, so it can become `null` and come back. The texture works either way.
+`null` rather than a zero rect, because effects divide by its size: a zero rect gives NaN, and a NaN written to a persistent buffer stays there.
+An element that is laid out with a zero size gets a zero rect, since that is real layout.
+
 - `x`, `y`: the element's position in the viewport, measured by VFX at the start of every rendered frame.
   All effects in one frame see the same value, and it matches that frame's canvas position.
 - `width`, `height`: the element's CSS size **when the current texture was captured**.
   After a resize, the texture is one frame behind the DOM. The size stays in step with the texture, so the texture is never stretched for a frame.
 - For HTML sources the rect is the wrapper canvas's rect, which is the element's border box.
-- The object is mutated in place. Copy the numbers to keep an old value.
+- While it is not `null`, it is the same object, mutated in place. Copy the numbers to keep an old value.
 - Outside the render loop (`autoplay: false`, or before the first frame), `x` / `y` hold the value from the last rendered frame, or from the capture.
 
 No pure "rect at capture time" is exposed: a viewport rect goes stale as soon as the page scrolls, and scrolling does not trigger a re-capture.

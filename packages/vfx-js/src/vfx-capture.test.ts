@@ -279,4 +279,23 @@ describe("VFX.capture with reduced motion", () => {
         // Not tracked, so a second capture works too.
         await expect(vfx.capture(el)).resolves.toBeDefined();
     });
+
+    test("has no rect for an element without layout", async () => {
+        vi.stubGlobal("window", {
+            matchMedia: () => ({ matches: true }),
+        });
+        const vfx = createVFX();
+        const el = {
+            style: { opacity: "" },
+            getBoundingClientRect: () => ({
+                left: 0,
+                top: 0,
+                width: 0,
+                height: 0,
+            }),
+            getClientRects: () => [],
+        } as unknown as HTMLElement;
+        const capture = await vfx.capture(el);
+        expect(capture.rect).toBeNull();
+    });
 });

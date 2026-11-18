@@ -1,5 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/html-vite";
-import type { Effect, EffectContext, VFXCapture } from "@vfx-js/core";
+import type {
+    Effect,
+    EffectContext,
+    VFXCapture,
+    VFXCaptureRect,
+} from "@vfx-js/core";
 import JellyfishMp4 from "./assets/jellyfish.mp4";
 import Jellyfish from "./assets/jellyfish.webp";
 import { initVFX } from "./utils";
@@ -17,8 +22,8 @@ function fullscreenRoot() {
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
 
-/** `[x, y, w, h]` of a capture's rect, for a `vec4` uniform. */
-const rectOf = ({ rect }: VFXCapture): [number, number, number, number] => [
+/** `[x, y, w, h]` of a capture rect, for a `vec4` uniform. */
+const rectOf = (rect: VFXCaptureRect): [number, number, number, number] => [
     rect.x,
     rect.y,
     rect.width,
@@ -81,12 +86,17 @@ class MinimapEffect implements Effect {
     constructor(private page: VFXCapture) {}
 
     render(ctx: EffectContext) {
+        // Nothing to place while the article has no layout.
+        const rect = this.page.rect;
+        if (!rect) {
+            return;
+        }
         ctx.draw({
             frag: MINIMAP_FRAG,
             uniforms: {
                 page: this.page.texture,
                 size: [ctx.dims.element[0], ctx.dims.element[1]],
-                pageRect: rectOf(this.page),
+                pageRect: rectOf(rect),
                 viewport: viewportSize(),
             },
         });
@@ -202,17 +212,19 @@ void main() {
 
 /**
  * Post effect that draws a capture where its element is, with a wave.
- * Passes the scene through until `page` is set.
+ * Passes the scene through until `page` is set, and while the card has no layout.
  */
 class WavyPageEffect implements Effect {
     page: VFXCapture | null = null;
 
+    // Disabled, it passes the scene through.
     get enabled() {
-        return this.page !== null;
+        return this.page?.rect != null;
     }
 
     render(ctx: EffectContext) {
-        if (!this.page) {
+        const rect = this.page?.rect;
+        if (!this.page || !rect) {
             return;
         }
         ctx.draw({
@@ -222,7 +234,7 @@ class WavyPageEffect implements Effect {
                 page: this.page.texture,
                 canvas: [ctx.dims.canvas[0], ctx.dims.canvas[1]],
                 viewport: viewportSize(),
-                pageRect: rectOf(this.page),
+                pageRect: rectOf(rect),
                 time: ctx.time,
             },
         });

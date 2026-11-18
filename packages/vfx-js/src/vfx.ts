@@ -1,3 +1,4 @@
+import { layoutRect } from "./capture.js";
 import { isHicCanvas } from "./hic-canvas.js";
 import {
     lockCanvasSize,
@@ -371,10 +372,15 @@ export class VFX {
     }
 
     #inertCapture(source: HTMLElement): VFXCapture {
-        const r = source.getBoundingClientRect();
+        const r = layoutRect(source);
         return {
             texture: this.#player.emptyTexture(),
-            rect: { x: r.left, y: r.top, width: r.width, height: r.height },
+            rect: r && {
+                x: r.left,
+                y: r.top,
+                width: r.width,
+                height: r.height,
+            },
             update: () => Promise.resolve(),
             dispose: () => {},
         };

@@ -587,6 +587,7 @@ export type VFXCaptureOpts = {
 /**
  * Where a captured element is.
  * CSS px, relative to the viewport, like `getBoundingClientRect()`.
+ * See {@link VFXCapture.rect} for when there is none.
  *
  * `x` / `y` are measured at the start of every rendered frame.
  * `width` / `height` are the element's size when the current texture
@@ -607,8 +608,15 @@ export type VFXCapture = {
     /** The captured pixels. The same object for the life of the capture. */
     readonly texture: EffectTexture;
 
-    /** Where the element is. The same object for the life of the capture; its fields change. */
-    readonly rect: VFXCaptureRect;
+    /**
+     * Where the element is, or `null` while it has no layout: it is not in
+     * the document (e.g. an `<img>` made with `new Image()` and never
+     * inserted), or it is `display: none`. Checked every frame.
+     *
+     * While it is not `null` it is the same object, and its fields change.
+     * The texture works either way.
+     */
+    readonly rect: VFXCaptureRect | null;
 
     /**
      * Capture again. Resolves when the new pixels are in `texture`.

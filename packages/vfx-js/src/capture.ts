@@ -82,6 +82,19 @@ export type CaptureEntry = {
 type MutableRect = { -readonly [K in keyof VFXCaptureRect]: VFXCaptureRect[K] };
 
 /**
+ * The box's rect, or null when it has no layout (not in the document,
+ * `display: none`). Only an empty rect can mean that, so only then are
+ * the client rects checked.
+ */
+export function layoutRect(box: Element): DOMRect | null {
+    const r = box.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0 && box.getClientRects().length === 0) {
+        return null;
+    }
+    return r;
+}
+
+/**
  * Capture `source` into a texture that effects can read.
  * Resolves after the first capture is in the texture.
  * `onDispose` is called once, when the capture is disposed.
@@ -100,9 +113,14 @@ export async function createCapture(
     let disposed = false;
     let warned = false;
     const rect: MutableRect = { x: 0, y: 0, width: 0, height: 0 };
+    let hasLayout = false;
 
     const measure = () => {
-        const r = driver.box.getBoundingClientRect();
+        const r = layoutRect(driver.box);
+        hasLayout = r !== null;
+        if (!r) {
+            return;
+        }
         rect.x = r.left;
         rect.y = r.top;
         // Video and canvas are captured every frame, so their size follows the box.
@@ -138,7 +156,9 @@ export async function createCapture(
 
     const capture: VFXCapture = {
         texture,
-        rect,
+        get rect() {
+            return hasLayout ? rect : null;
+        },
         update,
         dispose() {
             if (disposed) {

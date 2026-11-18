@@ -251,10 +251,57 @@ describe("createCapture: tick", () => {
             el.box = { left: 5, top: 6, width: 30, height: 40 };
             tick();
             expect(capture.rect).toBe(rect);
-            expect([rect.x, rect.y]).toEqual([5, 6]);
+            expect([rect?.x, rect?.y]).toEqual([5, 6]);
             expect(made[0].needsUpdate).toBe(everyFrame);
         },
     );
+
+    test("rect is null while the element has no layout, then comes back", async () => {
+        const { deps, made } = fakeDeps();
+        const video = new FakeVideo();
+        const { capture, tick } = await createCapture(
+            deps,
+            asElement(video),
+            {},
+        );
+        const rect = capture.rect;
+        video.box = { left: 0, top: 0, width: 0, height: 0 };
+        video.hasBox = false;
+        tick();
+        expect(capture.rect).toBeNull();
+        // The texture works without layout.
+        expect(resolveTexture(capture.texture)).toBe(made[0]);
+        expect(made[0].needsUpdate).toBe(true);
+
+        video.box = { left: 7, top: 8, width: 30, height: 40 };
+        video.hasBox = true;
+        tick();
+        expect(capture.rect).toBe(rect);
+        expect(capture.rect).toEqual({ x: 7, y: 8, width: 30, height: 40 });
+    });
+
+    test("rect is null for an element never put in the document", async () => {
+        const { deps } = fakeDeps();
+        const img = new FakeImage();
+        img.box = { left: 0, top: 0, width: 0, height: 0 };
+        img.hasBox = false;
+        const { capture } = await createCapture(deps, asElement(img), {});
+        expect(capture.rect).toBeNull();
+        expect(capture.texture.width).toBe(60);
+    });
+
+    test("a laid-out element of zero size keeps a zero rect", async () => {
+        const { deps } = fakeDeps();
+        const canvas = new FakeCanvas();
+        const { capture, tick } = await createCapture(
+            deps,
+            asElement(canvas),
+            {},
+        );
+        canvas.box = { left: 3, top: 4, width: 0, height: 0 };
+        tick();
+        expect(capture.rect).toEqual({ x: 3, y: 4, width: 0, height: 0 });
+    });
 
     test("image size follows update(), not tick()", async () => {
         const { deps, made } = fakeDeps();
@@ -262,12 +309,12 @@ describe("createCapture: tick", () => {
         const { capture, tick } = await createCapture(deps, asElement(img), {});
         img.box = { left: 1, top: 2, width: 50, height: 60 };
         tick();
-        expect([capture.rect.width, capture.rect.height]).toEqual([30, 40]);
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([30, 40]);
         await capture.update();
         expect(img.decode).toHaveBeenCalledTimes(2);
         expect(made[0].needsUpdate).toBe(true);
         tick();
-        expect([capture.rect.width, capture.rect.height]).toEqual([50, 60]);
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([50, 60]);
     });
 });
 
@@ -441,13 +488,13 @@ describe("createCapture: html-in-canvas", () => {
 
         hic.wrapper.box = { left: 3, top: 4, width: 70, height: 30 };
         tick();
-        expect([capture.rect.width, capture.rect.height]).toEqual([50, 20]);
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([50, 20]);
 
         hic.wrapOpts().onCapture(hic.first);
         expect(made).toHaveLength(1);
         expect(made[0].needsUpdate).toBe(true);
         tick();
-        expect([capture.rect.width, capture.rect.height]).toEqual([70, 30]);
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([70, 30]);
 
         hic.wrapOpts().onCapture(offscreen(140, 60));
         expect(made).toHaveLength(2);
@@ -648,13 +695,13 @@ describe("createCapture: snapshot", () => {
         snap.setSize(120, 160);
         snap.el.box = { left: 1, top: 2, width: 60, height: 80 };
         tick();
-        expect([capture.rect.width, capture.rect.height]).toEqual([30, 40]);
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([30, 40]);
         await capture.update();
         expect(made).toHaveLength(2);
         expect(made[0].dispose).toHaveBeenCalledOnce();
         expect(resolveTexture(capture.texture)).toBe(made[1]);
         tick();
-        expect([capture.rect.width, capture.rect.height]).toEqual([60, 80]);
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([60, 80]);
     });
 
     test("update() keeps the texture when the snapshot is empty", async () => {
