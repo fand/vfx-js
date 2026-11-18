@@ -65,6 +65,9 @@ To decide, ask: can an effect author build this with the current `EffectContext`
 - **Yes**: keep it out of core.
 - **No**, because it needs GPU state or resources the API hides: it belongs in core.
 
+A feature that doesn't belong in core can still ship.
+If people want it, we can offer it in `@vfx-js/effects` or as another helper.
+
 ## Sending a Pull Request
 
 1. Create a branch from `main`.
