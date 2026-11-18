@@ -318,13 +318,17 @@ export class VFX {
      *
      * A WebGL `<canvas>` needs `preserveDrawingBuffer: true`, or the
      * capture may read an empty buffer.
+     * A `loading="lazy"` image is waited for until it loads.
+     * A capture inside another html-in-canvas capture does not repaint the
+     * outer one; call `update()` on the outer capture.
      *
      * Rejects when the element already has a capture in any VFX instance,
      * when `addHTML` or a transition wraps it, when `add` has it or is
      * adding it (unless it is an `<img>`, `<video>` or `<canvas>` captured
      * without `hide`), or when the first capture fails. That covers a
-     * source with no pixels, one larger than `maxTextureSize`, and one
-     * WebGL can't read (a cross-origin image without CORS).
+     * source with no pixels, one larger than `maxTextureSize`, one WebGL
+     * can't read (a cross-origin image without CORS), and a video that has
+     * no source, failed, or has `preload="none"` and is not playing.
      * It also rejects `<html>`, `<body>` and any element that contains a
      * VFX canvas. `add` and `addHTML` reject a captured element under the
      * same rules.

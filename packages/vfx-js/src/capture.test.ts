@@ -38,8 +38,25 @@ class FakeImage extends FakeElement {
 }
 class FakeVideo extends FakeElement {
     readyState = 4;
+    error: unknown = null;
+    paused = true;
+    autoplay = false;
+    preload = "auto";
+    src = "video.mp4";
+    srcObject: unknown = null;
+    sources: FakeSource[] = [];
     videoWidth = 60;
     videoHeight = 80;
+    querySelectorAll(selector: string) {
+        return selector === "source"
+            ? this.sources
+            : this.sources.filter((s) => s.src);
+    }
+}
+class FakeSource extends FakeElement {
+    constructor(public src = "") {
+        super();
+    }
 }
 class FakeCanvas extends FakeElement {
     width = 60;
@@ -166,6 +183,81 @@ describe("createCapture: sources", () => {
         await expect(pending).rejects.toThrow("could not load the video");
         expect(video.style.opacity).toBe("");
         expect(made).toHaveLength(0);
+        expect(Object.keys(video.listeners)).toEqual([]);
+    });
+
+    test.each([
+        [
+            "no source",
+            (v: FakeVideo) => {
+                v.src = "";
+            },
+            "has no source",
+        ],
+        [
+            "already failed",
+            (v: FakeVideo) => {
+                v.error = { code: 4 };
+            },
+            "failed to load",
+        ],
+        [
+            'preload="none" and not playing',
+            (v: FakeVideo) => {
+                v.preload = "none";
+            },
+            "Call play() first",
+        ],
+    ])("rejects a video that will not load: %s", async (_, setup, message) => {
+        const { deps, made } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        setup(video);
+        await expect(
+            createCapture(deps, asElement(video), { hide: true }),
+        ).rejects.toThrow(message);
+        expect(video.style.opacity).toBe("");
+        expect(made).toHaveLength(0);
+        expect(Object.keys(video.listeners)).toEqual([]);
+    });
+
+    test("waits for a video with a stream and no src", async () => {
+        const { deps, made } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        video.src = "";
+        video.srcObject = {};
+        const pending = createCapture(deps, asElement(video), {});
+        await Promise.resolve();
+        video.listeners.canplay();
+        await pending;
+        expect(made[0].source).toBe(video);
+    });
+
+    test("waits for a preload=none video once it is playing", async () => {
+        const { deps } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        video.preload = "none";
+        video.paused = false;
+        const pending = createCapture(deps, asElement(video), {});
+        await Promise.resolve();
+        video.listeners.canplay();
+        await expect(pending).resolves.toBeDefined();
+    });
+
+    test("rejects when the last <source> fails", async () => {
+        const { deps } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        video.src = "";
+        const source = new FakeSource("a.webm");
+        video.sources = [new FakeSource("b.mp4"), source];
+        const pending = createCapture(deps, asElement(video), {});
+        await Promise.resolve();
+        source.listeners.error();
+        await expect(pending).rejects.toThrow("could not load the video");
+        expect(Object.keys(source.listeners)).toEqual([]);
         expect(Object.keys(video.listeners)).toEqual([]);
     });
 

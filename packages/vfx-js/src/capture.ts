@@ -263,15 +263,49 @@ function abortable<T>(
     });
 }
 
+/**
+ * Why `canplay` will never come without the page doing something, or null.
+ * networkState can't tell: it reads NETWORK_NO_SOURCE right after `src` is set.
+ */
+function videoWontLoad(video: HTMLVideoElement): string | null {
+    if (video.error) {
+        return "failed to load";
+    }
+    const sources = video.querySelectorAll("source[src]");
+    if (!video.srcObject && !video.src && sources.length === 0) {
+        return "has no source";
+    }
+    // With preload="none", only playing loads it.
+    if (
+        video.preload === "none" &&
+        video.paused &&
+        !video.autoplay &&
+        video.readyState === 0
+    ) {
+        return 'is not loading (preload="none"). Call play() first';
+    }
+    return null;
+}
+
 /** Resolve on `canplay`, reject on `error` or abort. */
 function waitForVideo(
     video: HTMLVideoElement,
     signal: AbortSignal | undefined,
 ): Promise<void> {
+    const reason = videoWontLoad(video);
+    if (reason) {
+        return Promise.reject(
+            new Error(`[VFX-JS] capture() got a video that ${reason}.`),
+        );
+    }
+    // When every <source> fails, the error fires on the last one, not the video.
+    const sources = video.querySelectorAll("source");
+    const lastSource = sources[sources.length - 1];
     return new Promise<void>((resolve, reject) => {
         const cleanup = () => {
             video.removeEventListener("canplay", onCanPlay);
             video.removeEventListener("error", onError);
+            lastSource?.removeEventListener("error", onError);
             signal?.removeEventListener("abort", onAbort);
         };
         const onCanPlay = () => {
@@ -292,6 +326,7 @@ function waitForVideo(
         }
         video.addEventListener("canplay", onCanPlay);
         video.addEventListener("error", onError);
+        lastSource?.addEventListener("error", onError);
         signal?.addEventListener("abort", onAbort);
     });
 }
