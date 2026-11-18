@@ -67,9 +67,9 @@ void main() {
         col = texture(page, vec2(a.x / pageRect.z, 1.0 - a.y / pageRect.w));
     }
 
-    // The visible part of the page, in minimap px.
-    vec2 vmin = off - pageRect.xy * s;
-    vec2 vmax = vmin + viewport * s;
+    // The visible rows of the page, in minimap px. The frame spans the page width.
+    vec2 vmin = vec2(off.x, off.y - pageRect.y * s);
+    vec2 vmax = vec2(off.x + pageRect.z * s, vmin.y + viewport.y * s);
     bool inView = all(greaterThanEqual(p, vmin)) && all(lessThan(p, vmax));
     bool inInner = all(greaterThanEqual(p, vmin + 2.0)) && all(lessThan(p, vmax - 2.0));
     if (inView && !inInner) {
