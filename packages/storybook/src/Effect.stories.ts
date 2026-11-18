@@ -16,6 +16,11 @@ import {
     type GradientMapMixSpace,
     type GradientMapRepeat,
     HalftoneEffect,
+    HoloEffect,
+    type HoloLook,
+    type HoloMask,
+    type HoloMaterial,
+    type HoloQuality,
     HueShiftEffect,
     JPEGGlitchEffect,
     MatrixEffect,
@@ -1809,3 +1814,62 @@ export const asciiTiles: StoryObj<{
         grid: { control: { type: "range", min: 4, max: 48, step: 1 } },
     },
 };
+
+type HoloArgs = {
+    material: HoloMaterial;
+    look: HoloLook;
+    quality: HoloQuality;
+    mask: HoloMask;
+    ink: number;
+    ev: number;
+    glare: number;
+    wobble: boolean;
+};
+export const holo = presetStory<HoloArgs>(
+    (a) =>
+        new HoloEffect({
+            material: a.material,
+            look: a.look,
+            quality: a.quality,
+            mask: a.mask,
+            ink: a.ink,
+            settings: {
+                "display.ev": a.ev,
+                "display.glare": a.glare,
+                "motion.wobble": a.wobble,
+            },
+        }),
+    {
+        material: "prism",
+        look: "card",
+        quality: "medium",
+        mask: "alpha",
+        ink: 0,
+        ev: 0.5,
+        glare: 0.03,
+        wobble: true,
+    },
+    {
+        material: {
+            control: { type: "select" },
+            options: ["prism", "shatter", "nebula", "sparkle", "vortex"],
+        },
+        look: {
+            control: { type: "select" },
+            options: ["card", "object", "plain"],
+        },
+        quality: {
+            control: { type: "select" },
+            options: ["low", "medium", "high"],
+        },
+        mask: {
+            control: { type: "select" },
+            options: ["alpha", "luma", "none"],
+        },
+        ink: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+        ev: { control: { type: "range", min: -3, max: 3, step: 0.05 } },
+        glare: { control: { type: "range", min: 0, max: 0.1, step: 0.005 } },
+        wobble: { control: { type: "boolean" } },
+    },
+    { src: Logo, clock: false },
+);
