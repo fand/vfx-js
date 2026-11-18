@@ -10,6 +10,7 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
+import { HoloGlare } from "./_holo/glare.js";
 import outputFrag from "./_holo/glsl/output.js";
 import {
     FRAG_DECODE_LTC_MAIN,
@@ -192,25 +193,29 @@ in vec2 uvSrc;
 uniform sampler2D src;
 uniform int uMask;
 void main() {
-  vec4 P = textureLod(tHdr, clamp(uvContent, 0.0, 1.0), 0.0);
-  float a = clamp(P.a, 0.0, 1.0); vec3 c = vec3(0.0);
-  if (a > 1e-5) { vec3 cu = P.rgb / a; c = cu / (ENC_S * max(1.0 - max(max3(cu), 0.0), 1e-4)); }
-  vec3 card = toDisplay(c * uExposure);
-  vec3 enc = srgbOETF(card);
-  enc += triangularDither(gl_FragCoord.xy) / 255.0;
-  vec4 foil = vec4(clamp(enc, 0.0, 1.0), 1.0);
   vec4 s = texture(src, uvSrc);
   if (uvContent.x < 0.0 || uvContent.x > 1.0 || uvContent.y < 0.0 || uvContent.y > 1.0) {
     gl_FragColor = s;
-  } else if (uMask == 0) {
-    gl_FragColor = foil * s.a;
-  } else if (uMask == 1) {
-    vec3 u = s.a > 1e-4 ? s.rgb / s.a : vec3(0.0);
-    float m = clamp(dot(u, LUMA_SRGB), 0.0, 1.0);
-    gl_FragColor = mix(s, foil * s.a, m);
-  } else {
-    gl_FragColor = foil;
+    return;
   }
+  vec4 P = textureLod(tHdr, clamp(uvContent, 0.0, 1.0), 0.0);
+  float a = clamp(P.a, 0.0, 1.0); vec3 c = vec3(0.0);
+  if (a > 1e-5) { vec3 cu = P.rgb / a; c = cu / (ENC_S * max(1.0 - max(max3(cu), 0.0), 1e-4)); }
+  vec3 G = uGW0 * textureLod(tG0, uvContent * uG0Scale, 0.0).rgb;   // premultiplied linear glare
+  vec3 card  = toDisplay(((1.0 - uGlare) * c + uGlare * G) * uExposure);
+  vec3 spill = toDisplay(uGlare * G * uExposure);
+  // Foil coverage from the element (the mask), then the foil over it. holospot screens the glare spill onto the
+  // page: in premultiplied output that is the spill with alpha = its largest channel (exact on black, invisible on
+  // white), under the foil.
+  vec3 u = s.a > 1e-4 ? s.rgb / s.a : vec3(0.0);
+  float cov = uMask == 0 ? s.a : uMask == 1 ? clamp(dot(u, LUMA_SRGB), 0.0, 1.0) * s.a : 1.0;
+  vec4 base = uMask == 1 ? s : vec4(0.0);
+  vec3 se = srgbOETF(spill);
+  vec4 spillP = vec4(se, max3(se));
+  base = spillP + (1.0 - spillP.a) * base;
+  vec3 enc = srgbOETF(card);
+  if (cov > 0.0 || max3(spill) > 1e-4) enc += triangularDither(gl_FragCoord.xy) / 255.0;
+  gl_FragColor = vec4(clamp(enc, 0.0, 1.0), 1.0) * cov + base * (1.0 - cov);
 }
 `;
 
@@ -250,6 +255,7 @@ export class HoloEffect implements Effect {
     #ltc1: EffectRenderTarget | null = null;
     #ltc2: EffectRenderTarget | null = null;
     #ltcReady = false;
+    #glare = new HoloGlare();
     #envDrawn: EnvLevels | null = null;
     #blobs = cameraSideBlobs();
     #waves: WaveSet | null = null;
@@ -621,6 +627,25 @@ export class HoloEffect implements Effect {
             },
         });
 
+        const hw = this.#hdr.width;
+        const hh = this.#hdr.height;
+        const div = tier.glareStartDiv;
+        let gw0 = 0;
+        const glare = s.display.glare;
+        if (glare > 0) {
+            this.#glare.ensure(ctx, hw, hh, tier.glareLevels, div);
+            gw0 = this.#glare.render(
+                ctx,
+                this.#hdr,
+                hw,
+                hh,
+                div,
+                s.display.glareRadiusPx,
+                ctx.pixelRatio,
+            );
+        }
+        const g0 = glare > 0 ? this.#glare.level0 : null;
+
         ctx.draw({
             frag: FRAG_OUTPUT,
             target: ctx.target,
@@ -631,6 +656,10 @@ export class HoloEffect implements Effect {
                 uTone: TONES[s.display.tone],
                 uP3: 0,
                 uMask: MASKS[this.params.mask] ?? 0,
+                tG0: g0 ?? this.#black,
+                uGW0: gw0,
+                uGlare: g0 ? glare : 0,
+                uG0Scale: g0 ? this.#glare.outputScale(hw, hh, div) : [1, 1],
             },
         });
     }
