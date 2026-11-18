@@ -276,12 +276,6 @@ export default {
 
 export const depthAndMsaa: StoryObj<Args> = {};
 
-export const noDepth: StoryObj<Args> = { args: { depth: false } };
-
 export const samples1: StoryObj<Args> = { args: { samples: 1 } };
 
 export const depthView: StoryObj<Args> = { args: { view: "depth" } };
-
-export const floatMsaa: StoryObj<Args> = { args: { float: true } };
-
-export const persistentTrail: StoryObj<Args> = { args: { trail: true } };
