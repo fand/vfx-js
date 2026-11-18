@@ -625,11 +625,14 @@ export type VFXCapture = {
     readonly rect: VFXCaptureRect | null;
 
     /**
-     * Capture again. Resolves when the new pixels are in `texture`.
+     * Capture again. Resolves to `true` once the new pixels are in
+     * `texture`, or `false` when none came: with html-in-canvas the
+     * repaint did not arrive within 1 second, the snapshot came out empty,
+     * or the capture is disposed.
      * With the DOM snapshot fallback (no html-in-canvas), and for images,
      * the texture changes only when you call this.
      */
-    update(): Promise<void>;
+    update(): Promise<boolean>;
 
     /** Stop capturing, free the texture and restore the element. Idempotent. */
     dispose(): void;

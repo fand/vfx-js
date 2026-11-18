@@ -450,7 +450,7 @@ describe("createCapture: dispose", () => {
         expect(resolveTexture(capture.texture)).toBe(emptyTexture);
         expect(warn).toHaveBeenCalledOnce();
         expect([capture.texture.width, capture.texture.height]).toEqual([0, 0]);
-        await expect(capture.update()).resolves.toBeUndefined();
+        await expect(capture.update()).resolves.toBe(false);
         made[0].needsUpdate = false;
         tick();
         expect(made[0].needsUpdate).toBe(false);
@@ -623,15 +623,23 @@ describe("createCapture: html-in-canvas", () => {
         const { deps } = fakeDeps(hic.dom);
         const { capture } = await createCapture(deps, asElement(hic.el), {});
         let done = false;
-        const updated = capture.update().then(() => {
+        const updated = capture.update().then((ok) => {
             done = true;
+            return ok;
         });
-        expect(hic.dom.requestCapture).toHaveBeenCalledWith(hic.wrapper);
+        expect(hic.dom.requestCapture).toHaveBeenCalledWith(hic.wrapper, 1000);
         await Promise.resolve();
         expect(done).toBe(false);
         hic.capture();
-        await updated;
-        expect(done).toBe(true);
+        await expect(updated).resolves.toBe(true);
+    });
+
+    test("update() resolves to false when the repaint times out", async () => {
+        const hic = fakeHic();
+        hic.dom.requestCapture.mockReturnValueOnce(Promise.resolve(false));
+        const { deps } = fakeDeps(hic.dom);
+        const { capture } = await createCapture(deps, asElement(hic.el), {});
+        await expect(capture.update()).resolves.toBe(false);
     });
 
     test("dispose() unwraps", async () => {
@@ -906,7 +914,7 @@ describe("createCapture: snapshot", () => {
         await flush();
         expect(runs).toHaveLength(2);
         runs[1].resolve();
-        await expect(p2).resolves.toBeUndefined();
+        await expect(p2).resolves.toBe(true);
     });
 
     test("a queued snapshot does not run after dispose", async () => {
@@ -917,7 +925,7 @@ describe("createCapture: snapshot", () => {
         await flush();
         capture.dispose();
         runs[0].resolve();
-        await expect(p2).resolves.toBeUndefined();
+        await expect(p2).resolves.toBe(false);
         expect(runs).toHaveLength(1);
     });
 

@@ -211,7 +211,7 @@ await vfx.add(minimapEl, { effect: new Minimap(page) });
 // A reusable effect takes the texture as a uniform and reads ctx.uniforms.page.
 await vfx.add(other, { effect: new MyEffect(), uniforms: { page: page.texture } });
 
-await page.update(); // capture again
+const ok = await page.update(); // capture again; false if no new pixels came (1s wait with html-in-canvas)
 page.dispose();      // free it and restore the element
 ```
 

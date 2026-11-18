@@ -287,7 +287,7 @@ describe("VFX.capture with reduced motion", () => {
         expect(el.style.opacity).toBe("");
         expect([capture.texture.width, capture.texture.height]).toEqual([0, 0]);
         expect(capture.rect).toEqual({ x: 1, y: 2, width: 30, height: 40 });
-        await expect(capture.update()).resolves.toBeUndefined();
+        await expect(capture.update()).resolves.toBe(false);
         capture.dispose();
         // Not tracked, so a second capture works too.
         await expect(vfx.capture(el)).resolves.toBeDefined();

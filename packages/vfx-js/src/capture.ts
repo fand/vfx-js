@@ -32,6 +32,9 @@ const defaultDom: CaptureDom = {
     nextFrame: () => new Promise((r) => requestAnimationFrame(() => r())),
 };
 
+// Longer than `vfx.update`'s wait: a repaint can be slow on phones.
+const UPDATE_TIMEOUT_MS = 1000;
+
 /** What the player gives `createCapture`. */
 export type CaptureDeps = {
     /** A new texture, premultiplied like `ctx.src`. */
@@ -63,7 +66,8 @@ type CaptureDriver = {
     readonly sizeFollowsBox: boolean;
     /** Upload on every frame (video, canvas). */
     readonly uploadEveryFrame: boolean;
-    update(): Promise<void>;
+    /** True when new pixels are in the texture. */
+    update(): Promise<boolean>;
     /** Called on a window resize. */
     resize?(): void;
     dispose(): void;
@@ -145,8 +149,8 @@ export async function createCapture(
         rect.height = slot.height;
     };
 
-    const update = (): Promise<void> =>
-        disposed ? Promise.resolve() : driver.update();
+    const update = (): Promise<boolean> =>
+        disposed ? Promise.resolve(false) : driver.update();
 
     const texture = makeEffectTexture(
         () => {
@@ -400,6 +404,7 @@ async function mediaDriver(
             async update() {
                 await source.decode();
                 slot.texture.needsUpdate = true;
+                return true;
             },
             dispose: restoreOpacity,
         };
@@ -408,7 +413,7 @@ async function mediaDriver(
         box: source,
         sizeFollowsBox: true,
         uploadEveryFrame: true,
-        update: () => Promise.resolve(),
+        update: () => Promise.resolve(true),
         dispose: restoreOpacity,
     };
 }
@@ -471,7 +476,9 @@ async function hicDriver(
         sizeFollowsBox: false,
         uploadEveryFrame: false,
         async update() {
-            await dom.requestCapture(wrapper);
+            return (
+                (await dom.requestCapture(wrapper, UPDATE_TIMEOUT_MS)) ?? false
+            );
         },
         dispose() {
             dom.unwrapElement(wrapper, source);
@@ -508,9 +515,9 @@ async function snapshotDriver(
     }
 
     let disposed = false;
-    let running: Promise<void> | null = null;
-    let queued: Promise<void> | null = null;
-    const snapshot = async () => {
+    let running: Promise<boolean> | null = null;
+    let queued: Promise<boolean> | null = null;
+    const snapshot = async (): Promise<boolean> => {
         const old = slot.texture.source;
         // dom2canvas sizes the snapshot from the box at its start.
         const [w, h] = snapshotSize(source);
@@ -522,17 +529,18 @@ async function snapshotDriver(
         );
         // Not laid out (0-size canvas): keep the previous texture.
         if (disposed || canvas.width === 0 || canvas.height === 0) {
-            return;
+            return false;
         }
         slot.texture = deps.refreshTexture(slot.texture, canvas);
         slot.width = w;
         slot.height = h;
+        return true;
     };
     // One snapshot at a time. A call during a snapshot queues one more,
     // which every call until it starts shares, so its DOM changes are kept.
-    const update = (): Promise<void> => {
+    const update = (): Promise<boolean> => {
         if (disposed) {
-            return Promise.resolve();
+            return Promise.resolve(false);
         }
         if (!running) {
             running = snapshot().finally(() => {

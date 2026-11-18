@@ -421,7 +421,7 @@ export class VFX {
                 width: r.width,
                 height: r.height,
             },
-            update: () => Promise.resolve(),
+            update: () => Promise.resolve(false),
             dispose: () => {},
         };
     }
