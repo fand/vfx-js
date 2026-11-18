@@ -55,7 +55,10 @@ export type EffectRenderTargetInternal = EffectRenderTarget & {
 
 /** @internal */
 type RenderTargetResolver = {
-    /** Current read texture (for sampling the RT as a uniform). */
+    /**
+     * Current read texture (for sampling the RT as a uniform).
+     * May resolve multisampled pixels, which changes framebuffer bindings.
+     */
     getReadTexture(): Texture;
 
     /** Current write target (for `bindFramebuffer`). */
@@ -470,6 +473,7 @@ export class EffectHost {
         const mipmap = mipmapOpt !== false;
         const mipmapAutoRegen = mipmapOpt === true;
         const depth = opts?.depth ?? false;
+        const samples = opts?.samples === 4 ? 4 : 1;
         const explicitSize = opts?.size;
         const sizeW = explicitSize ? explicitSize[0] : this.#dims.outputBufferW;
         const sizeH = explicitSize ? explicitSize[1] : this.#dims.outputBufferH;
@@ -487,9 +491,13 @@ export class EffectHost {
                 filter,
                 mipmap,
                 depth,
+                samples,
             });
             resolver = {
-                getReadTexture: () => bb.texture,
+                getReadTexture: () => {
+                    bb.read.resolveColor();
+                    return bb.read.texture;
+                },
                 getWriteFbo: () => bb.target,
                 swap: () => bb.swap(),
                 resize: explicitSize
@@ -507,7 +515,10 @@ export class EffectHost {
                 resolver.mipmapAutoRegen = mipmapAutoRegen;
             }
             if (depth) {
-                resolver.getDepthTexture = () => bb.depthTexture;
+                resolver.getDepthTexture = () => {
+                    bb.read.resolveDepth();
+                    return bb.read.depthTexture;
+                };
             }
             getW = () => bb.target.width;
             getH = () => bb.target.height;
@@ -518,9 +529,13 @@ export class EffectHost {
                 filter,
                 mipmap,
                 depth,
+                samples,
             });
             resolver = {
-                getReadTexture: () => fb.texture,
+                getReadTexture: () => {
+                    fb.resolveColor();
+                    return fb.texture;
+                },
                 getWriteFbo: () => fb,
                 resize: explicitSize
                     ? undefined
@@ -532,7 +547,10 @@ export class EffectHost {
                 resolver.mipmapAutoRegen = mipmapAutoRegen;
             }
             if (depth) {
-                resolver.getDepthTexture = () => fb.depthTexture;
+                resolver.getDepthTexture = () => {
+                    fb.resolveDepth();
+                    return fb.depthTexture;
+                };
             }
             getW = () => fb.width;
             getH = () => fb.height;
@@ -792,6 +810,7 @@ export class EffectHost {
             gl.enable(gl.SCISSOR_TEST);
             gl.scissor(vp.x, vp.y, vp.w, vp.h);
             gl.clear(bits);
+            resolver?.getWriteFbo().markDirty();
             gl.disable(gl.SCISSOR_TEST);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             return;
@@ -801,8 +820,10 @@ export class EffectHost {
         // so the next read side is cleared too.
         gl.disable(gl.SCISSOR_TEST);
         const clearWrite = () => {
-            gl.bindFramebuffer(gl.FRAMEBUFFER, resolver.getWriteFbo().fbo);
+            const writeFb = resolver.getWriteFbo();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, writeFb.fbo);
             gl.clear(bits);
+            writeFb.markDirty();
         };
         clearWrite();
         if (resolver.swap) {
@@ -922,7 +943,11 @@ export class EffectHost {
         // user-allocated RT get full-RT dims.
         const isStageOutput = rawTarget === null || rawTarget === ctxOutput;
 
-        let fbo: WebGLFramebuffer | null;
+        // Sampling a multisampled RT resolves it, which rebinds framebuffers.
+        // So build uniforms before binding the draw target.
+        const uniforms = this.#buildUniforms(opts.uniforms);
+
+        let writeFb: Framebuffer | null = null;
         let vpX: number;
         let vpY: number;
         let vpW: number;
@@ -931,14 +956,13 @@ export class EffectHost {
         let regenerateMipmaps: (() => void) | undefined;
         let hasDepth = false;
         if (rawTarget === null) {
-            fbo = null;
             vpX = this.#dims.outputViewport.x;
             vpY = this.#dims.outputViewport.y;
             vpW = this.#dims.outputViewport.w;
             vpH = this.#dims.outputViewport.h;
         } else {
             const resolver = resolveRt(rawTarget);
-            fbo = resolver.getWriteFbo().fbo;
+            writeFb = resolver.getWriteFbo();
             if (isStageOutput) {
                 vpX = this.#dims.outputViewport.x;
                 vpY = this.#dims.outputViewport.y;
@@ -957,7 +981,7 @@ export class EffectHost {
             }
         }
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, writeFb ? writeFb.fbo : null);
         gl.viewport(vpX, vpY, vpW, vpH);
         gl.disable(gl.SCISSOR_TEST);
         const blend =
@@ -966,7 +990,6 @@ export class EffectHost {
         const drawState = this.#resolveDrawState(opts, hasDepth);
 
         program.use();
-        const uniforms = this.#buildUniforms(opts.uniforms);
         program.uploadUniforms(uniforms);
 
         const geometry = opts.geometry ?? EFFECT_QUAD_TOKEN;
@@ -983,6 +1006,7 @@ export class EffectHost {
         } else {
             compiled.draw();
         }
+        writeFb?.markDirty();
 
         // Regen pre-swap: getWriteFbo() returned the buffer we just
         // drew to. After swap, that buffer rotates to the read side

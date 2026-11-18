@@ -794,6 +794,14 @@ export type EffectRenderTargetOpts = {
      * Each side of a `persistent: true` target has its own depth.
      */
     depth?: boolean;
+
+    /**
+     * Samples per pixel (Default: `1`). `4` turns on multisampling,
+     * which smooths triangle edges.
+     * The target still samples and blits like a normal texture.
+     * With `float: true`, a multisampled target uses 16-bit float.
+     */
+    samples?: 1 | 4;
 };
 
 export type EffectAttributeTypedArray =

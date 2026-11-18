@@ -7,6 +7,11 @@ import { Texture, type TextureFilter, type TextureWrap } from "./texture.js";
  * The `texture` field is a {@link Texture} that wraps the FBO's color
  * attachment, so it can be fed directly into a shader as a sampler.
  *
+ * With `samples: 4`, draws go to a multisampled FBO backed by
+ * renderbuffers, and the textures live on {@link resolveFbo}.
+ * Call {@link markDirty} after drawing, and {@link resolveColor} /
+ * {@link resolveDepth} before sampling.
+ *
  * Self-registers with {@link GLContext} so the FBO + its attachment
  * texture are rebuilt after a context loss. The internal attachment
  * texture opts out of auto-registering; its storage is managed here.
@@ -19,11 +24,21 @@ export class Framebuffer implements Restorable {
     float: boolean;
     mipmap: boolean;
     depth: boolean;
+    samples: 1 | 4;
+
+    /** Draw target. Multisampled when `samples` is 4. */
     fbo!: WebGLFramebuffer;
+
+    /** FBO holding the textures, when `samples` is 4. Null otherwise. */
+    resolveFbo: WebGLFramebuffer | null = null;
     texture: Texture;
     depthTexture: Texture | null;
 
     #ctx: GLContext;
+    #colorRenderbuffer: WebGLRenderbuffer | null = null;
+    #depthRenderbuffer: WebGLRenderbuffer | null = null;
+    #colorDirty = false;
+    #depthDirty = false;
 
     constructor(
         ctx: GLContext,
@@ -35,6 +50,7 @@ export class Framebuffer implements Restorable {
             filter?: TextureFilter;
             mipmap?: boolean;
             depth?: boolean;
+            samples?: 1 | 4;
         } = {},
     ) {
         this.#ctx = ctx;
@@ -44,6 +60,7 @@ export class Framebuffer implements Restorable {
         this.float = opts.float ?? false;
         this.mipmap = opts.mipmap ?? false;
         this.depth = opts.depth ?? false;
+        this.samples = opts.samples === 4 ? 4 : 1;
 
         this.texture = new Texture(ctx, undefined, { autoRegister: false });
         const w = opts.wrap;
@@ -95,8 +112,62 @@ export class Framebuffer implements Restorable {
     dispose(): void {
         this.#ctx.removeResource(this);
         this.gl.deleteFramebuffer(this.fbo);
+        this.#deleteMultisample(
+            this.resolveFbo,
+            this.#colorRenderbuffer,
+            this.#depthRenderbuffer,
+        );
         this.texture.dispose();
         this.depthTexture?.dispose();
+    }
+
+    /** Flag new pixels in the multisampled buffers. No-op without MSAA. */
+    markDirty(): void {
+        if (this.samples === 1) {
+            return;
+        }
+        this.#colorDirty = true;
+        this.#depthDirty = this.depth;
+    }
+
+    /** Copy multisampled color into {@link texture} if it changed. */
+    resolveColor(): void {
+        if (!this.#colorDirty) {
+            return;
+        }
+        this.#colorDirty = false;
+        this.#blitToResolve(this.gl.COLOR_BUFFER_BIT);
+    }
+
+    /** Copy multisampled depth into {@link depthTexture} if it changed. */
+    resolveDepth(): void {
+        if (!this.#depthDirty) {
+            return;
+        }
+        this.#depthDirty = false;
+        this.#blitToResolve(this.gl.DEPTH_BUFFER_BIT);
+    }
+
+    #blitToResolve(mask: number): void {
+        const gl = this.gl;
+        // Scissor would clip the blit.
+        gl.disable(gl.SCISSOR_TEST);
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fbo);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.resolveFbo);
+        gl.blitFramebuffer(
+            0,
+            0,
+            this.width,
+            this.height,
+            0,
+            0,
+            this.width,
+            this.height,
+            mask,
+            gl.NEAREST,
+        );
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
     }
 
     /**
@@ -107,6 +178,7 @@ export class Framebuffer implements Restorable {
         if (!this.mipmap) {
             return;
         }
+        this.resolveColor();
         const gl = this.gl;
         gl.bindTexture(gl.TEXTURE_2D, this.texture.texture);
         gl.generateMipmap(gl.TEXTURE_2D);
@@ -116,11 +188,25 @@ export class Framebuffer implements Restorable {
     #allocate(): void {
         const gl = this.gl;
         const oldFbo = this.fbo;
+        const oldResolveFbo = this.resolveFbo;
+        const oldColorRenderbuffer = this.#colorRenderbuffer;
+        const oldDepthRenderbuffer = this.#depthRenderbuffer;
         const fbo = gl.createFramebuffer();
         if (!fbo) {
             throw new Error("[VFX-JS] Failed to create framebuffer");
         }
-        this.fbo = fbo;
+        let multisampleFbo: WebGLFramebuffer | null = null;
+        if (this.samples > 1) {
+            multisampleFbo = gl.createFramebuffer();
+            if (!multisampleFbo) {
+                gl.deleteFramebuffer(fbo);
+                throw new Error("[VFX-JS] Failed to create framebuffer");
+            }
+            this.fbo = multisampleFbo;
+            this.resolveFbo = fbo;
+        } else {
+            this.fbo = fbo;
+        }
 
         const tex = this.texture.texture;
         gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -128,7 +214,8 @@ export class Framebuffer implements Restorable {
         // Choose format based on float/non-float. For float textures, use
         // RGBA16F as a fallback if linear filtering on RGBA32F is not
         // supported by the GPU.
-        const floatLinear = this.#ctx.floatLinearFilter;
+        // Multisampled float always uses RGBA16F.
+        const floatLinear = this.#ctx.floatLinearFilter && this.samples === 1;
         if (this.float && floatLinear && !this.#ctx.floatBlend) {
             // Blending into RGBA32F needs EXT_float_blend; fail fast
             // instead of letting blended draws drop silently.
@@ -210,8 +297,13 @@ export class Framebuffer implements Restorable {
         if (this.depthTexture) {
             this.#allocateDepth(this.depthTexture);
         }
+        if (multisampleFbo) {
+            this.#allocateMultisample(multisampleFbo, internalFormat);
+        }
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.bindTexture(gl.TEXTURE_2D, null);
+        this.#colorDirty = false;
+        this.#depthDirty = false;
 
         this.texture.needsUpdate = false;
         // Keep the Texture wrapper's source null: the storage is managed
@@ -222,6 +314,71 @@ export class Framebuffer implements Restorable {
         // On restore() the old handle is dead; deleteFramebuffer is a no-op.
         if (oldFbo) {
             gl.deleteFramebuffer(oldFbo);
+        }
+        this.#deleteMultisample(
+            oldResolveFbo,
+            oldColorRenderbuffer,
+            oldDepthRenderbuffer,
+        );
+    }
+
+    /** Allocate multisampled renderbuffers and attach them to `fbo`. */
+    #allocateMultisample(fbo: WebGLFramebuffer, colorFormat: number): void {
+        const gl = this.gl;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        this.#colorRenderbuffer = this.#createRenderbuffer(colorFormat);
+        gl.framebufferRenderbuffer(
+            gl.FRAMEBUFFER,
+            gl.COLOR_ATTACHMENT0,
+            gl.RENDERBUFFER,
+            this.#colorRenderbuffer,
+        );
+        this.#depthRenderbuffer = null;
+        if (this.depth) {
+            this.#depthRenderbuffer = this.#createRenderbuffer(
+                gl.DEPTH_COMPONENT24,
+            );
+            gl.framebufferRenderbuffer(
+                gl.FRAMEBUFFER,
+                gl.DEPTH_ATTACHMENT,
+                gl.RENDERBUFFER,
+                this.#depthRenderbuffer,
+            );
+        }
+        gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+    }
+
+    #createRenderbuffer(format: number): WebGLRenderbuffer {
+        const gl = this.gl;
+        const renderbuffer = gl.createRenderbuffer();
+        if (!renderbuffer) {
+            throw new Error("[VFX-JS] Failed to create renderbuffer");
+        }
+        gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
+        gl.renderbufferStorageMultisample(
+            gl.RENDERBUFFER,
+            this.samples,
+            format,
+            this.width,
+            this.height,
+        );
+        return renderbuffer;
+    }
+
+    #deleteMultisample(
+        resolveFbo: WebGLFramebuffer | null,
+        colorRenderbuffer: WebGLRenderbuffer | null,
+        depthRenderbuffer: WebGLRenderbuffer | null,
+    ): void {
+        const gl = this.gl;
+        if (resolveFbo) {
+            gl.deleteFramebuffer(resolveFbo);
+        }
+        if (colorRenderbuffer) {
+            gl.deleteRenderbuffer(colorRenderbuffer);
+        }
+        if (depthRenderbuffer) {
+            gl.deleteRenderbuffer(depthRenderbuffer);
         }
     }
 

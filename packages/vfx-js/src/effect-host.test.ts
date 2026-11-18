@@ -74,6 +74,9 @@ type MockFramebuffer = {
     setSize: (w: number, h: number) => void;
     generateMipmapsCount: number;
     generateMipmaps: () => void;
+    markDirty: () => void;
+    resolveColor: () => void;
+    resolveDepth: () => void;
     opts:
         | {
               float?: boolean;
@@ -81,8 +84,17 @@ type MockFramebuffer = {
               filter?: string;
               mipmap?: boolean;
               depth?: boolean;
+              samples?: 1 | 4;
           }
         | undefined;
+};
+
+/** Read side of a mock Backbuffer. */
+type MockReadSide = {
+    texture: unknown;
+    depthTexture: unknown;
+    resolveColor: () => void;
+    resolveDepth: () => void;
 };
 
 type MockBackbuffer = {
@@ -96,12 +108,12 @@ type MockBackbuffer = {
             filter?: string;
             mipmap?: boolean;
             depth?: boolean;
+            samples?: 1 | 4;
         };
     };
     target: MockFramebuffer;
-    texture: unknown;
-    depthTexture: unknown;
-    depths: [unknown, unknown] | null;
+    read: MockReadSide;
+    readSides: [MockReadSide, MockReadSide];
     swaps: number;
     disposed: boolean;
     dispose: () => void;
@@ -125,6 +137,9 @@ const textures: MockTexture[] = [];
 const framebuffers: MockFramebuffer[] = [];
 const backbuffers: MockBackbuffer[] = [];
 const programs: MockProgram[] = [];
+
+// Framebuffer events in call order, e.g. "markDirty:<label>".
+const fbEvents: string[] = [];
 
 // Tracked across tests; reset in beforeEach.
 const textureCtorCalls: Array<{
@@ -201,6 +216,15 @@ vi.mock("./gl/framebuffer.js", () => {
         generateMipmaps() {
             this.generateMipmapsCount += 1;
         }
+        markDirty() {
+            fbEvents.push("markDirty:fb");
+        }
+        resolveColor() {
+            fbEvents.push("resolveColor:fb");
+        }
+        resolveDepth() {
+            fbEvents.push("resolveDepth:fb");
+        }
     }
     return { Framebuffer };
 });
@@ -209,10 +233,9 @@ vi.mock("./backbuffer.js", () => {
     class Backbuffer {
         ctorArgs: MockBackbuffer["ctorArgs"];
         target: MockFramebuffer;
-        texture = { _brand: "mock-bb-tex" };
         swaps = 0;
         disposed = false;
-        depths: [unknown, unknown] | null;
+        readSides: [MockReadSide, MockReadSide];
         constructor(
             ctx: { gl: unknown },
             w: number,
@@ -222,12 +245,15 @@ vi.mock("./backbuffer.js", () => {
             opts?: MockBackbuffer["ctorArgs"]["opts"],
         ) {
             this.ctorArgs = { w, h, pr, float, opts };
-            this.depths = opts?.depth
-                ? [
-                      { _brand: "mock-bb-depth-0", gl: ctx.gl },
-                      { _brand: "mock-bb-depth-1", gl: ctx.gl },
-                  ]
-                : null;
+            const makeReadSide = (index: number): MockReadSide => ({
+                texture: { _brand: `mock-bb-tex-${index}` },
+                depthTexture: opts?.depth
+                    ? { _brand: `mock-bb-depth-${index}`, gl: ctx.gl }
+                    : null,
+                resolveColor: () => fbEvents.push(`resolveColor:bb${index}`),
+                resolveDepth: () => fbEvents.push(`resolveDepth:bb${index}`),
+            });
+            this.readSides = [makeReadSide(0), makeReadSide(1)];
             this.target = {
                 width: w * pr,
                 height: h * pr,
@@ -240,14 +266,18 @@ vi.mock("./backbuffer.js", () => {
                 generateMipmapsCount: 0,
                 generateMipmaps() {
                     this.generateMipmapsCount += 1;
+                    fbEvents.push("generateMipmaps:bb-target");
                 },
+                markDirty: () => fbEvents.push("markDirty:bb-target"),
+                resolveColor: () => {},
+                resolveDepth: () => {},
                 opts: undefined,
             };
             backbuffers.push(this as unknown as MockBackbuffer);
         }
-        // Read-side depth follows swaps.
-        get depthTexture() {
-            return this.depths ? this.depths[this.swaps % 2] : null;
+        // Read side follows swaps.
+        get read() {
+            return this.readSides[this.swaps % 2];
         }
         dispose() {
             this.disposed = true;
@@ -427,6 +457,7 @@ beforeEach(() => {
     backbuffers.length = 0;
     programs.length = 0;
     textureCtorCalls.length = 0;
+    fbEvents.length = 0;
 });
 
 afterEach(() => {
@@ -1229,8 +1260,8 @@ describe("EffectHost depth", () => {
             host.ctx.draw({ frag: FRAG, target: rt });
             host.ctx.draw({ frag: FRAG, uniforms: { depth } });
             const second = programs[0].uploads[2]["depth"].value;
-            expect(first).toBe(backbuffers[0].depths?.[0]);
-            expect(second).toBe(backbuffers[0].depths?.[1]);
+            expect(first).toBe(backbuffers[0].readSides[0].depthTexture);
+            expect(second).toBe(backbuffers[0].readSides[1].depthTexture);
         });
     });
 
@@ -1422,6 +1453,123 @@ describe("EffectHost depth", () => {
             host.ctx.clear(null, { color: false });
             expect(m.clear).not.toHaveBeenCalled();
         });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// samples — multisampled targets resolve lazily
+// ---------------------------------------------------------------------------
+
+describe("EffectHost samples", () => {
+    const FRAG = "void main(){}";
+
+    function glMock(gl: WebGL2RenderingContext) {
+        return gl as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    }
+
+    it("passes samples 4 through; other values become 1", () => {
+        const { host } = makeHost();
+        host.ctx.createRenderTarget({ samples: 4 });
+        host.ctx.createRenderTarget({ samples: 2 as unknown as 4 });
+        host.ctx.createRenderTarget({ persistent: true, samples: 4 });
+        expect(framebuffers[0].opts?.samples).toBe(4);
+        expect(framebuffers[1].opts?.samples).toBe(1);
+        expect(backbuffers[0].ctorArgs.opts?.samples).toBe(4);
+    });
+
+    it("draw marks the target dirty", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({ samples: 4 });
+        host.ctx.draw({ frag: FRAG, target: rt });
+        expect(fbEvents).toEqual(["markDirty:fb"]);
+    });
+
+    it("sampling an RT resolves it before the draw framebuffer is bound", () => {
+        const { host, gl } = makeHost();
+        host.setPhase("render");
+        const source = host.ctx.createRenderTarget({ samples: 4 });
+        const target = host.ctx.createRenderTarget();
+        const resolve = vi.spyOn(
+            framebuffers[0] as { resolveColor: () => void },
+            "resolveColor",
+        );
+        host.ctx.draw({ frag: FRAG, target, uniforms: { source } });
+        expect(resolve).toHaveBeenCalledTimes(1);
+        const bindOrder = glMock(gl).bindFramebuffer.mock.invocationCallOrder;
+        expect(bindOrder.length).toBeGreaterThan(0);
+        expect(resolve.mock.invocationCallOrder[0]).toBeLessThan(
+            Math.min(...bindOrder),
+        );
+        expect(programs[0].uploads[0]["source"].value).toBe(
+            framebuffers[0].texture,
+        );
+    });
+
+    it("sampling depthTexture resolves depth", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({ samples: 4, depth: true });
+        const depth = rt.depthTexture as EffectTexture;
+        host.ctx.draw({ frag: FRAG, uniforms: { depth } });
+        expect(fbEvents).toEqual(["resolveDepth:fb"]);
+    });
+
+    it("clear marks the target dirty; persistent marks both sides", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({ samples: 4 });
+        host.ctx.clear(rt);
+        expect(fbEvents).toEqual(["markDirty:fb"]);
+        fbEvents.length = 0;
+        const persistent = host.ctx.createRenderTarget({
+            persistent: true,
+            samples: 4,
+        });
+        host.ctx.clear(persistent);
+        expect(fbEvents).toEqual([
+            "markDirty:bb-target",
+            "markDirty:bb-target",
+        ]);
+    });
+
+    it("persistent: resolves the read side, which follows swaps", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({
+            persistent: true,
+            samples: 4,
+        });
+        host.ctx.draw({ frag: FRAG, uniforms: { rt } });
+        host.ctx.draw({ frag: FRAG, target: rt });
+        host.ctx.draw({ frag: FRAG, uniforms: { rt } });
+        expect(fbEvents).toEqual([
+            "resolveColor:bb0",
+            "markDirty:bb-target",
+            "resolveColor:bb1",
+        ]);
+        expect(programs[0].uploads[0]["rt"].value).toBe(
+            backbuffers[0].readSides[0].texture,
+        );
+        expect(programs[0].uploads[2]["rt"].value).toBe(
+            backbuffers[0].readSides[1].texture,
+        );
+    });
+
+    it("auto mipmaps: marks dirty before regenerating, before swap", () => {
+        const { host } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({
+            persistent: true,
+            samples: 4,
+            mipmap: true,
+        });
+        host.ctx.draw({ frag: FRAG, target: rt });
+        expect(fbEvents).toEqual([
+            "markDirty:bb-target",
+            "generateMipmaps:bb-target",
+        ]);
+        expect(backbuffers[0].swaps).toBe(1);
     });
 });
 
