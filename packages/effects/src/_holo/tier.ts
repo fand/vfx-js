@@ -1,0 +1,81 @@
+// Quality tiers (holospot engine/render/tier.ts, MIT © 2026 Dmitry Kurash): defines and loop trip counts of the
+// material programs. MSAA, DPR caps and memory budgets do not apply to an element effect.
+import type { Tier, TierConfig } from "./types.js";
+
+export const TIERS: Readonly<Record<Tier, TierConfig>> = {
+    high: {
+        tier: "high",
+        glareLevels: 5,
+        glareStartDiv: 2,
+        waves: { board: 8, coat: 16 },
+        defines: {
+            RECT_EXACT: 1,
+            RECT_LTC: 1,
+            NB: 8,
+            IBL_ORDERS: 1,
+            DISCRETE_LIGHTS: 4,
+            DISCRETE_LIGHTS_B: 2,
+            FLAKE_ENV: 1,
+            WEAR_CELLS: 3,
+        },
+        trips: {
+            maxOrder: 3,
+            ghB: 4,
+            vorR: 2,
+            flakeR: 1,
+            bCells: 3,
+            bBins: 5,
+            bLevels: 2,
+        },
+    },
+    medium: {
+        tier: "medium",
+        glareLevels: 4,
+        glareStartDiv: 2,
+        waves: { board: 6, coat: 8 },
+        defines: {
+            RECT_EXACT: 1,
+            RECT_LTC: 1,
+            NB: 6,
+            IBL_ORDERS: 1,
+            DISCRETE_LIGHTS: 4,
+            DISCRETE_LIGHTS_B: 2,
+            FLAKE_ENV: 1,
+            WEAR_CELLS: 3,
+        },
+        trips: {
+            maxOrder: 2,
+            ghB: 4,
+            vorR: 2,
+            flakeR: 0,
+            bCells: 3,
+            bBins: 3,
+            bLevels: 2,
+        },
+    },
+    low: {
+        tier: "low",
+        glareLevels: 3,
+        glareStartDiv: 4,
+        waves: { board: 2, coat: 2 },
+        defines: {
+            RECT_EXACT: 0,
+            RECT_LTC: 0,
+            NB: 0,
+            IBL_ORDERS: 0,
+            DISCRETE_LIGHTS: 2,
+            DISCRETE_LIGHTS_B: 1,
+            FLAKE_ENV: 0,
+            WEAR_CELLS: 2,
+        },
+        trips: {
+            maxOrder: 2,
+            ghB: 2,
+            vorR: 1,
+            flakeR: 0,
+            bCells: 2,
+            bBins: 2,
+            bLevels: 1,
+        },
+    },
+};
