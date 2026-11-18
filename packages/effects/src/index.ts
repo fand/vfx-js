@@ -38,6 +38,17 @@ export {
     type HalftoneMode,
     type HalftoneParams,
 } from "./halftone.js";
+export {
+    HoloEffect,
+    type HoloLook,
+    type HoloMask,
+    type HoloMaterial,
+    type HoloParams,
+    type HoloQuality,
+    type HoloSettings,
+    type HoloSettingValue,
+    type HoloVec2,
+} from "./holo.js";
 export { HueShiftEffect, type HueShiftParams } from "./hue-shift.js";
 export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch.js";
 export { LightStreakEffect, type LightStreakParams } from "./light-streak.js";

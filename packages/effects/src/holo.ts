@@ -46,7 +46,6 @@ import {
     backgroundTone,
     exposureMultiplier,
     isCopyBlob,
-    type LookId,
     type Resolved,
     resolveSettings,
     type SceneState,
@@ -71,9 +70,14 @@ import {
 } from "./_holo/types.js";
 
 /** Foil materials of holo.spot. */
-export type HoloMaterial = HoloMaterialId;
+export type HoloMaterial =
+    | "prism"
+    | "shatter"
+    | "nebula"
+    | "sparkle"
+    | "vortex";
 /** Look the settings start from: holo.spot's holographic card, its 3D object, or the bare parameter defaults. */
-export type HoloLook = LookId;
+export type HoloLook = "card" | "object" | "plain";
 /** Quality tier (holospot's tiers: orders, rect-light model, environment diffraction, glitter search radii). */
 export type HoloQuality = "low" | "medium" | "high";
 /** Where the foil is: where the element is opaque, where it is bright, or the whole element rect. */
@@ -697,6 +701,30 @@ export class HoloEffect implements Effect {
                 ...grainUniforms(s.grain, ctx.pixelRatio, ctx.time),
             },
         });
+    }
+
+    dispose(): void {
+        for (const rt of [
+            this.#conv,
+            this.#cum,
+            this.#hdr,
+            this.#black,
+            this.#env,
+            this.#ltc1,
+            this.#ltc2,
+        ]) {
+            rt?.dispose();
+        }
+        this.#bytesTex?.dispose();
+        this.#ltcTex?.dispose();
+        this.#glare.dispose();
+        this.#conv = this.#cum = this.#hdr = this.#black = this.#env = null;
+        this.#ltc1 = this.#ltc2 = null;
+        this.#bytesTex = this.#ltcTex = null;
+        this.#atlasUploaded = -1;
+        this.#ltcReady = false;
+        this.#blackReady = false;
+        this.#envDrawn = null;
     }
 
     #uploadAtlas(ctx: EffectContext, atlas: SpectralAtlas): void {

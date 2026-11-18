@@ -44,6 +44,7 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `GlitchEffect` | Block shift and aberration glitch. |
 | `GradientMapEffect` | Map luminance to a color gradient. |
 | `HalftoneEffect` | RGB / CMYK halftone screen. |
+| `HoloEffect` | Holographic foil (holo.spot materials): rainbow foil, gold shatter, glitter, sparkle, spiral. Tilts with the pointer. |
 | `HueShiftEffect` | Rotate hue. |
 | `JPEGGlitchEffect` | Real JPEG glitch: corrupts the encoded bytes. |
 | `LightStreakEffect` | Anamorphic flare / starburst streaks. |
@@ -65,6 +66,30 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `VignetteEffect` | Vignette. |
 | `VoronoiEffect` | Voronoi cells around the cursor. |
 | `WarpEffect` | Sine wave, twist or ripple warp. |
+
+### `HoloEffect`
+
+Physically based holographic foil, ported from [holospot](https://github.com/dmitrykurash/holospot) (the renderer of holo.spot).
+The element is a flat card lit by holo.spot's spectral studio lights; the pointer tilts it.
+
+```ts
+import { HoloEffect } from "@vfx-js/effects";
+
+await vfx.add(el, {
+    effect: new HoloEffect({
+        material: "prism", // "prism" | "shatter" | "nebula" | "sparkle" | "vortex"
+        settings: { "prism.pitch": 1200, "prism.pattern": "radial", "display.ev": 0.8 },
+        mask: "alpha", // foil where the element is opaque; "luma" or "none"
+    }),
+});
+```
+
+- `settings` takes holo.spot's setting ids (`<material>.*`, `studio.*` lights, `display.*`, `grain.*`, `card.*`, `motion.*`), or a holo.spot "Copy settings" blob. The ids, ranges and meanings are in holospot's `docs/materials/<material>.md` and `docs/scene-settings.md`.
+- `look` (`"card"` default, `"object"`, `"plain"`) picks the values holo.spot ships before `settings` apply.
+- `sizeMm` is the real size of the element's largest side (the foil has a physical grain). Default: CSS size at 96 dpi.
+- `quality`: `"low"` for phones, `"medium"` (default) or `"high"`.
+- `ink` (0–1) tints the foil with the element's colours, like a translucent ink.
+- Use `setParams({ settings: { ... } })` to change values live; it merges `settings` by id.
 
 Live demos: https://amagi.dev/vfx-js/storybook
 
