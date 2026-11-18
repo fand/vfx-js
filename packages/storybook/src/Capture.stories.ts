@@ -182,10 +182,10 @@ export const Minimap: StoryObj = {
 };
 
 // ---------------------------------------------------------------------------
-// Hidden source
+// Hide
 // ---------------------------------------------------------------------------
 
-const HIDDEN_FRAG = `#version 300 es
+const PIXELATE_FRAG = `#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvSrc;
@@ -195,14 +195,16 @@ uniform sampler2D page;
 uniform vec2 canvas;    // VFX canvas, CSS px
 uniform vec2 viewport;  // CSS px
 uniform vec4 pageRect;  // captured element in the viewport, CSS px
-uniform float time;
+uniform float cell;     // pixel size, CSS px
 void main() {
     vec4 base = texture(src, uvSrc);
     // The canvas is the viewport plus the same scroll padding on each side.
     vec2 pad = (canvas - viewport) * 0.5;
-    vec2 p = vec2(uv.x, 1.0 - uv.y) * canvas - pad;
-    vec2 l = (p - pageRect.xy) / pageRect.zw;
-    l.x += sin(l.y * 24.0 + time * 3.0) * 0.015;
+    vec2 p = vec2(uv.x, 1.0 - uv.y) * canvas - pad - pageRect.xy;
+    if (cell > 1.0) {
+        p = (floor(p / cell) + 0.5) * cell;
+    }
+    vec2 l = p / pageRect.zw;
     vec4 c = vec4(0.0);
     if (all(greaterThanEqual(l, vec2(0.0))) && all(lessThan(l, vec2(1.0)))) {
         c = texture(page, vec2(l.x, 1.0 - l.y));
@@ -212,15 +214,23 @@ void main() {
 `;
 
 /**
- * Post effect that draws a capture where its element is, with a wave.
+ * Post effect that draws a capture where its element is, pixelated until `reveal` is set.
  * Passes the scene through until `page` is set, and while the card has no layout.
  */
-class WavyPageEffect implements Effect {
+class PixelateUntilRevealEffect implements Effect {
     page: VFXCapture | null = null;
+    reveal = false;
+    #amount = 1;
 
     // Disabled, it passes the scene through.
     get enabled() {
         return this.page?.rect != null;
+    }
+
+    update(ctx: EffectContext) {
+        const target = this.reveal ? 0 : 1;
+        this.#amount +=
+            (target - this.#amount) * Math.min(1, ctx.deltaTime * 6);
     }
 
     render(ctx: EffectContext) {
@@ -229,14 +239,14 @@ class WavyPageEffect implements Effect {
             return;
         }
         ctx.draw({
-            frag: HIDDEN_FRAG,
+            frag: PIXELATE_FRAG,
             uniforms: {
                 src: ctx.src,
                 page: this.page.texture,
                 canvas: [ctx.dims.canvas[0], ctx.dims.canvas[1]],
                 viewport: viewportSize(),
                 pageRect: rectOf(rect),
-                time: ctx.time,
+                cell: 1 + this.#amount * 23,
             },
         });
     }
@@ -254,41 +264,26 @@ export const Hide: StoryObj = {
         card.style.cssText =
             "width:480px; padding:24px; background:#235; border-radius:12px";
         card.innerHTML = `
-            <h2 style="margin-top:0">Drawn by a post effect</h2>
+            <img src="${Jellyfish}" style="display:block; width:100%; border-radius:8px" />
+            <h2>Hover to reveal</h2>
             <p style="line-height:1.6">This card is captured with
-               <code>hide: true</code>. You see a post effect's drawing of
-               it, not the card. Clicks and typing reach the real card
-               underneath.</p>
-            <p><a id="capture-link" href="#capture-hidden" style="color:#8cf; font-size:1.2rem">Click this link</a></p>
-            <input id="capture-input" placeholder="Type here" style="font-size:1.1rem; padding:4px; width:300px" />
+               <code>hide: true</code>. A post effect draws it pixelated,
+               and sharp while you hover it. The card itself is unchanged.</p>
         `;
         container.appendChild(card);
-
-        const status = document.createElement("p");
-        status.id = "capture-status";
-        status.textContent = "Clicks: 0. Typed: ";
-        container.appendChild(status);
         return container;
     },
     play: async ({ canvasElement }) => {
         await nextFrame();
         const card = qs<HTMLElement>(canvasElement, "#capture-hidden");
-        const status = qs<HTMLElement>(canvasElement, "#capture-status");
-        const input = qs<HTMLInputElement>(canvasElement, "#capture-input");
         // The capture needs the VFX instance, so the post effect gets it afterwards.
-        const effect = new WavyPageEffect();
-        let clicks = 0;
-        const report = () => {
-            status.textContent = `Clicks: ${clicks}. Typed: ${input.value}`;
-            // The fallback snapshot only changes on update().
-            effect.page?.update();
-        };
-        qs(canvasElement, "#capture-link").addEventListener("click", (e) => {
-            e.preventDefault();
-            clicks++;
-            report();
+        const effect = new PixelateUntilRevealEffect();
+        card.addEventListener("pointerenter", () => {
+            effect.reveal = true;
         });
-        input.addEventListener("input", report);
+        card.addEventListener("pointerleave", () => {
+            effect.reveal = false;
+        });
 
         const vfx = initVFX({ postEffect: { effect } });
         effect.page = await vfx.capture(card, { hide: true });
