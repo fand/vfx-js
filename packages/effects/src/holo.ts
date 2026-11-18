@@ -11,6 +11,12 @@ import type {
     EffectTexture,
 } from "@vfx-js/core";
 import outputFrag from "./_holo/glsl/output.js";
+import {
+    FRAG_DECODE_LTC_MAIN,
+    LTC_IMAGE,
+    LTC_SIZE,
+    ltcImageBytes,
+} from "./_holo/ltc.js";
 import type { MaterialDef, Uniforms } from "./_holo/materials/build.js";
 import { prism } from "./_holo/materials/prism.js";
 import {
@@ -150,6 +156,13 @@ void main() {
 }
 `;
 
+const FRAG_DECODE_LTC = `#version 300 es
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+${GLSL_DECODE_FLOAT24}
+${FRAG_DECODE_LTC_MAIN}`;
+
 const FRAG_ZERO = `#version 300 es
 precision highp float;
 out vec4 outColor;
@@ -223,6 +236,10 @@ export class HoloEffect implements Effect {
     #hdr: EffectRenderTarget | null = null;
     #black: EffectRenderTarget | null = null;
     #env: EffectRenderTarget | null = null;
+    #ltcTex: EffectTexture | null = null;
+    #ltc1: EffectRenderTarget | null = null;
+    #ltc2: EffectRenderTarget | null = null;
+    #ltcReady = false;
     #envDrawn: EnvLevels | null = null;
     #blobs = cameraSideBlobs();
     #waves: WaveSet | null = null;
@@ -260,12 +277,7 @@ export class HoloEffect implements Effect {
 
     init(ctx: EffectContext): void {
         this.#atlas = new SpectralAtlas();
-        const canvas =
-            typeof document !== "undefined"
-                ? document.createElement("canvas")
-                : new OffscreenCanvas(ATLAS.imageWidth, ATLAS.imageHeight);
-        canvas.width = ATLAS.imageWidth;
-        canvas.height = ATLAS.imageHeight;
+        const canvas = this.#makeCanvas(ATLAS.imageWidth, ATLAS.imageHeight);
         this.#bytesCanvas = canvas;
         this.#bytesTex = ctx.wrapTexture(canvas, {
             autoUpdate: false,
@@ -280,11 +292,47 @@ export class HoloEffect implements Effect {
         this.#cum = ctx.createRenderTarget(tableOpts);
         this.#hdr = ctx.createRenderTarget({ float: true, filter: "nearest" });
         this.#black = ctx.createRenderTarget({ size: [1, 1], float: true });
+        const ltcCanvas = this.#makeCanvas(LTC_IMAGE.width, LTC_IMAGE.height);
+        this.#ctx2d(ltcCanvas)?.putImageData(
+            new ImageData(ltcImageBytes(), LTC_IMAGE.width, LTC_IMAGE.height),
+            0,
+            0,
+        );
+        this.#ltcTex = ctx.wrapTexture(ltcCanvas, {
+            autoUpdate: false,
+            filter: "nearest",
+        });
+        const ltcOpts = {
+            size: [LTC_SIZE, LTC_SIZE] as const,
+            float: true,
+            filter: "linear" as const,
+        };
+        this.#ltc1 = ctx.createRenderTarget(ltcOpts);
+        this.#ltc2 = ctx.createRenderTarget(ltcOpts);
         this.#env = ctx.createRenderTarget({
             size: [ENV_SIZE, ENV_SIZE * ENV_LEVELS],
             float: true,
             filter: "linear",
         });
+    }
+
+    #makeCanvas(w: number, h: number): HTMLCanvasElement | OffscreenCanvas {
+        const c =
+            typeof document !== "undefined"
+                ? document.createElement("canvas")
+                : new OffscreenCanvas(w, h);
+        c.width = w;
+        c.height = h;
+        return c;
+    }
+
+    #ctx2d(
+        c: HTMLCanvasElement | OffscreenCanvas,
+    ): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null {
+        return c.getContext("2d") as
+            | CanvasRenderingContext2D
+            | OffscreenCanvasRenderingContext2D
+            | null;
     }
 
     #resolve(): void {
@@ -452,6 +500,20 @@ export class HoloEffect implements Effect {
             });
             this.#blackReady = true;
         }
+        if (!this.#ltcReady && this.#ltcTex && this.#ltc1 && this.#ltc2) {
+            for (const [target, row] of [
+                [this.#ltc1, 0],
+                [this.#ltc2, LTC_SIZE],
+            ] as const) {
+                ctx.draw({
+                    frag: FRAG_DECODE_LTC,
+                    vert: PLAIN_VERT,
+                    target,
+                    uniforms: { uBytes: this.#ltcTex, uRowOffset: row },
+                });
+            }
+            this.#ltcReady = true;
+        }
         if (this.#atlasUploaded !== atlas.version) {
             this.#uploadAtlas(ctx, atlas);
         }
@@ -531,8 +593,8 @@ export class HoloEffect implements Effect {
                 uBinLam: binLam,
                 uBinW: binW,
                 uBinWidth: bins.width,
-                uLtc1: this.#black,
-                uLtc2: this.#black,
+                uLtc1: this.#ltc1 ?? this.#black,
+                uLtc2: this.#ltc2 ?? this.#black,
                 uWave: waves?.data ?? new Float32Array(128),
                 uWaveBoard: waves?.board ?? [0, 0],
                 uWaveCoat: waves?.coat ?? [0, 0],
@@ -565,10 +627,7 @@ export class HoloEffect implements Effect {
 
     #uploadAtlas(ctx: EffectContext, atlas: SpectralAtlas): void {
         const canvas = this.#bytesCanvas;
-        const c2d = canvas?.getContext("2d") as
-            | CanvasRenderingContext2D
-            | OffscreenCanvasRenderingContext2D
-            | null;
+        const c2d = canvas ? this.#ctx2d(canvas) : null;
         if (!c2d || !this.#bytesTex || !this.#conv || !this.#cum) {
             return;
         }
