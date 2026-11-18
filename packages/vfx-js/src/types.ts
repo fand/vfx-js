@@ -804,6 +804,7 @@ export type EffectRenderTargetOpts = {
      * Samples per pixel (Default: `1`). `4` turns on multisampling,
      * which smooths triangle edges.
      * The target still samples and blits like a normal texture.
+     * It uses about 5 times the memory, or 10 times with `depth: true`.
      * If the GPU can't take 4 samples for the format, it uses 1 and warns.
      * With `float: true`, asking for 4 samples always gives 16-bit float,
      * also when the GPU falls back to 1.

@@ -197,6 +197,7 @@ render(ctx) {
 - Don't sample a target, or its `depthTexture`, while drawing into it. To read the previous frame, use `persistent: true`.
 - A multisampled target samples and blits like any other. If the GPU can't take 4 samples for the format, it falls back to 1 with a warning. With `float: true`, asking for 4 samples always gives 16-bit float, even after the fallback.
 - `samples` must be 1 or 4; other values use 1 with a warning.
+- `samples: 4` uses about 5 times the memory of a plain target, or 10 times with `depth: true`.
 - With `persistent: true`, depth does not carry over between frames: the side you draw into holds depth from two frames ago. Clear it every frame with `ctx.clear(rt, { color: false })` before drawing.
 - Depth and cull state only lasts for that draw. Other draws stay depth-off.
 
