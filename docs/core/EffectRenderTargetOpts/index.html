@@ -49,7 +49,7 @@
     <body class="DocPage">
         <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
 
-<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.D1N54lFt.js"></script>
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.9ZiDRA5_.js"></script>
         <header class="SiteHeader">
     <a class="SiteHeaderBrand" href="/vfx-js/">
         <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
@@ -88,7 +88,7 @@
 <script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
 
         <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
-        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.xAwV4kWt.js"></script>
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.hgMzd4T5.js"></script>
         <!-- Back plays the slit scan reversed. -->
         <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
     
@@ -246,7 +246,7 @@
                                         </details><details open>
                                             <summary>
                                                 <span class="DocSidebarLabel">Types</span>
-                                                <span class="DocSidebarCount">44</span>
+                                                <span class="DocSidebarCount">47</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -280,9 +280,27 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectClearOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectClearOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/core/EffectContext/">
                                                             <span class="DocSidebarLabel">
                                                                 EffectContext
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectCullMode/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectCullMode
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectDepthFunc/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectDepthFunc
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1134,8 +1152,8 @@
         <h1>
             EffectRenderTargetOpts
         </h1>
-        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/444e19e61918ff7749ec9a49332be6fe8f80176d/packages/vfx-js/src/types.ts#L739" target="_blank" rel="noreferrer">
-                    vfx-js/src/types.ts:739 &#8599;
+        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/45983452617b9eebfa3d7896573c0d1ee5578957/packages/vfx-js/src/types.ts#L751" target="_blank" rel="noreferrer">
+                    vfx-js/src/types.ts:751 &#8599;
                 </a>
     </header>
 
@@ -1145,7 +1163,31 @@
 
     <section class="ApiGroup">
                 <h2>Properties</h2>
-                <section class="ApiMember" id="filter">
+                <section class="ApiMember" id="depth">
+    <h3>
+        <a class="ApiAnchor" href="#depth">depth</a>
+        
+        
+    </h3>
+    
+    
+    
+    
+                <pre class="ApiCode"><code><span class="tm">depth</span><span class="tp">?: </span><span class="tk">boolean</span></code></pre>
+                
+            
+    
+<div class="ApiText"><p>Give the target a depth buffer (Default: <code>false</code>).
+Needed for <code>depthTest</code> / <code>depthWrite</code> in <code>ctx.draw()</code>.
+Read it back with <code>rt.depthTexture</code>.</p>
+<p>Each side of a <code>persistent: true</code> target has its own depth.
+Depth does not carry over between frames:
+the side you draw into holds depth from two frames ago.
+So with <code>persistent: true</code>, clear depth every frame before drawing,
+with <code>ctx.clear(rt, { color: false })</code>.</p>
+</div>
+
+</section><section class="ApiMember" id="filter">
     <h3>
         <a class="ApiAnchor" href="#filter">filter</a>
         
@@ -1223,6 +1265,30 @@ stays bilinear / nearest.</p>
     
 <div class="ApiText"><p>Whether the target content should persist across frames (Default: <code>false</code>).
 Useful for feedback effects like trails or motion blur.</p>
+</div>
+
+</section><section class="ApiMember" id="samples">
+    <h3>
+        <a class="ApiAnchor" href="#samples">samples</a>
+        
+        
+    </h3>
+    
+    
+    
+    
+                <pre class="ApiCode"><code><span class="tm">samples</span><span class="tp">?: </span><span class="tn">1</span><span class="tp"> | </span><span class="tn">4</span></code></pre>
+                
+            
+    
+<div class="ApiText"><p>Samples per pixel (Default: <code>1</code>). <code>4</code> turns on multisampling,
+which smooths triangle edges.
+The target still samples and blits like a normal texture.
+It uses about 5 times the memory, or 10 times with <code>depth: true</code>.
+If the GPU can't take 4 samples for the format, it uses 1 and warns.
+With <code>float: true</code>, asking for 4 samples always gives 16-bit float,
+also when the GPU falls back to 1.
+Other values are ignored with a warning.</p>
 </div>
 
 </section><section class="ApiMember" id="size">
@@ -1348,7 +1414,7 @@ If omitted, the target size will follow the source element size
         
 </div>
 
-<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DVWY5cdY.js"></script>
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DZcGUPGB.js"></script>
 
         <div id="Frame"><div id="FrameBottom"></div></div>
         

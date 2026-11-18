@@ -49,7 +49,7 @@
     <body class="DocPage">
         <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
 
-<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.D1N54lFt.js"></script>
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.9ZiDRA5_.js"></script>
         <header class="SiteHeader">
     <a class="SiteHeaderBrand" href="/vfx-js/">
         <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
@@ -88,7 +88,7 @@
 <script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
 
         <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
-        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.xAwV4kWt.js"></script>
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.hgMzd4T5.js"></script>
         <!-- Back plays the slit scan reversed. -->
         <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
     
@@ -246,7 +246,7 @@
                                         </details><details open>
                                             <summary>
                                                 <span class="DocSidebarLabel">Types</span>
-                                                <span class="DocSidebarCount">44</span>
+                                                <span class="DocSidebarCount">47</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -280,9 +280,27 @@
                                                             </span>
                                                         </a>
                                                     </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectClearOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectClearOpts
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
                                                         <a href="/vfx-js/docs/core/EffectContext/" aria-current="page">
                                                             <span class="DocSidebarLabel">
                                                                 EffectContext
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectCullMode/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectCullMode
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectDepthFunc/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectDepthFunc
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1134,8 +1152,8 @@
         <h1>
             EffectContext
         </h1>
-        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/444e19e61918ff7749ec9a49332be6fe8f80176d/packages/vfx-js/src/types.ts#L897" target="_blank" rel="noreferrer">
-                    vfx-js/src/types.ts:897 &#8599;
+        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/45983452617b9eebfa3d7896573c0d1ee5578957/packages/vfx-js/src/types.ts#L984" target="_blank" rel="noreferrer">
+                    vfx-js/src/types.ts:984 &#8599;
                 </a>
     </header>
 
@@ -1238,6 +1256,9 @@ texture bindings and blend state. <code>ctx.draw()</code>, <code>ctx.blit()</cod
 <code>ctx.clear()</code> also turn off <code>SCISSOR_TEST</code>, but the rest of the
 frame (other elements, post effects, the per-frame canvas clear)
 does not touch scissor.</p>
+<p>When a draw asks for <code>depthTest</code>, <code>depthWrite</code> or <code>cull</code>, it sets
+the depth test, depth mask, depth func and face culling for that
+draw only, and puts them back to the baseline below afterwards.</p>
 <p>The rest of the GL state is never set per draw. VFX-JS assumes:</p>
 <ul>
 <li><code>SCISSOR_TEST</code>, <code>DEPTH_TEST</code>, <code>CULL_FACE</code>, <code>STENCIL_TEST</code>,
@@ -1515,12 +1536,14 @@ copy passes (capture, downsample, source passthrough).</p>
         
     </h3>
     <div class="ApiSignature">
-    <pre class="ApiCode"><code><span class="tf">clear</span><span class="tp">(</span><span class="tm">target</span><span class="tp">?: </span><a class="tr" href="/vfx-js/docs/core/EffectRenderTarget/">EffectRenderTarget</a><span class="tp"> | </span><span class="tk">null</span><span class="tp">)</span><span class="tp">: </span><span class="tk">void</span></code></pre>
+    <pre class="ApiCode"><code><span class="tf">clear</span><span class="tp">(</span><span class="tm">target</span><span class="tp">?: </span><a class="tr" href="/vfx-js/docs/core/EffectRenderTarget/">EffectRenderTarget</a><span class="tp"> | </span><span class="tk">null</span><span class="tp">, </span><span class="tm">opts</span><span class="tp">?: </span><a class="tr" href="/vfx-js/docs/core/EffectClearOpts/">EffectClearOpts</a><span class="tp">)</span><span class="tp">: </span><span class="tk">void</span></code></pre>
     
 <div class="ApiText"><p>Zero a render target with a fast GPU clear, instead of a full-screen
 draw. Use it to reset accumulation / trail buffers each frame.</p>
 <p>Omit <code>target</code> (or pass <code>null</code>) to clear the stage's assigned output.
-Clears both sides of a ping-pong (<code>persistent: true</code>) RT.</p>
+Clears both sides of a ping-pong (<code>persistent: true</code>) RT.
+Clears color and depth by default; pick one with <code>opts</code>.
+The stage's assigned output has no depth, so only color applies.</p>
 <p>Only valid during <code>Effect.render()</code>; other calls are ignored.</p>
 </div>
 
@@ -1808,7 +1831,7 @@ With <code>autoUpdate: false</code>, call <code>texture.update()</code> after th
         
 </div>
 
-<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DVWY5cdY.js"></script>
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DZcGUPGB.js"></script>
 
         <div id="Frame"><div id="FrameBottom"></div></div>
         

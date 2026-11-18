@@ -50,7 +50,7 @@
     <body class="DocPage">
         <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
 
-<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.D1N54lFt.js"></script>
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.9ZiDRA5_.js"></script>
         <header class="SiteHeader">
     <a class="SiteHeaderBrand" href="/vfx-js/">
         <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
@@ -89,7 +89,7 @@
 <script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
 
         <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
-        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.xAwV4kWt.js"></script>
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.hgMzd4T5.js"></script>
         <!-- Back plays the slit scan reversed. -->
         <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
     
@@ -439,10 +439,14 @@
 <span class="line"><span style="color:#E1E4E8">    blend,               </span><span style="color:#6A737D">// "premultiplied" | "none" | "additive" | "normal"</span></span>
 <span class="line"><span style="color:#E1E4E8">    geometry,            </span><span style="color:#6A737D">// ctx.quad (default) or your own geometry</span></span>
 <span class="line"><span style="color:#E1E4E8">    swap,                </span><span style="color:#6A737D">// persistent targets: false keeps the same buffer</span></span>
+<span class="line"><span style="color:#E1E4E8">    depthTest,           </span><span style="color:#6A737D">// test depth; the target needs depth: true</span></span>
+<span class="line"><span style="color:#E1E4E8">    depthFunc,           </span><span style="color:#6A737D">// "lequal" (default) | "less" | "greater" | ...</span></span>
+<span class="line"><span style="color:#E1E4E8">    depthWrite,          </span><span style="color:#6A737D">// write depth; defaults to depthTest</span></span>
+<span class="line"><span style="color:#E1E4E8">    cull,                </span><span style="color:#6A737D">// "none" (default) | "back" | "front"</span></span>
 <span class="line"><span style="color:#E1E4E8">});</span></span>
 <span class="line"></span>
 <span class="line"><span style="color:#E1E4E8">ctx.</span><span style="color:#B392F0">blit</span><span style="color:#E1E4E8">(source, target); </span><span style="color:#6A737D">// copy a texture</span></span>
-<span class="line"><span style="color:#E1E4E8">ctx.</span><span style="color:#B392F0">clear</span><span style="color:#E1E4E8">(target);        </span><span style="color:#6A737D">// clear a render target</span></span></code></pre>
+<span class="line"><span style="color:#E1E4E8">ctx.</span><span style="color:#B392F0">clear</span><span style="color:#E1E4E8">(target, opts);  </span><span style="color:#6A737D">// clear a render target; opts: { color, depth }</span></span></code></pre>
 </figure>
 
 
@@ -517,6 +521,8 @@
 <span class="line"><span style="color:#E1E4E8">    wrap,        </span><span style="color:#6A737D">// "clamp" (default) | "repeat" | "mirror"</span></span>
 <span class="line"><span style="color:#E1E4E8">    filter,      </span><span style="color:#6A737D">// "linear" (default) | "nearest"</span></span>
 <span class="line"><span style="color:#E1E4E8">    mipmap,      </span><span style="color:#6A737D">// true | "manual"</span></span>
+<span class="line"><span style="color:#E1E4E8">    depth,       </span><span style="color:#6A737D">// add a depth buffer, readable as rt.depthTexture</span></span>
+<span class="line"><span style="color:#E1E4E8">    samples,     </span><span style="color:#6A737D">// 1 (default) | 4 for smooth edges (MSAA)</span></span>
 <span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
 </figure>
 
@@ -525,6 +531,42 @@
             A <code data-astro-cid-empkddct>persistent</code> target has two buffers. As a uniform, it
             reads the last frame. As a target, it writes the next one. They swap
             after each draw.
+        </p>
+
+        <h3 data-astro-cid-empkddct>3D geometry</h3>
+        <p data-astro-cid-empkddct>
+            To draw meshes that cross each other, give the target a depth
+            buffer with <code data-astro-cid-empkddct>depth: true</code>, and draw with
+            <code data-astro-cid-empkddct>depthTest: true</code>. Add <code data-astro-cid-empkddct>samples: 4</code> for smooth
+            edges.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>EffectContext</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#B392F0">init</span><span style="color:#E1E4E8">(ctx) {</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.rt </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> ctx.</span><span style="color:#B392F0">createRenderTarget</span><span style="color:#E1E4E8">({ depth: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">, samples: </span><span style="color:#79B8FF">4</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">render</span><span style="color:#E1E4E8">(ctx) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    ctx.</span><span style="color:#B392F0">clear</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.rt); </span><span style="color:#6A737D">// color and depth</span></span>
+<span class="line"><span style="color:#E1E4E8">    ctx.</span><span style="color:#B392F0">draw</span><span style="color:#E1E4E8">({ vert, frag, geometry: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.tubes, target: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.rt, depthTest: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">, cull: </span><span style="color:#9ECBFF">"back"</span><span style="color:#E1E4E8"> });</span></span>
+<span class="line"><span style="color:#E1E4E8">    ctx.</span><span style="color:#B392F0">blit</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.rt);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-empkddct>
+            Depth options only work on a target with <code data-astro-cid-empkddct>depth: true</code>.
+            The canvas and <code data-astro-cid-empkddct>ctx.target</code> have no depth, so draw there
+            with <code data-astro-cid-empkddct>ctx.blit</code>. Read the depth with
+            <code data-astro-cid-empkddct>rt.depthTexture</code>: raw values in 0..1, not linear. A
+            target with <code data-astro-cid-empkddct>samples: 4</code> reads and blits like any other.
+            With <code data-astro-cid-empkddct>float: true</code> it uses 16-bit float.
+            On a <code data-astro-cid-empkddct>persistent</code> target, depth does not carry over
+            between frames, so clear it every frame with
+            <code data-astro-cid-empkddct>ctx.clear(rt, { color: false })</code>.
         </p>
 
         <h3 data-astro-cid-empkddct>Drawing outside the element</h3>
@@ -1058,7 +1100,7 @@
         
 </div>
 
-<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DVWY5cdY.js"></script>
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DZcGUPGB.js"></script>
 
         <div id="Frame"><div id="FrameBottom"></div></div>
         
@@ -1066,4 +1108,4 @@
     </body>
 </html>
 
-<script type="module" src="/vfx-js/_astro/custom-effects.astro_astro_type_script_index_0_lang.CaCAFt6O.js"></script>
+<script type="module" src="/vfx-js/_astro/custom-effects.astro_astro_type_script_index_0_lang.BKoOe6ix.js"></script>
