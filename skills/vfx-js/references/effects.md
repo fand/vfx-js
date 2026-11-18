@@ -228,6 +228,7 @@ page.dispose();      // free it and restore the element
     const pic = await vfx.capture(img); // waits for decode()
     ```
 - A WebGL `<canvas>` source needs `preserveDrawingBuffer: true`, or it may capture an empty buffer.
+- An SVG `<img>` needs a `width` and `height` in the SVG, or it may capture as black.
 - `capture` waits for an `<img>` to decode and a `<video>` to have a frame. A `loading="lazy"` image waits until it scrolls into view. A video with no source, one that failed, or one with `preload="none"` that is not playing rejects.
 - Capturing inside another html-in-canvas capture: the outer capture does not repaint when the inner one starts, hides or ends. Call `update()` on the outer capture.
 - With html-in-canvas, capture moves the element into a wrapper canvas like `addHTML`, so the same layout rules apply (CSS that depends on the parent may change, inline elements become blocks).

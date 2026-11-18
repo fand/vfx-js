@@ -318,6 +318,8 @@ export class VFX {
      *
      * A WebGL `<canvas>` needs `preserveDrawingBuffer: true`, or the
      * capture may read an empty buffer.
+     * An SVG `<img>` needs a `width` and `height` in the SVG, or it may
+     * capture as black.
      * A `loading="lazy"` image is waited for until it loads.
      * A capture inside another html-in-canvas capture does not repaint the
      * outer one; call `update()` on the outer capture.

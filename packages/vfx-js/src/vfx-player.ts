@@ -1118,20 +1118,15 @@ export class VFXPlayer {
         return entry.capture;
     }
 
-    // Throws when the upload throws or leaves a GL error.
+    // Throws when the upload throws (e.g. a cross-origin image without CORS).
+    // No gl.getError(): it stalls on the GPU.
     #uploadNow(texture: Texture): void {
-        const gl = this.#gl;
-        // Drop errors left by earlier calls.
-        for (let i = 0; i < 8 && gl.getError() !== gl.NO_ERROR; i++) {}
         try {
             texture.upload(0);
         } catch (err) {
             throw new Error(
                 `[VFX-JS] capture() could not upload the source: ${err}`,
             );
-        }
-        if (gl.getError() !== gl.NO_ERROR) {
-            throw new Error("[VFX-JS] capture() could not upload the source.");
         }
     }
 
