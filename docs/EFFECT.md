@@ -197,6 +197,10 @@ ctx.draw({
     target,            // EffectRenderTarget | null (canvas) | ctx.target
     blend,             // "premultiplied" (canvas default) | "none" (RT default) | "additive" | "normal"
     swap,              // persistent RT: pass false to keep writing to the same buffer
+    depthTest,         // test against the target's depth (needs depth: true); default false
+    depthFunc,         // "lequal" (default) | "less" | "greater" | "always" | ...
+    depthWrite,        // write depth; defaults to depthTest
+    cull,              // "none" (default) | "back" | "front"
 });
 ```
 
@@ -230,8 +234,15 @@ ctx.createRenderTarget({
     wrap,        // "clamp" (default) | "repeat" | "mirror" | [s, t]
     filter,      // "linear" (default) | "nearest"
     mipmap,      // true (auto) | "manual"
+    depth,       // add a depth buffer; read it with rt.depthTexture
+    samples,     // 1 (default) | 4 for MSAA; float + 4 uses 16F
 });
 ```
+
+`rt.depthTexture` holds raw non-linear depth in [0, 1] (nearest
+sampling). Depth options on a target without depth (canvas, stage
+output) are ignored with a warning. `ctx.clear(rt, { color, depth })`
+clears both by default.
 
 Allocate in `init`, reuse across frames. `rt.dispose()` is eager and
 idempotent; otherwise the host frees it on effect disposal.

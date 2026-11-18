@@ -76,10 +76,14 @@ ctx.draw({
     blend,               // "premultiplied" | "none" | "additive" | "normal"
     geometry,            // ctx.quad (default) or your own geometry
     swap,                // persistent targets: false keeps the same buffer
+    depthTest,           // test depth; the target needs depth: true
+    depthFunc,           // "lequal" (default) | "less" | "greater" | ...
+    depthWrite,          // write depth; defaults to depthTest
+    cull,                // "none" (default) | "back" | "front"
 });
 
 ctx.blit(source, target); // copy a texture
-ctx.clear(target);        // clear a render target
+ctx.clear(target, opts);  // clear a render target; opts: { color, depth }
 `;
 
 const varyings = [
@@ -105,7 +109,21 @@ ctx.createRenderTarget({
     wrap,        // "clamp" (default) | "repeat" | "mirror"
     filter,      // "linear" (default) | "nearest"
     mipmap,      // true | "manual"
+    depth,       // add a depth buffer, readable as rt.depthTexture
+    samples,     // 1 (default) | 4 for smooth edges (MSAA)
 });
+`;
+
+const depthCode = `
+init(ctx) {
+    this.rt = ctx.createRenderTarget({ depth: true, samples: 4 });
+}
+
+render(ctx) {
+    ctx.clear(this.rt); // color and depth
+    ctx.draw({ vert, frag, geometry: this.tubes, target: this.rt, depthTest: true, cull: "back" });
+    ctx.blit(this.rt);
+}
 `;
 
 const dimsFields = [
@@ -344,6 +362,23 @@ for (const img of document.querySelectorAll("img")) {
             A <code>persistent</code> target has two buffers. As a uniform, it
             reads the last frame. As a target, it writes the next one. They swap
             after each draw.
+        </p>
+
+        <h3>3D geometry</h3>
+        <p>
+            To draw meshes that cross each other, give the target a depth
+            buffer with <code>depth: true</code>, and draw with
+            <code>depthTest: true</code>. Add <code>samples: 4</code> for smooth
+            edges.
+        </p>
+        <CodeBlock code={depthCode} lang="ts" label="EffectContext" />
+        <p>
+            Depth options only work on a target with <code>depth: true</code>.
+            The canvas and <code>ctx.target</code> have no depth, so draw there
+            with <code>ctx.blit</code>. Read the depth with
+            <code>rt.depthTexture</code>: raw values in 0..1, not linear. A
+            target with <code>samples: 4</code> reads and blits like any other.
+            With <code>float: true</code> it uses 16-bit float.
         </p>
 
         <h3>Drawing outside the element</h3>

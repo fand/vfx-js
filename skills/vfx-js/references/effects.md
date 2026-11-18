@@ -136,11 +136,11 @@ Always declare `#version 300 es` in `ctx.draw` shaders.
 | `src`, `target` | Input texture / output for this stage. `target: null` is the canvas. Both are premultiplied alpha. |
 | `uniforms` | User `uniforms` from `vfx.add`, evaluated each frame. |
 | `dims` | Sizes: `elementPixel`, `canvasPixel`, `pixelRatio`, `contentRect`, `srcRect`, `canvasRect`. |
-| `createRenderTarget(opts)` | `{ size?, float?, persistent?, wrap?, filter?, mipmap? }`. Call in `init`. |
+| `createRenderTarget(opts)` | `{ size?, float?, persistent?, wrap?, filter?, mipmap?, depth?, samples? }`. Call in `init`. |
 | `wrapTexture(source, opts)` | Wrap an image, canvas, video or `WebGLTexture`. Call in `init`. With `autoUpdate: false`, call `tex.update()` after the source changes. |
-| `draw(opts)` | `{ frag, vert?, geometry?, uniforms?, target?, blend?, swap? }`. |
+| `draw(opts)` | `{ frag, vert?, geometry?, uniforms?, target?, blend?, swap?, depthTest?, depthFunc?, depthWrite?, cull? }`. |
 | `blit(source, target?)` | Copy a texture into a target. |
-| `clear(target?)` | Clear a render target. |
+| `clear(target?, opts?)` | Clear a render target. `opts: EffectClearOpts` is `{ color?, depth? }`, both default `true`. |
 | `gl` | Raw `WebGL2RenderingContext`. |
 | `resetState()` | Restore the GL state VFX-JS assumes after raw `ctx.gl` calls. Write-only, no queries. |
 
@@ -175,6 +175,28 @@ render(ctx) {
     ctx.blit(this.#buf, ctx.target);
 }
 ```
+
+### 3D geometry (depth and MSAA)
+
+Draw meshes into a target with `depth: true`.
+`samples: 4` smooths the edges (MSAA).
+
+```ts
+init(ctx) { this.#rt = ctx.createRenderTarget({ depth: true, samples: 4 }); }
+render(ctx) {
+    ctx.clear(this.#rt); // color and depth
+    ctx.draw({ vert, frag, geometry: this.#mesh, target: this.#rt, depthTest: true, cull: "back" });
+    ctx.blit(this.#rt);
+}
+```
+
+- `depthTest` (default `false`) compares with `depthFunc: EffectDepthFunc` (default `"lequal"`). `depthWrite` defaults to `depthTest`; `depthWrite: true` alone writes depth and lets every fragment pass.
+- `cull: EffectCullMode` is `"none"` (default), `"back"` or `"front"`. Front faces wind counter-clockwise. Cull works on any target.
+- Depth options need a target made with `depth: true`. On other targets they are ignored with a warning. The canvas and `ctx.target` have no depth.
+- `rt.depthTexture` reads the depth as a texture: raw non-linear values in [0, 1], nearest sampling. Linearize it in your shader if you need distance. A persistent target gives the read side's depth.
+- A non-persistent target can't sample its own `depthTexture` while drawing into itself.
+- A multisampled target samples and blits like any other. With `float: true` it uses 16-bit float. If the GPU can't take 4 samples for the format, it falls back to 1 with a warning.
+- Depth and cull state only lasts for that draw. Other draws stay depth-off.
 
 ### Drawing outside the element
 
