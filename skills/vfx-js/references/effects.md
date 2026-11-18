@@ -195,7 +195,9 @@ render(ctx) {
 - Depth options need a target made with `depth: true`. On other targets they are ignored with a warning. The canvas and `ctx.target` have no depth.
 - `rt.depthTexture` reads the depth as a texture: raw non-linear values in [0, 1], nearest sampling. Linearize it in your shader if you need distance. A persistent target gives the read side's depth.
 - A non-persistent target can't sample its own `depthTexture` while drawing into itself.
-- A multisampled target samples and blits like any other. With `float: true` it uses 16-bit float. If the GPU can't take 4 samples for the format, it falls back to 1 with a warning.
+- A multisampled target samples and blits like any other. If the GPU can't take 4 samples for the format, it falls back to 1 with a warning. With `float: true`, asking for 4 samples always gives 16-bit float, even after the fallback.
+- `samples` must be 1 or 4; other values use 1 with a warning.
+- With `persistent: true`, depth does not carry over between frames: the side you draw into holds depth from two frames ago. Clear it every frame with `ctx.clear(rt, { color: false })` before drawing.
 - Depth and cull state only lasts for that draw. Other draws stay depth-off.
 
 ### Drawing outside the element

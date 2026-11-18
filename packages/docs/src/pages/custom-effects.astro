@@ -379,6 +379,9 @@ for (const img of document.querySelectorAll("img")) {
             <code>rt.depthTexture</code>: raw values in 0..1, not linear. A
             target with <code>samples: 4</code> reads and blits like any other.
             With <code>float: true</code> it uses 16-bit float.
+            On a <code>persistent</code> target, depth does not carry over
+            between frames, so clear it every frame with
+            <code>{"ctx.clear(rt, { color: false })"}</code>.
         </p>
 
         <h3>Drawing outside the element</h3>

@@ -235,14 +235,16 @@ ctx.createRenderTarget({
     filter,      // "linear" (default) | "nearest"
     mipmap,      // true (auto) | "manual"
     depth,       // add a depth buffer; read it with rt.depthTexture
-    samples,     // 1 (default) | 4 for MSAA; float + 4 uses 16F
+    samples,     // 1 (default) | 4 for MSAA; float + 4 always uses 16F
 });
 ```
 
 `rt.depthTexture` holds raw non-linear depth in [0, 1] (nearest
 sampling). Depth options on a target without depth (canvas, stage
 output) are ignored with a warning. `ctx.clear(rt, { color, depth })`
-clears both by default.
+clears both by default. With `persistent: true`, depth does not carry
+over between frames, so call `ctx.clear(rt, { color: false })` every
+frame before drawing.
 
 Allocate in `init`, reuse across frames. `rt.dispose()` is eager and
 idempotent; otherwise the host frees it on effect disposal.
