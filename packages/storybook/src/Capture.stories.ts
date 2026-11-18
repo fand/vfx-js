@@ -155,7 +155,8 @@ export const Minimap: StoryObj = {
         const box = qs<HTMLElement>(canvasElement, "#capture-box");
         const toggle = qs(canvasElement, "#capture-toggle");
 
-        const vfx = initVFX();
+        // The minimap is fixed, so it needs a fixed canvas. With scroll padding it lags on scroll.
+        const vfx = initVFX({ scrollPadding: false });
         const page = await vfx.capture(article);
 
         // Live updates: a ticking clock, and a box that changes on click.
@@ -253,10 +254,11 @@ export const HiddenSource: StoryObj = {
         card.style.cssText =
             "width:480px; padding:24px; background:#235; border-radius:12px";
         card.innerHTML = `
-            <h2 style="margin-top:0">Hidden source</h2>
-            <p style="line-height:1.6">This card has <code>hide: true</code>.
-               Only a post effect draws it, with a wave. The link and the
-               input still work.</p>
+            <h2 style="margin-top:0">Drawn by a post effect</h2>
+            <p style="line-height:1.6">This card is captured with
+               <code>hide: true</code>. You see a post effect's drawing of
+               it, not the card. Clicks and typing reach the real card
+               underneath.</p>
             <p><a id="capture-link" href="#capture-hidden" style="color:#8cf; font-size:1.2rem">Click this link</a></p>
             <input id="capture-input" placeholder="Type here" style="font-size:1.1rem; padding:4px; width:300px" />
         `;

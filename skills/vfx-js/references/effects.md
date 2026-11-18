@@ -233,6 +233,7 @@ page.dispose();      // free it and restore the element
 - One capture per element. `capture` rejects for an element `addHTML` or a transition wraps, and the other way round. It also excludes `add` on the same element (both ways), except for an `<img>` / `<video>` / `<canvas>` captured without `hide`.
 - An HTML element needs a width and height when captured; an empty one rejects.
 - The texture belongs to its `VFX`; drawing it in another instance throws.
+- For a `position: fixed` target (e.g. a minimap), draw it with its own `new VFX({ scrollPadding: false })`. With scroll padding the canvas moves with the page and a fixed drawing lags on scroll. Capture the source in that instance too: capture draws nothing, and the texture only works in its own instance.
 - To map `rect` in a post effect, add the scroll padding: the canvas is the viewport plus the same padding on each side, so `pad = (ctx.dims.canvas - [clientWidth, clientHeight]) / 2` with the size of `document.documentElement`, and the canvas position is `rect.xy + pad` (CSS px, top-left origin).
 
 ### Rules
