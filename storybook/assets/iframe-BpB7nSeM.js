@@ -1,1 +1,0 @@
-import{t as e}from"./iframe-w5tNuibo.js";e();
