@@ -708,8 +708,8 @@ export type EffectRenderTarget = {
      *
      * Values are raw, non-linear depth in [0, 1], sampled with nearest
      * filtering. Convert them to linear depth in your shader if needed.
-     * A non-persistent target cannot sample its own depth while drawing
-     * into itself.
+     * Don't sample a target, or its depth, while drawing into it.
+     * To read the previous frame, use `persistent: true`.
      */
     readonly depthTexture?: EffectTexture;
 };
