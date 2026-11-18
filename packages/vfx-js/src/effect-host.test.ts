@@ -68,6 +68,7 @@ type MockFramebuffer = {
     height: number;
     fbo: unknown;
     texture: unknown;
+    depthTexture: unknown;
     disposed: boolean;
     dispose: () => void;
     setSize: (w: number, h: number) => void;
@@ -79,6 +80,7 @@ type MockFramebuffer = {
               wrap?: unknown;
               filter?: string;
               mipmap?: boolean;
+              depth?: boolean;
           }
         | undefined;
 };
@@ -89,10 +91,17 @@ type MockBackbuffer = {
         h: number;
         pr: number;
         float?: boolean;
-        opts?: { wrap?: unknown; filter?: string; mipmap?: boolean };
+        opts?: {
+            wrap?: unknown;
+            filter?: string;
+            mipmap?: boolean;
+            depth?: boolean;
+        };
     };
     target: MockFramebuffer;
     texture: unknown;
+    depthTexture: unknown;
+    depths: [unknown, unknown] | null;
     swaps: number;
     disposed: boolean;
     dispose: () => void;
@@ -164,11 +173,12 @@ vi.mock("./gl/framebuffer.js", () => {
         height: number;
         fbo = { _brand: "mock-fbo" };
         texture = { _brand: "mock-fb-tex" };
+        depthTexture: unknown;
         disposed = false;
         generateMipmapsCount = 0;
         opts: MockFramebuffer["opts"];
         constructor(
-            _ctx: unknown,
+            ctx: { gl: unknown },
             w: number,
             h: number,
             opts?: MockFramebuffer["opts"],
@@ -176,6 +186,9 @@ vi.mock("./gl/framebuffer.js", () => {
             this.width = w;
             this.height = h;
             this.opts = opts;
+            this.depthTexture = opts?.depth
+                ? { _brand: "mock-fb-depth", gl: ctx.gl }
+                : null;
             framebuffers.push(this as unknown as MockFramebuffer);
         }
         dispose() {
@@ -199,20 +212,28 @@ vi.mock("./backbuffer.js", () => {
         texture = { _brand: "mock-bb-tex" };
         swaps = 0;
         disposed = false;
+        depths: [unknown, unknown] | null;
         constructor(
-            _ctx: unknown,
+            ctx: { gl: unknown },
             w: number,
             h: number,
             pr: number,
             float: boolean,
-            opts?: { wrap?: unknown; filter?: string; mipmap?: boolean },
+            opts?: MockBackbuffer["ctorArgs"]["opts"],
         ) {
             this.ctorArgs = { w, h, pr, float, opts };
+            this.depths = opts?.depth
+                ? [
+                      { _brand: "mock-bb-depth-0", gl: ctx.gl },
+                      { _brand: "mock-bb-depth-1", gl: ctx.gl },
+                  ]
+                : null;
             this.target = {
                 width: w * pr,
                 height: h * pr,
                 fbo: { _brand: "mock-bb-fbo" },
                 texture: { _brand: "mock-bb-target-tex" },
+                depthTexture: null,
                 disposed: false,
                 dispose: () => {},
                 setSize: () => {},
@@ -223,6 +244,10 @@ vi.mock("./backbuffer.js", () => {
                 opts: undefined,
             };
             backbuffers.push(this as unknown as MockBackbuffer);
+        }
+        // Read-side depth follows swaps.
+        get depthTexture() {
+            return this.depths ? this.depths[this.swaps % 2] : null;
         }
         dispose() {
             this.disposed = true;
@@ -270,7 +295,8 @@ vi.mock("./gl/program.js", () => {
     return { Program };
 });
 
-vi.mock("./gl/pass.js", () => ({
+vi.mock("./gl/pass.js", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("./gl/pass.js")>()),
     applyBlend: vi.fn(),
 }));
 
@@ -290,10 +316,10 @@ vi.mock("./effect-geometry.js", async () => {
                     this.quadDrawCount += 1;
                 },
             };
-            resolve() {
+            resolve(geometry: { onDraw?: () => void }) {
                 this.customResolveCount += 1;
                 return {
-                    draw: () => {},
+                    draw: () => geometry.onDraw?.(),
                 };
             }
             dispose() {
@@ -317,6 +343,19 @@ function makeGlStub() {
         FRAMEBUFFER: 0x8d40,
         SCISSOR_TEST: 0xc11,
         COLOR_BUFFER_BIT: 0x4000,
+        DEPTH_BUFFER_BIT: 0x100,
+        DEPTH_TEST: 0xb71,
+        CULL_FACE: 0xb44,
+        FRONT: 0x404,
+        BACK: 0x405,
+        LESS: 0x201,
+        LEQUAL: 0x203,
+        GREATER: 0x204,
+        ALWAYS: 0x207,
+        depthFunc: vi.fn(),
+        depthMask: vi.fn(),
+        cullFace: vi.fn(),
+        clearDepth: vi.fn(),
         bindFramebuffer: vi.fn(),
         viewport: vi.fn(),
         disable: vi.fn(),
@@ -1106,6 +1145,283 @@ describe("EffectHost.clear", () => {
         expect(gl.clear).not.toHaveBeenCalled();
         expect(warn).toHaveBeenCalledTimes(1);
         warn.mockRestore();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// depth — depth textures, per-draw depth / cull state, depth clears
+// ---------------------------------------------------------------------------
+
+describe("EffectHost depth", () => {
+    const FRAG = "void main(){}";
+
+    function glMocks(gl: WebGL2RenderingContext) {
+        return gl as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    }
+
+    /** Assert the draw left depth and cull at the baseline. */
+    function expectBaselineAfterDraw(gl: WebGL2RenderingContext) {
+        const m = glMocks(gl);
+        const disables = m.disable.mock.calls.map((c) => c[0]);
+        expect(disables.slice(-2)).toEqual([gl.DEPTH_TEST, gl.CULL_FACE]);
+        expect(m.depthMask.mock.calls.at(-1)).toEqual([true]);
+    }
+
+    function drawWithDepth(
+        opts: Omit<Parameters<EffectHost["ctx"]["draw"]>[0], "frag">,
+    ) {
+        const { host, gl } = makeHost();
+        host.setPhase("render");
+        const rt = host.ctx.createRenderTarget({ depth: true });
+        host.ctx.draw({ frag: FRAG, target: rt, ...opts });
+        return { host, gl, m: glMocks(gl) };
+    }
+
+    describe("depthTexture", () => {
+        it("absent without depth: true", () => {
+            const { host } = makeHost();
+            const rt = host.ctx.createRenderTarget();
+            expect(rt.depthTexture).toBeUndefined();
+            expect(framebuffers[0].opts?.depth).toBe(false);
+        });
+
+        it("present with depth: true, sized like the RT", () => {
+            const { host } = makeHost();
+            const rt = host.ctx.createRenderTarget({
+                depth: true,
+                size: [64, 32],
+            });
+            expect(framebuffers[0].opts?.depth).toBe(true);
+            expect(rt.depthTexture?.__brand).toBe("EffectTexture");
+            expect(rt.depthTexture?.width).toBe(64);
+            expect(rt.depthTexture?.height).toBe(32);
+        });
+
+        it("samples the framebuffer's depth texture as a uniform", () => {
+            const { host } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({ depth: true });
+            const depth = rt.depthTexture as EffectTexture;
+            host.ctx.draw({ frag: FRAG, uniforms: { depth } });
+            expect(programs[0].uploads[0]["depth"].value).toBe(
+                framebuffers[0].depthTexture,
+            );
+        });
+
+        it("dispose on the depth handle is a no-op", () => {
+            const { host } = makeHost();
+            const rt = host.ctx.createRenderTarget({ depth: true });
+            rt.depthTexture?.dispose();
+            expect(framebuffers[0].disposed).toBe(false);
+        });
+
+        it("persistent: follows the read side across swaps", () => {
+            const { host } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({
+                persistent: true,
+                depth: true,
+            });
+            expect(backbuffers[0].ctorArgs.opts?.depth).toBe(true);
+            const depth = rt.depthTexture as EffectTexture;
+            host.ctx.draw({ frag: FRAG, uniforms: { depth } });
+            const first = programs[0].uploads[0]["depth"].value;
+            host.ctx.draw({ frag: FRAG, target: rt });
+            host.ctx.draw({ frag: FRAG, uniforms: { depth } });
+            const second = programs[0].uploads[2]["depth"].value;
+            expect(first).toBe(backbuffers[0].depths?.[0]);
+            expect(second).toBe(backbuffers[0].depths?.[1]);
+        });
+    });
+
+    describe("draw state", () => {
+        it("no depth or cull opts → depth and cull state untouched", () => {
+            const { m } = drawWithDepth({});
+            expect(m.depthFunc).not.toHaveBeenCalled();
+            expect(m.depthMask).not.toHaveBeenCalled();
+            expect(m.cullFace).not.toHaveBeenCalled();
+        });
+
+        it("depthTest: true → DEPTH_TEST on, LEQUAL, mask on, then baseline", () => {
+            const { gl, m } = drawWithDepth({ depthTest: true });
+            expect(m.enable).toHaveBeenCalledWith(gl.DEPTH_TEST);
+            expect(m.depthFunc).toHaveBeenCalledWith(gl.LEQUAL);
+            expect(m.depthMask).toHaveBeenNthCalledWith(1, true);
+            expectBaselineAfterDraw(gl);
+        });
+
+        it("depthFunc is honored", () => {
+            const { gl, m } = drawWithDepth({
+                depthTest: true,
+                depthFunc: "greater",
+            });
+            expect(m.depthFunc).toHaveBeenCalledWith(gl.GREATER);
+        });
+
+        it("depthTest: true + depthWrite: false → depthMask(false)", () => {
+            const { gl, m } = drawWithDepth({
+                depthTest: true,
+                depthWrite: false,
+            });
+            expect(m.depthMask).toHaveBeenNthCalledWith(1, false);
+            expectBaselineAfterDraw(gl);
+        });
+
+        it("depthWrite only → DEPTH_TEST on with ALWAYS", () => {
+            const { gl, m } = drawWithDepth({ depthWrite: true });
+            expect(m.enable).toHaveBeenCalledWith(gl.DEPTH_TEST);
+            expect(m.depthFunc).toHaveBeenCalledWith(gl.ALWAYS);
+            expect(m.depthMask).toHaveBeenNthCalledWith(1, true);
+            expectBaselineAfterDraw(gl);
+        });
+
+        it("cull: back / front → CULL_FACE on with the face", () => {
+            for (const cull of ["back", "front"] as const) {
+                const { gl, m } = drawWithDepth({ cull });
+                expect(m.enable).toHaveBeenCalledWith(gl.CULL_FACE);
+                expect(m.cullFace).toHaveBeenCalledWith(
+                    cull === "back" ? gl.BACK : gl.FRONT,
+                );
+                expect(m.enable).not.toHaveBeenCalledWith(gl.DEPTH_TEST);
+                expectBaselineAfterDraw(gl);
+            }
+        });
+
+        it("cull works on the canvas, which has no depth", () => {
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            host.ctx.draw({ frag: FRAG, cull: "back" });
+            expect(glMocks(gl).enable).toHaveBeenCalledWith(gl.CULL_FACE);
+            expectBaselineAfterDraw(gl);
+        });
+
+        it("state is reset even when the draw throws", () => {
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({ depth: true });
+            const geometry = {
+                attributes: {},
+                onDraw: () => {
+                    throw new Error("draw failed");
+                },
+            };
+            expect(() =>
+                host.ctx.draw({
+                    frag: FRAG,
+                    target: rt,
+                    geometry,
+                    depthTest: true,
+                    cull: "back",
+                }),
+            ).toThrow("draw failed");
+            expectBaselineAfterDraw(gl);
+        });
+
+        it("depth on a target without depth → warns once and skips depth", () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget();
+            host.ctx.draw({ frag: FRAG, target: rt, depthTest: true });
+            host.ctx.draw({ frag: FRAG, depthWrite: true });
+            host.ctx.draw({
+                frag: FRAG,
+                target: host.ctx.target,
+                depthTest: true,
+            });
+            const m = glMocks(gl);
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(m.enable).not.toHaveBeenCalledWith(gl.DEPTH_TEST);
+            expect(m.depthFunc).not.toHaveBeenCalled();
+            warn.mockRestore();
+        });
+
+        it("blit leaves depth off", () => {
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({ depth: true });
+            host.ctx.blit(host.ctx.createRenderTarget(), rt);
+            const m = glMocks(gl);
+            expect(m.enable).not.toHaveBeenCalledWith(gl.DEPTH_TEST);
+            expect(m.depthMask).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("clear", () => {
+        it("depth RT → clears color and depth to 1", () => {
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({ depth: true });
+            host.ctx.clear(rt);
+            const m = glMocks(gl);
+            expect(m.clearDepth).toHaveBeenCalledWith(1);
+            expect(m.clear).toHaveBeenCalledWith(
+                gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT,
+            );
+        });
+
+        it("RT without depth → color only", () => {
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget();
+            host.ctx.clear(rt);
+            expect(glMocks(gl).clear).toHaveBeenCalledWith(gl.COLOR_BUFFER_BIT);
+            expect(glMocks(gl).clearDepth).not.toHaveBeenCalled();
+        });
+
+        it("depth: false → color only", () => {
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({ depth: true });
+            host.ctx.clear(rt, { depth: false });
+            expect(glMocks(gl).clear).toHaveBeenCalledWith(gl.COLOR_BUFFER_BIT);
+        });
+
+        it("color: false → depth only", () => {
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({ depth: true });
+            host.ctx.clear(rt, { color: false });
+            const m = glMocks(gl);
+            expect(m.clear).toHaveBeenCalledWith(gl.DEPTH_BUFFER_BIT);
+            expect(m.clearColor).not.toHaveBeenCalled();
+        });
+
+        it("both false → nothing", () => {
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({ depth: true });
+            host.ctx.clear(rt, { color: false, depth: false });
+            expect(glMocks(gl).clear).not.toHaveBeenCalled();
+            expect(glMocks(gl).bindFramebuffer).not.toHaveBeenCalled();
+        });
+
+        it("persistent depth RT → both sides get color and depth", () => {
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            const rt = host.ctx.createRenderTarget({
+                persistent: true,
+                depth: true,
+            });
+            host.ctx.clear(rt);
+            const m = glMocks(gl);
+            expect(m.clear).toHaveBeenCalledTimes(2);
+            for (const call of m.clear.mock.calls) {
+                expect(call[0]).toBe(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            }
+            expect(backbuffers[0].swaps).toBe(2);
+        });
+
+        it("stage output → color only; color: false does nothing", () => {
+            const { host, gl } = makeHost();
+            host.setPhase("render");
+            host.ctx.clear();
+            const m = glMocks(gl);
+            expect(m.clear).toHaveBeenCalledWith(gl.COLOR_BUFFER_BIT);
+            m.clear.mockClear();
+            host.ctx.clear(null, { color: false });
+            expect(m.clear).not.toHaveBeenCalled();
+        });
     });
 });
 

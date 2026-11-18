@@ -700,6 +700,18 @@ export type EffectRenderTarget = {
      * before the RT is sampled at non-zero LOD.
      */
     generateMipmaps(): void;
+
+    /**
+     * Depth buffer of the target, as a texture.
+     * Present only when the target was created with `depth: true`.
+     * For a `persistent: true` target, it is the depth of the read side.
+     *
+     * Values are raw, non-linear depth in [0, 1], sampled with nearest
+     * filtering. Convert them to linear depth in your shader if needed.
+     * A non-persistent target cannot sample its own depth while drawing
+     * into itself.
+     */
+    readonly depthTexture?: EffectTexture;
 };
 
 /**
@@ -774,6 +786,14 @@ export type EffectRenderTargetOpts = {
      * stays bilinear / nearest.
      */
     mipmap?: boolean | "manual";
+
+    /**
+     * Give the target a depth buffer (Default: `false`).
+     * Needed for `depthTest` / `depthWrite` in `ctx.draw()`.
+     * Read it back with `rt.depthTexture`.
+     * Each side of a `persistent: true` target has its own depth.
+     */
+    depth?: boolean;
 };
 
 export type EffectAttributeTypedArray =
@@ -829,6 +849,32 @@ export type EffectQuad = { readonly __brand: "EffectQuad" };
 
 export type EffectBlendMode = "normal" | "premultiplied" | "additive" | "none";
 
+/** Comparison for the depth test. See {@link EffectDrawOpts.depthFunc}. */
+export type EffectDepthFunc =
+    | "never"
+    | "less"
+    | "equal"
+    | "lequal"
+    | "greater"
+    | "notequal"
+    | "gequal"
+    | "always";
+
+/** Which faces to skip. See {@link EffectDrawOpts.cull}. */
+export type EffectCullMode = "none" | "back" | "front";
+
+/** Options for {@link EffectContext.clear}. */
+export type EffectClearOpts = {
+    /** Clear the color to `(0, 0, 0, 0)`. Default: `true`. */
+    color?: boolean;
+
+    /**
+     * Clear the depth to 1. Default: `true`.
+     * Ignored when the target has no depth.
+     */
+    depth?: boolean;
+};
+
 export type EffectDrawOpts = {
     frag: string;
     vert?: string;
@@ -865,6 +911,30 @@ export type EffectDrawOpts = {
      * No-op for non-persistent RTs and for canvas writes.
      */
     swap?: boolean;
+
+    /**
+     * Test each fragment against the target's depth. Default: `false`.
+     * Needs a target created with `depth: true`.
+     * On other targets it is ignored with a warning.
+     */
+    depthTest?: boolean;
+
+    /** Comparison for {@link EffectDrawOpts.depthTest}. Default: `"lequal"`. */
+    depthFunc?: EffectDepthFunc;
+
+    /**
+     * Write each fragment's depth to the target.
+     * Default: same as {@link EffectDrawOpts.depthTest}.
+     * Works without `depthTest` too: then every fragment passes.
+     * Needs a target created with `depth: true`.
+     */
+    depthWrite?: boolean;
+
+    /**
+     * Skip back- or front-facing triangles. Default: `"none"`.
+     * Front faces wind counter-clockwise.
+     */
+    cull?: EffectCullMode;
 };
 
 export type EffectBlitOpts = {
@@ -1011,10 +1081,12 @@ export type EffectContext = {
      *
      * Omit `target` (or pass `null`) to clear the stage's assigned output.
      * Clears both sides of a ping-pong (`persistent: true`) RT.
+     * Clears color and depth by default; pick one with `opts`.
+     * The stage's assigned output has no depth, so only color applies.
      *
      * Only valid during `Effect.render()`; other calls are ignored.
      */
-    clear(target?: EffectRenderTarget | null): void;
+    clear(target?: EffectRenderTarget | null, opts?: EffectClearOpts): void;
 
     /**
      * Raw WebGL2 context, for low-level operations
@@ -1028,6 +1100,10 @@ export type EffectContext = {
      * `ctx.clear()` also turn off `SCISSOR_TEST`, but the rest of the
      * frame (other elements, post effects, the per-frame canvas clear)
      * does not touch scissor.
+     *
+     * When a draw asks for `depthTest`, `depthWrite` or `cull`, it sets
+     * the depth test, depth mask, depth func and face culling for that
+     * draw only, and puts them back to the baseline below afterwards.
      *
      * The rest of the GL state is never set per draw. VFX-JS assumes:
      * - `SCISSOR_TEST`, `DEPTH_TEST`, `CULL_FACE`, `STENCIL_TEST`,
