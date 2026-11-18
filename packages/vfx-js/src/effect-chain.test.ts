@@ -139,6 +139,7 @@ vi.mock("./gl/framebuffer.js", () => {
         dispose() {
             this.disposed = true;
         }
+        markDirty() {}
     }
     return { Framebuffer };
 });
