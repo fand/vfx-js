@@ -242,7 +242,7 @@ class WavyPageEffect implements Effect {
     }
 }
 
-export const HiddenSource: StoryObj = {
+export const Hide: StoryObj = {
     render: () => {
         fullscreenRoot();
         const container = document.createElement("div");
