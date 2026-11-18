@@ -185,7 +185,7 @@ export const Minimap: StoryObj = {
 // Hide
 // ---------------------------------------------------------------------------
 
-const PIXELATE_FRAG = `#version 300 es
+const LENS_FRAG = `#version 300 es
 precision highp float;
 in vec2 uv;
 in vec2 uvSrc;
@@ -195,32 +195,46 @@ uniform sampler2D page;
 uniform vec2 canvas;    // VFX canvas, CSS px
 uniform vec2 viewport;  // CSS px
 uniform vec4 pageRect;  // captured element in the viewport, CSS px
-uniform float cell;     // pixel size, CSS px
+uniform vec2 pointer;   // viewport, CSS px
+uniform float radius;   // lens radius, CSS px
+uniform float time;
+
+vec4 samplePage(vec2 q) {
+    vec2 l = q / pageRect.zw;
+    if (any(lessThan(l, vec2(0.0))) || any(greaterThanEqual(l, vec2(1.0)))) {
+        return vec4(0.0);
+    }
+    return texture(page, vec2(l.x, 1.0 - l.y));
+}
+
 void main() {
     vec4 base = texture(src, uvSrc);
     // The canvas is the viewport plus the same scroll padding on each side.
     vec2 pad = (canvas - viewport) * 0.5;
-    vec2 p = vec2(uv.x, 1.0 - uv.y) * canvas - pad - pageRect.xy;
-    if (cell > 1.0) {
-        p = (floor(p / cell) + 0.5) * cell;
-    }
-    vec2 l = p / pageRect.zw;
-    vec4 c = vec4(0.0);
-    if (all(greaterThanEqual(l, vec2(0.0))) && all(lessThan(l, vec2(1.0)))) {
-        c = texture(page, vec2(l.x, 1.0 - l.y));
-    }
+    vec2 p = vec2(uv.x, 1.0 - uv.y) * canvas - pad;
+    vec2 q = p - pageRect.xy;
+
+    // Outside the lens: wobbly and pixelated.
+    vec2 w = q + 10.0 * vec2(sin(q.y * 0.04 + time * 2.0), sin(q.x * 0.03 + time * 1.7));
+    vec2 cell = (floor(w / 14.0) + 0.5) * 14.0;
+    vec4 rough = samplePage(cell);
+    rough.rgb = mix(rough.rgb, vec3(dot(rough.rgb, vec3(0.3, 0.59, 0.11))), 0.6);
+
+    float inLens = 1.0 - smoothstep(radius - 16.0, radius, length(p - pointer));
+    vec4 c = mix(rough, samplePage(q), inLens);
     outColor = c + base * (1.0 - c.a);
 }
 `;
 
 /**
- * Post effect that draws a capture where its element is, pixelated until `reveal` is set.
+ * Post effect that draws a capture where its element is: wobbly and pixelated,
+ * and sharp inside a lens around the pointer while `reveal` is set.
  * Passes the scene through until `page` is set, and while the card has no layout.
  */
-class PixelateUntilRevealEffect implements Effect {
+class LensEffect implements Effect {
     page: VFXCapture | null = null;
     reveal = false;
-    #amount = 1;
+    #radius = 0;
 
     // Disabled, it passes the scene through.
     get enabled() {
@@ -228,9 +242,9 @@ class PixelateUntilRevealEffect implements Effect {
     }
 
     update(ctx: EffectContext) {
-        const target = this.reveal ? 0 : 1;
-        this.#amount +=
-            (target - this.#amount) * Math.min(1, ctx.deltaTime * 6);
+        const target = this.reveal ? 120 : 0;
+        this.#radius +=
+            (target - this.#radius) * Math.min(1, ctx.deltaTime * 8);
     }
 
     render(ctx: EffectContext) {
@@ -238,15 +252,23 @@ class PixelateUntilRevealEffect implements Effect {
         if (!this.page || !rect) {
             return;
         }
+        // mouseViewport is physical px with a bottom-left origin.
+        const [mx, my] = ctx.mouseViewport;
+        const pointer = [
+            mx / ctx.pixelRatio,
+            window.innerHeight - my / ctx.pixelRatio,
+        ];
         ctx.draw({
-            frag: PIXELATE_FRAG,
+            frag: LENS_FRAG,
             uniforms: {
                 src: ctx.src,
                 page: this.page.texture,
                 canvas: [ctx.dims.canvas[0], ctx.dims.canvas[1]],
                 viewport: viewportSize(),
                 pageRect: rectOf(rect),
-                cell: 1 + this.#amount * 23,
+                pointer,
+                radius: this.#radius,
+                time: ctx.time,
             },
         });
     }
@@ -265,10 +287,11 @@ export const Hide: StoryObj = {
             "width:480px; padding:24px; background:#235; border-radius:12px";
         card.innerHTML = `
             <img src="${Jellyfish}" style="display:block; width:100%; border-radius:8px" />
-            <h2>Hover to reveal</h2>
+            <h2>Hover to look through the lens</h2>
             <p style="line-height:1.6">This card is captured with
-               <code>hide: true</code>. A post effect draws it pixelated,
-               and sharp while you hover it. The card itself is unchanged.</p>
+               <code>hide: true</code>, so you only see a post effect's
+               drawing of it: wobbly and pixelated, and sharp around the
+               pointer while you hover it.</p>
         `;
         container.appendChild(card);
         return container;
@@ -277,7 +300,7 @@ export const Hide: StoryObj = {
         await nextFrame();
         const card = qs<HTMLElement>(canvasElement, "#capture-hidden");
         // The capture needs the VFX instance, so the post effect gets it afterwards.
-        const effect = new PixelateUntilRevealEffect();
+        const effect = new LensEffect();
         card.addEventListener("pointerenter", () => {
             effect.reveal = true;
         });
