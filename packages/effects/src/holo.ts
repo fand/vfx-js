@@ -19,6 +19,7 @@ import {
 } from "./_holo/ltc.js";
 import type { MaterialDef, Uniforms } from "./_holo/materials/build.js";
 import { prism } from "./_holo/materials/prism.js";
+import { shatter } from "./_holo/materials/shatter.js";
 import {
     type EnvLevels,
     envLevels,
@@ -117,7 +118,10 @@ const DEFAULT_PARAMS: HoloParams = {
     ink: 0,
 };
 
-const MATERIALS: Partial<Record<HoloMaterialId, MaterialDef>> = { prism };
+const MATERIALS: Partial<Record<HoloMaterialId, MaterialDef>> = {
+    prism,
+    shatter,
+};
 
 const MM_PER_CSS_PX = 25.4 / 96;
 const MASKS: Record<HoloMask, number> = { alpha: 0, luma: 1, none: 2 };
