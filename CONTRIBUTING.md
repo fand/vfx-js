@@ -49,6 +49,22 @@ To work on a single package, use `pnpm --filter <package> run <command>`.
 Formatting and linting are handled by [Biome](https://biomejs.dev/) (4-space indent).
 A pre-commit hook formats staged files, so you rarely need to run it manually.
 
+## What Goes Into Core
+
+`@vfx-js/core` gives effects the low-level tools they need. It is not a 3D engine.
+
+- **Core adds low-level features that effects can't work around.**
+  Examples: depth buffers, MSAA, multiple render targets.
+- **Effect authors own everything they can build on top.**
+  Examples: materials, lighting, model loading, FXAA, TAA.
+- **Helpers may come later, but not in core.**
+  They belong in `@vfx-js/effects` or a new package.
+
+To decide, ask: can an effect author build this with the current `EffectContext` API?
+
+- **Yes**: keep it out of core.
+- **No**, because it needs GPU state or resources the API hides: it belongs in core.
+
 ## Sending a Pull Request
 
 1. Create a branch from `main`.
