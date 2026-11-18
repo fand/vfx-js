@@ -233,11 +233,10 @@ void main() {
   vec3 G = uGW0 * textureLod(tG0, uvContent * uG0Scale, 0.0).rgb;   // premultiplied linear glare
   vec3 card  = toDisplay(((1.0 - uGlare) * c + uGlare * G) * uExposure);
   vec3 spill = toDisplay(uGlare * G * uExposure);
-  // Foil coverage from the element (the mask), then the foil over it. holospot screens the glare spill onto the
-  // page: in premultiplied output that is the spill with alpha = its largest channel (exact on black, invisible on
-  // white), under the foil.
-  vec3 u = s.a > 1e-4 ? s.rgb / s.a : vec3(0.0);
-  float cov = uMask == 0 ? s.a : uMask == 1 ? clamp(dot(u, LUMA_SRGB), 0.0, 1.0) * s.a : 1.0;
+  // The foil's coverage (the mask, applied by the material pass) is the card target's alpha, then the foil goes over
+  // what is left of the element (luma mask) with the glare spill on it. holospot screens the spill onto the page: in
+  // premultiplied output that is the spill with alpha = its largest channel (exact on black, invisible on white).
+  float cov = a;
   vec4 base = uMask == 1 ? s : vec4(0.0);
   vec3 se = srgbOETF(spill);
   vec4 spillP = vec4(se, max3(se));
@@ -660,7 +659,8 @@ export class HoloEffect implements Effect {
                 uWear: s.card.wear,
                 uDebugLight: 1,
                 uPrintSrc: ctx.src,
-                uPrintRect: [0, 0, 1, 1],
+                uHdrSize: [this.#hdr.width, this.#hdr.height],
+                uMask: MASKS[this.params.mask] ?? 0,
                 uInk: Math.min(Math.max(this.params.ink, 0), 1),
             },
         });

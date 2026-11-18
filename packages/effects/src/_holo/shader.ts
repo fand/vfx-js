@@ -106,10 +106,14 @@ const PRINT = `
 // ===== print (vfx-js port) — the element is the print layer =====
 // holospot composes R ≈ (1 − W)·T2·R_foil + W·onWhite (print.glsl). Here W = 0 everywhere (the element's own pixels
 // outside the foil are composited by the output pass) and T2 = mix(1, element colour, uInk): the element tints the
-// foil like a translucent ink.
+// foil like a translucent ink. The foil's coverage comes from the element too (uMask: 0 its alpha, 1 its luma × alpha,
+// 2 everywhere) and goes into the card target's alpha, as holospot's coverage does, so the glare only sees visible
+// foil.
 uniform sampler2D uPrintSrc;
-uniform vec4 uPrintRect;   // element UV → src texture UV (srcRectUv)
+uniform vec4 srcRectUv;    // element UV → src texture UV (vfx-js auto uniform)
+uniform vec2 uHdrSize;     // card target size [texels]
 uniform float uInk;
+uniform int uMask;
 struct Print { float W; vec3 T2; vec3 onWhite; float silver; };
 vec4 printUvDerivs(vec2 p) { return vec4(0.0); }
 vec3 printSrgbToLinear(vec3 c) {
@@ -117,11 +121,21 @@ vec3 printSrgbToLinear(vec3 c) {
 }
 Print printLayer(vec2 pMm, vec4 dUv) {
   Print pr; pr.W = 0.0; pr.onWhite = vec3(0.85); pr.silver = 0.0;
-  vec4 s = texture(uPrintSrc, uPrintRect.xy + (pMm / uCardSizeMm) * uPrintRect.zw);
+  vec4 s = texture(uPrintSrc, srcRectUv.xy + (pMm / uCardSizeMm) * srcRectUv.zw);
   vec3 c = s.a > 1e-4 ? printSrgbToLinear(clamp(s.rgb / s.a, 0.0, 1.0)) : vec3(1.0);
   pr.T2 = mix(vec3(1.0), c, uInk);
   return pr;
 }
+float printCoverage() {
+  if (uMask == 2) return 1.0;
+  vec4 s = texture(uPrintSrc, srcRectUv.xy + (gl_FragCoord.xy / uHdrSize) * srcRectUv.zw);
+  if (uMask == 0) return clamp(s.a, 0.0, 1.0);
+  vec3 u = s.a > 1e-4 ? clamp(s.rgb / s.a, 0.0, 1.0) : vec3(0.0);
+  return clamp(dot(u, LUMA_SRGB) * s.a, 0.0, 1.0);
+}
+// The material mains end with gl_FragColor = encodeCard(L): premultiply it by the coverage.
+vec4 encodeCardCovered(vec3 L) { return encodeCard(L) * printCoverage(); }
+#define encodeCard(L) encodeCardCovered(L)
 `;
 
 const DEFINE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
