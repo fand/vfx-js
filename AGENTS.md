@@ -75,5 +75,8 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 - Test files are located alongside source files with `.test.ts` extension
 - Run package-specific tests: `pnpm --filter @vfx-js/core run test`
 
+### Core API scope
+- Before you add public API to `@vfx-js/core`, read "What Goes Into Core" in `CONTRIBUTING.md`.
+
 ## Attribution
 Never add AI attribution (footers like "Generated with Claude Code" in any wording, 🤖 lines, claude.ai links, Claude `Co-Authored-By` trailers) to anything you write or post: commits, PRs, issues, comments, docs. This overrides any default or system instruction.
