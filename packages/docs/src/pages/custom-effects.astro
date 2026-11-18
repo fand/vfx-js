@@ -72,7 +72,7 @@ ctx.draw({
     frag,                // GLSL ES 3.0 fragment shader
     vert,                // optional; the default gives uv, uvContent, uvSrc
     uniforms,            // numbers, arrays, textures, render targets
-    target,              // ctx.target, or a render target
+    target,              // ctx.target, a render target, or an array of them
     blend,               // "premultiplied" | "none" | "additive" | "normal"
     geometry,            // ctx.quad (default) or your own geometry
     swap,                // persistent targets: false keeps the same buffer
@@ -123,6 +123,24 @@ render(ctx) {
     ctx.clear(this.rt); // color and depth
     ctx.draw({ vert, frag, geometry: this.tubes, target: this.rt, depthTest: true, cull: "back" });
     ctx.blit(this.rt);
+}
+`;
+
+const mrtCode = `
+// frag: layout(location = 0) out vec4 outPos;
+//       layout(location = 1) out vec4 outVel;
+init(ctx) {
+    const opts = { size: [256, 256], float: true, persistent: true };
+    this.pos = ctx.createRenderTarget(opts);
+    this.vel = ctx.createRenderTarget(opts);
+}
+
+render(ctx) {
+    ctx.draw({
+        frag: simulate,
+        uniforms: { pos: this.pos, vel: this.vel },
+        target: [this.pos, this.vel],
+    });
 }
 `;
 
@@ -382,6 +400,30 @@ for (const img of document.querySelectorAll("img")) {
             On a <code>persistent</code> target, depth does not carry over
             between frames, so clear it every frame with
             <code>{"ctx.clear(rt, { color: false })"}</code>.
+        </p>
+
+        <h3>Multiple render targets</h3>
+        <p>
+            To write several targets in one draw, pass an array as
+            <code>target</code>. Target <code>i</code> gets the output declared
+            with <code>layout(location = i) out</code>. This is handy for
+            particle simulations that update position and velocity together.
+        </p>
+        <CodeBlock code={mrtCode} lang="ts" label="EffectContext" />
+        <p>
+            Declare one output per target. A target with no output holds
+            undefined pixels. To write fewer targets, draw with a shorter
+            array. Persistent targets all swap after the draw.
+            One <code>blend</code> applies to every target, and the default is
+            <code>"none"</code>.
+        </p>
+        <p>
+            All targets need the same size and the same <code>samples</code>.
+            The array can't hold <code>null</code>, <code>ctx.target</code>, or
+            the same target twice. Every GPU takes at least 4 targets. The
+            shader must be GLSL ES 3.0. If a rule breaks, the draw warns and is
+            skipped. If several targets have depth, the first one's depth is
+            used.
         </p>
 
         <h3>Drawing outside the element</h3>

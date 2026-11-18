@@ -138,7 +138,7 @@ Always declare `#version 300 es` in `ctx.draw` shaders.
 | `dims` | Sizes: `elementPixel`, `canvasPixel`, `pixelRatio`, `contentRect`, `srcRect`, `canvasRect`. |
 | `createRenderTarget(opts)` | `{ size?, float?, persistent?, wrap?, filter?, mipmap?, depth?, samples? }`. Call in `init`. |
 | `wrapTexture(source, opts)` | Wrap an image, canvas, video or `WebGLTexture`. Call in `init`. With `autoUpdate: false`, call `tex.update()` after the source changes. |
-| `draw(opts)` | `{ frag, vert?, geometry?, uniforms?, target?, blend?, swap?, depthTest?, depthFunc?, depthWrite?, cull? }`. |
+| `draw(opts)` | `{ frag, vert?, geometry?, uniforms?, target?, blend?, swap?, depthTest?, depthFunc?, depthWrite?, cull? }`. `target` can be an array to write several targets in one draw. |
 | `blit(source, target?)` | Copy a texture into a target. |
 | `clear(target?, opts?)` | Clear a render target. `opts: EffectClearOpts` is `{ color?, depth? }`, both default `true`. |
 | `gl` | Raw `WebGL2RenderingContext`. |
@@ -200,6 +200,46 @@ render(ctx) {
 - `samples: 4` uses about 5 times the memory of a plain target, or 10 times with `depth: true`.
 - With `persistent: true`, depth does not carry over between frames: the side you draw into holds depth from two frames ago. Clear it every frame with `ctx.clear(rt, { color: false })` before drawing.
 - Depth and cull state only lasts for that draw. Other draws stay depth-off.
+
+### Multiple render targets
+
+Pass an array as `target` to write several targets in one draw.
+Target `i` gets the output declared with `layout(location = i) out`.
+
+```ts
+const SIMULATE = `#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D pos;
+uniform sampler2D vel;
+layout(location = 0) out vec4 outPos;
+layout(location = 1) out vec4 outVel;
+void main() {
+    vec4 v = texture(vel, uv);
+    outPos = texture(pos, uv) + v * 0.01;
+    outVel = v;
+}`;
+
+init(ctx) {
+    this.#pos = ctx.createRenderTarget({ size: [256, 256], float: true, persistent: true });
+    this.#vel = ctx.createRenderTarget({ size: [256, 256], float: true, persistent: true });
+}
+render(ctx) {
+    ctx.draw({ frag: SIMULATE, uniforms: { pos: this.#pos, vel: this.#vel }, target: [this.#pos, this.#vel] });
+}
+```
+
+- Each target keeps its own options (`float`, `wrap`, `filter`, `mipmap`).
+- Persistent targets all swap after the draw. `swap: false` skips all of them.
+- Declare one output per target. A target with no output holds undefined pixels.
+- To write fewer targets, draw with a shorter array. A draw can't skip a target in the middle.
+- One `blend` applies to every target. The default is `"none"`.
+- If several targets have `depth: true`, the first one's depth is used, with a warning.
+- These rules apply. If one breaks, the draw warns once and is skipped:
+  - All targets have the same size and the same `samples`.
+  - No `null`, no `ctx.target`, and no target twice.
+  - At most `MAX_DRAW_BUFFERS` targets. Every WebGL2 GPU takes at least 4.
+  - The shader is GLSL 300 es.
 
 ### Drawing outside the element
 
