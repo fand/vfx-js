@@ -22,6 +22,7 @@ import { nebula } from "./_holo/materials/nebula.js";
 import { prism } from "./_holo/materials/prism.js";
 import { shatter } from "./_holo/materials/shatter.js";
 import { sparkle } from "./_holo/materials/sparkle.js";
+import { vortex } from "./_holo/materials/vortex.js";
 import {
     type EnvLevels,
     envLevels,
@@ -120,11 +121,12 @@ const DEFAULT_PARAMS: HoloParams = {
     ink: 0,
 };
 
-const MATERIALS: Partial<Record<HoloMaterialId, MaterialDef>> = {
+const MATERIALS: Record<HoloMaterialId, MaterialDef> = {
     prism,
     shatter,
     nebula,
     sparkle,
+    vortex,
 };
 
 const MM_PER_CSS_PX = 25.4 / 96;
