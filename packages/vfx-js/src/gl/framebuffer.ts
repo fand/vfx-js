@@ -37,6 +37,7 @@ export class Framebuffer implements Restorable {
     depthTexture: Texture | null;
 
     #ctx: GLContext;
+    #multisampleRequested: boolean;
     #colorRenderbuffer: WebGLRenderbuffer | null = null;
     #depthRenderbuffer: WebGLRenderbuffer | null = null;
     #colorDirty = false;
@@ -62,8 +63,9 @@ export class Framebuffer implements Restorable {
         this.float = opts.float ?? false;
         this.mipmap = opts.mipmap ?? false;
         this.depth = opts.depth ?? false;
+        this.#multisampleRequested = opts.samples === 4;
         this.samples =
-            opts.samples === 4 && this.#supportsMultisample() ? 4 : 1;
+            this.#multisampleRequested && this.#supportsMultisample() ? 4 : 1;
 
         this.texture = new Texture(ctx, undefined, { autoRegister: false });
         const w = opts.wrap;
@@ -242,8 +244,9 @@ export class Framebuffer implements Restorable {
         // Choose format based on float/non-float. For float textures, use
         // RGBA16F as a fallback if linear filtering on RGBA32F is not
         // supported by the GPU.
-        // Multisampled float always uses RGBA16F.
-        const floatLinear = this.#ctx.floatLinearFilter && this.samples === 1;
+        // Asking for 4 samples always gives RGBA16F, even after the fallback to 1.
+        const floatLinear =
+            this.#ctx.floatLinearFilter && !this.#multisampleRequested;
         if (this.float && floatLinear && !this.#ctx.floatBlend) {
             // Blending into RGBA32F needs EXT_float_blend; fail fast
             // instead of letting blended draws drop silently.

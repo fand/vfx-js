@@ -275,6 +275,7 @@ export class EffectHost {
     #phase: Phase = "init";
     #warnedDrawInUpdate = false;
     #warnedDepthWithoutBuffer = false;
+    #warnedInvalidSamples = false;
     #textureUnitCount: number | undefined;
     #dims: HostFrameDims;
 
@@ -473,7 +474,7 @@ export class EffectHost {
         const mipmap = mipmapOpt !== false;
         const mipmapAutoRegen = mipmapOpt === true;
         const depth = opts?.depth ?? false;
-        const samples = opts?.samples === 4 ? 4 : 1;
+        const samples = this.#resolveSamples(opts?.samples);
         const explicitSize = opts?.size;
         const sizeW = explicitSize ? explicitSize[0] : this.#dims.outputBufferW;
         const sizeH = explicitSize ? explicitSize[1] : this.#dims.outputBufferH;
@@ -565,6 +566,19 @@ export class EffectHost {
             this.#autoResizeRTs.push(owned);
         }
         return handle;
+    }
+
+    #resolveSamples(samples: number | undefined): 1 | 4 {
+        if (samples === undefined || samples === 1 || samples === 4) {
+            return samples ?? 1;
+        }
+        if (!this.#warnedInvalidSamples) {
+            this.#warnedInvalidSamples = true;
+            console.warn(
+                "[VFX-JS] createRenderTarget() samples must be 1 or 4; using 1.",
+            );
+        }
+        return 1;
     }
 
     #disposeOwnedRT(owned: OwnedRT): void {

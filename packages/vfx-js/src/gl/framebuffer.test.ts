@@ -532,6 +532,36 @@ describe("Framebuffer", () => {
             warn.mockRestore();
         });
 
+        it("float + samples 4 fallback keeps RGBA16F and skips the float-blend check", () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const gl = makeMockGl();
+            gl.getInternalformatParameter.mockReturnValue(new Int32Array([2]));
+            const fb = new Framebuffer(
+                makeCtx(gl, { floatLinearFilter: true, floatBlend: false }),
+                16,
+                16,
+                { float: true, samples: 4 },
+            );
+            expect(fb.samples).toBe(1);
+            const upload = gl.texImage2D.mock.calls[0];
+            expect(upload[2]).toBe(gl.RGBA16F);
+            expect(upload[7]).toBe(gl.HALF_FLOAT);
+            warn.mockRestore();
+        });
+
+        it("float + samples 1 with float-linear still uses RGBA32F", () => {
+            const gl = makeMockGl();
+            new Framebuffer(
+                makeCtx(gl, { floatLinearFilter: true, floatBlend: true }),
+                16,
+                16,
+                { float: true },
+            );
+            const upload = gl.texImage2D.mock.calls[0];
+            expect(upload[2]).toBe(gl.RGBA32F);
+            expect(upload[7]).toBe(gl.FLOAT);
+        });
+
         it("checks RGBA8 for non-float targets", () => {
             const gl = makeMockGl();
             const fb = new Framebuffer(makeCtx(gl), 16, 16, { samples: 4 });

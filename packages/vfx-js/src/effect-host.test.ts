@@ -1468,6 +1468,7 @@ describe("EffectHost samples", () => {
     }
 
     it("passes samples 4 through; other values become 1", () => {
+        vi.spyOn(console, "warn").mockImplementation(() => {});
         const { host } = makeHost();
         host.ctx.createRenderTarget({ samples: 4 });
         host.ctx.createRenderTarget({ samples: 2 as unknown as 4 });
@@ -1475,6 +1476,21 @@ describe("EffectHost samples", () => {
         expect(framebuffers[0].opts?.samples).toBe(4);
         expect(framebuffers[1].opts?.samples).toBe(1);
         expect(backbuffers[0].ctorArgs.opts?.samples).toBe(4);
+    });
+
+    it("invalid samples → 1, warns once", () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const { host } = makeHost();
+        host.ctx.createRenderTarget({ samples: 2 as unknown as 4 });
+        host.ctx.createRenderTarget({ samples: 8 as unknown as 4 });
+        host.ctx.createRenderTarget({ samples: 1 });
+        host.ctx.createRenderTarget({ samples: 4 });
+        expect(framebuffers.map((fb) => fb.opts?.samples)).toEqual([
+            1, 1, 1, 4,
+        ]);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0][0]).toContain("samples must be 1 or 4");
+        warn.mockRestore();
     });
 
     it("draw marks the target dirty", () => {

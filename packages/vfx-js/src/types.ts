@@ -791,7 +791,12 @@ export type EffectRenderTargetOpts = {
      * Give the target a depth buffer (Default: `false`).
      * Needed for `depthTest` / `depthWrite` in `ctx.draw()`.
      * Read it back with `rt.depthTexture`.
+     *
      * Each side of a `persistent: true` target has its own depth.
+     * Depth does not carry over between frames:
+     * the side you draw into holds depth from two frames ago.
+     * So with `persistent: true`, clear depth every frame before drawing,
+     * with `ctx.clear(rt, { color: false })`.
      */
     depth?: boolean;
 
@@ -799,8 +804,10 @@ export type EffectRenderTargetOpts = {
      * Samples per pixel (Default: `1`). `4` turns on multisampling,
      * which smooths triangle edges.
      * The target still samples and blits like a normal texture.
-     * With `float: true`, a multisampled target uses 16-bit float.
      * If the GPU can't take 4 samples for the format, it uses 1 and warns.
+     * With `float: true`, asking for 4 samples always gives 16-bit float,
+     * also when the GPU falls back to 1.
+     * Other values are ignored with a warning.
      */
     samples?: 1 | 4;
 };
