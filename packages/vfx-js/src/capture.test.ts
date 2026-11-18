@@ -1,0 +1,1066 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { type CaptureDeps, type CaptureDom, createCapture } from "./capture";
+import { resolveTexture } from "./effect-host";
+import type { Texture } from "./gl/texture";
+
+class FakeElement {
+    style = Object.assign(
+        { opacity: "" },
+        {
+            setProperty(this: { opacity: string }, _: string, value: string) {
+                this.opacity = value;
+            },
+        },
+    );
+    box = { left: 1, top: 2, width: 30, height: 40 };
+    listeners: Record<string, () => void> = {};
+    hasBox = true;
+    parentNode: unknown = null;
+    getBoundingClientRect() {
+        return { ...this.box };
+    }
+    getClientRects() {
+        return this.hasBox ? [this.box] : [];
+    }
+    addEventListener(type: string, fn: () => void) {
+        this.listeners[type] = fn;
+    }
+    removeEventListener(type: string, fn: () => void) {
+        if (this.listeners[type] === fn) {
+            delete this.listeners[type];
+        }
+    }
+}
+class FakeImage extends FakeElement {
+    decode = vi.fn(() => Promise.resolve());
+    naturalWidth = 60;
+    naturalHeight = 80;
+}
+class FakeVideo extends FakeElement {
+    readyState = 4;
+    error: unknown = null;
+    paused = true;
+    autoplay = false;
+    preload = "auto";
+    src = "video.mp4";
+    srcObject: unknown = null;
+    sources: FakeSource[] = [];
+    videoWidth = 60;
+    videoHeight = 80;
+    querySelectorAll(selector: string) {
+        return selector === "source"
+            ? this.sources
+            : this.sources.filter((s) => s.src);
+    }
+}
+class FakeSource extends FakeElement {
+    constructor(public src = "") {
+        super();
+    }
+}
+class FakeCanvas extends FakeElement {
+    width = 60;
+    height = 80;
+}
+class FakeDiv extends FakeElement {}
+class FakeOffscreen {
+    constructor(
+        public width: number,
+        public height: number,
+    ) {}
+}
+
+type FakeTexture = Texture & { dispose: ReturnType<typeof vi.fn> };
+
+function fakeDeps(dom?: Partial<CaptureDom>) {
+    const made: FakeTexture[] = [];
+    const emptyTexture = { dispose: vi.fn() } as unknown as Texture;
+    const createTexture = (source: unknown) => {
+        const texture = {
+            source,
+            needsUpdate: false,
+            dispose: vi.fn(),
+        } as unknown as FakeTexture;
+        made.push(texture);
+        return texture;
+    };
+    const uploadTexture = vi.fn((_: Texture) => {});
+    const deps = {
+        createTexture,
+        uploadTexture,
+        // Like the player: re-upload the same canvas, replace on a new one.
+        refreshTexture: (old, offscreen) => {
+            if (old.source === offscreen) {
+                old.needsUpdate = true;
+                return old;
+            }
+            old.dispose();
+            const texture = createTexture(offscreen);
+            return texture;
+        },
+        textureSize: (_, axis) => (axis === "w" ? 60 : 80),
+        emptyTexture,
+        maxTextureSize: 4096,
+        stillZIndex: 41,
+        dom,
+    } satisfies CaptureDeps;
+    return { deps, made, emptyTexture };
+}
+
+const asElement = (el: FakeElement) => el as unknown as HTMLElement;
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+beforeEach(() => {
+    vi.stubGlobal("HTMLImageElement", FakeImage);
+    vi.stubGlobal("HTMLVideoElement", FakeVideo);
+    vi.stubGlobal("HTMLCanvasElement", FakeCanvas);
+    vi.stubGlobal("OffscreenCanvas", FakeOffscreen);
+});
+afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+});
+
+describe("createCapture: sources", () => {
+    test("resolves after the image decodes", async () => {
+        const { deps, made } = fakeDeps();
+        const img = new FakeImage();
+        let decoded!: () => void;
+        img.decode.mockReturnValueOnce(
+            new Promise<void>((resolve) => {
+                decoded = resolve;
+            }),
+        );
+        let done = false;
+        const pending = createCapture(deps, asElement(img), {}).then((e) => {
+            done = true;
+            return e;
+        });
+        await Promise.resolve();
+        expect(done).toBe(false);
+        expect(made).toHaveLength(0);
+        decoded();
+        const { capture } = await pending;
+        expect(made).toHaveLength(1);
+        expect(made[0].source).toBe(img);
+        expect(resolveTexture(capture.texture)).toBe(made[0]);
+        expect([capture.texture.width, capture.texture.height]).toEqual([
+            60, 80,
+        ]);
+        expect(capture.rect).toEqual({ x: 1, y: 2, width: 30, height: 40 });
+    });
+
+    test("rejects when decode() rejects and leaves the element", async () => {
+        const { deps, made } = fakeDeps();
+        const img = new FakeImage();
+        img.style.opacity = "0.5";
+        img.decode.mockRejectedValueOnce(new Error("broken"));
+        const pending = createCapture(deps, asElement(img), { hide: true });
+        expect(img.style.opacity).toBe("0.5");
+        await expect(pending).rejects.toThrow("broken");
+        expect(img.style.opacity).toBe("0.5");
+        expect(made).toHaveLength(0);
+    });
+
+    test("hides a video only once it has a frame", async () => {
+        const { deps } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 1;
+        const pending = createCapture(deps, asElement(video), { hide: true });
+        await Promise.resolve();
+        expect(video.style.opacity).toBe("");
+        video.listeners.canplay();
+        await pending;
+        expect(video.style.opacity).toBe("0.0001");
+    });
+
+    test("rejects when the video fails to load and leaves it", async () => {
+        const { deps, made } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        const pending = createCapture(deps, asElement(video), { hide: true });
+        video.listeners.error();
+        await expect(pending).rejects.toThrow("could not load the video");
+        expect(video.style.opacity).toBe("");
+        expect(made).toHaveLength(0);
+        expect(Object.keys(video.listeners)).toEqual([]);
+    });
+
+    test.each([
+        [
+            "no source",
+            (v: FakeVideo) => {
+                v.src = "";
+            },
+            "has no source",
+        ],
+        [
+            "already failed",
+            (v: FakeVideo) => {
+                v.error = { code: 4 };
+            },
+            "failed to load",
+        ],
+        [
+            'preload="none" and not playing',
+            (v: FakeVideo) => {
+                v.preload = "none";
+            },
+            "Call play() first",
+        ],
+    ])("rejects a video that will not load: %s", async (_, setup, message) => {
+        const { deps, made } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        setup(video);
+        await expect(
+            createCapture(deps, asElement(video), { hide: true }),
+        ).rejects.toThrow(message);
+        expect(video.style.opacity).toBe("");
+        expect(made).toHaveLength(0);
+        expect(Object.keys(video.listeners)).toEqual([]);
+    });
+
+    test("waits for a video with a stream and no src", async () => {
+        const { deps, made } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        video.src = "";
+        video.srcObject = {};
+        const pending = createCapture(deps, asElement(video), {});
+        await Promise.resolve();
+        video.listeners.canplay();
+        await pending;
+        expect(made[0].source).toBe(video);
+    });
+
+    test("waits for a preload=none video once it is playing", async () => {
+        const { deps } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        video.preload = "none";
+        video.paused = false;
+        const pending = createCapture(deps, asElement(video), {});
+        await Promise.resolve();
+        video.listeners.canplay();
+        await expect(pending).resolves.toBeDefined();
+    });
+
+    test("rejects when the last <source> fails", async () => {
+        const { deps } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        video.src = "";
+        const source = new FakeSource("a.webm");
+        video.sources = [new FakeSource("b.mp4"), source];
+        const pending = createCapture(deps, asElement(video), {});
+        await Promise.resolve();
+        source.listeners.error();
+        await expect(pending).rejects.toThrow("could not load the video");
+        expect(Object.keys(source.listeners)).toEqual([]);
+        expect(Object.keys(video.listeners)).toEqual([]);
+    });
+
+    test("rejects when aborted while waiting for the video", async () => {
+        const { deps } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 0;
+        const abort = new AbortController();
+        const pending = createCapture(
+            deps,
+            asElement(video),
+            {},
+            undefined,
+            abort.signal,
+        );
+        abort.abort();
+        await expect(pending).rejects.toThrow("aborted");
+        expect(Object.keys(video.listeners)).toEqual([]);
+    });
+
+    test("texture.update() reports a failed update instead of throwing", async () => {
+        const { deps } = fakeDeps();
+        const img = new FakeImage();
+        const { capture } = await createCapture(deps, asElement(img), {});
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        img.decode.mockRejectedValueOnce(new Error("broken"));
+        capture.texture.update();
+        await new Promise((r) => setTimeout(r));
+        expect(error).toHaveBeenCalledWith(new Error("broken"));
+    });
+
+    test("waits for canplay when the video has no frame yet", async () => {
+        const { deps, made } = fakeDeps();
+        const video = new FakeVideo();
+        video.readyState = 1;
+        const pending = createCapture(deps, asElement(video), {});
+        await Promise.resolve();
+        expect(made).toHaveLength(0);
+        video.listeners.canplay();
+        await pending;
+        expect(made[0].source).toBe(video);
+    });
+});
+
+describe("createCapture: hide", () => {
+    test.each([
+        ["image", () => new FakeImage(), "0"],
+        ["canvas", () => new FakeCanvas(), "0"],
+        ["video", () => new FakeVideo(), "0.0001"],
+    ])(
+        "%s: hide sets and dispose() restores the opacity",
+        async (_, make, hidden) => {
+            const { deps } = fakeDeps();
+            const el = make();
+            el.style.opacity = "0.7";
+            const { capture } = await createCapture(deps, asElement(el), {
+                hide: true,
+            });
+            expect(el.style.opacity).toBe(hidden);
+            capture.dispose();
+            expect(el.style.opacity).toBe("0.7");
+        },
+    );
+
+    test("leaves the opacity alone without hide", async () => {
+        const { deps } = fakeDeps();
+        const el = new FakeCanvas();
+        el.style.opacity = "0.7";
+        const { capture } = await createCapture(deps, asElement(el), {});
+        expect(el.style.opacity).toBe("0.7");
+        capture.dispose();
+        expect(el.style.opacity).toBe("0.7");
+    });
+});
+
+describe("createCapture: tick", () => {
+    test.each([
+        ["image", () => new FakeImage(), false],
+        ["canvas", () => new FakeCanvas(), true],
+        ["video", () => new FakeVideo(), true],
+    ])(
+        "%s: updates the position, and flags an upload: %s",
+        async (_, make, everyFrame) => {
+            const { deps, made } = fakeDeps();
+            const el = make();
+            const { capture, tick } = await createCapture(
+                deps,
+                asElement(el),
+                {},
+            );
+            const rect = capture.rect;
+            el.box = { left: 5, top: 6, width: 30, height: 40 };
+            tick();
+            expect(capture.rect).toBe(rect);
+            expect([rect?.x, rect?.y]).toEqual([5, 6]);
+            expect(made[0].needsUpdate).toBe(everyFrame);
+        },
+    );
+
+    test("rect is null while the element has no layout, then comes back", async () => {
+        const { deps, made } = fakeDeps();
+        const video = new FakeVideo();
+        const { capture, tick } = await createCapture(
+            deps,
+            asElement(video),
+            {},
+        );
+        const rect = capture.rect;
+        video.box = { left: 0, top: 0, width: 0, height: 0 };
+        video.hasBox = false;
+        tick();
+        expect(capture.rect).toBeNull();
+        // The texture works without layout.
+        expect(resolveTexture(capture.texture)).toBe(made[0]);
+        expect(made[0].needsUpdate).toBe(true);
+
+        video.box = { left: 7, top: 8, width: 30, height: 40 };
+        video.hasBox = true;
+        tick();
+        expect(capture.rect).toBe(rect);
+        expect(capture.rect).toEqual({ x: 7, y: 8, width: 30, height: 40 });
+    });
+
+    test("rect is null for an element never put in the document", async () => {
+        const { deps } = fakeDeps();
+        const img = new FakeImage();
+        img.box = { left: 0, top: 0, width: 0, height: 0 };
+        img.hasBox = false;
+        const { capture } = await createCapture(deps, asElement(img), {});
+        expect(capture.rect).toBeNull();
+        expect(capture.texture.width).toBe(60);
+    });
+
+    test("a laid-out element of zero size keeps a zero rect", async () => {
+        const { deps } = fakeDeps();
+        const canvas = new FakeCanvas();
+        const { capture, tick } = await createCapture(
+            deps,
+            asElement(canvas),
+            {},
+        );
+        canvas.box = { left: 3, top: 4, width: 0, height: 0 };
+        tick();
+        expect(capture.rect).toEqual({ x: 3, y: 4, width: 0, height: 0 });
+    });
+
+    test("image size follows the box on tick(), the upload waits for update()", async () => {
+        const { deps, made } = fakeDeps();
+        const img = new FakeImage();
+        const { capture, tick } = await createCapture(deps, asElement(img), {});
+        img.box = { left: 1, top: 2, width: 50, height: 60 };
+        tick();
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([50, 60]);
+        expect(made[0].needsUpdate).toBe(false);
+        await capture.update();
+        expect(img.decode).toHaveBeenCalledTimes(2);
+        expect(made[0].needsUpdate).toBe(true);
+    });
+
+    test("an image captured before it is in the document gets its size once inserted", async () => {
+        const { deps } = fakeDeps();
+        const img = new FakeImage();
+        img.box = { left: 0, top: 0, width: 0, height: 0 };
+        img.hasBox = false;
+        const { capture, tick } = await createCapture(deps, asElement(img), {});
+        expect(capture.rect).toBeNull();
+        img.box = { left: 5, top: 6, width: 30, height: 40 };
+        img.hasBox = true;
+        tick();
+        expect(capture.rect).toEqual({ x: 5, y: 6, width: 30, height: 40 });
+    });
+});
+
+describe("createCapture: dispose", () => {
+    test("leaves a safe handle", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const { deps, made, emptyTexture } = fakeDeps();
+        const onDispose = vi.fn();
+        const { capture, tick } = await createCapture(
+            deps,
+            asElement(new FakeCanvas()),
+            {},
+            onDispose,
+        );
+        capture.dispose();
+        expect(made[0].dispose).toHaveBeenCalledOnce();
+        expect(onDispose).toHaveBeenCalledOnce();
+
+        expect(resolveTexture(capture.texture)).toBe(emptyTexture);
+        expect(resolveTexture(capture.texture)).toBe(emptyTexture);
+        expect(warn).toHaveBeenCalledOnce();
+        expect([capture.texture.width, capture.texture.height]).toEqual([0, 0]);
+        await expect(capture.update()).resolves.toBe(false);
+        made[0].needsUpdate = false;
+        tick();
+        expect(made[0].needsUpdate).toBe(false);
+
+        capture.dispose();
+        expect(made[0].dispose).toHaveBeenCalledOnce();
+        expect(onDispose).toHaveBeenCalledOnce();
+    });
+
+    test("texture.dispose() does nothing", async () => {
+        const { deps, made } = fakeDeps();
+        const { capture } = await createCapture(
+            deps,
+            asElement(new FakeCanvas()),
+            {},
+        );
+        capture.texture.dispose();
+        expect(made[0].dispose).not.toHaveBeenCalled();
+        expect(resolveTexture(capture.texture)).toBe(made[0]);
+    });
+});
+
+const offscreen = (width: number, height: number) =>
+    new FakeOffscreen(width, height) as unknown as OffscreenCanvas;
+
+type WrapOpts = Parameters<CaptureDom["wrapElement"]>[1];
+
+function fakeHic() {
+    const el = new FakeDiv();
+    const parent = {};
+    el.parentNode = parent;
+    const wrapper = new FakeCanvas();
+    wrapper.box = { left: 3, top: 4, width: 50, height: 20 };
+    const first = offscreen(100, 40);
+    let wrapOpts!: WrapOpts;
+    let captured!: () => void;
+    const dom = {
+        supportsHtmlInCanvas: () => true,
+        wrapElement: vi.fn(
+            async (_: HTMLElement, opts: WrapOpts, _signal?: AbortSignal) => {
+                wrapOpts = opts;
+                el.parentNode = wrapper;
+                return {
+                    canvas: wrapper as unknown as HTMLCanvasElement,
+                    initialCapture: first,
+                };
+            },
+        ),
+        unwrapElement: vi.fn(() => {
+            el.parentNode = parent;
+        }),
+        requestCapture: vi.fn(
+            () =>
+                new Promise<boolean>((resolve) => {
+                    captured = () => resolve(true);
+                }),
+        ),
+        releaseFirstCapture: vi.fn(),
+        nextFrame: vi.fn(() => Promise.resolve()),
+    };
+    return {
+        el,
+        wrapper,
+        first,
+        dom,
+        wrapOpts: () => wrapOpts,
+        capture: () => captured(),
+    };
+}
+
+describe("createCapture: html-in-canvas", () => {
+    test("wraps with keepDrawn and a still copy without hide", async () => {
+        const hic = fakeHic();
+        const { deps, made } = fakeDeps(hic.dom);
+        const { capture } = await createCapture(deps, asElement(hic.el), {});
+        expect(hic.wrapOpts()).toMatchObject({
+            maxSize: 4096,
+            keepDrawn: true,
+            stillCover: { zIndex: 41 },
+        });
+        expect(hic.dom.releaseFirstCapture).toHaveBeenCalledWith(
+            hic.wrapper,
+            true,
+        );
+        expect(made[0].source).toBe(hic.first);
+        expect(resolveTexture(capture.texture)).toBe(made[0]);
+        expect(capture.rect).toEqual({ x: 3, y: 4, width: 50, height: 20 });
+    });
+
+    test("wraps without keepDrawn or a still copy with hide", async () => {
+        const hic = fakeHic();
+        const { deps } = fakeDeps(hic.dom);
+        await createCapture(deps, asElement(hic.el), { hide: true });
+        expect(hic.wrapOpts().keepDrawn).toBe(false);
+        expect(hic.wrapOpts().stillCover).toBeUndefined();
+        expect(hic.dom.releaseFirstCapture).toHaveBeenCalledWith(
+            hic.wrapper,
+            false,
+        );
+        expect(hic.el.style.opacity).toBe("");
+    });
+
+    test("without hide, waits a frame after releasing the still copy", async () => {
+        const hic = fakeHic();
+        let frame!: () => void;
+        hic.dom.nextFrame.mockImplementationOnce(
+            () =>
+                new Promise<void>((resolve) => {
+                    frame = resolve;
+                }),
+        );
+        const { deps, made } = fakeDeps(hic.dom);
+        let done = false;
+        const pending = createCapture(deps, asElement(hic.el), {}).then(
+            (entry) => {
+                done = true;
+                return entry;
+            },
+        );
+        await flush();
+        expect(hic.dom.releaseFirstCapture).toHaveBeenCalledOnce();
+        expect(hic.dom.nextFrame).toHaveBeenCalledOnce();
+        expect(done).toBe(false);
+
+        // A paint during the wait still reaches the slot.
+        hic.wrapOpts().onCapture(offscreen(140, 60));
+        expect(made).toHaveLength(2);
+
+        frame();
+        const { capture } = await pending;
+        expect(resolveTexture(capture.texture)).toBe(made[1]);
+    });
+
+    test("with hide, does not wait a frame", async () => {
+        const hic = fakeHic();
+        const { deps } = fakeDeps(hic.dom);
+        await createCapture(deps, asElement(hic.el), { hide: true });
+        expect(hic.dom.nextFrame).not.toHaveBeenCalled();
+    });
+
+    test("a capture goes through refreshTexture and sets the size", async () => {
+        const hic = fakeHic();
+        const { deps, made } = fakeDeps(hic.dom);
+        const { capture, tick } = await createCapture(
+            deps,
+            asElement(hic.el),
+            {},
+        );
+        const handle = capture.texture;
+
+        hic.wrapper.box = { left: 3, top: 4, width: 70, height: 30 };
+        tick();
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([50, 20]);
+
+        hic.wrapOpts().onCapture(hic.first);
+        expect(made).toHaveLength(1);
+        expect(made[0].needsUpdate).toBe(true);
+        tick();
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([70, 30]);
+
+        hic.wrapOpts().onCapture(offscreen(140, 60));
+        expect(made).toHaveLength(2);
+        expect(made[0].dispose).toHaveBeenCalledOnce();
+        expect(capture.texture).toBe(handle);
+        expect(resolveTexture(handle)).toBe(made[1]);
+    });
+
+    test("update() resolves after requestCapture", async () => {
+        const hic = fakeHic();
+        const { deps } = fakeDeps(hic.dom);
+        const { capture } = await createCapture(deps, asElement(hic.el), {});
+        let done = false;
+        const updated = capture.update().then((ok) => {
+            done = true;
+            return ok;
+        });
+        expect(hic.dom.requestCapture).toHaveBeenCalledWith(hic.wrapper, 1000);
+        await Promise.resolve();
+        expect(done).toBe(false);
+        hic.capture();
+        await expect(updated).resolves.toBe(true);
+    });
+
+    test("update() resolves to false when the repaint times out", async () => {
+        const hic = fakeHic();
+        hic.dom.requestCapture.mockReturnValueOnce(Promise.resolve(false));
+        const { deps } = fakeDeps(hic.dom);
+        const { capture } = await createCapture(deps, asElement(hic.el), {});
+        await expect(capture.update()).resolves.toBe(false);
+    });
+
+    test("dispose() unwraps", async () => {
+        const hic = fakeHic();
+        const { deps, made } = fakeDeps(hic.dom);
+        const { capture } = await createCapture(deps, asElement(hic.el), {});
+        capture.dispose();
+        expect(hic.dom.unwrapElement).toHaveBeenCalledWith(hic.wrapper, hic.el);
+        expect(made[0].dispose).toHaveBeenCalledOnce();
+    });
+
+    test("rejects an element with no height before wrapping", async () => {
+        const hic = fakeHic();
+        hic.el.box = { left: 0, top: 0, width: 100, height: 0 };
+        const { deps } = fakeDeps(hic.dom);
+        await expect(
+            createCapture(deps, asElement(hic.el), {}),
+        ).rejects.toThrow("needs an element with a size");
+        expect(hic.dom.wrapElement).not.toHaveBeenCalled();
+    });
+
+    test("unwraps when aborted while waiting for the first capture", async () => {
+        const hic = fakeHic();
+        hic.dom.wrapElement.mockImplementationOnce(() => {
+            hic.el.parentNode = hic.wrapper;
+            return new Promise(() => {});
+        });
+        const { deps, made } = fakeDeps(hic.dom);
+        const abort = new AbortController();
+        const pending = createCapture(
+            deps,
+            asElement(hic.el),
+            {},
+            undefined,
+            abort.signal,
+        );
+        await Promise.resolve();
+        abort.abort();
+        await expect(pending).rejects.toThrow("aborted");
+        expect(hic.dom.unwrapElement).toHaveBeenCalledWith(hic.wrapper, hic.el);
+        expect(made).toHaveLength(0);
+    });
+
+    test("rejects an element without a box before wrapping", async () => {
+        const hic = fakeHic();
+        hic.el.hasBox = false;
+        const { deps } = fakeDeps(hic.dom);
+        await expect(
+            createCapture(deps, asElement(hic.el), {}),
+        ).rejects.toThrow();
+        expect(hic.dom.wrapElement).not.toHaveBeenCalled();
+    });
+
+    test("unwraps when the capture setup fails after the wrap", async () => {
+        const hic = fakeHic();
+        hic.dom.wrapElement.mockImplementationOnce(async () => {
+            hic.el.parentNode = hic.wrapper;
+            throw new Error("no context");
+        });
+        const { deps, made } = fakeDeps(hic.dom);
+        await expect(
+            createCapture(deps, asElement(hic.el), {}),
+        ).rejects.toThrow("no context");
+        expect(hic.dom.unwrapElement).toHaveBeenCalledWith(hic.wrapper, hic.el);
+        expect(made).toHaveLength(0);
+    });
+
+    test("does not unwrap when the wrap fails before moving the element", async () => {
+        const hic = fakeHic();
+        hic.dom.wrapElement.mockRejectedValueOnce(new Error("early"));
+        const { deps } = fakeDeps(hic.dom);
+        await expect(
+            createCapture(deps, asElement(hic.el), {}),
+        ).rejects.toThrow("early");
+        expect(hic.dom.unwrapElement).not.toHaveBeenCalled();
+    });
+
+    test("resize() does nothing", async () => {
+        const hic = fakeHic();
+        const { deps } = fakeDeps(hic.dom);
+        const { resize } = await createCapture(deps, asElement(hic.el), {});
+        hic.wrapper.box = { left: 0, top: 0, width: 1, height: 1 };
+        resize();
+        expect(hic.dom.requestCapture).not.toHaveBeenCalled();
+    });
+});
+
+function fakeSnapshot() {
+    const el = new FakeDiv();
+    el.style.opacity = "0.5";
+    let size: [number, number] = [60, 80];
+    const dom = {
+        supportsHtmlInCanvas: () => false,
+        dom2canvas: vi.fn(
+            async (
+                _el: HTMLElement,
+                _opacity: number,
+                old?: OffscreenCanvas,
+                _maxSize?: number,
+            ) =>
+                old && old.width === size[0] && old.height === size[1]
+                    ? old
+                    : offscreen(...size),
+        ),
+    };
+    return {
+        el,
+        dom,
+        setSize: (w: number, h: number) => {
+            size = [w, h];
+        },
+    };
+}
+
+describe("createCapture: snapshot", () => {
+    test("snapshots with the original opacity, then hides", async () => {
+        const snap = fakeSnapshot();
+        const { deps, made } = fakeDeps(snap.dom);
+        const { capture } = await createCapture(deps, asElement(snap.el), {
+            hide: true,
+        });
+        expect(snap.dom.dom2canvas).toHaveBeenCalledWith(
+            snap.el,
+            0.5,
+            undefined,
+            4096,
+        );
+        expect(made[0].source).toBeInstanceOf(FakeOffscreen);
+        expect(snap.el.style.opacity).toBe("0");
+        expect(capture.rect).toEqual({ x: 1, y: 2, width: 30, height: 40 });
+        capture.dispose();
+        expect(snap.el.style.opacity).toBe("0.5");
+    });
+
+    test("rejects an empty first snapshot and leaves the element", async () => {
+        const snap = fakeSnapshot();
+        snap.setSize(0, 0);
+        const { deps, made } = fakeDeps(snap.dom);
+        await expect(
+            createCapture(deps, asElement(snap.el), { hide: true }),
+        ).rejects.toThrow();
+        expect(snap.el.style.opacity).toBe("0.5");
+        expect(made).toHaveLength(0);
+    });
+
+    test("rejects an element without a box before the snapshot", async () => {
+        const snap = fakeSnapshot();
+        snap.el.hasBox = false;
+        const { deps } = fakeDeps(snap.dom);
+        await expect(
+            createCapture(deps, asElement(snap.el), {}),
+        ).rejects.toThrow();
+        expect(snap.dom.dom2canvas).not.toHaveBeenCalled();
+    });
+
+    test("update() re-runs dom2canvas and goes through refreshTexture", async () => {
+        const snap = fakeSnapshot();
+        const { deps, made } = fakeDeps(snap.dom);
+        const { capture, tick } = await createCapture(
+            deps,
+            asElement(snap.el),
+            {},
+        );
+        const first = made[0].source;
+
+        await capture.update();
+        expect(snap.dom.dom2canvas).toHaveBeenLastCalledWith(
+            snap.el,
+            0.5,
+            first,
+            4096,
+        );
+        expect(made).toHaveLength(1);
+        expect(made[0].needsUpdate).toBe(true);
+
+        snap.setSize(120, 160);
+        snap.el.box = { left: 1, top: 2, width: 60, height: 80 };
+        tick();
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([30, 40]);
+        await capture.update();
+        expect(made).toHaveLength(2);
+        expect(made[0].dispose).toHaveBeenCalledOnce();
+        expect(resolveTexture(capture.texture)).toBe(made[1]);
+        tick();
+        expect([capture.rect?.width, capture.rect?.height]).toEqual([60, 80]);
+    });
+
+    test("update() keeps the texture when the snapshot is empty", async () => {
+        const snap = fakeSnapshot();
+        const { deps, made } = fakeDeps(snap.dom);
+        const { capture } = await createCapture(deps, asElement(snap.el), {});
+        snap.setSize(0, 0);
+        await capture.update();
+        expect(made).toHaveLength(1);
+        expect(made[0].dispose).not.toHaveBeenCalled();
+        expect(resolveTexture(capture.texture)).toBe(made[0]);
+    });
+
+    // After setup, each dom2canvas call waits until the test settles it.
+    async function overlapping(snap: ReturnType<typeof fakeSnapshot>) {
+        const { deps } = fakeDeps(snap.dom);
+        const entry = await createCapture(deps, asElement(snap.el), {});
+        const runs: { resolve: () => void; reject: (e: Error) => void }[] = [];
+        let inFlight = 0;
+        let maxInFlight = 0;
+        snap.dom.dom2canvas.mockImplementation(
+            (_el, _opacity, old) =>
+                new Promise<OffscreenCanvas>((resolve, reject) => {
+                    inFlight++;
+                    maxInFlight = Math.max(maxInFlight, inFlight);
+                    const done = () => inFlight--;
+                    runs.push({
+                        resolve: () => {
+                            done();
+                            resolve(old ?? offscreen(60, 80));
+                        },
+                        reject: (e) => {
+                            done();
+                            reject(e);
+                        },
+                    });
+                }),
+        );
+        return { ...entry, runs, maxInFlight: () => maxInFlight };
+    }
+
+    test("update() during a snapshot queues one more after it", async () => {
+        const snap = fakeSnapshot();
+        const { capture, runs, maxInFlight } = await overlapping(snap);
+        const settled: string[] = [];
+        const p1 = capture.update().then(() => settled.push("p1"));
+        const p2 = capture.update().then(() => settled.push("p2"));
+        await flush();
+        expect(runs).toHaveLength(1);
+
+        runs[0].resolve();
+        await p1;
+        await flush();
+        expect(runs).toHaveLength(2);
+        expect(settled).toEqual(["p1"]);
+
+        runs[1].resolve();
+        await p2;
+        expect(settled).toEqual(["p1", "p2"]);
+        expect(maxInFlight()).toBe(1);
+    });
+
+    test("overlapping calls share one queued snapshot", async () => {
+        const snap = fakeSnapshot();
+        const { capture, runs } = await overlapping(snap);
+        const p1 = capture.update();
+        const p2 = capture.update();
+        const p3 = capture.update();
+        expect(p3).toBe(p2);
+        await flush();
+        runs[0].resolve();
+        await flush();
+        runs[1].resolve();
+        await Promise.all([p1, p2, p3]);
+        await flush();
+        expect(runs).toHaveLength(2);
+    });
+
+    test("a failed snapshot does not block the queued one", async () => {
+        const snap = fakeSnapshot();
+        const { capture, runs } = await overlapping(snap);
+        const p1 = capture.update();
+        const p2 = capture.update();
+        await flush();
+        runs[0].reject(new Error("first"));
+        await expect(p1).rejects.toThrow("first");
+        await flush();
+        expect(runs).toHaveLength(2);
+        runs[1].resolve();
+        await expect(p2).resolves.toBe(true);
+    });
+
+    test("a queued snapshot does not run after dispose", async () => {
+        const snap = fakeSnapshot();
+        const { capture, runs } = await overlapping(snap);
+        capture.update();
+        const p2 = capture.update();
+        await flush();
+        capture.dispose();
+        runs[0].resolve();
+        await expect(p2).resolves.toBe(false);
+        expect(runs).toHaveLength(1);
+    });
+
+    test("resize() snapshots again only when the size changed", async () => {
+        const snap = fakeSnapshot();
+        const { deps } = fakeDeps(snap.dom);
+        const { capture, resize } = await createCapture(
+            deps,
+            asElement(snap.el),
+            {},
+        );
+        resize();
+        expect(snap.dom.dom2canvas).toHaveBeenCalledTimes(1);
+
+        snap.el.box = { left: 1, top: 2, width: 31, height: 40 };
+        resize();
+        expect(snap.dom.dom2canvas).toHaveBeenCalledTimes(2);
+        await flush();
+
+        snap.el.box = { left: 1, top: 2, width: 32, height: 40 };
+        capture.dispose();
+        resize();
+        expect(snap.dom.dom2canvas).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("createCapture: sources WebGL can't read", () => {
+    test.each([
+        [
+            "a 0×0 canvas",
+            () => Object.assign(new FakeCanvas(), { width: 0, height: 0 }),
+        ],
+        [
+            "an image with no natural size",
+            () =>
+                Object.assign(new FakeImage(), {
+                    naturalWidth: 0,
+                    naturalHeight: 0,
+                }),
+        ],
+        [
+            "a video with no frame size",
+            () =>
+                Object.assign(new FakeVideo(), {
+                    videoWidth: 0,
+                    videoHeight: 0,
+                }),
+        ],
+    ])("rejects %s and leaves it", async (_, make) => {
+        const { deps, made } = fakeDeps();
+        const el = make();
+        el.style.opacity = "0.5";
+        await expect(
+            createCapture(deps, asElement(el), { hide: true }),
+        ).rejects.toThrow("no pixels");
+        expect(el.style.opacity).toBe("0.5");
+        expect(made).toHaveLength(0);
+    });
+
+    test("rejects a source larger than maxTextureSize", async () => {
+        const { deps, made } = fakeDeps();
+        const img = new FakeImage();
+        img.naturalWidth = 4097;
+        await expect(
+            createCapture(deps, asElement(img), { hide: true }),
+        ).rejects.toThrow("max texture size");
+        expect(img.style.opacity).toBe("");
+        expect(made).toHaveLength(0);
+    });
+
+    test("uploads the first capture during setup", async () => {
+        const { deps, made } = fakeDeps();
+        await createCapture(deps, asElement(new FakeImage()), {});
+        expect(deps.uploadTexture).toHaveBeenCalledWith(made[0]);
+    });
+
+    test("rejects when the first upload fails and restores the element", async () => {
+        const { deps, made } = fakeDeps();
+        deps.uploadTexture.mockImplementationOnce(() => {
+            throw new Error("tainted");
+        });
+        const img = new FakeImage();
+        img.style.opacity = "0.5";
+        const onDispose = vi.fn();
+        await expect(
+            createCapture(deps, asElement(img), { hide: true }, onDispose),
+        ).rejects.toThrow("tainted");
+        expect(img.style.opacity).toBe("0.5");
+        expect(made[0].dispose).toHaveBeenCalledOnce();
+        expect(onDispose).not.toHaveBeenCalled();
+    });
+
+    test("unwraps when the first html-in-canvas upload fails", async () => {
+        const hic = fakeHic();
+        const { deps, made } = fakeDeps(hic.dom);
+        deps.uploadTexture.mockImplementationOnce(() => {
+            throw new Error("lost");
+        });
+        await expect(
+            createCapture(deps, asElement(hic.el), {}),
+        ).rejects.toThrow("lost");
+        expect(hic.dom.unwrapElement).toHaveBeenCalledWith(hic.wrapper, hic.el);
+        expect(made[0].dispose).toHaveBeenCalledOnce();
+    });
+});
+
+describe("createCapture: the page moves a wrapped element", () => {
+    test("rect is null while the element is out of its wrapper", async () => {
+        const hic = fakeHic();
+        const { deps } = fakeDeps(hic.dom);
+        const { capture, tick } = await createCapture(
+            deps,
+            asElement(hic.el),
+            {},
+        );
+        expect(capture.rect).not.toBeNull();
+        hic.el.parentNode = null;
+        tick();
+        expect(capture.rect).toBeNull();
+        hic.el.parentNode = hic.wrapper;
+        tick();
+        expect(capture.rect).toEqual({ x: 3, y: 4, width: 50, height: 20 });
+    });
+
+    test("passes the abort signal to wrapElement", async () => {
+        const hic = fakeHic();
+        const { deps } = fakeDeps(hic.dom);
+        const abort = new AbortController();
+        await createCapture(
+            deps,
+            asElement(hic.el),
+            {},
+            undefined,
+            abort.signal,
+        );
+        expect(hic.dom.wrapElement.mock.calls[0][2]).toBe(abort.signal);
+    });
+});

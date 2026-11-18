@@ -28,7 +28,7 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 ## Common Commands
 
 ### Development
-- `pnpm run dev` - Start docs, docs-react and the transition demo site (Next), plus watchers for core, effects, react and transitions (uses Turborepo TUI). Start anything else with `pnpm --filter <package> dev`
+- `pnpm run dev` - Start docs, docs-react, the transition demo site (Next) and storybook (port 6006), plus watchers for core, effects, react and transitions (uses Turborepo TUI). Start anything else with `pnpm --filter <package> dev`
 - `pnpm run dev:testbed` - Start the framework testbed apps (ports 5002-5006), plus watchers for core, the bindings and transitions
 - `pnpm run build` - Build all packages
 - `pnpm run clean` - Clean build artifacts across all packages

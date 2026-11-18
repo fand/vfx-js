@@ -110,12 +110,21 @@ export class Texture implements Restorable {
         gl.activeTexture(gl.TEXTURE0 + unit);
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
         if (this.needsUpdate) {
-            this.#upload();
+            this.#upload(false);
             this.needsUpdate = false;
         }
     }
 
-    #upload(): void {
+    /** Bind and upload now. Throws when the upload throws, instead of logging. */
+    upload(unit: number): void {
+        const gl = this.gl;
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        this.#upload(true);
+        this.needsUpdate = false;
+    }
+
+    #upload(strict: boolean): void {
         const gl = this.gl;
         const src = this.source;
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -135,6 +144,9 @@ export class Texture implements Restorable {
                     src as TexImageSource,
                 );
             } catch (e) {
+                if (strict) {
+                    throw e;
+                }
                 // Some sources (e.g. cross-origin videos before playback)
                 // can fail temporarily; log and keep the previous pixels.
                 console.error(e);

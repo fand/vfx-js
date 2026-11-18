@@ -1,3 +1,4 @@
+import { layoutRect } from "./capture.js";
 import { isHicCanvas } from "./hic-canvas.js";
 import {
     lockCanvasSize,
@@ -19,6 +20,8 @@ import type {
 import {
     type Effect,
     getVFXOpts,
+    type VFXCapture,
+    type VFXCaptureOpts,
     type VFXOpts,
     type VFXProps,
 } from "./types.js";
@@ -48,15 +51,47 @@ function getCanvasStyle(fixed: boolean) {
     };
 }
 
+/** A captured element, including one whose first capture is pending. */
+type CaptureRecord = {
+    hide: boolean;
+    abort: AbortController;
+};
+
+function isMediaElement(element: HTMLElement): boolean {
+    return (
+        element instanceof HTMLImageElement ||
+        element instanceof HTMLVideoElement ||
+        element instanceof HTMLCanvasElement
+    );
+}
+
+/**
+ * Whether `add` and `capture` would both own the element's look: both hide
+ * an HTML element, and both set a media element's opacity with `hide`.
+ */
+function addConflictsWithCapture(element: HTMLElement, hide: boolean): boolean {
+    return hide || !isMediaElement(element);
+}
+
 /**
  * The main interface of VFX-JS.
  */
 export class VFX {
+    // Live instances. capture, add and addHTML check all of them, so two
+    // instances can't both own one element.
+    static #instances = new Set<VFX>();
+
     #player: VFXPlayer;
     #canvas: HTMLCanvasElement;
     #wrapperCanvases = new Map<HTMLElement, HTMLCanvasElement>();
+    // Elements that addHTML is still wrapping.
+    #wrapping = new Set<HTMLElement>();
+    // Elements that add is still loading.
+    #adding = new Set<HTMLElement>();
     #transitions = new Set<TransitionHandle>();
+    #captures = new Map<HTMLElement, CaptureRecord>();
     #reducedMotion: boolean;
+    #destroyed = false;
 
     /**
      * Create a VFX instance if WebGL is available, or return `null`.
@@ -100,6 +135,7 @@ export class VFX {
         this.#canvas = canvas;
 
         this.#player = new VFXPlayer(opts, canvas);
+        VFX.#instances.add(this);
 
         if (opts.autoplay) {
             this.play();
@@ -126,18 +162,31 @@ export class VFX {
         if (this.#reducedMotion) {
             return;
         }
-        if (element instanceof HTMLImageElement) {
-            await this.#addImage(element, opts);
-        } else if (element instanceof HTMLVideoElement) {
-            await this.#addVideo(element, opts);
-        } else if (element instanceof HTMLCanvasElement) {
-            if (isHicCanvas(element) && initialCapture) {
-                await this.#addHICCanvas(element, opts, initialCapture);
-            } else {
-                await this.#addCanvas(element, opts);
+        for (const vfx of VFX.#instances) {
+            const captured = vfx.#captures.get(element);
+            if (captured && addConflictsWithCapture(element, captured.hide)) {
+                throw new Error(
+                    "[VFX-JS] This element is captured. Dispose the capture before add.",
+                );
             }
-        } else {
-            await this.#addText(element, opts);
+        }
+        this.#adding.add(element);
+        try {
+            if (element instanceof HTMLImageElement) {
+                await this.#addImage(element, opts);
+            } else if (element instanceof HTMLVideoElement) {
+                await this.#addVideo(element, opts);
+            } else if (element instanceof HTMLCanvasElement) {
+                if (isHicCanvas(element) && initialCapture) {
+                    await this.#addHICCanvas(element, opts, initialCapture);
+                } else {
+                    await this.#addCanvas(element, opts);
+                }
+            } else {
+                await this.#addText(element, opts);
+            }
+        } finally {
+            this.#adding.delete(element);
         }
     }
 
@@ -194,6 +243,13 @@ export class VFX {
         if (this.#reducedMotion) {
             return;
         }
+        for (const vfx of VFX.#instances) {
+            if (vfx.#captures.has(element)) {
+                throw new Error(
+                    "[VFX-JS] This element is captured. Dispose the capture before addHTML.",
+                );
+            }
+        }
         if (!supportsHtmlInCanvas()) {
             console.warn(
                 "html-in-canvas not supported, falling back to dom-to-canvas",
@@ -214,17 +270,162 @@ export class VFX {
             this.#player.removeElement(wrapper);
         }
 
-        const { canvas, initialCapture } = await wrapElement(element, {
-            onCapture: (offscreen) => {
-                this.#player.updateHICTexture(canvas, offscreen);
-            },
-            maxSize: this.#player.maxTextureSize,
-            stillCover: withStill ? { zIndex: this.#stillZIndex() } : undefined,
-        });
-        wrapper = canvas;
-        this.#wrapperCanvases.set(element, wrapper);
+        this.#wrapping.add(element);
+        let initialCapture: OffscreenCanvas;
+        try {
+            const wrapped = await wrapElement(element, {
+                onCapture: (offscreen) => {
+                    this.#player.updateHICTexture(wrapped.canvas, offscreen);
+                },
+                maxSize: this.#player.maxTextureSize,
+                stillCover: withStill
+                    ? { zIndex: this.#stillZIndex() }
+                    : undefined,
+            });
+            wrapper = wrapped.canvas;
+            initialCapture = wrapped.initialCapture;
+            this.#wrapperCanvases.set(element, wrapper);
+        } finally {
+            this.#wrapping.delete(element);
+        }
 
         await this.#addHICCanvas(wrapper, hicOpts, initialCapture);
+    }
+
+    /**
+     * Capture an element as a texture without drawing it.
+     * Any effect of this VFX instance can read the texture.
+     * Resolves after the first capture is in the texture.
+     *
+     * `<img>`, `<video>` and `<canvas>` are uploaded as they are.
+     * Other elements are captured with html-in-canvas when the browser
+     * supports it (like {@link VFX.addHTML}), or else with one DOM snapshot
+     * (like {@link VFX.add}). Call `update()` on the snapshot after the
+     * element changes.
+     *
+     * ```ts
+     * const page = await vfx.capture(article, { hide: true });
+     * await vfx.add(minimap, {
+     *     effect: myEffect,
+     *     uniforms: { page: page.texture },
+     * });
+     * // Later:
+     * page.dispose();
+     * ```
+     *
+     * The texture works on the effect path (`effect`) only, and only in
+     * this VFX instance.
+     *
+     * A WebGL `<canvas>` needs `preserveDrawingBuffer: true`, or the
+     * capture may read an empty buffer.
+     * An SVG `<img>` needs a `width` and `height` in the SVG, or it may
+     * capture as black.
+     * A `loading="lazy"` image is waited for until it loads.
+     * A capture inside another html-in-canvas capture does not repaint the
+     * outer one; call `update()` on the outer capture.
+     *
+     * Rejects when the element already has a capture in any VFX instance,
+     * when `addHTML` or a transition wraps it, when `add` has it or is
+     * adding it (unless it is an `<img>`, `<video>` or `<canvas>` captured
+     * without `hide`), or when the first capture fails. That covers a
+     * source with no pixels, one larger than `maxTextureSize`, one WebGL
+     * can't read (a cross-origin image without CORS), and a video that has
+     * no source, failed, or has `preload="none"` and is not playing.
+     * It also rejects `<html>`, `<body>` and any element that contains a
+     * VFX canvas. `add` and `addHTML` reject a captured element under the
+     * same rules.
+     * When the user prefers reduced motion, it resolves to a handle that
+     * leaves the element alone and samples as transparent.
+     */
+    async capture(
+        source: HTMLElement,
+        opts: VFXCaptureOpts = {},
+    ): Promise<VFXCapture> {
+        if (this.#reducedMotion) {
+            return this.#inertCapture(source);
+        }
+        if (this.#destroyed) {
+            throw new Error("[VFX-JS] This VFX instance is destroyed.");
+        }
+        if (
+            source === document.documentElement ||
+            source === document.body ||
+            [...VFX.#instances].some((vfx) => source.contains(vfx.#canvas))
+        ) {
+            throw new Error(
+                "[VFX-JS] capture() cannot take <html>, <body> or an element that contains a VFX canvas.",
+            );
+        }
+        const hide = opts.hide ?? false;
+        for (const vfx of VFX.#instances) {
+            if (vfx.#captures.has(source)) {
+                throw new Error(
+                    vfx === this
+                        ? "[VFX-JS] This element is already captured. Share the capture instead."
+                        : "[VFX-JS] This element is already captured by another VFX instance.",
+                );
+            }
+            if (vfx.#wrapperCanvases.has(source) || vfx.#wrapping.has(source)) {
+                throw new Error(
+                    "[VFX-JS] capture() cannot take an element that addHTML or a transition has wrapped.",
+                );
+            }
+            if (
+                (vfx.#player.hasElement(source) || vfx.#adding.has(source)) &&
+                addConflictsWithCapture(source, hide)
+            ) {
+                throw new Error(
+                    "[VFX-JS] capture() cannot take an element added with add(). Remove it first.",
+                );
+            }
+        }
+
+        // Register now, so a second call cannot wrap the element too.
+        const record: CaptureRecord = {
+            hide,
+            abort: new AbortController(),
+        };
+        this.#captures.set(source, record);
+        let capture: VFXCapture;
+        try {
+            capture = await this.#player.addCapture(
+                source,
+                opts,
+                this.#stillZIndex(),
+                () => this.#captures.delete(source),
+                record.abort.signal,
+            );
+        } catch (err) {
+            this.#captures.delete(source);
+            if (this.#destroyed) {
+                throw new Error(
+                    "[VFX-JS] This VFX instance was destroyed during capture().",
+                );
+            }
+            throw err;
+        }
+        if (this.#destroyed) {
+            capture.dispose();
+            throw new Error(
+                "[VFX-JS] This VFX instance was destroyed during capture().",
+            );
+        }
+        return capture;
+    }
+
+    #inertCapture(source: HTMLElement): VFXCapture {
+        const r = layoutRect(source);
+        return {
+            texture: this.#player.emptyTexture(),
+            rect: r && {
+                x: r.left,
+                y: r.top,
+                width: r.width,
+                height: r.height,
+            },
+            update: () => Promise.resolve(false),
+            dispose: () => {},
+        };
     }
 
     // One below the VFX canvas.
@@ -469,6 +670,15 @@ export class VFX {
      * Destroy VFX and stop rendering.
      */
     destroy(): void {
+        // The player disposes the captures.
+        this.#destroyed = true;
+        VFX.#instances.delete(this);
+        // A pending capture restores the element when aborted. The player
+        // disposes the ones that are done.
+        for (const { abort } of this.#captures.values()) {
+            abort.abort();
+        }
+
         for (const transition of this.#transitions) {
             transition.destroy();
         }
@@ -487,12 +697,13 @@ export class VFX {
         if (element.complete) {
             return this.#player.addElement(element, opts);
         } else {
-            return new Promise<void>((resolve) => {
+            return new Promise<void>((resolve, reject) => {
                 element.addEventListener(
                     "load",
                     () => {
-                        this.#player.addElement(element, opts);
-                        resolve();
+                        this.#player
+                            .addElement(element, opts)
+                            .then(resolve, reject);
                     },
                     { once: true },
                 );
@@ -504,12 +715,13 @@ export class VFX {
         if (element.readyState >= 3) {
             return this.#player.addElement(element, opts);
         } else {
-            return new Promise<void>((resolve) => {
+            return new Promise<void>((resolve, reject) => {
                 element.addEventListener(
                     "canplay",
                     () => {
-                        this.#player.addElement(element, opts);
-                        resolve();
+                        this.#player
+                            .addElement(element, opts)
+                            .then(resolve, reject);
                     },
                     { once: true },
                 );

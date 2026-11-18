@@ -1,0 +1,402 @@
+import type { Meta, StoryObj } from "@storybook/html-vite";
+import type {
+    Effect,
+    EffectContext,
+    VFXCapture,
+    VFXCaptureRect,
+} from "@vfx-js/core";
+import JellyfishMp4 from "./assets/jellyfish.mp4";
+import Jellyfish from "./assets/jellyfish.webp";
+import { initVFX } from "./utils";
+
+const qs = <T extends Element>(el: Element, sel: string) =>
+    // biome-ignore lint/style/noNonNullAssertion: story helpers query known IDs
+    el.querySelector(sel)! as T;
+
+function fullscreenRoot() {
+    // biome-ignore lint/style/noNonNullAssertion: storybook root always exists
+    const root = document.getElementById("storybook-root")!;
+    root.style.height = "auto";
+    root.style.display = "block";
+}
+
+const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
+
+/** `[x, y, w, h]` of a capture rect, for a `vec4` uniform. */
+const rectOf = (rect: VFXCaptureRect): [number, number, number, number] => [
+    rect.x,
+    rect.y,
+    rect.width,
+    rect.height,
+];
+
+/** The viewport size in CSS px, without scrollbars. */
+const viewportSize = (): [number, number] => [
+    document.documentElement.clientWidth,
+    document.documentElement.clientHeight,
+];
+
+export default {
+    title: "Capture",
+    parameters: {
+        layout: "fullscreen",
+        chromatic: { disableSnapshot: true },
+    },
+} satisfies Meta;
+
+// ---------------------------------------------------------------------------
+// Minimap
+// ---------------------------------------------------------------------------
+
+const MINIMAP_FRAG = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D page;
+uniform vec2 size;      // minimap, CSS px
+uniform vec4 pageRect;  // captured element in the viewport, CSS px
+uniform vec2 viewport;  // CSS px
+void main() {
+    vec2 p = vec2(uv.x, 1.0 - uv.y) * size;
+    float s = min(size.x / pageRect.z, size.y / pageRect.w);
+    vec2 off = (size - pageRect.zw * s) * 0.5;
+    vec2 a = (p - off) / s;
+
+    vec4 col = vec4(0.0, 0.0, 0.0, 0.6);
+    if (all(greaterThanEqual(a, vec2(0.0))) && all(lessThan(a, pageRect.zw))) {
+        col = texture(page, vec2(a.x / pageRect.z, 1.0 - a.y / pageRect.w));
+    }
+
+    // The visible rows of the page, in minimap px. The frame spans the page width.
+    vec2 vmin = vec2(off.x, off.y - pageRect.y * s);
+    vec2 vmax = vec2(off.x + pageRect.z * s, vmin.y + viewport.y * s);
+    bool inView = all(greaterThanEqual(p, vmin)) && all(lessThan(p, vmax));
+    bool inInner = all(greaterThanEqual(p, vmin + 2.0)) && all(lessThan(p, vmax - 2.0));
+    if (inView && !inInner) {
+        col = vec4(1.0, 0.3, 0.2, 1.0);
+    } else if (!inView) {
+        col.rgb *= 0.5;
+    }
+    outColor = col;
+}
+`;
+
+/** Draws a capture scaled down, with a frame for the visible part. */
+class MinimapEffect implements Effect {
+    constructor(private page: VFXCapture) {}
+
+    render(ctx: EffectContext) {
+        // Nothing to place while the article has no layout.
+        const rect = this.page.rect;
+        if (!rect) {
+            return;
+        }
+        ctx.draw({
+            frag: MINIMAP_FRAG,
+            uniforms: {
+                page: this.page.texture,
+                size: [ctx.dims.element[0], ctx.dims.element[1]],
+                pageRect: rectOf(rect),
+                viewport: viewportSize(),
+            },
+        });
+    }
+}
+
+const ARTICLE_TEXT =
+    "VFX-JS captures this article into a texture with vfx.capture(). " +
+    "The minimap is a separate element, drawn by an effect that reads " +
+    "capture.texture and capture.rect. Scroll to move the frame.";
+
+export const Minimap: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "padding:48px 220px 96px 48px; font-family:sans-serif; color:white; background:#111";
+
+        const sections = Array.from(
+            { length: 8 },
+            (_, i) => `
+                <h2 style="margin:48px 0 16px">Section ${i + 1}</h2>
+                <p style="font-size:1.1rem; line-height:1.7">${ARTICLE_TEXT}</p>
+                <p style="font-size:1.1rem; line-height:1.7">${ARTICLE_TEXT}</p>
+            `,
+        ).join("");
+
+        const article = document.createElement("article");
+        article.id = "capture-article";
+        article.style.cssText =
+            "max-width:640px; padding:24px; background:#223; border-radius:12px";
+        article.innerHTML = `
+            <h1 style="margin:0">Minimap</h1>
+            <p>Updated <span id="capture-clock">0</span>s ago.
+               <button id="capture-toggle">Toggle box</button>
+               <a href="#capture-article" style="color:#8cf">A link</a>
+               <input placeholder="Type here" style="margin-left:8px" /></p>
+            <div id="capture-box" style="height:80px; background:#e63; border-radius:8px"></div>
+            <img src="${Jellyfish}" style="display:block; width:100%; margin-top:24px; border-radius:8px" />
+            ${sections}
+        `;
+        container.appendChild(article);
+
+        const minimap = document.createElement("div");
+        minimap.id = "capture-minimap";
+        minimap.style.cssText =
+            "position:fixed; top:16px; right:16px; width:160px; height:60vh";
+        container.appendChild(minimap);
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await nextFrame();
+        const article = qs<HTMLElement>(canvasElement, "#capture-article");
+        const minimap = qs<HTMLElement>(canvasElement, "#capture-minimap");
+        const clock = qs<HTMLElement>(canvasElement, "#capture-clock");
+        const box = qs<HTMLElement>(canvasElement, "#capture-box");
+        const toggle = qs(canvasElement, "#capture-toggle");
+
+        // The minimap is fixed, so it needs a fixed canvas. With scroll padding it lags on scroll.
+        const vfx = initVFX({ scrollPadding: false });
+        const page = await vfx.capture(article);
+
+        // Live updates: a ticking clock, and a box that changes on click.
+        // html-in-canvas re-captures on its own; update() covers the fallback.
+        const start = Date.now();
+        const timer = setInterval(() => {
+            if (!clock.isConnected) {
+                clearInterval(timer);
+                return;
+            }
+            clock.textContent = String(Math.floor((Date.now() - start) / 1000));
+            page.update();
+        }, 1000);
+        let blue = false;
+        toggle.addEventListener("click", () => {
+            blue = !blue;
+            box.style.background = blue ? "#38e" : "#e63";
+            page.update();
+        });
+
+        await vfx.add(minimap, { effect: new MinimapEffect(page) });
+    },
+};
+
+// ---------------------------------------------------------------------------
+// Hide
+// ---------------------------------------------------------------------------
+
+const LENS_FRAG = `#version 300 es
+precision highp float;
+in vec2 uv;
+in vec2 uvSrc;
+out vec4 outColor;
+uniform sampler2D src;
+uniform sampler2D page;
+uniform vec2 canvas;    // VFX canvas, CSS px
+uniform vec2 viewport;  // CSS px
+uniform vec4 pageRect;  // captured element in the viewport, CSS px
+uniform vec2 pointer;   // viewport, CSS px
+uniform float radius;   // lens radius, CSS px
+uniform float time;
+
+vec4 samplePage(vec2 q) {
+    vec2 l = q / pageRect.zw;
+    if (any(lessThan(l, vec2(0.0))) || any(greaterThanEqual(l, vec2(1.0)))) {
+        return vec4(0.0);
+    }
+    return texture(page, vec2(l.x, 1.0 - l.y));
+}
+
+void main() {
+    vec4 base = texture(src, uvSrc);
+    // The canvas is the viewport plus the same scroll padding on each side.
+    vec2 pad = (canvas - viewport) * 0.5;
+    vec2 p = vec2(uv.x, 1.0 - uv.y) * canvas - pad;
+    vec2 q = p - pageRect.xy;
+
+    // Outside the lens: wobbly and pixelated.
+    vec2 w = q + 10.0 * vec2(sin(q.y * 0.04 + time * 2.0), sin(q.x * 0.03 + time * 1.7));
+    vec2 cell = (floor(w / 14.0) + 0.5) * 14.0;
+    vec4 rough = samplePage(cell);
+    rough.rgb = mix(rough.rgb, vec3(dot(rough.rgb, vec3(0.3, 0.59, 0.11))), 0.6);
+
+    float inLens = 1.0 - smoothstep(radius - 16.0, radius, length(p - pointer));
+    vec4 c = mix(rough, samplePage(q), inLens);
+    outColor = c + base * (1.0 - c.a);
+}
+`;
+
+/**
+ * Post effect that draws a capture where its element is: wobbly and pixelated,
+ * and sharp inside a lens around the pointer while `reveal` is set.
+ * Passes the scene through until `page` is set, and while the card has no layout.
+ */
+class LensEffect implements Effect {
+    page: VFXCapture | null = null;
+    reveal = false;
+    #radius = 0;
+
+    // Disabled, it passes the scene through.
+    get enabled() {
+        return this.page?.rect != null;
+    }
+
+    update(ctx: EffectContext) {
+        const target = this.reveal ? 120 : 0;
+        this.#radius +=
+            (target - this.#radius) * Math.min(1, ctx.deltaTime * 8);
+    }
+
+    render(ctx: EffectContext) {
+        const rect = this.page?.rect;
+        if (!this.page || !rect) {
+            return;
+        }
+        // mouseViewport is physical px with a bottom-left origin.
+        const [mx, my] = ctx.mouseViewport;
+        const pointer = [
+            mx / ctx.pixelRatio,
+            window.innerHeight - my / ctx.pixelRatio,
+        ];
+        ctx.draw({
+            frag: LENS_FRAG,
+            uniforms: {
+                src: ctx.src,
+                page: this.page.texture,
+                canvas: [ctx.dims.canvas[0], ctx.dims.canvas[1]],
+                viewport: viewportSize(),
+                pageRect: rectOf(rect),
+                pointer,
+                radius: this.#radius,
+                time: ctx.time,
+            },
+        });
+    }
+}
+
+export const Hide: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "padding:96px 48px 150vh; font-family:sans-serif; color:white; background:#111";
+
+        const card = document.createElement("div");
+        card.id = "capture-hidden";
+        card.style.cssText =
+            "width:480px; padding:24px; background:#235; border-radius:12px";
+        card.innerHTML = `
+            <img src="${Jellyfish}" style="display:block; width:100%; border-radius:8px" />
+            <h2>Hover to look through the lens</h2>
+            <p style="line-height:1.6">This card is captured with
+               <code>hide: true</code>, so you only see a post effect's
+               drawing of it: wobbly and pixelated, and sharp around the
+               pointer while you hover it.</p>
+        `;
+        container.appendChild(card);
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await nextFrame();
+        const card = qs<HTMLElement>(canvasElement, "#capture-hidden");
+        // The capture needs the VFX instance, so the post effect gets it afterwards.
+        const effect = new LensEffect();
+        card.addEventListener("pointerenter", () => {
+            effect.reveal = true;
+        });
+        card.addEventListener("pointerleave", () => {
+            effect.reveal = false;
+        });
+
+        const vfx = initVFX({ postEffect: { effect } });
+        effect.page = await vfx.capture(card, { hide: true });
+    },
+};
+
+// ---------------------------------------------------------------------------
+// Sources
+// ---------------------------------------------------------------------------
+
+const SOURCES_FRAG = `#version 300 es
+precision highp float;
+in vec2 uv;
+out vec4 outColor;
+uniform sampler2D image;
+uniform sampler2D video;
+uniform sampler2D canvas;
+void main() {
+    float i = floor(uv.x * 3.0);
+    vec2 st = vec2(fract(uv.x * 3.0), uv.y);
+    outColor = i < 1.0 ? texture(image, st)
+        : i < 2.0 ? texture(video, st)
+        : texture(canvas, st);
+}
+`;
+
+/** Draws `image`, `video` and `canvas` uniforms side by side. */
+class SideBySideEffect implements Effect {
+    render(ctx: EffectContext) {
+        ctx.draw({ frag: SOURCES_FRAG, uniforms: ctx.uniforms });
+    }
+}
+
+export const Sources: StoryObj = {
+    render: () => {
+        fullscreenRoot();
+        const container = document.createElement("div");
+        container.style.cssText =
+            "padding:48px; min-height:100vh; font-family:sans-serif; color:white; background:#111";
+        const cell = "width:240px; height:160px; object-fit:cover";
+        container.innerHTML = `
+            <p>Sources: an image, a video and a 2D canvas.</p>
+            <div style="display:flex; gap:16px">
+                <img id="capture-img" src="${Jellyfish}" style="${cell}" />
+                <video id="capture-video" src="${JellyfishMp4}" muted loop autoplay playsinline style="${cell}"></video>
+                <canvas id="capture-canvas" width="240" height="160" style="${cell}"></canvas>
+            </div>
+            <p>Captured and drawn by one effect:</p>
+            <div id="capture-strip" style="width:752px; height:160px"></div>
+        `;
+        return container;
+    },
+    play: async ({ canvasElement }) => {
+        await nextFrame();
+        const img = qs<HTMLImageElement>(canvasElement, "#capture-img");
+        const video = qs<HTMLVideoElement>(canvasElement, "#capture-video");
+        const canvas = qs<HTMLCanvasElement>(canvasElement, "#capture-canvas");
+        const strip = qs<HTMLElement>(canvasElement, "#capture-strip");
+
+        // biome-ignore lint/style/noNonNullAssertion: 2D context always exists
+        const g = canvas.getContext("2d")!;
+        const draw = (t: number) => {
+            if (!canvas.isConnected) {
+                return;
+            }
+            g.fillStyle = "#123";
+            g.fillRect(0, 0, canvas.width, canvas.height);
+            g.save();
+            g.translate(canvas.width / 2, canvas.height / 2);
+            g.rotate(t / 500);
+            g.fillStyle = "#e63";
+            g.fillRect(-40, -40, 80, 80);
+            g.restore();
+            requestAnimationFrame(draw);
+        };
+        requestAnimationFrame(draw);
+
+        const vfx = initVFX();
+        const [image, clip, drawing] = await Promise.all([
+            vfx.capture(img),
+            vfx.capture(video),
+            vfx.capture(canvas),
+        ]);
+        await vfx.add(strip, {
+            effect: new SideBySideEffect(),
+            uniforms: {
+                image: image.texture,
+                video: clip.texture,
+                canvas: drawing.texture,
+            },
+        });
+    },
+};

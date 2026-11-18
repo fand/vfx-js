@@ -128,6 +128,15 @@ render(ctx: EffectContext) {
 }
 `;
 
+const captureCode = `
+const page = await vfx.capture(article, { hide: true });
+
+// The effect reads ctx.uniforms.page and passes it to ctx.draw.
+await vfx.add(minimap, { effect: new MyEffect(), uniforms: { page: page.texture } });
+
+page.dispose(); // free it and restore the element
+`;
+
 const paramsCode = `
 export class WaveEffect implements Effect {
     params: WaveParams;
@@ -414,6 +423,13 @@ for (const img of document.querySelectorAll("img")) {
                 <code>update()</code> does nothing for it.
             </li>
         </ul>
+        <p>
+            <code>vfx.capture</code> turns another element into a texture,
+            without drawing it. Pass <code>capture.texture</code> as a uniform,
+            or give the capture to the effect when it also needs
+            <code>capture.rect</code>, the element's place in the viewport.
+        </p>
+        <CodeBlock code={captureCode} lang="ts" label="main.ts" />
         <p>
             This effect tints the element with an 8×4 canvas. The canvas changes
             only on click, so it skips the upload on other frames. Click the logo:

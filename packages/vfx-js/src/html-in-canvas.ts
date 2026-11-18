@@ -137,6 +137,12 @@ const LOCKED_PROPS = [
 export interface CaptureOpts {
     onCapture: (offscreen: OffscreenCanvas) => void;
     maxSize?: number;
+    /**
+     * Leave each later capture drawn on the canvas instead of clearing it,
+     * so the canvas keeps showing the element.
+     * @internal
+     */
+    keepDrawn?: boolean;
 }
 
 const canvasResizeObservers = new WeakMap<HTMLCanvasElement, ResizeObserver>();
@@ -322,7 +328,7 @@ export async function setupCapture(
         throw new Error("Failed to get 2d context from layoutsubtree canvas");
     }
 
-    const { onCapture, maxSize } = opts;
+    const { onCapture, maxSize, keepDrawn } = opts;
     const waiters = new Set<() => void>();
     captureWaiters.set(canvas, waiters);
     let offscreen: OffscreenCanvas | null = null;
@@ -388,7 +394,9 @@ export async function setupCapture(
         }
 
         // Clear so VFXPlayer's WebGL canvas renders the shader version
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!keepDrawn) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
         onCapture(offscreen);
         flushWaiters(waiters);
     };
@@ -664,10 +672,14 @@ interface WrapResult {
  * sizing policy in docs/html-in-canvas.md.
  *
  * Delegates onpaint + ROs to `setupCapture`.
+ *
+ * When `signal` aborts, it undoes its image swap and capture setup after
+ * the step in progress, and rejects. The caller unwraps.
  */
 export async function wrapElement(
     element: HTMLElement,
     opts: WrapOpts,
+    signal?: AbortSignal,
 ): Promise<WrapResult> {
     const rect = element.getBoundingClientRect();
     const insetSizing = getInsetSizing(element);
@@ -811,9 +823,17 @@ export async function wrapElement(
 
     // Cross-origin images
     const restore = await inlineCrossOriginImages(element);
+    if (signal?.aborted) {
+        restore();
+        throw new Error("[VFX-JS] Wrapping was aborted.");
+    }
     imageRestorers.set(canvas, restore);
 
     const initialCapture = await setupCapture(canvas, opts);
+    if (signal?.aborted) {
+        teardownCapture(canvas);
+        throw new Error("[VFX-JS] Wrapping was aborted.");
+    }
 
     return { canvas, initialCapture };
 }
@@ -835,9 +855,10 @@ export function unwrapElement(
         imageRestorers.delete(canvas);
     }
 
-    // Move element back before canvas, then remove canvas
+    // Move element back before canvas, then remove canvas. Leave it
+    // where it is when the page has removed or moved it.
     const parent = canvas.parentNode;
-    if (parent) {
+    if (parent && element.parentNode === canvas) {
         moveNode(parent, element, canvas);
     }
     canvas.remove();

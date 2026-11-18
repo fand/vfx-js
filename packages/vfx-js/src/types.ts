@@ -75,7 +75,8 @@ export type VFXPass = {
 
     /**
      * Uniform values to be passed to this pass's shader.
-     * Works the same way as element uniforms.
+     * Works the same way as element uniforms. Texture values are ignored
+     * here, since passes are on the shader path.
      */
     uniforms?: VFXUniforms;
 
@@ -293,6 +294,8 @@ export type VFXProps = {
      * ```
      *
      * Supported uniform types are defined as {@link VFXUniformValue}.
+     * A texture (e.g. `capture.texture`) works with `effect` only; the
+     * effect reads it from `ctx.uniforms`.
      */
     uniforms?: VFXUniforms;
 
@@ -429,6 +432,10 @@ export type VFXUniforms = {
  * Scalars/tuples map to GLSL `float`/`vec2`/`vec3`/`vec4`. Flat numeric
  * arrays (e.g. `Float32Array`) map to array uniforms — a `Float32Array`
  * of length `N*4` feeds `uniform vec4 foo[N]` (or `uniform float foo[N*4]`).
+ *
+ * An {@link EffectTexture} (e.g. `capture.texture` from `VFX.capture`) is
+ * passed to the effect as `ctx.uniforms[name]`. It works with `effect`
+ * only: with `shader`, it is ignored with a warning.
  */
 export type VFXUniformValue =
     | number // float
@@ -438,7 +445,8 @@ export type VFXUniformValue =
     | number[]
     | Float32Array
     | Int32Array
-    | Uint32Array;
+    | Uint32Array
+    | EffectTexture;
 
 /**
  * @internal
@@ -538,6 +546,8 @@ export type VFXPostEffect = {
     /**
      * Custom uniform values to be passed to the post effect shader.
      * Works the same way as element uniforms.
+     * A capture cannot come through here, since `VFX.capture` needs the
+     * VFX instance first. Give the capture to the effect itself instead.
      */
     uniforms?: VFXUniforms;
 
@@ -559,6 +569,73 @@ export type VFXPostEffect = {
      * Effect (or pipeline of effects) to apply in this post-effect slot.
      */
     effect?: Effect | readonly Effect[];
+};
+
+/** Options for `VFX.capture`. */
+export type VFXCaptureOpts = {
+    /**
+     * Hide the source element. (Default: `false`)
+     * A hidden element keeps its layout and stays interactive.
+     *
+     * With html-in-canvas, the element is always moved into a wrapper
+     * canvas. Without `hide`, the canvas shows the latest capture, so the
+     * element looks unchanged.
+     * The wrap is the same as `addHTML`'s, so the same layout rules apply:
+     * CSS that depends on the parent may change, and an inline element becomes a block.
+     * While wrapped, the element's parent is the wrapper canvas, so a
+     * framework's `parent.removeChild(el)` throws. Dispose the capture first.
+     */
+    hide?: boolean;
+};
+
+/**
+ * Where a captured element is.
+ * CSS px, relative to the viewport, like `getBoundingClientRect()`.
+ * See {@link VFXCapture.rect} for when there is none.
+ *
+ * `x` / `y` are measured at the start of every rendered frame.
+ * For `<img>`, `<video>` and `<canvas>`, so are `width` / `height`.
+ * For other elements, `width` / `height` are the size when the current
+ * texture was captured, so the texture is never stretched after a resize.
+ */
+export type VFXCaptureRect = {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+};
+
+/**
+ * An element captured as a texture by `VFX.capture`, without drawing it.
+ * Pass `texture` to any effect of the same VFX instance.
+ */
+export type VFXCapture = {
+    /** The captured pixels. The same object for the life of the capture. */
+    readonly texture: EffectTexture;
+
+    /**
+     * Where the element is, or `null` while it has no layout: it is not in
+     * the document (e.g. an `<img>` made with `new Image()` and never
+     * inserted), or it is `display: none`, or the page removed it from its
+     * html-in-canvas wrapper. Checked every frame.
+     *
+     * While it is not `null` it is the same object, and its fields change.
+     * The texture works either way.
+     */
+    readonly rect: VFXCaptureRect | null;
+
+    /**
+     * Capture again. Resolves to `true` once the new pixels are in
+     * `texture`, or `false` when none came: with html-in-canvas the
+     * repaint did not arrive within 1 second, the snapshot came out empty,
+     * or the capture is disposed.
+     * With the DOM snapshot fallback (no html-in-canvas), and for images,
+     * the texture changes only when you call this.
+     */
+    update(): Promise<boolean>;
+
+    /** Stop capturing, free the texture and restore the element. Idempotent. */
+    dispose(): void;
 };
 
 // ---------------------------------------------------------------------------

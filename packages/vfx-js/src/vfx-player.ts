@@ -1,4 +1,5 @@
 import { Backbuffer } from "./backbuffer.js";
+import { type CaptureEntry, createCapture } from "./capture.js";
 import { shaders } from "./constants.js";
 import { CopyPass } from "./copy-pass.js";
 import dom2canvas from "./dom-to-canvas.js";
@@ -14,7 +15,12 @@ import type { Framebuffer } from "./gl/framebuffer.js";
 import { type Pass, renderPass } from "./gl/pass.js";
 import type { Uniform, Uniforms } from "./gl/program.js";
 import { Quad } from "./gl/quad.js";
-import { loadImage, Texture, type TextureWrap } from "./gl/texture.js";
+import {
+    loadImage,
+    Texture,
+    type TextureSource,
+    type TextureWrap,
+} from "./gl/texture.js";
 import { Vec2, Vec4 } from "./gl/vec.js";
 import { type GLRect, getGLRect, rectToGLRect } from "./gl-rect.js";
 import { isHicCanvas } from "./hic-canvas.js";
@@ -42,8 +48,11 @@ import {
 import { createPassMaterial, createRenderTarget } from "./render-target.js";
 import type {
     Effect,
+    EffectTexture,
     EffectUniformValue,
     EffectVFXProps,
+    VFXCapture,
+    VFXCaptureOpts,
     VFXElement,
     VFXElementIntersection,
     VFXElementPass,
@@ -180,6 +189,10 @@ export class VFXPlayer {
 
     #isRenderingToCanvas = new WeakMap<HTMLElement, boolean>();
 
+    #captures = new Set<CaptureEntry>();
+    /** What a disposed capture samples: transparent 1×1. */
+    #emptyTexture: Texture;
+
     constructor(opts: VFXOptsInner, canvas: HTMLCanvasElement) {
         this.#opts = opts;
 
@@ -193,6 +206,7 @@ export class VFXPlayer {
 
         this.#quad = new Quad(this.#ctx);
         this.#programCache = new ProgramCache(this.#ctx);
+        this.#emptyTexture = new Texture(this.#ctx);
 
         if (typeof window !== "undefined") {
             window.addEventListener("resize", this.#resize);
@@ -230,6 +244,10 @@ export class VFXPlayer {
             this.#postEffectChain = null;
             this.#postEffectChainReady = false;
         }
+        for (const entry of [...this.#captures]) {
+            entry.capture.dispose();
+        }
+        this.#emptyTexture.dispose();
         this.#copyPass.dispose();
         this.#programCache.dispose();
         this.#quad.dispose();
@@ -320,6 +338,9 @@ export class VFXPlayer {
 
     #resize = async (): Promise<void> => {
         if (typeof window !== "undefined") {
+            for (const entry of this.#captures) {
+                entry.resize();
+            }
             // Update dom2canvas result.
             // Render elements in viewport first, then render elements outside of the viewport.
             for (const e of this.#elements) {
@@ -505,10 +526,12 @@ export class VFXPlayer {
         if (opts.uniforms !== undefined) {
             for (const [key, value] of Object.entries(opts.uniforms)) {
                 if (typeof value === "function") {
-                    sharedUniforms[key] = { value: value() };
+                    sharedUniforms[key] = {
+                        value: value(),
+                    };
                     sharedUniformGenerators[key] = value;
                 } else {
-                    sharedUniforms[key] = { value };
+                    sharedUniforms[key] = { value: value };
                 }
             }
         }
@@ -617,10 +640,14 @@ export class VFXPlayer {
             if (p.uniforms) {
                 for (const [key, value] of Object.entries(p.uniforms)) {
                     if (typeof value === "function") {
-                        passUniforms[key] = { value: value() };
+                        passUniforms[key] = {
+                            value: value(),
+                        };
                         passUniformGenerators[key] = value;
                     } else {
-                        passUniforms[key] = { value };
+                        passUniforms[key] = {
+                            value: value,
+                        };
                     }
                 }
             }
@@ -822,10 +849,10 @@ export class VFXPlayer {
         if (opts.uniforms) {
             for (const [k, v] of Object.entries(opts.uniforms)) {
                 if (typeof v === "function") {
-                    gens[k] = v as () => EffectUniformValue;
-                    staticUniforms[k] = v() as EffectUniformValue;
+                    gens[k] = v;
+                    staticUniforms[k] = v();
                 } else {
-                    staticUniforms[k] = v as EffectUniformValue;
+                    staticUniforms[k] = v;
                 }
             }
         }
@@ -1058,18 +1085,79 @@ export class VFXPlayer {
     }
 
     /**
+     * Capture `source` into a texture without drawing it.
+     * Resolves after the first capture is in the texture.
+     */
+    async addCapture(
+        source: HTMLElement,
+        opts: VFXCaptureOpts,
+        stillZIndex: number,
+        onDispose?: () => void,
+        signal?: AbortSignal,
+    ): Promise<VFXCapture> {
+        const entry = await createCapture(
+            {
+                createTexture: (src) => this.#premultipliedTexture(src),
+                uploadTexture: (texture) => this.#uploadNow(texture),
+                refreshTexture: (old, offscreen) =>
+                    this.#textureFromCapture(old, offscreen),
+                textureSize: readTextureSourceDim,
+                emptyTexture: this.#emptyTexture,
+                maxTextureSize: this.maxTextureSize,
+                stillZIndex,
+            },
+            source,
+            opts,
+            () => {
+                this.#captures.delete(entry);
+                onDispose?.();
+            },
+            signal,
+        );
+        this.#captures.add(entry);
+        return entry.capture;
+    }
+
+    // Throws when the upload throws (e.g. a cross-origin image without CORS).
+    // No gl.getError(): it stalls on the GPU.
+    #uploadNow(texture: Texture): void {
+        try {
+            texture.upload(0);
+        } catch (err) {
+            throw new Error(
+                `[VFX-JS] capture() could not upload the source: ${err}`,
+            );
+        }
+    }
+
+    // Effects read `ctx.src` as premultiplied; match it.
+    #premultipliedTexture(source: TextureSource): Texture {
+        const texture = new Texture(this.#ctx, source);
+        texture.premultiplyAlpha = true;
+        return texture;
+    }
+
+    /** Whether `element` is registered with `addElement`. */
+    hasElement(element: HTMLElement): boolean {
+        return this.#elements.some((e) => e.element === element);
+    }
+
+    /** A transparent texture handle, for captures that render nothing. */
+    emptyTexture(): EffectTexture {
+        return makeEffectTexture(
+            () => this.#emptyTexture,
+            () => 0,
+            () => 0,
+        );
+    }
+
+    /**
      * A texture that follows the captures of a canvas that is not on screen.
      * `texture` is null until the first capture.
      */
     liveTexture(): LiveTexture {
         return createLiveTexture(
-            (offscreen) => {
-                const texture = new Texture(this.#ctx, offscreen);
-                // Effects read `ctx.src` as premultiplied; match it.
-                texture.premultiplyAlpha = true;
-                texture.needsUpdate = true;
-                return texture;
-            },
+            (offscreen) => this.#premultipliedTexture(offscreen),
             (texture, offscreen) =>
                 this.#textureFromCapture(texture, offscreen),
             readTextureSourceDim,
@@ -1191,6 +1279,10 @@ export class VFXPlayer {
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             }
+        }
+
+        for (const entry of this.#captures) {
+            entry.tick();
         }
 
         for (const e of this.#elements) {
@@ -1544,7 +1636,7 @@ export class VFXPlayer {
         };
         if (e.effectUniformGenerators) {
             for (const [k, gen] of Object.entries(e.effectUniformGenerators)) {
-                resolvedUniforms[k] = gen() as EffectUniformValue;
+                resolvedUniforms[k] = gen();
             }
         }
 
@@ -1934,13 +2026,10 @@ export class VFXPlayer {
         if (pe.uniforms) {
             for (const [k, v] of Object.entries(pe.uniforms)) {
                 if (typeof v === "function") {
-                    this.#postEffectChainGenerators[k] =
-                        v as () => EffectUniformValue;
-                    this.#postEffectChainStaticUniforms[k] =
-                        v() as EffectUniformValue;
+                    this.#postEffectChainGenerators[k] = v;
+                    this.#postEffectChainStaticUniforms[k] = v();
                 } else {
-                    this.#postEffectChainStaticUniforms[k] =
-                        v as EffectUniformValue;
+                    this.#postEffectChainStaticUniforms[k] = v;
                 }
             }
         }
