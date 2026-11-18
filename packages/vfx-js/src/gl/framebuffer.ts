@@ -1,6 +1,8 @@
 import type { GLContext, Restorable } from "./context.js";
 import { Texture, type TextureFilter, type TextureWrap } from "./texture.js";
 
+const warnedMultisample = new WeakSet<WebGL2RenderingContext>();
+
 /**
  * Single color-attachment framebuffer, with an optional depth texture.
  * Replaces `THREE.WebGLRenderTarget`.
@@ -60,7 +62,8 @@ export class Framebuffer implements Restorable {
         this.float = opts.float ?? false;
         this.mipmap = opts.mipmap ?? false;
         this.depth = opts.depth ?? false;
-        this.samples = opts.samples === 4 ? 4 : 1;
+        this.samples =
+            opts.samples === 4 && this.#supportsMultisample() ? 4 : 1;
 
         this.texture = new Texture(ctx, undefined, { autoRegister: false });
         const w = opts.wrap;
@@ -119,6 +122,31 @@ export class Framebuffer implements Restorable {
         );
         this.texture.dispose();
         this.depthTexture?.dispose();
+    }
+
+    /**
+     * Whether the color format takes 4 samples.
+     * Warns once per context if not.
+     */
+    #supportsMultisample(): boolean {
+        const gl = this.gl;
+        const format = this.float ? gl.RGBA16F : gl.RGBA8;
+        const counts = gl.getInternalformatParameter(
+            gl.RENDERBUFFER,
+            format,
+            gl.SAMPLES,
+        ) as Int32Array | null;
+        // Counts are sorted high to low; null means the context is lost.
+        if (!counts || (counts.length > 0 && counts[0] >= 4)) {
+            return true;
+        }
+        if (!warnedMultisample.has(gl)) {
+            warnedMultisample.add(gl);
+            console.warn(
+                "[VFX-JS] This GPU can't use samples: 4 for this render target format; using samples: 1.",
+            );
+        }
+        return false;
     }
 
     /** Flag new pixels in the multisampled buffers. No-op without MSAA. */

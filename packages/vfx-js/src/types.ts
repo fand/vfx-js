@@ -800,6 +800,7 @@ export type EffectRenderTargetOpts = {
      * which smooths triangle edges.
      * The target still samples and blits like a normal texture.
      * With `float: true`, a multisampled target uses 16-bit float.
+     * If the GPU can't take 4 samples for the format, it uses 1 and warns.
      */
     samples?: 1 | 4;
 };

@@ -54,6 +54,10 @@ function makeMockGl() {
         framebufferRenderbuffer: vi.fn(),
         blitFramebuffer: vi.fn(),
         disable: vi.fn(),
+        SAMPLES: 0x80a9,
+        getInternalformatParameter: vi.fn<
+            (target: number, format: number, name: number) => Int32Array | null
+        >(() => new Int32Array([8, 4, 2])),
         bindTexture: noop,
         texImage2D: vi.fn(),
         texStorage2D: vi.fn(),
@@ -504,6 +508,45 @@ describe("Framebuffer", () => {
             expect(fb.fbo).toBe(oldFbo);
             expect(gl.deleteFramebuffer).toHaveBeenCalledWith({ _fbo: 900 });
             expect(gl.deleteFramebuffer).not.toHaveBeenCalledWith(oldFbo);
+        });
+
+        it("falls back to samples 1 with one warning when the format can't take 4", () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const gl = makeMockGl();
+            gl.getInternalformatParameter.mockReturnValue(new Int32Array([2]));
+            const ctx = makeCtx(gl);
+            const fb = new Framebuffer(ctx, 16, 16, {
+                float: true,
+                samples: 4,
+            });
+            new Framebuffer(ctx, 16, 16, { float: true, samples: 4 });
+            expect(gl.getInternalformatParameter).toHaveBeenCalledWith(
+                gl.RENDERBUFFER,
+                gl.RGBA16F,
+                gl.SAMPLES,
+            );
+            expect(fb.samples).toBe(1);
+            expect(fb.resolveFbo).toBeNull();
+            expect(gl.createRenderbuffer).not.toHaveBeenCalled();
+            expect(warn).toHaveBeenCalledTimes(1);
+            warn.mockRestore();
+        });
+
+        it("checks RGBA8 for non-float targets", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16, { samples: 4 });
+            expect(gl.getInternalformatParameter).toHaveBeenCalledWith(
+                gl.RENDERBUFFER,
+                gl.RGBA8,
+                gl.SAMPLES,
+            );
+            expect(fb.samples).toBe(4);
+        });
+
+        it("samples 1 never queries sample counts", () => {
+            const gl = makeMockGl();
+            new Framebuffer(makeCtx(gl), 16, 16);
+            expect(gl.getInternalformatParameter).not.toHaveBeenCalled();
         });
     });
 });
