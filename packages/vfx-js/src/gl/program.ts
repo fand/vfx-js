@@ -91,6 +91,10 @@ export class Program implements Restorable {
         ctx.addResource(this);
     }
 
+    get glslVersion(): GlslVersion {
+        return this.#glslVersion;
+    }
+
     #compile(): void {
         const gl = this.gl;
         const vs = compileShader(
