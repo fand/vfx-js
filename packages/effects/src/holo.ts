@@ -134,6 +134,31 @@ const MM_PER_CSS_PX = 25.4 / 96;
 const MASKS: Record<HoloMask, number> = { alpha: 0, luma: 1, none: 2 };
 const TONES = { neutral: 0, agx: 1, clamp: 2 } as const;
 
+/** The output pass's grain uniforms (holospot render/grain.ts): off at amount 0. */
+function grainUniforms(
+    g: SceneState["grain"],
+    dpr: number,
+    timeS: number,
+): Record<string, number> {
+    if (!g.on || !(g.amount > 0)) {
+        return {
+            uGrain: 0,
+            uGrainCell: 1,
+            uGrainSeed: 0,
+            uGrainRgb: 0,
+            uGrainBg: 0,
+        };
+    }
+    const seed = g.animated ? (((timeS * 120) % 512) + 512) % 512 : 0;
+    return {
+        uGrain: g.amount,
+        uGrainCell: Math.max(g.sizePx * (dpr > 0 ? dpr : 1), 1),
+        uGrainSeed: Number.isFinite(seed) ? seed : 0,
+        uGrainRgb: g.colour === "rgb" ? 1 : 0,
+        uGrainBg: g.onBackground ? 1 : 0,
+    };
+}
+
 /** Row-major Mat3 → column-major Float32Array (GLSL mat3). */
 function colMajor(m: Mat3, out = new Float32Array(9)): Float32Array {
     out[0] = m[0];
@@ -214,6 +239,15 @@ void main() {
   vec4 spillP = vec4(se, max3(se));
   base = spillP + (1.0 - spillP.a) * base;
   vec3 enc = srgbOETF(card);
+  // A4.1 film grain in display space, after the tone curve and before the dither (output.frag).
+  if (uGrain > 0.0) {
+    vec2 fc = gl_FragCoord.xy;
+    vec3 n = uGrainRgb == 1
+      ? vec3(grainNoise(fc, uGrainSeed), grainNoise(fc, uGrainSeed + 171.0), grainNoise(fc, uGrainSeed + 342.0))
+      : vec3(grainNoise(fc, uGrainSeed));
+    enc += uGrain * n;
+    if (uGrainBg == 1) base.rgb = clamp(base.rgb + uGrain * n * base.a, 0.0, 1.0);
+  }
   if (cov > 0.0 || max3(spill) > 1e-4) enc += triangularDither(gl_FragCoord.xy) / 255.0;
   gl_FragColor = vec4(clamp(enc, 0.0, 1.0), 1.0) * cov + base * (1.0 - cov);
 }
@@ -660,6 +694,7 @@ export class HoloEffect implements Effect {
                 uGW0: gw0,
                 uGlare: g0 ? glare : 0,
                 uG0Scale: g0 ? this.#glare.outputScale(hw, hh, div) : [1, 1],
+                ...grainUniforms(s.grain, ctx.pixelRatio, ctx.time),
             },
         });
     }
