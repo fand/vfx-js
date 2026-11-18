@@ -41,7 +41,7 @@ The core library uses Three.js for WebGL rendering and provides a VFX class that
 - `pnpm --filter docs test` also fails when a public API uses a type its package does not export, or a doc comment has a `{@link}` that does not resolve. The API reference only lists exported types, so export the type (or add it to `ignored` in `packages/docs/scripts/check-api.mjs`).
 
 ### Testing
-- `pnpm test` - Run tests in every package that has them (core, transitions, react, react-vfx, vue, svelte, astro)
+- `pnpm test` - Run tests in every package that has them (core, effects, transitions, react, react-vfx, vue, svelte, astro)
 - `pnpm --filter @vfx-js/core run test:watch` - Run tests in watch mode
 
 ### Package-specific Development
