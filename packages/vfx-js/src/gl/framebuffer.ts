@@ -2,7 +2,8 @@ import type { GLContext, Restorable } from "./context.js";
 import { Texture, type TextureFilter, type TextureWrap } from "./texture.js";
 
 /**
- * Single color-attachment framebuffer. Replaces `THREE.WebGLRenderTarget`.
+ * Single color-attachment framebuffer, with an optional depth texture.
+ * Replaces `THREE.WebGLRenderTarget`.
  * The `texture` field is a {@link Texture} that wraps the FBO's color
  * attachment, so it can be fed directly into a shader as a sampler.
  *
@@ -17,8 +18,10 @@ export class Framebuffer implements Restorable {
     height: number;
     float: boolean;
     mipmap: boolean;
+    depth: boolean;
     fbo!: WebGLFramebuffer;
     texture: Texture;
+    depthTexture: Texture | null;
 
     #ctx: GLContext;
 
@@ -31,6 +34,7 @@ export class Framebuffer implements Restorable {
             wrap?: TextureWrap | readonly [TextureWrap, TextureWrap];
             filter?: TextureFilter;
             mipmap?: boolean;
+            depth?: boolean;
         } = {},
     ) {
         this.#ctx = ctx;
@@ -39,6 +43,7 @@ export class Framebuffer implements Restorable {
         this.height = Math.max(1, Math.floor(height));
         this.float = opts.float ?? false;
         this.mipmap = opts.mipmap ?? false;
+        this.depth = opts.depth ?? false;
 
         this.texture = new Texture(ctx, undefined, { autoRegister: false });
         const w = opts.wrap;
@@ -54,6 +59,14 @@ export class Framebuffer implements Restorable {
         if (opts.filter !== undefined) {
             this.texture.minFilter = opts.filter;
             this.texture.magFilter = opts.filter;
+        }
+        this.depthTexture = null;
+        if (this.depth) {
+            this.depthTexture = new Texture(ctx, undefined, {
+                autoRegister: false,
+            });
+            this.depthTexture.minFilter = "nearest";
+            this.depthTexture.magFilter = "nearest";
         }
         this.#allocate();
         ctx.addResource(this);
@@ -75,6 +88,7 @@ export class Framebuffer implements Restorable {
         // recreated its handle via its own `restore()` (not registered;
         // done manually here because ordering matters).
         this.texture.restore();
+        this.depthTexture?.restore();
         this.#allocate();
     }
 
@@ -82,6 +96,7 @@ export class Framebuffer implements Restorable {
         this.#ctx.removeResource(this);
         this.gl.deleteFramebuffer(this.fbo);
         this.texture.dispose();
+        this.depthTexture?.dispose();
     }
 
     /**
@@ -192,6 +207,9 @@ export class Framebuffer implements Restorable {
             tex,
             0,
         );
+        if (this.depthTexture) {
+            this.#allocateDepth(this.depthTexture);
+        }
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.bindTexture(gl.TEXTURE_2D, null);
 
@@ -205,6 +223,38 @@ export class Framebuffer implements Restorable {
         if (oldFbo) {
             gl.deleteFramebuffer(oldFbo);
         }
+    }
+
+    /** Allocate the depth texture and attach it to the bound FBO. */
+    #allocateDepth(depthTexture: Texture): void {
+        const gl = this.gl;
+        gl.bindTexture(gl.TEXTURE_2D, depthTexture.texture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.DEPTH_COMPONENT24,
+            this.width,
+            this.height,
+            0,
+            gl.DEPTH_COMPONENT,
+            gl.UNSIGNED_INT,
+            null,
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.NONE);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,
+            gl.DEPTH_ATTACHMENT,
+            gl.TEXTURE_2D,
+            depthTexture.texture,
+            0,
+        );
+        // Storage is managed here; the wrapper must not upload over it.
+        depthTexture.needsUpdate = false;
+        depthTexture.source = null;
     }
 }
 

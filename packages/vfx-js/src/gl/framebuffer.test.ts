@@ -11,6 +11,12 @@ function makeMockGl() {
         TEXTURE_2D: 0x0de1,
         FRAMEBUFFER: 0x8d40,
         COLOR_ATTACHMENT0: 0x8ce0,
+        DEPTH_ATTACHMENT: 0x8d00,
+        DEPTH_COMPONENT: 0x1902,
+        DEPTH_COMPONENT24: 0x81a6,
+        UNSIGNED_INT: 0x1405,
+        TEXTURE_COMPARE_MODE: 0x884c,
+        NONE: 0,
         TEXTURE_MIN_FILTER: 0x2801,
         TEXTURE_MAG_FILTER: 0x2800,
         TEXTURE_WRAP_S: 0x2802,
@@ -38,7 +44,7 @@ function makeMockGl() {
         texImage2D: vi.fn(),
         texStorage2D: vi.fn(),
         texParameteri: vi.fn(),
-        framebufferTexture2D: noop,
+        framebufferTexture2D: vi.fn(),
         generateMipmap: vi.fn(),
     };
 }
@@ -170,6 +176,86 @@ describe("Framebuffer", () => {
             fb.setSize(64, 64);
             // +7 levels for the new size = 12 total
             expect(gl.texImage2D).toHaveBeenCalledTimes(12);
+        });
+    });
+
+    describe("depth", () => {
+        function depthAttachCalls(gl: ReturnType<typeof makeMockGl>) {
+            return gl.framebufferTexture2D.mock.calls.filter(
+                (c) => c[1] === gl.DEPTH_ATTACHMENT,
+            );
+        }
+
+        function depthUploads(gl: ReturnType<typeof makeMockGl>) {
+            return gl.texImage2D.mock.calls.filter(
+                (c) => c[2] === gl.DEPTH_COMPONENT24,
+            );
+        }
+
+        it("no depth by default", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16);
+            expect(fb.depth).toBe(false);
+            expect(fb.depthTexture).toBeNull();
+            expect(depthAttachCalls(gl)).toHaveLength(0);
+            expect(depthUploads(gl)).toHaveLength(0);
+        });
+
+        it("depth:true attaches a DEPTH_COMPONENT24 texture", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 8, { depth: true });
+            expect(fb.depth).toBe(true);
+            expect(fb.depthTexture).not.toBeNull();
+            const uploads = depthUploads(gl);
+            expect(uploads).toHaveLength(1);
+            expect(uploads[0][3]).toBe(16);
+            expect(uploads[0][4]).toBe(8);
+            expect(uploads[0][6]).toBe(gl.DEPTH_COMPONENT);
+            expect(uploads[0][7]).toBe(gl.UNSIGNED_INT);
+            const attach = depthAttachCalls(gl);
+            expect(attach).toHaveLength(1);
+            expect(attach[0][3]).toBe(fb.depthTexture?.texture);
+            expect(fb.depthTexture?.needsUpdate).toBe(false);
+            expect(gl.texParameteri).toHaveBeenCalledWith(
+                gl.TEXTURE_2D,
+                gl.TEXTURE_COMPARE_MODE,
+                gl.NONE,
+            );
+        });
+
+        it("setSize re-allocates depth at the new size", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16, { depth: true });
+            const handle = fb.depthTexture?.texture;
+            fb.setSize(32, 24);
+            const uploads = depthUploads(gl);
+            expect(uploads).toHaveLength(2);
+            expect(uploads[1][3]).toBe(32);
+            expect(uploads[1][4]).toBe(24);
+            expect(depthAttachCalls(gl)).toHaveLength(2);
+            expect(fb.depthTexture?.texture).toBe(handle);
+        });
+
+        it("restore rebuilds the depth texture handle", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16, { depth: true });
+            const oldHandle = fb.depthTexture?.texture;
+            fb.restore();
+            const newHandle = fb.depthTexture?.texture;
+            expect(newHandle).not.toBe(oldHandle);
+            const attach = depthAttachCalls(gl);
+            expect(attach).toHaveLength(2);
+            expect(attach[1][3]).toBe(newHandle);
+            expect(fb.depthTexture?.needsUpdate).toBe(false);
+        });
+
+        it("dispose deletes the depth texture", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16, { depth: true });
+            const handle = fb.depthTexture?.texture;
+            fb.dispose();
+            expect(gl.deleteTexture).toHaveBeenCalledWith(fb.texture.texture);
+            expect(gl.deleteTexture).toHaveBeenCalledWith(handle);
         });
     });
 });

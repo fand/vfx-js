@@ -25,6 +25,7 @@ export class Backbuffer {
             wrap?: TextureWrap | readonly [TextureWrap, TextureWrap];
             filter?: TextureFilter;
             mipmap?: boolean;
+            depth?: boolean;
         } = {},
     ) {
         this.#width = width;
@@ -38,6 +39,7 @@ export class Backbuffer {
             wrap: opts.wrap,
             filter: opts.filter,
             mipmap: opts.mipmap,
+            depth: opts.depth,
         };
         this.#buffers = [
             new Framebuffer(ctx, pwidth, pheight, fbOpts),
@@ -48,6 +50,11 @@ export class Backbuffer {
     /** Read texture (the previous frame's output). */
     get texture(): Texture {
         return this.#buffers[0].texture;
+    }
+
+    /** Read-side depth texture, or null without `depth: true`. */
+    get depthTexture(): Texture | null {
+        return this.#buffers[0].depthTexture;
     }
 
     /** Write target for the current frame. */
