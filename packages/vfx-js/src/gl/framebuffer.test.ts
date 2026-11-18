@@ -579,4 +579,108 @@ describe("Framebuffer", () => {
             expect(gl.getInternalformatParameter).not.toHaveBeenCalled();
         });
     });
+
+    describe("attach to another FBO", () => {
+        it("attaches the color texture at the given index", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16);
+            gl.framebufferTexture2D.mockClear();
+            fb.attachColorTo(2);
+            expect(gl.framebufferTexture2D).toHaveBeenCalledExactlyOnceWith(
+                gl.FRAMEBUFFER,
+                gl.COLOR_ATTACHMENT0 + 2,
+                gl.TEXTURE_2D,
+                fb.texture.texture,
+                0,
+            );
+            expect(gl.framebufferRenderbuffer).not.toHaveBeenCalled();
+        });
+
+        it("attaches the color renderbuffer when multisampled", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16, { samples: 4 });
+            const colorRenderbuffer =
+                gl.createRenderbuffer.mock.results[0].value;
+            gl.framebufferTexture2D.mockClear();
+            gl.framebufferRenderbuffer.mockClear();
+            fb.attachColorTo(1);
+            expect(gl.framebufferRenderbuffer).toHaveBeenCalledExactlyOnceWith(
+                gl.FRAMEBUFFER,
+                gl.COLOR_ATTACHMENT0 + 1,
+                gl.RENDERBUFFER,
+                colorRenderbuffer,
+            );
+            expect(gl.framebufferTexture2D).not.toHaveBeenCalled();
+        });
+
+        it("attaches the depth texture", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16, { depth: true });
+            gl.framebufferTexture2D.mockClear();
+            fb.attachDepthTo();
+            expect(gl.framebufferTexture2D).toHaveBeenCalledExactlyOnceWith(
+                gl.FRAMEBUFFER,
+                gl.DEPTH_ATTACHMENT,
+                gl.TEXTURE_2D,
+                fb.depthTexture?.texture,
+                0,
+            );
+            expect(gl.framebufferRenderbuffer).not.toHaveBeenCalled();
+        });
+
+        it("attaches the depth renderbuffer when multisampled", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16, {
+                samples: 4,
+                depth: true,
+            });
+            const depthRenderbuffer =
+                gl.createRenderbuffer.mock.results[1].value;
+            gl.framebufferTexture2D.mockClear();
+            gl.framebufferRenderbuffer.mockClear();
+            fb.attachDepthTo();
+            expect(gl.framebufferRenderbuffer).toHaveBeenCalledExactlyOnceWith(
+                gl.FRAMEBUFFER,
+                gl.DEPTH_ATTACHMENT,
+                gl.RENDERBUFFER,
+                depthRenderbuffer,
+            );
+            expect(gl.framebufferTexture2D).not.toHaveBeenCalled();
+        });
+
+        it("attachDepthTo is a no-op without depth", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16);
+            gl.framebufferTexture2D.mockClear();
+            fb.attachDepthTo();
+            expect(gl.framebufferTexture2D).not.toHaveBeenCalled();
+            expect(gl.framebufferRenderbuffer).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("version", () => {
+        it("changes on setSize", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16);
+            const version = fb.version;
+            fb.setSize(32, 32);
+            expect(fb.version).not.toBe(version);
+        });
+
+        it("stays the same when setSize keeps the size", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16);
+            const version = fb.version;
+            fb.setSize(16, 16);
+            expect(fb.version).toBe(version);
+        });
+
+        it("changes on restore", () => {
+            const gl = makeMockGl();
+            const fb = new Framebuffer(makeCtx(gl), 16, 16);
+            const version = fb.version;
+            fb.restore();
+            expect(fb.version).not.toBe(version);
+        });
+    });
 });

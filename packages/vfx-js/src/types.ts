@@ -903,8 +903,11 @@ export type EffectDrawOpts = {
     /**
      * Render target of the effect.
      * It renders to the Canvas if omitted (or `null`).
+     *
+     * Pass an array to write several targets in one draw.
+     * Element `i` is written by `layout(location = i) out` in the fragment shader.
      */
-    target?: EffectRenderTarget | null;
+    target?: EffectRenderTarget | readonly EffectRenderTarget[] | null;
 
     /**
      * Blend mode override. Default: `"premultiplied"` when drawing to

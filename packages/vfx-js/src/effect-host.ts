@@ -949,11 +949,16 @@ export class EffectHost {
             this.#mutCtx.vfxProps.glslVersion,
         );
 
+        // TODO: temporary until MRT draws land.
+        if (Array.isArray(opts.target)) {
+            throw new Error("[VFX-JS] not implemented");
+        }
+
         const ctxOutput = this.#mutCtx.target;
         const rawTarget =
             opts.target === undefined || opts.target === null
                 ? ctxOutput
-                : opts.target;
+                : (opts.target as EffectRenderTarget);
         // Writes to the stage's assigned target (explicit ctx.target, null,
         // or omitted) honor the chain-computed outputViewport. Writes to a
         // user-allocated RT get full-RT dims.
