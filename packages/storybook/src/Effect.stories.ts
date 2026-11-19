@@ -1824,6 +1824,8 @@ type HoloArgs = {
     ev: number;
     glare: number;
     wobble: boolean;
+    perspective: boolean;
+    msaa: boolean;
 };
 export const holo = presetStory<HoloArgs>(
     (a) =>
@@ -1833,6 +1835,8 @@ export const holo = presetStory<HoloArgs>(
             quality: a.quality,
             mask: a.mask,
             ink: a.ink,
+            perspective: a.perspective,
+            msaa: a.msaa,
             settings: {
                 "display.ev": a.ev,
                 "display.glare": a.glare,
@@ -1848,6 +1852,8 @@ export const holo = presetStory<HoloArgs>(
         ev: 0.5,
         glare: 0.03,
         wobble: true,
+        perspective: false,
+        msaa: false,
     },
     {
         material: {
@@ -1870,6 +1876,8 @@ export const holo = presetStory<HoloArgs>(
         ev: { control: { type: "range", min: -3, max: 3, step: 0.05 } },
         glare: { control: { type: "range", min: 0, max: 0.1, step: 0.005 } },
         wobble: { control: { type: "boolean" } },
+        perspective: { control: { type: "boolean" } },
+        msaa: { control: { type: "boolean" } },
     },
     { src: Logo, clock: false },
 );

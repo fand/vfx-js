@@ -89,6 +89,8 @@ await vfx.add(el, {
 - `sizeMm` is the real size of the element's largest side (the foil has a physical grain). Default: CSS size at 96 dpi.
 - `quality`: `"low"` for phones, `"medium"` (default) or `"high"`.
 - `ink` (0–1) tints the foil with the element's colours, like a translucent ink.
+- `perspective: true` draws the card tilted in 3D, as holo.spot does. The output grows by about 21 % on each side. Default `false`: the element stays in place and only its shading tilts.
+- `msaa: true` turns on 4× multisampling of the card. Use it with `perspective`, where it smooths the card's outline; it costs about 5× the card target's memory.
 - Use `setParams({ settings: { ... } })` to change values live; it merges `settings` by id.
 
 Live demos: https://amagi.dev/vfx-js/storybook

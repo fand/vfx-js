@@ -238,9 +238,15 @@ The per-pixel residual of the glints and shard edges matches holospot's card sit
 grid (220.5 px wide, centred): high-frequency detail sampled at shifted positions. An earlier version of this table
 blamed MSAA; the actual cause was a one-pixel crop misalignment in the comparison script plus this sub-pixel offset.
 
-The card target uses 4× MSAA in half float, as holospot's HDR target (core supports `samples: 4` since #277). The
-material pass is one full-screen quad, so MSAA changes nothing visible today (≤ 1/255, half-float rounding). It
-matters once the card is drawn as tilted geometry (a perspective mode), where its outline becomes triangle edges.
+Perspective mode (`perspective: true`) draws the card as geometry projected by holospot's camera (FOV 22°, the card
+at rest filling 70 % of the view, which is exactly the element's rect inside the grown output). At holo.spot's card
+pose (rx −20.5°, ry −25°) it matches holospot's tilted render: prism 1.5–1.9 per pixel (0.9 blurred), shatter
+2.7–2.9 (0.6 blurred). The element itself is mapped onto the card (print layer, mask, the base layer of the luma
+mask), and the glare spills into the grown output.
+
+`msaa: true` gives the card target 4× MSAA in half float, as holospot's HDR target (core `samples: 4`, #277). It
+smooths the card's outline in perspective mode. In flat mode the material pass is one full-screen quad with no
+triangle edges, so MSAA changes nothing there (≤ 1/255, half-float rounding); the flag defaults to `false`.
 
 Deviations found while porting:
 
@@ -248,5 +254,6 @@ Deviations found while porting:
   glare only sees visible foil.
 - Glare spill stays inside the element rect (no `outputRect` growth yet).
 - The environment is prefiltered with an importance-sampled GGX lobe per tile instead of three's PMREM.
+- Flat mode (the default) keeps the element in place and does not warp it; `perspective: true` is holospot's view.
 - The pose is this port's: spring toward rest pose + pointer tilt (`motion.tiltRange`), idle wobble as a slow
   Lissajous. holospot's site pose controller is not part of its kit.
