@@ -119,6 +119,8 @@ export type HoloSettingSpec = {
 
 /** Tone curve: Khronos PBR Neutral (hue-stable), AgX, or a plain clamp. */
 export type HoloTone = "neutral" | "agx" | "clamp";
+/** What the pointer does over the element. */
+export type HoloPointer = "tilt" | "light" | "flash" | "none";
 /** holo.spot's light rigs (`studio.preset`). */
 export type HoloLights =
     | "studio"
@@ -195,6 +197,12 @@ export type HoloParams = {
     bow: number | null;
     /** Rest pose in degrees: `x` turns the face to the right, `y` tips the top edge toward the viewer. `null`: look. */
     pose: HoloVec2 | null;
+    /**
+     * What the pointer does over the element (holo.spot `motion.pointer`): `"tilt"` tilts the card, `"light"` moves a
+     * flashlight over it (the card stays at its pose), `"flash"` puts the flashlight at the camera, `"none"` ignores the
+     * pointer. `null`: from the look (holo.spot's default is `"tilt"`).
+     */
+    pointer: HoloPointer | null;
     /** How far the pointer tilts the card, in degrees at the element's edge (holo.spot `motion.tiltRange`). `null`: 25. */
     tiltRange: number | null;
     /** Slow automatic tilt while the pointer is away, amplitude in degrees; 0 turns it off (holo.spot `motion.wobble`, `motion.wobbleAmp`). `null`: 14. */
@@ -223,6 +231,7 @@ const DEFAULT_PARAMS: HoloParams = {
     background: null,
     bow: null,
     pose: null,
+    pointer: null,
     tiltRange: null,
     wobble: null,
     msaa: false,
@@ -265,6 +274,9 @@ function typedSettings(p: HoloParams): Record<string, ParamValue> {
     }
     if (p.pose && fin(p.pose.x) && fin(p.pose.y)) {
         o["motion.pose"] = { x: p.pose.x, y: p.pose.y };
+    }
+    if (p.pointer) {
+        o["motion.pointer"] = p.pointer;
     }
     if (fin(p.tiltRange)) {
         o["motion.tiltRange"] = Math.min(Math.max(p.tiltRange, 0), 89);

@@ -46,6 +46,7 @@ export {
     type HoloMask,
     type HoloMaterial,
     type HoloParams,
+    type HoloPointer,
     type HoloQuality,
     type HoloSettingSpec,
     type HoloSettings,
