@@ -98,7 +98,7 @@ export type HoloMaterial =
     | "vortex"
     | "emboss";
 /**
- * The artwork of the `emboss` material's foil logo: an image, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG
+ * The artwork of the `emboss` material's foil logo (`emboss.logo`): an image, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG
  * (fetched, so a cross-origin URL needs CORS; an `<img>` from another origin needs `crossOrigin`). Transparent areas
  * carry no foil; an opaque image is read by its contrast against its border. `""` is no logo.
  */
@@ -154,7 +154,9 @@ export type HoloSettingValue = number | boolean | string | HoloVec2;
  * removes an id given earlier, so the default (or the look's value) applies again.
  */
 export type HoloSettings = Readonly<{
-    [K in HoloSettingId]?: HoloSettingValue | null;
+    [K in HoloSettingId]?:
+        | (K extends "emboss.logo" ? HoloLogo : HoloSettingValue)
+        | null;
 }>;
 /**
  * What holo.spot's "Copy settings" button (`</>` in the Object tab) puts on the clipboard: the whole scene and
@@ -216,8 +218,6 @@ export type HoloParams = {
      * turns. Default `true`.
      */
     msaa: boolean;
-    /** `emboss`: the foil logo's artwork. `null`: the `emboss.logo` setting (a URL), else no logo. */
-    logo: HoloLogo | null;
 };
 
 /**
@@ -279,7 +279,6 @@ const DEFAULT_PARAMS: HoloParams = {
     flat: false,
     structureScale: 1,
     msaa: true,
-    logo: null,
 };
 
 const PARAM_KEYS = new Set(Object.keys(DEFAULT_PARAMS));
@@ -833,7 +832,7 @@ export class HoloEffect implements Effect {
      * The settings in effect, by holo.spot id: holo.spot's defaults with `settings` over them, checked (clamped to
      * the ranges, invalid values dropped). Useful to show a control's current value.
      */
-    resolvedSettings(): Readonly<Record<string, HoloSettingValue>> {
+    resolvedSettings(): Readonly<Record<string, HoloSettingValue | HoloLogo>> {
         if (this.#dirty || !this.#resolved) {
             this.#resolve();
         }
@@ -1120,9 +1119,9 @@ export class HoloEffect implements Effect {
         }
         if (this.params.material === "emboss") {
             this.#emboss ??= new EmbossAssets();
-            const lv = r.values["emboss.logo"];
+            // a URL, or an image given in settings (kept by reference)
             this.#emboss.setLogo(
-                this.params.logo ?? (typeof lv === "string" ? lv : null),
+                r.values["emboss.logo"] as unknown as HoloLogo | undefined,
             );
             this.#emboss.setPaper(paperKey(r.values));
         }

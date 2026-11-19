@@ -62,8 +62,17 @@ export interface Resolved {
     pose: { rx: number; ry: number };
 }
 
+// a plain { x, y } (an <img> has numeric x / y too)
+const isVec2 = (v: unknown): v is Vec2 =>
+    !!v &&
+    typeof v === "object" &&
+    Object.getPrototypeOf(v) === Object.prototype &&
+    typeof (v as Vec2).x === "number" &&
+    typeof (v as Vec2).y === "number";
+
+/** Copies a pad value; anything else (an `emboss.logo` image) is kept by reference. */
 function clone(v: ParamValue | { type: string }): ParamValue {
-    return typeof v === "object" ? ({ ...(v as Vec2) } as Vec2) : v;
+    return isVec2(v) ? { x: v.x, y: v.y } : (v as ParamValue);
 }
 
 const warned = new Set<string>();
@@ -137,6 +146,12 @@ function checked(spec: ParamSpec, v: ParamValue): ParamValue | undefined {
             return typeof d === "number" ? Number(v) : String(v);
         case "color":
             return hexColour(v) ?? bad("is not a #rgb / #rrggbb colour");
+        case "image":
+            // a URL, or an image / canvas / ImageBitmap (emboss.logo)
+            return typeof v === "string" ||
+                (typeof v === "object" && !isVec2(v))
+                ? v
+                : bad("is not a URL or an image");
         case "pad":
             return v &&
                 typeof v === "object" &&

@@ -269,3 +269,17 @@ test("flat view: the turned rig meets the card as the turned card meets the rig"
         }
     }
 });
+
+test("emboss.logo takes a URL or an image, kept by reference; none by default", () => {
+    expect(
+        new HoloEffect({ material: "emboss" }).resolvedSettings()[
+            "emboss.logo"
+        ],
+    ).toBe("");
+    const img = { width: 10, height: 10 } as unknown as HTMLCanvasElement;
+    const v = new HoloEffect({
+        material: "emboss",
+        settings: { "emboss.logo": img },
+    }).resolvedSettings();
+    expect(v["emboss.logo"]).toBe(img);
+});

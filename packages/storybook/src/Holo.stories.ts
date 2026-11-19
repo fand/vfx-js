@@ -295,7 +295,7 @@ type LookName = "(none)" | keyof typeof HoloEffect.looks;
 function addSettings(
     folder: FolderApi,
     specs: readonly HoloSettingSpec[],
-    v: Readonly<Record<string, HoloSettingValue>>,
+    v: ReturnType<HoloEffect["resolvedSettings"]>,
     effect: HoloEffect,
 ) {
     const state: Record<string, HoloSettingValue> = {};
@@ -312,11 +312,15 @@ function addSetting(
     folder: FolderApi,
     s: HoloSettingSpec,
     state: Record<string, HoloSettingValue>,
-    v: Readonly<Record<string, HoloSettingValue>>,
+    v: ReturnType<HoloEffect["resolvedSettings"]>,
     effect: HoloEffect,
 ) {
     {
-        const cur = v[s.id] ?? s.default;
+        // an image given as emboss.logo has no option in the select: show the default
+        const raw = v[s.id] ?? s.default;
+        const cur = (
+            typeof raw === "object" && s.kind === "image" ? s.default : raw
+        ) as HoloSettingValue;
         const key = s.id.split(".").slice(1).join(".");
         state[key] =
             typeof cur === "object"

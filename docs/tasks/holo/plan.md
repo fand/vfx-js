@@ -262,8 +262,8 @@ Deviations found while porting:
 
 `material: "emboss"` is holospot's paper card with one foil logo:
 
-- The logo's artwork is the `logo` param (an `<img>`, a canvas, an `ImageBitmap`, or a URL) or the `emboss.logo`
-  setting (a URL). Without one there is no logo. holo.spot's own marks are not shipped (the generator drops them, and
+- The logo's artwork is the `emboss.logo` setting: a URL as on holo.spot, or (the port's addition) an `<img>`, a
+  canvas or an `ImageBitmap`, kept by reference. Without one there is no logo. holo.spot's own marks are not shipped (the generator drops them, and
   `emboss.logo` from the starting points); a pasted holo.spot blob's `/logos/<name>.svg` fails to load and is listed
   in `errors`. holospot's pipeline builds its distance field and
   dome membrane (the kernels of `scene/logo.ts`, in an inline worker as in holospot); the base level travels as a
@@ -275,7 +275,7 @@ Deviations found while porting:
 - Not ported: the hologram sticker (`emboss.element` hologram: it needs the volume-hologram assets) and the
   multi-element document (`emboss.doc`).
 
-Parity (measured with holospot's rosette given as `logo`, plain look, pose (0, 0)): 0.9 per pixel, 0.2 blurred. Koru in gold foil at holo.spot's card
+Parity (measured with holospot's rosette given as `emboss.logo`, plain look, pose (0, 0)): 0.9 per pixel, 0.2 blurred. Koru in gold foil at holo.spot's card
 pose in perspective mode: 2.5–4.3 per pixel, 0.4–1.0 blurred.
 
 ## Looks
@@ -308,7 +308,7 @@ Typed params use holo.spot's names, units and ranges (clamped): `exposure` (`dis
 (`display.glare`, 0–0.1), `grain` (`grain.amount`, 0–0.6), `bow` (`card.bow`, 0–2), `pose` (`motion.pose`, ±35),
 `lens` (`dof.lens`, 24–200), `tiltRange` (`motion.tiltRange`, 5–35), `wobble` / `wobbleAmp` (`motion.wobble`,
 `motion.wobbleAmp` 0–25), `quality` (the kit's option, with `"auto"`). The looks are named as holospot's (`card`,
-`object`, `image`) and set holospot's quality. Port-only params: `view`, `mask`, `ink`, `sizeMm`, `logo`, `msaa`.
+`object`, `image`) and set holospot's quality. Port-only params: `view`, `mask`, `ink`, `sizeMm`, `msaa`.
 `structureScale` is holo.spot's `object.structureScale` (0.25–4, domain = size × scale, larger = finer).
 
 ## One source of truth for settings (review fixes)
