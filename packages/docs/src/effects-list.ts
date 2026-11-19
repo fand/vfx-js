@@ -217,7 +217,7 @@ export const effectDemos: EffectDemo[] = [
         media: "logo",
         create: () =>
             new HoloEffect({
-                material: "prism",
+                ...HoloEffect.looks.card,
                 perspective: 1,
                 msaa: true,
             }),

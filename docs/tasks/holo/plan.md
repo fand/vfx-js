@@ -125,8 +125,6 @@ type HoloMaterial = "prism" | "shatter" | "nebula" | "sparkle" | "vortex";
 
 type HoloParams = {
     material: HoloMaterial;
-    /** Look the values start from: "card" (default), "object" or "plain". */
-    look: HoloLook;
     /** holospot setting ids → values (material, studio.*, display.*, grain.*, card.*, motion.*). */
     settings: HoloSettings;
     /** Largest side of the element in mm. Default: CSS px × 0.2646. */
@@ -275,3 +273,10 @@ Deviations found while porting:
 
 Parity (rosette logo, plain look, pose (0, 0)): 0.9 per pixel, 0.2 blurred. Koru in gold foil at holo.spot's card
 pose in perspective mode: 2.5–4.3 per pixel, 0.4–1.0 blurred.
+
+## Looks
+
+The `look` param was removed: the effect starts from holo.spot's parameter defaults, and the looks holo.spot ships
+are params to spread (`HoloEffect.looks.card`, `.object`, `.paperCard`). Their scene values are shared by the five
+foils, so one object per look holds every foil's values; a test checks that spreading one resolves to exactly
+holospot's look.

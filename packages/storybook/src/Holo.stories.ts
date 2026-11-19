@@ -3,7 +3,6 @@ import type { VFX } from "@vfx-js/core";
 import {
     HoloEffect,
     type HoloLights,
-    type HoloLook,
     type HoloMask,
     type HoloMaterial,
     type HoloPointer,
@@ -68,12 +67,15 @@ holo.play = async ({ canvasElement }) => {
 };
 
 /**
- * Tweakpane for HoloEffect. The scene and material folders show the values in effect (the look's, unless set) and
- * are rebuilt when the material or the look changes.
+ * Tweakpane for HoloEffect. The scene and material folders show the values in effect and are rebuilt when the
+ * material, the look or the lights change. A look spreads one of `HoloEffect.looks` over a clean effect.
  */
 function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
     let pane: Pane | null = null;
-    const ui = { source: "Logo" as keyof typeof SOURCES };
+    const ui = {
+        source: "Logo" as keyof typeof SOURCES,
+        look: "(none)" as LookName,
+    };
 
     // rebuilding inside a control's own change event would dispose it mid-event: defer it
     const rebuild = () => setTimeout(build, 0);
@@ -97,7 +99,6 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         const fx = p.addFolder({ title: "Effect" });
         const general = {
             material: params.material,
-            look: params.look,
             quality: params.quality,
             mask: params.mask,
             perspective: params.perspective,
@@ -112,12 +113,16 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
                 rebuild();
             },
         );
-        fx.addBinding(general, "look", {
-            options: opts<HoloLook>(["card", "object", "plain"]),
+        fx.addBinding(ui, "look", {
+            options: opts<LookName>(["(none)", "card", "object", "paperCard"]),
         }).on("change", (ev) => {
-            // a new look starts clean: what was set over the previous one goes
-            effect.setParams({ look: ev.value as HoloLook, ...CLEAR_SCENE });
+            // a look starts clean: what was set before goes, then HoloEffect.looks.<name> is spread over it
+            const look = ev.value as LookName;
             effect.params.settings = {};
+            effect.setParams({
+                ...CLEAR_SCENE,
+                ...(look === "(none)" ? {} : HoloEffect.looks[look]),
+            });
             rebuild();
         });
         fx.addBinding(general, "quality", {
@@ -163,7 +168,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             glare: num("display.glare", 0.03) / 0.1,
             grain:
                 v["grain.on"] === false ? 0 : num("grain.amount", 0.18) / 0.6,
-            lights: params.lights ?? "(look)",
+            lights: params.lights ?? "(default)",
             background:
                 bg === "colour"
                     ? String(v["scene.bgColor"])
@@ -195,10 +200,11 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             (ev) => effect.setParams({ grain: ev.value }),
         );
         sc.addBinding(scene, "lights", {
-            options: opts(["(look)", ...LIGHTS]),
+            options: opts(["(default)", ...LIGHTS]),
         }).on("change", (ev) => {
             effect.setParams({
-                lights: ev.value === "(look)" ? null : (ev.value as HoloLights),
+                lights:
+                    ev.value === "(default)" ? null : (ev.value as HoloLights),
             });
             rebuild(); // the single lights below follow the rig
         });
@@ -228,7 +234,9 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             "change",
             (ev) => effect.setParams({ wobble: ev.value }),
         );
-        sc.addButton({ title: "Reset scene to the look" }).on("click", () => {
+        sc.addButton({ title: "Reset scene" }).on("click", () => {
+            ui.look = "(none)";
+            effect.params.settings = {};
             effect.setParams(CLEAR_SCENE);
             rebuild();
         });
@@ -253,6 +261,8 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
     };
     build();
 }
+
+type LookName = "(none)" | keyof typeof HoloEffect.looks;
 
 const CLEAR_SCENE = {
     exposure: null,
