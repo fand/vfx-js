@@ -125,6 +125,10 @@ class ParticlesEffect implements Effect {
         };
         this.#pos = ctx.createRenderTarget(opts);
         this.#vel = ctx.createRenderTarget(opts);
+        // A restored context has empty targets, so place the particles again.
+        ctx.onContextRestored(() => {
+            this.#frame = 0;
+        });
     }
 
     // Whole fixed steps, so the motion is the same at any frame rate.
