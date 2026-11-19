@@ -1110,7 +1110,10 @@ export class EffectHost {
         const depthIndices = resolvers.flatMap((r, i) =>
             r.getDepthTexture ? [i] : [],
         );
-        if (depthIndices.length > 1) {
+        // Only a draw that uses depth leaves the other depth buffers stale.
+        const depthTest = opts.depthTest ?? false;
+        const usesDepth = depthTest || (opts.depthWrite ?? depthTest);
+        if (depthIndices.length > 1 && usesDepth) {
             this.#warnOnce(
                 "depths",
                 "[VFX-JS] ctx.draw() got several targets with depth; using the first one's depth.",

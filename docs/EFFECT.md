@@ -234,8 +234,8 @@ ctx.draw({
   pixels.
 - To write fewer targets, draw with a shorter array.
 - One `blend` applies to every target. The default is `"none"`.
-- If several targets have `depth: true`, the first one's depth is used,
-  with a warning.
+- If several targets have `depth: true`, the first one's depth is used.
+  A draw that uses depth warns about it.
 
 If one of these rules breaks, the draw warns once and is skipped:
 

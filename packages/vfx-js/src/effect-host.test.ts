@@ -2235,6 +2235,27 @@ describe("EffectHost.draw with several targets", () => {
             expect(drawCount()).toBe(2);
         });
 
+        it("several depth targets without depth options → no warning", () => {
+            const { host, warn } = setup();
+            const target = [
+                host.ctx.createRenderTarget({ depth: true }),
+                host.ctx.createRenderTarget({ depth: true }),
+            ];
+            host.ctx.draw({ frag: FRAG, target });
+            expect(warn).not.toHaveBeenCalled();
+            expect(drawCount()).toBe(1);
+        });
+
+        it("several depth targets with depthWrite only → warns", () => {
+            const { host, warn } = setup();
+            const target = [
+                host.ctx.createRenderTarget({ depth: true }),
+                host.ctx.createRenderTarget({ depth: true }),
+            ];
+            host.ctx.draw({ frag: FRAG, target, depthWrite: true });
+            expect(warn).toHaveBeenCalledTimes(1);
+        });
+
         it("depthTest works with one depth target", () => {
             const { host, gl, m, warn } = setup();
             const target = [

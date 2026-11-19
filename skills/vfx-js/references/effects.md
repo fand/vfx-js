@@ -238,7 +238,7 @@ render(ctx) {
 - Declare one output per target. A target with no output holds undefined pixels.
 - To write fewer targets, draw with a shorter array. A draw can't skip a target in the middle.
 - One `blend` applies to every target. The default is `"none"`.
-- If several targets have `depth: true`, the first one's depth is used, with a warning.
+- If several targets have `depth: true`, the first one's depth is used. A draw that uses depth warns about it.
 - These rules apply. If one breaks, the draw warns once and is skipped:
   - All targets have the same size and the same `samples`.
   - No `null`, no `ctx.target`, and no target twice.
