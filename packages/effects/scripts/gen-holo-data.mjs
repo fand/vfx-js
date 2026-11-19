@@ -30,6 +30,7 @@ const keep = (p) => {
     const o = { id: p.id, kind: p.kind, default: p.default };
     if (p.min !== undefined) o.min = p.min;
     if (p.max !== undefined) o.max = p.max;
+    if (p.step !== undefined) o.step = p.step;
     if (p.options) o.options = p.options;
     return o;
 };

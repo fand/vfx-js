@@ -11,6 +11,7 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
+import { PARAM_SPECS } from "./_holo/data/params.js";
 import { EmbossAssets } from "./_holo/emboss-assets.js";
 import { HoloGlare } from "./_holo/glare.js";
 import outputFrag from "./_holo/glsl/output.js";
@@ -101,6 +102,21 @@ export type HoloQuality = "low" | "medium" | "high";
 export type HoloMask = "alpha" | "luma" | "none";
 /** A 2D value of a holo.spot setting (pads such as `studio.panel.dir`, `motion.pose`). */
 export type HoloVec2 = { x: number; y: number };
+/**
+ * A holo.spot setting this effect understands, for building controls: its id, the kind of control holo.spot shows
+ * (`slider`, `select`, `toggle`, `color` (`#rrggbb`), `pad` (`{ x, y }`) or `image` (a URL)), its default, and the
+ * range, step or options.
+ */
+export type HoloSettingSpec = {
+    readonly id: string;
+    readonly kind: "slider" | "select" | "toggle" | "color" | "pad" | "image";
+    readonly default: HoloSettingValue;
+    readonly min?: number;
+    readonly max?: number;
+    readonly step?: number;
+    readonly options?: readonly string[];
+};
+
 /** Tone curve: Khronos PBR Neutral (hue-stable), AgX, or a plain clamp. */
 export type HoloTone = "neutral" | "agx" | "clamp";
 /** holo.spot's light rigs (`studio.preset`). */
@@ -270,6 +286,7 @@ const MATERIALS: Record<HoloMaterialId, MaterialDef> = {
 };
 
 const MM_PER_CSS_PX = 25.4 / 96;
+const MATERIAL_PREFIXES = new Set(Object.keys(MATERIALS));
 /** holospot's framing: the card at rest fills this share of the view (camera FOV 22°). */
 const FRAMING = 0.7;
 const TAN_HALF_FOV = Math.tan((11 * Math.PI) / 180);
@@ -478,6 +495,36 @@ export class HoloEffect implements Effect {
 
     constructor(initial: Partial<HoloParams> = {}) {
         this.params = { ...DEFAULT_PARAMS, ...initial };
+    }
+
+    /**
+     * The holo.spot settings a material understands (its own ids, then the scene's), for building controls. Ids, ranges
+     * and meanings follow holospot's docs (`docs/materials/<material>.md`, `docs/scene-settings.md`).
+     */
+    static settingSpecs(material: HoloMaterial): readonly HoloSettingSpec[] {
+        const own = (id: string) => id.startsWith(`${material}.`);
+        const scene = (id: string) => !MATERIAL_PREFIXES.has(id.split(".")[0]);
+        const specs = PARAM_SPECS.filter((p) => own(p.id) || scene(p.id));
+        return [
+            ...specs.filter((p) => own(p.id)),
+            ...specs.filter((p) => !own(p.id)),
+        ] as readonly HoloSettingSpec[];
+    }
+
+    /**
+     * The settings in effect: the look's values, then `settings`, then the typed params (`exposure`, `glare`, …), by
+     * holo.spot id. Useful to show a control's current value.
+     */
+    resolvedSettings(): Readonly<Record<string, HoloSettingValue>> {
+        if (this.#dirty || !this.#resolved) {
+            this.#resolve();
+        }
+        const r = this.#resolved;
+        if (!r) {
+            return {};
+        }
+        // the rest pose in effect (the look's, or motion.pose / pose when given): x = ry, y = rx
+        return { ...r.values, "motion.pose": { x: r.pose.ry, y: r.pose.rx } };
     }
 
     setParams(updates: Partial<HoloParams>): void {

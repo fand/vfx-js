@@ -6,6 +6,7 @@ export interface ParamSpec {
     default: ParamValue | { type: string };
     min?: number;
     max?: number;
+    step?: number;
     options?: readonly string[];
 }
 

@@ -43,6 +43,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         },
         min: -1,
         max: 1,
+        step: 0.01,
     },
     {
         id: "studio.panel.width",
@@ -50,6 +51,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 14,
         min: 1,
         max: 80,
+        step: 1,
     },
     {
         id: "studio.panel.length",
@@ -57,6 +59,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 50,
         min: 1,
         max: 90,
+        step: 1,
     },
     {
         id: "studio.panel.radiance",
@@ -64,6 +67,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 4,
         min: 0,
         max: 50,
+        step: 0.1,
     },
     {
         id: "studio.panel.distance",
@@ -71,6 +75,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.9,
         min: 0.3,
         max: 3,
+        step: 0.05,
     },
     {
         id: "studio.panel.spd",
@@ -92,6 +97,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         },
         min: -1,
         max: 1,
+        step: 0.01,
     },
     {
         id: "studio.spotA.size",
@@ -99,6 +105,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.5,
         min: 0.2,
         max: 10,
+        step: 0.1,
     },
     {
         id: "studio.spotA.radiance",
@@ -106,6 +113,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1200,
         min: 0,
         max: 5000,
+        step: 10,
     },
     {
         id: "studio.spotA.distance",
@@ -113,6 +121,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 0.3,
         max: 3,
+        step: 0.05,
     },
     {
         id: "studio.spotA.spd",
@@ -134,6 +143,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         },
         min: -1,
         max: 1,
+        step: 0.01,
     },
     {
         id: "studio.spotB.size",
@@ -141,6 +151,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 2.5,
         min: 0.2,
         max: 10,
+        step: 0.1,
     },
     {
         id: "studio.spotB.radiance",
@@ -148,6 +159,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 600,
         min: 0,
         max: 5000,
+        step: 10,
     },
     {
         id: "studio.spotB.distance",
@@ -155,6 +167,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.2,
         min: 0.3,
         max: 3,
+        step: 0.05,
     },
     {
         id: "studio.spotB.spd",
@@ -176,6 +189,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         },
         min: -1,
         max: 1,
+        step: 0.01,
     },
     {
         id: "studio.spotC.size",
@@ -183,6 +197,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 0.2,
         max: 10,
+        step: 0.1,
     },
     {
         id: "studio.spotC.radiance",
@@ -190,6 +205,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1200,
         min: 0,
         max: 5000,
+        step: 10,
     },
     {
         id: "studio.spotC.distance",
@@ -197,6 +213,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 0.3,
         max: 3,
+        step: 0.05,
     },
     {
         id: "studio.spotC.spd",
@@ -210,6 +227,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 3,
         min: 0,
         max: 10,
+        step: 0.1,
     },
     {
         id: "studio.ambient.fill",
@@ -217,6 +235,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.4,
         min: 0,
         max: 3,
+        step: 0.05,
     },
     {
         id: "studio.ambient.scrim",
@@ -224,6 +243,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.4,
         min: 0,
         max: 2,
+        step: 0.05,
     },
     {
         id: "studio.ambient.cameraSide",
@@ -231,6 +251,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.004,
         min: 0,
         max: 0.1,
+        step: 0.001,
     },
     {
         id: "studio.ambient.cameraTexture",
@@ -238,6 +259,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 0,
         max: 1,
+        step: 0.05,
     },
     {
         id: "studio.ambient.backdrop",
@@ -245,6 +267,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "studio.ambient.rotation",
@@ -252,6 +275,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0,
         min: -180,
         max: 180,
+        step: 1,
     },
     {
         id: "studio.flash.size",
@@ -259,6 +283,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 8.5,
         min: 1,
         max: 20,
+        step: 0.5,
     },
     {
         id: "studio.flash.distance",
@@ -266,6 +291,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0.15,
         max: 1,
+        step: 0.01,
     },
     {
         id: "studio.flash.radiance",
@@ -273,6 +299,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1500,
         min: 0,
         max: 5000,
+        step: 10,
     },
     {
         id: "studio.flash.spd",
@@ -286,6 +313,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.5,
         min: -3,
         max: 3,
+        step: 0.1,
     },
     {
         id: "display.tone",
@@ -299,6 +327,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.03,
         min: 0,
         max: 0.1,
+        step: 0.005,
     },
     {
         id: "display.glareRadius",
@@ -306,6 +335,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 8,
         min: 2,
         max: 32,
+        step: 1,
     },
     {
         id: "grain.on",
@@ -318,6 +348,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.18,
         min: 0,
         max: 0.6,
+        step: 0.005,
     },
     {
         id: "grain.size",
@@ -325,6 +356,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 1,
         max: 4,
+        step: 0.25,
     },
     {
         id: "grain.animated",
@@ -348,6 +380,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.6,
         min: 0,
         max: 2,
+        step: 0.05,
     },
     {
         id: "card.bowAxis",
@@ -367,6 +400,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.17,
         min: 0.15,
         max: 2,
+        step: 0.01,
     },
     {
         id: "card.embossHeight",
@@ -374,6 +408,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.5,
         min: 0,
         max: 15,
+        step: 0.5,
     },
     {
         id: "card.embossLayer",
@@ -387,6 +422,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.16,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "motion.pointer",
@@ -400,6 +436,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 25,
         min: 5,
         max: 35,
+        step: 1,
     },
     {
         id: "motion.pose",
@@ -410,6 +447,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         },
         min: -35,
         max: 35,
+        step: 0.5,
     },
     {
         id: "motion.wobble",
@@ -422,6 +460,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 14,
         min: 0,
         max: 25,
+        step: 0.5,
     },
     {
         id: "prism.pitch",
@@ -429,6 +468,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1000,
         min: 500,
         max: 2000,
+        step: 5,
     },
     {
         id: "prism.grooveAngle",
@@ -436,6 +476,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 120,
         min: 0,
         max: 180,
+        step: 1,
     },
     {
         id: "prism.pattern",
@@ -449,6 +490,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 50,
         min: 0,
         max: 200,
+        step: 1,
     },
     {
         id: "prism.coverage",
@@ -456,6 +498,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "prism.fan",
@@ -463,6 +506,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 7,
         min: 0,
         max: 20,
+        step: 0.1,
     },
     {
         id: "prism.sigTheta",
@@ -470,6 +514,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0,
         max: 5,
+        step: 0.05,
     },
     {
         id: "prism.sigPitch",
@@ -477,6 +522,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.5,
         min: 0,
         max: 3,
+        step: 0.05,
     },
     {
         id: "prism.nc",
@@ -484,6 +530,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.5,
         min: 1.4,
         max: 1.7,
+        step: 0.01,
     },
     {
         id: "prism.roughness",
@@ -491,6 +538,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.2,
         min: 0.05,
         max: 3,
+        step: 0.05,
     },
     {
         id: "prism.tint",
@@ -504,6 +552,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 505,
         min: 400,
         max: 700,
+        step: 1,
     },
     {
         id: "prism.tintWidth",
@@ -511,6 +560,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 35,
         min: 5,
         max: 150,
+        step: 1,
     },
     {
         id: "prism.tintFloor",
@@ -518,6 +568,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.06,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "prism.waviness",
@@ -525,6 +576,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "prism.coatAlpha",
@@ -532,6 +584,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.04,
         min: 0.01,
         max: 0.5,
+        step: 0.005,
     },
     {
         id: "prism.orangePeel",
@@ -539,6 +592,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.6,
         min: 0,
         max: 2,
+        step: 0.05,
     },
     {
         id: "prism.seed",
@@ -546,6 +600,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 1,
         max: 999,
+        step: 1,
     },
     {
         id: "shatter.size",
@@ -553,6 +608,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 2.5,
         min: 0.5,
         max: 8,
+        step: 0.1,
     },
     {
         id: "shatter.jitter",
@@ -560,6 +616,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.9,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "shatter.chords",
@@ -567,6 +624,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.8,
         min: 0,
         max: 3,
+        step: 0.1,
     },
     {
         id: "shatter.orientK",
@@ -574,6 +632,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0,
         min: 0,
         max: 24,
+        step: 1,
     },
     {
         id: "shatter.tilt",
@@ -581,6 +640,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 0,
         max: 6,
+        step: 0.05,
     },
     {
         id: "shatter.fan",
@@ -588,6 +648,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 5,
         min: 0,
         max: 15,
+        step: 0.1,
     },
     {
         id: "shatter.pitchA",
@@ -595,6 +656,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1150,
         min: 500,
         max: 2000,
+        step: 5,
     },
     {
         id: "shatter.pitchB",
@@ -602,6 +664,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1080,
         min: 500,
         max: 2000,
+        step: 5,
     },
     {
         id: "shatter.pitchC",
@@ -609,6 +672,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 870,
         min: 500,
         max: 2000,
+        step: 5,
     },
     {
         id: "shatter.depth",
@@ -616,6 +680,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 95,
         min: 0,
         max: 200,
+        step: 1,
     },
     {
         id: "shatter.coverage",
@@ -623,6 +688,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.7,
         min: 0.2,
         max: 1,
+        step: 0.01,
     },
     {
         id: "shatter.chirp",
@@ -630,6 +696,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0,
         min: 0,
         max: 5,
+        step: 0.1,
     },
     {
         id: "shatter.ridgeH",
@@ -637,6 +704,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: -0.4,
         max: 0.4,
+        step: 0.01,
     },
     {
         id: "shatter.ridgeW",
@@ -644,6 +712,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 40,
         min: 10,
         max: 200,
+        step: 1,
     },
     {
         id: "shatter.creaseShare",
@@ -651,6 +720,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 50,
         min: 0,
         max: 100,
+        step: 1,
     },
     {
         id: "shatter.nc",
@@ -658,6 +728,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.5,
         min: 1.4,
         max: 1.7,
+        step: 0.01,
     },
     {
         id: "shatter.roughness",
@@ -665,6 +736,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.45,
         min: 0.05,
         max: 3,
+        step: 0.05,
     },
     {
         id: "shatter.tint",
@@ -678,6 +750,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 500,
         min: 400,
         max: 700,
+        step: 1,
     },
     {
         id: "shatter.tintWidth",
@@ -685,6 +758,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 70,
         min: 5,
         max: 150,
+        step: 1,
     },
     {
         id: "shatter.tintFloor",
@@ -692,6 +766,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.25,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "shatter.waviness",
@@ -699,6 +774,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "shatter.coatAlpha",
@@ -706,6 +782,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.05,
         min: 0.01,
         max: 0.5,
+        step: 0.005,
     },
     {
         id: "shatter.orangePeel",
@@ -713,6 +790,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.6,
         min: 0,
         max: 2,
+        step: 0.05,
     },
     {
         id: "shatter.seed",
@@ -720,6 +798,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 7,
         min: 1,
         max: 999,
+        step: 1,
     },
     {
         id: "nebula.size",
@@ -727,6 +806,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 200,
         min: 50,
         max: 400,
+        step: 5,
     },
     {
         id: "nebula.shape",
@@ -740,6 +820,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 2,
         min: 1,
         max: 3,
+        step: 1,
     },
     {
         id: "nebula.tilt",
@@ -747,6 +828,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 4.6,
         min: 0,
         max: 20,
+        step: 0.1,
     },
     {
         id: "nebula.curv",
@@ -754,6 +836,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.4,
         min: 0.05,
         max: 3,
+        step: 0.05,
     },
     {
         id: "nebula.coverage",
@@ -761,6 +844,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.65,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "nebula.pitchMin",
@@ -768,6 +852,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 665,
         min: 400,
         max: 2000,
+        step: 5,
     },
     {
         id: "nebula.pitchMax",
@@ -775,6 +860,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 740,
         min: 400,
         max: 2000,
+        step: 5,
     },
     {
         id: "nebula.depth",
@@ -782,6 +868,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 100,
         min: 0,
         max: 200,
+        step: 1,
     },
     {
         id: "nebula.starSize",
@@ -789,6 +876,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 600,
         min: 150,
         max: 1500,
+        step: 10,
     },
     {
         id: "nebula.starDensity",
@@ -796,6 +884,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 3,
         min: 0,
         max: 30,
+        step: 0.5,
     },
     {
         id: "nebula.baseColor",
@@ -808,6 +897,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.5,
         min: 1.4,
         max: 1.7,
+        step: 0.01,
     },
     {
         id: "nebula.tint",
@@ -821,6 +911,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 525,
         min: 400,
         max: 700,
+        step: 1,
     },
     {
         id: "nebula.tintWidth",
@@ -828,6 +919,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 30,
         min: 5,
         max: 150,
+        step: 1,
     },
     {
         id: "nebula.tintFloor",
@@ -835,6 +927,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.15,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "nebula.waviness",
@@ -842,6 +935,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "nebula.coatAlpha",
@@ -849,6 +943,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.06,
         min: 0.01,
         max: 0.5,
+        step: 0.005,
     },
     {
         id: "nebula.orangePeel",
@@ -856,6 +951,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.6,
         min: 0,
         max: 2,
+        step: 0.05,
     },
     {
         id: "nebula.seed",
@@ -863,6 +959,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 3,
         min: 1,
         max: 999,
+        step: 1,
     },
     {
         id: "sparkle.size",
@@ -870,6 +967,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 470,
         min: 100,
         max: 1500,
+        step: 5,
     },
     {
         id: "sparkle.coverage",
@@ -877,6 +975,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.4,
         min: 0.1,
         max: 0.8,
+        step: 0.01,
     },
     {
         id: "sparkle.irregularity",
@@ -884,6 +983,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.8,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "sparkle.tilt",
@@ -891,6 +991,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0,
         max: 5,
+        step: 0.05,
     },
     {
         id: "sparkle.dome",
@@ -898,6 +999,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0.05,
         max: 2,
+        step: 0.05,
     },
     {
         id: "sparkle.orientJitter",
@@ -905,6 +1007,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 2,
         min: 0,
         max: 15,
+        step: 0.1,
     },
     {
         id: "sparkle.pitch",
@@ -912,6 +1015,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1000,
         min: 500,
         max: 2000,
+        step: 5,
     },
     {
         id: "sparkle.grooveAngle",
@@ -919,6 +1023,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 120,
         min: 0,
         max: 180,
+        step: 1,
     },
     {
         id: "sparkle.depth",
@@ -926,6 +1031,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 55,
         min: 0,
         max: 200,
+        step: 1,
     },
     {
         id: "sparkle.fan",
@@ -933,6 +1039,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 12,
         min: 0,
         max: 30,
+        step: 0.1,
     },
     {
         id: "sparkle.pitchJitter",
@@ -940,6 +1047,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.5,
         min: 0,
         max: 5,
+        step: 0.05,
     },
     {
         id: "sparkle.speckShare",
@@ -947,6 +1055,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 9,
         min: 0,
         max: 30,
+        step: 0.5,
     },
     {
         id: "sparkle.speckType",
@@ -960,6 +1069,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 460,
         min: 420,
         max: 520,
+        step: 1,
     },
     {
         id: "sparkle.speckDyeWidth",
@@ -967,6 +1077,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 25,
         min: 10,
         max: 60,
+        step: 1,
     },
     {
         id: "sparkle.speckDyeFloor",
@@ -974,6 +1085,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "sparkle.speckPitch",
@@ -981,6 +1093,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 700,
         min: 400,
         max: 2000,
+        step: 5,
     },
     {
         id: "sparkle.speckSize",
@@ -988,6 +1101,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.9,
         min: 0.3,
         max: 1,
+        step: 0.01,
     },
     {
         id: "sparkle.matte",
@@ -995,6 +1109,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 8,
         min: 1,
         max: 20,
+        step: 0.1,
     },
     {
         id: "sparkle.sandSize",
@@ -1002,6 +1117,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.5,
         min: 0.15,
         max: 1,
+        step: 0.01,
     },
     {
         id: "sparkle.sandTilt",
@@ -1009,6 +1125,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 5,
         min: 0,
         max: 8,
+        step: 0.1,
     },
     {
         id: "sparkle.hazeShare",
@@ -1016,6 +1133,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "sparkle.hazeDepth",
@@ -1023,6 +1141,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 60,
         min: 0,
         max: 200,
+        step: 1,
     },
     {
         id: "sparkle.hazeRoughness",
@@ -1030,6 +1149,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.5,
         min: 0.05,
         max: 6,
+        step: 0.05,
     },
     {
         id: "sparkle.hazeFan",
@@ -1037,6 +1157,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 10,
         min: 0,
         max: 20,
+        step: 0.1,
     },
     {
         id: "sparkle.nc",
@@ -1044,6 +1165,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.5,
         min: 1.4,
         max: 1.7,
+        step: 0.01,
     },
     {
         id: "sparkle.tint",
@@ -1057,6 +1179,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 600,
         min: 400,
         max: 700,
+        step: 1,
     },
     {
         id: "sparkle.tintWidth",
@@ -1064,6 +1187,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 90,
         min: 5,
         max: 150,
+        step: 1,
     },
     {
         id: "sparkle.tintFloor",
@@ -1071,6 +1195,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.5,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "sparkle.waviness",
@@ -1078,6 +1203,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "sparkle.coatAlpha",
@@ -1085,6 +1211,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.05,
         min: 0.01,
         max: 0.5,
+        step: 0.005,
     },
     {
         id: "sparkle.orangePeel",
@@ -1092,6 +1219,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.6,
         min: 0,
         max: 2,
+        step: 0.05,
     },
     {
         id: "sparkle.seed",
@@ -1099,6 +1227,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 5,
         min: 1,
         max: 999,
+        step: 1,
     },
     {
         id: "vortex.pitch",
@@ -1106,6 +1235,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1250,
         min: 600,
         max: 2000,
+        step: 5,
     },
     {
         id: "vortex.swirl",
@@ -1113,6 +1243,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 15,
         min: 0,
         max: 60,
+        step: 0.5,
     },
     {
         id: "vortex.handedness",
@@ -1129,6 +1260,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         },
         min: -1,
         max: 1,
+        step: 0.01,
     },
     {
         id: "vortex.depth",
@@ -1136,6 +1268,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 45,
         min: 0,
         max: 200,
+        step: 1,
     },
     {
         id: "vortex.fan",
@@ -1143,6 +1276,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.5,
         min: 0,
         max: 10,
+        step: 0.1,
     },
     {
         id: "vortex.bands",
@@ -1150,6 +1284,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 24,
         min: 0,
         max: 96,
+        step: 1,
     },
     {
         id: "vortex.contrast",
@@ -1157,6 +1292,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.45,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "vortex.nc",
@@ -1164,6 +1300,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1.5,
         min: 1.4,
         max: 1.7,
+        step: 0.01,
     },
     {
         id: "vortex.roughness",
@@ -1171,6 +1308,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.25,
         min: 0.05,
         max: 3,
+        step: 0.05,
     },
     {
         id: "vortex.tint",
@@ -1184,6 +1322,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 500,
         min: 400,
         max: 700,
+        step: 1,
     },
     {
         id: "vortex.tintWidth",
@@ -1191,6 +1330,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 50,
         min: 5,
         max: 150,
+        step: 1,
     },
     {
         id: "vortex.tintFloor",
@@ -1198,6 +1338,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "vortex.waviness",
@@ -1205,6 +1346,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.3,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "vortex.coatAlpha",
@@ -1212,6 +1354,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.045,
         min: 0.01,
         max: 0.5,
+        step: 0.005,
     },
     {
         id: "vortex.orangePeel",
@@ -1219,6 +1362,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.6,
         min: 0,
         max: 2,
+        step: 0.05,
     },
     {
         id: "vortex.seed",
@@ -1226,6 +1370,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 9,
         min: 1,
         max: 999,
+        step: 1,
     },
     {
         id: "emboss.logo",
@@ -1245,6 +1390,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 31.5,
         min: -12.5,
         max: 75.5,
+        step: 0.1,
     },
     {
         id: "emboss.y",
@@ -1252,6 +1398,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 44,
         min: 0,
         max: 88,
+        step: 0.1,
     },
     {
         id: "emboss.width",
@@ -1259,6 +1406,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 36,
         min: 3,
         max: 63,
+        step: 0.1,
     },
     {
         id: "emboss.rotation",
@@ -1266,6 +1414,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0,
         min: -180,
         max: 180,
+        step: 0.5,
     },
     {
         id: "emboss.height",
@@ -1273,6 +1422,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 450,
         min: 0,
         max: 1000,
+        step: 5,
     },
     {
         id: "emboss.shoulder",
@@ -1280,6 +1430,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.6,
         min: 0.05,
         max: 2,
+        step: 0.01,
     },
     {
         id: "emboss.profile",
@@ -1293,6 +1444,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.4,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.foil",
@@ -1306,6 +1458,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1000,
         min: 500,
         max: 2000,
+        step: 5,
     },
     {
         id: "emboss.grooveAngle",
@@ -1313,6 +1466,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 120,
         min: 0,
         max: 180,
+        step: 1,
     },
     {
         id: "emboss.foilCoverage",
@@ -1320,6 +1474,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.85,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.edgeBreakup",
@@ -1327,6 +1482,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.35,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.showThrough",
@@ -1334,6 +1490,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.25,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.gloss",
@@ -1341,6 +1498,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.8,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.sparkleSize",
@@ -1348,6 +1506,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 160,
         min: 40,
         max: 600,
+        step: 5,
     },
     {
         id: "emboss.foilBump",
@@ -1355,6 +1514,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.25,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.printInk",
@@ -1362,6 +1522,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.paperColour",
@@ -1380,6 +1541,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 0,
         max: 2,
+        step: 0.01,
     },
     {
         id: "emboss.fibreAmount",
@@ -1387,6 +1549,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.55,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.fibreScale",
@@ -1394,6 +1557,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 1,
         min: 0.5,
         max: 2,
+        step: 0.01,
     },
     {
         id: "emboss.tooth",
@@ -1401,6 +1565,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 7,
         min: 0,
         max: 30,
+        step: 0.5,
     },
     {
         id: "emboss.formation",
@@ -1408,6 +1573,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.45,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.roughness",
@@ -1415,6 +1581,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.75,
         min: 0.2,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.sheen",
@@ -1422,6 +1589,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.35,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.translucency",
@@ -1429,6 +1597,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.35,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.waviness",
@@ -1436,6 +1605,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.12,
         min: 0,
         max: 1,
+        step: 0.01,
     },
     {
         id: "emboss.paperBump",
@@ -1448,6 +1618,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 0.6,
         min: -2,
         max: 2,
+        step: 0.1,
     },
     {
         id: "emboss.seed",
@@ -1455,5 +1626,6 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: 7,
         min: 1,
         max: 999,
+        step: 1,
     },
 ];

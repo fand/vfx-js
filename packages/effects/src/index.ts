@@ -47,6 +47,7 @@ export {
     type HoloMaterial,
     type HoloParams,
     type HoloQuality,
+    type HoloSettingSpec,
     type HoloSettings,
     type HoloSettingValue,
     type HoloTone,
