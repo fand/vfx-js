@@ -308,3 +308,25 @@ Typed params use holo.spot's names, units and ranges (clamped): `exposure` (`dis
 `motion.wobbleAmp` 0–25), `quality` (the kit's option, with `"auto"`). The looks are named as holospot's (`card`,
 `object`, `image`) and set holospot's quality. Port-only params: `view`, `mask`, `ink`, `sizeMm`, `logo`, `msaa`.
 `structureScale` is holo.spot's `object.structureScale` (0.25–4, domain = size × scale, larger = finer).
+
+## One source of truth for settings (review fixes)
+
+- The scene params are shorthands: each writes its holo.spot id(s) into `settings` where it is given, so inputs apply
+  strictly in order (constructor arguments, then each `setParams`), later values winning whichever way they are
+  written. `null` removes an id. `effect.params` is read-only; `setParams(input, { resetSettings: true })` starts the
+  settings over.
+- A light rig (`studio.preset`) and a material preset select (`emboss.stock`) write their values where they are
+  given, as holospot applies a preset over the look: ids given later win, earlier ones lose.
+- A Copy settings blob is normalised on input: its values replace the settings, its `material` applies unless
+  `material` is given with it, its `pose` becomes `motion.pose`, its `object.structureScale` the `structureScale`.
+  Settings given after it merge by id.
+- Values are checked against holo.spot's specs in one place (`resolveSettings`): numbers and pads clamped, options,
+  booleans and colours (holospot's `hexColour`, `#rgb` too) checked; each problem warns once. Unknown ids warn;
+  holo.spot ids the port does not render (`NOT_PORTED`, generated) warn when set away from holospot's default; the
+  ids holospot's kit ignores too are silent.
+- `settings` is typed by the generated `HoloSettingId`; a blob is `HoloCopyBlob`.
+- Renamed where holospot uses the name for something else: `lights` → `studio` (holospot's `lights` is the rig
+  mode), `presets` → `startingPoints`, `view` → `flat: boolean` (holospot's `View` is the orbit).
+- `emboss` ignores `mask`: the paper is the whole card.
+- `effect.ready` resolves after a frame drawn with the emboss logo and paper in place; `effect.errors` lists loading
+  errors (a logo URL without CORS, …), which also warn.
