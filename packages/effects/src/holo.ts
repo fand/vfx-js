@@ -129,15 +129,25 @@ export type HoloParams = {
     quality: HoloQuality;
     /** Where the foil is. */
     mask: HoloMask;
-    /** How much the element's colour tints the foil as a translucent ink, in [0, 1]. */
+    /**
+     * How much the element's colour tints the foil as a translucent ink, in [0, 1]. 0: bare foil. All materials but
+     * `emboss`, whose element is printed on the paper instead (`emboss.printInk`).
+     */
     ink: number;
     /**
-     * Draw the card in perspective, tilted with the pose as holospot draws its card mesh. The output grows by about
-     * 21 % of the element's size on each side, so the tilted card and its glare fit (holospot's framing: the card at
-     * rest fills 70 % of the view, exactly the element's rect). `false` keeps the element in place and only shades it as
-     * tilted.
+     * How much the card visibly tilts, in [0, 1]. The shading always follows the full pose; this only sets how far the
+     * drawn card turns with it. 0: the element stays in place (flat). 1: the card turns as far as it is lit, seen by
+     * holospot's camera. Above 0 the output grows by about 21 % of the element's size on each side, so the tilted card
+     * and its glare fit (holospot's framing: the card at rest fills 70 % of the view, exactly the element's rect).
      */
-    perspective: boolean;
+    perspective: number;
+    /**
+     * Density of the foil's structure: shards (`shatter`), flakes (`nebula`), dots (`sparkle`), the paper's tooth and
+     * the logo (`emboss`), the relief waves. Above 1 smaller, below 1 larger (holo.spot's "structure scale"). The
+     * gratings keep their pitch: the colours do not change. Each material also has its own size settings
+     * (`shatter.size`, `nebula.size`, `sparkle.size`, …).
+     */
+    structureScale: number;
     /** 4× multisampling of the card target (half float, as holospot). Smooths the card's outline in perspective mode. */
     msaa: boolean;
     /** `emboss`: the foil logo's artwork. `null`: the `emboss.logo` setting, else holo.spot's rosette. */
@@ -152,7 +162,8 @@ const DEFAULT_PARAMS: HoloParams = {
     quality: "medium",
     mask: "alpha",
     ink: 0,
-    perspective: false,
+    perspective: 0,
+    structureScale: 1,
     msaa: false,
     logo: null,
 };
@@ -361,6 +372,10 @@ export class HoloEffect implements Effect {
     #prevCardRot = new Float32Array(9);
     #camPos: Vec3 = [0, 0, 0.4];
     #cardSizeMm: [number, number] = [63, 88];
+    /** The card's surface domain [mm]: its size × `structureScale` (the structure's frame, not the geometry's). */
+    #domainMm: [number, number] = [63, 88];
+    /** The drawn card's rotation: the pose scaled by `perspective`. */
+    #visRot = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
     #eta: { ord: Float32Array; mir: Float32Array; env: Float32Array } | null =
         null;
     #matUniforms: Uniforms = {};
@@ -453,7 +468,7 @@ export class HoloEffect implements Effect {
     outputRect(
         dims: EffectDims,
     ): readonly [number, number, number, number] | undefined {
-        if (!this.params.perspective) {
+        if (!(this.params.perspective > 0)) {
             return undefined;
         }
         const [w, h] = dims.elementPixel;
@@ -564,12 +579,17 @@ export class HoloEffect implements Effect {
         const largest = this.params.sizeMm ?? Math.max(w, h) * MM_PER_CSS_PX;
         const k = largest / Math.max(w, h);
         this.#cardSizeMm = [w * k, h * k];
+        const ss = Math.min(
+            Math.max(this.params.structureScale || 1, 0.05),
+            20,
+        );
+        this.#domainMm = [w * k * ss, h * k * ss];
         let D = framingDistance(
             w / h,
             this.#cardSizeMm[0] / 2000,
             this.#cardSizeMm[1] / 2000,
         );
-        if (this.params.perspective) {
+        if (this.params.perspective > 0) {
             // the card at rest maps exactly onto the element inside the grown output
             const [mx, my] = perspectiveMargin(pw, ph);
             const oh = ph + 2 * my;
@@ -614,6 +634,11 @@ export class HoloEffect implements Effect {
             this.#prevLightPos.set(this.#lights.pos);
         }
         colMajor(rot, this.#cardRot);
+        const pv = Math.min(Math.max(this.params.perspective || 0, 0), 1);
+        colMajor(
+            eulerXYZ(pv * this.#pose.rx, pv * this.#pose.ry, 0),
+            this.#visRot,
+        );
 
         const pad = over ? { x: nx, y: ny } : { x: 0, y: 0 };
         computeLights(
@@ -730,11 +755,13 @@ export class HoloEffect implements Effect {
 
         const emb =
             this.params.material === "emboss" ? this.#embossUniforms(ctx) : {};
-        const persp = this.params.perspective;
+        const persp = this.params.perspective > 0;
         const card = {
             uCardRot: this.#cardRot,
             uPrevCardRot: this.#prevCardRot,
-            uCardSizeMm: this.#cardSizeMm,
+            uCardSizeMm: this.#domainMm,
+            uCardWorldMm: this.#cardSizeMm,
+            uVisRot: this.#visRot,
             uViewProj: this.#viewProj,
             uPersp: persp ? 1 : 0,
         };

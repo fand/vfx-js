@@ -186,15 +186,17 @@ export function assembleMaterial(
 }
 
 /**
- * card.vert for the element: a flat card of uCardSizeMm centred at the origin, rotated by uCardRot. Flat mode
- * (uPersp 0): the card fills the target unwarped, only its shading follows the pose. Perspective mode (uPersp 1): the
- * card is projected by holospot's camera (uViewProj), like the card mesh holospot draws.
+ * card.vert for the element: a flat card of uCardWorldMm centred at the origin, rotated by uCardRot for its shading.
+ * Flat mode (uPersp 0): the card fills the target unwarped. Perspective mode (uPersp 1): the card turned by uVisRot
+ * (the pose × `perspective`) is projected by holospot's camera (uViewProj), like the card mesh holospot draws.
+ * uCardSizeMm is the surface's domain (size × structure scale) the fragment shaders lay their structure out in.
  */
 export const CARD_VERT = `#version 300 es
 precision highp float;
 in vec3 position;
 uniform mat3 uCardRot, uPrevCardRot;
-uniform vec2 uCardSizeMm;
+uniform vec2 uCardWorldMm;
+uniform mat3 uVisRot;
 uniform mat4 uViewProj;
 uniform int uPersp;
 out vec3 vWorldPos; out vec3 vPrevWorldPos; out vec2 vUv; out vec3 vN; out vec3 vT; out vec3 vB;
@@ -202,14 +204,14 @@ out float vOcc;
 out vec2 vHoloUv;
 void main() {
   vec2 uv = position.xy * 0.5 + 0.5;
-  vec3 local = vec3((uv - 0.5) * uCardSizeMm * 0.001, 0.0);   // metres, card centre at the origin
+  vec3 local = vec3((uv - 0.5) * uCardWorldMm * 0.001, 0.0);   // metres, card centre at the origin
   vWorldPos = uCardRot * local;
   vPrevWorldPos = uPrevCardRot * local;
   vUv = uv;
   vN = uCardRot[2]; vT = uCardRot[0]; vB = uCardRot[1];
   vOcc = 0.0;
   vHoloUv = uv;
-  gl_Position = uPersp == 1 ? uViewProj * vec4(vWorldPos, 1.0) : vec4(position.xy, 0.0, 1.0);
+  gl_Position = uPersp == 1 ? uViewProj * vec4(uVisRot * local, 1.0) : vec4(position.xy, 0.0, 1.0);
 }
 `;
 
