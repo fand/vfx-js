@@ -17,10 +17,12 @@ import {
     type GradientMapRepeat,
     HalftoneEffect,
     HoloEffect,
+    type HoloLights,
     type HoloLook,
     type HoloMask,
     type HoloMaterial,
     type HoloQuality,
+    type HoloTone,
     HueShiftEffect,
     JPEGGlitchEffect,
     MatrixEffect,
@@ -1815,6 +1817,7 @@ export const asciiTiles: StoryObj<{
     },
 };
 
+// Args left unset (undefined) take the look's value; set them in the controls to override it.
 type HoloArgs = {
     material: HoloMaterial;
     look: HoloLook;
@@ -1824,9 +1827,15 @@ type HoloArgs = {
     msaa: boolean;
     structureScale: number;
     ink: number;
-    tiltRange: number;
-    idleWobble: boolean;
-    grain: boolean;
+    exposure?: number;
+    tone?: HoloTone;
+    glare?: number;
+    grain?: number;
+    lights?: HoloLights;
+    background?: string;
+    bow?: number;
+    tiltRange?: number;
+    wobble?: number;
 };
 export const holo = presetStory<HoloArgs>(
     (a) =>
@@ -1839,12 +1848,15 @@ export const holo = presetStory<HoloArgs>(
             msaa: a.msaa,
             structureScale: a.structureScale,
             ink: a.ink,
-            // holo.spot setting ids; everything not given comes from the look
-            settings: {
-                "motion.tiltRange": a.tiltRange,
-                "motion.wobble": a.idleWobble,
-                ...(a.grain ? {} : { "grain.on": false }),
-            },
+            exposure: a.exposure ?? null,
+            tone: a.tone ?? null,
+            glare: a.glare ?? null,
+            grain: a.grain ?? null,
+            lights: a.lights ?? null,
+            background: a.background ?? null,
+            bow: a.bow ?? null,
+            tiltRange: a.tiltRange ?? null,
+            wobble: a.wobble ?? null,
         }),
     {
         material: "prism",
@@ -1855,9 +1867,6 @@ export const holo = presetStory<HoloArgs>(
         msaa: false,
         structureScale: 1,
         ink: 0,
-        tiltRange: 25,
-        idleWobble: true,
-        grain: true,
     },
     {
         material: {
@@ -1874,7 +1883,7 @@ export const holo = presetStory<HoloArgs>(
         },
         look: {
             description:
-                "Values holo.spot ships: lights, exposure, grain, rest pose and some material values (card: its holographic card; object: its 3D object; plain: parameter defaults)",
+                "Starting values holo.spot ships (card: its holographic card; object: its 3D object; plain: parameter defaults). The params below override them",
             control: { type: "select" },
             options: ["card", "object", "plain"],
         },
@@ -1891,7 +1900,7 @@ export const holo = presetStory<HoloArgs>(
         },
         perspective: {
             description:
-                "How much the drawn card turns with the pose (0: stays flat, 1: full 3D)",
+                "How far the drawn card turns with its tilt (0: stays flat, 1: full 3D)",
             control: { type: "range", min: 0, max: 1, step: 0.01 },
         },
         msaa: {
@@ -1901,27 +1910,62 @@ export const holo = presetStory<HoloArgs>(
         },
         structureScale: {
             description:
-                "Density of shards, flakes, dots and paper: above 1 smaller, below 1 larger",
-            control: { type: "range", min: 0.25, max: 4, step: 0.05 },
+                "Size of shards, flakes, dots and paper (smaller: finer; 1 = as designed)",
+            control: { type: "range", min: 0.1, max: 10, step: 0.05 },
         },
         ink: {
             description:
                 "How much the element's colours tint the foil (not emboss)",
             control: { type: "range", min: 0, max: 1, step: 0.01 },
         },
-        tiltRange: {
-            description: "Pointer tilt in degrees (motion.tiltRange)",
-            control: { type: "range", min: 5, max: 35, step: 1 },
+        exposure: {
+            description: "Exposure in EV (display.ev)",
+            control: { type: "range", min: -3, max: 3, step: 0.05 },
         },
-        idleWobble: {
-            description:
-                "Slow automatic tilt while the pointer is away (motion.wobble)",
-            control: { type: "boolean" },
+        tone: {
+            description: "Tone curve (display.tone)",
+            control: { type: "select" },
+            options: ["neutral", "agx", "clamp"],
+        },
+        glare: {
+            description: "Glow around bright points (display.glare × 10)",
+            control: { type: "range", min: 0, max: 1, step: 0.01 },
         },
         grain: {
+            description: "Film grain (grain.amount / 0.6); 0 turns it off",
+            control: { type: "range", min: 0, max: 1, step: 0.01 },
+        },
+        lights: {
+            description: "Light rig (studio.preset)",
+            control: { type: "select" },
+            options: [
+                "studio",
+                "spot",
+                "softbox",
+                "strip",
+                "dark",
+                "desk",
+                "office",
+                "raking",
+            ],
+        },
+        background: {
             description:
-                "holo.spot's film grain (grain.on). Off: no grain over the foil",
-            control: { type: "boolean" },
+                "The page the lighting adapts to: black, white or #rrggbb",
+            control: { type: "text" },
+        },
+        bow: {
+            description: "Card bow in mm (card.bow)",
+            control: { type: "range", min: 0, max: 2, step: 0.05 },
+        },
+        tiltRange: {
+            description: "Pointer tilt in degrees (motion.tiltRange)",
+            control: { type: "range", min: 0, max: 45, step: 1 },
+        },
+        wobble: {
+            description:
+                "Idle auto tilt amplitude in degrees; 0 off (motion.wobble)",
+            control: { type: "range", min: 0, max: 25, step: 0.5 },
         },
     },
     { src: Logo, clock: false },
