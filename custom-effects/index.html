@@ -50,7 +50,7 @@
     <body class="DocPage">
         <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
 
-<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.9ZiDRA5_.js"></script>
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.C-I4K2lq.js"></script>
         <header class="SiteHeader">
     <a class="SiteHeaderBrand" href="/vfx-js/">
         <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
@@ -89,7 +89,7 @@
 <script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
 
         <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
-        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.hgMzd4T5.js"></script>
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.Qu4AtjtI.js"></script>
         <!-- Back plays the slit scan reversed. -->
         <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
     
@@ -435,7 +435,7 @@
 <span class="line"><span style="color:#E1E4E8">    frag,                </span><span style="color:#6A737D">// GLSL ES 3.0 fragment shader</span></span>
 <span class="line"><span style="color:#E1E4E8">    vert,                </span><span style="color:#6A737D">// optional; the default gives uv, uvContent, uvSrc</span></span>
 <span class="line"><span style="color:#E1E4E8">    uniforms,            </span><span style="color:#6A737D">// numbers, arrays, textures, render targets</span></span>
-<span class="line"><span style="color:#E1E4E8">    target,              </span><span style="color:#6A737D">// ctx.target, or a render target</span></span>
+<span class="line"><span style="color:#E1E4E8">    target,              </span><span style="color:#6A737D">// ctx.target, a render target, or an array of them</span></span>
 <span class="line"><span style="color:#E1E4E8">    blend,               </span><span style="color:#6A737D">// "premultiplied" | "none" | "additive" | "normal"</span></span>
 <span class="line"><span style="color:#E1E4E8">    geometry,            </span><span style="color:#6A737D">// ctx.quad (default) or your own geometry</span></span>
 <span class="line"><span style="color:#E1E4E8">    swap,                </span><span style="color:#6A737D">// persistent targets: false keeps the same buffer</span></span>
@@ -567,6 +567,55 @@
             On a <code data-astro-cid-empkddct>persistent</code> target, depth does not carry over
             between frames, so clear it every frame with
             <code data-astro-cid-empkddct>ctx.clear(rt, { color: false })</code>.
+        </p>
+
+        <h3 data-astro-cid-empkddct>Multiple render targets</h3>
+        <p data-astro-cid-empkddct>
+            To write several targets in one draw, pass an array as
+            <code data-astro-cid-empkddct>target</code>. Target <code data-astro-cid-empkddct>i</code> gets the output declared
+            with <code data-astro-cid-empkddct>layout(location = i) out</code>. Use it when state
+            needs more than one vec4 per texel and the outputs share work, so
+            it runs once. For example, 3D particles keep position and age in
+            one target and velocity in another.
+        </p>
+        <figure class="CodeBlock" data-astro-cid-c6nuo4je>
+    <figcaption class="CodeBlockHead" data-astro-cid-c6nuo4je>
+        <span data-astro-cid-c6nuo4je>EffectContext</span>
+        <button class="CodeBlockCopy" type="button" data-astro-cid-c6nuo4je>Copy</button>
+    </figcaption>
+    <pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-astro-cid-c6nuo4je data-language="ts"><code><span class="line"><span style="color:#6A737D">// frag: layout(location = 0) out vec4 outPos; // xyz + age</span></span>
+<span class="line"><span style="color:#6A737D">//       layout(location = 1) out vec4 outVel; // xyz</span></span>
+<span class="line"><span style="color:#6A737D">// The shader computes the force once and writes both.</span></span>
+<span class="line"><span style="color:#B392F0">init</span><span style="color:#E1E4E8">(ctx) {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> opts</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> { size: [</span><span style="color:#79B8FF">256</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">256</span><span style="color:#E1E4E8">], float: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">, persistent: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8"> };</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.pos </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> ctx.</span><span style="color:#B392F0">createRenderTarget</span><span style="color:#E1E4E8">(opts);</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.vel </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> ctx.</span><span style="color:#B392F0">createRenderTarget</span><span style="color:#E1E4E8">(opts);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">render</span><span style="color:#E1E4E8">(ctx) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    ctx.</span><span style="color:#B392F0">draw</span><span style="color:#E1E4E8">({</span></span>
+<span class="line"><span style="color:#E1E4E8">        frag: simulate,</span></span>
+<span class="line"><span style="color:#E1E4E8">        uniforms: { pos: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.pos, vel: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.vel },</span></span>
+<span class="line"><span style="color:#E1E4E8">        target: [</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.pos, </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.vel],</span></span>
+<span class="line"><span style="color:#E1E4E8">    });</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</figure>
+
+
+        <p data-astro-cid-empkddct>
+            Declare one output per target. A target with no output holds
+            undefined pixels. To write fewer targets, draw with a shorter
+            array. Persistent targets all swap after the draw.
+            One <code data-astro-cid-empkddct>blend</code> applies to every target, and the default is
+            <code data-astro-cid-empkddct>"none"</code>.
+        </p>
+        <p data-astro-cid-empkddct>
+            All targets need the same size and the same <code data-astro-cid-empkddct>samples</code>.
+            The array can't hold <code data-astro-cid-empkddct>null</code>, <code data-astro-cid-empkddct>ctx.target</code>, or
+            the same target twice. Every GPU takes at least 4 targets. The
+            shader must be GLSL ES 3.0. If a rule breaks, the draw warns and is
+            skipped. If several targets have depth, the first one's depth is
+            used.
         </p>
 
         <h3 data-astro-cid-empkddct>Drawing outside the element</h3>
@@ -1100,7 +1149,7 @@
         
 </div>
 
-<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DZcGUPGB.js"></script>
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DrywtiMD.js"></script>
 
         <div id="Frame"><div id="FrameBottom"></div></div>
         
@@ -1108,4 +1157,4 @@
     </body>
 </html>
 
-<script type="module" src="/vfx-js/_astro/custom-effects.astro_astro_type_script_index_0_lang.BKoOe6ix.js"></script>
+<script type="module" src="/vfx-js/_astro/custom-effects.astro_astro_type_script_index_0_lang.B8zeGMS_.js"></script>
