@@ -1,6 +1,7 @@
 // Settings resolution: parameter defaults, the looks holo.spot ships, studio presets and holo.spot "Copy settings"
 // blobs. Ported from holospot src/settings.ts (https://github.com/dmitrykurash/holospot), MIT © 2026 Dmitry Kurash.
 import { LOOKS } from "./data/looks.js";
+import { MATERIAL_PRESETS } from "./data/material-presets.js";
 import { PARAM_SPECS } from "./data/params.js";
 import { STUDIO_PRESETS } from "./data/studio-presets.js";
 import type { ParamSpec } from "./settings-types.js";
@@ -95,6 +96,15 @@ export function resolveSettings(
     if (typeof preset === "string" && STUDIO_PRESETS[preset]) {
         for (const [id, v] of Object.entries(STUDIO_PRESETS[preset])) {
             write(id, v);
+        }
+    }
+    // a material's preset selects (the paper stock writes the paper's values), as choosing it on holo.spot does
+    for (const [id, options] of Object.entries(MATERIAL_PRESETS)) {
+        const choice = given[id];
+        if (id.startsWith(prefix) && typeof choice === "string" && options[choice]) {
+            for (const [k, v] of Object.entries(options[choice])) {
+                write(k, v);
+            }
         }
     }
     for (const [id, v] of Object.entries(given)) {

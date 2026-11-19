@@ -13,12 +13,14 @@ export type LookData = Readonly<
     Record<
         "card" | "object",
         Readonly<
-            Record<
-                string,
-                {
-                    values: Readonly<Record<string, ParamValue>>;
-                    pose: { rx: number; ry: number };
-                }
+            Partial<
+                Record<
+                    string,
+                    {
+                        values: Readonly<Record<string, ParamValue>>;
+                        pose: { rx: number; ry: number };
+                    }
+                >
             >
         >
     >
