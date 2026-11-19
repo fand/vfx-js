@@ -7,6 +7,7 @@
 import type {
     Effect,
     EffectContext,
+    EffectDims,
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
@@ -54,6 +55,7 @@ import {
 import {
     assembleMaterial,
     CARD_VERT,
+    FRAG_CARD_BASE,
     FRAG_PREFIX,
     GLSL_COMMON,
     PLAIN_VERT,
@@ -114,6 +116,15 @@ export type HoloParams = {
     mask: HoloMask;
     /** How much the element's colour tints the foil as a translucent ink, in [0, 1]. */
     ink: number;
+    /**
+     * Draw the card in perspective, tilted with the pose as holospot draws its card mesh. The output grows by about
+     * 21 % of the element's size on each side, so the tilted card and its glare fit (holospot's framing: the card at
+     * rest fills 70 % of the view, exactly the element's rect). `false` keeps the element in place and only shades it as
+     * tilted.
+     */
+    perspective: boolean;
+    /** 4× multisampling of the card target (half float, as holospot). Smooths the card's outline in perspective mode. */
+    msaa: boolean;
 };
 
 const DEFAULT_PARAMS: HoloParams = {
@@ -124,6 +135,8 @@ const DEFAULT_PARAMS: HoloParams = {
     quality: "medium",
     mask: "alpha",
     ink: 0,
+    perspective: false,
+    msaa: false,
 };
 
 const MATERIALS: Record<HoloMaterialId, MaterialDef> = {
@@ -135,6 +148,15 @@ const MATERIALS: Record<HoloMaterialId, MaterialDef> = {
 };
 
 const MM_PER_CSS_PX = 25.4 / 96;
+/** holospot's framing: the card at rest fills this share of the view (camera FOV 22°). */
+const FRAMING = 0.7;
+const TAN_HALF_FOV = Math.tan((11 * Math.PI) / 180);
+
+/** Perspective-mode margin [physical px] on each side of the element. */
+function perspectiveMargin(w: number, h: number): [number, number] {
+    const k = (1 / FRAMING - 1) / 2;
+    return [Math.ceil(w * k), Math.ceil(h * k)];
+}
 const MASKS: Record<HoloMask, number> = { alpha: 0, luma: 1, none: 2 };
 const TONES = { neutral: 0, agx: 1, clamp: 2 } as const;
 
@@ -217,20 +239,25 @@ const OUTPUT_HELPERS = outputFrag
 const FRAG_OUTPUT = `${FRAG_PREFIX}
 ${GLSL_COMMON}
 ${OUTPUT_HELPERS}
+in vec2 uv;
 in vec2 uvContent;
 in vec2 uvSrc;
 uniform sampler2D src;
+uniform sampler2D uBase;   // perspective mode: the element mapped onto the card
 uniform int uMask;
+uniform int uPersp;
 void main() {
-  vec4 s = texture(src, uvSrc);
-  if (uvContent.x < 0.0 || uvContent.x > 1.0 || uvContent.y < 0.0 || uvContent.y > 1.0) {
+  // flat mode: the card target covers the element; perspective mode: the whole (grown) output
+  vec2 hu = uPersp == 1 ? uv : uvContent;
+  vec4 s = uPersp == 1 ? (uMask == 1 ? texture(uBase, uv) : vec4(0.0)) : texture(src, uvSrc);
+  if (uPersp == 0 && (uvContent.x < 0.0 || uvContent.x > 1.0 || uvContent.y < 0.0 || uvContent.y > 1.0)) {
     gl_FragColor = s;
     return;
   }
-  vec4 P = textureLod(tHdr, clamp(uvContent, 0.0, 1.0), 0.0);
+  vec4 P = textureLod(tHdr, clamp(hu, 0.0, 1.0), 0.0);
   float a = clamp(P.a, 0.0, 1.0); vec3 c = vec3(0.0);
   if (a > 1e-5) { vec3 cu = P.rgb / a; c = cu / (ENC_S * max(1.0 - max(max3(cu), 0.0), 1e-4)); }
-  vec3 G = uGW0 * textureLod(tG0, uvContent * uG0Scale, 0.0).rgb;   // premultiplied linear glare
+  vec3 G = uGW0 * textureLod(tG0, hu * uG0Scale, 0.0).rgb;   // premultiplied linear glare
   vec3 card  = toDisplay(((1.0 - uGlare) * c + uGlare * G) * uExposure);
   vec3 spill = toDisplay(uGlare * G * uExposure);
   // The foil's coverage (the mask, applied by the material pass) is the card target's alpha, then the foil goes over
@@ -286,6 +313,8 @@ export class HoloEffect implements Effect {
     #conv: EffectRenderTarget | null = null;
     #cum: EffectRenderTarget | null = null;
     #hdr: EffectRenderTarget | null = null;
+    #base: EffectRenderTarget | null = null;
+    #viewProj = new Float32Array(16);
     #black: EffectRenderTarget | null = null;
     #env: EffectRenderTarget | null = null;
     #ltcTex: EffectTexture | null = null;
@@ -369,21 +398,40 @@ export class HoloEffect implements Effect {
         });
     }
 
-    #hdrSamples = 0;
+    #samples: 1 | 4 = 1;
 
-    /** The card target: float, sized to the element, with the tier's MSAA (holospot: 4× half float). */
+    /** The card target (float, the output's size) and the perspective base layer, with `msaa` (4× half float). */
     #ensureHdr(ctx: EffectContext): void {
-        const samples = (TIERS[this.params.quality] ?? TIERS.medium).msaa;
-        if (this.#hdr && this.#hdrSamples === samples) {
+        const samples = this.params.msaa ? 4 : 1;
+        if (this.#hdr && this.#samples === samples) {
             return;
         }
         this.#hdr?.dispose();
+        this.#base?.dispose();
+        this.#base = null;
         this.#hdr = ctx.createRenderTarget({
             float: true,
             filter: "nearest",
             samples,
         });
-        this.#hdrSamples = samples;
+        this.#samples = samples;
+    }
+
+    #ensureBase(ctx: EffectContext): EffectRenderTarget {
+        this.#base ??= ctx.createRenderTarget({ samples: this.#samples });
+        return this.#base;
+    }
+
+    /** Perspective mode grows the output so the tilted card and its glare fit. */
+    outputRect(
+        dims: EffectDims,
+    ): readonly [number, number, number, number] | undefined {
+        if (!this.params.perspective) {
+            return undefined;
+        }
+        const [w, h] = dims.elementPixel;
+        const [mx, my] = perspectiveMargin(w, h);
+        return [-mx, -my, w + 2 * mx, h + 2 * my];
     }
 
     #makeCanvas(w: number, h: number): HTMLCanvasElement | OffscreenCanvas {
@@ -456,6 +504,23 @@ export class HoloEffect implements Effect {
         return def;
     }
 
+    /** holospot's camera: FOV 22°, at (0, 0, D) looking down −Z (column-major projection × view). */
+    #setViewProj(aspect: number, D: number): void {
+        const f = 1 / TAN_HALF_FOV;
+        const near = 0.1 * D;
+        const far = 10 * D;
+        const a = (far + near) / (near - far);
+        const b = (2 * far * near) / (near - far);
+        const m = this.#viewProj;
+        m.fill(0);
+        m[0] = f / aspect;
+        m[5] = f;
+        m[10] = a;
+        m[11] = -1;
+        m[14] = a * -D + b; // view = translate(0, 0, −D)
+        m[15] = D;
+    }
+
     update(ctx: EffectContext): void {
         if (this.#dirty || !this.#resolved) {
             this.#resolve();
@@ -472,11 +537,20 @@ export class HoloEffect implements Effect {
         const largest = this.params.sizeMm ?? Math.max(w, h) * MM_PER_CSS_PX;
         const k = largest / Math.max(w, h);
         this.#cardSizeMm = [w * k, h * k];
-        const D = framingDistance(
+        let D = framingDistance(
             w / h,
             this.#cardSizeMm[0] / 2000,
             this.#cardSizeMm[1] / 2000,
         );
+        if (this.params.perspective) {
+            // the card at rest maps exactly onto the element inside the grown output
+            const [mx, my] = perspectiveMargin(pw, ph);
+            const oh = ph + 2 * my;
+            D =
+                (this.#cardSizeMm[1] / 2000 / TAN_HALF_FOV) *
+                (oh / Math.max(ph, 1));
+            this.#setViewProj((pw + 2 * mx) / Math.max(oh, 1), D);
+        }
         this.#camPos = [0, 0, D];
 
         // pointer: normalised element position, active once the pointer has moved and while it is over the element
@@ -619,16 +693,36 @@ export class HoloEffect implements Effect {
         const binW = new Float32Array(72);
         binW.set(bins.W);
 
+        const persp = this.params.perspective;
+        const card = {
+            uCardRot: this.#cardRot,
+            uPrevCardRot: this.#prevCardRot,
+            uCardSizeMm: this.#cardSizeMm,
+            uViewProj: this.#viewProj,
+            uPersp: persp ? 1 : 0,
+        };
+        const mask = MASKS[this.params.mask] ?? 0;
+        if (persp) {
+            ctx.clear(this.#hdr);
+            if (mask === 1) {
+                const base = this.#ensureBase(ctx);
+                ctx.clear(base);
+                ctx.draw({
+                    frag: FRAG_CARD_BASE,
+                    vert: CARD_VERT,
+                    target: base,
+                    uniforms: { ...card, src: ctx.src },
+                });
+            }
+        }
         ctx.draw({
             frag: this.#frag,
             vert: CARD_VERT,
             target: this.#hdr,
             uniforms: {
                 ...this.#matUniforms,
+                ...card,
                 cameraPosition: [...this.#camPos],
-                uCardRot: this.#cardRot,
-                uPrevCardRot: this.#prevCardRot,
-                uCardSizeMm: this.#cardSizeMm,
                 uWrapMm: [0, 0],
                 uBowMm: s.card.bowMm,
                 uBowAxis: s.card.bowAxis === "along" ? 1 : 0,
@@ -677,8 +771,7 @@ export class HoloEffect implements Effect {
                 uWear: s.card.wear,
                 uDebugLight: 1,
                 uPrintSrc: ctx.src,
-                uHdrSize: [this.#hdr.width, this.#hdr.height],
-                uMask: MASKS[this.params.mask] ?? 0,
+                uMask: mask,
                 uInk: Math.min(Math.max(this.params.ink, 0), 1),
             },
         });
@@ -711,7 +804,9 @@ export class HoloEffect implements Effect {
                 uExposure: exposureMultiplier(s.display.ev, tone),
                 uTone: TONES[s.display.tone],
                 uP3: 0,
-                uMask: MASKS[this.params.mask] ?? 0,
+                uMask: mask,
+                uPersp: persp ? 1 : 0,
+                uBase: (persp && mask === 1 && this.#base) || this.#black,
                 tG0: g0 ?? this.#black,
                 uGW0: gw0,
                 uGlare: g0 ? glare : 0,
@@ -726,6 +821,7 @@ export class HoloEffect implements Effect {
             this.#conv,
             this.#cum,
             this.#hdr,
+            this.#base,
             this.#black,
             this.#env,
             this.#ltc1,
@@ -737,6 +833,7 @@ export class HoloEffect implements Effect {
         this.#ltcTex?.dispose();
         this.#glare.dispose();
         this.#conv = this.#cum = this.#hdr = this.#black = this.#env = null;
+        this.#base = null;
         this.#ltc1 = this.#ltc2 = null;
         this.#bytesTex = this.#ltcTex = null;
         this.#atlasUploaded = -1;

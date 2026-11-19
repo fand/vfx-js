@@ -143,8 +143,6 @@ export interface TierTrips {
 }
 export interface TierConfig {
     tier: Tier;
-    /** Samples of the card target (holospot renders it with 4× MSAA at every tier). */
-    msaa: 1 | 4;
     glareLevels: number;
     glareStartDiv: 2 | 4;
     waves: { board: number; coat: number };

@@ -111,16 +111,17 @@ const PRINT = `
 // foil.
 uniform sampler2D uPrintSrc;
 uniform vec4 srcRectUv;    // element UV → src texture UV (vfx-js auto uniform)
-uniform vec2 uHdrSize;     // card target size [texels]
 uniform float uInk;
 uniform int uMask;
 struct Print { float W; vec3 T2; vec3 onWhite; float silver; };
+vec2 gPrintUv = vec2(0.5);   // card UV of this fragment, set by printLayer (every main calls it before encodeCard)
 vec4 printUvDerivs(vec2 p) { return vec4(0.0); }
 vec3 printSrgbToLinear(vec3 c) {
   return mix(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, vec3(lessThanEqual(c, vec3(0.04045))));
 }
 Print printLayer(vec2 pMm, vec4 dUv) {
   Print pr; pr.W = 0.0; pr.onWhite = vec3(0.85); pr.silver = 0.0;
+  gPrintUv = pMm / uCardSizeMm;
   vec4 s = texture(uPrintSrc, srcRectUv.xy + (pMm / uCardSizeMm) * srcRectUv.zw);
   vec3 c = s.a > 1e-4 ? printSrgbToLinear(clamp(s.rgb / s.a, 0.0, 1.0)) : vec3(1.0);
   pr.T2 = mix(vec3(1.0), c, uInk);
@@ -128,7 +129,7 @@ Print printLayer(vec2 pMm, vec4 dUv) {
 }
 float printCoverage() {
   if (uMask == 2) return 1.0;
-  vec4 s = texture(uPrintSrc, srcRectUv.xy + (gl_FragCoord.xy / uHdrSize) * srcRectUv.zw);
+  vec4 s = texture(uPrintSrc, srcRectUv.xy + gPrintUv * srcRectUv.zw);
   if (uMask == 0) return clamp(s.a, 0.0, 1.0);
   vec3 u = s.a > 1e-4 ? clamp(s.rgb / s.a, 0.0, 1.0) : vec3(0.0);
   return clamp(dot(u, LUMA_SRGB) * s.a, 0.0, 1.0);
@@ -178,12 +179,18 @@ export function assembleMaterial(
     ].join("\n");
 }
 
-/** card.vert for the element: a flat card of uCardSizeMm centred at the origin, rotated by uCardRot. */
+/**
+ * card.vert for the element: a flat card of uCardSizeMm centred at the origin, rotated by uCardRot. Flat mode
+ * (uPersp 0): the card fills the target unwarped, only its shading follows the pose. Perspective mode (uPersp 1): the
+ * card is projected by holospot's camera (uViewProj), like the card mesh holospot draws.
+ */
 export const CARD_VERT = `#version 300 es
 precision highp float;
 in vec3 position;
 uniform mat3 uCardRot, uPrevCardRot;
 uniform vec2 uCardSizeMm;
+uniform mat4 uViewProj;
+uniform int uPersp;
 out vec3 vWorldPos; out vec3 vPrevWorldPos; out vec2 vUv; out vec3 vN; out vec3 vT; out vec3 vB;
 out float vOcc;
 void main() {
@@ -194,8 +201,18 @@ void main() {
   vUv = uv;
   vN = uCardRot[2]; vT = uCardRot[0]; vB = uCardRot[1];
   vOcc = 0.0;
-  gl_Position = vec4(position.xy, 0.0, 1.0);
+  gl_Position = uPersp == 1 ? uViewProj * vec4(vWorldPos, 1.0) : vec4(position.xy, 0.0, 1.0);
 }
+`;
+
+/** The element mapped onto the card (perspective mode, luma mask: what the output pass shows around the foil). */
+export const FRAG_CARD_BASE = `#version 300 es
+precision highp float;
+in vec2 vUv;
+uniform sampler2D src;
+uniform vec4 srcRectUv;
+out vec4 outColor;
+void main() { outColor = texture(src, srcRectUv.xy + vUv * srcRectUv.zw); }
 `;
 
 /** Fullscreen vertex shader with a plain 0..1 uv (passes into the effect's own targets). */
