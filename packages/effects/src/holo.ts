@@ -74,12 +74,14 @@ import {
 } from "./_holo/shader.js";
 import { ATLAS, SpectralAtlas } from "./_holo/spectral/atlas.js";
 import { GLSL_DECODE_FLOAT24 } from "./_holo/spectral/float24.js";
-import { TIERS } from "./_holo/tier.js";
+import { detectTier, TIERS } from "./_holo/tier.js";
 import {
     type HoloMaterialId,
     type Mat3,
     type ParamValue,
     SPD_IDS,
+    type Tier,
+    type TierConfig,
     type Vec3,
 } from "./_holo/types.js";
 
@@ -103,8 +105,11 @@ export type HoloLogo =
     | HTMLCanvasElement
     | ImageBitmap
     | OffscreenCanvas;
-/** Quality tier (holospot's tiers: orders, rect-light model, environment diffraction, glitter search radii). */
-export type HoloQuality = "low" | "medium" | "high";
+/**
+ * Quality tier (holospot's tiers: orders, rect-light model, environment diffraction, glitter search radii). `"auto"`
+ * picks one from the device as holospot does: `low` on phones, `high` on discrete and Apple GPUs, else `medium`.
+ */
+export type HoloQuality = "auto" | "low" | "medium" | "high";
 /** Where the foil is: where the element is opaque, where it is bright, or the whole element rect. */
 export type HoloMask = "alpha" | "luma" | "none";
 /** A 2D value of a holo.spot setting (pads such as `studio.panel.dir`, `motion.pose`). */
@@ -165,7 +170,10 @@ export type HoloParams = {
      * at 96 dpi (1 px = 0.2646 mm).
      */
     sizeMm: number | null;
-    /** Quality tier. */
+    /**
+     * Quality tier (holospot's `quality` option). Default `"medium"`, what holospot ships without a look; the looks
+     * set their own (`object` is `"low"`).
+     */
     quality: HoloQuality;
     /** Where the foil is. */
     mask: HoloMask;
@@ -222,7 +230,10 @@ export type HoloParams = {
     background: string | null;
     /** The card's bow in mm (holo.spot `card.bow`, 0–2): the sheet sags, so the light sweeps across it. `null`: the default. */
     bow: number | null;
-    /** Rest pose in degrees: `x` turns the face to the right, `y` tips the top edge toward the viewer. `null`: the default. */
+    /**
+     * Rest pose in degrees, −35 to 35 (holo.spot `motion.pose`): `x` turns the face to the right, `y` tips the top edge
+     * toward the viewer. `null`: the default.
+     */
     pose: HoloVec2 | null;
     /**
      * What the pointer does over the element (holo.spot `motion.pointer`): `"tilt"` tilts the card, `"light"` moves a
@@ -230,11 +241,16 @@ export type HoloParams = {
      * pointer. `null`: `"tilt"`.
      */
     pointer: HoloPointer | null;
-    /** How far the pointer tilts the card, in degrees at the element's edge (holo.spot `motion.tiltRange`). `null`: 25. */
+    /** How far the pointer tilts the card, in degrees at the element's edge, 5–35 (holo.spot `motion.tiltRange`). `null`: 25. */
     tiltRange: number | null;
-    /** Slow automatic tilt while the pointer is away, amplitude in degrees; 0 turns it off (holo.spot `motion.wobble`, `motion.wobbleAmp`). `null`: 14. */
-    wobble: number | null;
-    /** 4× multisampling of the card target (half float, as holospot). Smooths the card's outline in the `"3d"` view. */
+    /** Slow automatic tilt while the pointer is away (holo.spot `motion.wobble`). `null`: on. */
+    wobble: boolean | null;
+    /** The wobble's amplitude in degrees, 0–25 (holo.spot `motion.wobbleAmp`). `null`: 14. */
+    wobbleAmp: number | null;
+    /**
+     * 4× multisampling of the card target (half float), as holospot renders. Smooths the card's outline in the `"3d"`
+     * view. Default `true`.
+     */
     msaa: boolean;
     /** `emboss`: the foil logo's artwork. `null`: the `emboss.logo` setting, else holo.spot's rosette. */
     logo: HoloLogo | null;
@@ -261,7 +277,8 @@ const DEFAULT_PARAMS: HoloParams = {
     pointer: null,
     tiltRange: null,
     wobble: null,
-    msaa: false,
+    wobbleAmp: null,
+    msaa: true,
     logo: null,
 };
 
@@ -278,6 +295,7 @@ function lookParams(
             pose: { rx: number; ry: number };
         },
     ])[],
+    quality: Exclude<HoloQuality, "auto">,
     material?: HoloMaterial,
 ): Readonly<Partial<HoloParams>> {
     const values: Record<string, ParamValue> = {};
@@ -289,6 +307,7 @@ function lookParams(
     values["motion.pose"] = { x: pose.ry, y: pose.rx };
     return Object.freeze({
         ...(material ? { material } : {}),
+        quality,
         settings: Object.freeze(values),
     });
 }
@@ -369,7 +388,8 @@ function typedSettings(p: HoloParams): Record<string, ParamValue> {
         o["card.bow"] = Math.min(Math.max(p.bow, 0), 2);
     }
     if (p.pose && fin(p.pose.x) && fin(p.pose.y)) {
-        o["motion.pose"] = { x: p.pose.x, y: p.pose.y };
+        const c = (v: number) => Math.min(Math.max(v, -35), 35);
+        o["motion.pose"] = { x: c(p.pose.x), y: c(p.pose.y) };
     }
     if (fin(p.lens)) {
         o["dof.lens"] = Math.min(Math.max(p.lens, 24), 200);
@@ -378,11 +398,13 @@ function typedSettings(p: HoloParams): Record<string, ParamValue> {
         o["motion.pointer"] = p.pointer;
     }
     if (fin(p.tiltRange)) {
-        o["motion.tiltRange"] = Math.min(Math.max(p.tiltRange, 0), 89);
+        o["motion.tiltRange"] = Math.min(Math.max(p.tiltRange, 5), 35);
     }
-    if (fin(p.wobble)) {
-        o["motion.wobble"] = p.wobble > 0;
-        o["motion.wobbleAmp"] = Math.max(p.wobble, 0);
+    if (typeof p.wobble === "boolean") {
+        o["motion.wobble"] = p.wobble;
+    }
+    if (fin(p.wobbleAmp)) {
+        o["motion.wobbleAmp"] = Math.min(Math.max(p.wobbleAmp, 0), 25);
     }
     return o;
 }
@@ -622,8 +644,8 @@ export class HoloEffect implements Effect {
     }
 
     /**
-     * The looks holo.spot ships, as params to spread: `card` (its holographic card), `object` (its 3D object),
-     * `paperCard` (its Foil Emboss paper card; sets `material: "emboss"`). Without one, the effect starts from holo.spot's
+     * The looks holo.spot ships, as params: `card` (its holographic card), `object` (its 3D object), `image` (its
+     * Foil Emboss paper card; sets `material: "emboss"`). Each also sets the `quality` holospot ships it with. Without one, the effect starts from holo.spot's
      * parameter defaults. Looks set the scene (lights, pose, exposure, …); `HoloEffect.presets` set the material.
      *
      * @example
@@ -634,11 +656,11 @@ export class HoloEffect implements Effect {
     static readonly looks: Readonly<{
         card: Readonly<Partial<HoloParams>>;
         object: Readonly<Partial<HoloParams>>;
-        paperCard: Readonly<Partial<HoloParams>>;
+        image: Readonly<Partial<HoloParams>>;
     }> = Object.freeze({
-        card: lookParams(lookEntries("card")),
-        object: lookParams(lookEntries("object")),
-        paperCard: lookParams(
+        card: lookParams(lookEntries("card"), "medium"),
+        object: lookParams(lookEntries("object"), "low"),
+        image: lookParams(
             [
                 [
                     "emboss",
@@ -647,6 +669,7 @@ export class HoloEffect implements Effect {
                     >,
                 ],
             ],
+            "medium",
             "emboss",
         ),
     });
@@ -716,7 +739,16 @@ export class HoloEffect implements Effect {
         this.#dirty = true;
     }
 
+    /** The tier `quality: "auto"` picks, detected once from the GL context. */
+    #autoTier: Tier | null = null;
+    #tier(): TierConfig {
+        const q = this.params.quality;
+        const t = q === "auto" ? (this.#autoTier ?? "medium") : q;
+        return TIERS[t] ?? TIERS.medium;
+    }
+
     init(ctx: EffectContext): void {
+        this.#autoTier = detectTier(ctx.gl);
         this.#atlas = new SpectralAtlas();
         const canvas = this.#makeCanvas(ATLAS.imageWidth, ATLAS.imageHeight);
         this.#bytesCanvas = canvas;
@@ -829,7 +861,7 @@ export class HoloEffect implements Effect {
         const def = this.#def();
         this.#matUniforms = def.uniforms(this.#resolved.values);
         this.#atlas?.setTint(def.gratingSummary(this.#resolved.values).tint);
-        const tier = TIERS[p.quality] ?? TIERS.medium;
+        const tier = this.#tier();
         const c = this.#scene.card;
         this.#waves = buildWaves(
             def.relief(this.#resolved.values),
@@ -1066,7 +1098,7 @@ export class HoloEffect implements Effect {
         }
         const waves = this.#waves;
 
-        const tier = TIERS[this.params.quality] ?? TIERS.medium;
+        const tier = this.#tier();
         const tr = tier.trips;
         const L = this.#lights;
         const bins = atlas.bins[tier.defines.NB === 6 ? 6 : 8];

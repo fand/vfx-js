@@ -30,6 +30,31 @@ test("grain and glare take holo.spot's units", () => {
     expect(off["grain.on"]).toBe(false);
 });
 
+test("typed params map to holo.spot's settings, clamped to its ranges", () => {
+    const v = new HoloEffect({
+        tiltRange: 80,
+        wobble: false,
+        wobbleAmp: 40,
+        pose: { x: 50, y: -50 },
+        bow: 3,
+        lens: 10,
+    }).resolvedSettings();
+    expect(v["motion.tiltRange"]).toBe(35);
+    expect(v["motion.wobble"]).toBe(false);
+    expect(v["motion.wobbleAmp"]).toBe(25);
+    expect(v["motion.pose"]).toEqual({ x: 35, y: -35 });
+    expect(v["card.bow"]).toBe(2);
+    expect(v["dof.lens"]).toBe(24);
+});
+
+test("looks carry the quality holospot ships them with; msaa is on by default", () => {
+    expect(HoloEffect.looks.card.quality).toBe("medium");
+    expect(HoloEffect.looks.object.quality).toBe("low");
+    expect(HoloEffect.looks.image.quality).toBe("medium");
+    expect(new HoloEffect().params.quality).toBe("medium");
+    expect(new HoloEffect().params.msaa).toBe(true);
+});
+
 test("resolvedSettings: defaults, then settings, then typed params", () => {
     const fx = new HoloEffect({
         material: "prism",
@@ -76,8 +101,8 @@ test.each([
     },
 );
 
-test("looks.paperCard is the emboss paper card", () => {
-    const p = HoloEffect.looks.paperCard;
+test("looks.image is the emboss paper card", () => {
+    const p = HoloEffect.looks.image;
     expect(p.material).toBe("emboss");
     const got = new HoloEffect({ ...p }).resolvedSettings();
     const want = resolveSettings("emboss", "card", {});

@@ -112,11 +112,12 @@ vfx-js only binds `sampler2D` and can only wrap DOM sources or a
 
 ## Quality tiers
 
-`quality: "low" | "medium" | "high"` selects holospot's `TierConfig`: the
+`quality: "auto" | "low" | "medium" | "high"` selects holospot's `TierConfig`: the
 defines (`RECT_EXACT`, `RECT_LTC`, `NB`, `IBL_ORDERS`, `DISCRETE_LIGHTS`,
 `FLAKE_ENV`, …) and the loop trip counts (`uMaxOrder`, `uGhB`, `uVorR`,
-`uFlakeR`, `uBCells`, `uBBins`, `uBLevels`). Default `"medium"`. MSAA and the
-DPR caps do not apply: the effect renders at the element's pixel size.
+`uFlakeR`, `uBCells`, `uBBins`, `uBLevels`). Default `"medium"` (holospot's kit without a look; the looks carry
+their own, `object` = `"low"`). `"auto"` is holospot's `detectTier`. The DPR caps do not apply: the effect renders at
+the element's pixel size.
 
 ## Public API
 
@@ -244,7 +245,8 @@ mask), and the glare spills into the grown output.
 
 `msaa: true` gives the card target 4× MSAA in half float, as holospot's HDR target (core `samples: 4`, #277). It
 smooths the card's outline in perspective mode. In flat mode the material pass is one full-screen quad with no
-triangle edges, so MSAA changes nothing there (≤ 1/255, half-float rounding); the flag defaults to `false`.
+triangle edges, so MSAA changes nothing there (≤ 1/255, half-float rounding). The flag defaults to `true`, as
+holospot always renders.
 
 Deviations found while porting:
 
@@ -277,7 +279,7 @@ pose in perspective mode: 2.5–4.3 per pixel, 0.4–1.0 blurred.
 ## Looks
 
 The `look` param was removed: the effect starts from holo.spot's parameter defaults, and the looks holo.spot ships
-are params to spread (`HoloEffect.looks.card`, `.object`, `.paperCard`). Their scene values are shared by the five
+are params to spread (`HoloEffect.looks.card`, `.object`, `.image`). Their scene values are shared by the five
 foils, so one object per look holds every foil's values; a test checks that spreading one resolves to exactly
 holospot's look.
 
@@ -297,3 +299,13 @@ Looks now carry everything in `settings` (pose as `motion.pose`), so whatever co
 
 The typed `glare` and `grain` take holo.spot's units (`display.glare` 0–0.1, `grain.amount` 0–0.6). The port's
 default grain is 0.07, the value holo.spot's looks use (holospot's parameter default is 0.18).
+
+## Params aligned with holospot
+
+Typed params use holo.spot's names, units and ranges (clamped): `exposure` (`display.ev`, ±3), `glare`
+(`display.glare`, 0–0.1), `grain` (`grain.amount`, 0–0.6), `bow` (`card.bow`, 0–2), `pose` (`motion.pose`, ±35),
+`lens` (`dof.lens`, 24–200), `tiltRange` (`motion.tiltRange`, 5–35), `wobble` / `wobbleAmp` (`motion.wobble`,
+`motion.wobbleAmp` 0–25), `quality` (the kit's option, with `"auto"`). The looks are named as holospot's (`card`,
+`object`, `image`) and set holospot's quality. Port-only params: `view`, `mask`, `ink`, `sizeMm`, `logo`, `msaa`.
+`structureScale` keeps the port's scale (0.1–10, smaller = finer); holospot's `object.structureScale` (0.25–4, larger
+= finer) is its reciprocal over a narrower range.

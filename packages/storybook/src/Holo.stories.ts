@@ -118,7 +118,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             },
         );
         fx.addBinding(ui, "look", {
-            options: opts<LookName>(["(none)", "card", "object", "paperCard"]),
+            options: opts<LookName>(["(none)", "card", "object", "image"]),
         }).on("change", (ev) => {
             // a look starts clean: what was set before goes, then HoloEffect.looks.<name> is spread over it
             const look = ev.value as LookName;
@@ -151,7 +151,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             rebuild();
         });
         fx.addBinding(general, "quality", {
-            options: opts<HoloQuality>(["low", "medium", "high"]),
+            options: opts<HoloQuality>(["auto", "low", "medium", "high"]),
         }).on("change", (ev) =>
             effect.setParams({ quality: ev.value as HoloQuality }),
         );
@@ -211,8 +211,8 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
                 v["motion.pointer"] ??
                 "tilt") as HoloPointer,
             tiltRange: num("motion.tiltRange", 25),
-            wobble:
-                v["motion.wobble"] === false ? 0 : num("motion.wobbleAmp", 14),
+            wobble: v["motion.wobble"] !== false,
+            wobbleAmp: num("motion.wobbleAmp", 14),
         };
         sc.addBinding(scene, "exposure", { min: -3, max: 3, step: 0.05 }).on(
             "change",
@@ -248,8 +248,8 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             (ev) => effect.setParams({ bow: ev.value }),
         );
         sc.addBinding(scene, "pose", {
-            x: { min: -45, max: 45 },
-            y: { min: -45, max: 45, inverted: true },
+            x: { min: -35, max: 35 },
+            y: { min: -35, max: 35, inverted: true },
         }).on("change", (ev) =>
             effect.setParams({ pose: { x: ev.value.x, y: ev.value.y } }),
         );
@@ -258,13 +258,16 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         }).on("change", (ev) =>
             effect.setParams({ pointer: ev.value as HoloPointer }),
         );
-        sc.addBinding(scene, "tiltRange", { min: 0, max: 45, step: 1 }).on(
+        sc.addBinding(scene, "tiltRange", { min: 5, max: 35, step: 1 }).on(
             "change",
             (ev) => effect.setParams({ tiltRange: ev.value }),
         );
-        sc.addBinding(scene, "wobble", { min: 0, max: 25, step: 0.5 }).on(
+        sc.addBinding(scene, "wobble").on("change", (ev) =>
+            effect.setParams({ wobble: ev.value }),
+        );
+        sc.addBinding(scene, "wobbleAmp", { min: 0, max: 25, step: 0.5 }).on(
             "change",
-            (ev) => effect.setParams({ wobble: ev.value }),
+            (ev) => effect.setParams({ wobbleAmp: ev.value }),
         );
         sc.addButton({ title: "Reset scene" }).on("click", () => {
             ui.look = "(none)";
@@ -309,6 +312,7 @@ const CLEAR_SCENE = {
     pointer: null,
     tiltRange: null,
     wobble: null,
+    wobbleAmp: null,
 } as const;
 
 /** One control per holo.spot setting, writing `settings` by id. */

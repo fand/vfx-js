@@ -2,6 +2,42 @@
 // material programs. MSAA is the effect's `msaa` flag; DPR caps and memory budgets do not apply to an element effect.
 import type { Tier, TierConfig } from "./types.js";
 
+const HIGH_RE =
+    /NVIDIA|GeForce|RTX|Quadro|Radeon RX|Radeon Pro|Arc A|Apple M\d|Apple GPU/i;
+
+/** Unmasked renderer string: WEBGL_debug_renderer_info when exposed, else gl.RENDERER. */
+function rendererString(gl: WebGL2RenderingContext): string {
+    try {
+        const ext = gl.getExtension("WEBGL_debug_renderer_info") as {
+            UNMASKED_RENDERER_WEBGL: number;
+        } | null;
+        const s = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : null;
+        if (typeof s === "string" && s.length > 0) {
+            return s;
+        }
+    } catch {
+        // fall through
+    }
+    const r = gl.getParameter(gl.RENDERER);
+    return typeof r === "string" ? r : "";
+}
+
+/** holospot's `quality: "auto"`: low on phones (coarse touch pointer, small screen), high on discrete/Apple GPUs. */
+export function detectTier(gl: WebGL2RenderingContext): Tier {
+    const coarse =
+        typeof matchMedia === "function" &&
+        matchMedia("(pointer: coarse)").matches;
+    const touch =
+        typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
+    const small =
+        typeof screen !== "undefined" &&
+        Math.min(screen.width, screen.height) < 900;
+    if (coarse && touch && small) {
+        return "low";
+    }
+    return HIGH_RE.test(rendererString(gl)) ? "high" : "medium";
+}
+
 export const TIERS: Readonly<Record<Tier, TierConfig>> = {
     high: {
         tier: "high",
