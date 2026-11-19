@@ -286,11 +286,11 @@ holospot's look.
 `perspective` (0–1) was replaced. It shaded the card as tilted but drew it turned by only a share of that tilt, a
 view no camera has. Now both views are scenes holospot can draw:
 
-- `view: "flat"` (default): the card stays facing the viewer; the pose turns the light rig the other way, as
+- `view: "flat"`: the card stays facing the viewer; the pose turns the light rig the other way, as
   holospot's light-rig rotation `Q_L` does (scene/lights.ts, studioEnv.ts envRotation). The light meets the card as
   if it were tilted (a test checks every light's card-frame position); the view does not move, so the rainbows travel
   about half as far as in 3D.
-- `view: "3d"`: the card turns, seen by holospot's camera with `lens` (holo.spot `dof.lens`, 62 mm = 22°; the camera
+- `view: "3d"` (default): the card turns, seen by holospot's camera with `lens` (holo.spot `dof.lens`, 62 mm = 22°; the camera
   keeps the framing).
 
 Looks now carry everything in `settings` (pose as `motion.pose`), so whatever comes after them wins.

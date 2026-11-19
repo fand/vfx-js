@@ -175,7 +175,7 @@ export type HoloParams = {
      */
     ink: number;
     /**
-     * How the card moves (default `"flat"`). Both are a scene holospot can draw.
+     * How the card moves (default `"3d"`). Both are a scene holospot can draw.
      *
      * - `"flat"`: the card stays facing the viewer, exactly where the element is, and the pose (pointer tilt, wobble,
      *   `pose`) turns the light rig the other way instead, as holospot's light-rig rotation does. The light meets the
@@ -241,7 +241,7 @@ const DEFAULT_PARAMS: HoloParams = {
     quality: "medium",
     mask: "alpha",
     ink: 0,
-    view: "flat",
+    view: "3d",
     lens: null,
     structureScale: 1,
     exposure: null,
