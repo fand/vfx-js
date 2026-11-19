@@ -43,6 +43,18 @@ function trackPane(pane: Pane): void {
     w.__vfxPanes.push(pane);
 }
 
+/** A tracked Tweakpane in the top-right corner (disposed with the story). */
+export function makePane(title: string, expanded = true): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:300px;max-height:calc(100vh - 32px);overflow:auto;z-index:10000";
+    document.body.appendChild(container);
+    const pane = new Pane({ container, title, expanded });
+    trackPane(pane);
+    return pane;
+}
+
 export const isChromatic = (): boolean =>
     typeof navigator !== "undefined" && /Chromatic/.test(navigator.userAgent);
 

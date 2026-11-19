@@ -95,6 +95,7 @@ await vfx.add(el, {
 - `material: "emboss"` is a paper card with a foil logo pressed into it. The element is the picture printed on the paper; `logo` takes the logo's artwork (an `<img>`, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG; transparent areas get no foil). Place and shape it with `emboss.*` settings (`emboss.width` in mm, `emboss.foil`: `"rainbow"`, `"concentric"`, `"sparkle"`, `"silver"`, `"gold"`, `emboss.profile`, `emboss.stock`, …). Hologram stickers and multi-element cards of holo.spot are not supported.
 - `msaa: true` turns on 4× multisampling of the card. Use it with `perspective`, where it smooths the card's outline; it costs about 5× the card target's memory.
 - Use `setParams({ settings: { ... } })` to change values live; it merges `settings` by id.
+- For a settings UI: `HoloEffect.settingSpecs(material)` lists every supported holo.spot id with its kind, range and options, and `effect.resolvedSettings()` returns the values in effect (look, then `settings`, then the typed params).
 
 Live demos: https://amagi.dev/vfx-js/storybook
 
