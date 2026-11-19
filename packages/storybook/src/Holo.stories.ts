@@ -75,6 +75,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
     const ui = {
         source: "Logo" as keyof typeof SOURCES,
         look: "(none)" as LookName,
+        preset: "(none)",
     };
 
     // rebuilding inside a control's own change event would dispose it mid-event: defer it
@@ -109,6 +110,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         fx.addBinding(general, "material", { options: opts(MATERIALS) }).on(
             "change",
             (ev) => {
+                ui.preset = "(none)";
                 effect.setParams({ material: ev.value as HoloMaterial });
                 rebuild();
             },
@@ -123,6 +125,27 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
                 ...CLEAR_SCENE,
                 ...(look === "(none)" ? {} : HoloEffect.looks[look]),
             });
+            rebuild();
+        });
+        // holospot's "Starting points" of the material: its settings replace the material's (the scene stays)
+        const presets = HoloEffect.presets[params.material] as Record<
+            string,
+            { settings: Record<string, HoloSettingValue | undefined> }
+        >;
+        fx.addBinding(ui, "preset", {
+            options: opts(["(none)", ...Object.keys(presets)]),
+        }).on("change", (ev) => {
+            const own = `${params.material}.`;
+            const kept = Object.fromEntries(
+                Object.entries(effect.params.settings).filter(
+                    ([id]) => !id.startsWith(own),
+                ),
+            );
+            effect.params.settings = {
+                ...kept,
+                ...(ev.value === "(none)" ? {} : presets[ev.value].settings),
+            };
+            effect.setParams({});
             rebuild();
         });
         fx.addBinding(general, "quality", {

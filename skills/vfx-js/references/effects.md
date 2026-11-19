@@ -85,7 +85,7 @@ await vfx.add(el, {
 ```
 
 - `settings` takes holo.spot's setting ids (`<material>.*`, `studio.*` lights, `display.*`, `grain.*`, `card.*`, `motion.*`), or a holo.spot "Copy settings" blob. The ids, ranges and meanings are in holospot's `docs/materials/<material>.md` and `docs/scene-settings.md`.
-- The effect starts from holo.spot's parameter defaults. `HoloEffect.looks.card`, `.object` and `.paperCard` (emboss) are the looks holo.spot ships, as params to spread: `new HoloEffect({ ...HoloEffect.looks.card, material: "shatter" })`. Spreading replaces `settings` as a whole, so merge: `settings: { ...HoloEffect.looks.card.settings, "prism.pitch": 1200 }`.
+- The effect starts from holo.spot's parameter defaults. `HoloEffect.looks.card`, `.object` and `.paperCard` (emboss) are the looks holo.spot ships, as params to spread: `new HoloEffect({ ...HoloEffect.looks.card, material: "shatter" })`. Looks set the scene (lights, pose, exposure); `HoloEffect.presets.<material>.<name>` (holo.spot's starting points, e.g. `HoloEffect.presets.prism.compactDisc`, `.shatter.squareTiles`, `.nebula.starfield`) set the material. The constructor takes several param objects and merges them in order, `settings` by id: `new HoloEffect(HoloEffect.looks.card, HoloEffect.presets.prism.compactDisc, { exposure: 1 })`.
 - `sizeMm` is the real size of the element's largest side (the foil has a physical grain). Default: CSS size at 96 dpi.
 - `quality`: `"low"` for phones, `"medium"` (default) or `"high"`.
 - `ink` (0–1) tints the foil with the element's colours, like a translucent ink.
