@@ -6,6 +6,7 @@ import {
     type HoloLook,
     type HoloMask,
     type HoloMaterial,
+    type HoloPointer,
     type HoloQuality,
     type HoloSettingSpec,
     type HoloSettingValue,
@@ -169,6 +170,9 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
                     : String(bg ?? "white"),
             bow: num("card.bow", 1.6),
             pose: { ...(v["motion.pose"] as { x: number; y: number }) },
+            pointer: (params.pointer ??
+                v["motion.pointer"] ??
+                "tilt") as HoloPointer,
             tiltRange: num("motion.tiltRange", 25),
             wobble:
                 v["motion.wobble"] === false ? 0 : num("motion.wobbleAmp", 14),
@@ -210,6 +214,11 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             y: { min: -45, max: 45, inverted: true },
         }).on("change", (ev) =>
             effect.setParams({ pose: { x: ev.value.x, y: ev.value.y } }),
+        );
+        sc.addBinding(scene, "pointer", {
+            options: opts<HoloPointer>(["tilt", "light", "flash", "none"]),
+        }).on("change", (ev) =>
+            effect.setParams({ pointer: ev.value as HoloPointer }),
         );
         sc.addBinding(scene, "tiltRange", { min: 0, max: 45, step: 1 }).on(
             "change",
@@ -254,6 +263,7 @@ const CLEAR_SCENE = {
     background: null,
     bow: null,
     pose: null,
+    pointer: null,
     tiltRange: null,
     wobble: null,
 } as const;
