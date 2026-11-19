@@ -95,8 +95,20 @@ export class EmbossAssets {
     /** The paper maps (moments, aux), or null while they build. Changes bump `paperVersion`. */
     paper: { mom: ByteImage; aux: ByteImage } | null = null;
     paperVersion = 0;
-    /** Warning of the last logo that failed to load. */
-    error: string | null = null;
+    /** Errors of the current logo and paper requests. */
+    get errors(): readonly string[] {
+        return [this.logoError, this.paperError].filter(
+            (e): e is string => e !== null,
+        );
+    }
+    /** Whether a logo or paper request is still in flight. */
+    get busy(): boolean {
+        return this.logoBusy || this.paperBusy;
+    }
+    private logoError: string | null = null;
+    private paperError: string | null = null;
+    private logoBusy = false;
+    private paperBusy = false;
 
     /** Requests the logo (no-op when unchanged). */
     setLogo(input: LogoInput | null | undefined): void {
@@ -106,10 +118,13 @@ export class EmbossAssets {
         }
         this.logoWanted = want;
         const token = ++this.logoToken;
+        this.logoError = null;
         if (typeof want === "string" && want.trim().toLowerCase() === "none") {
+            this.logoBusy = false;
             this.install(null);
             return;
         }
+        this.logoBusy = true;
         void (async () => {
             try {
                 const { raster } =
@@ -137,13 +152,14 @@ export class EmbossAssets {
                         b.logoH / b.logoW,
                     ],
                 });
-                this.error = null;
+                this.logoBusy = false;
             } catch (e) {
                 if (token !== this.logoToken) {
                     return;
                 }
-                this.error = `HoloEffect: could not load the logo: ${e instanceof Error ? e.message : String(e)}`;
-                console.warn(this.error);
+                this.logoError = `HoloEffect: could not load the logo${typeof want === "string" ? ` ${want}` : ""}: ${e instanceof Error ? e.message : String(e)}. A cross-origin image needs CORS (and crossOrigin on an <img>).`;
+                console.warn(this.logoError);
+                this.logoBusy = false;
                 this.install(null);
             }
         })();
@@ -167,6 +183,8 @@ export class EmbossAssets {
         }
         this.paperWanted = key;
         const token = ++this.paperToken;
+        this.paperError = null;
+        this.paperBusy = true;
         void (async () => {
             try {
                 const b = await this.paperWorker.run<PaperBuild>("build", {
@@ -183,11 +201,12 @@ export class EmbossAssets {
                     aux: byteImageOfHalf(l0.aux, l0.w, l0.h),
                 };
                 this.paperVersion++;
+                this.paperBusy = false;
             } catch (e) {
                 if (token === this.paperToken) {
-                    console.warn(
-                        `HoloEffect: could not build the paper maps: ${e instanceof Error ? e.message : String(e)}`,
-                    );
+                    this.paperError = `HoloEffect: could not build the paper maps: ${e instanceof Error ? e.message : String(e)}`;
+                    console.warn(this.paperError);
+                    this.paperBusy = false;
                 }
             }
         })();

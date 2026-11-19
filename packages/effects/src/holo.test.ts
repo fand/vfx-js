@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { resolveSettings } from "./_holo/settings.js";
 import { HoloEffect, type HoloMaterial } from "./holo.js";
 
@@ -55,21 +55,106 @@ test("looks carry the quality holospot ships them with; msaa is on by default", 
     expect(new HoloEffect().params.msaa).toBe(true);
 });
 
-test("resolvedSettings: defaults, then settings, then typed params", () => {
+test("scene shorthands write settings ids: later values win, whichever way they are written", () => {
     const fx = new HoloEffect({
         material: "prism",
         settings: { "prism.pitch": 1200, "display.ev": 2 },
         exposure: -1,
         grain: 0,
-        lights: "spot",
+        studio: "spot",
     });
     const v = fx.resolvedSettings();
     expect(v["prism.pitch"]).toBe(1200);
-    expect(v["display.ev"]).toBe(-1); // typed param wins over settings
+    expect(v["display.ev"]).toBe(-1); // in one input, the shorthand wins
     expect(v["grain.on"]).toBe(false);
     expect(v["studio.panel.on"]).toBe(false); // the spot rig
+    expect(fx.params.settings["display.ev"]).toBe(-1);
+    fx.setParams({ settings: { "display.ev": 1.5 } });
+    expect(fx.resolvedSettings()["display.ev"]).toBe(1.5); // later settings win over the earlier shorthand
     fx.setParams({ exposure: null });
-    expect(fx.resolvedSettings()["display.ev"]).toBe(2);
+    expect(fx.resolvedSettings()["display.ev"]).toBe(0.5); // removed: holo.spot's default
+    fx.setParams({}, { resetSettings: true });
+    expect(fx.params.settings).toEqual({});
+});
+
+test("a light rig goes over the look's lights; single lights given later win", () => {
+    // as holospot: the look's values, then the rig's
+    const want = resolveSettings("prism", "card", {
+        "studio.preset": "softbox",
+    }).values;
+    const v = new HoloEffect(HoloEffect.looks.card, {
+        studio: "softbox",
+    }).resolvedSettings();
+    for (const [id, x] of Object.entries(want)) {
+        expect(close(v[id], x), id).toBe(true);
+    }
+    const softbox = new HoloEffect({ studio: "softbox" }).resolvedSettings();
+    const w = new HoloEffect(
+        { settings: { "studio.ambient.fill": 0.5 } },
+        { studio: "softbox" },
+        { settings: { "studio.ambient.rims": 0.3 } },
+    ).resolvedSettings();
+    expect(w["studio.ambient.fill"]).toBe(softbox["studio.ambient.fill"]); // before the rig: replaced
+    expect(w["studio.ambient.rims"]).toBe(0.3); // after: wins
+});
+
+test("a Copy settings blob brings its material and pose, and later settings merge into it", () => {
+    const blob = {
+        holoDev: 1 as const,
+        entity: "card",
+        material: "shatter",
+        values: { "shatter.size": 3, "display.ev": 1.5, "object.scene": "x" },
+        pose: { rx: -8, ry: 12 },
+    };
+    const fx = new HoloEffect(
+        { settings: blob },
+        { settings: { "display.glare": 0.05 } },
+    );
+    const v = fx.resolvedSettings();
+    expect(fx.params.material).toBe("shatter");
+    expect(v["shatter.size"]).toBe(3);
+    expect(v["display.ev"]).toBe(1.5);
+    expect(v["display.glare"]).toBe(0.05);
+    expect(v["motion.pose"]).toEqual({ x: 12, y: -8 });
+    fx.setParams({ settings: { "display.ev": -1 } });
+    expect(fx.resolvedSettings()["display.ev"]).toBe(-1);
+    expect(
+        new HoloEffect({ material: "prism", settings: blob }).params.material,
+    ).toBe("prism");
+});
+
+test("settings are checked: clamped to holo.spot's ranges, bad values and unknown ids warn", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const v = new HoloEffect({
+        settings: {
+            "display.ev": 9,
+            "display.tone": "sepia",
+            "prism.picth": 1,
+        } as never,
+        background: "#fff",
+    }).resolvedSettings();
+    expect(v["display.ev"]).toBe(3);
+    expect(v["display.tone"]).toBe("neutral");
+    expect(v["scene.background"]).toBe("colour");
+    expect(v["scene.bgColor"]).toBe("#ffffff");
+    const msgs = warn.mock.calls.map((c) => String(c[0]));
+    expect(msgs.some((m) => m.includes("display.ev"))).toBe(true);
+    expect(msgs.some((m) => m.includes("display.tone"))).toBe(true);
+    expect(
+        msgs.some((m) => m.includes("unknown holo.spot setting prism.picth")),
+    ).toBe(true);
+    warn.mockClear();
+    new HoloEffect({
+        settings: { "bump.strength": 0.78, "scene.wall": "x" } as never,
+    }).resolvedSettings();
+    expect(warn).not.toHaveBeenCalled(); // holospot's default of an unported id, a site-only id
+    new HoloEffect({
+        settings: { "dof.on": true } as never,
+    }).resolvedSettings();
+    expect(warn.mock.calls.some((c) => String(c[0]).includes("dof.on"))).toBe(
+        true,
+    );
+    warn.mockRestore();
 });
 
 const close = (a: unknown, b: unknown) =>
@@ -111,9 +196,9 @@ test("looks.image is the emboss paper card", () => {
     }
 });
 
-test("presets: every id is a setting of its material or the scene", () => {
+test("startingPoints: every id is a setting of its material or the scene", () => {
     let n = 0;
-    for (const [m, ps] of Object.entries(HoloEffect.presets)) {
+    for (const [m, ps] of Object.entries(HoloEffect.startingPoints)) {
         const ids = new Set(
             HoloEffect.settingSpecs(m as HoloMaterial).map((s) => s.id),
         );
@@ -131,7 +216,7 @@ test("presets: every id is a setting of its material or the scene", () => {
 test("constructor parts compose: look, then preset, then own values; settings merge by id", () => {
     const fx = new HoloEffect(
         HoloEffect.looks.card,
-        HoloEffect.presets.prism.compactDisc,
+        HoloEffect.startingPoints.prism.compactDisc,
         { exposure: 1, settings: { "prism.fan": 3 } },
     );
     const v = fx.resolvedSettings();

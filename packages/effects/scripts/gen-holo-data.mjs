@@ -29,14 +29,20 @@ const supported = (id) =>
 const params = read("params.json");
 // The port's own defaults where it departs from holospot's: holo.spot's looks use 0.07 grain, not the 0.18 default.
 const PORT_DEFAULTS = { "grain.amount": 0.07 };
+// Options the port adds: "none" ignores the pointer (an element effect may not want it).
+const PORT_OPTIONS = { "motion.pointer": ["tilt", "light", "flash", "none"] };
 const keep = (p) => {
     const o = { id: p.id, kind: p.kind, default: PORT_DEFAULTS[p.id] ?? p.default };
     if (p.min !== undefined) o.min = p.min;
     if (p.max !== undefined) o.max = p.max;
     if (p.step !== undefined) o.step = p.step;
-    if (p.options) o.options = p.options;
+    const options = PORT_OPTIONS[p.id] ?? p.options;
+    if (options) o.options = options;
     return o;
 };
+// holo.spot ids the kit ignores too (its site's objects, orbit, pointer controller), and the Volume Hologram material:
+// accepted without a warning.
+const SITE_ONLY = /^(scene\.|object\.|motion\.|display\.quality$|studio\.flash\.|volume\.)/;
 const specs = [
     ...params.scene.filter((p) => supported(p.id)),
     ...MATERIALS.flatMap((m) => params.materials[m]),
@@ -53,7 +59,31 @@ writeFileSync(
     new URL("params.ts", out),
     `${header}import type { ParamSpec } from "../settings-types.js";
 
+/** Every holo.spot setting id this effect understands. */
+export type HoloSettingId =
+${specs.map((p) => `    | ${JSON.stringify(p.id)}`).join("\n")};
+
 export const PARAM_SPECS: readonly ParamSpec[] = ${ts(specs)};
+`,
+);
+
+// holo.spot ids this port does not render, with holospot's defaults: given a different value, the effect warns.
+const allHolospot = [...params.scene, ...Object.values(params.materials).flat()];
+const notPorted = Object.fromEntries(
+    allHolospot
+        .filter((p) => !supported(p.id) && !SITE_ONLY.test(p.id) && p.id !== "object.structureScale")
+        .map((p) => [p.id, p.default]),
+);
+const ignored = allHolospot.filter((p) => !supported(p.id) && !(p.id in notPorted)).map((p) => p.id);
+writeFileSync(
+    new URL("not-ported.ts", out),
+    `${header}import type { ParamValue } from "../types.js";
+
+/** holo.spot settings the port does not render, with holospot's defaults (a different value warns). */
+export const NOT_PORTED: Readonly<Record<string, ParamValue>> = ${ts(notPorted)};
+
+/** holo.spot settings the port accepts and ignores without a warning, as holospot's kit does. */
+export const IGNORED_IDS: ReadonlySet<string> = new Set(${ts(ignored)});
 `,
 );
 
@@ -139,8 +169,8 @@ writeFileSync(
     `${header}import type { ParamValue } from "../types.js";
 
 /** holospot's material "Starting points" (docs/materials/<material>.md), by material and camel-cased name. */
-/** Names of holospot's material starting points, by material (\`HoloEffect.presets\`). */
-export type HoloPresetNames = {
+/** Names of holospot's material starting points, by material (\`HoloEffect.startingPoints\`). */
+export type HoloStartingPointNames = {
 ${Object.entries(startingPoints)
     .map(([m, ps]) => `    ${m}: ${Object.keys(ps).map((n) => JSON.stringify(n)).join(" | ")};`)
     .join("\n")}

@@ -2,15 +2,15 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { VFX } from "@vfx-js/core";
 import {
     HoloEffect,
-    type HoloLights,
     type HoloMask,
     type HoloMaterial,
     type HoloPointer,
     type HoloQuality,
     type HoloSettingSpec,
     type HoloSettingValue,
+    type HoloStartingPoint,
+    type HoloStudio,
     type HoloTone,
-    type HoloView,
 } from "@vfx-js/effects";
 import type { FolderApi, Pane } from "tweakpane";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -33,7 +33,7 @@ const MATERIALS: HoloMaterial[] = [
     "vortex",
     "emboss",
 ];
-const LIGHTS: HoloLights[] = [
+const LIGHTS: HoloStudio[] = [
     "studio",
     "spot",
     "softbox",
@@ -69,7 +69,7 @@ holo.play = async ({ canvasElement }) => {
 
 /**
  * Tweakpane for HoloEffect. The scene and material folders show the values in effect and are rebuilt when the
- * material, the look or the lights change. A look spreads one of `HoloEffect.looks` over a clean effect.
+ * material, the look or the lights change. A look is applied with `setParams(look, { resetSettings: true })`.
  */
 function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
     let pane: Pane | null = null;
@@ -103,7 +103,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             material: params.material,
             quality: params.quality,
             mask: params.mask,
-            view: params.view,
+            flat: params.flat,
             lens: typeof v["dof.lens"] === "number" ? v["dof.lens"] : 62,
             msaa: params.msaa,
             structureScale: params.structureScale,
@@ -120,34 +120,32 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         fx.addBinding(ui, "look", {
             options: opts<LookName>(["(none)", "card", "object", "image"]),
         }).on("change", (ev) => {
-            // a look starts clean: what was set before goes, then HoloEffect.looks.<name> is spread over it
+            // a look starts clean: the settings go back to holo.spot's defaults, then the look applies
             const look = ev.value as LookName;
-            effect.params.settings = {};
-            effect.setParams({
-                ...CLEAR_SCENE,
-                ...(look === "(none)" ? {} : HoloEffect.looks[look]),
+            effect.setParams(look === "(none)" ? {} : HoloEffect.looks[look], {
+                resetSettings: true,
             });
             rebuild();
         });
         // holospot's "Starting points" of the material: its settings replace the material's (the scene stays)
-        const presets = HoloEffect.presets[params.material] as Record<
+        const points = HoloEffect.startingPoints[params.material] as Record<
             string,
-            { settings: Record<string, HoloSettingValue | undefined> }
+            HoloStartingPoint
         >;
         fx.addBinding(ui, "preset", {
-            options: opts(["(none)", ...Object.keys(presets)]),
+            options: opts(["(none)", ...Object.keys(points)]),
         }).on("change", (ev) => {
             const own = `${params.material}.`;
-            const kept = Object.fromEntries(
-                Object.entries(effect.params.settings).filter(
-                    ([id]) => !id.startsWith(own),
-                ),
+            // remove the material's ids (null), then apply the starting point
+            const clear = Object.fromEntries(
+                Object.keys(effect.params.settings)
+                    .filter((id) => id.startsWith(own))
+                    .map((id) => [id, null]),
             );
-            effect.params.settings = {
-                ...kept,
-                ...(ev.value === "(none)" ? {} : presets[ev.value].settings),
-            };
-            effect.setParams({});
+            effect.setParams({ settings: clear });
+            if (ev.value !== "(none)") {
+                effect.setParams(points[ev.value]);
+            }
             rebuild();
         });
         fx.addBinding(general, "quality", {
@@ -160,14 +158,12 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         }).on("change", (ev) =>
             effect.setParams({ mask: ev.value as HoloMask }),
         );
-        // flat: the card stays and the light rig turns; 3d: the card turns, seen through the lens
-        fx.addBinding(general, "view", {
-            options: opts<HoloView>(["flat", "3d"]),
-        }).on("change", (ev) => {
-            effect.setParams({ view: ev.value as HoloView });
+        // flat: the card stays and the light rig turns; otherwise the card turns, seen through the lens
+        fx.addBinding(general, "flat").on("change", (ev) => {
+            effect.setParams({ flat: ev.value });
             rebuild();
         });
-        if (params.view === "3d") {
+        if (!params.flat) {
             fx.addBinding(general, "lens", { min: 24, max: 200, step: 1 }).on(
                 "change",
                 (ev) => effect.setParams({ lens: ev.value }),
@@ -200,16 +196,14 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             tone: (v["display.tone"] as HoloTone) ?? "neutral",
             glare: num("display.glare", 0.03),
             grain: v["grain.on"] === false ? 0 : num("grain.amount", 0.07),
-            lights: params.lights ?? "(default)",
+            studio: String(v["studio.preset"] ?? "studio"),
             background:
                 bg === "colour"
                     ? String(v["scene.bgColor"])
                     : String(bg ?? "white"),
             bow: num("card.bow", 1.6),
             pose: { ...(v["motion.pose"] as { x: number; y: number }) },
-            pointer: (params.pointer ??
-                v["motion.pointer"] ??
-                "tilt") as HoloPointer,
+            pointer: (v["motion.pointer"] ?? "tilt") as HoloPointer,
             tiltRange: num("motion.tiltRange", 25),
             wobble: v["motion.wobble"] !== false,
             wobbleAmp: num("motion.wobbleAmp", 14),
@@ -231,15 +225,13 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             "change",
             (ev) => effect.setParams({ grain: ev.value }),
         );
-        sc.addBinding(scene, "lights", {
-            options: opts(["(default)", ...LIGHTS]),
-        }).on("change", (ev) => {
-            effect.setParams({
-                lights:
-                    ev.value === "(default)" ? null : (ev.value as HoloLights),
-            });
-            rebuild(); // the single lights below follow the rig
-        });
+        sc.addBinding(scene, "studio", { options: opts(LIGHTS) }).on(
+            "change",
+            (ev) => {
+                effect.setParams({ studio: ev.value as HoloStudio });
+                rebuild(); // the single lights below follow the rig
+            },
+        );
         sc.addBinding(scene, "background", {
             options: { black: "black", white: "white", grey: "#3a4458" },
         }).on("change", (ev) => effect.setParams({ background: ev.value }));
@@ -271,8 +263,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         );
         sc.addButton({ title: "Reset scene" }).on("click", () => {
             ui.look = "(none)";
-            effect.params.settings = {};
-            effect.setParams(CLEAR_SCENE);
+            effect.setParams({}, { resetSettings: true });
             rebuild();
         });
 
@@ -298,22 +289,6 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
 }
 
 type LookName = "(none)" | keyof typeof HoloEffect.looks;
-
-const CLEAR_SCENE = {
-    exposure: null,
-    tone: null,
-    glare: null,
-    grain: null,
-    lights: null,
-    background: null,
-    bow: null,
-    pose: null,
-    lens: null,
-    pointer: null,
-    tiltRange: null,
-    wobble: null,
-    wobbleAmp: null,
-} as const;
 
 /** One control per holo.spot setting, writing `settings` by id. */
 function addSettings(

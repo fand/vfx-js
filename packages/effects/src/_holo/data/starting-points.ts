@@ -3,8 +3,8 @@
 import type { ParamValue } from "../types.js";
 
 /** holospot's material "Starting points" (docs/materials/<material>.md), by material and camel-cased name. */
-/** Names of holospot's material starting points, by material (`HoloEffect.presets`). */
-export type HoloPresetNames = {
+/** Names of holospot's material starting points, by material (`HoloEffect.startingPoints`). */
+export type HoloStartingPointNames = {
     prism:
         | "compactDisc"
         | "goldRainbowFoil"

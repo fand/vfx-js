@@ -1,4 +1,5 @@
-export type { HoloPresetNames } from "./_holo/data/starting-points.js";
+export type { HoloSettingId } from "./_holo/data/params.js";
+export type { HoloStartingPointNames } from "./_holo/data/starting-points.js";
 export {
     ASCII_PRESETS,
     type AsciiCharRamp,
@@ -40,22 +41,24 @@ export {
     type HalftoneParams,
 } from "./halftone.js";
 export {
+    type HoloCopyBlob,
     HoloEffect,
-    type HoloLights,
+    type HoloInput,
     type HoloLogo,
     type HoloMask,
     type HoloMaterial,
     type HoloParams,
     type HoloPointer,
-    type HoloPreset,
-    type HoloPresets,
     type HoloQuality,
+    type HoloSceneParams,
     type HoloSettingSpec,
     type HoloSettings,
     type HoloSettingValue,
+    type HoloStartingPoint,
+    type HoloStartingPoints,
+    type HoloStudio,
     type HoloTone,
     type HoloVec2,
-    type HoloView,
 } from "./holo.js";
 export { HueShiftEffect, type HueShiftParams } from "./hue-shift.js";
 export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch.js";

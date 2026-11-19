@@ -2,6 +2,7 @@
 // blobs. Ported from holospot src/settings.ts (https://github.com/dmitrykurash/holospot), MIT © 2026 Dmitry Kurash.
 import { LOOKS } from "./data/looks.js";
 import { MATERIAL_PRESETS } from "./data/material-presets.js";
+import { IGNORED_IDS, NOT_PORTED } from "./data/not-ported.js";
 import { PARAM_SPECS } from "./data/params.js";
 import { STUDIO_PRESETS } from "./data/studio-presets.js";
 import type { ParamSpec } from "./settings-types.js";
@@ -38,10 +39,10 @@ function isSceneId(id: string): boolean {
 
 /** A "Copy settings" blob from holo.spot (the `</>` button of the Object tab). */
 export interface CopyBlob {
-    holoDev: 1;
-    material: string;
-    values: Record<string, ParamValue>;
-    pose?: { rx: number; ry: number };
+    readonly holoDev: 1;
+    readonly material?: string;
+    readonly values: Readonly<Record<string, unknown>>;
+    readonly pose?: Readonly<{ rx: number; ry: number }>;
 }
 
 export function isCopyBlob(s: unknown): s is CopyBlob {
@@ -65,15 +66,122 @@ function clone(v: ParamValue | { type: string }): ParamValue {
     return typeof v === "object" ? ({ ...(v as Vec2) } as Vec2) : v;
 }
 
+const warned = new Set<string>();
+/** console.warn, once per message. */
+export function warnOnce(msg: string): void {
+    if (!warned.has(msg)) {
+        warned.add(msg);
+        console.warn(msg);
+    }
+}
+
+const MATERIAL_HEADS = new Set([
+    "prism",
+    "shatter",
+    "nebula",
+    "sparkle",
+    "vortex",
+    "emboss",
+]);
+
+/** holospot's hexColour: `#rrggbb`, or `#rgb` expanded; otherwise null. */
+export function hexColour(v: unknown): string | null {
+    if (typeof v !== "string") {
+        return null;
+    }
+    const s = v.trim().toLowerCase();
+    if (/^#[0-9a-f]{6}$/.test(s)) {
+        return s;
+    }
+    if (/^#[0-9a-f]{3}$/.test(s)) {
+        return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`;
+    }
+    return null;
+}
+
 /**
- * Defaults, then the look's shipped values, then `studio.preset`, then the given values. Ids that belong to neither
- * the scene nor this material are ignored.
+ * A given value checked against its spec: numbers clamped to the range, options and types checked. Returns the value
+ * to use, or undefined to drop it; warns (once) about what it changed.
+ */
+function checked(spec: ParamSpec, v: ParamValue): ParamValue | undefined {
+    const bad = (why: string) => {
+        warnOnce(
+            `HoloEffect: ${spec.id} = ${JSON.stringify(v)} ${why}; ignored.`,
+        );
+        return undefined;
+    };
+    const clampWarn = (x: number): number => {
+        const lo = spec.min ?? Number.NEGATIVE_INFINITY;
+        const hi = spec.max ?? Number.POSITIVE_INFINITY;
+        const c = Math.min(Math.max(x, lo), hi);
+        if (c !== x) {
+            warnOnce(
+                `HoloEffect: ${spec.id} = ${x} is outside ${spec.min}–${spec.max}; clamped to ${c}.`,
+            );
+        }
+        return c;
+    };
+    const d = spec.default;
+    switch (spec.kind) {
+        case "slider":
+            return typeof v === "number" && Number.isFinite(v)
+                ? clampWarn(v)
+                : bad("is not a number");
+        case "toggle":
+            return typeof v === "boolean" ? v : bad("is not a boolean");
+        case "select":
+            if (spec.options && !spec.options.includes(String(v))) {
+                return bad(`is not one of ${spec.options.join(", ")}`);
+            }
+            // holo.spot keeps the option's type (some options are numbers written as strings)
+            return typeof d === "number" ? Number(v) : String(v);
+        case "color":
+            return hexColour(v) ?? bad("is not a #rgb / #rrggbb colour");
+        case "pad":
+            return v &&
+                typeof v === "object" &&
+                Number.isFinite((v as Vec2).x) &&
+                Number.isFinite((v as Vec2).y)
+                ? { x: clampWarn((v as Vec2).x), y: clampWarn((v as Vec2).y) }
+                : bad("is not { x, y }");
+        default:
+            return typeof v === typeof d || typeof d === "object"
+                ? v
+                : bad(`is not a ${typeof d}`);
+    }
+}
+
+/** Why an id that is not a setting of this material or the scene is dropped (warns when it matters). */
+function dropped(id: string, v: ParamValue): void {
+    const head = id.split(".")[0];
+    if (MATERIAL_HEADS.has(head) && !(id in NOT_PORTED)) {
+        // another material's id (a look or a blob carries every foil's)
+        if (SPECS.has(id)) {
+            return;
+        }
+    }
+    if (IGNORED_IDS.has(id)) {
+        return;
+    }
+    if (id in NOT_PORTED) {
+        if (JSON.stringify(NOT_PORTED[id]) !== JSON.stringify(v)) {
+            warnOnce(
+                `HoloEffect: holo.spot setting ${id} is not supported by this port; ignored.`,
+            );
+        }
+        return;
+    }
+    warnOnce(`HoloEffect: unknown holo.spot setting ${id}; ignored.`);
+}
+
+/**
+ * Defaults, then the look's shipped values, then `studio.preset`, then the given values, each checked against its
+ * spec. Ids of other materials are ignored; unknown ids and holo.spot ids the port does not render warn.
  */
 export function resolveSettings(
     material: HoloMaterialId,
     look: LookId,
     given: Readonly<Record<string, ParamValue | undefined>>,
-    blobPose?: { rx: number; ry: number },
 ): Resolved {
     const values: Record<string, ParamValue> = {};
     const prefix = `${material}.`;
@@ -82,21 +190,29 @@ export function resolveSettings(
             values[p.id] = clone(p.default);
         }
     }
-    const write = (id: string, v: ParamValue) => {
-        if (id in values) {
-            values[id] = clone(v);
+    const write = (id: string, v: ParamValue, strict: boolean) => {
+        if (!(id in values)) {
+            if (strict) {
+                dropped(id, v);
+            }
+            return;
+        }
+        const spec = SPECS.get(id);
+        const c = spec ? checked(spec, v) : v;
+        if (c !== undefined) {
+            values[id] = clone(c);
         }
     };
     const shipped = look === "plain" ? null : LOOKS[look][material];
     if (shipped) {
         for (const [id, v] of Object.entries(shipped.values)) {
-            write(id, v);
+            write(id, v, false);
         }
     }
     const preset = given["studio.preset"];
     if (typeof preset === "string" && STUDIO_PRESETS[preset]) {
         for (const [id, v] of Object.entries(STUDIO_PRESETS[preset])) {
-            write(id, v);
+            write(id, v, false);
         }
     }
     // a material's preset selects (the paper stock writes the paper's values), as choosing it on holo.spot does
@@ -108,18 +224,19 @@ export function resolveSettings(
             options[choice]
         ) {
             for (const [k, v] of Object.entries(options[choice])) {
-                write(k, v);
+                write(k, v, false);
             }
         }
     }
     for (const [id, v] of Object.entries(given)) {
-        if (v !== undefined) {
-            write(id, v);
+        if (v !== undefined && v !== null) {
+            write(id, v, true);
         }
     }
-    const pose = blobPose ?? shipped?.pose ?? { rx: 0, ry: 0 };
-    // `motion.pose` given explicitly overrides the look's pose (x = ry, y = rx).
-    const mp = given["motion.pose"];
+    const pose = shipped?.pose ?? { rx: 0, ry: 0 };
+    // `motion.pose` overrides the look's pose (x = ry, y = rx)
+    const mp =
+        given["motion.pose"] !== undefined ? values["motion.pose"] : null;
     return {
         material,
         values,

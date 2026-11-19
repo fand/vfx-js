@@ -12,11 +12,14 @@ import type {
     EffectTexture,
 } from "@vfx-js/core";
 import { LOOKS } from "./_holo/data/looks.js";
+import { MATERIAL_PRESETS } from "./_holo/data/material-presets.js";
+import type { HoloSettingId } from "./_holo/data/params.js";
 import { PARAM_SPECS } from "./_holo/data/params.js";
 import {
-    type HoloPresetNames,
+    type HoloStartingPointNames,
     STARTING_POINTS,
 } from "./_holo/data/starting-points.js";
+import { STUDIO_PRESETS } from "./_holo/data/studio-presets.js";
 import { EmbossAssets } from "./_holo/emboss-assets.js";
 import { HoloGlare } from "./_holo/glare.js";
 import outputFrag from "./_holo/glsl/output.js";
@@ -63,6 +66,7 @@ import {
     resolveSettings,
     type SceneState,
     sceneStateFrom,
+    warnOnce,
 } from "./_holo/settings.js";
 import {
     assembleMaterial,
@@ -131,12 +135,10 @@ export type HoloSettingSpec = {
 
 /** Tone curve: Khronos PBR Neutral (hue-stable), AgX, or a plain clamp. */
 export type HoloTone = "neutral" | "agx" | "clamp";
-/** How the card moves: it stays facing the viewer and the light rig turns, or it turns in 3D. */
-export type HoloView = "flat" | "3d";
 /** What the pointer does over the element. */
 export type HoloPointer = "tilt" | "light" | "flash" | "none";
 /** holo.spot's light rigs (`studio.preset`). */
-export type HoloLights =
+export type HoloStudio =
     | "studio"
     | "spot"
     | "softbox"
@@ -149,20 +151,31 @@ export type HoloLights =
 export type HoloSettingValue = number | boolean | string | HoloVec2;
 /**
  * holo.spot settings by id, as on holo.spot and in holospot's docs: material ids (`prism.pitch`, `shatter.size`, …)
- * and scene ids (`studio.*` lights, `display.ev` / `display.tone` / `display.glare`, `grain.*`, `card.*`,
- * `motion.*`, `scene.background`). A holo.spot "Copy settings" blob (`{ holoDev: 1, material, values }`) is
- * accepted as well.
+ * and scene ids (`studio.*` lights, `display.*`, `grain.*`, `card.*`, `motion.*`, `scene.*`, `dof.lens`). `null`
+ * removes an id given earlier, so the default (or the look's value) applies again.
  */
-export type HoloSettings = Readonly<
-    Record<string, HoloSettingValue | undefined>
->;
+export type HoloSettings = Readonly<{
+    [K in HoloSettingId]?: HoloSettingValue | null;
+}>;
+/**
+ * What holo.spot's "Copy settings" button (`</>` in the Object tab) puts on the clipboard: the whole scene and
+ * material. Pass it as `settings` to reproduce it; its `material` applies unless `material` is given with it.
+ */
+export type HoloCopyBlob = Readonly<{
+    holoDev: 1;
+    material?: string;
+    values: Readonly<Record<string, unknown>>;
+    pose?: Readonly<{ rx: number; ry: number }>;
+    [key: string]: unknown;
+}>;
 
+/** The effect's params, as `effect.params` holds them. */
 export type HoloParams = {
     /** Foil material. */
     material: HoloMaterial;
     /**
-     * holo.spot settings by id (the material's `<material>.*`, the lights `studio.*`, `card.*`, …), over holo.spot's
-     * parameter defaults. The typed params below win over them.
+     * holo.spot settings by id over holo.spot's parameter defaults: everything given so far, merged by id (the
+     * scene shorthands, `exposure`, `studio`, …, write here too).
      */
     settings: HoloSettings;
     /**
@@ -175,7 +188,7 @@ export type HoloParams = {
      * set their own (`object` is `"low"`).
      */
     quality: HoloQuality;
-    /** Where the foil is. */
+    /** Where the foil is (not `emboss`, whose paper is the whole card). */
     mask: HoloMask;
     /**
      * How much the element's colour tints the foil as a translucent ink, in [0, 1]. 0: bare foil. All materials but
@@ -183,78 +196,79 @@ export type HoloParams = {
      */
     ink: number;
     /**
-     * How the card moves (default `"3d"`). Both are a scene holospot can draw.
+     * Keep the card flat (default `false`). Both are scenes holospot can draw.
      *
-     * - `"flat"`: the card stays facing the viewer, exactly where the element is, and the pose (pointer tilt, wobble,
+     * - `false`: the card turns with the pose, seen by holospot's camera (`lens`). The output grows by about 21 % of
+     *   the element's size on each side, so the tilted card and its glare fit (holospot's framing: the card at rest
+     *   fills 70 % of the view, exactly the element's rect).
+     * - `true`: the card stays facing the viewer, exactly where the element is, and the pose (pointer tilt, wobble,
      *   `pose`) turns the light rig the other way instead, as holospot's light-rig rotation does. The light meets the
-     *   card as if it were tilted; the view does not change, so the rainbows travel about half as far as in `"3d"`
-     *   (raise `tiltRange` to taste).
-     * - `"3d"`: the card turns with the pose, seen by holospot's camera (`lens`). The output grows by about 21 % of the
-     *   element's size on each side, so the tilted card and its glare fit (holospot's framing: the card at rest fills
-     *   70 % of the view, exactly the element's rect).
+     *   card as if it were tilted; the view does not change, so the rainbows travel about half as far.
      */
-    view: HoloView;
-    /**
-     * holospot's camera lens: focal length in mm on a 36 × 24 mm sensor, 24–200 (holo.spot `dof.lens`). 62 mm is the
-     * 22° camera; shorter is a wider angle with stronger perspective, longer is flatter. The camera steps back or
-     * forward to keep the framing. `null`: the default (or `settings`).
-     */
-    lens: number | null;
+    flat: boolean;
     /**
      * Scale of the foil's structure, 0.25–4 (holo.spot `object.structureScale`; 1 = as designed): shards (`shatter`),
      * flakes (`nebula`), dots (`sparkle`), the paper's tooth and the logo (`emboss`), the relief waves. Above 1 they
-     * get smaller, below 1 larger. The gratings keep their pitch: the colours do not change. Each material also has its own size settings
-     * (`shatter.size`, `nebula.size`, `sparkle.size`, …).
+     * get smaller, below 1 larger. The gratings keep their pitch: the colours do not change.
      */
     structureScale: number;
-    /** Exposure in stops (EV; holo.spot `display.ev`, −3 to 3). `null`: the default (or `settings`). */
-    exposure: number | null;
-    /** Tone curve (holo.spot `display.tone`). `null`: the default (or `settings`). */
-    tone: HoloTone | null;
     /**
-     * Glow around bright points: the share of the light spread into the glow, 0–0.1 (holo.spot `display.glare`).
-     * `null`: the default 0.03 (or `settings`).
-     */
-    glare: number | null;
-    /**
-     * Film grain amplitude in display code values, 0–0.6 (holo.spot `grain.amount`); 0 turns it off. `null`: the
-     * default 0.07 (or `settings`). holospot's own default is 0.18; its looks use 0.07.
-     */
-    grain: number | null;
-    /** Light rig (holo.spot `studio.preset`). `null`: holo.spot's default rig (or `settings`). Single lights: `settings` (`studio.*`). */
-    lights: HoloLights | null;
-    /**
-     * The page behind the element, which the lighting adapts to (holo.spot `scene.background`): `"black"`, `"white"`
-     * or a `#rrggbb` colour. `null`: the default (or `settings`).
-     */
-    background: string | null;
-    /** The card's bow in mm (holo.spot `card.bow`, 0–2): the sheet sags, so the light sweeps across it. `null`: the default. */
-    bow: number | null;
-    /**
-     * Rest pose in degrees, −35 to 35 (holo.spot `motion.pose`): `x` turns the face to the right, `y` tips the top edge
-     * toward the viewer. `null`: the default.
-     */
-    pose: HoloVec2 | null;
-    /**
-     * What the pointer does over the element (holo.spot `motion.pointer`): `"tilt"` tilts the card, `"light"` moves a
-     * flashlight over it (the card stays at its pose), `"flash"` puts the flashlight at the camera, `"none"` ignores the
-     * pointer. `null`: `"tilt"`.
-     */
-    pointer: HoloPointer | null;
-    /** How far the pointer tilts the card, in degrees at the element's edge, 5–35 (holo.spot `motion.tiltRange`). `null`: 25. */
-    tiltRange: number | null;
-    /** Slow automatic tilt while the pointer is away (holo.spot `motion.wobble`). `null`: on. */
-    wobble: boolean | null;
-    /** The wobble's amplitude in degrees, 0–25 (holo.spot `motion.wobbleAmp`). `null`: 14. */
-    wobbleAmp: number | null;
-    /**
-     * 4× multisampling of the card target (half float), as holospot renders. Smooths the card's outline in the `"3d"`
-     * view. Default `true`.
+     * 4× multisampling of the card target (half float), as holospot renders. Smooths the card's outline when it
+     * turns. Default `true`.
      */
     msaa: boolean;
     /** `emboss`: the foil logo's artwork. `null`: the `emboss.logo` setting, else holo.spot's rosette. */
     logo: HoloLogo | null;
 };
+
+/**
+ * Shorthands for holo.spot scene settings: each writes its id(s) into `settings` where it is given, so later values
+ * win, whichever way they are written. `null` removes the id (the default or the look's value applies again). Values
+ * are checked like any setting: out of range is clamped, with a warning.
+ */
+export type HoloSceneParams = {
+    /** Exposure in stops (EV), −3 to 3: `display.ev`. */
+    exposure: number | null;
+    /** Tone curve: `display.tone`. */
+    tone: HoloTone | null;
+    /** Glow around bright points: the share of the light spread into it, 0–0.1: `display.glare`. */
+    glare: number | null;
+    /** Film grain amplitude in display code values, 0–0.6; 0 turns it off: `grain.amount` and `grain.on`. */
+    grain: number | null;
+    /** Light rig: `studio.preset`. Its lights go over the earlier ones; single lights given later win. */
+    studio: HoloStudio | null;
+    /** The page behind the element, which the lighting adapts to: `"black"`, `"white"` or a `#rgb` / `#rrggbb` colour: `scene.background`, `scene.bgColor`. */
+    background: string | null;
+    /** The card's bow in mm, 0–2 (the sheet sags, so the light sweeps across it): `card.bow`. */
+    bow: number | null;
+    /** Rest pose in degrees, −35 to 35: `x` turns the face to the right, `y` tips the top edge toward the viewer: `motion.pose`. */
+    pose: HoloVec2 | null;
+    /**
+     * holospot's camera lens: focal length in mm on a 36 × 24 mm sensor, 24–200: `dof.lens`. It sets the field of
+     * view (62 mm is the 22° camera; shorter is wider with stronger perspective); there is no blur.
+     */
+    lens: number | null;
+    /**
+     * What the pointer does over the element: `"tilt"` tilts the card, `"light"` moves a flashlight over it, `"flash"`
+     * puts the flashlight at the camera, `"none"` (the port's) ignores the pointer: `motion.pointer`.
+     */
+    pointer: HoloPointer | null;
+    /** How far the pointer tilts the card, in degrees at the element's edge, 5–35: `motion.tiltRange`. */
+    tiltRange: number | null;
+    /** Slow automatic tilt while the pointer is away: `motion.wobble`. */
+    wobble: boolean | null;
+    /** The wobble's amplitude in degrees, 0–25: `motion.wobbleAmp`. */
+    wobbleAmp: number | null;
+};
+
+/**
+ * What the constructor and `setParams` take: any of the params, the scene shorthands, and `settings` as ids or a
+ * holo.spot Copy settings blob.
+ */
+export type HoloInput = Partial<Omit<HoloParams, "settings">> &
+    Partial<HoloSceneParams> & {
+        settings?: HoloSettings | HoloCopyBlob;
+    };
 
 const DEFAULT_PARAMS: HoloParams = {
     material: "prism",
@@ -263,29 +277,148 @@ const DEFAULT_PARAMS: HoloParams = {
     quality: "medium",
     mask: "alpha",
     ink: 0,
-    view: "3d",
-    lens: null,
+    flat: false,
     structureScale: 1,
-    exposure: null,
-    tone: null,
-    glare: null,
-    grain: null,
-    lights: null,
-    background: null,
-    bow: null,
-    pose: null,
-    pointer: null,
-    tiltRange: null,
-    wobble: null,
-    wobbleAmp: null,
     msaa: true,
     logo: null,
 };
 
+const PARAM_KEYS = new Set(Object.keys(DEFAULT_PARAMS));
+const MATERIAL_IDS: readonly HoloMaterial[] = [
+    "prism",
+    "shatter",
+    "nebula",
+    "sparkle",
+    "vortex",
+    "emboss",
+];
+
+/** The ids a scene shorthand writes (`null` for each removes it). */
+function sceneWrites(
+    p: Partial<HoloSceneParams>,
+): Record<string, HoloSettingValue | null> {
+    const o: Record<string, HoloSettingValue | null> = {};
+    const set = (
+        v: HoloSettingValue | null | undefined,
+        ...ids: readonly string[]
+    ) => {
+        if (v !== undefined) {
+            for (const id of ids) {
+                o[id] = v;
+            }
+        }
+    };
+    set(p.exposure, "display.ev");
+    set(p.tone, "display.tone");
+    set(p.glare, "display.glare");
+    if (p.grain !== undefined) {
+        o["grain.amount"] = p.grain;
+        o["grain.on"] = p.grain === null ? null : p.grain > 0;
+    }
+    set(p.studio, "studio.preset");
+    if (p.background !== undefined) {
+        const b = p.background?.trim() ?? null;
+        if (b === null || b === "black" || b === "white") {
+            o["scene.background"] = b;
+            o["scene.bgColor"] = null;
+        } else {
+            o["scene.background"] = "colour";
+            o["scene.bgColor"] = b;
+        }
+    }
+    set(p.bow, "card.bow");
+    set(p.pose && { x: p.pose.x, y: p.pose.y }, "motion.pose");
+    set(p.lens, "dof.lens");
+    set(p.pointer, "motion.pointer");
+    set(p.tiltRange, "motion.tiltRange");
+    set(p.wobble, "motion.wobble");
+    set(p.wobbleAmp, "motion.wobbleAmp");
+    return o;
+}
+
+const isSettingValue = (v: unknown): v is HoloSettingValue =>
+    typeof v === "number" ||
+    typeof v === "boolean" ||
+    typeof v === "string" ||
+    (!!v &&
+        typeof v === "object" &&
+        typeof (v as HoloVec2).x === "number" &&
+        typeof (v as HoloVec2).y === "number");
+
+/**
+ * Applies one input to the params, in place. A Copy settings blob replaces the settings (it is a whole scene) and
+ * brings its material; everything else merges by id. A light rig (`studio.preset`) or a material preset select
+ * (`emboss.stock`) writes its values where it is given, so ids given after it win and ids given before it lose.
+ */
+function applyInput(st: HoloParams, input: HoloInput): void {
+    const { settings, ...rest } = input;
+    const writes: Record<string, HoloSettingValue | null> = {};
+    let next: Record<string, HoloSettingValue> = { ...st.settings } as Record<
+        string,
+        HoloSettingValue
+    >;
+    if (isCopyBlob(settings)) {
+        next = {};
+        const m = settings.material;
+        if (rest.material === undefined && m !== undefined) {
+            if (MATERIAL_IDS.includes(m as HoloMaterial)) {
+                st.material = m as HoloMaterial;
+            } else {
+                warnOnce(
+                    `HoloEffect: the Copy settings' material "${m}" is not supported (one of ${MATERIAL_IDS.join(", ")}); keeping "${st.material}".`,
+                );
+            }
+        }
+        for (const [id, v] of Object.entries(settings.values)) {
+            if (isSettingValue(v)) {
+                writes[id] = v;
+            }
+        }
+        const pose = settings.pose;
+        if (
+            pose &&
+            typeof pose.rx === "number" &&
+            typeof pose.ry === "number"
+        ) {
+            writes["motion.pose"] = { x: pose.ry, y: pose.rx };
+        }
+        const ss = settings.values["object.structureScale"];
+        if (rest.structureScale === undefined && typeof ss === "number") {
+            st.structureScale = ss;
+        }
+    } else if (settings) {
+        Object.assign(writes, settings);
+    }
+    Object.assign(writes, sceneWrites(rest));
+    for (const [k, v] of Object.entries(rest)) {
+        if (PARAM_KEYS.has(k) && v !== undefined) {
+            (st as Record<string, unknown>)[k] = v;
+        }
+    }
+    // presets first, so the ids given with them win
+    const rig = writes["studio.preset"];
+    if (typeof rig === "string" && STUDIO_PRESETS[rig]) {
+        Object.assign(next, STUDIO_PRESETS[rig]);
+    }
+    for (const [id, options] of Object.entries(MATERIAL_PRESETS)) {
+        const choice = writes[id];
+        if (typeof choice === "string" && options[choice]) {
+            Object.assign(next, options[choice]);
+        }
+    }
+    for (const [id, v] of Object.entries(writes)) {
+        if (v === null) {
+            delete next[id];
+        } else if (v !== undefined) {
+            next[id] = v;
+        }
+    }
+    st.settings = Object.freeze(next) as HoloSettings;
+}
+
 /**
  * A look holo.spot ships, as params: all of it in `settings` (lights `studio.*`, exposure, glare, grain, card finish,
- * pose, material values), so whatever comes after it (more `settings`, or the typed params) wins. Pass it as one of
- * the constructor's parts, which merge `settings` by id: `new HoloEffect(HoloEffect.looks.card, { exposure: 1 })`.
+ * pose, material values) plus its quality, so whatever comes after it wins.
  */
 function lookParams(
     entries: readonly (readonly [
@@ -297,7 +430,7 @@ function lookParams(
     ])[],
     quality: Exclude<HoloQuality, "auto">,
     material?: HoloMaterial,
-): Readonly<Partial<HoloParams>> {
+): HoloInput {
     const values: Record<string, ParamValue> = {};
     for (const [, e] of entries) {
         Object.assign(values, e.values);
@@ -308,38 +441,20 @@ function lookParams(
     return Object.freeze({
         ...(material ? { material } : {}),
         quality,
-        settings: Object.freeze(values),
+        settings: Object.freeze(values) as HoloSettings,
     });
 }
 
-/** Merges param objects in order; `settings` merge by id (a holo.spot Copy settings blob replaces them). */
-function mergeParams(
-    parts: readonly Partial<HoloParams>[],
-): Partial<HoloParams> {
-    const out: Partial<HoloParams> = {};
-    for (const p of parts) {
-        const { settings, ...rest } = p;
-        Object.assign(out, rest);
-        if (settings) {
-            out.settings =
-                isCopyBlob(settings) || isCopyBlob(out.settings)
-                    ? settings
-                    : { ...out.settings, ...settings };
-        }
-    }
-    return out;
-}
-
-/** Params of holo.spot's material presets: `material` and its `settings`. */
-export type HoloPreset = Readonly<{
+/** A holospot material starting point: `material` and its `settings`. */
+export type HoloStartingPoint = Readonly<{
     material: HoloMaterial;
     settings: HoloSettings;
 }>;
 
-/** holospot's material "Starting points", by material and name (see `HoloEffect.presets`). */
-export type HoloPresets = {
-    readonly [M in keyof HoloPresetNames]: {
-        readonly [N in HoloPresetNames[M]]: HoloPreset;
+/** holospot's material "Starting points", by material and name (see `HoloEffect.startingPoints`). */
+export type HoloStartingPoints = {
+    readonly [M in keyof HoloStartingPointNames]: {
+        readonly [N in HoloStartingPointNames[M]]: HoloStartingPoint;
     };
 };
 
@@ -352,62 +467,6 @@ const lookEntries = (name: "card" | "object") =>
             pose: { rx: number; ry: number };
         },
     ][];
-
-/** The holo.spot settings the typed params stand for (they win over `settings`). */
-function typedSettings(p: HoloParams): Record<string, ParamValue> {
-    const o: Record<string, ParamValue> = {};
-    const fin = (x: number | null): x is number =>
-        typeof x === "number" && Number.isFinite(x);
-    if (fin(p.exposure)) {
-        o["display.ev"] = Math.min(Math.max(p.exposure, -3), 3);
-    }
-    if (p.tone) {
-        o["display.tone"] = p.tone;
-    }
-    if (fin(p.glare)) {
-        o["display.glare"] = Math.min(Math.max(p.glare, 0), 0.1);
-    }
-    if (fin(p.grain)) {
-        const g = Math.min(Math.max(p.grain, 0), 0.6);
-        o["grain.on"] = g > 0;
-        o["grain.amount"] = g;
-    }
-    if (p.lights) {
-        o["studio.preset"] = p.lights;
-    }
-    if (p.background) {
-        const b = p.background.trim();
-        if (b === "black" || b === "white") {
-            o["scene.background"] = b;
-        } else {
-            o["scene.background"] = "colour";
-            o["scene.bgColor"] = b;
-        }
-    }
-    if (fin(p.bow)) {
-        o["card.bow"] = Math.min(Math.max(p.bow, 0), 2);
-    }
-    if (p.pose && fin(p.pose.x) && fin(p.pose.y)) {
-        const c = (v: number) => Math.min(Math.max(v, -35), 35);
-        o["motion.pose"] = { x: c(p.pose.x), y: c(p.pose.y) };
-    }
-    if (fin(p.lens)) {
-        o["dof.lens"] = Math.min(Math.max(p.lens, 24), 200);
-    }
-    if (p.pointer) {
-        o["motion.pointer"] = p.pointer;
-    }
-    if (fin(p.tiltRange)) {
-        o["motion.tiltRange"] = Math.min(Math.max(p.tiltRange, 5), 35);
-    }
-    if (typeof p.wobble === "boolean") {
-        o["motion.wobble"] = p.wobble;
-    }
-    if (fin(p.wobbleAmp)) {
-        o["motion.wobbleAmp"] = Math.min(Math.max(p.wobbleAmp, 0), 25);
-    }
-    return o;
-}
 
 const MATERIALS: Record<HoloMaterialId, MaterialDef> = {
     prism,
@@ -578,7 +637,7 @@ void main() {
  * ```
  */
 export class HoloEffect implements Effect {
-    params: HoloParams;
+    #p: HoloParams = { ...DEFAULT_PARAMS };
 
     #resolved: Resolved | null = null;
     #scene: SceneState | null = null;
@@ -635,28 +694,85 @@ export class HoloEffect implements Effect {
     #started = false;
 
     /**
-     * Takes any number of param objects, merged in order: later ones win, and `settings` merge by id. So a look, a
-     * material preset and your own values compose:
-     * `new HoloEffect(HoloEffect.looks.card, HoloEffect.presets.prism.compactDisc, { exposure: 1 })`.
+     * Takes any number of inputs, applied in order: later ones win, and `settings` merge by id. So a look, a material
+     * starting point and your own values compose:
+     * `new HoloEffect(HoloEffect.looks.card, HoloEffect.startingPoints.prism.compactDisc, { exposure: 1 })`.
      */
-    constructor(...parts: Partial<HoloParams>[]) {
-        this.params = { ...DEFAULT_PARAMS, ...mergeParams(parts) };
+    constructor(...inputs: HoloInput[]) {
+        for (const input of inputs) {
+            applyInput(this.#p, input);
+        }
+    }
+
+    /** The params in effect (read-only; change them with `setParams`). Scene shorthands are in `settings`. */
+    get params(): Readonly<HoloParams> {
+        return this.#p;
     }
 
     /**
-     * The looks holo.spot ships, as params: `card` (its holographic card), `object` (its 3D object), `image` (its
-     * Foil Emboss paper card; sets `material: "emboss"`). Each also sets the `quality` holospot ships it with. Without one, the effect starts from holo.spot's
-     * parameter defaults. Looks set the scene (lights, pose, exposure, …); `HoloEffect.presets` set the material.
+     * Applies an input over the current params, as one more constructor argument would: later values win, `settings`
+     * merge by id. With `{ resetSettings: true }` the settings start over from holo.spot's defaults first (to switch
+     * looks, for example).
+     */
+    setParams(input: HoloInput, opts?: { resetSettings?: boolean }): void {
+        if (opts?.resetSettings) {
+            this.#p.settings = {};
+        }
+        applyInput(this.#p, input);
+        this.#dirty = true;
+    }
+
+    /**
+     * Resolves once the effect has drawn a frame with everything it loads in place: for `emboss`, the logo and the
+     * paper maps, which load in the background (until then the card is drawn without them). A logo that fails to
+     * load does not reject it; see `errors`.
+     */
+    get ready(): Promise<void> {
+        if (this.#readyNow()) {
+            return Promise.resolve();
+        }
+        return new Promise((resolve) => this.#readyWaiters.push(resolve));
+    }
+
+    /** Loading errors (a logo that could not be fetched or read, …), newest last; cleared when the input changes. */
+    get errors(): readonly string[] {
+        return this.#emboss?.errors ?? [];
+    }
+
+    #readyWaiters: (() => void)[] = [];
+    #drawnOnce = false;
+    #readyNow(): boolean {
+        return (
+            this.#drawnOnce &&
+            !this.#dirty &&
+            (this.#p.material !== "emboss" || !this.#emboss?.busy)
+        );
+    }
+    #settleReady(): void {
+        if (this.#readyWaiters.length > 0 && this.#readyNow()) {
+            const w = this.#readyWaiters;
+            this.#readyWaiters = [];
+            for (const f of w) {
+                f();
+            }
+        }
+    }
+
+    /**
+     * The looks holo.spot ships, as inputs: `card` (its holographic card), `object` (its 3D object), `image` (its
+     * Foil Emboss paper card; sets `material: "emboss"`). Each sets the scene (lights, pose, exposure, …, all in
+     * `settings`) and the `quality` holospot ships it with. Without one, the effect starts from holo.spot's parameter
+     * defaults. Pass a look as its own argument, not spread, so the `settings` after it merge by id.
      *
      * @example
      * ```ts
-     * new HoloEffect({ ...HoloEffect.looks.card, material: "shatter", lights: "softbox" });
+     * new HoloEffect(HoloEffect.looks.card, { material: "shatter", studio: "softbox" });
      * ```
      */
     static readonly looks: Readonly<{
-        card: Readonly<Partial<HoloParams>>;
-        object: Readonly<Partial<HoloParams>>;
-        image: Readonly<Partial<HoloParams>>;
+        card: HoloInput;
+        object: HoloInput;
+        image: HoloInput;
     }> = Object.freeze({
         card: lookParams(lookEntries("card"), "medium"),
         object: lookParams(lookEntries("object"), "low"),
@@ -675,11 +791,11 @@ export class HoloEffect implements Effect {
     });
 
     /**
-     * Material presets: the "Starting points" of holospot's material docs, as params (`material` and `settings`). They
-     * set the material only, not the lights or the pose, so combine them with a look:
-     * `new HoloEffect(HoloEffect.looks.card, HoloEffect.presets.prism.compactDisc)`.
+     * The "Starting points" of holospot's material docs, as inputs (`material` and `settings`). They set the material
+     * only, not the lights or the pose, so combine them with a look:
+     * `new HoloEffect(HoloEffect.looks.card, HoloEffect.startingPoints.prism.compactDisc)`.
      */
-    static readonly presets: HoloPresets = Object.freeze(
+    static readonly startingPoints: HoloStartingPoints = Object.freeze(
         Object.fromEntries(
             Object.entries(STARTING_POINTS).map(([m, ps]) => [
                 m,
@@ -689,14 +805,16 @@ export class HoloEffect implements Effect {
                             name,
                             Object.freeze({
                                 material: m as HoloMaterial,
-                                settings: Object.freeze({ ...settings }),
+                                settings: Object.freeze({
+                                    ...settings,
+                                }) as HoloSettings,
                             }),
                         ]),
                     ),
                 ),
             ]),
         ),
-    ) as HoloPresets;
+    ) as HoloStartingPoints;
 
     /**
      * The holo.spot settings a material understands (its own ids, then the scene's), for building controls. Ids, ranges
@@ -713,8 +831,8 @@ export class HoloEffect implements Effect {
     }
 
     /**
-     * The settings in effect: holo.spot's defaults, then `settings`, then the typed params (`exposure`, `glare`, …), by
-     * holo.spot id. Useful to show a control's current value.
+     * The settings in effect, by holo.spot id: holo.spot's defaults with `settings` over them, checked (clamped to
+     * the ranges, invalid values dropped). Useful to show a control's current value.
      */
     resolvedSettings(): Readonly<Record<string, HoloSettingValue>> {
         if (this.#dirty || !this.#resolved) {
@@ -726,17 +844,6 @@ export class HoloEffect implements Effect {
         }
         // the rest pose in effect (motion.pose / pose when given): x = ry, y = rx
         return { ...r.values, "motion.pose": { x: r.pose.ry, y: r.pose.rx } };
-    }
-
-    setParams(updates: Partial<HoloParams>): void {
-        if (updates.settings) {
-            const merged = isCopyBlob(updates.settings)
-                ? updates.settings
-                : { ...this.params.settings, ...updates.settings };
-            updates = { ...updates, settings: merged };
-        }
-        Object.assign(this.params, updates);
-        this.#dirty = true;
     }
 
     /** The tier `quality: "auto"` picks, detected once from the GL context. */
@@ -817,7 +924,7 @@ export class HoloEffect implements Effect {
     outputRect(
         dims: EffectDims,
     ): readonly [number, number, number, number] | undefined {
-        if (this.params.view !== "3d") {
+        if (this.params.flat) {
             return undefined;
         }
         const [w, h] = dims.elementPixel;
@@ -845,18 +952,12 @@ export class HoloEffect implements Effect {
     }
 
     #resolve(): void {
-        const p = this.params;
-        const s = p.settings as unknown;
-        const blob = isCopyBlob(s) ? s : null;
-        const material = p.material;
-        const given = {
-            ...((blob ? blob.values : p.settings) as Record<
-                string,
-                ParamValue | undefined
-            >),
-            ...typedSettings(p),
-        };
-        this.#resolved = resolveSettings(material, "plain", given, blob?.pose);
+        const p = this.#p;
+        this.#resolved = resolveSettings(
+            p.material,
+            "plain",
+            p.settings as Readonly<Record<string, ParamValue>>,
+        );
         this.#scene = sceneStateFrom(this.#resolved.values);
         const def = this.#def();
         this.#matUniforms = def.uniforms(this.#resolved.values);
@@ -936,7 +1037,7 @@ export class HoloEffect implements Effect {
         this.#domainMm = [w * k * ss, h * k * ss];
         const fov = lensFovDeg(s.lensMm);
         const tanHalf = Math.tan((fov * Math.PI) / 360);
-        const view3d = this.params.view === "3d";
+        const view3d = !this.params.flat;
         let D = framingDistance(
             w / h,
             this.#cardSizeMm[0] / 2000,
@@ -1109,7 +1210,7 @@ export class HoloEffect implements Effect {
 
         const emb =
             this.params.material === "emboss" ? this.#embossUniforms(ctx) : {};
-        const persp = this.params.view === "3d";
+        const persp = !this.params.flat;
         const card = {
             uCardRot: this.#cardRot,
             uPrevCardRot: this.#prevCardRot,
@@ -1119,7 +1220,11 @@ export class HoloEffect implements Effect {
             uViewProj: this.#viewProj,
             uPersp: persp ? 1 : 0,
         };
-        const mask = MASKS[this.params.mask] ?? 0;
+        // the emboss paper is the whole card
+        const mask =
+            this.params.material === "emboss"
+                ? MASKS.none
+                : (MASKS[this.params.mask] ?? 0);
         if (persp) {
             ctx.clear(this.#hdr);
             if (mask === 1) {
@@ -1236,6 +1341,8 @@ export class HoloEffect implements Effect {
                 ...grainUniforms(s.grain, ctx.pixelRatio, ctx.time),
             },
         });
+        this.#drawnOnce = true;
+        this.#settleReady();
     }
 
     /** Uploads the Foil Emboss textures when they change and returns their uniforms. */
