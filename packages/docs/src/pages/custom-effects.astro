@@ -127,8 +127,9 @@ render(ctx) {
 `;
 
 const mrtCode = `
-// frag: layout(location = 0) out vec4 outPos;
-//       layout(location = 1) out vec4 outVel;
+// frag: layout(location = 0) out vec4 outPos; // xyz + age
+//       layout(location = 1) out vec4 outVel; // xyz
+// The shader computes the force once and writes both.
 init(ctx) {
     const opts = { size: [256, 256], float: true, persistent: true };
     this.pos = ctx.createRenderTarget(opts);
@@ -406,8 +407,10 @@ for (const img of document.querySelectorAll("img")) {
         <p>
             To write several targets in one draw, pass an array as
             <code>target</code>. Target <code>i</code> gets the output declared
-            with <code>layout(location = i) out</code>. This is handy for
-            particle simulations that update position and velocity together.
+            with <code>layout(location = i) out</code>. Use it when state
+            needs more than one vec4 per texel and the outputs share work, so
+            it runs once. For example, 3D particles keep position and age in
+            one target and velocity in another.
         </p>
         <CodeBlock code={mrtCode} lang="ts" label="EffectContext" />
         <p>

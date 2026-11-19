@@ -10,68 +10,89 @@ import "./preset.css";
 import { initVFX, isChromatic } from "./utils";
 
 // The state textures are SIZE x SIZE, one texel per particle.
-const SIZE = 128;
+const SIZE = 64;
+const DT = 1 / 60;
+const MAX_STEPS_PER_FRAME = 4;
+const CHROMATIC_STEPS = 180;
 
-// Writes position to location 0 and velocity to location 1.
+// Shared by the simulation and the points draw.
+const COMMON = `
+const float SIZE = ${SIZE.toFixed(1)};
+
+// A fixed lattice on a sphere, one point per texel.
+vec3 startPosition(vec2 uv) {
+    float theta = uv.x * 6.2831853;
+    float phi = uv.y * 3.1415927;
+    return 0.8 * vec3(sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta));
+}
+
+// Lifetimes from 180 to 324 steps, staggered by particle index.
+// Age counts whole steps, which stay exact in half-float targets too.
+float lifetime(vec2 uv) {
+    vec2 cell = floor(uv * SIZE);
+    return 180.0 + mod(cell.y * SIZE + cell.x, 7.0) * 24.0;
+}
+`;
+
+// pos = xyz + age in steps, vel = xyz.
 const SIMULATE_FRAG = `#version 300 es
 precision highp float;
 in vec2 uv;
 uniform sampler2D pos;
 uniform sampler2D vel;
-uniform float time;
-uniform bool reset;
+uniform float frame;
 layout(location = 0) out vec4 outPos;
 layout(location = 1) out vec4 outVel;
+${COMMON}
+const float DT = ${DT.toFixed(8)};
 
-vec2 hash(vec2 p) {
-    vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
-    q += dot(q, q.yzx + 33.33);
-    return fract((q.xx + q.yz) * q.zy);
+vec3 force(vec3 p, float t) {
+    vec3 swirl = vec3(sin(p.y * 3.0 + t * 0.5), sin(p.z * 3.0 + t * 0.7), sin(p.x * 3.0 + t * 0.3));
+    vec3 spin = cross(vec3(0.0, 1.0, 0.0), p);
+    return swirl * 0.8 + spin * 0.6 - p * 0.3;
 }
 
 void main() {
-    if (reset) {
-        outPos = vec4(hash(uv * 512.0) * 2.0 - 1.0, 0.0, 1.0);
+    vec4 state = texture(pos, uv);
+    float age = state.w + 1.0;
+    if (frame == 0.0 || age > lifetime(uv)) {
+        outPos = vec4(startPosition(uv), 0.0);
         outVel = vec4(0.0);
         return;
     }
-    vec2 p = texture(pos, uv).xy;
-    vec2 v = texture(vel, uv).xy;
-
-    // Pull toward a moving point, and swirl around it.
-    vec2 center = 0.5 * vec2(cos(time * 0.7), sin(time * 1.1));
-    vec2 d = center - p;
-    vec2 force = d * 2.0 + vec2(-d.y, d.x) * 1.5;
-    v = (v + force * 0.016) * 0.985;
-    p += v * 0.016;
-
-    outPos = vec4(p, 0.0, 1.0);
-    outVel = vec4(v, 0.0, 1.0);
+    // One force evaluation updates both outputs; MRT writes them in one pass.
+    vec3 v = (texture(vel, uv).xyz + force(state.xyz, frame * DT) * DT) * 0.99;
+    outPos = vec4(state.xyz + v * DT, age);
+    outVel = vec4(v, 0.0);
 }
 `;
 
 const POINTS_VERT = `#version 300 es
 in vec2 particle;
 uniform sampler2D pos;
-uniform sampler2D vel;
-out float vSpeed;
+uniform float aspect;
+uniform float pixelRatio;
+out float vFade;
+${COMMON}
 
 void main() {
-    vec2 p = texture(pos, particle).xy;
-    vSpeed = length(texture(vel, particle).xy);
-    gl_Position = vec4(p, 0.0, 1.0);
-    gl_PointSize = 2.0;
+    vec4 state = texture(pos, particle);
+    // Fixed camera at z = 3, looking at the origin.
+    vec3 view = state.xyz - vec3(0.0, 0.0, 3.0);
+    float focal = 2.0;
+    gl_Position = vec4(view.x * focal / aspect, view.y * focal, 0.0, -view.z);
+    gl_PointSize = 4.0 * pixelRatio / -view.z;
+    vFade = sin(3.1415927 * clamp(state.w / lifetime(particle), 0.0, 1.0));
 }
 `;
 
 const POINTS_FRAG = `#version 300 es
 precision highp float;
-in float vSpeed;
+in float vFade;
 out vec4 outColor;
 
 void main() {
-    vec3 color = mix(vec3(0.2, 0.5, 1.0), vec3(1.0, 0.6, 0.3), clamp(vSpeed, 0.0, 1.0));
-    outColor = vec4(color * 0.6, 0.6);
+    outColor = vec4(0.3, 0.6, 1.0, 1.0) * 0.5 * vFade;
 }
 `;
 
@@ -92,7 +113,8 @@ class ParticlesEffect implements Effect {
     #points = makePoints();
     #pos: EffectRenderTarget | null = null;
     #vel: EffectRenderTarget | null = null;
-    #reset = true;
+    #frame = 0;
+    #pendingTime = 0;
 
     init(ctx: EffectContext): void {
         const opts = {
@@ -105,30 +127,46 @@ class ParticlesEffect implements Effect {
         this.#vel = ctx.createRenderTarget(opts);
     }
 
+    // Whole fixed steps, so the motion is the same at any frame rate.
+    #stepCount(deltaTime: number): number {
+        if (isChromatic()) {
+            return this.#frame === 0 ? CHROMATIC_STEPS : 0;
+        }
+        this.#pendingTime += deltaTime;
+        const steps = Math.floor(this.#pendingTime / DT);
+        this.#pendingTime -= steps * DT;
+        const capped = Math.min(steps, MAX_STEPS_PER_FRAME);
+        // The first frame steps once to place the particles.
+        return this.#frame === 0 ? Math.max(capped, 1) : capped;
+    }
+
     render(ctx: EffectContext): void {
         const pos = this.#pos;
         const vel = this.#vel;
         if (!pos || !vel) {
             return;
         }
-        ctx.draw({
-            frag: SIMULATE_FRAG,
-            uniforms: {
-                pos,
-                vel,
-                time: isChromatic() ? 2 : ctx.time,
-                reset: this.#reset,
-            },
-            target: [pos, vel],
-        });
-        this.#reset = false;
+        const steps = this.#stepCount(ctx.deltaTime);
+        for (let i = 0; i < steps; i++) {
+            ctx.draw({
+                frag: SIMULATE_FRAG,
+                uniforms: { pos, vel, frame: this.#frame },
+                target: [pos, vel],
+            });
+            this.#frame++;
+        }
 
+        const [width, height] = ctx.dims.elementPixel;
         ctx.blit(ctx.src);
         ctx.draw({
             vert: POINTS_VERT,
             frag: POINTS_FRAG,
             geometry: this.#points,
-            uniforms: { pos, vel },
+            uniforms: {
+                pos,
+                aspect: width / height,
+                pixelRatio: ctx.pixelRatio,
+            },
             target: ctx.target,
             blend: "additive",
         });

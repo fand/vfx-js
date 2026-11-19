@@ -205,19 +205,23 @@ render(ctx) {
 
 Pass an array as `target` to write several targets in one draw.
 Target `i` gets the output declared with `layout(location = i) out`.
+Use it when state needs more than one vec4 per texel and the outputs share work, so it runs once.
 
 ```ts
 const SIMULATE = `#version 300 es
 precision highp float;
 in vec2 uv;
-uniform sampler2D pos;
-uniform sampler2D vel;
+uniform sampler2D pos; // xyz + age
+uniform sampler2D vel; // xyz
 layout(location = 0) out vec4 outPos;
 layout(location = 1) out vec4 outVel;
+const float DT = 1.0 / 60.0;
+vec3 force(vec3 p) { return -p; } // your force field
 void main() {
-    vec4 v = texture(vel, uv);
-    outPos = texture(pos, uv) + v * 0.01;
-    outVel = v;
+    vec4 p = texture(pos, uv);
+    vec3 v = texture(vel, uv).xyz + force(p.xyz) * DT; // shared by both outputs
+    outPos = vec4(p.xyz + v * DT, p.w + DT);
+    outVel = vec4(v, 0.0);
 }`;
 
 init(ctx) {

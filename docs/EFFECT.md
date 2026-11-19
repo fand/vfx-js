@@ -213,11 +213,14 @@ Default varyings (all in [0, 1], nested largest→smallest):
 #### Multiple render targets
 
 Pass an array as `target` to write several targets in one draw. Target
-`i` gets the output declared with `layout(location = i) out`:
+`i` gets the output declared with `layout(location = i) out`. Use it when
+state needs more than one vec4 per texel and the outputs share work, so
+it runs once:
 
 ```ts
-// frag: layout(location = 0) out vec4 outPos;
-//       layout(location = 1) out vec4 outVel;
+// frag: layout(location = 0) out vec4 outPos; // xyz + age
+//       layout(location = 1) out vec4 outVel; // xyz
+// Compute the force once, then write both.
 ctx.draw({
     frag: SIMULATE,
     uniforms: { pos: this.#pos, vel: this.#vel },
