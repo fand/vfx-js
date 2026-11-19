@@ -13,6 +13,10 @@ import type {
 } from "@vfx-js/core";
 import { LOOKS } from "./_holo/data/looks.js";
 import { PARAM_SPECS } from "./_holo/data/params.js";
+import {
+    type HoloPresetNames,
+    STARTING_POINTS,
+} from "./_holo/data/starting-points.js";
 import { EmbossAssets } from "./_holo/emboss-assets.js";
 import { HoloGlare } from "./_holo/glare.js";
 import outputFrag from "./_holo/glsl/output.js";
@@ -298,6 +302,37 @@ function lookParams(
     return Object.freeze(out);
 }
 
+/** Merges param objects in order; `settings` merge by id (a holo.spot Copy settings blob replaces them). */
+function mergeParams(
+    parts: readonly Partial<HoloParams>[],
+): Partial<HoloParams> {
+    const out: Partial<HoloParams> = {};
+    for (const p of parts) {
+        const { settings, ...rest } = p;
+        Object.assign(out, rest);
+        if (settings) {
+            out.settings =
+                isCopyBlob(settings) || isCopyBlob(out.settings)
+                    ? settings
+                    : { ...out.settings, ...settings };
+        }
+    }
+    return out;
+}
+
+/** Params of holo.spot's material presets: `material` and its `settings`. */
+export type HoloPreset = Readonly<{
+    material: HoloMaterial;
+    settings: HoloSettings;
+}>;
+
+/** holospot's material "Starting points", by material and name (see `HoloEffect.presets`). */
+export type HoloPresets = {
+    readonly [M in keyof HoloPresetNames]: {
+        readonly [N in HoloPresetNames[M]]: HoloPreset;
+    };
+};
+
 /** A look's entries: the foils share its scene values, each adds its own material values. */
 const lookEntries = (name: "card" | "object") =>
     Object.entries(LOOKS[name]).filter(([m]) => m !== "emboss") as [
@@ -575,14 +610,19 @@ export class HoloEffect implements Effect {
     #pointerSeen = false;
     #started = false;
 
-    constructor(initial: Partial<HoloParams> = {}) {
-        this.params = { ...DEFAULT_PARAMS, ...initial };
+    /**
+     * Takes any number of param objects, merged in order: later ones win, and `settings` merge by id. So a look, a
+     * material preset and your own values compose:
+     * `new HoloEffect(HoloEffect.looks.card, HoloEffect.presets.prism.compactDisc, { exposure: 1 })`.
+     */
+    constructor(...parts: Partial<HoloParams>[]) {
+        this.params = { ...DEFAULT_PARAMS, ...mergeParams(parts) };
     }
 
     /**
      * The looks holo.spot ships, as params to spread: `card` (its holographic card), `object` (its 3D object),
      * `paperCard` (its Foil Emboss paper card; sets `material: "emboss"`). Without one, the effect starts from holo.spot's
-     * parameter defaults.
+     * parameter defaults. Looks set the scene (lights, pose, exposure, …); `HoloEffect.presets` set the material.
      *
      * @example
      * ```ts
@@ -608,6 +648,30 @@ export class HoloEffect implements Effect {
             "emboss",
         ),
     });
+
+    /**
+     * Material presets: the "Starting points" of holospot's material docs, as params (`material` and `settings`). They
+     * set the material only, not the lights or the pose, so combine them with a look:
+     * `new HoloEffect(HoloEffect.looks.card, HoloEffect.presets.prism.compactDisc)`.
+     */
+    static readonly presets: HoloPresets = Object.freeze(
+        Object.fromEntries(
+            Object.entries(STARTING_POINTS).map(([m, ps]) => [
+                m,
+                Object.freeze(
+                    Object.fromEntries(
+                        Object.entries(ps).map(([name, settings]) => [
+                            name,
+                            Object.freeze({
+                                material: m as HoloMaterial,
+                                settings: Object.freeze({ ...settings }),
+                            }),
+                        ]),
+                    ),
+                ),
+            ]),
+        ),
+    ) as HoloPresets;
 
     /**
      * The holo.spot settings a material understands (its own ids, then the scene's), for building controls. Ids, ranges

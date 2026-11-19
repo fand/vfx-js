@@ -112,6 +112,41 @@ export const LOGO_DEFAULT = "/logos/rosette.svg";
 `,
 );
 
+// The "Starting points" of holospot's material docs (docs/materials/<material>.md): a bold name, a sentence, a JSON map.
+// A starting point that needs an unported feature (the emboss hologram sticker) is skipped.
+const camel = (name) =>
+    name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+(.)/g, (_, c) => c.toUpperCase())
+        .replace(/[^a-zA-Z0-9]/g, "");
+const startingPoints = {};
+for (const m of MATERIALS) {
+    const md = readFileSync(join(root, "docs/materials", `${m}.md`), "utf8");
+    const sec = md.split("## Starting points")[1]?.split("\n## ")[0] ?? "";
+    const out = {};
+    for (const [, name, json] of sec.matchAll(/\*\*([^*]+?)\.\*\*[^\n]*\n+```json\n([\s\S]*?)```/g)) {
+        const values = JSON.parse(json);
+        if (Object.keys(values).some((id) => !supported(id))) continue;
+        out[camel(name)] = values;
+    }
+    startingPoints[m] = out;
+}
+writeFileSync(
+    new URL("starting-points.ts", out),
+    `${header}import type { ParamValue } from "../types.js";
+
+/** holospot's material "Starting points" (docs/materials/<material>.md), by material and camel-cased name. */
+/** Names of holospot's material starting points, by material (\`HoloEffect.presets\`). */
+export type HoloPresetNames = {
+${Object.entries(startingPoints)
+    .map(([m, ps]) => `    ${m}: ${Object.keys(ps).map((n) => JSON.stringify(n)).join(" | ")};`)
+    .join("\n")}
+};
+
+export const STARTING_POINTS = ${ts(startingPoints)} as const satisfies Readonly<Record<string, Readonly<Record<string, Readonly<Record<string, ParamValue>>>>>>;
+`,
+);
+
 const presets = read("studio-presets.json");
 writeFileSync(
     new URL("studio-presets.ts", out),

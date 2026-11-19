@@ -1,3 +1,4 @@
+export type { HoloPresetNames } from "./_holo/data/starting-points.js";
 export {
     ASCII_PRESETS,
     type AsciiCharRamp,
@@ -46,6 +47,8 @@ export {
     type HoloMaterial,
     type HoloParams,
     type HoloPointer,
+    type HoloPreset,
+    type HoloPresets,
     type HoloQuality,
     type HoloSettingSpec,
     type HoloSettings,
