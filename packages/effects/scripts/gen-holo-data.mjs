@@ -27,8 +27,10 @@ const supported = (id) =>
     (SCENE_IDS.some((r) => r.test(id)) || MATERIALS.includes(id.split(".")[0]));
 
 const params = read("params.json");
+// The port's own defaults where it departs from holospot's: holo.spot's looks use 0.07 grain, not the 0.18 default.
+const PORT_DEFAULTS = { "grain.amount": 0.07 };
 const keep = (p) => {
-    const o = { id: p.id, kind: p.kind, default: p.default };
+    const o = { id: p.id, kind: p.kind, default: PORT_DEFAULTS[p.id] ?? p.default };
     if (p.min !== undefined) o.min = p.min;
     if (p.max !== undefined) o.max = p.max;
     if (p.step !== undefined) o.step = p.step;

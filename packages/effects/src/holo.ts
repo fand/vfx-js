@@ -203,9 +203,15 @@ export type HoloParams = {
     exposure: number | null;
     /** Tone curve (holo.spot `display.tone`). `null`: the default (or `settings`). */
     tone: HoloTone | null;
-    /** Glow around bright points, in [0, 1] (holo.spot `display.glare` 0–0.1). `null`: the default (or `settings`). */
+    /**
+     * Glow around bright points: the share of the light spread into the glow, 0–0.1 (holo.spot `display.glare`).
+     * `null`: the default 0.03 (or `settings`).
+     */
     glare: number | null;
-    /** Film grain, in [0, 1] (holo.spot `grain.amount` 0–0.6; 0 turns it off). `null`: the default (or `settings`). */
+    /**
+     * Film grain amplitude in display code values, 0–0.6 (holo.spot `grain.amount`); 0 turns it off. `null`: the
+     * default 0.07 (or `settings`). holospot's own default is 0.18; its looks use 0.07.
+     */
     grain: number | null;
     /** Light rig (holo.spot `studio.preset`). `null`: holo.spot's default rig (or `settings`). Single lights: `settings` (`studio.*`). */
     lights: HoloLights | null;
@@ -340,12 +346,12 @@ function typedSettings(p: HoloParams): Record<string, ParamValue> {
         o["display.tone"] = p.tone;
     }
     if (fin(p.glare)) {
-        o["display.glare"] = 0.1 * Math.min(Math.max(p.glare, 0), 1);
+        o["display.glare"] = Math.min(Math.max(p.glare, 0), 0.1);
     }
     if (fin(p.grain)) {
-        const g = Math.min(Math.max(p.grain, 0), 1);
+        const g = Math.min(Math.max(p.grain, 0), 0.6);
         o["grain.on"] = g > 0;
-        o["grain.amount"] = 0.6 * g;
+        o["grain.amount"] = g;
     }
     if (p.lights) {
         o["studio.preset"] = p.lights;

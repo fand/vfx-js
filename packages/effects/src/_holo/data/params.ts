@@ -353,7 +353,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
     {
         id: "grain.amount",
         kind: "slider",
-        default: 0.18,
+        default: 0.07,
         min: 0,
         max: 0.6,
         step: 0.005,

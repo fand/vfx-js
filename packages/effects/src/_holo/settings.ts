@@ -301,7 +301,7 @@ export function sceneStateFrom(v: ParamValues): SceneState {
         lensMm: clamp(num(v, "dof.lens", 62), 24, 200),
         grain: {
             on: bool(v, "grain.on", true),
-            amount: clamp(num(v, "grain.amount", 0.18), 0, 0.6),
+            amount: clamp(num(v, "grain.amount", 0.07), 0, 0.6),
             sizePx: clamp(num(v, "grain.size", 1), 1, 4),
             animated: bool(v, "grain.animated", true),
             colour: pick<"mono" | "rgb">(

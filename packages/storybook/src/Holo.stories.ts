@@ -198,9 +198,8 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         const scene = {
             exposure: num("display.ev", 0.5),
             tone: (v["display.tone"] as HoloTone) ?? "neutral",
-            glare: num("display.glare", 0.03) / 0.1,
-            grain:
-                v["grain.on"] === false ? 0 : num("grain.amount", 0.18) / 0.6,
+            glare: num("display.glare", 0.03),
+            grain: v["grain.on"] === false ? 0 : num("grain.amount", 0.07),
             lights: params.lights ?? "(default)",
             background:
                 bg === "colour"
@@ -224,11 +223,11 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         }).on("change", (ev) =>
             effect.setParams({ tone: ev.value as HoloTone }),
         );
-        sc.addBinding(scene, "glare", { min: 0, max: 1, step: 0.01 }).on(
+        sc.addBinding(scene, "glare", { min: 0, max: 0.1, step: 0.001 }).on(
             "change",
             (ev) => effect.setParams({ glare: ev.value }),
         );
-        sc.addBinding(scene, "grain", { min: 0, max: 1, step: 0.01 }).on(
+        sc.addBinding(scene, "grain", { min: 0, max: 0.6, step: 0.005 }).on(
             "change",
             (ev) => effect.setParams({ grain: ev.value }),
         );

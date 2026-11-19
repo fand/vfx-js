@@ -18,6 +18,16 @@ test("the default is holo.spot's parameter defaults", () => {
     expect(v["prism.pitch"]).toBe(1000);
     expect(v["prism.pattern"]).toBe("linear");
     expect(v["motion.pose"]).toEqual({ x: 0, y: 0 });
+    expect(v["grain.amount"]).toBe(0.07); // the port's default (holospot's is 0.18)
+});
+
+test("grain and glare take holo.spot's units", () => {
+    const v = new HoloEffect({ grain: 0.18, glare: 0.05 }).resolvedSettings();
+    expect(v["grain.amount"]).toBe(0.18);
+    expect(v["grain.on"]).toBe(true);
+    expect(v["display.glare"]).toBe(0.05);
+    const off = new HoloEffect({ grain: 0 }).resolvedSettings();
+    expect(off["grain.on"]).toBe(false);
 });
 
 test("resolvedSettings: defaults, then settings, then typed params", () => {

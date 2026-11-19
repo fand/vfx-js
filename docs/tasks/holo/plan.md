@@ -294,3 +294,6 @@ view no camera has. Now both views are scenes holospot can draw:
   keeps the framing).
 
 Looks now carry everything in `settings` (pose as `motion.pose`), so whatever comes after them wins.
+
+The typed `glare` and `grain` take holo.spot's units (`display.glare` 0–0.1, `grain.amount` 0–0.6). The port's
+default grain is 0.07, the value holo.spot's looks use (holospot's parameter default is 0.18).
