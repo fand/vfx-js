@@ -40,6 +40,7 @@ export {
 } from "./halftone.js";
 export {
     HoloEffect,
+    type HoloLights,
     type HoloLogo,
     type HoloLook,
     type HoloMask,
@@ -48,6 +49,7 @@ export {
     type HoloQuality,
     type HoloSettings,
     type HoloSettingValue,
+    type HoloTone,
     type HoloVec2,
 } from "./holo.js";
 export { HueShiftEffect, type HueShiftParams } from "./hue-shift.js";

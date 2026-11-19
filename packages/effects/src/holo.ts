@@ -101,6 +101,18 @@ export type HoloQuality = "low" | "medium" | "high";
 export type HoloMask = "alpha" | "luma" | "none";
 /** A 2D value of a holo.spot setting (pads such as `studio.panel.dir`, `motion.pose`). */
 export type HoloVec2 = { x: number; y: number };
+/** Tone curve: Khronos PBR Neutral (hue-stable), AgX, or a plain clamp. */
+export type HoloTone = "neutral" | "agx" | "clamp";
+/** holo.spot's light rigs (`studio.preset`). */
+export type HoloLights =
+    | "studio"
+    | "spot"
+    | "softbox"
+    | "strip"
+    | "dark"
+    | "desk"
+    | "office"
+    | "raking";
 /** A holo.spot setting value. */
 export type HoloSettingValue = number | boolean | string | HoloVec2;
 /**
@@ -142,12 +154,35 @@ export type HoloParams = {
      */
     perspective: number;
     /**
-     * Density of the foil's structure: shards (`shatter`), flakes (`nebula`), dots (`sparkle`), the paper's tooth and
-     * the logo (`emboss`), the relief waves. Above 1 smaller, below 1 larger (holo.spot's "structure scale"). The
+     * Size of the foil's structure, in [0.1, 10] (1 = as designed): shards (`shatter`), flakes (`nebula`), dots
+     * (`sparkle`), the paper's tooth and the logo (`emboss`), the relief waves. Smaller values make it finer. The
      * gratings keep their pitch: the colours do not change. Each material also has its own size settings
      * (`shatter.size`, `nebula.size`, `sparkle.size`, …).
      */
     structureScale: number;
+    /** Exposure in stops (EV; holo.spot `display.ev`, −3 to 3). `null`: from the look. */
+    exposure: number | null;
+    /** Tone curve (holo.spot `display.tone`). `null`: from the look. */
+    tone: HoloTone | null;
+    /** Glow around bright points, in [0, 1] (holo.spot `display.glare` 0–0.1). `null`: from the look. */
+    glare: number | null;
+    /** Film grain, in [0, 1] (holo.spot `grain.amount` 0–0.6; 0 turns it off). `null`: from the look. */
+    grain: number | null;
+    /** Light rig (holo.spot `studio.preset`). `null`: the look's lights. Single lights: `settings` (`studio.*`). */
+    lights: HoloLights | null;
+    /**
+     * The page behind the element, which the lighting adapts to (holo.spot `scene.background`): `"black"`, `"white"`
+     * or a `#rrggbb` colour. `null`: from the look.
+     */
+    background: string | null;
+    /** The card's bow in mm (holo.spot `card.bow`, 0–2): the sheet sags, so the light sweeps across it. `null`: look. */
+    bow: number | null;
+    /** Rest pose in degrees: `x` turns the face to the right, `y` tips the top edge toward the viewer. `null`: look. */
+    pose: HoloVec2 | null;
+    /** How far the pointer tilts the card, in degrees at the element's edge (holo.spot `motion.tiltRange`). `null`: 25. */
+    tiltRange: number | null;
+    /** Slow automatic tilt while the pointer is away, amplitude in degrees; 0 turns it off (holo.spot `motion.wobble`, `motion.wobbleAmp`). `null`: 14. */
+    wobble: number | null;
     /** 4× multisampling of the card target (half float, as holospot). Smooths the card's outline in perspective mode. */
     msaa: boolean;
     /** `emboss`: the foil logo's artwork. `null`: the `emboss.logo` setting, else holo.spot's rosette. */
@@ -164,9 +199,66 @@ const DEFAULT_PARAMS: HoloParams = {
     ink: 0,
     perspective: 0,
     structureScale: 1,
+    exposure: null,
+    tone: null,
+    glare: null,
+    grain: null,
+    lights: null,
+    background: null,
+    bow: null,
+    pose: null,
+    tiltRange: null,
+    wobble: null,
     msaa: false,
     logo: null,
 };
+
+/** The holo.spot settings the typed params stand for (they win over `settings`). */
+function typedSettings(p: HoloParams): Record<string, ParamValue> {
+    const o: Record<string, ParamValue> = {};
+    const fin = (x: number | null): x is number =>
+        typeof x === "number" && Number.isFinite(x);
+    if (fin(p.exposure)) {
+        o["display.ev"] = Math.min(Math.max(p.exposure, -3), 3);
+    }
+    if (p.tone) {
+        o["display.tone"] = p.tone;
+    }
+    if (fin(p.glare)) {
+        o["display.glare"] = 0.1 * Math.min(Math.max(p.glare, 0), 1);
+    }
+    if (fin(p.grain)) {
+        const g = Math.min(Math.max(p.grain, 0), 1);
+        o["grain.on"] = g > 0;
+        o["grain.amount"] = 0.6 * g;
+    }
+    if (p.lights) {
+        o["studio.preset"] = p.lights;
+    }
+    if (p.background) {
+        const b = p.background.trim();
+        if (b === "black" || b === "white") {
+            o["scene.background"] = b;
+        } else {
+            o["scene.background"] = "colour";
+            o["scene.bgColor"] = b;
+        }
+    }
+    if (fin(p.bow)) {
+        o["card.bow"] = Math.min(Math.max(p.bow, 0), 2);
+    }
+    if (p.pose && fin(p.pose.x) && fin(p.pose.y)) {
+        o["motion.pose"] = { x: p.pose.x, y: p.pose.y };
+    }
+    if (fin(p.tiltRange)) {
+        o["motion.tiltRange"] = Math.min(Math.max(p.tiltRange, 0), 89);
+    }
+    if (fin(p.wobble)) {
+        o["motion.wobble"] = p.wobble > 0;
+        o["motion.wobbleAmp"] = Math.max(p.wobble, 0);
+    }
+    return o;
+}
 
 const MATERIALS: Record<HoloMaterialId, MaterialDef> = {
     prism,
@@ -372,7 +464,7 @@ export class HoloEffect implements Effect {
     #prevCardRot = new Float32Array(9);
     #camPos: Vec3 = [0, 0, 0.4];
     #cardSizeMm: [number, number] = [63, 88];
-    /** The card's surface domain [mm]: its size × `structureScale` (the structure's frame, not the geometry's). */
+    /** The card's surface domain [mm]: its size / `structureScale` (the structure's frame, not the geometry's). */
     #domainMm: [number, number] = [63, 88];
     /** The drawn card's rotation: the pose scaled by `perspective`. */
     #visRot = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
@@ -500,10 +592,13 @@ export class HoloEffect implements Effect {
         const s = p.settings as unknown;
         const blob = isCopyBlob(s) ? s : null;
         const material = p.material;
-        const given = (blob ? blob.values : p.settings) as Record<
-            string,
-            ParamValue | undefined
-        >;
+        const given = {
+            ...((blob ? blob.values : p.settings) as Record<
+                string,
+                ParamValue | undefined
+            >),
+            ...typedSettings(p),
+        };
         this.#resolved = resolveSettings(material, p.look, given, blob?.pose);
         this.#scene = sceneStateFrom(this.#resolved.values);
         const def = this.#def();
@@ -579,11 +674,9 @@ export class HoloEffect implements Effect {
         const largest = this.params.sizeMm ?? Math.max(w, h) * MM_PER_CSS_PX;
         const k = largest / Math.max(w, h);
         this.#cardSizeMm = [w * k, h * k];
-        const ss = Math.min(
-            Math.max(this.params.structureScale || 1, 0.05),
-            20,
-        );
-        this.#domainMm = [w * k * ss, h * k * ss];
+        // the surface's domain: a smaller structure scale lays more of the structure over the card
+        const ss = Math.min(Math.max(this.params.structureScale || 1, 0.1), 10);
+        this.#domainMm = [(w * k) / ss, (h * k) / ss];
         let D = framingDistance(
             w / h,
             this.#cardSizeMm[0] / 2000,
