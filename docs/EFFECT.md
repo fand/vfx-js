@@ -194,7 +194,7 @@ ctx.draw({
     vert,              // optional; default supplies uv / uvContent / uvSrc varyings
     geometry,          // ctx.quad (default) | EffectGeometry
     uniforms,          // { name: number | tuple | typed array | texture handle }
-    target,            // EffectRenderTarget | null (canvas) | ctx.target
+    target,            // EffectRenderTarget | null (canvas) | ctx.target | EffectRenderTarget[]
     blend,             // "premultiplied" (canvas default) | "none" (RT default) | "additive" | "normal"
     swap,              // persistent RT: pass false to keep writing to the same buffer
     depthTest,         // test against the target's depth (needs depth: true); default false
@@ -209,6 +209,40 @@ Default varyings (all in [0, 1], nested largest→smallest):
 - `uv` — over the full destination buffer (content + pad)
 - `uvContent` — over the captured content; outside [0, 1] = pad
 - `uvSrc` — over the source buffer
+
+#### Multiple render targets
+
+Pass an array as `target` to write several targets in one draw. Target
+`i` gets the output declared with `layout(location = i) out`. Use it when
+state needs more than one vec4 per texel and the outputs share work, so
+it runs once:
+
+```ts
+// frag: layout(location = 0) out vec4 outPos; // xyz + age
+//       layout(location = 1) out vec4 outVel; // xyz
+// Compute the force once, then write both.
+ctx.draw({
+    frag: SIMULATE,
+    uniforms: { pos: this.#pos, vel: this.#vel },
+    target: [this.#pos, this.#vel],
+});
+```
+
+- Each target keeps its own options (`float`, `wrap`, `filter`, `mipmap`).
+- Persistent targets all swap after the draw. `swap: false` skips all of them.
+- Declare one output per target. A target with no output holds undefined
+  pixels.
+- To write fewer targets, draw with a shorter array.
+- One `blend` applies to every target. The default is `"none"`.
+- If several targets have `depth: true`, the first one's depth is used.
+  A draw that uses depth warns about it.
+
+If one of these rules breaks, the draw warns once and is skipped:
+
+- All targets have the same size and the same `samples`.
+- No `null`, no `ctx.target`, and no target twice.
+- At most `MAX_DRAW_BUFFERS` targets (4 or more on every WebGL2 GPU).
+- The shader is GLSL 300 es.
 
 ### `ctx.blit(source, target?, opts?)`
 

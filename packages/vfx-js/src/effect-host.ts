@@ -6,13 +6,14 @@ import {
 } from "./effect-geometry.js";
 import type { GLContext } from "./gl/context.js";
 import { Framebuffer } from "./gl/framebuffer.js";
+import { MultiFramebuffer } from "./gl/multi-framebuffer.js";
 import {
     applyBlend,
     applyDrawState,
     type DrawState,
     resetDrawState,
 } from "./gl/pass.js";
-import type { Uniform, Uniforms } from "./gl/program.js";
+import type { Program, Uniform, Uniforms } from "./gl/program.js";
 import type { Quad } from "./gl/quad.js";
 import { Texture, type TextureWrap } from "./gl/texture.js";
 import type { ProgramCache } from "./program-cache.js";
@@ -64,6 +65,9 @@ type RenderTargetResolver = {
     /** Current write target (for `bindFramebuffer`). */
     getWriteFbo(): Framebuffer;
 
+    /** Every framebuffer the RT owns: both sides for `persistent: true`. */
+    getFramebuffers?: () => readonly Framebuffer[];
+
     /** Current read-side depth texture. Present only for RTs with depth. */
     getDepthTexture?: () => Texture;
 
@@ -94,6 +98,24 @@ function resolveTexture(h: EffectTexture): Texture {
 
 function resolveRt(h: EffectRenderTarget): RenderTargetResolver {
     return (h as EffectRenderTargetInternal)[RESOLVE_RT];
+}
+
+function isTargetList(
+    target: EffectDrawOpts["target"],
+): target is readonly EffectRenderTarget[] {
+    return Array.isArray(target);
+}
+
+const framebufferIds = new WeakMap<Framebuffer, number>();
+let nextFramebufferId = 0;
+
+function framebufferId(framebuffer: Framebuffer): number {
+    let id = framebufferIds.get(framebuffer);
+    if (id === undefined) {
+        id = nextFramebufferId++;
+        framebufferIds.set(framebuffer, id);
+    }
+    return id;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +298,11 @@ export class EffectHost {
     #warnedDrawInUpdate = false;
     #warnedDepthWithoutBuffer = false;
     #warnedInvalidSamples = false;
+    #warnedDrawKeys = new Set<string>();
     #textureUnitCount: number | undefined;
+    #maxDrawBuffers: number | undefined;
+    /** Keyed by the ids of the write framebuffers, in order. */
+    #multiFramebuffers = new Map<string, MultiFramebuffer>();
     #dims: HostFrameDims;
 
     /**
@@ -500,6 +526,7 @@ export class EffectHost {
                     return bb.read.texture;
                 },
                 getWriteFbo: () => bb.target,
+                getFramebuffers: () => bb.framebuffers,
                 swap: () => bb.swap(),
                 resize: explicitSize
                     ? undefined
@@ -539,6 +566,7 @@ export class EffectHost {
                     return fb.texture;
                 },
                 getWriteFbo: () => fb,
+                getFramebuffers: () => [fb],
                 resize: explicitSize
                     ? undefined
                     : (bufferW, bufferH) => fb.setSize(bufferW, bufferH),
@@ -592,6 +620,13 @@ export class EffectHost {
         const aIdx = this.#autoResizeRTs.indexOf(owned);
         if (aIdx >= 0) {
             this.#autoResizeRTs.splice(aIdx, 1);
+        }
+        const framebuffers = owned.resolver.getFramebuffers?.() ?? [];
+        for (const [key, multi] of this.#multiFramebuffers) {
+            if (multi.members.some((m) => framebuffers.includes(m))) {
+                multi.dispose();
+                this.#multiFramebuffers.delete(key);
+            }
         }
         owned.resolver.dispose?.();
     }
@@ -936,24 +971,58 @@ export class EffectHost {
         return this.#textureUnitCount;
     }
 
-    #doDraw(opts: EffectDrawOpts): void {
-        const gl = this.#gl;
+    /** `MAX_DRAW_BUFFERS`, queried once. */
+    #getMaxDrawBuffers(): number {
+        if (this.#maxDrawBuffers === undefined) {
+            const gl = this.#gl;
+            const n = gl.getParameter(gl.MAX_DRAW_BUFFERS);
+            this.#maxDrawBuffers = typeof n === "number" && n > 0 ? n : 4;
+        }
+        return this.#maxDrawBuffers;
+    }
+
+    #warnOnce(key: string, message: string): void {
+        if (this.#warnedDrawKeys.has(key)) {
+            return;
+        }
+        this.#warnedDrawKeys.add(key);
+        console.warn(message);
+    }
+
+    #getProgram(opts: EffectDrawOpts): Program {
         const vert =
             opts.vert ??
             (this.#mutCtx.vfxProps.glslVersion === "100"
                 ? DEFAULT_VERT_100
                 : DEFAULT_VERT_300);
-        const program = this.#programCache.get(
+        return this.#programCache.get(
             vert,
             opts.frag,
             this.#mutCtx.vfxProps.glslVersion,
         );
+    }
+
+    #doDraw(opts: EffectDrawOpts): void {
+        const target = opts.target;
+        if (!isTargetList(target)) {
+            this.#drawToTarget(opts, target);
+        } else if (target.length === 1 && target[0]) {
+            this.#drawToTarget(opts, target[0]);
+        } else {
+            this.#drawToTargets(opts, target);
+        }
+    }
+
+    #drawToTarget(
+        opts: EffectDrawOpts,
+        target: EffectRenderTarget | null | undefined,
+    ): void {
+        const gl = this.#gl;
+        const program = this.#getProgram(opts);
 
         const ctxOutput = this.#mutCtx.target;
         const rawTarget =
-            opts.target === undefined || opts.target === null
-                ? ctxOutput
-                : opts.target;
+            target === undefined || target === null ? ctxOutput : target;
         // Writes to the stage's assigned target (explicit ctx.target, null,
         // or omitted) honor the chain-computed outputViewport. Writes to a
         // user-allocated RT get full-RT dims.
@@ -1003,6 +1072,165 @@ export class EffectHost {
         const blend =
             opts.blend ?? (rawTarget === null ? "premultiplied" : "none");
         applyBlend(gl, blend);
+        this.#submitDraw(opts, program, uniforms, hasDepth);
+        writeFb?.markDirty();
+
+        // Regen pre-swap: getWriteFbo() returned the buffer we just
+        // drew to. After swap, that buffer rotates to the read side
+        // and the next draw would land on the stale partner.
+        regenerateMipmaps?.();
+        if (swap && opts.swap !== false) {
+            swap();
+        }
+    }
+
+    #drawToTargets(
+        opts: EffectDrawOpts,
+        targets: readonly EffectRenderTarget[],
+    ): void {
+        const resolvers = this.#validateTargets(targets);
+        if (!resolvers) {
+            return;
+        }
+        const program = this.#getProgram(opts);
+        if (program.glslVersion === "100") {
+            this.#warnOnce(
+                "glsl100",
+                "[VFX-JS] ctx.draw() with several targets needs a GLSL 300 es shader; draw skipped.",
+            );
+            return;
+        }
+
+        const gl = this.#gl;
+        // Sampling a multisampled RT resolves it, which rebinds framebuffers.
+        // So build uniforms before binding the draw target.
+        const uniforms = this.#buildUniforms(opts.uniforms);
+
+        const members = resolvers.map((r) => r.getWriteFbo());
+        const depthIndices = resolvers.flatMap((r, i) =>
+            r.getDepthTexture ? [i] : [],
+        );
+        // Only a draw that uses depth leaves the other depth buffers stale.
+        const depthTest = opts.depthTest ?? false;
+        const usesDepth = depthTest || (opts.depthWrite ?? depthTest);
+        if (depthIndices.length > 1 && usesDepth) {
+            this.#warnOnce(
+                "depths",
+                "[VFX-JS] ctx.draw() got several targets with depth; using the first one's depth.",
+            );
+        }
+        const depthSource =
+            depthIndices.length > 0 ? members[depthIndices[0]] : null;
+        const multi = this.#getMultiFramebuffer(members, depthSource);
+
+        multi.bind();
+        gl.viewport(0, 0, multi.width, multi.height);
+        gl.disable(gl.SCISSOR_TEST);
+        applyBlend(gl, opts.blend ?? "none");
+        this.#submitDraw(opts, program, uniforms, depthSource !== null);
+
+        for (const member of members) {
+            member.markDirty();
+        }
+        // Regen pre-swap, as in the single-target path.
+        for (const resolver of resolvers) {
+            if (resolver.mipmapAutoRegen) {
+                resolver.regenerateMipmaps?.();
+            }
+        }
+        if (opts.swap !== false) {
+            for (const resolver of resolvers) {
+                resolver.swap?.();
+            }
+        }
+    }
+
+    /** Resolvers for a valid target list, or null after a warning. */
+    #validateTargets(
+        targets: readonly EffectRenderTarget[],
+    ): RenderTargetResolver[] | null {
+        if (targets.length === 0) {
+            this.#warnOnce(
+                "empty",
+                "[VFX-JS] ctx.draw() got an empty target array; draw skipped.",
+            );
+            return null;
+        }
+        if (targets.some((target) => !target)) {
+            this.#warnOnce(
+                "null",
+                "[VFX-JS] ctx.draw() target array can't contain null; draw skipped.",
+            );
+            return null;
+        }
+        const ctxOutput = this.#mutCtx.target;
+        if (ctxOutput && targets.includes(ctxOutput)) {
+            this.#warnOnce(
+                "stageOutput",
+                "[VFX-JS] ctx.draw() target array can't contain ctx.target; draw skipped.",
+            );
+            return null;
+        }
+        if (new Set(targets).size !== targets.length) {
+            this.#warnOnce(
+                "duplicate",
+                "[VFX-JS] ctx.draw() target array has the same target twice; draw skipped.",
+            );
+            return null;
+        }
+        const resolvers = targets.map(resolveRt);
+        const framebuffers = resolvers.map((r) => r.getWriteFbo());
+        const first = framebuffers[0];
+        if (
+            framebuffers.some(
+                (fb) => fb.width !== first.width || fb.height !== first.height,
+            )
+        ) {
+            this.#warnOnce(
+                "size",
+                "[VFX-JS] ctx.draw() targets in an array must have the same size; draw skipped.",
+            );
+            return null;
+        }
+        if (framebuffers.some((fb) => fb.samples !== first.samples)) {
+            this.#warnOnce(
+                "samples",
+                "[VFX-JS] ctx.draw() targets in an array must have the same samples; draw skipped.",
+            );
+            return null;
+        }
+        const maxDrawBuffers = this.#getMaxDrawBuffers();
+        if (targets.length > maxDrawBuffers) {
+            this.#warnOnce(
+                "count",
+                `[VFX-JS] ctx.draw() got ${targets.length} targets, but this GPU takes at most ${maxDrawBuffers}; draw skipped.`,
+            );
+            return null;
+        }
+        return resolvers;
+    }
+
+    #getMultiFramebuffer(
+        members: readonly Framebuffer[],
+        depthSource: Framebuffer | null,
+    ): MultiFramebuffer {
+        const key = members.map((m) => framebufferId(m)).join(",");
+        let multi = this.#multiFramebuffers.get(key);
+        if (!multi) {
+            multi = new MultiFramebuffer(this.#glCtx, members, depthSource);
+            this.#multiFramebuffers.set(key, multi);
+        }
+        return multi;
+    }
+
+    /** Upload uniforms and draw the geometry with its depth and cull state. */
+    #submitDraw(
+        opts: EffectDrawOpts,
+        program: Program,
+        uniforms: Uniforms,
+        hasDepth: boolean,
+    ): void {
+        const gl = this.#gl;
         const drawState = this.#resolveDrawState(opts, hasDepth);
 
         program.use();
@@ -1018,15 +1246,6 @@ export class EffectHost {
         compiled.draw();
         if (drawState) {
             resetDrawState(gl);
-        }
-        writeFb?.markDirty();
-
-        // Regen pre-swap: getWriteFbo() returned the buffer we just
-        // drew to. After swap, that buffer rotates to the read side
-        // and the next draw would land on the stale partner.
-        regenerateMipmaps?.();
-        if (swap && opts.swap !== false) {
-            swap();
         }
     }
 
@@ -1081,6 +1300,10 @@ export class EffectHost {
             unsub();
         }
         this.#restoredUnsubs = [];
+        for (const multi of this.#multiFramebuffers.values()) {
+            multi.dispose();
+        }
+        this.#multiFramebuffers.clear();
         for (const rt of this.#ownedRTs) {
             rt.resolver.dispose?.();
         }

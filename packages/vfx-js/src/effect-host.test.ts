@@ -77,6 +77,12 @@ type MockFramebuffer = {
     markDirty: () => void;
     resolveColor: () => void;
     resolveDepth: () => void;
+    samples: 1 | 4;
+    version: number;
+    colorAttachments: number[];
+    depthAttachCount: number;
+    attachColorTo: (index: number) => void;
+    attachDepthTo: () => void;
     opts:
         | {
               float?: boolean;
@@ -112,6 +118,7 @@ type MockBackbuffer = {
         };
     };
     target: MockFramebuffer;
+    writeSides: [MockFramebuffer, MockFramebuffer];
     read: MockReadSide;
     readSides: [MockReadSide, MockReadSide];
     swaps: number;
@@ -191,6 +198,10 @@ vi.mock("./gl/framebuffer.js", () => {
         depthTexture: unknown;
         disposed = false;
         generateMipmapsCount = 0;
+        samples: 1 | 4;
+        version = 0;
+        colorAttachments: number[] = [];
+        depthAttachCount = 0;
         opts: MockFramebuffer["opts"];
         constructor(
             ctx: { gl: unknown },
@@ -201,6 +212,7 @@ vi.mock("./gl/framebuffer.js", () => {
             this.width = w;
             this.height = h;
             this.opts = opts;
+            this.samples = opts?.samples ?? 1;
             this.depthTexture = opts?.depth
                 ? { _brand: "mock-fb-depth", gl: ctx.gl }
                 : null;
@@ -212,9 +224,16 @@ vi.mock("./gl/framebuffer.js", () => {
         setSize(w: number, h: number) {
             this.width = w;
             this.height = h;
+            this.version += 1;
         }
         generateMipmaps() {
             this.generateMipmapsCount += 1;
+        }
+        attachColorTo(index: number) {
+            this.colorAttachments.push(index);
+        }
+        attachDepthTo() {
+            this.depthAttachCount += 1;
         }
         markDirty() {
             fbEvents.push("markDirty:fb");
@@ -232,7 +251,7 @@ vi.mock("./gl/framebuffer.js", () => {
 vi.mock("./backbuffer.js", () => {
     class Backbuffer {
         ctorArgs: MockBackbuffer["ctorArgs"];
-        target: MockFramebuffer;
+        writeSides: [MockFramebuffer, MockFramebuffer];
         swaps = 0;
         disposed = false;
         readSides: [MockReadSide, MockReadSide];
@@ -254,12 +273,13 @@ vi.mock("./backbuffer.js", () => {
                 resolveDepth: () => fbEvents.push(`resolveDepth:bb${index}`),
             });
             this.readSides = [makeReadSide(0), makeReadSide(1)];
-            this.target = {
+            const makeWriteSide = (index: number): MockFramebuffer => ({
                 width: w * pr,
                 height: h * pr,
-                fbo: { _brand: "mock-bb-fbo" },
+                fbo: { _brand: `mock-bb-fbo-${index}` },
                 texture: { _brand: "mock-bb-target-tex" },
-                depthTexture: null,
+                // The write side's depth is the other read side's.
+                depthTexture: this.readSides[1 - index].depthTexture,
                 disposed: false,
                 dispose: () => {},
                 setSize: () => {},
@@ -271,15 +291,31 @@ vi.mock("./backbuffer.js", () => {
                 markDirty: () => fbEvents.push("markDirty:bb-target"),
                 resolveColor: () => {},
                 resolveDepth: () => {},
+                samples: opts?.samples ?? 1,
+                version: 0,
+                colorAttachments: [],
+                depthAttachCount: 0,
+                attachColorTo(index: number) {
+                    this.colorAttachments.push(index);
+                },
+                attachDepthTo() {
+                    this.depthAttachCount += 1;
+                },
                 opts: undefined,
-            };
-            // The write side starts as the other side, like the real one.
-            this.target.depthTexture = this.readSides[1].depthTexture;
+            });
+            // Like the real one, the first write side is the other read side.
+            this.writeSides = [makeWriteSide(1), makeWriteSide(0)];
             backbuffers.push(this as unknown as MockBackbuffer);
         }
-        // Read side follows swaps.
+        // Read and write sides follow swaps.
         get read() {
             return this.readSides[this.swaps % 2];
+        }
+        get target() {
+            return this.writeSides[this.swaps % 2];
+        }
+        get framebuffers() {
+            return this.writeSides;
         }
         dispose() {
             this.disposed = true;
@@ -288,8 +324,11 @@ vi.mock("./backbuffer.js", () => {
             this.swaps += 1;
         }
         resize(w: number, h: number) {
-            this.target.width = w * this.ctorArgs.pr;
-            this.target.height = h * this.ctorArgs.pr;
+            for (const side of this.writeSides) {
+                side.width = w * this.ctorArgs.pr;
+                side.height = h * this.ctorArgs.pr;
+                side.version += 1;
+            }
         }
     }
     return { Backbuffer };
@@ -311,7 +350,9 @@ vi.mock("./gl/program.js", () => {
         ) {
             this.vert = vert;
             this.frag = frag;
-            this.glslVersion = glslVersion;
+            this.glslVersion =
+                glslVersion ??
+                (frag.includes("#version 300 es") ? "300 es" : "100");
             programs.push(this as unknown as MockProgram);
         }
         use() {
@@ -370,9 +411,12 @@ import { ProgramCache } from "./program-cache.js";
 // ---------------------------------------------------------------------------
 
 function makeGlStub() {
+    let fboSeq = 0;
     return {
         BLEND: 0xbe2,
         FRAMEBUFFER: 0x8d40,
+        COLOR_ATTACHMENT0: 0x8ce0,
+        MAX_DRAW_BUFFERS: 0x8824,
         SCISSOR_TEST: 0xc11,
         COLOR_BUFFER_BIT: 0x4000,
         DEPTH_BUFFER_BIT: 0x100,
@@ -396,6 +440,13 @@ function makeGlStub() {
         clear: vi.fn(),
         scissor: vi.fn(),
         blendFunc: vi.fn(),
+        getParameter: vi.fn((name: number) => (name === 0x8824 ? 4 : 16)),
+        createFramebuffer: vi.fn(() => ({
+            _brand: "mock-mrt-fbo",
+            id: ++fboSeq,
+        })),
+        deleteFramebuffer: vi.fn(),
+        drawBuffers: vi.fn(),
     } as unknown as WebGL2RenderingContext;
 }
 
@@ -423,7 +474,7 @@ function makeCtxStub(gl: WebGL2RenderingContext): {
     };
 }
 
-function makeHost() {
+function makeHost(glslVersion: "100" | "300 es" = "300 es") {
     const gl = makeGlStub();
     const { ctx: glCtx } = makeCtxStub(gl);
     const quad = {} as Quad;
@@ -437,7 +488,7 @@ function makeHost() {
             width: 100,
             height: 100,
         } as unknown as EffectTexture,
-        { autoCrop: true, glslVersion: "300 es" },
+        { autoCrop: true, glslVersion },
         programCache,
     );
     host.setFrameDims({
@@ -964,7 +1015,7 @@ describe("EffectHost.createRenderTarget", () => {
                 mipmap: true,
             });
             host.ctx.draw({ frag: FRAG, target: rt });
-            expect(backbuffers[0].target.generateMipmapsCount).toBe(1);
+            expect(backbuffers[0].writeSides[0].generateMipmapsCount).toBe(1);
             expect(backbuffers[0].swaps).toBe(1);
         });
 
@@ -1920,5 +1971,316 @@ describe("EffectHost.resetState", () => {
         host.ctx.resetState();
         expect(gl.bindFramebuffer).not.toHaveBeenCalled();
         expect(gl.disable).not.toHaveBeenCalled();
+    });
+});
+
+describe("EffectHost.draw with several targets", () => {
+    const FRAG = "#version 300 es\nvoid main(){}";
+
+    function setup(glslVersion?: "100" | "300 es") {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const { host, gl } = makeHost(glslVersion);
+        host.setPhase("render");
+        const m = gl as unknown as Record<string, ReturnType<typeof vi.fn>>;
+        return { host, gl, m, warn };
+    }
+
+    function drawCount() {
+        return programs.reduce((sum, p) => sum + p.useCount, 0);
+    }
+
+    describe("validation", () => {
+        type Host = ReturnType<typeof setup>["host"];
+        const cases: Array<{
+            name: string;
+            message: string;
+            targets: (
+                host: Host,
+                persistent: ReturnType<Host["ctx"]["createRenderTarget"]>,
+            ) => unknown[];
+        }> = [
+            {
+                name: "empty array",
+                message: "empty target array",
+                targets: () => [],
+            },
+            {
+                name: "null element",
+                message: "can't contain null",
+                targets: (_host, persistent) => [persistent, null],
+            },
+            {
+                name: "ctx.target element",
+                message: "can't contain ctx.target",
+                targets: (host, persistent) => {
+                    const output = host.ctx.createRenderTarget();
+                    host.setOutput(output);
+                    return [persistent, output];
+                },
+            },
+            {
+                name: "same target twice",
+                message: "same target twice",
+                targets: (_host, persistent) => [persistent, persistent],
+            },
+            {
+                name: "different sizes",
+                message: "same size",
+                targets: (host, persistent) => [
+                    persistent,
+                    host.ctx.createRenderTarget({ size: [32, 16] }),
+                ],
+            },
+            {
+                name: "different samples",
+                message: "same samples",
+                targets: (host, persistent) => [
+                    persistent,
+                    host.ctx.createRenderTarget({ samples: 4 }),
+                ],
+            },
+            {
+                name: "more targets than MAX_DRAW_BUFFERS",
+                message: "at most 4",
+                targets: (host, persistent) => [
+                    persistent,
+                    ...Array.from({ length: 4 }, () =>
+                        host.ctx.createRenderTarget(),
+                    ),
+                ],
+            },
+        ];
+
+        for (const { name, message, targets } of cases) {
+            it(`${name} → warns once, no draw, no swap`, () => {
+                const { host, m, warn } = setup();
+                const persistent = host.ctx.createRenderTarget({
+                    persistent: true,
+                });
+                const target = targets(host, persistent) as never;
+                host.ctx.draw({ frag: FRAG, target });
+                host.ctx.draw({ frag: FRAG, target });
+                expect(warn).toHaveBeenCalledTimes(1);
+                expect(warn.mock.calls[0][0]).toContain(message);
+                expect(drawCount()).toBe(0);
+                expect(m.drawBuffers).not.toHaveBeenCalled();
+                expect(backbuffers[0].swaps).toBe(0);
+            });
+        }
+
+        it("GLSL 100 → warns once, no draw, no swap", () => {
+            const { host, m, warn } = setup("100");
+            const target = [
+                host.ctx.createRenderTarget({ persistent: true }),
+                host.ctx.createRenderTarget(),
+            ];
+            host.ctx.draw({ frag: "void main(){}", target });
+            host.ctx.draw({ frag: "void main(){}", target });
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(warn.mock.calls[0][0]).toContain("GLSL 300 es");
+            expect(drawCount()).toBe(0);
+            expect(m.drawBuffers).not.toHaveBeenCalled();
+            expect(backbuffers[0].swaps).toBe(0);
+        });
+
+        it("queries MAX_DRAW_BUFFERS once", () => {
+            const { host, gl, m } = setup();
+            const target = [
+                host.ctx.createRenderTarget(),
+                host.ctx.createRenderTarget(),
+            ];
+            host.ctx.draw({ frag: FRAG, target });
+            host.ctx.draw({ frag: FRAG, target });
+            const queries = m.getParameter.mock.calls.filter(
+                (c) => c[0] === gl.MAX_DRAW_BUFFERS,
+            );
+            expect(queries).toHaveLength(1);
+        });
+    });
+
+    it("length-1 array draws like a single target", () => {
+        const { host, gl, m, warn } = setup();
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        host.ctx.draw({ frag: FRAG, target: [rt] });
+        expect(m.bindFramebuffer).toHaveBeenLastCalledWith(
+            gl.FRAMEBUFFER,
+            backbuffers[0].writeSides[0].fbo,
+        );
+        expect(m.createFramebuffer).not.toHaveBeenCalled();
+        expect(m.drawBuffers).not.toHaveBeenCalled();
+        expect(drawCount()).toBe(1);
+        expect(backbuffers[0].swaps).toBe(1);
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("binds one FBO with every target attached, then draws once", () => {
+        const { host, gl, m, warn } = setup();
+        const target = [
+            host.ctx.createRenderTarget({ size: [64, 32] }),
+            host.ctx.createRenderTarget({ size: [64, 32] }),
+            host.ctx.createRenderTarget({ size: [64, 32] }),
+        ];
+        host.ctx.draw({ frag: FRAG, target });
+        const fbo = m.createFramebuffer.mock.results[0].value;
+        expect(m.createFramebuffer).toHaveBeenCalledOnce();
+        expect(m.bindFramebuffer).toHaveBeenLastCalledWith(gl.FRAMEBUFFER, fbo);
+        expect(framebuffers.map((fb) => fb.colorAttachments)).toEqual([
+            [0],
+            [1],
+            [2],
+        ]);
+        expect(m.drawBuffers).toHaveBeenCalledExactlyOnceWith([
+            gl.COLOR_ATTACHMENT0,
+            gl.COLOR_ATTACHMENT0 + 1,
+            gl.COLOR_ATTACHMENT0 + 2,
+        ]);
+        expect(m.viewport).toHaveBeenLastCalledWith(0, 0, 64, 32);
+        expect(m.disable).toHaveBeenCalledWith(gl.SCISSOR_TEST);
+        expect(drawCount()).toBe(1);
+        expect(fbEvents.filter((e) => e === "markDirty:fb")).toHaveLength(3);
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("regenerates auto mipmaps on members that have them", () => {
+        const { host } = setup();
+        const target = [
+            host.ctx.createRenderTarget({ mipmap: true }),
+            host.ctx.createRenderTarget({ mipmap: "manual" }),
+        ];
+        host.ctx.draw({ frag: FRAG, target });
+        expect(framebuffers[0].generateMipmapsCount).toBe(1);
+        expect(framebuffers[1].generateMipmapsCount).toBe(0);
+    });
+
+    it("swaps persistent members; swap: false skips them", () => {
+        const { host } = setup();
+        const target = [
+            host.ctx.createRenderTarget({ persistent: true }),
+            host.ctx.createRenderTarget(),
+            host.ctx.createRenderTarget({ persistent: true }),
+        ];
+        host.ctx.draw({ frag: FRAG, target });
+        expect(backbuffers.map((bb) => bb.swaps)).toEqual([1, 1]);
+        host.ctx.draw({ frag: FRAG, target, swap: false });
+        expect(backbuffers.map((bb) => bb.swaps)).toEqual([1, 1]);
+    });
+
+    it("caches one FBO per write side and reuses them", () => {
+        const { host, m } = setup();
+        const target = [
+            host.ctx.createRenderTarget({ persistent: true }),
+            host.ctx.createRenderTarget({ persistent: true }),
+        ];
+        for (let frame = 0; frame < 4; frame++) {
+            host.ctx.draw({ frag: FRAG, target });
+        }
+        expect(m.createFramebuffer).toHaveBeenCalledTimes(2);
+        expect(m.drawBuffers).toHaveBeenCalledTimes(2);
+        expect(drawCount()).toBe(4);
+    });
+
+    it("disposing a target deletes its cached FBOs", () => {
+        const { host, m } = setup();
+        const persistent = host.ctx.createRenderTarget({ persistent: true });
+        const other = host.ctx.createRenderTarget();
+        const unrelated = [
+            host.ctx.createRenderTarget(),
+            host.ctx.createRenderTarget(),
+        ];
+        host.ctx.draw({ frag: FRAG, target: [persistent, other] });
+        host.ctx.draw({ frag: FRAG, target: [persistent, other] });
+        host.ctx.draw({ frag: FRAG, target: unrelated });
+        const created = m.createFramebuffer.mock.results.map((r) => r.value);
+        expect(created).toHaveLength(3);
+        persistent.dispose();
+        expect(m.deleteFramebuffer.mock.calls.map((c) => c[0])).toEqual([
+            created[0],
+            created[1],
+        ]);
+        // A new set builds a new FBO.
+        host.ctx.draw({ frag: FRAG, target: [other, unrelated[0]] });
+        expect(m.createFramebuffer).toHaveBeenCalledTimes(4);
+    });
+
+    it("host dispose deletes every cached FBO", () => {
+        const { host, m } = setup();
+        const a = host.ctx.createRenderTarget();
+        const b = host.ctx.createRenderTarget();
+        host.ctx.draw({ frag: FRAG, target: [a, b] });
+        host.ctx.draw({ frag: FRAG, target: [b, a] });
+        host.dispose();
+        expect(m.deleteFramebuffer.mock.calls.map((c) => c[0])).toEqual(
+            m.createFramebuffer.mock.results.map((r) => r.value),
+        );
+    });
+
+    describe("depth", () => {
+        it("several depth targets → warns once, attaches the first", () => {
+            const { host, gl, m, warn } = setup();
+            const target = [
+                host.ctx.createRenderTarget(),
+                host.ctx.createRenderTarget({ depth: true }),
+                host.ctx.createRenderTarget({ depth: true }),
+            ];
+            host.ctx.draw({ frag: FRAG, target, depthTest: true });
+            host.ctx.draw({ frag: FRAG, target, depthTest: true });
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(warn.mock.calls[0][0]).toContain(
+                "several targets with depth",
+            );
+            expect(framebuffers.map((fb) => fb.depthAttachCount)).toEqual([
+                0, 1, 0,
+            ]);
+            expect(m.enable).toHaveBeenCalledWith(gl.DEPTH_TEST);
+            expect(drawCount()).toBe(2);
+        });
+
+        it("several depth targets without depth options → no warning", () => {
+            const { host, warn } = setup();
+            const target = [
+                host.ctx.createRenderTarget({ depth: true }),
+                host.ctx.createRenderTarget({ depth: true }),
+            ];
+            host.ctx.draw({ frag: FRAG, target });
+            expect(warn).not.toHaveBeenCalled();
+            expect(drawCount()).toBe(1);
+        });
+
+        it("several depth targets with depthWrite only → warns", () => {
+            const { host, warn } = setup();
+            const target = [
+                host.ctx.createRenderTarget({ depth: true }),
+                host.ctx.createRenderTarget({ depth: true }),
+            ];
+            host.ctx.draw({ frag: FRAG, target, depthWrite: true });
+            expect(warn).toHaveBeenCalledTimes(1);
+        });
+
+        it("depthTest works with one depth target", () => {
+            const { host, gl, m, warn } = setup();
+            const target = [
+                host.ctx.createRenderTarget(),
+                host.ctx.createRenderTarget({ depth: true }),
+            ];
+            host.ctx.draw({ frag: FRAG, target, depthTest: true });
+            expect(framebuffers[1].depthAttachCount).toBe(1);
+            expect(m.enable).toHaveBeenCalledWith(gl.DEPTH_TEST);
+            expect(warn).not.toHaveBeenCalled();
+        });
+
+        it("depthTest without a depth target → existing warning, depth off", () => {
+            const { host, gl, m, warn } = setup();
+            const target = [
+                host.ctx.createRenderTarget(),
+                host.ctx.createRenderTarget(),
+            ];
+            host.ctx.draw({ frag: FRAG, target, depthTest: true });
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(warn.mock.calls[0][0]).toContain(
+                "depthTest / depthWrite needs a target created with depth: true",
+            );
+            expect(m.enable).not.toHaveBeenCalledWith(gl.DEPTH_TEST);
+            expect(drawCount()).toBe(1);
+        });
     });
 });
