@@ -1820,12 +1820,13 @@ type HoloArgs = {
     look: HoloLook;
     quality: HoloQuality;
     mask: HoloMask;
-    ink: number;
-    ev: number;
-    glare: number;
-    wobble: boolean;
-    perspective: boolean;
+    perspective: number;
     msaa: boolean;
+    structureScale: number;
+    ink: number;
+    tiltRange: number;
+    idleWobble: boolean;
+    grain: boolean;
 };
 export const holo = presetStory<HoloArgs>(
     (a) =>
@@ -1834,13 +1835,15 @@ export const holo = presetStory<HoloArgs>(
             look: a.look,
             quality: a.quality,
             mask: a.mask,
-            ink: a.ink,
             perspective: a.perspective,
             msaa: a.msaa,
+            structureScale: a.structureScale,
+            ink: a.ink,
+            // holo.spot setting ids; everything not given comes from the look
             settings: {
-                "display.ev": a.ev,
-                "display.glare": a.glare,
-                "motion.wobble": a.wobble,
+                "motion.tiltRange": a.tiltRange,
+                "motion.wobble": a.idleWobble,
+                ...(a.grain ? {} : { "grain.on": false }),
             },
         }),
     {
@@ -1848,15 +1851,17 @@ export const holo = presetStory<HoloArgs>(
         look: "card",
         quality: "medium",
         mask: "alpha",
-        ink: 0,
-        ev: 0.5,
-        glare: 0.03,
-        wobble: true,
-        perspective: false,
+        perspective: 0,
         msaa: false,
+        structureScale: 1,
+        ink: 0,
+        tiltRange: 25,
+        idleWobble: true,
+        grain: true,
     },
     {
         material: {
+            description: "Foil material",
             control: { type: "select" },
             options: [
                 "prism",
@@ -1868,23 +1873,56 @@ export const holo = presetStory<HoloArgs>(
             ],
         },
         look: {
+            description:
+                "Values holo.spot ships: lights, exposure, grain, rest pose and some material values (card: its holographic card; object: its 3D object; plain: parameter defaults)",
             control: { type: "select" },
             options: ["card", "object", "plain"],
         },
         quality: {
+            description: "holospot's quality tier",
             control: { type: "select" },
             options: ["low", "medium", "high"],
         },
         mask: {
+            description:
+                "Where the foil is: the element's alpha, its luma, or everywhere",
             control: { type: "select" },
             options: ["alpha", "luma", "none"],
         },
-        ink: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
-        ev: { control: { type: "range", min: -3, max: 3, step: 0.05 } },
-        glare: { control: { type: "range", min: 0, max: 0.1, step: 0.005 } },
-        wobble: { control: { type: "boolean" } },
-        perspective: { control: { type: "boolean" } },
-        msaa: { control: { type: "boolean" } },
+        perspective: {
+            description:
+                "How much the drawn card turns with the pose (0: stays flat, 1: full 3D)",
+            control: { type: "range", min: 0, max: 1, step: 0.01 },
+        },
+        msaa: {
+            description:
+                "4× MSAA: smooths the card outline when perspective > 0",
+            control: { type: "boolean" },
+        },
+        structureScale: {
+            description:
+                "Density of shards, flakes, dots and paper: above 1 smaller, below 1 larger",
+            control: { type: "range", min: 0.25, max: 4, step: 0.05 },
+        },
+        ink: {
+            description:
+                "How much the element's colours tint the foil (not emboss)",
+            control: { type: "range", min: 0, max: 1, step: 0.01 },
+        },
+        tiltRange: {
+            description: "Pointer tilt in degrees (motion.tiltRange)",
+            control: { type: "range", min: 5, max: 35, step: 1 },
+        },
+        idleWobble: {
+            description:
+                "Slow automatic tilt while the pointer is away (motion.wobble)",
+            control: { type: "boolean" },
+        },
+        grain: {
+            description:
+                "holo.spot's film grain (grain.on). Off: no grain over the foil",
+            control: { type: "boolean" },
+        },
     },
     { src: Logo, clock: false },
 );

@@ -238,7 +238,7 @@ The per-pixel residual of the glints and shard edges matches holospot's card sit
 grid (220.5 px wide, centred): high-frequency detail sampled at shifted positions. An earlier version of this table
 blamed MSAA; the actual cause was a one-pixel crop misalignment in the comparison script plus this sub-pixel offset.
 
-Perspective mode (`perspective: true`) draws the card as geometry projected by holospot's camera (FOV 22°, the card
+Perspective mode (`perspective` > 0) draws the card as geometry projected by holospot's camera (FOV 22°, the card
 at rest filling 70 % of the view, which is exactly the element's rect inside the grown output). At holo.spot's card
 pose (rx −20.5°, ry −25°) it matches holospot's tilted render: prism 1.5–1.9 per pixel (0.9 blurred), shatter
 2.7–2.9 (0.6 blurred). The element itself is mapped onto the card (print layer, mask, the base layer of the luma
@@ -254,7 +254,7 @@ Deviations found while porting:
   glare only sees visible foil.
 - Glare spill stays inside the element rect (no `outputRect` growth yet).
 - The environment is prefiltered with an importance-sampled GGX lobe per tile instead of three's PMREM.
-- Flat mode (the default) keeps the element in place and does not warp it; `perspective: true` is holospot's view.
+- Flat mode (the default) keeps the element in place and does not warp it; `perspective: 1` is holospot's view, values between turn the drawn card by that share of the pose (the shading always follows the full pose).
 - The pose is this port's: spring toward rest pose + pointer tilt (`motion.tiltRange`), idle wobble as a slow
   Lissajous. holospot's site pose controller is not part of its kit.
 

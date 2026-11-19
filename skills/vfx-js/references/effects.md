@@ -89,7 +89,9 @@ await vfx.add(el, {
 - `sizeMm` is the real size of the element's largest side (the foil has a physical grain). Default: CSS size at 96 dpi.
 - `quality`: `"low"` for phones, `"medium"` (default) or `"high"`.
 - `ink` (0–1) tints the foil with the element's colours, like a translucent ink.
-- `perspective: true` draws the card tilted in 3D, as holo.spot does. The output grows by about 21 % on each side. Default `false`: the element stays in place and only its shading tilts.
+- `perspective` (0–1) sets how far the drawn card turns with the pose: 0 (default) keeps the element in place and only its shading tilts, 1 turns it in 3D as holo.spot does. Above 0 the output grows by about 21 % on each side.
+- `structureScale` sets the density of shards, flakes, dots and the paper: above 1 smaller, below 1 larger. The colours stay the same.
+- The pointer tilts the card by up to `motion.tiltRange` degrees (default 25). `motion.wobble` tilts it slowly while the pointer is away. holo.spot's film grain is on in its looks; turn it off with `"grain.on": false`.
 - `material: "emboss"` is a paper card with a foil logo pressed into it. The element is the picture printed on the paper; `logo` takes the logo's artwork (an `<img>`, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG; transparent areas get no foil). Place and shape it with `emboss.*` settings (`emboss.width` in mm, `emboss.foil`: `"rainbow"`, `"concentric"`, `"sparkle"`, `"silver"`, `"gold"`, `emboss.profile`, `emboss.stock`, …). Hologram stickers and multi-element cards of holo.spot are not supported.
 - `msaa: true` turns on 4× multisampling of the card. Use it with `perspective`, where it smooths the card's outline; it costs about 5× the card target's memory.
 - Use `setParams({ settings: { ... } })` to change values live; it merges `settings` by id.

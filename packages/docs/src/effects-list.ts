@@ -218,7 +218,7 @@ export const effectDemos: EffectDemo[] = [
         create: () =>
             new HoloEffect({
                 material: "prism",
-                perspective: true,
+                perspective: 1,
                 msaa: true,
             }),
     },
