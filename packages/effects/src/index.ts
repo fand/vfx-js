@@ -42,7 +42,6 @@ export {
     HoloEffect,
     type HoloLights,
     type HoloLogo,
-    type HoloLook,
     type HoloMask,
     type HoloMaterial,
     type HoloParams,
