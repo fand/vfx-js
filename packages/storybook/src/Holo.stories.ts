@@ -177,8 +177,8 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             );
         }
         fx.addBinding(general, "structureScale", {
-            min: 0.1,
-            max: 10,
+            min: 0.25,
+            max: 4,
             step: 0.05,
         }).on("change", (ev) => effect.setParams({ structureScale: ev.value }));
         if (params.material !== "emboss") {

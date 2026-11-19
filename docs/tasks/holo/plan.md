@@ -307,5 +307,4 @@ Typed params use holo.spot's names, units and ranges (clamped): `exposure` (`dis
 `lens` (`dof.lens`, 24–200), `tiltRange` (`motion.tiltRange`, 5–35), `wobble` / `wobbleAmp` (`motion.wobble`,
 `motion.wobbleAmp` 0–25), `quality` (the kit's option, with `"auto"`). The looks are named as holospot's (`card`,
 `object`, `image`) and set holospot's quality. Port-only params: `view`, `mask`, `ink`, `sizeMm`, `logo`, `msaa`.
-`structureScale` keeps the port's scale (0.1–10, smaller = finer); holospot's `object.structureScale` (0.25–4, larger
-= finer) is its reciprocal over a narrower range.
+`structureScale` is holo.spot's `object.structureScale` (0.25–4, domain = size × scale, larger = finer).

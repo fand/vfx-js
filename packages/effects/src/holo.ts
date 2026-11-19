@@ -201,9 +201,9 @@ export type HoloParams = {
      */
     lens: number | null;
     /**
-     * Size of the foil's structure, in [0.1, 10] (1 = as designed): shards (`shatter`), flakes (`nebula`), dots
-     * (`sparkle`), the paper's tooth and the logo (`emboss`), the relief waves. Smaller values make it finer. The
-     * gratings keep their pitch: the colours do not change. Each material also has its own size settings
+     * Scale of the foil's structure, 0.25–4 (holo.spot `object.structureScale`; 1 = as designed): shards (`shatter`),
+     * flakes (`nebula`), dots (`sparkle`), the paper's tooth and the logo (`emboss`), the relief waves. Above 1 they
+     * get smaller, below 1 larger. The gratings keep their pitch: the colours do not change. Each material also has its own size settings
      * (`shatter.size`, `nebula.size`, `sparkle.size`, …).
      */
     structureScale: number;
@@ -620,7 +620,7 @@ export class HoloEffect implements Effect {
     #prevCardRot = new Float32Array(9);
     #camPos: Vec3 = [0, 0, 0.4];
     #cardSizeMm: [number, number] = [63, 88];
-    /** The card's surface domain [mm]: its size / `structureScale` (the structure's frame, not the geometry's). */
+    /** The card's surface domain [mm]: its size × `structureScale` (the structure's frame, not the geometry's). */
     #domainMm: [number, number] = [63, 88];
     /** The drawn card's rotation (3d view: the pose; flat: identity). */
     #visRot = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
@@ -931,9 +931,9 @@ export class HoloEffect implements Effect {
         const largest = this.params.sizeMm ?? Math.max(w, h) * MM_PER_CSS_PX;
         const k = largest / Math.max(w, h);
         this.#cardSizeMm = [w * k, h * k];
-        // the surface's domain: a smaller structure scale lays more of the structure over the card
-        const ss = Math.min(Math.max(this.params.structureScale || 1, 0.1), 10);
-        this.#domainMm = [(w * k) / ss, (h * k) / ss];
+        // the surface's domain, as holospot's models.ts: size × structureScale (a larger one lays more structure over the card)
+        const ss = Math.min(Math.max(this.params.structureScale || 1, 0.25), 4);
+        this.#domainMm = [w * k * ss, h * k * ss];
         const fov = lensFovDeg(s.lensMm);
         const tanHalf = Math.tan((fov * Math.PI) / 360);
         const view3d = this.params.view === "3d";
