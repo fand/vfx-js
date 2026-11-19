@@ -218,7 +218,7 @@ export const effectDemos: EffectDemo[] = [
         create: () =>
             new HoloEffect({
                 ...HoloEffect.looks.card,
-                perspective: 1,
+                view: "3d",
                 msaa: true,
             }),
     },

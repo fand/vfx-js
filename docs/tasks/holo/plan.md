@@ -280,3 +280,17 @@ The `look` param was removed: the effect starts from holo.spot's parameter defau
 are params to spread (`HoloEffect.looks.card`, `.object`, `.paperCard`). Their scene values are shared by the five
 foils, so one object per look holds every foil's values; a test checks that spreading one resolves to exactly
 holospot's look.
+
+## Views
+
+`perspective` (0–1) was replaced. It shaded the card as tilted but drew it turned by only a share of that tilt, a
+view no camera has. Now both views are scenes holospot can draw:
+
+- `view: "flat"` (default): the card stays facing the viewer; the pose turns the light rig the other way, as
+  holospot's light-rig rotation `Q_L` does (scene/lights.ts, studioEnv.ts envRotation). The light meets the card as
+  if it were tilted (a test checks every light's card-frame position); the view does not move, so the rainbows travel
+  about half as far as in 3D.
+- `view: "3d"`: the card turns, seen by holospot's camera with `lens` (holo.spot `dof.lens`, 62 mm = 22°; the camera
+  keeps the framing).
+
+Looks now carry everything in `settings` (pose as `motion.pose`), so whatever comes after them wins.

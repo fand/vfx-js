@@ -10,6 +10,7 @@ import {
     type HoloSettingSpec,
     type HoloSettingValue,
     type HoloTone,
+    type HoloView,
 } from "@vfx-js/effects";
 import type { FolderApi, Pane } from "tweakpane";
 import Jellyfish from "./assets/jellyfish.webp";
@@ -102,7 +103,8 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             material: params.material,
             quality: params.quality,
             mask: params.mask,
-            perspective: params.perspective,
+            view: params.view,
+            lens: typeof v["dof.lens"] === "number" ? v["dof.lens"] : 62,
             msaa: params.msaa,
             structureScale: params.structureScale,
             ink: params.ink,
@@ -158,14 +160,22 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         }).on("change", (ev) =>
             effect.setParams({ mask: ev.value as HoloMask }),
         );
-        fx.addBinding(general, "perspective", {
-            min: 0,
-            max: 1,
-            step: 0.01,
-        }).on("change", (ev) => effect.setParams({ perspective: ev.value }));
-        fx.addBinding(general, "msaa").on("change", (ev) =>
-            effect.setParams({ msaa: ev.value }),
-        );
+        // flat: the card stays and the light rig turns; 3d: the card turns, seen through the lens
+        fx.addBinding(general, "view", {
+            options: opts<HoloView>(["flat", "3d"]),
+        }).on("change", (ev) => {
+            effect.setParams({ view: ev.value as HoloView });
+            rebuild();
+        });
+        if (params.view === "3d") {
+            fx.addBinding(general, "lens", { min: 24, max: 200, step: 1 }).on(
+                "change",
+                (ev) => effect.setParams({ lens: ev.value }),
+            );
+            fx.addBinding(general, "msaa").on("change", (ev) =>
+                effect.setParams({ msaa: ev.value }),
+            );
+        }
         fx.addBinding(general, "structureScale", {
             min: 0.1,
             max: 10,
@@ -296,6 +306,7 @@ const CLEAR_SCENE = {
     background: null,
     bow: null,
     pose: null,
+    lens: null,
     pointer: null,
     tiltRange: null,
     wobble: null,
