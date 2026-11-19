@@ -110,3 +110,42 @@ test("constructor parts compose: look, then preset, then own values; settings me
     );
     expect(v["motion.pose"]).toEqual({ x: -25, y: -20.5 });
 });
+
+test("flat view: the turned rig meets the card as the turned card meets the rig", async () => {
+    const { eulerXYZ } = await import("./_holo/physics/geometry.js");
+    const { computeLights } = await import("./_holo/scene/lights.js");
+    const { inversePoseQuat } = await import("./_holo/scene/pose.js");
+    const { sceneStateFrom, resolveSettings: rs } = await import(
+        "./_holo/settings.js"
+    );
+    const s = sceneStateFrom(rs("prism", "card", {}).values);
+    const [rx, ry] = [-20.5, 31];
+    const R = eulerXYZ(rx, ry, 0); // row-major
+    const still = computeLights(
+        s.studio,
+        { mode: "tilt", pad: { x: 0, y: 0 } },
+        s.background,
+        { x: 0, y: 0, z: 0, w: 1 },
+        [0, 0, 0.4],
+    );
+    const turned = computeLights(
+        s.studio,
+        { mode: "tilt", pad: { x: 0, y: 0 } },
+        s.background,
+        inversePoseQuat(rx, ry),
+        [0, 0, 0.4],
+    );
+    for (let i = 0; i < 4; i++) {
+        if (still.type[i] === 0) {
+            continue;
+        }
+        const P = [0, 1, 2].map((c) => still.pos[3 * i + c]);
+        // the light in the turned card's frame: Rᵀ·P
+        const local = [0, 1, 2].map(
+            (c) => R[c] * P[0] + R[3 + c] * P[1] + R[6 + c] * P[2],
+        );
+        for (let c = 0; c < 3; c++) {
+            expect(turned.pos[3 * i + c]).toBeCloseTo(local[c], 5);
+        }
+    }
+});

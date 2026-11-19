@@ -49,7 +49,11 @@ import {
     sameLevels,
 } from "./_holo/scene/env.js";
 import { computeLights, emptyLightSet } from "./_holo/scene/lights.js";
-import { PoseSpring, wobbleOffset } from "./_holo/scene/pose.js";
+import {
+    inversePoseQuat,
+    PoseSpring,
+    wobbleOffset,
+} from "./_holo/scene/pose.js";
 import { buildWaves, type WaveSet } from "./_holo/scene/relief.js";
 import {
     backgroundTone,
@@ -122,6 +126,8 @@ export type HoloSettingSpec = {
 
 /** Tone curve: Khronos PBR Neutral (hue-stable), AgX, or a plain clamp. */
 export type HoloTone = "neutral" | "agx" | "clamp";
+/** How the card moves: it stays facing the viewer and the light rig turns, or it turns in 3D. */
+export type HoloView = "flat" | "3d";
 /** What the pointer does over the element. */
 export type HoloPointer = "tilt" | "light" | "flash" | "none";
 /** holo.spot's light rigs (`studio.preset`). */
@@ -169,12 +175,23 @@ export type HoloParams = {
      */
     ink: number;
     /**
-     * How much the card visibly tilts, in [0, 1]. The shading always follows the full pose; this only sets how far the
-     * drawn card turns with it. 0: the element stays in place (flat). 1: the card turns as far as it is lit, seen by
-     * holospot's camera. Above 0 the output grows by about 21 % of the element's size on each side, so the tilted card
-     * and its glare fit (holospot's framing: the card at rest fills 70 % of the view, exactly the element's rect).
+     * How the card moves (default `"flat"`). Both are a scene holospot can draw.
+     *
+     * - `"flat"`: the card stays facing the viewer, exactly where the element is, and the pose (pointer tilt, wobble,
+     *   `pose`) turns the light rig the other way instead, as holospot's light-rig rotation does. The light meets the
+     *   card as if it were tilted; the view does not change, so the rainbows travel about half as far as in `"3d"`
+     *   (raise `tiltRange` to taste).
+     * - `"3d"`: the card turns with the pose, seen by holospot's camera (`lens`). The output grows by about 21 % of the
+     *   element's size on each side, so the tilted card and its glare fit (holospot's framing: the card at rest fills
+     *   70 % of the view, exactly the element's rect).
      */
-    perspective: number;
+    view: HoloView;
+    /**
+     * holospot's camera lens: focal length in mm on a 36 × 24 mm sensor, 24–200 (holo.spot `dof.lens`). 62 mm is the
+     * 22° camera; shorter is a wider angle with stronger perspective, longer is flatter. The camera steps back or
+     * forward to keep the framing. `null`: the default (or `settings`).
+     */
+    lens: number | null;
     /**
      * Size of the foil's structure, in [0.1, 10] (1 = as designed): shards (`shatter`), flakes (`nebula`), dots
      * (`sparkle`), the paper's tooth and the logo (`emboss`), the relief waves. Smaller values make it finer. The
@@ -211,7 +228,7 @@ export type HoloParams = {
     tiltRange: number | null;
     /** Slow automatic tilt while the pointer is away, amplitude in degrees; 0 turns it off (holo.spot `motion.wobble`, `motion.wobbleAmp`). `null`: 14. */
     wobble: number | null;
-    /** 4× multisampling of the card target (half float, as holospot). Smooths the card's outline in perspective mode. */
+    /** 4× multisampling of the card target (half float, as holospot). Smooths the card's outline in the `"3d"` view. */
     msaa: boolean;
     /** `emboss`: the foil logo's artwork. `null`: the `emboss.logo` setting, else holo.spot's rosette. */
     logo: HoloLogo | null;
@@ -224,7 +241,8 @@ const DEFAULT_PARAMS: HoloParams = {
     quality: "medium",
     mask: "alpha",
     ink: 0,
-    perspective: 0,
+    view: "flat",
+    lens: null,
     structureScale: 1,
     exposure: null,
     tone: null,
@@ -242,10 +260,9 @@ const DEFAULT_PARAMS: HoloParams = {
 };
 
 /**
- * A look holo.spot ships, as params to spread into the constructor: the typed params it sets (`pose`, `exposure`,
- * `glare`, `grain`, `bow`, `background`) and the rest as `settings` (its lights `studio.*`, card finish, material
- * values). Spreading replaces `settings` as a whole, so merge yours into the look's:
- * `{ ...look, settings: { ...look.settings, "prism.pitch": 1200 } }`.
+ * A look holo.spot ships, as params: all of it in `settings` (lights `studio.*`, exposure, glare, grain, card finish,
+ * pose, material values), so whatever comes after it (more `settings`, or the typed params) wins. Pass it as one of
+ * the constructor's parts, which merge `settings` by id: `new HoloEffect(HoloEffect.looks.card, { exposure: 1 })`.
  */
 function lookParams(
     entries: readonly (readonly [
@@ -261,45 +278,13 @@ function lookParams(
     for (const [, e] of entries) {
         Object.assign(values, e.values);
     }
+    // the look's rest pose as holo.spot's motion.pose (x = ry, y = rx)
     const pose = entries[0][1].pose;
-    const take = (id: string) => {
-        const v = values[id];
-        delete values[id];
-        return v;
-    };
-    const out: Partial<HoloParams> = { pose: { x: pose.ry, y: pose.rx } };
-    take("motion.pose");
-    if (material) {
-        out.material = material;
-    }
-    const ev = take("display.ev");
-    if (typeof ev === "number") {
-        out.exposure = ev;
-    }
-    const glare = take("display.glare");
-    if (typeof glare === "number") {
-        out.glare = glare / 0.1;
-    }
-    const on = take("grain.on");
-    const amount = take("grain.amount");
-    if (on === false) {
-        out.grain = 0;
-    } else if (typeof amount === "number") {
-        out.grain = amount / 0.6;
-    }
-    const bow = take("card.bow");
-    if (typeof bow === "number") {
-        out.bow = bow;
-    }
-    const bg = take("scene.background");
-    const bgColor = take("scene.bgColor");
-    if (bg === "colour" && typeof bgColor === "string") {
-        out.background = bgColor;
-    } else if (bg === "black" || bg === "white") {
-        out.background = bg;
-    }
-    out.settings = Object.freeze(values);
-    return Object.freeze(out);
+    values["motion.pose"] = { x: pose.ry, y: pose.rx };
+    return Object.freeze({
+        ...(material ? { material } : {}),
+        settings: Object.freeze(values),
+    });
 }
 
 /** Merges param objects in order; `settings` merge by id (a holo.spot Copy settings blob replaces them). */
@@ -380,6 +365,9 @@ function typedSettings(p: HoloParams): Record<string, ParamValue> {
     if (p.pose && fin(p.pose.x) && fin(p.pose.y)) {
         o["motion.pose"] = { x: p.pose.x, y: p.pose.y };
     }
+    if (fin(p.lens)) {
+        o["dof.lens"] = Math.min(Math.max(p.lens, 24), 200);
+    }
     if (p.pointer) {
         o["motion.pointer"] = p.pointer;
     }
@@ -406,7 +394,13 @@ const MM_PER_CSS_PX = 25.4 / 96;
 const MATERIAL_PREFIXES = new Set(Object.keys(MATERIALS));
 /** holospot's framing: the card at rest fills this share of the view (camera FOV 22°). */
 const FRAMING = 0.7;
-const TAN_HALF_FOV = Math.tan((11 * Math.PI) / 180);
+/** Vertical field of view [deg] of a focal length (holospot physics/lens.ts lensFovDeg: exactly 22° at 62 mm). */
+function lensFovDeg(fMm: number): number {
+    if (!(fMm > 0) || fMm === 62) {
+        return 22;
+    }
+    return (2 * Math.atan(12 / fMm) * 180) / Math.PI;
+}
 
 /** Perspective-mode margin [physical px] on each side of the element. */
 function perspectiveMargin(w: number, h: number): [number, number] {
@@ -499,11 +493,11 @@ in vec2 uv;
 in vec2 uvContent;
 in vec2 uvSrc;
 uniform sampler2D src;
-uniform sampler2D uBase;   // perspective mode: the element mapped onto the card
+uniform sampler2D uBase;   // 3d view: the element mapped onto the card
 uniform int uMask;
 uniform int uPersp;
 void main() {
-  // flat mode: the card target covers the element; perspective mode: the whole (grown) output
+  // flat view: the card target covers the element; 3d view: the whole (grown) output
   vec2 hu = uPersp == 1 ? uv : uvContent;
   vec4 s = uPersp == 1 ? (uMask == 1 ? texture(uBase, uv) : vec4(0.0)) : texture(src, uvSrc);
   if (uPersp == 0 && (uvContent.x < 0.0 || uvContent.x > 1.0 || uvContent.y < 0.0 || uvContent.y > 1.0)) {
@@ -600,8 +594,10 @@ export class HoloEffect implements Effect {
     #cardSizeMm: [number, number] = [63, 88];
     /** The card's surface domain [mm]: its size / `structureScale` (the structure's frame, not the geometry's). */
     #domainMm: [number, number] = [63, 88];
-    /** The drawn card's rotation: the pose scaled by `perspective`. */
+    /** The drawn card's rotation (3d view: the pose; flat: identity). */
     #visRot = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    /** Flat view: the inverse of the light rig's rotation (= the pose), row-major; null in 3d. */
+    #rigInv: Mat3 | null = null;
     #eta: { ord: Float32Array; mir: Float32Array; env: Float32Array } | null =
         null;
     #matUniforms: Uniforms = {};
@@ -757,7 +753,7 @@ export class HoloEffect implements Effect {
 
     #samples: 1 | 4 = 1;
 
-    /** The card target (float, the output's size) and the perspective base layer, with `msaa` (4× half float). */
+    /** The card target (float, the output's size) and the 3d view's base layer, with `msaa` (4× half float). */
     #ensureHdr(ctx: EffectContext): void {
         const samples = this.params.msaa ? 4 : 1;
         if (this.#hdr && this.#samples === samples) {
@@ -783,7 +779,7 @@ export class HoloEffect implements Effect {
     outputRect(
         dims: EffectDims,
     ): readonly [number, number, number, number] | undefined {
-        if (!(this.params.perspective > 0)) {
+        if (this.params.view !== "3d") {
             return undefined;
         }
         const [w, h] = dims.elementPixel;
@@ -864,9 +860,9 @@ export class HoloEffect implements Effect {
         return def;
     }
 
-    /** holospot's camera: FOV 22°, at (0, 0, D) looking down −Z (column-major projection × view). */
-    #setViewProj(aspect: number, D: number): void {
-        const f = 1 / TAN_HALF_FOV;
+    /** holospot's camera: vertical FOV from the lens, at (0, 0, D) looking down −Z (column-major projection × view). */
+    #setViewProj(aspect: number, D: number, tanHalf: number): void {
+        const f = 1 / tanHalf;
         const near = 0.1 * D;
         const far = 10 * D;
         const a = (far + near) / (near - far);
@@ -900,19 +896,21 @@ export class HoloEffect implements Effect {
         // the surface's domain: a smaller structure scale lays more of the structure over the card
         const ss = Math.min(Math.max(this.params.structureScale || 1, 0.1), 10);
         this.#domainMm = [(w * k) / ss, (h * k) / ss];
+        const fov = lensFovDeg(s.lensMm);
+        const tanHalf = Math.tan((fov * Math.PI) / 360);
+        const view3d = this.params.view === "3d";
         let D = framingDistance(
             w / h,
             this.#cardSizeMm[0] / 2000,
             this.#cardSizeMm[1] / 2000,
+            fov,
         );
-        if (this.params.perspective > 0) {
+        if (view3d) {
             // the card at rest maps exactly onto the element inside the grown output
             const [mx, my] = perspectiveMargin(pw, ph);
             const oh = ph + 2 * my;
-            D =
-                (this.#cardSizeMm[1] / 2000 / TAN_HALF_FOV) *
-                (oh / Math.max(ph, 1));
-            this.#setViewProj((pw + 2 * mx) / Math.max(oh, 1), D);
+            D = (this.#cardSizeMm[1] / 2000 / tanHalf) * (oh / Math.max(ph, 1));
+            this.#setViewProj((pw + 2 * mx) / Math.max(oh, 1), D, tanHalf);
         }
         this.#camPos = [0, 0, D];
 
@@ -944,17 +942,19 @@ export class HoloEffect implements Effect {
         }
         this.#pose.step(target, dt);
 
-        const rot = eulerXYZ(this.#pose.rx, this.#pose.ry, 0);
+        // 3d: the card turns. flat: the card stays and the light rig turns the other way (holospot's Q_L).
+        const pose = eulerXYZ(this.#pose.rx, this.#pose.ry, 0);
+        const rot: Mat3 = view3d ? pose : [1, 0, 0, 0, 1, 0, 0, 0, 1];
+        const rig = view3d
+            ? { x: 0, y: 0, z: 0, w: 1 }
+            : inversePoseQuat(this.#pose.rx, this.#pose.ry);
+        this.#rigInv = view3d ? null : pose; // mat3(conj(Q_L)) for the environment
         if (this.#started) {
             this.#prevCardRot.set(this.#cardRot);
             this.#prevLightPos.set(this.#lights.pos);
         }
         colMajor(rot, this.#cardRot);
-        const pv = Math.min(Math.max(this.params.perspective || 0, 0), 1);
-        colMajor(
-            eulerXYZ(pv * this.#pose.rx, pv * this.#pose.ry, 0),
-            this.#visRot,
-        );
+        colMajor(rot, this.#visRot);
 
         const pad = over ? { x: nx, y: ny } : { x: 0, y: 0 };
         computeLights(
@@ -964,7 +964,7 @@ export class HoloEffect implements Effect {
                 pad,
             },
             s.background,
-            { x: 0, y: 0, z: 0, w: 1 },
+            rig,
             this.#camPos,
             this.#lights,
         );
@@ -1071,7 +1071,7 @@ export class HoloEffect implements Effect {
 
         const emb =
             this.params.material === "emboss" ? this.#embossUniforms(ctx) : {};
-        const persp = this.params.perspective > 0;
+        const persp = this.params.view === "3d";
         const card = {
             uCardRot: this.#cardRot,
             uPrevCardRot: this.#prevCardRot,
@@ -1131,7 +1131,10 @@ export class HoloEffect implements Effect {
                 uEnv: this.#env ?? this.#black,
                 uEnvMaxLod: ENV_LEVELS - 1,
                 uEnvIntensity: 1,
-                uEnvRot: envRotation(s.studio.ambient.rotationDeg),
+                uEnvRot: envRotation(
+                    s.studio.ambient.rotationDeg,
+                    this.#rigInv ?? undefined,
+                ),
                 uEnvUniform: 0,
                 uCmfConv: this.#conv,
                 uCmfCum: this.#cum,

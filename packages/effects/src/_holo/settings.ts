@@ -250,6 +250,8 @@ export interface SceneState {
         glare: number;
         glareRadiusPx: number;
     };
+    /** holo.spot's camera: focal length on a 36 × 24 mm sensor (`dof.lens`; 62 mm = the 22° camera). */
+    lensMm: number;
     grain: {
         on: boolean;
         amount: number;
@@ -296,6 +298,7 @@ export function sceneStateFrom(v: ParamValues): SceneState {
             glare: Math.max(num(v, "display.glare", 0.03), 0),
             glareRadiusPx: Math.max(num(v, "display.glareRadius", 8), 0.5),
         },
+        lensMm: clamp(num(v, "dof.lens", 62), 24, 200),
         grain: {
             on: bool(v, "grain.on", true),
             amount: clamp(num(v, "grain.amount", 0.18), 0, 0.6),

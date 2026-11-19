@@ -4,6 +4,14 @@ import type { ParamSpec } from "../settings-types.js";
 
 export const PARAM_SPECS: readonly ParamSpec[] = [
     {
+        id: "dof.lens",
+        kind: "slider",
+        default: 62,
+        min: 24,
+        max: 200,
+        step: 1,
+    },
+    {
         id: "scene.background",
         kind: "select",
         default: "white",

@@ -56,6 +56,24 @@ export class PoseSpring {
     }
 }
 
+/**
+ * The quaternion (x, y, z, w) of the inverse of the card rotation eulerXYZ(rx, ry, 0) = Rx·Ry: flat mode turns the
+ * light rig by it instead of turning the card (holospot's light-rig rotation `Q_L`, scene/lights.ts).
+ */
+export function inversePoseQuat(
+    rxDeg: number,
+    ryDeg: number,
+): { x: number; y: number; z: number; w: number } {
+    const a = (rxDeg * Math.PI) / 360;
+    const b = (ryDeg * Math.PI) / 360;
+    const sa = Math.sin(a);
+    const ca = Math.cos(a);
+    const sb = Math.sin(b);
+    const cb = Math.cos(b);
+    // q = qx(rx)·qy(ry) = (sa·cb, ca·sb, sa·sb, ca·cb); its conjugate is the inverse
+    return { x: -sa * cb, y: -ca * sb, z: -sa * sb, w: ca * cb };
+}
+
 /** Idle wobble offset [deg] at time t [s]. */
 export function wobbleOffset(t: number, ampDeg: number): PoseTarget {
     return {

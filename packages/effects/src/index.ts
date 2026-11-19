@@ -55,6 +55,7 @@ export {
     type HoloSettingValue,
     type HoloTone,
     type HoloVec2,
+    type HoloView,
 } from "./holo.js";
 export { HueShiftEffect, type HueShiftParams } from "./hue-shift.js";
 export { JPEGGlitchEffect, type JPEGGlitchParams } from "./jpeg-glitch.js";

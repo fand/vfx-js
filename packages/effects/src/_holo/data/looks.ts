@@ -233,6 +233,7 @@ export const LOOKS: LookData = {
         },
         emboss: {
             values: {
+                "dof.lens": 51,
                 "scene.background": "colour",
                 "scene.bgColor": "#ffffff",
                 "studio.panel.dir": {
@@ -307,6 +308,7 @@ export const LOOKS: LookData = {
     object: {
         prism: {
             values: {
+                "dof.lens": 200,
                 "scene.background": "colour",
                 "scene.bgColor": "#ffffff",
                 "studio.panel.dir": {
@@ -365,6 +367,7 @@ export const LOOKS: LookData = {
         },
         shatter: {
             values: {
+                "dof.lens": 200,
                 "scene.background": "colour",
                 "scene.bgColor": "#ffffff",
                 "studio.panel.dir": {
@@ -416,6 +419,7 @@ export const LOOKS: LookData = {
         },
         nebula: {
             values: {
+                "dof.lens": 200,
                 "scene.background": "colour",
                 "scene.bgColor": "#ffffff",
                 "studio.panel.dir": {
@@ -484,6 +488,7 @@ export const LOOKS: LookData = {
         },
         sparkle: {
             values: {
+                "dof.lens": 200,
                 "scene.background": "colour",
                 "scene.bgColor": "#ffffff",
                 "studio.panel.dir": {
@@ -537,6 +542,7 @@ export const LOOKS: LookData = {
         },
         vortex: {
             values: {
+                "dof.lens": 200,
                 "scene.background": "colour",
                 "scene.bgColor": "#ffffff",
                 "studio.panel.dir": {

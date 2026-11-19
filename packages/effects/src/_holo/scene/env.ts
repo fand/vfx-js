@@ -57,12 +57,26 @@ export function cameraSideBlobs(seed = CAMERA_SIDE_SEED): {
     return { blobs: new Float32Array(blobs.flat()), norm: sum / (NZ * NP) };
 }
 
-/** `uEnvRot` = R_z(−rotation) (holospot envRotation without the gyro), column-major. */
-export function envRotation(rotationDeg: number): Float32Array {
+/**
+ * `uEnvRot` = R_z(−rotation)·mat3(conj(Q_L)) (holospot envRotation), column-major: world direction → environment lookup.
+ * `rig` is mat3(conj(Q_L)), row-major: the inverse of the light rig's rotation (identity when the rig is not turned).
+ */
+export function envRotation(rotationDeg: number, rig?: Mat3): Float32Array {
     const a = (-rotationDeg * Math.PI) / 180;
     const c = Math.cos(a);
     const s = Math.sin(a);
-    const m: Mat3 = [c, -s, 0, s, c, 0, 0, 0, 1];
+    const z: Mat3 = [c, -s, 0, s, c, 0, 0, 0, 1];
+    const m = rig
+        ? (Array.from({ length: 9 }, (_, i) => {
+              const r = Math.floor(i / 3);
+              const k = i % 3;
+              return (
+                  z[3 * r] * rig[k] +
+                  z[3 * r + 1] * rig[3 + k] +
+                  z[3 * r + 2] * rig[6 + k]
+              );
+          }) as unknown as Mat3)
+        : z;
     return new Float32Array([
         m[0],
         m[3],

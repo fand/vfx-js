@@ -20,6 +20,7 @@ const SCENE_IDS = [
     /^card\.(bow|bowAxis|emboss|embossPitch|embossHeight|embossLayer|wear)$/,
     /^motion\.(pointer|tiltRange|pose|wobble|wobbleAmp)$/,
     /^scene\.(background|bgColor)$/,
+    /^dof\.lens$/,
 ];
 const supported = (id) =>
     !EMBOSS_UNSUPPORTED.test(id) &&
