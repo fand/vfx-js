@@ -66,7 +66,10 @@ for (const name of ["card", "object"]) {
         if (!s) continue;
         const values = Object.fromEntries(
             Object.entries(s.values).filter(
-                ([id]) => supported(id) && id !== "emboss.logo",
+                ([id]) =>
+                    supported(id) &&
+                    // the site's own artwork, and its placement on a 63 × 88 mm card: the port's logo is centred
+                    !["emboss.logo", "emboss.x", "emboss.y"].includes(id),
             ),
         );
         lookOut[name][m] = { values, pose: { rx: s.pose.rx, ry: s.pose.ry } };
