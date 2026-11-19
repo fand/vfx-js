@@ -31,7 +31,8 @@ function isSceneId(id: string): boolean {
         head === "grain" ||
         head === "card" ||
         head === "motion" ||
-        head === "scene"
+        head === "scene" ||
+        head === "dof"
     );
 }
 
