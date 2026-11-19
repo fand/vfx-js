@@ -1,0 +1,202 @@
+// The textures of Foil Emboss (holospot engine/scene/embossAssets.ts, LogoMaps and PaperMaps, MIT © 2026 Dmitry
+// Kurash), re-shaped for vfx-js: the kernels run in an inline worker as in holospot, and their base levels travel as
+// float24 byte images (spectral/float24.ts) that the effect decodes into mipmapped float targets. The GPU builds the
+// mip chains (box filter, the same 2 × 2 average holospot computes on the CPU; both maps are moments or distances,
+// which average linearly).
+import { BUILTIN_LOGOS, LOGO_DEFAULT } from "./data/logos.js";
+import { KernelWorker, transferables } from "./scene/kernel-worker.js";
+import {
+    type LogoBuild,
+    logoKernel,
+    rasterizeLogo,
+    rasterizeLogoImage,
+} from "./scene/logo.js";
+import {
+    PAPER_N,
+    PAPER_TILE_MM,
+    type PaperBuild,
+    paperKernel,
+} from "./scene/paper-maps.js";
+import { encodeFloat24 } from "./spectral/float24.js";
+
+/** An image the logo can be read from. */
+export type LogoImage =
+    | HTMLImageElement
+    | HTMLCanvasElement
+    | ImageBitmap
+    | OffscreenCanvas;
+
+/** A float RGBA image ready for upload: `bytes` is the canvas image (4 values per texel, one per pixel). */
+export interface ByteImage {
+    w: number;
+    h: number;
+    bytes: Uint8ClampedArray<ArrayBuffer>;
+}
+
+/** Half float → float. */
+function fromHalf(h: number): number {
+    const s = h & 0x8000 ? -1 : 1;
+    const e = (h >> 10) & 0x1f;
+    const m = h & 0x3ff;
+    if (e === 0) {
+        return s * m * 2 ** -24;
+    }
+    if (e === 31) {
+        return m ? Number.NaN : s * Number.POSITIVE_INFINITY;
+    }
+    return s * (1 + m / 1024) * 2 ** (e - 15);
+}
+
+/** A w × h RGBA half-float level (rows bottom-up) as a byte image for the decode pass (GPU row j = level row j). */
+export function byteImageOfHalf(
+    data: Uint16Array,
+    w: number,
+    h: number,
+): ByteImage {
+    const W = 4 * w;
+    const bytes = new Uint8ClampedArray(W * h * 4).fill(255);
+    for (let j = 0; j < h; j++) {
+        const row = (h - 1 - j) * W * 4;
+        for (let i = 0; i < 4 * w; i++) {
+            encodeFloat24(fromHalf(data[j * 4 * w + i]), bytes, row + 4 * i);
+        }
+    }
+    return { w, h, bytes };
+}
+
+/** The logo source of the values: an image, a URL, a built-in mark path, or "none". */
+export type LogoInput = string | LogoImage;
+
+function logoUrl(s: string): string {
+    const t = s.trim();
+    const svg = BUILTIN_LOGOS[t];
+    return svg
+        ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+        : t;
+}
+
+export interface LogoState {
+    image: ByteImage;
+    /** uLogoMap: texture span in logo widths (x, y), 1/logo width [texels], aspect (height / width). */
+    map: [number, number, number, number];
+}
+
+export class EmbossAssets {
+    private readonly logoWorker = new KernelWorker(logoKernel as never);
+    private readonly paperWorker = new KernelWorker(paperKernel as never);
+    private logoWanted: LogoInput | null = null;
+    private paperWanted = "";
+    private logoToken = 0;
+    private paperToken = 0;
+
+    /** The logo of the current values, or null (none, still loading, or failed). Changes bump `logoVersion`. */
+    logo: LogoState | null = null;
+    logoVersion = 0;
+    /** The paper maps (moments, aux), or null while they build. Changes bump `paperVersion`. */
+    paper: { mom: ByteImage; aux: ByteImage } | null = null;
+    paperVersion = 0;
+    /** Warning of the last logo that failed to load. */
+    error: string | null = null;
+
+    /** Requests the logo (no-op when unchanged). */
+    setLogo(input: LogoInput | null | undefined): void {
+        const want = input ?? LOGO_DEFAULT;
+        if (want === this.logoWanted) {
+            return;
+        }
+        this.logoWanted = want;
+        const token = ++this.logoToken;
+        if (typeof want === "string" && want.trim().toLowerCase() === "none") {
+            this.install(null);
+            return;
+        }
+        void (async () => {
+            try {
+                const { raster } =
+                    typeof want === "string"
+                        ? await rasterizeLogo(logoUrl(want))
+                        : await rasterizeLogoImage(want);
+                if (token !== this.logoToken) {
+                    return;
+                }
+                const b = await this.logoWorker.run<LogoBuild>(
+                    "build",
+                    raster,
+                    transferables(raster),
+                );
+                if (token !== this.logoToken) {
+                    return;
+                }
+                const l0 = b.levels[0];
+                this.install({
+                    image: byteImageOfHalf(l0.data, l0.w, l0.h),
+                    map: [
+                        b.w / b.logoW,
+                        b.h / b.logoW,
+                        1 / b.logoW,
+                        b.logoH / b.logoW,
+                    ],
+                });
+                this.error = null;
+            } catch (e) {
+                if (token !== this.logoToken) {
+                    return;
+                }
+                this.error = `HoloEffect: could not load the logo: ${e instanceof Error ? e.message : String(e)}`;
+                console.warn(this.error);
+                this.install(null);
+            }
+        })();
+    }
+
+    private install(l: LogoState | null): void {
+        this.logo = l;
+        this.logoVersion++;
+    }
+
+    /** Requests the paper maps of a stock (no-op when unchanged). */
+    setPaper(k: {
+        stock: number;
+        fibreAmount: number;
+        fibreScale: number;
+        seed: number;
+    }): void {
+        const key = `${k.stock}|${k.fibreAmount}|${k.fibreScale}|${k.seed}`;
+        if (key === this.paperWanted) {
+            return;
+        }
+        this.paperWanted = key;
+        const token = ++this.paperToken;
+        void (async () => {
+            try {
+                const b = await this.paperWorker.run<PaperBuild>("build", {
+                    n: PAPER_N,
+                    tileMm: PAPER_TILE_MM,
+                    ...k,
+                });
+                if (token !== this.paperToken) {
+                    return;
+                }
+                const l0 = b.levels[0];
+                this.paper = {
+                    mom: byteImageOfHalf(l0.mom, l0.w, l0.h),
+                    aux: byteImageOfHalf(l0.aux, l0.w, l0.h),
+                };
+                this.paperVersion++;
+            } catch (e) {
+                if (token === this.paperToken) {
+                    console.warn(
+                        `HoloEffect: could not build the paper maps: ${e instanceof Error ? e.message : String(e)}`,
+                    );
+                }
+            }
+        })();
+    }
+
+    dispose(): void {
+        this.logoToken++;
+        this.paperToken++;
+        this.logoWorker.dispose();
+        this.paperWorker.dispose();
+    }
+}

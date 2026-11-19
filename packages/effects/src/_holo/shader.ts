@@ -14,6 +14,7 @@ import grating from "./glsl/grating.js";
 import ibl from "./glsl/ibl.js";
 import lights from "./glsl/lights.js";
 import ltc from "./glsl/ltc.js";
+import paper from "./glsl/paper.js";
 import relief from "./glsl/relief.js";
 import spectral from "./glsl/spectral.js";
 import wear from "./glsl/wear.js";
@@ -114,14 +115,13 @@ uniform vec4 srcRectUv;    // element UV → src texture UV (vfx-js auto uniform
 uniform float uInk;
 uniform int uMask;
 struct Print { float W; vec3 T2; vec3 onWhite; float silver; };
-vec2 gPrintUv = vec2(0.5);   // card UV of this fragment, set by printLayer (every main calls it before encodeCard)
+in vec2 vHoloUv;             // card UV of this fragment (CARD_VERT; the mains declare their own vUv)
 vec4 printUvDerivs(vec2 p) { return vec4(0.0); }
 vec3 printSrgbToLinear(vec3 c) {
   return mix(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, vec3(lessThanEqual(c, vec3(0.04045))));
 }
 Print printLayer(vec2 pMm, vec4 dUv) {
   Print pr; pr.W = 0.0; pr.onWhite = vec3(0.85); pr.silver = 0.0;
-  gPrintUv = pMm / uCardSizeMm;
   vec4 s = texture(uPrintSrc, srcRectUv.xy + (pMm / uCardSizeMm) * srcRectUv.zw);
   vec3 c = s.a > 1e-4 ? printSrgbToLinear(clamp(s.rgb / s.a, 0.0, 1.0)) : vec3(1.0);
   pr.T2 = mix(vec3(1.0), c, uInk);
@@ -129,10 +129,16 @@ Print printLayer(vec2 pMm, vec4 dUv) {
 }
 float printCoverage() {
   if (uMask == 2) return 1.0;
-  vec4 s = texture(uPrintSrc, srcRectUv.xy + gPrintUv * srcRectUv.zw);
+  vec4 s = texture(uPrintSrc, srcRectUv.xy + vHoloUv * srcRectUv.zw);
   if (uMask == 0) return clamp(s.a, 0.0, 1.0);
   vec3 u = s.a > 1e-4 ? clamp(s.rgb / s.a, 0.0, 1.0) : vec3(0.0);
   return clamp(dot(u, LUMA_SRGB) * s.a, 0.0, 1.0);
+}
+// The element as Foil Emboss's printed picture (paper.glsl printTint): linear colour, straight alpha, as three decodes
+// an sRGB image texture.
+vec4 holoPrintSample(vec2 uv, vec2 dx, vec2 dy) {
+  vec4 s = textureGrad(uPrintSrc, srcRectUv.xy + uv * srcRectUv.zw, dx * srcRectUv.zw, dy * srcRectUv.zw);
+  return vec4(s.a > 1e-4 ? printSrgbToLinear(clamp(s.rgb / s.a, 0.0, 1.0)) : vec3(1.0), s.a);
 }
 // The material mains end with gl_FragColor = encodeCard(L): premultiply it by the coverage.
 vec4 encodeCardCovered(vec3 L) { return encodeCard(L) * printCoverage(); }
@@ -193,6 +199,7 @@ uniform mat4 uViewProj;
 uniform int uPersp;
 out vec3 vWorldPos; out vec3 vPrevWorldPos; out vec2 vUv; out vec3 vN; out vec3 vT; out vec3 vB;
 out float vOcc;
+out vec2 vHoloUv;
 void main() {
   vec2 uv = position.xy * 0.5 + 0.5;
   vec3 local = vec3((uv - 0.5) * uCardSizeMm * 0.001, 0.0);   // metres, card centre at the origin
@@ -201,6 +208,7 @@ void main() {
   vUv = uv;
   vN = uCardRot[2]; vT = uCardRot[0]; vB = uCardRot[1];
   vOcc = 0.0;
+  vHoloUv = uv;
   gl_Position = uPersp == 1 ? uViewProj * vec4(vWorldPos, 1.0) : vec4(position.xy, 0.0, 1.0);
 }
 `;
@@ -227,3 +235,11 @@ void main() {
 `;
 
 export { common as GLSL_COMMON };
+
+/** paper.glsl for vfx-js: the printed picture (uPrintTex, three's sRGB texture) is the element (holoPrintSample). */
+export const PAPER = replaceExact(
+    paper,
+    "vec4 c = textureGrad(uPrintTex, clamp(uv, 0.0, 1.0), dx, dy);",
+    "vec4 c = holoPrintSample(clamp(uv, 0.0, 1.0), dx, dy);",
+    "paper print",
+);

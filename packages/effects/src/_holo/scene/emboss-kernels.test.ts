@@ -84,3 +84,22 @@ test("relief: round profile reaches the height inside, 0 far outside", () => {
     expect(reliefHeight(-2, 0, r).h).toBeCloseTo(0, 6);
     expect(reliefUniform(r).H).toBeCloseTo(0.45, 6);
 });
+
+test("emboss assets: half-float level → float24 byte image (rows flipped for upload)", async () => {
+    const { byteImageOfHalf } = await import("../emboss-assets.js");
+    const { decodeFloat24 } = await import("../spectral/float24.js");
+    const k = logoKernel();
+    // 1 × 2 texels, RGBA: row 0 = (1, −2, 0.5, 0), row 1 = (3, 0, 0, 0.25)
+    const data = new Uint16Array(
+        [1, -2, 0.5, 0, 3, 0, 0, 0.25].map((x) => k.half(x)),
+    );
+    const img = byteImageOfHalf(data, 1, 2);
+    expect(img.w).toBe(1);
+    const at = (canvasRow: number, i: number) => {
+        const o = (canvasRow * 4 + i) * 4;
+        return decodeFloat24(img.bytes[o], img.bytes[o + 1], img.bytes[o + 2]);
+    };
+    // GPU row 0 is the canvas's last row
+    expect([0, 1, 2, 3].map((i) => at(1, i))).toEqual([1, -2, 0.5, 0]);
+    expect([0, 1, 2, 3].map((i) => at(0, i))).toEqual([3, 0, 0, 0.25]);
+});

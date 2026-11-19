@@ -6,7 +6,8 @@ export type HoloMaterialId =
     | "shatter"
     | "nebula"
     | "sparkle"
-    | "vortex";
+    | "vortex"
+    | "emboss";
 export type Tier = "low" | "medium" | "high";
 export type Background = "black" | "white" | "colour";
 export type PointerMode = "tilt" | "light" | "flash";

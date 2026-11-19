@@ -11,6 +11,7 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
+import { EmbossAssets } from "./_holo/emboss-assets.js";
 import { HoloGlare } from "./_holo/glare.js";
 import outputFrag from "./_holo/glsl/output.js";
 import {
@@ -20,6 +21,7 @@ import {
     ltcImageBytes,
 } from "./_holo/ltc.js";
 import type { MaterialDef, Uniforms } from "./_holo/materials/build.js";
+import { emboss, paperKey } from "./_holo/materials/emboss.js";
 import { nebula } from "./_holo/materials/nebula.js";
 import { prism } from "./_holo/materials/prism.js";
 import { shatter } from "./_holo/materials/shatter.js";
@@ -77,7 +79,20 @@ export type HoloMaterial =
     | "shatter"
     | "nebula"
     | "sparkle"
-    | "vortex";
+    | "vortex"
+    | "emboss";
+/**
+ * The artwork of the `emboss` material's foil logo: an image, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG
+ * (also one of holo.spot's built-in marks, `"/logos/rosette.svg"`, `"koru"`, `"wordmark"`, `"leaf"`, `"facets"` as
+ * `/logos/<name>.svg`), or `"none"`. Transparent areas carry no foil; an opaque image is read by its contrast against
+ * its border.
+ */
+export type HoloLogo =
+    | string
+    | HTMLImageElement
+    | HTMLCanvasElement
+    | ImageBitmap
+    | OffscreenCanvas;
 /** Look the settings start from: holo.spot's holographic card, its 3D object, or the bare parameter defaults. */
 export type HoloLook = "card" | "object" | "plain";
 /** Quality tier (holospot's tiers: orders, rect-light model, environment diffraction, glitter search radii). */
@@ -125,6 +140,8 @@ export type HoloParams = {
     perspective: boolean;
     /** 4× multisampling of the card target (half float, as holospot). Smooths the card's outline in perspective mode. */
     msaa: boolean;
+    /** `emboss`: the foil logo's artwork. `null`: the `emboss.logo` setting, else holo.spot's rosette. */
+    logo: HoloLogo | null;
 };
 
 const DEFAULT_PARAMS: HoloParams = {
@@ -137,6 +154,7 @@ const DEFAULT_PARAMS: HoloParams = {
     ink: 0,
     perspective: false,
     msaa: false,
+    logo: null,
 };
 
 const MATERIALS: Record<HoloMaterialId, MaterialDef> = {
@@ -145,6 +163,7 @@ const MATERIALS: Record<HoloMaterialId, MaterialDef> = {
     nebula,
     sparkle,
     vortex,
+    emboss,
 };
 
 const MM_PER_CSS_PX = 25.4 / 96;
@@ -322,6 +341,14 @@ export class HoloEffect implements Effect {
     #ltc2: EffectRenderTarget | null = null;
     #ltcReady = false;
     #glare = new HoloGlare();
+    // Foil Emboss: the logo distance field and the paper maps (built on demand)
+    #emboss: EmbossAssets | null = null;
+    #logoRt: EffectRenderTarget | null = null;
+    #logoMap: [number, number, number, number] = [1.28, 1.28, 1 / 800, 1];
+    #logoUp = -1;
+    #paperRt: { mom: EffectRenderTarget; aux: EffectRenderTarget } | null =
+        null;
+    #paperUp = -1;
     #envDrawn: EnvLevels | null = null;
     #blobs = cameraSideBlobs();
     #waves: WaveSet | null = null;
@@ -612,6 +639,14 @@ export class HoloEffect implements Effect {
             this.#prevLightPos.set(this.#lights.pos);
             this.#started = true;
         }
+        if (this.params.material === "emboss") {
+            this.#emboss ??= new EmbossAssets();
+            const lv = r.values["emboss.logo"];
+            this.#emboss.setLogo(
+                this.params.logo ?? (typeof lv === "string" ? lv : null),
+            );
+            this.#emboss.setPaper(paperKey(r.values));
+        }
         this.#eta = etaFrame(
             this.#def().gratingSummary(r.values),
             this.#lights,
@@ -693,6 +728,8 @@ export class HoloEffect implements Effect {
         const binW = new Float32Array(72);
         binW.set(bins.W);
 
+        const emb =
+            this.params.material === "emboss" ? this.#embossUniforms(ctx) : {};
         const persp = this.params.perspective;
         const card = {
             uCardRot: this.#cardRot,
@@ -721,6 +758,7 @@ export class HoloEffect implements Effect {
             target: this.#hdr,
             uniforms: {
                 ...this.#matUniforms,
+                ...emb,
                 ...card,
                 cameraPosition: [...this.#camPos],
                 uWrapMm: [0, 0],
@@ -816,6 +854,93 @@ export class HoloEffect implements Effect {
         });
     }
 
+    /** Uploads the Foil Emboss textures when they change and returns their uniforms. */
+    #embossUniforms(ctx: EffectContext): Uniforms {
+        const a = this.#emboss;
+        const black = this.#black;
+        if (!a || !black) {
+            return {};
+        }
+        if (a.logoVersion !== this.#logoUp) {
+            this.#logoUp = a.logoVersion;
+            const l = a.logo;
+            if (l) {
+                const { w, h } = l.image;
+                if (
+                    !this.#logoRt ||
+                    this.#logoRt.width !== w ||
+                    this.#logoRt.height !== h
+                ) {
+                    this.#logoRt?.dispose();
+                    this.#logoRt = ctx.createRenderTarget({
+                        size: [w, h],
+                        float: true,
+                        filter: "linear",
+                        mipmap: true,
+                        wrap: "clamp",
+                    });
+                }
+                this.#upload(ctx, l.image, this.#logoRt, "logo");
+                this.#logoMap = l.map;
+            } else {
+                this.#logoRt?.dispose();
+                this.#logoRt = null;
+            }
+        }
+        if (a.paperVersion !== this.#paperUp && a.paper) {
+            this.#paperUp = a.paperVersion;
+            const n = a.paper.mom.w;
+            const opts = {
+                size: [n, n] as const,
+                float: true,
+                filter: "linear" as const,
+                mipmap: true,
+                wrap: "repeat" as const,
+            };
+            this.#paperRt ??= {
+                mom: ctx.createRenderTarget(opts),
+                aux: ctx.createRenderTarget(opts),
+            };
+            this.#upload(ctx, a.paper.mom, this.#paperRt.mom, "mom");
+            this.#upload(ctx, a.paper.aux, this.#paperRt.aux, "aux");
+        }
+        return {
+            uLogoTex: this.#logoRt ?? black,
+            uLogoOn: this.#logoRt ? 1 : 0,
+            uLogoMap: this.#logoMap,
+            uPaperMom: this.#paperRt?.mom ?? black,
+            uPaperAux: this.#paperRt?.aux ?? black,
+            uPaperOn: this.#paperRt ? 1 : 0,
+            uPrintTex: black,
+        };
+    }
+
+    /** One float RGBA byte image (emboss-assets.ts) → a float target, through a canvas and the decode pass. */
+    #upload(
+        ctx: EffectContext,
+        img: { w: number; h: number; bytes: Uint8ClampedArray<ArrayBuffer> },
+        target: EffectRenderTarget,
+        _what: string,
+    ): void {
+        const canvas = this.#makeCanvas(4 * img.w, img.h);
+        this.#ctx2d(canvas)?.putImageData(
+            new ImageData(img.bytes, 4 * img.w, img.h),
+            0,
+            0,
+        );
+        const tex = ctx.wrapTexture(canvas, {
+            autoUpdate: false,
+            filter: "nearest",
+        });
+        ctx.draw({
+            frag: FRAG_DECODE_LTC,
+            vert: PLAIN_VERT,
+            target,
+            uniforms: { uBytes: tex, uRowOffset: 0 },
+        });
+        tex.dispose();
+    }
+
     dispose(): void {
         for (const rt of [
             this.#conv,
@@ -832,6 +957,14 @@ export class HoloEffect implements Effect {
         this.#bytesTex?.dispose();
         this.#ltcTex?.dispose();
         this.#glare.dispose();
+        this.#emboss?.dispose();
+        this.#emboss = null;
+        this.#logoRt?.dispose();
+        this.#logoRt = null;
+        this.#paperRt?.mom.dispose();
+        this.#paperRt?.aux.dispose();
+        this.#paperRt = null;
+        this.#logoUp = this.#paperUp = -1;
         this.#conv = this.#cum = this.#hdr = this.#black = this.#env = null;
         this.#base = null;
         this.#ltc1 = this.#ltc2 = null;

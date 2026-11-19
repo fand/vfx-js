@@ -101,7 +101,11 @@ export function resolveSettings(
     // a material's preset selects (the paper stock writes the paper's values), as choosing it on holo.spot does
     for (const [id, options] of Object.entries(MATERIAL_PRESETS)) {
         const choice = given[id];
-        if (id.startsWith(prefix) && typeof choice === "string" && options[choice]) {
+        if (
+            id.startsWith(prefix) &&
+            typeof choice === "string" &&
+            options[choice]
+        ) {
             for (const [k, v] of Object.entries(options[choice])) {
                 write(k, v);
             }

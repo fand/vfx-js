@@ -758,7 +758,34 @@ function borderInfo(
 export async function rasterizeLogo(
     url: string,
 ): Promise<{ raster: LogoRaster; layout: LogoLayout; aspect: number }> {
-    const src = await decodeLogo(url);
+    return rasterizeSource(await decodeLogo(url));
+}
+
+/** vfx-js port: rasterises an image object (a decoded <img>, a canvas or an ImageBitmap) as rasterizeLogo does a URL. */
+export async function rasterizeLogoImage(
+    img: HTMLImageElement | HTMLCanvasElement | ImageBitmap | OffscreenCanvas,
+): Promise<{ raster: LogoRaster; layout: LogoLayout; aspect: number }> {
+    if (img instanceof HTMLImageElement && !img.complete) {
+        await img.decode();
+    }
+    const w = img instanceof HTMLImageElement ? img.naturalWidth : img.width;
+    const h = img instanceof HTMLImageElement ? img.naturalHeight : img.height;
+    if (!(w > 0 && h > 0)) {
+        throw new Error("the image has no size");
+    }
+    return rasterizeSource({
+        w,
+        h,
+        async draw(g, s, d) {
+            g.drawImage(img, s[0], s[1], s[2], s[3], d[0], d[1], d[2], d[3]);
+        },
+        close() {},
+    });
+}
+
+async function rasterizeSource(
+    src: LogoSource,
+): Promise<{ raster: LogoRaster; layout: LogoLayout; aspect: number }> {
     try {
         // pass 1: bounding box of the ink
         const s1 = 1024 / Math.max(src.w, src.h),
