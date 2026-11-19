@@ -40,6 +40,7 @@ export {
 } from "./halftone.js";
 export {
     HoloEffect,
+    type HoloLogo,
     type HoloLook,
     type HoloMask,
     type HoloMaterial,

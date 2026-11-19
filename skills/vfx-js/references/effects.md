@@ -44,7 +44,7 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `GlitchEffect` | Block shift and aberration glitch. |
 | `GradientMapEffect` | Map luminance to a color gradient. |
 | `HalftoneEffect` | RGB / CMYK halftone screen. |
-| `HoloEffect` | Holographic foil (holo.spot materials): rainbow foil, gold shatter, glitter, sparkle, spiral. Tilts with the pointer. |
+| `HoloEffect` | Holographic foil (holo.spot materials): rainbow foil, gold shatter, glitter, sparkle, spiral, foil-embossed paper. Tilts with the pointer. |
 | `HueShiftEffect` | Rotate hue. |
 | `JPEGGlitchEffect` | Real JPEG glitch: corrupts the encoded bytes. |
 | `LightStreakEffect` | Anamorphic flare / starburst streaks. |
@@ -77,7 +77,7 @@ import { HoloEffect } from "@vfx-js/effects";
 
 await vfx.add(el, {
     effect: new HoloEffect({
-        material: "prism", // "prism" | "shatter" | "nebula" | "sparkle" | "vortex"
+        material: "prism", // "prism" | "shatter" | "nebula" | "sparkle" | "vortex" | "emboss"
         settings: { "prism.pitch": 1200, "prism.pattern": "radial", "display.ev": 0.8 },
         mask: "alpha", // foil where the element is opaque; "luma" or "none"
     }),
@@ -90,6 +90,7 @@ await vfx.add(el, {
 - `quality`: `"low"` for phones, `"medium"` (default) or `"high"`.
 - `ink` (0–1) tints the foil with the element's colours, like a translucent ink.
 - `perspective: true` draws the card tilted in 3D, as holo.spot does. The output grows by about 21 % on each side. Default `false`: the element stays in place and only its shading tilts.
+- `material: "emboss"` is a paper card with a foil logo pressed into it. The element is the picture printed on the paper; `logo` takes the logo's artwork (an `<img>`, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG; transparent areas get no foil). Place and shape it with `emboss.*` settings (`emboss.width` in mm, `emboss.foil`: `"rainbow"`, `"concentric"`, `"sparkle"`, `"silver"`, `"gold"`, `emboss.profile`, `emboss.stock`, …). Hologram stickers and multi-element cards of holo.spot are not supported.
 - `msaa: true` turns on 4× multisampling of the card. Use it with `perspective`, where it smooths the card's outline; it costs about 5× the card target's memory.
 - Use `setParams({ settings: { ... } })` to change values live; it merges `settings` by id.
 

@@ -1858,7 +1858,14 @@ export const holo = presetStory<HoloArgs>(
     {
         material: {
             control: { type: "select" },
-            options: ["prism", "shatter", "nebula", "sparkle", "vortex"],
+            options: [
+                "prism",
+                "shatter",
+                "nebula",
+                "sparkle",
+                "vortex",
+                "emboss",
+            ],
         },
         look: {
             control: { type: "select" },

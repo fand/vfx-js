@@ -217,7 +217,7 @@ Phase 2 (same PR, after the above works): Foil Emboss with an image param.
 
 ## Status
 
-Milestones 1–20 are done. Phase 2 (Foil Emboss) is next.
+Milestones 1–20 are done, and Phase 2 (Foil Emboss) with them.
 
 Parity against holospot `dist/holo.js` (the card at pose (0, 0), same lights and camera, holospot's `bump.strength`
 0, grain and glare off unless noted). Mean absolute difference per channel, 0–255, over the card interior after
@@ -257,3 +257,21 @@ Deviations found while porting:
 - Flat mode (the default) keeps the element in place and does not warp it; `perspective: true` is holospot's view.
 - The pose is this port's: spring toward rest pose + pointer tilt (`motion.tiltRange`), idle wobble as a slow
   Lissajous. holospot's site pose controller is not part of its kit.
+
+## Phase 2: Foil Emboss
+
+`material: "emboss"` is holospot's paper card with one foil logo:
+
+- The logo's artwork is the `logo` param (an `<img>`, a canvas, an `ImageBitmap`, or a URL; holo.spot's built-in marks
+  `/logos/<name>.svg` are embedded) or the `emboss.logo` setting. holospot's pipeline builds its distance field and
+  dome membrane (the kernels of `scene/logo.ts`, in an inline worker as in holospot); the base level travels as a
+  float24 image and the GPU builds the mip chain.
+- The paper maps (`scene/paperMaps.ts`, 1024² LEAN moments per stock) are built the same way.
+- The element is the picture printed on the paper (holospot's `emboss.print`, always on; `emboss.printInk`).
+- The `card` look of emboss is holo.spot's paper card (the look `image`) without its logo artwork and placement: the
+  logo is centred unless `emboss.x` / `emboss.y` say otherwise.
+- Not ported: the hologram sticker (`emboss.element` hologram: it needs the volume-hologram assets) and the
+  multi-element document (`emboss.doc`).
+
+Parity (rosette logo, plain look, pose (0, 0)): 0.9 per pixel, 0.2 blurred. Koru in gold foil at holo.spot's card
+pose in perspective mode: 2.5–4.3 per pixel, 0.4–1.0 blurred.
