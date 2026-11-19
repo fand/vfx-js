@@ -1597,14 +1597,7 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
     {
         id: "emboss.logo",
         kind: "image",
-        default: "/logos/rosette.svg",
-        options: [
-            "/logos/rosette.svg",
-            "/logos/koru.svg",
-            "/logos/wordmark.svg",
-            "/logos/leaf.svg",
-            "/logos/facets.svg",
-        ],
+        default: "",
     },
     {
         id: "emboss.x",

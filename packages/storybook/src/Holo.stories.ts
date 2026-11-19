@@ -43,7 +43,8 @@ const LIGHTS: HoloStudio[] = [
     "office",
     "raking",
 ];
-const BUILTIN_LOGOS = ["rosette", "koru", "wordmark", "leaf", "facets"];
+// emboss logos: none by default, or the story's own artwork
+const LOGOS: Record<string, string> = { "(none)": "", "vfx-js logo": Logo };
 
 const opts = <T extends string>(xs: readonly T[]) =>
     Object.fromEntries(xs.map((x) => [x, x])) as Record<string, T>;
@@ -331,9 +332,7 @@ function addSetting(
             state[key] = String(cur);
             folder
                 .addBinding(state, key, {
-                    options: Object.fromEntries(
-                        BUILTIN_LOGOS.map((n) => [n, `/logos/${n}.svg`]),
-                    ),
+                    options: LOGOS,
                 })
                 .on("change", (ev) => set(ev.value as string));
         } else if (s.kind === "pad") {

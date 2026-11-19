@@ -3,7 +3,6 @@
 // float24 byte images (spectral/float24.ts) that the effect decodes into mipmapped float targets. The GPU builds the
 // mip chains (box filter, the same 2 × 2 average holospot computes on the CPU; both maps are moments or distances,
 // which average linearly).
-import { BUILTIN_LOGOS, LOGO_DEFAULT } from "./data/logos.js";
 import { KernelWorker, transferables } from "./scene/kernel-worker.js";
 import {
     type LogoBuild,
@@ -64,16 +63,8 @@ export function byteImageOfHalf(
     return { w, h, bytes };
 }
 
-/** The logo source of the values: an image, a URL, a built-in mark path, or "none". */
+/** The logo source: an image or a URL; "" (or "none") is no logo. */
 export type LogoInput = string | LogoImage;
-
-function logoUrl(s: string): string {
-    const t = s.trim();
-    const svg = BUILTIN_LOGOS[t];
-    return svg
-        ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-        : t;
-}
 
 export interface LogoState {
     image: ByteImage;
@@ -110,16 +101,19 @@ export class EmbossAssets {
     private logoBusy = false;
     private paperBusy = false;
 
-    /** Requests the logo (no-op when unchanged). */
+    /** Requests the logo (no-op when unchanged); null, "" or "none" is no logo. */
     setLogo(input: LogoInput | null | undefined): void {
-        const want = input ?? LOGO_DEFAULT;
+        const want = input ?? "";
         if (want === this.logoWanted) {
             return;
         }
         this.logoWanted = want;
         const token = ++this.logoToken;
         this.logoError = null;
-        if (typeof want === "string" && want.trim().toLowerCase() === "none") {
+        if (
+            typeof want === "string" &&
+            (want.trim() === "" || want.trim().toLowerCase() === "none")
+        ) {
             this.logoBusy = false;
             this.install(null);
             return;
@@ -129,7 +123,7 @@ export class EmbossAssets {
             try {
                 const { raster } =
                     typeof want === "string"
-                        ? await rasterizeLogo(logoUrl(want))
+                        ? await rasterizeLogo(want.trim())
                         : await rasterizeLogoImage(want);
                 if (token !== this.logoToken) {
                     return;

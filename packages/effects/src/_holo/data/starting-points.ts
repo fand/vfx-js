@@ -208,7 +208,6 @@ export const STARTING_POINTS = {
     },
     emboss: {
         goldMarkOnCotton: {
-            "emboss.logo": "/logos/koru.svg",
             "emboss.foil": "gold",
             "emboss.width": 24,
             "emboss.y": 58,
@@ -216,7 +215,6 @@ export const STARTING_POINTS = {
             "emboss.shoulder": 0.3,
         },
         silverDeboss: {
-            "emboss.logo": "/logos/wordmark.svg",
             "emboss.foil": "silver",
             "emboss.profile": "deboss",
             "emboss.height": 300,
@@ -224,12 +222,10 @@ export const STARTING_POINTS = {
         },
         rainbowSealOnKraft: {
             "emboss.stock": "kraft",
-            "emboss.logo": "/logos/rosette.svg",
             "emboss.foil": "rainbow",
             "emboss.width": 30,
         },
         sparkleFoilPillow: {
-            "emboss.logo": "/logos/facets.svg",
             "emboss.foil": "sparkle",
             "emboss.sparkleSize": 120,
             "emboss.profile": "dome",

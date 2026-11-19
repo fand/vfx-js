@@ -2,7 +2,7 @@
 // A6 Foil Emboss: the logo — SVG / PNG → alpha mask → exact signed distance field + dome membrane → mipmapped texture.
 //
 // Pipeline (addendum A6.1 "Logo source"):
-//   1. Page: the image (a built-in path in public/logos/, a same-origin path or an uploaded data URL) is decoded by the
+//   1. Page: the image (an image element, a canvas or a URL) is decoded by the
 //      browser (SVG included: its root gets explicit width/height so it rasterises crisply at the size drawn), drawn
 //      once at 1024 px on the long side to find the ink's bounding box, then drawn again so that box fills the analysis
 //      raster's logo box (≤ 1600 px on the long side, 14 % padding per side, aspect preserved). Coverage = alpha (an

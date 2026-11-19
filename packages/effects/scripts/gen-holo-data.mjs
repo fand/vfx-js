@@ -28,7 +28,8 @@ const supported = (id) =>
 
 const params = read("params.json");
 // The port's own defaults where it departs from holospot's: holo.spot's looks use 0.07 grain, not the 0.18 default.
-const PORT_DEFAULTS = { "grain.amount": 0.07 };
+// The port ships none of holo.spot's logo marks: no logo unless one is given (an image or a URL).
+const PORT_DEFAULTS = { "grain.amount": 0.07, "emboss.logo": "" };
 // Options the port adds: "none" ignores the pointer (an element effect may not want it).
 const PORT_OPTIONS = { "motion.pointer": ["tilt", "light", "flash", "none"] };
 const keep = (p) => {
@@ -36,7 +37,7 @@ const keep = (p) => {
     if (p.min !== undefined) o.min = p.min;
     if (p.max !== undefined) o.max = p.max;
     if (p.step !== undefined) o.step = p.step;
-    const options = PORT_OPTIONS[p.id] ?? p.options;
+    const options = p.id === "emboss.logo" ? undefined : (PORT_OPTIONS[p.id] ?? p.options);
     if (options) o.options = options;
     return o;
 };
@@ -126,25 +127,6 @@ export const MATERIAL_PRESETS: Readonly<Record<string, Readonly<Record<string, R
 `,
 );
 
-// The built-in logo marks (assets/logos/*.svg), keyed by holo.spot's paths.
-const LOGOS = ["rosette", "koru", "wordmark", "leaf", "facets"];
-const logos = Object.fromEntries(
-    LOGOS.map((n) => [
-        `/logos/${n}.svg`,
-        readFileSync(join(root, "assets/logos", `${n}.svg`), "utf8").trim(),
-    ]),
-);
-writeFileSync(
-    new URL("logos.ts", out),
-    `${header}
-/** SVG source of holo.spot's built-in logo marks, by their \`emboss.logo\` path. */
-export const BUILTIN_LOGOS: Readonly<Record<string, string>> = ${ts(logos)};
-
-/** The default mark of a foil logo. */
-export const LOGO_DEFAULT = "/logos/rosette.svg";
-`,
-);
-
 // The "Starting points" of holospot's material docs (docs/materials/<material>.md): a bold name, a sentence, a JSON map.
 // A starting point that needs an unported feature (the emboss hologram sticker) is skipped.
 const camel = (name) =>
@@ -160,6 +142,7 @@ for (const m of MATERIALS) {
     for (const [, name, json] of sec.matchAll(/\*\*([^*]+?)\.\*\*[^\n]*\n+```json\n([\s\S]*?)```/g)) {
         const values = JSON.parse(json);
         if (Object.keys(values).some((id) => !supported(id))) continue;
+        delete values["emboss.logo"]; // holo.spot's own marks are not shipped
         out[camel(name)] = values;
     }
     startingPoints[m] = out;

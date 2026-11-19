@@ -99,9 +99,8 @@ export type HoloMaterial =
     | "emboss";
 /**
  * The artwork of the `emboss` material's foil logo: an image, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG
- * (also one of holo.spot's built-in marks, `"/logos/rosette.svg"`, `"koru"`, `"wordmark"`, `"leaf"`, `"facets"` as
- * `/logos/<name>.svg`), or `"none"`. Transparent areas carry no foil; an opaque image is read by its contrast against
- * its border.
+ * (fetched, so a cross-origin URL needs CORS; an `<img>` from another origin needs `crossOrigin`). Transparent areas
+ * carry no foil; an opaque image is read by its contrast against its border. `""` is no logo.
  */
 export type HoloLogo =
     | string
@@ -217,7 +216,7 @@ export type HoloParams = {
      * turns. Default `true`.
      */
     msaa: boolean;
-    /** `emboss`: the foil logo's artwork. `null`: the `emboss.logo` setting, else holo.spot's rosette. */
+    /** `emboss`: the foil logo's artwork. `null`: the `emboss.logo` setting (a URL), else no logo. */
     logo: HoloLogo | null;
 };
 

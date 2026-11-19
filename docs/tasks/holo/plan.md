@@ -262,8 +262,10 @@ Deviations found while porting:
 
 `material: "emboss"` is holospot's paper card with one foil logo:
 
-- The logo's artwork is the `logo` param (an `<img>`, a canvas, an `ImageBitmap`, or a URL; holo.spot's built-in marks
-  `/logos/<name>.svg` are embedded) or the `emboss.logo` setting. holospot's pipeline builds its distance field and
+- The logo's artwork is the `logo` param (an `<img>`, a canvas, an `ImageBitmap`, or a URL) or the `emboss.logo`
+  setting (a URL). Without one there is no logo. holo.spot's own marks are not shipped (the generator drops them, and
+  `emboss.logo` from the starting points); a pasted holo.spot blob's `/logos/<name>.svg` fails to load and is listed
+  in `errors`. holospot's pipeline builds its distance field and
   dome membrane (the kernels of `scene/logo.ts`, in an inline worker as in holospot); the base level travels as a
   float24 image and the GPU builds the mip chain.
 - The paper maps (`scene/paperMaps.ts`, 1024² LEAN moments per stock) are built the same way.
@@ -273,7 +275,7 @@ Deviations found while porting:
 - Not ported: the hologram sticker (`emboss.element` hologram: it needs the volume-hologram assets) and the
   multi-element document (`emboss.doc`).
 
-Parity (rosette logo, plain look, pose (0, 0)): 0.9 per pixel, 0.2 blurred. Koru in gold foil at holo.spot's card
+Parity (measured with holospot's rosette given as `logo`, plain look, pose (0, 0)): 0.9 per pixel, 0.2 blurred. Koru in gold foil at holo.spot's card
 pose in perspective mode: 2.5–4.3 per pixel, 0.4–1.0 blurred.
 
 ## Looks
