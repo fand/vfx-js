@@ -313,3 +313,21 @@ test("the emboss logo's placement is CSS px: unset by default, mm from a holo.sp
     );
     warn.mockRestore();
 });
+
+test("emboss: the element as the logo, its threshold, and an own print", () => {
+    const img = { width: 10, height: 10 } as unknown as HTMLCanvasElement;
+    const v = new HoloEffect({
+        material: "emboss",
+        settings: { "emboss.logo": "element", "emboss.print": img },
+    }).resolvedSettings();
+    expect(v["emboss.logo"]).toBe("element");
+    expect(v["emboss.print"]).toBe(img);
+    expect(v["emboss.threshold"]).toBe(0.5); // the port's: holospot cuts at ½
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const t = new HoloEffect({
+        material: "emboss",
+        settings: { "emboss.threshold": 2 },
+    }).resolvedSettings();
+    expect(t["emboss.threshold"]).toBe(0.99);
+    warn.mockRestore();
+});

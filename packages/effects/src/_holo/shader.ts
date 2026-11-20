@@ -127,17 +127,29 @@ Print printLayer(vec2 pMm, vec4 dUv) {
   pr.T2 = mix(vec3(1.0), c, uInk);
   return pr;
 }
+#ifdef HOLO_CLEAR_PAPER
+// emboss with the element as its logo and no ground: only the logo is drawn (defined by the emboss chunk)
+float holoPaperAlpha();
+#endif
 float printCoverage() {
+#ifdef HOLO_CLEAR_PAPER
+  return holoPaperAlpha();
+#endif
   if (uMask == 2) return 1.0;
   vec4 s = texture(uPrintSrc, srcRectUv.xy + vHoloUv * srcRectUv.zw);
   if (uMask == 0) return clamp(s.a, 0.0, 1.0);
   vec3 u = s.a > 1e-4 ? clamp(s.rgb / s.a, 0.0, 1.0) : vec3(0.0);
   return clamp(dot(u, LUMA_SRGB) * s.a, 0.0, 1.0);
 }
-// The element as Foil Emboss's printed picture (paper.glsl printTint): linear colour, straight alpha, as three decodes
-// an sRGB image texture.
+// Foil Emboss's printed picture (paper.glsl printTint): the element, or the emboss.print image (uPrintOwn, fitted by
+// uPrintRect); linear colour, straight alpha, as three decodes an sRGB image texture.
+uniform sampler2D uPrintImg;
+uniform vec4 uPrintRect;
+uniform int uPrintOwn;
 vec4 holoPrintSample(vec2 uv, vec2 dx, vec2 dy) {
-  vec4 s = textureGrad(uPrintSrc, srcRectUv.xy + uv * srcRectUv.zw, dx * srcRectUv.zw, dy * srcRectUv.zw);
+  vec4 s = uPrintOwn == 1
+    ? textureGrad(uPrintImg, uPrintRect.xy + uv * uPrintRect.zw, dx * uPrintRect.zw, dy * uPrintRect.zw)
+    : textureGrad(uPrintSrc, srcRectUv.xy + uv * srcRectUv.zw, dx * srcRectUv.zw, dy * srcRectUv.zw);
   return vec4(s.a > 1e-4 ? printSrgbToLinear(clamp(s.rgb / s.a, 0.0, 1.0)) : vec3(1.0), s.a);
 }
 // The material mains end with gl_FragColor = encodeCard(L): premultiply it by the coverage.

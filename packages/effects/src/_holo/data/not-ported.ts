@@ -73,7 +73,6 @@ export const NOT_PORTED: Readonly<Record<string, ParamValue>> = {
     "emboss.holo.glare": 0.15,
     "emboss.filmUm": 40,
     "emboss.filmWall": 0,
-    "emboss.print": "",
     "emboss.thickness": 0.8,
     "emboss.doc": "",
 };

@@ -72,6 +72,17 @@ export const FOIL_GRATING = {
     roughnessDeg: 0.25,
 } as const;
 
+/** vfx-js port: the coverage of a ground-less card (HOLO_CLEAR_PAPER): the logo's inside, anti-aliased. */
+const CLEAR_PAPER = `
+#ifdef HOLO_CLEAR_PAPER
+float holoPaperAlpha() {
+  float d = logoFetch(vHoloUv * uCardSizeMm, 0.0).x;
+  float w = max(fwidth(d), 1e-4);
+  return smoothstep(-w, w, d);
+}
+#endif
+`;
+
 const clamp = (x: number, lo: number, hi: number) =>
     Math.min(Math.max(x, lo), hi);
 const pitchNm = (v: ParamValues) =>
@@ -105,7 +116,7 @@ export function paperKey(v: ParamValues): {
 export const emboss: MaterialDef = {
     id: "emboss",
     fragmentMain,
-    extraChunks: [PAPER, embossGlsl],
+    extraChunks: [PAPER, embossGlsl, CLEAR_PAPER],
 
     uniforms(values: ParamValues): Uniforms {
         // ---- logo relief (the placement, in CSS px of the element, is HoloEffect's: uLogoXf, uLogoW)
@@ -165,9 +176,16 @@ export const emboss: MaterialDef = {
             uPaperCard: 0,
             uEmbExposure:
                 2 ** clamp(numParam(values, "emboss.exposure", 0.6), -2, 2),
-            // the element is the printed picture: always on
+            // the print: the element, or emboss.print; none when the element is the logo and no emboss.print is given
             uPrintK: [
-                1,
+                values["emboss.logo"] === "element" &&
+                !(
+                    typeof values["emboss.print"] === "object" ||
+                    (typeof values["emboss.print"] === "string" &&
+                        values["emboss.print"].trim() !== "")
+                )
+                    ? 0
+                    : 1,
                 clamp(numParam(values, "emboss.printInk", 1), 0, 1),
                 0,
                 0,

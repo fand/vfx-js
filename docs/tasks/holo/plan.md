@@ -341,3 +341,16 @@ departs from holo.spot on purpose. Unset, the logo is centred at 36/63 of the el
 proportion). Their specs have no default (`null`) and no range. The generator drops them from the looks and the
 starting points, and a Copy settings blob's are ignored with a warning. The px are converted to the card's surface
 frame in mm when drawing (`#logoPlacement`); `emboss.rotation` keeps holo.spot's degrees, counter-clockwise.
+
+## The element as the emboss logo
+
+- `"emboss.logo": "element"`: the effect draws the element into an 8-bit target, reads it back (`ctx.draw` leaves
+  its target bound; `gl.readPixels`), and passes it to holospot's logo pipeline with the whole image as the logo box
+  (`LogoReadOpts.frame: "full"`), so the logo maps 1:1 onto the element (default width: the element's). It is read
+  again on a resize or `setParams` (a still element), and retried for a while while the element is still blank.
+- The logo image is cut into foil / no foil at `emboss.threshold` (the port's, default ½ as holospot): the coverage is
+  remapped so the cut moves to ½. `mask` picks the coverage: holospot's (`"alpha"`) or luma × alpha.
+- The ground: `emboss.print` (holospot's id, now supported: an image or a URL, fitted like `background-size: cover`;
+  it also replaces the element as the print in the default mode), else the paper. Without `emboss.print` and an
+  explicit `emboss.paperColour`, the element-as-logo card has no ground (`HOLO_CLEAR_PAPER`): the coverage is the
+  logo's inside, so the page shows through.

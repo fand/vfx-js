@@ -44,7 +44,13 @@ const LIGHTS: HoloStudio[] = [
     "raking",
 ];
 // emboss logos: none by default, or the story's own artwork
-const LOGOS: Record<string, string> = { "(none)": "", "vfx-js logo": Logo };
+const LOGOS: Record<string, string> = {
+    "(none)": "",
+    "the element": "element",
+    "vfx-js logo": Logo,
+};
+// emboss.print: the ground when the element is the logo (none: transparent, unless emboss.paperColour is set)
+const PRINTS: Record<string, string> = { "(none)": "", pigeon: Pigeon };
 
 const opts = <T extends string>(xs: readonly T[]) =>
     Object.fromEntries(xs.map((x) => [x, x])) as Record<string, T>;
@@ -343,7 +349,7 @@ function addSetting(
             state[key] = String(cur);
             folder
                 .addBinding(state, key, {
-                    options: LOGOS,
+                    options: s.id === "emboss.print" ? PRINTS : LOGOS,
                 })
                 .on("change", (ev) => set(ev.value as string));
         } else if (s.kind === "pad") {

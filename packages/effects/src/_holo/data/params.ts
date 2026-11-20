@@ -183,6 +183,7 @@ export type HoloSettingId =
     | "vortex.orangePeel"
     | "vortex.seed"
     | "emboss.logo"
+    | "emboss.threshold"
     | "emboss.x"
     | "emboss.y"
     | "emboss.width"
@@ -200,6 +201,7 @@ export type HoloSettingId =
     | "emboss.gloss"
     | "emboss.sparkleSize"
     | "emboss.foilBump"
+    | "emboss.print"
     | "emboss.printInk"
     | "emboss.paperColour"
     | "emboss.stock"
@@ -1600,6 +1602,14 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         default: "",
     },
     {
+        id: "emboss.threshold",
+        kind: "slider",
+        default: 0.5,
+        min: 0.01,
+        max: 0.99,
+        step: 0.01,
+    },
+    {
         id: "emboss.x",
         kind: "slider",
         default: null,
@@ -1725,6 +1735,12 @@ export const PARAM_SPECS: readonly ParamSpec[] = [
         min: 0,
         max: 1,
         step: 0.01,
+    },
+    {
+        id: "emboss.print",
+        kind: "image",
+        default: "",
+        options: [],
     },
     {
         id: "emboss.printInk",

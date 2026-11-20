@@ -20,7 +20,7 @@ import {
     STARTING_POINTS,
 } from "./_holo/data/starting-points.js";
 import { STUDIO_PRESETS } from "./_holo/data/studio-presets.js";
-import { EmbossAssets } from "./_holo/emboss-assets.js";
+import { EmbossAssets, type LogoImage } from "./_holo/emboss-assets.js";
 import { HoloGlare } from "./_holo/glare.js";
 import outputFrag from "./_holo/glsl/output.js";
 import {
@@ -52,6 +52,7 @@ import {
     sameLevels,
 } from "./_holo/scene/env.js";
 import { computeLights, emptyLightSet } from "./_holo/scene/lights.js";
+import type { LogoReadOpts } from "./_holo/scene/logo.js";
 import {
     inversePoseQuat,
     PoseSpring,
@@ -100,7 +101,10 @@ export type HoloMaterial =
 /**
  * The artwork of the `emboss` material's foil logo (`emboss.logo`): an image, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG
  * (fetched, so a cross-origin URL needs CORS; an `<img>` from another origin needs `crossOrigin`). Transparent areas
- * carry no foil; an opaque image is read by its contrast against its border. `""` is no logo.
+ * carry no foil; an opaque image is read by its contrast against its border (see `mask`), cut at `emboss.threshold`.
+ * `""` is no logo. `"element"` makes the element itself the logo (read back once, and again on `setParams` or a
+ * resize, so a still element): the paper is then plain, `emboss.print` prints an image on it, and without
+ * `emboss.print` and `emboss.paperColour` the ground is transparent, so only the foil logo is drawn.
  */
 export type HoloLogo =
     | string
@@ -156,7 +160,9 @@ export type HoloSettingValue = number | boolean | string | HoloVec2;
  */
 export type HoloSettings = Readonly<{
     [K in HoloSettingId]?:
-        | (K extends "emboss.logo" ? HoloLogo : HoloSettingValue)
+        | (K extends "emboss.logo" | "emboss.print"
+              ? HoloLogo
+              : HoloSettingValue)
         | null;
 }>;
 /**
@@ -190,7 +196,10 @@ export type HoloParams = {
      * set their own (`object` is `"low"`).
      */
     quality: HoloQuality;
-    /** Where the foil is (not `emboss`, whose paper is the whole card). */
+    /**
+     * Where the foil is. For `emboss`, whose paper is the whole card, how the logo image is read instead: `"alpha"`
+     * (holospot's: its alpha, or an opaque image's contrast against its border) or `"luma"` (its brightness).
+     */
     mask: HoloMask;
     /**
      * How much the element's colour tints the foil as a translucent ink, in [0, 1]. 0: bare foil. All materials but
@@ -336,6 +345,11 @@ function sceneWrites(
     set(p.wobbleAmp, "motion.wobbleAmp");
     return o;
 }
+
+/** An image setting that is set: a non-empty URL, or an image object. */
+const givenImage = (v: unknown): boolean =>
+    (typeof v === "string" && v.trim() !== "") ||
+    (!!v && typeof v === "object");
 
 const isSettingValue = (v: unknown): v is HoloSettingValue =>
     typeof v === "number" ||
@@ -728,6 +742,7 @@ export class HoloEffect implements Effect {
         }
         applyInput(this.#p, input);
         this.#dirty = true;
+        this.#capGen++; // the element as the logo is read again
     }
 
     /**
@@ -744,7 +759,10 @@ export class HoloEffect implements Effect {
 
     /** Loading errors (a logo that could not be fetched or read, …), newest last; cleared when the input changes. */
     get errors(): readonly string[] {
-        return this.#emboss?.errors ?? [];
+        return [
+            ...(this.#emboss?.errors ?? []),
+            ...(this.#printError ? [this.#printError] : []),
+        ];
     }
 
     #readyWaiters: (() => void)[] = [];
@@ -753,7 +771,8 @@ export class HoloEffect implements Effect {
         return (
             this.#drawnOnce &&
             !this.#dirty &&
-            (this.#p.material !== "emboss" || !this.#emboss?.busy)
+            (this.#p.material !== "emboss" ||
+                (!this.#emboss?.busy && !this.#printBusy && !this.#capPending))
         );
     }
     #settleReady(): void {
@@ -987,6 +1006,7 @@ export class HoloEffect implements Effect {
                 ...tier.defines,
                 ...def.defines(tier),
                 [`MATERIAL_${def.id.toUpperCase()}`]: 1,
+                ...(this.#clearPaper() ? { HOLO_CLEAR_PAPER: 1 } : {}),
                 NSPD: 5,
                 MAX_LIGHTS: 4,
                 DEBUG_VIEW: 0,
@@ -1130,10 +1150,14 @@ export class HoloEffect implements Effect {
         }
         if (this.params.material === "emboss") {
             this.#emboss ??= new EmbossAssets();
-            // a URL, or an image given in settings (kept by reference)
-            this.#emboss.setLogo(
-                r.values["emboss.logo"] as unknown as HoloLogo | undefined,
-            );
+            // a URL, or an image given in settings (kept by reference); "element" is read back in render
+            const logo = r.values["emboss.logo"];
+            if (logo !== "element") {
+                this.#emboss.setLogo(
+                    logo as unknown as HoloLogo | undefined,
+                    this.#logoReadOpts("ink"),
+                );
+            }
             this.#emboss.setPaper(paperKey(r.values));
         }
         this.#eta = etaFrame(
@@ -1368,7 +1392,10 @@ export class HoloEffect implements Effect {
         const mmPerPx = this.#domainMm[0] / Math.max(ew, 1);
         const x = px("emboss.x") ?? ew / 2;
         const y = px("emboss.y") ?? eh / 2;
-        const w = px("emboss.width") ?? (ew * 36) / 63;
+        // the element as the logo fills the element; an image logo is 36/63 of its width (holo.spot's proportion)
+        const w =
+            px("emboss.width") ??
+            (v["emboss.logo"] === "element" ? ew : (ew * 36) / 63);
         const rot = ((px("emboss.rotation") ?? 0) * Math.PI) / 180;
         return {
             uLogoXf: [
@@ -1381,6 +1408,167 @@ export class HoloEffect implements Effect {
         };
     }
 
+    /** How the logo image is read: `mask` picks alpha (holospot's coverage) or luma, `emboss.threshold` the cut. */
+    #logoReadOpts(frame: "ink" | "full"): LogoReadOpts {
+        const t = this.#resolved?.values["emboss.threshold"];
+        return {
+            frame,
+            read: this.#p.mask === "luma" ? "luma" : "auto",
+            threshold: typeof t === "number" ? t : 0.5,
+        };
+    }
+
+    /** emboss with the element as its logo, and neither `emboss.print` nor `emboss.paperColour`: no ground. */
+    #clearPaper(): boolean {
+        const v = this.#resolved?.values;
+        return (
+            this.#p.material === "emboss" &&
+            v?.["emboss.logo"] === "element" &&
+            !givenImage(v["emboss.print"]) &&
+            this.#p.settings["emboss.paperColour"] === undefined
+        );
+    }
+
+    // ---- the element as the logo: read back once per size / setParams (a still element)
+    #capRt: EffectRenderTarget | null = null;
+    #capKey = "";
+    #capGen = 0;
+    #capTries = 0;
+    #capPending = false;
+    #captureElementLogo(ctx: EffectContext, a: EmbossAssets): void {
+        const [pw, ph] = ctx.dims.elementPixel;
+        const k = Math.min(1, 1024 / Math.max(pw, ph, 1));
+        const w = Math.max(1, Math.round(pw * k));
+        const h = Math.max(1, Math.round(ph * k));
+        const key = `${w}x${h}|${this.#capGen}|${JSON.stringify(this.#logoReadOpts("full"))}`;
+        if (key === this.#capKey) {
+            return;
+        }
+        this.#capPending = true;
+        if (
+            !this.#capRt ||
+            this.#capRt.width !== w ||
+            this.#capRt.height !== h
+        ) {
+            this.#capRt?.dispose();
+            this.#capRt = ctx.createRenderTarget({ size: [w, h] });
+        }
+        ctx.draw({
+            frag: FRAG_CARD_BASE,
+            vert: PLAIN_VERT,
+            target: this.#capRt,
+            uniforms: { src: ctx.src },
+        });
+        // ctx.draw leaves its target bound: read it back (8 bit, premultiplied, rows bottom-up)
+        const gl = ctx.gl;
+        if (!gl.getParameter(gl.FRAMEBUFFER_BINDING)) {
+            warnOnce(
+                "HoloEffect: could not read the element back as the emboss logo.",
+            );
+            this.#capKey = key;
+            this.#capPending = false;
+            return;
+        }
+        const raw = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, raw);
+        const px = new Uint8ClampedArray(w * h * 4);
+        let visible = false;
+        for (let y = 0; y < h; y++) {
+            const from = (h - 1 - y) * w * 4;
+            const to = y * w * 4;
+            for (let i = 0; i < w * 4; i += 4) {
+                const al = raw[from + i + 3];
+                const u = al > 0 ? 255 / al : 0;
+                px[to + i] = raw[from + i] * u;
+                px[to + i + 1] = raw[from + i + 1] * u;
+                px[to + i + 2] = raw[from + i + 2] * u;
+                px[to + i + 3] = al;
+                visible ||= al > 8;
+            }
+        }
+        // the element may not be drawn yet on the first frames: try again for a while
+        if (!visible && ++this.#capTries < 120) {
+            return;
+        }
+        this.#capKey = key;
+        this.#capTries = 0;
+        this.#capPending = false;
+        const canvas = this.#makeCanvas(w, h);
+        this.#ctx2d(canvas)?.putImageData(new ImageData(px, w, h), 0, 0);
+        a.setLogo(
+            visible ? (canvas as LogoImage) : "",
+            this.#logoReadOpts("full"),
+        );
+    }
+
+    // ---- emboss.print: an image printed on the paper instead of the element
+    #printWant: unknown = "";
+    #printImg: LogoImage | null = null;
+    #printTex: EffectTexture | null = null;
+    #printBusy = false;
+    #printError: string | null = null;
+    #printToken = 0;
+    #printUniforms(ctx: EffectContext): Uniforms {
+        const want = this.#resolved?.values["emboss.print"] ?? "";
+        if (want !== this.#printWant) {
+            this.#printWant = want;
+            const token = ++this.#printToken;
+            this.#printTex?.dispose();
+            this.#printTex = null;
+            this.#printImg = null;
+            this.#printError = null;
+            this.#printBusy = false;
+            if (typeof want === "string" && want.trim() !== "") {
+                this.#printBusy = true;
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.src = want.trim();
+                img.decode().then(
+                    () => {
+                        if (token === this.#printToken) {
+                            this.#printImg = img;
+                            this.#printBusy = false;
+                        }
+                    },
+                    (e: unknown) => {
+                        if (token === this.#printToken) {
+                            this.#printError = `HoloEffect: could not load emboss.print ${want}: ${e instanceof Error ? e.message : String(e)}. A cross-origin image needs CORS.`;
+                            console.warn(this.#printError);
+                            this.#printBusy = false;
+                        }
+                    },
+                );
+            } else if (givenImage(want)) {
+                this.#printImg = want as LogoImage;
+            }
+        }
+        const img = this.#printImg;
+        if (img && !this.#printTex) {
+            this.#printTex = ctx.wrapTexture(img, { autoUpdate: false });
+        }
+        if (!img || !this.#printTex) {
+            return {
+                uPrintOwn: 0,
+                uPrintImg: this.#black ?? ctx.src,
+                uPrintRect: [0, 0, 1, 1],
+            };
+        }
+        // cover the element, as CSS background-size: cover
+        const iw =
+            img instanceof HTMLImageElement ? img.naturalWidth : img.width;
+        const ih =
+            img instanceof HTMLImageElement ? img.naturalHeight : img.height;
+        const ae = this.#elemCss[0] / Math.max(this.#elemCss[1], 1);
+        const ai = iw / Math.max(ih, 1);
+        const sx = ai > ae ? ae / ai : 1;
+        const sy = ai > ae ? 1 : ai / ae;
+        return {
+            uPrintOwn: 1,
+            uPrintImg: this.#printTex,
+            uPrintRect: [(1 - sx) / 2, (1 - sy) / 2, sx, sy],
+        };
+    }
+
     /** Uploads the Foil Emboss textures when they change and returns their uniforms. */
     #embossUniforms(ctx: EffectContext): Uniforms {
         const a = this.#emboss;
@@ -1388,6 +1576,10 @@ export class HoloEffect implements Effect {
         if (!a || !black) {
             return {};
         }
+        if (this.#resolved?.values["emboss.logo"] === "element") {
+            this.#captureElementLogo(ctx, a);
+        }
+        const print = this.#printUniforms(ctx);
         if (a.logoVersion !== this.#logoUp) {
             this.#logoUp = a.logoVersion;
             const l = a.logo;
@@ -1432,6 +1624,7 @@ export class HoloEffect implements Effect {
             this.#upload(ctx, a.paper.aux, this.#paperRt.aux, "aux");
         }
         return {
+            ...print,
             ...this.#logoPlacement(),
             uLogoTex: this.#logoRt ?? black,
             uLogoOn: this.#logoRt ? 1 : 0,
@@ -1479,9 +1672,11 @@ export class HoloEffect implements Effect {
             this.#env,
             this.#ltc1,
             this.#ltc2,
+            this.#capRt,
         ]) {
             rt?.dispose();
         }
+        this.#printTex?.dispose();
         this.#bytesTex?.dispose();
         this.#ltcTex?.dispose();
         this.#glare.dispose();

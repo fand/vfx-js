@@ -5,7 +5,9 @@
 // which average linearly).
 import { KernelWorker, transferables } from "./scene/kernel-worker.js";
 import {
+    LOGO_READ_DEFAULT,
     type LogoBuild,
+    type LogoReadOpts,
     logoKernel,
     rasterizeLogo,
     rasterizeLogoImage,
@@ -76,6 +78,7 @@ export class EmbossAssets {
     private readonly logoWorker = new KernelWorker(logoKernel as never);
     private readonly paperWorker = new KernelWorker(paperKernel as never);
     private logoWanted: LogoInput | null = null;
+    private logoOptsKey = "";
     private paperWanted = "";
     private logoToken = 0;
     private paperToken = 0;
@@ -102,12 +105,17 @@ export class EmbossAssets {
     private paperBusy = false;
 
     /** Requests the logo (no-op when unchanged); null, "" or "none" is no logo. */
-    setLogo(input: LogoInput | null | undefined): void {
+    setLogo(
+        input: LogoInput | null | undefined,
+        opts: LogoReadOpts = LOGO_READ_DEFAULT,
+    ): void {
         const want = input ?? "";
-        if (want === this.logoWanted) {
+        const key = JSON.stringify(opts);
+        if (want === this.logoWanted && key === this.logoOptsKey) {
             return;
         }
         this.logoWanted = want;
+        this.logoOptsKey = key;
         const token = ++this.logoToken;
         this.logoError = null;
         if (
@@ -123,8 +131,8 @@ export class EmbossAssets {
             try {
                 const { raster } =
                     typeof want === "string"
-                        ? await rasterizeLogo(want.trim())
-                        : await rasterizeLogoImage(want);
+                        ? await rasterizeLogo(want.trim(), opts)
+                        : await rasterizeLogoImage(want, opts);
                 if (token !== this.logoToken) {
                     return;
                 }

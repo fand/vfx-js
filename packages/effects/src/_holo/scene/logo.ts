@@ -754,16 +754,71 @@ function borderInfo(
     return { opaque: minA > 245, bg: k ? s / k : 1 };
 }
 
+/**
+ * vfx-js port: how an image is read as a logo.
+ * - `frame`: `"ink"` fits the ink's bounding box (holospot); `"full"` keeps the whole image as the logo box (the
+ *   element as the logo, so it maps 1:1 onto the element).
+ * - `read`: `"auto"` is holospot's coverage (alpha, or the contrast against the border of an opaque image); `"luma"`
+ *   is the brightness × alpha.
+ * - `threshold`: the coverage cut into foil / no foil (holospot: ½), moved by remapping the coverage around it.
+ */
+export interface LogoReadOpts {
+    frame: "ink" | "full";
+    read: "auto" | "luma";
+    threshold: number;
+}
+export const LOGO_READ_DEFAULT: LogoReadOpts = {
+    frame: "ink",
+    read: "auto",
+    threshold: 0.5,
+};
+
+/** Coverage per the read options: holospot's, or luma × alpha; then the threshold moved to ½. */
+function readCoverage(
+    px: Uint8ClampedArray,
+    w: number,
+    h: number,
+    bi: { opaque: boolean; bg: number },
+    o: LogoReadOpts,
+): Float32Array {
+    let cov: Float32Array;
+    if (o.read === "luma") {
+        cov = new Float32Array(w * h);
+        for (let i = 0; i < w * h; i++) {
+            const a = px[4 * i + 3] / 255;
+            // straight colour (canvas pixels are not premultiplied)
+            cov[i] =
+                a *
+                ((0.2126 * px[4 * i] +
+                    0.7152 * px[4 * i + 1] +
+                    0.0722 * px[4 * i + 2]) /
+                    255);
+        }
+    } else {
+        cov = coverageOf(px, w, h, bi.opaque, bi.bg);
+    }
+    const t = Math.min(Math.max(o.threshold, 0.01), 0.99);
+    if (t !== 0.5) {
+        for (let i = 0; i < cov.length; i++) {
+            const c = cov[i];
+            cov[i] = c < t ? (0.5 * c) / t : 0.5 + (0.5 * (c - t)) / (1 - t);
+        }
+    }
+    return cov;
+}
+
 /** Rasterises a logo for the kernel: ink bounding box at 1024 px, then the analysis raster of `logoLayout`. */
 export async function rasterizeLogo(
     url: string,
+    opts: LogoReadOpts = LOGO_READ_DEFAULT,
 ): Promise<{ raster: LogoRaster; layout: LogoLayout; aspect: number }> {
-    return rasterizeSource(await decodeLogo(url));
+    return rasterizeSource(await decodeLogo(url), opts);
 }
 
 /** vfx-js port: rasterises an image object (a decoded <img>, a canvas or an ImageBitmap) as rasterizeLogo does a URL. */
 export async function rasterizeLogoImage(
     img: HTMLImageElement | HTMLCanvasElement | ImageBitmap | OffscreenCanvas,
+    opts: LogoReadOpts = LOGO_READ_DEFAULT,
 ): Promise<{ raster: LogoRaster; layout: LogoLayout; aspect: number }> {
     if (img instanceof HTMLImageElement && !img.complete) {
         await img.decode();
@@ -773,18 +828,32 @@ export async function rasterizeLogoImage(
     if (!(w > 0 && h > 0)) {
         throw new Error("the image has no size");
     }
-    return rasterizeSource({
-        w,
-        h,
-        async draw(g, s, d) {
-            g.drawImage(img, s[0], s[1], s[2], s[3], d[0], d[1], d[2], d[3]);
+    return rasterizeSource(
+        {
+            w,
+            h,
+            async draw(g, s, d) {
+                g.drawImage(
+                    img,
+                    s[0],
+                    s[1],
+                    s[2],
+                    s[3],
+                    d[0],
+                    d[1],
+                    d[2],
+                    d[3],
+                );
+            },
+            close() {},
         },
-        close() {},
-    });
+        opts,
+    );
 }
 
 async function rasterizeSource(
     src: LogoSource,
+    opts: LogoReadOpts,
 ): Promise<{ raster: LogoRaster; layout: LogoLayout; aspect: number }> {
     try {
         // pass 1: bounding box of the ink
@@ -795,7 +864,7 @@ async function rasterizeSource(
         await src.draw(g1, [0, 0, src.w, src.h], [0, 0, w1, h1]);
         const p1 = g1.getImageData(0, 0, w1, h1).data;
         const bi = borderInfo(p1, w1, h1);
-        const c1 = coverageOf(p1, w1, h1, bi.opaque, bi.bg);
+        const c1 = readCoverage(p1, w1, h1, bi, opts);
         let x0 = w1,
             y0 = h1,
             x1 = -1,
@@ -813,11 +882,12 @@ async function rasterizeSource(
         if (x1 < x0 || y1 < y0) {
             throw new Error("the image has no visible (opaque) pixels");
         }
-        // the ink's box (one pass-1 pixel of margin against clipping anti-aliased ink), intrinsic px
-        const bx = (x0 - 1) / s1,
-            by = (y0 - 1) / s1,
-            bw = (x1 + 3 - x0) / s1,
-            bh = (y1 + 3 - y0) / s1;
+        // the ink's box (one pass-1 pixel of margin against clipping anti-aliased ink), intrinsic px; or the whole image
+        const full = opts.frame === "full";
+        const bx = full ? 0 : (x0 - 1) / s1,
+            by = full ? 0 : (y0 - 1) / s1,
+            bw = full ? src.w : (x1 + 3 - x0) / s1,
+            bh = full ? src.h : (y1 + 3 - y0) / s1;
         const aspect = bh / bw;
         // pass 2: the box fills the analysis logo box
         const L = logoLayout(aspect);
@@ -828,7 +898,7 @@ async function rasterizeSource(
             [L.box[0], L.box[1], L.box[2] - L.box[0], L.box[3] - L.box[1]],
         );
         const p2 = g2.getImageData(0, 0, L.aw, L.ah).data;
-        const cov = coverageOf(p2, L.aw, L.ah, bi.opaque, bi.bg);
+        const cov = readCoverage(p2, L.aw, L.ah, bi, opts);
         return {
             raster: { cov, aw: L.aw, ah: L.ah, box: L.box, f: LOGO_ANALYSIS_F },
             layout: L,
