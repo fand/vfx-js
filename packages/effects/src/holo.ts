@@ -11,6 +11,7 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
+import { captureContent } from "./_capture.js";
 import { LOOKS } from "./_holo/data/looks.js";
 import { MATERIAL_PRESETS } from "./_holo/data/material-presets.js";
 import type { HoloSettingId } from "./_holo/data/params.js";
@@ -1453,13 +1454,9 @@ export class HoloEffect implements Effect {
             this.#capRt?.dispose();
             this.#capRt = ctx.createRenderTarget({ size: [w, h] });
         }
-        ctx.draw({
-            frag: FRAG_CARD_BASE,
-            vert: PLAIN_VERT,
-            target: this.#capRt,
-            uniforms: { src: ctx.src },
-        });
-        // ctx.draw leaves its target bound: read it back (8 bit, premultiplied, rows bottom-up)
+        // the draw leaves the target's framebuffer bound, so readPixels reads from it (as JPEGGlitchEffect does;
+        // fand/vfx-js#282 proposes ctx.readPixels). 8 bit, premultiplied, rows bottom-up.
+        captureContent(ctx, this.#capRt);
         const gl = ctx.gl;
         if (!gl.getParameter(gl.FRAMEBUFFER_BINDING)) {
             warnOnce(
@@ -1471,6 +1468,7 @@ export class HoloEffect implements Effect {
         }
         const raw = new Uint8Array(w * h * 4);
         gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, raw);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         const px = new Uint8ClampedArray(w * h * 4);
         let visible = false;
         for (let y = 0; y < h; y++) {
