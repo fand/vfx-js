@@ -271,10 +271,17 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         // ---- every holo.spot setting of the material, then the single lights
         const specs = HoloEffect.settingSpecs(params.material);
         const own = specs.filter((s) => s.id.startsWith(`${params.material}.`));
+        // the emboss logo's px placement has no default (centre, 36/63 of the width): show what is drawn
+        const placed = {
+            "emboss.x": Math.round(img.clientWidth / 2),
+            "emboss.y": Math.round(img.clientHeight / 2),
+            "emboss.width": Math.round((img.clientWidth * 36) / 63),
+            ...v,
+        };
         addSettings(
             p.addFolder({ title: `${params.material}.*`, expanded: false }),
             own,
-            v,
+            placed,
             effect,
         );
         addSettings(

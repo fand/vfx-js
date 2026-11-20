@@ -125,7 +125,8 @@ export type HoloVec2 = { x: number; y: number };
 export type HoloSettingSpec = {
     readonly id: string;
     readonly kind: "slider" | "select" | "toggle" | "color" | "pad" | "image";
-    readonly default: HoloSettingValue;
+    /** `null`: depends on the element (`emboss.x` / `emboss.y`: its centre; `emboss.width`: 36/63 of its width). */
+    readonly default: HoloSettingValue | null;
     readonly min?: number;
     readonly max?: number;
     readonly step?: number;
@@ -282,6 +283,8 @@ const DEFAULT_PARAMS: HoloParams = {
 };
 
 const PARAM_KEYS = new Set(Object.keys(DEFAULT_PARAMS));
+/** The emboss logo's placement: CSS px here, mm on holo.spot's card in a Copy settings blob. */
+const MM_PLACEMENT = new Set(["emboss.x", "emboss.y", "emboss.width"]);
 const MATERIAL_IDS: readonly HoloMaterial[] = [
     "prism",
     "shatter",
@@ -368,7 +371,12 @@ function applyInput(st: HoloParams, input: HoloInput): void {
             }
         }
         for (const [id, v] of Object.entries(settings.values)) {
-            if (isSettingValue(v)) {
+            if (MM_PLACEMENT.has(id)) {
+                // mm on holo.spot's 63 × 88 mm card; the port's are px of the element
+                warnOnce(
+                    `HoloEffect: ${id} of a holo.spot Copy settings is in mm on holo.spot's card; ignored (HoloEffect's is in CSS px).`,
+                );
+            } else if (isSettingValue(v)) {
                 writes[id] = v;
             }
         }
@@ -677,6 +685,8 @@ export class HoloEffect implements Effect {
     #prevCardRot = new Float32Array(9);
     #camPos: Vec3 = [0, 0, 0.4];
     #cardSizeMm: [number, number] = [63, 88];
+    /** The element's CSS size [px] (the emboss logo's placement frame). */
+    #elemCss: [number, number] = [238, 333];
     /** The card's surface domain [mm]: its size × `structureScale` (the structure's frame, not the geometry's). */
     #domainMm: [number, number] = [63, 88];
     /** The drawn card's rotation (3d view: the pose; flat: identity). */
@@ -1030,6 +1040,7 @@ export class HoloEffect implements Effect {
         const largest = this.params.sizeMm ?? Math.max(w, h) * MM_PER_CSS_PX;
         const k = largest / Math.max(w, h);
         this.#cardSizeMm = [w * k, h * k];
+        this.#elemCss = [w, h];
         // the surface's domain, as holospot's models.ts: size × structureScale (a larger one lays more structure over the card)
         const ss = Math.min(Math.max(this.params.structureScale || 1, 0.25), 4);
         this.#domainMm = [w * k * ss, h * k * ss];
@@ -1343,6 +1354,33 @@ export class HoloEffect implements Effect {
         this.#settleReady();
     }
 
+    /**
+     * The logo's placement in the card's surface frame [mm]: `emboss.x` / `emboss.y` / `emboss.width` are CSS px of the
+     * element (centre and 36/63 of the width when unset), converted with the frame's mm per px.
+     */
+    #logoPlacement(): Uniforms {
+        const v = this.#resolved?.values ?? {};
+        const px = (id: string) => {
+            const x = v[id];
+            return typeof x === "number" && Number.isFinite(x) ? x : null;
+        };
+        const [ew, eh] = this.#elemCss;
+        const mmPerPx = this.#domainMm[0] / Math.max(ew, 1);
+        const x = px("emboss.x") ?? ew / 2;
+        const y = px("emboss.y") ?? eh / 2;
+        const w = px("emboss.width") ?? (ew * 36) / 63;
+        const rot = ((px("emboss.rotation") ?? 0) * Math.PI) / 180;
+        return {
+            uLogoXf: [
+                (x - ew / 2) * mmPerPx,
+                (eh / 2 - y) * mmPerPx, // CSS y runs down, the card frame's up
+                Math.cos(rot),
+                Math.sin(rot),
+            ],
+            uLogoW: Math.max(w, 1) * mmPerPx,
+        };
+    }
+
     /** Uploads the Foil Emboss textures when they change and returns their uniforms. */
     #embossUniforms(ctx: EffectContext): Uniforms {
         const a = this.#emboss;
@@ -1394,6 +1432,7 @@ export class HoloEffect implements Effect {
             this.#upload(ctx, a.paper.aux, this.#paperRt.aux, "aux");
         }
         return {
+            ...this.#logoPlacement(),
             uLogoTex: this.#logoRt ?? black,
             uLogoOn: this.#logoRt ? 1 : 0,
             uLogoMap: this.#logoMap,

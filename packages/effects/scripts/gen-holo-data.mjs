@@ -32,7 +32,15 @@ const params = read("params.json");
 const PORT_DEFAULTS = { "grain.amount": 0.07, "emboss.logo": "" };
 // Options the port adds: "none" ignores the pointer (an element effect may not want it).
 const PORT_OPTIONS = { "motion.pointer": ["tilt", "light", "flash", "none"] };
+// The emboss logo's placement is in CSS px of the element (the port's; holo.spot's are mm on its 63 × 88 mm card).
+// No default: centred, 36/63 of the element's width (holo.spot's proportion).
+const PX_PLACEMENT = {
+    "emboss.x": { id: "emboss.x", kind: "slider", default: null, step: 1 },
+    "emboss.y": { id: "emboss.y", kind: "slider", default: null, step: 1 },
+    "emboss.width": { id: "emboss.width", kind: "slider", default: null, min: 1, step: 1 },
+};
 const keep = (p) => {
+    if (PX_PLACEMENT[p.id]) return PX_PLACEMENT[p.id];
     const o = { id: p.id, kind: p.kind, default: PORT_DEFAULTS[p.id] ?? p.default };
     if (p.min !== undefined) o.min = p.min;
     if (p.max !== undefined) o.max = p.max;
@@ -91,7 +99,7 @@ export const IGNORED_IDS: ReadonlySet<string> = new Set(${ts(ignored)});
 const looks = read("looks.json");
 const lookOut = {};
 // holo.spot ships Foil Emboss on its paper card (the look `image`), not on its card or 3D object: the port's `card`
-// look of emboss is that paper card. Its logo is the site's own artwork, so the built-in default stands instead.
+// look of emboss is that paper card, without the site's own logo artwork.
 const lookOf = (name, m) =>
     m === "emboss" ? (name === "card" ? looks.image.surfaces.emboss : null) : looks[name].surfaces[m];
 for (const name of ["card", "object"]) {
@@ -103,8 +111,8 @@ for (const name of ["card", "object"]) {
             Object.entries(s.values).filter(
                 ([id]) =>
                     supported(id) &&
-                    // the site's own artwork, and its placement on a 63 × 88 mm card: the port's logo is centred
-                    !["emboss.logo", "emboss.x", "emboss.y"].includes(id),
+                    // the site's own artwork, and its placement in mm on a 63 × 88 mm card (the port's is in px)
+                    !["emboss.logo", "emboss.x", "emboss.y", "emboss.width"].includes(id),
             ),
         );
         lookOut[name][m] = { values, pose: { rx: s.pose.rx, ry: s.pose.ry } };
@@ -143,6 +151,7 @@ for (const m of MATERIALS) {
         const values = JSON.parse(json);
         if (Object.keys(values).some((id) => !supported(id))) continue;
         delete values["emboss.logo"]; // holo.spot's own marks are not shipped
+        for (const id of Object.keys(PX_PLACEMENT)) delete values[id]; // mm on holo.spot's card, not px
         out[camel(name)] = values;
     }
     startingPoints[m] = out;

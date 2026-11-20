@@ -282,7 +282,6 @@ export const LOOKS: LookData = {
                     x: -0.5,
                     y: 0,
                 },
-                "emboss.width": 40.8,
                 "emboss.height": 15,
                 "emboss.shoulder": 0.1,
                 "emboss.profile": "bevel",

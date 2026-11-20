@@ -3,7 +3,8 @@ import type { ParamValue } from "./types.js";
 export interface ParamSpec {
     id: string;
     kind: string;
-    default: ParamValue | { type: string };
+    /** null: depends on the element (the emboss logo's px placement). */
+    default: ParamValue | { type: string } | null;
     min?: number;
     max?: number;
     step?: number;

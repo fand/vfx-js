@@ -71,8 +71,6 @@ export const FOIL_GRATING = {
     nc: 1.5,
     roughnessDeg: 0.25,
 } as const;
-/** Largest logo width [mm] (holospot's placement frame of a card). */
-const MAX_WIDTH_MM = 750;
 
 const clamp = (x: number, lo: number, hi: number) =>
     Math.min(Math.max(x, lo), hi);
@@ -110,14 +108,7 @@ export const emboss: MaterialDef = {
     extraChunks: [PAPER, embossGlsl],
 
     uniforms(values: ParamValues): Uniforms {
-        // ---- logo placement and relief
-        const x = clamp(
-            numParam(values, "emboss.x", 31.5),
-            31.5 - 375,
-            31.5 + 375,
-        );
-        const y = clamp(numParam(values, "emboss.y", 44), 44 - 150, 44 + 150);
-        const rot = numParam(values, "emboss.rotation", 0) * DEG;
+        // ---- logo relief (the placement, in CSS px of the element, is HoloEffect's: uLogoXf, uLogoW)
         const prof = profileOf(values);
         const r = reliefUniform({
             heightMm:
@@ -144,12 +135,6 @@ export const emboss: MaterialDef = {
         // ---- foil
         const a = grooveDeg(values) * DEG; // grooves at a ⇒ ĝ = (sin a, −cos a) (§3.1)
         return {
-            uLogoXf: [x - 31.5, y - 44, Math.cos(rot), Math.sin(rot)],
-            uLogoW: clamp(
-                numParam(values, "emboss.width", 36),
-                1,
-                MAX_WIDTH_MM,
-            ),
             uRelief: [r.H, r.s, r.hp, r.lambda],
             uRelProfile: EMBOSS_PROFILES.indexOf(prof),
             uPaperMap: [

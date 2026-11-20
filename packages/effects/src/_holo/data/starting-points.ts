@@ -209,8 +209,6 @@ export const STARTING_POINTS = {
     emboss: {
         goldMarkOnCotton: {
             "emboss.foil": "gold",
-            "emboss.width": 24,
-            "emboss.y": 58,
             "emboss.height": 350,
             "emboss.shoulder": 0.3,
         },
@@ -223,7 +221,6 @@ export const STARTING_POINTS = {
         rainbowSealOnKraft: {
             "emboss.stock": "kraft",
             "emboss.foil": "rainbow",
-            "emboss.width": 30,
         },
         sparkleFoilPillow: {
             "emboss.foil": "sparkle",

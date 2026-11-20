@@ -283,3 +283,33 @@ test("emboss.logo takes a URL or an image, kept by reference; none by default", 
     }).resolvedSettings();
     expect(v["emboss.logo"]).toBe(img);
 });
+
+test("the emboss logo's placement is CSS px: unset by default, mm from a holo.spot blob dropped", () => {
+    const v = new HoloEffect({ material: "emboss" }).resolvedSettings();
+    expect(v["emboss.x"]).toBeUndefined(); // centred, 36/63 of the width
+    expect(v["emboss.width"]).toBeUndefined();
+    const placed = new HoloEffect({
+        material: "emboss",
+        settings: { "emboss.x": 80, "emboss.width": 400 },
+    }).resolvedSettings();
+    expect(placed["emboss.x"]).toBe(80);
+    expect(placed["emboss.width"]).toBe(400); // no mm range
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fromBlob = new HoloEffect({
+        settings: {
+            holoDev: 1,
+            material: "emboss",
+            values: {
+                "emboss.x": 20,
+                "emboss.width": 36,
+                "emboss.foil": "gold",
+            },
+        },
+    }).resolvedSettings();
+    expect(fromBlob["emboss.x"]).toBeUndefined();
+    expect(fromBlob["emboss.foil"]).toBe("gold");
+    expect(warn.mock.calls.some((c) => String(c[0]).includes("emboss.x"))).toBe(
+        true,
+    );
+    warn.mockRestore();
+});

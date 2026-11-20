@@ -332,3 +332,12 @@ Typed params use holo.spot's names, units and ranges (clamped): `exposure` (`dis
 - `emboss` ignores `mask`: the paper is the whole card.
 - `effect.ready` resolves after a frame drawn with the emboss logo and paper in place; `effect.errors` lists loading
   errors (a logo URL without CORS, …), which also warn.
+
+## Emboss logo placement in px
+
+`emboss.x`, `emboss.y` and `emboss.width` are CSS px of the element (the logo's centre from the top left, and its
+width), not holo.spot's mm on its 63 × 88 mm card: on an element of any size the logo goes where it is put. This
+departs from holo.spot on purpose. Unset, the logo is centred at 36/63 of the element's width (holo.spot's default
+proportion). Their specs have no default (`null`) and no range. The generator drops them from the looks and the
+starting points, and a Copy settings blob's are ignored with a warning. The px are converted to the card's surface
+frame in mm when drawing (`#logoPlacement`); `emboss.rotation` keeps holo.spot's degrees, counter-clockwise.

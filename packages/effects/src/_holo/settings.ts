@@ -71,7 +71,7 @@ const isVec2 = (v: unknown): v is Vec2 =>
     typeof (v as Vec2).y === "number";
 
 /** Copies a pad value; anything else (an `emboss.logo` image) is kept by reference. */
-function clone(v: ParamValue | { type: string }): ParamValue {
+function clone(v: ParamValue | { type: string } | null): ParamValue {
     return isVec2(v) ? { x: v.x, y: v.y } : (v as ParamValue);
 }
 
@@ -200,13 +200,16 @@ export function resolveSettings(
 ): Resolved {
     const values: Record<string, ParamValue> = {};
     const prefix = `${material}.`;
+    const own = (id: string) =>
+        SPECS.has(id) && (isSceneId(id) || id.startsWith(prefix));
     for (const p of PARAM_SPECS) {
-        if (isSceneId(p.id) || p.id.startsWith(prefix)) {
+        // a null default (the emboss logo's px placement) depends on the element: unset
+        if (own(p.id) && p.default !== null) {
             values[p.id] = clone(p.default);
         }
     }
     const write = (id: string, v: ParamValue, strict: boolean) => {
-        if (!(id in values)) {
+        if (!own(id)) {
             if (strict) {
                 dropped(id, v);
             }
