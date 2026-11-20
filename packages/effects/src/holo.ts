@@ -104,8 +104,11 @@ export type HoloMaterial =
  * (fetched, so a cross-origin URL needs CORS; an `<img>` from another origin needs `crossOrigin`). Transparent areas
  * carry no foil; an opaque image is read by its contrast against its border (see `mask`), cut at `emboss.threshold`.
  * `""` is no logo. `"element"` makes the element itself the logo (read back once, and again on a resize or when
- * `emboss.logo` is given again, so a still element): the paper is then plain, `emboss.print` prints an image on it, and without
- * `emboss.print` and `emboss.paperColour` the ground is transparent, so only the foil logo is drawn.
+ * `emboss.logo` is given again, so a still element): the paper is then plain, and without `emboss.print` and
+ * `emboss.paperColour` the ground is transparent, so only the foil logo is drawn.
+ *
+ * `emboss.print` takes the same kinds of image (or a URL): it is printed on the paper instead of the element, in
+ * either mode, fitted like `background-size: cover`. While it loads, and if it fails, the paper is plain.
  */
 export type HoloLogo =
     | string
@@ -130,7 +133,10 @@ export type HoloVec2 = { x: number; y: number };
 export type HoloSettingSpec = {
     readonly id: string;
     readonly kind: "slider" | "select" | "toggle" | "color" | "pad" | "image";
-    /** `null`: depends on the element (`emboss.x` / `emboss.y`: its centre; `emboss.width`: 36/63 of its width). */
+    /**
+     * `null`: depends on the element (`emboss.x` / `emboss.y`: its centre; `emboss.width`: 36/63 of its width for an
+     * image logo, its whole width when the element is the logo).
+     */
     readonly default: HoloSettingValue | null;
     readonly min?: number;
     readonly max?: number;
@@ -220,8 +226,9 @@ export type HoloParams = {
     flat: boolean;
     /**
      * Scale of the foil's structure, 0.25–4 (holo.spot `object.structureScale`; 1 = as designed): shards (`shatter`),
-     * flakes (`nebula`), dots (`sparkle`), the paper's tooth and the logo (`emboss`), the relief waves. Above 1 they
-     * get smaller, below 1 larger. The gratings keep their pitch: the colours do not change.
+     * flakes (`nebula`), dots (`sparkle`), the paper's tooth and the logo's relief (`emboss`), the relief waves. Above
+     * 1 they get smaller, below 1 larger. The gratings keep their pitch: the colours do not change, and the emboss
+     * logo keeps its size and place (`emboss.x` / `emboss.y` / `emboss.width`, in px).
      */
     structureScale: number;
     /**
