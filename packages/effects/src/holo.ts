@@ -1548,7 +1548,7 @@ export class HoloEffect implements Effect {
                     },
                     (e: unknown) => {
                         if (token === this.#printToken) {
-                            this.#printError = `HoloEffect: could not load emboss.print ${want}: ${e instanceof Error ? e.message : String(e)}. A cross-origin image needs CORS.`;
+                            this.#printError = `HoloEffect: could not load emboss.print ${want}: ${(e instanceof Error ? e.message : String(e)).replace(/\.$/, "")}. A cross-origin image needs CORS.`;
                             console.warn(this.#printError);
                             this.#printBusy = false;
                         }
@@ -1562,8 +1562,18 @@ export class HoloEffect implements Effect {
         if (img && !this.#printTex) {
             this.#printTex = ctx.wrapTexture(img, { autoUpdate: false });
         }
+        // the print: emboss.print once it is loaded (none while it loads or after it fails, not the element), else
+        // the element, unless the element is the logo
+        const v = this.#resolved?.values ?? {};
+        const ink =
+            typeof v["emboss.printInk"] === "number" ? v["emboss.printInk"] : 1;
+        const printOn = givenImage(want)
+            ? !!this.#printTex
+            : v["emboss.logo"] !== "element";
+        const uPrintK = [printOn ? 1 : 0, Math.min(Math.max(ink, 0), 1), 0, 0];
         if (!img || !this.#printTex) {
             return {
+                uPrintK,
                 uPrintOwn: 0,
                 uPrintImg: this.#black ?? ctx.src,
                 uPrintRect: [0, 0, 1, 1],
@@ -1579,6 +1589,7 @@ export class HoloEffect implements Effect {
         const sx = ai > ae ? ae / ai : 1;
         const sy = ai > ae ? 1 : ai / ae;
         return {
+            uPrintK,
             uPrintOwn: 1,
             uPrintImg: this.#printTex,
             uPrintRect: [(1 - sx) / 2, (1 - sy) / 2, sx, sy],

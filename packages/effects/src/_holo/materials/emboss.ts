@@ -176,16 +176,9 @@ export const emboss: MaterialDef = {
             uPaperCard: 0,
             uEmbExposure:
                 2 ** clamp(numParam(values, "emboss.exposure", 0.6), -2, 2),
-            // the print: the element, or emboss.print; none when the element is the logo and no emboss.print is given
+            // the print (on, ink); HoloEffect decides whether it is on (the element, or emboss.print once loaded)
             uPrintK: [
-                values["emboss.logo"] === "element" &&
-                !(
-                    typeof values["emboss.print"] === "object" ||
-                    (typeof values["emboss.print"] === "string" &&
-                        values["emboss.print"].trim() !== "")
-                )
-                    ? 0
-                    : 1,
+                1,
                 clamp(numParam(values, "emboss.printInk", 1), 0, 1),
                 0,
                 0,
