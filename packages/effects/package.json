@@ -5,6 +5,7 @@
   "files": [
     "package.json",
     "README.md",
+        "THIRD_PARTY_NOTICES.md",
     "lib/"
   ],
   "type": "module",

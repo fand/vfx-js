@@ -159,7 +159,7 @@ packages/effects/src/
 ```
 
 Each ported file keeps a header naming its holospot source. The MIT notice of
-holospot goes into `_holo/LICENSE-holospot` and the header of `holo.ts`.
+holospot and three.js go into `packages/effects/THIRD_PARTY_NOTICES.md` (shipped in the npm package) and the header of `holo.ts`.
 
 ## Verification
 
