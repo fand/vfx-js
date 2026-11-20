@@ -347,7 +347,8 @@ frame in mm when drawing (`#logoPlacement`); `emboss.rotation` keeps holo.spot's
 - `"emboss.logo": "element"`: the effect draws the element into an 8-bit target, reads it back (`ctx.draw` leaves
   its target bound; `gl.readPixels`), and passes it to holospot's logo pipeline with the whole image as the logo box
   (`LogoReadOpts.frame: "full"`), so the logo maps 1:1 onto the element (default width: the element's). It is read
-  again on a resize or `setParams` (a still element), and retried for a while while the element is still blank.
+  again on a resize or when `emboss.logo` is given again (a still element), and an unchanged readback (hashed)
+  does not rebuild the logo, and retried for a while while the element is still blank.
 - The logo image is cut into foil / no foil at `emboss.threshold` (the port's, default ½ as holospot): the coverage is
   remapped so the cut moves to ½. `mask` picks the coverage: holospot's (`"alpha"`) or luma × alpha.
 - The ground: `emboss.print` (holospot's id, now supported: an image or a URL, fitted like `background-size: cover`;

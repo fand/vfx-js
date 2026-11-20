@@ -103,8 +103,8 @@ export type HoloMaterial =
  * The artwork of the `emboss` material's foil logo (`emboss.logo`): an image, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG
  * (fetched, so a cross-origin URL needs CORS; an `<img>` from another origin needs `crossOrigin`). Transparent areas
  * carry no foil; an opaque image is read by its contrast against its border (see `mask`), cut at `emboss.threshold`.
- * `""` is no logo. `"element"` makes the element itself the logo (read back once, and again on `setParams` or a
- * resize, so a still element): the paper is then plain, `emboss.print` prints an image on it, and without
+ * `""` is no logo. `"element"` makes the element itself the logo (read back once, and again on a resize or when
+ * `emboss.logo` is given again, so a still element): the paper is then plain, `emboss.print` prints an image on it, and without
  * `emboss.print` and `emboss.paperColour` the ground is transparent, so only the foil logo is drawn.
  */
 export type HoloLogo =
@@ -345,6 +345,16 @@ function sceneWrites(
     set(p.wobble, "motion.wobble");
     set(p.wobbleAmp, "motion.wobbleAmp");
     return o;
+}
+
+/** FNV-1a hash of bytes (32 bit, hex). */
+function fnv1a(b: ArrayLike<number>): string {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < b.length; i++) {
+        h ^= b[i];
+        h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(16);
 }
 
 /** An image setting that is set: a non-empty URL, or an image object. */
@@ -743,7 +753,11 @@ export class HoloEffect implements Effect {
         }
         applyInput(this.#p, input);
         this.#dirty = true;
-        this.#capGen++; // the element as the logo is read again
+        // the element as the logo is read again when emboss.logo is given again (after the element changed)
+        const settings = input.settings as Record<string, unknown> | undefined;
+        if (settings && "emboss.logo" in settings) {
+            this.#capGen++;
+        }
     }
 
     /**
@@ -1172,6 +1186,7 @@ export class HoloEffect implements Effect {
             // a URL, or an image given in settings (kept by reference); "element" is read back in render
             const logo = r.values["emboss.logo"];
             if (logo !== "element") {
+                this.#capHash = ""; // the next element readback installs its logo again
                 this.#emboss.setLogo(
                     logo as unknown as HoloLogo | undefined,
                     this.#logoReadOpts("ink"),
@@ -1454,6 +1469,8 @@ export class HoloEffect implements Effect {
     #capGen = 0;
     #capTries = 0;
     #capPending = false;
+    /** Hash of the last pixels read back, so an unchanged element does not rebuild the logo. */
+    #capHash = "";
     #captureElementLogo(ctx: EffectContext, a: EmbossAssets): void {
         const [pw, ph] = ctx.dims.elementPixel;
         const k = Math.min(1, 1024 / Math.max(pw, ph, 1));
@@ -1509,6 +1526,11 @@ export class HoloEffect implements Effect {
         this.#capKey = key;
         this.#capTries = 0;
         this.#capPending = false;
+        const hash = `${w}x${h}|${JSON.stringify(this.#logoReadOpts("full"))}|${fnv1a(px)}`;
+        if (hash === this.#capHash) {
+            return;
+        }
+        this.#capHash = hash;
         const canvas = this.#makeCanvas(w, h);
         this.#ctx2d(canvas)?.putImageData(new ImageData(px, w, h), 0, 0);
         a.setLogo(
@@ -1739,6 +1761,7 @@ export class HoloEffect implements Effect {
         // the element read back as the logo, and emboss.print: start over on the next init
         this.#capRt = null;
         this.#capKey = "";
+        this.#capHash = "";
         this.#capTries = 0;
         this.#capPending = false;
         this.#printTex?.dispose();
