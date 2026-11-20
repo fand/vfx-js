@@ -302,14 +302,6 @@ const DEFAULT_PARAMS: HoloParams = {
 const PARAM_KEYS = new Set(Object.keys(DEFAULT_PARAMS));
 /** The emboss logo's placement: CSS px here, mm on holo.spot's card in a Copy settings blob. */
 const MM_PLACEMENT = new Set(["emboss.x", "emboss.y", "emboss.width"]);
-const MATERIAL_IDS: readonly HoloMaterial[] = [
-    "prism",
-    "shatter",
-    "nebula",
-    "sparkle",
-    "vortex",
-    "emboss",
-];
 
 /** The ids a scene shorthand writes (`null` for each removes it). */
 function sceneWrites(
@@ -394,11 +386,11 @@ function applyInput(st: HoloParams, input: HoloInput): void {
         next = {};
         const m = settings.material;
         if (rest.material === undefined && m !== undefined) {
-            if (MATERIAL_IDS.includes(m as HoloMaterial)) {
+            if (Object.hasOwn(MATERIALS, m)) {
                 st.material = m as HoloMaterial;
             } else {
                 warnOnce(
-                    `HoloEffect: the Copy settings' material "${m}" is not supported (one of ${MATERIAL_IDS.join(", ")}); keeping "${st.material}".`,
+                    `HoloEffect: the Copy settings' material "${m}" is not supported (one of ${Object.keys(MATERIALS).join(", ")}); keeping "${st.material}".`,
                 );
             }
         }
