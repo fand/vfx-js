@@ -19,10 +19,10 @@ export class GLContext {
     maxTextureSize: number;
 
     /** True if `OES_texture_float_linear` is available. */
-    floatLinearFilter: boolean;
+    floatLinearFilter = false;
 
     /** True if `EXT_float_blend` is available (blending into RGBA32F). */
-    floatBlend: boolean;
+    floatBlend = false;
 
     /** True between `webglcontextlost` and `webglcontextrestored`. */
     isContextLost = false;
@@ -45,11 +45,7 @@ export class GLContext {
         }
         this.gl = gl;
         this.canvas = canvas;
-        gl.getExtension("EXT_color_buffer_float");
-        gl.getExtension("EXT_color_buffer_half_float");
-        // Required to blend into RGBA32F targets.
-        this.floatBlend = !!gl.getExtension("EXT_float_blend");
-        this.floatLinearFilter = !!gl.getExtension("OES_texture_float_linear");
+        this.#enableExtensions();
         this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
 
         canvas.addEventListener("webglcontextlost", this.#handleLost, false);
@@ -89,6 +85,19 @@ export class GLContext {
         return () => this.#onRestored.delete(cb);
     }
 
+    /**
+     * Enables the extensions the renderer relies on (at creation, and again on a restored context). Without
+     * OES_texture_float_linear, linearly filtered float textures are incomplete and sample as zero.
+     */
+    #enableExtensions(): void {
+        const gl = this.gl;
+        gl.getExtension("EXT_color_buffer_float");
+        gl.getExtension("EXT_color_buffer_half_float");
+        // Required to blend into RGBA32F targets.
+        this.floatBlend = !!gl.getExtension("EXT_float_blend");
+        this.floatLinearFilter = !!gl.getExtension("OES_texture_float_linear");
+    }
+
     #handleLost = (event: Event): void => {
         // Without preventDefault the browser will not attempt to restore.
         event.preventDefault();
@@ -100,11 +109,8 @@ export class GLContext {
 
     #handleRestored = (): void => {
         this.isContextLost = false;
-        // Re-float extensions (fresh context).
-        const gl = this.gl;
-        gl.getExtension("EXT_color_buffer_float");
-        gl.getExtension("EXT_color_buffer_half_float");
-        this.floatBlend = !!gl.getExtension("EXT_float_blend");
+        // A restored context is a fresh one: its extensions must be enabled again.
+        this.#enableExtensions();
         for (const r of this.#resources) {
             r.restore();
         }
