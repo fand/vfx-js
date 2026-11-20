@@ -525,6 +525,8 @@ function perspectiveMargin(w: number, h: number): [number, number] {
     return [Math.ceil(w * k), Math.ceil(h * k)];
 }
 const MASKS: Record<HoloMask, number> = { alpha: 0, luma: 1, none: 2 };
+/** uWave without relief waves. */
+const NO_WAVES = new Float32Array(128);
 const TONES = { neutral: 0, agx: 1, clamp: 2 } as const;
 
 /** The output pass's grain uniforms (holospot render/grain.ts): off at amount 0. */
@@ -802,6 +804,9 @@ export class HoloEffect implements Effect {
     #eta: { ord: Float32Array; mir: Float32Array; env: Float32Array } | null =
         null;
     #matUniforms: Uniforms = {};
+    /** Per-frame uniform buffers, reused. */
+    #binLam = new Float32Array(8);
+    #binW = new Float32Array(72);
     #frag = "";
     #mouseStart: readonly [number, number] | null = null;
     #pointerSeen = false;
@@ -1357,9 +1362,10 @@ export class HoloEffect implements Effect {
         const tr = tier.trips;
         const L = this.#lights;
         const bins = atlas.bins[tier.defines.NB === 6 ? 6 : 8];
-        const binLam = new Float32Array(8);
+        // the uniforms take 8 bins; the low tier's 6 leave the rest zero
+        const binLam = this.#binLam.fill(0);
         binLam.set(bins.lambda);
-        const binW = new Float32Array(72);
+        const binW = this.#binW.fill(0);
         binW.set(bins.W);
 
         const emb =
@@ -1441,7 +1447,7 @@ export class HoloEffect implements Effect {
                 uBinWidth: bins.width,
                 uLtc1: this.#ltc1 ?? this.#black,
                 uLtc2: this.#ltc2 ?? this.#black,
-                uWave: waves?.data ?? new Float32Array(128),
+                uWave: waves?.data ?? NO_WAVES,
                 uWaveBoard: waves?.board ?? [0, 0],
                 uWaveCoat: waves?.coat ?? [0, 0],
                 uBumpMode: 0,
@@ -1539,6 +1545,12 @@ export class HoloEffect implements Effect {
         };
     }
 
+    /** What decides how the element logo is read (its cache key). */
+    #readOptsKey(): string {
+        const o = this.#logoReadOpts("full");
+        return `${o.read}|${o.threshold}`;
+    }
+
     /** emboss with the element as its logo, and neither `emboss.print` nor `emboss.paperColour`: no ground. */
     #clearPaper(): boolean {
         const v = this.#resolved?.values;
@@ -1563,7 +1575,7 @@ export class HoloEffect implements Effect {
         const k = Math.min(1, 1024 / Math.max(pw, ph, 1));
         const w = Math.max(1, Math.round(pw * k));
         const h = Math.max(1, Math.round(ph * k));
-        const key = `${w}x${h}|${this.#capGen}|${JSON.stringify(this.#logoReadOpts("full"))}`;
+        const key = `${w}x${h}|${this.#capGen}|${this.#readOptsKey()}`;
         if (key === this.#capKey) {
             return;
         }
@@ -1613,7 +1625,7 @@ export class HoloEffect implements Effect {
         this.#capKey = key;
         this.#capTries = 0;
         this.#capPending = false;
-        const hash = `${w}x${h}|${JSON.stringify(this.#logoReadOpts("full"))}|${fnv1a(px)}`;
+        const hash = `${w}x${h}|${this.#readOptsKey()}|${fnv1a(px)}`;
         if (hash === this.#capHash) {
             return;
         }
