@@ -49,7 +49,7 @@
     <body class="DocPage">
         <div data-astro-transition-persist="astro-essv6x2d-2" id="BG"></div>
 
-<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.DgouDdyq.js"></script>
+<script type="module" src="/vfx-js/_astro/Background.astro_astro_type_script_index_0_lang.UQRe5s0k.js"></script>
         <header class="SiteHeader">
     <a class="SiteHeaderBrand" href="/vfx-js/">
         <img src="/vfx-js/vfx-js-logo-no-padding.svg" alt="VFX-JS">
@@ -88,7 +88,7 @@
 <script type="module" src="/vfx-js/_astro/Header.astro_astro_type_script_index_0_lang.C4fRsOlc.js"></script>
 
         <!-- Sets up the shared VFX before <VFXTransition> makes it. -->
-        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.Bhk3YEwR.js"></script>
+        <script type="module" src="/vfx-js/_astro/Layout.astro_astro_type_script_index_0_lang.CWHuitDT.js"></script>
         <!-- Back plays the slit scan reversed. -->
         <div data-vfx-transition-target="{&quot;transition&quot;:&quot;slitscan&quot;,&quot;duration&quot;:0.6,&quot;autoReverse&quot;:true}" style="height:100dvh;overflow:hidden;">
     
@@ -246,7 +246,7 @@
                                         </details><details open>
                                             <summary>
                                                 <span class="DocSidebarLabel">Types</span>
-                                                <span class="DocSidebarCount">47</span>
+                                                <span class="DocSidebarCount">48</span>
                                             </summary>
                                             <ul>
                                                 <li>
@@ -325,6 +325,12 @@
                                                         <a href="/vfx-js/docs/core/EffectQuad/">
                                                             <span class="DocSidebarLabel">
                                                                 EffectQuad
+                                                            </span>
+                                                        </a>
+                                                    </li><li>
+                                                        <a href="/vfx-js/docs/core/EffectReadPixelsOpts/">
+                                                            <span class="DocSidebarLabel">
+                                                                EffectReadPixelsOpts
                                                             </span>
                                                         </a>
                                                     </li><li>
@@ -1152,8 +1158,8 @@
         <h1>
             EffectContext
         </h1>
-        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/a855df020f33e6c1a1bf1fb7ae539a209beb91b5/packages/vfx-js/src/types.ts#L987" target="_blank" rel="noreferrer">
-                    vfx-js/src/types.ts:987 &#8599;
+        <a class="ApiSource" href="https://github.com/fand/vfx-js/blob/2a81073f8a22d319e0c5070252813ebba494f59c/packages/vfx-js/src/types.ts#L993" target="_blank" rel="noreferrer">
+                    vfx-js/src/types.ts:993 &#8599;
                 </a>
     </header>
 
@@ -1623,6 +1629,58 @@ via raw <code>ctx.gl</code>. High-level API resources (<code>createRenderTarget<
     
 
 
+</section><section class="ApiMember" id="readPixels">
+    <h3>
+        <a class="ApiAnchor" href="#readPixels">readPixels</a>
+        
+        
+    </h3>
+    <div class="ApiSignature">
+    <pre class="ApiCode"><code><span class="tf">readPixels</span><span class="tp">(</span>
+    <span class="tm">target</span><span class="tp">: </span><a class="tr" href="/vfx-js/docs/core/EffectRenderTarget/">EffectRenderTarget</a><span class="tp">,</span>
+    <span class="tm">opts</span><span class="tp">?: </span><a class="tr" href="/vfx-js/docs/core/EffectReadPixelsOpts/">EffectReadPixelsOpts</a><span class="tp">,</span>
+<span class="tp">)</span><span class="tp">: </span><span class="tr">Promise</span><span class="tp">&lt;</span><span class="tr">Uint8Array</span><span class="tp">&lt;</span><span class="tr">ArrayBufferLike</span><span class="tp">&gt;</span><span class="tp"> | </span><span class="tr">Float32Array</span><span class="tp">&lt;</span><span class="tr">ArrayBufferLike</span><span class="tp">&gt;</span><span class="tp">&gt;</span></code></pre>
+    
+<div class="ApiText"><p>Read a render target's pixels back to the CPU, without stalling the GPU.</p>
+<p>The copy is queued when you call it, so the result is the target's content at that
+moment, even if you draw into it, resize it or dispose it before the promise resolves.
+It resolves a frame or so later.</p>
+<ul>
+<li>8-bit targets give a <code>Uint8Array</code>, <code>float: true</code> targets a <code>Float32Array</code>.
+4 values per pixel (RGBA), premultiplied like everything VFX-JS draws.</li>
+<li><code>samples: 4</code> targets are resolved first.</li>
+<li><code>persistent: true</code> targets give the side last written.</li>
+</ul>
+<p>Rows are bottom-up (GL order) unless <code>opts.flipY</code> is set.
+The promise rejects when the effect is disposed or the WebGL context is
+lost before it resolves.</p>
+<p>Valid in <code>init()</code>, <code>update()</code> and <code>render()</code>. Read in <code>render()</code>, after the draw
+you want to read, to get this frame's pixels.</p>
+</div>
+<div class="ApiTag">
+            <h4>Example</h4>
+            <div class="ApiText"><pre class="shiki github-dark" tabindex="0"><code><span class="line"><span style="color:#B392F0">render</span><span style="color:#E1E4E8">(ctx) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    ctx.</span><span style="color:#B392F0">blit</span><span style="color:#E1E4E8">(ctx.src, </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.small);</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.wantPixels) {</span></span>
+<span class="line"><span style="color:#79B8FF">        this</span><span style="color:#E1E4E8">.wantPixels </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        ctx.</span><span style="color:#B392F0">readPixels</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.small, { flipY: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8"> }).</span><span style="color:#B392F0">then</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#E1E4E8">            (</span><span style="color:#FFAB70">px</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">analyze</span><span style="color:#E1E4E8">(px),</span></span>
+<span class="line"><span style="color:#E1E4E8">            () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {}, </span><span style="color:#6A737D">// disposed or context lost</span></span>
+<span class="line"><span style="color:#E1E4E8">        );</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">    ctx.</span><span style="color:#B392F0">blit</span><span style="color:#E1E4E8">(ctx.src);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+</div>
+        </div>
+    
+    
+</div>
+    
+    
+    
+    
+
+
 </section><section class="ApiMember" id="releaseGeometry">
     <h3>
         <a class="ApiAnchor" href="#releaseGeometry">releaseGeometry</a>
@@ -1831,7 +1889,7 @@ With <code>autoUpdate: false</code>, call <code>texture.update()</code> after th
         
 </div>
 
-<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.BYZdP98W.js"></script>
+<script type="module" src="/vfx-js/_astro/VFXTransition.astro_astro_type_script_index_0_lang.DG6LclDt.js"></script>
 
         <div id="Frame"><div id="FrameBottom"></div></div>
         
