@@ -892,6 +892,12 @@ export type EffectClearOpts = {
     depth?: boolean;
 };
 
+/** Options for {@link EffectContext.readPixels}. */
+export type EffectReadPixelsOpts = {
+    /** Return rows top-down (canvas / `ImageData` order) instead of bottom-up. Default: `false`. */
+    flipY?: boolean;
+};
+
 export type EffectDrawOpts = {
     frag: string;
     vert?: string;
@@ -1107,6 +1113,45 @@ export type EffectContext = {
      * Only valid during `Effect.render()`; other calls are ignored.
      */
     clear(target?: EffectRenderTarget | null, opts?: EffectClearOpts): void;
+
+    /**
+     * Read a render target's pixels back to the CPU, without stalling the GPU.
+     *
+     * The copy is queued when you call it, so the result is the target's content at that
+     * moment, even if you draw into it, resize it or dispose it before the promise resolves.
+     * It resolves a frame or so later.
+     *
+     * - 8-bit targets give a `Uint8Array`, `float: true` targets a `Float32Array`.
+     *   4 values per pixel (RGBA), premultiplied like everything VFX-JS draws.
+     * - `samples: 4` targets are resolved first.
+     * - `persistent: true` targets give the side last written.
+     *
+     * Rows are bottom-up (GL order) unless `opts.flipY` is set.
+     * The promise rejects when the effect is disposed or the WebGL context is
+     * lost before it resolves.
+     *
+     * Valid in `init()`, `update()` and `render()`. Read in `render()`, after the draw
+     * you want to read, to get this frame's pixels.
+     *
+     * @example
+     * ```ts
+     * render(ctx) {
+     *     ctx.blit(ctx.src, this.small);
+     *     if (this.wantPixels) {
+     *         this.wantPixels = false;
+     *         ctx.readPixels(this.small, { flipY: true }).then(
+     *             (px) => this.analyze(px),
+     *             () => {}, // disposed or context lost
+     *         );
+     *     }
+     *     ctx.blit(ctx.src);
+     * }
+     * ```
+     */
+    readPixels(
+        target: EffectRenderTarget,
+        opts?: EffectReadPixelsOpts,
+    ): Promise<Uint8Array | Float32Array>;
 
     /**
      * Raw WebGL2 context, for low-level operations
