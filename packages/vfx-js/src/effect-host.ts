@@ -15,6 +15,7 @@ import {
 } from "./gl/pass.js";
 import type { Program, Uniform, Uniforms } from "./gl/program.js";
 import type { Quad } from "./gl/quad.js";
+import { PixelRead } from "./gl/read-pixels.js";
 import { Texture, type TextureWrap } from "./gl/texture.js";
 import type { ProgramCache } from "./program-cache.js";
 import type {
@@ -25,6 +26,7 @@ import type {
     EffectDims,
     EffectDrawOpts,
     EffectGeometry,
+    EffectReadPixelsOpts,
     EffectRenderTarget,
     EffectRenderTargetOpts,
     EffectTexture,
@@ -64,6 +66,9 @@ type RenderTargetResolver = {
 
     /** Current write target (for `bindFramebuffer`). */
     getWriteFbo(): Framebuffer;
+
+    /** Framebuffer behind {@link getReadTexture}: the side last written. */
+    getReadFbo(): Framebuffer;
 
     /** Every framebuffer the RT owns: both sides for `persistent: true`. */
     getFramebuffers?: () => readonly Framebuffer[];
@@ -294,6 +299,8 @@ export class EffectHost {
     #ownedRTs: OwnedRT[] = [];
     #autoResizeRTs: OwnedRT[] = [];
     #restoredUnsubs: (() => void)[] = [];
+    #pendingReads = new Set<PixelRead>();
+    #lostUnsub: (() => void) | null = null;
     #phase: Phase = "init";
     #warnedDrawInUpdate = false;
     #warnedDepthWithoutBuffer = false;
@@ -370,6 +377,10 @@ export class EffectHost {
             draw: (opts) => this.#draw(opts),
             blit: (source, target, opts) => this.#blit(source, target, opts),
             clear: (target, opts) => this.#clear(target, opts),
+            readPixels: ((
+                target: EffectRenderTarget,
+                opts?: EffectReadPixelsOpts,
+            ) => this.#readPixels(target, opts)) as EffectContext["readPixels"],
             resetState: () => this.#resetState(),
             onContextRestored: (cb) => {
                 const unsub = this.#glCtx.onContextRestored(cb);
@@ -526,6 +537,7 @@ export class EffectHost {
                     return bb.read.texture;
                 },
                 getWriteFbo: () => bb.target,
+                getReadFbo: () => bb.read,
                 getFramebuffers: () => bb.framebuffers,
                 swap: () => bb.swap(),
                 resize: explicitSize
@@ -566,6 +578,7 @@ export class EffectHost {
                     return fb.texture;
                 },
                 getWriteFbo: () => fb,
+                getReadFbo: () => fb,
                 getFramebuffers: () => [fb],
                 resize: explicitSize
                     ? undefined
@@ -629,6 +642,50 @@ export class EffectHost {
             }
         }
         owned.resolver.dispose?.();
+    }
+
+    // -- readPixels ---------------------------------------------------------
+
+    #readPixels(
+        target: EffectRenderTarget,
+        opts: EffectReadPixelsOpts | undefined,
+    ): Promise<Uint8Array | Float32Array> {
+        if (this.#phase === "disposed") {
+            return Promise.reject(
+                new Error(
+                    "[VFX-JS] readPixels() was called after the effect was disposed.",
+                ),
+            );
+        }
+        if (this.#glCtx.isContextLost) {
+            return Promise.reject(
+                new Error(
+                    "[VFX-JS] readPixels() was called while the WebGL context is lost.",
+                ),
+            );
+        }
+        // A lost context kills the buffer and the fence: reject what is pending.
+        this.#lostUnsub ??= this.#glCtx.onContextLost(() =>
+            this.#cancelReads(
+                "[VFX-JS] readPixels() was cancelled: the WebGL context was lost.",
+            ),
+        );
+        const fb = resolveRt(target).getReadFbo();
+        const read = new PixelRead(this.#gl, fb, opts, (r) =>
+            this.#pendingReads.delete(r),
+        );
+        if (!read.settled) {
+            this.#pendingReads.add(read);
+        }
+        return read.promise;
+    }
+
+    #cancelReads(message: string): void {
+        const reads = [...this.#pendingReads];
+        this.#pendingReads.clear();
+        for (const read of reads) {
+            read.cancel(new Error(message));
+        }
     }
 
     // -- wrapTexture --------------------------------------------------------
@@ -1296,6 +1353,11 @@ export class EffectHost {
 
     dispose(): void {
         this.#phase = "disposed";
+        this.#cancelReads(
+            "[VFX-JS] readPixels() was cancelled: the effect was disposed.",
+        );
+        this.#lostUnsub?.();
+        this.#lostUnsub = null;
         for (const unsub of this.#restoredUnsubs) {
             unsub();
         }
@@ -1466,6 +1528,7 @@ export function makeEffectRenderTargetFromFb(
     const resolver: RenderTargetResolver = {
         getReadTexture: () => fb.texture,
         getWriteFbo: () => fb,
+        getReadFbo: () => fb,
     };
     return makeEffectRenderTarget(
         resolver,

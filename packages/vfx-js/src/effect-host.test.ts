@@ -368,6 +368,54 @@ vi.mock("./gl/program.js", () => {
     return { Program };
 });
 
+type MockPixelRead = {
+    fb: unknown;
+    opts: unknown;
+    settled: boolean;
+    promise: Promise<Uint8Array | Float32Array>;
+    resolve: () => void;
+    cancel: (err: Error) => void;
+};
+const pixelReads: MockPixelRead[] = [];
+
+vi.mock("./gl/read-pixels.js", () => {
+    class PixelRead {
+        fb: unknown;
+        opts: unknown;
+        settled = false;
+        promise: Promise<Uint8Array | Float32Array>;
+        #resolve!: (px: Uint8Array) => void;
+        #reject!: (err: Error) => void;
+        #onSettle: (r: unknown) => void;
+        constructor(
+            _gl: unknown,
+            fb: unknown,
+            opts: unknown,
+            onSettle: (r: unknown) => void,
+        ) {
+            this.fb = fb;
+            this.opts = opts;
+            this.#onSettle = onSettle;
+            this.promise = new Promise((resolve, reject) => {
+                this.#resolve = resolve;
+                this.#reject = reject;
+            });
+            pixelReads.push(this as unknown as MockPixelRead);
+        }
+        resolve() {
+            this.settled = true;
+            this.#onSettle(this);
+            this.#resolve(new Uint8Array(4));
+        }
+        cancel(err: Error) {
+            this.settled = true;
+            this.#onSettle(this);
+            this.#reject(err);
+        }
+    }
+    return { PixelRead };
+});
+
 vi.mock("./gl/pass.js", async (importOriginal) => ({
     ...(await importOriginal<typeof import("./gl/pass.js")>()),
     applyBlend: vi.fn(),
@@ -450,6 +498,8 @@ function makeGlStub() {
     } as unknown as WebGL2RenderingContext;
 }
 
+const lostCbs: Array<() => void> = [];
+
 function makeCtxStub(gl: WebGL2RenderingContext): {
     ctx: GLContext;
     unsubCalls: Array<() => void>;
@@ -460,8 +510,18 @@ function makeCtxStub(gl: WebGL2RenderingContext): {
     return {
         ctx: {
             gl,
+            isContextLost: false,
             addResource: () => {},
             removeResource: () => {},
+            onContextLost: (cb: () => void) => {
+                lostCbs.push(cb);
+                return () => {
+                    const i = lostCbs.indexOf(cb);
+                    if (i >= 0) {
+                        lostCbs.splice(i, 1);
+                    }
+                };
+            },
             onContextRestored: (cb: () => void) => {
                 restoreCbs.push(cb);
                 const unsub = () => {};
@@ -511,6 +571,8 @@ beforeEach(() => {
     programs.length = 0;
     textureCtorCalls.length = 0;
     fbEvents.length = 0;
+    pixelReads.length = 0;
+    lostCbs.length = 0;
 });
 
 afterEach(() => {
@@ -2282,5 +2344,71 @@ describe("EffectHost.draw with several targets", () => {
             expect(m.enable).not.toHaveBeenCalledWith(gl.DEPTH_TEST);
             expect(drawCount()).toBe(1);
         });
+    });
+});
+
+describe("EffectHost.readPixels", () => {
+    it("reads the framebuffer of a plain render target", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget({ size: [8, 4] });
+        const opts = { flipY: true };
+        void host.ctx.readPixels(rt, opts);
+        expect(pixelReads).toHaveLength(1);
+        expect(pixelReads[0].fb).toBe(framebuffers[0]);
+        expect(pixelReads[0].opts).toBe(opts);
+    });
+
+    it("reads the side last written of a persistent target", () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget({ persistent: true });
+        const bb = backbuffers[0];
+        void host.ctx.readPixels(rt);
+        expect(pixelReads[0].fb).toBe(bb.readSides[0]);
+        host.setPhase("render");
+        host.ctx.draw({ frag: "void main(){}", target: rt });
+        expect(bb.swaps).toBe(1);
+        void host.ctx.readPixels(rt);
+        expect(pixelReads[1].fb).toBe(bb.readSides[1]);
+    });
+
+    it("resolves with the read's pixels", async () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        const p = host.ctx.readPixels(rt);
+        pixelReads[0].resolve();
+        await expect(p).resolves.toBeInstanceOf(Uint8Array);
+    });
+
+    it("rejects pending reads on dispose, and reads after it", async () => {
+        const { host } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        const done = host.ctx.readPixels(rt);
+        pixelReads[0].resolve();
+        const pending = host.ctx.readPixels(rt);
+        host.dispose();
+        await expect(done).resolves.toBeDefined();
+        await expect(pending).rejects.toThrow("disposed");
+        await expect(host.ctx.readPixels(rt)).rejects.toThrow("disposed");
+        expect(pixelReads).toHaveLength(2);
+        expect(lostCbs).toHaveLength(0);
+    });
+
+    it("rejects pending reads when the context is lost", async () => {
+        const { host, glCtx } = makeHost();
+        const rt = host.ctx.createRenderTarget();
+        const pending = host.ctx.readPixels(rt);
+        expect(lostCbs).toHaveLength(1);
+        const second = host.ctx.readPixels(rt);
+        expect(lostCbs).toHaveLength(1);
+        for (const cb of lostCbs) {
+            cb();
+        }
+        await expect(pending).rejects.toThrow("context was lost");
+        await expect(second).rejects.toThrow("context was lost");
+        (glCtx as { isContextLost: boolean }).isContextLost = true;
+        await expect(host.ctx.readPixels(rt)).rejects.toThrow(
+            "context is lost",
+        );
+        expect(pixelReads).toHaveLength(2);
     });
 });

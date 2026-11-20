@@ -8,7 +8,7 @@
 // byte stream, exactly like the classic "open a .jpg in a text editor and
 // mash the keyboard" trick:
 //
-//   1. read the element capture back to the CPU (GPU -> ImageData)
+//   1. read the element capture back to the CPU (ctx.readPixels -> ImageData)
 //   2. encode it to a real JPEG with the browser's native encoder
 //   3. flip random bytes in the entropy-coded scan data (NOT the header,
 //      so the file still parses) — the glitch-canvas algorithm
@@ -538,6 +538,40 @@ export class JPEGGlitchEffect implements Effect {
     }
 
     #startGlitch(ctx: EffectContext): void {
+        const readRT = this.#readRT;
+        if (!readRT) {
+            return;
+        }
+        captureContent(ctx, readRT);
+
+        this.#busy = true;
+        this.#dirty = false;
+        this.#lastGlitchTime = ctx.time;
+        // Static glitch (speed 0) stays on variant 0 so it's reproducible;
+        // animated glitch advances the variant each round.
+        const variant = this.params.speed > 0 ? this.#glitchCount : 0;
+        this.#glitchCount++;
+
+        // Read the capture back to the CPU without stalling the GPU. Rows
+        // come top-down, ready for ImageData. #busy keeps #raw to this read.
+        const generation = this.#generation;
+        ctx.readPixels(readRT, { flipY: true, into: this.#raw }).then(
+            (raw) => {
+                if (generation === this.#generation) {
+                    this.#glitchPixels(raw, variant, generation);
+                }
+            },
+            () => {
+                // Disposed or context lost: nothing to glitch.
+                if (generation === this.#generation) {
+                    this.#busy = false;
+                }
+            },
+        );
+    }
+
+    // Corrupt the read-back pixels through the JPEG codec (async).
+    #glitchPixels(raw: Uint8Array, variant: number, generation: number): void {
         const w = this.#w;
         const h = this.#h;
         const srcCanvas = this.#srcCanvas;
@@ -545,47 +579,17 @@ export class JPEGGlitchEffect implements Effect {
         const encCanvas = this.#encCanvas;
         const encCtx = this.#encCtx;
         const imageData = this.#imageData;
-        if (
-            !srcCanvas ||
-            !srcCtx ||
-            !encCanvas ||
-            !encCtx ||
-            !imageData ||
-            !this.#readRT
-        ) {
+        if (!srcCanvas || !srcCtx || !encCanvas || !encCtx || !imageData) {
+            this.#busy = false;
             return;
         }
 
-        // Read the element capture back to the CPU. The draw leaves the
-        // readback RT's framebuffer bound, so readPixels reads from it.
-        captureContent(ctx, this.#readRT);
-        const gl = ctx.gl;
-        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.#raw);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-        this.#busy = true;
-        this.#dirty = false;
-        this.#lastGlitchTime = ctx.time;
-
-        // GL framebuffers are bottom-up; flip rows so the canvas is upright.
         // Force opaque alpha — JPEG has no alpha channel.
         const data = imageData.data;
-        const rowBytes = w * 4;
-        for (let y = 0; y < h; y++) {
-            const srcRow = (h - 1 - y) * rowBytes;
-            data.set(
-                this.#raw.subarray(srcRow, srcRow + rowBytes),
-                y * rowBytes,
-            );
-        }
+        data.set(raw.subarray(0, data.length));
         for (let i = 3; i < data.length; i += 4) {
             data[i] = 255;
         }
-
-        // Static glitch (speed 0) stays on variant 0 so it's reproducible;
-        // animated glitch advances the variant each round.
-        const variant = this.params.speed > 0 ? this.#glitchCount : 0;
-        this.#glitchCount++;
 
         const { quality, seed, iterations, randomFlip, vertical } = this.params;
         // One seeded sequence drives both the flip decision and the byte
@@ -613,7 +617,7 @@ export class JPEGGlitchEffect implements Effect {
             iterations,
             srcAngle,
             rng,
-            this.#generation,
+            generation,
         );
     }
 

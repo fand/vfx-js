@@ -43,6 +43,7 @@ export type {
     EffectDrawOpts,
     EffectGeometry,
     EffectQuad,
+    EffectReadPixelsOpts,
     EffectRenderTarget,
     EffectRenderTargetOpts,
     EffectTexture,
