@@ -11,7 +11,7 @@ mkdirSync(out, { recursive: true });
 
 const MATERIALS = ["prism", "shatter", "nebula", "sparkle", "vortex", "emboss"];
 // Foil Emboss ids this port does not support: the hologram sticker (needs the volume-hologram assets), the
-// multi-element document, the editor, the printed picture (the element is the print) and the card's thickness.
+// multi-element document, the editor and the card's thickness.
 const EMBOSS_UNSUPPORTED = /^emboss\.(holo\..*|element|shape|aspect|cornerRadius|edit|doc|filmUm|filmWall|thickness)$/;
 const SCENE_IDS = [
     /^studio\./,

@@ -199,8 +199,8 @@ export function assembleMaterial(
 
 /**
  * card.vert for the element: a flat card of uCardWorldMm centred at the origin, rotated by uCardRot for its shading.
- * Flat mode (uPersp 0): the card fills the target unwarped. Perspective mode (uPersp 1): the card turned by uVisRot
- * (the pose × `perspective`) is projected by holospot's camera (uViewProj), like the card mesh holospot draws.
+ * Flat view (`flat: true`, uPersp 0): the card fills the target unwarped. 3D view (uPersp 1): the card turned by
+ * uVisRot (the pose) is projected by holospot's camera (uViewProj), like the card mesh holospot draws.
  * uCardSizeMm is the surface's domain (size × structure scale) the fragment shaders lay their structure out in.
  */
 export const CARD_VERT = `#version 300 es
@@ -227,7 +227,7 @@ void main() {
 }
 `;
 
-/** The element mapped onto the card (perspective mode, luma mask: what the output pass shows around the foil). */
+/** The element mapped onto the card (3D view, luma mask: what the output pass shows around the foil); also copies the element for the emboss logo readback. */
 export const FRAG_CARD_BASE = `#version 300 es
 precision highp float;
 in vec2 vUv;

@@ -33,7 +33,7 @@ const MATERIALS: HoloMaterial[] = [
     "vortex",
     "emboss",
 ];
-const LIGHTS: HoloStudio[] = [
+const STUDIOS: HoloStudio[] = [
     "studio",
     "spot",
     "softbox",
@@ -232,7 +232,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
             "change",
             (ev) => effect.setParams({ grain: ev.value }),
         );
-        sc.addBinding(scene, "studio", { options: opts(LIGHTS) }).on(
+        sc.addBinding(scene, "studio", { options: opts(STUDIOS) }).on(
             "change",
             (ev) => {
                 effect.setParams({ studio: ev.value as HoloStudio });
