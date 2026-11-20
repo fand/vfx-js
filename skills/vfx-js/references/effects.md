@@ -169,9 +169,10 @@ Always declare `#version 300 es` in `ctx.draw` shaders.
 | `dims` | Sizes: `elementPixel`, `canvasPixel`, `pixelRatio`, `contentRect`, `srcRect`, `canvasRect`. |
 | `createRenderTarget(opts)` | `{ size?, float?, persistent?, wrap?, filter?, mipmap?, depth?, samples? }`. Call in `init`. |
 | `wrapTexture(source, opts)` | Wrap an image, canvas, video or `WebGLTexture`. Call in `init`. With `autoUpdate: false`, call `tex.update()` after the source changes. |
-| `draw(opts)` | `{ frag, vert?, geometry?, uniforms?, target?, blend?, swap?, depthTest?, depthFunc?, depthWrite?, cull? }`. |
+| `draw(opts)` | `{ frag, vert?, geometry?, uniforms?, target?, blend?, swap?, depthTest?, depthFunc?, depthWrite?, cull? }`. `target` can be an array to write several targets in one draw. |
 | `blit(source, target?)` | Copy a texture into a target. |
 | `clear(target?, opts?)` | Clear a render target. `opts: EffectClearOpts` is `{ color?, depth? }`, both default `true`. |
+| `readPixels(target, opts?)` | Read a render target back to the CPU, async (no GPU stall). Resolves with a `Uint8Array` (8-bit) or `Float32Array` (`float: true`), RGBA, premultiplied, rows bottom-up. `opts: EffectReadPixelsOpts` is `{ flipY? }`. Resolves MSAA targets and reads the side last written of a `persistent` one. |
 | `gl` | Raw `WebGL2RenderingContext`. |
 | `resetState()` | Restore the GL state VFX-JS assumes after raw `ctx.gl` calls. Write-only, no queries. |
 
@@ -231,6 +232,50 @@ render(ctx) {
 - `samples: 4` uses about 5 times the memory of a plain target, or 10 times with `depth: true`.
 - With `persistent: true`, depth does not carry over between frames: the side you draw into holds depth from two frames ago. Clear it every frame with `ctx.clear(rt, { color: false })` before drawing.
 - Depth and cull state only lasts for that draw. Other draws stay depth-off.
+
+### Multiple render targets
+
+Pass an array as `target` to write several targets in one draw.
+Target `i` gets the output declared with `layout(location = i) out`.
+Use it when state needs more than one vec4 per texel and the outputs share work, so it runs once.
+
+```ts
+const SIMULATE = `#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D pos; // xyz + age
+uniform sampler2D vel; // xyz
+layout(location = 0) out vec4 outPos;
+layout(location = 1) out vec4 outVel;
+const float DT = 1.0 / 60.0;
+vec3 force(vec3 p) { return -p; } // your force field
+void main() {
+    vec4 p = texture(pos, uv);
+    vec3 v = texture(vel, uv).xyz + force(p.xyz) * DT; // shared by both outputs
+    outPos = vec4(p.xyz + v * DT, p.w + DT);
+    outVel = vec4(v, 0.0);
+}`;
+
+init(ctx) {
+    this.#pos = ctx.createRenderTarget({ size: [256, 256], float: true, persistent: true });
+    this.#vel = ctx.createRenderTarget({ size: [256, 256], float: true, persistent: true });
+}
+render(ctx) {
+    ctx.draw({ frag: SIMULATE, uniforms: { pos: this.#pos, vel: this.#vel }, target: [this.#pos, this.#vel] });
+}
+```
+
+- Each target keeps its own options (`float`, `wrap`, `filter`, `mipmap`).
+- Persistent targets all swap after the draw. `swap: false` skips all of them.
+- Declare one output per target. A target with no output holds undefined pixels.
+- To write fewer targets, draw with a shorter array. A draw can't skip a target in the middle.
+- One `blend` applies to every target. The default is `"none"`.
+- If several targets have `depth: true`, the first one's depth is used. A draw that uses depth warns about it.
+- These rules apply. If one breaks, the draw warns once and is skipped:
+  - All targets have the same size and the same `samples`.
+  - No `null`, no `ctx.target`, and no target twice.
+  - At most `MAX_DRAW_BUFFERS` targets. Every WebGL2 GPU takes at least 4.
+  - The shader is GLSL 300 es.
 
 ### Drawing outside the element
 
@@ -306,3 +351,4 @@ page.dispose();      // free it and restore the element
 - Free anything you allocate with raw `ctx.gl` in `dispose`, and rebuild it in `ctx.onContextRestored(cb)`.
 - After drawing with raw `ctx.gl` (depth test, culling, own framebuffers, pixel store), call `ctx.resetState()` before the next `ctx.draw` / `ctx.blit` / `ctx.clear`, and before `render` returns. End transform feedback first.
 - Use `ctx.dims` for pixel sizes. Don't read DOM sizes in `render`.
+- Read pixels with `ctx.readPixels`, not raw `gl.readPixels`. It copies the target as it is when you call it, so call it in `render` after the draw you want to read. The promise rejects when the effect is disposed or the context is lost: always handle the rejection.

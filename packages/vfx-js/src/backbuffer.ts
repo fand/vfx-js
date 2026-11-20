@@ -64,6 +64,11 @@ export class Backbuffer {
         return this.#buffers[1];
     }
 
+    /** Both sides, in no particular order. */
+    get framebuffers(): readonly Framebuffer[] {
+        return this.#buffers;
+    }
+
     resize(width: number, height: number): void {
         if (width === this.#width && height === this.#height) {
             return;

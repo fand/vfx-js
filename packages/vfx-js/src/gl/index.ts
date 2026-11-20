@@ -1,6 +1,7 @@
 export type { Restorable } from "./context.js";
 export { GLContext } from "./context.js";
 export { Framebuffer } from "./framebuffer.js";
+export { MultiFramebuffer } from "./multi-framebuffer.js";
 export type { BlendMode } from "./pass.js";
 export { applyBlend, Pass, renderPass } from "./pass.js";
 export type { Uniform, Uniforms, UniformValue } from "./program.js";

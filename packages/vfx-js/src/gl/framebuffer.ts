@@ -37,6 +37,7 @@ export class Framebuffer implements Restorable {
     depthTexture: Texture | null;
 
     #ctx: GLContext;
+    #version = 0;
     #multisampleRequested: boolean;
     #colorRenderbuffer: WebGLRenderbuffer | null = null;
     #depthRenderbuffer: WebGLRenderbuffer | null = null;
@@ -149,6 +150,54 @@ export class Framebuffer implements Restorable {
             );
         }
         return false;
+    }
+
+    /** Bumped each time the attachments are reallocated. */
+    get version(): number {
+        return this.#version;
+    }
+
+    /** Attach this color to the bound FRAMEBUFFER at `COLOR_ATTACHMENT0 + index`. */
+    attachColorTo(index: number): void {
+        const gl = this.gl;
+        const attachment = gl.COLOR_ATTACHMENT0 + index;
+        if (this.#colorRenderbuffer) {
+            gl.framebufferRenderbuffer(
+                gl.FRAMEBUFFER,
+                attachment,
+                gl.RENDERBUFFER,
+                this.#colorRenderbuffer,
+            );
+        } else {
+            gl.framebufferTexture2D(
+                gl.FRAMEBUFFER,
+                attachment,
+                gl.TEXTURE_2D,
+                this.texture.texture,
+                0,
+            );
+        }
+    }
+
+    /** Attach this depth to the bound FRAMEBUFFER. No-op without depth. */
+    attachDepthTo(): void {
+        const gl = this.gl;
+        if (this.#depthRenderbuffer) {
+            gl.framebufferRenderbuffer(
+                gl.FRAMEBUFFER,
+                gl.DEPTH_ATTACHMENT,
+                gl.RENDERBUFFER,
+                this.#depthRenderbuffer,
+            );
+        } else if (this.depthTexture) {
+            gl.framebufferTexture2D(
+                gl.FRAMEBUFFER,
+                gl.DEPTH_ATTACHMENT,
+                gl.TEXTURE_2D,
+                this.depthTexture.texture,
+                0,
+            );
+        }
     }
 
     /** Flag new pixels in the multisampled buffers. No-op without MSAA. */
@@ -335,6 +384,7 @@ export class Framebuffer implements Restorable {
         gl.bindTexture(gl.TEXTURE_2D, null);
         this.#colorDirty = false;
         this.#depthDirty = false;
+        this.#version++;
 
         this.texture.needsUpdate = false;
         // Keep the Texture wrapper's source null: the storage is managed
