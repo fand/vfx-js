@@ -1,6 +1,6 @@
 // Assembles holospot's material programs for vfx-js (holospot engine/shaders/lib/index.ts `assemble`, MIT © 2026
 // Dmitry Kurash) and applies the few adaptations the port needs. Every adaptation replaces an exact snippet of the
-// verbatim sources in ./glsl and throws if the snippet is missing, so a re-import that changes them is caught.
+// generated sources in ./glsl (holospot's code without comments) and throws if the snippet is missing, so a re-import that changes them is caught.
 //
 // Adaptations:
 //   prefix     what three.js prepends to a ShaderMaterial fragment shader (version, precision, gl_FragColor,

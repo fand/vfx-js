@@ -685,7 +685,7 @@ void main() {
  *
  * holospot's physics is kept: the grating equation, order efficiencies, η renormalisation, material- and
  * SPD-convolved spectral tables, LTC rect lights, the studio environment, coat, wear, glare, grain and tone curves.
- * Its GLSL is used verbatim. What differs:
+ * Its GLSL is used as is, without comments. What differs:
  *
  * - The environment is a prefiltered octahedral atlas (an importance-sampled GGX lobe per level) instead of three's
  *   PMREM.
