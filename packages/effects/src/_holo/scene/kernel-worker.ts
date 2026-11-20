@@ -47,6 +47,7 @@ export class KernelWorker {
     private worker: Worker | null = null;
     private url = "";
     private failed = false;
+    private disposed = false;
     private local: Record<string, (arg: never) => unknown> | null = null;
     private id = 0;
     private readonly jobs = new Map<number, Job>();
@@ -61,6 +62,9 @@ export class KernelWorker {
         arg: unknown,
         transfer: Transferable[] = [],
     ): Promise<R> {
+        if (this.disposed) {
+            throw new Error("kernel worker disposed");
+        }
         const w = this.ensure();
         if (w) {
             try {
@@ -79,8 +83,8 @@ export class KernelWorker {
                     }
                 });
             } catch (e) {
-                if (!(e instanceof WorkerGone)) {
-                    throw e; // a kernel error: report it
+                if (!(e instanceof WorkerGone) || this.disposed) {
+                    throw e; // a kernel error, or disposed: no fallback to the page
                 }
                 // the worker died: fall through to the page
             }
@@ -95,6 +99,7 @@ export class KernelWorker {
     }
 
     dispose(): void {
+        this.disposed = true;
         this.fail();
         this.failed = true;
     }
