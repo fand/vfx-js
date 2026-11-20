@@ -84,7 +84,7 @@ afterEach(() => {
 
 /**
  * A fake EffectContext. Every draw, clear and blit fails if it touches a disposed target or texture, and
- * `gl.readPixels` returns `pixels` (bottom-up rows, premultiplied).
+ * `ctx.readPixels` resolves to `pixels` (given bottom-up and premultiplied, flipped for `flipY`).
  */
 function makeCtx(o: { w?: number; h?: number; pixels?: Uint8Array } = {}) {
     const w = o.w ?? 40;
@@ -109,28 +109,28 @@ function makeCtx(o: { w?: number; h?: number; pixels?: Uint8Array } = {}) {
         }
     };
     const gl = {
-        FRAMEBUFFER: 0x8d40,
-        FRAMEBUFFER_BINDING: 0x8ca6,
         RENDERER: 0x1f01,
-        RGBA: 0x1908,
-        UNSIGNED_BYTE: 0x1401,
         getExtension: () => null,
-        getParameter: (p: number) => (p === 0x8ca6 ? {} : "test renderer"),
-        readPixels: vi.fn(
-            (
-                _x: number,
-                _y: number,
-                _w: number,
-                _h: number,
-                _f: number,
-                _t: number,
-                out: Uint8Array,
-            ) => {
-                out.set(o.pixels ?? new Uint8Array(out.length).fill(255));
-            },
-        ),
-        bindFramebuffer: vi.fn(),
+        getParameter: () => "test renderer",
     };
+    const readPixels = vi.fn(
+        (t: { width: number; height: number }, opts?: { flipY?: boolean }) => {
+            const n = t.width * t.height * 4;
+            const px = o.pixels ?? new Uint8Array(n).fill(255);
+            if (!opts?.flipY) {
+                return Promise.resolve(px);
+            }
+            const row = t.width * 4;
+            const out = new Uint8Array(n);
+            for (let y = 0; y < t.height; y++) {
+                out.set(
+                    px.subarray((t.height - 1 - y) * row, (t.height - y) * row),
+                    y * row,
+                );
+            }
+            return Promise.resolve(out);
+        },
+    );
     const dims = { element: [w, h], elementPixel: [w, h] };
     const ctx = {
         gl,
@@ -142,6 +142,7 @@ function makeCtx(o: { w?: number; h?: number; pixels?: Uint8Array } = {}) {
         mouse: [0, 0],
         mouseViewport: [0, 0],
         dims,
+        readPixels,
         draw(d: Draw) {
             check("draw target", d.target);
             for (const v of Object.values(d.uniforms ?? {})) {
@@ -172,7 +173,7 @@ function makeCtx(o: { w?: number; h?: number; pixels?: Uint8Array } = {}) {
     return {
         ctx: ctx as unknown as EffectContext,
         draws,
-        gl,
+        readPixels,
         restore: () => restore?.(),
         hasRestoreListener: () => restore !== null,
     };
@@ -190,6 +191,9 @@ const lastMaterial = (draws: Draw[]) => draws.filter(isMaterial).at(-1);
 /** uPrintK.x of the last material draw: whether the paper has a print. */
 const printOn = (draws: Draw[]) =>
     (lastMaterial(draws)?.uniforms?.uPrintK as number[] | undefined)?.[0];
+
+/** Lets the readbacks (promises) resolve. */
+const tick = () => new Promise((r) => setTimeout(r, 0));
 
 /** Resolves to "ready" or "pending" after a tick. */
 const settled = (p: Promise<void>) =>
@@ -211,7 +215,7 @@ describe("HoloEffect lifecycle", () => {
     });
 
     test("dispose resolves a pending ready, and init again draws with fresh resources", async () => {
-        const { ctx, draws, gl, hasRestoreListener } = makeCtx();
+        const { ctx, draws, readPixels, hasRestoreListener } = makeCtx();
         const fx = new HoloEffect({
             material: "emboss",
             settings: { "emboss.logo": "element" },
@@ -228,7 +232,7 @@ describe("HoloEffect lifecycle", () => {
         fx.init?.(ctx);
         expect(() => frame(fx, ctx)).not.toThrow(); // nothing disposed is drawn with
         expect(draws.some(isMaterial)).toBe(true);
-        expect(gl.readPixels).toHaveBeenCalledTimes(2); // the element is read again
+        expect(readPixels).toHaveBeenCalledTimes(2); // the element is read again
     });
 
     test("a restored context uploads the tables again", () => {
@@ -279,17 +283,18 @@ describe("HoloEffect emboss with the element as the logo", () => {
         );
     });
 
-    test("the readback is flipped to top-down rows and un-premultiplied", () => {
+    test("the readback is read top-down and un-premultiplied", async () => {
         // 2 × 2, bottom-up: the bottom row is red at half alpha (premultiplied), the top row is clear
         const pixels = new Uint8Array([
             128, 0, 0, 128, 128, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0,
         ]);
-        const { ctx, gl } = makeCtx({ w: 2, h: 2, pixels });
+        const { ctx, readPixels } = makeCtx({ w: 2, h: 2, pixels });
         const fx = new HoloEffect(element);
         fx.init?.(ctx);
         frame(fx, ctx);
-        expect(gl.readPixels).toHaveBeenCalledTimes(1);
-        expect(gl.bindFramebuffer).toHaveBeenCalledWith(gl.FRAMEBUFFER, null);
+        expect(readPixels).toHaveBeenCalledTimes(1);
+        expect(readPixels.mock.calls[0][1]).toEqual({ flipY: true });
+        await tick();
         const read = puts.find((p) => p.w === 2 && p.h === 2);
         expect(read).toBeDefined();
         // canvas row 0 is the top: clear; row 1 is the red, straight alpha
@@ -301,17 +306,20 @@ describe("HoloEffect emboss with the element as the logo", () => {
         ]);
     });
 
-    test("the element is not read again on an unrelated setParams", () => {
-        const { ctx, gl } = makeCtx();
+    test("the element is read once at a time, and not again on an unrelated setParams", async () => {
+        const { ctx, readPixels } = makeCtx();
         const fx = new HoloEffect(element);
         fx.init?.(ctx);
         frame(fx, ctx);
+        frame(fx, ctx); // the first read is still on its way
+        expect(readPixels).toHaveBeenCalledTimes(1);
+        await tick();
         fx.setParams({ exposure: 1 });
         frame(fx, ctx);
-        expect(gl.readPixels).toHaveBeenCalledTimes(1);
+        expect(readPixels).toHaveBeenCalledTimes(1);
         fx.setParams({ settings: { "emboss.logo": "element" } });
         frame(fx, ctx);
-        expect(gl.readPixels).toHaveBeenCalledTimes(2);
+        expect(readPixels).toHaveBeenCalledTimes(2);
     });
 
     test("an <img> given as emboss.print before it loads is printed once it has loaded", async () => {

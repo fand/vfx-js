@@ -999,6 +999,8 @@ export class HoloEffect implements Effect {
             this.#envDrawn = null;
             this.#logoUp = this.#paperUp = -1;
             this.#capKey = "";
+            this.#capInFlight = false;
+            this.#capToken++;
         });
         this.#setup(ctx);
     }
@@ -1572,15 +1574,18 @@ export class HoloEffect implements Effect {
     #capGen = 0;
     #capTries = 0;
     #capPending = false;
+    /** A readback is on its way; the token drops one that arrives after #release or a restore. */
+    #capInFlight = false;
+    #capToken = 0;
     /** Hash of the last pixels read back, so an unchanged element does not rebuild the logo. */
     #capHash = "";
-    #captureElementLogo(ctx: EffectContext, a: EmbossAssets): void {
+    #captureElementLogo(ctx: EffectContext): void {
         const [pw, ph] = ctx.dims.elementPixel;
         const k = Math.min(1, 1024 / Math.max(pw, ph, 1));
         const w = Math.max(1, Math.round(pw * k));
         const h = Math.max(1, Math.round(ph * k));
         const key = `${w}x${h}|${this.#capGen}|${this.#readOptsKey()}`;
-        if (key === this.#capKey) {
+        if (key === this.#capKey || this.#capInFlight) {
             return;
         }
         this.#capPending = true;
@@ -1592,37 +1597,45 @@ export class HoloEffect implements Effect {
             this.#capRt?.dispose();
             this.#capRt = ctx.createRenderTarget({ size: [w, h] });
         }
-        // the draw leaves the target's framebuffer bound, so readPixels reads from it (as JPEGGlitchEffect does;
-        // fand/vfx-js#282 proposes ctx.readPixels). 8 bit, premultiplied, rows bottom-up.
         captureContent(ctx, this.#capRt);
-        const gl = ctx.gl;
-        if (!gl.getParameter(gl.FRAMEBUFFER_BINDING)) {
-            warnOnce(
-                "HoloEffect: could not read the element back as the emboss logo.",
-            );
-            this.#capKey = key;
-            this.#capPending = false;
-            return;
-        }
-        const raw = new Uint8Array(w * h * 4);
-        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, raw);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        // read back without stalling the GPU: 8 bit, premultiplied, rows top-down; it resolves a frame or so later
+        this.#capInFlight = true;
+        const token = this.#capToken;
+        ctx.readPixels(this.#capRt, { flipY: true }).then(
+            (raw) => {
+                if (token === this.#capToken) {
+                    this.#capInFlight = false;
+                    this.#useElementLogo(raw, w, h, key);
+                }
+            },
+            () => {
+                // disposed or context lost: #release / the restore start over
+                if (token === this.#capToken) {
+                    this.#capInFlight = false;
+                }
+            },
+        );
+    }
+
+    /** Turns the element read back (premultiplied, top-down) into the logo. */
+    #useElementLogo(
+        raw: Uint8Array | Float32Array,
+        w: number,
+        h: number,
+        key: string,
+    ): void {
         const px = new Uint8ClampedArray(w * h * 4);
         let visible = false;
-        for (let y = 0; y < h; y++) {
-            const from = (h - 1 - y) * w * 4;
-            const to = y * w * 4;
-            for (let i = 0; i < w * 4; i += 4) {
-                const al = raw[from + i + 3];
-                const u = al > 0 ? 255 / al : 0;
-                px[to + i] = raw[from + i] * u;
-                px[to + i + 1] = raw[from + i + 1] * u;
-                px[to + i + 2] = raw[from + i + 2] * u;
-                px[to + i + 3] = al;
-                visible ||= al > 8;
-            }
+        for (let i = 0; i < w * h * 4; i += 4) {
+            const al = raw[i + 3];
+            const u = al > 0 ? 255 / al : 0;
+            px[i] = raw[i] * u;
+            px[i + 1] = raw[i + 1] * u;
+            px[i + 2] = raw[i + 2] * u;
+            px[i + 3] = al;
+            visible ||= al > 8;
         }
-        // the element may not be drawn yet on the first frames: try again for a while
+        // the element may not be drawn yet on the first frames: read it again for a while
         if (!visible && ++this.#capTries < 120) {
             return;
         }
@@ -1630,7 +1643,8 @@ export class HoloEffect implements Effect {
         this.#capTries = 0;
         this.#capPending = false;
         const hash = `${w}x${h}|${this.#readOptsKey()}|${fnv1a(px)}`;
-        if (hash === this.#capHash) {
+        const a = this.#emboss;
+        if (!a || hash === this.#capHash) {
             return;
         }
         this.#capHash = hash;
@@ -1739,7 +1753,7 @@ export class HoloEffect implements Effect {
             return {};
         }
         if (this.#resolved?.values["emboss.logo"] === "element") {
-            this.#captureElementLogo(ctx, a);
+            this.#captureElementLogo(ctx);
         }
         const print = this.#printUniforms(ctx);
         if (a.logoVersion !== this.#logoUp) {
@@ -1875,6 +1889,8 @@ export class HoloEffect implements Effect {
         this.#capHash = "";
         this.#capTries = 0;
         this.#capPending = false;
+        this.#capInFlight = false;
+        this.#capToken++;
         this.#printTex?.dispose();
         this.#printTex = null;
         this.#printImg = null;
