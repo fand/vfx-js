@@ -356,6 +356,10 @@ function fnv1a(b: ArrayLike<number>): string {
     return (h >>> 0).toString(16);
 }
 
+/** An <img> (false where the DOM has none, such as a worker or a test). */
+const isImgElement = (v: unknown): v is HTMLImageElement =>
+    typeof HTMLImageElement !== "undefined" && v instanceof HTMLImageElement;
+
 /** An image setting that is set: a non-empty URL, or an image object. */
 const givenImage = (v: unknown): boolean =>
     (typeof v === "string" && v.trim() !== "") ||
@@ -1655,11 +1659,25 @@ export class HoloEffect implements Effect {
             this.#printImg = null;
             this.#printError = null;
             this.#printBusy = false;
+            // a URL, or an <img> that has not loaded yet: decode it first (a texture of an unloaded image would stay
+            // 0 × 0); a loaded image, a canvas or an ImageBitmap is used at once
+            let pending: HTMLImageElement | null = null;
             if (typeof want === "string" && want.trim() !== "") {
+                pending = new Image();
+                pending.crossOrigin = "anonymous";
+                pending.src = want.trim();
+            } else if (
+                isImgElement(want) &&
+                !(want.complete && want.naturalWidth > 0)
+            ) {
+                pending = want;
+            } else if (givenImage(want)) {
+                this.#printImg = want as LogoImage;
+            }
+            if (pending) {
+                const img = pending;
+                const label = typeof want === "string" ? ` ${want}` : "";
                 this.#printBusy = true;
-                const img = new Image();
-                img.crossOrigin = "anonymous";
-                img.src = want.trim();
                 img.decode().then(
                     () => {
                         if (token === this.#printToken) {
@@ -1669,14 +1687,12 @@ export class HoloEffect implements Effect {
                     },
                     (e: unknown) => {
                         if (token === this.#printToken) {
-                            this.#printError = `HoloEffect: could not load emboss.print ${want}: ${(e instanceof Error ? e.message : String(e)).replace(/\.$/, "")}. A cross-origin image needs CORS.`;
+                            this.#printError = `HoloEffect: could not load emboss.print${label}: ${(e instanceof Error ? e.message : String(e)).replace(/\.$/, "")}. A cross-origin image needs CORS.`;
                             console.warn(this.#printError);
                             this.#printBusy = false;
                         }
                     },
                 );
-            } else if (givenImage(want)) {
-                this.#printImg = want as LogoImage;
             }
         }
         const img = this.#printImg;
@@ -1701,10 +1717,8 @@ export class HoloEffect implements Effect {
             };
         }
         // cover the element, as CSS background-size: cover
-        const iw =
-            img instanceof HTMLImageElement ? img.naturalWidth : img.width;
-        const ih =
-            img instanceof HTMLImageElement ? img.naturalHeight : img.height;
+        const iw = isImgElement(img) ? img.naturalWidth : img.width;
+        const ih = isImgElement(img) ? img.naturalHeight : img.height;
         const ae = this.#elemCss[0] / Math.max(this.#elemCss[1], 1);
         const ai = iw / Math.max(ih, 1);
         const sx = ai > ae ? ae / ai : 1;

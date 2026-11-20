@@ -314,6 +314,47 @@ describe("HoloEffect emboss with the element as the logo", () => {
         expect(gl.readPixels).toHaveBeenCalledTimes(2);
     });
 
+    test("an <img> given as emboss.print before it loads is printed once it has loaded", async () => {
+        let loaded = () => {};
+        class FakeImg {
+            complete = false;
+            naturalWidth = 0;
+            naturalHeight = 0;
+            decode() {
+                return new Promise<void>((r) => {
+                    loaded = () => {
+                        this.complete = true;
+                        this.naturalWidth = 300;
+                        this.naturalHeight = 200;
+                        r();
+                    };
+                });
+            }
+        }
+        vi.stubGlobal("HTMLImageElement", FakeImg);
+        const img = new FakeImg();
+        const { ctx, draws } = makeCtx();
+        const wrapped: unknown[] = [];
+        const wrap = ctx.wrapTexture.bind(ctx);
+        ctx.wrapTexture = ((src: unknown, o?: unknown) => {
+            wrapped.push(src);
+            return wrap(src as never, o as never);
+        }) as typeof ctx.wrapTexture;
+        const fx = new HoloEffect({
+            material: "emboss",
+            settings: { "emboss.print": img as unknown as HTMLImageElement },
+        });
+        fx.init?.(ctx);
+        frame(fx, ctx);
+        expect(printOn(draws)).toBe(0); // loading: no print, and not wrapped at 0 × 0
+        expect(wrapped).not.toContain(img);
+        loaded();
+        await Promise.resolve();
+        frame(fx, ctx);
+        expect(printOn(draws)).toBe(1);
+        expect(wrapped).toContain(img);
+    });
+
     test("no print while emboss.print loads; the element is the print otherwise", () => {
         const loading = makeCtx();
         const fx = new HoloEffect({
