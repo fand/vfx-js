@@ -749,7 +749,7 @@ export class HoloEffect implements Effect {
     /**
      * Resolves once the effect has drawn a frame with everything it loads in place: for `emboss`, the logo and the
      * paper maps, which load in the background (until then the card is drawn without them). A logo that fails to
-     * load does not reject it; see `errors`.
+     * load does not reject it; see `errors`. It also resolves when the effect is disposed.
      */
     get ready(): Promise<void> {
         if (this.#readyNow()) {
@@ -1674,7 +1674,6 @@ export class HoloEffect implements Effect {
         ]) {
             rt?.dispose();
         }
-        this.#printTex?.dispose();
         this.#bytesTex?.dispose();
         this.#ltcTex?.dispose();
         this.#glare.dispose();
@@ -1694,6 +1693,24 @@ export class HoloEffect implements Effect {
         this.#ltcReady = false;
         this.#blackReady = false;
         this.#envDrawn = null;
+        // the element read back as the logo, and emboss.print: start over on the next init
+        this.#capRt = null;
+        this.#capKey = "";
+        this.#capTries = 0;
+        this.#capPending = false;
+        this.#printTex?.dispose();
+        this.#printTex = null;
+        this.#printImg = null;
+        this.#printWant = "";
+        this.#printToken++;
+        this.#printBusy = false;
+        // a pending ready resolves: nothing more is drawn until the next init
+        this.#drawnOnce = false;
+        const w = this.#readyWaiters;
+        this.#readyWaiters = [];
+        for (const f of w) {
+            f();
+        }
     }
 
     #uploadAtlas(ctx: EffectContext, atlas: SpectralAtlas): void {
