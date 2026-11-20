@@ -18,7 +18,7 @@ import {
     type PaperBuild,
     paperKernel,
 } from "./scene/paper-maps.js";
-import { encodeFloat24 } from "./spectral/float24.js";
+import { encodeFloat24, fromHalf } from "./spectral/float24.js";
 
 /** An image the logo can be read from. */
 export type LogoImage =
@@ -32,20 +32,6 @@ export interface ByteImage {
     w: number;
     h: number;
     bytes: Uint8ClampedArray<ArrayBuffer>;
-}
-
-/** Half float → float. */
-function fromHalf(h: number): number {
-    const s = h & 0x8000 ? -1 : 1;
-    const e = (h >> 10) & 0x1f;
-    const m = h & 0x3ff;
-    if (e === 0) {
-        return s * m * 2 ** -24;
-    }
-    if (e === 31) {
-        return m ? Number.NaN : s * Number.POSITIVE_INFINITY;
-    }
-    return s * (1 + m / 1024) * 2 ** (e - 15);
 }
 
 /** A w × h RGBA half-float level (rows bottom-up) as a byte image for the decode pass (GPU row j = level row j). */

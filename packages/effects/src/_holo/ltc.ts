@@ -1,5 +1,6 @@
 // LTC tables (data/ltc.ts) as a float24 byte image for the GPU decode pass (FRAG_DECODE_LTC) (one value per pixel, 4 per RGBA texel; table 1 in GPU rows [0, 64), table 2 in [64, 128)).
 import { LTC_1, LTC_2 } from "./data/ltc.js";
+import { encodeFloat24, fromHalf } from "./spectral/float24.js";
 
 export const LTC_SIZE = 64;
 export const LTC_IMAGE = { width: 4 * LTC_SIZE, height: 2 * LTC_SIZE } as const;
@@ -18,15 +19,23 @@ export function ltcImageBytes(): Uint8ClampedArray<ArrayBuffer> {
     const { width, height } = LTC_IMAGE;
     const img = new Uint8ClampedArray(width * height * 4).fill(255);
     [LTC_1, LTC_2].forEach((b64, t) => {
+        // half floats stored as differences from the row above, high bytes then low bytes (gen-holo-ltc.mjs) →
+        // float24 bytes
         const src = decodeBase64(b64);
+        const n = src.length / 2;
+        const h = new Uint16Array(n);
+        for (let i = 0; i < n; i++) {
+            const d = (src[i] << 8) | src[n + i];
+            h[i] = (d + (i >= width ? h[i - width] : 0)) & 0xffff;
+        }
         for (let j = 0; j < LTC_SIZE; j++) {
             const row = height - 1 - (t * LTC_SIZE + j);
             for (let x = 0; x < width; x++) {
-                const s = 3 * (j * width + x);
-                const d = 4 * (row * width + x);
-                img[d] = src[s];
-                img[d + 1] = src[s + 1];
-                img[d + 2] = src[s + 2];
+                encodeFloat24(
+                    fromHalf(h[j * width + x]),
+                    img,
+                    4 * (row * width + x),
+                );
             }
         }
     });

@@ -55,3 +55,17 @@ float decodeFloat24(vec3 c) {
     return b.x >= 128.0 ? -v : v;
 }
 `;
+
+/** Half float → float. */
+export function fromHalf(h: number): number {
+    const s = h & 0x8000 ? -1 : 1;
+    const e = (h >> 10) & 0x1f;
+    const m = h & 0x3ff;
+    if (e === 0) {
+        return s * m * 2 ** -24;
+    }
+    if (e === 31) {
+        return m ? Number.NaN : s * Number.POSITIVE_INFINITY;
+    }
+    return s * (1 + m / 1024) * 2 ** (e - 15);
+}

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { ATLAS, SpectralAtlas } from "./atlas.js";
-import { decodeFloat24, encodeFloat24 } from "./float24.js";
+import { decodeFloat24, encodeFloat24, fromHalf } from "./float24.js";
 import { materialFactor } from "./spd.js";
 import { buildCmfLayer } from "./tables.js";
 
@@ -51,4 +51,14 @@ test("atlas builds layers lazily and bumps its version", () => {
     expect(a.version).toBe(v + 1);
     a.ensureLayer("tungsten");
     expect(a.version).toBe(v + 1);
+});
+
+test("fromHalf decodes IEEE half floats", () => {
+    expect(fromHalf(0x3c00)).toBe(1);
+    expect(fromHalf(0xc000)).toBe(-2);
+    expect(fromHalf(0x0000)).toBe(0);
+    expect(fromHalf(0x0001)).toBe(2 ** -24); // the smallest subnormal
+    expect(fromHalf(0x7bff)).toBe(65504); // the largest normal
+    expect(fromHalf(0x7c00)).toBe(Number.POSITIVE_INFINITY);
+    expect(Number.isNaN(fromHalf(0x7e00))).toBe(true);
 });
