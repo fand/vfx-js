@@ -1,17 +1,20 @@
 import { VFX, type VFXOpts } from "@vfx-js/core";
-import type {
-    BloomEffect,
-    DatamoshEffect,
-    FluidEffect,
-    HalftoneEffect,
-    HalftoneInkPresetName,
-    LightStreakEffect,
-    ParticleEffect,
-    ParticleExplodeEffect,
-    PixelSortEffect,
+import {
+    type BloomEffect,
+    type DatamoshEffect,
+    type FluidEffect,
+    type HalftoneEffect,
+    type HalftoneInkPresetName,
+    type LightStreakEffect,
+    type ParticleEffect,
+    type ParticleExplodeEffect,
+    type PixelSortEffect,
+    SWIRL_PARTICLES_PALETTES,
+    type SwirlParticlesColorStop,
+    type SwirlParticlesPaletteName,
+    type SwirlParticlesParams,
 } from "@vfx-js/effects";
 import { type BindingParams, type FolderApi, Pane } from "tweakpane";
-import type { SwirlParticlesParams } from "./swirl-particles";
 
 const PANE_CLASS = "vfx-tweakpane-container";
 
@@ -804,6 +807,13 @@ const SWIRL_REBUILD_KEYS: ReadonlySet<string> = new Set([
     "fireflyRatio",
 ]);
 
+/** Source picker for {@link attachSwirlParticlesPane}. */
+export type SwirlSourceSelector = {
+    keys: readonly string[];
+    value: string;
+    onChange: (key: string) => void;
+};
+
 /**
  * Tweakpane for SwirlParticlesEffect. Binds to a story-owned `params`
  * object; `apply` copies live edits into the current effect, and
@@ -813,11 +823,14 @@ export function attachSwirlParticlesPane(
     title: string,
     params: SwirlParticlesParams,
     cb: { apply: () => void; rebuild: () => void },
+    source?: SwirlSourceSelector,
 ): Pane {
     const container = document.createElement("div");
     container.className = PANE_CLASS;
     container.style.cssText =
         "position:fixed;top:16px;right:16px;width:280px;z-index:10000;max-height:calc(100vh - 32px);overflow-y:auto";
+    // The effect orbits on window pointer drags; keep panel drags out.
+    container.addEventListener("pointerdown", (e) => e.stopPropagation());
     document.body.appendChild(container);
 
     const pane = new Pane({ container, title, expanded: true });
@@ -838,7 +851,7 @@ export function attachSwirlParticlesPane(
         }
     };
     const bind = (
-        folder: FolderApi,
+        folder: FolderApi | Pane,
         key: keyof SwirlParticlesParams,
         opts: BindingParams = {},
     ) => {
@@ -846,6 +859,13 @@ export function attachSwirlParticlesPane(
             .addBinding(params, key, opts)
             .on("change", (ev) => onChange(key, ev.last));
     };
+
+    if (source) {
+        const state = { source: source.value };
+        pane.addBinding(state, "source", {
+            options: Object.fromEntries(source.keys.map((k) => [k, k])),
+        }).on("change", (ev) => source.onChange(ev.value));
+    }
 
     const particles = pane.addFolder({ title: "Particles" });
     bind(particles, "count", {
@@ -872,29 +892,95 @@ export function attachSwirlParticlesPane(
     bind(flow, "attract", range(0, 20, 0.5));
     bind(flow, "peel", range(0, 1, 0.01));
 
+    addSwirlPaletteBindings(pane, params, cb.apply);
+
     const glow = pane.addFolder({ title: "Fireflies & Bloom" });
     bind(glow, "fireflyRatio", range(0, 0.1, 0.001));
     bind(glow, "fireflyIntensity", range(0, 20, 0.5));
+    bind(glow, "fireflyColor", { view: "color" });
     bind(glow, "bloom", range(0, 3, 0.05));
     bind(glow, "bloomThreshold", range(0, 3, 0.05));
 
     const camera = pane.addFolder({ title: "Camera" });
+    bind(camera, "yaw", range(-Math.PI, Math.PI, 0.01));
+    bind(camera, "pitch", range(-1.5, 1.5, 0.01));
     bind(camera, "orbit", range(0, 1.5, 0.01));
+    bind(camera, "fov", range(5, 90, 1));
     bind(camera, "zoom", range(0.3, 3, 0.05));
+    bind(camera, "drag");
 
-    const colors = pane.addFolder({ title: "Colors", expanded: false });
-    for (const key of [
-        "deepColor",
-        "midColor",
-        "hotColor",
-        "highlightColor",
-        "fireflyColor",
-        "skyColor",
-        "groundColor",
-    ] as const) {
-        bind(colors, key, { view: "color" });
-    }
+    // `pad` is `number | "fullscreen"`: mirror it as a checkbox + slider.
+    const padState = {
+        fullscreen: params.pad === "fullscreen",
+        pad: typeof params.pad === "number" ? params.pad : 200,
+    };
+    const writePad = () => {
+        params.pad = padState.fullscreen ? "fullscreen" : padState.pad;
+        cb.apply();
+    };
+    const output = pane.addFolder({ title: "Output", expanded: false });
+    output.addBinding(padState, "fullscreen").on("change", writePad);
+    output.addBinding(padState, "pad", range(0, 600, 1)).on("change", writePad);
 
     trackPane(pane);
     return pane;
+}
+
+// Palette preset dropdown plus the current stops (offset slider + colour
+// picker each), rebuilt when the preset changes. Edits mutate the stop
+// objects in place; the effect re-bakes when the stops' JSON changes.
+function addSwirlPaletteBindings(
+    pane: Pane,
+    params: SwirlParticlesParams,
+    apply: () => void,
+): void {
+    const copyStops = (
+        stops: readonly SwirlParticlesColorStop[],
+    ): SwirlParticlesColorStop[] => stops.map((s) => ({ ...s }));
+    const initial: SwirlParticlesPaletteName =
+        typeof params.palette === "string" ? params.palette : "nebula";
+    params.palette = copyStops(
+        typeof params.palette === "string"
+            ? SWIRL_PARTICLES_PALETTES[params.palette]
+            : params.palette,
+    );
+
+    const color = pane.addFolder({ title: "Color" });
+    const presetState = { palette: initial };
+    color
+        .addBinding(presetState, "palette", {
+            options: Object.fromEntries(
+                Object.keys(SWIRL_PARTICLES_PALETTES).map((k) => [k, k]),
+            ),
+        })
+        .on("change", (ev) => {
+            params.palette = copyStops(SWIRL_PARTICLES_PALETTES[ev.value]);
+            rebuildStops();
+            apply();
+        });
+    color
+        .addBinding(params, "sourceColor", { min: 0, max: 1, step: 0.01 })
+        .on("change", apply);
+
+    const stopsFolder = color.addFolder({ title: "Stops", expanded: true });
+    const rebuildStops = () => {
+        for (const child of [...stopsFolder.children]) {
+            stopsFolder.remove(child);
+        }
+        const stops = params.palette as SwirlParticlesColorStop[];
+        stops.forEach((stop, i) => {
+            stopsFolder
+                .addBinding(stop, "offset", {
+                    label: `stop ${i + 1}`,
+                    min: 0,
+                    max: 1,
+                    step: 0.01,
+                })
+                .on("change", apply);
+            stopsFolder
+                .addBinding(stop, "color", { label: "", view: "color" })
+                .on("change", apply);
+        });
+    };
+    rebuildStops();
 }

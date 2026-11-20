@@ -1,4 +1,5 @@
 // Particles that crawl and curl over an extruded silhouette.
+// Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 //
 // 1. The silhouette is read back from the element (`ctx.src` alpha), and a
 //    2D signed distance field is built on the CPU. The 3D shape is the
@@ -10,9 +11,11 @@
 //    generation) moves each particle with a flow tangent to the surface,
 //    `cross(normal, noiseVector)`, plus curl noise, plus an attraction back
 //    to the surface that weakens with age, so old particles peel off.
-// 4. The particles are drawn as opaque points with a depth buffer,
-//    shaded from the SDF, coloured by a ramp. A few "fireflies" are drawn
-//    again additively in HDR, then bloomed.
+// 4. The particles are drawn as opaque fibres with a depth buffer,
+//    shaded from the SDF, coloured by a gradient (optionally mixed with the
+//    source colour at the spawn point). A few "fireflies" are drawn again
+//    additively in HDR, then bloomed. The output is premultiplied over
+//    transparency.
 import type {
     Effect,
     EffectContext,
@@ -21,9 +24,87 @@ import type {
     EffectRenderTarget,
     EffectTexture,
 } from "@vfx-js/core";
+import { captureContent } from "./_capture.js";
+import { parseHexColor } from "./_figma-common.js";
+import { padOutputRect } from "./_pad.js";
+import {
+    QUAD_VERTS,
+    sanitizeCount,
+    stateSizeFromCount,
+} from "./_particle-common.js";
+
+/**
+ * One stop of a {@link SwirlParticlesParams.palette} gradient, like a
+ * stop in a CSS `linear-gradient`.
+ */
+export type SwirlParticlesColorStop = {
+    /** Position on the gradient, in [0, 1]. */
+    offset: number;
+    /** CSS hex colour (`"#rrggbb"` or `"#rgb"`). */
+    color: string;
+};
+
+/** Name of a built-in {@link SWIRL_PARTICLES_PALETTES} gradient. */
+export type SwirlParticlesPaletteName =
+    | "nebula"
+    | "ember"
+    | "aurora"
+    | "mono"
+    | "sakura"
+    | "ocean";
+
+/**
+ * Built-in particle gradients. Low offsets colour the shaded body, high
+ * offsets the fast, glinting and peeled-off particles.
+ */
+export const SWIRL_PARTICLES_PALETTES: Record<
+    SwirlParticlesPaletteName,
+    readonly SwirlParticlesColorStop[]
+> = {
+    // Deep navy → blue → violet-pink → near white.
+    nebula: [
+        { offset: 0, color: "#0e1554" },
+        { offset: 0.45, color: "#3a50d4" },
+        { offset: 0.8, color: "#c478e0" },
+        { offset: 1, color: "#f4e6ff" },
+    ],
+    ember: [
+        { offset: 0, color: "#2a0603" },
+        { offset: 0.45, color: "#b0260c" },
+        { offset: 0.8, color: "#ff9a2e" },
+        { offset: 1, color: "#fff3cf" },
+    ],
+    aurora: [
+        { offset: 0, color: "#03262a" },
+        { offset: 0.45, color: "#0d8f72" },
+        { offset: 0.8, color: "#5cf2b0" },
+        { offset: 1, color: "#e4fffb" },
+    ],
+    mono: [
+        { offset: 0, color: "#141519" },
+        { offset: 0.45, color: "#4b4f58" },
+        { offset: 0.8, color: "#b4b8c0" },
+        { offset: 1, color: "#ffffff" },
+    ],
+    sakura: [
+        { offset: 0, color: "#3b0d2f" },
+        { offset: 0.45, color: "#a8357a" },
+        { offset: 0.8, color: "#f5a3c7" },
+        { offset: 1, color: "#fff2f7" },
+    ],
+    ocean: [
+        { offset: 0, color: "#021a35" },
+        { offset: 0.45, color: "#0a61a3" },
+        { offset: 0.8, color: "#2fc6da" },
+        { offset: 1, color: "#e9fcff" },
+    ],
+};
 
 export type SwirlParticlesParams = {
-    /** Number of particles. Fixed at construction. */
+    /**
+     * Number of particles. Construction-time only: changing it later has
+     * no effect until the effect is re-added.
+     */
     count: number;
     /** Extrusion depth, relative to the long side of the element (= 2). */
     depth: number;
@@ -33,40 +114,84 @@ export type SwirlParticlesParams = {
     curl: number;
     /** Spatial frequency of the curl noise. */
     curlScale: number;
-    /** Overall flow speed (world units / sec). */
+    /** Overall flow speed, in world units per second (the long side is 2). */
     speed: number;
     /** How strongly particles are pulled back onto the surface. */
     attract: number;
-    /** 0..1: how much the pull fades with age (old particles peel off). */
+    /** How much the pull fades with age, in [0, 1]. Old particles peel off. */
     peel: number;
     /** Mean particle lifetime in seconds (randomised ±40%). */
     life: number;
-    /** Particle width in CSS px at the focal distance. */
+    /** Particle width in CSS px at the z = 0 plane. */
     pointSize: number;
     /** Motion streak length, in seconds of travel. */
     streak: number;
-    /** Fraction of particles drawn as bright sparkles. */
+    /**
+     * Fraction of particles drawn as bright sparkles, in [0, 1].
+     * Construction-time only (see {@link count}).
+     */
     fireflyRatio: number;
     /** HDR intensity of the sparkles. */
     fireflyIntensity: number;
+    /** Sparkle colour, CSS hex. */
+    fireflyColor: string;
     /** Bloom intensity. */
     bloom: number;
     /** Brightness above which pixels bloom. */
     bloomThreshold: number;
-    /** Camera orbit amplitude in radians. */
+    /**
+     * Particle colour gradient: a preset name or your own stops. Stops are
+     * sorted by offset, the ends clamp, and colours blend linearly. Read
+     * every frame; edits to the stops in place are picked up too.
+     */
+    palette: SwirlParticlesPaletteName | readonly SwirlParticlesColorStop[];
+    /**
+     * Mix from the palette colour (0) to the source element's colour at
+     * each particle's spawn point (1). Lighting still applies on top.
+     */
+    sourceColor: number;
+    /** Camera yaw in radians. 0 looks straight at the front cap. */
+    yaw: number;
+    /** Camera pitch in radians. 0 looks straight at the front cap. */
+    pitch: number;
+    /**
+     * Amplitude of the slow camera wobble, in radians. 0 keeps the camera
+     * still (pointer drags still orbit it when {@link drag} is on).
+     */
     orbit: number;
-    /** Camera zoom. 1 = the shape matches the element size. */
+    /**
+     * Field of view in degrees, measured across the element's long side.
+     * The camera moves so the z = 0 plane keeps the element's size, so this
+     * only changes the strength of the perspective (like a dolly zoom).
+     */
+    fov: number;
+    /** Camera zoom. 1 = the z = 0 plane matches the element size. */
     zoom: number;
-    deepColor: string;
-    midColor: string;
-    hotColor: string;
-    highlightColor: string;
-    fireflyColor: string;
-    skyColor: string;
-    groundColor: string;
+    /**
+     * Orbit the camera by dragging the pointer anywhere on the page.
+     * Off by default: it listens on `window`. UI that should not orbit
+     * can stop `pointerdown` propagation.
+     */
+    drag: boolean;
+    /**
+     * Extra pad around the element in CSS px for the particles and bloom
+     * to draw into, or `"fullscreen"` to draw over the whole canvas. Wisps
+     * and a tilted shape reach well outside the element, so a small pad
+     * clips them.
+     */
+    pad: number | "fullscreen";
 };
 
-export const SWIRL_PARTICLES_DEFAULTS: SwirlParticlesParams = {
+/** Options for {@link SwirlParticlesEffect}'s constructor. */
+export type SwirlParticlesEffectOptions = {
+    /**
+     * Render a still frame: simulate a fixed number of steps once, then
+     * stop. For visual tests and `prefers-reduced-motion`.
+     */
+    still?: boolean;
+};
+
+const DEFAULT_PARAMS: SwirlParticlesParams = {
     count: 512 * 512,
     depth: 0.22,
     swirl: 1.0,
@@ -80,25 +205,18 @@ export const SWIRL_PARTICLES_DEFAULTS: SwirlParticlesParams = {
     streak: 0.3,
     fireflyRatio: 0.01,
     fireflyIntensity: 6.0,
+    fireflyColor: "#ffd2ec",
     bloom: 0.9,
     bloomThreshold: 1.0,
+    palette: "nebula",
+    sourceColor: 0,
+    yaw: 0,
+    pitch: 0,
     orbit: 0.4,
+    fov: 35,
     zoom: 1.0,
-    deepColor: "#0e1554",
-    midColor: "#3a50d4",
-    hotColor: "#c478e0",
-    highlightColor: "#f4e6ff",
-    fireflyColor: "#ffd2ec",
-    skyColor: "#5f6b80",
-    groundColor: "#a9b2bf",
-};
-
-export type SwirlParticlesOpts = {
-    /**
-     * Render a still frame: simulate a fixed number of steps once, then stop.
-     * For visual tests.
-     */
-    still?: boolean;
+    drag: false,
+    pad: "fullscreen",
 };
 
 // Long side of the silhouette read back from the element, in px.
@@ -108,14 +226,15 @@ const SDF_PAD = 0.3;
 // Spawn points on the surface: SPAWN_SIZE² of them.
 const SPAWN_SIZE = 256;
 const BLOOM_LEVELS = 6;
-// One quad per particle, stretched into a capsule in the vertex shader.
-const QUAD = new Float32Array([-0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5]);
-const QUAD_INDICES = new Uint16Array([0, 1, 2, 0, 2, 3]);
+// Texels of the baked palette gradient.
+const PALETTE_SIZE = 256;
 const MAX_DT = 1 / 30;
 const STILL_STEPS = 90;
-const CAM_DIST = 3.2;
-const NEAR = 0.05;
-const FAR = CAM_DIST + 6;
+// Pitch wobble relative to the yaw wobble.
+const PITCH_WOBBLE = 0.3;
+// Near / far planes relative to the camera distance.
+const NEAR_K = 0.05 / 3.2;
+const FAR_K = 1 + 6 / 3.2;
 
 // ---------------------------------------------------------------------------
 // GLSL
@@ -228,23 +347,26 @@ vec4 sdf3(vec3 p) {
 }
 `;
 
+// Spawn points are a pure function of (id, generation), so the draw pass
+// can find where a particle was born without storing it.
 const GLSL_PARTICLE_COMMON = `
 uniform int stateWidth;
 uniform float lifeMean;
+uniform sampler2D spawnTex;
+uniform int spawnSize;
 
 float lifeOf(uint id, float gen) {
     return lifeMean * mix(0.6, 1.4, rnd(id * 1664525u + uint(gen) * 1013904223u + 7u));
 }
-`;
 
-const FRAG_MASK = `#version 300 es
-precision highp float;
-in vec2 uv;
-uniform sampler2D src;
-uniform vec4 srcRectUv;
-out vec4 outColor;
-void main() {
-    outColor = texture(src, srcRectUv.xy + uv * srcRectUv.zw);
+uint spawnKey(uint id, float gen) {
+    return pcg(id ^ (uint(gen) * 2654435769u));
+}
+
+// xy = world position, z = position along the depth / halfDepth (-1..1).
+vec4 spawnPoint(uint key) {
+    int idx = int(key % uint(spawnSize * spawnSize));
+    return texelFetch(spawnTex, ivec2(idx % spawnSize, idx / spawnSize), 0);
 }
 `;
 
@@ -255,8 +377,6 @@ precision highp sampler2D;
 
 uniform sampler2D posTex;
 uniform sampler2D velTex;
-uniform sampler2D spawnTex;
-uniform int spawnSize;
 uniform int count;
 uniform int reset;
 uniform float time;
@@ -277,10 +397,8 @@ ${GLSL_SDF}
 ${GLSL_PARTICLE_COMMON}
 
 vec3 spawn(uint id, float gen) {
-    uint key = pcg(id ^ (uint(gen) * 2654435769u));
-    int total = spawnSize * spawnSize;
-    int idx = int(key % uint(total));
-    vec4 s = texelFetch(spawnTex, ivec2(idx % spawnSize, idx / spawnSize), 0);
+    uint key = spawnKey(id, gen);
+    vec4 s = spawnPoint(key);
     vec3 p = vec3(s.xy, s.z * halfDepth);
     // A thin fuzzy layer instead of an exact shell.
     vec4 d = sdf3(p);
@@ -373,11 +491,19 @@ in float pid;
 in vec2 position;
 uniform int idOffset;
 uniform float streak;
+uniform sampler2D paletteTex;
+uniform sampler2D src;
+uniform vec4 srcRectUv;
+uniform vec2 shapeHalf;
+uniform float sourceColor;
 #endif
 
 uniform sampler2D posTex;
 uniform sampler2D velTex;
 uniform mat3 viewRot;
+uniform float camDist;
+uniform float camNear;
+uniform float camFar;
 uniform float focalPx;
 uniform vec2 centerPx;
 uniform vec2 bufferPx;
@@ -385,10 +511,6 @@ uniform float pointPx;
 uniform float time;
 uniform float speed;
 uniform float fireflyIntensity;
-uniform vec3 deepColor;
-uniform vec3 midColor;
-uniform vec3 hotColor;
-uniform vec3 highlightColor;
 uniform vec3 fireflyColor;
 
 out vec3 vColor;
@@ -400,12 +522,23 @@ ${GLSL_NOISE}
 ${GLSL_SDF}
 ${GLSL_PARTICLE_COMMON}
 
+#ifndef FIREFLY
 vec3 ramp(float t) {
-    t = clamp(t, 0.0, 1.0);
-    if (t < 0.45) return mix(deepColor, midColor, t / 0.45);
-    if (t < 0.8) return mix(midColor, hotColor, (t - 0.45) / 0.35);
-    return mix(hotColor, highlightColor, (t - 0.8) / 0.2);
+    float u = (clamp(t, 0.0, 1.0) * ${(PALETTE_SIZE - 1).toFixed(1)} + 0.5) / ${PALETTE_SIZE.toFixed(1)};
+    return textureLod(paletteTex, vec2(u, 0.5), 0.0).rgb;
 }
+
+// Straight colour of the source where this particle was born.
+vec3 spawnColor(uint id, float gen) {
+    vec2 xy = spawnPoint(spawnKey(id, gen)).xy;
+    // Side-wall points sit on the contour; step inside to skip the AA edge.
+    vec3 s = sd2(xy);
+    xy -= s.yz * max(s.x + 0.01, 0.0);
+    vec2 uv = clamp(xy / (2.0 * shapeHalf) + 0.5, 0.0, 1.0);
+    vec4 c = textureLod(src, srcRectUv.xy + uv * srcRectUv.zw, 0.0);
+    return c.a > 1e-3 ? c.rgb / c.a : vec3(0.0);
+}
+#endif
 
 void cull() {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -418,7 +551,7 @@ void cull() {
 // Camera space: xy in buffer px, z = distance from the camera.
 vec3 project(vec3 p) {
     vec3 q = viewRot * p;
-    float depth = ${CAM_DIST.toFixed(2)} - q.z;
+    float depth = camDist - q.z;
     return vec3(centerPx + q.xy * focalPx / max(depth, 1e-3), depth);
 }
 
@@ -439,12 +572,12 @@ void main() {
     // Grow in, shrink out: opaque particles can't fade.
     float lifeScale = smoothstep(0.0, 0.08, ageN) * (1.0 - smoothstep(0.85, 1.0, ageN));
     vec3 c = project(p);
-    if (lifeScale <= 0.01 || c.z < ${NEAR.toFixed(3)}) {
+    if (lifeScale <= 0.01 || c.z < camNear) {
         cull();
         return;
     }
-    float zLin = (c.z - ${NEAR.toFixed(3)}) / ${(FAR - NEAR).toFixed(3)};
-    float persp = ${CAM_DIST.toFixed(2)} / c.z;
+    float zLin = (c.z - camNear) / (camFar - camNear);
+    float persp = camDist / c.z;
     vec4 s = sdf3(p);
     float off = clamp(s.x / 0.08, 0.0, 1.0);
     float r = rnd(id * 2246822519u + 13u);
@@ -452,7 +585,7 @@ void main() {
 #ifdef FIREFLY
     float flick = pow(0.5 + 0.5 * sin(time * (3.0 + r * 5.0) + r * 40.0), 6.0);
     // Nudge towards the camera so the fibres don't bury every sparkle.
-    zLin -= 0.03 / ${(FAR - NEAR).toFixed(3)};
+    zLin -= 0.03 / (camFar - camNear);
     gl_Position = vec4(c.xy / bufferPx * 2.0 - 1.0, zLin * 2.0 - 1.0, 1.0);
     gl_PointSize = pointPx * persp * (1.4 + 1.6 * flick) * lifeScale;
     vColor = fireflyColor * fireflyIntensity * (0.25 + 1.75 * flick);
@@ -474,12 +607,20 @@ void main() {
     float spd = length(V.xyz) / max(speed, 1e-4);
     float t = 0.3 + 0.35 * nz + 0.3 * clamp(spd - 0.5, 0.0, 1.5) + 0.3 * (r - 0.5);
     t += 0.4 * off;
-    vec3 col = ramp(t) * mix(0.25, 1.15, wrap) * ao;
+    vec3 base = ramp(t);
+    vec3 highlight = ramp(1.0);
+    if (sourceColor > 0.0) {
+        // Carried from the spawn point like paint; t keeps some texture.
+        vec3 sc = spawnColor(id, V.w);
+        base = mix(base, sc * mix(0.85, 1.15, clamp(t, 0.0, 1.0)), sourceColor);
+        highlight = mix(highlight, mix(sc, vec3(1.0), 0.5), sourceColor);
+    }
+    vec3 col = base * mix(0.25, 1.15, wrap) * ao;
     // Some fibres catch the light.
     float glint = pow(max(ndl, 0.0), 3.0) * step(0.65, fract(r * 7.13));
-    col += highlightColor * glint * 0.7 * ao;
+    col += highlight * glint * 0.7 * ao;
     // Peeled-off wisps get lighter.
-    col = mix(col, highlightColor * 0.85, off * 0.5);
+    col = mix(col, highlight * 0.85, off * 0.5);
 
     // Capsule from the previous position to the current one, on screen.
     float w = max(pointPx * persp * lifeScale * mix(1.0, 0.6, off), 1.0);
@@ -610,6 +751,8 @@ void main() {
 }
 `;
 
+// Premultiplied particles + bloom over transparency. Alpha covers the
+// bloom too, so the glow composites over any page background.
 const FRAG_COMPOSITE = `#version 300 es
 precision highp float;
 in vec2 uv;
@@ -617,9 +760,6 @@ uniform sampler2D scene;
 uniform sampler2D bloomTex;
 uniform int hasScene;
 uniform float bloom;
-uniform vec3 skyColor;
-uniform vec3 groundColor;
-uniform vec2 bufferPx;
 out vec4 outColor;
 
 vec3 softClip(vec3 x) {
@@ -628,24 +768,18 @@ vec3 softClip(vec3 x) {
 }
 
 void main() {
-    // Soft grey-blue backdrop, lighter towards the bottom right.
-    vec2 aspect = vec2(bufferPx.x / bufferPx.y, 1.0);
-    vec2 g = (uv - vec2(0.7, 0.05)) * aspect;
-    float glow = exp(-dot(g, g) * 0.9);
-    vec3 bg = mix(skyColor, groundColor, clamp(glow * 0.9 + (1.0 - uv.y) * 0.25, 0.0, 1.0));
-    vec2 vg = (uv - 0.5) * aspect;
-    bg *= 1.0 - 0.18 * dot(vg, vg);
-
-    vec3 col = bg;
-    if (hasScene == 1) {
-        vec4 s = texture(scene, uv);
-        col = bg * (1.0 - clamp(s.a, 0.0, 1.0)) + s.rgb;
-        col += texture(bloomTex, uv).rgb * bloom;
+    if (hasScene == 0) {
+        outColor = vec4(0.0);
+        return;
     }
-    // Noise dither against banding in the backdrop.
+    vec4 s = texture(scene, uv);
+    vec3 col = s.rgb + texture(bloomTex, uv).rgb * bloom;
+    col = softClip(max(col, 0.0));
+    float a = clamp(max(s.a, max(col.r, max(col.g, col.b))), 0.0, 1.0);
+    // Noise dither against banding in the faint glow.
     float dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
-    col = softClip(max(col, 0.0)) + dither / 255.0;
-    outColor = vec4(col, 1.0);
+    col = clamp(col + dither / 255.0 * step(1.0 / 255.0, a), 0.0, a);
+    outColor = vec4(col, a);
 }
 `;
 
@@ -660,6 +794,8 @@ type ShapeData = {
     sdfH: number;
     /** [minX, minY, sizeX, sizeY] in world units. */
     sdfRect: [number, number, number, number];
+    /** Half size of the element in world units (the long side is 1). */
+    shapeHalf: [number, number];
     /** RGBA: x, y, z / halfDepth (-1..1), 0. */
     spawn: Float32Array;
 };
@@ -893,21 +1029,61 @@ function buildShape(
         sdfW: W,
         sdfH: H,
         sdfRect: [minX, minY, W * px, H * px],
+        shapeHalf: [mw / mLong, mh / mLong],
         spawn,
     };
 }
 
-function hexToRgb(hex: string): [number, number, number] {
-    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-    if (!m) {
-        return [1, 1, 1];
+function resolvePalette(
+    palette: SwirlParticlesParams["palette"],
+): readonly SwirlParticlesColorStop[] {
+    const stops =
+        typeof palette === "string"
+            ? SWIRL_PARTICLES_PALETTES[palette]
+            : palette;
+    return stops && stops.length > 0 ? stops : SWIRL_PARTICLES_PALETTES.nebula;
+}
+
+// Bake the stops into PALETTE_SIZE RGBA8 texels, like a CSS gradient:
+// sorted by offset, flat beyond the ends, linear in between.
+function bakePalette(palette: SwirlParticlesParams["palette"]): Uint8Array {
+    const stops = resolvePalette(palette)
+        .map((s) => ({
+            offset: Number.isFinite(s.offset)
+                ? Math.min(Math.max(s.offset, 0), 1)
+                : 0,
+            rgb: parseHexColor(s.color),
+        }))
+        .sort((a, b) => a.offset - b.offset);
+    const out = new Uint8Array(PALETTE_SIZE * 4);
+    let k = 0;
+    for (let i = 0; i < PALETTE_SIZE; i++) {
+        const t = i / (PALETTE_SIZE - 1);
+        while (k < stops.length - 1 && stops[k + 1].offset < t) {
+            k++;
+        }
+        const a = stops[k];
+        const b = stops[Math.min(k + 1, stops.length - 1)];
+        let f = 0;
+        if (t <= a.offset) {
+            f = 0;
+        } else if (t >= b.offset) {
+            f = 1;
+        } else {
+            f = (t - a.offset) / Math.max(b.offset - a.offset, 1e-6);
+        }
+        for (let c = 0; c < 3; c++) {
+            const v = a.rgb[c] + (b.rgb[c] - a.rgb[c]) * f;
+            out[i * 4 + c] = Math.round(v * 255);
+        }
+        out[i * 4 + 3] = 255;
     }
-    const c = Number.parseInt(m[1], 16);
-    return [
-        ((c >> 16) & 0xff) / 255,
-        ((c >> 8) & 0xff) / 255,
-        (c & 0xff) / 255,
-    ];
+    return out;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+    const [r, g, b] = parseHexColor(hex);
+    return [r, g, b];
 }
 
 // Column-major rotation: pitch (around X) after yaw (around Y).
@@ -941,8 +1117,26 @@ type BloomLevel = {
     up: EffectRenderTarget;
 };
 
+/**
+ * Particles that flow over the surface of the element's silhouette,
+ * extruded into 3D, and peel off it in curling wisps. Fibres are shaded
+ * from the shape's SDF, coloured by a gradient {@link SwirlParticlesParams.palette}
+ * (or the source colours, with `sourceColor`), with HDR sparkles and bloom.
+ *
+ * ```ts
+ * vfx.add(img, { effect: new SwirlParticlesEffect({ palette: "ember" }) });
+ * ```
+ *
+ * The silhouette is the element's alpha, read once when the effect starts.
+ * An opaque photo becomes an extruded slab. The output is premultiplied
+ * over transparency, so set the page background yourself.
+ *
+ * All params except `count` and `fireflyRatio` are read every frame, so
+ * you can mutate `params` live. Set `drag: true` to orbit the camera
+ * with pointer drags.
+ */
 export class SwirlParticlesEffect implements Effect {
-    readonly params: SwirlParticlesParams;
+    params: SwirlParticlesParams;
     readonly #still: boolean;
     readonly #count: number;
     readonly #stateWidth: number;
@@ -965,8 +1159,11 @@ export class SwirlParticlesEffect implements Effect {
     #gl: WebGL2RenderingContext | null = null;
     #sdfRaw: WebGLTexture | null = null;
     #spawnRaw: WebGLTexture | null = null;
+    #paletteRaw: WebGLTexture | null = null;
     #sdfTex: EffectTexture | null = null;
     #spawnTex: EffectTexture | null = null;
+    #paletteTex: EffectTexture | null = null;
+    #paletteKey = "";
 
     readonly #nFire: number;
     #body: EffectGeometry;
@@ -981,28 +1178,27 @@ export class SwirlParticlesEffect implements Effect {
     #unsubRestored: (() => void) | null = null;
 
     constructor(
-        params: Partial<SwirlParticlesParams> = {},
-        opts: SwirlParticlesOpts = {},
+        initial: Partial<SwirlParticlesParams> = {},
+        opts: SwirlParticlesEffectOptions = {},
     ) {
-        this.params = { ...SWIRL_PARTICLES_DEFAULTS, ...params };
+        this.params = { ...DEFAULT_PARAMS, ...initial };
         this.#still = opts.still ?? false;
-        this.#count = Math.max(1, Math.floor(this.params.count));
-        this.#stateWidth = 2 ** Math.ceil(Math.log2(Math.sqrt(this.#count)));
+        this.#count = sanitizeCount(this.params.count);
+        this.#stateWidth = stateSizeFromCount(this.#count);
 
         // Fireflies take the first ids. Particles are statistically
         // identical, so that is as random as any other choice.
-        const nFire = Math.min(
-            this.#count,
-            Math.round(this.#count * Math.max(0, this.params.fireflyRatio)),
-        );
+        const ratio = Number.isFinite(this.params.fireflyRatio)
+            ? Math.min(Math.max(this.params.fireflyRatio, 0), 1)
+            : 0;
+        const nFire = Math.min(this.#count, Math.round(this.#count * ratio));
         this.#nFire = nFire;
         const ids = new Float32Array(Math.max(nFire, 1));
         for (let i = 0; i < ids.length; i++) {
             ids[i] = i;
         }
         this.#body = {
-            attributes: { position: { data: QUAD, itemSize: 2 } },
-            indices: QUAD_INDICES,
+            attributes: { position: { data: QUAD_VERTS, itemSize: 2 } },
             instanceCount: this.#count - nFire,
         };
         this.#fireflies = {
@@ -1010,6 +1206,10 @@ export class SwirlParticlesEffect implements Effect {
             attributes: { pid: { data: ids, itemSize: 1 } },
             drawRange: { start: 0, count: nFire },
         };
+    }
+
+    setParams(updates: Partial<SwirlParticlesParams>): void {
+        Object.assign(this.params, updates);
     }
 
     init(ctx: EffectContext): void {
@@ -1025,12 +1225,15 @@ export class SwirlParticlesEffect implements Effect {
         this.#scene = ctx.createRenderTarget({ float: true, depth: true });
 
         this.#unsubRestored = ctx.onContextRestored(() => {
-            // Raw textures are gone; read the silhouette again.
+            // Raw textures are gone; upload them again.
             this.#gl = ctx.gl;
             this.#sdfRaw = null;
             this.#spawnRaw = null;
+            this.#paletteRaw = null;
             this.#sdfTex = null;
             this.#spawnTex = null;
+            this.#paletteTex = null;
+            this.#paletteKey = "";
             this.#pending = this.#shape;
             this.#needsReset = true;
             this.#stillDone = false;
@@ -1038,8 +1241,7 @@ export class SwirlParticlesEffect implements Effect {
 
         if (!this.#still && typeof window !== "undefined") {
             const down = (e: PointerEvent) => {
-                // Don't orbit while using a control panel (Tweakpane).
-                if ((e.target as Element | null)?.closest?.(".tp-rotv")) {
+                if (!this.params.drag) {
                     return;
                 }
                 this.#dragging = true;
@@ -1075,7 +1277,7 @@ export class SwirlParticlesEffect implements Effect {
     }
 
     outputRect(dims: EffectDims): readonly [number, number, number, number] {
-        return dims.canvasRect;
+        return padOutputRect(this.params.pad, dims);
     }
 
     render(ctx: EffectContext): void {
@@ -1094,8 +1296,13 @@ export class SwirlParticlesEffect implements Effect {
             this.#phase = "ready";
             this.#needsReset = true;
         }
+        this.#updatePalette(ctx);
 
-        const ready = this.#phase === "ready" && this.#sdfTex && this.#spawnTex;
+        const ready =
+            this.#phase === "ready" &&
+            this.#sdfTex &&
+            this.#spawnTex &&
+            this.#paletteTex;
         if (ready) {
             this.#simulate(ctx);
             this.#drawParticles(ctx, scene);
@@ -1109,9 +1316,6 @@ export class SwirlParticlesEffect implements Effect {
                 bloomTex: top ? top.up : scene,
                 hasScene: ready && top ? 1 : 0,
                 bloom: this.params.bloom,
-                skyColor: hexToRgb(this.params.skyColor),
-                groundColor: hexToRgb(this.params.groundColor),
-                bufferPx: [scene.width, scene.height],
             },
             target: ctx.target,
         });
@@ -1138,11 +1342,7 @@ export class SwirlParticlesEffect implements Effect {
             this.#mask?.dispose();
             this.#mask = ctx.createRenderTarget({ size: [mw, mh] });
         }
-        ctx.draw({
-            frag: FRAG_MASK,
-            uniforms: { src: ctx.src },
-            target: this.#mask,
-        });
+        captureContent(ctx, this.#mask);
         this.#phase = "reading";
         const halfDepth = this.params.depth / 2;
         ctx.readPixels(this.#mask).then(
@@ -1228,15 +1428,97 @@ export class SwirlParticlesEffect implements Effect {
         });
     }
 
-    #sdfUniforms(): Record<string, number | [number, number, number, number]> {
+    // Re-bake the gradient texture when the palette changes.
+    #updatePalette(ctx: EffectContext): void {
+        const palette = this.params.palette;
+        const key =
+            typeof palette === "string" ? palette : JSON.stringify(palette);
+        if (this.#paletteTex && key === this.#paletteKey) {
+            return;
+        }
+        const gl = ctx.gl;
+        const texels = bakePalette(palette);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+        let tex = this.#paletteRaw;
+        if (tex) {
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texSubImage2D(
+                gl.TEXTURE_2D,
+                0,
+                0,
+                0,
+                PALETTE_SIZE,
+                1,
+                gl.RGBA,
+                gl.UNSIGNED_BYTE,
+                texels,
+            );
+        } else {
+            tex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texImage2D(
+                gl.TEXTURE_2D,
+                0,
+                gl.RGBA8,
+                PALETTE_SIZE,
+                1,
+                0,
+                gl.RGBA,
+                gl.UNSIGNED_BYTE,
+                texels,
+            );
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(
+                gl.TEXTURE_2D,
+                gl.TEXTURE_WRAP_S,
+                gl.CLAMP_TO_EDGE,
+            );
+            gl.texParameteri(
+                gl.TEXTURE_2D,
+                gl.TEXTURE_WRAP_T,
+                gl.CLAMP_TO_EDGE,
+            );
+        }
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        ctx.resetState();
+        if (!tex) {
+            return;
+        }
+        if (!this.#paletteTex) {
+            this.#paletteRaw = tex;
+            this.#paletteTex = ctx.wrapTexture(tex, {
+                size: [PALETTE_SIZE, 1],
+                filter: "linear",
+                wrap: "clamp",
+            });
+        }
+        this.#paletteKey = key;
+    }
+
+    #shapeUniforms(): Record<
+        string,
+        number | EffectTexture | [number, number, number, number]
+    > {
         const halfDepth = Math.max(this.params.depth / 2, 0.005);
-        return {
+        const uniforms: Record<
+            string,
+            number | EffectTexture | [number, number, number, number]
+        > = {
             sdfRect: this.#shape?.sdfRect ?? [0, 0, 1, 1],
             halfDepth,
             rounding: Math.min(0.025, halfDepth * 0.5),
             stateWidth: this.#stateWidth,
             lifeMean: Math.max(this.params.life, 0.1),
+            spawnSize: SPAWN_SIZE,
         };
+        if (this.#sdfTex && this.#spawnTex) {
+            uniforms.sdfTex = this.#sdfTex;
+            uniforms.spawnTex = this.#spawnTex;
+        }
+        return uniforms;
     }
 
     #simulate(ctx: EffectContext): void {
@@ -1256,10 +1538,7 @@ export class SwirlParticlesEffect implements Effect {
         }
         const p = this.params;
         const base = {
-            ...this.#sdfUniforms(),
-            sdfTex: this.#sdfTex,
-            spawnTex: this.#spawnTex,
-            spawnSize: SPAWN_SIZE,
+            ...this.#shapeUniforms(),
             count: this.#count,
             swirl: p.swirl,
             curl: p.curl,
@@ -1304,37 +1583,44 @@ export class SwirlParticlesEffect implements Effect {
     #drawParticles(ctx: EffectContext, scene: EffectRenderTarget): void {
         const pos = this.#pos;
         const vel = this.#vel;
-        if (!pos || !vel || !this.#sdfTex) {
+        const shape = this.#shape;
+        if (!pos || !vel || !shape || !this.#paletteTex) {
             return;
         }
         const p = this.params;
         const t = this.#simTime;
 
-        // Camera: slow orbit plus pointer drag.
-        const yaw = 0.2 + p.orbit * Math.sin(t * 0.13) + this.#dragYaw;
-        const pitch = 0.22 + 0.12 * Math.sin(t * 0.09 + 1.3) + this.#dragPitch;
+        // Camera: base angles, a slow wobble, and pointer drag.
+        const orbit = Number.isFinite(p.orbit) ? p.orbit : 0;
+        const yaw = p.yaw + orbit * Math.sin(t * 0.13) + this.#dragYaw;
+        const pitch =
+            p.pitch +
+            orbit * PITCH_WOBBLE * Math.sin(t * 0.09 + 1.3) +
+            this.#dragPitch;
+
+        // Distance so that the long side (2 world units) spans `fov`.
+        const fov = Math.min(Math.max(p.fov, 1), 150);
+        const camDist = 1 / Math.tan((fov * Math.PI) / 360);
 
         const dims = ctx.dims;
         const [ew, eh] = dims.elementPixel;
-        const [cx, cy] = dims.canvasRect;
+        const [ox, oy] = padOutputRect(p.pad, dims);
         const unitPx = (Math.max(ew, eh) / 2) * p.zoom;
         const uniforms = {
-            ...this.#sdfUniforms(),
-            sdfTex: this.#sdfTex,
+            ...this.#shapeUniforms(),
             posTex: pos,
             velTex: vel,
             viewRot: viewMatrix(yaw, pitch),
-            focalPx: CAM_DIST * unitPx,
-            centerPx: [ew / 2 - cx, eh / 2 - cy] as [number, number],
+            camDist,
+            camNear: camDist * NEAR_K,
+            camFar: camDist * FAR_K,
+            focalPx: camDist * unitPx,
+            centerPx: [ew / 2 - ox, eh / 2 - oy] as [number, number],
             bufferPx: [scene.width, scene.height] as [number, number],
             pointPx: p.pointSize * ctx.pixelRatio,
             time: t,
             speed: p.speed,
             fireflyIntensity: p.fireflyIntensity,
-            deepColor: hexToRgb(p.deepColor),
-            midColor: hexToRgb(p.midColor),
-            hotColor: hexToRgb(p.hotColor),
-            highlightColor: hexToRgb(p.highlightColor),
             fireflyColor: hexToRgb(p.fireflyColor),
         };
 
@@ -1347,6 +1633,10 @@ export class SwirlParticlesEffect implements Effect {
                 ...uniforms,
                 idOffset: this.#nFire,
                 streak: p.streak,
+                paletteTex: this.#paletteTex,
+                src: ctx.src,
+                shapeHalf: shape.shapeHalf,
+                sourceColor: Math.min(Math.max(p.sourceColor, 0), 1),
             },
             target: scene,
             depthTest: true,
@@ -1438,17 +1728,23 @@ export class SwirlParticlesEffect implements Effect {
         this.#unlisten?.();
         this.#unlisten = null;
         if (this.#gl) {
-            if (this.#sdfRaw) {
-                this.#gl.deleteTexture(this.#sdfRaw);
-            }
-            if (this.#spawnRaw) {
-                this.#gl.deleteTexture(this.#spawnRaw);
+            for (const tex of [
+                this.#sdfRaw,
+                this.#spawnRaw,
+                this.#paletteRaw,
+            ]) {
+                if (tex) {
+                    this.#gl.deleteTexture(tex);
+                }
             }
         }
         this.#sdfRaw = null;
         this.#spawnRaw = null;
+        this.#paletteRaw = null;
         this.#sdfTex = null;
         this.#spawnTex = null;
+        this.#paletteTex = null;
+        this.#paletteKey = "";
         this.#gl = null;
         this.#unsubRestored?.();
         this.#unsubRestored = null;
