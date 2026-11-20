@@ -2,7 +2,7 @@
 // (https://github.com/dmitrykurash/holospot, MIT © 2026 Dmitry Kurash; the renderer of https://www.holo.spot),
 // ported to a vfx-js effect. The element is a flat card under holo.spot's spectral studio lights; the pointer tilts it.
 // The port keeps holospot's physics (grating equation, order efficiencies, η renormalisation, material- and
-// SPD-convolved spectral tables, coat, environment, tone curve); see docs/tasks/holo/plan.md for what differs.
+// SPD-convolved spectral tables, coat, environment, tone curve); the class doc comment says what differs.
 // Zero-runtime-dep effect — imports ONLY types from @vfx-js/core.
 import type {
     Effect,
@@ -660,19 +660,100 @@ void main() {
 
 /**
  * Holographic foil: the diffraction foils of holo.spot (Prism Rainbow and friends) on an element, ported from
- * [holospot](https://github.com/dmitrykurash/holospot) (MIT). The element is lit as a flat card by holo.spot's
- * spectral studio lights and tilts toward the pointer. Settings use holo.spot's ids, so a look copied from
- * holo.spot carries over.
+ * [holospot](https://github.com/dmitrykurash/holospot) (MIT). The element is lit as a card by holo.spot's spectral
+ * studio lights and tilts toward the pointer. Settings use holo.spot's ids, so a look copied from holo.spot carries
+ * over.
  *
  * @example
  * ```ts
  * vfx.add(el, {
- *     effect: new HoloEffect({
+ *     effect: new HoloEffect(HoloEffect.looks.card, {
  *         material: "prism",
  *         settings: { "prism.pitch": 1200, "prism.pattern": "radial" },
  *     }),
  * });
  * ```
+ *
+ * @remarks
+ * ### The model
+ *
+ * The element is a card of real size (`sizeMm`, else its CSS size at 96 dpi), lit by holo.spot's studio rig and
+ * seen by holospot's camera (`lens`). By default the card turns in 3D with the pose (pointer tilt, idle wobble,
+ * `pose`), and the output grows by about 21 % per side so the turned card and its glare fit. With `flat: true` the
+ * card stays in place and the light rig turns the other way instead.
+ *
+ * holospot's physics is kept: the grating equation, order efficiencies, η renormalisation, material- and
+ * SPD-convolved spectral tables, LTC rect lights, the studio environment, coat, wear, glare, grain and tone curves.
+ * Its GLSL is used verbatim. What differs:
+ *
+ * - The environment is a prefiltered octahedral atlas (an importance-sampled GGX lobe per level) instead of three's
+ *   PMREM.
+ * - The pose is the port's: a spring toward the rest pose plus the pointer tilt, and an idle wobble.
+ * - The foil's coverage comes from the element (`mask`), and `ink` tints the foil with its colours.
+ *
+ * ### Inputs and settings
+ *
+ * The constructor takes any number of inputs and `setParams` applies one more. They apply in order, and later
+ * values win. `settings` are holo.spot ids (`HoloSettingId`), merged by id. `null` removes an id, so the default or
+ * the look's value applies again. `setParams(input, { resetSettings: true })` starts the settings over.
+ *
+ * - **Looks:** `HoloEffect.looks` are the looks holo.spot ships: their scene in `settings`, and the quality holospot
+ *   ships each with. Pass a look as its own argument, not spread into an object that has its own `settings`.
+ * - **Starting points:** `HoloEffect.startingPoints` are holospot's material starting points.
+ * - **Presets:** a light rig (`studio.preset`) or `emboss.stock` writes its values where it is given. Ids given
+ *   after it win; ids given before it lose.
+ * - **Copy settings:** a holo.spot "Copy settings" blob (`HoloCopyBlob`) replaces the settings and brings its
+ *   material, pose and structure scale.
+ * - **Checks:** values are checked against holo.spot's ranges. Out-of-range values are clamped, and bad values
+ *   and unknown ids are dropped, each with one console warning. holo.spot ids the port does not render (depth of
+ *   field blur, bump maps, card borders) warn when set away from holospot's default.
+ *
+ * The scene shorthands write holo.spot ids with holospot's units and ranges:
+ *
+ * | Shorthand | holo.spot id |
+ * | --- | --- |
+ * | `exposure` (EV, ±3), `tone` | `display.ev`, `display.tone` |
+ * | `glare` (0–0.1), `grain` (0–0.6, 0 = off) | `display.glare`, `grain.amount` |
+ * | `studio` | `studio.preset` |
+ * | `background` (`black`, `white`, `#rgb`, `#rrggbb`) | `scene.background`, `scene.bgColor` |
+ * | `bow` (mm, 0–2), `pose` (±35°) | `card.bow`, `motion.pose` |
+ * | `lens` (mm, 24–200: the field of view, no blur) | `dof.lens` |
+ * | `pointer`, `tiltRange` (5–35°) | `motion.pointer`, `motion.tiltRange` |
+ * | `wobble`, `wobbleAmp` (0–25°) | `motion.wobble`, `motion.wobbleAmp` |
+ *
+ * ### Foil Emboss
+ *
+ * `material: "emboss"` is a paper card with a foil logo pressed into it, and the whole element is the paper.
+ *
+ * - **Logo:** `emboss.logo` takes a URL, an `<img>`, a canvas or an `ImageBitmap`. Without one there is no logo.
+ *   The logo is cut into foil / no foil: `mask` picks how the image is read (`"alpha"` or `"luma"`), and
+ *   `emboss.threshold` sets where it is cut. A photo becomes a one-tone stamp.
+ * - **Placement:** in CSS px of the element. `emboss.x` and `emboss.y` are the logo's centre from the top left,
+ *   and `emboss.width` its width. Unset, the logo is centred at 36/63 of the element's width.
+ * - **Print:** by default the element is printed on the paper. `emboss.print` prints an image instead, fitted like
+ *   `background-size: cover`. While it loads, and if it fails, the paper is plain.
+ * - **The element as the logo:** `"emboss.logo": "element"` presses the element itself in foil, 1:1. It is read
+ *   back once, and again on a resize or when `emboss.logo` is given again, so it suits a still element. The ground
+ *   is `emboss.print` or `emboss.paperColour`, and transparent without both, so CSS can show what is behind.
+ * - **Loading:** the logo, paper and print load in the background. `ready` resolves after a frame with them, and
+ *   `errors` lists what failed (a cross-origin image needs CORS).
+ *
+ * ### Differences from holo.spot
+ *
+ * - **Port-only params:** `flat`, `mask`, `ink`, `sizeMm`, `msaa`, the `"none"` pointer, `emboss.threshold` and the
+ *   element as the emboss logo.
+ * - **Changed defaults:** grain is 0.07 (the value holo.spot's looks use), and there is no default emboss logo
+ *   (holo.spot's marks are not included).
+ * - **Changed units:** the emboss placement is in px, not mm on holo.spot's 63 × 88 mm card. A blob's mm placement
+ *   is ignored.
+ * - **Different names:** `studio` instead of `lights`, `startingPoints`, and `flat`, because holospot uses
+ *   `lights` and `View` for other things.
+ * - **Not ported:** the Volume Hologram and the emboss hologram stickers, multi-element emboss cards
+ *   (`emboss.doc`), depth of field blur, bump maps, and card borders and thickness.
+ *
+ * Rendered next to holospot in Chromium, the foils differ by about 1 per channel (0–255) on average. Glitter
+ * glints differ per pixel, but match within 1 after a slight blur. holospot's and three.js's MIT notices ship in
+ * the package's `THIRD_PARTY_NOTICES.md`.
  */
 export class HoloEffect implements Effect {
     #p: HoloParams = { ...DEFAULT_PARAMS };
