@@ -882,8 +882,26 @@ export class HoloEffect implements Effect {
         return TIERS[t] ?? TIERS.medium;
     }
 
+    #restoreUnsub: (() => void) | null = null;
+
     init(ctx: EffectContext): void {
+        // after a context loss the render targets come back empty (wrapped canvases are re-uploaded): fill them
+        // again from the CPU-side data, which survives
+        this.#restoreUnsub = ctx.onContextRestored(() => {
+            this.#autoTier = detectTier(ctx.gl);
+            this.#atlasUploaded = -1;
+            this.#ltcReady = false;
+            this.#blackReady = false;
+            this.#envDrawn = null;
+            this.#logoUp = this.#paperUp = -1;
+            this.#capKey = "";
+        });
+        this.#setup(ctx);
+    }
+
+    #setup(ctx: EffectContext): void {
         this.#autoTier = detectTier(ctx.gl);
+        this.#dirty = true; // resolve again: the new atlas takes the material's tint
         this.#atlas = new SpectralAtlas();
         const canvas = this.#makeCanvas(ATLAS.imageWidth, ATLAS.imageHeight);
         this.#bytesCanvas = canvas;
@@ -1661,6 +1679,20 @@ export class HoloEffect implements Effect {
     }
 
     dispose(): void {
+        this.#restoreUnsub?.();
+        this.#restoreUnsub = null;
+        this.#release();
+        // a pending ready resolves: nothing more is drawn until the next init
+        this.#drawnOnce = false;
+        const w = this.#readyWaiters;
+        this.#readyWaiters = [];
+        for (const f of w) {
+            f();
+        }
+    }
+
+    /** Frees the GPU resources and forgets what was drawn into them (dispose, and a restored context). */
+    #release(): void {
         for (const rt of [
             this.#conv,
             this.#cum,
@@ -1704,13 +1736,6 @@ export class HoloEffect implements Effect {
         this.#printWant = "";
         this.#printToken++;
         this.#printBusy = false;
-        // a pending ready resolves: nothing more is drawn until the next init
-        this.#drawnOnce = false;
-        const w = this.#readyWaiters;
-        this.#readyWaiters = [];
-        for (const f of w) {
-            f();
-        }
     }
 
     #uploadAtlas(ctx: EffectContext, atlas: SpectralAtlas): void {
