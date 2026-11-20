@@ -10,7 +10,8 @@ import type {
     ParticleExplodeEffect,
     PixelSortEffect,
 } from "@vfx-js/effects";
-import { Pane } from "tweakpane";
+import { type BindingParams, type FolderApi, Pane } from "tweakpane";
+import type { SwirlParticlesParams } from "./swirl-particles";
 
 const PANE_CLASS = "vfx-tweakpane-container";
 
@@ -791,6 +792,108 @@ export function attachClockPane(
         requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
+
+    trackPane(pane);
+    return pane;
+}
+
+// Params that are baked in when the effect is constructed (the state
+// texture size and the firefly split). Changing them rebuilds the effect.
+const SWIRL_REBUILD_KEYS: ReadonlySet<string> = new Set([
+    "count",
+    "fireflyRatio",
+]);
+
+/**
+ * Tweakpane for SwirlParticlesEffect. Binds to a story-owned `params`
+ * object; `apply` copies live edits into the current effect, and
+ * `rebuild` is called when a construction-time param changes.
+ */
+export function attachSwirlParticlesPane(
+    title: string,
+    params: SwirlParticlesParams,
+    cb: { apply: () => void; rebuild: () => void },
+): Pane {
+    const container = document.createElement("div");
+    container.className = PANE_CLASS;
+    container.style.cssText =
+        "position:fixed;top:16px;right:16px;width:280px;z-index:10000;max-height:calc(100vh - 32px);overflow-y:auto";
+    document.body.appendChild(container);
+
+    const pane = new Pane({ container, title, expanded: true });
+    const range = (min: number, max: number, step: number) => ({
+        min,
+        max,
+        step,
+    });
+
+    const onChange = (key: string, last: boolean) => {
+        if (SWIRL_REBUILD_KEYS.has(key)) {
+            // Rebuilding reallocates the state, so wait for the drag to end.
+            if (last) {
+                cb.rebuild();
+            }
+        } else {
+            cb.apply();
+        }
+    };
+    const bind = (
+        folder: FolderApi,
+        key: keyof SwirlParticlesParams,
+        opts: BindingParams = {},
+    ) => {
+        folder
+            .addBinding(params, key, opts)
+            .on("change", (ev) => onChange(key, ev.last));
+    };
+
+    const particles = pane.addFolder({ title: "Particles" });
+    bind(particles, "count", {
+        options: {
+            "65k": 65536,
+            "131k": 131072,
+            "262k": 262144,
+            "524k": 524288,
+            "1M": 1048576,
+        },
+    });
+    bind(particles, "life", range(0.5, 12, 0.1));
+    bind(particles, "pointSize", range(0.5, 5, 0.1));
+    bind(particles, "streak", range(0, 1.5, 0.01));
+
+    const shape = pane.addFolder({ title: "Shape" });
+    bind(shape, "depth", range(0.02, 1, 0.01));
+
+    const flow = pane.addFolder({ title: "Flow" });
+    bind(flow, "speed", range(0, 1, 0.01));
+    bind(flow, "swirl", range(0, 3, 0.05));
+    bind(flow, "curl", range(0, 3, 0.05));
+    bind(flow, "curlScale", range(0.5, 6, 0.1));
+    bind(flow, "attract", range(0, 20, 0.5));
+    bind(flow, "peel", range(0, 1, 0.01));
+
+    const glow = pane.addFolder({ title: "Fireflies & Bloom" });
+    bind(glow, "fireflyRatio", range(0, 0.1, 0.001));
+    bind(glow, "fireflyIntensity", range(0, 20, 0.5));
+    bind(glow, "bloom", range(0, 3, 0.05));
+    bind(glow, "bloomThreshold", range(0, 3, 0.05));
+
+    const camera = pane.addFolder({ title: "Camera" });
+    bind(camera, "orbit", range(0, 1.5, 0.01));
+    bind(camera, "zoom", range(0.3, 3, 0.05));
+
+    const colors = pane.addFolder({ title: "Colors", expanded: false });
+    for (const key of [
+        "deepColor",
+        "midColor",
+        "hotColor",
+        "highlightColor",
+        "fireflyColor",
+        "skyColor",
+        "groundColor",
+    ] as const) {
+        bind(colors, key, { view: "color" });
+    }
 
     trackPane(pane);
     return pane;

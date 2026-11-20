@@ -1038,6 +1038,10 @@ export class SwirlParticlesEffect implements Effect {
 
         if (!this.#still && typeof window !== "undefined") {
             const down = (e: PointerEvent) => {
+                // Don't orbit while using a control panel (Tweakpane).
+                if ((e.target as Element | null)?.closest?.(".tp-rotv")) {
+                    return;
+                }
                 this.#dragging = true;
                 this.#lastPointer = [e.clientX, e.clientY];
             };
