@@ -893,25 +893,9 @@ export type EffectClearOpts = {
 };
 
 /** Options for {@link EffectContext.readPixels}. */
-export type EffectReadPixelsOpts<
-    T extends Uint8Array | Float32Array = Uint8Array | Float32Array,
-> = {
-    /**
-     * Area to read, in the target's px with a bottom-left origin: `[x, y, width, height]`.
-     * Whole pixels inside the target. Default: the whole target.
-     */
-    rect?: readonly [x: number, y: number, width: number, height: number];
-
+export type EffectReadPixelsOpts = {
     /** Return rows top-down (canvas / `ImageData` order) instead of bottom-up. Default: `false`. */
     flipY?: boolean;
-
-    /**
-     * Buffer to read into instead of a new one: a `Uint8Array` for an 8-bit target,
-     * a `Float32Array` for a float one, with at least `width * height * 4` elements.
-     * The pixels fill its start and the promise resolves with it.
-     * Don't touch it until then.
-     */
-    into?: T;
 };
 
 export type EffectDrawOpts = {
@@ -1164,10 +1148,10 @@ export type EffectContext = {
      * }
      * ```
      */
-    readPixels<T extends Uint8Array | Float32Array = Uint8Array | Float32Array>(
+    readPixels(
         target: EffectRenderTarget,
-        opts?: EffectReadPixelsOpts<T>,
-    ): Promise<T>;
+        opts?: EffectReadPixelsOpts,
+    ): Promise<Uint8Array | Float32Array>;
 
     /**
      * Raw WebGL2 context, for low-level operations

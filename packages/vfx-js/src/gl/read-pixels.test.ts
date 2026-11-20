@@ -82,17 +82,8 @@ function makeGl(opts: { pendingPolls?: number } = {}) {
             return GL.SIGNALED;
         }),
         getBufferSubData: vi.fn(
-            (
-                _t: number,
-                _offset: number,
-                dst: Uint8Array | Float32Array,
-                dstOffset: number,
-                len: number,
-            ) => {
-                const src = buffers.get(state.pack as object) ?? [];
-                for (let i = 0; i < len; i++) {
-                    dst[dstOffset + i] = src[i];
-                }
+            (_t: number, _offset: number, dst: Uint8Array | Float32Array) => {
+                dst.set(buffers.get(state.pack as object) ?? []);
             },
         ),
         deleteBuffer: vi.fn(() => deleted.buffers++),
@@ -223,61 +214,6 @@ describe("PixelRead", () => {
         expect([...px]).toEqual([
             1, 0, 0, 255, 1, 1, 0, 255, 0, 0, 0, 255, 0, 1, 0, 255,
         ]);
-    });
-
-    it("reads a rect", async () => {
-        const { gl } = makeGl();
-        const read = new PixelRead(
-            gl,
-            makeFb(),
-            { rect: [1, 1, 1, 1] },
-            () => {},
-        );
-        await vi.runAllTimersAsync();
-        expect([...(await read.promise)]).toEqual([1, 1, 0, 255]);
-    });
-
-    it("reads into the given buffer", async () => {
-        const { gl } = makeGl();
-        const into = new Uint8Array(20);
-        const read = new PixelRead(gl, makeFb(), { into }, () => {});
-        await vi.runAllTimersAsync();
-        expect(await read.promise).toBe(into);
-        expect(into[3]).toBe(255);
-        expect(into[16]).toBe(0);
-    });
-
-    it("rejects a rect outside the target without touching GL", async () => {
-        const { gl, raw } = makeGl();
-        const settled = vi.fn();
-        const read = new PixelRead(
-            gl,
-            makeFb(),
-            { rect: [1, 0, 2, 2] },
-            settled,
-        );
-        expect(read.settled).toBe(true);
-        expect(settled).toHaveBeenCalledWith(read);
-        await expect(read.promise).rejects.toThrow("rect");
-        expect(raw.createBuffer).not.toHaveBeenCalled();
-    });
-
-    it("rejects an into of the wrong type or size", async () => {
-        const { gl } = makeGl();
-        const wrongType = new PixelRead(
-            gl,
-            makeFb({ float: true }),
-            { into: new Uint8Array(16) },
-            () => {},
-        );
-        await expect(wrongType.promise).rejects.toThrow("Float32Array");
-        const tooSmall = new PixelRead(
-            gl,
-            makeFb(),
-            { into: new Uint8Array(15) },
-            () => {},
-        );
-        await expect(tooSmall.promise).rejects.toThrow("Uint8Array");
     });
 
     it("cancel rejects and frees the GL objects", async () => {

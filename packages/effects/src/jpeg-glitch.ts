@@ -335,7 +335,6 @@ export class JPEGGlitchEffect implements Effect {
     #outCanvas: GlitchCanvas | null = null;
     #outCtx: Ctx2D | null = null;
 
-    #raw: Uint8Array = new Uint8Array(0);
     #imageData: ImageData | null = null;
 
     #w = 0;
@@ -516,7 +515,6 @@ export class JPEGGlitchEffect implements Effect {
     #resize(ctx: EffectContext, w: number, h: number): void {
         this.#w = w;
         this.#h = h;
-        this.#raw = new Uint8Array(w * h * 4);
         this.#imageData = new ImageData(w, h);
         if (this.#srcCanvas) {
             this.#srcCanvas.width = w;
@@ -553,9 +551,9 @@ export class JPEGGlitchEffect implements Effect {
         this.#glitchCount++;
 
         // Read the capture back to the CPU without stalling the GPU. Rows
-        // come top-down, ready for ImageData. #busy keeps #raw to this read.
+        // come top-down, ready for ImageData.
         const generation = this.#generation;
-        ctx.readPixels(readRT, { flipY: true, into: this.#raw }).then(
+        ctx.readPixels(readRT, { flipY: true }).then(
             (raw) => {
                 if (generation === this.#generation) {
                     this.#glitchPixels(raw, variant, generation);
@@ -571,7 +569,11 @@ export class JPEGGlitchEffect implements Effect {
     }
 
     // Corrupt the read-back pixels through the JPEG codec (async).
-    #glitchPixels(raw: Uint8Array, variant: number, generation: number): void {
+    #glitchPixels(
+        raw: Uint8Array | Float32Array,
+        variant: number,
+        generation: number,
+    ): void {
         const w = this.#w;
         const h = this.#h;
         const srcCanvas = this.#srcCanvas;
@@ -586,7 +588,7 @@ export class JPEGGlitchEffect implements Effect {
 
         // Force opaque alpha — JPEG has no alpha channel.
         const data = imageData.data;
-        data.set(raw.subarray(0, data.length));
+        data.set(raw);
         for (let i = 3; i < data.length; i += 4) {
             data[i] = 255;
         }
@@ -712,7 +714,6 @@ export class JPEGGlitchEffect implements Effect {
         this.#outCanvas = null;
         this.#outCtx = null;
         this.#imageData = null;
-        this.#raw = new Uint8Array(0);
         this.#hasResult = false;
         this.#busy = false;
         // Forget the processed size so a re-init reallocates the readback RT

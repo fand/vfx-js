@@ -377,10 +377,7 @@ export class EffectHost {
             draw: (opts) => this.#draw(opts),
             blit: (source, target, opts) => this.#blit(source, target, opts),
             clear: (target, opts) => this.#clear(target, opts),
-            readPixels: ((
-                target: EffectRenderTarget,
-                opts?: EffectReadPixelsOpts,
-            ) => this.#readPixels(target, opts)) as EffectContext["readPixels"],
+            readPixels: (target, opts) => this.#readPixels(target, opts),
             resetState: () => this.#resetState(),
             onContextRestored: (cb) => {
                 const unsub = this.#glCtx.onContextRestored(cb);

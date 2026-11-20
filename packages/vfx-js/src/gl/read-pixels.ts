@@ -1,10 +1,8 @@
 import type { Framebuffer } from "./framebuffer.js";
 
-/** Options for {@link startPixelRead}. Mirrors `EffectReadPixelsOpts`. @internal */
+/** Options for {@link PixelRead}. Mirrors `EffectReadPixelsOpts`. @internal */
 export type PixelReadOpts = {
-    rect?: readonly [number, number, number, number];
     flipY?: boolean;
-    into?: Uint8Array | Float32Array;
 };
 
 /** How often a pending read checks its fence, in ms. */
@@ -23,8 +21,7 @@ export class PixelRead {
     #buffer: WebGLBuffer | null = null;
     #sync: WebGLSync | null = null;
     #timer: ReturnType<typeof setTimeout> | undefined;
-    #out: Uint8Array | Float32Array | null = null;
-    #len = 0;
+    #out: Uint8Array | Float32Array = new Uint8Array(0);
     #rowLen = 0;
     #rows = 0;
     #flipY = false;
@@ -68,36 +65,9 @@ export class PixelRead {
 
     #start(fb: Framebuffer, opts: PixelReadOpts | undefined): void {
         const gl = this.#gl;
-        const [x, y, w, h] = opts?.rect ?? [0, 0, fb.width, fb.height];
-        if (
-            ![x, y, w, h].every(Number.isInteger) ||
-            w <= 0 ||
-            h <= 0 ||
-            x < 0 ||
-            y < 0 ||
-            x + w > fb.width ||
-            y + h > fb.height
-        ) {
-            throw new Error(
-                `[VFX-JS] readPixels() rect [${x}, ${y}, ${w}, ${h}] must be whole pixels inside the ${fb.width}x${fb.height} target.`,
-            );
-        }
-        const float = fb.float;
+        const { width: w, height: h, float } = fb;
         const len = w * h * 4;
-        const into = opts?.into;
-        if (into) {
-            const ok = float
-                ? into instanceof Float32Array
-                : into instanceof Uint8Array;
-            if (!ok || into.length < len) {
-                throw new Error(
-                    `[VFX-JS] readPixels() into must be a ${float ? "Float32Array" : "Uint8Array"} of at least ${len} elements for this read.`,
-                );
-            }
-        }
-        this.#out =
-            into ?? (float ? new Float32Array(len) : new Uint8Array(len));
-        this.#len = len;
+        this.#out = float ? new Float32Array(len) : new Uint8Array(len);
         this.#rowLen = w * 4;
         this.#rows = h;
         this.#flipY = opts?.flipY ?? false;
@@ -121,8 +91,8 @@ export class PixelRead {
         );
         gl.bindFramebuffer(gl.READ_FRAMEBUFFER, fb.resolveFbo ?? fb.fbo);
         gl.readPixels(
-            x,
-            y,
+            0,
+            0,
             w,
             h,
             gl.RGBA,
@@ -162,10 +132,10 @@ export class PixelRead {
             this.cancel(new Error("[VFX-JS] readPixels() lost its fence."));
             return;
         }
-        const out = this.#out as Uint8Array | Float32Array;
+        const out = this.#out;
         const prevPack = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.#buffer);
-        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, out, 0, this.#len);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, out);
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prevPack);
         if (this.#flipY) {
             flipRows(out, this.#rowLen, this.#rows);
@@ -190,7 +160,6 @@ export class PixelRead {
             gl.deleteBuffer(this.#buffer);
             this.#buffer = null;
         }
-        this.#out = null;
         this.#onSettle(this);
     }
 }
