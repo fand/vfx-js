@@ -209,14 +209,3 @@ export function rmsSlope(
     }
     return Math.sqrt(s);
 }
-/** RMS height √(ΣA_k²/2) of a range of the table [mm]. */
-export function rmsHeight(
-    data: Float32Array,
-    range: readonly [number, number],
-): number {
-    let s = 0;
-    for (let k = range[0]; k < range[0] + range[1]; k++) {
-        s += data[4 * k + 2] ** 2 / 2;
-    }
-    return Math.sqrt(s);
-}

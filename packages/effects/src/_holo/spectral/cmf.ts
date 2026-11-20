@@ -25,15 +25,6 @@ for (let i = 0; i < QUAD_N; i++) {
     QUAD_WEIGHT[i] = i === 0 || i === QUAD_N - 1 ? 0.5 * QUAD_STEP : QUAD_STEP;
 }
 
-/** ∫₃₆₀⁸³⁰ f(λ) dλ on the shared trapezoid grid. */
-export function integrate(f: (lambdaNm: number) => number): number {
-    let s = 0;
-    for (let i = 0; i < QUAD_N; i++) {
-        s += QUAD_WEIGHT[i] * f(QUAD_LAMBDA[i]);
-    }
-    return s;
-}
-
 // ---------------------------------------------------------------------------------------------------------------
 // Wyman, Sloan & Shirley 2013 multi-lobe fit (JCGT 2(2), Table 1; Appendix A.1). Lobe: a·exp(−½[(λ − b)·(λ < b ? γ : δ)]²).
 // ---------------------------------------------------------------------------------------------------------------
@@ -110,10 +101,6 @@ export function mat3Mul(a: Mat3, b: Mat3): Mat3 {
         }
     }
     return r as unknown as Mat3;
-}
-
-export function mat3Transpose(m: Mat3): Mat3 {
-    return [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]];
 }
 
 export function mat3Inverse(m: Mat3): Mat3 {

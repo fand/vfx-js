@@ -68,19 +68,6 @@ export function fresnelDiel(c: number, nc: number): number {
     return 0.5 * (rs * rs + rp * rp);
 }
 
-/** Grating equation (§4.1, R02 §0): exit direction cosines v = −l + m·λ/d·ĝ of order m, or null if evanescent in air. */
-export function gratingOrder(
-    l: Vec2,
-    m: number,
-    lambdaNm: number,
-    invD: number,
-    g: Vec2,
-): Vec2 | null {
-    const k = m * lambdaNm * invD;
-    const v = { x: -l.x + k * g.x, y: -l.y + k * g.y };
-    return v.x * v.x + v.y * v.y < 1 ? v : null;
-}
-
 /** Piecewise-linear interpolation of a per-node vec4 at λ (nodes 430/510/590/670 nm), constant beyond the end nodes (twin of GLSL `etaAt`). */
 export function etaAt(
     e: ArrayLike<number>,

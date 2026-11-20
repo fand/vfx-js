@@ -54,16 +54,6 @@ export function selectParam<T extends string>(
         : fallback;
 }
 
-/** Boolean value of `id`, or `fallback`. */
-export function boolParam(
-    values: ParamValues,
-    id: string,
-    fallback: boolean,
-): boolean {
-    const v = values[id];
-    return typeof v === "boolean" ? v : fallback;
-}
-
 const TINT_TYPES: readonly TintType[] = ["clear", "longpass", "shortpass"];
 
 /** The tint inputs of a material panel (`<prefix>.tint`, `.tintEdge`, `.tintWidth`, `.tintFloor`, §4.2.6). */

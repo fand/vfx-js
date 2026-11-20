@@ -300,11 +300,6 @@ export function clamp(x: number, lo: number, hi: number): number {
     return Math.min(Math.max(x, lo), hi);
 }
 
-/** Spec of a parameter (range, options), or undefined. */
-export function paramSpec(id: string): ParamSpec | undefined {
-    return SPECS.get(id);
-}
-
 function light(
     v: ParamValues,
     key: string,
@@ -495,16 +490,6 @@ export function linearOfHex(hex: string): [number, number, number] {
         return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
     };
     return [lin((n >> 16) & 255), lin((n >> 8) & 255), lin(n & 255)];
-}
-export function backgroundLinear(
-    bg: Background,
-    hex: string,
-): [number, number, number] {
-    return bg === "white"
-        ? [1, 1, 1]
-        : bg === "colour"
-          ? linearOfHex(hex)
-          : [0, 0, 0];
 }
 /** Lightness of the page for the lighting adaptation: 0 on black, 1 on white, a colour's luminance between. */
 export function backgroundTone(bg: Background, hex: string): number {

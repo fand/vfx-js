@@ -25,7 +25,7 @@ import { EmbossAssets, type LogoImage } from "./_holo/emboss-assets.js";
 import { HoloGlare } from "./_holo/glare.js";
 import outputFrag from "./_holo/glsl/output.js";
 import {
-    FRAG_DECODE_LTC_MAIN,
+    FRAG_DECODE_RGBA_MAIN,
     LTC_IMAGE,
     LTC_SIZE,
     ltcImageBytes,
@@ -593,12 +593,13 @@ void main() {
 }
 `;
 
-const FRAG_DECODE_LTC = `#version 300 es
+/** Decodes a float24 byte image (4 values per output texel) into an RGBA float target: the LTC tables, the logo and the paper maps. */
+const FRAG_DECODE_RGBA = `#version 300 es
 precision highp float;
 precision highp int;
 precision highp sampler2D;
 ${GLSL_DECODE_FLOAT24}
-${FRAG_DECODE_LTC_MAIN}`;
+${FRAG_DECODE_RGBA_MAIN}`;
 
 const FRAG_ZERO = `#version 300 es
 precision highp float;
@@ -1327,7 +1328,7 @@ export class HoloEffect implements Effect {
                 [this.#ltc2, LTC_SIZE],
             ] as const) {
                 ctx.draw({
-                    frag: FRAG_DECODE_LTC,
+                    frag: FRAG_DECODE_RGBA,
                     vert: PLAIN_VERT,
                     target,
                     uniforms: { uBytes: this.#ltcTex, uRowOffset: row },
@@ -1742,7 +1743,7 @@ export class HoloEffect implements Effect {
                         wrap: "clamp",
                     });
                 }
-                this.#upload(ctx, l.image, this.#logoRt, "logo");
+                this.#upload(ctx, l.image, this.#logoRt);
                 this.#logoMap = l.map;
             } else {
                 this.#logoRt?.dispose();
@@ -1763,8 +1764,8 @@ export class HoloEffect implements Effect {
                 mom: ctx.createRenderTarget(opts),
                 aux: ctx.createRenderTarget(opts),
             };
-            this.#upload(ctx, a.paper.mom, this.#paperRt.mom, "mom");
-            this.#upload(ctx, a.paper.aux, this.#paperRt.aux, "aux");
+            this.#upload(ctx, a.paper.mom, this.#paperRt.mom);
+            this.#upload(ctx, a.paper.aux, this.#paperRt.aux);
         }
         return {
             ...print,
@@ -1775,7 +1776,6 @@ export class HoloEffect implements Effect {
             uPaperMom: this.#paperRt?.mom ?? black,
             uPaperAux: this.#paperRt?.aux ?? black,
             uPaperOn: this.#paperRt ? 1 : 0,
-            uPrintTex: black,
         };
     }
 
@@ -1784,7 +1784,6 @@ export class HoloEffect implements Effect {
         ctx: EffectContext,
         img: { w: number; h: number; bytes: Uint8ClampedArray<ArrayBuffer> },
         target: EffectRenderTarget,
-        _what: string,
     ): void {
         const canvas = this.#makeCanvas(4 * img.w, img.h);
         this.#ctx2d(canvas)?.putImageData(
@@ -1797,7 +1796,7 @@ export class HoloEffect implements Effect {
             filter: "nearest",
         });
         ctx.draw({
-            frag: FRAG_DECODE_LTC,
+            frag: FRAG_DECODE_RGBA,
             vert: PLAIN_VERT,
             target,
             uniforms: { uBytes: tex, uRowOffset: 0 },

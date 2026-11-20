@@ -1,4 +1,4 @@
-// LTC tables (data/ltc.ts) as a float24 byte image for the GPU decode pass (FRAG_DECODE_LTC) (one value per pixel, 4 per RGBA texel; table 1 in GPU rows [0, 64), table 2 in [64, 128)).
+// LTC tables (data/ltc.ts) as a float24 byte image for the GPU decode pass (FRAG_DECODE_RGBA) (one value per pixel, 4 per RGBA texel; table 1 in GPU rows [0, 64), table 2 in [64, 128)).
 import { LTC_1, LTC_2 } from "./data/ltc.js";
 import { encodeFloat24, fromHalf } from "./spectral/float24.js";
 
@@ -42,8 +42,8 @@ export function ltcImageBytes(): Uint8ClampedArray<ArrayBuffer> {
     return img;
 }
 
-/** Decodes one 64 × 64 table (uRowOffset 0 or 64) of the byte image into an RGBA float target. */
-export const FRAG_DECODE_LTC_MAIN = `
+/** Decodes the float24 byte image (4 values per output texel, from row uRowOffset) into an RGBA float target: one LTC table (uRowOffset 0 or 64), and the logo and paper maps. */
+export const FRAG_DECODE_RGBA_MAIN = `
 uniform sampler2D uBytes;
 uniform int uRowOffset;
 out vec4 outColor;
