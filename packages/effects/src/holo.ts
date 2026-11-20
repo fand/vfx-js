@@ -399,7 +399,16 @@ function applyInput(st: HoloParams, input: HoloInput): void {
             }
         }
         for (const [id, v] of Object.entries(settings.values)) {
-            if (MM_PLACEMENT.has(id)) {
+            if (
+                (id === "emboss.logo" || id === "emboss.print") &&
+                typeof v === "string" &&
+                /^(\/logos\/|asset:)/.test(v.trim())
+            ) {
+                // holo.spot's own logo marks and its uploaded images do not come with a blob
+                warnOnce(
+                    `HoloEffect: ${id} "${v}" of a holo.spot Copy settings is holo.spot's own image, which HoloEffect does not include; ignored. Set ${id} to an image or a URL.`,
+                );
+            } else if (MM_PLACEMENT.has(id)) {
                 // mm on holo.spot's 63 × 88 mm card; the port's are px of the element
                 warnOnce(
                     `HoloEffect: ${id} of a holo.spot Copy settings is in mm on holo.spot's card; ignored (HoloEffect's is in CSS px).`,
@@ -742,7 +751,8 @@ void main() {
  * - **Port-only params:** `flat`, `mask`, `ink`, `sizeMm`, `msaa`, the `"none"` pointer, `emboss.threshold` and the
  *   element as the emboss logo.
  * - **Changed defaults:** grain is 0.07 (the value holo.spot's looks use), and there is no default emboss logo
- *   (holo.spot's marks are not included).
+ *   (holo.spot's marks are not included). A blob's references to holo.spot's marks or uploaded images
+ *   (`emboss.logo`, `emboss.print`) are ignored with a warning.
  * - **Changed units:** the emboss placement is in px, not mm on holo.spot's 63 × 88 mm card. A blob's mm placement
  *   is ignored.
  * - **Different names:** `studio` instead of `lights`, `startingPoints`, and `flat`, because holospot uses

@@ -331,3 +331,25 @@ test("emboss: the element as the logo, its threshold, and an own print", () => {
     expect(t["emboss.threshold"]).toBe(0.99);
     warn.mockRestore();
 });
+
+test("a Copy settings blob's holo.spot images are ignored with a warning", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const v = new HoloEffect({
+        settings: {
+            holoDev: 1,
+            material: "emboss",
+            values: {
+                "emboss.logo": "/logos/koru.svg",
+                "emboss.print": "asset:print-1",
+                "emboss.foil": "gold",
+            },
+        },
+    }).resolvedSettings();
+    expect(v["emboss.logo"]).toBe(""); // no logo, not a fetch of /logos/koru.svg
+    expect(v["emboss.print"]).toBe("");
+    expect(v["emboss.foil"]).toBe("gold");
+    const msgs = warn.mock.calls.map((c) => String(c[0]));
+    expect(msgs.some((m) => m.includes("/logos/koru.svg"))).toBe(true);
+    expect(msgs.some((m) => m.includes("asset:print-1"))).toBe(true);
+    warn.mockRestore();
+});
