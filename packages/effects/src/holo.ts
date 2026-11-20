@@ -188,8 +188,8 @@ export type HoloParams = {
      */
     settings: HoloSettings;
     /**
-     * Physical size of the element's largest side in mm (the foil has a real grain). `null`: the element's CSS size
-     * at 96 dpi (1 px = 0.2646 mm).
+     * Physical size of the element's largest side in mm (the foil has a real grain). `null` (or a value that is not
+     * a positive number): the element's CSS size at 96 dpi (1 px = 0.2646 mm).
      */
     sizeMm: number | null;
     /**
@@ -1087,10 +1087,16 @@ export class HoloEffect implements Effect {
             return;
         }
         const [ew, eh] = ctx.dims.element;
-        const [pw, ph] = ctx.dims.elementPixel;
+        // a zero-size element (not laid out yet, display: none) is treated as 1 px, so the geometry stays finite
+        const pw = Math.max(ctx.dims.elementPixel[0], 1);
+        const ph = Math.max(ctx.dims.elementPixel[1], 1);
         const w = Math.max(ew, 1);
         const h = Math.max(eh, 1);
-        const largest = this.params.sizeMm ?? Math.max(w, h) * MM_PER_CSS_PX;
+        const given = this.params.sizeMm;
+        const largest =
+            given !== null && Number.isFinite(given) && given > 0
+                ? given
+                : Math.max(w, h) * MM_PER_CSS_PX;
         const k = largest / Math.max(w, h);
         this.#cardSizeMm = [w * k, h * k];
         this.#elemCss = [w, h];
