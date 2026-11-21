@@ -29,7 +29,7 @@ const packages = {
         ".": "src/index.ts",
         "./client": "src/client/index.ts",
     },
-    effects: { ".": "src/index.ts" },
+    effects: { ".": "src/index.ts", "./holo/static": "src/holo-static.ts" },
     transitions: { ".": "src/index.ts" },
 };
 

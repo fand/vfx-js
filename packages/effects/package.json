@@ -5,21 +5,37 @@
   "files": [
     "package.json",
     "README.md",
-        "THIRD_PARTY_NOTICES.md",
+    "THIRD_PARTY_NOTICES.md",
     "lib/"
   ],
   "type": "module",
   "main": "./lib/esm/index.js",
-  "sideEffects": false,
+  "sideEffects": [
+    "./lib/esm/holo-static.js",
+    "./lib/cjs/holo-static.js",
+    "./holo-static.js"
+  ],
   "types": "lib/esm/index.d.ts",
   "exports": {
-    "require": {
-      "types": "./lib/cjs/index.d.ts",
-      "default": "./lib/cjs/index.js"
+    ".": {
+      "require": {
+        "types": "./lib/cjs/index.d.ts",
+        "default": "./lib/cjs/index.js"
+      },
+      "import": {
+        "types": "./lib/esm/index.d.ts",
+        "default": "./lib/esm/index.js"
+      }
     },
-    "import": {
-      "types": "./lib/esm/index.d.ts",
-      "default": "./lib/esm/index.js"
+    "./holo/static": {
+      "require": {
+        "types": "./lib/cjs/holo-static.d.ts",
+        "default": "./lib/cjs/holo-static.js"
+      },
+      "import": {
+        "types": "./lib/esm/holo-static.d.ts",
+        "default": "./lib/esm/holo-static.js"
+      }
     }
   },
   "scripts": {
