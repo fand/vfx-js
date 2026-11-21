@@ -4,7 +4,7 @@
 
 ## holospot
 
-https://github.com/dmitrykurash/holospot
+https://github.com/dmitrykurash/holospot, ported from commit `7ca9873f7834c4952df628fb26b85c78d9639c1d` (2026-11-17). The generated files under `src/_holo/glsl/` and `src/_holo/data/` name the commit in their headers.
 
 ```
 MIT License
