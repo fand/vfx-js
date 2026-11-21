@@ -1010,9 +1010,16 @@ export class HoloEffect implements Effect {
         return Promise.all(materials.map(loadMaterial)).then(() => {});
     }
 
+    /** Counts init / dispose, so an init that awaited across a dispose stops. */
+    #life = 0;
+
     async init(ctx: EffectContext): Promise<void> {
+        const life = ++this.#life;
         // the material's code, before the first frame
         await this.#requestDef(this.#p.material);
+        if (life !== this.#life) {
+            return; // disposed (or initialised again) while loading
+        }
         // after a context loss the render targets come back empty (wrapped canvases are re-uploaded): fill them
         // again from the CPU-side data, which survives
         this.#restoreUnsub = ctx.onContextRestored(() => {
@@ -1904,6 +1911,7 @@ export class HoloEffect implements Effect {
     }
 
     dispose(): void {
+        this.#life++;
         this.#restoreUnsub?.();
         this.#restoreUnsub = null;
         this.#release();
