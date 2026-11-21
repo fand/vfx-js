@@ -5,7 +5,8 @@
 Add `GlassEffect`: the element's silhouette, extruded into 3D, as a block of ray-traced glass with dispersion.
 
 - The silhouette is the element's alpha, read once with `ctx.readPixels`. An opaque photo becomes a slab.
-- Shape: `depth` and `bevel`. Most of the rainbow shows on the bevel.
+- Shape: `depth` and `bevel`. Most of the rainbow shows on the bevel. `bevelShape: "chamfer"` cuts it flat instead of round, and `bulge` / `bulgeWidth` raise the caps in the middle, for lenses and gems.
+- Surface: `bump` / `bumpScale` ripple the normals like hammered glass; `frost` makes it rough, blurring the backdrop (images too, through a mipmapped copy) and the lights.
 - Glass: `ior`, `dispersion`, `bounces` (internal reflections), `tint`, `absorption`, `reflection`.
 - Quality: `paths` rays are traced through the glass per pixel, and `samples` wavelengths are interpolated between them. With `samples` equal to `paths` the channels split into separate bands.
 - `backdrop` is what shows through the glass: a procedural pattern (`"stripes"`, `"grid"`, `"checker"`, `"dots"`, `"noise"`, `"none"`) or an image. `backdropVisible: true` draws it around the glass too. The page behind is not refracted.

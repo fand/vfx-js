@@ -12,7 +12,11 @@ export const SPAWN_SIZE = 256;
 // sdfTex: r = 2D signed distance (world units), gb = its gradient.
 // The 3D shape is that silhouette extruded to [-halfDepth, halfDepth],
 // with edges rounded by \`rounding\`.
-export const GLSL_SDF = `
+//
+// GLSL_SD2 is the 2D lookup and the shape's uniforms, GLSL_EXTRUDE the
+// rounded extrusion; GLSL_SDF is both. An effect with its own extrusion
+// takes GLSL_SD2 and defines `extrude` and `sdf3` itself.
+export const GLSL_SD2 = `
 uniform sampler2D sdfTex;
 uniform vec4 sdfRect;
 uniform float halfDepth;
@@ -28,7 +32,9 @@ vec3 sd2(vec2 p) {
     float gl = length(g);
     return vec3(s.r + lo, gl > 1e-5 ? g / gl : vec2(0.0, 1.0));
 }
+`;
 
+export const GLSL_EXTRUDE = `
 // The extrusion of a 2D sample s (from sd2) at depth z.
 // x = distance, yzw = unit gradient.
 vec4 extrude(vec3 s, float z) {
@@ -48,6 +54,8 @@ vec4 sdf3(vec3 p) {
     return extrude(sd2(p.xy), p.z);
 }
 `;
+
+export const GLSL_SDF = GLSL_SD2 + GLSL_EXTRUDE;
 
 export type ShapeData = {
     /** RGBA: sd (world), gradient xy, 0. */

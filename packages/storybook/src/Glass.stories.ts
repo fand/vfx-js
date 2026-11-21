@@ -226,6 +226,48 @@ export const image: StoryObj<Args> = {
     },
 };
 
+// A rough surface: the image behind blurs with its distance.
+export const frosted: StoryObj<Args> = {
+    args: {
+        source: "VFX-JS logo",
+        backdrop: "image: jellyfish",
+        params: { backdropScale: 1.6, frost: 0.6, dispersion: 0.06 },
+    },
+};
+
+// Hammered glass: rippled normals on a deeper slab.
+export const bumpy: StoryObj<Args> = {
+    args: {
+        source: "amagi",
+        backdrop: "checker",
+        params: {
+            depth: 0.3,
+            bevel: 0.06,
+            bump: 0.5,
+            bumpScale: 0.12,
+            zoom: 1.2,
+        },
+    },
+};
+
+// Chamfered edges and caps that rise in the middle, like a cut stone.
+export const gem: StoryObj<Args> = {
+    args: {
+        source: "HTML button",
+        backdrop: "stripes",
+        params: {
+            depth: 0.12,
+            bevel: 0.05,
+            bevelShape: "chamfer",
+            bulge: 0.1,
+            bulgeWidth: 0.2,
+            dispersion: 0.2,
+            paths: 3,
+            zoom: 1.2,
+        },
+    },
+};
+
 export const htmlText: StoryObj<Args> = {
     args: { source: "HTML text", backdrop: "stripes" },
 };
