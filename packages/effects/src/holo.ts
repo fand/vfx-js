@@ -1345,6 +1345,14 @@ export class HoloEffect implements Effect {
             const logo = r.values["emboss.logo"];
             if (logo !== "element") {
                 this.#capHash = ""; // the next element readback installs its logo again
+                if (this.#capPending || this.#capInFlight) {
+                    // a readback of the element (still blank, or on its way) is no longer wanted
+                    this.#capPending = false;
+                    this.#capInFlight = false;
+                    this.#capToken++;
+                    this.#capKey = "";
+                    this.#capTries = 0;
+                }
                 this.#emboss.setLogo(
                     logo as unknown as HoloLogo | undefined,
                     this.#logoReadOpts("ink"),
