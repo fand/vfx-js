@@ -14,12 +14,11 @@ import grating from "./glsl/grating.js";
 import ibl from "./glsl/ibl.js";
 import lights from "./glsl/lights.js";
 import ltc from "./glsl/ltc.js";
-import paper from "./glsl/paper.js";
 import relief from "./glsl/relief.js";
 import spectral from "./glsl/spectral.js";
 import wear from "./glsl/wear.js";
 
-function replaceExact(
+export function replaceExact(
     src: string,
     from: string,
     to: string,
@@ -249,11 +248,3 @@ void main() {
 `;
 
 export { common as GLSL_COMMON };
-
-/** paper.glsl for vfx-js: the printed picture (uPrintTex, three's sRGB texture) is the element (holoPrintSample). */
-export const PAPER = replaceExact(
-    paper,
-    "vec4 c = textureGrad(uPrintTex, clamp(uv, 0.0, 1.0), dx, dy);",
-    "vec4 c = holoPrintSample(clamp(uv, 0.0, 1.0), dx, dy);",
-    "paper print",
-);

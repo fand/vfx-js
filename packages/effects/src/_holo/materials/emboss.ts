@@ -6,10 +6,13 @@
 // needs the volume-hologram assets and is not ported, nor is the multi-element document (`emboss.doc`). The element
 // is the picture printed on the paper (holospot's `emboss.print`), so the print is always on.
 //
-// The paper chunk is shader.ts PAPER (the print read from the element). The textures (logo distance field, paper maps) are built and uploaded by ../emboss-assets.ts; this module holds the
+// The paper chunk is PAPER below (the print read from the element or emboss.print). The textures (logo distance field, paper maps) are built and uploaded by ../emboss-assets.ts; this module holds the
 // uniform conversions of the panel values.
+
+import { EmbossAssets } from "../emboss-assets.js";
 import embossGlsl from "../glsl/emboss.js";
 import fragmentMain from "../glsl/holo-emboss.js";
+import paper from "../glsl/paper.js";
 import {
     EMBOSS_PROFILES,
     type EmbossProfile,
@@ -17,7 +20,7 @@ import {
 } from "../physics/emboss.js";
 import { PAPER_N, PAPER_TILE_MM } from "../scene/paper-maps.js";
 import { linearOfHex } from "../settings.js";
-import { PAPER } from "../shader.js";
+import { replaceExact } from "../shader.js";
 import type {
     GratingSummary,
     ParamValues,
@@ -31,6 +34,14 @@ import {
     selectParam,
     type Uniforms,
 } from "./build.js";
+
+/** paper.glsl for vfx-js: the printed picture (uPrintTex, three's sRGB texture) is the element (holoPrintSample). */
+const PAPER = replaceExact(
+    paper,
+    "vec4 c = textureGrad(uPrintTex, clamp(uv, 0.0, 1.0), dx, dy);",
+    "vec4 c = holoPrintSample(clamp(uv, 0.0, 1.0), dx, dy);",
+    "paper print",
+);
 
 export const FOIL_TYPES = [
     "rainbow",
@@ -115,6 +126,10 @@ export function paperKey(v: ParamValues): {
 
 export const emboss: MaterialDef = {
     id: "emboss",
+    emboss: {
+        createAssets: () => new EmbossAssets(),
+        paperKey,
+    },
     fragmentMain,
     extraChunks: [PAPER, embossGlsl, CLEAR_PAPER],
 

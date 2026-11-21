@@ -21,7 +21,7 @@ import {
     STARTING_POINTS,
 } from "./_holo/data/starting-points.js";
 import { STUDIO_PRESETS } from "./_holo/data/studio-presets.js";
-import { EmbossAssets, type LogoImage } from "./_holo/emboss-assets.js";
+import type { EmbossAssets, LogoImage } from "./_holo/emboss-assets.js";
 import { HoloGlare } from "./_holo/glare.js";
 import outputFrag from "./_holo/glsl/output.js";
 import {
@@ -31,12 +31,12 @@ import {
     ltcImageBytes,
 } from "./_holo/ltc.js";
 import type { MaterialDef, Uniforms } from "./_holo/materials/build.js";
-import { emboss, paperKey } from "./_holo/materials/emboss.js";
-import { nebula } from "./_holo/materials/nebula.js";
-import { prism } from "./_holo/materials/prism.js";
-import { shatter } from "./_holo/materials/shatter.js";
-import { sparkle } from "./_holo/materials/sparkle.js";
-import { vortex } from "./_holo/materials/vortex.js";
+import {
+    isMaterialName,
+    loadedMaterial,
+    loadMaterial,
+    MATERIAL_NAMES,
+} from "./_holo/materials/registry.js";
 import {
     type EnvLevels,
     envLevels,
@@ -82,7 +82,6 @@ import { ATLAS, SpectralAtlas } from "./_holo/spectral/atlas.js";
 import { GLSL_DECODE_FLOAT24 } from "./_holo/spectral/float24.js";
 import { detectTier, TIERS } from "./_holo/tier.js";
 import {
-    type HoloMaterialId,
     type Mat3,
     type ParamValue,
     SPD_IDS,
@@ -390,11 +389,11 @@ function applyInput(st: HoloParams, input: HoloInput): void {
         next = {};
         const m = settings.material;
         if (rest.material === undefined && m !== undefined) {
-            if (Object.hasOwn(MATERIALS, m)) {
+            if (isMaterialName(m)) {
                 st.material = m as HoloMaterial;
             } else {
                 warnOnce(
-                    `HoloEffect: the Copy settings' material "${m}" is not supported (one of ${Object.keys(MATERIALS).join(", ")}); keeping "${st.material}".`,
+                    `HoloEffect: the Copy settings' material "${m}" is not supported (one of ${MATERIAL_NAMES.join(", ")}); keeping "${st.material}".`,
                 );
             }
         }
@@ -511,17 +510,8 @@ const lookEntries = (name: "card" | "object") =>
         },
     ][];
 
-const MATERIALS: Record<HoloMaterialId, MaterialDef> = {
-    prism,
-    shatter,
-    nebula,
-    sparkle,
-    vortex,
-    emboss,
-};
-
 const MM_PER_CSS_PX = 25.4 / 96;
-const MATERIAL_PREFIXES = new Set(Object.keys(MATERIALS));
+const MATERIAL_PREFIXES = new Set<string>(MATERIAL_NAMES);
 /** holospot's framing: the card at rest fills this share of the view (camera FOV 22°). */
 const FRAMING = 0.7;
 /** Vertical field of view [deg] of a focal length (holospot physics/lens.ts lensFovDeg: exactly 22° at 62 mm). */
@@ -746,6 +736,14 @@ void main() {
  * - **Loading:** the logo, paper and print load in the background. `ready` resolves after a frame with them, and
  *   `errors` lists what failed (a cross-origin image needs CORS).
  *
+ * ### Code loading
+ *
+ * Each material's code (its shaders; for `emboss` also the logo and paper builders) is a separate chunk, loaded
+ * when the material is first used. `init` waits for it. After `setParams({ material })` the effect keeps drawing
+ * the previous material until the new one has loaded, and `ready` waits for it. `HoloEffect.preload(...)` loads
+ * materials ahead. `@vfx-js/effects/holo/static` exports the same class with every material built in, for
+ * CommonJS, pages without a bundler, or when a material change must not wait.
+ *
  * ### Differences from holo.spot
  *
  * - **Port-only params:** `flat`, `mask`, `ink`, `sizeMm`, `msaa`, the `"none"` pointer, `emboss.threshold` and the
@@ -875,6 +873,7 @@ export class HoloEffect implements Effect {
     /** Loading errors (a logo that could not be fetched or read, …), newest last; cleared when the input changes. */
     get errors(): readonly string[] {
         return [
+            ...(this.#defError ? [this.#defError] : []),
             ...(this.#emboss?.errors ?? []),
             ...(this.#printError ? [this.#printError] : []),
         ];
@@ -977,13 +976,12 @@ export class HoloEffect implements Effect {
      * the ranges, invalid values dropped). Useful to show a control's current value.
      */
     resolvedSettings(): Readonly<Record<string, HoloSettingValue | HoloLogo>> {
-        if (this.#dirty || !this.#resolved) {
-            this.#resolve();
-        }
-        const r = this.#resolved;
-        if (!r) {
-            return {};
-        }
+        // the settings alone: no material code is needed (it may not be loaded yet)
+        const r = resolveSettings(
+            this.#p.material,
+            "plain",
+            this.#p.settings as Readonly<Record<string, ParamValue>>,
+        );
         // the rest pose in effect (motion.pose / pose when given): x = ry, y = rx
         return { ...r.values, "motion.pose": { x: r.pose.ry, y: r.pose.rx } };
     }
@@ -998,7 +996,18 @@ export class HoloEffect implements Effect {
 
     #restoreUnsub: (() => void) | null = null;
 
-    init(ctx: EffectContext): void {
+    /**
+     * Loads materials' code ahead of use, so switching `material` later draws at once. HoloEffect loads a material's
+     * code (its shaders, and for `emboss` the logo and paper builders) when it is first used; `@vfx-js/effects/holo/static`
+     * has every material built in instead.
+     */
+    static preload(...materials: HoloMaterial[]): Promise<void> {
+        return Promise.all(materials.map(loadMaterial)).then(() => {});
+    }
+
+    async init(ctx: EffectContext): Promise<void> {
+        // the material's code, before the first frame
+        await this.#requestDef(this.#p.material);
         // after a context loss the render targets come back empty (wrapped canvases are re-uploaded): fill them
         // again from the CPU-side data, which survives
         this.#restoreUnsub = ctx.onContextRestored(() => {
@@ -1113,15 +1122,39 @@ export class HoloEffect implements Effect {
             | null;
     }
 
+    /** The material code the current render state was built with. */
+    #renderDef: MaterialDef | null = null;
+    #defError: string | null = null;
+
+    /** Loads a material's code; a failure is listed in `errors`, and the effect keeps drawing what it drew. */
+    #requestDef(m: HoloMaterial): Promise<void> {
+        return loadMaterial(m).then(
+            () => {
+                this.#defError = null;
+                this.#dirty = true;
+            },
+            (e: unknown) => {
+                this.#defError = `HoloEffect: could not load the "${m}" material: ${e instanceof Error ? e.message : String(e)}`;
+                console.warn(this.#defError);
+            },
+        );
+    }
+
     #resolve(): void {
         const p = this.#p;
+        const def = loadedMaterial(p.material);
+        if (!def) {
+            // not loaded yet: keep drawing the current state (dirty stays set) until it is
+            void this.#requestDef(p.material);
+            return;
+        }
+        this.#renderDef = def;
         this.#resolved = resolveSettings(
             p.material,
             "plain",
             p.settings as Readonly<Record<string, ParamValue>>,
         );
         this.#scene = sceneStateFrom(this.#resolved.values);
-        const def = this.#def();
         this.#matUniforms = def.uniforms(this.#resolved.values);
         this.#atlas?.setTint(def.gratingSummary(this.#resolved.values).tint);
         const tier = this.#tier();
@@ -1150,16 +1183,6 @@ export class HoloEffect implements Effect {
             def.fragmentMain,
         );
         this.#dirty = false;
-    }
-
-    #def(): MaterialDef {
-        const def = MATERIALS[this.params.material];
-        if (!def) {
-            throw new Error(
-                `HoloEffect: unknown material "${this.params.material}"`,
-            );
-        }
-        return def;
     }
 
     /** holospot's camera: vertical FOV from the lens, at (0, 0, D) looking down −Z (column-major projection × view). */
@@ -1289,8 +1312,9 @@ export class HoloEffect implements Effect {
             this.#prevLightPos.set(this.#lights.pos);
             this.#started = true;
         }
-        if (this.params.material === "emboss") {
-            this.#emboss ??= new EmbossAssets();
+        const embossDef = this.#renderDef?.emboss;
+        if (embossDef) {
+            this.#emboss ??= embossDef.createAssets();
             // a URL, or an image given in settings (kept by reference); "element" is read back in render
             const logo = r.values["emboss.logo"];
             if (logo !== "element") {
@@ -1300,10 +1324,10 @@ export class HoloEffect implements Effect {
                     this.#logoReadOpts("ink"),
                 );
             }
-            this.#emboss.setPaper(paperKey(r.values));
+            this.#emboss.setPaper(embossDef.paperKey(r.values));
         }
         this.#eta = etaFrame(
-            this.#def().gratingSummary(r.values),
+            (this.#renderDef as MaterialDef).gratingSummary(r.values),
             this.#lights,
             rot,
             this.#camPos,
@@ -1384,8 +1408,7 @@ export class HoloEffect implements Effect {
         const binW = this.#binW.fill(0);
         binW.set(bins.W);
 
-        const emb =
-            this.params.material === "emboss" ? this.#embossUniforms(ctx) : {};
+        const emb = this.#renderDef?.emboss ? this.#embossUniforms(ctx) : {};
         const persp = !this.params.flat;
         const card = {
             uCardRot: this.#cardRot,
@@ -1398,7 +1421,7 @@ export class HoloEffect implements Effect {
         };
         // the emboss paper is the whole card
         const mask =
-            this.params.material === "emboss"
+            this.#renderDef?.id === "emboss"
                 ? MASKS.none
                 : (MASKS[this.params.mask] ?? 0);
         if (persp) {

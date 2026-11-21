@@ -2,6 +2,7 @@
 // transparent emboss ground's define, outputRect, the element readback, and the print while emboss.print loads.
 import type { EffectContext, EffectDims } from "@vfx-js/core";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { loadedMaterial } from "./_holo/materials/registry.js";
 import { HoloEffect } from "./holo.js";
 
 type Uniforms = Record<string, unknown>;
@@ -206,7 +207,7 @@ describe("HoloEffect lifecycle", () => {
     test("ready resolves after a frame is drawn", async () => {
         const { ctx, draws } = makeCtx();
         const fx = new HoloEffect();
-        fx.init?.(ctx);
+        await fx.init?.(ctx);
         const ready = fx.ready;
         expect(await settled(ready)).toBe("pending");
         frame(fx, ctx);
@@ -220,7 +221,7 @@ describe("HoloEffect lifecycle", () => {
             material: "emboss",
             settings: { "emboss.logo": "element" },
         });
-        fx.init?.(ctx);
+        await fx.init?.(ctx);
         frame(fx, ctx);
         const ready = fx.ready; // emboss: the paper build is still pending
         expect(await settled(ready)).toBe("pending");
@@ -229,16 +230,16 @@ describe("HoloEffect lifecycle", () => {
         expect(hasRestoreListener()).toBe(false);
 
         draws.length = 0;
-        fx.init?.(ctx);
+        await fx.init?.(ctx);
         expect(() => frame(fx, ctx)).not.toThrow(); // nothing disposed is drawn with
         expect(draws.some(isMaterial)).toBe(true);
         expect(readPixels).toHaveBeenCalledTimes(2); // the element is read again
     });
 
-    test("a restored context uploads the tables again", () => {
+    test("a restored context uploads the tables again", async () => {
         const { ctx, draws, restore } = makeCtx();
         const fx = new HoloEffect();
-        fx.init?.(ctx);
+        await fx.init?.(ctx);
         frame(fx, ctx);
         const decodes = () =>
             draws.filter((d) => d.uniforms && "uBytes" in d.uniforms).length;
@@ -251,7 +252,7 @@ describe("HoloEffect lifecycle", () => {
         expect(decodes()).toBeGreaterThan(first);
     });
 
-    test("outputRect: the element's rect flat, grown in 3D", () => {
+    test("outputRect: the element's rect flat, grown in 3D", async () => {
         const dims = { elementPixel: [100, 200] } as unknown as EffectDims;
         expect(
             new HoloEffect({ flat: true }).outputRect?.(dims),
@@ -270,10 +271,10 @@ describe("HoloEffect emboss with the element as the logo", () => {
         settings: { "emboss.logo": "element" },
     };
 
-    test("the transparent ground's define follows emboss.paperColour", () => {
+    test("the transparent ground's define follows emboss.paperColour", async () => {
         const { ctx, draws } = makeCtx();
         const fx = new HoloEffect(element);
-        fx.init?.(ctx);
+        await fx.init?.(ctx);
         frame(fx, ctx);
         expect(lastMaterial(draws)?.frag).toMatch(/#define HOLO_CLEAR_PAPER\b/);
         fx.setParams({ settings: { "emboss.paperColour": "#ffffff" } });
@@ -290,7 +291,7 @@ describe("HoloEffect emboss with the element as the logo", () => {
         ]);
         const { ctx, readPixels } = makeCtx({ w: 2, h: 2, pixels });
         const fx = new HoloEffect(element);
-        fx.init?.(ctx);
+        await fx.init?.(ctx);
         frame(fx, ctx);
         expect(readPixels).toHaveBeenCalledTimes(1);
         expect(readPixels.mock.calls[0][1]).toEqual({ flipY: true });
@@ -309,7 +310,7 @@ describe("HoloEffect emboss with the element as the logo", () => {
     test("the element is read once at a time, and not again on an unrelated setParams", async () => {
         const { ctx, readPixels } = makeCtx();
         const fx = new HoloEffect(element);
-        fx.init?.(ctx);
+        await fx.init?.(ctx);
         frame(fx, ctx);
         frame(fx, ctx); // the first read is still on its way
         expect(readPixels).toHaveBeenCalledTimes(1);
@@ -352,7 +353,7 @@ describe("HoloEffect emboss with the element as the logo", () => {
             material: "emboss",
             settings: { "emboss.print": img as unknown as HTMLImageElement },
         });
-        fx.init?.(ctx);
+        await fx.init?.(ctx);
         frame(fx, ctx);
         expect(printOn(draws)).toBe(0); // loading: no print, and not wrapped at 0 × 0
         expect(wrapped).not.toContain(img);
@@ -363,7 +364,7 @@ describe("HoloEffect emboss with the element as the logo", () => {
         expect(wrapped).toContain(img);
     });
 
-    test("no print while emboss.print loads; the element is the print otherwise", () => {
+    test("no print while emboss.print loads; the element is the print otherwise", async () => {
         const loading = makeCtx();
         const fx = new HoloEffect({
             material: "emboss",
@@ -372,14 +373,43 @@ describe("HoloEffect emboss with the element as the logo", () => {
                 "emboss.print": "/print.png",
             },
         });
-        fx.init?.(loading.ctx);
+        await fx.init?.(loading.ctx);
         frame(fx, loading.ctx);
         expect(printOn(loading.draws)).toBe(0);
 
         const plain = makeCtx();
         const fy = new HoloEffect({ material: "emboss" });
-        fy.init?.(plain.ctx);
+        await fy.init?.(plain.ctx);
         frame(fy, plain.ctx);
         expect(printOn(plain.draws)).toBe(1);
+    });
+});
+
+// vortex and nebula are not used above, so they start unloaded in this file
+describe("HoloEffect loads a material's code on first use", () => {
+    test("switching material keeps drawing the current one until the new one has loaded", async () => {
+        const { ctx, draws } = makeCtx();
+        const fx = new HoloEffect();
+        await fx.init?.(ctx);
+        frame(fx, ctx);
+        expect(lastMaterial(draws)?.frag).toMatch(/#define MATERIAL_PRISM /);
+        expect(loadedMaterial("vortex")).toBeUndefined();
+        fx.setParams({ material: "vortex" });
+        frame(fx, ctx); // vortex is on its way: still prism
+        expect(lastMaterial(draws)?.frag).toMatch(/#define MATERIAL_PRISM /);
+        const ready = fx.ready;
+        await vi.waitFor(() => expect(loadedMaterial("vortex")).toBeDefined());
+        frame(fx, ctx);
+        expect(lastMaterial(draws)?.frag).toMatch(/#define MATERIAL_VORTEX /);
+        expect(await settled(ready)).toBe("ready");
+    });
+
+    test("preload loads ahead; resolvedSettings needs no material code", async () => {
+        expect(loadedMaterial("nebula")).toBeUndefined();
+        const v = new HoloEffect({ material: "nebula" }).resolvedSettings();
+        expect(typeof v["nebula.size"]).toBe("number");
+        expect(loadedMaterial("nebula")).toBeUndefined();
+        await HoloEffect.preload("nebula");
+        expect(loadedMaterial("nebula")).toBeDefined();
     });
 });

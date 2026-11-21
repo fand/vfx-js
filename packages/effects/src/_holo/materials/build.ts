@@ -1,5 +1,7 @@
 // Shared helpers of the material definitions (holospot engine/materials/build.ts, MIT © 2026 Dmitry Kurash).
+
 import type { EffectUniformValue } from "@vfx-js/core";
+import type { EmbossAssets } from "../emboss-assets.js";
 import type {
     GratingSummary,
     ParamValues,
@@ -23,6 +25,16 @@ export interface MaterialDef {
     defines(tier: TierConfig): Record<string, string | number>;
     gratingSummary(values: ParamValues): GratingSummary;
     relief(values: ParamValues): ReliefInputs;
+    /** Foil Emboss only: its textures (logo and paper maps, built in a worker) and the paper maps' key. */
+    emboss?: {
+        createAssets(): EmbossAssets;
+        paperKey(values: ParamValues): {
+            stock: number;
+            fibreAmount: number;
+            fibreScale: number;
+            seed: number;
+        };
+    };
 }
 
 /** Numeric value of `id`, or `fallback` when it is missing or not a finite number. */
