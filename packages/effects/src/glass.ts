@@ -51,6 +51,13 @@ export type GlassImageSource =
     | ImageBitmap
     | string;
 
+/**
+ * A {@link GlassParams.debug} view: the SDF lookups spent per pixel on
+ * finding the surface (`"outer"`), on tracing inside the glass
+ * (`"inner"`), or both (`"total"`).
+ */
+export type GlassDebugView = "off" | "outer" | "inner" | "total";
+
 export type GlassParams = {
     /** Extrusion depth, relative to the long side of the element (= 2). */
     depth: number;
@@ -142,6 +149,12 @@ export type GlassParams = {
      * the whole canvas.
      */
     pad: number | "fullscreen";
+    /**
+     * Show the cost of each pixel instead of the glass, as a heat map of
+     * SDF lookups: black 0, blue 64, green 128, yellow 192, red 256,
+     * white 320 or more.
+     */
+    debug: GlassDebugView;
 };
 
 export type GlassEffectOptions = {
@@ -177,6 +190,7 @@ const DEFAULT_PARAMS: GlassParams = {
     drag: false,
     resolution: 1,
     pad: "fullscreen",
+    debug: "off",
 };
 
 const PATTERN_MODES: Record<GlassPatternName, number> = {
@@ -188,6 +202,12 @@ const PATTERN_MODES: Record<GlassPatternName, number> = {
     noise: 5,
 };
 const IMAGE_MODE = 6;
+const DEBUG_VIEWS: Record<GlassDebugView, number> = {
+    off: 0,
+    outer: 1,
+    inner: 2,
+    total: 3,
+};
 const MAX_PATHS = 4;
 const MAX_SAMPLES = 16;
 const MAX_BOUNCES = 6;
@@ -240,6 +260,7 @@ uniform vec3 backdropB;
 
 uniform float lightIntensity;
 uniform float lightSoftness;
+uniform int debugView;
 
 const int MAX_PATHS = ${MAX_PATHS};
 const int MAX_SAMPLES = ${MAX_SAMPLES};
@@ -411,6 +432,17 @@ vec3 normalAt(vec3 p) {
     return extrude(sd2Smooth(p.xy), p.z).yzw;
 }
 
+// Heat map of a count of SDF lookups, 64 per colour step.
+vec4 heat(float n) {
+    float x = clamp(n / 64.0, 0.0, 5.0);
+    vec3 c = mix(vec3(0.0), vec3(0.0, 0.0, 1.0), clamp(x, 0.0, 1.0));
+    c = mix(c, vec3(0.0, 1.0, 0.0), clamp(x - 1.0, 0.0, 1.0));
+    c = mix(c, vec3(1.0, 1.0, 0.0), clamp(x - 2.0, 0.0, 1.0));
+    c = mix(c, vec3(1.0, 0.0, 0.0), clamp(x - 3.0, 0.0, 1.0));
+    c = mix(c, vec3(1.0), clamp(x - 4.0, 0.0, 1.0));
+    return vec4(c, 1.0);
+}
+
 // Slab test against the shape's bounding box. x = near, y = far.
 vec2 boundsHit(vec3 ro, vec3 rd) {
     vec3 b = vec3(shapeHalf + 0.01, halfDepth + 0.01);
@@ -439,9 +471,11 @@ void main() {
 
     vec2 tb = boundsHit(ro, rd);
     if (tb.x > tb.y || tb.y < 0.0) {
-        outColor = vec4(miss, missA);
+        outColor = debugView != 0 ? heat(0.0) : vec4(miss, missA);
         return;
     }
+    float outerCount = 0.0;
+    float innerCount = 0.0;
     float t = max(tb.x, 0.0);
     bool hit = false;
     vec4 s;
@@ -453,6 +487,7 @@ void main() {
     float tNearest = t;
     for (int i = 0; i < OUTER_STEPS; i++) {
         s = sdf3(ro + rd * t);
+        outerCount += 1.0;
         if (s.x < HIT) {
             hit = true;
             break;
@@ -470,7 +505,9 @@ void main() {
     float coverage = 1.0;
     if (!hit) {
         if (nearest >= 1.0) {
-            outColor = vec4(miss, missA);
+            outColor = debugView != 0
+                ? heat(debugView == 2 ? 0.0 : outerCount)
+                : vec4(miss, missA);
             return;
         }
         // Shade the closest point as the edge of the glass.
@@ -519,6 +556,7 @@ void main() {
             vec4 si;
             for (int i = 0; i < INNER_STEPS; i++) {
                 si = sdf3(p + d * ti);
+                innerCount += 1.0;
                 float di = -si.x;
                 // At the wall, and heading out of it.
                 if (di < HIT && dot(d, si.yzw) > 0.0) {
@@ -589,6 +627,13 @@ void main() {
     }
     col += acc / max(wsum, vec3(1e-4));
 
+    if (debugView != 0) {
+        outColor = heat(
+            (debugView != 2 ? outerCount : 0.0)
+                + (debugView != 1 ? innerCount : 0.0)
+        );
+        return;
+    }
     outColor = mix(
         vec4(miss, missA),
         vec4(col, backdropMode == 0 ? 0.0 : 1.0),
@@ -604,6 +649,7 @@ precision highp float;
 in vec2 uv;
 uniform sampler2D scene;
 uniform int hasScene;
+uniform int raw;
 out vec4 outColor;
 
 vec3 softClip(vec3 x) {
@@ -617,6 +663,10 @@ void main() {
         return;
     }
     vec4 s = texture(scene, uv);
+    if (raw != 0) {
+        outColor = s;
+        return;
+    }
     vec3 col = softClip(max(s.rgb, 0.0));
     float a = clamp(max(s.a, max(col.r, max(col.g, col.b))), 0.0, 1.0);
     outColor = vec4(min(col, a), a);
@@ -770,9 +820,14 @@ export class GlassEffect implements Effect {
             uniforms: {
                 scene: scene ?? ctx.src,
                 hasScene: scene ? 1 : 0,
+                raw: this.#debugView() !== 0 ? 1 : 0,
             },
             target: ctx.target,
         });
+    }
+
+    #debugView(): number {
+        return DEBUG_VIEWS[this.params.debug] ?? 0;
     }
 
     #drawGlass(ctx: EffectContext): EffectRenderTarget | null {
@@ -864,6 +919,7 @@ export class GlassEffect implements Effect {
                 backdropB: hexToRgb(p.backdropColors[1]),
                 lightIntensity: Math.max(p.lightIntensity, 0),
                 lightSoftness: Math.min(Math.max(p.lightSoftness, 0), 1),
+                debugView: this.#debugView(),
             },
             target: scene,
         });
