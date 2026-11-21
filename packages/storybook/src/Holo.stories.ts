@@ -63,6 +63,8 @@ export const holo: StoryObj<undefined> = {
         return img;
     },
     args: undefined,
+    // animated (wobble, grain) and loads its material and logo in the background: no stable snapshot
+    parameters: { chromatic: { disableSnapshot: true } },
 };
 
 holo.play = async ({ canvasElement }) => {
