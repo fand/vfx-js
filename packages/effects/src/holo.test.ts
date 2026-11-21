@@ -52,8 +52,62 @@ test("looks carry the quality holospot ships them with; msaa is on by default", 
     expect(HoloEffect.looks.object.quality).toBe("low");
     expect(HoloEffect.looks.image.quality).toBe("medium");
     expect(new HoloEffect().params.quality).toBe("medium");
-    expect(new HoloEffect().params.msaa).toBe(true);
+    expect(new HoloEffect().config.msaa).toBe(true);
 });
+
+test("the config comes last and setParams takes params or a config, told apart by their keys", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fx = new HoloEffect(
+        HoloEffect.looks.card,
+        { material: "shatter", exposure: 1 },
+        { flat: true, sourceChannel: "luminance" },
+    );
+    expect(fx.params.material).toBe("shatter");
+    expect(fx.params.settings["display.ev"]).toBe(1);
+    expect(fx.config).toEqual({
+        sizeMm: null,
+        sourceChannel: "luminance",
+        ink: 0,
+        flat: true,
+        msaa: true,
+    });
+    expect("flat" in fx.params).toBe(false);
+    fx.setParams({ ink: 0.5 });
+    fx.setParams({ material: "nebula" });
+    expect(fx.config.ink).toBe(0.5);
+    expect(fx.config.flat).toBe(true);
+    expect(fx.params.material).toBe("nebula");
+    expect(warn).not.toHaveBeenCalled();
+    // a param in a config is ignored, with a warning
+    // @ts-expect-error: params and config are separate arguments
+    fx.setParams({ flat: false, material: "vortex" });
+    expect(fx.params.material).toBe("nebula");
+    expect(fx.config.flat).toBe(false);
+    expect(
+        warn.mock.calls.some((c) => String(c[0]).includes('"material"')),
+    ).toBe(true);
+    warn.mockRestore();
+});
+
+test("an unknown param warns", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // @ts-expect-error: not a param
+    new HoloEffect({ mask: "luma" });
+    expect(
+        warn.mock.calls.some((c) =>
+            String(c[0]).includes('unknown param "mask"'),
+        ),
+    ).toBe(true);
+    warn.mockRestore();
+});
+
+// types only: the config can only be the last argument
+() => {
+    // @ts-expect-error: the config comes last
+    new HoloEffect({ flat: true }, { exposure: 1 });
+    new HoloEffect({ exposure: 1 }, { flat: true });
+    new HoloEffect({ flat: true });
+};
 
 test("scene shorthands write settings ids: later values win, whichever way they are written", () => {
     const fx = new HoloEffect({

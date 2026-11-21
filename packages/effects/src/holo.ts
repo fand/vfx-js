@@ -101,7 +101,8 @@ export type HoloMaterial =
 /**
  * The artwork of the `emboss` material's foil logo (`emboss.logo`): an image, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG
  * (fetched, so a cross-origin URL needs CORS; an `<img>` from another origin needs `crossOrigin`). Transparent areas
- * carry no foil; an opaque image is read by its contrast against its border (see `mask`), cut at `emboss.threshold`.
+ * carry no foil; an opaque image is read by its contrast against its border (see `sourceChannel`), cut at
+ * `emboss.threshold`.
  * `""` is no logo. `"element"` makes the element itself the logo (read back once, and again on a resize or when
  * `emboss.logo` is given again, so a still element): the paper is then plain, and without `emboss.print` and
  * `emboss.paperColour` the ground is transparent, so only the foil logo is drawn.
@@ -120,8 +121,11 @@ export type HoloLogo =
  * picks one from the device as holospot does: `low` on phones, `high` on discrete and Apple GPUs, else `medium`.
  */
 export type HoloQuality = "auto" | "low" | "medium" | "high";
-/** Where the foil is: where the element is opaque, where it is bright, or the whole element rect. */
-export type HoloMask = "alpha" | "luma" | "none";
+/**
+ * Which channel of a source is read as a shape: its alpha, its luminance, or none (the whole rect). The source is the
+ * element (where the foil is), or for `emboss` the logo image (where it is pressed).
+ */
+export type HoloSourceChannel = "alpha" | "luminance" | "none";
 /** A 2D value of a holo.spot setting (pads such as `studio.panel.dir`, `motion.pose`). */
 export type HoloVec2 = { x: number; y: number };
 /**
@@ -185,8 +189,8 @@ export type HoloCopyBlob = Readonly<{
     [key: string]: unknown;
 }>;
 
-/** The effect's params, as `effect.params` holds them. */
-export type HoloParams = {
+/** The holo.spot params in effect, as `effect.params` holds them: everything given so far. */
+export type HoloCurrentParams = {
     /** Foil material. */
     material: HoloMaterial;
     /**
@@ -195,23 +199,40 @@ export type HoloParams = {
      */
     settings: HoloSettings;
     /**
-     * Physical size of the element's largest side in mm (the foil has a real grain). `null` (or a value that is not
-     * a positive number): the element's CSS size at 96 dpi (1 px = 0.2646 mm).
-     */
-    sizeMm: number | null;
-    /**
      * Quality tier (holospot's `quality` option). Default `"medium"`, what holospot ships without a look; the looks
      * set their own (`object` is `"low"`).
      */
     quality: HoloQuality;
     /**
-     * Where the foil is. For `emboss`, whose paper is the whole card, how the logo image is read instead: `"alpha"`
-     * (holospot's: its alpha, or an opaque image's contrast against its border) or `"luma"` (its brightness).
+     * Scale of the foil's structure, 0.25–4 (holo.spot `object.structureScale`; 1 = as designed): shards (`shatter`),
+     * flakes (`nebula`), dots (`sparkle`), the paper's tooth and the logo's relief (`emboss`), the relief waves. Above
+     * 1 they get smaller, below 1 larger. The gratings keep their pitch: the colours do not change, and the emboss
+     * logo keeps its size and place (`emboss.x` / `emboss.y` / `emboss.width`, in px).
      */
-    mask: HoloMask;
+    structureScale: number;
+};
+
+/**
+ * HoloEffect's own config, as `effect.config` holds it: how the element becomes holospot's card. holo.spot has none
+ * of these (its card is a fixed 63 × 88 mm card with its own artwork). Pass it as the constructor's last argument,
+ * or to `setParams`.
+ */
+export type HoloEffectConfig = {
     /**
-     * How much the element's colour tints the foil as a translucent ink, in [0, 1]. 0: bare foil. All materials but
-     * `emboss`, whose element is printed on the paper instead (`emboss.printInk`).
+     * Physical size of the element's largest side in mm (the foil has a real grain). `null` (or a value that is not
+     * a positive number): the element's CSS size at 96 dpi (1 px = 0.2646 mm). Default `null`.
+     */
+    sizeMm: number | null;
+    /**
+     * Which channel of the element is read as the foil's shape: `"alpha"` (where it is opaque; default),
+     * `"luminance"` (where it is bright; the element shows where there is no foil) or `"none"` (the whole element
+     * rect). For `emboss`, whose paper is the whole card, it is how the logo image is read instead: `"alpha"`
+     * (holospot's: its alpha, or an opaque image's contrast against its border) or `"luminance"`.
+     */
+    sourceChannel: HoloSourceChannel;
+    /**
+     * How much the element's colour tints the foil as a translucent ink, in [0, 1]. 0: bare foil (default). All
+     * materials but `emboss`, whose element is printed on the paper instead (`emboss.printInk`).
      */
     ink: number;
     /**
@@ -226,15 +247,8 @@ export type HoloParams = {
      */
     flat: boolean;
     /**
-     * Scale of the foil's structure, 0.25–4 (holo.spot `object.structureScale`; 1 = as designed): shards (`shatter`),
-     * flakes (`nebula`), dots (`sparkle`), the paper's tooth and the logo's relief (`emboss`), the relief waves. Above
-     * 1 they get smaller, below 1 larger. The gratings keep their pitch: the colours do not change, and the emboss
-     * logo keeps its size and place (`emboss.x` / `emboss.y` / `emboss.width`, in px).
-     */
-    structureScale: number;
-    /**
      * 4× multisampling of the card target (half float), as holospot renders. Smooths the card's outline when it
-     * turns. Default `true`.
+     * turns. Default `true`; `false` saves memory (about 5× the card target's).
      */
     msaa: boolean;
 };
@@ -280,27 +294,66 @@ export type HoloSceneParams = {
 };
 
 /**
- * What the constructor and `setParams` take: any of the params, the scene shorthands, and `settings` as ids or a
- * holo.spot Copy settings blob.
+ * The holo.spot params the constructor and `setParams` take: the material, quality and structure scale, the scene
+ * shorthands, and `settings` as ids or a holo.spot Copy settings blob. They compose: later values win, and `settings`
+ * merge by id.
  */
-export type HoloInput = Partial<Omit<HoloParams, "settings">> &
+export type HoloParams = Partial<Omit<HoloCurrentParams, "settings">> &
     Partial<HoloSceneParams> & {
         settings?: HoloSettings | HoloCopyBlob;
     };
 
-const DEFAULT_PARAMS: HoloParams = {
+const DEFAULT_PARAMS: HoloCurrentParams = {
     material: "prism",
     settings: {},
-    sizeMm: null,
     quality: "medium",
-    mask: "alpha",
+    structureScale: 1,
+};
+
+const DEFAULT_CONFIG: HoloEffectConfig = {
+    sizeMm: null,
+    sourceChannel: "alpha",
     ink: 0,
     flat: false,
-    structureScale: 1,
     msaa: true,
 };
 
 const PARAM_KEYS = new Set(Object.keys(DEFAULT_PARAMS));
+const CONFIG_KEYS = new Set(Object.keys(DEFAULT_CONFIG));
+const SCENE_KEYS = new Set<string>([
+    "exposure",
+    "tone",
+    "glare",
+    "grain",
+    "studio",
+    "background",
+    "bow",
+    "pose",
+    "lens",
+    "pointer",
+    "tiltRange",
+    "wobble",
+    "wobbleAmp",
+] satisfies (keyof HoloSceneParams)[]);
+
+/** A config, not params: it has a config key (the two have no key in common). */
+const isConfigInput = (
+    input: HoloParams | Partial<HoloEffectConfig>,
+): input is Partial<HoloEffectConfig> =>
+    Object.keys(input).some((k) => CONFIG_KEYS.has(k));
+
+/** Applies a config over the current one, in place. */
+function applyConfig(c: HoloEffectConfig, input: Partial<HoloEffectConfig>) {
+    for (const [k, v] of Object.entries(input)) {
+        if (!CONFIG_KEYS.has(k)) {
+            warnOnce(
+                `HoloEffect: "${k}" is not a config key (${[...CONFIG_KEYS].join(", ")}); ignored. Pass the holo.spot params (material, settings, …) in their own argument.`,
+            );
+        } else if (v !== undefined) {
+            (c as Record<string, unknown>)[k] = v;
+        }
+    }
+}
 /** holo.spot entities whose blobs HoloEffect draws as they are meant (the rest are drawn as the flat card). */
 const BLOB_ENTITIES = new Set(["card", "object", "image", "plain"]);
 /** The emboss logo's placement: CSS px here, mm on holo.spot's card in a Copy settings blob. */
@@ -382,7 +435,7 @@ const isSettingValue = (v: unknown): v is HoloSettingValue =>
  * brings its material; everything else merges by id. A light rig (`studio.preset`) or a material preset select
  * (`emboss.stock`) writes its values where it is given, so ids given after it win and ids given before it lose.
  */
-function applyInput(st: HoloParams, input: HoloInput): void {
+function applyInput(st: HoloCurrentParams, input: HoloParams): void {
     const { settings, ...rest } = input;
     const writes: Record<string, HoloSettingValue | null> = {};
     let next: Record<string, HoloSettingValue> = { ...st.settings } as Record<
@@ -443,8 +496,12 @@ function applyInput(st: HoloParams, input: HoloInput): void {
     }
     Object.assign(writes, sceneWrites(rest));
     for (const [k, v] of Object.entries(rest)) {
-        if (PARAM_KEYS.has(k) && v !== undefined) {
-            (st as Record<string, unknown>)[k] = v;
+        if (PARAM_KEYS.has(k)) {
+            if (v !== undefined) {
+                (st as Record<string, unknown>)[k] = v;
+            }
+        } else if (!SCENE_KEYS.has(k)) {
+            warnOnce(`HoloEffect: unknown param "${k}"; ignored.`);
         }
     }
     // presets first, so the ids given with them win
@@ -482,7 +539,7 @@ function lookParams(
     ])[],
     quality: Exclude<HoloQuality, "auto">,
     material?: HoloMaterial,
-): HoloInput {
+): HoloParams {
     const values: Record<string, ParamValue> = {};
     for (const [, e] of entries) {
         Object.assign(values, e.values);
@@ -537,7 +594,11 @@ function perspectiveMargin(w: number, h: number): [number, number] {
     const k = (1 / FRAMING - 1) / 2;
     return [Math.ceil(w * k), Math.ceil(h * k)];
 }
-const MASKS: Record<HoloMask, number> = { alpha: 0, luma: 1, none: 2 };
+const SOURCE_CHANNELS: Record<HoloSourceChannel, number> = {
+    alpha: 0,
+    luminance: 1,
+    none: 2,
+};
 /** uWave without relief waves. */
 const NO_WAVES = new Float32Array(128);
 const TONES = { neutral: 0, agx: 1, clamp: 2 } as const;
@@ -697,13 +758,18 @@ void main() {
  * - The environment is a prefiltered octahedral atlas (an importance-sampled GGX lobe per level) instead of three's
  *   PMREM.
  * - The pose is the port's: a spring toward the rest pose plus the pointer tilt, and an idle wobble.
- * - The foil's coverage comes from the element (`mask`), and `ink` tints the foil with its colours.
+ * - The foil's shape comes from the element (`sourceChannel`), and `ink` tints the foil with its colours.
  *
- * ### Inputs and settings
+ * ### Params and config
  *
- * The constructor takes any number of inputs and `setParams` applies one more. They apply in order, and later
- * values win. `settings` are holo.spot ids (`HoloSettingId`), merged by id. `null` removes an id, so the default or
- * the look's value applies again. `setParams(input, { resetSettings: true })` starts the settings over.
+ * The constructor takes any number of holo.spot params (`HoloParams`), then optionally the effect's own config
+ * (`HoloEffectConfig`: `sizeMm`, `sourceChannel`, `ink`, `flat`, `msaa`), which says how the element becomes the
+ * card: `new HoloEffect(HoloEffect.looks.card, { exposure: 1 }, { flat: true })`. `setParams` takes either; the two
+ * have no key in common, so it tells them apart by their keys. `effect.params` and `effect.config` hold them.
+ *
+ * The params apply in order, and later values win. `settings` are holo.spot ids (`HoloSettingId`), merged by id.
+ * `null` removes an id, so the default or the look's value applies again. `setParams(params, { resetSettings: true })`
+ * starts the settings over.
  *
  * - **Looks:** `HoloEffect.looks` are the looks holo.spot ships: their scene in `settings`, and the quality holospot
  *   ships each with. Pass a look as its own argument, not spread into an object that has its own `settings`.
@@ -734,7 +800,7 @@ void main() {
  * `material: "emboss"` is a paper card with a foil logo pressed into it, and the whole element is the paper.
  *
  * - **Logo:** `emboss.logo` takes a URL, an `<img>`, a canvas or an `ImageBitmap`. Without one there is no logo.
- *   The logo is cut into foil / no foil: `mask` picks how the image is read (`"alpha"` or `"luma"`), and
+ *   The logo is cut into foil / no foil: `sourceChannel` picks how the image is read (`"alpha"` or `"luminance"`), and
  *   `emboss.threshold` sets where it is cut. A photo becomes a one-tone stamp.
  * - **Placement:** in CSS px of the element. `emboss.x` and `emboss.y` are the logo's centre from the top left,
  *   and `emboss.width` its width. Unset, the logo is centred at 36/63 of the element's width.
@@ -756,8 +822,8 @@ void main() {
  *
  * ### Differences from holo.spot
  *
- * - **Port-only params:** `flat`, `mask`, `ink`, `sizeMm`, `msaa`, the `"none"` pointer, `emboss.threshold` and the
- *   element as the emboss logo.
+ * - **Port-only:** the config (`sizeMm`, `sourceChannel`, `ink`, `flat`, `msaa`), the `"none"` pointer,
+ *   `emboss.threshold` and the element as the emboss logo.
  * - **Changed defaults:** grain is 0.07 (the value holo.spot's looks use), and there is no default emboss logo
  *   (holo.spot's marks are not included). A blob's references to holo.spot's marks or uploaded images
  *   (`emboss.logo`, `emboss.print`) are ignored with a warning.
@@ -774,7 +840,8 @@ void main() {
  * the package's `THIRD_PARTY_NOTICES.md`.
  */
 export class HoloEffect implements Effect {
-    #p: HoloParams = { ...DEFAULT_PARAMS };
+    #p: HoloCurrentParams = { ...DEFAULT_PARAMS };
+    #c: HoloEffectConfig = { ...DEFAULT_CONFIG };
 
     #resolved: Resolved | null = null;
     #scene: SceneState | null = null;
@@ -836,37 +903,66 @@ export class HoloEffect implements Effect {
     #started = false;
 
     /**
-     * Takes any number of inputs, applied in order: later ones win, and `settings` merge by id. So a look, a material
-     * starting point and your own values compose:
-     * `new HoloEffect(HoloEffect.looks.card, HoloEffect.startingPoints.prism.compactDisc, { exposure: 1 })`.
+     * Takes any number of holo.spot params, applied in order (later ones win, and `settings` merge by id), then
+     * optionally the effect's config. So a look, a material starting point and your own values compose:
+     * `new HoloEffect(HoloEffect.looks.card, HoloEffect.startingPoints.prism.compactDisc, { exposure: 1 }, { flat: true })`.
      */
-    constructor(...inputs: HoloInput[]) {
+    constructor(
+        ...inputs:
+            | (HoloParams & { [K in keyof HoloEffectConfig]?: never })[]
+            | [
+                  ...(HoloParams & { [K in keyof HoloEffectConfig]?: never })[],
+                  Partial<HoloEffectConfig> & {
+                      [K in keyof HoloParams]?: never;
+                  },
+              ]
+    ) {
         for (const input of inputs) {
-            applyInput(this.#p, input);
+            this.#apply(input);
         }
     }
 
-    /** The params in effect (read-only; change them with `setParams`). Scene shorthands are in `settings`. */
-    get params(): Readonly<HoloParams> {
+    /** The holo.spot params in effect (read-only; change them with `setParams`). Scene shorthands are in `settings`. */
+    get params(): Readonly<HoloCurrentParams> {
         return this.#p;
     }
 
+    /** The effect's config in effect (read-only; change it with `setParams`). */
+    get config(): Readonly<HoloEffectConfig> {
+        return this.#c;
+    }
+
     /**
-     * Applies an input over the current params, as one more constructor argument would: later values win, `settings`
-     * merge by id. With `{ resetSettings: true }` the settings start over from holo.spot's defaults first (to switch
-     * looks, for example).
+     * Applies holo.spot params over the current ones, as one more constructor argument would (later values win,
+     * `settings` merge by id), or a config over the current config. With `{ resetSettings: true }` the settings start
+     * over from holo.spot's defaults first (to switch looks, for example).
      */
-    setParams(input: HoloInput, opts?: { resetSettings?: boolean }): void {
+    setParams(
+        input:
+            | (HoloParams & { [K in keyof HoloEffectConfig]?: never })
+            | (Partial<HoloEffectConfig> & { [K in keyof HoloParams]?: never }),
+        opts?: { resetSettings?: boolean },
+    ): void {
         if (opts?.resetSettings) {
             this.#p.settings = {};
         }
-        applyInput(this.#p, input);
+        this.#apply(input);
         this.#dirty = true;
         this.#defFailed = null; // a material that failed to load is tried again
         // the element as the logo is read again when emboss.logo is given again (after the element changed)
-        const settings = input.settings as Record<string, unknown> | undefined;
+        const settings = (input as HoloParams).settings as
+            | Record<string, unknown>
+            | undefined;
         if (settings && "emboss.logo" in settings) {
             this.#capGen++;
+        }
+    }
+
+    #apply(input: HoloParams | Partial<HoloEffectConfig>): void {
+        if (isConfigInput(input)) {
+            applyConfig(this.#c, input);
+        } else {
+            applyInput(this.#p, input);
         }
     }
 
@@ -927,9 +1023,9 @@ export class HoloEffect implements Effect {
      * ```
      */
     static readonly looks: Readonly<{
-        card: HoloInput;
-        object: HoloInput;
-        image: HoloInput;
+        card: HoloParams;
+        object: HoloParams;
+        image: HoloParams;
     }> = Object.freeze({
         card: lookParams(lookEntries("card"), "medium"),
         object: lookParams(lookEntries("object"), "low"),
@@ -1094,7 +1190,7 @@ export class HoloEffect implements Effect {
 
     /** The card target (float, the output's size) and the 3d view's base layer, with `msaa` (4× half float). */
     #ensureHdr(ctx: EffectContext): void {
-        const samples = this.params.msaa ? 4 : 1;
+        const samples = this.#c.msaa ? 4 : 1;
         if (this.#hdr && this.#samples === samples) {
             return;
         }
@@ -1118,7 +1214,7 @@ export class HoloEffect implements Effect {
     outputRect(
         dims: EffectDims,
     ): readonly [number, number, number, number] | undefined {
-        if (this.params.flat) {
+        if (this.#c.flat) {
             return undefined;
         }
         const [w, h] = dims.elementPixel;
@@ -1261,7 +1357,7 @@ export class HoloEffect implements Effect {
         const ph = Math.max(ctx.dims.elementPixel[1], 1);
         const w = Math.max(ew, 1);
         const h = Math.max(eh, 1);
-        const given = this.params.sizeMm;
+        const given = this.#c.sizeMm;
         const largest =
             given !== null && Number.isFinite(given) && given > 0
                 ? given
@@ -1274,7 +1370,7 @@ export class HoloEffect implements Effect {
         this.#domainMm = [w * k * ss, h * k * ss];
         const fov = lensFovDeg(s.lensMm);
         const tanHalf = Math.tan((fov * Math.PI) / 360);
-        const view3d = !this.params.flat;
+        const view3d = !this.#c.flat;
         let D = framingDistance(
             w / h,
             this.#cardSizeMm[0] / 2000,
@@ -1461,7 +1557,7 @@ export class HoloEffect implements Effect {
         binW.set(bins.W);
 
         const emb = this.#renderDef?.emboss ? this.#embossUniforms(ctx) : {};
-        const persp = !this.params.flat;
+        const persp = !this.#c.flat;
         const card = {
             uCardRot: this.#cardRot,
             uPrevCardRot: this.#prevCardRot,
@@ -1474,8 +1570,8 @@ export class HoloEffect implements Effect {
         // the emboss paper is the whole card
         const mask =
             this.#renderDef?.id === "emboss"
-                ? MASKS.none
-                : (MASKS[this.params.mask] ?? 0);
+                ? SOURCE_CHANNELS.none
+                : (SOURCE_CHANNELS[this.#c.sourceChannel] ?? 0);
         if (persp) {
             ctx.clear(this.#hdr);
             if (mask === 1) {
@@ -1550,7 +1646,7 @@ export class HoloEffect implements Effect {
                 uDebugLight: 1,
                 uPrintSrc: ctx.src,
                 uMask: mask,
-                uInk: Math.min(Math.max(this.params.ink, 0), 1),
+                uInk: Math.min(Math.max(this.#c.ink, 0), 1),
             },
         });
 
@@ -1626,12 +1722,12 @@ export class HoloEffect implements Effect {
         };
     }
 
-    /** How the logo image is read: `mask` picks alpha (holospot's coverage) or luma, `emboss.threshold` the cut. */
+    /** How the logo image is read: `sourceChannel` picks alpha (holospot's coverage) or luminance, `emboss.threshold` the cut. */
     #logoReadOpts(frame: "ink" | "full"): LogoReadOpts {
         const t = this.#resolved?.values["emboss.threshold"];
         return {
             frame,
-            read: this.#p.mask === "luma" ? "luma" : "auto",
+            read: this.#c.sourceChannel === "luminance" ? "luma" : "auto",
             threshold: typeof t === "number" ? t : 0.5,
         };
     }

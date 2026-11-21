@@ -42,10 +42,10 @@ export {
 } from "./halftone.js";
 export {
     type HoloCopyBlob,
+    type HoloCurrentParams,
     HoloEffect,
-    type HoloInput,
+    type HoloEffectConfig,
     type HoloLogo,
-    type HoloMask,
     type HoloMaterial,
     type HoloParams,
     type HoloPointer,
@@ -54,6 +54,7 @@ export {
     type HoloSettingSpec,
     type HoloSettings,
     type HoloSettingValue,
+    type HoloSourceChannel,
     type HoloStartingPoint,
     type HoloStartingPoints,
     type HoloStudio,

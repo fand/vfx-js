@@ -2,12 +2,12 @@ import type { Meta, StoryObj } from "@storybook/html-vite";
 import type { VFX } from "@vfx-js/core";
 import {
     HoloEffect,
-    type HoloMask,
     type HoloMaterial,
     type HoloPointer,
     type HoloQuality,
     type HoloSettingSpec,
     type HoloSettingValue,
+    type HoloSourceChannel,
     type HoloStartingPoint,
     type HoloStudio,
     type HoloTone,
@@ -95,6 +95,7 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         const p = makePane("Holo");
         pane = p;
         const params = effect.params;
+        const config = effect.config;
         const v = effect.resolvedSettings();
 
         p.addBinding(ui, "source", { options: opts(Object.keys(SOURCES)) }).on(
@@ -111,12 +112,12 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         const general = {
             material: params.material,
             quality: params.quality,
-            mask: params.mask,
-            flat: params.flat,
+            sourceChannel: config.sourceChannel,
+            flat: config.flat,
             lens: typeof v["dof.lens"] === "number" ? v["dof.lens"] : 62,
-            msaa: params.msaa,
+            msaa: config.msaa,
             structureScale: params.structureScale,
-            ink: params.ink,
+            ink: config.ink,
         };
         fx.addBinding(general, "material", { options: opts(MATERIALS) }).on(
             "change",
@@ -162,17 +163,19 @@ function attachHoloPane(effect: HoloEffect, img: HTMLImageElement, vfx: VFX) {
         }).on("change", (ev) =>
             effect.setParams({ quality: ev.value as HoloQuality }),
         );
-        fx.addBinding(general, "mask", {
-            options: opts<HoloMask>(["alpha", "luma", "none"]),
+        fx.addBinding(general, "sourceChannel", {
+            options: opts<HoloSourceChannel>(["alpha", "luminance", "none"]),
         }).on("change", (ev) =>
-            effect.setParams({ mask: ev.value as HoloMask }),
+            effect.setParams({
+                sourceChannel: ev.value as HoloSourceChannel,
+            }),
         );
         // flat: the card stays and the light rig turns; otherwise the card turns, seen through the lens
         fx.addBinding(general, "flat").on("change", (ev) => {
             effect.setParams({ flat: ev.value });
             rebuild();
         });
-        if (!params.flat) {
+        if (!config.flat) {
             fx.addBinding(general, "lens", { min: 24, max: 200, step: 1 }).on(
                 "change",
                 (ev) => effect.setParams({ lens: ev.value }),
