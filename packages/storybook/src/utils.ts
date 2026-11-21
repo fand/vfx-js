@@ -928,6 +928,7 @@ export function attachSwirlParticlesPane(
     bind(light, "lightColor", { view: "color" });
     bind(light, "lightIntensity", range(0, 3, 0.01));
     bind(light, "ambient", range(0, 1, 0.01));
+    bind(light, "occlusion", range(0, 1, 0.01));
     bind(light, "glint", range(0, 3, 0.01));
 
     const shadow = light.addFolder({ title: "Shadow" });

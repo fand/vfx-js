@@ -168,6 +168,12 @@ export type SwirlParticlesParams = {
     lightIntensity: number;
     /** Light on the side facing away from the light, in [0, 1]. */
     ambient: number;
+    /**
+     * How much the creases of the shape darken, in [0, 1]. At 0.7 (the
+     * default) a fibre deep in a crease keeps 30% of its light; 0 turns
+     * the darkening off.
+     */
+    occlusion: number;
     /** Strength of the glints on the fibres that face the light. */
     glint: number;
     /**
@@ -254,6 +260,7 @@ const DEFAULT_PARAMS: SwirlParticlesParams = {
     lightColor: "#ffffff",
     lightIntensity: 1,
     ambient: 0.25,
+    occlusion: 0.7,
     glint: 0.7,
     shadow: false,
     shadowOpacity: 0.35,
@@ -654,6 +661,7 @@ uniform vec3 lightDir;
 uniform vec3 lightColor;
 uniform float lightIntensity;
 uniform float ambient;
+uniform float occlusion;
 uniform float glintAmount;
 #endif
 #ifdef SHADOW
@@ -839,7 +847,7 @@ void main() {
     float wrap = 0.5 + 0.5 * ndl;
     // Cheap occlusion: how far the field is clear along the normal.
     float aoDist = sdf3(pa + s.yzw * 0.07).x;
-    float ao = mix(0.3, 1.0, clamp(aoDist / 0.07, 0.0, 1.0));
+    float ao = mix(1.0 - occlusion, 1.0, clamp(aoDist / 0.07, 0.0, 1.0));
     vec3 col = base * (ambient + 0.9 * lightIntensity * wrap * lightColor) * ao;
     // Some fibres catch the light.
     float glint = pow(max(ndl, 0.0), 3.0) * step(0.65, fract(r * 7.13));
@@ -2113,6 +2121,7 @@ export class SwirlParticlesEffect implements Effect {
                 lightColor: hexToRgb(p.lightColor),
                 lightIntensity: p.lightIntensity,
                 ambient: p.ambient,
+                occlusion: p.occlusion,
                 glintAmount: p.glint,
             },
             target: scene,
