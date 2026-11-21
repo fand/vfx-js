@@ -12,6 +12,7 @@ import {
     GlitchEffect,
     GradientMapEffect,
     HalftoneEffect,
+    HoloEffect,
     HueShiftEffect,
     JPEGGlitchEffect,
     LightStreakEffect,
@@ -209,6 +210,12 @@ export const effectDemos: EffectDemo[] = [
         text: "RGB or CMYK halftone screen.",
         media: "pigeon",
         create: () => new HalftoneEffect(),
+    },
+    {
+        name: "HoloEffect",
+        text: "Holographic foil from holo.spot. Move the pointer over it to tilt.",
+        media: "logo",
+        create: () => new HoloEffect(HoloEffect.looks.card),
     },
     {
         name: "HueShiftEffect",

@@ -44,6 +44,7 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `GlitchEffect` | Block shift and aberration glitch. |
 | `GradientMapEffect` | Map luminance to a color gradient. |
 | `HalftoneEffect` | RGB / CMYK halftone screen. |
+| `HoloEffect` | Holographic foil (holo.spot materials): rainbow foil, gold shatter, glitter, sparkle, spiral, foil-embossed paper. Tilts with the pointer. |
 | `HueShiftEffect` | Rotate hue. |
 | `JPEGGlitchEffect` | Real JPEG glitch: corrupts the encoded bytes. |
 | `LightStreakEffect` | Anamorphic flare / starburst streaks. |
@@ -65,6 +66,37 @@ For the exact params, read the `.d.ts` files in `node_modules/@vfx-js/effects/li
 | `VignetteEffect` | Vignette. |
 | `VoronoiEffect` | Voronoi cells around the cursor. |
 | `WarpEffect` | Sine wave, twist or ripple warp. |
+
+### `HoloEffect`
+
+Physically based holographic foil, ported from [holospot](https://github.com/dmitrykurash/holospot) (the renderer of holo.spot).
+The element is a flat card lit by holo.spot's spectral studio lights; the pointer tilts it.
+
+```ts
+import { HoloEffect } from "@vfx-js/effects";
+
+await vfx.add(el, {
+    effect: new HoloEffect({
+        material: "prism", // "prism" | "shatter" | "nebula" | "sparkle" | "vortex" | "emboss"
+        settings: { "prism.pitch": 1200, "prism.pattern": "radial", "display.ev": 0.8 },
+        mask: "alpha", // foil where the element is opaque; "luma" or "none"
+    }),
+});
+```
+
+- `settings` takes holo.spot's setting ids (`<material>.*`, `studio.*` lights, `display.*`, `grain.*`, `card.*`, `motion.*`, `scene.*`, `dof.lens`; typed as `HoloSettingId`), or the blob holo.spot's "Copy settings" button (`</>` in the Object tab) copies: that reproduces the scene, its material included unless `material` is given. The ids, ranges and meanings are in holospot's `docs/materials/<material>.md` and `docs/scene-settings.md`. Values are checked: out of range is clamped, bad values and unknown ids are dropped, with a console warning. holo.spot ids the port does not render (depth-of-field blur `dof.*` but `dof.lens`, bump maps `bump.*`, card borders `card.corner` etc., `display.wideGamut`) warn when set away from holospot's default.
+- Inputs apply in order and later values win; `settings` merge by id, `null` removes an id. The constructor takes several inputs; `setParams(input)` applies one more (`setParams(input, { resetSettings: true })` starts the settings over from holo.spot's defaults). `effect.params` is read-only.
+- The effect starts from holo.spot's parameter defaults. `HoloEffect.looks.card`, `.object` and `.image` (emboss) are the looks holo.spot ships (their scene in `settings`, plus the `quality` holospot ships them with); `HoloEffect.startingPoints.<material>.<name>` (holo.spot's starting points, e.g. `.prism.compactDisc`, `.shatter.squareTiles`, `.nebula.starfield`) set the material: `new HoloEffect(HoloEffect.looks.card, HoloEffect.startingPoints.prism.compactDisc, { exposure: 1 })`. Pass a look as its own argument, not spread into an object with its own `settings`.
+- Scene shorthands write holo.spot ids where they are given (`null` removes them): `exposure` (`display.ev`, ±3), `tone` (`display.tone`: `"neutral"`, `"agx"`, `"clamp"`), `glare` (`display.glare`, 0–0.1), `grain` (`grain.amount`, 0–0.6, default 0.07; 0 = off), `studio` (`studio.preset`: `"studio"`, `"spot"`, `"softbox"`, `"strip"`, `"dark"`, `"desk"`, `"office"`, `"raking"`; the rig goes over earlier lights, single `studio.*` lights given later win), `background` (`scene.background`: `"black"`, `"white"`, `#rgb` or `#rrggbb`: the page the lighting adapts to), `bow` (`card.bow`, mm, 0–2), `pose` (`motion.pose`, `{ x, y }` degrees, ±35), `lens` (`dof.lens`, focal length in mm, 24–200: the 3D view's field of view, no blur), `pointer` (`motion.pointer`: `"tilt"`, `"light"` moves a flashlight, `"flash"` lights from the camera, `"none"`), `tiltRange` (`motion.tiltRange`, 5–35°), `wobble` (`motion.wobble`), `wobbleAmp` (`motion.wobbleAmp`, 0–25°).
+- `sizeMm` is the real size of the element's largest side (the foil has a physical grain). Default: CSS size at 96 dpi.
+- `quality`: `"low"` for phones, `"medium"` (default), `"high"`, or `"auto"` (picked from the device as holospot does).
+- `ink` (0–1) tints the foil with the element's colours, like a translucent ink.
+- `flat: true` keeps the card facing the viewer where the element is, and the tilt turns the light rig the other way instead. By default the card turns in 3D as holo.spot draws it (the output grows by about 21 % on each side).
+- `structureScale` (0.25–4, default 1; holo.spot's `object.structureScale`) scales shards, flakes, dots and the paper: above 1 is finer, below 1 coarser. The colours stay the same.
+- `material: "emboss"` is a paper card with a foil logo pressed into it; the whole element rect is the paper (`mask` does not cut it; for emboss it picks how the logo image is read, see below). The element is the picture printed on the paper, not the logo; `settings["emboss.logo"]` takes the logo's artwork (an `<img>`, a canvas, an `ImageBitmap`, or the URL of an SVG or PNG; transparent areas get no foil): `new HoloEffect({ material: "emboss", settings: { "emboss.logo": img } })`. Without one there is no logo, only the paper. `"emboss.logo": "element"` makes the element itself the logo (a still element: it is read back once, and again on a resize or when `emboss.logo` is given again, e.g. `setParams({ settings: { "emboss.logo": "element" } })` after the element changed); the ground is then `emboss.print` or `emboss.paperColour`, and transparent without both, so CSS can show what is behind. `emboss.print` (an image, a canvas, an `ImageBitmap` or a URL, fitted like `background-size: cover`) is printed on the paper instead of the element in either mode; while it loads, and if it fails, the paper is plain. The logo is cut into foil / no foil: `mask` (`"alpha"`, `"luma"`) picks how the image is read and `emboss.threshold` (0.01–0.99, default 0.5) where it is cut, so a photo becomes a one-tone stamp; prepare it (posterise, line art) for finer results. A URL or `<img>` from another origin needs CORS (`crossOrigin` on the `<img>`). The logo and the paper load in the background: `await effect.ready` waits for a frame with them, and `effect.errors` lists what failed. Place and shape it with `emboss.*` settings (placement in CSS px of the element, unlike holo.spot's mm: `emboss.x` / `emboss.y` the logo's centre from the element's top left, `emboss.width` its width; unset, it is centred at 36/63 of the element's width, or fills the element when the element is the logo; `structureScale` scales its relief and the paper, not its size; `emboss.rotation` in degrees, counter-clockwise as on holo.spot; a holo.spot Copy settings' mm placement is ignored; `emboss.foil`: `"rainbow"`, `"concentric"`, `"sparkle"`, `"silver"`, `"gold"`, `emboss.profile`, `emboss.stock`, …). Hologram stickers and multi-element cards of holo.spot are not supported. A Copy settings blob of holo.spot's cloth, stickers or flag is drawn as the flat card, with a warning.
+- `msaa` (default `true`, as holospot renders) is 4× multisampling of the card; it smooths the card's outline when it turns. Set `false` to save memory (it costs about 5× the card target's).
+- Each material's code (its shaders; for `emboss` also the logo and paper builders) loads when the material is first used, as a separate chunk: `init` waits for it, and after `setParams({ material })` the effect keeps drawing the previous material until the new one has loaded (`ready` waits for it). `HoloEffect.preload("shatter", "emboss")` loads materials ahead. `import { HoloEffect } from "@vfx-js/effects/holo/static"` is the same class with every material built in (one bundle, nothing loaded later): use it for one file, or when a material change must not wait for code.
+- For a settings UI: `HoloEffect.settingSpecs(material)` lists every supported holo.spot id with its kind, range and options, and `effect.resolvedSettings()` returns the values in effect.
 
 Live demos: https://amagi.dev/vfx-js/storybook
 
