@@ -137,10 +137,40 @@ function mulberry32(seed: number): () => number {
     };
 }
 
+// In-place box blur of `n` values at `start + i * stride`, over
+// [i - r, i + r] clipped to the line.
+function boxBlur1d(
+    data: Float32Array,
+    start: number,
+    stride: number,
+    n: number,
+    r: number,
+    line: Float32Array,
+): void {
+    for (let i = 0; i < n; i++) {
+        line[i] = data[start + i * stride];
+    }
+    let sum = 0;
+    for (let i = 0; i < Math.min(r, n); i++) {
+        sum += line[i];
+    }
+    for (let i = 0; i < n; i++) {
+        if (i + r < n) {
+            sum += line[i + r];
+        }
+        if (i - r - 1 >= 0) {
+            sum -= line[i - r - 1];
+        }
+        const cnt = Math.min(i + r, n - 1) - Math.max(i - r, 0) + 1;
+        data[start + i * stride] = sum / cnt;
+    }
+}
+
 /**
  * Build the SDF and spawn points from RGBA pixels (bottom-up rows).
- * `smoothPasses` 3x3 blurs soften the pixel staircase of the field; more
- * of them give smoother normals and rounder corners.
+ * The pixel staircase of the field is softened by `smoothPasses` box
+ * blurs of radius `smoothRadius` px: more gives smoother normals and
+ * rounder corners.
  * Returns null when the silhouette is empty.
  */
 export function buildShape(
@@ -149,6 +179,7 @@ export function buildShape(
     mh: number,
     halfDepthHint: number,
     aspect: number,
+    smoothRadius = 1,
     smoothPasses = 1,
 ): ShapeData | null {
     const alphaScale = pixels instanceof Float32Array ? 1 : 1 / 255;
@@ -180,37 +211,24 @@ export function buildShape(
     edt2d(toOut, W, H);
     edt2d(toIn, W, H);
 
-    // Signed distance in px, then 3x3 blurs to soften the staircase.
-    let sd = new Float32Array(W * H);
+    // Signed distance in px, then box blurs to soften the staircase.
+    const sd = new Float32Array(W * H);
     for (let i = 0; i < W * H; i++) {
         sd[i] = inside[i]
             ? -(Math.sqrt(toIn[i]) - 0.5)
             : Math.sqrt(toOut[i]) - 0.5;
     }
-    let tmp = new Float32Array(W * H);
-    for (let pass = 0; pass < Math.max(smoothPasses, 0); pass++) {
-        for (let y = 0; y < H; y++) {
+    const r = Math.max(Math.round(smoothRadius), 0);
+    if (r > 0) {
+        const line = new Float32Array(Math.max(W, H));
+        for (let pass = 0; pass < Math.max(smoothPasses, 0); pass++) {
+            for (let y = 0; y < H; y++) {
+                boxBlur1d(sd, y * W, 1, W, r, line);
+            }
             for (let x = 0; x < W; x++) {
-                let sum = 0;
-                let cnt = 0;
-                for (let dy = -1; dy <= 1; dy++) {
-                    const yy = y + dy;
-                    if (yy < 0 || yy >= H) {
-                        continue;
-                    }
-                    for (let dx = -1; dx <= 1; dx++) {
-                        const xx = x + dx;
-                        if (xx < 0 || xx >= W) {
-                            continue;
-                        }
-                        sum += sd[yy * W + xx];
-                        cnt++;
-                    }
-                }
-                tmp[y * W + x] = sum / cnt;
+                boxBlur1d(sd, x, W, H, r, line);
             }
         }
-        [sd, tmp] = [tmp, sd];
     }
 
     const px = 2 / mLong; // world units per px
