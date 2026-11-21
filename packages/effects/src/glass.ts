@@ -145,6 +145,12 @@ export type GlassParams = {
      */
     resolution: number;
     /**
+     * Smooth the remaining stair steps with FXAA. Refraction on a narrow
+     * bevel changes faster than the pixels can follow; this is the cheap
+     * fix, `resolution: 2` the thorough one.
+     */
+    fxaa: boolean;
+    /**
      * Padding around the element, in CSS px, or `"fullscreen"` to draw on
      * the whole canvas.
      */
@@ -189,6 +195,7 @@ const DEFAULT_PARAMS: GlassParams = {
     zoom: 0.7,
     drag: false,
     resolution: 1,
+    fxaa: true,
     pad: "fullscreen",
     debug: "off",
 };
@@ -454,76 +461,9 @@ vec2 boundsHit(vec3 ro, vec3 rd) {
     return vec2(max(max(lo.x, lo.y), lo.z), min(min(hi.x, hi.y), hi.z));
 }
 
-void main() {
-    vec2 px = uv * bufferPx;
-    vec3 rdV = normalize(vec3((px - centerPx) / focalPx, -1.0));
-    vec3 roV = vec3(0.0, 0.0, camDist);
-    // viewRot maps object to view; its transpose maps back.
-    vec3 ro = roV * viewRot;
-    vec3 rd = rdV * viewRot;
-
-    vec3 miss = vec3(0.0);
-    float missA = 0.0;
-    if (backdropVisible > 0.5) {
-        miss = radiance(roV, rdV) * step(0.5, float(backdropMode));
-        missA = backdropMode == 0 ? 0.0 : 1.0;
-    }
-
-    vec2 tb = boundsHit(ro, rd);
-    if (tb.x > tb.y || tb.y < 0.0) {
-        outColor = debugView != 0 ? heat(0.0) : vec4(miss, missA);
-        return;
-    }
-    float outerCount = 0.0;
-    float innerCount = 0.0;
-    float t = max(tb.x, 0.0);
-    bool hit = false;
-    vec4 s;
-    // Radius of the pixel's cone per unit of distance, and the closest
-    // the ray came to the surface in those radii: the coverage of a ray
-    // that just misses the silhouette.
-    float cone = 0.75 * pixelSize / focalPx;
-    float nearest = 1e9;
-    float tNearest = t;
-    for (int i = 0; i < OUTER_STEPS; i++) {
-        s = sdf3(ro + rd * t);
-        outerCount += 1.0;
-        if (s.x < HIT) {
-            hit = true;
-            break;
-        }
-        float k = s.x / (t * cone);
-        if (k < nearest) {
-            nearest = k;
-            tNearest = t;
-        }
-        t += s.x;
-        if (t > tb.y) {
-            break;
-        }
-    }
-    float coverage = 1.0;
-    if (!hit) {
-        if (nearest >= 1.0) {
-            outColor = debugView != 0
-                ? heat(debugView == 2 ? 0.0 : outerCount)
-                : vec4(miss, missA);
-            return;
-        }
-        // Shade the closest point as the edge of the glass.
-        coverage = 1.0 - nearest;
-        t = tNearest;
-        s = sdf3(ro + rd * t);
-    }
-
-    // One Newton step onto the surface: the march stops anywhere within
-    // HIT of it, which would show as contour lines once refracted.
-    vec3 p0 = ro + rd * t;
-    if (hit) {
-        p0 += rd * min(s.x / max(-dot(rd, s.yzw), 0.1), HIT * 4.0);
-    } else {
-        p0 -= s.yzw * s.x;
-    }
+// The glass seen along rd at surface point p0: the reflection on the
+// outside, plus the light that comes back out of the inside.
+vec3 shade(vec3 p0, vec3 rd, inout float innerCount) {
     vec3 n0 = normalAt(p0);
     float cos0 = clamp(-dot(rd, n0), 0.0, 1.0);
 
@@ -625,8 +565,121 @@ void main() {
         acc += sw * l;
         wsum += sw;
     }
-    col += acc / max(wsum, vec3(1e-4));
+    return col + acc / max(wsum, vec3(1e-4));
+}
 
+void main() {
+    vec2 px = uv * bufferPx;
+    vec3 rdV = normalize(vec3((px - centerPx) / focalPx, -1.0));
+    vec3 roV = vec3(0.0, 0.0, camDist);
+    // viewRot maps object to view; its transpose maps back.
+    vec3 ro = roV * viewRot;
+    vec3 rd = rdV * viewRot;
+
+    vec3 miss = vec3(0.0);
+    float missA = 0.0;
+    if (backdropVisible > 0.5) {
+        miss = radiance(roV, rdV) * step(0.5, float(backdropMode));
+        missA = backdropMode == 0 ? 0.0 : 1.0;
+    }
+
+    vec2 tb = boundsHit(ro, rd);
+    if (tb.x > tb.y || tb.y < 0.0) {
+        outColor = debugView != 0 ? heat(0.0) : vec4(miss, missA);
+        return;
+    }
+    float outerCount = 0.0;
+    float innerCount = 0.0;
+    float t = max(tb.x, 0.0);
+    // Radius of the pixel's cone per unit of distance.
+    float cone = pixelSize / focalPx;
+    // Front to back: what is left to cover, and the colour so far. A ray
+    // that grazes an edge covers part of the pixel with it and goes on
+    // to what is behind, so edges are antialiased by their coverage.
+    float remain = 1.0;
+    // Up to two layers: their surface points and weights. They are
+    // shaded after the march, where screen-space derivatives are valid.
+    vec3 layerP[2];
+    float layerW[2];
+    int layers = 0;
+    bool leaving = false;
+    for (int i = 0; i < OUTER_STEPS; i++) {
+        vec4 s = sdf3(ro + rd * t);
+        outerCount += 1.0;
+        float r = t * cone;
+        float zone = max(HIT, r);
+        if (leaving) {
+            // Step away from the edge that was just grazed.
+            if (s.x > zone) {
+                leaving = false;
+            }
+            t += max(s.x, 3.0 * r);
+        } else if (s.x < zone) {
+            // Near the surface. Step to where the ray would cross its
+            // tangent plane: a ray that hits gets there, one that
+            // grazes a convex edge ends up moving away from it.
+            float k = s.x / r;
+            bool solid = false;
+            for (int j = 0; j < 6; j++) {
+                if (s.x < 0.15 * r) {
+                    solid = true;
+                    break;
+                }
+                float c = dot(rd, s.yzw);
+                if (c > -0.02) {
+                    break;
+                }
+                t += min(s.x / -c, 0.05);
+                s = sdf3(ro + rd * t);
+                outerCount += 1.0;
+                k = min(k, s.x / (t * cone));
+            }
+            float cov = solid ? 1.0 : clamp(1.0 - k, 0.0, 1.0);
+            if (cov > 0.0) {
+                // Onto the surface: the march stops anywhere near it,
+                // which would show as contour lines once refracted.
+                vec3 p0 = ro + rd * t;
+                if (solid) {
+                    p0 += rd * clamp(
+                        s.x / max(-dot(rd, s.yzw), 0.1),
+                        -HIT * 4.0,
+                        HIT * 4.0
+                    );
+                } else {
+                    p0 -= s.yzw * s.x;
+                }
+                if (layers == 0) {
+                    layerP[0] = p0;
+                    layerW[0] = remain * cov;
+                } else {
+                    layerP[1] = p0;
+                    layerW[1] = remain * cov;
+                }
+                remain *= 1.0 - cov;
+                layers++;
+            }
+            if (solid || layers >= 2 || remain < 0.02) {
+                break;
+            }
+            leaving = true;
+            t += max(s.x, 3.0 * r);
+        } else {
+            t += s.x;
+        }
+        if (t > tb.y) {
+            break;
+        }
+    }
+
+    float layerA = backdropMode == 0 ? 0.0 : 1.0;
+    vec4 acc = remain * vec4(miss, missA);
+    if (layers > 0) {
+        acc += layerW[0] * vec4(shade(layerP[0], rd, innerCount), layerA);
+    }
+    if (layers > 1) {
+        acc += layerW[1] * vec4(shade(layerP[1], rd, innerCount), layerA);
+    }
+    outColor = acc;
     if (debugView != 0) {
         outColor = heat(
             (debugView != 2 ? outerCount : 0.0)
@@ -634,11 +687,6 @@ void main() {
         );
         return;
     }
-    outColor = mix(
-        vec4(miss, missA),
-        vec4(col, backdropMode == 0 ? 0.0 : 1.0),
-        coverage
-    );
 }
 `;
 
@@ -670,6 +718,46 @@ void main() {
     vec3 col = softClip(max(s.rgb, 0.0));
     float a = clamp(max(s.a, max(col.r, max(col.g, col.b))), 0.0, 1.0);
     outColor = vec4(min(col, a), a);
+}
+`;
+
+// FXAA (after the public domain FXAA 3 by Timothy Lottes, in its compact
+// form): blur along the local edge direction, unless that reaches past
+// the local luma range. Works on the premultiplied output.
+const FRAG_FXAA = `#version 300 es
+precision highp float;
+in vec2 uv;
+uniform sampler2D srcTex;
+uniform vec2 texel;
+out vec4 outColor;
+
+float luma(vec4 c) {
+    return dot(c.rgb, vec3(0.299, 0.587, 0.114));
+}
+
+void main() {
+    vec4 m = texture(srcTex, uv);
+    float lNW = luma(texture(srcTex, uv + texel * vec2(-1.0, -1.0)));
+    float lNE = luma(texture(srcTex, uv + texel * vec2(1.0, -1.0)));
+    float lSW = luma(texture(srcTex, uv + texel * vec2(-1.0, 1.0)));
+    float lSE = luma(texture(srcTex, uv + texel * vec2(1.0, 1.0)));
+    float lM = luma(m);
+    float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE)));
+    float lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
+    if (lMax - lMin < max(0.03, lMax * 0.1)) {
+        outColor = m;
+        return;
+    }
+    vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), (lNW + lSW) - (lNE + lSE));
+    float reduce = max((lNW + lNE + lSW + lSE) * 0.03125, 1.0 / 128.0);
+    float rcp = 1.0 / (min(abs(dir.x), abs(dir.y)) + reduce);
+    dir = clamp(dir * rcp, vec2(-8.0), vec2(8.0)) * texel;
+    vec4 a = 0.5 * (texture(srcTex, uv + dir * (1.0 / 3.0 - 0.5))
+        + texture(srcTex, uv + dir * (2.0 / 3.0 - 0.5)));
+    vec4 b = a * 0.5 + 0.25 * (texture(srcTex, uv - dir * 0.5)
+        + texture(srcTex, uv + dir * 0.5));
+    float lB = luma(b);
+    outColor = (lB < lMin || lB > lMax) ? a : b;
 }
 `;
 
@@ -716,6 +804,7 @@ export class GlassEffect implements Effect {
     #shape: ShapeData | null = null;
     #mask: EffectRenderTarget | null = null;
     #scene: EffectRenderTarget | null = null;
+    #ldr: EffectRenderTarget | null = null;
 
     #gl: WebGL2RenderingContext | null = null;
     #sdfRaw: WebGLTexture | null = null;
@@ -815,15 +904,40 @@ export class GlassEffect implements Effect {
         }
 
         const scene = this.#drawGlass(ctx);
+        const debug = this.#debugView() !== 0;
+        // FXAA reads the tone-mapped image, so it gets its own target.
+        const [, , ow, oh] = padOutputRect(this.params.pad, ctx.dims);
+        const lw = Math.round(ow);
+        const lh = Math.round(oh);
+        const fxaa =
+            this.params.fxaa && scene !== null && !debug && lw > 0 && lh > 0;
+        if (fxaa && (this.#ldr?.width !== lw || this.#ldr?.height !== lh)) {
+            this.#ldr?.dispose();
+            this.#ldr = ctx.createRenderTarget({
+                size: [lw, lh],
+                filter: "linear",
+            });
+        }
+        const ldr = fxaa ? this.#ldr : null;
         ctx.draw({
             frag: FRAG_COMPOSITE,
             uniforms: {
                 scene: scene ?? ctx.src,
                 hasScene: scene ? 1 : 0,
-                raw: this.#debugView() !== 0 ? 1 : 0,
+                raw: debug ? 1 : 0,
             },
-            target: ctx.target,
+            target: ldr ?? ctx.target,
         });
+        if (ldr) {
+            ctx.draw({
+                frag: FRAG_FXAA,
+                uniforms: {
+                    srcTex: ldr,
+                    texel: [1 / ldr.width, 1 / ldr.height],
+                },
+                target: ctx.target,
+            });
+        }
     }
 
     #debugView(): number {
@@ -1091,6 +1205,8 @@ export class GlassEffect implements Effect {
         this.#mask = null;
         this.#scene?.dispose();
         this.#scene = null;
+        this.#ldr?.dispose();
+        this.#ldr = null;
         this.#shape = null;
         this.#pending = null;
         this.#phase = "capture";
