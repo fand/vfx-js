@@ -84,7 +84,6 @@ export default {
         const vfx = initVFX();
         const still = isChromatic();
         const defaults = new GlassEffect({
-            backdropVisible: true,
             drag: true,
             ...args.params,
         }).params;

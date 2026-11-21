@@ -173,8 +173,8 @@ export type GlassEffectOptions = {
 };
 
 const DEFAULT_PARAMS: GlassParams = {
-    depth: 0.3,
-    bevel: 0.06,
+    depth: 0.2,
+    bevel: 0.03,
     ior: 1.5,
     dispersion: 0.12,
     paths: 2,
